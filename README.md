@@ -1,75 +1,104 @@
-# Vinafit Mobile
+# Vinafit Mobile 💪
 
 A Flutter fitness app with AI-powered pose detection for exercise tracking.
 
-## Prerequisites
+---
 
-Before you begin, ensure you have the following installed:
+## 🚀 For New Team Members - Start Here!
 
-- **Flutter SDK** (>= 3.0.0) - [Install Flutter](https://docs.flutter.dev/get-started/install)
-- **Android Studio** or **VS Code** with Flutter extension
-- **Android SDK** (for Android development)
-- **Xcode** (for iOS development, macOS only)
+### Step 1: Install These First (One-Time Setup)
 
-## Quick Start (3 Steps)
+| What to Install | Why You Need It | Download Link |
+|-----------------|-----------------|---------------|
+| **Flutter SDK** | Framework to build the app (includes Dart) | [📥 Download Flutter](https://docs.flutter.dev/get-started/install/windows) |
+| **Android Studio** | For Android SDK & Emulator | [📥 Download Android Studio](https://developer.android.com/studio) |
+| **VS Code** (recommended) | Code editor | [📥 Download VS Code](https://code.visualstudio.com/) |
 
-### 1. Clone the repository
+> ✅ **Note:** You do NOT need to install Dart separately - it comes with Flutter!
+
+### Step 2: Verify Installation
+
+Open terminal/command prompt and run:
 ```bash
+flutter doctor
+```
+Make sure you see ✅ for Flutter and Android toolchain.
+
+---
+
+### Step 3: Get the Code & Run (5 minutes)
+
+```bash
+# 1. Clone the project
 git clone https://github.com/YOUR_USERNAME/vinafit_mobile.git
+
+# 2. Go into the folder
 cd vinafit_mobile
-```
 
-### 2. Install dependencies
-```bash
+# 3. Download all dependencies (automatic!)
 flutter pub get
-```
 
-### 3. Run the app
-```bash
-# Check connected devices
-flutter devices
-
-# Run on connected device/emulator
+# 4. Connect your phone OR start an emulator, then run:
 flutter run
 ```
 
-## Platform-Specific Setup
+**That's it! The app should launch on your device.** 🎉
 
-### Android
-- Minimum SDK: 21 (Android 5.0)
-- Camera permission required
+---
 
-### iOS
-- Minimum iOS: 12.0
-- Add camera permission description in `ios/Runner/Info.plist`
+## 📱 How to Test on Your Phone
 
-## Common Commands
+### Android Phone:
+1. Enable **Developer Options** on your phone (tap Build Number 7 times in Settings > About)
+2. Enable **USB Debugging** in Developer Options
+3. Connect phone via USB cable
+4. Run `flutter devices` to check if detected
+5. Run `flutter run`
 
-| Command | Description |
-|---------|-------------|
-| `flutter pub get` | Install dependencies |
-| `flutter run` | Run in debug mode |
-| `flutter run --release` | Run in release mode |
-| `flutter build apk` | Build Android APK |
-| `flutter build ios` | Build iOS app |
-| `flutter clean` | Clean build files |
-| `flutter doctor` | Check environment setup |
+### Android Emulator:
+1. Open Android Studio → Device Manager → Create Virtual Device
+2. Choose a phone (e.g., Pixel 6) → Download system image → Finish
+3. Start the emulator
+4. Run `flutter run`
 
-## Troubleshooting
+---
 
-### First time setup not working?
+## 🛠️ Common Commands
+
+| Command | What It Does |
+|---------|--------------|
+| `flutter pub get` | Download dependencies |
+| `flutter run` | Run app on device |
+| `flutter devices` | List connected devices |
+| `flutter clean` | Clear cache (fixes most issues) |
+| `flutter doctor` | Check if everything is installed |
+
+---
+
+## ❓ Troubleshooting
+
+### "Command not found: flutter"
+→ Flutter is not in your PATH. Follow the [installation guide](https://docs.flutter.dev/get-started/install/windows) again.
+
+### "No connected devices"
+→ Connect a phone via USB with USB Debugging ON, or start an emulator.
+
+### App won't build / weird errors
 ```bash
 flutter clean
 flutter pub get
 flutter run
 ```
 
-### Check your environment
+### Still not working?
 ```bash
 flutter doctor -v
 ```
+Share the output with the team.
 
-## Project Structure
+---
+
+## 📁 Project Structure
 
 ```
 lib/
@@ -77,23 +106,19 @@ lib/
 ├── exercise/              # Exercise tracking logic
 │   ├── exercise_base.dart
 │   └── squat.dart
-└── utils/                 # Utility functions
+└── utils/                 # Helper functions
     ├── debouncer.dart
     ├── pose_math_helpers.dart
     └── pose_smoother.dart
 ```
 
-## Dependencies
+---
 
-- `camera` - Camera access
-- `google_mlkit_pose_detection` - AI pose detection
-- `permission_handler` - Runtime permissions
+## 🤝 How to Contribute
 
-## Contributing
-
-1. Create a new branch: `git checkout -b feature/your-feature`
-2. Make your changes
-3. Test on device: `flutter run`
+1. Pull latest changes: `git pull origin main`
+2. Create your branch: `git checkout -b feature/your-feature-name`
+3. Make changes & test: `flutter run`
 4. Commit: `git commit -m "Add your feature"`
-5. Push: `git push origin feature/your-feature`
-6. Create a Pull Request
+5. Push: `git push origin feature/your-feature-name`
+6. Create a Pull Request on GitHub
