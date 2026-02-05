@@ -14,10 +14,11 @@ const double MIN_CONFIDENCE = 0.98; // 98% confidence required
 const int MARGIN_ANGLE_ERROR = 5;
 const double MARGIN_POSITION_ERROR = 0.005;
 
-// KNEE ANGLES (0-180 Joint Logic)
-// 180 = Straight leg.
-// < 150: Start of squat (Descending).
-// > 115: Deep squat (Bottom/Ascending).
+/* KNEE ANGLES (0-180 Joint Logic)
+ 180 = Straight leg.
+ < 150: Start of squat (Descending).
+ > 115: Deep squat (Bottom/Ascending). 
+ */
 const SQUAT_STAND_ANGLE_THRESHOLD = 165 + MARGIN_ANGLE_ERROR;
 const int SQUAT_DESCEND_ANGLE_THRESHOLD = 150 - MARGIN_ANGLE_ERROR;
 const int SQUAT_ASCEND_ANGLE_THRESHOLD = 100 - MARGIN_ANGLE_ERROR;
@@ -25,15 +26,17 @@ const int SQUAT_ASCEND_ANGLE_THRESHOLD = 100 - MARGIN_ANGLE_ERROR;
 // HIP ANGLES (40 deg is parallel/deep)
 const int SQUAT_HIP_ANGLE_THRESHOLD = 40 + MARGIN_ANGLE_ERROR;
 
-// BACK POSTURE (0 is Vertical Up)
-// Facing Left: Forward < 300. Backward > 10.
+/* BACK POSTURE (0 is Vertical Up)
+Facing Left: Forward < 300. Backward > 10.
+*/
 const int SQUAT_BACK_ANGLE_FORWARD_LIMIT = 332;
 const int SQUAT_BACK_ANGLE_BACKWARD_LIMIT = 2;
 
-// Heel lift threshold (in normalized units)
-// HEEL CHECK (Relative to Shin Length)
-// 0.08 means: "If heel is lifted more than 8% of the back length"
-// This makes it work even if the user is far away from the camera.
+/* Heel lift threshold (in normalized units)
+HEEL CHECK (Relative to Shin Length)
+0.08 means: "If heel is lifted more than 8% of the back length"
+This makes it work even if the user is far away from the camera.
+*/
 const double SQUAT_HEEL_LIFT_THRESHOLD = 0.15; // 15%
 
 enum SquatState {
@@ -65,13 +68,20 @@ class Squat extends ExerciseBase {
   Debouncer hipDebouncer =
       Debouncer(requiredFrames: 10); // 10 frames ~0.33s at 30fps
 
-  // Error Accumulator
-  // Structure: { "PHASE": { "FaultType": "Message" } }
-  // Example: { "DESCENDING": { "Back": "Too Forward" } }
+  /* Error Accumulator
+  Structure: { "PHASE": { "FaultType": "Message" } }
+  Example: { "DESCENDING": { "Back": "Too Forward" } }
+  */
   final Map<String, Map<String, String>> _currentRepFaults = {};
 
-  /// Helper to log faults without overwriting previous errors in the same phase.
-  /// Also sets the global [correctForm] flag to false.
+  /* Log a fault for the current rep.
+    Parameters:
+    - phase: The current phase of the squat (e.g., "DESCENDING").
+    - type: The type/category of the fault (e.g., "Back").
+    - message: A descriptive message for the fault.
+    Logic:
+    - If the fault type for the phase is not already logged, add it.
+  */
   void _logFault(String phase, String type, String message) {
     if (!_currentRepFaults.containsKey(phase)) {
       _currentRepFaults[phase] = {};
@@ -112,8 +122,22 @@ class Squat extends ExerciseBase {
      Called every frame when ExerciseState is 'activated'.
   ----------------------------------------------------------------------- */
   @override
+  /* Main pose checking logic for Squat exercise.
+    Parameters:
+    - pose: The smoothed Pose object.
+    - isLeft: Boolean indicating if left side is visible.
+    - scaleFactor: Optional scaling factor for normalizing distances.
+
+    Logic:
+    1. Extract relevant landmarks for left or right side based on visibility.
+    2. Calculate key angles and distances.
+    3. Update state machine based on knee angle.
+    4. Provide live feedback and log faults as needed.
+  */
+
   void checkingPose(Pose pose, bool isLeft, double? scaleFactor) {
-    // 1. Get Landmarks
+    // ----------1. Get Landmarks------------//
+
     PoseLandmark? knee = getLandmark(
         pose: pose,
         rightType: PoseLandmarkType.rightKnee,
@@ -147,7 +171,8 @@ class Squat extends ExerciseBase {
         foot == null ||
         heel == null) return;
 
-    // 2. Calculate Geometry
+    // ----------2. Calculate Geometry------------//
+
     double kneeAngle =
         calculateAngle(firstPoint: hip, midPoint: knee, lastPoint: ankle);
     double backAngle = calculateVerticalAngle(pivot: hip, point: shoulder);
@@ -156,7 +181,8 @@ class Squat extends ExerciseBase {
     double heelDistanceToFloor =
         foot.y - heel.y; // y coordinate increases upwards from the bottom
 
-    // 3. Logic: Rep Completion (Standing Up)
+    // ----------3. Logic: Rep Completion (Standing Up) -----------//
+
     if (kneeAngle > SQUAT_STAND_ANGLE_THRESHOLD) {
       // Only count if they were actually doing a squat
       if (squatState != SquatState.standing) {
@@ -171,9 +197,10 @@ class Squat extends ExerciseBase {
         // UI Feedback for the finished rep
         feedbackMessage["Result"] = correctForm ? "Good Rep!" : "Fix Form";
 
-        // SAVE HISTORY (Unified Logic)
-        // If correctForm is True -> Map is empty (Good).
-        // If correctForm is False -> Map has details (Bad).
+        /* SAVE HISTORY (Unified Logic)
+         If correctForm is True -> Map is empty (Good).
+         If correctForm is False -> Map has details (Bad).
+        */
         setFeedback.add({correctForm: Map.from(_currentRepFaults)});
       }
 
@@ -187,21 +214,23 @@ class Squat extends ExerciseBase {
       return;
     }
 
-    // 4. Update State Machine
+    // ----------4. Update State Machine -----------//
+
     detectSquatState(kneeAngle);
 
     String currentPhase = squatState.toString().split('.').last.toUpperCase();
 
-    // 5. Live Feedback & Fault Logging
+    // ----------5. Live Feedback & Fault Logging -----------//
+
     if (squatState != SquatState.standing) {
       checkBack(backAngle, isLeft, currentPhase);
       checkHeels(heelDistanceToFloor, scaleFactor: scaleFactor);
 
       if (squatState == SquatState.descending) {
-        checkDepthAndHip(kneeAngle, hipAngle, currentPhase);
+        checkDepthAndHip(knee.y, hip.y, kneeAngle, hipAngle, currentPhase);
         feedbackMessage["Status"] = "Going Down...";
       } else if (squatState == SquatState.bottom) {
-        checkDepthAndHip(kneeAngle, hipAngle, currentPhase);
+        checkDepthAndHip(knee.y, hip.y, kneeAngle, hipAngle, currentPhase);
         feedbackMessage["Status"] = "Hold Bottom";
       } else if (squatState == SquatState.ascending) {
         feedbackMessage["Status"] = "Push Up!";
@@ -209,8 +238,26 @@ class Squat extends ExerciseBase {
     }
   }
 
-  /* -------------------- HELPER CHECKS -------------------- */
-  void checkDepthAndHip(double kneeAngle, double hipAngle, String phase) {
+  /* -----------------------------------------------------------------------
+                                METRICS CHECKS
+                  Apply 1 euro filtering and debouncing here
+  ----------------------------------------------------------------------- */
+
+  /* Check Depth and Hip Positioning 
+    Parameters:
+    - kneeY: Y position of the knee landmark.
+    - hipY: Y position of the hip landmark.
+    - kneeAngle: Current angle at the knee joint.
+    - hipAngle: Current angle at the hip joint.
+    - phase: Current phase of the squat (for logging).
+
+    Logic:
+    - Hip Check: At bottom, hips must be open (hipAngle >= threshold).
+    - Depth Check: During descent, kneeY must be lower than hipY for good depth
+    - Hip Check is only strict at the bottom position to avoid sensor noise.
+  */
+  void checkDepthAndHip(double kneeY, double hipY, double kneeAngle,
+      double hipAngle, String phase) {
     // Hip Check (Only strict at bottom to avoid sensor noise)
     if (squatState == SquatState.bottom) {
       if (hipDebouncer.update(hipAngle < SQUAT_HIP_ANGLE_THRESHOLD)) {
@@ -219,15 +266,27 @@ class Squat extends ExerciseBase {
       }
     }
 
-    // Depth Check (Live feedback only)
+    // Depth Check
+    // bigger y value means lower position
     if (squatState == SquatState.descending &&
-        kneeAngle > SQUAT_DESCEND_ANGLE_THRESHOLD) {
+        kneeAngle > SQUAT_DESCEND_ANGLE_THRESHOLD &&
+        kneeY <= hipY) {
       feedbackMessage["Depth"] = "Go Lower";
     } else if (squatState == SquatState.bottom) {
       feedbackMessage["Depth"] = "Good Depth";
     }
   }
 
+  /* Check Back Posture 
+    Parameters:
+    - angle: Current back angle relative to vertical.
+    - isLeft: Boolean indicating if left side is visible.
+    - phase: Current phase of the squat (for logging).
+
+    Logic:
+    - Leaning Forward: If back angle exceeds forward limit.
+    - Leaning Backward: If back angle exceeds backward limit.
+  */
   void checkBack(double angle, bool isLeft, String phase) {
     bool leanForward = false;
     bool leanBackward = false;
@@ -256,6 +315,14 @@ class Squat extends ExerciseBase {
     }
   }
 
+  /* Check Heel Position 
+    Parameters:
+    - heelDistanceToFloor: Vertical distance from heel to floor.
+    - scaleFactor: Optional scaling factor for normalization.
+
+    Logic:
+    - If heel is lifted beyond threshold, log fault and provide feedback.
+  */
   void checkHeels(double heelDistanceToFloor, {double? scaleFactor}) {
     if (heelDebouncer.update(heelDistanceToFloor / (scaleFactor ?? 1.0) >=
         SQUAT_HEEL_LIFT_THRESHOLD)) {
@@ -267,7 +334,9 @@ class Squat extends ExerciseBase {
     }
   }
 
-  /* -------------------- STATE MACHINE -------------------- */
+  /* ================================ 
+    STATE MACHINE 
+     ================================ */
   void detectSquatState(double kneeAngle) {
     // Transition: Standing -> Descending
     if (kneeAngle <= SQUAT_DESCEND_ANGLE_THRESHOLD &&
