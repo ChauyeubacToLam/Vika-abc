@@ -1,20 +1,17 @@
 // ignore_for_file: constant_identifier_names
 
-import 'package:flutter/rendering.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:vinafit_mobile/utils/debouncer.dart';
 import '../utils/pose_smoother.dart';
-
-/* Represents the current lifecycle state of any exercise session.
-  - notActivated: User is in frame but hasn't met start criteria.
-  - activated: User is performing the exercise.
-  - completed: Session finished (e.g., reached target reps).
-*/
+import '../utils/pose_math_helpers.dart';
 
 /* =========================================================================
    CONFIGURATION & THRESHOLDS
    ========================================================================= */
 
 const double NODDING_ANGLE_FOR_START = 0.185; // 18.5% of the back length
+const double FRONT_FACING_SHOULDER_THRESHOLD = 0.57; // > 0.57 is Front
+const double SIDE_FACING_SHOULDER_THRESHOLD = 0.35; // < 0.35 is Side
 
 enum ExerciseState {
   notActivated,
@@ -22,62 +19,45 @@ enum ExerciseState {
   completed,
 }
 
+enum CameraFacing {
+  front,
+  left,
+  right,
+  angled,
+  undefined,
+}
+
 /* A base class that handles the core pipeline for all fitness exercises.
-
-  This class manages:
-  1. Signal Smoothing: Applies the 1€ Filter to remove jitter.
-  2. Safety Checks: Ensures user is visible.
-  3. Orientation: Auto-detects Left vs Right side.
-  4. State Machine: Transitions between states.
-
-  How to use:
-  Extend this class (e.g., class Squat extends ExerciseBase) and implement
-  the abstract methods [checkSafety], [checkStartState], and [checkingPose].
+   Manages Smoothing, Orientation, Safety, and State.
 */
 abstract class ExerciseBase {
-  /* Handles temporal smoothing to reduce jitter/noise. */
   late PoseSmoother poseSmoother;
-
-  /* Current number of valid repetitions. */
   int repCount = 0;
-
-  /* Real-time feedback for the current frame (e.g., "Go Lower"). */
   Map<String, String> feedbackMessage = {};
-
-  /* A history log of every repetition. */
   List<Map<bool, Map<String, Map<String, String>>>> setFeedback = [];
 
-  /* The current stage of the exercise logic. */
   ExerciseState exerciseState = ExerciseState.notActivated;
-
-  /* Detected orientation. 
-    true = Left side visible. 
-    false = Right side visible. 
-  */
-  bool? isLeft;
-
-  /* Flag for current rep form. 
-    Set to false if a fault is detected during the rep. 
-  */
+  CameraFacing cameraFacing = CameraFacing.front;
   bool correctForm = true;
+  double? distanceScaleFactor; // Back length (Shoulder to Hip)
 
-  double? distanceScaleFactor;
+  double frontFacingRatio =
+      1.0; // Shoulder width / Torso height ratio for front view
+
+  /// Debug data exposed for the UI debug overlay.
+  /// Child classes populate this with exercise-specific metrics.
+  Map<String, dynamic> debugData = {};
 
   ExerciseBase() {
-    /* Initialize the One Euro Filter.
-      - minCutoff: 0.5 (Higher = less lag, more jitter).
-      - beta: 0.005 (Sensitivity to speed).
-    */
     poseSmoother = PoseSmoother(minCutoff: 0.5, beta: 0.005);
   }
 
-  /* The main entry point for processing a camera frame.
-    
-    Returns:
-    - [int repCount, Map feedback] if active.
-    - List<Map> setFeedback if completed.
-    - null if processing failed or idle.
-  */
+  Debouncer nodDebouncer =
+      Debouncer(requiredFrames: 10); // 10 frames ~0.33s at 30fps
+
+  /* -----------------------------------------------------------------------
+     MAIN PIPELINE
+     ----------------------------------------------------------------------- */
   List<dynamic>? processPose(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     feedbackMessage = {};
 
@@ -85,111 +65,201 @@ abstract class ExerciseBase {
     Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks =
         poseSmoother.smoothing(landmarks);
 
-    // 2. Check for safety errors
-    String? safetyError = checkSafety(smoothedLandmarks);
+    // 2. Auto-detect Left/Right/Front (MUST come before safety check!)
+    //    This updates frontFacingRatio and debugData
+    cameraFacing = detectCameraFacing(smoothedLandmarks);
+
+    // 3. Check for safety errors (Child class logic)
+    //    Now has correct cameraFacing and frontFacingRatio values
+    String? safetyError =
+        checkSafety(smoothedLandmarks, cameraFacing, frontFacingRatio);
     if (safetyError != null) {
       feedbackMessage = {"System": safetyError};
+      // Still populate debug data even on safety error
+      debugData['exerciseState'] = exerciseState.toString().split('.').last;
+      debugData['cameraFacing'] = cameraFacing.toString().split('.').last;
       return [repCount, feedbackMessage];
     }
 
     Pose pose = Pose(landmarks: smoothedLandmarks);
 
-    // 3. Determine left or right
-    isLeft = leftOrRight(smoothedLandmarks);
-
-    //4. Set  distance scale factor == back length
-    PoseLandmark? shoulder = getLandmark(
+    // 4. Calculate Distance Scale Factor (Back Length)
+    // We use getSideLandmark to get the dominant side's back length.
+    // If Front view, it defaults to Left, which is acceptable for scaling.
+    PoseLandmark? shoulder = getSideLandmark(
       pose: pose,
       rightType: PoseLandmarkType.rightShoulder,
       leftType: PoseLandmarkType.leftShoulder,
     );
-    PoseLandmark? hip = getLandmark(
+    PoseLandmark? hip = getSideLandmark(
       pose: pose,
       rightType: PoseLandmarkType.rightHip,
       leftType: PoseLandmarkType.leftHip,
     );
 
     if (shoulder != null && hip != null) {
-      distanceScaleFactor =
-          (shoulder.y - hip.y).abs(); // Vertical distance as scale factor
+      distanceScaleFactor = calculateDistance(shoulder, hip);
     }
 
-    // 4. Start exercise logic
+    // 5. Run State Machine (Start -> Active -> Done)
     exerciseState = checkExerciseState(pose, exerciseState,
         scaleFactor: distanceScaleFactor);
 
+    // Populate base-level debug data
+    debugData['exerciseState'] = exerciseState.toString().split('.').last;
+    debugData['cameraFacing'] = cameraFacing.toString().split('.').last;
+    debugData['scaleFactor'] = distanceScaleFactor?.toStringAsFixed(1) ?? 'N/A';
+
     if (exerciseState == ExerciseState.activated) {
-      checkingPose(pose, isLeft!, distanceScaleFactor);
+      // Pass 'cameraFacing' so child class knows which side to check
+      checkingPose(pose, cameraFacing, distanceScaleFactor);
       return getRepCountAndFeedback();
-    }
-    // if done ()
-    else if (exerciseState == ExerciseState.completed) {
+    } else if (exerciseState == ExerciseState.completed) {
       return getSetFeedback();
     }
 
-    return null;
+    return null; // Idle
   }
 
-  /* Auto-detects which side is facing the camera.
-    Returns true if Left Shoulder is more confident than Right. 
+  /* -----------------------------------------------------------------------
+     ORIENTATION LOGIC
+     ----------------------------------------------------------------------- */
+
+  CameraFacing detectCameraFacing(
+      Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
+    PoseLandmark? leftS = smoothedLandmarks[PoseLandmarkType.leftShoulder];
+    PoseLandmark? rightS = smoothedLandmarks[PoseLandmarkType.rightShoulder];
+    PoseLandmark? leftH = smoothedLandmarks[PoseLandmarkType.leftHip];
+
+    if (leftS == null || rightS == null || leftH == null) {
+      return CameraFacing.undefined;
+    }
+
+    double shoulderWidth = (leftS.x - rightS.x).abs(); // Use absolute value!
+    double torsoHeight = calculateDistance(leftS, leftH);
+
+    if (torsoHeight < 10) return CameraFacing.undefined;
+
+    double ratio = shoulderWidth / torsoHeight;
+
+    frontFacingRatio = ratio; // Store for debug/UI purposes
+
+    // Add all values to debugData for in-app display
+    debugData['leftS_x'] = leftS.x.toStringAsFixed(0);
+    debugData['rightS_x'] = rightS.x.toStringAsFixed(0);
+    debugData['shoulderWidth'] = shoulderWidth.toStringAsFixed(1);
+    debugData['torsoHeight'] = torsoHeight.toStringAsFixed(1);
+    debugData['facingRatio'] = ratio.toStringAsFixed(3);
+    debugData['frontThresh'] = FRONT_FACING_SHOULDER_THRESHOLD.toString();
+    debugData['sideThresh'] = SIDE_FACING_SHOULDER_THRESHOLD.toString();
+
+    if (ratio > FRONT_FACING_SHOULDER_THRESHOLD) {
+      return CameraFacing.front;
+    } else if (ratio < SIDE_FACING_SHOULDER_THRESHOLD) {
+      // It is side view. Use X-position to find which side.
+      return isLeft(smoothedLandmarks) ? CameraFacing.left : CameraFacing.right;
+    } else {
+      return CameraFacing.angled;
+    }
+  }
+
+  bool isLeft(Map<PoseLandmarkType, PoseLandmark>? smoothedLandmarks) {
+    if (smoothedLandmarks == null) return true;
+    double leftSConfidence =
+        smoothedLandmarks[PoseLandmarkType.leftShoulder]?.likelihood ?? 0.0;
+    double leftHipConfidence =
+        smoothedLandmarks[PoseLandmarkType.leftHip]?.likelihood ?? 0.0;
+    double leftKneeConfidence =
+        smoothedLandmarks[PoseLandmarkType.leftKnee]?.likelihood ?? 0.0;
+    double leftAnkleConfidence =
+        smoothedLandmarks[PoseLandmarkType.leftAnkle]?.likelihood ?? 0.0;
+
+    double rightSConfidence =
+        smoothedLandmarks[PoseLandmarkType.rightShoulder]?.likelihood ?? 0.0;
+    double rightHipConfidence =
+        smoothedLandmarks[PoseLandmarkType.rightHip]?.likelihood ?? 0.0;
+    double rightKneeConfidence =
+        smoothedLandmarks[PoseLandmarkType.rightKnee]?.likelihood ?? 0.0;
+    double rightAnkleConfidence =
+        smoothedLandmarks[PoseLandmarkType.rightAnkle]?.likelihood ?? 0.0;
+
+    double leftAvg = (leftSConfidence +
+            leftHipConfidence +
+            leftKneeConfidence +
+            leftAnkleConfidence) /
+        4.0;
+    double rightAvg = (rightSConfidence +
+            rightHipConfidence +
+            rightKneeConfidence +
+            rightAnkleConfidence) /
+        4.0;
+
+    return leftAvg <= rightAvg; // Camera is flipped so this is a reversed logic
+  }
+
+  /* -----------------------------------------------------------------------
+     HELPERS
+     ----------------------------------------------------------------------- */
+
+  /* HELPER: Smart Selector
+     - If Facing LEFT -> Returns Left Landmark
+     - If Facing RIGHT -> Returns Right Landmark
+     - If Facing FRONT/ANGLED -> Defaults to Left Landmark
+     
+     Use this for Side-View mechanics. For Front-View symmetry checks, 
+     access pose.landmarks directly in the child class.
   */
-  bool leftOrRight(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
-    bool isLeft =
-        (smoothedLandmarks[PoseLandmarkType.leftShoulder]?.likelihood ?? 0) >
-            (smoothedLandmarks[PoseLandmarkType.rightShoulder]?.likelihood ??
-                0);
-
-    return isLeft;
-  }
-
-  /* Returns [count, feedback] for the UI. */
-  List getRepCountAndFeedback() {
-    return [repCount, feedbackMessage];
-  }
-
-  /* Returns complete history for summary screens. */
-  List getSetFeedback() {
-    return setFeedback;
-  }
-
-  /* Helper to get the correct landmark based on orientation.
-    Example: If isLeft is true, it returns the Left version of the requested part.
-  */
-  PoseLandmark? getLandmark({
+  PoseLandmark? getSideLandmark({
     required Pose pose,
     required PoseLandmarkType rightType,
     required PoseLandmarkType leftType,
   }) {
-    return isLeft! ? pose.landmarks[leftType] : pose.landmarks[rightType];
+    if (cameraFacing == CameraFacing.left) {
+      return pose.landmarks[leftType];
+    } else if (cameraFacing == CameraFacing.right) {
+      return pose.landmarks[rightType];
+    }
+    // Default to left for front/angled views logic
+    return pose.landmarks[leftType];
   }
 
-  /* Checks criteria to transition states (e.g., Start -> Active). 
-  */
+  List getRepCountAndFeedback() => [repCount, feedbackMessage];
+
+  List getSetFeedback() => setFeedback;
+
+  /* -----------------------------------------------------------------------
+     STATE MACHINE
+     ----------------------------------------------------------------------- */
+
   ExerciseState checkExerciseState(Pose pose, ExerciseState currentState,
       {double? scaleFactor}) {
     switch (currentState) {
       case ExerciseState.notActivated:
-        PoseLandmark? shoulder = getLandmark(
+        // Use smart selector to get the visible shoulder
+        PoseLandmark? shoulder = getSideLandmark(
           pose: pose,
           rightType: PoseLandmarkType.rightShoulder,
           leftType: PoseLandmarkType.leftShoulder,
         );
         PoseLandmark? nose = pose.landmarks[PoseLandmarkType.nose];
+
         if (shoulder == null || nose == null) {
           return ExerciseState.notActivated;
         }
-        double noseAndShoulderDistance =
-            (nose.y - shoulder.y).abs() / (scaleFactor ?? 1.0);
-        if (noseAndShoulderDistance < NODDING_ANGLE_FOR_START) {
+
+        // Check "Nod" (Nose drops down to shoulder level)
+        double dist = (nose.y - shoulder.y).abs() / (scaleFactor ?? 1.0);
+        debugData['nodDist'] = dist.toStringAsFixed(3);
+        if (nodDebouncer.update(dist < NODDING_ANGLE_FOR_START)) {
           return ExerciseState.activated;
         }
         break;
+
       case ExerciseState.activated:
-        // **** TEMPORARY: Auto-complete after 15 reps for testing ****
-        if (repCount >= 15) {
-          return ExerciseState.completed;
-        }
+        // TEMPORARY: Auto-complete for testing
+        if (repCount >= 15) return ExerciseState.completed;
         break;
+
       case ExerciseState.completed:
         break;
     }
@@ -197,16 +267,11 @@ abstract class ExerciseBase {
   }
 
   // ---------------------------------------------------------
-  // ABSTRACT METHODS (Must be implemented by child classes)
+  // ABSTRACT METHODS
   // ---------------------------------------------------------
 
-  /* Validates if necessary body parts are visible.
-    Return an error string if unsafe, or null if safe.
-  */
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks);
+  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks,
+      CameraFacing cameraFacing, double? front_facingRatio);
 
-  /* The core exercise logic loop.
-    Calculates angles, counts reps, and checks form.
-  */
-  void checkingPose(Pose pose, bool isLeft, double? scaleFactor);
+  void checkingPose(Pose pose, CameraFacing cameraFacing, double? scaleFactor);
 }
