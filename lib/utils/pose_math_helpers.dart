@@ -69,3 +69,9 @@ double calculateVerticalAngle(
 
   return clockAngle;
 }
+
+double calculateDistance(PoseLandmark point1, PoseLandmark point2) {
+  double dx = point2.x - point1.x;
+  double dy = point2.y - point1.y;
+  return math.sqrt(dx * dx + dy * dy);
+}
