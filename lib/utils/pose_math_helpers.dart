@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import '../exercise/exercise_base.dart';
 
 /* ---------------------------------------------------------------------------
   PART 1: JOINT FLEXION (0 - 180 degrees)
@@ -70,8 +71,51 @@ double calculateVerticalAngle(
   return clockAngle;
 }
 
-double calculateDistance(PoseLandmark point1, PoseLandmark point2) {
+double calculateDistance(var point1, var point2) {
   double dx = point2.x - point1.x;
   double dy = point2.y - point1.y;
   return math.sqrt(dx * dx + dy * dy);
+}
+
+/* =========================================================================
+   HELPER: Clock Angle to Trunk Lean Conversion
+   Converts the 0-360° clock angle into degrees-from-vertical (0-90°)
+   - negative values for backward lean
+   - positive values for forward lean
+   ========================================================================= */
+// Return: POSITIVE = forward lean, NEGATIVE = backward lean, 0 = vertical
+double convertClockAngleToTrunkLean(double clockAngle, CameraFacing facing) {
+  if (facing == CameraFacing.left) {
+    // LEFT-FACING VIEW:
+    // 270-360° = forward lean (shoulder ahead of hip)
+    // 0-90° = backward lean (shoulder behind hip)
+
+    if (clockAngle >= 270) {
+      // Forward lean: 330° → +30°
+      return (360 - clockAngle).toDouble();
+    } else if (clockAngle <= 90) {
+      // Backward lean: 30° → -30°
+      return -clockAngle;
+    } else {
+      // Extreme angles (90-270°) - invalid
+      return clockAngle > 180 ? 90.0 : -90.0;
+    }
+  } else if (facing == CameraFacing.right) {
+    // RIGHT-FACING VIEW (mirror):
+    // 0-90° = forward lean
+    // 270-360° = backward lean
+
+    if (clockAngle <= 90) {
+      // Forward lean: 30° → +30°
+      return clockAngle;
+    } else if (clockAngle >= 270) {
+      // Backward lean: 330° → -30°
+      return -(360 - clockAngle);
+    } else {
+      // Extreme angles
+      return clockAngle < 180 ? 90.0 : -90.0;
+    }
+  }
+
+  return 0.0; // Default for front/undefined
 }
