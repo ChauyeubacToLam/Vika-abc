@@ -1,6 +1,7 @@
 // ignore_for_file: curly_braces_in_flow_control_structures
 
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:camera/camera.dart';
@@ -21,7 +22,6 @@ late List<CameraDescription> _cameras;
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-  // Transparent status bar for edge-to-edge feel
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
@@ -31,14 +31,14 @@ Future<void> main() async {
 }
 
 /* =========================================================================
-   REP LOG — Per-rep data store for history + after-set summary
+   REP LOG
    ========================================================================= */
 
 class RepLog {
   final int repNumber;
   final bool correctForm;
-  final Map<String, Map<String, String>> faults; // phase → {type: message}
-  final String? tempo; // "↓1.2s ↑0.8s"
+  final Map<String, Map<String, String>> faults;
+  final String? tempo;
   final double? descentDuration;
   final double? ascentDuration;
   final double? bottomHold;
@@ -70,7 +70,7 @@ class RepLog {
 }
 
 /* =========================================================================
-   APP THEME
+   APP
    ========================================================================= */
 
 class VinaFitApp extends StatelessWidget {
@@ -83,7 +83,7 @@ class VinaFitApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0A0E21),
+        scaffoldBackgroundColor: const Color(0xFF080C1A),
         colorSchemeSeed: const Color(0xFF00E5FF),
         useMaterial3: true,
         fontFamily: 'Roboto',
@@ -135,7 +135,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
   bool _showDebug = false;
   bool _showRepLog = false;
 
-  // ── FPS counter ──
+  // ── FPS ──
   int _frameCount = 0;
   DateTime _lastFpsTime = DateTime.now();
   double _fps = 0;
@@ -153,8 +153,6 @@ class _ExerciseScreenState extends State<ExerciseScreen>
   // ── State logging ──
   String _lastLoggedState = '';
   String _lastLoggedSquatState = '';
-
-  /* ----------------------------------------------------------------------- */
 
   @override
   void initState() {
@@ -211,7 +209,6 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     if (_cameraIndex == -1) _cameraIndex = 0;
 
     final camera = _cameras[_cameraIndex];
-
     _cameraController = CameraController(
       camera,
       ResolutionPreset.medium,
@@ -233,7 +230,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
   }
 
   /* -----------------------------------------------------------------------
-     IMAGE → POSE PIPELINE (with logging)
+     POSE PIPELINE
      ----------------------------------------------------------------------- */
   void _processCameraImage(CameraImage cameraImage) {
     if (_isDetecting) return;
@@ -251,7 +248,6 @@ class _ExerciseScreenState extends State<ExerciseScreen>
       if (poses.isNotEmpty) {
         final pose = poses.first;
         _detectedPose = pose;
-
         _result = _squat.processPose(pose.landmarks);
 
         if (_result != null) {
@@ -263,15 +259,12 @@ class _ExerciseScreenState extends State<ExerciseScreen>
             final prevRepCount = _repCount;
             _repCount = _result![0] as int;
             _feedback = Map<String, String>.from(_result![1] as Map);
-
-            // Log rep completion when rep count increments
             if (_repCount > prevRepCount) {
               _logRepCompletion();
             }
           }
         }
 
-        // Log state changes
         _logStateChanges();
       } else {
         _detectedPose = null;
@@ -294,14 +287,11 @@ class _ExerciseScreenState extends State<ExerciseScreen>
   }
 
   /* -----------------------------------------------------------------------
-     LOGGING SYSTEM
+     LOGGING
      ----------------------------------------------------------------------- */
-
-  /// Log state transitions to console
   void _logStateChanges() {
     final exState = _squat.exerciseState.toString().split('.').last;
     final sqState = _squat.squatState.toString().split('.').last;
-
     if (exState != _lastLoggedState) {
       debugPrint('[VinaFit][State] Exercise: $_lastLoggedState -> $exState');
       _lastLoggedState = exState;
@@ -312,12 +302,10 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     }
   }
 
-  /// Log each completed rep with full details
   void _logRepCompletion() {
     if (_repCount <= _lastLoggedRep) return;
     _lastLoggedRep = _repCount;
 
-    // Build tempo string
     String? tempo;
     final d = _squat.debugData;
     final descent = d['descentDur'];
@@ -329,11 +317,9 @@ class _ExerciseScreenState extends State<ExerciseScreen>
       }
     }
 
-    // Build fault map from setFeedback
     final faultMap = <String, Map<String, String>>{};
     if (_squat.setFeedback.isNotEmpty) {
       final lastEntry = _squat.setFeedback.last;
-      // lastEntry is Map<bool, Map<String, Map<String, String>>>
       for (final entry in lastEntry.entries) {
         for (final phaseEntry in entry.value.entries) {
           faultMap[phaseEntry.key] = Map<String, String>.from(phaseEntry.value);
@@ -341,8 +327,6 @@ class _ExerciseScreenState extends State<ExerciseScreen>
       }
     }
 
-    // Read correctForm from feedback Result — _squat.correctForm is already
-    // reset to true by the time this runs.
     final wasGoodRep = _feedback['Result'] == 'Good Rep!';
 
     final log = RepLog(
@@ -356,27 +340,22 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     );
     _repLogs.add(log);
 
-    // Console log
     debugPrint('[VinaFit][Rep] $log');
     debugPrint(
         '[VinaFit][Feedback] ${_feedback.entries.map((e) => '${e.key}: ${e.value}').join(' | ')}');
 
-    // Show after-rep banner
     _repBannerGood = log.correctForm;
     final parts = <String>[];
-    parts.add(log.correctForm ? 'Good Rep!' : 'Fix Form');
+    parts.add(log.correctForm ? 'Tốt lắm!' : 'Sửa tư thế');
     if (tempo != null) parts.add(tempo);
     _repBannerText = parts.join('  ');
     _bannerController.forward(from: 0.0);
   }
 
-  /// Log set summary when exercise completes
   void _logSetComplete() {
     if (_repLogs.isEmpty) return;
-
     final goodReps = _repLogs.where((r) => r.correctForm).length;
     final badReps = _repLogs.where((r) => !r.correctForm).length;
-
     debugPrint('');
     debugPrint('============================================');
     debugPrint('[VinaFit][SET COMPLETE] $_repCount reps total');
@@ -395,7 +374,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
   }
 
   /* -----------------------------------------------------------------------
-     BUILD InputImage FROM CameraImage
+     INPUT IMAGE
      ----------------------------------------------------------------------- */
   InputImage? _buildInputImage(CameraImage image) {
     final camera = _cameras[_cameraIndex];
@@ -444,12 +423,12 @@ class _ExerciseScreenState extends State<ExerciseScreen>
   }
 
   /* =======================================================================
-     BUILD UI — Modern dark theme with glassmorphism accents
+     BUILD
      ======================================================================= */
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0E21),
+      backgroundColor: const Color(0xFF080C1A),
       body: SafeArea(
         child:
             !_isCameraReady ? _buildLoadingView() : _buildCameraView(context),
@@ -467,18 +446,18 @@ class _ExerciseScreenState extends State<ExerciseScreen>
             width: 56,
             height: 56,
             child: CircularProgressIndicator(
-              strokeWidth: 3,
+              strokeWidth: 2.5,
               valueColor: AlwaysStoppedAnimation(
                   Colors.cyanAccent.withValues(alpha: 0.8)),
             ),
           ),
           const SizedBox(height: 20),
           Text(
-            'Initializing Camera...',
+            'Đang khởi động camera...',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.6),
-              fontSize: 15,
-              letterSpacing: 1.2,
+              color: Colors.white.withValues(alpha: 0.5),
+              fontSize: 14,
+              letterSpacing: 0.5,
             ),
           ),
         ],
@@ -494,73 +473,58 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     return Column(
       children: [
         _buildTopBar(),
-
-        // Camera + overlays
         Expanded(
           child: Stack(
             children: [
               _buildCameraStack(controller),
-
-              // After-rep banner (animated slide-in)
               _buildRepBanner(),
-
-              // Big rep counter overlay (bottom-right of camera)
               Positioned(
                 bottom: 12,
                 right: 12,
                 child: _buildRepCountOverlay(),
               ),
-
-              // Rep history dots (bottom-left of camera)
               if (_repLogs.isNotEmpty)
                 Positioned(
                   bottom: 12,
                   left: 12,
                   child: _buildRepDots(),
                 ),
+              // Floating coaching chips (right side of camera)
+              _buildCoachingOverlay(),
             ],
           ),
         ),
-
-        // Coaching instructions (status + tempo reminders)
         _buildInstructionsBar(),
-
-        // Live feedback cards
         _buildFeedbackCards(),
-
-        // Bottom controls bar
         _buildBottomBar(),
-
-        // Expandable panels
         if (_showDebug) _buildDebugPanel(),
         if (_showRepLog || isCompleted) _buildRepLogPanel(),
       ],
     );
   }
 
-  /* ── TOP BAR (glassmorphism) ── */
+  /* ── TOP BAR ── */
   Widget _buildTopBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFF0A0E21),
-            const Color(0xFF0A0E21).withValues(alpha: 0.85),
-          ],
-        ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: const BoxDecoration(
+        color: Color(0xFF080C1A),
       ),
       child: Row(
         children: [
-          // App logo / title
           Container(
-            padding: const EdgeInsets.all(6),
+            width: 34,
+            height: 34,
             decoration: BoxDecoration(
-              color: Colors.cyanAccent.withValues(alpha: 0.12),
+              color: const Color(0xFF00E5FF).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: const Color(0xFF00E5FF).withValues(alpha: 0.2),
+                width: 1,
+              ),
             ),
             child: const Icon(Icons.fitness_center,
-                color: Colors.cyanAccent, size: 20),
+                color: Color(0xFF00E5FF), size: 18),
           ),
           const SizedBox(width: 10),
           Column(
@@ -570,42 +534,38 @@ class _ExerciseScreenState extends State<ExerciseScreen>
                 'VINAFIT',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 16,
+                  fontSize: 15,
                   fontWeight: FontWeight.w800,
-                  letterSpacing: 2.0,
+                  letterSpacing: 2.5,
                 ),
               ),
               Text(
-                'Squat Analysis',
+                'Phân tích Squat',
                 style: TextStyle(
-                  color: Colors.cyanAccent.withValues(alpha: 0.7),
-                  fontSize: 11,
+                  color: const Color(0xFF00E5FF).withValues(alpha: 0.6),
+                  fontSize: 10,
                   fontWeight: FontWeight.w500,
-                  letterSpacing: 0.8,
+                  letterSpacing: 0.5,
                 ),
               ),
             ],
           ),
           const Spacer(),
-
-          // State pill
           _buildStatePill(),
-
           const SizedBox(width: 8),
-
-          // FPS
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(8),
+              color: Colors.white.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
               '${_fps.toStringAsFixed(0)} fps',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.4),
-                fontSize: 11,
+                color: Colors.white.withValues(alpha: 0.3),
+                fontSize: 10,
                 fontWeight: FontWeight.w600,
+                fontFamily: 'monospace',
               ),
             ),
           ),
@@ -626,7 +586,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     switch (exerciseState) {
       case ExerciseState.notActivated:
         color = const Color(0xFFFF9800);
-        text = 'Nod to Start';
+        text = 'Gật đầu để bắt đầu';
         icon = Icons.accessibility_new;
         break;
       case ExerciseState.activated:
@@ -636,7 +596,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         break;
       case ExerciseState.completed:
         color = const Color(0xFF00E676);
-        text = 'Set Done!';
+        text = 'Hoàn thành!';
         icon = Icons.emoji_events;
         break;
     }
@@ -644,22 +604,22 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.2),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.5), width: 1),
+        border: Border.all(color: color.withValues(alpha: 0.4), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: color, size: 14),
+          Icon(icon, color: color, size: 13),
           const SizedBox(width: 5),
           Text(
             text,
             style: TextStyle(
               color: color,
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: FontWeight.w700,
-              letterSpacing: 0.5,
+              letterSpacing: 0.3,
             ),
           ),
         ],
@@ -683,70 +643,64 @@ class _ExerciseScreenState extends State<ExerciseScreen>
   String _sqStateLabel(SquatState s) {
     switch (s) {
       case SquatState.standing:
-        return 'Standing';
+        return 'Đứng thẳng';
       case SquatState.descending:
-        return 'Going Down';
+        return 'Xuống';
       case SquatState.bottom:
-        return 'At Bottom';
+        return 'Giữ';
       case SquatState.ascending:
-        return 'Pushing Up';
+        return 'Đứng lên';
     }
   }
 
-  /* ── CAMERA + SKELETON STACK ── */
+  /* ── CAMERA + SKELETON ── */
   Widget _buildCameraStack(CameraController controller) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final previewSize = Size(constraints.maxWidth, constraints.maxHeight);
-
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(0),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Center(child: CameraPreview(controller)),
-
-              if (_detectedPose != null)
-                CustomPaint(
-                  size: previewSize,
-                  painter: PosePainter(
-                    pose: _detectedPose!,
-                    imageSize: _imageSize,
-                    widgetSize: previewSize,
-                    rotation: _imageRotation,
-                    lensDirection: controller.description.lensDirection,
-                    debugData: _squat.debugData,
-                  ),
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            Center(child: CameraPreview(controller)),
+            if (_detectedPose != null)
+              CustomPaint(
+                size: previewSize,
+                painter: PosePainter(
+                  pose: _detectedPose!,
+                  imageSize: _imageSize,
+                  widgetSize: previewSize,
+                  rotation: _imageRotation,
+                  lensDirection: controller.description.lensDirection,
+                  debugData: _squat.debugData,
                 ),
-
-              // Gradient vignette overlay for better text readability
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.black.withValues(alpha: 0.15),
-                          Colors.transparent,
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.4),
-                        ],
-                        stops: const [0.0, 0.15, 0.7, 1.0],
-                      ),
+              ),
+            // Subtle vignette
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.2),
+                        Colors.transparent,
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.5),
+                      ],
+                      stops: const [0.0, 0.12, 0.72, 1.0],
                     ),
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         );
       },
     );
   }
 
-  /* ── REP COUNT OVERLAY (big number, bottom-right of camera) ── */
+  /* ── REP COUNT OVERLAY ── */
   Widget _buildRepCountOverlay() {
     final isActive = _squat.exerciseState == ExerciseState.activated ||
         _squat.exerciseState == ExerciseState.completed;
@@ -754,63 +708,67 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(16),
+        color: Colors.black.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: Colors.cyanAccent.withValues(alpha: 0.3),
+          color: const Color(0xFF00E5FF).withValues(alpha: 0.25),
           width: 1,
         ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Text(
             '$_repCount',
             style: TextStyle(
-              color: isActive ? Colors.cyanAccent : Colors.white60,
-              fontSize: 36,
+              color: isActive ? const Color(0xFF00E5FF) : Colors.white60,
+              fontSize: 38,
               fontWeight: FontWeight.w900,
               height: 1.0,
             ),
           ),
-          const SizedBox(width: 4),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'REPS',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.5),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.5,
-                ),
-              ),
-              if (_squat.exerciseState == ExerciseState.activated)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4, left: 4),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(
-                  _squat.correctForm ? 'GOOD' : 'FIX',
+                  'REPS',
                   style: TextStyle(
-                    color: _squat.correctForm
-                        ? const Color(0xFF00E676)
-                        : const Color(0xFFFF5252),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
+                    color: Colors.white.withValues(alpha: 0.45),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.5,
                   ),
                 ),
-            ],
+                if (_squat.exerciseState == ExerciseState.activated)
+                  Text(
+                    _squat.correctForm ? '✓ TỐT' : '✗ SỬA',
+                    style: TextStyle(
+                      color: _squat.correctForm
+                          ? const Color(0xFF00E676)
+                          : const Color(0xFFFF5252),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  /* ── REP DOTS (visual history strip) ── */
+  /* ── REP DOTS ── */
   Widget _buildRepDots() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.55),
+        color: Colors.black.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -819,22 +777,13 @@ class _ExerciseScreenState extends State<ExerciseScreen>
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 2),
             child: Container(
-              width: 10,
-              height: 10,
+              width: 9,
+              height: 9,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: log.correctForm
                     ? const Color(0xFF00E676)
                     : const Color(0xFFFF5252),
-                boxShadow: [
-                  BoxShadow(
-                    color: (log.correctForm
-                            ? const Color(0xFF00E676)
-                            : const Color(0xFFFF5252))
-                        .withValues(alpha: 0.5),
-                    blurRadius: 4,
-                  ),
-                ],
               ),
             ),
           );
@@ -843,7 +792,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     );
   }
 
-  /* ── AFTER-REP BANNER (animated) ── */
+  /* ── AFTER-REP BANNER ── */
   Widget _buildRepBanner() {
     if (_repBannerText == null) return const SizedBox.shrink();
 
@@ -851,7 +800,6 @@ class _ExerciseScreenState extends State<ExerciseScreen>
       animation: _bannerAnimation,
       builder: (context, child) {
         if (_bannerAnimation.value <= 0.01) return const SizedBox.shrink();
-
         return Positioned(
           top: 20,
           left: 0,
@@ -859,7 +807,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
           child: Opacity(
             opacity: _bannerAnimation.value.clamp(0.0, 1.0),
             child: Transform.translate(
-              offset: Offset(0, -30 * (1.0 - _bannerAnimation.value)),
+              offset: Offset(0, -24 * (1.0 - _bannerAnimation.value)),
               child: Center(child: child),
             ),
           ),
@@ -871,23 +819,23 @@ class _ExerciseScreenState extends State<ExerciseScreen>
           gradient: LinearGradient(
             colors: _repBannerGood
                 ? [
-                    const Color(0xFF00E676).withValues(alpha: 0.9),
-                    const Color(0xFF00C853).withValues(alpha: 0.9)
+                    const Color(0xFF00E676).withValues(alpha: 0.92),
+                    const Color(0xFF00C853).withValues(alpha: 0.92),
                   ]
                 : [
-                    const Color(0xFFFF5252).withValues(alpha: 0.9),
-                    const Color(0xFFD50000).withValues(alpha: 0.9)
+                    const Color(0xFFFF5252).withValues(alpha: 0.92),
+                    const Color(0xFFD50000).withValues(alpha: 0.92),
                   ],
           ),
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
               color: (_repBannerGood
                       ? const Color(0xFF00E676)
                       : const Color(0xFFFF5252))
-                  .withValues(alpha: 0.4),
-              blurRadius: 16,
-              spreadRadius: 2,
+                  .withValues(alpha: 0.35),
+              blurRadius: 20,
+              spreadRadius: 0,
             ),
           ],
         ),
@@ -899,16 +847,16 @@ class _ExerciseScreenState extends State<ExerciseScreen>
                   ? Icons.check_circle_rounded
                   : Icons.warning_rounded,
               color: Colors.white,
-              size: 22,
+              size: 20,
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Text(
               _repBannerText!,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 16,
+                fontSize: 15,
                 fontWeight: FontWeight.w800,
-                letterSpacing: 0.5,
+                letterSpacing: 0.3,
               ),
             ),
           ],
@@ -917,198 +865,255 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     );
   }
 
-  /* ── COACHING INSTRUCTIONS BAR (status + tempo reminders) ── */
+  /* ── INSTRUCTIONS BAR (Status badge only — coaching moved to camera overlay) ── */
   Widget _buildInstructionsBar() {
-    final instr = _squat.instructions;
-    if (instr.isEmpty) return const SizedBox.shrink();
+    // Read instructions for the current squat phase
+    final phaseKey = _squat.squatState.toString().split('.').last;
+    final phaseInstr = _squat.resultIssues.instructions[phaseKey];
+    if (phaseInstr == null || phaseInstr.isEmpty)
+      return const SizedBox.shrink();
 
-    // Separate status from coaching reminders
-    final statusText = instr['Status'];
-    final coachingEntries =
-        instr.entries.where((e) => e.key != 'Status').toList();
+    final statusText = phaseInstr['Status'];
+    if (statusText == null) return const SizedBox.shrink();
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      color: const Color(0xFF0D1228),
+      child: _buildStatusBadge(statusText),
+    );
+  }
+
+  /* ── STATUS BADGE (with arc countdown for Hold phase) ── */
+  Widget _buildStatusBadge(String statusText) {
+    final isHold = statusText.startsWith('Hold') ||
+        statusText.startsWith('Giữ') ||
+        statusText.contains('!') && _squat.squatState == SquatState.bottom;
+
+    final progress = isHold
+        ? (_squat.debugData['bottomHoldProgress'] as double? ?? 0.0)
+        : null;
+
+    final color = _statusColor(statusText);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFF0D1228),
-            const Color(0xFF131A3A),
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.35), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (progress != null) ...[
+            // Circular countdown arc
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CustomPaint(
+                painter: _ArcCountdownPainter(
+                  progress: progress,
+                  color: color,
+                ),
+              ),
+            ),
+            const SizedBox(width: 7),
+          ] else ...[
+            Icon(_statusIcon(statusText), color: color, size: 14),
+            const SizedBox(width: 6),
           ],
+          Text(
+            statusText,
+            style: TextStyle(
+              color: color,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCoachingChip(String message) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFF9800).withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: const Color(0xFFFF9800).withValues(alpha: 0.25),
+          width: 1,
         ),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Status badge (Going Down / Hold Bottom / Push Up)
-          if (statusText != null) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          const Icon(
+            Icons.tips_and_updates_outlined,
+            color: Color(0xFFFFB74D),
+            size: 12,
+          ),
+          const SizedBox(width: 5),
+          Text(
+            message,
+            style: const TextStyle(
+              color: Color(0xFFFFB74D),
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /* ── FLOATING COACHING CHIPS (right side of camera view) ── */
+  /// Shows coaching instructions from previous rep as floating pills
+  /// on the camera view. Like a PT standing beside you whispering tips.
+  /// Only visible during standing phase (before next rep starts).
+  Widget _buildCoachingOverlay() {
+    // Collect coaching entries for the current phase (exclude Status)
+    final phaseKey = _squat.squatState.toString().split('.').last;
+    final phaseInstr = _squat.resultIssues.instructions[phaseKey];
+
+    if (phaseInstr == null || phaseInstr.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final coachingEntries =
+        phaseInstr.entries.where((e) => e.key != 'Status').toList();
+    if (coachingEntries.isEmpty) return const SizedBox.shrink();
+
+    return Positioned(
+      top: 60,
+      right: 8,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: coachingEntries.map((entry) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
               decoration: BoxDecoration(
-                color: _statusColor(statusText).withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8),
+                color: Colors.black.withValues(alpha: 0.65),
+                borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: _statusColor(statusText).withValues(alpha: 0.4),
+                  color: const Color(0xFFFF9800).withValues(alpha: 0.35),
                   width: 1,
                 ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    _statusIcon(statusText),
-                    color: _statusColor(statusText),
-                    size: 14,
+                  const Icon(
+                    Icons.tips_and_updates_outlined,
+                    color: Color(0xFFFFB74D),
+                    size: 13,
                   ),
-                  const SizedBox(width: 5),
-                  Text(
-                    statusText,
-                    style: TextStyle(
-                      color: _statusColor(statusText),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.3,
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      entry.value,
+                      style: const TextStyle(
+                        color: Color(0xFFFFB74D),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        height: 1.3,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-          ],
-
-          // Coaching reminders from tempo (e.g. "Go down slower this time")
-          if (coachingEntries.isNotEmpty) ...[
-            if (statusText != null) const SizedBox(width: 8),
-            Expanded(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: coachingEntries.map((entry) {
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color:
-                              const Color(0xFFFF9800).withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color:
-                                const Color(0xFFFF9800).withValues(alpha: 0.3),
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.tips_and_updates_outlined,
-                              color: Color(0xFFFFB74D),
-                              size: 13,
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              entry.value,
-                              style: const TextStyle(
-                                color: Color(0xFFFFB74D),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-            ),
-          ],
-        ],
+          );
+        }).toList(),
       ),
     );
   }
 
   Color _statusColor(String status) {
-    if (status.contains('Down')) return const Color(0xFFFFD600);
-    if (status.contains('Hold') || status.contains('Bottom'))
-      return const Color(0xFFFF6D00);
-    if (status.contains('Push') || status.contains('Up'))
-      return const Color(0xFF00B0FF);
+    if (status.contains('Xuống') || status.contains('Down'))
+      return const Color(0xFFFFD600);
+    if (status.contains('Giữ') ||
+        status.contains('Hold') ||
+        status.contains('Bottom')) return const Color(0xFFFF6D00);
+    if (status.contains('Đứng lên') ||
+        status.contains('Push') ||
+        status.contains('Up')) return const Color(0xFF00B0FF);
     return Colors.white70;
   }
 
   IconData _statusIcon(String status) {
-    if (status.contains('Down')) return Icons.arrow_downward_rounded;
-    if (status.contains('Hold') || status.contains('Bottom'))
-      return Icons.pause_circle_outline;
-    if (status.contains('Push') || status.contains('Up'))
-      return Icons.arrow_upward_rounded;
+    if (status.contains('Xuống') || status.contains('Down'))
+      return Icons.arrow_downward_rounded;
+    if (status.contains('Giữ') ||
+        status.contains('Hold') ||
+        status.contains('Bottom')) return Icons.pause_circle_outline;
+    if (status.contains('Đứng lên') ||
+        status.contains('Push') ||
+        status.contains('Up')) return Icons.arrow_upward_rounded;
     return Icons.info_outline;
   }
 
-  /* ── LIVE FEEDBACK CARDS ── */
+  /* ── FEEDBACK CARDS ── */
   Widget _buildFeedbackCards() {
     if (_feedback.isEmpty) return const SizedBox(height: 2);
 
-    // Filter out "System" for separate display, and "Result" for banner
     final liveEntries =
         _feedback.entries.where((e) => e.key != 'Result').toList();
-
     if (liveEntries.isEmpty) return const SizedBox(height: 2);
 
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      decoration: const BoxDecoration(
-        color: Color(0xFF0D1228),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: liveEntries.map((entry) {
-            final severity = _feedbackSeverity(entry.value);
-            final color = _severityColor(severity);
-            final icon = _severityIcon(severity);
+      color: const Color(0xFF0A0F20),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 5,
+        children: liveEntries.map((entry) {
+          final severity = _feedbackSeverity(entry.value);
+          final color = _severityColor(severity);
+          final icon = _severityIcon(severity);
 
-            return Padding(
-              padding: const EdgeInsets.only(right: 6),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                  border:
-                      Border.all(color: color.withValues(alpha: 0.3), width: 1),
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+              border:
+                  Border.all(color: color.withValues(alpha: 0.25), width: 1),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, color: color, size: 13),
+                const SizedBox(width: 5),
+                Text(
+                  entry.key,
+                  style: TextStyle(
+                    color: color.withValues(alpha: 0.6),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
+                  ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(icon, color: color, size: 14),
-                    const SizedBox(width: 5),
-                    Text(
-                      entry.key,
-                      style: TextStyle(
-                        color: color.withValues(alpha: 0.7),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      entry.value,
-                      style: TextStyle(
-                        color: color,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
+                const SizedBox(width: 4),
+                Text(
+                  entry.value,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
-            );
-          }).toList(),
-        ),
+              ],
+            ),
+          );
+        }).toList(),
       ),
     );
   }
@@ -1117,12 +1122,14 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     final lower = value.toLowerCase();
     if (lower.contains('good') ||
         lower.contains('deep') ||
-        lower.contains('push')) return 0; // Good
+        lower.contains('tốt') ||
+        lower.contains('push')) return 0;
     if (value.contains('!') ||
         lower.contains('lifting') ||
         lower.contains("don't") ||
-        lower.contains('fix')) return 2; // Error
-    return 1; // Neutral / warning
+        lower.contains('sửa') ||
+        lower.contains('fix')) return 2;
+    return 1;
   }
 
   Color _severityColor(int severity) {
@@ -1150,40 +1157,34 @@ class _ExerciseScreenState extends State<ExerciseScreen>
   /* ── BOTTOM BAR ── */
   Widget _buildBottomBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: const Color(0xFF0D1228),
+        color: const Color(0xFF080C1A),
         border: Border(
           top: BorderSide(
-            color: Colors.white.withValues(alpha: 0.06),
+            color: Colors.white.withValues(alpha: 0.05),
             width: 1,
           ),
         ),
       ),
       child: Row(
         children: [
-          // Camera facing
           _buildMiniInfo(
             Icons.videocam_outlined,
             _squat.cameraFacing.toString().split('.').last.toUpperCase(),
           ),
           const SizedBox(width: 8),
-
-          // Form status
           if (_squat.exerciseState == ExerciseState.activated)
             _buildMiniInfo(
               _squat.correctForm
                   ? Icons.verified_outlined
                   : Icons.warning_amber_rounded,
-              _squat.correctForm ? 'Good Form' : 'Fix Form',
+              _squat.correctForm ? 'Tư thế tốt' : 'Sửa tư thế',
               color: _squat.correctForm
                   ? const Color(0xFF00E676)
                   : const Color(0xFFFF5252),
             ),
-
           const Spacer(),
-
-          // Rep log toggle
           _buildToggleButton(
             icon: Icons.format_list_numbered,
             label: 'Log',
@@ -1191,8 +1192,6 @@ class _ExerciseScreenState extends State<ExerciseScreen>
             onTap: () => setState(() => _showRepLog = !_showRepLog),
           ),
           const SizedBox(width: 6),
-
-          // Debug toggle
           _buildToggleButton(
             icon: Icons.bug_report_outlined,
             label: 'Debug',
@@ -1205,15 +1204,15 @@ class _ExerciseScreenState extends State<ExerciseScreen>
   }
 
   Widget _buildMiniInfo(IconData icon, String text, {Color? color}) {
-    final c = color ?? Colors.white.withValues(alpha: 0.4);
+    final c = color ?? Colors.white.withValues(alpha: 0.35);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: c, size: 14),
+        Icon(icon, color: c, size: 13),
         const SizedBox(width: 4),
         Text(
           text,
-          style: TextStyle(color: c, fontSize: 11, fontWeight: FontWeight.w600),
+          style: TextStyle(color: c, fontSize: 10, fontWeight: FontWeight.w600),
         ),
       ],
     );
@@ -1231,13 +1230,13 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           color: isActive
-              ? Colors.cyanAccent.withValues(alpha: 0.15)
+              ? const Color(0xFF00E5FF).withValues(alpha: 0.12)
               : Colors.white.withValues(alpha: 0.04),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: isActive
-                ? Colors.cyanAccent.withValues(alpha: 0.4)
-                : Colors.white.withValues(alpha: 0.08),
+                ? const Color(0xFF00E5FF).withValues(alpha: 0.35)
+                : Colors.white.withValues(alpha: 0.07),
           ),
         ),
         child: Row(
@@ -1245,20 +1244,20 @@ class _ExerciseScreenState extends State<ExerciseScreen>
           children: [
             Icon(
               icon,
-              size: 14,
+              size: 13,
               color: isActive
-                  ? Colors.cyanAccent
-                  : Colors.white.withValues(alpha: 0.4),
+                  ? const Color(0xFF00E5FF)
+                  : Colors.white.withValues(alpha: 0.35),
             ),
             const SizedBox(width: 4),
             Text(
               label,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: FontWeight.w600,
                 color: isActive
-                    ? Colors.cyanAccent
-                    : Colors.white.withValues(alpha: 0.4),
+                    ? const Color(0xFF00E5FF)
+                    : Colors.white.withValues(alpha: 0.35),
               ),
             ),
           ],
@@ -1267,19 +1266,17 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     );
   }
 
-  /* ── DEBUG PANEL (organized by category) ── */
+  /* ── DEBUG PANEL ── */
   Widget _buildDebugPanel() {
     final d = _squat.debugData;
     if (d.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(8),
-        color: const Color(0xFF080B18),
+        color: const Color(0xFF060A16),
         child: Text(
           'Waiting for pose data...',
           style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.25),
-            fontSize: 11,
-          ),
+              color: Colors.white.withValues(alpha: 0.2), fontSize: 10),
         ),
       );
     }
@@ -1287,36 +1284,30 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF080B18),
-        border: Border(
-          top: BorderSide(
-              color: Colors.cyanAccent.withValues(alpha: 0.1), width: 1),
-        ),
-      ),
+      color: const Color(0xFF060A16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
           Row(
             children: [
               Icon(Icons.terminal,
-                  size: 12, color: Colors.cyanAccent.withValues(alpha: 0.5)),
+                  size: 11,
+                  color: const Color(0xFF00E5FF).withValues(alpha: 0.4)),
               const SizedBox(width: 4),
               Text(
                 'DEBUG',
                 style: TextStyle(
-                  color: Colors.cyanAccent.withValues(alpha: 0.5),
-                  fontSize: 10,
+                  color: const Color(0xFF00E5FF).withValues(alpha: 0.4),
+                  fontSize: 9,
                   fontWeight: FontWeight.w800,
-                  letterSpacing: 1.5,
+                  letterSpacing: 2,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 6),
           Wrap(
-            spacing: 8,
+            spacing: 6,
             runSpacing: 4,
             children: [
               _debugChip(
@@ -1327,27 +1318,34 @@ class _ExerciseScreenState extends State<ExerciseScreen>
                   'Facing', d['cameraFacing'] ?? '?', const Color(0xFF7C4DFF)),
               _debugChip(
                   'Scale', d['scaleFactor'] ?? '?', const Color(0xFF607D8B)),
-              _debugChip('Knee\u2220', '${d['kneeAngle'] ?? '?'}\u00B0',
+              _debugChip('Knee∠', '${d['kneeAngle'] ?? '?'}°',
                   const Color(0xFF00BCD4)),
+              // _debugChip(
+              //     'Trunk',
+              //     '${d['trunkLean'] ?? '?'} ${d['trunkLeanDir'] ?? ''}',
+              //     const Color(0xFFFF9800)),
+              // _debugChip(
+              //     'Descent', d['descentDur'] ?? '-', const Color(0xFF29B6F6)),
+              // _debugChip(
+              //     'Ascent', d['ascentDur'] ?? '-', const Color(0xFF4FC3F7)),
+              // _debugChip(
+              //     'BtmHold', d['bottomHold'] ?? '-', const Color(0xFFFF6D00)),
+              // _debugChip('D:A', d['ratio'] ?? '-', const Color(0xFFAB47BC)),
+              // _debugChip(
+              //   'Form',
+              //   d['correctForm'] ?? '?',
+              //   d['correctForm'] == 'true'
+              //       ? const Color(0xFF00E676)
+              //       : const Color(0xFFFF5252),
               _debugChip(
-                  'Trunk',
-                  '${d['trunkLean'] ?? '?'} ${d['trunkLeanDir'] ?? ''}',
-                  const Color(0xFFFF9800)),
+                  "Hip speed", d['hipSpeed'] ?? '?', const Color(0xFF00E5FF)),
+              _debugChip("Shoulder Speed", d['shoulderSpeed'] ?? '?',
+                  const Color(0xFFFFD600)),
               _debugChip(
-                  'Descent', d['descentDur'] ?? '-', const Color(0xFF29B6F6)),
-              _debugChip(
-                  'Ascent', d['ascentDur'] ?? '-', const Color(0xFF4FC3F7)),
-              _debugChip(
-                  'BtmHold', d['bottomHold'] ?? '-', const Color(0xFFFF6D00)),
-              _debugChip(
-                  'D:A Ratio', d['ratio'] ?? '-', const Color(0xFFAB47BC)),
-              _debugChip(
-                'Form',
-                d['correctForm'] ?? '?',
-                d['correctForm'] == 'true'
-                    ? const Color(0xFF00E676)
-                    : const Color(0xFFFF5252),
-              ),
+                  "Sync Ratio", d['syncRatio'] ?? '?', const Color(0xFF4CAF50)),
+              _debugChip("Peak Sync Ratio", d['peakSyncRatio'] ?? '?',
+                  const Color(0xFF00E5FF)),
+              // ),
             ],
           ),
         ],
@@ -1359,9 +1357,9 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+        color: color.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
       ),
       child: RichText(
         text: TextSpan(
@@ -1369,8 +1367,8 @@ class _ExerciseScreenState extends State<ExerciseScreen>
             TextSpan(
               text: '$label ',
               style: TextStyle(
-                color: color.withValues(alpha: 0.5),
-                fontSize: 10,
+                color: color.withValues(alpha: 0.45),
+                fontSize: 9,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -1378,8 +1376,9 @@ class _ExerciseScreenState extends State<ExerciseScreen>
               text: value,
               style: TextStyle(
                 color: color,
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: FontWeight.w700,
+                fontFamily: 'monospace',
               ),
             ),
           ],
@@ -1388,18 +1387,16 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     );
   }
 
-  /* ── REP LOG / SET SUMMARY PANEL ── */
+  /* ── REP LOG PANEL ── */
   Widget _buildRepLogPanel() {
     if (_repLogs.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(12),
-        color: const Color(0xFF080B18),
+        color: const Color(0xFF060A16),
         child: Text(
-          'No reps completed yet.',
+          'Chưa có lượt squat nào.',
           style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.3),
-            fontSize: 12,
-          ),
+              color: Colors.white.withValues(alpha: 0.25), fontSize: 11),
         ),
       );
     }
@@ -1409,63 +1406,49 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     final isSetComplete = _squat.exerciseState == ExerciseState.completed;
 
     return Container(
-      constraints: const BoxConstraints(maxHeight: 280),
-      decoration: BoxDecoration(
-        color: const Color(0xFF080B18),
-        border: Border(
-          top: BorderSide(
-            color: (isSetComplete ? const Color(0xFF00E676) : Colors.cyanAccent)
-                .withValues(alpha: 0.15),
-            width: 1,
-          ),
-        ),
-      ),
+      constraints: const BoxConstraints(maxHeight: 260),
+      color: const Color(0xFF060A16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Summary header
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
             child: Row(
               children: [
                 Icon(
-                  isSetComplete ? Icons.emoji_events : Icons.analytics,
-                  size: 16,
+                  isSetComplete ? Icons.emoji_events : Icons.analytics_outlined,
+                  size: 14,
                   color: isSetComplete
                       ? const Color(0xFFFFD600)
-                      : Colors.cyanAccent.withValues(alpha: 0.6),
+                      : const Color(0xFF00E5FF).withValues(alpha: 0.5),
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  isSetComplete ? 'SET SUMMARY' : 'REP LOG',
+                  isSetComplete ? 'KẾT QUẢ BÀI TẬP' : 'LỊCH SỬ REP',
                   style: TextStyle(
                     color: isSetComplete
                         ? const Color(0xFFFFD600)
-                        : Colors.cyanAccent.withValues(alpha: 0.6),
-                    fontSize: 11,
+                        : const Color(0xFF00E5FF).withValues(alpha: 0.5),
+                    fontSize: 10,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 1.5,
                   ),
                 ),
                 const Spacer(),
-                _buildMiniStat('$goodCount', 'good', const Color(0xFF00E676)),
+                _buildMiniStat('$goodCount', 'tốt', const Color(0xFF00E676)),
                 const SizedBox(width: 10),
-                _buildMiniStat('$badCount', 'fix', const Color(0xFFFF5252)),
+                _buildMiniStat('$badCount', 'sửa', const Color(0xFFFF5252)),
               ],
             ),
           ),
-
-          // Rep list
           Flexible(
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               shrinkWrap: true,
               itemCount: _repLogs.length,
-              itemBuilder: (context, index) {
-                final log = _repLogs[index];
-                return _buildRepLogCard(log);
-              },
+              itemBuilder: (context, index) =>
+                  _buildRepLogCard(_repLogs[index]),
             ),
           ),
         ],
@@ -1480,19 +1463,15 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         Text(
           count,
           style: TextStyle(
-            color: color,
-            fontSize: 14,
-            fontWeight: FontWeight.w900,
-          ),
+              color: color, fontSize: 14, fontWeight: FontWeight.w900),
         ),
         const SizedBox(width: 3),
         Text(
           label,
           style: TextStyle(
-            color: color.withValues(alpha: 0.6),
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-          ),
+              color: color.withValues(alpha: 0.55),
+              fontSize: 10,
+              fontWeight: FontWeight.w600),
         ),
       ],
     );
@@ -1505,36 +1484,30 @@ class _ExerciseScreenState extends State<ExerciseScreen>
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 2),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.06),
+        color: color.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.15)),
+        border: Border.all(color: color.withValues(alpha: 0.12)),
       ),
       child: Row(
         children: [
-          // Rep number badge
           Container(
-            width: 28,
-            height: 28,
+            width: 26,
+            height: 26,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: color.withValues(alpha: 0.2),
+              color: color.withValues(alpha: 0.15),
             ),
             child: Center(
               child: Text(
                 '${log.repNumber}',
                 style: TextStyle(
-                  color: color,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                ),
+                    color: color, fontSize: 12, fontWeight: FontWeight.w800),
               ),
             ),
           ),
           const SizedBox(width: 10),
-
-          // Details
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1546,16 +1519,15 @@ class _ExerciseScreenState extends State<ExerciseScreen>
                           ? Icons.check_circle
                           : Icons.cancel_rounded,
                       color: color,
-                      size: 14,
+                      size: 13,
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      log.correctForm ? 'Good Rep' : 'Issues Found',
+                      log.correctForm ? 'Tốt' : 'Cần sửa',
                       style: TextStyle(
-                        color: color,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
+                          color: color,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700),
                     ),
                     const Spacer(),
                     if (log.tempo != null)
@@ -1564,8 +1536,8 @@ class _ExerciseScreenState extends State<ExerciseScreen>
                             horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           color:
-                              const Color(0xFF29B6F6).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(6),
+                              const Color(0xFF29B6F6).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(5),
                         ),
                         child: Text(
                           log.tempo!,
@@ -1573,6 +1545,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
                             color: Color(0xFF29B6F6),
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
+                            fontFamily: 'monospace',
                           ),
                         ),
                       ),
@@ -1581,9 +1554,9 @@ class _ExerciseScreenState extends State<ExerciseScreen>
                 if (faults.isNotEmpty) ...[
                   const SizedBox(height: 3),
                   Text(
-                    faults.join(' \u2022 '),
+                    faults.join(' · '),
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.45),
+                      color: Colors.white.withValues(alpha: 0.35),
                       fontSize: 10,
                     ),
                     maxLines: 2,
@@ -1600,13 +1573,68 @@ class _ExerciseScreenState extends State<ExerciseScreen>
 }
 
 /* =========================================================================
-   POSE PAINTER — Accurate Skeleton Overlay
+   ARC COUNTDOWN PAINTER
+   Draws a circular progress arc for the bottom hold countdown.
+   ========================================================================= */
+
+class _ArcCountdownPainter extends CustomPainter {
+  final double progress; // 0.0 → 1.0
+  final Color color;
+
+  const _ArcCountdownPainter({required this.progress, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2 - 1.5;
+
+    // Background track
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..color = color.withValues(alpha: 0.2)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5,
+    );
+
+    // Progress arc — starts at top (−π/2), sweeps clockwise
+    final sweepAngle = 2 * math.pi * progress;
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      -math.pi / 2,
+      sweepAngle,
+      false,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5
+        ..strokeCap = StrokeCap.round,
+    );
+
+    // Center dot when complete
+    if (progress >= 1.0) {
+      canvas.drawCircle(
+        center,
+        2.5,
+        Paint()..color = color,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ArcCountdownPainter old) =>
+      old.progress != progress || old.color != color;
+}
+
+/* =========================================================================
+   POSE PAINTER
    ========================================================================= */
 
 class PosePainter extends CustomPainter {
   final Pose pose;
-  final Size imageSize; // Effective image size (after rotation swap)
-  final Size widgetSize; // The canvas/widget size
+  final Size imageSize;
+  final Size widgetSize;
   final InputImageRotation rotation;
   final CameraLensDirection lensDirection;
   final Map<String, dynamic> debugData;
@@ -1620,26 +1648,20 @@ class PosePainter extends CustomPainter {
     this.debugData = const {},
   });
 
-  /* Fixed body skeleton connections */
   static const List<List<PoseLandmarkType>> _bodyConnections = [
-    // Torso
     [PoseLandmarkType.leftShoulder, PoseLandmarkType.rightShoulder],
     [PoseLandmarkType.leftHip, PoseLandmarkType.rightHip],
     [PoseLandmarkType.leftShoulder, PoseLandmarkType.leftHip],
     [PoseLandmarkType.rightShoulder, PoseLandmarkType.rightHip],
-    // Left arm
     [PoseLandmarkType.leftShoulder, PoseLandmarkType.leftElbow],
     [PoseLandmarkType.leftElbow, PoseLandmarkType.leftWrist],
-    // Right arm
     [PoseLandmarkType.rightShoulder, PoseLandmarkType.rightElbow],
     [PoseLandmarkType.rightElbow, PoseLandmarkType.rightWrist],
-    // Left leg
     [PoseLandmarkType.leftHip, PoseLandmarkType.leftKnee],
     [PoseLandmarkType.leftKnee, PoseLandmarkType.leftAnkle],
     [PoseLandmarkType.leftAnkle, PoseLandmarkType.leftHeel],
     [PoseLandmarkType.leftHeel, PoseLandmarkType.leftFootIndex],
     [PoseLandmarkType.leftAnkle, PoseLandmarkType.leftFootIndex],
-    // Right leg
     [PoseLandmarkType.rightHip, PoseLandmarkType.rightKnee],
     [PoseLandmarkType.rightKnee, PoseLandmarkType.rightAnkle],
     [PoseLandmarkType.rightAnkle, PoseLandmarkType.rightHeel],
@@ -1647,9 +1669,7 @@ class PosePainter extends CustomPainter {
     [PoseLandmarkType.rightAnkle, PoseLandmarkType.rightFootIndex],
   ];
 
-  /* Map of body part colors for visual clarity */
   static final Map<PoseLandmarkType, Color> _landmarkColors = {
-    // Left side → cyan
     PoseLandmarkType.leftShoulder: Colors.cyanAccent,
     PoseLandmarkType.leftElbow: Colors.cyanAccent,
     PoseLandmarkType.leftWrist: Colors.cyanAccent,
@@ -1658,7 +1678,6 @@ class PosePainter extends CustomPainter {
     PoseLandmarkType.leftAnkle: Colors.cyanAccent,
     PoseLandmarkType.leftHeel: Colors.cyanAccent,
     PoseLandmarkType.leftFootIndex: Colors.cyanAccent,
-    // Right side → yellow
     PoseLandmarkType.rightShoulder: Colors.yellowAccent,
     PoseLandmarkType.rightElbow: Colors.yellowAccent,
     PoseLandmarkType.rightWrist: Colors.yellowAccent,
@@ -1667,7 +1686,6 @@ class PosePainter extends CustomPainter {
     PoseLandmarkType.rightAnkle: Colors.yellowAccent,
     PoseLandmarkType.rightHeel: Colors.yellowAccent,
     PoseLandmarkType.rightFootIndex: Colors.yellowAccent,
-    // Head → white
     PoseLandmarkType.nose: Colors.white,
     PoseLandmarkType.leftEye: Colors.white70,
     PoseLandmarkType.rightEye: Colors.white70,
@@ -1692,33 +1710,21 @@ class PosePainter extends CustomPainter {
     final landmarks = pose.landmarks;
     if (landmarks.isEmpty) return;
 
-    /* ── Coordinate transformation ──
-       ML Kit returns coordinates in the image space.
-       On Android with rotation90, the effective coordinate space is
-       (imageHeight × imageWidth). We scale to the widget/canvas size.
-       
-       The CameraPreview widget may not fill the canvas exactly (aspect ratio
-       mismatch), so we compute the actual preview rect within the canvas and
-       offset our drawing accordingly.
-    */
     final double imageW = imageSize.width;
     final double imageH = imageSize.height;
     final double canvasW = size.width;
     final double canvasH = size.height;
 
-    // Compute the area the camera preview occupies (aspect-fit centered)
     final double imageAspect = imageW / imageH;
     final double canvasAspect = canvasW / canvasH;
 
     double previewW, previewH, offsetX, offsetY;
     if (imageAspect > canvasAspect) {
-      // Image is wider → pillarbox (black bars top/bottom)
       previewW = canvasW;
       previewH = canvasW / imageAspect;
       offsetX = 0;
       offsetY = (canvasH - previewH) / 2;
     } else {
-      // Image is taller → letterbox (black bars left/right)
       previewH = canvasH;
       previewW = canvasH * imageAspect;
       offsetX = (canvasW - previewW) / 2;
@@ -1732,9 +1738,6 @@ class PosePainter extends CustomPainter {
       double x = lm.x;
       double y = lm.y;
 
-      // On Android, ML Kit with rotation90 returns coords in
-      // the rotated coordinate space. Scale directly.
-      // On iOS the coords are in the original space.
       if (Platform.isAndroid) {
         switch (rotation) {
           case InputImageRotation.rotation90deg:
@@ -1750,7 +1753,6 @@ class PosePainter extends CustomPainter {
         }
       }
 
-      // Front camera mirror
       if (lensDirection == CameraLensDirection.front) {
         x = imageW - x;
       }
@@ -1758,7 +1760,7 @@ class PosePainter extends CustomPainter {
       return Offset(x * scaleX + offsetX, y * scaleY + offsetY);
     }
 
-    /* ── Draw skeleton lines ── */
+    // Draw skeleton lines
     for (final connection in _bodyConnections) {
       final lm1 = landmarks[connection[0]];
       final lm2 = landmarks[connection[1]];
@@ -1768,23 +1770,22 @@ class PosePainter extends CustomPainter {
       final p1 = transformPoint(lm1);
       final p2 = transformPoint(lm2);
 
-      // Determine line color based on confidence
       final avgConf = (lm1.likelihood + lm2.likelihood) / 2;
       final lineColor = avgConf > 0.8
-          ? Colors.greenAccent.withValues(alpha: 0.7)
-          : Colors.orangeAccent.withValues(alpha: 0.5);
+          ? Colors.greenAccent.withValues(alpha: 0.65)
+          : Colors.orangeAccent.withValues(alpha: 0.45);
 
       canvas.drawLine(
         p1,
         p2,
         Paint()
           ..color = lineColor
-          ..strokeWidth = 3.0
+          ..strokeWidth = 2.5
           ..strokeCap = StrokeCap.round,
       );
     }
 
-    /* ── Draw landmark dots ── */
+    // Draw landmark dots
     for (final entry in landmarks.entries) {
       final lm = entry.value;
       if (lm.likelihood < 0.5) continue;
@@ -1792,35 +1793,30 @@ class PosePainter extends CustomPainter {
       final point = transformPoint(lm);
       final color = _landmarkColors[entry.key] ?? Colors.white;
 
-      // Outer glow
       canvas.drawCircle(
         point,
-        6,
+        5.5,
         Paint()
-          ..color = color.withValues(alpha: 0.3)
+          ..color = color.withValues(alpha: 0.25)
           ..style = PaintingStyle.fill,
       );
-      // Inner dot
       canvas.drawCircle(
         point,
-        4,
+        3.5,
         Paint()
           ..color = color
           ..style = PaintingStyle.fill,
       );
     }
 
-    /* ── Draw angle labels at key joints ── */
     _drawAngleLabels(canvas, landmarks, transformPoint);
   }
 
-  /* Draw angle values next to key joints for debugging */
   void _drawAngleLabels(
     Canvas canvas,
     Map<PoseLandmarkType, PoseLandmark> landmarks,
     Offset Function(PoseLandmark) transformPoint,
   ) {
-    // Knee angle
     final knee = landmarks[PoseLandmarkType.leftKnee] ??
         landmarks[PoseLandmarkType.rightKnee];
     if (knee != null && knee.likelihood > 0.5) {
@@ -1832,7 +1828,6 @@ class PosePainter extends CustomPainter {
       }
     }
 
-    // Trunk lean (at shoulder)
     final shoulder = landmarks[PoseLandmarkType.leftShoulder] ??
         landmarks[PoseLandmarkType.rightShoulder];
     if (shoulder != null && shoulder.likelihood > 0.5) {
@@ -1851,7 +1846,7 @@ class PosePainter extends CustomPainter {
         text: text,
         style: TextStyle(
           color: color,
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: FontWeight.bold,
           shadows: const [
             Shadow(color: Colors.black, blurRadius: 4),
@@ -1863,7 +1858,6 @@ class PosePainter extends CustomPainter {
     );
     textPainter.layout();
 
-    // Background rect
     final bgRect = RRect.fromRectAndRadius(
       Rect.fromLTWH(
         position.dx - 2,
@@ -1873,11 +1867,7 @@ class PosePainter extends CustomPainter {
       ),
       const Radius.circular(4),
     );
-    canvas.drawRRect(
-      bgRect,
-      Paint()..color = Colors.black54,
-    );
-
+    canvas.drawRRect(bgRect, Paint()..color = Colors.black54);
     textPainter.paint(canvas, position);
   }
 

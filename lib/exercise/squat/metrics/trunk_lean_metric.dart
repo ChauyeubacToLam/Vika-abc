@@ -12,7 +12,7 @@ import '../../../utils/debouncer.dart';
 class TrunkLeanConfig {
   /// Good forward lean range (degrees from vertical)
   /// Wide for Vietnamese Group 1 males (short torso, long femurs)
-  static const List<int> GOOD_LEAN_RANGE = [15, 50];
+  static const List<int> GOOD_LEAN_RANGE = [15, 40];
 
   /// Backward lean threshold (degrees). Below this = leaning back.
   static const double BACKWARD_LIMIT = 0.02;
@@ -32,6 +32,9 @@ class TrunkLeanMetric extends SquatMetricBase {
   /// Track maximum trunk lean this rep (for post-rep analysis)
   double? maxTrunkLean;
 
+  /// Prevent instruction spam — only set coaching once per rep.
+  bool _instructionSet = false;
+
   @override
   List<FaultRecord> get faults => _faults;
 
@@ -39,8 +42,8 @@ class TrunkLeanMetric extends SquatMetricBase {
   Map<String, dynamic> get debugData => _debugData;
 
   @override
-  Map<String, String> update(RepContext ctx) {
-    // Track max lean per rep (spec: record maximum lean angle per rep)
+  void update(RepContext ctx) {
+    // Track max lean per rep
     if (maxTrunkLean == null || ctx.trunkLean > maxTrunkLean!) {
       maxTrunkLean = ctx.trunkLean;
     }
@@ -48,7 +51,6 @@ class TrunkLeanMetric extends SquatMetricBase {
     _debugData['maxTrunkLean'] = maxTrunkLean?.toStringAsFixed(1) ?? 'N/A';
 
     final phase = ctx.squatState.toString().split('.').last.toUpperCase();
-    final feedback = <String, String>{};
 
     bool leanForward = ctx.trunkLean > TrunkLeanConfig.GOOD_LEAN_RANGE[1];
     bool leanBackward = ctx.trunkLean < -TrunkLeanConfig.BACKWARD_LIMIT;
@@ -57,16 +59,24 @@ class TrunkLeanMetric extends SquatMetricBase {
     bool backwardConfirmed = _backwardDebouncer.update(leanBackward);
 
     if (forwardConfirmed) {
-      feedback['Back'] = 'Chest up!';
+      ctx.resultIssues.feedback['Back'] = 'Chest up!';
+      if (!_instructionSet) {
+        ctx.resultIssues
+            .addInstruction('standing', 'Back', 'Keep chest up next time!');
+        _instructionSet = true;
+      }
       _logFault(phase, 'Leaned too forward');
     } else if (backwardConfirmed) {
-      feedback['Back'] = "Don't lean back!";
+      ctx.resultIssues.feedback['Back'] = "Don't lean back!";
+      if (!_instructionSet) {
+        ctx.resultIssues
+            .addInstruction('standing', 'Back', "Don't lean back next time!");
+        _instructionSet = true;
+      }
       _logFault(phase, 'Leaned backward');
     } else {
-      feedback['Back'] = 'Good back';
+      ctx.resultIssues.feedback['Back'] = 'Good back';
     }
-
-    return feedback;
   }
 
   void _logFault(String phase, String message) {
@@ -87,5 +97,6 @@ class TrunkLeanMetric extends SquatMetricBase {
     _forwardDebouncer.reset();
     _backwardDebouncer.reset();
     maxTrunkLean = null;
+    _instructionSet = false;
   }
 }

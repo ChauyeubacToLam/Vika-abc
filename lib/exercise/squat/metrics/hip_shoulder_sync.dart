@@ -21,6 +21,8 @@
    - Group 1 males (long legs, short torso) are mechanically prone to
      hip-dominant ascent. Expand Good to 0.8-1.4 for this body type.
    - For bodyweight squats, frame as coaching cue, not safety alert.
+   
+  
    ========================================================================= */
 
 import 'package:vinafit_mobile/utils/debouncer.dart';
@@ -30,27 +32,19 @@ import '../squat.dart';
 
 class HipShoulderSyncConfig {
   /// Good: hips and shoulders rise together.
-  static const double RATIO_GOOD_MAX = 1.3;
+  static const double RATIO_GOOD_MAX = 0.85;
 
   /// Warning: mild hip-leading pattern.
-  static const double RATIO_WARNING_MAX = 1.8;
-
-  /// Above this = clear good morning pattern (error).
-  /// (anything > RATIO_WARNING_MAX)
+  static const double RATIO_WARNING_MAX = 1.0;
 
   /// Sliding window size in frames for velocity calculation.
   static const int WINDOW_SIZE = 3; // ~0.1s at 30fps
 
   /// Maximum frames to evaluate during ascent.
-  /// Only evaluate first ~50% of ascent to catch the pattern early.
-  /// At 30fps, 15 frames ≈ 0.5s — covers the critical first half
-  /// of a typical 1-1.5s ascent.
-  static const int MAX_ASCENT_FRAMES = 15;
+  static const int MAX_ASCENT_FRAMES = 20;
 
   /// Minimum shoulder speed to compute ratio (avoids divide-by-near-zero).
-  /// If shoulders barely move while hips shoot up, that's the worst case
-  /// and we flag it directly without computing ratio.
-  static const double MIN_SHOULDER_SPEED = 0.5;
+  static const double MIN_SHOULDER_SPEED = 0.6;
 
   /// Consecutive warning frames before confirming fault.
   static const int CONFIRM_FRAMES = 3;
@@ -67,7 +61,6 @@ class HipShoulderSyncMetric extends SquatMetricBase {
   final List<double> _hipYWindow = [];
   final List<double> _shoulderYWindow = [];
 
-  //Debouncer for clear good morning pattern (hip speed >> shoulder speed)
   final Debouncer _warningEdgeDebouncer =
       Debouncer(requiredFrames: HipShoulderSyncConfig.CONFIRM_FRAMES);
   final Debouncer _warningMaxDebouncer =
@@ -75,11 +68,12 @@ class HipShoulderSyncMetric extends SquatMetricBase {
   final Debouncer _warningMildDebouncer =
       Debouncer(requiredFrames: HipShoulderSyncConfig.CONFIRM_FRAMES);
 
-  // Ascent tracking
   int _ascentFrameCount = 0;
   bool _faultLogged = false;
 
-  // Peak ratio this rep (for post-rep analysis)
+  /// Prevent instruction spam — only set coaching once per rep.
+  bool _instructionSet = false;
+
   double _peakRatio = 0.0;
 
   @override
@@ -89,11 +83,9 @@ class HipShoulderSyncMetric extends SquatMetricBase {
   Map<String, dynamic> get debugData => _debugData;
 
   @override
-  Map<String, String> update(RepContext ctx) {
-    final feedback = <String, String>{};
-
+  void update(RepContext ctx) {
     if (ctx.squatState != SquatState.ascending) {
-      return feedback;
+      return;
     }
 
     _ascentFrameCount++;
@@ -101,14 +93,13 @@ class HipShoulderSyncMetric extends SquatMetricBase {
     // Only evaluate first 50% of ascent — signal normalizes near standing
     if (_ascentFrameCount > HipShoulderSyncConfig.MAX_ASCENT_FRAMES) {
       _debugData['syncStatus'] = 'past window';
-      return feedback;
+      return;
     }
 
     // Add to sliding windows
     _hipYWindow.add(ctx.hipY);
     _shoulderYWindow.add(ctx.shoulderY);
 
-    // Trim to window size
     while (_hipYWindow.length > HipShoulderSyncConfig.WINDOW_SIZE) {
       _hipYWindow.removeAt(0);
     }
@@ -116,14 +107,11 @@ class HipShoulderSyncMetric extends SquatMetricBase {
       _shoulderYWindow.removeAt(0);
     }
 
-    // Need full window to compute velocity
     if (_hipYWindow.length < HipShoulderSyncConfig.WINDOW_SIZE) {
       _debugData['syncStatus'] = 'filling window';
-      return feedback;
+      return;
     }
 
-    // Compute upward speed (positive = moving up)
-    // ML Kit Y increases downward, so (first - last) = upward movement
     final frameCount = _hipYWindow.length - 1;
     final hipSpeed = (_hipYWindow.first - _hipYWindow.last) / frameCount;
     final shoulderSpeed =
@@ -133,21 +121,19 @@ class HipShoulderSyncMetric extends SquatMetricBase {
     _debugData['shoulderSpeed'] = shoulderSpeed.toStringAsFixed(2);
 
     // Edge case: shoulders barely moving while hips shoot up
-    // This IS the good morning pattern — worst case
     if (_warningEdgeDebouncer.update(
         shoulderSpeed < HipShoulderSyncConfig.MIN_SHOULDER_SPEED &&
             hipSpeed > HipShoulderSyncConfig.MIN_SHOULDER_SPEED)) {
       _debugData['syncStatus'] = 'ERROR (shoulders still, hips up)';
       _maybeLogFault(ctx, 'Shoulders stalled while hips rose');
-      feedback['Sync'] = 'Drive chest up!';
-      return feedback;
+      ctx.resultIssues.feedback['Sync'] = 'Drive chest up!';
+      _maybeSetInstruction(ctx, 'Shoulders barely moved, drive chest up!');
+      return;
     }
 
-    // Normal case: compute ratio
     if (shoulderSpeed < HipShoulderSyncConfig.MIN_SHOULDER_SPEED) {
-      // Both barely moving — no meaningful data
       _debugData['syncStatus'] = 'minimal movement';
-      return feedback;
+      return;
     }
 
     final ratio = hipSpeed / shoulderSpeed;
@@ -158,27 +144,25 @@ class HipShoulderSyncMetric extends SquatMetricBase {
 
     if (_warningMaxDebouncer
         .update(ratio > HipShoulderSyncConfig.RATIO_WARNING_MAX)) {
-      // Clear good morning pattern — hips rising much faster than shoulders
       _debugData['syncStatus'] = 'ERROR (hip-leading)';
       _maybeLogFault(ctx, 'Hips rising much faster than shoulders');
-      feedback['Sync'] = 'Drive chest up!';
+      ctx.resultIssues.feedback['Sync'] = 'Drive chest up!';
+      _maybeSetInstruction(
+          ctx, 'Hips too fast, move hips and shoulders together');
     } else if (_warningMildDebouncer
         .update(ratio > HipShoulderSyncConfig.RATIO_GOOD_MAX)) {
-      // Warning: mild hip-leading pattern
       _debugData['syncStatus'] = 'WARNING';
-      _maybeLogFault(ctx, 'Hips rising abit faster than shoulders');
-      feedback['Sync'] = 'Try to keep chest up';
+      _maybeLogFault(ctx, 'Hips rising a bit faster than shoulders');
+      ctx.resultIssues.feedback['Sync'] = 'Try to keep chest up';
+      _maybeSetInstruction(ctx, 'Hips a bit fast, try keeping chest up');
     } else {
-      // Good sync — reset warning counter
       _debugData['syncStatus'] = 'good';
-      feedback['Sync'] = 'Good sync';
+      ctx.resultIssues.feedback['Sync'] = 'Good sync';
     }
-
-    return feedback;
   }
 
   void _maybeLogFault(RepContext ctx, String message) {
-    if (_faultLogged) return; // One fault per rep max
+    if (_faultLogged) return;
     _faultLogged = true;
 
     final phase = ctx.squatState.toString().split('.').last.toUpperCase();
@@ -190,12 +174,20 @@ class HipShoulderSyncMetric extends SquatMetricBase {
     ));
   }
 
+  /// Set instruction once per rep — avoids overwriting every frame.
+  void _maybeSetInstruction(RepContext ctx, String message) {
+    if (_instructionSet) return;
+    _instructionSet = true;
+    ctx.resultIssues.addInstruction('standing', 'Sync', message);
+  }
+
   @override
   void reset() {
     _hipYWindow.clear();
     _shoulderYWindow.clear();
     _ascentFrameCount = 0;
     _faultLogged = false;
+    _instructionSet = false;
     _peakRatio = 0.0;
     _faults.clear();
     _debugData.clear();

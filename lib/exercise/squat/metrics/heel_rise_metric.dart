@@ -16,6 +16,7 @@ import '../../../utils/debouncer.dart';
 class HeelRiseConfig {
   /// Heel lift threshold normalized to back length (shoulder-to-hip).
   /// 0.15 = "If heel lifts more than 15% of back length."
+  // ignore: constant_identifier_names
   static const double LIFT_THRESHOLD = 0.15;
 }
 
@@ -29,6 +30,9 @@ class HeelRiseMetric extends SquatMetricBase {
   // 10 frames ~0.33s at 30fps — prevents false triggers from floor jitter
   final Debouncer _heelDebouncer = Debouncer(requiredFrames: 10);
 
+  /// Prevent instruction spam — only set coaching once per rep.
+  bool _instructionSet = false;
+
   @override
   List<FaultRecord> get faults => _faults;
 
@@ -36,23 +40,25 @@ class HeelRiseMetric extends SquatMetricBase {
   Map<String, dynamic> get debugData => _debugData;
 
   @override
-  Map<String, String> update(RepContext ctx) {
+  void update(RepContext ctx) {
     double normalized = ctx.heelDistance / (ctx.scaleFactor ?? 1.0);
 
     _debugData['heelNorm'] = normalized.toStringAsFixed(3);
     _debugData['heelRaw'] = ctx.heelDistance.toStringAsFixed(2);
 
     final phase = ctx.squatState.toString().split('.').last.toUpperCase();
-    final feedback = <String, String>{};
 
     if (_heelDebouncer.update(normalized >= HeelRiseConfig.LIFT_THRESHOLD)) {
-      feedback['Feet'] = 'Heels lifting - try elevating heels';
+      ctx.resultIssues.feedback['Feet'] = 'Heels lifting';
+      if (!_instructionSet) {
+        ctx.resultIssues.addInstruction(
+            'standing', 'Feet', 'Heels lifting — try elevating heels');
+        _instructionSet = true;
+      }
       _logFault(phase, 'Heels lifting');
     } else {
-      feedback['Feet'] = 'Good Heels';
+      ctx.resultIssues.feedback['Feet'] = 'Good Heels';
     }
-
-    return feedback;
   }
 
   void _logFault(String phase, String message) {
@@ -72,5 +78,6 @@ class HeelRiseMetric extends SquatMetricBase {
     _faults.clear();
     _debugData.clear();
     _heelDebouncer.reset();
+    _instructionSet = false;
   }
 }

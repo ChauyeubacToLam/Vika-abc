@@ -5,7 +5,7 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
 import '../exercise_base.dart';
 import 'metrics/squat_metric_base.dart';
-import 'metrics/depth_metric.dart';
+import 'metrics/squat_depth_metric.dart';
 import 'metrics/trunk_lean_metric.dart';
 import 'metrics/heel_rise_metric.dart';
 import 'metrics/tempo_metric.dart';
@@ -17,11 +17,6 @@ import 'metrics/hip_shoulder_sync.dart';
 class SquatConfig {
   static const double MIN_CONFIDENCE = 0.98;
 
-  /* KNEE ANGLES (0-180 Joint Logic)
-     180 = Straight leg.
-     <= 130: Start of squat (Descending).
-     80-115: Deep squat (Bottom/Ascending).
-  */
   static const int SQUAT_STAND_ANGLE_THRESHOLD = 160;
   static const int SQUAT_DESCEND_ANGLE_THRESHOLD = 152;
   static const List<int> SQUAT_BOTTOM_ANGLE_THRESHOLD = [80, 100];
@@ -41,14 +36,12 @@ enum SquatState {
 class Squat extends ExerciseBase {
   SquatState squatState = SquatState.standing;
 
-  // --- Metrics (each is a self-contained unit) ---
   final DepthMetric depthMetric = DepthMetric();
   final TrunkLeanMetric trunkLeanMetric = TrunkLeanMetric();
   final HeelRiseMetric heelRiseMetric = HeelRiseMetric();
   final TempoMetric tempoMetric = TempoMetric();
   final HipShoulderSyncMetric hipShoulderSyncMetric = HipShoulderSyncMetric();
 
-  /// All metrics in evaluation order.
   late final List<SquatMetricBase> _metrics = [
     depthMetric,
     trunkLeanMetric,
@@ -133,7 +126,7 @@ class Squat extends ExerciseBase {
     double heelDistanceToFloor = foot.y - heel.y;
     int now = DateTime.now().millisecondsSinceEpoch;
 
-    // ---------- 3. Build RepContext (shared across all metrics) ----------
+    // ---------- 3. Build RepContext ----------
 
     final ctx = RepContext(
       kneeAngle: kneeAngle,
@@ -146,6 +139,7 @@ class Squat extends ExerciseBase {
       kneeY: knee.y,
       hipY: hip.y,
       shoulderY: shoulder.y,
+      resultIssues: resultIssues,
     );
 
     // ---------- 4. Populate Debug Data ----------
@@ -166,13 +160,13 @@ class Squat extends ExerciseBase {
         repCount += 1;
 
         // Let depth check if rep was deep enough
-        depthMetric.checkRepCompletion(squatState);
+        depthMetric.checkRepCompletion(squatState, ctx);
 
         // Fire final state transition so tempo can calculate ascent
         _transitionState(SquatState.standing, now);
 
         // Let tempo evaluate the full rep
-        tempoMetric.evaluateRep();
+        tempoMetric.evaluateRep(ctx);
 
         // Collect faults from all metrics
         final allFaults = <FaultRecord>[];
@@ -184,9 +178,10 @@ class Squat extends ExerciseBase {
         correctForm = !allFaults.any((f) => f.affectsForm);
 
         // UI feedback
-        feedbackMessage['Result'] = correctForm ? 'Good Rep!' : 'Fix Form';
+        resultIssues.feedback['Result'] =
+            correctForm ? 'Good Rep!' : 'Fix Form';
 
-        // Build fault map for set history (same structure as before)
+        // Build fault map for set history
         final faultMap = <String, Map<String, String>>{};
         for (final fault in allFaults) {
           if (!faultMap.containsKey(fault.phase)) {
@@ -196,23 +191,23 @@ class Squat extends ExerciseBase {
         }
         setFeedback.add({correctForm: faultMap});
 
-        // Merge metric debug data BEFORE reset (so ascent duration etc. are captured)
+        // Merge metric debug data BEFORE reset
         for (final metric in _metrics) {
           debugData.addAll(metric.debugData);
         }
 
-        // Add tempo to post-rep feedback
+        // Add tempo summary to post-rep feedback
         if (tempoMetric.descentDuration != null) {
-          feedbackMessage['Tempo'] =
+          resultIssues.feedback['Tempo'] =
               '↓${tempoMetric.descentDuration!.toStringAsFixed(1)}s';
           if (tempoMetric.ascentDuration != null) {
-            feedbackMessage['Tempo'] =
+            resultIssues.feedback['Tempo'] =
                 '↓${tempoMetric.descentDuration!.toStringAsFixed(1)}s ↑${tempoMetric.ascentDuration!.toStringAsFixed(1)}s';
           }
         }
       }
 
-      // Reset everything for next rep
+      // Reset metrics for next rep (instructions survive — shown during standing)
       squatState = SquatState.standing;
       correctForm = true;
       for (final metric in _metrics) {
@@ -225,34 +220,36 @@ class Squat extends ExerciseBase {
 
     _updateSquatState(kneeAngle, now);
 
-    // ---------- 7. Run All Metrics & Collect Feedback ----------
+    // ---------- 7. Run All Metrics ----------
 
     if (squatState != SquatState.standing) {
       for (final metric in _metrics) {
-        final result = metric.update(ctx);
-
-        // Tempo produces coaching reminders from the PREVIOUS rep.
-        // These go into instructions (persistent coaching), not feedback.
-        if (metric is TempoMetric) {
-          instructions.addAll(result);
-        } else {
-          feedbackMessage.addAll(result);
-        }
+        metric.update(ctx);
       }
+    }
 
-      // Merge metric debug data into main debug map
-      for (final metric in _metrics) {
-        debugData.addAll(metric.debugData);
-      }
+    // Merge metric debug data
+    for (final metric in _metrics) {
+      debugData.addAll(metric.debugData);
+    }
 
-      // Status instruction based on current squat phase
-      if (squatState == SquatState.descending) {
-        instructions['Status'] = 'Going Down...';
-      } else if (squatState == SquatState.bottom) {
-        instructions['Status'] = 'Hold Bottom';
-      } else if (squatState == SquatState.ascending) {
-        instructions['Status'] = 'Push Up!';
+    // Status instruction based on current squat phase
+    if (squatState == SquatState.descending) {
+      resultIssues.addInstruction('descending', 'Status', 'Going Down...');
+    } else if (squatState == SquatState.bottom) {
+      final remaining = tempoMetric.bottomHoldRemaining;
+      final progress = tempoMetric.bottomHoldProgress;
+      if (remaining != null && remaining > 0.05) {
+        resultIssues.addInstruction(
+            'bottom', 'Status', 'Hold! ${remaining.toStringAsFixed(1)}s');
+      } else {
+        resultIssues.addInstruction('bottom', 'Status', 'Push Up Now!');
       }
+      if (progress != null) {
+        debugData['bottomHoldProgress'] = progress;
+      }
+    } else if (squatState == SquatState.ascending) {
+      resultIssues.addInstruction('ascending', 'Status', 'Push Up!');
     }
   }
 
@@ -261,29 +258,28 @@ class Squat extends ExerciseBase {
   ----------------------------------------------------------------------- */
 
   void _updateSquatState(double kneeAngle, int timestampMs) {
-    // Standing → Descending
     if (kneeAngle <= SquatConfig.SQUAT_DESCEND_ANGLE_THRESHOLD &&
         squatState == SquatState.standing) {
       _transitionState(SquatState.descending, timestampMs);
-    }
-    // Descending → Bottom
-    else if (kneeAngle <= SquatConfig.SQUAT_BOTTOM_ANGLE_THRESHOLD[1] &&
+    } else if (kneeAngle <= SquatConfig.SQUAT_BOTTOM_ANGLE_THRESHOLD[1] &&
         squatState == SquatState.descending) {
       _transitionState(SquatState.bottom, timestampMs);
-    }
-    // Bottom → Ascending (+5 buffer to prevent flickering)
-    else if (kneeAngle > (SquatConfig.SQUAT_BOTTOM_ANGLE_THRESHOLD[1] + 5) &&
+    } else if (kneeAngle > (SquatConfig.SQUAT_BOTTOM_ANGLE_THRESHOLD[1] + 5) &&
         squatState == SquatState.bottom) {
       _transitionState(SquatState.ascending, timestampMs);
     }
   }
 
-  /// Transitions state and notifies all metrics.
   void _transitionState(SquatState newState, int timestampMs) {
     final oldState = squatState;
     squatState = newState;
 
-    // Notify all metrics of the transition
+    // Clear coaching instructions when user starts a new rep.
+    // Instructions were shown during standing — no longer needed.
+    if (newState == SquatState.descending) {
+      resultIssues.instructions.clear();
+    }
+
     for (final metric in _metrics) {
       metric.onStateTransition(oldState, newState, timestampMs);
     }

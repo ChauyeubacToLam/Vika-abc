@@ -3,7 +3,7 @@
    
    Each metric is a self-contained unit that:
    - Receives frame data via update()
-   - Produces feedback via getFeedback()
+   - Writes feedback + instructions to ctx.resultIssues
    - Logs faults into its own fault list
    - Resets cleanly between reps
    
@@ -12,9 +12,18 @@
    │  Squat  │────▶│  RepContext   │◀────│  MetricBase  │
    │ (owner) │     │ (shared state)│     │  (per metric)│
    └─────────┘     └──────────────┘     └──────────────┘
+   
+   Data flow:
+   - feedback{}  → cleared every frame in processPose()
+                  → metrics write live cards here (Depth, Back, Feet, etc.)
+   - instructions{phase → {type → message}}
+                  → coaching from evaluateRep() or per-frame faults
+                  → cleared when new rep begins (standing → descending)
+                  → UI reads instructions[currentPhase] for coaching chips
    ========================================================================= */
 
 import '../squat.dart';
+import '../../exercise_base.dart';
 
 /* =========================================================================
    RepContext — Shared per-frame state, passed to all metrics.
@@ -34,6 +43,9 @@ class RepContext {
   final double hipY;
   final double shoulderY;
 
+  /// Shared result container — metrics write feedback + instructions here.
+  final ResultIssues resultIssues;
+
   RepContext({
     required this.kneeAngle,
     required this.trunkLean,
@@ -45,6 +57,7 @@ class RepContext {
     required this.kneeY,
     required this.hipY,
     required this.shoulderY,
+    required this.resultIssues,
   });
 }
 
@@ -73,8 +86,8 @@ abstract class SquatMetricBase {
   String get name;
 
   /// Called every frame during an active rep (squatState != standing).
-  /// Returns feedback key-value pairs to display.
-  Map<String, String> update(RepContext ctx);
+  /// Writes feedback + instructions directly to ctx.resultIssues.
+  void update(RepContext ctx);
 
   /// Faults accumulated this rep. Squat reads these when rep completes.
   List<FaultRecord> get faults;

@@ -1,3 +1,5 @@
+// ignore_for_file: constant_identifier_names
+
 /* =========================================================================
    Metric 4: Descent Tempo Control
    Priority: NICE-TO-HAVE — Ship Month 1-2
@@ -9,15 +11,17 @@
    - Slow grinding ascent (struggling / weak quads)
    
    APPROACH:
-   - onStateTransition() records timestamps at each phase change.
-   - evaluateRep() runs post-rep to calculate durations and log faults.
-   - update() shows reminders from PREVIOUS rep during CURRENT rep.
+   - onStateTransition() records timestamps + calculates durations.
+   - update() checks durations per-frame (null-gated) for live feedback.
+   - evaluateRep() logs faults + sets coaching instructions for next rep.
    
-   FEEDBACK TIMING ("coach next rep" pattern):
-   The reminder shows ONE PHASE BEFORE the user needs it:
-     Descent too fast  → remind during Standing    (before they go down)
-     Bottom too short  → remind during Descending  (before they reach bottom)
-     Ascent too slow   → remind during Bottom      (before they push up)
+   LIVE FEEDBACK (in update, fires as soon as data exists):
+     Bottom phase    → descent speed check (descentDuration available)
+     Ascending phase → bottom hold check (bottomHoldDuration available)
+   
+   COACHING INSTRUCTIONS (set by evaluateRep, shown during standing):
+     All tempo coaching shows during standing — one moment to absorb
+     tips before the next rep begins.
    
    Vietnamese Adjustments (Weeks 1-4):
    - Beginners with stiff ankles often descend slowly (3-5s) → ACCEPTABLE
@@ -30,37 +34,18 @@ import '../squat.dart';
 
 class TempoConfig {
   /* --- Descent Duration (seconds) --- */
-  static const double DESCENT_MIN_GOOD = 0.4; // Below this = a bit fast
-  static const double DESCENT_MAX_GOOD = 2.0; // Above this = slow
-  static const double DESCENT_MIN_ERROR =
-      0.25; // Below this = dropped like a rock (no control)
+  static const double DESCENT_MIN_GOOD = 0.45;
+  static const double DESCENT_MIN_ERROR = 0.32;
 
   /* --- Bottom Hold (seconds) --- */
-  /// Below this = bouncing (no controlled pause at bottom).
   static const double BOTTOM_HOLD_MIN = 0.8;
 
   /* --- Descent:Ascent Ratio --- */
-  static const double RATIO_GOOD = 1.0;
+  static const double RATIO_GOOD = 2.0;
   static const double RATIO_WARNING = 0.5;
 
   /* --- Ascent Struggle Detection --- */
-  /// If ascent > descent × this multiplier, user is struggling.
-  /// Not a form error — coaching observation for weak quads.
   static const double ASCENT_STRUGGLE_MULTIPLIER = 2.0;
-}
-
-/* =========================================================================
-   Cross-rep coaching issues.
-   Each field is null (no issue) or a feedback message string.
-   Survives reset() — cleared at start of next evaluateRep().
-   ========================================================================= */
-class _TempoIssues {
-  String? descentIssue; // Shown during Standing  (before descent)
-  String? bottomIssue; // Shown during Descending (before bottom)
-  String? ascentIssue; // Shown during Bottom     (before ascent)
-
-  bool get hasAny =>
-      descentIssue != null || bottomIssue != null || ascentIssue != null;
 }
 
 /* =========================================================================
@@ -86,9 +71,6 @@ class TempoMetric extends SquatMetricBase {
   double? _bottomHoldDuration;
   double? _descentAscentRatio;
 
-  // --- Cross-rep coaching (survives reset) ---
-  final _TempoIssues _nextRepIssues = _TempoIssues();
-
   // --- Public getters ---
   double? get descentDuration => _descentDuration;
   double? get ascentDuration => _ascentDuration;
@@ -102,7 +84,7 @@ class TempoMetric extends SquatMetricBase {
   Map<String, dynamic> get debugData => _debugData;
 
   /* -----------------------------------------------------------------------
-     STATE TRANSITIONS
+     STATE TRANSITIONS — record timestamps + compute durations.
      ----------------------------------------------------------------------- */
   @override
   void onStateTransition(SquatState from, SquatState to, int timestampMs) {
@@ -132,10 +114,6 @@ class TempoMetric extends SquatMetricBase {
       case SquatState.standing:
         _repCompleteMs = timestampMs;
         if (_ascentStartMs != null) {
-          _debugData['ascendingTime'] =
-              _ascentStartMs?.toStringAsFixed(2) ?? '-';
-          _debugData['standingTime'] = timestampMs.toStringAsFixed(2);
-
           _ascentDuration = (timestampMs - _ascentStartMs!) / 1000.0;
           _debugData['ascentDur'] = _ascentDuration?.toStringAsFixed(2) ?? '-';
         }
@@ -150,75 +128,55 @@ class TempoMetric extends SquatMetricBase {
   }
 
   /* -----------------------------------------------------------------------
-     PER-FRAME UPDATE — Show reminder from PREVIOUS rep.
-     Each reminder appears one phase before the user needs it.
-      Descent too fast  → remind during Standing    (before they go down)
-      Bottom too short  → remind during Descending  (before they reach bottom)
-      Ascent too slow   → remind during Bottom      (before they push up)
+     PER-FRAME UPDATE — Live feedback (null-gated, fires once data exists).
      ----------------------------------------------------------------------- */
   @override
-  Map<String, String> update(RepContext ctx) {
-    final feedback = <String, String>{};
-    if (!_nextRepIssues.hasAny) return feedback;
-
-    switch (ctx.squatState) {
-      case SquatState.standing:
-        _nextRepIssues.ascentIssue = null;
-
-        break;
-
-      case SquatState.descending:
-        if (_nextRepIssues.bottomIssue != null) {
-          feedback['Tempo'] = _nextRepIssues.bottomIssue!;
-        }
-        break;
-
-      case SquatState.bottom:
-        _nextRepIssues.descentIssue = null;
-        if (_nextRepIssues.ascentIssue != null) {
-          feedback['Tempo'] = _nextRepIssues.ascentIssue!;
-        }
-        break;
-
-      case SquatState.ascending:
-        // No reminder during ascent — they're already doing it
-        _nextRepIssues.bottomIssue = null;
-
-        break;
+  void update(RepContext ctx) {
+    // Live check: descent speed (available after entering bottom)
+    if (_descentDuration != null) {
+      if (_descentDuration! < TempoConfig.DESCENT_MIN_ERROR) {
+        ctx.resultIssues.feedback['Tempo'] =
+            'Dropping like a rock, control the way down!';
+      } else if (_descentDuration! < TempoConfig.DESCENT_MIN_GOOD) {
+        ctx.resultIssues.feedback['Tempo'] =
+            'Dropping a bit fast, try to slow down!';
+      }
     }
 
-    _debugData['nextIssues'] = {
-      'descent': _nextRepIssues.descentIssue?.toString() ?? '-',
-      'bottom': _nextRepIssues.bottomIssue?.toString() ?? '-',
-      'ascent': _nextRepIssues.ascentIssue?.toString() ?? '-',
-    };
-    return feedback;
+    // Live check: bottom hold (available after entering ascending)
+    if (_bottomHoldDuration != null &&
+        _bottomHoldDuration! < TempoConfig.BOTTOM_HOLD_MIN) {
+      ctx.resultIssues.feedback['Tempo'] = 'Not pausing at bottom!';
+    }
+
+    if (ctx.resultIssues.feedback['Tempo'] == null) {
+      ctx.resultIssues.feedback['Tempo'] = 'Good tempo';
+    }
   }
 
   /* -----------------------------------------------------------------------
-     REP COMPLETE — Evaluate this rep, set coaching flags for next rep.
+     REP COMPLETE — Log faults + set coaching instructions for next rep.
+     Called by Squat after final state transition to standing.
      ----------------------------------------------------------------------- */
-  void evaluateRep() {
-    // Clear previous issues — fresh evaluation from this rep
-
+  void evaluateRep(RepContext ctx) {
     if (_descentDuration == null) {
       _debugData['tempoResult'] = 'no data';
       return;
     }
 
-    final phase = 'REP_COMPLETE';
+    const phase = 'REP_COMPLETE';
 
     // --- 1. Descent duration ---
     if (_descentDuration! < TempoConfig.DESCENT_MIN_ERROR) {
       _logFault(
           phase, 'Dropped too fast (${_descentDuration!.toStringAsFixed(1)}s)');
-      _nextRepIssues.descentIssue =
-          'Drop too fast last rep, go down slower this time';
+      ctx.resultIssues.addInstruction(
+          'standing', 'Tempo', 'Dropped too fast last rep, go slower');
     } else if (_descentDuration! < TempoConfig.DESCENT_MIN_GOOD) {
       _logFault(phase,
           'Descent a bit fast (${_descentDuration!.toStringAsFixed(1)}s)');
-      _nextRepIssues.descentIssue =
-          'Drop a bit faster last rep, try 2-3 seconds on the way down';
+      ctx.resultIssues.addInstruction(
+          'standing', 'Tempo', 'A bit fast last rep, try 2-3 seconds down');
     }
 
     // --- 2. Bottom hold (bounce detection) ---
@@ -226,39 +184,31 @@ class TempoMetric extends SquatMetricBase {
         _bottomHoldDuration! < TempoConfig.BOTTOM_HOLD_MIN) {
       _logFault(phase,
           'Bounced at bottom (${_bottomHoldDuration!.toStringAsFixed(2)}s hold)');
-      _nextRepIssues.bottomIssue =
-          'Last time not holding at the bottom, pause this time!';
+      ctx.resultIssues.addInstruction(
+          'standing', 'Tempo', 'Not holding at bottom, pause this time!');
     }
 
     // --- 3. Descent:Ascent ratio (eccentric control) ---
-    // Low ratio = descent much faster than ascent = no control going down.
-    // We only flag low ratio. High ratio (fast ascent) is GOOD — explosive.
     if (_descentAscentRatio != null) {
       if (_descentAscentRatio! < TempoConfig.RATIO_WARNING) {
         _logFault(phase,
             'No eccentric control (ratio ${_descentAscentRatio!.toStringAsFixed(1)})');
-        // Only set if descent wasn't already flagged (avoid double-nagging)
-        _nextRepIssues.ascentIssue ??=
-            'No eccentric control last time,Control the way down';
+        ctx.resultIssues.addInstruction(
+            'standing', 'Tempo', 'Control the way down this time');
       } else if (_descentAscentRatio! >
           TempoConfig.RATIO_GOOD + TempoConfig.RATIO_WARNING) {
-        _logFault(phase,
-            'Ascent too fast compared to descent (ratio ${_descentAscentRatio!.toStringAsFixed(1)})');
-        _nextRepIssues.ascentIssue =
-            'Ascent too fast last time, drive up slowly with control';
+        ctx.resultIssues
+            .addInstruction('standing', 'Tempo', 'Drive up with more control');
       }
     }
 
-    // --- 4. Ascent struggle detection ---
-    // If ascent takes >2× descent time, they're grinding.
-    // This is a coaching observation, NOT a form fault.
-    // Hints at weak quads — useful for programming recommendations.
+    // --- 4. Ascent struggle (coaching only, NOT a fault) ---
     if (_descentDuration != null &&
         _ascentDuration != null &&
         _ascentDuration! >
             _descentDuration! * TempoConfig.ASCENT_STRUGGLE_MULTIPLIER) {
-      _nextRepIssues.ascentIssue = 'Drive up with more power!';
-      // Intentionally NOT logged as fault — coaching only
+      ctx.resultIssues
+          .addInstruction('standing', 'Tempo', 'Drive up with more power!');
     }
 
     _debugData['tempoResult'] = _faults.isEmpty ? 'good' : 'fault';
@@ -275,6 +225,25 @@ class TempoMetric extends SquatMetricBase {
     }
   }
 
+  /// Progress 0.0–1.0 of bottom hold countdown. Null if not in bottom.
+  double? get bottomHoldProgress {
+    if (_bottomReachedMs == null) return null;
+    if (_ascentStartMs != null) return null;
+    final elapsed =
+        (DateTime.now().millisecondsSinceEpoch - _bottomReachedMs!) / 1000.0;
+    return (elapsed / TempoConfig.BOTTOM_HOLD_MIN).clamp(0.0, 1.0);
+  }
+
+  /// Remaining seconds to hold. Counts down from BOTTOM_HOLD_MIN to 0.
+  double? get bottomHoldRemaining {
+    if (_bottomReachedMs == null) return null;
+    if (_ascentStartMs != null) return null;
+    final elapsed =
+        (DateTime.now().millisecondsSinceEpoch - _bottomReachedMs!) / 1000.0;
+    return (TempoConfig.BOTTOM_HOLD_MIN - elapsed)
+        .clamp(0.0, TempoConfig.BOTTOM_HOLD_MIN);
+  }
+
   @override
   void reset() {
     _faults.clear();
@@ -287,7 +256,7 @@ class TempoMetric extends SquatMetricBase {
     _ascentDuration = null;
     _bottomHoldDuration = null;
     _descentAscentRatio = null;
-    // _nextRepIssues is NOT reset here — carries to next rep.
-    // get cleared in update().
+    // Instructions survive reset — they carry coaching to next rep.
+    // Cleared when new rep starts (standing → descending) in squat.dart.
   }
 }
