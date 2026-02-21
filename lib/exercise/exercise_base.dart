@@ -31,6 +31,23 @@ enum CameraFacing {
   undefined,
 }
 
+// All metrics will have feedback and instruction for next rep, so we can bundle them together.
+class ResultIssues {
+  Map<String, String> feedback = {};
+  Map<String, Map<String, String>> instructions =
+      {}; // not using squat state because the exercise base won't know
+
+  void addInstruction(String phase, String type, String message) {
+    instructions.putIfAbsent(phase, () => {});
+    instructions[phase]![type] = message;
+  }
+
+  void clear() {
+    feedback.clear();
+    instructions.clear();
+  }
+}
+
 /* =========================================================================
    ExerciseBase - abstract base class for all fitness exercises.
    Manages: Smoothing, Orientation, Safety, Foreign Object Filter, and State.
@@ -41,9 +58,8 @@ abstract class ExerciseBase {
   late PoseSmoother poseSmoother;
   int repCount = 0;
   final int MAX_REP = 15; // Placeholder max rep count for demo purposes
-  Map<String, String> feedbackMessage = {};
   List<Map<bool, Map<String, Map<String, String>>>> setFeedback = [];
-  Map<String, String> instructions = {};
+  ResultIssues resultIssues = ResultIssues();
 
   ExerciseState exerciseState = ExerciseState.notActivated;
   CameraFacing cameraFacing = CameraFacing.front;
@@ -71,8 +87,8 @@ abstract class ExerciseBase {
      ----------------------------------------------------------------------- */
 
   List<dynamic>? processPose(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    feedbackMessage = {};
-    instructions = {};
+    resultIssues.feedback
+        .clear(); // only clear feedback, keep instructions until rep completes
 
     // 1. Smooth the landmarks
     final smoothedLandmarks = poseSmoother.smoothing(landmarks);
@@ -81,9 +97,9 @@ abstract class ExerciseBase {
     if (exerciseState == ExerciseState.notActivated) {
       final objectFilterError = detectObjectFilter(smoothedLandmarks);
       if (objectFilterError != null) {
-        feedbackMessage = {"System": objectFilterError};
+        resultIssues.feedback["System"] = objectFilterError;
         _populateBaseDebugData();
-        return [repCount, feedbackMessage];
+        return [repCount, resultIssues.feedback];
       }
     }
     // 3. Auto-detect Left/Right/Front (MUST come before safety check!)
@@ -93,9 +109,9 @@ abstract class ExerciseBase {
     final safetyError =
         checkSafety(smoothedLandmarks, cameraFacing, frontFacingRatio);
     if (safetyError != null) {
-      feedbackMessage = {"System": safetyError};
+      resultIssues.feedback["System"] = safetyError;
       _populateBaseDebugData();
-      return [repCount, feedbackMessage];
+      return [repCount, resultIssues.feedback];
     }
 
     final pose = Pose(landmarks: smoothedLandmarks);
@@ -224,7 +240,7 @@ abstract class ExerciseBase {
     return pose.landmarks[leftType]; // left / front / angled
   }
 
-  List<dynamic> getRepCountAndFeedback() => [repCount, feedbackMessage];
+  List<dynamic> getRepCountAndFeedback() => [repCount, resultIssues.feedback];
 
   List<dynamic> getSetFeedback() => setFeedback;
 
