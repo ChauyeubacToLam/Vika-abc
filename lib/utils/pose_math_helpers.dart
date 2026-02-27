@@ -3,12 +3,12 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../exercise/exercise_base.dart';
 
 /* ---------------------------------------------------------------------------
-  PART 1: JOINT FLEXION (0 - 180 degrees)
+  PART 1: JOINT FLEXION (0 - 360 degrees)
   ---------------------------------------------------------------------------
   Measures the angle between three landmarks (e.g., Hip -> Knee -> Ankle).
   Logic adapted directly from Google ML Kit documentation.
 */
-double calculateAngle(
+double calculateAngleNormalized(
     {required PoseLandmark firstPoint,
     required PoseLandmark midPoint,
     required PoseLandmark lastPoint}) {
@@ -28,6 +28,25 @@ double calculateAngle(
   if (degrees > 180.0) {
     degrees = 360.0 - degrees;
   }
+
+  return degrees;
+}
+
+double calculateAngle(
+    {required PoseLandmark firstPoint,
+    required PoseLandmark midPoint,
+    required PoseLandmark lastPoint}) {
+  // 1. Calculate the difference of angles in radians
+  // Logic: atan2(last) - atan2(first)
+  double radians =
+      math.atan2(lastPoint.y - midPoint.y, lastPoint.x - midPoint.x) -
+          math.atan2(firstPoint.y - midPoint.y, firstPoint.x - midPoint.x);
+
+  // 2. Convert to degrees
+  double degrees = radians * (180.0 / math.pi);
+
+  // 3. Absolute value (Angle should never be negative)
+  degrees = degrees.abs();
 
   return degrees;
 }

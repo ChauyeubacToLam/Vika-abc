@@ -57,7 +57,8 @@ abstract class ExerciseBase {
   // -- Core State --
   late PoseSmoother poseSmoother;
   int repCount = 0;
-  final int MAX_REP = 15; // Placeholder max rep count for demo purposes
+  static const MIN_CONFIDENCE = 0.98;
+
   List<Map<bool, Map<String, Map<String, String>>>> setFeedback = [];
   ResultIssues resultIssues = ResultIssues();
 
@@ -106,24 +107,21 @@ abstract class ExerciseBase {
     cameraFacing = detectCameraFacing(smoothedLandmarks);
 
     // 4. Check for safety errors (child class logic)
-    final safetyError =
-        checkSafety(smoothedLandmarks, cameraFacing, frontFacingRatio);
+    final safetyError = checkSafety(smoothedLandmarks, cameraFacing);
     if (safetyError != null) {
       resultIssues.feedback["System"] = safetyError;
       _populateBaseDebugData();
       return [repCount, resultIssues.feedback];
     }
 
-    final pose = Pose(landmarks: smoothedLandmarks);
-
     // 5. Calculate Distance Scale Factor (Back Length)
     final shoulder = getSideLandmark(
-      pose: pose,
+      landmarks: smoothedLandmarks,
       rightType: PoseLandmarkType.rightShoulder,
       leftType: PoseLandmarkType.leftShoulder,
     );
     final hip = getSideLandmark(
-      pose: pose,
+      landmarks: smoothedLandmarks,
       rightType: PoseLandmarkType.rightHip,
       leftType: PoseLandmarkType.leftHip,
     );
@@ -132,7 +130,7 @@ abstract class ExerciseBase {
     }
 
     // 6. Run State Machine (Start -> Active -> Done)
-    exerciseState = checkExerciseState(pose, exerciseState,
+    checkExerciseState(smoothedLandmarks, exerciseState,
         scaleFactor: distanceScaleFactor);
 
     // Populate base-level debug data
@@ -140,7 +138,7 @@ abstract class ExerciseBase {
     debugData['scaleFactor'] = distanceScaleFactor?.toStringAsFixed(1) ?? 'N/A';
 
     if (exerciseState == ExerciseState.activated) {
-      checkingPose(pose, cameraFacing, distanceScaleFactor);
+      checkingPose(smoothedLandmarks, cameraFacing, distanceScaleFactor);
       return getRepCountAndFeedback();
     } else if (exerciseState == ExerciseState.completed) {
       return getSetFeedback();
@@ -230,14 +228,14 @@ abstract class ExerciseBase {
   /// - RIGHT facing -> Right landmark
   /// - FRONT/ANGLED -> Defaults to Left
   PoseLandmark? getSideLandmark({
-    required Pose pose,
+    required Map<PoseLandmarkType, PoseLandmark> landmarks,
     required PoseLandmarkType rightType,
     required PoseLandmarkType leftType,
   }) {
     if (cameraFacing == CameraFacing.right) {
-      return pose.landmarks[rightType];
+      return landmarks[rightType];
     }
-    return pose.landmarks[leftType]; // left / front / angled
+    return landmarks[leftType]; // left / front / angled
   }
 
   List<dynamic> getRepCountAndFeedback() => [repCount, resultIssues.feedback];
@@ -248,41 +246,41 @@ abstract class ExerciseBase {
      STATE MACHINE
      ----------------------------------------------------------------------- */
 
-  ExerciseState checkExerciseState(
-    Pose pose,
+  void checkExerciseState(
+    Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks,
     ExerciseState currentState, {
     double? scaleFactor,
   }) {
     switch (currentState) {
       case ExerciseState.notActivated:
         final shoulder = getSideLandmark(
-          pose: pose,
+          landmarks: smoothedLandmarks,
           rightType: PoseLandmarkType.rightShoulder,
           leftType: PoseLandmarkType.leftShoulder,
         );
-        final nose = pose.landmarks[PoseLandmarkType.nose];
+        final nose = smoothedLandmarks[PoseLandmarkType.nose];
 
         if (shoulder == null || nose == null) {
-          return ExerciseState.notActivated;
+          exerciseState = ExerciseState.notActivated;
+          return;
         }
 
         final dist = (nose.y - shoulder.y).abs() / (scaleFactor ?? 1.0);
         debugData['nodDist'] = dist.toStringAsFixed(3);
 
         if (dist < NODDING_ANGLE_FOR_START) {
-          return ExerciseState.activated;
+          exerciseState = ExerciseState.activated;
         }
         break;
 
       case ExerciseState.activated:
         // TODO: Replace with real completion logic
-        if (repCount >= MAX_REP) return ExerciseState.completed;
+        if (requestStop()) exerciseState = ExerciseState.completed;
         break;
 
       case ExerciseState.completed:
         break;
     }
-    return currentState;
   }
 
   /* -----------------------------------------------------------------------
@@ -501,12 +499,28 @@ abstract class ExerciseBase {
   /* -----------------------------------------------------------------------
      ABSTRACT METHODS (implemented by child exercises)
      ----------------------------------------------------------------------- */
+  bool requestStop();
 
   String? checkSafety(
     Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks,
     CameraFacing cameraFacing,
-    double? frontFacingRatio,
   );
 
-  void checkingPose(Pose pose, CameraFacing cameraFacing, double? scaleFactor);
+  void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks,
+      CameraFacing cameraFacing, double? scaleFactor);
+
+  /* -----------------------------------------------------------------------
+     UI BRIDGE — Abstract getters for generic UI rendering.
+     Child exercises provide their phase/state info without coupling
+     backend logic to Flutter widgets.
+     ----------------------------------------------------------------------- */
+
+  /// Display name for the exercise (e.g. "Squat", "Plank").
+  String get exerciseName;
+
+  /// Current phase key for instruction lookup (e.g. "standing", "holding").
+  String get currentPhaseKey;
+
+  /// Human-readable label for the current phase (e.g. "Đứng thẳng", "Giữ!").
+  String get currentPhaseLabel;
 }

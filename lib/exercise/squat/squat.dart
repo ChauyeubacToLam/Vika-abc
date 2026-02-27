@@ -15,8 +15,7 @@ import 'metrics/hip_shoulder_sync.dart';
    CONFIGURATION & THRESHOLDS
    ========================================================================= */
 class SquatConfig {
-  static const double MIN_CONFIDENCE = 0.98;
-
+  static const int MAX_REP = 15; // Placeholder max rep count for demo purposes
   static const int SQUAT_STAND_ANGLE_THRESHOLD = 160;
   static const int SQUAT_DESCEND_ANGLE_THRESHOLD = 152;
   static const List<int> SQUAT_BOTTOM_ANGLE_THRESHOLD = [80, 100];
@@ -35,6 +34,7 @@ enum SquatState {
 
 class Squat extends ExerciseBase {
   SquatState squatState = SquatState.standing;
+  SquatState previousSquatState = SquatState.standing;
 
   final DepthMetric depthMetric = DepthMetric();
   final TrunkLeanMetric trunkLeanMetric = TrunkLeanMetric();
@@ -51,29 +51,84 @@ class Squat extends ExerciseBase {
   ];
 
   /* -----------------------------------------------------------------------
+     UI BRIDGE
+  ----------------------------------------------------------------------- */
+  @override
+  String get exerciseName => 'Squat';
+
+  @override
+  String get currentPhaseKey => squatState.toString().split('.').last;
+
+  @override
+  String get currentPhaseLabel {
+    switch (squatState) {
+      case SquatState.standing:
+        return 'Đứng thẳng';
+      case SquatState.descending:
+        return 'Xuống';
+      case SquatState.bottom:
+        return 'Giữ';
+      case SquatState.ascending:
+        return 'Đứng lên';
+    }
+  }
+
+  /* -----------------------------------------------------------------------
      SAFETY CHECKS
   ----------------------------------------------------------------------- */
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks,
-      CameraFacing cameraFacing, double? frontFacingRatio) {
-    final criticalTypes = [
-      PoseLandmarkType.leftHip,
-      PoseLandmarkType.rightHip,
-      PoseLandmarkType.leftKnee,
-      PoseLandmarkType.rightKnee,
-      PoseLandmarkType.leftShoulder,
-      PoseLandmarkType.rightShoulder,
-    ];
+  bool requestStop() {
+    return repCount >= SquatConfig.MAX_REP;
+  }
 
+  @override
+  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks,
+      CameraFacing cameraFacing) {
+    // Only accept side view for squat — front view makes it hard to track depth and trunk lean, which are critical for safety feedback.
     if (cameraFacing == CameraFacing.front) {
       return "⚠️ Please turn to the side for better tracking for Squat";
     }
 
-    for (var type in criticalTypes) {
-      final landmark = landmarks[type];
-      if (landmark == null) return "⚠️ Body not fully visible.";
-      if (landmark.likelihood < SquatConfig.MIN_CONFIDENCE)
-        return "⚠️ Adjust lighting/position.";
+    // check visibility and confidence of critical landmarks: hip, shoulder, knee, ankle
+    PoseLandmark? hip = getSideLandmark(
+        landmarks: landmarks,
+        rightType: PoseLandmarkType.rightHip,
+        leftType: PoseLandmarkType.leftHip);
+    PoseLandmark? shoulder = getSideLandmark(
+        landmarks: landmarks,
+        rightType: PoseLandmarkType.rightShoulder,
+        leftType: PoseLandmarkType.leftShoulder);
+    PoseLandmark? knee = getSideLandmark(
+        landmarks: landmarks,
+        rightType: PoseLandmarkType.rightKnee,
+        leftType: PoseLandmarkType.leftKnee);
+    PoseLandmark? ankle = getSideLandmark(
+        landmarks: landmarks,
+        rightType: PoseLandmarkType.rightAnkle,
+        leftType: PoseLandmarkType.leftAnkle);
+    PoseLandmark? foot = getSideLandmark(
+        landmarks: landmarks,
+        rightType: PoseLandmarkType.rightFootIndex,
+        leftType: PoseLandmarkType.leftFootIndex);
+    PoseLandmark? heel = getSideLandmark(
+        landmarks: landmarks,
+        rightType: PoseLandmarkType.rightHeel,
+        leftType: PoseLandmarkType.leftHeel);
+
+    if (hip == null ||
+        shoulder == null ||
+        knee == null ||
+        ankle == null ||
+        foot == null ||
+        heel == null) return "⚠️ Body not fully visible.";
+
+    if (hip.likelihood < ExerciseBase.MIN_CONFIDENCE ||
+        shoulder.likelihood < ExerciseBase.MIN_CONFIDENCE ||
+        knee.likelihood < ExerciseBase.MIN_CONFIDENCE ||
+        ankle.likelihood < ExerciseBase.MIN_CONFIDENCE ||
+        foot.likelihood < ExerciseBase.MIN_CONFIDENCE ||
+        heel.likelihood < ExerciseBase.MIN_CONFIDENCE) {
+      return "⚠️ Adjust lighting/position.";
     }
     return null;
   }
@@ -82,31 +137,32 @@ class Squat extends ExerciseBase {
      MAIN PHYSICS LOOP — Called every frame when activated.
   ----------------------------------------------------------------------- */
   @override
-  void checkingPose(Pose pose, CameraFacing cameraFacing, double? scaleFactor) {
+  void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks,
+      CameraFacing cameraFacing, double? scaleFactor) {
     // ---------- 1. Get Landmarks ----------
 
     PoseLandmark? knee = getSideLandmark(
-        pose: pose,
+        landmarks: smoothedLandmarks,
         rightType: PoseLandmarkType.rightKnee,
         leftType: PoseLandmarkType.leftKnee);
     PoseLandmark? hip = getSideLandmark(
-        pose: pose,
+        landmarks: smoothedLandmarks,
         rightType: PoseLandmarkType.rightHip,
         leftType: PoseLandmarkType.leftHip);
     PoseLandmark? ankle = getSideLandmark(
-        pose: pose,
+        landmarks: smoothedLandmarks,
         rightType: PoseLandmarkType.rightAnkle,
         leftType: PoseLandmarkType.leftAnkle);
     PoseLandmark? shoulder = getSideLandmark(
-        pose: pose,
+        landmarks: smoothedLandmarks,
         rightType: PoseLandmarkType.rightShoulder,
         leftType: PoseLandmarkType.leftShoulder);
     PoseLandmark? foot = getSideLandmark(
-        pose: pose,
+        landmarks: smoothedLandmarks,
         rightType: PoseLandmarkType.rightFootIndex,
         leftType: PoseLandmarkType.leftFootIndex);
     PoseLandmark? heel = getSideLandmark(
-        pose: pose,
+        landmarks: smoothedLandmarks,
         rightType: PoseLandmarkType.rightHeel,
         leftType: PoseLandmarkType.leftHeel);
 
@@ -119,8 +175,8 @@ class Squat extends ExerciseBase {
 
     // ---------- 2. Calculate Geometry ----------
 
-    double kneeAngle =
-        calculateAngle(firstPoint: hip, midPoint: knee, lastPoint: ankle);
+    double kneeAngle = calculateAngleNormalized(
+        firstPoint: hip, midPoint: knee, lastPoint: ankle);
     double backAngle = calculateVerticalAngle(pivot: hip, point: shoulder);
     double trunkLean = convertClockAngleToTrunkLean(backAngle, cameraFacing);
     double heelDistanceToFloor = foot.y - heel.y;
@@ -155,60 +211,57 @@ class Squat extends ExerciseBase {
 
     // ---------- 5. Rep Completion (Standing Up) ----------
 
-    if (kneeAngle > SquatConfig.SQUAT_STAND_ANGLE_THRESHOLD) {
-      if (squatState != SquatState.standing) {
-        repCount += 1;
+    if (squatState == SquatState.standing &&
+        previousSquatState != SquatState.standing) {
+      repCount += 1;
 
-        // Let depth check if rep was deep enough
-        depthMetric.checkRepCompletion(squatState, ctx);
+      // Let depth check if rep was deep enough
+      depthMetric.checkRepCompletion(squatState, ctx);
 
-        // Fire final state transition so tempo can calculate ascent
-        _transitionState(SquatState.standing, now);
+      // Fire final state transition so tempo can calculate ascent
+      _transitionState(SquatState.standing, now);
 
-        // Let tempo evaluate the full rep
-        tempoMetric.evaluateRep(ctx);
+      // Let tempo evaluate the full rep
+      tempoMetric.evaluateRep(ctx);
 
-        // Collect faults from all metrics
-        final allFaults = <FaultRecord>[];
-        for (final metric in _metrics) {
-          allFaults.addAll(metric.faults);
+      // Collect faults from all metrics
+      final allFaults = <FaultRecord>[];
+      for (final metric in _metrics) {
+        allFaults.addAll(metric.faults);
+      }
+
+      // Determine correctForm: true if no faults with affectsForm=true
+      correctForm = !allFaults.any((f) => f.affectsForm);
+
+      // UI feedback
+      resultIssues.feedback['Result'] = correctForm ? 'Good Rep!' : 'Fix Form';
+
+      // Build fault map for set history
+      final faultMap = <String, Map<String, String>>{};
+      for (final fault in allFaults) {
+        if (!faultMap.containsKey(fault.phase)) {
+          faultMap[fault.phase] = {};
         }
+        faultMap[fault.phase]![fault.type] = fault.message;
+      }
+      setFeedback.add({correctForm: faultMap});
 
-        // Determine correctForm: true if no faults with affectsForm=true
-        correctForm = !allFaults.any((f) => f.affectsForm);
+      // Merge metric debug data BEFORE reset
+      for (final metric in _metrics) {
+        debugData.addAll(metric.debugData);
+      }
 
-        // UI feedback
-        resultIssues.feedback['Result'] =
-            correctForm ? 'Good Rep!' : 'Fix Form';
-
-        // Build fault map for set history
-        final faultMap = <String, Map<String, String>>{};
-        for (final fault in allFaults) {
-          if (!faultMap.containsKey(fault.phase)) {
-            faultMap[fault.phase] = {};
-          }
-          faultMap[fault.phase]![fault.type] = fault.message;
-        }
-        setFeedback.add({correctForm: faultMap});
-
-        // Merge metric debug data BEFORE reset
-        for (final metric in _metrics) {
-          debugData.addAll(metric.debugData);
-        }
-
-        // Add tempo summary to post-rep feedback
-        if (tempoMetric.descentDuration != null) {
+      // Add tempo summary to post-rep feedback
+      if (tempoMetric.descentDuration != null) {
+        resultIssues.feedback['Tempo'] =
+            '↓${tempoMetric.descentDuration!.toStringAsFixed(1)}s';
+        if (tempoMetric.ascentDuration != null) {
           resultIssues.feedback['Tempo'] =
-              '↓${tempoMetric.descentDuration!.toStringAsFixed(1)}s';
-          if (tempoMetric.ascentDuration != null) {
-            resultIssues.feedback['Tempo'] =
-                '↓${tempoMetric.descentDuration!.toStringAsFixed(1)}s ↑${tempoMetric.ascentDuration!.toStringAsFixed(1)}s';
-          }
+              '↓${tempoMetric.descentDuration!.toStringAsFixed(1)}s ↑${tempoMetric.ascentDuration!.toStringAsFixed(1)}s';
         }
       }
 
       // Reset metrics for next rep (instructions survive — shown during standing)
-      squatState = SquatState.standing;
       correctForm = true;
       for (final metric in _metrics) {
         metric.reset();
@@ -267,11 +320,15 @@ class Squat extends ExerciseBase {
     } else if (kneeAngle > (SquatConfig.SQUAT_BOTTOM_ANGLE_THRESHOLD[1] + 5) &&
         squatState == SquatState.bottom) {
       _transitionState(SquatState.ascending, timestampMs);
+    } else if (kneeAngle > SquatConfig.SQUAT_STAND_ANGLE_THRESHOLD &&
+        (squatState == SquatState.ascending ||
+            squatState == SquatState.descending)) {
+      _transitionState(SquatState.standing, timestampMs);
     }
   }
 
   void _transitionState(SquatState newState, int timestampMs) {
-    final oldState = squatState;
+    previousSquatState = squatState;
     squatState = newState;
 
     // Clear coaching instructions when user starts a new rep.
@@ -281,7 +338,7 @@ class Squat extends ExerciseBase {
     }
 
     for (final metric in _metrics) {
-      metric.onStateTransition(oldState, newState, timestampMs);
+      metric.onStateTransition(previousSquatState, newState, timestampMs);
     }
   }
 }

@@ -11,7 +11,8 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'exercise/exercise_base.dart';
-import 'exercise/squat/squat.dart';
+import 'models/exercise_definition.dart';
+import 'screens/home_screen.dart';
 
 /* =========================================================================
    APP ENTRY POINT
@@ -31,7 +32,7 @@ Future<void> main() async {
 }
 
 /* =========================================================================
-   REP LOG
+   REP LOG — Generic rep/hold log, works for any exercise.
    ========================================================================= */
 
 class RepLog {
@@ -88,17 +89,32 @@ class VinaFitApp extends StatelessWidget {
         useMaterial3: true,
         fontFamily: 'Roboto',
       ),
-      home: const ExerciseScreen(),
+      initialRoute: '/',
+      onGenerateRoute: (settings) {
+        switch (settings.name) {
+          case '/exercise':
+            final definition = settings.arguments as ExerciseDefinition;
+            return MaterialPageRoute(
+              builder: (_) => ExerciseScreen(definition: definition),
+            );
+          default:
+            return MaterialPageRoute(
+              builder: (_) => const HomeScreen(),
+            );
+        }
+      },
     );
   }
 }
 
 /* =========================================================================
-   EXERCISE SCREEN
+   EXERCISE SCREEN — Generic, works with any ExerciseBase subclass.
    ========================================================================= */
 
 class ExerciseScreen extends StatefulWidget {
-  const ExerciseScreen({super.key});
+  final ExerciseDefinition definition;
+
+  const ExerciseScreen({super.key, required this.definition});
 
   @override
   State<ExerciseScreen> createState() => _ExerciseScreenState();
@@ -106,6 +122,9 @@ class ExerciseScreen extends StatefulWidget {
 
 class _ExerciseScreenState extends State<ExerciseScreen>
     with WidgetsBindingObserver, TickerProviderStateMixin {
+  // ── Shorthand ──
+  ExerciseDefinition get _definition => widget.definition;
+
   // ── Camera ──
   CameraController? _cameraController;
   int _cameraIndex = -1;
@@ -120,8 +139,8 @@ class _ExerciseScreenState extends State<ExerciseScreen>
   );
   bool _isDetecting = false;
 
-  // ── Exercise ──
-  final Squat _squat = Squat();
+  // ── Exercise (generic) ──
+  late ExerciseBase _exercise;
   int _repCount = 0;
   Map<String, String> _feedback = {};
   List<dynamic>? _result;
@@ -152,12 +171,14 @@ class _ExerciseScreenState extends State<ExerciseScreen>
 
   // ── State logging ──
   String _lastLoggedState = '';
-  String _lastLoggedSquatState = '';
+  String _lastLoggedPhaseState = '';
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
+    _exercise = _definition.createExercise();
 
     _bannerController = AnimationController(
       duration: const Duration(milliseconds: 2500),
@@ -248,12 +269,12 @@ class _ExerciseScreenState extends State<ExerciseScreen>
       if (poses.isNotEmpty) {
         final pose = poses.first;
         _detectedPose = pose;
-        _result = _squat.processPose(pose.landmarks);
+        _result = _exercise.processPose(pose.landmarks);
 
         if (_result != null) {
-          if (_squat.exerciseState == ExerciseState.completed) {
-            _repCount = _squat.repCount;
-            _feedback = {'Result': 'Set Complete! $_repCount reps'};
+          if (_exercise.exerciseState == ExerciseState.completed) {
+            _repCount = _exercise.repCount;
+            _feedback = {'Result': 'Hoàn thành! $_repCount reps'};
             _logSetComplete();
           } else if (_result!.length == 2) {
             final prevRepCount = _repCount;
@@ -290,15 +311,16 @@ class _ExerciseScreenState extends State<ExerciseScreen>
      LOGGING
      ----------------------------------------------------------------------- */
   void _logStateChanges() {
-    final exState = _squat.exerciseState.toString().split('.').last;
-    final sqState = _squat.squatState.toString().split('.').last;
+    final exState = _exercise.exerciseState.toString().split('.').last;
+    final phaseState = _exercise.currentPhaseKey;
     if (exState != _lastLoggedState) {
       debugPrint('[VinaFit][State] Exercise: $_lastLoggedState -> $exState');
       _lastLoggedState = exState;
     }
-    if (sqState != _lastLoggedSquatState) {
-      debugPrint('[VinaFit][State] Squat: $_lastLoggedSquatState -> $sqState');
-      _lastLoggedSquatState = sqState;
+    if (phaseState != _lastLoggedPhaseState) {
+      debugPrint(
+          '[VinaFit][State] ${_exercise.exerciseName}: $_lastLoggedPhaseState -> $phaseState');
+      _lastLoggedPhaseState = phaseState;
     }
   }
 
@@ -306,8 +328,10 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     if (_repCount <= _lastLoggedRep) return;
     _lastLoggedRep = _repCount;
 
+    final d = _exercise.debugData;
+
+    // Extract tempo info (squat-style: descent/ascent, plank-style: holdTime)
     String? tempo;
-    final d = _squat.debugData;
     final descent = d['descentDur'];
     final ascent = d['ascentDur'];
     if (descent != null && descent != '-') {
@@ -316,10 +340,17 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         tempo = '\u2193${descent}s \u2191${ascent}s';
       }
     }
+    // Plank hold time
+    if (tempo == null) {
+      final holdTime = d['holdTime'];
+      if (holdTime != null && holdTime != '0.0') {
+        tempo = '\u23F1${holdTime}s';
+      }
+    }
 
     final faultMap = <String, Map<String, String>>{};
-    if (_squat.setFeedback.isNotEmpty) {
-      final lastEntry = _squat.setFeedback.last;
+    if (_exercise.setFeedback.isNotEmpty) {
+      final lastEntry = _exercise.setFeedback.last;
       for (final entry in lastEntry.entries) {
         for (final phaseEntry in entry.value.entries) {
           faultMap[phaseEntry.key] = Map<String, String>.from(phaseEntry.value);
@@ -327,7 +358,8 @@ class _ExerciseScreenState extends State<ExerciseScreen>
       }
     }
 
-    final wasGoodRep = _feedback['Result'] == 'Good Rep!';
+    final wasGoodRep =
+        _feedback['Result'] == 'Good Rep!' || _feedback['Result'] == 'Tốt lắm!';
 
     final log = RepLog(
       repNumber: _repCount,
@@ -336,7 +368,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
       tempo: tempo,
       descentDuration: double.tryParse(d['descentDur'] ?? ''),
       ascentDuration: double.tryParse(d['ascentDur'] ?? ''),
-      bottomHold: double.tryParse(d['bottomHold'] ?? ''),
+      bottomHold: double.tryParse(d['bottomHold'] ?? d['holdTime'] ?? ''),
     );
     _repLogs.add(log);
 
@@ -358,7 +390,8 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     final badReps = _repLogs.where((r) => !r.correctForm).length;
     debugPrint('');
     debugPrint('============================================');
-    debugPrint('[VinaFit][SET COMPLETE] $_repCount reps total');
+    debugPrint(
+        '[VinaFit][SET COMPLETE] ${_exercise.exerciseName} — $_repCount reps total');
     debugPrint('[VinaFit][SET] Good: $goodReps | Bad: $badReps');
     debugPrint('--------------------------------------------');
     for (final log in _repLogs) {
@@ -448,7 +481,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
             child: CircularProgressIndicator(
               strokeWidth: 2.5,
               valueColor: AlwaysStoppedAnimation(
-                  Colors.cyanAccent.withValues(alpha: 0.8)),
+                  _definition.primaryColor.withValues(alpha: 0.8)),
             ),
           ),
           const SizedBox(height: 20),
@@ -468,7 +501,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
   /* ── MAIN LAYOUT ── */
   Widget _buildCameraView(BuildContext context) {
     final controller = _cameraController!;
-    final isCompleted = _squat.exerciseState == ExerciseState.completed;
+    final isCompleted = _exercise.exerciseState == ExerciseState.completed;
 
     return Column(
       children: [
@@ -489,7 +522,6 @@ class _ExerciseScreenState extends State<ExerciseScreen>
                   left: 12,
                   child: _buildRepDots(),
                 ),
-              // Floating coaching chips (right side of camera)
               _buildCoachingOverlay(),
             ],
           ),
@@ -505,34 +537,54 @@ class _ExerciseScreenState extends State<ExerciseScreen>
 
   /* ── TOP BAR ── */
   Widget _buildTopBar() {
+    final accent = _definition.primaryColor;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: const BoxDecoration(
         color: Color(0xFF080C1A),
       ),
       child: Row(
         children: [
+          // Back button
+          GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  width: 1,
+                ),
+              ),
+              child: const Icon(Icons.arrow_back_rounded,
+                  color: Colors.white70, size: 18),
+            ),
+          ),
+          const SizedBox(width: 10),
+          // Exercise icon
           Container(
             width: 34,
             height: 34,
             decoration: BoxDecoration(
-              color: const Color(0xFF00E5FF).withValues(alpha: 0.1),
+              color: accent.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: const Color(0xFF00E5FF).withValues(alpha: 0.2),
+                color: accent.withValues(alpha: 0.2),
                 width: 1,
               ),
             ),
-            child: const Icon(Icons.fitness_center,
-                color: Color(0xFF00E5FF), size: 18),
+            child: Icon(_definition.icon, color: accent, size: 18),
           ),
           const SizedBox(width: 10),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'VINAFIT',
-                style: TextStyle(
+              Text(
+                _definition.name.toUpperCase(),
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
@@ -540,9 +592,9 @@ class _ExerciseScreenState extends State<ExerciseScreen>
                 ),
               ),
               Text(
-                'Phân tích Squat',
+                _definition.subtitle,
                 style: TextStyle(
-                  color: const Color(0xFF00E5FF).withValues(alpha: 0.6),
+                  color: accent.withValues(alpha: 0.6),
                   fontSize: 10,
                   fontWeight: FontWeight.w500,
                   letterSpacing: 0.5,
@@ -574,10 +626,9 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     );
   }
 
-  /* ── STATE PILL ── */
+  /* ── STATE PILL (generic) ── */
   Widget _buildStatePill() {
-    final exerciseState = _squat.exerciseState;
-    final sqState = _squat.squatState;
+    final exerciseState = _exercise.exerciseState;
 
     Color color;
     String text;
@@ -590,8 +641,9 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         icon = Icons.accessibility_new;
         break;
       case ExerciseState.activated:
-        color = _sqStateColor(sqState);
-        text = _sqStateLabel(sqState);
+        final phaseKey = _exercise.currentPhaseKey;
+        color = _definition.phaseColors[phaseKey] ?? _definition.primaryColor;
+        text = _exercise.currentPhaseLabel;
         icon = Icons.directions_run;
         break;
       case ExerciseState.completed:
@@ -627,32 +679,6 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     );
   }
 
-  Color _sqStateColor(SquatState s) {
-    switch (s) {
-      case SquatState.standing:
-        return const Color(0xFF00E676);
-      case SquatState.descending:
-        return const Color(0xFFFFD600);
-      case SquatState.bottom:
-        return const Color(0xFFFF6D00);
-      case SquatState.ascending:
-        return const Color(0xFF00B0FF);
-    }
-  }
-
-  String _sqStateLabel(SquatState s) {
-    switch (s) {
-      case SquatState.standing:
-        return 'Đứng thẳng';
-      case SquatState.descending:
-        return 'Xuống';
-      case SquatState.bottom:
-        return 'Giữ';
-      case SquatState.ascending:
-        return 'Đứng lên';
-    }
-  }
-
   /* ── CAMERA + SKELETON ── */
   Widget _buildCameraStack(CameraController controller) {
     return LayoutBuilder(
@@ -671,7 +697,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
                   widgetSize: previewSize,
                   rotation: _imageRotation,
                   lensDirection: controller.description.lensDirection,
-                  debugData: _squat.debugData,
+                  debugData: _exercise.debugData,
                 ),
               ),
             // Subtle vignette
@@ -702,8 +728,9 @@ class _ExerciseScreenState extends State<ExerciseScreen>
 
   /* ── REP COUNT OVERLAY ── */
   Widget _buildRepCountOverlay() {
-    final isActive = _squat.exerciseState == ExerciseState.activated ||
-        _squat.exerciseState == ExerciseState.completed;
+    final isActive = _exercise.exerciseState == ExerciseState.activated ||
+        _exercise.exerciseState == ExerciseState.completed;
+    final accent = _definition.primaryColor;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -711,7 +738,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         color: Colors.black.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: const Color(0xFF00E5FF).withValues(alpha: 0.25),
+          color: accent.withValues(alpha: 0.25),
           width: 1,
         ),
       ),
@@ -722,7 +749,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
           Text(
             '$_repCount',
             style: TextStyle(
-              color: isActive ? const Color(0xFF00E5FF) : Colors.white60,
+              color: isActive ? accent : Colors.white60,
               fontSize: 38,
               fontWeight: FontWeight.w900,
               height: 1.0,
@@ -735,7 +762,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'REPS',
+                  _definition.id == 'plank' ? 'HOLDS' : 'REPS',
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.45),
                     fontSize: 9,
@@ -743,11 +770,11 @@ class _ExerciseScreenState extends State<ExerciseScreen>
                     letterSpacing: 1.5,
                   ),
                 ),
-                if (_squat.exerciseState == ExerciseState.activated)
+                if (_exercise.exerciseState == ExerciseState.activated)
                   Text(
-                    _squat.correctForm ? '✓ TỐT' : '✗ SỬA',
+                    _exercise.correctForm ? '✓ TỐT' : '✗ SỬA',
                     style: TextStyle(
-                      color: _squat.correctForm
+                      color: _exercise.correctForm
                           ? const Color(0xFF00E676)
                           : const Color(0xFFFF5252),
                       fontSize: 9,
@@ -865,11 +892,10 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     );
   }
 
-  /* ── INSTRUCTIONS BAR (Status badge only — coaching moved to camera overlay) ── */
+  /* ── INSTRUCTIONS BAR (generic — reads from exercise's current phase) ── */
   Widget _buildInstructionsBar() {
-    // Read instructions for the current squat phase
-    final phaseKey = _squat.squatState.toString().split('.').last;
-    final phaseInstr = _squat.resultIssues.instructions[phaseKey];
+    final phaseKey = _exercise.currentPhaseKey;
+    final phaseInstr = _exercise.resultIssues.instructions[phaseKey];
     if (phaseInstr == null || phaseInstr.isEmpty)
       return const SizedBox.shrink();
 
@@ -884,17 +910,22 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     );
   }
 
-  /* ── STATUS BADGE (with arc countdown for Hold phase) ── */
+  /* ── STATUS BADGE (with arc countdown for hold phases) ── */
   Widget _buildStatusBadge(String statusText) {
     final isHold = statusText.startsWith('Hold') ||
         statusText.startsWith('Giữ') ||
-        statusText.contains('!') && _squat.squatState == SquatState.bottom;
+        statusText.contains('!');
 
-    final progress = isHold
-        ? (_squat.debugData['bottomHoldProgress'] as double? ?? 0.0)
+    // Read progress from exercise-specific debugData keys
+    final holdProgress = isHold
+        ? (_exercise.debugData['bottomHoldProgress'] as double? ??
+            _exercise.debugData['holdProgress'] as double? ??
+            0.0)
         : null;
 
-    final color = _statusColor(statusText);
+    // Use phase color from definition
+    final phaseKey = _exercise.currentPhaseKey;
+    final color = _definition.phaseColors[phaseKey] ?? _definition.primaryColor;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -906,14 +937,13 @@ class _ExerciseScreenState extends State<ExerciseScreen>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (progress != null) ...[
-            // Circular countdown arc
+          if (holdProgress != null && holdProgress > 0) ...[
             SizedBox(
               width: 20,
               height: 20,
               child: CustomPaint(
                 painter: _ArcCountdownPainter(
-                  progress: progress,
+                  progress: holdProgress,
                   color: color,
                 ),
               ),
@@ -937,47 +967,10 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     );
   }
 
-  Widget _buildCoachingChip(String message) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFF9800).withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: const Color(0xFFFF9800).withValues(alpha: 0.25),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.tips_and_updates_outlined,
-            color: Color(0xFFFFB74D),
-            size: 12,
-          ),
-          const SizedBox(width: 5),
-          Text(
-            message,
-            style: const TextStyle(
-              color: Color(0xFFFFB74D),
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   /* ── FLOATING COACHING CHIPS (right side of camera view) ── */
-  /// Shows coaching instructions from previous rep as floating pills
-  /// on the camera view. Like a PT standing beside you whispering tips.
-  /// Only visible during standing phase (before next rep starts).
   Widget _buildCoachingOverlay() {
-    // Collect coaching entries for the current phase (exclude Status)
-    final phaseKey = _squat.squatState.toString().split('.').last;
-    final phaseInstr = _squat.resultIssues.instructions[phaseKey];
+    final phaseKey = _exercise.currentPhaseKey;
+    final phaseInstr = _exercise.resultIssues.instructions[phaseKey];
 
     if (phaseInstr == null || phaseInstr.isEmpty) {
       return const SizedBox.shrink();
@@ -1035,18 +1028,6 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     );
   }
 
-  Color _statusColor(String status) {
-    if (status.contains('Xuống') || status.contains('Down'))
-      return const Color(0xFFFFD600);
-    if (status.contains('Giữ') ||
-        status.contains('Hold') ||
-        status.contains('Bottom')) return const Color(0xFFFF6D00);
-    if (status.contains('Đứng lên') ||
-        status.contains('Push') ||
-        status.contains('Up')) return const Color(0xFF00B0FF);
-    return Colors.white70;
-  }
-
   IconData _statusIcon(String status) {
     if (status.contains('Xuống') || status.contains('Down'))
       return Icons.arrow_downward_rounded;
@@ -1056,6 +1037,10 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     if (status.contains('Đứng lên') ||
         status.contains('Push') ||
         status.contains('Up')) return Icons.arrow_upward_rounded;
+    if (status.contains('Nghỉ') || status.contains('Rest'))
+      return Icons.bedtime_outlined;
+    if (status.contains('Chuẩn bị') || status.contains('Setup'))
+      return Icons.accessibility_new;
     return Icons.info_outline;
   }
 
@@ -1128,7 +1113,8 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         lower.contains('lifting') ||
         lower.contains("don't") ||
         lower.contains('sửa') ||
-        lower.contains('fix')) return 2;
+        lower.contains('fix') ||
+        lower.contains('cần')) return 2;
     return 1;
   }
 
@@ -1171,16 +1157,16 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         children: [
           _buildMiniInfo(
             Icons.videocam_outlined,
-            _squat.cameraFacing.toString().split('.').last.toUpperCase(),
+            _exercise.cameraFacing.toString().split('.').last.toUpperCase(),
           ),
           const SizedBox(width: 8),
-          if (_squat.exerciseState == ExerciseState.activated)
+          if (_exercise.exerciseState == ExerciseState.activated)
             _buildMiniInfo(
-              _squat.correctForm
+              _exercise.correctForm
                   ? Icons.verified_outlined
                   : Icons.warning_amber_rounded,
-              _squat.correctForm ? 'Tư thế tốt' : 'Sửa tư thế',
-              color: _squat.correctForm
+              _exercise.correctForm ? 'Tư thế tốt' : 'Sửa tư thế',
+              color: _exercise.correctForm
                   ? const Color(0xFF00E676)
                   : const Color(0xFFFF5252),
             ),
@@ -1224,18 +1210,19 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     required bool isActive,
     required VoidCallback onTap,
   }) {
+    final accent = _definition.primaryColor;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           color: isActive
-              ? const Color(0xFF00E5FF).withValues(alpha: 0.12)
+              ? accent.withValues(alpha: 0.12)
               : Colors.white.withValues(alpha: 0.04),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: isActive
-                ? const Color(0xFF00E5FF).withValues(alpha: 0.35)
+                ? accent.withValues(alpha: 0.35)
                 : Colors.white.withValues(alpha: 0.07),
           ),
         ),
@@ -1245,9 +1232,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
             Icon(
               icon,
               size: 13,
-              color: isActive
-                  ? const Color(0xFF00E5FF)
-                  : Colors.white.withValues(alpha: 0.35),
+              color: isActive ? accent : Colors.white.withValues(alpha: 0.35),
             ),
             const SizedBox(width: 4),
             Text(
@@ -1255,9 +1240,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
-                color: isActive
-                    ? const Color(0xFF00E5FF)
-                    : Colors.white.withValues(alpha: 0.35),
+                color: isActive ? accent : Colors.white.withValues(alpha: 0.35),
               ),
             ),
           ],
@@ -1266,9 +1249,9 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     );
   }
 
-  /* ── DEBUG PANEL ── */
+  /* ── DEBUG PANEL (dynamic — shows all keys from exercise debugData) ── */
   Widget _buildDebugPanel() {
-    final d = _squat.debugData;
+    final d = _exercise.debugData;
     if (d.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(8),
@@ -1281,6 +1264,26 @@ class _ExerciseScreenState extends State<ExerciseScreen>
       );
     }
 
+    // Color palette for cycling through debug chip colors
+    const colorPalette = [
+      Color(0xFF00E5FF),
+      Color(0xFFFFD600),
+      Color(0xFF7C4DFF),
+      Color(0xFF607D8B),
+      Color(0xFF00BCD4),
+      Color(0xFFFF9800),
+      Color(0xFF4CAF50),
+      Color(0xFF29B6F6),
+      Color(0xFFAB47BC),
+      Color(0xFFFF6D00),
+      Color(0xFF00E676),
+      Color(0xFFFF5252),
+      Color(0xFF5C6BC0),
+      Color(0xFF26A69A),
+    ];
+
+    final entries = d.entries.toList();
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -1292,12 +1295,12 @@ class _ExerciseScreenState extends State<ExerciseScreen>
             children: [
               Icon(Icons.terminal,
                   size: 11,
-                  color: const Color(0xFF00E5FF).withValues(alpha: 0.4)),
+                  color: _definition.primaryColor.withValues(alpha: 0.4)),
               const SizedBox(width: 4),
               Text(
-                'DEBUG',
+                'DEBUG — ${_exercise.exerciseName.toUpperCase()}',
                 style: TextStyle(
-                  color: const Color(0xFF00E5FF).withValues(alpha: 0.4),
+                  color: _definition.primaryColor.withValues(alpha: 0.4),
                   fontSize: 9,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 2,
@@ -1309,44 +1312,14 @@ class _ExerciseScreenState extends State<ExerciseScreen>
           Wrap(
             spacing: 6,
             runSpacing: 4,
-            children: [
-              _debugChip(
-                  'State', d['exerciseState'] ?? '?', const Color(0xFF00E5FF)),
-              _debugChip(
-                  'Squat', d['squatState'] ?? '?', const Color(0xFFFFD600)),
-              _debugChip(
-                  'Facing', d['cameraFacing'] ?? '?', const Color(0xFF7C4DFF)),
-              _debugChip(
-                  'Scale', d['scaleFactor'] ?? '?', const Color(0xFF607D8B)),
-              _debugChip('Knee∠', '${d['kneeAngle'] ?? '?'}°',
-                  const Color(0xFF00BCD4)),
-              // _debugChip(
-              //     'Trunk',
-              //     '${d['trunkLean'] ?? '?'} ${d['trunkLeanDir'] ?? ''}',
-              //     const Color(0xFFFF9800)),
-              // _debugChip(
-              //     'Descent', d['descentDur'] ?? '-', const Color(0xFF29B6F6)),
-              // _debugChip(
-              //     'Ascent', d['ascentDur'] ?? '-', const Color(0xFF4FC3F7)),
-              // _debugChip(
-              //     'BtmHold', d['bottomHold'] ?? '-', const Color(0xFFFF6D00)),
-              // _debugChip('D:A', d['ratio'] ?? '-', const Color(0xFFAB47BC)),
-              // _debugChip(
-              //   'Form',
-              //   d['correctForm'] ?? '?',
-              //   d['correctForm'] == 'true'
-              //       ? const Color(0xFF00E676)
-              //       : const Color(0xFFFF5252),
-              _debugChip(
-                  "Hip speed", d['hipSpeed'] ?? '?', const Color(0xFF00E5FF)),
-              _debugChip("Shoulder Speed", d['shoulderSpeed'] ?? '?',
-                  const Color(0xFFFFD600)),
-              _debugChip(
-                  "Sync Ratio", d['syncRatio'] ?? '?', const Color(0xFF4CAF50)),
-              _debugChip("Peak Sync Ratio", d['peakSyncRatio'] ?? '?',
-                  const Color(0xFF00E5FF)),
-              // ),
-            ],
+            children: entries.asMap().entries.map((indexed) {
+              final entry = indexed.value;
+              final color = colorPalette[indexed.key % colorPalette.length];
+              final value = entry.value is double
+                  ? (entry.value as double).toStringAsFixed(2)
+                  : '${entry.value}';
+              return _debugChip(entry.key, value, color);
+            }).toList(),
           ),
         ],
       ),
@@ -1394,7 +1367,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         padding: const EdgeInsets.all(12),
         color: const Color(0xFF060A16),
         child: Text(
-          'Chưa có lượt squat nào.',
+          'Chưa có lượt ${_exercise.exerciseName.toLowerCase()} nào.',
           style: TextStyle(
               color: Colors.white.withValues(alpha: 0.25), fontSize: 11),
         ),
@@ -1403,7 +1376,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
 
     final goodCount = _repLogs.where((r) => r.correctForm).length;
     final badCount = _repLogs.where((r) => !r.correctForm).length;
-    final isSetComplete = _squat.exerciseState == ExerciseState.completed;
+    final isSetComplete = _exercise.exerciseState == ExerciseState.completed;
 
     return Container(
       constraints: const BoxConstraints(maxHeight: 260),
@@ -1421,7 +1394,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
                   size: 14,
                   color: isSetComplete
                       ? const Color(0xFFFFD600)
-                      : const Color(0xFF00E5FF).withValues(alpha: 0.5),
+                      : _definition.primaryColor.withValues(alpha: 0.5),
                 ),
                 const SizedBox(width: 6),
                 Text(
@@ -1429,7 +1402,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
                   style: TextStyle(
                     color: isSetComplete
                         ? const Color(0xFFFFD600)
-                        : const Color(0xFF00E5FF).withValues(alpha: 0.5),
+                        : _definition.primaryColor.withValues(alpha: 0.5),
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 1.5,
@@ -1574,11 +1547,10 @@ class _ExerciseScreenState extends State<ExerciseScreen>
 
 /* =========================================================================
    ARC COUNTDOWN PAINTER
-   Draws a circular progress arc for the bottom hold countdown.
    ========================================================================= */
 
 class _ArcCountdownPainter extends CustomPainter {
-  final double progress; // 0.0 → 1.0
+  final double progress;
   final Color color;
 
   const _ArcCountdownPainter({required this.progress, required this.color});
@@ -1588,7 +1560,6 @@ class _ArcCountdownPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2 - 1.5;
 
-    // Background track
     canvas.drawCircle(
       center,
       radius,
@@ -1598,7 +1569,6 @@ class _ArcCountdownPainter extends CustomPainter {
         ..strokeWidth = 2.5,
     );
 
-    // Progress arc — starts at top (−π/2), sweeps clockwise
     final sweepAngle = 2 * math.pi * progress;
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
@@ -1612,7 +1582,6 @@ class _ArcCountdownPainter extends CustomPainter {
         ..strokeCap = StrokeCap.round,
     );
 
-    // Center dot when complete
     if (progress >= 1.0) {
       canvas.drawCircle(
         center,
@@ -1628,7 +1597,7 @@ class _ArcCountdownPainter extends CustomPainter {
 }
 
 /* =========================================================================
-   POSE PAINTER
+   POSE PAINTER — Generic skeleton overlay, adapts to exercise debug data.
    ========================================================================= */
 
 class PosePainter extends CustomPainter {
@@ -1812,11 +1781,13 @@ class PosePainter extends CustomPainter {
     _drawAngleLabels(canvas, landmarks, transformPoint);
   }
 
+  /// Draws angle labels at key joints using whatever data the exercise provides.
   void _drawAngleLabels(
     Canvas canvas,
     Map<PoseLandmarkType, PoseLandmark> landmarks,
     Offset Function(PoseLandmark) transformPoint,
   ) {
+    // Knee angle (both squat and plank track this)
     final knee = landmarks[PoseLandmarkType.leftKnee] ??
         landmarks[PoseLandmarkType.rightKnee];
     if (knee != null && knee.likelihood > 0.5) {
@@ -1828,14 +1799,32 @@ class PosePainter extends CustomPainter {
       }
     }
 
+    // Shoulder-area label: trunk lean (squat) or back angle (plank)
     final shoulder = landmarks[PoseLandmarkType.leftShoulder] ??
         landmarks[PoseLandmarkType.rightShoulder];
     if (shoulder != null && shoulder.likelihood > 0.5) {
       final shoulderPos = transformPoint(shoulder);
+      // Try squat-specific trunkLean, then plank-specific backAngle
       final trunkLean = debugData['trunkLean'];
+      final backAngle = debugData['backAngle'];
       if (trunkLean != null) {
         _drawLabel(canvas, shoulderPos + const Offset(12, -8), '$trunkLean',
             Colors.orange);
+      } else if (backAngle != null) {
+        _drawLabel(canvas, shoulderPos + const Offset(12, -8), '$backAngle°',
+            Colors.orange);
+      }
+    }
+
+    // Hip-area label for plank neck angle
+    final ear = landmarks[PoseLandmarkType.leftEar] ??
+        landmarks[PoseLandmarkType.rightEar];
+    if (ear != null && ear.likelihood > 0.5) {
+      final neckAngle = debugData['neckAngle'];
+      if (neckAngle != null) {
+        final earPos = transformPoint(ear);
+        _drawLabel(canvas, earPos + const Offset(12, -8), '$neckAngle°',
+            const Color(0xFF4CAF50));
       }
     }
   }

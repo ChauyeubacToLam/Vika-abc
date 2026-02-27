@@ -28,7 +28,7 @@ class HeelRiseMetric extends SquatMetricBase {
   final Map<String, dynamic> _debugData = {};
 
   // 10 frames ~0.33s at 30fps — prevents false triggers from floor jitter
-  final Debouncer _heelDebouncer = Debouncer(requiredFrames: 10);
+  final Debouncer _heelDebouncer = Debouncer(requiredFrames: 5);
 
   /// Prevent instruction spam — only set coaching once per rep.
   bool _instructionSet = false;
