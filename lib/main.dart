@@ -129,6 +129,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
   CameraController? _cameraController;
   int _cameraIndex = -1;
   bool _isCameraReady = false;
+  CameraLensDirection _currentLensDirection = CameraLensDirection.back;
 
   // ── ML Kit ──
   final PoseDetector _poseDetector = PoseDetector(
@@ -203,7 +204,6 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     WidgetsBinding.instance.removeObserver(this);
     _cameraController?.dispose();
     _poseDetector.close();
-    _exercise.disposeDetectors(); // <-- add this
     _bannerController.dispose();
     super.dispose();
   }
@@ -227,8 +227,9 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     if (!status.isGranted) return;
 
     _cameraIndex = _cameras
-        .indexWhere((cam) => cam.lensDirection == CameraLensDirection.front);
+        .indexWhere((cam) => cam.lensDirection == _currentLensDirection);
     if (_cameraIndex == -1) _cameraIndex = 0;
+    _currentLensDirection = _cameras[_cameraIndex].lensDirection;
 
     final camera = _cameras[_cameraIndex];
     _cameraController = CameraController(
@@ -252,6 +253,50 @@ class _ExerciseScreenState extends State<ExerciseScreen>
   }
 
   /* -----------------------------------------------------------------------
+     CAMERA TOGGLE
+     ----------------------------------------------------------------------- */
+  Future<void> _toggleCamera() async {
+    final newDirection = _currentLensDirection == CameraLensDirection.back
+        ? CameraLensDirection.front
+        : CameraLensDirection.back;
+
+    final newIndex =
+        _cameras.indexWhere((cam) => cam.lensDirection == newDirection);
+    if (newIndex == -1) return;
+
+    await _cameraController?.stopImageStream();
+    await _cameraController?.dispose();
+
+    setState(() {
+      _isCameraReady = false;
+      _cameraIndex = newIndex;
+      _currentLensDirection = newDirection;
+      _detectedPose = null;
+    });
+
+    final camera = _cameras[_cameraIndex];
+    _cameraController = CameraController(
+      camera,
+      ResolutionPreset.medium,
+      enableAudio: false,
+      imageFormatGroup: Platform.isAndroid
+          ? ImageFormatGroup.nv21
+          : ImageFormatGroup.bgra8888,
+    );
+
+    try {
+      await _cameraController!.initialize();
+      if (!mounted) return;
+      _cameraController!.startImageStream(_processCameraImage);
+      setState(() {
+        _isCameraReady = true;
+      });
+    } catch (e) {
+      debugPrint('[VinaFit] Camera toggle error: $e');
+    }
+  }
+
+  /* -----------------------------------------------------------------------
      POSE PIPELINE
      ----------------------------------------------------------------------- */
   void _processCameraImage(CameraImage cameraImage) {
@@ -264,9 +309,6 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     try {
       final inputImage = _buildInputImage(cameraImage);
       if (inputImage == null) return;
-
-      // Run person detection (async, fire-and-forget style)
-      await _exercise.runPersonDetection(inputImage);
 
       final poses = await _poseDetector.processImage(inputImage);
 
@@ -607,6 +649,29 @@ class _ExerciseScreenState extends State<ExerciseScreen>
             ],
           ),
           const Spacer(),
+          GestureDetector(
+            onTap: _toggleCamera,
+            child: Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  width: 1,
+                ),
+              ),
+              child: Icon(
+                _currentLensDirection == CameraLensDirection.back
+                    ? Icons.camera_front
+                    : Icons.camera_rear,
+                color: Colors.white70,
+                size: 18,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
           _buildStatePill(),
           const SizedBox(width: 8),
           Container(
