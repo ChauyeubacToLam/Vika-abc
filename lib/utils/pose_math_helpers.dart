@@ -3,7 +3,7 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../exercise/exercise_base.dart';
 
 /* ---------------------------------------------------------------------------
-  PART 1: JOINT FLEXION (0 - 360 degrees)
+  PART 1: JOINT FLEXION (0 - 180 degrees)
   ---------------------------------------------------------------------------
   Measures the angle between three landmarks (e.g., Hip -> Knee -> Ankle).
   Logic adapted directly from Google ML Kit documentation.

@@ -79,7 +79,7 @@ abstract class ExerciseBase {
   // StickyDebouncer: starts as "not detected" (false).
   // Requires N consecutive "person detected" frames to pass.
   // Requires N consecutive "no person" frames to block again.
-  StickyDebouncer _personDetectedDebouncer =
+  final StickyDebouncer _personDetectedDebouncer =
       StickyDebouncer(requiredFrames: 15, currentState: false);
 
   // Track if person detection has ever passed (to avoid re-checking
@@ -93,7 +93,7 @@ abstract class ExerciseBase {
   bool _isPaused = false;
 
   static const int _SEG_CHECK_INTERVAL = 30; // frames (~1.5s at 30fps)
-  static const int _SEG_FAIL_THRESHOLD = 1; // consecutive fails to pause
+  static const int _SEG_FAIL_THRESHOLD = 2; // consecutive fails to pause
 
   /// Whether the exercise is currently paused (user left frame).
   bool get isPaused => _isPaused;
