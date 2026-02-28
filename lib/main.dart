@@ -203,6 +203,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     WidgetsBinding.instance.removeObserver(this);
     _cameraController?.dispose();
     _poseDetector.close();
+    _exercise.disposeDetectors(); // <-- add this
     _bannerController.dispose();
     super.dispose();
   }
@@ -226,7 +227,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     if (!status.isGranted) return;
 
     _cameraIndex = _cameras
-        .indexWhere((cam) => cam.lensDirection == CameraLensDirection.back);
+        .indexWhere((cam) => cam.lensDirection == CameraLensDirection.front);
     if (_cameraIndex == -1) _cameraIndex = 0;
 
     final camera = _cameras[_cameraIndex];
@@ -263,6 +264,9 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     try {
       final inputImage = _buildInputImage(cameraImage);
       if (inputImage == null) return;
+
+      // Run person detection (async, fire-and-forget style)
+      await _exercise.runPersonDetection(inputImage);
 
       final poses = await _poseDetector.processImage(inputImage);
 

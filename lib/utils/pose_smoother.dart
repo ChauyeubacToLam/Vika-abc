@@ -99,7 +99,9 @@ class _OneEuroFilter {
 
     // 2. Use Velocity to Tune Cutoff
     double speed = 0.0;
-    for (double v in edx) speed += v * v;
+    for (double v in edx) {
+      speed += v * v;
+    }
     speed = math.sqrt(speed);
 
     // The faster you move, the higher the cutoff (less smoothing)

@@ -216,7 +216,7 @@ class Squat extends ExerciseBase {
       repCount += 1;
 
       // Let depth check if rep was deep enough
-      depthMetric.checkRepCompletion(squatState, ctx);
+      depthMetric.checkRepCompletion(previousSquatState, ctx);
 
       // Fire final state transition so tempo can calculate ascent
       _transitionState(SquatState.standing, now);
