@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../exercise/exercise_base.dart';
 import '../exercise/squat/squat.dart';
 import '../exercise/plank/plank.dart';
+import '../exercise/lunge/lunge.dart';
 
 /* =========================================================================
    ExerciseDefinition — Metadata + factory for each exercise type.
@@ -87,6 +88,26 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'setup': const Color(0xFFFF9800),
       'holding': const Color(0xFF00E676),
       'resting': const Color(0xFF29B6F6),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'lunge',
+    name: 'Lunge',
+    subtitle: 'Phân tích tư thế Lunge',
+    description:
+        'AI phân tích form lunge theo thời gian thực.\nTheo dõi độ sâu đầu gối, thân trên và cân bằng.',
+    icon: Icons.directions_walk,
+    primaryColor: const Color(0xFF7C4DFF),
+    secondaryColor: const Color(0xFF6200EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Đùi', 'Mông', 'Hamstring'],
+    duration: '10 reps',
+    createExercise: () => Lunge(),
+    phaseColors: {
+      'standing': const Color(0xFF00E676),
+      'descending': const Color(0xFFFFD600),
+      'bottom': const Color(0xFFFF6D00),
+      'ascending': const Color(0xFF00B0FF),
     },
   ),
 ];
