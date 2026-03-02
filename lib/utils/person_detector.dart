@@ -24,7 +24,7 @@ class PersonDetectorConfig {
   static const double MIN_PERSON_RATIO = 0.05;
 
   /// Per-pixel confidence threshold to count as "person"
-  static const double PIXEL_CONFIDENCE_THRESHOLD = 0.5;
+  static const double PIXEL_CONFIDENCE_THRESHOLD = 0.98;
 }
 
 class PersonDetector {

@@ -116,6 +116,46 @@ class Plank extends ExerciseBase {
   }
 
   /* -----------------------------------------------------------------------
+     INITIALIZATION
+     ----------------------------------------------------------------------- */
+  /* =========================================================================
+   ADD THESE TO plank.dart (Plank class)
+   ========================================================================= */
+  @override
+  bool isInStartPosition(
+    Map<PoseLandmarkType, PoseLandmark> landmarks,
+    CameraFacing facing,
+    double? scaleFactor,
+  ) {
+    // Check: user is in plank position (horizontal trunk)
+    final shoulder = getSideLandmark(
+      landmarks: landmarks,
+      rightType: PoseLandmarkType.rightShoulder,
+      leftType: PoseLandmarkType.leftShoulder,
+    );
+    final hip = getSideLandmark(
+      landmarks: landmarks,
+      rightType: PoseLandmarkType.rightHip,
+      leftType: PoseLandmarkType.leftHip,
+    );
+
+    if (shoulder == null || hip == null) return false;
+
+    // Trunk must be roughly horizontal (within 25° of horizontal)
+    double trunkClockAngle =
+        calculateVerticalAngle(pivot: hip, point: shoulder);
+    double horizontalTarget = facing == CameraFacing.right
+        ? PlankConfig.HORIZONTAL_CLOCK_RIGHT
+        : PlankConfig.HORIZONTAL_CLOCK_LEFT;
+    double diff = trunkClockAngle - horizontalTarget;
+    if (diff > 180) diff -= 360;
+    if (diff < -180) diff += 360;
+    if (diff.abs() > 25.0) return false;
+
+    return true;
+  }
+
+  /* -----------------------------------------------------------------------
      STOP CONDITION
      ----------------------------------------------------------------------- */
   @override
@@ -217,7 +257,7 @@ class Plank extends ExerciseBase {
         ? PlankConfig.HORIZONTAL_CLOCK_RIGHT
         : PlankConfig.HORIZONTAL_CLOCK_LEFT;
     double trunkDeviation =
-        _clockAngleDeviation(trunkClockAngle, horizontalTarget);
+        clockAngleDeviation(trunkClockAngle, horizontalTarget);
 
     // Neck: ear→shoulder→hip (unsigned 0–180° is fine)
     double neckAngle =
@@ -412,18 +452,5 @@ class Plank extends ExerciseBase {
   double _currentHoldSeconds() {
     if (_holdStartMs == null) return 0.0;
     return (DateTime.now().millisecondsSinceEpoch - _holdStartMs!) / 1000.0;
-  }
-
-  /// Calculates signed deviation from a target clock angle.
-  /// Positive = clockwise from target, Negative = counter-clockwise.
-  /// Handles 360°/0° wraparound correctly.
-  /// For plank: positive = sag direction, negative = pike direction.
-  /// (verify with debug data and swap if needed)
-  double _clockAngleDeviation(double clockAngle, double target) {
-    double diff = clockAngle - target;
-    // Normalize to -180..+180
-    if (diff > 180) diff -= 360;
-    if (diff < -180) diff += 360;
-    return diff;
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../exercise/exercise_base.dart';
 import '../exercise/squat/squat.dart';
 import '../exercise/plank/plank.dart';
+import '../exercise/push up/push_up.dart';
 
 /* =========================================================================
    ExerciseDefinition — Metadata + factory for each exercise type.
@@ -87,6 +88,26 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'setup': const Color(0xFFFF9800),
       'holding': const Color(0xFF00E676),
       'resting': const Color(0xFF29B6F6),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'push_up',
+    name: 'Push Up',
+    subtitle: 'Phân tích tư thế Hít Đất',
+    description:
+        'AI phân tích form hít đất theo thời gian thực.\nTheo dõi thân trên, độ sâu và nhịp hạ người.',
+    icon: Icons.arrow_downward_rounded,
+    primaryColor: const Color(0xFFE040FB),
+    secondaryColor: const Color(0xFF7C4DFF),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Ngực', 'Tay sau', 'Vai', 'Core'],
+    duration: '15 reps',
+    createExercise: () => PushUp(),
+    phaseColors: {
+      'plank': const Color(0xFF00E676),
+      'descending': const Color(0xFFFFD600),
+      'bottom': const Color(0xFFFF6D00),
+      'ascending': const Color(0xFF00B0FF),
     },
   ),
 ];

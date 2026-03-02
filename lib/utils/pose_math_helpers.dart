@@ -138,3 +138,16 @@ double convertClockAngleToTrunkLean(double clockAngle, CameraFacing facing) {
 
   return 0.0; // Default for front/undefined
 }
+
+/// Calculates signed deviation from a target clock angle.
+/// Positive = clockwise from target, Negative = counter-clockwise.
+/// Handles 360°/0° wraparound correctly.
+/// For plank: positive = sag direction, negative = pike direction.
+/// (verify with debug data and swap if needed)
+double clockAngleDeviation(double clockAngle, double target) {
+  double diff = clockAngle - target;
+  // Normalize to -180..+180
+  if (diff > 180) diff -= 360;
+  if (diff < -180) diff += 360;
+  return diff;
+}

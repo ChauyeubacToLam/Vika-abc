@@ -10,7 +10,6 @@ import '../utils/pose_math_helpers.dart';
    CONFIGURATION & THRESHOLDS
    ========================================================================= */
 
-const double NODDING_ANGLE_FOR_START = 0.2; // 20% of the back length
 const double FRONT_FACING_SHOULDER_THRESHOLD = 0.57; // > 0.57 is Front
 const double SIDE_FACING_SHOULDER_THRESHOLD = 0.35; // < 0.35 is Side
 
@@ -49,6 +48,11 @@ class ResultIssues {
 
 /* =========================================================================
    ExerciseBase - abstract base class for all fitness exercises.
+   
+   Activation: hold-still (universal).
+   Each exercise overrides isInStartPosition() to define what
+   "ready" looks like (standing for squat, horizontal for plank/push-up).
+   User holds valid position for 3 seconds → exercise begins.
    ========================================================================= */
 
 abstract class ExerciseBase {
@@ -72,22 +76,12 @@ abstract class ExerciseBase {
   StickyDebouncer leftRightDebouncer = StickyDebouncer(requiredFrames: 5);
 
   // -- Person Detection (Selfie Segmentation) --
-  // Replaces all heuristic object filters with one ML-based check.
-  // Only runs before activation — once person confirmed + nod, stops.
   final PersonDetector _personDetector = PersonDetector();
-
-  // StickyDebouncer: starts as "not detected" (false).
-  // Requires N consecutive "person detected" frames to pass.
-  // Requires N consecutive "no person" frames to block again.
   final StickyDebouncer _personDetectedDebouncer =
       StickyDebouncer(requiredFrames: 15, currentState: false);
-
-  // Track if person detection has ever passed (to avoid re-checking
-  // after brief detection gaps during nod animation)
   bool _personConfirmed = false;
 
   // -- Periodic Segmentation (mid-set person check) --
-  // Runs once every ~1.5s during active exercise to detect if user left.
   int _segCheckCounter = 0;
   int _segFailStreak = 0;
   bool _isPaused = false;
@@ -98,6 +92,18 @@ abstract class ExerciseBase {
   /// Whether the exercise is currently paused (user left frame).
   bool get isPaused => _isPaused;
 
+  // -- Hold-Still Activation --
+  int _holdStillFrames = 0;
+  static const int HOLD_STILL_REQUIRED_FRAMES = 90; // ~3s at 30fps
+
+  /// Progress 0.0–1.0 for hold-still countdown UI. Null if not in countdown.
+  double? get activationProgress {
+    if (exerciseState != ExerciseState.notActivated) return null;
+    if (!_personConfirmed) return null;
+    if (_holdStillFrames <= 0) return null;
+    return (_holdStillFrames / HOLD_STILL_REQUIRED_FRAMES).clamp(0.0, 1.0);
+  }
+
   // -- Constructor --
   ExerciseBase() {
     poseSmoother = PoseSmoother(minCutoff: 0.5, beta: 0.005);
@@ -107,9 +113,6 @@ abstract class ExerciseBase {
      MAIN PIPELINE
      ----------------------------------------------------------------------- */
 
-  /// Main entry point. Called every frame from the camera stream.
-  /// [inputImage] is needed for person detection (segmentation).
-  /// [landmarks] are the pose landmarks from ML Kit Pose Detection.
   List<dynamic>? processPose(
     Map<PoseLandmarkType, PoseLandmark> landmarks, {
     InputImage? inputImage,
@@ -121,7 +124,6 @@ abstract class ExerciseBase {
 
     // 2. Person Detection — only before activation
     if (exerciseState == ExerciseState.notActivated && !_personConfirmed) {
-      // Check last known result from async person detector
       bool personOk =
           _personDetectedDebouncer.update(_personDetector.personDetected);
 
@@ -136,7 +138,6 @@ abstract class ExerciseBase {
         return [repCount, resultIssues.feedback];
       }
 
-      // Person confirmed — stop running segmentation
       _personConfirmed = true;
     }
 
@@ -144,7 +145,6 @@ abstract class ExerciseBase {
     if (exerciseState == ExerciseState.activated) {
       _segCheckCounter++;
 
-      // Read last async result
       if (_segCheckCounter >= _SEG_CHECK_INTERVAL) {
         _segCheckCounter = 0;
 
@@ -215,22 +215,17 @@ abstract class ExerciseBase {
   }
 
   /// Async person detection — call from camera stream handler.
-  /// Fire-and-forget: results are read synchronously in processPose().
-  /// Runs during notActivated (gate) AND activated (periodic mid-set check).
   Future<void> runPersonDetection(InputImage inputImage) async {
     if (exerciseState == ExerciseState.completed) return;
 
-    // Before activation: run every frame until confirmed
     if (exerciseState == ExerciseState.notActivated && _personConfirmed) return;
 
-    // During activation: only run on check intervals
     if (exerciseState == ExerciseState.activated &&
         _segCheckCounter != _SEG_CHECK_INTERVAL - 1 &&
         !_isPaused) {
-      return; // Not time to check yet
+      return;
     }
 
-    // If paused, run every frame to detect return quickly
     await _personDetector.detect(inputImage);
   }
 
@@ -329,7 +324,10 @@ abstract class ExerciseBase {
   List<dynamic> getSetFeedback() => setFeedback;
 
   /* -----------------------------------------------------------------------
-     STATE MACHINE
+     STATE MACHINE — Hold-Still Activation (universal)
+     
+     User gets into valid position → holds for 3s → exercise starts.
+     Each exercise defines "valid position" via isInStartPosition().
      ----------------------------------------------------------------------- */
 
   void checkExerciseState(
@@ -339,23 +337,32 @@ abstract class ExerciseBase {
   }) {
     switch (currentState) {
       case ExerciseState.notActivated:
-        final shoulder = getSideLandmark(
-          landmarks: smoothedLandmarks,
-          rightType: PoseLandmarkType.rightShoulder,
-          leftType: PoseLandmarkType.leftShoulder,
+        final inPosition = isInStartPosition(
+          smoothedLandmarks,
+          cameraFacing,
+          scaleFactor,
         );
-        final nose = smoothedLandmarks[PoseLandmarkType.nose];
 
-        if (shoulder == null || nose == null) {
-          exerciseState = ExerciseState.notActivated;
-          return;
-        }
+        if (inPosition) {
+          _holdStillFrames++;
+          final remaining =
+              ((HOLD_STILL_REQUIRED_FRAMES - _holdStillFrames) / 30.0)
+                  .clamp(0.0, 99.0);
+          debugData['holdStill'] = '${remaining.toStringAsFixed(1)}s';
 
-        final dist = (nose.y - shoulder.y).abs() / (scaleFactor ?? 1.0);
-        debugData['nodDist'] = dist.toStringAsFixed(3);
-
-        if (dist < NODDING_ANGLE_FOR_START) {
-          exerciseState = ExerciseState.activated;
+          if (_holdStillFrames >= HOLD_STILL_REQUIRED_FRAMES) {
+            exerciseState = ExerciseState.activated;
+            _holdStillFrames = 0;
+          } else {
+            resultIssues.feedback['System'] =
+                'Giữ yên... ${remaining.toStringAsFixed(0)}s';
+          }
+        } else {
+          if (_holdStillFrames > 0) {
+            debugData['holdStill'] = 'reset';
+          }
+          _holdStillFrames = 0;
+          resultIssues.feedback['System'] = 'Vào tư thế và giữ yên để bắt đầu';
         }
         break;
 
@@ -371,6 +378,7 @@ abstract class ExerciseBase {
   /* -----------------------------------------------------------------------
      ABSTRACT METHODS
      ----------------------------------------------------------------------- */
+
   bool requestStop();
 
   String? checkSafety(
@@ -380,6 +388,15 @@ abstract class ExerciseBase {
 
   void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks,
       CameraFacing cameraFacing, double? scaleFactor);
+
+  /// Define what "ready position" looks like for this exercise.
+  /// Called every frame during notActivated state.
+  /// Return true if user is in valid starting position.
+  bool isInStartPosition(
+    Map<PoseLandmarkType, PoseLandmark> landmarks,
+    CameraFacing facing,
+    double? scaleFactor,
+  );
 
   /* -----------------------------------------------------------------------
      UI BRIDGE
