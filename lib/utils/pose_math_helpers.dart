@@ -31,6 +31,7 @@ double calculateAngleNormalized(
 
   return degrees;
 }
+/* Not normalized version (0-360) for debugging and advanced use cases */
 
 double calculateAngle(
     {required PoseLandmark firstPoint,
@@ -90,6 +91,33 @@ double calculateVerticalAngle(
   return clockAngle;
 }
 
+/* =========================================================================
+   Calculate angle compare with the x coordinate (horizontal) 
+   ========================================================================= */
+
+/// For example, arm-x angle;
+/// Returns 0° for arms horizontal, 90° for arms straight up.
+/// Works for both left and right arms.
+double calculateHorizontalAngle(
+    {required PoseLandmark point1, required PoseLandmark point2}) {
+  // Note: Y increases downward in screen coordinates.
+  double dy = point1.y - point2.y;
+  double dx = (point2.x - point1.x).abs();
+
+  // atan2(dy, dx) gives angle from horizontal
+  // When dy > 0 and dx small → near 90° (arm pointing up)
+  // When dy ≈ 0 → near 0° (arm horizontal)
+  // When dy < 0 → negative (arm pointing down)
+  double radians = math.atan2(dy, dx);
+  double degrees = radians * (180.0 / math.pi);
+
+  // Clamp: below horizontal = 0, straight up = 90
+  return degrees.clamp(0.0, 90.0);
+}
+
+/* =========================================================================
+   Calculate distance between two points
+   ========================================================================= */
 double calculateDistance(var point1, var point2) {
   double dx = point2.x - point1.x;
   double dy = point2.y - point1.y;
@@ -97,8 +125,8 @@ double calculateDistance(var point1, var point2) {
 }
 
 /* =========================================================================
-   HELPER: Clock Angle to Trunk Lean Conversion
-   Converts the 0-360° clock angle into degrees-from-vertical (0-90°)
+  Clock Angle to Trunk Lean Conversion
+  Converts the 0-360° clock angle into degrees-from-vertical (0-90°)
    - negative values for backward lean
    - positive values for forward lean
    ========================================================================= */

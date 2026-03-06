@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../exercise/exercise_base.dart';
-import '../exercise/squat/squat.dart';
+import '../exercise/jumping jack/jumping_jack.dart';
 import '../exercise/plank/plank.dart';
 import '../exercise/push up/push_up.dart';
+import '../exercise/squat/squat.dart';
 
 /* =========================================================================
    ExerciseDefinition — Metadata + factory for each exercise type.
@@ -25,6 +26,9 @@ class ExerciseDefinition {
   final String difficulty;
   final List<String> targetMuscles;
   final String duration;
+  final String cameraHint;
+  final String framingHint;
+  final List<String> setupTips;
   final ExerciseBase Function() createExercise;
 
   /// Maps phaseKey → Color for the state pill during activated state.
@@ -41,6 +45,9 @@ class ExerciseDefinition {
     required this.difficulty,
     required this.targetMuscles,
     required this.duration,
+    required this.cameraHint,
+    required this.framingHint,
+    required this.setupTips,
     required this.createExercise,
     required this.phaseColors,
   });
@@ -63,6 +70,13 @@ final List<ExerciseDefinition> exerciseDefinitions = [
     difficulty: 'Trung bình',
     targetMuscles: ['Đùi', 'Mông', 'Core'],
     duration: '15 reps',
+    cameraHint: 'Đứng nghiêng người so với camera.',
+    framingHint: 'Giữ vai, hông, gối, mắt cá và bàn chân trong khung hình.',
+    setupTips: [
+      'Đặt camera ngang hông, cách bạn khoảng 2–3 mét.',
+      'Quay nghiêng 90° để AI thấy rõ độ sâu và thân người.',
+      'Giữ đủ ánh sáng ở chân và thân trên trước khi bắt đầu.',
+    ],
     createExercise: () => Squat(),
     phaseColors: {
       'standing': const Color(0xFF00E676),
@@ -83,6 +97,13 @@ final List<ExerciseDefinition> exerciseDefinitions = [
     difficulty: 'Dễ – Trung bình',
     targetMuscles: ['Core', 'Vai', 'Lưng'],
     duration: '3 × 10s',
+    cameraHint: 'Quay nghiêng người so với camera.',
+    framingHint: 'Ưu tiên thấy rõ vai, hông, tai và đầu gối.',
+    setupTips: [
+      'Đặt điện thoại thấp ngang thân người để thấy rõ thân plank.',
+      'Giữ phần thân trên sáng và không che khuất vai/hông.',
+      'Nếu không đủ chỗ, vẫn cố gắng giữ đầu gối và mông trọn khung.',
+    ],
     createExercise: () => Plank(),
     phaseColors: {
       'setup': const Color(0xFFFF9800),
@@ -91,23 +112,55 @@ final List<ExerciseDefinition> exerciseDefinitions = [
     },
   ),
   ExerciseDefinition(
+    id: 'jumping_jack',
+    name: 'Jumping Jack',
+    subtitle: 'Cardio nhẹ cho dân văn phòng',
+    description:
+        'AI phân tích tư thế nhảy dạng.\nTheo dõi tay, chân và nhịp độ.',
+    icon: Icons.directions_run,
+    primaryColor: const Color(0xFF76FF03),
+    secondaryColor: const Color(0xFF64DD17),
+    difficulty: 'Dễ',
+    targetMuscles: ['Toàn thân', 'Vai', 'Chân'],
+    duration: '30 reps',
+    cameraHint: 'Đứng đối diện camera.',
+    framingHint: 'Giữ toàn thân, hai tay và hai chân luôn ở trong khung hình.',
+    setupTips: [
+      'Lùi xa camera để khi dang tay và chân vẫn không bị cắt khung.',
+      'Giữ đầu, cổ tay và mắt cá luôn nhìn thấy rõ.',
+      'Chừa khoảng trống phía trên đầu vì tay sẽ vươn cao qua đầu.',
+    ],
+    createExercise: () => JumpingJack(),
+    phaseColors: {
+      'closed': const Color(0xFF00E676),
+      'open': const Color(0xFFFFD600),
+    },
+  ),
+  ExerciseDefinition(
     id: 'push_up',
     name: 'Push Up',
-    subtitle: 'Phân tích tư thế Hít Đất',
+    subtitle: 'Theo dõi độ sâu và thân người',
     description:
-        'AI phân tích form hít đất theo thời gian thực.\nTheo dõi thân trên, độ sâu và nhịp hạ người.',
-    icon: Icons.arrow_downward_rounded,
-    primaryColor: const Color(0xFFE040FB),
-    secondaryColor: const Color(0xFF7C4DFF),
+        'AI phân tích chống đẩy theo thời gian thực.\nTheo dõi thân người, độ sâu và nhịp độ.',
+    icon: Icons.sports_gymnastics,
+    primaryColor: const Color(0xFFFF6E40),
+    secondaryColor: const Color(0xFFFF3D00),
     difficulty: 'Trung bình',
-    targetMuscles: ['Ngực', 'Tay sau', 'Vai', 'Core'],
+    targetMuscles: ['Ngực', 'Vai', 'Core'],
     duration: '15 reps',
+    cameraHint: 'Quay nghiêng người so với camera.',
+    framingHint: 'Giữ vai, khuỷu tay, cổ tay và hông luôn trong khung hình.',
+    setupTips: [
+      'Đặt camera thấp ngang thân để thấy rõ đường vai–hông.',
+      'Giữ thân trên và khuỷu tay đủ sáng trước khi bắt đầu.',
+      'Lùi camera thêm nếu cổ tay hoặc đầu dễ bị cắt khung.',
+    ],
     createExercise: () => PushUp(),
     phaseColors: {
       'plank': const Color(0xFF00E676),
       'descending': const Color(0xFFFFD600),
       'bottom': const Color(0xFFFF6D00),
-      'ascending': const Color(0xFF00B0FF),
+      'ascending': const Color(0xFFFF6E40),
     },
   ),
 ];

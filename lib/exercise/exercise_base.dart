@@ -77,31 +77,36 @@ abstract class ExerciseBase {
 
   // -- Person Detection (Selfie Segmentation) --
   final PersonDetector _personDetector = PersonDetector();
-  final StickyDebouncer _personDetectedDebouncer =
-      StickyDebouncer(requiredFrames: 15, currentState: false);
   bool _personConfirmed = false;
+  DateTime? _personSeenSince;
+  DateTime? _personLostSince;
+  DateTime? _resumePresenceSince;
 
-  // -- Periodic Segmentation (mid-set person check) --
-  int _segCheckCounter = 0;
-  int _segFailStreak = 0;
   bool _isPaused = false;
 
-  static const int _SEG_CHECK_INTERVAL = 30; // frames (~1.5s at 30fps)
-  static const int _SEG_FAIL_THRESHOLD = 2; // consecutive fails to pause
+  static const Duration _PERSON_CONFIRM_DURATION = Duration(milliseconds: 650);
+  static const Duration _PERSON_LOST_GRACE = Duration(milliseconds: 900);
+  static const Duration _PERSON_RESUME_CONFIRM_DURATION =
+      Duration(milliseconds: 320);
 
   /// Whether the exercise is currently paused (user left frame).
   bool get isPaused => _isPaused;
 
+  double get personPresenceScore => _personDetector.presenceScore;
+
   // -- Hold-Still Activation --
-  int _holdStillFrames = 0;
-  static const int HOLD_STILL_REQUIRED_FRAMES = 90; // ~3s at 30fps
+  DateTime? _holdStillStartedAt;
+  static const Duration HOLD_STILL_REQUIRED_DURATION = Duration(seconds: 3);
 
   /// Progress 0.0–1.0 for hold-still countdown UI. Null if not in countdown.
   double? get activationProgress {
     if (exerciseState != ExerciseState.notActivated) return null;
     if (!_personConfirmed) return null;
-    if (_holdStillFrames <= 0) return null;
-    return (_holdStillFrames / HOLD_STILL_REQUIRED_FRAMES).clamp(0.0, 1.0);
+    if (_holdStillStartedAt == null) return null;
+    final elapsed = DateTime.now().difference(_holdStillStartedAt!);
+    return (elapsed.inMilliseconds /
+            HOLD_STILL_REQUIRED_DURATION.inMilliseconds)
+        .clamp(0.0, 1.0);
   }
 
   // -- Constructor --
@@ -122,45 +127,30 @@ abstract class ExerciseBase {
     // 1. Smooth
     final smoothedLandmarks = poseSmoother.smoothing(landmarks);
 
+    _syncPresenceState(hasPose: true);
+
+    debugData['personRatio'] =
+        _personDetector.lastPersonRatio.toStringAsFixed(3);
+    debugData['personScore'] = _personDetector.presenceScore.toStringAsFixed(3);
+    debugData['personDetected'] = _personDetector.personDetected;
+
     // 2. Person Detection — only before activation
     if (exerciseState == ExerciseState.notActivated && !_personConfirmed) {
-      bool personOk =
-          _personDetectedDebouncer.update(_personDetector.personDetected);
+      final stableFor = _personSeenSince == null
+          ? 0
+          : DateTime.now().difference(_personSeenSince!).inMilliseconds;
+      debugData['personStableMs'] = stableFor;
 
-      debugData['personRatio'] =
-          _personDetector.lastPersonRatio.toStringAsFixed(3);
-      debugData['personOk'] = personOk;
-
-      if (!personOk) {
+      if (!_personConfirmed) {
         resultIssues.feedback["System"] =
             "Đang tìm người... Vui lòng đứng trong khung hình.";
         _populateBaseDebugData();
         return [repCount, resultIssues.feedback];
       }
-
-      _personConfirmed = true;
     }
 
-    // 2b. Periodic segmentation during active exercise
+    // 2b. Presence re-check during active exercise
     if (exerciseState == ExerciseState.activated) {
-      _segCheckCounter++;
-
-      if (_segCheckCounter >= _SEG_CHECK_INTERVAL) {
-        _segCheckCounter = 0;
-
-        if (!_personDetector.personDetected) {
-          _segFailStreak++;
-          debugData['segFailStreak'] = _segFailStreak;
-
-          if (_segFailStreak >= _SEG_FAIL_THRESHOLD) {
-            _isPaused = true;
-          }
-        } else {
-          _segFailStreak = 0;
-          _isPaused = false;
-        }
-      }
-
       debugData['isPaused'] = _isPaused;
 
       if (_isPaused) {
@@ -214,17 +204,39 @@ abstract class ExerciseBase {
     return null;
   }
 
+  /// Called when no pose is detected in the current frame.
+  Map<String, String> processNoPoseFrame() {
+    resultIssues.feedback.clear();
+    _syncPresenceState(hasPose: false);
+    _populateBaseDebugData();
+    debugData['personRatio'] =
+        _personDetector.lastPersonRatio.toStringAsFixed(3);
+    debugData['personScore'] = _personDetector.presenceScore.toStringAsFixed(3);
+    debugData['personDetected'] = _personDetector.personDetected;
+    debugData['isPaused'] = _isPaused;
+
+    if (exerciseState == ExerciseState.completed) {
+      return {'Result': 'Hoàn thành! $repCount reps'};
+    }
+
+    if (exerciseState == ExerciseState.notActivated) {
+      resultIssues.feedback['System'] = _personConfirmed
+          ? 'Giữ toàn thân trong khung hình để bắt đầu.'
+          : 'Đang tìm người... Vui lòng đứng trong khung hình.';
+    } else if (_isPaused || !_personDetector.personDetected) {
+      resultIssues.feedback['System'] =
+          '⏸ Tạm dừng — Quay lại khung hình để tiếp tục';
+    } else {
+      resultIssues.feedback['System'] =
+          'Giữ toàn thân trong khung hình để AI theo dõi ổn định hơn.';
+    }
+
+    return Map<String, String>.from(resultIssues.feedback);
+  }
+
   /// Async person detection — call from camera stream handler.
   Future<void> runPersonDetection(InputImage inputImage) async {
     if (exerciseState == ExerciseState.completed) return;
-
-    if (exerciseState == ExerciseState.notActivated && _personConfirmed) return;
-
-    if (exerciseState == ExerciseState.activated &&
-        _segCheckCounter != _SEG_CHECK_INTERVAL - 1 &&
-        !_isPaused) {
-      return;
-    }
 
     await _personDetector.detect(inputImage);
   }
@@ -237,6 +249,53 @@ abstract class ExerciseBase {
   void _populateBaseDebugData() {
     debugData['exerciseState'] = exerciseState.toString().split('.').last;
     debugData['cameraFacing'] = cameraFacing.toString().split('.').last;
+    debugData['personConfirmed'] = _personConfirmed;
+  }
+
+  void _syncPresenceState({required bool hasPose}) {
+    final now = DateTime.now();
+    final segmentationPresent = _personDetector.personDetected;
+    final presentNow = hasPose || segmentationPresent;
+
+    if (exerciseState == ExerciseState.notActivated) {
+      if (!_personConfirmed) {
+        if (presentNow) {
+          _personSeenSince ??= now;
+          if (now.difference(_personSeenSince!) >= _PERSON_CONFIRM_DURATION) {
+            _personConfirmed = true;
+          }
+        } else {
+          _personSeenSince = null;
+        }
+      } else if (!presentNow) {
+        _personConfirmed = false;
+        _personSeenSince = null;
+        _holdStillStartedAt = null;
+      }
+      return;
+    }
+
+    if (exerciseState != ExerciseState.activated) return;
+
+    if (presentNow) {
+      _personLostSince = null;
+      if (_isPaused) {
+        _resumePresenceSince ??= now;
+        if (now.difference(_resumePresenceSince!) >=
+            _PERSON_RESUME_CONFIRM_DURATION) {
+          _isPaused = false;
+        }
+      } else {
+        _resumePresenceSince = now;
+      }
+      return;
+    }
+
+    _resumePresenceSince = null;
+    _personLostSince ??= now;
+    if (!_isPaused && now.difference(_personLostSince!) >= _PERSON_LOST_GRACE) {
+      _isPaused = true;
+    }
   }
 
   /* -----------------------------------------------------------------------
@@ -342,26 +401,28 @@ abstract class ExerciseBase {
           cameraFacing,
           scaleFactor,
         );
+        final now = DateTime.now();
 
         if (inPosition) {
-          _holdStillFrames++;
-          final remaining =
-              ((HOLD_STILL_REQUIRED_FRAMES - _holdStillFrames) / 30.0)
-                  .clamp(0.0, 99.0);
+          _holdStillStartedAt ??= now;
+          final elapsed = now.difference(_holdStillStartedAt!);
+          final remaining = (HOLD_STILL_REQUIRED_DURATION.inMilliseconds -
+                  elapsed.inMilliseconds) /
+              1000.0;
           debugData['holdStill'] = '${remaining.toStringAsFixed(1)}s';
 
-          if (_holdStillFrames >= HOLD_STILL_REQUIRED_FRAMES) {
+          if (elapsed >= HOLD_STILL_REQUIRED_DURATION) {
             exerciseState = ExerciseState.activated;
-            _holdStillFrames = 0;
+            _holdStillStartedAt = null;
           } else {
             resultIssues.feedback['System'] =
-                'Giữ yên... ${remaining.toStringAsFixed(0)}s';
+                'Giữ yên... ${remaining.clamp(0.0, 99.0).toStringAsFixed(0)}s';
           }
         } else {
-          if (_holdStillFrames > 0) {
+          if (_holdStillStartedAt != null) {
             debugData['holdStill'] = 'reset';
           }
-          _holdStillFrames = 0;
+          _holdStillStartedAt = null;
           resultIssues.feedback['System'] = 'Vào tư thế và giữ yên để bắt đầu';
         }
         break;

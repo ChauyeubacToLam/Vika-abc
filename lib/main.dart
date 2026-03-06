@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
@@ -154,6 +155,16 @@ class _ExerciseScreenState extends State<ExerciseScreen>
   // ── UI toggles ──
   bool _showDebug = false;
   bool _showRepLog = false;
+  bool _didShowSetupSheet = false;
+
+  // ── Camera UX state ──
+  PermissionStatus? _cameraPermissionStatus;
+  String? _cameraErrorMessage;
+  bool _isInitializingCamera = false;
+
+  // ── UI refresh throttling ──
+  int _lastUiRefreshAtMs = 0;
+  static const int _MIN_UI_REFRESH_INTERVAL_MS = 50;
 
   // ── FPS ──
   int _frameCount = 0;
@@ -196,14 +207,20 @@ class _ExerciseScreenState extends State<ExerciseScreen>
       }
     });
 
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _showSetupSheet();
+    });
+
     _initCamera();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _cameraController?.stopImageStream();
     _cameraController?.dispose();
     _poseDetector.close();
+    _exercise.disposeDetectors();
     _bannerController.dispose();
     super.dispose();
   }
@@ -226,9 +243,26 @@ class _ExerciseScreenState extends State<ExerciseScreen>
      CAMERA INIT
      ----------------------------------------------------------------------- */
   Future<void> _initCamera({int retryCount = 0}) async {
+    if (mounted) {
+      setState(() {
+        _isInitializingCamera = true;
+        _cameraErrorMessage = null;
+      });
+    }
+
     final status = await Permission.camera.request();
+    _cameraPermissionStatus = status;
     if (!status.isGranted) {
       debugPrint('[VinaFit] Camera permission not granted: $status');
+      if (mounted) {
+        setState(() {
+          _isInitializingCamera = false;
+          _isCameraReady = false;
+          _cameraErrorMessage = status.isPermanentlyDenied
+              ? 'Quyền camera đã bị chặn. Hãy mở lại trong cài đặt.'
+              : 'Ứng dụng cần quyền camera để theo dõi bài tập.';
+        });
+      }
       return;
     }
 
@@ -244,6 +278,13 @@ class _ExerciseScreenState extends State<ExerciseScreen>
 
     if (_cameras.isEmpty) {
       debugPrint('[VinaFit] No cameras available');
+      if (mounted) {
+        setState(() {
+          _isInitializingCamera = false;
+          _isCameraReady = false;
+          _cameraErrorMessage = 'Không tìm thấy camera trên thiết bị này.';
+        });
+      }
       return;
     }
 
@@ -282,9 +323,14 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         _cameraIndex = idx;
         _currentLensDirection = camera.lensDirection;
         _isCameraReady = true;
-        controller.startImageStream(_processCameraImage);
+        await controller.startImageStream(_processCameraImage);
         debugPrint('[VinaFit] Camera $idx initialized successfully');
-        if (mounted) setState(() {});
+        if (mounted) {
+          setState(() {
+            _isInitializingCamera = false;
+            _cameraErrorMessage = null;
+          });
+        }
         return; // success
       } catch (e) {
         debugPrint('[VinaFit] Camera $idx init error: $e');
@@ -304,7 +350,14 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     }
 
     debugPrint('[VinaFit] Camera open failed after all retries');
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {
+        _isInitializingCamera = false;
+        _isCameraReady = false;
+        _cameraErrorMessage =
+            'Không thể khởi động camera. Hãy thử lại hoặc đổi camera.';
+      });
+    }
   }
 
   /* -----------------------------------------------------------------------
@@ -343,12 +396,18 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     try {
       await _cameraController!.initialize();
       if (!mounted) return;
-      _cameraController!.startImageStream(_processCameraImage);
+      await _cameraController!.startImageStream(_processCameraImage);
       setState(() {
         _isCameraReady = true;
+        _cameraErrorMessage = null;
       });
     } catch (e) {
       debugPrint('[VinaFit] Camera toggle error: $e');
+      if (mounted) {
+        setState(() {
+          _cameraErrorMessage = 'Không thể chuyển camera. Hãy thử lại.';
+        });
+      }
     }
   }
 
@@ -366,7 +425,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
       final inputImage = _buildInputImage(cameraImage);
       if (inputImage == null) return;
 
-      _exercise.runPersonDetection(inputImage);
+      await _exercise.runPersonDetection(inputImage);
       final poses = await _poseDetector.processImage(inputImage);
 
       if (poses.isNotEmpty) {
@@ -392,6 +451,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         _logStateChanges();
       } else {
         _detectedPose = null;
+        _feedback = _exercise.processNoPoseFrame();
       }
 
       // FPS
@@ -404,7 +464,12 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         _lastFpsTime = now;
       }
 
-      if (mounted) setState(() {});
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      if (mounted &&
+          nowMs - _lastUiRefreshAtMs >= _MIN_UI_REFRESH_INTERVAL_MS) {
+        _lastUiRefreshAtMs = nowMs;
+        setState(() {});
+      }
     } catch (e) {
       debugPrint('[VinaFit] Detection error: $e');
     }
@@ -514,6 +579,153 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     debugPrint('');
   }
 
+  Future<void> _showSetupSheet({bool force = false}) async {
+    if (!mounted) return;
+    if (_didShowSetupSheet && !force) return;
+    _didShowSetupSheet = true;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF0D1228),
+      isScrollControlled: true,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: _definition.primaryColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        _definition.icon,
+                        color: _definition.primaryColor,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _definition.name,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          Text(
+                            _definition.subtitle,
+                            style: TextStyle(
+                              color: _definition.primaryColor,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  _definition.description,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.72),
+                    fontSize: 13,
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _buildSetupRow(
+                    Icons.cameraswitch_outlined, _definition.cameraHint),
+                const SizedBox(height: 8),
+                _buildSetupRow(
+                    Icons.crop_free_outlined, _definition.framingHint),
+                const SizedBox(height: 14),
+                ..._definition.setupTips.map(
+                  (tip) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.check_circle_outline,
+                          size: 16,
+                          color: _definition.primaryColor,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            tip,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.72),
+                              fontSize: 12,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _definition.primaryColor,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Bắt đầu'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSetupRow(IconData icon, String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: _definition.primaryColor, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.76),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /* -----------------------------------------------------------------------
      INPUT IMAGE
      ----------------------------------------------------------------------- */
@@ -571,14 +783,52 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     return Scaffold(
       backgroundColor: const Color(0xFF080C1A),
       body: SafeArea(
-        child:
-            !_isCameraReady ? _buildLoadingView() : _buildCameraView(context),
+        child: !_hasCameraPermission
+            ? _buildPermissionView()
+            : !_isCameraReady
+                ? _buildLoadingView()
+                : _buildCameraView(context),
       ),
     );
   }
 
+  bool get _hasCameraPermission => _cameraPermissionStatus?.isGranted ?? true;
+
   /* ── LOADING ── */
   Widget _buildLoadingView() {
+    if (_cameraErrorMessage != null && !_isInitializingCamera) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.videocam_off_outlined,
+                size: 48,
+                color: _definition.primaryColor,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                _cameraErrorMessage!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.75),
+                  fontSize: 14,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 20),
+              FilledButton(
+                onPressed: _initCamera,
+                child: const Text('Thử lại'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -595,7 +845,9 @@ class _ExerciseScreenState extends State<ExerciseScreen>
           ),
           const SizedBox(height: 20),
           Text(
-            'Đang khởi động camera...',
+            _isInitializingCamera
+                ? 'Đang khởi động camera...'
+                : 'Đang chờ camera sẵn sàng...',
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.5),
               fontSize: 14,
@@ -603,6 +855,57 @@ class _ExerciseScreenState extends State<ExerciseScreen>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPermissionView() {
+    final status = _cameraPermissionStatus;
+    final permanentlyDenied = status?.isPermanentlyDenied ?? false;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.camera_alt_outlined,
+              size: 54,
+              color: _definition.primaryColor,
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              'Cần quyền camera',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              _cameraErrorMessage ??
+                  'Hãy cấp quyền camera để AI theo dõi bài tập của bạn.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.7),
+                fontSize: 13,
+                height: 1.45,
+              ),
+            ),
+            const SizedBox(height: 20),
+            FilledButton(
+              onPressed: permanentlyDenied ? openAppSettings : _initCamera,
+              child: Text(permanentlyDenied ? 'Mở cài đặt' : 'Cấp quyền'),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Quay lại'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -728,6 +1031,27 @@ class _ExerciseScreenState extends State<ExerciseScreen>
             ),
           ),
           const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () => _showSetupSheet(force: true),
+            child: Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  width: 1,
+                ),
+              ),
+              child: const Icon(
+                Icons.help_outline_rounded,
+                color: Colors.white70,
+                size: 18,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
           _buildStatePill(),
           const SizedBox(width: 8),
           Container(
@@ -816,22 +1140,43 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     return LayoutBuilder(
       builder: (context, constraints) {
         final previewSize = Size(constraints.maxWidth, constraints.maxHeight);
+        final framingColor = _exercise.isPaused
+            ? const Color(0xFFFF5252)
+            : _definition.primaryColor;
         return Stack(
           fit: StackFit.expand,
           children: [
-            Center(child: CameraPreview(controller)),
+            RepaintBoundary(child: Center(child: CameraPreview(controller))),
             if (_detectedPose != null)
-              CustomPaint(
-                size: previewSize,
-                painter: PosePainter(
-                  pose: _detectedPose!,
-                  imageSize: _imageSize,
-                  widgetSize: previewSize,
-                  rotation: _imageRotation,
-                  lensDirection: controller.description.lensDirection,
-                  debugData: _exercise.debugData,
+              RepaintBoundary(
+                child: CustomPaint(
+                  size: previewSize,
+                  painter: PosePainter(
+                    pose: _detectedPose!,
+                    imageSize: _imageSize,
+                    widgetSize: previewSize,
+                    rotation: _imageRotation,
+                    lensDirection: controller.description.lensDirection,
+                    debugData: _exercise.debugData,
+                  ),
                 ),
               ),
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(28, 70, 28, 90),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: framingColor.withValues(alpha: 0.45),
+                        width: 1.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
             // Subtle vignette
             Positioned.fill(
               child: IgnorePointer(
@@ -852,9 +1197,55 @@ class _ExerciseScreenState extends State<ExerciseScreen>
                 ),
               ),
             ),
+            Positioned(
+              top: 14,
+              left: 12,
+              right: 12,
+              child: _buildFramingGuideCard(),
+            ),
           ],
         );
       },
+    );
+  }
+
+  Widget _buildFramingGuideCard() {
+    final showSystemMessage = _feedback['System'];
+    final guidance = showSystemMessage ??
+        (_exercise.exerciseState == ExerciseState.notActivated
+            ? _definition.framingHint
+            : _definition.cameraHint);
+    final color =
+        _exercise.isPaused ? const Color(0xFFFF5252) : _definition.primaryColor;
+
+    return Align(
+      alignment: Alignment.topCenter,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 340),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.58),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withValues(alpha: 0.28)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.center_focus_strong, size: 15, color: color),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                guidance,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.86),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  height: 1.35,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -2044,5 +2435,12 @@ class PosePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant PosePainter oldDelegate) => true;
+  bool shouldRepaint(covariant PosePainter oldDelegate) {
+    return oldDelegate.pose != pose ||
+        oldDelegate.imageSize != imageSize ||
+        oldDelegate.widgetSize != widgetSize ||
+        oldDelegate.rotation != rotation ||
+        oldDelegate.lensDirection != lensDirection ||
+        !mapEquals(oldDelegate.debugData, debugData);
+  }
 }

@@ -20,9 +20,8 @@ import '../push_up.dart';
 
 class DepthConfig {
   /// Good depth: elbow flexion reaches 80°-100° (widened for desk workers)
-  static final double GOOD_DEPTH_MIN =
-      PushUpConfig.BOTTOM_ANGLE_RANGE[0]; // 80.0
-  static final double GOOD_DEPTH_MAX =
+  static final double goodDepthMin = PushUpConfig.BOTTOM_ANGLE_RANGE[0]; // 80.0
+  static final double goodDepthMax =
       PushUpConfig.BOTTOM_ANGLE_RANGE[1]; // 100.0
 
   /// Warning: 100°-110° — almost deep enough
@@ -75,10 +74,10 @@ class DepthMetric extends PushUpMetricBase {
 
     // Live feedback during bottom — let user know if depth is good
     if (ctx.pushUpState == PushUpState.bottom) {
-      if (beta <= DepthConfig.GOOD_DEPTH_MAX &&
-          beta >= DepthConfig.GOOD_DEPTH_MIN) {
+      if (beta <= DepthConfig.goodDepthMax &&
+          beta >= DepthConfig.goodDepthMin) {
         ctx.resultIssues.feedback['Depth'] = 'Độ sâu chuẩn xác!';
-      } else if (beta > DepthConfig.GOOD_DEPTH_MAX &&
+      } else if (beta > DepthConfig.goodDepthMax &&
           beta <= DepthConfig.SHALLOW_WARNING_MAX) {
         ctx.resultIssues.feedback['Depth'] = 'Xuống thấp hơn một chút.';
       } else if (beta > DepthConfig.SHALLOW_WARNING_MAX) {
@@ -107,7 +106,7 @@ class DepthMetric extends PushUpMetricBase {
             'plank', 'Depth', 'Chưa đủ sâu! Hạ ngực thấp hơn lần sau.');
         _instructionSet = true;
       }
-    } else if (min > DepthConfig.GOOD_DEPTH_MAX) {
+    } else if (min > DepthConfig.goodDepthMax) {
       // Warning: almost deep enough
       _faults.add(FaultRecord(
         phase: 'REP_COMPLETE',
@@ -123,7 +122,7 @@ class DepthMetric extends PushUpMetricBase {
     }
 
     _debugData['depthResult'] =
-        min <= DepthConfig.GOOD_DEPTH_MAX ? 'good' : 'shallow';
+        min <= DepthConfig.goodDepthMax ? 'good' : 'shallow';
   }
 
   @override

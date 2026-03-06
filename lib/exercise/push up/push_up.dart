@@ -1,5 +1,7 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, non_constant_identifier_names, constant_identifier_names
 
+import 'package:vinafit_mobile/utils/debouncer.dart';
+
 import '../../utils/pose_math_helpers.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
@@ -44,6 +46,9 @@ enum PushUpState {
 class PushUp extends ExerciseBase {
   PushUpState pushUpState = PushUpState.plank;
   PushUpState previousPushUpState = PushUpState.plank;
+
+  // Debounce entry into rep — prevents false starts from noisy frames
+  final Debouncer _entryDebouncer = Debouncer(requiredFrames: 2);
 
   // -- Metrics --
   final TrunkAlignmentMetric trunkAlignmentMetric = TrunkAlignmentMetric();
@@ -352,9 +357,12 @@ class PushUp extends ExerciseBase {
      ----------------------------------------------------------------------- */
 
   void _updatePushUpState(double elbowAngle, int timestampMs) {
-    // plank → descending: elbow starts bending
-    if (elbowAngle < PushUpConfig.DESCEND_ANGLE_THRESHOLD &&
-        pushUpState == PushUpState.plank) {
+    // Debounce entry: require 2 consecutive frames below threshold
+    bool isEnteringRep = elbowAngle < PushUpConfig.DESCEND_ANGLE_THRESHOLD;
+    bool confirmedEntry = _entryDebouncer.update(isEnteringRep);
+
+    // plank → descending: elbow starts bending (debounced)
+    if (confirmedEntry && pushUpState == PushUpState.plank) {
       _transitionState(PushUpState.descending, timestampMs);
     }
     // descending → bottom: elbow enters bottom range

@@ -63,7 +63,6 @@ class TempoMetric extends SquatMetricBase {
   int? _descentStartMs;
   int? _bottomReachedMs;
   int? _ascentStartMs;
-  int? _repCompleteMs;
 
   // --- Computed durations (seconds) ---
   double? _descentDuration;
@@ -112,7 +111,6 @@ class TempoMetric extends SquatMetricBase {
         break;
 
       case SquatState.standing:
-        _repCompleteMs = timestampMs;
         if (_ascentStartMs != null) {
           _ascentDuration = (timestampMs - _ascentStartMs!) / 1000.0;
           _debugData['ascentDur'] = _ascentDuration?.toStringAsFixed(2) ?? '-';
@@ -251,7 +249,6 @@ class TempoMetric extends SquatMetricBase {
     _descentStartMs = null;
     _bottomReachedMs = null;
     _ascentStartMs = null;
-    _repCompleteMs = null;
     _descentDuration = null;
     _ascentDuration = null;
     _bottomHoldDuration = null;

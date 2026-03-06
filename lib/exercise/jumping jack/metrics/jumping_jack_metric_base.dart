@@ -1,0 +1,126 @@
+/* =========================================================================
+   JJMetricBase — Abstract base for all jumping jack form metrics.
+   
+   Each metric is a self-contained unit that:
+   - Receives frame data via update()
+   - Writes feedback + instructions to ctx.resultIssues
+   - Logs faults into its own fault list
+   - Resets cleanly between reps
+   
+   Architecture:
+   ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+   │ JumpingJack  │────▶│  RepContext   │◀────│  MetricBase  │
+   │   (owner)    │     │ (shared state)│     │  (per metric)│
+   └──────────────┘     └──────────────┘     └──────────────┘
+   
+   FRONT VIEW exercise — uses BOTH left + right landmarks simultaneously.
+   Scale factor = shoulder width (NOT back length like squat/plank).
+   
+   Data flow:
+   - feedback{}  → cleared every frame in processPose()
+                  → metrics write live cards here (Arms, Legs, Tempo)
+   - instructions{phase → {type → message}}
+                  → coaching from evaluateRep() or per-frame faults
+                  → cleared when new rep begins (open → closed transition)
+                  → UI reads instructions[currentPhase] for coaching chips
+   ========================================================================= */
+
+import '../jumping_jack.dart';
+import '../../exercise_base.dart';
+
+/* =========================================================================
+   RepContext — Shared per-frame state, passed to all metrics.
+   Avoids each metric needing to recalculate the same geometry.
+   ========================================================================= */
+class RepContext {
+  /// Shoulder→Elbow→Wrist angle for left arm (0–180°). 180° = straight.
+  final double leftArmAngle;
+
+  /// Shoulder→Elbow→Wrist angle for right arm (0–180°). 180° = straight.
+  final double rightArmAngle;
+
+  /// Elevation angle of shoulder→wrist vector from horizontal (degrees).
+  /// 0° = arms horizontal, 90° = arms straight overhead.
+  final double leftArmElevation;
+
+  /// Elevation angle of shoulder→wrist vector from horizontal (degrees).
+  final double rightArmElevation;
+
+  /// Distance between ankles normalized to shoulder width.
+  /// ~0.0 = feet together, ~1.5 = good spread.
+  final double ankleSpreadNorm;
+
+  /// True if BOTH wrists are above nose Y level.
+  final bool wristAboveHead;
+
+  /// True if BOTH wrists are below shoulder Y level.
+  final bool wristBelowShoulders;
+
+  /// Current state of the jumping jack cycle.
+  final JJState jjState;
+
+  /// Milliseconds since epoch.
+  final int frameTimestamp;
+
+  /// Shoulder width in pixels — used as scale factor for front view.
+  final double? scaleFactor;
+
+  /// Shared result container — metrics write feedback + instructions here.
+  final ResultIssues resultIssues;
+
+  RepContext({
+    required this.leftArmAngle,
+    required this.rightArmAngle,
+    required this.leftArmElevation,
+    required this.rightArmElevation,
+    required this.ankleSpreadNorm,
+    required this.wristAboveHead,
+    required this.wristBelowShoulders,
+    required this.jjState,
+    required this.frameTimestamp,
+    required this.scaleFactor,
+    required this.resultIssues,
+  });
+}
+
+/* =========================================================================
+   FaultRecord — A single fault logged by a metric.
+   ========================================================================= */
+class FaultRecord {
+  final String phase; // e.g. "OPEN", "CLOSED", "REP_COMPLETE"
+  final String type; // e.g. "Arms", "Legs", "Tempo"
+  final String message; // e.g. "Tay chưa đủ cao"
+  final bool affectsForm; // false = informational only
+
+  FaultRecord({
+    required this.phase,
+    required this.type,
+    required this.message,
+    this.affectsForm = true,
+  });
+}
+
+/* =========================================================================
+   JJMetricBase — Interface every jumping jack metric implements.
+   ========================================================================= */
+abstract class JJMetricBase {
+  /// Human-readable name for debug/logging.
+  String get name;
+
+  /// Called every frame during an active rep.
+  /// Writes feedback + instructions directly to ctx.resultIssues.
+  void update(RepContext ctx);
+
+  /// Faults accumulated this rep. JumpingJack reads these when rep completes.
+  List<FaultRecord> get faults;
+
+  /// Debug data for the overlay. Keys should be metric-specific.
+  Map<String, dynamic> get debugData;
+
+  /// Reset all internal state for the next rep.
+  void reset();
+
+  /// Called when JJ state transitions (e.g. closed → open).
+  /// Override in metrics that care about transitions (tempo).
+  void onStateTransition(JJState from, JJState to, int timestampMs) {}
+}

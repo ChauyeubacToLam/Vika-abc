@@ -36,9 +36,7 @@ class TempoMetric extends PushUpMetricBase {
 
   // --- Timestamps (milliseconds) ---
   int? _descentStartMs;
-  int? _bottomReachedMs;
   int? _ascentStartMs;
-  int? _repCompleteMs;
 
   // --- Computed durations (seconds) ---
   double? _descentDuration;
@@ -65,7 +63,6 @@ class TempoMetric extends PushUpMetricBase {
         break;
 
       case PushUpState.bottom:
-        _bottomReachedMs = timestampMs;
         if (_descentStartMs != null) {
           _descentDuration = (timestampMs - _descentStartMs!) / 1000.0;
           _debugData['descentDur'] =
@@ -78,7 +75,6 @@ class TempoMetric extends PushUpMetricBase {
         break;
 
       case PushUpState.plank:
-        _repCompleteMs = timestampMs;
         if (_ascentStartMs != null) {
           _ascentDuration = (timestampMs - _ascentStartMs!) / 1000.0;
           _debugData['ascentDur'] = _ascentDuration?.toStringAsFixed(2) ?? '-';
@@ -147,9 +143,7 @@ class TempoMetric extends PushUpMetricBase {
     _faults.clear();
     _debugData.clear();
     _descentStartMs = null;
-    _bottomReachedMs = null;
     _ascentStartMs = null;
-    _repCompleteMs = null;
     _descentDuration = null;
     _ascentDuration = null;
   }

@@ -11,20 +11,20 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vinafit_mobile/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
+  testWidgets('VinaFit home screen renders exercise cards',
+      (WidgetTester tester) async {
     await tester.pumpWidget(const VinaFitApp());
+    await tester.pumpAndSettle();
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(find.text('VINAFIT'), findsOneWidget);
+    expect(find.text('Chọn bài tập'), findsOneWidget);
+    expect(find.text('Squat'), findsOneWidget);
+    expect(find.text('Plank'), findsOneWidget);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -300));
+    await tester.pumpAndSettle();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('Nhảy Dạng'), findsOneWidget);
+    expect(find.text('Push Up'), findsOneWidget);
   });
 }

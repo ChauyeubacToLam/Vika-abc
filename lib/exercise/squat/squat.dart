@@ -1,5 +1,7 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, non_constant_identifier_names, constant_identifier_names
 
+import 'package:vinafit_mobile/utils/debouncer.dart';
+
 import '../../utils/pose_math_helpers.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
@@ -35,6 +37,9 @@ enum SquatState {
 class Squat extends ExerciseBase {
   SquatState squatState = SquatState.standing;
   SquatState previousSquatState = SquatState.standing;
+
+  // Debounce entry into rep — prevents false starts from noisy frames
+  final Debouncer _entryDebouncer = Debouncer(requiredFrames: 2);
 
   final DepthMetric depthMetric = DepthMetric();
   final TrunkLeanMetric trunkLeanMetric = TrunkLeanMetric();
@@ -367,8 +372,11 @@ class Squat extends ExerciseBase {
   ----------------------------------------------------------------------- */
 
   void _updateSquatState(double kneeAngle, int timestampMs) {
-    if (kneeAngle <= SquatConfig.SQUAT_DESCEND_ANGLE_THRESHOLD &&
-        squatState == SquatState.standing) {
+    // Debounce entry: require 2 consecutive frames below threshold
+    bool isEnteringRep = kneeAngle <= SquatConfig.SQUAT_DESCEND_ANGLE_THRESHOLD;
+    bool confirmedEntry = _entryDebouncer.update(isEnteringRep);
+
+    if (confirmedEntry && squatState == SquatState.standing) {
       _transitionState(SquatState.descending, timestampMs);
     } else if (kneeAngle <= SquatConfig.SQUAT_BOTTOM_ANGLE_THRESHOLD[1] &&
         squatState == SquatState.descending) {

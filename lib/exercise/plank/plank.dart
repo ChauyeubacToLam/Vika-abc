@@ -1,6 +1,7 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, non_constant_identifier_names, constant_identifier_names
 
 import 'package:vinafit_mobile/exercise/exercise_base.dart';
+import 'package:vinafit_mobile/utils/debouncer.dart';
 
 import '../../utils/pose_math_helpers.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
@@ -82,6 +83,9 @@ class Plank extends ExerciseBase {
 
   // -- Ankle availability --
   bool _ankleAvailable = true;
+
+  // Debounce plank-position detection — prevents false hold starts
+  final Debouncer _positionDebouncer = Debouncer(requiredFrames: 2);
 
   // -- Metrics --
   final TrunkAlignmentMetric trunkAlignmentMetric = TrunkAlignmentMetric();
@@ -349,12 +353,13 @@ class Plank extends ExerciseBase {
     bool isPlankPosition =
         trunkDeviation.abs() <= PlankConfig.PLANK_POSITION_TOLERANCE &&
             !isStanding;
+    bool confirmedPlank = _positionDebouncer.update(isPlankPosition);
 
-    debugData['isPlankPosition'] = isPlankPosition;
+    debugData['isPlankPosition'] = confirmedPlank;
 
     switch (plankState) {
       case PlankState.setup:
-        if (isPlankPosition) {
+        if (confirmedPlank) {
           _transitionState(PlankState.holding, timestampMs);
         }
         break;
@@ -368,7 +373,7 @@ class Plank extends ExerciseBase {
       case PlankState.resting:
         if (_restStartMs != null) {
           final restElapsed = (timestampMs - _restStartMs!) / 1000.0;
-          if (restElapsed >= PlankConfig.REST_DURATION && isPlankPosition) {
+          if (restElapsed >= PlankConfig.REST_DURATION && confirmedPlank) {
             _transitionState(PlankState.holding, timestampMs);
           }
         }
