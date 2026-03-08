@@ -1,30 +1,14 @@
 /* =========================================================================
-   Lunge Metric: Heel Lift Detection (Lead Leg)
+   Lunge Metric: Heel Lift
 
-   Detects whether the lead leg's heel lifts off the ground during the lunge.
-   Checks DESCENDING and BOTTOM phases only (continuous monitoring).
+   Detects whether the front foot's heel lifts off the ground.
 
-   Landmarks: HEEL (#29/#30), FOOT_INDEX (#31/#32)
-   Normalization: SHOULDER (#11/#12) to HIP (#23/#24) — torso length
+   Landmarks: HEEL (#29/#30) — lead foot
+   Calculation: heelDistance / scaleFactor (torso length) → normalized ratio
 
-   Calculation:
-     1) heel_delta = foot.y - heel.y  (passed in as ctx.heelDistance)
-     2) ratio = heel_delta / torso_length
-     3) Compare ratio against thresholds
-
-   Thresholds (normalized to torso length):
-     ✅  ratio < 0.05        → Good heel contact
-     ⚠️  ratio 0.05 – 0.08   → Heel slightly lifting
-     ❌  ratio > 0.08        → Keep your heel down!
-
-   Debounce: 10 frames (~333ms at 30fps) — prevents false triggers from
-             floor jitter.
-
-   Post-rep instruction: "Gót chân trước đang nhấc lên. Hãy dồn lực đều
-   vào cả bàn chân để bảo vệ khớp gối."
-
-   Code pattern: Reuses existing HeelRiseMetric architecture from squat.
-   Same Debouncer(requiredFrames: 10), same normalization to torso length.
+   When to check: Descending and bottom phases only.
+   Uses debounced confirmation (10 frames ~333ms) to filter pose-detection
+   jitter before logging a fault.
    ========================================================================= */
 
 import 'lunge_metric_base.dart';
@@ -33,10 +17,10 @@ import '../../../utils/debouncer.dart';
 
 class LungeHeelLiftConfig {
   /// Good heel contact — ratio below this is fine.
-  static const double GOOD_THRESHOLD = 0.05;
+  static const double WARNING_THRESHOLD = 0.05;
 
   /// Warning zone — heel slightly lifting.
-  static const double WARN_THRESHOLD = 0.08;
+  static const double BAD_THRESHOLD = 0.08;
 }
 
 class LungeHeelLiftMetric extends LungeMetricBase {
@@ -68,14 +52,13 @@ class LungeHeelLiftMetric extends LungeMetricBase {
     }
 
     final double ratio = ctx.heelDistance / (ctx.scaleFactor ?? 1.0);
-    final String phase =
-        ctx.lungeState.toString().split('.').last.toUpperCase();
+    final String phase = ctx.lungeState.name.toUpperCase();
 
-    _debugData['heelNorm'] = ratio.toStringAsFixed(3);
+    _debugData['heelNorm'] = ratio.toStringAsFixed(2);
     _debugData['heelRaw'] = ctx.heelDistance.toStringAsFixed(2);
 
-    // ❌ Bad: ratio > 0.08
-    if (_heelBadDebouncer.update(ratio > LungeHeelLiftConfig.WARN_THRESHOLD)) {
+    // Bad: ratio > 0.08
+    if (_heelBadDebouncer.update(ratio > LungeHeelLiftConfig.BAD_THRESHOLD)) {
       ctx.resultIssues.feedback['Feet'] = 'Giữ gót chân chạm sàn!';
 
       if (!_instructionSet) {
@@ -88,9 +71,9 @@ class LungeHeelLiftMetric extends LungeMetricBase {
       }
       _logFault(phase, 'Keep your heel down!');
     }
-    // ⚠️ Warning: ratio 0.05 – 0.08
+    // Warning: ratio 0.05 – 0.08
     else if (_heelWarnDebouncer
-        .update(ratio > LungeHeelLiftConfig.GOOD_THRESHOLD)) {
+        .update(ratio > LungeHeelLiftConfig.WARNING_THRESHOLD)) {
       ctx.resultIssues.feedback['Feet'] = 'Gót hơi nhấc — ấn gót xuống';
 
       if (!_instructionSet) {
@@ -103,7 +86,7 @@ class LungeHeelLiftMetric extends LungeMetricBase {
       }
       _logFault(phase, 'Heel slightly lifting');
     }
-    // ✅ Good: ratio < 0.05
+    // Good: ratio < 0.05
     else {
       ctx.resultIssues.feedback['Feet'] = 'Tốt! Gót chân tốt';
     }

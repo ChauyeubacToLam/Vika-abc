@@ -95,7 +95,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
     name: 'Lunge',
     subtitle: 'Phân tích tư thế Lunge',
     description:
-        'AI phân tích form lunge theo thời gian thực.\nTheo dõi độ sâu đầu gối, thân trên và cân bằng.',
+        'AI phân tích form lunge theo thời gian thực.\nTheo dõi độ sâu, đầu gối, gót chân và thân trên.',
     icon: Icons.directions_walk,
     primaryColor: const Color(0xFF7C4DFF),
     secondaryColor: const Color(0xFF6200EA),

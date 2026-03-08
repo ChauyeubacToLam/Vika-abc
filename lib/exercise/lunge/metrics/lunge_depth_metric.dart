@@ -1,25 +1,14 @@
 /* =========================================================================
-   Lunge Metric: Depth (Lead Knee Flexion Angle)
+   Lunge Metric: Depth
 
-   Measures interior angle at the LEAD knee joint (hip-knee-ankle).
-   Primary indicator of lunge depth + gates rep counting.
+   Lead knee angle — how deep the user lunges.
 
-   Landmarks: Lead leg HIP (#23/#24), KNEE (#25/#26), ANKLE (#27/#28)
-   Calculation: calculateAngle(Hip, Knee, Ankle) on the LEAD leg
+   Landmarks: HIP (#23/#24), KNEE (#25/#26), ANKLE (#27/#28) — lead leg
+   Calculation: 3-point angle at the lead knee (hip-knee-ankle)
 
-   When to check: Throughout descent and bottom phases.
-   Continuous tracking, store minimum angle for per-rep evaluation.
-
-   Debounce: None needed — angle is inherently smooth.
-
-   Thresholds:
-     ❌  < 70°  (too deep)     → Quá sâu! Đứng lên một chút
-     ✅  70° – 110°            → Độ sâu tốt!
-     ⚠️  110° – 140° (shallow) → Xuống thấp hơn
-     ❌  > 140° (too shallow)  → Chưa đủ sâu
-
-   Code pattern: Same architecture as squat DepthMetric.
-   Track minKneeAngle per rep. checkRepCompletion() for shallow detection.
+   When to check: Continuously during descending and bottom phases.
+   Per-rep evaluation at rep completion (checkRepCompletion) to verify
+   the user reached sufficient depth without going too deep.
    ========================================================================= */
 
 import 'lunge_metric_base.dart';
@@ -64,28 +53,28 @@ class LungeDepthMetric extends LungeMetricBase {
     final phase = ctx.lungeState.toString().split('.').last.toUpperCase();
 
     if (ctx.leadKneeAngle < LungeDepthConfig.TOO_DEEP_THRESHOLD) {
-      // ❌ Too deep
+      // Too deep
       ctx.resultIssues.feedback['Depth'] = 'Quá sâu! Đứng lên một chút';
       _logFault(phase, 'Too deep! Come up a bit');
     } else if (ctx.leadKneeAngle >= LungeDepthConfig.GOOD_DEPTH_RANGE[0] &&
         ctx.leadKneeAngle <= LungeDepthConfig.GOOD_DEPTH_RANGE[1]) {
-      // ✅ Good depth
+      // Good depth
       ctx.resultIssues.feedback['Depth'] = 'Độ sâu tốt!';
     } else if (ctx.lungeState == LungeState.descending &&
         ctx.leadKneeAngle > LungeDepthConfig.GOOD_DEPTH_RANGE[1] &&
         ctx.leadKneeAngle <= LungeDepthConfig.SHALLOW_WARN_THRESHOLD) {
-      // ⚠️ Shallow — still descending, encourage going lower
+      // Shallow — still descending, encourage going lower
       ctx.resultIssues.feedback['Depth'] = 'Xuống thấp hơn';
     } else if (ctx.leadKneeAngle > LungeDepthConfig.SHALLOW_WARN_THRESHOLD) {
-      // ❌ Too shallow
+      // Too shallow
       ctx.resultIssues.feedback['Depth'] = 'Chưa đủ sâu';
     } else {
       ctx.resultIssues.feedback['Depth'] = 'Độ sâu tốt!';
     }
   }
 
-  /// Called by Lunge when rep completes to check if depth was sufficient.
-  /// (User stood up from descending without reaching bottom = shallow)
+  // Called by Lunge when rep completes to check if depth was sufficient.
+  // (User stood up from descending without reaching bottom = shallow)
   void checkRepCompletion(LungeState finalState, LungeRepContext ctx) {
     final phase = finalState.toString().split('.').last.toUpperCase();
 

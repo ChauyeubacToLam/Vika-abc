@@ -1,19 +1,11 @@
 /* =========================================================================
-   Lunge Metric: Lumbar Hyperextension Proxy
+   Lunge Metric: Lumbar Proxy
 
-   Proxy approach: Measure Shoulder-Hip-Trailing_Knee angle. In a safe lunge,
-   torso and trailing thigh form a roughly straight line at bottom (~160°–180°).
-   If this angle becomes acute (<140°) while torso remains vertical (<10° lean),
-   the pelvis is anteriorly tilted → lumbar hyperextension risk.
+   Detects lower-back arching (anterior pelvic tilt) using the
+   Shoulder-Hip-TrailingKnee angle as a proxy for lumbar extension.
 
-   Landmarks: SHOULDER (#11/#12), HIP (#23/#24), TRAILING_KNEE (#25/#26)
-   Calculation: calculateAngle(Shoulder, Hip, TrailingKnee)
-
-   When to check: Bottom phase only (15-frame window ~500ms)
-   Debounce: 5 frames (~167ms)
-   Estimated catch rate: ~65% of severe hyperextension cases
-   False positive risk: LOW — a highly acute angle at this junction almost
-                        always signifies improper pelvic mechanics.
+   Landmarks: SHOULDER (#11/#12), HIP (#23/#24), trailing KNEE (#25/#26)
+   Calculation: 3-point angle at hip (shoulder-hip-trailingKnee)
 
    Trigger condition: ONLY flag as error when BOTH:
      (1) Shoulder-Hip-TrailingKnee angle < 140°
@@ -22,14 +14,7 @@
    If the user is leaning forward naturally, the acute angle is expected
    and not a fault.
 
-   Thresholds:
-     ✅  ≥ 160°              → Good alignment
-     ⚠️  140° – 159°         → Brace your core, stay aligned
-     ❌  < 140° (+ upright)  → Lower back arching! Brace core!
-
-   Feedback framing: "Giữ ngực, hông và đầu gối sau thẳng hàng như một
-   đường thẳng" (Keep your chest, back hip, and back knee in a straight,
-   strong line.)
+   When to check: Bottom phase only (maximum lumbar stress).
    ========================================================================= */
 
 import 'lunge_metric_base.dart';
@@ -88,7 +73,7 @@ class LungeLumbarProxyMetric extends LungeMetricBase {
         trunkLean < LungeLumbarProxyConfig.UPRIGHT_TORSO_LIMIT;
 
     if (_faultDebouncer.update(isBad)) {
-      // ❌ < 140° with upright torso — lower back arching
+      // < 140° with upright torso — lower back arching
       ctx.resultIssues.feedback['Core'] = 'Lưng đang võng! Gồng cơ bụng!';
       if (!_instructionSet) {
         ctx.resultIssues.addInstruction(
@@ -101,10 +86,10 @@ class LungeLumbarProxyMetric extends LungeMetricBase {
       _logFault(phase, 'Lower back arching! Brace core!');
     } else if (shAngle >= LungeLumbarProxyConfig.WARN_THRESHOLD &&
         shAngle < LungeLumbarProxyConfig.GOOD_THRESHOLD) {
-      // ⚠️ 140° – 159° — warning zone (feedback only, no fault)
+      // 140° – 159° — warning zone (feedback only, no fault)
       ctx.resultIssues.feedback['Core'] = 'Siết cơ bụng, giữ thẳng hàng';
     } else {
-      // ✅ ≥ 160° — good alignment
+      // ≥ 160° — good alignment
       ctx.resultIssues.feedback['Core'] = 'Tư thế tốt';
     }
   }
