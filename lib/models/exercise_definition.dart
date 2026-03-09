@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../exercise/exercise_base.dart';
 import '../exercise/jumping jack/jumping_jack.dart';
 import '../exercise/plank/plank.dart';
+import '../exercise/lunge/lunge.dart';
 import '../exercise/push up/push_up.dart';
 import '../exercise/squat/squat.dart';
 
@@ -109,6 +110,33 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'setup': const Color(0xFFFF9800),
       'holding': const Color(0xFF00E676),
       'resting': const Color(0xFF29B6F6),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'lunge',
+    name: 'Lunge',
+    subtitle: 'Phân tích tư thế Lunge',
+    description:
+        'AI phân tích form lunge theo thời gian thực.\nTheo dõi độ sâu, đầu gối, gót chân và thân trên.',
+    icon: Icons.directions_walk,
+    primaryColor: const Color(0xFF7C4DFF),
+    secondaryColor: const Color(0xFF6200EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Đùi', 'Mông', 'Hamstring'],
+    duration: '10 reps',
+    cameraHint: 'Quay nghiêng người so với camera.',
+    framingHint: 'Giữ vai, hông, gối và bàn chân trong khung hình.',
+    setupTips: [
+      'Đặt camera ngang hông, cách bạn khoảng 2–3 mét.',
+      'Quay nghiêng 90° để AI thấy rõ độ sâu đầu gối.',
+      'Giữ đủ ánh sáng ở chân và thân trên trước khi bắt đầu.',
+    ],
+    createExercise: () => Lunge(),
+    phaseColors: {
+      'standing': const Color(0xFF00E676),
+      'descending': const Color(0xFFFFD600),
+      'bottom': const Color(0xFFFF6D00),
+      'ascending': const Color(0xFF00B0FF),
     },
   ),
   ExerciseDefinition(
