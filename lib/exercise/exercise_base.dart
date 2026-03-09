@@ -2,6 +2,7 @@
 
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:vinafit_mobile/utils/debouncer.dart';
+import 'package:vinafit_mobile/utils/person_detector.dart';
 import '../utils/pose_smoother.dart';
 import '../utils/pose_math_helpers.dart';
 
@@ -9,7 +10,6 @@ import '../utils/pose_math_helpers.dart';
    CONFIGURATION & THRESHOLDS
    ========================================================================= */
 
-const double NODDING_ANGLE_FOR_START = 0.185; // 18.5% of the back length
 const double FRONT_FACING_SHOULDER_THRESHOLD = 0.57; // > 0.57 is Front
 const double SIDE_FACING_SHOULDER_THRESHOLD = 0.35; // < 0.35 is Side
 
@@ -31,11 +31,9 @@ enum CameraFacing {
   undefined,
 }
 
-// All metrics will have feedback and instruction for next rep, so we can bundle them together.
 class ResultIssues {
   Map<String, String> feedback = {};
-  Map<String, Map<String, String>> instructions =
-      {}; // not using squat state because the exercise base won't know
+  Map<String, Map<String, String>> instructions = {};
 
   void addInstruction(String phase, String type, String message) {
     instructions.putIfAbsent(phase, () => {});
@@ -50,14 +48,18 @@ class ResultIssues {
 
 /* =========================================================================
    ExerciseBase - abstract base class for all fitness exercises.
-   Manages: Smoothing, Orientation, Safety, Foreign Object Filter, and State.
+   
+   Activation: hold-still (universal).
+   Each exercise overrides isInStartPosition() to define what
+   "ready" looks like (standing for squat, horizontal for plank/push-up).
+   User holds valid position for 3 seconds → exercise begins.
    ========================================================================= */
 
 abstract class ExerciseBase {
   // -- Core State --
   late PoseSmoother poseSmoother;
   int repCount = 0;
-  static const MIN_CONFIDENCE = 0.98;
+  static const MIN_CONFIDENCE = 0.92;
 
   List<Map<bool, Map<String, Map<String, String>>>> setFeedback = [];
   ResultIssues resultIssues = ResultIssues();
@@ -65,18 +67,47 @@ abstract class ExerciseBase {
   ExerciseState exerciseState = ExerciseState.notActivated;
   CameraFacing cameraFacing = CameraFacing.front;
   bool correctForm = true;
-  double? distanceScaleFactor; // Back length (Shoulder to Hip)
-  double frontFacingRatio = 1.0; // Shoulder width / Torso height ratio
+  double? distanceScaleFactor;
+  double frontFacingRatio = 1.0;
 
-  /// Debug data exposed for the UI debug overlay.
-  /// Child classes populate this with exercise-specific metrics.
   Map<String, dynamic> debugData = {};
 
-  // -- Debouncers for filtering foreign object detection --
+  // -- Orientation --
   StickyDebouncer leftRightDebouncer = StickyDebouncer(requiredFrames: 5);
-  Debouncer confidenceDebouncer = Debouncer(requiredFrames: 5);
-  Debouncer limbProportionsDebouncer = Debouncer(requiredFrames: 5);
-  Debouncer anatomicalPlausibilityDebouncer = Debouncer(requiredFrames: 5);
+
+  // -- Person Detection (Selfie Segmentation) --
+  final PersonDetector _personDetector = PersonDetector();
+  bool _personConfirmed = false;
+  DateTime? _personSeenSince;
+  DateTime? _personLostSince;
+  DateTime? _resumePresenceSince;
+
+  bool _isPaused = false;
+
+  static const Duration _PERSON_CONFIRM_DURATION = Duration(milliseconds: 650);
+  static const Duration _PERSON_LOST_GRACE = Duration(milliseconds: 900);
+  static const Duration _PERSON_RESUME_CONFIRM_DURATION =
+      Duration(milliseconds: 320);
+
+  /// Whether the exercise is currently paused (user left frame).
+  bool get isPaused => _isPaused;
+
+  double get personPresenceScore => _personDetector.presenceScore;
+
+  // -- Hold-Still Activation --
+  DateTime? _holdStillStartedAt;
+  static const Duration HOLD_STILL_REQUIRED_DURATION = Duration(seconds: 3);
+
+  /// Progress 0.0–1.0 for hold-still countdown UI. Null if not in countdown.
+  double? get activationProgress {
+    if (exerciseState != ExerciseState.notActivated) return null;
+    if (!_personConfirmed) return null;
+    if (_holdStillStartedAt == null) return null;
+    final elapsed = DateTime.now().difference(_holdStillStartedAt!);
+    return (elapsed.inMilliseconds /
+            HOLD_STILL_REQUIRED_DURATION.inMilliseconds)
+        .clamp(0.0, 1.0);
+  }
 
   // -- Constructor --
   ExerciseBase() {
@@ -87,26 +118,53 @@ abstract class ExerciseBase {
      MAIN PIPELINE
      ----------------------------------------------------------------------- */
 
-  List<dynamic>? processPose(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    resultIssues.feedback
-        .clear(); // only clear feedback, keep instructions until rep completes
+  List<dynamic>? processPose(
+    Map<PoseLandmarkType, PoseLandmark> landmarks, {
+    InputImage? inputImage,
+  }) {
+    resultIssues.feedback.clear();
 
-    // 1. Smooth the landmarks
+    // 1. Smooth
     final smoothedLandmarks = poseSmoother.smoothing(landmarks);
 
-    // 2. Foreign Object Filter (e.g., phone on table, chair, etc.)
-    if (exerciseState == ExerciseState.notActivated) {
-      final objectFilterError = detectObjectFilter(smoothedLandmarks);
-      if (objectFilterError != null) {
-        resultIssues.feedback["System"] = objectFilterError;
+    _syncPresenceState(hasPose: true);
+
+    debugData['personRatio'] =
+        _personDetector.lastPersonRatio.toStringAsFixed(3);
+    debugData['personScore'] = _personDetector.presenceScore.toStringAsFixed(3);
+    debugData['personDetected'] = _personDetector.personDetected;
+
+    // 2. Person Detection — only before activation
+    if (exerciseState == ExerciseState.notActivated && !_personConfirmed) {
+      final stableFor = _personSeenSince == null
+          ? 0
+          : DateTime.now().difference(_personSeenSince!).inMilliseconds;
+      debugData['personStableMs'] = stableFor;
+
+      if (!_personConfirmed) {
+        resultIssues.feedback["System"] =
+            "Đang tìm người... Vui lòng đứng trong khung hình.";
         _populateBaseDebugData();
         return [repCount, resultIssues.feedback];
       }
     }
-    // 3. Auto-detect Left/Right/Front (MUST come before safety check!)
+
+    // 2b. Presence re-check during active exercise
+    if (exerciseState == ExerciseState.activated) {
+      debugData['isPaused'] = _isPaused;
+
+      if (_isPaused) {
+        resultIssues.feedback["System"] =
+            "⏸ Tạm dừng — Quay lại khung hình để tiếp tục";
+        _populateBaseDebugData();
+        return [repCount, resultIssues.feedback];
+      }
+    }
+
+    // 3. Auto-detect orientation
     cameraFacing = detectCameraFacing(smoothedLandmarks);
 
-    // 4. Check for safety errors (child class logic)
+    // 4. Safety check (child class logic)
     final safetyError = checkSafety(smoothedLandmarks, cameraFacing);
     if (safetyError != null) {
       resultIssues.feedback["System"] = safetyError;
@@ -129,11 +187,10 @@ abstract class ExerciseBase {
       distanceScaleFactor = calculateDistance(shoulder, hip);
     }
 
-    // 6. Run State Machine (Start -> Active -> Done)
+    // 6. State Machine
     checkExerciseState(smoothedLandmarks, exerciseState,
         scaleFactor: distanceScaleFactor);
 
-    // Populate base-level debug data
     _populateBaseDebugData();
     debugData['scaleFactor'] = distanceScaleFactor?.toStringAsFixed(1) ?? 'N/A';
 
@@ -144,13 +201,101 @@ abstract class ExerciseBase {
       return getSetFeedback();
     }
 
-    return null; // Idle
+    return null;
   }
 
-  /// Populates common debug keys so they are always visible.
+  /// Called when no pose is detected in the current frame.
+  Map<String, String> processNoPoseFrame() {
+    resultIssues.feedback.clear();
+    _syncPresenceState(hasPose: false);
+    _populateBaseDebugData();
+    debugData['personRatio'] =
+        _personDetector.lastPersonRatio.toStringAsFixed(3);
+    debugData['personScore'] = _personDetector.presenceScore.toStringAsFixed(3);
+    debugData['personDetected'] = _personDetector.personDetected;
+    debugData['isPaused'] = _isPaused;
+
+    if (exerciseState == ExerciseState.completed) {
+      return {'Result': 'Hoàn thành! $repCount reps'};
+    }
+
+    if (exerciseState == ExerciseState.notActivated) {
+      resultIssues.feedback['System'] = _personConfirmed
+          ? 'Giữ toàn thân trong khung hình để bắt đầu.'
+          : 'Đang tìm người... Vui lòng đứng trong khung hình.';
+    } else if (_isPaused || !_personDetector.personDetected) {
+      resultIssues.feedback['System'] =
+          '⏸ Tạm dừng — Quay lại khung hình để tiếp tục';
+    } else {
+      resultIssues.feedback['System'] =
+          'Giữ toàn thân trong khung hình để AI theo dõi ổn định hơn.';
+    }
+
+    return Map<String, String>.from(resultIssues.feedback);
+  }
+
+  /// Async person detection — call from camera stream handler.
+  Future<void> runPersonDetection(InputImage inputImage) async {
+    if (exerciseState == ExerciseState.completed) return;
+
+    await _personDetector.detect(inputImage);
+  }
+
+  /// Call when exercise screen is disposed to free native resources.
+  Future<void> disposeDetectors() async {
+    await _personDetector.close();
+  }
+
   void _populateBaseDebugData() {
     debugData['exerciseState'] = exerciseState.toString().split('.').last;
     debugData['cameraFacing'] = cameraFacing.toString().split('.').last;
+    debugData['personConfirmed'] = _personConfirmed;
+  }
+
+  void _syncPresenceState({required bool hasPose}) {
+    final now = DateTime.now();
+    final segmentationPresent = _personDetector.personDetected;
+    final presentNow = hasPose || segmentationPresent;
+
+    if (exerciseState == ExerciseState.notActivated) {
+      if (!_personConfirmed) {
+        if (presentNow) {
+          _personSeenSince ??= now;
+          if (now.difference(_personSeenSince!) >= _PERSON_CONFIRM_DURATION) {
+            _personConfirmed = true;
+          }
+        } else {
+          _personSeenSince = null;
+        }
+      } else if (!presentNow) {
+        _personConfirmed = false;
+        _personSeenSince = null;
+        _holdStillStartedAt = null;
+      }
+      return;
+    }
+
+    if (exerciseState != ExerciseState.activated) return;
+
+    if (presentNow) {
+      _personLostSince = null;
+      if (_isPaused) {
+        _resumePresenceSince ??= now;
+        if (now.difference(_resumePresenceSince!) >=
+            _PERSON_RESUME_CONFIRM_DURATION) {
+          _isPaused = false;
+        }
+      } else {
+        _resumePresenceSince = now;
+      }
+      return;
+    }
+
+    _resumePresenceSince = null;
+    _personLostSince ??= now;
+    if (!_isPaused && now.difference(_personLostSince!) >= _PERSON_LOST_GRACE) {
+      _isPaused = true;
+    }
   }
 
   /* -----------------------------------------------------------------------
@@ -186,7 +331,6 @@ abstract class ExerciseBase {
     }
   }
 
-  // Determines left vs right side view using pair-voting on landmark Z coordinates. Only called when we already know it is a side view.
   bool _isLeftSide(Map<PoseLandmarkType, PoseLandmark>? smoothedLandmarks) {
     if (smoothedLandmarks == null) return false;
 
@@ -223,10 +367,6 @@ abstract class ExerciseBase {
      HELPERS
      ----------------------------------------------------------------------- */
 
-  /// Smart Selector: returns the dominant-side landmark based on camera facing.
-  /// - LEFT facing  -> Left landmark
-  /// - RIGHT facing -> Right landmark
-  /// - FRONT/ANGLED -> Defaults to Left
   PoseLandmark? getSideLandmark({
     required Map<PoseLandmarkType, PoseLandmark> landmarks,
     required PoseLandmarkType rightType,
@@ -235,7 +375,7 @@ abstract class ExerciseBase {
     if (cameraFacing == CameraFacing.right) {
       return landmarks[rightType];
     }
-    return landmarks[leftType]; // left / front / angled
+    return landmarks[leftType];
   }
 
   List<dynamic> getRepCountAndFeedback() => [repCount, resultIssues.feedback];
@@ -243,7 +383,10 @@ abstract class ExerciseBase {
   List<dynamic> getSetFeedback() => setFeedback;
 
   /* -----------------------------------------------------------------------
-     STATE MACHINE
+     STATE MACHINE — Hold-Still Activation (universal)
+     
+     User gets into valid position → holds for 3s → exercise starts.
+     Each exercise defines "valid position" via isInStartPosition().
      ----------------------------------------------------------------------- */
 
   void checkExerciseState(
@@ -253,28 +396,38 @@ abstract class ExerciseBase {
   }) {
     switch (currentState) {
       case ExerciseState.notActivated:
-        final shoulder = getSideLandmark(
-          landmarks: smoothedLandmarks,
-          rightType: PoseLandmarkType.rightShoulder,
-          leftType: PoseLandmarkType.leftShoulder,
+        final inPosition = isInStartPosition(
+          smoothedLandmarks,
+          cameraFacing,
+          scaleFactor,
         );
-        final nose = smoothedLandmarks[PoseLandmarkType.nose];
+        final now = DateTime.now();
 
-        if (shoulder == null || nose == null) {
-          exerciseState = ExerciseState.notActivated;
-          return;
-        }
+        if (inPosition) {
+          _holdStillStartedAt ??= now;
+          final elapsed = now.difference(_holdStillStartedAt!);
+          final remaining = (HOLD_STILL_REQUIRED_DURATION.inMilliseconds -
+                  elapsed.inMilliseconds) /
+              1000.0;
+          debugData['holdStill'] = '${remaining.toStringAsFixed(1)}s';
 
-        final dist = (nose.y - shoulder.y).abs() / (scaleFactor ?? 1.0);
-        debugData['nodDist'] = dist.toStringAsFixed(3);
-
-        if (dist < NODDING_ANGLE_FOR_START) {
-          exerciseState = ExerciseState.activated;
+          if (elapsed >= HOLD_STILL_REQUIRED_DURATION) {
+            exerciseState = ExerciseState.activated;
+            _holdStillStartedAt = null;
+          } else {
+            resultIssues.feedback['System'] =
+                'Giữ yên... ${remaining.clamp(0.0, 99.0).toStringAsFixed(0)}s';
+          }
+        } else {
+          if (_holdStillStartedAt != null) {
+            debugData['holdStill'] = 'reset';
+          }
+          _holdStillStartedAt = null;
+          resultIssues.feedback['System'] = 'Vào tư thế và giữ yên để bắt đầu';
         }
         break;
 
       case ExerciseState.activated:
-        // TODO: Replace with real completion logic
         if (requestStop()) exerciseState = ExerciseState.completed;
         break;
 
@@ -284,221 +437,9 @@ abstract class ExerciseBase {
   }
 
   /* -----------------------------------------------------------------------
-     FOREIGN OBJECT REJECTION FILTER
+     ABSTRACT METHODS
      ----------------------------------------------------------------------- */
 
-  String? detectObjectFilter(
-    Map<PoseLandmarkType, PoseLandmark>? smoothedLandmarks,
-  ) {
-    if (smoothedLandmarks == null) {
-      return "Please stay in frame.";
-    }
-
-    String? confidenceError = _overallConfidenceFilter(smoothedLandmarks);
-    // 1. Check overall confidence
-    if (confidenceDebouncer.update(confidenceError != null)) {
-      return confidenceError;
-    }
-    // 2. Check anatomical plausibility (nose above shoulders, shoulders above hips, etc.)
-    String? anatomicalError = checkAnatomicalPlausibility(smoothedLandmarks);
-    if (anatomicalPlausibilityDebouncer.update(anatomicalError != null)) {
-      return anatomicalError;
-    }
-
-    // 3. Check limb proportions (foreign object heuristic)
-    String? limbProportionsError = _limbProportionsFilter(smoothedLandmarks);
-    if (limbProportionsDebouncer.update(limbProportionsError != null)) {
-      return limbProportionsError;
-    }
-
-    return null;
-  }
-  /* =========================================================================
-     All the filter
-  ========================================================================= */
-
-  /// Rejects frames where average landmark confidence is too low.
-  String? _overallConfidenceFilter(
-      Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
-    double totalConfidence = 0.0;
-    int count = 0;
-
-    smoothedLandmarks.forEach((_, landmark) {
-      totalConfidence += landmark.likelihood;
-      count++;
-    });
-
-    if (count == 0) {
-      return "No landmarks detected. Please adjust your position.";
-    }
-
-    final avgConfidence = totalConfidence / count;
-    debugData['avgConfidence'] = avgConfidence.toStringAsFixed(3);
-
-    if (avgConfidence < 0.7) {
-      return "Low confidence in pose detection. Please improve lighting or move closer.";
-    }
-    return null;
-  }
-
-  /// Checks arm ratios, head-to-torso ratio, and joint angles to reject
-  /// non-human shapes (e.g. chairs, phones on a table).
-  String? _limbProportionsFilter(
-      Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
-    // 0. Get Important Landmarks (shoulders, hips, elbows, wrists, knees, ankles, nose,)
-    final leftShoulder = smoothedLandmarks[PoseLandmarkType.leftShoulder];
-    final leftElbow = smoothedLandmarks[PoseLandmarkType.leftElbow];
-    final leftWrist = smoothedLandmarks[PoseLandmarkType.leftWrist];
-    final rightShoulder = smoothedLandmarks[PoseLandmarkType.rightShoulder];
-    final rightElbow = smoothedLandmarks[PoseLandmarkType.rightElbow];
-    final rightWrist = smoothedLandmarks[PoseLandmarkType.rightWrist];
-    final nose = smoothedLandmarks[PoseLandmarkType.nose];
-    final leftHip = smoothedLandmarks[PoseLandmarkType.leftHip];
-    final rightHip = smoothedLandmarks[PoseLandmarkType.rightHip];
-    final leftKnee = smoothedLandmarks[PoseLandmarkType.leftKnee];
-    final rightKnee = smoothedLandmarks[PoseLandmarkType.rightKnee];
-    final leftAnkle = smoothedLandmarks[PoseLandmarkType.leftAnkle];
-    final rightAnkle = smoothedLandmarks[PoseLandmarkType.rightAnkle];
-
-    //
-    // -- 1. Arm proportions (upper arm vs lower arm) --
-
-    if (leftShoulder == null ||
-        leftElbow == null ||
-        leftWrist == null ||
-        rightShoulder == null ||
-        rightElbow == null ||
-        rightWrist == null) {
-      debugData['limbFilter'] = 'missing arm landmarks';
-      return null;
-    }
-
-    final leftArmRatio = calculateDistance(leftShoulder, leftElbow) /
-        calculateDistance(leftElbow, leftWrist);
-    final rightArmRatio = calculateDistance(rightShoulder, rightElbow) /
-        calculateDistance(rightElbow, rightWrist);
-
-    debugData['leftArmRatio'] = leftArmRatio.toStringAsFixed(3);
-    debugData['rightArmRatio'] = rightArmRatio.toStringAsFixed(3);
-
-    // -- 2. Head-to-torso ratio (calculated early for debug visibility) --
-
-    if (nose != null && leftHip != null && rightHip != null) {
-      final shoulderMid = (
-        x: (leftShoulder.x + rightShoulder.x) / 2,
-        y: (leftShoulder.y + rightShoulder.y) / 2,
-        z: (leftShoulder.z + rightShoulder.z) / 2,
-        likelihood: (leftShoulder.likelihood + rightShoulder.likelihood) / 2,
-      );
-
-      final headLength = calculateDistance(nose, shoulderMid);
-      final torsoLength = calculateDistance(leftHip, leftShoulder);
-      final headToTorsoRatio = headLength / torsoLength;
-
-      debugData['headToTorsoRatio'] = headToTorsoRatio.toStringAsFixed(3);
-
-      if (headToTorsoRatio > 0.42 || headToTorsoRatio < 0.3) {
-        return "Unusual head-to-torso ratio - this may not be a person.";
-      }
-    } else {
-      debugData['headToTorsoRatio'] = 'N/A';
-    }
-
-    if ((leftArmRatio > 1.5 || leftArmRatio < 0.98) &&
-        (rightArmRatio > 1.5 || rightArmRatio < 0.98)) {
-      return "Unusual arm proportions detected - this may not be a person.";
-    }
-
-    // -- 3. Joint angles (knees and elbows) --
-    if (leftKnee == null ||
-        leftAnkle == null ||
-        rightKnee == null ||
-        rightAnkle == null ||
-        leftHip == null ||
-        rightHip == null) {
-      debugData['limbFilter'] = 'missing leg landmarks';
-      return null;
-    }
-
-    final leftKneeAngle = calculateAngle(
-        firstPoint: leftHip, midPoint: leftKnee, lastPoint: leftAnkle);
-    final rightKneeAngle = calculateAngle(
-        firstPoint: rightHip, midPoint: rightKnee, lastPoint: rightAnkle);
-    final leftElbowAngle = calculateAngle(
-        firstPoint: leftShoulder, midPoint: leftElbow, lastPoint: leftWrist);
-    final rightElbowAngle = calculateAngle(
-        firstPoint: rightShoulder, midPoint: rightElbow, lastPoint: rightWrist);
-
-    debugData['leftKneeAngle'] = leftKneeAngle.toStringAsFixed(1);
-    debugData['rightKneeAngle'] = rightKneeAngle.toStringAsFixed(1);
-    debugData['leftElbowAngle'] = leftElbowAngle.toStringAsFixed(1);
-    debugData['rightElbowAngle'] = rightElbowAngle.toStringAsFixed(1);
-
-    if (leftKneeAngle < 10 ||
-        rightKneeAngle < 10 ||
-        leftElbowAngle < 10 ||
-        rightElbowAngle < 10) {
-      return "Unusual joint angles detected - this may not be a person.";
-    }
-
-    debugData['limbFilter'] = 'passed';
-    return null;
-  }
-
-  // Checks for basic anatomical plausibility (e.g., nose above shoulders, shoulders above hips, etc.) to filter out non-human detections.
-  String? checkAnatomicalPlausibility(
-      Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
-    final nose = smoothedLandmarks[PoseLandmarkType.nose];
-    final leftHip = smoothedLandmarks[PoseLandmarkType.leftHip];
-    final rightHip = smoothedLandmarks[PoseLandmarkType.rightHip];
-    final leftKnee = smoothedLandmarks[PoseLandmarkType.leftKnee];
-    final rightKnee = smoothedLandmarks[PoseLandmarkType.rightKnee];
-    final leftAnkle = smoothedLandmarks[PoseLandmarkType.leftAnkle];
-    final rightAnkle = smoothedLandmarks[PoseLandmarkType.rightAnkle];
-    final leftShoulder = smoothedLandmarks[PoseLandmarkType.leftShoulder];
-    final rightShoulder = smoothedLandmarks[PoseLandmarkType.rightShoulder];
-
-    double shoulderY = 0.0;
-    double hipY = 0.0;
-    double kneeY = 0.0;
-    // Nose > shoulder ( y  increases downwards)
-    if (nose != null && leftShoulder != null && rightShoulder != null) {
-      shoulderY = (leftShoulder.y + rightShoulder.y) / 2;
-      if (nose.y > shoulderY) {
-        return "Nose below shoulders. Might not be a person.";
-      }
-    }
-
-    // Shoulder < hip ( y  increases downwards)
-    if (shoulderY != 0.0 && leftHip != null && rightHip != null) {
-      hipY = (leftHip.y + rightHip.y) / 2;
-      if (shoulderY > hipY) {
-        return "Shoulders below hips. Might not be a person.";
-      }
-    }
-
-    // Hip < knee ( y  increases downwards)
-    if (hipY != 0.0 && leftKnee != null && rightKnee != null) {
-      kneeY = (leftKnee.y + rightKnee.y) / 2;
-      if (hipY > kneeY) {
-        return "Hips below knees. Might not be a person.";
-      }
-    }
-
-    // Knee < ankle ( y  increases downwards)
-    if (kneeY != 0.0 && leftAnkle != null && rightAnkle != null) {
-      final ankleY = (leftAnkle.y + rightAnkle.y) / 2;
-      if (kneeY > ankleY) {
-        return "Knees below ankles. Might not be a person.";
-      }
-    }
-
-    return null;
-  }
-
-  /* -----------------------------------------------------------------------
-     ABSTRACT METHODS (implemented by child exercises)
-     ----------------------------------------------------------------------- */
   bool requestStop();
 
   String? checkSafety(
@@ -509,18 +450,19 @@ abstract class ExerciseBase {
   void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks,
       CameraFacing cameraFacing, double? scaleFactor);
 
+  /// Define what "ready position" looks like for this exercise.
+  /// Called every frame during notActivated state.
+  /// Return true if user is in valid starting position.
+  bool isInStartPosition(
+    Map<PoseLandmarkType, PoseLandmark> landmarks,
+    CameraFacing facing,
+    double? scaleFactor,
+  );
+
   /* -----------------------------------------------------------------------
-     UI BRIDGE — Abstract getters for generic UI rendering.
-     Child exercises provide their phase/state info without coupling
-     backend logic to Flutter widgets.
+     UI BRIDGE
      ----------------------------------------------------------------------- */
-
-  /// Display name for the exercise (e.g. "Squat", "Plank").
   String get exerciseName;
-
-  /// Current phase key for instruction lookup (e.g. "standing", "holding").
   String get currentPhaseKey;
-
-  /// Human-readable label for the current phase (e.g. "Đứng thẳng", "Giữ!").
   String get currentPhaseLabel;
 }

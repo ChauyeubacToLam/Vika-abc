@@ -1,17 +1,26 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, non_constant_identifier_names, constant_identifier_names
 
 import 'package:vinafit_mobile/exercise/exercise_base.dart';
+import 'package:vinafit_mobile/utils/debouncer.dart';
 
 import '../../utils/pose_math_helpers.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'metrics/plank_metric_base.dart';
+import 'metrics/trunk_alignment_metric.dart';
+import 'metrics/head_neck_metric.dart';
+import 'metrics/knee_extension_metric.dart';
 
 /* =========================================================================
    PLANK EXERCISE — McGill Short-Hold Protocol
    
    Protocol: 3 holds × 10 seconds each, with 5s rest between holds.
    State transitions are ANGLE-DRIVEN for real-time responsiveness.
-   Hold timer only accumulates while in good plank position.
+   Timer runs continuously during hold — fault percentage judges quality.
+   
+   Trunk assessment uses calculateVerticalAngle (shoulder + hip only).
+   Ankle is OPTIONAL — only needed for knee extension metric.
+   This solves the small Vietnamese apartment problem where full body
+   may not fit in frame from side view.
    
    Vietnamese context:
    - Desk workers with Lower Crossed Syndrome fatigue around 40s
@@ -20,26 +29,43 @@ import 'metrics/plank_metric_base.dart';
    ========================================================================= */
 
 class PlankConfig {
-  static const int MAX_REP = 3;
+  static const int MAX_REP = 5;
 
   /// Hold duration in seconds (McGill protocol)
-  static const double HOLD_DURATION = 10.0;
+  static const double HOLD_DURATION = 15.0;
 
   /// Rest duration in seconds between holds
   static const double REST_DURATION = 5.0;
 
-  /// Angle thresholds for standing decection (hip vs shoulder y-diff ratio)
-  static const double STANDING_RATIO_THRESHOLD = 0.5;
+  // Hip to floor to be consider standing
+  static const double STANDING_HIP_FLOOR_THRESHOLD =
+      0.5; // in meters; > this = standing
 
-  /// Trunk angle thresholds (shoulder→hip→ankle)
-  /// 180° = perfectly straight. Adjust after empirical testing.
-  static const double TRUNK_PIKE_LIMIT = 170.0; // < this = too piked
-  static const double TRUNK_SAG_LIMIT = 185.0; // > this = too sagged
+  /// Trunk clock angle for "horizontal" per facing direction.
+  /// Left-facing: shoulder is left of hip → clock angle ~270°
+  /// Right-facing: shoulder is right of hip → clock angle ~90°
+  static const double HORIZONTAL_CLOCK_LEFT = 270.0;
+  static const double HORIZONTAL_CLOCK_RIGHT = 90.0;
+
+  /// Max deviation from horizontal to count as valid plank position (degrees)
+  /// For state machine: wider tolerance to enter/stay in holding
+  static const double PLANK_POSITION_TOLERANCE = 25.0;
+
+  /// Trunk deviation thresholds for form assessment (used by metric)
+  /// These are degrees of deviation from perfect horizontal
+  /// Sag (hips dropping) — more lenient, common issue
+  static const double SAG_GOOD_MAX = 4.5;
+  static const double SAG_WARNING_MAX = 5.5; // adjust after testing
+
+  ///Pike (hips too high) — stricter, less common
+  static const double PIKE_GOOD_MAX = 1.5;
+  static const double PIKE_WARNING_MAX = 3.0; // adjust after testing
+  // Above WARNING_MAX = error
 }
 
 enum PlankState {
   setup, // User getting into position
-  holding, // Active hold — timer accumulating
+  holding, // Active hold — timer running
   resting, // Rest period between holds
 }
 
@@ -52,18 +78,24 @@ class Plank extends ExerciseBase {
   PlankState previousPlankState = PlankState.setup;
 
   // -- Timer State --
-  /// Accumulated hold time in milliseconds (pauses when form breaks)
-
-  /// Timestamp when current holding period started (null if not holding)
   int? _holdStartMs;
-
-  /// Timestamp when rest period started
   int? _restStartMs;
 
-  final List<PlankMetricBase> _metrics = [
-    // TrunkAlignmentMetric(),
-    // HeadNeckMetric(),
-    // KneeExtensionMetric(),
+  // -- Ankle availability --
+  bool _ankleAvailable = true;
+
+  // Debounce plank-position detection — prevents false hold starts
+  final Debouncer _positionDebouncer = Debouncer(requiredFrames: 2);
+
+  // -- Metrics --
+  final TrunkAlignmentMetric trunkAlignmentMetric = TrunkAlignmentMetric();
+  final HeadNeckMetric headNeckMetric = HeadNeckMetric();
+  final KneeExtensionMetric kneeExtensionMetric = KneeExtensionMetric();
+
+  late final List<PlankMetricBase> _metrics = [
+    trunkAlignmentMetric,
+    headNeckMetric,
+    kneeExtensionMetric,
   ];
 
   /* -----------------------------------------------------------------------
@@ -88,6 +120,46 @@ class Plank extends ExerciseBase {
   }
 
   /* -----------------------------------------------------------------------
+     INITIALIZATION
+     ----------------------------------------------------------------------- */
+  /* =========================================================================
+   ADD THESE TO plank.dart (Plank class)
+   ========================================================================= */
+  @override
+  bool isInStartPosition(
+    Map<PoseLandmarkType, PoseLandmark> landmarks,
+    CameraFacing facing,
+    double? scaleFactor,
+  ) {
+    // Check: user is in plank position (horizontal trunk)
+    final shoulder = getSideLandmark(
+      landmarks: landmarks,
+      rightType: PoseLandmarkType.rightShoulder,
+      leftType: PoseLandmarkType.leftShoulder,
+    );
+    final hip = getSideLandmark(
+      landmarks: landmarks,
+      rightType: PoseLandmarkType.rightHip,
+      leftType: PoseLandmarkType.leftHip,
+    );
+
+    if (shoulder == null || hip == null) return false;
+
+    // Trunk must be roughly horizontal (within 25° of horizontal)
+    double trunkClockAngle =
+        calculateVerticalAngle(pivot: hip, point: shoulder);
+    double horizontalTarget = facing == CameraFacing.right
+        ? PlankConfig.HORIZONTAL_CLOCK_RIGHT
+        : PlankConfig.HORIZONTAL_CLOCK_LEFT;
+    double diff = trunkClockAngle - horizontalTarget;
+    if (diff > 180) diff -= 360;
+    if (diff < -180) diff += 360;
+    if (diff.abs() > 25.0) return false;
+
+    return true;
+  }
+
+  /* -----------------------------------------------------------------------
      STOP CONDITION
      ----------------------------------------------------------------------- */
   @override
@@ -105,6 +177,7 @@ class Plank extends ExerciseBase {
       return "⚠️ Xin hãy quay nghiêng để theo dõi tư thế Plank";
     }
 
+    // Critical landmarks (always required)
     PoseLandmark? shoulder = getSideLandmark(
         landmarks: landmarks,
         rightType: PoseLandmarkType.rightShoulder,
@@ -113,34 +186,34 @@ class Plank extends ExerciseBase {
         landmarks: landmarks,
         rightType: PoseLandmarkType.rightHip,
         leftType: PoseLandmarkType.leftHip);
-    PoseLandmark? knee = getSideLandmark(
-        landmarks: landmarks,
-        rightType: PoseLandmarkType.rightKnee,
-        leftType: PoseLandmarkType.leftKnee);
-    PoseLandmark? ankle = getSideLandmark(
-        landmarks: landmarks,
-        rightType: PoseLandmarkType.rightAnkle,
-        leftType: PoseLandmarkType.leftAnkle);
     PoseLandmark? ear = getSideLandmark(
         landmarks: landmarks,
         rightType: PoseLandmarkType.rightEar,
         leftType: PoseLandmarkType.leftEar);
+    PoseLandmark? knee = getSideLandmark(
+        landmarks: landmarks,
+        rightType: PoseLandmarkType.rightKnee,
+        leftType: PoseLandmarkType.leftKnee);
 
-    if (shoulder == null ||
-        hip == null ||
-        knee == null ||
-        ankle == null ||
-        ear == null) {
-      return "⚠️ Đảm bảo toàn bộ cơ thể trong khung hình";
+    if (shoulder == null || hip == null || ear == null || knee == null) {
+      return "⚠️ Đảm bảo phần trên cơ thể trong khung hình";
     }
 
     if (shoulder.likelihood < ExerciseBase.MIN_CONFIDENCE ||
         hip.likelihood < ExerciseBase.MIN_CONFIDENCE ||
-        knee.likelihood < ExerciseBase.MIN_CONFIDENCE ||
-        ankle.likelihood < ExerciseBase.MIN_CONFIDENCE ||
         ear.likelihood < ExerciseBase.MIN_CONFIDENCE) {
       return "⚠️ Hình ảnh không rõ. Điều chỉnh ánh sáng hoặc vị trí";
     }
+
+    // Optional landmarks (ankle + knee for knee extension metric)
+    PoseLandmark? ankle = getSideLandmark(
+        landmarks: landmarks,
+        rightType: PoseLandmarkType.rightAnkle,
+        leftType: PoseLandmarkType.leftAnkle);
+
+    _ankleAvailable = ankle != null &&
+        ankle.likelihood >= ExerciseBase.MIN_CONFIDENCE &&
+        knee.likelihood >= ExerciseBase.MIN_CONFIDENCE;
 
     return null;
   }
@@ -160,45 +233,61 @@ class Plank extends ExerciseBase {
         landmarks: smoothedLandmarks,
         rightType: PoseLandmarkType.rightHip,
         leftType: PoseLandmarkType.leftHip);
-    PoseLandmark? knee = getSideLandmark(
-        landmarks: smoothedLandmarks,
-        rightType: PoseLandmarkType.rightKnee,
-        leftType: PoseLandmarkType.leftKnee);
-    PoseLandmark? ankle = getSideLandmark(
-        landmarks: smoothedLandmarks,
-        rightType: PoseLandmarkType.rightAnkle,
-        leftType: PoseLandmarkType.leftAnkle);
     PoseLandmark? ear = getSideLandmark(
         landmarks: smoothedLandmarks,
         rightType: PoseLandmarkType.rightEar,
         leftType: PoseLandmarkType.leftEar);
+    PoseLandmark? knee = getSideLandmark(
+        landmarks: smoothedLandmarks,
+        rightType: PoseLandmarkType.rightKnee,
+        leftType: PoseLandmarkType.leftKnee);
 
-    if (shoulder == null ||
-        hip == null ||
-        knee == null ||
-        ankle == null ||
-        ear == null) return;
+    if (shoulder == null || hip == null || ear == null || knee == null) return;
+
+    // Optional: knee + ankle for knee extension
+    PoseLandmark? ankle = getSideLandmark(
+        landmarks: smoothedLandmarks,
+        rightType: PoseLandmarkType.rightAnkle,
+        leftType: PoseLandmarkType.leftAnkle);
 
     // ---------- 2. Calculate Geometry ----------
-    double backAngle =
-        calculateAngle(firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
+
+    // Trunk: clock angle from vertical (0°=up, 90°=right, 270°=left)
+    double trunkClockAngle =
+        calculateVerticalAngle(pivot: hip, point: shoulder);
+
+    // Deviation from horizontal (positive = one direction, negative = other)
+    double horizontalTarget = cameraFacing == CameraFacing.right
+        ? PlankConfig.HORIZONTAL_CLOCK_RIGHT
+        : PlankConfig.HORIZONTAL_CLOCK_LEFT;
+    double trunkDeviation =
+        clockAngleDeviation(trunkClockAngle, horizontalTarget);
+
+    // Neck: ear→shoulder→hip (unsigned 0–180° is fine)
     double neckAngle =
         calculateAngle(firstPoint: ear, midPoint: shoulder, lastPoint: hip);
-    double kneeAngle =
-        calculateAngle(firstPoint: hip, midPoint: knee, lastPoint: ankle);
 
-    // difference in y between hip and shoulder for identify standing or holding
-    double hipShoulderRatioDiff =
-        (hip.y - shoulder.y).abs() / (scaleFactor ?? 1.0);
-    bool isStanding = hipShoulderRatioDiff >
-        PlankConfig
-            .STANDING_RATIO_THRESHOLD; // Empirical threshold for standing vs holding
+    // Knee: only if ankle visible
+    double? kneeAngle;
+    if (_ankleAvailable && ankle != null) {
+      kneeAngle =
+          calculateAngle(firstPoint: hip, midPoint: knee, lastPoint: ankle);
+    }
+    // Get any foot-level landmark (doesn't need high confidence for floor reference)
+    PoseLandmark? foot = smoothedLandmarks[PoseLandmarkType.leftFootIndex] ??
+        smoothedLandmarks[PoseLandmarkType.rightFootIndex];
+    PoseLandmark? heel = smoothedLandmarks[PoseLandmarkType.leftHeel] ??
+        smoothedLandmarks[PoseLandmarkType.rightHeel];
 
+    double floorY = foot?.y ?? heel?.y ?? knee.y;
+
+    double hipToFloor = (floorY - hip.y).abs() / (scaleFactor ?? 1.0);
+    bool isStanding = hipToFloor > PlankConfig.STANDING_HIP_FLOOR_THRESHOLD;
     int now = DateTime.now().millisecondsSinceEpoch;
 
     // ---------- 3. Build RepContext ----------
     final ctx = RepContext(
-      backAngle: backAngle,
+      trunkDeviation: trunkDeviation,
       neckAngle: neckAngle,
       kneeAngle: kneeAngle,
       plankState: plankState,
@@ -208,26 +297,20 @@ class Plank extends ExerciseBase {
 
     // ---------- 4. Populate Debug Data ----------
     debugData['plankState'] = plankState.toString().split('.').last;
-    debugData['backAngle'] = backAngle.toStringAsFixed(1);
+    debugData['trunkClock'] = trunkClockAngle.toStringAsFixed(1);
+    debugData['trunkDev'] =
+        '${trunkDeviation >= 0 ? "+" : ""}${trunkDeviation.toStringAsFixed(1)}°';
     debugData['neckAngle'] = neckAngle.toStringAsFixed(1);
-    debugData['kneeAngle'] = kneeAngle.toStringAsFixed(1);
+    debugData['kneeAngle'] = kneeAngle?.toStringAsFixed(1) ?? 'N/A';
     debugData['holdTime'] = _currentHoldSeconds().toStringAsFixed(1);
     debugData['repCount'] = repCount.toString();
-    debugData['hipShoulderDiffRatio'] =
-        (hipShoulderRatioDiff).toStringAsFixed(2);
     debugData['isStanding'] = isStanding;
+    debugData['ankleAvail'] = _ankleAvailable;
 
-    // ---------- 5. Update Plank State (angle-driven) ----------
-    _updatePlankState(backAngle, now, isStanding);
+    // ---------- 5. Update Plank State ----------
+    _updatePlankState(trunkDeviation, now, isStanding);
 
-    // ---------- 6. Handle State Transitions ----------
-    // Rep completion: holding → resting transition
-    if (plankState == PlankState.resting &&
-        previousPlankState == PlankState.holding) {
-      _onHoldComplete(ctx);
-    }
-
-    // Rest complete: resting → holding transition after REST_DURATION
+    // ---------- 6. Rest period feedback ----------
     if (plankState == PlankState.resting && _restStartMs != null) {
       final restElapsed = (now - _restStartMs!) / 1000.0;
       final restRemaining = (PlankConfig.REST_DURATION - restElapsed)
@@ -238,9 +321,11 @@ class Plank extends ExerciseBase {
       debugData['restRemaining'] = restRemaining.toStringAsFixed(1);
     }
 
-    // ---------- 7. Run All Metrics (only during holding) ----------
-    if (plankState == PlankState.holding && !isStanding) {
+    // ---------- 7. Run Metrics (only during holding) ----------
+    if (plankState == PlankState.holding) {
       for (final metric in _metrics) {
+        // Skip knee metric if ankle not visible
+        if (metric == kneeExtensionMetric && !_ankleAvailable) continue;
         metric.update(ctx);
       }
 
@@ -261,36 +346,34 @@ class Plank extends ExerciseBase {
   }
 
   /* -----------------------------------------------------------------------
-     STATE MACHINE (angle-driven, with transition tracking)
+     STATE MACHINE
      ----------------------------------------------------------------------- */
-  void _updatePlankState(double backAngle, int timestampMs, bool isStanding) {
-    bool isPlankPosition = backAngle >= PlankConfig.TRUNK_PIKE_LIMIT &&
-        backAngle <= PlankConfig.TRUNK_SAG_LIMIT;
-    debugData['isPlankPosition'] = isPlankPosition;
+  void _updatePlankState(
+      double trunkDeviation, int timestampMs, bool isStanding) {
+    bool isPlankPosition =
+        trunkDeviation.abs() <= PlankConfig.PLANK_POSITION_TOLERANCE &&
+            !isStanding;
+    bool confirmedPlank = _positionDebouncer.update(isPlankPosition);
+
+    debugData['isPlankPosition'] = confirmedPlank;
 
     switch (plankState) {
       case PlankState.setup:
-        // Enter holding when body aligns into plank position
-        if (isPlankPosition && !isStanding) {
+        if (confirmedPlank) {
           _transitionState(PlankState.holding, timestampMs);
         }
         break;
 
       case PlankState.holding:
-        // Check if hold timer completed
         if (_currentHoldSeconds() >= PlankConfig.HOLD_DURATION) {
           _transitionState(PlankState.resting, timestampMs);
         }
-
         break;
 
       case PlankState.resting:
-        // Rest period complete + body back in position → start next hold
         if (_restStartMs != null) {
           final restElapsed = (timestampMs - _restStartMs!) / 1000.0;
-          if (restElapsed >= PlankConfig.REST_DURATION &&
-              isPlankPosition &&
-              !isStanding) {
+          if (restElapsed >= PlankConfig.REST_DURATION && confirmedPlank) {
             _transitionState(PlankState.holding, timestampMs);
           }
         }
@@ -304,16 +387,14 @@ class Plank extends ExerciseBase {
 
     switch (newState) {
       case PlankState.holding:
-        // Starting a new hold — reset timer
         _holdStartMs = timestampMs;
         _restStartMs = null;
-        // Clear previous coaching instructions
         resultIssues.instructions.clear();
         break;
 
       case PlankState.resting:
-        // Pause any running hold timer segment
         _restStartMs = timestampMs;
+        _onHoldComplete();
         break;
 
       case PlankState.setup:
@@ -322,15 +403,15 @@ class Plank extends ExerciseBase {
   }
 
   /* -----------------------------------------------------------------------
-     HOLD COMPLETE — Log rep, collect faults, reset metrics
+     HOLD COMPLETE
      ----------------------------------------------------------------------- */
-  void _onHoldComplete(RepContext ctx) {
+  void _onHoldComplete() {
     repCount += 1;
-    _transitionState(PlankState.resting, DateTime.now().millisecondsSinceEpoch);
-    // Collect faults from all metrics
+
+    // Finalize and collect faults
     final allFaults = <FaultRecord>[];
     for (final metric in _metrics) {
-      metric.finalizeHold(); // For metrics that calculate fault percentage
+      metric.finalizeHold();
       allFaults.addAll(metric.faults);
     }
 
@@ -352,10 +433,8 @@ class Plank extends ExerciseBase {
     // Build fault map for set history
     final faultMap = <String, Map<String, String>>{};
     for (final fault in allFaults) {
-      if (!faultMap.containsKey(PlankState.holding.toString())) {
-        faultMap[PlankState.holding.toString()] = {};
-      }
-      faultMap[PlankState.holding.toString()]![fault.type] = fault.message;
+      faultMap.putIfAbsent('HOLDING', () => {});
+      faultMap['HOLDING']![fault.type] = fault.message;
     }
     setFeedback.add({correctForm: faultMap});
 
@@ -372,10 +451,9 @@ class Plank extends ExerciseBase {
   }
 
   /* -----------------------------------------------------------------------
-     TIMER HELPERS
+     HELPERS
      ----------------------------------------------------------------------- */
 
-  /// Returns total hold time in seconds (accumulated + current segment)
   double _currentHoldSeconds() {
     if (_holdStartMs == null) return 0.0;
     return (DateTime.now().millisecondsSinceEpoch - _holdStartMs!) / 1000.0;

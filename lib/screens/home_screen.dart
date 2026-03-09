@@ -231,159 +231,175 @@ class _ExerciseCard extends StatelessWidget {
     final primary = definition.primaryColor;
     final secondary = definition.secondaryColor;
 
-    return GestureDetector(
-      onTap: () {
-        Navigator.of(context).pushNamed(
-          '/exercise',
-          arguments: definition,
-        );
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              primary.withValues(alpha: 0.12),
-              secondary.withValues(alpha: 0.06),
-              const Color(0xFF0D1228),
-            ],
-            stops: const [0.0, 0.4, 1.0],
-          ),
-          border: Border.all(
-            color: primary.withValues(alpha: 0.2),
-            width: 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: primary.withValues(alpha: 0.08),
-              blurRadius: 24,
-              spreadRadius: 0,
-              offset: const Offset(0, 8),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () {
+          Navigator.of(context).pushNamed(
+            '/exercise',
+            arguments: definition,
+          );
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                primary.withValues(alpha: 0.12),
+                secondary.withValues(alpha: 0.06),
+                const Color(0xFF0D1228),
+              ],
+              stops: const [0.0, 0.4, 1.0],
             ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Icon
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [primary, secondary],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+            border: Border.all(
+              color: primary.withValues(alpha: 0.2),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: primary.withValues(alpha: 0.08),
+                blurRadius: 24,
+                spreadRadius: 0,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Icon
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [primary, secondary],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: primary.withValues(alpha: 0.35),
+                        blurRadius: 12,
+                        spreadRadius: 0,
+                      ),
+                    ],
                   ),
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: primary.withValues(alpha: 0.35),
-                      blurRadius: 12,
-                      spreadRadius: 0,
+                  child: Icon(definition.icon, color: Colors.white, size: 24),
+                ),
+                const SizedBox(height: 16),
+                // Name
+                Text(
+                  definition.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  definition.subtitle,
+                  style: TextStyle(
+                    color: primary.withValues(alpha: 0.75),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.3,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  definition.cameraHint,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.45),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                    height: 1.35,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 12),
+                // Muscle tags
+                Wrap(
+                  spacing: 5,
+                  runSpacing: 5,
+                  children: definition.targetMuscles.map((muscle) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: primary.withValues(alpha: 0.2),
+                          width: 0.5,
+                        ),
+                      ),
+                      child: Text(
+                        muscle,
+                        style: TextStyle(
+                          color: primary.withValues(alpha: 0.8),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const Spacer(),
+                // Bottom row: difficulty + duration
+                Row(
+                  children: [
+                    Icon(
+                      Icons.speed_rounded,
+                      size: 13,
+                      color: Colors.white.withValues(alpha: 0.35),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        definition.difficulty,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.35),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),
-                child: Icon(definition.icon, color: Colors.white, size: 24),
-              ),
-              const SizedBox(height: 16),
-              // Name
-              Text(
-                definition.name,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                definition.subtitle,
-                style: TextStyle(
-                  color: primary.withValues(alpha: 0.75),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 0.3,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 12),
-              // Muscle tags
-              Wrap(
-                spacing: 5,
-                runSpacing: 5,
-                children: definition.targetMuscles.map((muscle) {
-                  return Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: primary.withValues(alpha: 0.2),
-                        width: 0.5,
-                      ),
+                const SizedBox(height: 5),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.timer_outlined,
+                      size: 13,
+                      color: Colors.white.withValues(alpha: 0.35),
                     ),
-                    child: Text(
-                      muscle,
-                      style: TextStyle(
-                        color: primary.withValues(alpha: 0.8),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-              const Spacer(),
-              // Bottom row: difficulty + duration
-              Row(
-                children: [
-                  Icon(
-                    Icons.speed_rounded,
-                    size: 13,
-                    color: Colors.white.withValues(alpha: 0.35),
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      definition.difficulty,
+                    const SizedBox(width: 4),
+                    Text(
+                      definition.duration,
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.35),
                         fontSize: 10,
                         fontWeight: FontWeight.w500,
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 5),
-              Row(
-                children: [
-                  Icon(
-                    Icons.timer_outlined,
-                    size: 13,
-                    color: Colors.white.withValues(alpha: 0.35),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    definition.duration,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.35),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

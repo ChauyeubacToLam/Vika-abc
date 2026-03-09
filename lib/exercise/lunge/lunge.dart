@@ -234,6 +234,50 @@ class Lunge extends ExerciseBase {
   }
 
   /* -----------------------------------------------------------------------
+     START POSITION — Standing upright, side-on to camera.
+  ----------------------------------------------------------------------- */
+  @override
+  bool isInStartPosition(
+    Map<PoseLandmarkType, PoseLandmark> landmarks,
+    CameraFacing facing,
+    double? scaleFactor,
+  ) {
+    // Require side view
+    if (facing != CameraFacing.left && facing != CameraFacing.right) {
+      return false;
+    }
+
+    final shoulder = getSideLandmark(
+      landmarks: landmarks,
+      rightType: PoseLandmarkType.rightShoulder,
+      leftType: PoseLandmarkType.leftShoulder,
+    );
+    final hip = getSideLandmark(
+      landmarks: landmarks,
+      rightType: PoseLandmarkType.rightHip,
+      leftType: PoseLandmarkType.leftHip,
+    );
+    final knee = getSideLandmark(
+      landmarks: landmarks,
+      rightType: PoseLandmarkType.rightKnee,
+      leftType: PoseLandmarkType.leftKnee,
+    );
+
+    if (shoulder == null || hip == null || knee == null) return false;
+
+    // Trunk roughly vertical (clock angle near 0°/360°)
+    double trunkAngle = calculateVerticalAngle(pivot: hip, point: shoulder);
+    double deviation = trunkAngle > 180 ? 360 - trunkAngle : trunkAngle;
+    if (deviation > 25) return false;
+
+    // Legs roughly straight (knee angle > standing threshold)
+    final hipKneeAngle = calculateAngle(firstPoint: shoulder, midPoint: hip, lastPoint: knee);
+    if (hipKneeAngle < LungeConfig.LUNGE_STAND_ANGLE_THRESHOLD) return false;
+
+    return true;
+  }
+
+  /* -----------------------------------------------------------------------
      MAIN PHYSICS LOOP — Called every frame when activated.
   ----------------------------------------------------------------------- */
   @override

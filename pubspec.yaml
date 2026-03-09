@@ -21,7 +21,8 @@ dependencies:
 
   # 4. Icons
   cupertino_icons: ^1.0.2
-
+  #5. segmentation
+  google_mlkit_selfie_segmentation: ^0.8.1
 dev_dependencies:
   flutter_test:
     sdk: flutter

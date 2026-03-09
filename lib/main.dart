@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
@@ -23,10 +24,12 @@ late List<CameraDescription> _cameras;
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.light,
-  ));
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+    ),
+  );
   _cameras = await availableCameras();
   runApp(const VinaFitApp());
 }
@@ -98,9 +101,7 @@ class VinaFitApp extends StatelessWidget {
               builder: (_) => ExerciseScreen(definition: definition),
             );
           default:
-            return MaterialPageRoute(
-              builder: (_) => const HomeScreen(),
-            );
+            return MaterialPageRoute(builder: (_) => const HomeScreen());
         }
       },
     );
@@ -154,6 +155,16 @@ class _ExerciseScreenState extends State<ExerciseScreen>
   // ── UI toggles ──
   bool _showDebug = false;
   bool _showRepLog = false;
+  bool _didShowSetupSheet = false;
+
+  // ── Camera UX state ──
+  PermissionStatus? _cameraPermissionStatus;
+  String? _cameraErrorMessage;
+  bool _isInitializingCamera = false;
+
+  // ── UI refresh throttling ──
+  int _lastUiRefreshAtMs = 0;
+  static const int _MIN_UI_REFRESH_INTERVAL_MS = 50;
 
   // ── FPS ──
   int _frameCount = 0;
@@ -196,24 +207,33 @@ class _ExerciseScreenState extends State<ExerciseScreen>
       }
     });
 
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _showSetupSheet();
+    });
+
     _initCamera();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _cameraController?.stopImageStream();
     _cameraController?.dispose();
     _poseDetector.close();
+    _exercise.disposeDetectors();
     _bannerController.dispose();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_cameraController == null || !_cameraController!.value.isInitialized)
-      return;
+    final controller = _cameraController;
+    if (controller == null || !controller.value.isInitialized) return;
+
     if (state == AppLifecycleState.inactive) {
-      _cameraController?.dispose();
+      _isCameraReady = false;
+      _cameraController = null;
+      controller.dispose();
     } else if (state == AppLifecycleState.resumed) {
       _initCamera();
     }
@@ -222,34 +242,122 @@ class _ExerciseScreenState extends State<ExerciseScreen>
   /* -----------------------------------------------------------------------
      CAMERA INIT
      ----------------------------------------------------------------------- */
-  Future<void> _initCamera() async {
-    final status = await Permission.camera.request();
-    if (!status.isGranted) return;
-
-    _cameraIndex = _cameras
-        .indexWhere((cam) => cam.lensDirection == _currentLensDirection);
-    if (_cameraIndex == -1) _cameraIndex = 0;
-    _currentLensDirection = _cameras[_cameraIndex].lensDirection;
-
-    final camera = _cameras[_cameraIndex];
-    _cameraController = CameraController(
-      camera,
-      ResolutionPreset.medium,
-      enableAudio: false,
-      imageFormatGroup: Platform.isAndroid
-          ? ImageFormatGroup.nv21
-          : ImageFormatGroup.bgra8888,
-    );
-
-    try {
-      await _cameraController!.initialize();
-      _isCameraReady = true;
-      _cameraController!.startImageStream(_processCameraImage);
-    } catch (e) {
-      debugPrint('[VinaFit] Camera init error: $e');
+  Future<void> _initCamera({int retryCount = 0}) async {
+    if (mounted) {
+      setState(() {
+        _isInitializingCamera = true;
+        _cameraErrorMessage = null;
+      });
     }
 
-    if (mounted) setState(() {});
+    final status = await Permission.camera.request();
+    _cameraPermissionStatus = status;
+    if (!status.isGranted) {
+      debugPrint('[VinaFit] Camera permission not granted: $status');
+      if (mounted) {
+        setState(() {
+          _isInitializingCamera = false;
+          _isCameraReady = false;
+          _cameraErrorMessage = status.isPermanentlyDenied
+              ? 'Quyền camera đã bị chặn. Hãy mở lại trong cài đặt.'
+              : 'Ứng dụng cần quyền camera để theo dõi bài tập.';
+        });
+      }
+      return;
+    }
+
+    // Dispose any previous controller safely
+    if (_cameraController != null) {
+      try {
+        await _cameraController!.dispose();
+      } catch (_) {}
+      _cameraController = null;
+      // Give the system time to release the camera resource
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
+    if (_cameras.isEmpty) {
+      debugPrint('[VinaFit] No cameras available');
+      if (mounted) {
+        setState(() {
+          _isInitializingCamera = false;
+          _isCameraReady = false;
+          _cameraErrorMessage = 'Không tìm thấy camera trên thiết bị này.';
+        });
+      }
+      return;
+    }
+
+    // Try the preferred camera first, then fall back to any available camera
+    final camerasToTry = <int>[];
+    final preferredIdx = _cameras.indexWhere(
+      (cam) => cam.lensDirection == _currentLensDirection,
+    );
+    if (preferredIdx != -1) camerasToTry.add(preferredIdx);
+    for (int i = 0; i < _cameras.length; i++) {
+      if (!camerasToTry.contains(i)) camerasToTry.add(i);
+    }
+
+    for (final idx in camerasToTry) {
+      final camera = _cameras[idx];
+      debugPrint(
+        '[VinaFit] Trying camera $idx: ${camera.lensDirection} (${camera.name})',
+      );
+
+      final controller = CameraController(
+        camera,
+        ResolutionPreset.medium,
+        enableAudio: false,
+        imageFormatGroup: Platform.isAndroid
+            ? ImageFormatGroup.nv21
+            : ImageFormatGroup.bgra8888,
+      );
+
+      try {
+        await controller.initialize();
+        if (!mounted) {
+          controller.dispose();
+          return;
+        }
+        _cameraController = controller;
+        _cameraIndex = idx;
+        _currentLensDirection = camera.lensDirection;
+        _isCameraReady = true;
+        await controller.startImageStream(_processCameraImage);
+        debugPrint('[VinaFit] Camera $idx initialized successfully');
+        if (mounted) {
+          setState(() {
+            _isInitializingCamera = false;
+            _cameraErrorMessage = null;
+          });
+        }
+        return; // success
+      } catch (e) {
+        debugPrint('[VinaFit] Camera $idx init error: $e');
+        try {
+          await controller.dispose();
+        } catch (_) {}
+      }
+    }
+
+    // Retry up to 3 times with increasing delay (handles "too many clients")
+    if (retryCount < 3 && mounted) {
+      final delay = Duration(seconds: 1 + retryCount);
+      debugPrint(
+          '[VinaFit] Camera open failed, retrying in ${delay.inSeconds}s (attempt ${retryCount + 1}/3)');
+      await Future.delayed(delay);
+      if (mounted) return _initCamera(retryCount: retryCount + 1);
+    }
+
+    debugPrint('[VinaFit] Camera open failed after all retries');
+    if (mounted) {
+      setState(() {
+        _isInitializingCamera = false;
+        _isCameraReady = false;
+        _cameraErrorMessage =
+            'Không thể khởi động camera. Hãy thử lại hoặc đổi camera.';
+      });
+    }
   }
 
   /* -----------------------------------------------------------------------
@@ -260,8 +368,9 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         ? CameraLensDirection.front
         : CameraLensDirection.back;
 
-    final newIndex =
-        _cameras.indexWhere((cam) => cam.lensDirection == newDirection);
+    final newIndex = _cameras.indexWhere(
+      (cam) => cam.lensDirection == newDirection,
+    );
     if (newIndex == -1) return;
 
     await _cameraController?.stopImageStream();
@@ -287,12 +396,18 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     try {
       await _cameraController!.initialize();
       if (!mounted) return;
-      _cameraController!.startImageStream(_processCameraImage);
+      await _cameraController!.startImageStream(_processCameraImage);
       setState(() {
         _isCameraReady = true;
+        _cameraErrorMessage = null;
       });
     } catch (e) {
       debugPrint('[VinaFit] Camera toggle error: $e');
+      if (mounted) {
+        setState(() {
+          _cameraErrorMessage = 'Không thể chuyển camera. Hãy thử lại.';
+        });
+      }
     }
   }
 
@@ -310,6 +425,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
       final inputImage = _buildInputImage(cameraImage);
       if (inputImage == null) return;
 
+      await _exercise.runPersonDetection(inputImage);
       final poses = await _poseDetector.processImage(inputImage);
 
       if (poses.isNotEmpty) {
@@ -335,6 +451,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         _logStateChanges();
       } else {
         _detectedPose = null;
+        _feedback = _exercise.processNoPoseFrame();
       }
 
       // FPS
@@ -347,7 +464,12 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         _lastFpsTime = now;
       }
 
-      if (mounted) setState(() {});
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      if (mounted &&
+          nowMs - _lastUiRefreshAtMs >= _MIN_UI_REFRESH_INTERVAL_MS) {
+        _lastUiRefreshAtMs = nowMs;
+        setState(() {});
+      }
     } catch (e) {
       debugPrint('[VinaFit] Detection error: $e');
     }
@@ -365,7 +487,8 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     }
     if (phaseState != _lastLoggedPhaseState) {
       debugPrint(
-          '[VinaFit][State] ${_exercise.exerciseName}: $_lastLoggedPhaseState -> $phaseState');
+        '[VinaFit][State] ${_exercise.exerciseName}: $_lastLoggedPhaseState -> $phaseState',
+      );
       _lastLoggedPhaseState = phaseState;
     }
   }
@@ -420,7 +543,8 @@ class _ExerciseScreenState extends State<ExerciseScreen>
 
     debugPrint('[VinaFit][Rep] $log');
     debugPrint(
-        '[VinaFit][Feedback] ${_feedback.entries.map((e) => '${e.key}: ${e.value}').join(' | ')}');
+      '[VinaFit][Feedback] ${_feedback.entries.map((e) => '${e.key}: ${e.value}').join(' | ')}',
+    );
 
     _repBannerGood = log.correctForm;
     final parts = <String>[];
@@ -437,7 +561,8 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     debugPrint('');
     debugPrint('============================================');
     debugPrint(
-        '[VinaFit][SET COMPLETE] ${_exercise.exerciseName} — $_repCount reps total');
+      '[VinaFit][SET COMPLETE] ${_exercise.exerciseName} — $_repCount reps total',
+    );
     debugPrint('[VinaFit][SET] Good: $goodReps | Bad: $badReps');
     debugPrint('--------------------------------------------');
     for (final log in _repLogs) {
@@ -445,11 +570,160 @@ class _ExerciseScreenState extends State<ExerciseScreen>
       final faultStr = log.allFaultMessages.isEmpty
           ? 'No issues'
           : log.allFaultMessages.join(', ');
-      debugPrint('[VinaFit][SET] Rep ${log.repNumber} [$status] '
-          'Tempo: ${log.tempo ?? "N/A"} | $faultStr');
+      debugPrint(
+        '[VinaFit][SET] Rep ${log.repNumber} [$status] '
+        'Tempo: ${log.tempo ?? "N/A"} | $faultStr',
+      );
     }
     debugPrint('============================================');
     debugPrint('');
+  }
+
+  Future<void> _showSetupSheet({bool force = false}) async {
+    if (!mounted) return;
+    if (_didShowSetupSheet && !force) return;
+    _didShowSetupSheet = true;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF0D1228),
+      isScrollControlled: true,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: _definition.primaryColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        _definition.icon,
+                        color: _definition.primaryColor,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _definition.name,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          Text(
+                            _definition.subtitle,
+                            style: TextStyle(
+                              color: _definition.primaryColor,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  _definition.description,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.72),
+                    fontSize: 13,
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _buildSetupRow(
+                    Icons.cameraswitch_outlined, _definition.cameraHint),
+                const SizedBox(height: 8),
+                _buildSetupRow(
+                    Icons.crop_free_outlined, _definition.framingHint),
+                const SizedBox(height: 14),
+                ..._definition.setupTips.map(
+                  (tip) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.check_circle_outline,
+                          size: 16,
+                          color: _definition.primaryColor,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            tip,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.72),
+                              fontSize: 12,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _definition.primaryColor,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Bắt đầu'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSetupRow(IconData icon, String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: _definition.primaryColor, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.76),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   /* -----------------------------------------------------------------------
@@ -509,14 +783,52 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     return Scaffold(
       backgroundColor: const Color(0xFF080C1A),
       body: SafeArea(
-        child:
-            !_isCameraReady ? _buildLoadingView() : _buildCameraView(context),
+        child: !_hasCameraPermission
+            ? _buildPermissionView()
+            : !_isCameraReady
+                ? _buildLoadingView()
+                : _buildCameraView(context),
       ),
     );
   }
 
+  bool get _hasCameraPermission => _cameraPermissionStatus?.isGranted ?? true;
+
   /* ── LOADING ── */
   Widget _buildLoadingView() {
+    if (_cameraErrorMessage != null && !_isInitializingCamera) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.videocam_off_outlined,
+                size: 48,
+                color: _definition.primaryColor,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                _cameraErrorMessage!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.75),
+                  fontSize: 14,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 20),
+              FilledButton(
+                onPressed: _initCamera,
+                child: const Text('Thử lại'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -527,12 +839,15 @@ class _ExerciseScreenState extends State<ExerciseScreen>
             child: CircularProgressIndicator(
               strokeWidth: 2.5,
               valueColor: AlwaysStoppedAnimation(
-                  _definition.primaryColor.withValues(alpha: 0.8)),
+                _definition.primaryColor.withValues(alpha: 0.8),
+              ),
             ),
           ),
           const SizedBox(height: 20),
           Text(
-            'Đang khởi động camera...',
+            _isInitializingCamera
+                ? 'Đang khởi động camera...'
+                : 'Đang chờ camera sẵn sàng...',
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.5),
               fontSize: 14,
@@ -540,6 +855,57 @@ class _ExerciseScreenState extends State<ExerciseScreen>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPermissionView() {
+    final status = _cameraPermissionStatus;
+    final permanentlyDenied = status?.isPermanentlyDenied ?? false;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.camera_alt_outlined,
+              size: 54,
+              color: _definition.primaryColor,
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              'Cần quyền camera',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              _cameraErrorMessage ??
+                  'Hãy cấp quyền camera để AI theo dõi bài tập của bạn.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.7),
+                fontSize: 13,
+                height: 1.45,
+              ),
+            ),
+            const SizedBox(height: 20),
+            FilledButton(
+              onPressed: permanentlyDenied ? openAppSettings : _initCamera,
+              child: Text(permanentlyDenied ? 'Mở cài đặt' : 'Cấp quyền'),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Quay lại'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -557,17 +923,9 @@ class _ExerciseScreenState extends State<ExerciseScreen>
             children: [
               _buildCameraStack(controller),
               _buildRepBanner(),
-              Positioned(
-                bottom: 12,
-                right: 12,
-                child: _buildRepCountOverlay(),
-              ),
+              Positioned(bottom: 12, right: 12, child: _buildRepCountOverlay()),
               if (_repLogs.isNotEmpty)
-                Positioned(
-                  bottom: 12,
-                  left: 12,
-                  child: _buildRepDots(),
-                ),
+                Positioned(bottom: 12, left: 12, child: _buildRepDots()),
               _buildCoachingOverlay(),
             ],
           ),
@@ -586,9 +944,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     final accent = _definition.primaryColor;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: const BoxDecoration(
-        color: Color(0xFF080C1A),
-      ),
+      decoration: const BoxDecoration(color: Color(0xFF080C1A)),
       child: Row(
         children: [
           // Back button
@@ -605,8 +961,11 @@ class _ExerciseScreenState extends State<ExerciseScreen>
                   width: 1,
                 ),
               ),
-              child: const Icon(Icons.arrow_back_rounded,
-                  color: Colors.white70, size: 18),
+              child: const Icon(
+                Icons.arrow_back_rounded,
+                color: Colors.white70,
+                size: 18,
+              ),
             ),
           ),
           const SizedBox(width: 10),
@@ -672,6 +1031,27 @@ class _ExerciseScreenState extends State<ExerciseScreen>
             ),
           ),
           const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () => _showSetupSheet(force: true),
+            child: Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  width: 1,
+                ),
+              ),
+              child: const Icon(
+                Icons.help_outline_rounded,
+                color: Colors.white70,
+                size: 18,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
           _buildStatePill(),
           const SizedBox(width: 8),
           Container(
@@ -706,8 +1086,15 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     switch (exerciseState) {
       case ExerciseState.notActivated:
         color = const Color(0xFFFF9800);
-        text = 'Gật đầu để bắt đầu';
-        icon = Icons.accessibility_new;
+        final progress = _exercise.activationProgress;
+        if (progress != null && progress > 0) {
+          final remaining = ((1.0 - progress) * 3.0).toStringAsFixed(0);
+          text = 'Giữ yên... ${remaining}s';
+          icon = Icons.timer_outlined;
+        } else {
+          text = 'Vào tư thế để bắt đầu';
+          icon = Icons.accessibility_new;
+        }
         break;
       case ExerciseState.activated:
         final phaseKey = _exercise.currentPhaseKey;
@@ -753,22 +1140,43 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     return LayoutBuilder(
       builder: (context, constraints) {
         final previewSize = Size(constraints.maxWidth, constraints.maxHeight);
+        final framingColor = _exercise.isPaused
+            ? const Color(0xFFFF5252)
+            : _definition.primaryColor;
         return Stack(
           fit: StackFit.expand,
           children: [
-            Center(child: CameraPreview(controller)),
+            RepaintBoundary(child: Center(child: CameraPreview(controller))),
             if (_detectedPose != null)
-              CustomPaint(
-                size: previewSize,
-                painter: PosePainter(
-                  pose: _detectedPose!,
-                  imageSize: _imageSize,
-                  widgetSize: previewSize,
-                  rotation: _imageRotation,
-                  lensDirection: controller.description.lensDirection,
-                  debugData: _exercise.debugData,
+              RepaintBoundary(
+                child: CustomPaint(
+                  size: previewSize,
+                  painter: PosePainter(
+                    pose: _detectedPose!,
+                    imageSize: _imageSize,
+                    widgetSize: previewSize,
+                    rotation: _imageRotation,
+                    lensDirection: controller.description.lensDirection,
+                    debugData: _exercise.debugData,
+                  ),
                 ),
               ),
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(28, 70, 28, 90),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: framingColor.withValues(alpha: 0.45),
+                        width: 1.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
             // Subtle vignette
             Positioned.fill(
               child: IgnorePointer(
@@ -789,9 +1197,55 @@ class _ExerciseScreenState extends State<ExerciseScreen>
                 ),
               ),
             ),
+            Positioned(
+              top: 14,
+              left: 12,
+              right: 12,
+              child: _buildFramingGuideCard(),
+            ),
           ],
         );
       },
+    );
+  }
+
+  Widget _buildFramingGuideCard() {
+    final showSystemMessage = _feedback['System'];
+    final guidance = showSystemMessage ??
+        (_exercise.exerciseState == ExerciseState.notActivated
+            ? _definition.framingHint
+            : _definition.cameraHint);
+    final color =
+        _exercise.isPaused ? const Color(0xFFFF5252) : _definition.primaryColor;
+
+    return Align(
+      alignment: Alignment.topCenter,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 340),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.58),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withValues(alpha: 0.28)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.center_focus_strong, size: 15, color: color),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                guidance,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.86),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  height: 1.35,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -806,10 +1260,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: accent.withValues(alpha: 0.25),
-          width: 1,
-        ),
+        border: Border.all(color: accent.withValues(alpha: 0.25), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1138,8 +1589,10 @@ class _ExerciseScreenState extends State<ExerciseScreen>
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
-              border:
-                  Border.all(color: color.withValues(alpha: 0.25), width: 1),
+              border: Border.all(
+                color: color.withValues(alpha: 0.25),
+                width: 1,
+              ),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -1328,7 +1781,9 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         child: Text(
           'Waiting for pose data...',
           style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.2), fontSize: 10),
+            color: Colors.white.withValues(alpha: 0.2),
+            fontSize: 10,
+          ),
         ),
       );
     }
@@ -1362,9 +1817,11 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         children: [
           Row(
             children: [
-              Icon(Icons.terminal,
-                  size: 11,
-                  color: _definition.primaryColor.withValues(alpha: 0.4)),
+              Icon(
+                Icons.terminal,
+                size: 11,
+                color: _definition.primaryColor.withValues(alpha: 0.4),
+              ),
               const SizedBox(width: 4),
               Text(
                 'DEBUG — ${_exercise.exerciseName.toUpperCase()}',
@@ -1438,7 +1895,9 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         child: Text(
           'Chưa có lượt ${_exercise.exerciseName.toLowerCase()} nào.',
           style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.25), fontSize: 11),
+            color: Colors.white.withValues(alpha: 0.25),
+            fontSize: 11,
+          ),
         ),
       );
     }
@@ -1505,15 +1964,19 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         Text(
           count,
           style: TextStyle(
-              color: color, fontSize: 14, fontWeight: FontWeight.w900),
+            color: color,
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+          ),
         ),
         const SizedBox(width: 3),
         Text(
           label,
           style: TextStyle(
-              color: color.withValues(alpha: 0.55),
-              fontSize: 10,
-              fontWeight: FontWeight.w600),
+            color: color.withValues(alpha: 0.55),
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ],
     );
@@ -1545,7 +2008,10 @@ class _ExerciseScreenState extends State<ExerciseScreen>
               child: Text(
                 '${log.repNumber}',
                 style: TextStyle(
-                    color: color, fontSize: 12, fontWeight: FontWeight.w800),
+                  color: color,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           ),
@@ -1567,18 +2033,22 @@ class _ExerciseScreenState extends State<ExerciseScreen>
                     Text(
                       log.correctForm ? 'Tốt' : 'Cần sửa',
                       style: TextStyle(
-                          color: color,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700),
+                        color: color,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     const Spacer(),
                     if (log.tempo != null)
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
-                          color:
-                              const Color(0xFF29B6F6).withValues(alpha: 0.12),
+                          color: const Color(
+                            0xFF29B6F6,
+                          ).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(5),
                         ),
                         child: Text(
@@ -1652,11 +2122,7 @@ class _ArcCountdownPainter extends CustomPainter {
     );
 
     if (progress >= 1.0) {
-      canvas.drawCircle(
-        center,
-        2.5,
-        Paint()..color = color,
-      );
+      canvas.drawCircle(center, 2.5, Paint()..color = color);
     }
   }
 
@@ -1859,41 +2325,80 @@ class PosePainter extends CustomPainter {
     // Knee angle (both squat and plank track this)
     final knee = landmarks[PoseLandmarkType.leftKnee] ??
         landmarks[PoseLandmarkType.rightKnee];
-    if (knee != null && knee.likelihood > 0.5) {
+    if (knee != null && knee.likelihood > 0.92) {
       final kneePos = transformPoint(knee);
       final kneeAngle = debugData['kneeAngle'];
       if (kneeAngle != null) {
         _drawLabel(
-            canvas, kneePos + const Offset(12, -8), '$kneeAngle°', Colors.cyan);
+          canvas,
+          kneePos + const Offset(12, -8),
+          '$kneeAngle°',
+          Colors.cyan,
+        );
       }
     }
 
-    // Shoulder-area label: trunk lean (squat) or back angle (plank)
+    // Elbow angle (push-up: drives state machine)
+    final elbow = landmarks[PoseLandmarkType.leftElbow] ??
+        landmarks[PoseLandmarkType.rightElbow];
+    if (elbow != null && elbow.likelihood > 0.5) {
+      final elbowAngle = debugData['elbowAngle'];
+      if (elbowAngle != null) {
+        final elbowPos = transformPoint(elbow);
+        _drawLabel(
+          canvas,
+          elbowPos + const Offset(12, -8),
+          '$elbowAngle°',
+          const Color(0xFFE040FB),
+        );
+      }
+    }
+
+    // Shoulder-area label: trunk lean (squat) or back angle (plank) or trunk dev (push-up)
     final shoulder = landmarks[PoseLandmarkType.leftShoulder] ??
         landmarks[PoseLandmarkType.rightShoulder];
     if (shoulder != null && shoulder.likelihood > 0.5) {
       final shoulderPos = transformPoint(shoulder);
-      // Try squat-specific trunkLean, then plank-specific backAngle
       final trunkLean = debugData['trunkLean'];
       final backAngle = debugData['backAngle'];
+      final trunkDev = debugData['trunkDev'];
       if (trunkLean != null) {
-        _drawLabel(canvas, shoulderPos + const Offset(12, -8), '$trunkLean',
-            Colors.orange);
+        _drawLabel(
+          canvas,
+          shoulderPos + const Offset(12, -8),
+          '$trunkLean',
+          Colors.orange,
+        );
+      } else if (trunkDev != null) {
+        _drawLabel(
+          canvas,
+          shoulderPos + const Offset(12, -8),
+          '$trunkDev',
+          Colors.orange,
+        );
       } else if (backAngle != null) {
-        _drawLabel(canvas, shoulderPos + const Offset(12, -8), '$backAngle°',
-            Colors.orange);
+        _drawLabel(
+          canvas,
+          shoulderPos + const Offset(12, -8),
+          '$backAngle°',
+          Colors.orange,
+        );
       }
     }
 
-    // Hip-area label for plank neck angle
+    // Hip-area label: plank neck angle
     final ear = landmarks[PoseLandmarkType.leftEar] ??
         landmarks[PoseLandmarkType.rightEar];
     if (ear != null && ear.likelihood > 0.5) {
       final neckAngle = debugData['neckAngle'];
       if (neckAngle != null) {
         final earPos = transformPoint(ear);
-        _drawLabel(canvas, earPos + const Offset(12, -8), '$neckAngle°',
-            const Color(0xFF4CAF50));
+        _drawLabel(
+          canvas,
+          earPos + const Offset(12, -8),
+          '$neckAngle°',
+          const Color(0xFF4CAF50),
+        );
       }
     }
   }
@@ -1930,5 +2435,12 @@ class PosePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant PosePainter oldDelegate) => true;
+  bool shouldRepaint(covariant PosePainter oldDelegate) {
+    return oldDelegate.pose != pose ||
+        oldDelegate.imageSize != imageSize ||
+        oldDelegate.widgetSize != widgetSize ||
+        oldDelegate.rotation != rotation ||
+        oldDelegate.lensDirection != lensDirection ||
+        !mapEquals(oldDelegate.debugData, debugData);
+  }
 }

@@ -1,5 +1,7 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, non_constant_identifier_names, constant_identifier_names
 
+import 'package:vinafit_mobile/utils/debouncer.dart';
+
 import '../../utils/pose_math_helpers.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
@@ -35,6 +37,9 @@ enum SquatState {
 class Squat extends ExerciseBase {
   SquatState squatState = SquatState.standing;
   SquatState previousSquatState = SquatState.standing;
+
+  // Debounce entry into rep — prevents false starts from noisy frames
+  final Debouncer _entryDebouncer = Debouncer(requiredFrames: 2);
 
   final DepthMetric depthMetric = DepthMetric();
   final TrunkLeanMetric trunkLeanMetric = TrunkLeanMetric();
@@ -74,12 +79,68 @@ class Squat extends ExerciseBase {
   }
 
   /* -----------------------------------------------------------------------
-     SAFETY CHECKS
+      INITIALIZATION 
+  ----------------------------------------------------------------------- */
+  @override
+  bool isInStartPosition(
+    Map<PoseLandmarkType, PoseLandmark> landmarks,
+    CameraFacing facing,
+    double? scaleFactor,
+  ) {
+    // Check: user is standing upright
+    final shoulder = getSideLandmark(
+      landmarks: landmarks,
+      rightType: PoseLandmarkType.rightShoulder,
+      leftType: PoseLandmarkType.leftShoulder,
+    );
+    final hip = getSideLandmark(
+      landmarks: landmarks,
+      rightType: PoseLandmarkType.rightHip,
+      leftType: PoseLandmarkType.leftHip,
+    );
+    final knee = getSideLandmark(
+      landmarks: landmarks,
+      rightType: PoseLandmarkType.rightKnee,
+      leftType: PoseLandmarkType.leftKnee,
+    );
+
+    if (shoulder == null || hip == null || knee == null) return false;
+
+    // 1. Trunk must be roughly vertical (clock angle near 0°/360°)
+    double trunkClockAngle =
+        calculateVerticalAngle(pivot: hip, point: shoulder);
+    // Near vertical: clock angle close to 0° (or 360°)
+    double deviationFromVertical = trunkClockAngle;
+    if (deviationFromVertical > 180)
+      deviationFromVertical = 360 - deviationFromVertical;
+    if (deviationFromVertical > 25.0) return false;
+
+    // 2. Legs must be straight (knee angle > 155° = standing)
+    double kneeAngle = calculateAngleNormalized(
+      firstPoint: hip,
+      midPoint: knee,
+      lastPoint: getSideLandmark(
+        landmarks: landmarks,
+        rightType: PoseLandmarkType.rightAnkle,
+        leftType: PoseLandmarkType.leftAnkle,
+      )!,
+    );
+    if (kneeAngle < 155.0) return false;
+
+    return true;
+  }
+
+  /* -----------------------------------------------------------------------
+     STOP CONDITION
   ----------------------------------------------------------------------- */
   @override
   bool requestStop() {
     return repCount >= SquatConfig.MAX_REP;
   }
+
+  /* -----------------------------------------------------------------------
+     SAFETY CHECKS
+  ----------------------------------------------------------------------- */
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks,
@@ -200,14 +261,14 @@ class Squat extends ExerciseBase {
 
     // ---------- 4. Populate Debug Data ----------
 
-    debugData['squatState'] = squatState.toString().split('.').last;
-    debugData['kneeAngle'] = kneeAngle.toStringAsFixed(1);
-    debugData['backClockAngle'] = backAngle.toStringAsFixed(1);
-    debugData['trunkLean'] =
-        '${trunkLean >= 0 ? "+" : ""}${trunkLean.toStringAsFixed(1)}°';
-    debugData['trunkLeanDir'] = trunkLean >= 0 ? 'Forward' : 'Backward';
-    debugData['heelDist'] = heelDistanceToFloor.toStringAsFixed(2);
-    debugData['correctForm'] = correctForm.toString();
+    // debugData['squatState'] = squatState.toString().split('.').last;
+    // debugData['kneeAngle'] = kneeAngle.toStringAsFixed(1);
+    // debugData['backClockAngle'] = backAngle.toStringAsFixed(1);
+    // debugData['trunkLean'] =
+    //     '${trunkLean >= 0 ? "+" : ""}${trunkLean.toStringAsFixed(1)}°';
+    // debugData['trunkLeanDir'] = trunkLean >= 0 ? 'Forward' : 'Backward';
+    // debugData['heelDist'] = heelDistanceToFloor.toStringAsFixed(2);
+    // debugData['correctForm'] = correctForm.toString();
 
     // ---------- 5. Rep Completion (Standing Up) ----------
 
@@ -216,7 +277,7 @@ class Squat extends ExerciseBase {
       repCount += 1;
 
       // Let depth check if rep was deep enough
-      depthMetric.checkRepCompletion(squatState, ctx);
+      depthMetric.checkRepCompletion(previousSquatState, ctx);
 
       // Fire final state transition so tempo can calculate ascent
       _transitionState(SquatState.standing, now);
@@ -311,8 +372,11 @@ class Squat extends ExerciseBase {
   ----------------------------------------------------------------------- */
 
   void _updateSquatState(double kneeAngle, int timestampMs) {
-    if (kneeAngle <= SquatConfig.SQUAT_DESCEND_ANGLE_THRESHOLD &&
-        squatState == SquatState.standing) {
+    // Debounce entry: require 2 consecutive frames below threshold
+    bool isEnteringRep = kneeAngle <= SquatConfig.SQUAT_DESCEND_ANGLE_THRESHOLD;
+    bool confirmedEntry = _entryDebouncer.update(isEnteringRep);
+
+    if (confirmedEntry && squatState == SquatState.standing) {
       _transitionState(SquatState.descending, timestampMs);
     } else if (kneeAngle <= SquatConfig.SQUAT_BOTTOM_ANGLE_THRESHOLD[1] &&
         squatState == SquatState.descending) {

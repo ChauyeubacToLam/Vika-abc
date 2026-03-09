@@ -35,7 +35,7 @@ import '../squat.dart';
 class TempoConfig {
   /* --- Descent Duration (seconds) --- */
   static const double DESCENT_MIN_GOOD = 0.45;
-  static const double DESCENT_MIN_ERROR = 0.32;
+  static const double DESCENT_MIN_ERROR = 0.35;
 
   /* --- Bottom Hold (seconds) --- */
   static const double BOTTOM_HOLD_MIN = 0.8;
@@ -63,7 +63,6 @@ class TempoMetric extends SquatMetricBase {
   int? _descentStartMs;
   int? _bottomReachedMs;
   int? _ascentStartMs;
-  int? _repCompleteMs;
 
   // --- Computed durations (seconds) ---
   double? _descentDuration;
@@ -112,7 +111,6 @@ class TempoMetric extends SquatMetricBase {
         break;
 
       case SquatState.standing:
-        _repCompleteMs = timestampMs;
         if (_ascentStartMs != null) {
           _ascentDuration = (timestampMs - _ascentStartMs!) / 1000.0;
           _debugData['ascentDur'] = _ascentDuration?.toStringAsFixed(2) ?? '-';
@@ -171,12 +169,12 @@ class TempoMetric extends SquatMetricBase {
       _logFault(
           phase, 'Dropped too fast (${_descentDuration!.toStringAsFixed(1)}s)');
       ctx.resultIssues.addInstruction(
-          'standing', 'Tempo', 'Dropped too fast last rep, go slower');
+          'standing', 'Tempo descent', 'Dropped too fast last rep, go slower');
     } else if (_descentDuration! < TempoConfig.DESCENT_MIN_GOOD) {
       _logFault(phase,
           'Descent a bit fast (${_descentDuration!.toStringAsFixed(1)}s)');
-      ctx.resultIssues.addInstruction(
-          'standing', 'Tempo', 'A bit fast last rep, try 2-3 seconds down');
+      ctx.resultIssues.addInstruction('standing', 'Tempo descent',
+          'A bit fast last rep, try 2-3 seconds down');
     }
 
     // --- 2. Bottom hold (bounce detection) ---
@@ -184,8 +182,8 @@ class TempoMetric extends SquatMetricBase {
         _bottomHoldDuration! < TempoConfig.BOTTOM_HOLD_MIN) {
       _logFault(phase,
           'Bounced at bottom (${_bottomHoldDuration!.toStringAsFixed(2)}s hold)');
-      ctx.resultIssues.addInstruction(
-          'standing', 'Tempo', 'Not holding at bottom, pause this time!');
+      ctx.resultIssues.addInstruction('standing', 'Tempo bottom hold',
+          'Not holding at bottom, pause this time!');
     }
 
     // --- 3. Descent:Ascent ratio (eccentric control) ---
@@ -194,11 +192,11 @@ class TempoMetric extends SquatMetricBase {
         _logFault(phase,
             'No eccentric control (ratio ${_descentAscentRatio!.toStringAsFixed(1)})');
         ctx.resultIssues.addInstruction(
-            'standing', 'Tempo', 'Control the way down this time');
+            'standing', 'Tempo eccentric', 'Control the way down this time');
       } else if (_descentAscentRatio! >
           TempoConfig.RATIO_GOOD + TempoConfig.RATIO_WARNING) {
-        ctx.resultIssues
-            .addInstruction('standing', 'Tempo', 'Drive up with more control');
+        ctx.resultIssues.addInstruction(
+            'standing', 'Tempo eccentric', 'Drive up with more control');
       }
     }
 
@@ -207,8 +205,8 @@ class TempoMetric extends SquatMetricBase {
         _ascentDuration != null &&
         _ascentDuration! >
             _descentDuration! * TempoConfig.ASCENT_STRUGGLE_MULTIPLIER) {
-      ctx.resultIssues
-          .addInstruction('standing', 'Tempo', 'Drive up with more power!');
+      ctx.resultIssues.addInstruction(
+          'standing', 'Tempo ascent', 'Drive up with more power!');
     }
 
     _debugData['tempoResult'] = _faults.isEmpty ? 'good' : 'fault';
@@ -251,7 +249,6 @@ class TempoMetric extends SquatMetricBase {
     _descentStartMs = null;
     _bottomReachedMs = null;
     _ascentStartMs = null;
-    _repCompleteMs = null;
     _descentDuration = null;
     _ascentDuration = null;
     _bottomHoldDuration = null;

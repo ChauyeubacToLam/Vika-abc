@@ -15,9 +15,9 @@ import '../../../utils/debouncer.dart';
 
 class HeelRiseConfig {
   /// Heel lift threshold normalized to back length (shoulder-to-hip).
-  /// 0.15 = "If heel lifts more than 15% of back length."
+  /// 0.15 = "If heel lifts more than 8% of back length."
   // ignore: constant_identifier_names
-  static const double LIFT_THRESHOLD = 0.15;
+  static const double LIFT_THRESHOLD = 0.08;
 }
 
 class HeelRiseMetric extends SquatMetricBase {
@@ -27,8 +27,8 @@ class HeelRiseMetric extends SquatMetricBase {
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
 
-  // 10 frames ~0.33s at 30fps — prevents false triggers from floor jitter
-  final Debouncer _heelDebouncer = Debouncer(requiredFrames: 5);
+  // 3 frames  ~0.187s at 16fps — prevents false triggers from floor jitter
+  final Debouncer _heelDebouncer = Debouncer(requiredFrames: 3);
 
   /// Prevent instruction spam — only set coaching once per rep.
   bool _instructionSet = false;
@@ -67,8 +67,7 @@ class HeelRiseMetric extends SquatMetricBase {
         phase: phase,
         type: 'Feet',
         message: message,
-        // KEY: affectsForm = false — heel rise is informational only
-        affectsForm: false,
+        affectsForm: true,
       ));
     }
   }
