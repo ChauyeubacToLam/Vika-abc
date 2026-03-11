@@ -1,17 +1,17 @@
 // ignore_for_file: constant_identifier_names, non_constant_identifier_names
 
 /* =========================================================================
-   Metric 3: Knee Extension Angle (Locked Legs)
-   Priority: IMPORTANT — Chronic back stress.
+   Curl Up Metric: Knee Extension (Locked Legs)
 
-   Measures: calculateAngle(Hip, Knee, Ankle) — the interior knee angle.
+   Interior knee angle — whether the legs remain bent during the curl.
+   Straight/locked knees shift force to the lower back and increase
+   lumbar shear.
 
-   Locked/straight knees shift force to the lower back, increasing
-   rectus femoris activity, anterior pelvic tilt, and shear/compression
-   at the lumbar spine.
+   Landmarks: HIP (#23/#24), KNEE (#25/#26), ANKLE (#27/#28)
+   Calculation: 3-point angle at the knee (hip-knee-ankle)
 
-   Threshold: ~170° (extended/locked), with slight leniency to 175°
-   for Vietnamese demographic due to proportionally longer legs.
+   When to check: Continuously throughout the rep.
+   ≥ 175° = locked (error), ≥ 170° = getting straight (warning).
    ========================================================================= */
 
 import 'curl_up_metric_base.dart';

@@ -1,11 +1,5 @@
 /* =========================================================================
    CurlUpMetricBase — Abstract base for all curl-up form metrics.
-
-   Architecture mirrors SquatMetricBase:
-   ┌──────────┐     ┌──────────────┐     ┌──────────────┐
-   │  CurlUp  │────▶│  RepContext   │◀────│  MetricBase  │
-   │  (owner) │     │ (shared state)│     │  (per metric)│
-   └──────────┘     └──────────────┘     └──────────────┘
    ========================================================================= */
 
 import '../curl_up.dart';
@@ -13,6 +7,7 @@ import '../../exercise_base.dart';
 
 /* =========================================================================
    RepContext — Shared per-frame state, passed to all metrics.
+   Avoids each metric needing to recalculate the same geometry.
    ========================================================================= */
 class RepContext {
   final double trunkAngle; // Degrees from horizontal (0 = flat, + = curling up)
@@ -51,10 +46,10 @@ class RepContext {
    FaultRecord — A single fault logged by a metric.
    ========================================================================= */
 class FaultRecord {
-  final String phase;
-  final String type;
-  final String message;
-  final bool affectsForm;
+  final String phase; // e.g. "ASCENDING", "APEX"
+  final String type; // e.g. "Neck", "Range", "Knee"
+  final String message; // e.g. "Kéo cổ quá mạnh"
+  final bool affectsForm; // false = informational only
 
   FaultRecord({
     required this.phase,
@@ -68,15 +63,23 @@ class FaultRecord {
    CurlUpMetricBase — Interface every metric implements.
    ========================================================================= */
 abstract class CurlUpMetricBase {
+  /// Human-readable name for debug/logging.
   String get name;
 
+  /// Called every frame during an active rep (curlUpState != resting).
+  /// Writes feedback + instructions directly to ctx.resultIssues.
   void update(RepContext ctx);
 
+  /// Faults accumulated this rep. CurlUp reads these when rep completes.
   List<FaultRecord> get faults;
 
+  /// Debug data for the overlay. Keys should be metric-specific.
   Map<String, dynamic> get debugData;
 
+  /// Reset all internal state for the next rep.
   void reset();
 
+  /// Called when curl-up state transitions (e.g. ascending → apex).
+  /// Override in metrics that care about transitions.
   void onStateTransition(CurlUpState from, CurlUpState to, int timestampMs) {}
 }

@@ -1,3 +1,5 @@
+// ignore_for_file: curly_braces_in_flow_control_structures, non_constant_identifier_names, constant_identifier_names
+
 import 'package:vinafit_mobile/exercise/exercise_base.dart';
 import '../../utils/pose_math_helpers.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
@@ -271,7 +273,8 @@ class Lunge extends ExerciseBase {
     if (deviation > 25) return false;
 
     // Legs roughly straight (knee angle > standing threshold)
-    final hipKneeAngle = calculateAngle(firstPoint: shoulder, midPoint: hip, lastPoint: knee);
+    final hipKneeAngle =
+        calculateAngle(firstPoint: shoulder, midPoint: hip, lastPoint: knee);
     if (hipKneeAngle < LungeConfig.LUNGE_STAND_ANGLE_THRESHOLD) return false;
 
     return true;

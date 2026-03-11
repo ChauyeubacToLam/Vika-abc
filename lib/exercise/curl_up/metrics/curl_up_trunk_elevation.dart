@@ -1,17 +1,16 @@
 // ignore_for_file: constant_identifier_names, non_constant_identifier_names
 
 /* =========================================================================
-   Metric: Trunk Elevation (Shoulder-Hip-Knee Angle)
+   Curl Up Metric: Trunk Elevation
 
-   Measures how far the trunk rises from the resting position using
-   calculateAngle(Shoulder, Hip, Knee) — the interior angle at the hip.
+   How far the trunk rises from the resting position — guards against
+   a full sit-up which overloads the lumbar spine.
 
-   Evaluation at the absolute apex of the concentric phase (top state).
+   Landmarks: SHOULDER (#11/#12), HIP (#23/#24), KNEE (#25/#26)
+   Calculation: 3-point angle at the hip (shoulder-hip-knee)
 
-   Thresholds (degrees from resting):
-     Good:    < 30°   → "Biên độ rất chuẩn!"
-     Warning: 30°–45° → "Giữ biên độ ngắn để bảo vệ lưng."
-     Error:   > 45°   → "Lên quá cao - chỉ cần nâng vai khỏi sàn!"
+   When to check: Continuously during ascending and apex phases.
+   Per-rep evaluation at the kinematic apex (apex → descending transition).
    ========================================================================= */
 
 import 'curl_up_metric_base.dart';

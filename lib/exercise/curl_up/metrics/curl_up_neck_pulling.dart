@@ -1,19 +1,17 @@
 // ignore_for_file: constant_identifier_names, non_constant_identifier_names
 
 /* =========================================================================
-   Metric 2: Cervical Hyperflexion (Neck Pulling Detection)
-   Priority: CRITICAL — Acute injury risk to the cervical spine.
+   Curl Up Metric: Neck Pulling (Cervical Hyperflexion)
 
-   Measures: calculateAngle(Ear, Shoulder, Hip) — the head/neck angle
-   against the torso.
+   Head/neck angle relative to a personalised resting baseline — detects
+   chin-to-chest pulling that stresses the cervical spine.
 
-   Uses a personalized resting baseline captured while lying flat,
-   then triggers if the angle deviates by >15° during the concentric
-   phase. This handles Vietnamese users with forward head posture
-   (thoracic kyphosis) who already have a partially "flexed" resting
-   baseline.
+   Landmarks: EAR (#7/#8), SHOULDER (#11/#12), HIP (#23/#24)
+   Calculation: 3-point angle at the shoulder (ear-shoulder-hip)
 
-   Evaluated continuously during the concentric phase (curlingUp / top).
+   When to check: Continuously during ascending and apex phases.
+   Deviation > 15° from resting baseline triggers an error; > 12° a warning.
+   Baseline is sampled during the first lying frames (personalised per user).
    ========================================================================= */
 
 import 'curl_up_metric_base.dart';

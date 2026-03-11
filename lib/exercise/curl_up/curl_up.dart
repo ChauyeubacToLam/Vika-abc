@@ -34,10 +34,10 @@ class CurlUpConfig {
 }
 
 enum CurlUpState {
-  resting,
-  ascending,
-  apex,
-  descending,
+  resting, // start position (lying flat)
+  ascending, // curling up
+  apex, // maximum curl reached
+  descending, // lowering back down
 }
 
 /* =========================================================================
