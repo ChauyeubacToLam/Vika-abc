@@ -48,17 +48,25 @@ class NeckPullingMetric extends CurlUpMetricBase {
   Map<String, dynamic> get debugData => _debugData;
 
   @override
+  void onRestingFrame(RepContext ctx) {
+    // Accumulate baseline from resting frames (proper lying position).
+    final angle = ctx.earShoulderHipAngle;
+    _baselineSum += angle;
+    _baselineFrames++;
+    if (_baselineFrames >= _BASELINE_SAMPLE_COUNT) {
+      _baselineAngle = _baselineSum / _baselineFrames;
+      _debugData['neckBaseline'] = _baselineAngle!.toStringAsFixed(1);
+    } else {
+      _debugData['neckBaseline'] = 'sampling...';
+    }
+  }
+
+  @override
   void update(RepContext ctx) {
     final angle = ctx.earShoulderHipAngle;
 
-    // Collect baseline samples during early lying frames
     if (_baselineAngle == null) {
-      _baselineSum += angle;
-      _baselineFrames++;
-      if (_baselineFrames >= _BASELINE_SAMPLE_COUNT) {
-        _baselineAngle = _baselineSum / _baselineFrames;
-      }
-      _debugData['neckBaseline'] = 'sampling...';
+      _debugData['neckBaseline'] = 'no baseline';
       return;
     }
 
@@ -114,6 +122,10 @@ class NeckPullingMetric extends CurlUpMetricBase {
     _faults.clear();
     _debugData.clear();
     _faultLogged = false;
-    // Keep baseline — it's personalized and doesn't change between reps.
+    // Reset baseline accumulators — onRestingFrame will re-sample them
+    // from the actual resting position before the next rep begins.
+    _baselineAngle = null;
+    _baselineSum = 0.0;
+    _baselineFrames = 0;
   }
 }

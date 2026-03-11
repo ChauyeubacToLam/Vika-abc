@@ -39,11 +39,15 @@ class TrunkElevationMetric extends CurlUpMetricBase {
   Map<String, dynamic> get debugData => _debugData;
 
   @override
+  void onRestingFrame(RepContext ctx) {
+    // Continuously update baseline while lying flat — last resting value wins.
+    _baselineAngle = ctx.shoulderHipKneeAngle;
+    _debugData['shBaseline'] = _baselineAngle!.toStringAsFixed(1);
+  }
+
+  @override
   void update(RepContext ctx) {
     final angle = ctx.shoulderHipKneeAngle;
-
-    // Capture baseline from lying state (first frames before motion)
-    _baselineAngle ??= angle;
 
     // Track minimum angle (= peak curl position)
     if (_peakAngle == null || angle < _peakAngle!) {

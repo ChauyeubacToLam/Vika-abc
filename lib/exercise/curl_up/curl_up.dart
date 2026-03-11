@@ -117,19 +117,44 @@ class CurlUp extends ExerciseBase {
     double trunkAngle = _calculateTrunkAngle(shoulder, hip);
     if (trunkAngle > 15.0) return false;
 
-    // Knees should be bent (knee Y above or near hip Y in screen coords)
-    // For a curl up, knees are typically bent with feet flat on floor
-    double kneeAngle = calculateAngleNormalized(
+    // McGill setup: one knee bent, one straight.
+    // Accept if EITHER knee is bent (≤ 150°) — do not reject the straight leg.
+    final ankle = getSideLandmark(
+      landmarks: landmarks,
+      rightType: PoseLandmarkType.rightAnkle,
+      leftType: PoseLandmarkType.leftAnkle,
+    );
+    final oppKnee = getSideLandmark(
+      landmarks: landmarks,
+      rightType: PoseLandmarkType.leftKnee,
+      leftType: PoseLandmarkType.rightKnee,
+    );
+    final oppAnkle = getSideLandmark(
+      landmarks: landmarks,
+      rightType: PoseLandmarkType.leftAnkle,
+      leftType: PoseLandmarkType.rightAnkle,
+    );
+    final oppHip = getSideLandmark(
+      landmarks: landmarks,
+      rightType: PoseLandmarkType.leftHip,
+      leftType: PoseLandmarkType.rightHip,
+    );
+
+    if (ankle == null) return false;
+
+    double sideKneeAngle = calculateAngleNormalized(
       firstPoint: hip,
       midPoint: knee,
-      lastPoint: getSideLandmark(
-        landmarks: landmarks,
-        rightType: PoseLandmarkType.rightAnkle,
-        leftType: PoseLandmarkType.leftAnkle,
-      )!,
+      lastPoint: ankle,
     );
-    // Knees should be bent: angle < 140° indicates bent knees
-    if (kneeAngle > 150.0) return false;
+    double? oppKneeAngle =
+        (oppHip != null && oppKnee != null && oppAnkle != null)
+            ? calculateAngleNormalized(
+                firstPoint: oppHip, midPoint: oppKnee, lastPoint: oppAnkle)
+            : null;
+    bool eitherKneeBent = sideKneeAngle <= 150.0 ||
+        (oppKneeAngle != null && oppKneeAngle <= 150.0);
+    if (!eitherKneeBent) return false;
 
     return true;
   }
@@ -236,6 +261,23 @@ class CurlUp extends ExerciseBase {
       leftType: PoseLandmarkType.leftEar,
     );
 
+    // McGill setup: also get opposite-side leg to always find the bent knee.
+    PoseLandmark? oppKnee = getSideLandmark(
+      landmarks: smoothedLandmarks,
+      rightType: PoseLandmarkType.leftKnee,
+      leftType: PoseLandmarkType.rightKnee,
+    );
+    PoseLandmark? oppAnkle = getSideLandmark(
+      landmarks: smoothedLandmarks,
+      rightType: PoseLandmarkType.leftAnkle,
+      leftType: PoseLandmarkType.rightAnkle,
+    );
+    PoseLandmark? oppHip = getSideLandmark(
+      landmarks: smoothedLandmarks,
+      rightType: PoseLandmarkType.leftHip,
+      leftType: PoseLandmarkType.rightHip,
+    );
+
     if (shoulder == null ||
         hip == null ||
         knee == null ||
@@ -249,8 +291,18 @@ class CurlUp extends ExerciseBase {
         firstPoint: shoulder, midPoint: hip, lastPoint: knee);
     double earShoulderHipAngle = calculateAngleNormalized(
         firstPoint: ear, midPoint: shoulder, lastPoint: hip);
-    double hipKneeAnkleAngle = calculateAngleNormalized(
+    double sideKneeAngle = calculateAngleNormalized(
         firstPoint: hip, midPoint: knee, lastPoint: ankle);
+    double? oppKneeAngle =
+        (oppHip != null && oppKnee != null && oppAnkle != null)
+            ? calculateAngleNormalized(
+                firstPoint: oppHip, midPoint: oppKnee, lastPoint: oppAnkle)
+            : null;
+    // Always use the bent knee — McGill setup has one bent, one straight.
+    double hipKneeAnkleAngle =
+        (oppKneeAngle != null && oppKneeAngle < sideKneeAngle)
+            ? oppKneeAngle
+            : sideKneeAngle;
     int now = DateTime.now().millisecondsSinceEpoch;
 
     // ---------- 3. Build RepContext ----------
@@ -271,8 +323,11 @@ class CurlUp extends ExerciseBase {
 
     // ---------- 4. Rep Completion (Back to Resting) ----------
 
+    // Only count a rep if the user completed the full cycle (went through
+    // descending). An aborted ascending that drops back to resting without
+    // reaching the apex does NOT count.
     if (curlUpState == CurlUpState.resting &&
-        previousCurlUpState != CurlUpState.resting) {
+        previousCurlUpState == CurlUpState.descending) {
       repCount += 1;
 
       _transitionState(CurlUpState.resting, now);
@@ -316,7 +371,12 @@ class CurlUp extends ExerciseBase {
 
     // ---------- 6. Run All Metrics ----------
 
-    if (curlUpState != CurlUpState.resting) {
+    if (curlUpState == CurlUpState.resting) {
+      // Sample baselines from the actual lying position
+      for (final metric in _metrics) {
+        metric.onRestingFrame(ctx);
+      }
+    } else {
       for (final metric in _metrics) {
         metric.update(ctx);
       }
@@ -350,12 +410,25 @@ class CurlUp extends ExerciseBase {
       _prevShoulderY = shoulderY;
       _reversalCount = 0;
       _transitionState(CurlUpState.ascending, timestampMs);
+      return;
+    }
+
+    // --- Descending or Ascending → Resting: trunk returns to flat ---
+    // NOTE: checked before reversal detection so an aborted ascending
+    // (never reaches MIN_APEX_ANGLE) can still return to resting.
+    if (trunkAngle < CurlUpConfig.RESTING_ANGLE_THRESHOLD &&
+        (curlUpState == CurlUpState.descending ||
+            curlUpState == CurlUpState.ascending)) {
+      _transitionState(CurlUpState.resting, timestampMs);
+      _prevShoulderY = null;
+      _reversalCount = 0;
+      return;
     }
 
     // --- Ascending → Apex: kinematic reversal detection ---
     // In screen coords, Y increases downward, so shoulder.y DECREASES
     // as user curls up. Reversal = shoulder.y starts INCREASING.
-    else if (curlUpState == CurlUpState.ascending) {
+    if (curlUpState == CurlUpState.ascending) {
       if (_prevShoulderY != null &&
           shoulderY > _prevShoulderY! &&
           trunkAngle >= CurlUpConfig.MIN_APEX_ANGLE) {
@@ -370,15 +443,6 @@ class CurlUp extends ExerciseBase {
         _reversalCount = 0;
       }
       _prevShoulderY = shoulderY;
-    }
-
-    // --- Descending → Resting: trunk returns to flat ---
-    else if (trunkAngle < CurlUpConfig.RESTING_ANGLE_THRESHOLD &&
-        (curlUpState == CurlUpState.descending ||
-            curlUpState == CurlUpState.ascending)) {
-      _transitionState(CurlUpState.resting, timestampMs);
-      _prevShoulderY = null;
-      _reversalCount = 0;
     }
   }
 

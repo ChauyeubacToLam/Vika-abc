@@ -15,7 +15,8 @@ class RepContext {
       shoulderHipKneeAngle; // Interior angle at hip (Shoulder-Hip-Knee)
   final double
       earShoulderHipAngle; // Interior angle at shoulder (Ear-Shoulder-Hip)
-  final double hipKneeAnkleAngle; // Interior angle at knee (Hip-Knee-Ankle)
+  final double
+      hipKneeAnkleAngle; // Bent-leg knee angle — min(left, right) to always track the bent knee
   final double? scaleFactor;
   final CurlUpState curlUpState;
   final int frameTimestamp; // millisecondsSinceEpoch
@@ -78,6 +79,10 @@ abstract class CurlUpMetricBase {
 
   /// Reset all internal state for the next rep.
   void reset();
+
+  /// Called every frame while in the resting state (before rep starts).
+  /// Override in metrics that sample a personal baseline from lying frames.
+  void onRestingFrame(RepContext ctx) {}
 
   /// Called when curl-up state transitions (e.g. ascending → apex).
   /// Override in metrics that care about transitions.

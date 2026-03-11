@@ -1,14 +1,15 @@
 // ignore_for_file: constant_identifier_names, non_constant_identifier_names
 
 /* =========================================================================
-   Curl Up Metric: Knee Extension (Locked Legs)
+   Curl Up Metric: Knee Extension (Bent Leg Stays Bent)
 
-   Interior knee angle — whether the legs remain bent during the curl.
+   Interior angle of the bent knee — detects if the user accidentally
+   straightens it during the curl (losing the McGill lumbar-neutral setup).
    Straight/locked knees shift force to the lower back and increase
    lumbar shear.
 
-   Landmarks: HIP (#23/#24), KNEE (#25/#26), ANKLE (#27/#28)
-   Calculation: 3-point angle at the knee (hip-knee-ankle)
+   Landmarks: HIP, KNEE, ANKLE — bent leg (automatically selected)
+   Calculation: min(left knee angle, right knee angle) — always the bent leg
 
    When to check: Continuously throughout the rep.
    ≥ 175° = locked (error), ≥ 170° = getting straight (warning).
