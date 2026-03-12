@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../exercise/exercise_base.dart';
+import '../exercise/glute bridge/glute_bridge.dart';
 import '../exercise/jumping jack/jumping_jack.dart';
 import '../exercise/plank/plank.dart';
 import '../exercise/lunge/lunge.dart';
@@ -189,6 +190,33 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'descending': const Color(0xFFFFD600),
       'bottom': const Color(0xFFFF6D00),
       'ascending': const Color(0xFFFF6E40),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'glute_bridge',
+    name: 'Glute Bridge',
+    subtitle: 'Kích hoạt mông và lưng dưới',
+    description:
+        'AI phân tích tư thế cầu mông theo thời gian thực.\nTheo dõi độ nâng hông, giữ đỉnh và nhịp độ hạ xuống.',
+    icon: Icons.airline_seat_flat,
+    primaryColor: const Color(0xFFE040FB),
+    secondaryColor: const Color(0xFF7B1FA2),
+    difficulty: 'Dễ – Trung bình',
+    targetMuscles: ['Mông', 'Hamstring', 'Lưng dưới'],
+    duration: '15 reps',
+    cameraHint: 'Quay nghiêng người so với camera.',
+    framingHint: 'Giữ vai, hông, gối và bàn chân luôn trong khung hình.',
+    setupTips: [
+      'Đặt camera thấp ngang thân (khoảng 30–50 cm so với mặt sàn).',
+      'Quay nghiêng 90° để AI thấy rõ chuyển động hông.',
+      'Đảm bảo đủ ánh sáng dọc theo thân người trước khi bắt đầu.',
+    ],
+    createExercise: () => GluteBridge(),
+    phaseColors: {
+      'bottom': const Color(0xFF00E676),
+      'ascending': const Color(0xFFFFD600),
+      'topHold': const Color(0xFFE040FB),
+      'descending': const Color(0xFF00B0FF),
     },
   ),
 ];
