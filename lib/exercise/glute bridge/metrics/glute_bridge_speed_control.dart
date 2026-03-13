@@ -135,6 +135,7 @@ class SpeedControlMetric extends GluteBridgeMetricBase {
     switch (to) {
       case GluteBridgeState.ascending:
         _ascentStartMs = timestampMs;
+        _concentricDuration = null; // Clear previous concentric duration
         // Reset eccentric tracking for new rep cycle.
         _rapidDebouncer.reset();
         _liveInstructionShown = false;
@@ -198,9 +199,8 @@ class SpeedControlMetric extends GluteBridgeMetricBase {
     _liveInstructionShown = false;
     _velocityFaultAdded = false;
     _peakDescentVelocity = 0.0;
-    _ascentStartMs = null;
     _descentStartMs = null;
-    _concentricDuration = null;
     _eccentricDuration = null;
+    // _ascentStartMs and _concentricDuration are preserved for eccentric evaluation
   }
 }

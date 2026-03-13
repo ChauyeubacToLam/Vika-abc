@@ -585,9 +585,23 @@ class GluteBridge extends ExerciseBase {
     // Clear coaching instructions at the start of a new rep.
     if (newState == GluteBridgeState.ascending) {
       resultIssues.instructions.clear();
-      // Reset debouncers that shouldn't carry over.
-      _topHoldDebouncer.reset();
-      _bottomDebouncer.reset();
+    }
+
+    // Reset relevant debouncers for the newly entered state.
+    switch (newState) {
+      case GluteBridgeState.bottom:
+        _ascendDebouncer.reset();
+        break;
+      case GluteBridgeState.ascending:
+        _topHoldDebouncer.reset();
+        _bottomDebouncer.reset();
+        break;
+      case GluteBridgeState.topHold:
+        _descendDebouncer.reset();
+        break;
+      case GluteBridgeState.descending:
+        _bottomDebouncer.reset();
+        break;
     }
 
     for (final metric in _metrics) {
