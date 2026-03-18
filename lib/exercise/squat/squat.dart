@@ -35,8 +35,11 @@ enum SquatState {
    ========================================================================= */
 
 class Squat extends ExerciseBase {
+  final int maxRep;
   SquatState squatState = SquatState.standing;
   SquatState previousSquatState = SquatState.standing;
+
+  Squat({this.maxRep = SquatConfig.MAX_REP});
 
   // Debounce entry into rep — prevents false starts from noisy frames
   final Debouncer _entryDebouncer = Debouncer(requiredFrames: 2);
@@ -135,7 +138,7 @@ class Squat extends ExerciseBase {
   ----------------------------------------------------------------------- */
   @override
   bool requestStop() {
-    return repCount >= SquatConfig.MAX_REP;
+    return repCount >= maxRep;
   }
 
   /* -----------------------------------------------------------------------

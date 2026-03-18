@@ -10,6 +10,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'screens/onboarding/onboarding_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'exercise/exercise_base.dart';
 import 'models/exercise_definition.dart';
@@ -20,6 +22,7 @@ import 'screens/home_screen.dart';
    ========================================================================= */
 
 late List<CameraDescription> _cameras;
+late bool _hasCompletedOnboarding;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,6 +34,8 @@ Future<void> main() async {
     ),
   );
   _cameras = await availableCameras();
+  final prefs = await SharedPreferences.getInstance();
+  _hasCompletedOnboarding = prefs.getBool('onboarding_complete') ?? false;
   runApp(const VinaFitApp());
 }
 
@@ -92,9 +97,13 @@ class VinaFitApp extends StatelessWidget {
         useMaterial3: true,
         fontFamily: 'Roboto',
       ),
-      initialRoute: '/',
+      initialRoute: _hasCompletedOnboarding ? '/' : '/onboarding',
       onGenerateRoute: (settings) {
         switch (settings.name) {
+          case '/onboarding':
+            return MaterialPageRoute(
+              builder: (_) => const OnboardingScreen(),
+            );
           case '/exercise':
             final definition = settings.arguments as ExerciseDefinition;
             return MaterialPageRoute(
@@ -174,6 +183,11 @@ class _ExerciseScreenState extends State<ExerciseScreen>
   // ── Rep Logging ──
   final List<RepLog> _repLogs = [];
   int _lastLoggedRep = 0;
+
+  // ── Assessment data (per-rep tracking for onboarding) ──
+  final List<double> _repDepthAngles = [];
+  final List<double> _repTrunkLeans = [];
+  int _heelRiseCount = 0;
 
   // ── After-rep banner ──
   String? _repBannerText;
@@ -438,6 +452,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
             _repCount = _exercise.repCount;
             _feedback = {'Result': 'Hoàn thành! $_repCount reps'};
             _logSetComplete();
+            _autoPopWithResults();
           } else if (_result!.length == 2) {
             final prevRepCount = _repCount;
             _repCount = _result![0] as int;
@@ -541,6 +556,14 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     );
     _repLogs.add(log);
 
+    // Track assessment metrics per rep
+    final depthAngle = double.tryParse(d['minKneeAngle'] ?? '');
+    if (depthAngle != null) _repDepthAngles.add(depthAngle);
+    final trunkLean = double.tryParse(d['maxTrunkLean'] ?? '');
+    if (trunkLean != null) _repTrunkLeans.add(trunkLean);
+    final heelNorm = double.tryParse(d['heelNorm'] ?? '');
+    if (heelNorm != null && heelNorm > 0.15) _heelRiseCount++;
+
     debugPrint('[VinaFit][Rep] $log');
     debugPrint(
       '[VinaFit][Feedback] ${_feedback.entries.map((e) => '${e.key}: ${e.value}').join(' | ')}',
@@ -577,6 +600,50 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     }
     debugPrint('============================================');
     debugPrint('');
+  }
+
+  bool _didAutoPop = false;
+
+  void _autoPopWithResults() {
+    if (_didAutoPop) return;
+    // Only auto-pop for assessment exercises (launched from onboarding)
+    if (_definition.id != 'squat_assessment') return;
+    _didAutoPop = true;
+
+    final goodReps = _repLogs.where((r) => r.correctForm).length;
+    final avgDepth = _repDepthAngles.isEmpty
+        ? null
+        : _repDepthAngles.reduce((a, b) => a + b) / _repDepthAngles.length;
+    final maxTrunk = _repTrunkLeans.isEmpty
+        ? null
+        : _repTrunkLeans.reduce((a, b) => a > b ? a : b);
+    final avgDescent = _repLogs
+        .where((r) => r.descentDuration != null)
+        .map((r) => r.descentDuration!)
+        .toList();
+    final avgAscent = _repLogs
+        .where((r) => r.ascentDuration != null)
+        .map((r) => r.ascentDuration!)
+        .toList();
+
+    final result = <String, dynamic>{
+      'totalReps': _repCount,
+      'goodReps': goodReps,
+      'avgDepthAngle': avgDepth,
+      'maxTrunkLean': maxTrunk,
+      'heelRiseCount': _heelRiseCount,
+      'avgDescentTime': avgDescent.isEmpty
+          ? null
+          : avgDescent.reduce((a, b) => a + b) / avgDescent.length,
+      'avgAscentTime': avgAscent.isEmpty
+          ? null
+          : avgAscent.reduce((a, b) => a + b) / avgAscent.length,
+    };
+
+    // Pop with results after a short delay so user sees completion UI
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) Navigator.of(context).pop(result);
+    });
   }
 
   Future<void> _showSetupSheet({bool force = false}) async {
