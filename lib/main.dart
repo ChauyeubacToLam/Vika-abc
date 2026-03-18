@@ -1089,7 +1089,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
             ),
           ),
           const SizedBox(width: 8),
-          _buildStatePill(),
+          Flexible(child: _buildStatePill()),
           const SizedBox(width: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

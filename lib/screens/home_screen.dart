@@ -316,45 +316,52 @@ class _ExerciseCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  definition.cameraHint,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.45),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                    height: 1.35,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 12),
-                // Muscle tags
-                Wrap(
-                  spacing: 5,
-                  runSpacing: 5,
-                  children: definition.targetMuscles.map((muscle) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: primary.withValues(alpha: 0.2),
-                          width: 0.5,
-                        ),
-                      ),
-                      child: Text(
-                        muscle,
+                const SizedBox(height: 4),
+                // Flexible middle section
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        definition.cameraHint,
                         style: TextStyle(
-                          color: primary.withValues(alpha: 0.8),
+                          color: Colors.white.withValues(alpha: 0.45),
                           fontSize: 10,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w500,
+                          height: 1.35,
                         ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    );
-                  }).toList(),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 5,
+                        runSpacing: 5,
+                        children: definition.targetMuscles.map((muscle) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: primary.withValues(alpha: 0.2),
+                                width: 0.5,
+                              ),
+                            ),
+                            child: Text(
+                              muscle,
+                              style: TextStyle(
+                                color: primary.withValues(alpha: 0.8),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
                 ),
                 const Spacer(),
                 // Bottom row: difficulty + duration
