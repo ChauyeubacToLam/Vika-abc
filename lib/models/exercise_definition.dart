@@ -4,6 +4,7 @@ import '../exercise/exercise_base.dart';
 import '../exercise/jumping jack/jumping_jack.dart';
 import '../exercise/plank/plank.dart';
 import '../exercise/lunge/lunge.dart';
+import '../exercise/curl_up/curl_up.dart';
 import '../exercise/push up/push_up.dart';
 import '../exercise/squat/squat.dart';
 
@@ -32,6 +33,9 @@ class ExerciseDefinition {
   final List<String> setupTips;
   final ExerciseBase Function() createExercise;
 
+  /// Optional safety warning shown prominently before exercise starts.
+  final String? safetyWarning;
+
   /// Maps phaseKey → Color for the state pill during activated state.
   final Map<String, Color> phaseColors;
 
@@ -50,6 +54,7 @@ class ExerciseDefinition {
     required this.framingHint,
     required this.setupTips,
     required this.createExercise,
+    this.safetyWarning,
     required this.phaseColors,
   });
 }
@@ -189,6 +194,38 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'descending': const Color(0xFFFFD600),
       'bottom': const Color(0xFFFF6D00),
       'ascending': const Color(0xFFFF6E40),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'curl_up',
+    name: 'Curl Up',
+    subtitle: 'McGill Curl-Up — Bảo vệ lưng',
+    description: 'AI phân tích curl up theo thời gian thực.\n'
+        'Theo dõi góc thân trên, cổ và đầu gối.\n\n'
+        '💐 Tư thế McGill: Đặt hai tay dưới lưng dưới, co một gối, '
+        'chân kia duỗi thẳng. Chỉ nâng vai khỏi sàn.',
+    icon: Icons.airline_seat_flat,
+    primaryColor: const Color(0xFF42A5F5),
+    secondaryColor: const Color(0xFF1565C0),
+    difficulty: 'Dễ',
+    targetMuscles: ['Bụng', 'Core'],
+    duration: '15 reps',
+    cameraHint: 'Quay nghiêng người so với camera.',
+    framingHint: 'Giữ vai, hông và đầu gối luôn trong khung hình.',
+    setupTips: [
+      'Đặt camera ngang thân, cách bạn khoảng 2–3 mét.',
+      'Nằm ngửa, đặt hai tay dưới lưng dưới để giữ đường cong tự nhiên.',
+      'Co một gối (bàn chân đặt phẳng), chân kia duỗi thẳng.',
+      'Chỉ nâng đầu và vai khỏi sàn — không cuộn hết lên.',
+      'Giữ đủ ánh sáng ở phần thân trên trước khi bắt đầu.',
+    ],
+    safetyWarning: '⚠️ Dừng ngay nếu đau lưng tăng hoặc lan xuống chân.',
+    createExercise: () => CurlUp(),
+    phaseColors: {
+      'resting': const Color(0xFF00E676),
+      'ascending': const Color(0xFFFFD600),
+      'apex': const Color(0xFFFF6D00),
+      'descending': const Color(0xFF00B0FF),
     },
   ),
 ];
