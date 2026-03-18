@@ -3,15 +3,21 @@
 /* =========================================================================
    Curl Up Metric: Neck Pulling (Cervical Hyperflexion)
 
-   Head/neck angle relative to a personalised resting baseline — detects
+   Head/neck angle relative to a personalized resting baseline — detects
    chin-to-chest pulling that stresses the cervical spine.
 
    Landmarks: EAR (#7/#8), SHOULDER (#11/#12), HIP (#23/#24)
    Calculation: 3-point angle at the shoulder (ear-shoulder-hip)
 
+   Baseline source priority:
+   1. Hold-still activation (3s motionless, captured in isInStartPosition)
+   2. Resting frame averaging (accumulated between reps)
+   Baseline persists across reps — head posture doesn't change mid-set.
+
    When to check: Continuously during ascending and apex phases.
    Deviation > 15° from resting baseline triggers an error; > 12° a warning.
-   Baseline is sampled during the first lying frames (personalised per user).
+   Vietnamese adjustment: personalized baseline accounts for pre-existing
+   thoracic kyphosis common in desk workers.
    ========================================================================= */
 
 import 'curl_up_metric_base.dart';
@@ -32,7 +38,8 @@ class NeckPullingMetric extends CurlUpMetricBase {
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
 
-  /// Personalized resting baseline captured from lying state frames.
+  /// Personalized resting baseline. Set from hold-still or resting frames.
+  /// Persists across reps — never cleared by reset().
   double? _baselineAngle;
   int _baselineFrames = 0;
   double _baselineSum = 0.0;
@@ -49,7 +56,16 @@ class NeckPullingMetric extends CurlUpMetricBase {
 
   @override
   void onRestingFrame(RepContext ctx) {
-    // Accumulate baseline from resting frames (proper lying position).
+    // Use hold-still baseline as primary if we don't have one yet.
+    // 3 seconds of guaranteed stillness beats any averaging window.
+    if (_baselineAngle == null && ctx.holdStillEarShoulderHip != null) {
+      _baselineAngle = ctx.holdStillEarShoulderHip;
+      _debugData['neckBaseline'] =
+          '${_baselineAngle!.toStringAsFixed(1)} (hold)';
+      return;
+    }
+
+    // Refine with resting frame averaging.
     final angle = ctx.earShoulderHipAngle;
     _baselineSum += angle;
     _baselineFrames++;
@@ -70,13 +86,13 @@ class NeckPullingMetric extends CurlUpMetricBase {
       return;
     }
 
-    // Deviation: baseline is large (flat), angle decreases when neck flexes
+    // Deviation: baseline is large (flat), angle decreases when neck flexes.
     final deviation = (_baselineAngle! - angle).clamp(0.0, 90.0);
 
     _debugData['neckBaseline'] = _baselineAngle!.toStringAsFixed(1);
     _debugData['neckDev'] = '${deviation.toStringAsFixed(1)}°';
 
-    // Only evaluate during concentric phase
+    // Only evaluate during concentric phase.
     if (ctx.curlUpState != CurlUpState.ascending &&
         ctx.curlUpState != CurlUpState.apex) {
       return;
@@ -98,14 +114,6 @@ class NeckPullingMetric extends CurlUpMetricBase {
     }
   }
 
-  @override
-  void onStateTransition(CurlUpState from, CurlUpState to, int timestampMs) {
-    // Add coaching instruction when returning to lying after a neck-pull fault
-    if (to == CurlUpState.resting && _faultLogged) {
-      // Instructions will be attached by the fault system
-    }
-  }
-
   void _logFault(String phase, String message) {
     if (!_faults.any((f) => f.phase == phase && f.type == 'Neck')) {
       _faults.add(FaultRecord(
@@ -122,10 +130,7 @@ class NeckPullingMetric extends CurlUpMetricBase {
     _faults.clear();
     _debugData.clear();
     _faultLogged = false;
-    // Reset baseline accumulators — onRestingFrame will re-sample them
-    // from the actual resting position before the next rep begins.
-    _baselineAngle = null;
-    _baselineSum = 0.0;
-    _baselineFrames = 0;
+    // Baseline persists across reps — head posture doesn't change mid-set.
+    // _baselineAngle, _baselineSum, _baselineFrames intentionally kept.
   }
 }

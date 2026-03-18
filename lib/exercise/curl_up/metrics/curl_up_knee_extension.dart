@@ -3,26 +3,31 @@
 /* =========================================================================
    Curl Up Metric: Knee Extension (Bent Leg Stays Bent)
 
-   Interior angle of the bent knee — detects if the user accidentally
-   straightens it during the curl (losing the McGill lumbar-neutral setup).
-   Straight/locked knees shift force to the lower back and increase
-   lumbar shear.
+   Interior angle of the camera-side bent knee — detects if the user
+   accidentally straightens it during the curl (losing the McGill
+   lumbar-neutral setup). Straight/locked knees shift force to the
+   lower back and increase lumbar shear.
 
-   Landmarks: HIP, KNEE, ANKLE — bent leg (automatically selected)
-   Calculation: min(left knee angle, right knee angle) — always the bent leg
+   Landmarks: HIP, KNEE, ANKLE (camera-side only)
+   Calculation: calculateAngleNormalized(Hip, Knee, Ankle)
 
    When to check: Continuously throughout the rep.
-   ≥ 175° = locked (error), ≥ 170° = getting straight (warning).
+   Ankle is optional — metric silently skips frames where ankle
+   is not visible or below confidence threshold.
+
+   ≥ 150° = locked (error), ≥ 140° = drifting straight (warning).
+   Tighter than typical thresholds because McGill setup starts at ~90°;
+   drift to 140° already compromises lumbar neutral.
    ========================================================================= */
 
 import 'curl_up_metric_base.dart';
 
 class KneeExtensionConfig {
   /// Knee angle above which legs are considered locked/extended.
-  static const double LOCKED_THRESHOLD = 175.0;
+  static const double LOCKED_THRESHOLD = 150.0;
 
-  /// Warning zone: legs getting too straight.
-  static const double WARNING_THRESHOLD = 170.0;
+  /// Warning zone: bent knee drifting too straight.
+  static const double WARNING_THRESHOLD = 140.0;
 }
 
 class KneeExtensionMetric extends CurlUpMetricBase {
@@ -44,6 +49,11 @@ class KneeExtensionMetric extends CurlUpMetricBase {
   @override
   void update(RepContext ctx) {
     final kneeAngle = ctx.hipKneeAnkleAngle;
+
+    if (kneeAngle == null) {
+      // Ankle not visible — can't assess knee extension this frame.
+      return;
+    }
 
     _debugData['kneeExt'] = '${kneeAngle.toStringAsFixed(1)}°';
 

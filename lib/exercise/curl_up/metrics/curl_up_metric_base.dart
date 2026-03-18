@@ -15,11 +15,13 @@ class RepContext {
       shoulderHipKneeAngle; // Interior angle at hip (Shoulder-Hip-Knee)
   final double
       earShoulderHipAngle; // Interior angle at shoulder (Ear-Shoulder-Hip)
-  final double
+  final double?
       hipKneeAnkleAngle; // Bent-leg knee angle — min(left, right) to always track the bent knee
   final double? scaleFactor;
   final CurlUpState curlUpState;
   final int frameTimestamp; // millisecondsSinceEpoch
+  final double? holdStillEarShoulderHip;
+  final double? holdStillShoulderHipKnee;
 
   final double shoulderY;
   final double hipY;
@@ -40,6 +42,8 @@ class RepContext {
     required this.hipY,
     required this.kneeY,
     required this.resultIssues,
+    this.holdStillEarShoulderHip,
+    this.holdStillShoulderHipKnee,
   });
 }
 

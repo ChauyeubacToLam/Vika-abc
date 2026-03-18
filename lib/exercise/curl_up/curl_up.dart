@@ -31,6 +31,11 @@ class CurlUpConfig {
   /// Number of consecutive frames shoulder.y must increase to confirm
   /// kinematic reversal (ascending → apex).
   static const int REVERSAL_FRAMES = 3;
+
+  /// Minimum knee elevation (as fraction of torso length) to confirm
+  /// bent knee in McGill setup. Bent knee sticks up in side view;
+  /// straight leg stays near hip height.
+  static const double BENT_KNEE_ELEVATION = 0.15;
 }
 
 enum CurlUpState {
@@ -49,6 +54,10 @@ class CurlUp extends ExerciseBase {
   CurlUpState previousCurlUpState = CurlUpState.resting;
 
   final Debouncer _entryDebouncer = Debouncer(requiredFrames: 2);
+
+  /// Baselines captured during hold-still activation (3s motionless).
+  double? _holdStillEarShoulderHip;
+  double? _holdStillShoulderHipKnee;
 
   /// Tracks previous shoulder.y for kinematic reversal detection.
   double? _prevShoulderY;
@@ -110,51 +119,41 @@ class CurlUp extends ExerciseBase {
       rightType: PoseLandmarkType.rightKnee,
       leftType: PoseLandmarkType.leftKnee,
     );
+    final ear = getSideLandmark(
+      landmarks: landmarks,
+      rightType: PoseLandmarkType.rightEar,
+      leftType: PoseLandmarkType.leftEar,
+    );
 
-    if (shoulder == null || hip == null || knee == null) return false;
+    if (shoulder == null || hip == null || knee == null || ear == null)
+      return false;
 
     // Trunk must be roughly horizontal (lying flat)
-    double trunkAngle = _calculateTrunkAngle(shoulder, hip);
+    double trunkAngle = calculateHorizontalAngle(point1: shoulder, point2: hip);
     if (trunkAngle > 15.0) return false;
 
-    // McGill setup: one knee bent, one straight.
-    // Accept if EITHER knee is bent (≤ 150°) — do not reject the straight leg.
-    final ankle = getSideLandmark(
-      landmarks: landmarks,
-      rightType: PoseLandmarkType.rightAnkle,
-      leftType: PoseLandmarkType.leftAnkle,
-    );
-    final oppKnee = getSideLandmark(
-      landmarks: landmarks,
-      rightType: PoseLandmarkType.leftKnee,
-      leftType: PoseLandmarkType.rightKnee,
-    );
-    final oppAnkle = getSideLandmark(
-      landmarks: landmarks,
-      rightType: PoseLandmarkType.leftAnkle,
-      leftType: PoseLandmarkType.rightAnkle,
-    );
-    final oppHip = getSideLandmark(
-      landmarks: landmarks,
-      rightType: PoseLandmarkType.leftHip,
-      leftType: PoseLandmarkType.rightHip,
+    // McGill setup: camera-side knee must be bent.
+    // Bent knee sticks up in side view (knee.y < hip.y in screen coords).
+    // Normalized by torso length for body-size independence.
+    // User instruction: "Quay đầu gối co về phía camera."
+    double torsoLength = (shoulder.y - hip.y).abs();
+    if (torsoLength < 1) return false;
+    double kneeElevation = (hip.y - knee.y) / torsoLength;
+    if (kneeElevation < CurlUpConfig.BENT_KNEE_ELEVATION) return false;
+
+    // Capture baselines during hold-still. Last frame wins —
+    // user is motionless so all frames are equivalent.
+    _holdStillShoulderHipKnee = calculateAngleNormalized(
+      firstPoint: shoulder,
+      midPoint: hip,
+      lastPoint: knee,
     );
 
-    if (ankle == null) return false;
-
-    double sideKneeAngle = calculateAngleNormalized(
-      firstPoint: hip,
-      midPoint: knee,
-      lastPoint: ankle,
+    _holdStillEarShoulderHip = calculateAngleNormalized(
+      firstPoint: ear,
+      midPoint: shoulder,
+      lastPoint: hip,
     );
-    double? oppKneeAngle =
-        (oppHip != null && oppKnee != null && oppAnkle != null)
-            ? calculateAngleNormalized(
-                firstPoint: oppHip, midPoint: oppKnee, lastPoint: oppAnkle)
-            : null;
-    bool eitherKneeBent = sideKneeAngle <= 150.0 ||
-        (oppKneeAngle != null && oppKneeAngle <= 150.0);
-    if (!eitherKneeBent) return false;
 
     return true;
   }
@@ -176,8 +175,6 @@ class CurlUp extends ExerciseBase {
     CameraFacing cameraFacing,
   ) {
     // Side profile only — reject front, angled, and undefined views.
-    // Curl up biomechanics operate in the sagittal plane; even a ±10°
-    // deviation from pure side view causes foreshortening errors.
     if (cameraFacing == CameraFacing.front) {
       return "⚠️ Quay nghiêng để AI theo dõi Curl Up tốt hơn";
     }
@@ -188,6 +185,8 @@ class CurlUp extends ExerciseBase {
       return "⚠️ Không xác định được góc camera";
     }
 
+    // Only require landmarks needed by critical metrics.
+    // Ankle is optional — KneeExtensionMetric runs opportunistically.
     PoseLandmark? shoulder = getSideLandmark(
       landmarks: landmarks,
       rightType: PoseLandmarkType.rightShoulder,
@@ -249,60 +248,37 @@ class CurlUp extends ExerciseBase {
       rightType: PoseLandmarkType.rightKnee,
       leftType: PoseLandmarkType.leftKnee,
     );
-
-    PoseLandmark? ankle = getSideLandmark(
-      landmarks: smoothedLandmarks,
-      rightType: PoseLandmarkType.rightAnkle,
-      leftType: PoseLandmarkType.leftAnkle,
-    );
     PoseLandmark? ear = getSideLandmark(
       landmarks: smoothedLandmarks,
       rightType: PoseLandmarkType.rightEar,
       leftType: PoseLandmarkType.leftEar,
     );
 
-    // McGill setup: also get opposite-side leg to always find the bent knee.
-    PoseLandmark? oppKnee = getSideLandmark(
+    // Ankle is optional — only needed for KneeExtensionMetric.
+    PoseLandmark? ankle = getSideLandmark(
       landmarks: smoothedLandmarks,
-      rightType: PoseLandmarkType.leftKnee,
-      leftType: PoseLandmarkType.rightKnee,
+      rightType: PoseLandmarkType.rightAnkle,
+      leftType: PoseLandmarkType.leftAnkle,
     );
-    PoseLandmark? oppAnkle = getSideLandmark(
-      landmarks: smoothedLandmarks,
-      rightType: PoseLandmarkType.leftAnkle,
-      leftType: PoseLandmarkType.rightAnkle,
-    );
-    PoseLandmark? oppHip = getSideLandmark(
-      landmarks: smoothedLandmarks,
-      rightType: PoseLandmarkType.leftHip,
-      leftType: PoseLandmarkType.rightHip,
-    );
+    bool ankleVisible =
+        ankle != null && ankle.likelihood >= ExerciseBase.MIN_CONFIDENCE;
 
-    if (shoulder == null ||
-        hip == null ||
-        knee == null ||
-        ankle == null ||
-        ear == null) return;
+    // Critical landmarks only. Ankle absence doesn't block processing.
+    if (shoulder == null || hip == null || knee == null || ear == null) return;
 
     // ---------- 2. Calculate Geometry ----------
 
-    double trunkAngle = _calculateTrunkAngle(shoulder, hip);
+    double trunkAngle = calculateHorizontalAngle(point1: shoulder, point2: hip);
     double shoulderHipKneeAngle = calculateAngleNormalized(
         firstPoint: shoulder, midPoint: hip, lastPoint: knee);
     double earShoulderHipAngle = calculateAngleNormalized(
         firstPoint: ear, midPoint: shoulder, lastPoint: hip);
-    double sideKneeAngle = calculateAngleNormalized(
-        firstPoint: hip, midPoint: knee, lastPoint: ankle);
-    double? oppKneeAngle =
-        (oppHip != null && oppKnee != null && oppAnkle != null)
-            ? calculateAngleNormalized(
-                firstPoint: oppHip, midPoint: oppKnee, lastPoint: oppAnkle)
-            : null;
-    // Always use the bent knee — McGill setup has one bent, one straight.
-    double hipKneeAnkleAngle =
-        (oppKneeAngle != null && oppKneeAngle < sideKneeAngle)
-            ? oppKneeAngle
-            : sideKneeAngle;
+
+    double? hipKneeAnkleAngle = ankleVisible
+        ? calculateAngleNormalized(
+            firstPoint: hip, midPoint: knee, lastPoint: ankle)
+        : null;
+    if (hipKneeAnkleAngle == 0.0) {}
     int now = DateTime.now().millisecondsSinceEpoch;
 
     // ---------- 3. Build RepContext ----------
@@ -318,6 +294,8 @@ class CurlUp extends ExerciseBase {
       shoulderY: shoulder.y,
       hipY: hip.y,
       kneeY: knee.y,
+      holdStillEarShoulderHip: _holdStillEarShoulderHip,
+      holdStillShoulderHipKnee: _holdStillShoulderHipKnee,
       resultIssues: resultIssues,
     );
 
@@ -330,7 +308,7 @@ class CurlUp extends ExerciseBase {
         previousCurlUpState == CurlUpState.descending) {
       repCount += 1;
 
-      _transitionState(CurlUpState.resting, now);
+      previousCurlUpState = CurlUpState.resting;
 
       // Let trunk elevation evaluate the completed rep
       trunkElevationMetric.checkRepCompletion(ctx);
@@ -341,9 +319,9 @@ class CurlUp extends ExerciseBase {
         allFaults.addAll(metric.faults);
       }
 
-      correctForm = !allFaults.any((f) => f.affectsForm);
+      final repCorrect = !allFaults.any((f) => f.affectsForm);
 
-      resultIssues.feedback['Result'] = correctForm ? 'Good Rep!' : 'Fix Form';
+      resultIssues.feedback['Result'] = repCorrect ? 'Good Rep!' : 'Fix Form';
 
       final faultMap = <String, Map<String, String>>{};
       for (final fault in allFaults) {
@@ -352,7 +330,7 @@ class CurlUp extends ExerciseBase {
         }
         faultMap[fault.phase]![fault.type] = fault.message;
       }
-      setFeedback.add({correctForm: faultMap});
+      setFeedback.add({repCorrect: faultMap});
 
       for (final metric in _metrics) {
         debugData.addAll(metric.debugData);
@@ -419,6 +397,14 @@ class CurlUp extends ExerciseBase {
     if (trunkAngle < CurlUpConfig.RESTING_ANGLE_THRESHOLD &&
         (curlUpState == CurlUpState.descending ||
             curlUpState == CurlUpState.ascending)) {
+      // If aborting from ascending, reset metrics (no rep counted,
+      // but faults/state from the partial curl must be cleared).
+      if (curlUpState == CurlUpState.ascending) {
+        for (final metric in _metrics) {
+          metric.reset();
+        }
+      }
+
       _transitionState(CurlUpState.resting, timestampMs);
       _prevShoulderY = null;
       _reversalCount = 0;
@@ -457,19 +443,5 @@ class CurlUp extends ExerciseBase {
     for (final metric in _metrics) {
       metric.onStateTransition(previousCurlUpState, newState, timestampMs);
     }
-  }
-
-  /* -----------------------------------------------------------------------
-     HELPERS
-  ----------------------------------------------------------------------- */
-
-  /// Trunk angle from horizontal in degrees.
-  /// 0° = lying flat, increases as shoulder rises above hip.
-  double _calculateTrunkAngle(PoseLandmark shoulder, PoseLandmark hip) {
-    double dx = (shoulder.x - hip.x).abs();
-    double dy = hip.y - shoulder.y; // positive when shoulder is above hip
-    if (dx < 1) dx = 1; // avoid division by zero
-    double radians = math.atan2(dy, dx);
-    return (radians * 180.0 / math.pi).clamp(0.0, 90.0);
   }
 }

@@ -9,8 +9,20 @@
    Landmarks: SHOULDER (#11/#12), HIP (#23/#24), KNEE (#25/#26)
    Calculation: 3-point angle at the hip (shoulder-hip-knee)
 
+   Baseline source priority:
+   1. Hold-still activation (3s motionless, captured in isInStartPosition)
+   2. Last resting frame before rep starts
+   Baseline persists across reps — resting trunk angle doesn't change
+   mid-set. Using relative angle (not trunk-from-horizontal) makes this
+   proportion-independent across Vietnamese body types.
+
    When to check: Continuously during ascending and apex phases.
    Per-rep evaluation at the kinematic apex (apex → descending transition).
+
+   Note: checkRepCompletion() is called explicitly by CurlUp at rep
+   completion to add coaching instructions. This breaks the pure metric
+   interface pattern — future refactor could move it into
+   onStateTransition(descending, resting).
    ========================================================================= */
 
 import 'curl_up_metric_base.dart';
@@ -24,6 +36,7 @@ class TrunkElevationMetric extends CurlUpMetricBase {
   final Map<String, dynamic> _debugData = {};
 
   /// Baseline shoulder-hip-knee angle captured while lying flat.
+  /// Persists across reps — never cleared by reset().
   double? _baselineAngle;
 
   /// Tracks the minimum angle this rep (maximum curl = smallest angle).
@@ -40,7 +53,15 @@ class TrunkElevationMetric extends CurlUpMetricBase {
 
   @override
   void onRestingFrame(RepContext ctx) {
-    // Continuously update baseline while lying flat — last resting value wins.
+    // Use hold-still baseline as primary if we don't have one yet.
+    // 3 seconds of guaranteed stillness beats a single resting frame.
+    if (_baselineAngle == null && ctx.holdStillShoulderHipKnee != null) {
+      _baselineAngle = ctx.holdStillShoulderHipKnee;
+      _debugData['shBaseline'] = '${_baselineAngle!.toStringAsFixed(1)} (hold)';
+      return;
+    }
+
+    // Refine with latest resting frame.
     _baselineAngle = ctx.shoulderHipKneeAngle;
     _debugData['shBaseline'] = _baselineAngle!.toStringAsFixed(1);
   }
@@ -141,7 +162,7 @@ class TrunkElevationMetric extends CurlUpMetricBase {
   void reset() {
     _faults.clear();
     _debugData.clear();
-    _baselineAngle = null;
+    // Baseline persists — resting trunk angle doesn't change mid-set.
     _peakAngle = null;
     _peakElevation = null;
   }
