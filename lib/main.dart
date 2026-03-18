@@ -719,6 +719,43 @@ class _ExerciseScreenState extends State<ExerciseScreen>
                 _buildSetupRow(
                     Icons.crop_free_outlined, _definition.framingHint),
                 const SizedBox(height: 14),
+                // Safety warning (if any)
+                if (_definition.safetyWarning != null) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.redAccent.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.health_and_safety,
+                          size: 18,
+                          color: Colors.redAccent,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _definition.safetyWarning!,
+                            style: const TextStyle(
+                              color: Colors.redAccent,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                ],
                 ..._definition.setupTips.map(
                   (tip) => Padding(
                     padding: const EdgeInsets.only(bottom: 8),
@@ -1119,7 +1156,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
             ),
           ),
           const SizedBox(width: 8),
-          _buildStatePill(),
+          Flexible(child: _buildStatePill()),
           const SizedBox(width: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
