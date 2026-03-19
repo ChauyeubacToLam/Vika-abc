@@ -5,6 +5,7 @@ import '../exercise/glute bridge/glute_bridge.dart';
 import '../exercise/jumping jack/jumping_jack.dart';
 import '../exercise/plank/plank.dart';
 import '../exercise/lunge/lunge.dart';
+import '../exercise/curl_up/curl_up.dart';
 import '../exercise/push up/push_up.dart';
 import '../exercise/squat/squat.dart';
 
@@ -33,6 +34,9 @@ class ExerciseDefinition {
   final List<String> setupTips;
   final ExerciseBase Function() createExercise;
 
+  /// Optional safety warning shown prominently before exercise starts.
+  final String? safetyWarning;
+
   /// Maps phaseKey → Color for the state pill during activated state.
   final Map<String, Color> phaseColors;
 
@@ -51,6 +55,7 @@ class ExerciseDefinition {
     required this.framingHint,
     required this.setupTips,
     required this.createExercise,
+    this.safetyWarning,
     required this.phaseColors,
   });
 }
