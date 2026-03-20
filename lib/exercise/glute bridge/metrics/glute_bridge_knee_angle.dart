@@ -147,17 +147,14 @@ class KneeAngleMetric extends GluteBridgeMetricBase {
   @override
   void onStateTransition(
       GluteBridgeState from, GluteBridgeState to, int timestampMs) {
-    // Once a rep has started, allow setup instruction to re-show next bottom.
-    // (Foot placement rarely changes mid-set, but allow one re-check per rep.)
-    if (to == GluteBridgeState.bottom) {
-      _setupInstructionShown = false;
-    }
+    // Left empty as bottom reset is handled in checkRepCompletion/reset
   }
 
   @override
   void reset() {
     _faults.clear();
-    // Keep _setupInstructionShown so we don't spam between reps;
-    // it resets via onStateTransition → bottom.
+    // Once a rep has finished (hitting bottom), allow setup instruction to re-show next bottom.
+    // (Foot placement rarely changes mid-set, but allow one re-check per rep.)
+    _setupInstructionShown = false;
   }
 }

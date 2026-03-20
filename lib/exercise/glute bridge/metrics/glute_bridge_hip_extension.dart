@@ -87,7 +87,7 @@ class HipExtensionMetric extends GluteBridgeMetricBase {
       // Live coaching instruction — shown once until rep resets.
       if (!_hyperextInstructionSet) {
         ctx.resultIssues.addInstruction(
-          ctx.state.toString().split('.').last,
+          'bottom',
           'HipExt',
           'Đừng ưỡn lưng! Siết cơ bụng và ép lưng vào sàn',
         );
@@ -156,7 +156,7 @@ class HipExtensionMetric extends GluteBridgeMetricBase {
   @override
   void onStateTransition(
       GluteBridgeState from, GluteBridgeState to, int timestampMs) {
-    if (to == GluteBridgeState.ascending) {
+    if (to == GluteBridgeState.ascending || to == GluteBridgeState.bottom) {
       _hyperextDebouncer.reset();
       _hyperextInstructionSet = false;
       _hyperextFaultAdded = false;

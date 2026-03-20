@@ -75,6 +75,13 @@ abstract class ExerciseBase {
   // -- Orientation --
   StickyDebouncer leftRightDebouncer = StickyDebouncer(requiredFrames: 5);
 
+  // -- FPS Tracking --
+  DateTime? _lastFrameTime;
+  double _currentFps = 30.0;
+
+  double get currentFps => _currentFps;
+  double get fpsRatio => _currentFps / 30.0;
+
   // -- Person Detection (Selfie Segmentation) --
   final PersonDetector _personDetector = PersonDetector();
   bool _personConfirmed = false;
@@ -122,6 +129,16 @@ abstract class ExerciseBase {
     Map<PoseLandmarkType, PoseLandmark> landmarks, {
     InputImage? inputImage,
   }) {
+    final now = DateTime.now();
+    if (_lastFrameTime != null) {
+      final deltaMs = now.difference(_lastFrameTime!).inMilliseconds;
+      if (deltaMs > 0) {
+        final frameFps = 1000.0 / deltaMs;
+        _currentFps = _currentFps * 0.9 + frameFps * 0.1;
+      }
+    }
+    _lastFrameTime = now;
+
     resultIssues.feedback.clear();
 
     // 1. Smooth

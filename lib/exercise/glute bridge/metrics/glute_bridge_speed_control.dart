@@ -26,11 +26,10 @@
      descent') NOT anatomical diagnosis. Encourage rather than diagnose.
 
    Architecture note:
-     The rep is counted at TOP_HOLD → DESCENDING. The eccentric phase
-     completes at DESCENDING → BOTTOM — after rep counting. This metric
-     therefore sets faults during the eccentric phase whose results are
-     consumed by the NEXT _onRepCompleted() call (one-rep lag). Live
-     coaching is delivered with zero lag via update() during descent.
+     The rep is counted at DESCENDING → BOTTOM. The eccentric phase completes
+     at that same transition, so this metric now accurately assigns its faults
+     to the current rep, avoiding the previous one-rep lag. Live coaching
+     is delivered with zero lag via update() during descent.
    ========================================================================= */
 
 import 'glute_bridge_metric_base.dart';
@@ -103,25 +102,11 @@ class SpeedControlMetric extends GluteBridgeMetricBase {
       // Live coaching — once per descent.
       if (!_liveInstructionShown) {
         ctx.resultIssues.addInstruction(
-          'descending',
+          'bottom',
           'SpeedControl',
           'Kiểm soát hạ hông — không để rơi tự do',
         );
         _liveInstructionShown = true;
-      }
-
-      // Fault — once per descent (severity scales with velocity).
-      if (!_velocityFaultAdded) {
-        final bool isError = vel >= SpeedControlConfig.RAPID_VELOCITY_ERROR;
-        _faults.add(FaultRecord(
-          phase: 'descending',
-          type: 'SpeedControl',
-          message: isError
-              ? 'Hạ hông quá nhanh — siết cơ lõi để kiểm soát'
-              : 'Kiểm soát tốc độ hạ hông để bảo vệ lưng',
-          affectsForm: isError,
-        ));
-        _velocityFaultAdded = true;
       }
     }
   }
@@ -151,27 +136,50 @@ class SpeedControlMetric extends GluteBridgeMetricBase {
         break;
 
       case GluteBridgeState.descending:
+        if (from == GluteBridgeState.ascending && _ascentStartMs != null) {
+          _concentricDuration = (timestampMs - _ascentStartMs!) / 1000.0;
+          _debugData['concentricDur'] = _concentricDuration!.toStringAsFixed(2);
+        }
         _descentStartMs = timestampMs;
         break;
 
       case GluteBridgeState.bottom:
-        if (_descentStartMs != null) {
-          _eccentricDuration = (timestampMs - _descentStartMs!) / 1000.0;
-          _debugData['eccentricDur'] = _eccentricDuration!.toStringAsFixed(2);
-          _evaluateRatio();
-        }
+        // Handled in checkRepCompletion now
         break;
     }
   }
 
   /* -----------------------------------------------------------------------
-     Duration ratio evaluation — called when eccentric phase completes
-     (descending → bottom).
-
-     NOTE: This fault is consumed by the NEXT _onRepCompleted() call
-     (one-rep lag) since rep counting occurs at topHold → descending,
-     before the eccentric is complete. Live feedback has no lag.
+     Duration ratio evaluation — called at DESCENDING → BOTTOM transition.
      ----------------------------------------------------------------------- */
+  void checkRepCompletion(int timestampMs) {
+    if (_descentStartMs != null) {
+      _eccentricDuration = (timestampMs - _descentStartMs!) / 1000.0;
+      _debugData['eccentricDur'] = _eccentricDuration!.toStringAsFixed(2);
+      
+      // Evaluate outright speed error using the peak recorded velocity
+      if (_peakDescentVelocity >= SpeedControlConfig.RAPID_VELOCITY_ERROR) {
+        _faults.add(FaultRecord(
+          phase: 'descending',
+          type: 'SpeedControl',
+          message: 'Hạ hông quá nhanh — siết cơ lõi để kiểm soát',
+          affectsForm: true,
+        ));
+        _velocityFaultAdded = true;
+      } else if (_liveInstructionShown) {
+        _faults.add(FaultRecord(
+          phase: 'descending',
+          type: 'SpeedControl',
+          message: 'Kiểm soát tốc độ hạ hông để bảo vệ lưng',
+          affectsForm: false,
+        ));
+        _velocityFaultAdded = true;
+      }
+
+      _evaluateRatio();
+    }
+  }
+
   void _evaluateRatio() {
     if (_eccentricDuration == null || _concentricDuration == null) return;
     if (_concentricDuration! < 0.1) return; // avoid division noise
@@ -201,6 +209,7 @@ class SpeedControlMetric extends GluteBridgeMetricBase {
     _peakDescentVelocity = 0.0;
     _descentStartMs = null;
     _eccentricDuration = null;
-    // _ascentStartMs and _concentricDuration are preserved for eccentric evaluation
+    _ascentStartMs = null;
+    _concentricDuration = null;
   }
 }

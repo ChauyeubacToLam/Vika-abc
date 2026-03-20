@@ -280,12 +280,14 @@ class GluteBridge extends ExerciseBase {
         rightType: PoseLandmarkType.rightEar,
         leftType: PoseLandmarkType.leftEar);
     final nose = smoothedLandmarks[PoseLandmarkType.nose];
+    
+    // Explicit null fallback hierarchy to prevent bypass when head goes out of frame
     final double? headY =
         (ear != null && ear.likelihood >= ExerciseBase.MIN_CONFIDENCE)
             ? ear.y
             : (nose != null && nose.likelihood >= ExerciseBase.MIN_CONFIDENCE)
                 ? nose.y
-                : null;
+                : shoulder?.y; // Fallback to shoulder.y if head is totally lost to prevent metric crash
 
     if (shoulder == null || hip == null || knee == null) return;
 
@@ -419,7 +421,10 @@ class GluteBridge extends ExerciseBase {
     for (int i = 1; i < _hipYHistory.length; i++) {
       sum += _hipYHistory[i] - _hipYHistory[i - 1];
     }
-    return sum / (_hipYHistory.length - 1);
+    double rawVelocity = sum / (_hipYHistory.length - 1);
+    
+    // Scale velocity to base 30 FPS logic
+    return rawVelocity * fpsRatio;
   }
 
   /* -----------------------------------------------------------------------
@@ -507,6 +512,10 @@ class GluteBridge extends ExerciseBase {
         if (_topHoldDebouncer.update(isAtRest && isElevated)) {
           _transitionState(GluteBridgeState.topHold, timestampMs);
         }
+        // Fast-path: start descending immediately without holding.
+        else if (_descendDebouncer.update(isDescending && isElevated)) {
+          _transitionState(GluteBridgeState.descending, timestampMs);
+        }
         // Abort: hip never got high enough and stopped moving.
         else if (_bottomDebouncer.update(isAtRest && isAtBottom)) {
           _transitionState(GluteBridgeState.bottom, timestampMs);
@@ -514,16 +523,21 @@ class GluteBridge extends ExerciseBase {
         break;
 
       case GluteBridgeState.topHold:
-        // Rep counted on this transition (design doc spec).
         if (_descendDebouncer.update(isDescending)) {
-          _onRepCompleted(timestampMs);
           _transitionState(GluteBridgeState.descending, timestampMs);
         }
         break;
 
       case GluteBridgeState.descending:
+        // Rep counted here when returning to bottom.
         if (_bottomDebouncer.update(isAtRest && isAtBottom)) {
+          _onRepCompleted(timestampMs);
           _transitionState(GluteBridgeState.bottom, timestampMs);
+        }
+        // Fallback: If user goes right back into another rep without stopping at bottom.
+        else if (_ascendDebouncer.update(isAscending)) {
+          _onRepCompleted(timestampMs);
+          _transitionState(GluteBridgeState.ascending, timestampMs);
         }
         break;
     }
@@ -531,7 +545,7 @@ class GluteBridge extends ExerciseBase {
 
   /* -----------------------------------------------------------------------
      REP COMPLETION — Evaluate metrics and record set feedback.
-     Called just before TOP_HOLD → DESCENDING transition.
+     Called just before completing the descent phase.
      ----------------------------------------------------------------------- */
   void _onRepCompleted(int timestampMs) {
     repCount += 1;
@@ -542,6 +556,9 @@ class GluteBridge extends ExerciseBase {
 
     // Let KneeAngleMetric evaluate foot placement at top hold.
     kneeAngleMetric.checkRepCompletion(_peakKneeAngle);
+
+    // Evaluate speed control (eccentric vs concentric ratio).
+    speedControlMetric.checkRepCompletion(timestampMs);
 
     // Collect faults from all metrics.
     final allFaults = <FaultRecord>[];
@@ -587,22 +604,11 @@ class GluteBridge extends ExerciseBase {
       resultIssues.instructions.clear();
     }
 
-    // Reset relevant debouncers for the newly entered state.
-    switch (newState) {
-      case GluteBridgeState.bottom:
-        _ascendDebouncer.reset();
-        break;
-      case GluteBridgeState.ascending:
-        _topHoldDebouncer.reset();
-        _bottomDebouncer.reset();
-        break;
-      case GluteBridgeState.topHold:
-        _descendDebouncer.reset();
-        break;
-      case GluteBridgeState.descending:
-        _bottomDebouncer.reset();
-        break;
-    }
+    // Reset all debouncers to ensure a clean slate for the new state.
+    _ascendDebouncer.reset();
+    _topHoldDebouncer.reset();
+    _descendDebouncer.reset();
+    _bottomDebouncer.reset();
 
     for (final metric in _metrics) {
       metric.onStateTransition(previousGluteState, newState, timestampMs);

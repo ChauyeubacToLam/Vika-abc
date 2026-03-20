@@ -96,7 +96,7 @@ class NeckHeadMetric extends GluteBridgeMetricBase {
       // ascending phase clears resultIssues.instructions).
       if (!_instructionShown) {
         ctx.resultIssues.addInstruction(
-          ctx.state.toString().split('.').last,
+          'bottom',
           'NeckHead',
           'Đặt đầu xuống sàn — tránh căng cơ cổ',
         );
