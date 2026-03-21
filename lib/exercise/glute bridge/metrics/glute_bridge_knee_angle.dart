@@ -118,7 +118,7 @@ class KneeAngleMetric extends GluteBridgeMetricBase {
       _faults.add(FaultRecord(
         phase: 'topHold',
         type: 'KneeAngle',
-        message: 'Gập gối nhiều hơn — di chân lại gần hông',
+        message: 'Di chân ra xa hông hơn — duỗi gối nhiều hơn',
         affectsForm: true,
       ));
     } else if (kneeAngle < KneeAngleConfig.GOOD_MIN) {
