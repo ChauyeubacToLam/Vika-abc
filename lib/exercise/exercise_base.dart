@@ -1,4 +1,4 @@
-// ignore_for_file: constant_identifier_names
+﻿// ignore_for_file: constant_identifier_names
 
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:vinafit_mobile/utils/debouncer.dart';
@@ -75,6 +75,13 @@ abstract class ExerciseBase {
   // Orientation debouncer
   StickyDebouncer leftRightDebouncer = StickyDebouncer(requiredFrames: 5);
 
+  // -- FPS Tracking --
+  DateTime? _lastFrameTime;
+  double _currentFps = 30.0;
+
+  double get currentFps => _currentFps;
+  double get fpsRatio => _currentFps / 30.0;
+
   // Person detection (selfie segmentation)
   final PersonDetector _personDetector = PersonDetector();
   bool _personConfirmed = false;
@@ -117,7 +124,16 @@ abstract class ExerciseBase {
     Map<PoseLandmarkType, PoseLandmark> landmarks, {
     InputImage? inputImage,
   }) {
-    frameTimestamp = DateTime.now();
+    final now = DateTime.now();
+    if (_lastFrameTime != null) {
+      final deltaMs = now.difference(_lastFrameTime!).inMilliseconds;
+      if (deltaMs > 0) {
+        final frameFps = 1000.0 / deltaMs;
+        _currentFps = _currentFps * 0.9 + frameFps * 0.1;
+      }
+    }
+    _lastFrameTime = now;
+
     resultIssues.feedback.clear();
 
     final smoothedLandmarks = poseSmoother.smoothing(landmarks);
