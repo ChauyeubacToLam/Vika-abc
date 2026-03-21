@@ -84,8 +84,8 @@ class KneeAngleMetric extends GluteBridgeMetricBase {
       msg = 'Di chân ra xa hông hơn một chút';
       _setupInstructionShown = true;
     } else {
-      // Error level — feet very far (legs nearly straight).
-      msg = 'Gập gối nhiều hơn — di chân lại gần hông';
+      // Error level — feet very close.
+      msg = 'Di chân ra xa hông đi';
     }
 
     ctx.resultIssues.addInstruction('bottom', 'KneeAngle', msg);
