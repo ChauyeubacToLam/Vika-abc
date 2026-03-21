@@ -40,10 +40,10 @@ Future<void> main() async {
 }
 
 /* =========================================================================
-   REP LOG — Generic rep/hold log, works for any exercise.
+   UI REP LOG — For debug panel display only. Not the data pipeline.
    ========================================================================= */
 
-class RepLog {
+class UIRepLog {
   final int repNumber;
   final bool correctForm;
   final Map<String, Map<String, String>> faults;
@@ -53,7 +53,7 @@ class RepLog {
   final double? bottomHold;
   final DateTime timestamp;
 
-  RepLog({
+  UIRepLog({
     required this.repNumber,
     required this.correctForm,
     required this.faults,
@@ -97,7 +97,7 @@ class VinaFitApp extends StatelessWidget {
         useMaterial3: true,
         fontFamily: 'Roboto',
       ),
-      initialRoute: _hasCompletedOnboarding ? '/' : '/onboarding',
+      initialRoute: _hasCompletedOnboarding ? '/onboarding' : '/onboarding',
       onGenerateRoute: (settings) {
         switch (settings.name) {
           case '/onboarding':
@@ -180,14 +180,9 @@ class _ExerciseScreenState extends State<ExerciseScreen>
   DateTime _lastFpsTime = DateTime.now();
   double _fps = 0;
 
-  // ── Rep Logging ──
-  final List<RepLog> _repLogs = [];
+  // ── UI Rep Logging (for debug panel only) ──
+  final List<UIRepLog> _repLogs = [];
   int _lastLoggedRep = 0;
-
-  // ── Assessment data (per-rep tracking for onboarding) ──
-  final List<double> _repDepthAngles = [];
-  final List<double> _repTrunkLeans = [];
-  int _heelRiseCount = 0;
 
   // ── After-rep banner ──
   String? _repBannerText;
@@ -198,6 +193,9 @@ class _ExerciseScreenState extends State<ExerciseScreen>
   // ── State logging ──
   String _lastLoggedState = '';
   String _lastLoggedPhaseState = '';
+
+  // ── Completion guard ──
+  bool _didComplete = false;
 
   @override
   void initState() {
@@ -280,13 +278,11 @@ class _ExerciseScreenState extends State<ExerciseScreen>
       return;
     }
 
-    // Dispose any previous controller safely
     if (_cameraController != null) {
       try {
         await _cameraController!.dispose();
       } catch (_) {}
       _cameraController = null;
-      // Give the system time to release the camera resource
       await Future.delayed(const Duration(milliseconds: 500));
     }
 
@@ -302,7 +298,6 @@ class _ExerciseScreenState extends State<ExerciseScreen>
       return;
     }
 
-    // Try the preferred camera first, then fall back to any available camera
     final camerasToTry = <int>[];
     final preferredIdx = _cameras.indexWhere(
       (cam) => cam.lensDirection == _currentLensDirection,
@@ -345,7 +340,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
             _cameraErrorMessage = null;
           });
         }
-        return; // success
+        return;
       } catch (e) {
         debugPrint('[VinaFit] Camera $idx init error: $e');
         try {
@@ -354,7 +349,6 @@ class _ExerciseScreenState extends State<ExerciseScreen>
       }
     }
 
-    // Retry up to 3 times with increasing delay (handles "too many clients")
     if (retryCount < 3 && mounted) {
       final delay = Duration(seconds: 1 + retryCount);
       debugPrint(
@@ -452,7 +446,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
             _repCount = _exercise.repCount;
             _feedback = {'Result': 'Hoàn thành! $_repCount reps'};
             _logSetComplete();
-            _autoPopWithResults();
+            _popWithLogger();
           } else if (_result!.length == 2) {
             final prevRepCount = _repCount;
             _repCount = _result![0] as int;
@@ -491,7 +485,21 @@ class _ExerciseScreenState extends State<ExerciseScreen>
   }
 
   /* -----------------------------------------------------------------------
-     LOGGING
+     COMPLETION — Pop with logger after short delay
+     ----------------------------------------------------------------------- */
+  void _popWithLogger() {
+    if (_didComplete) return;
+    _didComplete = true;
+
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        Navigator.pop(context, {'logger': _exercise.logger});
+      }
+    });
+  }
+
+  /* -----------------------------------------------------------------------
+     LOGGING (UI debug panel only)
      ----------------------------------------------------------------------- */
   void _logStateChanges() {
     final exState = _exercise.exerciseState.toString().split('.').last;
@@ -514,7 +522,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
 
     final d = _exercise.debugData;
 
-    // Extract tempo info (squat-style: descent/ascent, plank-style: holdTime)
+    // Extract tempo info
     String? tempo;
     final descent = d['descentDur'];
     final ascent = d['ascentDur'];
@@ -524,7 +532,6 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         tempo = '\u2193${descent}s \u2191${ascent}s';
       }
     }
-    // Plank hold time
     if (tempo == null) {
       final holdTime = d['holdTime'];
       if (holdTime != null && holdTime != '0.0') {
@@ -545,7 +552,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     final wasGoodRep =
         _feedback['Result'] == 'Good Rep!' || _feedback['Result'] == 'Tốt lắm!';
 
-    final log = RepLog(
+    final log = UIRepLog(
       repNumber: _repCount,
       correctForm: wasGoodRep,
       faults: faultMap,
@@ -555,14 +562,6 @@ class _ExerciseScreenState extends State<ExerciseScreen>
       bottomHold: double.tryParse(d['bottomHold'] ?? d['holdTime'] ?? ''),
     );
     _repLogs.add(log);
-
-    // Track assessment metrics per rep
-    final depthAngle = double.tryParse(d['minKneeAngle'] ?? '');
-    if (depthAngle != null) _repDepthAngles.add(depthAngle);
-    final trunkLean = double.tryParse(d['maxTrunkLean'] ?? '');
-    if (trunkLean != null) _repTrunkLeans.add(trunkLean);
-    final heelNorm = double.tryParse(d['heelNorm'] ?? '');
-    if (heelNorm != null && heelNorm > 0.15) _heelRiseCount++;
 
     debugPrint('[VinaFit][Rep] $log');
     debugPrint(
@@ -600,50 +599,6 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     }
     debugPrint('============================================');
     debugPrint('');
-  }
-
-  bool _didAutoPop = false;
-
-  void _autoPopWithResults() {
-    if (_didAutoPop) return;
-    // Only auto-pop for assessment exercises (launched from onboarding)
-    if (_definition.id != 'squat_assessment') return;
-    _didAutoPop = true;
-
-    final goodReps = _repLogs.where((r) => r.correctForm).length;
-    final avgDepth = _repDepthAngles.isEmpty
-        ? null
-        : _repDepthAngles.reduce((a, b) => a + b) / _repDepthAngles.length;
-    final maxTrunk = _repTrunkLeans.isEmpty
-        ? null
-        : _repTrunkLeans.reduce((a, b) => a > b ? a : b);
-    final avgDescent = _repLogs
-        .where((r) => r.descentDuration != null)
-        .map((r) => r.descentDuration!)
-        .toList();
-    final avgAscent = _repLogs
-        .where((r) => r.ascentDuration != null)
-        .map((r) => r.ascentDuration!)
-        .toList();
-
-    final result = <String, dynamic>{
-      'totalReps': _repCount,
-      'goodReps': goodReps,
-      'avgDepthAngle': avgDepth,
-      'maxTrunkLean': maxTrunk,
-      'heelRiseCount': _heelRiseCount,
-      'avgDescentTime': avgDescent.isEmpty
-          ? null
-          : avgDescent.reduce((a, b) => a + b) / avgDescent.length,
-      'avgAscentTime': avgAscent.isEmpty
-          ? null
-          : avgAscent.reduce((a, b) => a + b) / avgAscent.length,
-    };
-
-    // Pop with results after a short delay so user sees completion UI
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) Navigator.of(context).pop(result);
-    });
   }
 
   Future<void> _showSetupSheet({bool force = false}) async {
@@ -719,7 +674,6 @@ class _ExerciseScreenState extends State<ExerciseScreen>
                 _buildSetupRow(
                     Icons.crop_free_outlined, _definition.framingHint),
                 const SizedBox(height: 14),
-                // Safety warning (if any)
                 if (_definition.safetyWarning != null) ...[
                   Container(
                     width: double.infinity,
@@ -1051,7 +1005,6 @@ class _ExerciseScreenState extends State<ExerciseScreen>
       decoration: const BoxDecoration(color: Color(0xFF080C1A)),
       child: Row(
         children: [
-          // Back button
           GestureDetector(
             onTap: () => Navigator.of(context).pop(),
             child: Container(
@@ -1073,7 +1026,6 @@ class _ExerciseScreenState extends State<ExerciseScreen>
             ),
           ),
           const SizedBox(width: 10),
-          // Exercise icon
           Container(
             width: 34,
             height: 34,
@@ -1179,7 +1131,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     );
   }
 
-  /* ── STATE PILL (generic) ── */
+  /* ── STATE PILL ── */
   Widget _buildStatePill() {
     final exerciseState = _exercise.exerciseState;
 
@@ -1281,7 +1233,6 @@ class _ExerciseScreenState extends State<ExerciseScreen>
                 ),
               ),
             ),
-            // Subtle vignette
             Positioned.fill(
               child: IgnorePointer(
                 child: DecoratedBox(
@@ -1516,7 +1467,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     );
   }
 
-  /* ── INSTRUCTIONS BAR (generic — reads from exercise's current phase) ── */
+  /* ── INSTRUCTIONS BAR ── */
   Widget _buildInstructionsBar() {
     final phaseKey = _exercise.currentPhaseKey;
     final phaseInstr = _exercise.resultIssues.instructions[phaseKey];
@@ -1534,20 +1485,17 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     );
   }
 
-  /* ── STATUS BADGE (with arc countdown for hold phases) ── */
   Widget _buildStatusBadge(String statusText) {
     final isHold = statusText.startsWith('Hold') ||
         statusText.startsWith('Giữ') ||
         statusText.contains('!');
 
-    // Read progress from exercise-specific debugData keys
     final holdProgress = isHold
         ? (_exercise.debugData['bottomHoldProgress'] as double? ??
             _exercise.debugData['holdProgress'] as double? ??
             0.0)
         : null;
 
-    // Use phase color from definition
     final phaseKey = _exercise.currentPhaseKey;
     final color = _definition.phaseColors[phaseKey] ?? _definition.primaryColor;
 
@@ -1591,7 +1539,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     );
   }
 
-  /* ── FLOATING COACHING CHIPS (right side of camera view) ── */
+  /* ── COACHING OVERLAY ── */
   Widget _buildCoachingOverlay() {
     final phaseKey = _exercise.currentPhaseKey;
     final phaseInstr = _exercise.resultIssues.instructions[phaseKey];
@@ -1875,7 +1823,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     );
   }
 
-  /* ── DEBUG PANEL (dynamic — shows all keys from exercise debugData) ── */
+  /* ── DEBUG PANEL ── */
   Widget _buildDebugPanel() {
     final d = _exercise.debugData;
     if (d.isEmpty) {
@@ -1892,7 +1840,6 @@ class _ExerciseScreenState extends State<ExerciseScreen>
       );
     }
 
-    // Color palette for cycling through debug chip colors
     const colorPalette = [
       Color(0xFF00E5FF),
       Color(0xFFFFD600),
@@ -2086,7 +2033,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     );
   }
 
-  Widget _buildRepLogCard(RepLog log) {
+  Widget _buildRepLogCard(UIRepLog log) {
     final color =
         log.correctForm ? const Color(0xFF00E676) : const Color(0xFFFF5252);
     final faults = log.allFaultMessages;
@@ -2150,9 +2097,8 @@ class _ExerciseScreenState extends State<ExerciseScreen>
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(
-                            0xFF29B6F6,
-                          ).withValues(alpha: 0.12),
+                          color:
+                              const Color(0xFF29B6F6).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(5),
                         ),
                         child: Text(
@@ -2236,7 +2182,7 @@ class _ArcCountdownPainter extends CustomPainter {
 }
 
 /* =========================================================================
-   POSE PAINTER — Generic skeleton overlay, adapts to exercise debug data.
+   POSE PAINTER
    ========================================================================= */
 
 class PosePainter extends CustomPainter {
@@ -2368,7 +2314,6 @@ class PosePainter extends CustomPainter {
       return Offset(x * scaleX + offsetX, y * scaleY + offsetY);
     }
 
-    // Draw skeleton lines
     for (final connection in _bodyConnections) {
       final lm1 = landmarks[connection[0]];
       final lm2 = landmarks[connection[1]];
@@ -2393,7 +2338,6 @@ class PosePainter extends CustomPainter {
       );
     }
 
-    // Draw landmark dots
     for (final entry in landmarks.entries) {
       final lm = entry.value;
       if (lm.likelihood < 0.5) continue;
@@ -2420,13 +2364,11 @@ class PosePainter extends CustomPainter {
     _drawAngleLabels(canvas, landmarks, transformPoint);
   }
 
-  /// Draws angle labels at key joints using whatever data the exercise provides.
   void _drawAngleLabels(
     Canvas canvas,
     Map<PoseLandmarkType, PoseLandmark> landmarks,
     Offset Function(PoseLandmark) transformPoint,
   ) {
-    // Knee angle (both squat and plank track this)
     final knee = landmarks[PoseLandmarkType.leftKnee] ??
         landmarks[PoseLandmarkType.rightKnee];
     if (knee != null && knee.likelihood > 0.92) {
@@ -2434,31 +2376,21 @@ class PosePainter extends CustomPainter {
       final kneeAngle = debugData['kneeAngle'];
       if (kneeAngle != null) {
         _drawLabel(
-          canvas,
-          kneePos + const Offset(12, -8),
-          '$kneeAngle°',
-          Colors.cyan,
-        );
+            canvas, kneePos + const Offset(12, -8), '$kneeAngle°', Colors.cyan);
       }
     }
 
-    // Elbow angle (push-up: drives state machine)
     final elbow = landmarks[PoseLandmarkType.leftElbow] ??
         landmarks[PoseLandmarkType.rightElbow];
     if (elbow != null && elbow.likelihood > 0.5) {
       final elbowAngle = debugData['elbowAngle'];
       if (elbowAngle != null) {
         final elbowPos = transformPoint(elbow);
-        _drawLabel(
-          canvas,
-          elbowPos + const Offset(12, -8),
-          '$elbowAngle°',
-          const Color(0xFFE040FB),
-        );
+        _drawLabel(canvas, elbowPos + const Offset(12, -8), '$elbowAngle°',
+            const Color(0xFFE040FB));
       }
     }
 
-    // Shoulder-area label: trunk lean (squat) or back angle (plank) or trunk dev (push-up)
     final shoulder = landmarks[PoseLandmarkType.leftShoulder] ??
         landmarks[PoseLandmarkType.rightShoulder];
     if (shoulder != null && shoulder.likelihood > 0.5) {
@@ -2467,42 +2399,25 @@ class PosePainter extends CustomPainter {
       final backAngle = debugData['backAngle'];
       final trunkDev = debugData['trunkDev'];
       if (trunkLean != null) {
-        _drawLabel(
-          canvas,
-          shoulderPos + const Offset(12, -8),
-          '$trunkLean',
-          Colors.orange,
-        );
+        _drawLabel(canvas, shoulderPos + const Offset(12, -8), '$trunkLean',
+            Colors.orange);
       } else if (trunkDev != null) {
-        _drawLabel(
-          canvas,
-          shoulderPos + const Offset(12, -8),
-          '$trunkDev',
-          Colors.orange,
-        );
+        _drawLabel(canvas, shoulderPos + const Offset(12, -8), '$trunkDev',
+            Colors.orange);
       } else if (backAngle != null) {
-        _drawLabel(
-          canvas,
-          shoulderPos + const Offset(12, -8),
-          '$backAngle°',
-          Colors.orange,
-        );
+        _drawLabel(canvas, shoulderPos + const Offset(12, -8), '$backAngle°',
+            Colors.orange);
       }
     }
 
-    // Hip-area label: plank neck angle
     final ear = landmarks[PoseLandmarkType.leftEar] ??
         landmarks[PoseLandmarkType.rightEar];
     if (ear != null && ear.likelihood > 0.5) {
       final neckAngle = debugData['neckAngle'];
       if (neckAngle != null) {
         final earPos = transformPoint(ear);
-        _drawLabel(
-          canvas,
-          earPos + const Offset(12, -8),
-          '$neckAngle°',
-          const Color(0xFF4CAF50),
-        );
+        _drawLabel(canvas, earPos + const Offset(12, -8), '$neckAngle°',
+            const Color(0xFF4CAF50));
       }
     }
   }

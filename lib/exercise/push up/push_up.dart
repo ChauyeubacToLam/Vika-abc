@@ -11,46 +11,34 @@ import 'metrics/trunk_alignment_metric.dart';
 import 'metrics/depth_metric.dart';
 import 'metrics/tempo_metric.dart';
 
-/* =========================================================================
-   CONFIGURATION & THRESHOLDS
-   ========================================================================= */
+// --- Config ---
+
 class PushUpConfig {
   static const int MAX_REP = 15;
 
-  /// State machine transitions driven by elbow angle (β)
-  /// β = SHOULDER→ELBOW→WRIST
-  static const double PLANK_ANGLE_THRESHOLD = 155.0; // above = plank
-  static const double DESCEND_ANGLE_THRESHOLD = 145.0; // below = descending
-  static const List<double> BOTTOM_ANGLE_RANGE = [80.0, 100.0]; // bottom zone
-  // Hysteresis: exit bottom when β > BOTTOM_ANGLE_RANGE[1] + 5°
+  // State machine transitions driven by elbow angle (β = shoulder→elbow→wrist)
+  static const double PLANK_ANGLE_THRESHOLD = 155.0;
+  static const double DESCEND_ANGLE_THRESHOLD = 145.0;
+  static const List<double> BOTTOM_ANGLE_RANGE = [80.0, 100.0];
 
-  /// Trunk horizontal targets per facing direction.
-  /// Same approach as Plank — clock angle from vertical.
-  /// Left-facing: shoulder is left of hip → clock angle ~270°
-  /// Right-facing: shoulder is right of hip → clock angle ~90°
+  // Trunk horizontal targets per facing direction (clock angle from vertical)
   static const double HORIZONTAL_CLOCK_LEFT = 270.0;
   static const double HORIZONTAL_CLOCK_RIGHT = 90.0;
 }
 
-enum PushUpState {
-  plank, // Top position — arms extended
-  descending, // Lowering body
-  bottom, // Maximum flexion
-  ascending, // Pushing back up
-}
+enum PushUpState { plank, descending, bottom, ascending }
 
-/* =========================================================================
-   PUSH-UP LOGIC
-   ========================================================================= */
+// --- Push Up ---
 
 class PushUp extends ExerciseBase {
+  final int maxRep;
+  PushUp({this.maxRep = PushUpConfig.MAX_REP});
+
   PushUpState pushUpState = PushUpState.plank;
   PushUpState previousPushUpState = PushUpState.plank;
 
-  // Debounce entry into rep — prevents false starts from noisy frames
   final Debouncer _entryDebouncer = Debouncer(requiredFrames: 2);
 
-  // -- Metrics --
   final TrunkAlignmentMetric trunkAlignmentMetric = TrunkAlignmentMetric();
   final DepthMetric depthMetric = DepthMetric();
   final TempoMetric tempoMetric = TempoMetric();
@@ -61,9 +49,8 @@ class PushUp extends ExerciseBase {
     tempoMetric,
   ];
 
-  /* -----------------------------------------------------------------------
-     UI BRIDGE
-     ----------------------------------------------------------------------- */
+  // --- UI Bridge ---
+
   @override
   String get exerciseName => 'Push Up';
 
@@ -84,16 +71,10 @@ class PushUp extends ExerciseBase {
     }
   }
 
-  /* -----------------------------------------------------------------------
-     Start     
-     ----------------------------------------------------------------------- */
+  // --- Start Position ---
+
   @override
-  bool isInStartPosition(
-    Map<PoseLandmarkType, PoseLandmark> landmarks,
-    CameraFacing facing,
-    double? scaleFactor,
-  ) {
-    // Check: user is in plank position (horizontal trunk, arms extended)
+  bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     final shoulder = getSideLandmark(
       landmarks: landmarks,
       rightType: PoseLandmarkType.rightShoulder,
@@ -119,10 +100,10 @@ class PushUp extends ExerciseBase {
       return false;
     }
 
-    // 1. Trunk must be roughly horizontal (within 25° of horizontal)
+    // Trunk must be roughly horizontal (within 25°)
     double trunkClockAngle =
         calculateVerticalAngle(pivot: hip, point: shoulder);
-    double horizontalTarget = facing == CameraFacing.right
+    double horizontalTarget = cameraFacing == CameraFacing.right
         ? PushUpConfig.HORIZONTAL_CLOCK_RIGHT
         : PushUpConfig.HORIZONTAL_CLOCK_LEFT;
     double diff = trunkClockAngle - horizontalTarget;
@@ -130,7 +111,7 @@ class PushUp extends ExerciseBase {
     if (diff < -180) diff += 360;
     if (diff.abs() > 25.0) return false;
 
-    // 2. Arms must be extended (elbow angle > 140° = plank top position)
+    // Arms must be extended (elbow angle > 140°)
     double elbowAngle = calculateAngle(
       firstPoint: shoulder,
       midPoint: elbow,
@@ -141,27 +122,22 @@ class PushUp extends ExerciseBase {
     return true;
   }
 
-  /* -----------------------------------------------------------------------
-     STOP CONDITION
-     ----------------------------------------------------------------------- */
-  @override
-  bool requestStop() {
-    return repCount >= PushUpConfig.MAX_REP;
-  }
+  // --- Stop Condition ---
 
-  /* -----------------------------------------------------------------------
-     SAFETY CHECKS
-     ----------------------------------------------------------------------- */
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks,
-      CameraFacing cameraFacing) {
-    // Side view only for MVP (front view = future elbow flare metric)
+  bool requestStop() => repCount >= maxRep;
+
+  @override
+  void onSetComplete() {}
+
+  // --- Safety Checks ---
+
+  @override
+  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing == CameraFacing.front) {
       return "⚠️ Xin hãy quay nghiêng để theo dõi tư thế Push Up";
     }
 
-    // Required landmarks: shoulder, elbow, wrist, hip
-    // Note: knee/ankle NOT required — may be out of frame
     PoseLandmark? shoulder = getSideLandmark(
         landmarks: landmarks,
         rightType: PoseLandmarkType.rightShoulder,
@@ -193,14 +169,11 @@ class PushUp extends ExerciseBase {
     return null;
   }
 
-  /* -----------------------------------------------------------------------
-     MAIN PHYSICS LOOP — Called every frame when activated.
-     ----------------------------------------------------------------------- */
-  @override
-  void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks,
-      CameraFacing cameraFacing, double? scaleFactor) {
-    // ---------- 1. Get Landmarks ----------
+  // --- Main Loop (called every frame when activated) ---
 
+  @override
+  void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
+    // 1. Get landmarks
     PoseLandmark? shoulder = getSideLandmark(
         landmarks: smoothedLandmarks,
         rightType: PoseLandmarkType.rightShoulder,
@@ -222,27 +195,22 @@ class PushUp extends ExerciseBase {
       return;
     }
 
-    // ---------- 2. Calculate Geometry ----------
-
-    // Elbow angle β: drives state machine (outer clock angle at elbow)
+    // 2. Calculate geometry
     double elbowAngle = 360 -
         calculateAngle(firstPoint: shoulder, midPoint: elbow, lastPoint: wrist);
 
-    // Trunk: clock angle from vertical (same as Plank approach)
     double trunkClockAngle =
         calculateVerticalAngle(pivot: hip, point: shoulder);
 
-    // Deviation from horizontal (positive = sag, negative = pike)
     double horizontalTarget = cameraFacing == CameraFacing.right
         ? PushUpConfig.HORIZONTAL_CLOCK_RIGHT
         : PushUpConfig.HORIZONTAL_CLOCK_LEFT;
     double trunkDeviation =
         clockAngleDeviation(trunkClockAngle, horizontalTarget);
 
-    int now = DateTime.now().millisecondsSinceEpoch;
+    int now = frameTimestampMs;
 
-    // ---------- 3. Build RepContext ----------
-
+    // 3. Build RepContext
     final ctx = RepContext(
       elbowAngle: elbowAngle,
       trunkDeviation: trunkDeviation,
@@ -253,8 +221,7 @@ class PushUp extends ExerciseBase {
       resultIssues: resultIssues,
     );
 
-    // ---------- 4. Populate Debug Data ----------
-
+    // 4. Debug data
     debugData['pushUpState'] = pushUpState.toString().split('.').last;
     debugData['elbowAngle'] = elbowAngle.toStringAsFixed(1);
     debugData['trunkClock'] = trunkClockAngle.toStringAsFixed(1);
@@ -262,34 +229,23 @@ class PushUp extends ExerciseBase {
         '${trunkDeviation >= 0 ? "+" : ""}${trunkDeviation.toStringAsFixed(1)}°';
     debugData['correctForm'] = correctForm.toString();
 
-    // ---------- 5. Rep Completion (Return to Plank) ----------
-
+    // 5. Rep completion (return to plank)
     if (pushUpState == PushUpState.plank &&
         previousPushUpState != PushUpState.plank) {
       repCount += 1;
 
-      // Let depth check if rep was deep enough
       depthMetric.checkRepCompletion(previousPushUpState, ctx);
-
-      // Fire final state transition so tempo can calculate ascent
       _transitionState(PushUpState.plank, now);
-
-      // Let tempo evaluate the full rep
       tempoMetric.evaluateRep(ctx);
 
-      // Collect faults from all metrics
       final allFaults = <FaultRecord>[];
       for (final metric in _metrics) {
         allFaults.addAll(metric.faults);
       }
 
-      // Determine correctForm: true if no faults with affectsForm=true
       correctForm = !allFaults.any((f) => f.affectsForm);
-
-      // UI feedback
       resultIssues.feedback['Result'] = correctForm ? 'Tốt!' : 'Chỉnh tư thế';
 
-      // Build fault map for set history
       final faultMap = <String, Map<String, String>>{};
       for (final fault in allFaults) {
         if (!faultMap.containsKey(fault.phase)) {
@@ -299,7 +255,6 @@ class PushUp extends ExerciseBase {
       }
       setFeedback.add({correctForm: faultMap});
 
-      // Add tempo summary to post-rep feedback
       if (tempoMetric.descentDuration != null) {
         resultIssues.feedback['Tempo'] =
             '↓${tempoMetric.descentDuration!.toStringAsFixed(1)}s';
@@ -309,12 +264,10 @@ class PushUp extends ExerciseBase {
         }
       }
 
-      // Merge metric debug data BEFORE reset
       for (final metric in _metrics) {
         debugData.addAll(metric.debugData);
       }
 
-      // Reset metrics for next rep
       correctForm = true;
       for (final metric in _metrics) {
         metric.reset();
@@ -322,26 +275,20 @@ class PushUp extends ExerciseBase {
       return;
     }
 
-    // ---------- 6. Update State Machine ----------
-
+    // 6. Update state machine
     _updatePushUpState(elbowAngle, now);
 
-    // ---------- 7. Run All Metrics ----------
-    // Trunk alignment runs continuously (not just during active phases)
-    // Depth and tempo run during descent/bottom/ascent
-
+    // 7. Run all metrics
     if (pushUpState != PushUpState.plank) {
       for (final metric in _metrics) {
         metric.update(ctx);
       }
     }
 
-    // Merge metric debug data
     for (final metric in _metrics) {
       debugData.addAll(metric.debugData);
     }
 
-    // Status instruction based on current phase
     if (pushUpState == PushUpState.descending) {
       resultIssues.addInstruction('descending', 'Status', 'Đang xuống...');
     } else if (pushUpState == PushUpState.bottom) {
@@ -351,32 +298,21 @@ class PushUp extends ExerciseBase {
     }
   }
 
-  /* -----------------------------------------------------------------------
-     STATE MACHINE (with transition notifications)
-     Driven by elbow angle β, same pattern as squat knee angle.
-     ----------------------------------------------------------------------- */
+  // --- State Machine ---
 
   void _updatePushUpState(double elbowAngle, int timestampMs) {
-    // Debounce entry: require 2 consecutive frames below threshold
     bool isEnteringRep = elbowAngle < PushUpConfig.DESCEND_ANGLE_THRESHOLD;
     bool confirmedEntry = _entryDebouncer.update(isEnteringRep);
 
-    // plank → descending: elbow starts bending (debounced)
     if (confirmedEntry && pushUpState == PushUpState.plank) {
       _transitionState(PushUpState.descending, timestampMs);
-    }
-    // descending → bottom: elbow enters bottom range
-    else if (elbowAngle <= PushUpConfig.BOTTOM_ANGLE_RANGE[1] &&
+    } else if (elbowAngle <= PushUpConfig.BOTTOM_ANGLE_RANGE[1] &&
         pushUpState == PushUpState.descending) {
       _transitionState(PushUpState.bottom, timestampMs);
-    }
-    // bottom → ascending: elbow starts opening past bottom range + hysteresis
-    else if (elbowAngle > (PushUpConfig.BOTTOM_ANGLE_RANGE[1] + 5) &&
+    } else if (elbowAngle > (PushUpConfig.BOTTOM_ANGLE_RANGE[1] + 5) &&
         pushUpState == PushUpState.bottom) {
       _transitionState(PushUpState.ascending, timestampMs);
-    }
-    // ascending → plank: elbow fully extended
-    else if (elbowAngle > PushUpConfig.PLANK_ANGLE_THRESHOLD &&
+    } else if (elbowAngle > PushUpConfig.PLANK_ANGLE_THRESHOLD &&
         (pushUpState == PushUpState.ascending ||
             pushUpState == PushUpState.descending)) {
       _transitionState(PushUpState.plank, timestampMs);
@@ -387,7 +323,6 @@ class PushUp extends ExerciseBase {
     previousPushUpState = pushUpState;
     pushUpState = newState;
 
-    // Clear coaching instructions when user starts a new rep
     if (newState == PushUpState.descending) {
       resultIssues.instructions.clear();
     }
@@ -396,8 +331,4 @@ class PushUp extends ExerciseBase {
       metric.onStateTransition(previousPushUpState, newState, timestampMs);
     }
   }
-
-  /* -----------------------------------------------------------------------
-     HELPERS
-     ----------------------------------------------------------------------- */
 }

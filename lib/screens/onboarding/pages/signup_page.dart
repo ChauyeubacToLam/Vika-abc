@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
 import '../onboarding_data.dart';
-
-const _cyan = Color(0xFF00E5FF);
-const _blue = Color(0xFF0091EA);
-const _cardBg = Color(0xFF0D1228);
+import '../vf_theme.dart';
 
 class SignupPage extends StatefulWidget {
   final OnboardingData data;
   final VoidCallback onNext;
-
   const SignupPage({super.key, required this.data, required this.onNext});
 
   @override
@@ -16,293 +12,151 @@ class SignupPage extends StatefulWidget {
 }
 
 class _SignupPageState extends State<SignupPage> {
-  final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _nameFocus = FocusNode();
-  bool _nameValid = false;
-  bool _emailValid = false;
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _emailCtrl;
 
   @override
   void initState() {
     super.initState();
-    // Pre-fill if coming back
-    if (widget.data.displayName != null) {
-      _nameController.text = widget.data.displayName!;
-      _nameValid = true;
-    }
-    if (widget.data.email != null) {
-      _emailController.text = widget.data.email!;
-      _emailValid = true;
-    }
+    _nameCtrl = TextEditingController(text: widget.data.displayName ?? '');
+    _emailCtrl = TextEditingController(text: widget.data.email ?? '');
   }
 
-  bool get _canProceed => _nameValid && _emailValid;
-
-  void _validateName(String v) {
-    setState(() => _nameValid = v.trim().length >= 2);
-  }
-
-  void _validateEmail(String v) {
-    setState(() => _emailValid =
-        v.contains('@') && v.contains('.') && v.trim().length >= 5);
-  }
+  bool get _valid =>
+      _nameCtrl.text.trim().length >= 2 &&
+      _emailCtrl.text.contains('@') &&
+      _emailCtrl.text.contains('.');
 
   void _submit() {
-    if (!_canProceed) return;
-    widget.data.displayName = _nameController.text.trim();
-    widget.data.email = _emailController.text.trim();
+    if (!_valid) return;
+    widget.data.displayName = _nameCtrl.text.trim();
+    widget.data.email = _emailCtrl.text.trim();
     widget.onNext();
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _emailController.dispose();
-    _nameFocus.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 28),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Header ──
-            const Text(
-              'Tạo tài khoản',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 26,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.5,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Lưu kết quả và theo dõi tiến trình của bạn',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.35),
-                fontSize: 14,
-              ),
-            ),
-            const SizedBox(height: 32),
+            const Text('Tạo tài khoản',
+                style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    color: VF.text,
+                    letterSpacing: -0.5)),
+            const SizedBox(height: 4),
+            const Text('Lưu kết quả và theo dõi tiến trình',
+                style: TextStyle(color: VF.textMuted, fontSize: 13)),
+            const SizedBox(height: 28),
 
-            // ── Name field ──
-            Text(
-              'TÊN CỦA BẠN',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.4),
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1,
-              ),
-            ),
-            const SizedBox(height: 8),
-            _buildTextField(
-              controller: _nameController,
-              hint: 'Ví dụ: Minh',
-              icon: Icons.person_outline,
-              onChanged: _validateName,
-              focusNode: _nameFocus,
-              textInputAction: TextInputAction.next,
-            ),
+            _label('TÊN'),
+            const SizedBox(height: 6),
+            _input(_nameCtrl, 'Ví dụ: Minh'),
+            const SizedBox(height: 18),
+
+            _label('EMAIL'),
+            const SizedBox(height: 6),
+            _input(_emailCtrl, 'email@example.com',
+                type: TextInputType.emailAddress),
             const SizedBox(height: 20),
 
-            // ── Email field ──
-            Text(
-              'EMAIL',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.4),
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1,
+            // Divider
+            Row(children: [
+              const Expanded(child: Divider(color: VF.border)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: Text('hoặc',
+                    style: TextStyle(fontSize: 11, color: VF.textMuted)),
               ),
-            ),
-            const SizedBox(height: 8),
-            _buildTextField(
-              controller: _emailController,
-              hint: 'email@example.com',
-              icon: Icons.email_outlined,
-              onChanged: _validateEmail,
-              keyboardType: TextInputType.emailAddress,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => _submit(),
-            ),
-            const SizedBox(height: 12),
+              const Expanded(child: Divider(color: VF.border)),
+            ]),
+            const SizedBox(height: 16),
 
-            // ── Social login divider ──
-            Row(
-              children: [
-                Expanded(
-                  child: Divider(
-                    color: Colors.white.withValues(alpha: 0.06),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Text(
-                    'hoặc',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Divider(
-                    color: Colors.white.withValues(alpha: 0.06),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
+            // Social
+            Row(children: [
+              _socialBtn('Google'),
+              const SizedBox(width: 10),
+              _socialBtn('Zalo'),
+            ]),
 
-            // ── Google / Zalo buttons ──
-            Row(
-              children: [
-                Expanded(
-                  child: _socialButton('Google', Icons.g_mobiledata),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _socialButton('Zalo', Icons.chat_bubble_outline),
-                ),
-              ],
-            ),
-            const SizedBox(height: 32),
-
-            // ── CTA ──
-            SizedBox(
-              width: double.infinity,
-              height: 54,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: _canProceed
-                      ? const LinearGradient(colors: [_cyan, _blue])
-                      : null,
-                  color: _canProceed
-                      ? null
-                      : Colors.white.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: _canProceed
-                      ? [
-                          BoxShadow(
-                            color: _cyan.withValues(alpha: 0.3),
-                            blurRadius: 20,
-                            offset: const Offset(0, 4),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: ElevatedButton(
-                  onPressed: _canProceed ? _submit : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    shadowColor: Colors.transparent,
-                    disabledBackgroundColor: Colors.transparent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: Text(
-                    'TIẾP TỤC',
-                    style: TextStyle(
-                      color: _canProceed
-                          ? Colors.black
-                          : Colors.white.withValues(alpha: 0.2),
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            const Spacer(),
+            VFButton(
+                label: 'Tiếp tục',
+                onTap: _valid ? _submit : null,
+                enabled: _valid),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String hint,
-    required IconData icon,
-    required ValueChanged<String> onChanged,
-    FocusNode? focusNode,
-    TextInputType? keyboardType,
-    TextInputAction? textInputAction,
-    ValueChanged<String>? onSubmitted,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: _cardBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+  Widget _label(String text) => Text(text,
+      style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: VF.textMuted,
+          letterSpacing: 0.8));
+
+  Widget _input(TextEditingController ctrl, String hint,
+      {TextInputType? type}) {
+    return TextField(
+      controller: ctrl,
+      keyboardType: type,
+      onChanged: (_) => setState(() {}),
+      style: const TextStyle(fontSize: 15, color: VF.text),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: VF.textMuted),
+        filled: true,
+        fillColor: VF.surface,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: VF.border, width: 1.5)),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: VF.border, width: 1.5)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: VF.brand, width: 1.5)),
       ),
-      child: TextField(
-        controller: controller,
-        focusNode: focusNode,
-        onChanged: onChanged,
-        onSubmitted: onSubmitted,
-        keyboardType: keyboardType,
-        textInputAction: textInputAction,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 15,
-          fontWeight: FontWeight.w500,
-        ),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: TextStyle(
-            color: Colors.white.withValues(alpha: 0.15),
-            fontSize: 15,
+    );
+  }
+
+  Widget _socialBtn(String label) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          // TODO: Social login integration (Phase 2)
+        },
+        child: Container(
+          height: 46,
+          decoration: BoxDecoration(
+            color: VF.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: VF.border, width: 1.5),
           ),
-          prefixIcon: Icon(
-            icon,
-            color: Colors.white.withValues(alpha: 0.2),
-            size: 20,
-          ),
-          border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          alignment: Alignment.center,
+          child: Text(label,
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: VF.textSec)),
         ),
       ),
     );
   }
 
-  Widget _socialButton(String label, IconData icon) {
-    return GestureDetector(
-      onTap: () {
-        // TODO: Implement social login
-      },
-      child: Container(
-        height: 48,
-        decoration: BoxDecoration(
-          color: _cardBg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: Colors.white54, size: 20),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.5),
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _emailCtrl.dispose();
+    super.dispose();
   }
 }

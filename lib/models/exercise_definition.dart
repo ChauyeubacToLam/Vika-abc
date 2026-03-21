@@ -63,7 +63,8 @@ class ExerciseDefinition {
    EXERCISE REGISTRY — Add new exercises here.
    ========================================================================= */
 
-/// 5-rep squat for onboarding assessment.
+/// ------------------ 5-rep for onboarding assessment. ------------------
+/// Squat
 final squatAssessmentDefinition = ExerciseDefinition(
   id: 'squat_assessment',
   name: 'Squat Assessment',
@@ -91,6 +92,33 @@ final squatAssessmentDefinition = ExerciseDefinition(
   },
 );
 
+/// Wall- push up
+final wallPushupAssessmentDefinition = ExerciseDefinition(
+  id: 'wall_pushup_assessment',
+  name: 'Wall Pushup Assessment',
+  subtitle: 'Kiểm tra tư thế Wall Pushup',
+  description: '5 wall pushups để AI đánh giá thể lực của bạn.',
+  icon: Icons.fitness_center,
+  primaryColor: const Color(0xFF00E5FF),
+  secondaryColor: const Color(0xFF0091EA),
+  difficulty: 'Dễ',
+  targetMuscles: ['Đùi', 'Mông', 'Core'],
+  duration: '5 reps',
+  cameraHint: 'Đứng nghiêng người so với camera.',
+  framingHint: 'Giữ vai, hông, gối, mắt cá và bàn chân trong khung hình.',
+  setupTips: [
+    'Đặt camera ngang hông, cách bạn khoảng 2–3 mét.',
+    'Quay nghiêng 90° để AI thấy rõ độ sâu và thân người.',
+    'Giữ đủ ánh sáng ở chân và thân trên trước khi bắt đầu.',
+  ],
+  createExercise: () => PushUp(maxRep: 5),
+  phaseColors: {
+    'standing': const Color(0xFF00E676),
+    'descending': const Color(0xFFFFD600),
+    'bottom': const Color(0xFFFF6D00),
+    'ascending': const Color(0xFF00B0FF),
+  },
+);
 final List<ExerciseDefinition> exerciseDefinitions = [
   ExerciseDefinition(
     id: 'squat',

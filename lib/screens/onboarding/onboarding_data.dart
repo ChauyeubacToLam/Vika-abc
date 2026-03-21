@@ -1,53 +1,66 @@
-/// Stores all data collected during onboarding.
-/// Passed through each step and saved at the end.
+import 'package:vinafit_mobile/interpreter/squat_interpreter.dart';
+import 'package:vinafit_mobile/utils/exercise_logger.dart';
+
 class OnboardingData {
-  String? goal; // 'lose_weight', 'tone', 'health'
-  String? timeCommitment; // '10', '20', '30'
-  bool medicalOk = false;
+  // ── Step 1: Goal ──
+  String? goal;
 
-  // Assessment results (filled after 5-squat test)
-  int totalReps = 0;
-  int goodReps = 0;
-  double? avgDepthAngle; // average min knee angle across reps
-  double? maxTrunkLean; // worst trunk lean seen
-  int heelRiseCount = 0; // how many reps had heel rise
-  double? avgDescentTime;
-  double? avgAscentTime;
+  // ── Step 2: Experience ──
+  String? experience; // 'never', 'sometimes', 'regularly'
 
-  // Post-signup body data
-  double? heightCm;
-  double? weightKg;
+  // ── Step 3: Medical ──
+  bool medicalClear = false;
 
-  // Account
+  // ── Step 4-5: Assessment ──
+  List<String> detectedIssues = [];
+  late ExerciseLogger squatLogger;
+  // ExerciseLogger? pushUpLogger;
+  late SquatInterpreter squatInterpreter;
+
+  void onSquatComplete(ExerciseLogger logger) {
+    squatLogger = logger;
+    squatInterpreter = SquatInterpreter(logger: logger);
+    squatInterpreter.analyze();
+    detectedIssues.addAll(squatInterpreter.detectedIssues);
+  }
+
+  // void onPushUpComplete(ExerciseLogger logger) {
+  //   // pushUpLogger = logger;
+  // }
+
+  // ── Step 7: Level ──
+  String? confirmedLevel;
+
+  // ── Step 8: Issue spotlight ──
+  String? issueAnswer; // user's yes/no
+
+  // ── Step 9-10: Signup + Body ──
   String? displayName;
   String? email;
+  double? heightCm;
+  double? weightKg;
+  List<int> workoutDays = [];
+  String? preferredTime;
 
-  /// Derived fitness level from assessment
-  String get fitnessLevel {
-    if (avgDepthAngle == null) return 'beginner';
-    final depth = avgDepthAngle!;
-    final trunk = maxTrunkLean ?? 50;
-    if (depth > 120 || trunk > 40) return 'beginner';
-    if (depth > 100 || trunk > 30) return 'intermediate';
-    return 'advanced';
+  // ── Step 11: time commitment ──
+  String? timeCommitment;
+
+  // ── Step 12: Program ──
+  String? program;
+
+  // ── Derived ──
+  double? get bmi {
+    if (heightCm == null || weightKg == null) return null;
+    if (heightCm! <= 0) return null;
+    return weightKg! / ((heightCm! / 100) * (heightCm! / 100));
   }
 
-  /// Mobility assessment
-  String get mobilityLevel {
-    if (avgDepthAngle == null) return 'limited';
-    if (avgDepthAngle! > 120) return 'limited';
-    if (avgDepthAngle! > 100) return 'average';
-    return 'good';
+  String get bmiCategory {
+    final b = bmi;
+    if (b == null) return '';
+    if (b < 18.5) return 'underweight';
+    if (b < 23) return 'normal';
+    if (b < 25) return 'overweight';
+    return 'obese';
   }
-
-  /// Core stability assessment
-  String get stabilityLevel {
-    if (maxTrunkLean == null) return 'weak';
-    if (maxTrunkLean! > 40) return 'weak';
-    if (maxTrunkLean! > 25) return 'average';
-    return 'good';
-  }
-
-  /// Whether ankle mobility is flagged
-  bool get hasAnkleIssue => heelRiseCount >= 3;
 }

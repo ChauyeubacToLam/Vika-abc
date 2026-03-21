@@ -1,201 +1,135 @@
 import 'package:flutter/material.dart';
+import '../vf_theme.dart';
 
-const _cyan = Color(0xFF00E5FF);
-const _blue = Color(0xFF0091EA);
-
-class WelcomePage extends StatefulWidget {
+class WelcomePage extends StatelessWidget {
   final VoidCallback onStart;
   const WelcomePage({super.key, required this.onStart});
 
   @override
-  State<WelcomePage> createState() => _WelcomePageState();
-}
-
-class _WelcomePageState extends State<WelcomePage>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _anim;
-  late Animation<double> _fadeIn;
-  late Animation<Offset> _slideUp;
-
-  @override
-  void initState() {
-    super.initState();
-    _anim = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 700),
-    );
-    _fadeIn = CurvedAnimation(parent: _anim, curve: Curves.easeOut);
-    _slideUp = Tween<Offset>(
-      begin: const Offset(0, 0.08),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _anim, curve: Curves.easeOutCubic));
-    _anim.forward();
-  }
-
-  @override
-  void dispose() {
-    _anim.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 40, 28, 40),
-      child: FadeTransition(
-        opacity: _fadeIn,
-        child: SlideTransition(
-          position: _slideUp,
+    return Column(
+      children: [
+        GradHeader(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(28, 32, 28, 44),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    alignment: Alignment.center,
+                    child: const Text('V',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900)),
+                  ),
+                  const SizedBox(width: 10),
+                  Text('VINAFIT',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.7),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1,
+                      )),
+                ]),
+                const SizedBox(height: 24),
+                const Text(
+                  'HLV cá nhân AI\nngay trên điện thoại',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    height: 1.25,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Phân tích tư thế. Phản hồi tức thì.\nChương trình riêng cho bạn.',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    fontSize: 14,
+                    height: 1.6,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+            child: Column(
+              children: [
+                _feature(
+                    1,
+                    'Phân tích AI thời gian thực',
+                    'Camera nhận diện và sửa tư thế ngay khi bạn tập',
+                    const [Color(0xFF0891B2), Color(0xFF06B6D4)]),
+                const SizedBox(height: 18),
+                _feature(
+                    2,
+                    'Không cần thiết bị',
+                    'Chỉ cần điện thoại và 2m² không gian',
+                    const [Color(0xFF10B981), Color(0xFF34D399)]),
+                const SizedBox(height: 18),
+                _feature(
+                    3,
+                    'Thiết kế cho người Việt',
+                    'Bài tập phù hợp dân văn phòng, không gian nhỏ',
+                    const [Color(0xFFF97316), Color(0xFFFB923C)]),
+              ],
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
+          child: VFButton(label: 'Bắt đầu miễn phí', onTap: onStart),
+        ),
+      ],
+    );
+  }
+
+  Widget _feature(int n, String title, String desc, List<Color> colors) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(colors: colors),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          alignment: Alignment.center,
+          child: Text('$n',
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800)),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Logo ──
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [_cyan, _blue],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: _cyan.withValues(alpha: 0.25),
-                      blurRadius: 24,
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.fitness_center,
-                  color: Colors.white,
-                  size: 30,
-                ),
-              ),
-              const SizedBox(height: 28),
-
-              // ── Title ──
-              const Text(
-                'VINAFIT',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 32,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 4,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'AI Fitness Coach',
-                style: TextStyle(
-                  color: _cyan.withValues(alpha: 0.7),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 1,
-                ),
-              ),
-              const SizedBox(height: 28),
-
-              // ── Description ──
-              Text.rich(
-                TextSpan(
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.55),
-                    fontSize: 15,
-                    height: 1.6,
-                  ),
-                  children: [
-                    const TextSpan(
-                        text: 'HLV cá nhân AI đầu tiên tại Việt Nam.\n'),
-                    const TextSpan(text: 'Phân tích tư thế '),
-                    TextSpan(
-                      text: 'theo thời gian thực',
-                      style: TextStyle(
-                        color: _cyan,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const TextSpan(text: ' ngay trên điện thoại của bạn.'),
-                  ],
-                ),
-              ),
-
-              const Spacer(),
-
-              // ── Features ──
-              _feature(Icons.phone_android, 'Chỉ cần điện thoại, không cần thiết bị'),
-              const SizedBox(height: 12),
-              _feature(Icons.track_changes, 'AI phát hiện lỗi tư thế ngay lập tức'),
-              const SizedBox(height: 12),
-              _feature(Icons.home_outlined, 'Tập tại nhà, phù hợp người Việt'),
-
-              const SizedBox(height: 32),
-
-              // ── CTA ──
-              SizedBox(
-                width: double.infinity,
-                height: 54,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [_cyan, _blue]),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _cyan.withValues(alpha: 0.3),
-                        blurRadius: 20,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: ElevatedButton(
-                    onPressed: widget.onStart,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      shadowColor: Colors.transparent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    child: const Text(
-                      'BẮT ĐẦU NGAY',
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Center(
-                child: Text(
-                  'Miễn phí hoàn toàn • Không cần đăng ký',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    fontSize: 11,
-                  ),
-                ),
-              ),
+              Text(title,
+                  style: const TextStyle(
+                      color: VF.text,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700)),
+              const SizedBox(height: 2),
+              Text(desc,
+                  style: const TextStyle(
+                      color: VF.textMuted, fontSize: 12.5, height: 1.5)),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _feature(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(icon, color: _cyan.withValues(alpha: 0.5), size: 18),
-        const SizedBox(width: 12),
-        Text(
-          text,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.45),
-            fontSize: 13,
           ),
         ),
       ],
