@@ -12,6 +12,8 @@
 .swiftpm/
 migrate_working_dir/
 claude/
+.claude/
+.claude/worktrees/
 
 # IntelliJ related
 *.iml
