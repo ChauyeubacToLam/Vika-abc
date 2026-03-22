@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import '../utils/constants.dart';
 
 class ViettelTTSService {
@@ -11,8 +12,30 @@ class ViettelTTSService {
   final AudioPlayer _audioPlayer = AudioPlayer();
   final String _apiUrl = 'https://viettelai.vn/tts/speech_synthesis';
 
+  final Map<String, String> _assetMap = {
+    "Xuống": "xuong.mp3",
+    "Giữ": "giu.mp3",
+    "Lên": "len.mp3",
+    "Tốt lắm": "tot_lam.mp3",
+    "Sai tư thế, chú ý": "sai_tu_the.mp3",
+  };
+
   Future<void> speak(String text) async {
     try {
+      // 1. Check local assets to reduce lag
+      if (_assetMap.containsKey(text)) {
+        final filename = _assetMap[text]!;
+        final assetPath = 'assets/audio/$filename';
+        try {
+          await rootBundle.load(assetPath);
+          await _audioPlayer.play(AssetSource('audio/$filename'));
+          return;
+        } catch (_) {
+          // Fall back to API if not cached locally
+        }
+      }
+
+      // 2. Fall back to Viettel API
       final response = await http.post(
         Uri.parse(_apiUrl),
         headers: {
