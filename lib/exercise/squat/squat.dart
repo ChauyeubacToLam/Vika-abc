@@ -12,6 +12,7 @@ import 'metrics/trunk_lean_metric.dart';
 import 'metrics/heel_rise_metric.dart';
 import 'metrics/tempo_metric.dart';
 import 'metrics/hip_shoulder_sync.dart';
+import '../../services/viettel_tts_service.dart';
 
 /* =========================================================================
    CONFIGURATION & THRESHOLDS
@@ -37,6 +38,8 @@ enum SquatState {
 class Squat extends ExerciseBase {
   SquatState squatState = SquatState.standing;
   SquatState previousSquatState = SquatState.standing;
+
+  final ViettelTTSService _ttsService = ViettelTTSService();
 
   // Debounce entry into rep — prevents false starts from noisy frames
   final Debouncer _entryDebouncer = Debouncer(requiredFrames: 2);
@@ -296,6 +299,12 @@ class Squat extends ExerciseBase {
 
       // UI feedback
       resultIssues.feedback['Result'] = correctForm ? 'Good Rep!' : 'Fix Form';
+      
+      if (correctForm) {
+        _ttsService.speak("Tốt lắm");
+      } else {
+        _ttsService.speak("Sai tư thế, chú ý");
+      }
 
       // Build fault map for set history
       final faultMap = <String, Map<String, String>>{};
@@ -399,6 +408,11 @@ class Squat extends ExerciseBase {
     // Instructions were shown during standing — no longer needed.
     if (newState == SquatState.descending) {
       resultIssues.instructions.clear();
+      _ttsService.speak("Xuống");
+    } else if (newState == SquatState.bottom) {
+      _ttsService.speak("Giữ");
+    } else if (newState == SquatState.ascending) {
+      _ttsService.speak("Lên");
     }
 
     for (final metric in _metrics) {
