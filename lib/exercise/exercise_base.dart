@@ -133,6 +133,7 @@ abstract class ExerciseBase {
       }
     }
     _lastFrameTime = now;
+    frameTimestamp = now; // for the person detection
 
     resultIssues.feedback.clear();
 

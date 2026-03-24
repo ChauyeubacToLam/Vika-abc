@@ -94,16 +94,16 @@ class TransitionPage extends StatelessWidget {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                     decoration: BoxDecoration(
-                      color: VF.brand.withValues(alpha: 0.13),
+                      color: VF.accent.withValues(alpha: 0.13),
                       borderRadius: BorderRadius.circular(8),
                       border:
-                          Border.all(color: VF.brand.withValues(alpha: 0.26)),
+                          Border.all(color: VF.accent.withValues(alpha: 0.26)),
                     ),
                     child: const Text('→ Chống đẩy tường',
                         style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: VF.brand)),
+                            color: VF.accent)),
                   ),
                 ],
               ),
@@ -116,9 +116,9 @@ class TransitionPage extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 48, vertical: 14),
                   decoration: BoxDecoration(
-                    gradient: VF.brandGrad,
+                    color: VF.accent,
                     borderRadius: BorderRadius.circular(14),
-                    boxShadow: VF.heroShadow,
+                    boxShadow: VF.accentShadow,
                   ),
                   child: const Text('Bắt đầu',
                       style: TextStyle(

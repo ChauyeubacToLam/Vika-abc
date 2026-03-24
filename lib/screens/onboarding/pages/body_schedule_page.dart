@@ -1,13 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import '../onboarding_data.dart';
 import '../vf_theme.dart';
 
 class BodySchedulePage extends StatefulWidget {
   final OnboardingData data;
-  final VoidCallback onComplete;
-  const BodySchedulePage(
-      {super.key, required this.data, required this.onComplete});
+  final VoidCallback onNext;
+  final VoidCallback onBack;
+
+  const BodySchedulePage({
+    super.key,
+    required this.data,
+    required this.onNext,
+    required this.onBack,
+  });
 
   @override
   State<BodySchedulePage> createState() => _BodySchedulePageState();
@@ -19,22 +26,23 @@ class _BodySchedulePageState extends State<BodySchedulePage> {
 
   static const _dayLabels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
   static const _times = [
-    ('morning', 'Sáng', '6-9h', '☀️'),
-    ('noon', 'Trưa', '11-13h', '🌤'),
-    ('evening', 'Chiều tối', '17-20h', '🌅'),
-    ('night', 'Tối', '20-22h', '🌙'),
+    ('morning', 'Sáng', '6-9h'),
+    ('noon', 'Trưa', '11-13h'),
+    ('evening', 'Chiều tối', '17-20h'),
+    ('night', 'Tối', '20-22h'),
   ];
 
   @override
   void initState() {
     super.initState();
     _hCtrl = TextEditingController(
-        text: widget.data.heightCm?.toStringAsFixed(0) ?? '');
+      text: widget.data.heightCm?.toStringAsFixed(0) ?? '',
+    );
     _wCtrl = TextEditingController(
-        text: widget.data.weightKg?.toStringAsFixed(0) ?? '');
-    // Default schedule if empty
+      text: widget.data.weightKg?.toStringAsFixed(0) ?? '',
+    );
     if (widget.data.workoutDays.isEmpty) {
-      widget.data.workoutDays = [0, 2, 4]; // Mon, Wed, Fri
+      widget.data.workoutDays = [0, 2, 4];
     }
     widget.data.preferredTime ??= 'evening';
   }
@@ -75,191 +83,172 @@ class _BodySchedulePageState extends State<BodySchedulePage> {
       onTap: () => FocusScope.of(context).unfocus(),
       child: Column(
         children: [
+          VFProgressBar(current: 6, total: 7, onBack: widget.onBack),
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+            child: VFFitViewport(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Thông tin & lịch tập',
-                      style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          color: VF.text,
-                          letterSpacing: -0.5)),
-                  const SizedBox(height: 4),
-                  const Text('Giúp AI tạo chương trình phù hợp nhất',
-                      style: TextStyle(fontSize: 13, color: VF.textMuted)),
-                  const SizedBox(height: 22),
-
-                  // ── Height + Weight side by side ──
-                  Row(children: [
-                    Expanded(child: _unitField('CHIỀU CAO', _hCtrl, 'cm')),
-                    const SizedBox(width: 10),
-                    Expanded(child: _unitField('CÂN NẶNG', _wCtrl, 'kg')),
-                  ]),
-                  const SizedBox(height: 6),
-
-                  // ── BMI Card ──
-                  if (bmiValid) _BmiCard(bmi: bmi),
-
-                  // ── Divider ──
-                  Container(
-                    height: 1,
-                    color: VF.border,
-                    margin: const EdgeInsets.symmetric(vertical: 18),
+                  const Text(
+                    'Thông tin và lịch tập',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                      color: VF.text,
+                      letterSpacing: -0.6,
+                    ),
                   ),
-
-                  // ── Schedule: Day picker ──
-                  const Text('LỊCH TẬP',
-                      style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: VF.textMuted,
-                          letterSpacing: 0.8)),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Phần cuối cùng trước khi hiện chương trình. Giữ mọi lựa chọn gọn, rõ, và thiên về planning hơn là decoration.',
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      color: VF.textMuted,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: List.generate(7, (i) {
-                      final on = widget.data.workoutDays.contains(i);
-                      return GestureDetector(
-                        onTap: () => _toggleDay(i),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 150),
-                          width: 40,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: on ? VF.brand : VF.surface,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                                color: on ? VF.brand : VF.border,
-                                width: on ? 2 : 1.5),
-                            boxShadow: on
-                                ? [
-                                    BoxShadow(
-                                        color: VF.brand.withValues(alpha: 0.2),
-                                        blurRadius: 6,
-                                        offset: const Offset(0, 2))
-                                  ]
-                                : null,
+                    children: [
+                      Expanded(child: _unitField('CHIỀU CAO', _hCtrl, 'cm')),
+                      const SizedBox(width: 10),
+                      Expanded(child: _unitField('CÂN NẶNG', _wCtrl, 'kg')),
+                    ],
+                  ),
+                  if (bmiValid) ...[
+                    const SizedBox(height: 12),
+                    _BmiCard(bmi: bmi),
+                  ],
+                  const SizedBox(height: 16),
+                  VFPanel(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Ngày tập',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: VF.text,
                           ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(_dayLabels[i],
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: on ? Colors.white : VF.textSec)),
-                              if (on)
-                                Container(
-                                  width: 5,
-                                  height: 5,
-                                  margin: const EdgeInsets.only(top: 3),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.6),
-                                    shape: BoxShape.circle,
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Chọn các ngày bạn có thể duy trì đều nhất.',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: VF.textMuted,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: List.generate(7, (i) {
+                            final on = widget.data.workoutDays.contains(i);
+                            return GestureDetector(
+                              onTap: () => _toggleDay(i),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 150),
+                                width: 40,
+                                height: 50,
+                                decoration: BoxDecoration(
+                                  color: on ? VF.accentSoft : VF.bg,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: on
+                                        ? VF.accent.withValues(alpha: 0.28)
+                                        : VF.border,
+                                    width: 1.4,
                                   ),
                                 ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }),
-                  ),
-                  if (widget.data.workoutDays.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Text('${widget.data.workoutDays.length} ngày/tuần',
-                          style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: VF.brand)),
-                    ),
-                  const SizedBox(height: 14),
-
-                  // ── Schedule: Time preference ──
-                  const Text('GIỜ TẬP',
-                      style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: VF.textMuted,
-                          letterSpacing: 0.8)),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: _times.map((t) {
-                      final on = widget.data.preferredTime == t.$1;
-                      return GestureDetector(
-                        onTap: () =>
-                            setState(() => widget.data.preferredTime = t.$1),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 150),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: on ? VF.brandLight : VF.surface,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                                color: on
-                                    ? VF.brand.withValues(alpha: 0.4)
-                                    : VF.border,
-                                width: on ? 2 : 1.5),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(t.$4, style: const TextStyle(fontSize: 14)),
-                              const SizedBox(width: 6),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(t.$2,
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      _dayLabels[i],
                                       style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w700,
-                                          color: on ? VF.brand : VF.text)),
-                                  Text(t.$3,
-                                      style: const TextStyle(
-                                          fontSize: 9.5, color: VF.textMuted)),
-                                ],
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: on ? VF.accent : VF.textSec,
+                                      ),
+                                    ),
+                                    if (on) ...[
+                                      const SizedBox(height: 3),
+                                      const VFCheckIcon(size: 9),
+                                    ],
+                                  ],
+                                ),
                               ),
-                            ],
+                            );
+                          }),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  VFPanel(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Khung giờ ưu tiên',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: VF.text,
                           ),
                         ),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 16),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'VinaFit sẽ ưu tiên reminder và planning quanh khung giờ này.',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: VF.textMuted,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ...List.generate(2, (rowIndex) {
+                          final start = rowIndex * 2;
+                          final rowItems = _times.skip(start).take(2).toList();
 
-                  // Privacy note
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: VF.surface,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: VF.border),
+                          return Padding(
+                            padding:
+                                EdgeInsets.only(bottom: rowIndex == 1 ? 0 : 8),
+                            child: Row(
+                              children: List.generate(rowItems.length, (index) {
+                                final item = rowItems[index];
+                                final isLast = index == rowItems.length - 1;
+                                return Expanded(
+                                  child: Padding(
+                                    padding:
+                                        EdgeInsets.only(right: isLast ? 0 : 8),
+                                    child: _TimeOptionCard(
+                                      label: item.$2,
+                                      subtitle: item.$3,
+                                      selected:
+                                          widget.data.preferredTime == item.$1,
+                                      onTap: () => setState(() {
+                                        widget.data.preferredTime = item.$1;
+                                      }),
+                                    ),
+                                  ),
+                                );
+                              }),
+                            ),
+                          );
+                        }),
+                      ],
                     ),
-                    child: const Row(children: [
-                      Icon(Icons.lock_outline, size: 14, color: VF.textMuted),
-                      SizedBox(width: 8),
-                      Text('Chỉ lưu trên thiết bị, không chia sẻ',
-                          style:
-                              TextStyle(fontSize: 10.5, color: VF.textMuted)),
-                    ]),
                   ),
-                  const SizedBox(height: 16),
                 ],
               ),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 28),
+            padding: const EdgeInsets.fromLTRB(24, 18, 24, 28),
             child: VFButton(
               label: 'Xem chương trình của tôi',
-              onTap: _canProceed ? widget.onComplete : null,
+              onTap: _canProceed ? widget.onNext : null,
               enabled: _canProceed,
             ),
           ),
@@ -272,49 +261,66 @@ class _BodySchedulePageState extends State<BodySchedulePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: VF.textMuted,
-                letterSpacing: 0.5)),
-        const SizedBox(height: 5),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10.5,
+            fontWeight: FontWeight.w700,
+            color: VF.textMuted,
+            letterSpacing: 0.6,
+          ),
+        ),
+        const SizedBox(height: 6),
         Container(
           decoration: BoxDecoration(
             color: VF.surface,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(color: VF.border, width: 1.5),
+            boxShadow: VF.cardShadow,
           ),
-          child: Row(children: [
-            Expanded(
-              child: TextField(
-                controller: ctrl,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))
-                ],
-                onChanged: (_) => setState(() {}),
-                style: const TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.w800, color: VF.text),
-                decoration: InputDecoration(
-                  border: InputBorder.none,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  hintText: unit == 'cm' ? '165' : '60',
-                  hintStyle: TextStyle(
-                      color: VF.textMuted.withValues(alpha: 0.5),
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: ctrl,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
+                  ],
+                  onChanged: (_) => setState(() {}),
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: VF.text,
+                  ),
+                  decoration: InputDecoration(
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 14,
+                    ),
+                    hintText: unit == 'cm' ? '165' : '60',
+                    hintStyle: TextStyle(
+                      color: VF.textMuted.withValues(alpha: 0.45),
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: Text(unit,
-                  style: const TextStyle(fontSize: 13, color: VF.textMuted)),
-            ),
-          ]),
+              Padding(
+                padding: const EdgeInsets.only(right: 14),
+                child: Text(
+                  unit,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: VF.textMuted,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -328,79 +334,129 @@ class _BodySchedulePageState extends State<BodySchedulePage> {
   }
 }
 
-/// BMI display card with color bar and WHO Asian cutoffs.
+class _TimeOptionCard extends StatelessWidget {
+  final String label;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _TimeOptionCard({
+    required this.label,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? VF.accentSoft : VF.bg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color:
+                selected ? VF.accent.withValues(alpha: 0.28) : VF.border,
+            width: 1.4,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                if (selected) ...[
+                  const VFCheckIcon(size: 10),
+                  const SizedBox(width: 8),
+                ],
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: selected ? VF.accent : VF.text,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: const TextStyle(
+                fontSize: 11,
+                color: VF.textMuted,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _BmiCard extends StatelessWidget {
   final double bmi;
+
   const _BmiCard({required this.bmi});
 
   @override
   Widget build(BuildContext context) {
     final info = _getBmiInfo(bmi);
-
-    // Position: map BMI 12-38 to 0%-100%
     final pos = ((bmi - 12) / 26).clamp(0.0, 1.0);
 
-    return Container(
-      margin: const EdgeInsets.only(top: 6),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: VF.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: VF.border),
-        boxShadow: VF.cardShadow,
-      ),
+    return VFPanel(
+      padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          // BMI number + label
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(children: [
-                const Text('BMI ',
+              Row(
+                children: [
+                  const Text(
+                    'BMI ',
                     style: TextStyle(
-                        fontSize: 12,
-                        color: VF.textMuted,
-                        fontWeight: FontWeight.w600)),
-                Text(bmi.toStringAsFixed(1),
+                      fontSize: 12,
+                      color: VF.textMuted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    bmi.toStringAsFixed(1),
                     style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        color: info.color)),
-              ]),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                decoration: BoxDecoration(
-                  color: info.color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(info.label,
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: info.color)),
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      color: info.color,
+                    ),
+                  ),
+                ],
+              ),
+              VFPill(
+                label: info.label,
+                color: info.color,
+                background: info.color.withValues(alpha: 0.10),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-
-          // Color bar
+          const SizedBox(height: 12),
           SizedBox(
-            height: 8,
+            height: 10,
             child: Stack(
               clipBehavior: Clip.none,
               children: [
-                // Segments
-                Row(children: [
-                  _seg(VF.amber.withValues(alpha: 0.4), 25,
-                      left: true), // Underweight: 12-18.5
-                  _seg(VF.green.withValues(alpha: 0.45), 17), // Normal: 18.5-23
-                  _seg(
-                      VF.orange.withValues(alpha: 0.4), 8), // Overweight: 23-25
-                  _seg(VF.red.withValues(alpha: 0.35), 50,
-                      right: true), // Obese: 25+
-                ]),
-                // Indicator dot
+                Row(
+                  children: [
+                    _seg(VF.amber.withValues(alpha: 0.35), 25, left: true),
+                    _seg(VF.green.withValues(alpha: 0.40), 17),
+                    _seg(VF.amber.withValues(alpha: 0.50), 8),
+                    _seg(VF.red.withValues(alpha: 0.30), 50, right: true),
+                  ],
+                ),
                 Positioned(
                   left: 0,
                   right: 0,
@@ -411,17 +467,12 @@ class _BmiCard extends StatelessWidget {
                     child: Align(
                       alignment: Alignment.centerRight,
                       child: Container(
-                        width: 14,
-                        height: 14,
+                        width: 16,
+                        height: 16,
                         decoration: BoxDecoration(
                           color: info.color,
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white, width: 2),
-                          boxShadow: [
-                            BoxShadow(
-                                color: info.color.withValues(alpha: 0.3),
-                                blurRadius: 4)
-                          ],
                         ),
                       ),
                     ),
@@ -430,24 +481,16 @@ class _BmiCard extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 6),
-
-          // Labels
+          const SizedBox(height: 8),
           const Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Thiếu cân',
-                  style: TextStyle(fontSize: 9, color: VF.textMuted)),
+              Text('Thiếu cân', style: TextStyle(fontSize: 9, color: VF.textMuted)),
               Text('BT', style: TextStyle(fontSize: 9, color: VF.textMuted)),
               Text('Thừa', style: TextStyle(fontSize: 9, color: VF.textMuted)),
-              Text('Béo phì',
-                  style: TextStyle(fontSize: 9, color: VF.textMuted)),
+              Text('Béo phì', style: TextStyle(fontSize: 9, color: VF.textMuted)),
             ],
           ),
-          const SizedBox(height: 6),
-          const Text('Chuẩn WHO cho người châu Á (BMI 18.5-23)',
-              style: TextStyle(fontSize: 10, color: VF.textMuted),
-              textAlign: TextAlign.center),
         ],
       ),
     );
@@ -460,10 +503,10 @@ class _BmiCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: color,
           borderRadius: BorderRadius.only(
-            topLeft: left ? const Radius.circular(4) : Radius.zero,
-            bottomLeft: left ? const Radius.circular(4) : Radius.zero,
-            topRight: right ? const Radius.circular(4) : Radius.zero,
-            bottomRight: right ? const Radius.circular(4) : Radius.zero,
+            topLeft: left ? const Radius.circular(999) : Radius.zero,
+            bottomLeft: left ? const Radius.circular(999) : Radius.zero,
+            topRight: right ? const Radius.circular(999) : Radius.zero,
+            bottomRight: right ? const Radius.circular(999) : Radius.zero,
           ),
         ),
       ),
@@ -473,7 +516,7 @@ class _BmiCard extends StatelessWidget {
   static _BmiInfo _getBmiInfo(double bmi) {
     if (bmi < 18.5) return const _BmiInfo('Thiếu cân', VF.amber);
     if (bmi < 23) return const _BmiInfo('Bình thường', VF.green);
-    if (bmi < 25) return const _BmiInfo('Thừa cân', VF.orange);
+    if (bmi < 25) return const _BmiInfo('Thừa cân', VF.amber);
     return const _BmiInfo('Béo phì', VF.red);
   }
 }
@@ -481,5 +524,6 @@ class _BmiCard extends StatelessWidget {
 class _BmiInfo {
   final String label;
   final Color color;
+
   const _BmiInfo(this.label, this.color);
 }

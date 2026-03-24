@@ -15,7 +15,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'exercise/exercise_base.dart';
 import 'models/exercise_definition.dart';
-import 'screens/home_screen.dart';
+import 'screens/main_shell.dart';
+import 'theme/vf_theme.dart';
 
 /* =========================================================================
    APP ENTRY POINT
@@ -97,9 +98,15 @@ class VinaFitApp extends StatelessWidget {
         useMaterial3: true,
         fontFamily: 'Roboto',
       ),
-      initialRoute: _hasCompletedOnboarding ? '/onboarding' : '/onboarding',
+      builder: (context, child) => ScrollConfiguration(
+        behavior: const VFScrollBehavior(),
+        child: child ?? const SizedBox.shrink(),
+      ),
+      initialRoute: _hasCompletedOnboarding ? '/' : '/onboarding',
       onGenerateRoute: (settings) {
         switch (settings.name) {
+          case '/':
+            return MaterialPageRoute(builder: (_) => const MainShell());
           case '/onboarding':
             return MaterialPageRoute(
               builder: (_) => const OnboardingScreen(),
@@ -110,7 +117,7 @@ class VinaFitApp extends StatelessWidget {
               builder: (_) => ExerciseScreen(definition: definition),
             );
           default:
-            return MaterialPageRoute(builder: (_) => const HomeScreen());
+            return MaterialPageRoute(builder: (_) => const MainShell());
         }
       },
     );

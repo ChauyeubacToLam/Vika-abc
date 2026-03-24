@@ -1,464 +1,336 @@
-import 'package:flutter/material.dart';
 import 'dart:math' as math;
-import '../onboarding_data.dart';
-import '../vf_theme.dart';
+
+import 'package:flutter/material.dart';
 import 'package:vinafit_mobile/utils/exercise_logger.dart';
 
-class FactsPage extends StatefulWidget {
+import '../onboarding_data.dart';
+import '../vf_theme.dart';
+
+class FactsPage extends StatelessWidget {
   final OnboardingData data;
   final VoidCallback onNext;
-  const FactsPage({super.key, required this.data, required this.onNext});
+  final VoidCallback onBack;
 
-  @override
-  State<FactsPage> createState() => _FactsPageState();
-}
-
-class _FactsPageState extends State<FactsPage> {
-  int _tab = 0;
-
-  // ── Extract per-rep data from logger ──
-
-  List<bool> _repResults(ExerciseLogger logger) {
-    return logger.repLogs.map((r) => r.correctForm == true).toList();
-  }
-
-  List<int> _repDepths(ExerciseLogger logger, String depthKey) {
-    return logger.repLogs
-        .map((r) => (r.data[depthKey] as num?)?.round() ?? 0)
-        .toList();
-  }
-
-  int _goodCount(ExerciseLogger logger) {
-    return (logger.setLogs["good_rep_count"] as int?) ?? 0;
-  }
-
-  int _totalCount(ExerciseLogger logger) {
-    return logger.repLogs.length;
-  }
+  const FactsPage({
+    super.key,
+    required this.data,
+    required this.onNext,
+    required this.onBack,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final sqLog = widget.data.squatLogger;
-    // final wpLog = widget.data.pushUpLogger;
-
-    final sqGood = _goodCount(sqLog);
-    final sqTotal = _totalCount(sqLog);
-    // final wpGood = wpLog != null ? (wpLog.setLogs["correct_rep"] as int? ?? 0) : 0;
-    // final wpTotal = wpLog != null ? wpLog.repLogs.length : 0;
-    final totalGood = sqGood; // + wpGood;
-    final totalAll = sqTotal; // + wpTotal;
-
-    final sqReps = _repResults(sqLog);
-    // final wpReps = wpLog != null ? _repResults(wpLog) : <bool>[];
-    final sqDepths = _repDepths(sqLog, "peak_knee_angle");
-    // final wpDepths = wpLog != null ? _repDepths(wpLog, "peak_knee_angle") : <int>[];
-
-    final sqHeelFails = (sqLog.setLogs["heel_fails_count"] as int?) ?? 0;
-    final sqMinDepth = sqLog.setLogs["min_knee_angle"];
-    final sqAvgDescent = sqLog.setLogs["avg_descending_time"];
-
-    // final wpMinDepth = wpLog != null ? wpLog.setLogs["min_knee_angle"] : null;
-    // final wpAvgDescent = wpLog != null ? wpLog.setLogs["avg_descending_time"] : null;
-
-    final exercises = [
-      _TabData(
-        label: 'Squat',
-        sub: 'Hạ thân',
-        icon: '🏋️',
-        accent: VF.brand,
-        good: sqGood,
-        total: sqTotal,
-        reps: sqReps,
-        depths: sqDepths.isNotEmpty ? sqDepths : [0],
-        bestDepth:
-            sqMinDepth != null ? '${(sqMinDepth as num).round()}°' : '--',
-        avgTempo: sqAvgDescent != null
-            ? '${(sqAvgDescent as num).toStringAsFixed(1)}s'
-            : '--',
-        heelRise: sqHeelFails > 0 ? '$sqHeelFails/$sqTotal' : null,
-        improved: sqDepths.length >= 2 && sqDepths.first > sqDepths.last,
-      ),
-      /*
-      _TabData(
-        label: 'Chống đẩy tường',
-        sub: 'Thân trên',
-        icon: '🧱',
-        accent: VF.green,
-        good: 0, // wpGood
-        total: 1, // wpTotal
-        reps: [], // wpReps
-        depths: [0], // wpDepths.isNotEmpty ? wpDepths : [0]
-        bestDepth: '--', // wpMinDepth != null ? '${(wpMinDepth as num).round()}°' : '--'
-        avgTempo: '--', // wpAvgDescent != null ? '${(wpAvgDescent as num).toStringAsFixed(1)}s' : '--'
-        heelRise: null,
-        improved: false, // wpDepths.length >= 2 && wpDepths.first > wpDepths.last
-      ),
-      */
-    ];
-
-    final ex = exercises[_tab];
-    final maxD = ex.depths.reduce(math.max);
-    final minD = ex.depths.reduce(math.min);
-    final range = (maxD - minD).clamp(1, 999);
+    final log = data.squatLogger;
+    final reps = _repResults(log);
+    final depths = _repDepths(log);
+    final good = _goodCount(log);
+    final total = log.repLogs.length;
+    final bestDepthValue = log.setLogs['min_knee_angle'];
+    final avgTempoValue = log.setLogs['avg_descending_time'];
+    final heelFails = (log.setLogs['heel_fails_count'] as int?) ?? 0;
+    final bestDepth =
+        bestDepthValue == null ? '--' : '${(bestDepthValue as num).round()}°';
+    final avgTempo = avgTempoValue == null
+        ? '--'
+        : '${(avgTempoValue as num).toStringAsFixed(1)}s';
 
     return Column(
       children: [
-        // ── Hero ──
-        GradHeader(
-          radius: 28,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-            child: Column(children: [
-              Text('KẾT QUẢ KIỂM TRA',
-                  style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.white.withValues(alpha: 0.4),
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 1.5)),
-              const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text('$totalGood',
-                      style: const TextStyle(
-                          fontSize: 48,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                          height: 1)),
-                  Text(' / $totalAll',
-                      style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white.withValues(alpha: 0.4))),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text('reps đúng form',
-                  style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.white.withValues(alpha: 0.5))),
-              const SizedBox(height: 10),
-              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                Text('Hạ thân ',
-                    style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.white.withValues(alpha: 0.5))),
-                Text('$sqGood/$sqTotal',
-                    style: const TextStyle(
-                        fontSize: 11,
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700)),
-                /*
-                Text('  ·  ',
-                    style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.white.withValues(alpha: 0.3))),
-                Text('Thân trên ',
-                    style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.white.withValues(alpha: 0.5))),
-                Text('\$wpGood/\$wpTotal',
-                    style: const TextStyle(
-                        fontSize: 11,
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700)),
-                */
-              ]),
-            ]),
-          ),
-        ),
-
-        // ── Tabs ──
-        Row(
-          children: List.generate(exercises.length, (i) {
-            final e = exercises[i];
-            final on = _tab == i;
-            return Expanded(
-              child: GestureDetector(
-                onTap: () => setState(() => _tab = i),
-                child: Container(
-                  padding: const EdgeInsets.only(top: 12, bottom: 10),
-                  decoration: BoxDecoration(
-                    border: Border(
-                        bottom: BorderSide(
-                            color: on ? e.accent : Colors.transparent,
-                            width: 2.5)),
-                  ),
-                  child: Column(children: [
-                    Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      Text(e.icon, style: const TextStyle(fontSize: 15)),
-                      const SizedBox(width: 6),
-                      Text(e.label,
-                          style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: on ? VF.text : VF.textMuted)),
-                    ]),
-                    const SizedBox(height: 2),
-                    Text('${e.good}/${e.total} reps tốt',
-                        style: TextStyle(
-                            fontSize: 10,
-                            color: on ? e.accent : VF.textMuted,
-                            fontWeight: FontWeight.w600)),
-                  ]),
-                ),
-              ),
-            );
-          }),
-        ),
-
-        // ── Content ──
+        VFProgressBar(current: 3, total: 7, onBack: onBack),
         Expanded(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-            child: Column(children: [
-              // Rep strip
-              Row(
-                children: List.generate(
-                    ex.reps.length,
-                    (i) => Expanded(
-                          child: Container(
-                            height: 6,
-                            margin: EdgeInsets.only(
-                                right: i < ex.reps.length - 1 ? 6 : 0),
-                            decoration: BoxDecoration(
-                              color: ex.reps[i]
-                                  ? VF.green
-                                  : VF.red.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                          ),
-                        )),
-              ),
-              const SizedBox(height: 18),
-
-              // Chart card
-              Container(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                decoration: BoxDecoration(
-                  color: VF.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: VF.border),
-                  boxShadow: VF.cardShadow,
+          child: VFFitViewport(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Baseline from your first check',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    color: VF.text,
+                    letterSpacing: -0.6,
+                  ),
                 ),
-                child: Column(children: [
-                  Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Độ sâu từng rep',
-                            style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: VF.text)),
-                        if (ex.improved &&
-                            ex.depths.length >= 2 &&
-                            ex.depths.first > ex.depths.last)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                                color: VF.green.withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(6)),
-                            child: Text(
-                                '↓ ${ex.depths.first - ex.depths.last}° sâu hơn',
-                                style: const TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color: VF.green)),
-                          ),
-                      ]),
-                  const SizedBox(height: 14),
-
-                  // Bars
-                  SizedBox(
-                    height: 100,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: List.generate(ex.depths.length, (i) {
-                        final d = ex.depths[i];
-                        final pct = range > 0
-                            ? 0.25 + ((maxD - d) / range) * 0.65
-                            : 0.5;
-                        final good = i < ex.reps.length ? ex.reps[i] : false;
-                        return Expanded(
-                          child: Padding(
-                            padding: EdgeInsets.only(
-                                left: i > 0 ? 5 : 0,
-                                right: i < ex.depths.length - 1 ? 5 : 0),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                Text('$d°',
-                                    style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w700,
-                                        color:
-                                            good ? ex.accent : VF.textMuted)),
-                                const SizedBox(height: 4),
-                                Flexible(
-                                  child: FractionallySizedBox(
-                                    heightFactor: pct,
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        borderRadius: const BorderRadius.only(
-                                            topLeft: Radius.circular(8),
-                                            topRight: Radius.circular(8),
-                                            bottomLeft: Radius.circular(4),
-                                            bottomRight: Radius.circular(4)),
-                                        gradient: LinearGradient(
-                                          begin: Alignment.topCenter,
-                                          end: Alignment.bottomCenter,
-                                          colors: good
-                                              ? [
-                                                  ex.accent,
-                                                  ex.accent
-                                                      .withValues(alpha: 0.5)
-                                                ]
-                                              : [
-                                                  VF.border,
-                                                  VF.border
-                                                      .withValues(alpha: 0.7)
-                                                ],
-                                        ),
-                                        boxShadow: good
-                                            ? [
-                                                BoxShadow(
-                                                    color: ex.accent.withValues(
-                                                        alpha: 0.15),
-                                                    blurRadius: 8,
-                                                    offset: const Offset(0, 2))
-                                              ]
-                                            : null,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
+                const SizedBox(height: 6),
+                const Text(
+                  'Giữ phần kết quả này sạch và thực dụng: form score, rep strip, và vài chỉ số đủ để dẫn sang level prediction.',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    color: VF.textMuted,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                VFPanel(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Squat assessment',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: VF.text,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '$good',
+                            style: const TextStyle(
+                              fontSize: 48,
+                              fontWeight: FontWeight.w900,
+                              color: VF.text,
+                              height: 0.95,
                             ),
                           ),
-                        );
-                      }),
-                    ),
-                  ),
-
-                  // Rep labels
-                  Container(
-                    padding: const EdgeInsets.only(top: 8),
-                    margin: const EdgeInsets.only(top: 8),
-                    decoration: BoxDecoration(
-                        border: Border(
-                            top: BorderSide(
-                                color: VF.border.withValues(alpha: 0.3)))),
-                    child: Row(
-                      children: List.generate(
-                          ex.depths.length,
+                          Padding(
+                            padding: const EdgeInsets.only(left: 8, bottom: 7),
+                            child: Text(
+                              '/ $total reps đúng form',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: VF.textMuted,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: List.generate(
+                          reps.length,
                           (i) => Expanded(
-                                child: Text('Rep ${i + 1}',
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                        fontSize: 9,
-                                        color: VF.textMuted,
-                                        fontWeight: FontWeight.w500)),
-                              )),
-                    ),
+                            child: Container(
+                              height: 6,
+                              margin: EdgeInsets.only(
+                                right: i < reps.length - 1 ? 6 : 0,
+                              ),
+                              decoration: BoxDecoration(
+                                color: reps[i]
+                                    ? VF.green
+                                    : VF.red.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      _DepthChart(depths: depths, reps: reps),
+                    ],
                   ),
-                ]),
-              ),
-              const SizedBox(height: 14),
-
-              // Stats
-              Row(children: [
-                _Stat(icon: '🎯', value: ex.bestDepth, label: 'Tốt nhất'),
-                const SizedBox(width: 8),
-                _Stat(icon: '⏱', value: ex.avgTempo, label: 'Nhịp TB'),
-                if (ex.heelRise != null) ...[
-                  const SizedBox(width: 8),
-                  _Stat(
-                      icon: '👟',
-                      value: ex.heelRise!,
-                      label: 'Gót nhấc',
-                      warn: true),
-                ],
-              ]),
-
-              const Spacer(),
-              const Center(
-                  child: Text('Đây là điểm xuất phát. Kiểm tra lại sau 2 tuần!',
-                      style: TextStyle(fontSize: 11, color: VF.textMuted))),
-            ]),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _StatCard(
+                        label: 'Độ sâu tốt nhất',
+                        value: bestDepth,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _StatCard(
+                        label: 'Nhịp trung bình',
+                        value: avgTempo,
+                      ),
+                    ),
+                    if (heelFails > 0) ...[
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _StatCard(
+                          label: 'Gót nhấc',
+                          value: '$heelFails/$total',
+                          emphasized: true,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
-
         Padding(
-          padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
-          child: VFButton(label: 'Tiếp tục', onTap: widget.onNext),
+          padding: const EdgeInsets.fromLTRB(24, 18, 24, 28),
+          child: VFButton(label: 'Tiếp tục', onTap: onNext),
         ),
       ],
     );
   }
-}
 
-class _Stat extends StatelessWidget {
-  final String icon, value, label;
-  final bool warn;
-  const _Stat(
-      {required this.icon,
-      required this.value,
-      required this.label,
-      this.warn = false});
+  static List<bool> _repResults(ExerciseLogger logger) {
+    return logger.repLogs.map((r) => r.correctForm == true).toList();
+  }
 
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-        child: Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
-      decoration: BoxDecoration(
-        color: VF.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-            color: warn ? VF.amber.withValues(alpha: 0.2) : VF.border),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 4)
-        ],
-      ),
-      child: Column(children: [
-        Text(icon, style: const TextStyle(fontSize: 13)),
-        const SizedBox(height: 4),
-        Text(value,
-            style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: warn ? VF.amber : VF.text)),
-        const SizedBox(height: 2),
-        Text(label,
-            style: const TextStyle(
-                fontSize: 9, color: VF.textMuted, fontWeight: FontWeight.w500)),
-      ]),
-    ));
+  static List<int> _repDepths(ExerciseLogger logger) {
+    final values = logger.repLogs
+        .map((r) => (r.data['peak_knee_angle'] as num?)?.round() ?? 0)
+        .toList();
+    return values.isEmpty ? [0] : values;
+  }
+
+  static int _goodCount(ExerciseLogger logger) {
+    return (logger.setLogs['good_rep_count'] as int?) ?? 0;
   }
 }
 
-class _TabData {
-  final String label, sub, icon, bestDepth, avgTempo;
-  final String? heelRise;
-  final Color accent;
-  final int good, total;
-  final List<bool> reps;
+class _DepthChart extends StatelessWidget {
   final List<int> depths;
-  final bool improved;
-  const _TabData(
-      {required this.label,
-      required this.sub,
-      required this.icon,
-      required this.accent,
-      required this.good,
-      required this.total,
-      required this.reps,
-      required this.depths,
-      required this.bestDepth,
-      required this.avgTempo,
-      required this.improved,
-      this.heelRise});
+  final List<bool> reps;
+
+  const _DepthChart({required this.depths, required this.reps});
+
+  @override
+  Widget build(BuildContext context) {
+    final maxDepth = depths.reduce(math.max);
+    final minDepth = depths.reduce(math.min);
+    final range = (maxDepth - minDepth).clamp(1, 999);
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+      decoration: BoxDecoration(
+        color: VF.bg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: VF.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Độ sâu từng rep',
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: VF.text,
+            ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            height: 110,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: List.generate(depths.length, (index) {
+                final depth = depths[index];
+                final good = index < reps.length ? reps[index] : false;
+                final heightFactor =
+                    0.28 + ((maxDepth - depth) / range) * 0.58;
+                return Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      left: index > 0 ? 5 : 0,
+                      right: index < depths.length - 1 ? 5 : 0,
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text(
+                          '$depth°',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: good ? VF.accent : VF.textMuted,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.bottomCenter,
+                            child: FractionallySizedBox(
+                              heightFactor: heightFactor,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: good ? VF.accent : VF.bgDeep,
+                                  borderRadius: const BorderRadius.only(
+                                    topLeft: Radius.circular(10),
+                                    topRight: Radius.circular(10),
+                                    bottomLeft: Radius.circular(4),
+                                    bottomRight: Radius.circular(4),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: List.generate(
+              depths.length,
+              (index) => Expanded(
+                child: Text(
+                  'Rep ${index + 1}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 9,
+                    color: VF.textMuted,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatCard extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool emphasized;
+
+  const _StatCard({
+    required this.label,
+    required this.value,
+    this.emphasized = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      decoration: BoxDecoration(
+        color: emphasized ? VF.amberSoft : VF.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: emphasized ? VF.amber.withValues(alpha: 0.18) : VF.border,
+        ),
+        boxShadow: emphasized ? null : VF.cardShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: emphasized ? VF.amber : VF.text,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11.5,
+              color: VF.textMuted,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

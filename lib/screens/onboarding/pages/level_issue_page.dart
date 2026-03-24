@@ -1,394 +1,279 @@
 import 'package:flutter/material.dart';
+
 import '../onboarding_data.dart';
 import '../vf_theme.dart';
 
 class LevelIssuePage extends StatefulWidget {
   final OnboardingData data;
   final VoidCallback onNext;
-  const LevelIssuePage({super.key, required this.data, required this.onNext});
+  final VoidCallback onBack;
+
+  const LevelIssuePage({
+    super.key,
+    required this.data,
+    required this.onNext,
+    required this.onBack,
+  });
 
   @override
   State<LevelIssuePage> createState() => _LevelIssuePageState();
 }
 
 class _LevelIssuePageState extends State<LevelIssuePage> {
-  late String _level;
-
-  @override
-  void initState() {
-    super.initState();
-    _level = _computeLevel();
-    widget.data.confirmedLevel = _level;
-  }
-
-  /// Rule-based level from logger data.
-  String _computeLevel() {
-    final sqLogs = widget.data.squatLogger.setLogs;
-    // final wpLogs = widget.data.pushUpLogger?.setLogs ?? {};
-
-    final sqGood = (sqLogs["good_rep_count"] as int?) ?? 0;
-    final sqTotal = widget.data.squatLogger.repLogs.length;
-    // final wpGood = (wpLogs["good_rep_count"] as int?) ?? 0;
-    // final wpTotal = widget.data.pushUpLogger?.repLogs.length ?? 0;
-
-    final totalGood = sqGood; // + wpGood;
-    final totalReps = sqTotal; // + wpTotal;
-    final ratio = totalReps > 0 ? totalGood / totalReps : 0.0;
-
-    if (ratio >= 0.7) return 'advanced';
-    if (ratio >= 0.4) return 'intermediate';
-    return 'beginner';
-  }
+  late final String _predictedLevel;
+  late String _selectedLevel;
 
   static const _levels = [
-    _LevelOption(
+    (
       id: 'beginner',
-      label: 'Người mới',
-      desc: 'Xây nền tảng, form đúng trước',
-      icon: '🌱',
-      color: VF.green,
-      preview: ['3 buổi/tuần', '~10 phút/buổi', 'Squat · Plank · JJ'],
+      title: 'Người mới',
+      desc: 'Tập trung vào nền tảng, form sạch, tiến bộ ổn định.',
+      preview: '3 buổi/tuần • 10-12 phút • bodyweight cơ bản',
     ),
-    _LevelOption(
+    (
       id: 'intermediate',
-      label: 'Trung bình',
-      desc: 'Sẵn sàng thử thách hơn',
-      icon: '💪',
-      color: VF.brand,
-      preview: ['3-4 buổi/tuần', '~12 phút/buổi', 'Squat · Push-up · Plank'],
+      title: 'Trung bình',
+      desc: 'Có nền tảng vận động và sẵn sàng tăng tải dần.',
+      preview: '3-4 buổi/tuần • 12-15 phút • volume cao hơn',
     ),
-    _LevelOption(
+    (
       id: 'advanced',
-      label: 'Khá tốt',
-      desc: 'Muốn nâng cao, tăng cường độ',
-      icon: '🔥',
-      color: VF.orange,
-      preview: ['4-5 buổi/tuần', '~15 phút/buổi', 'Tất cả · Reps cao'],
+      title: 'Khá tốt',
+      desc: 'Có thể chịu khối lượng tập lớn hơn và tiến độ nhanh hơn.',
+      preview: '4-5 buổi/tuần • 15+ phút • intensity cao hơn',
     ),
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _predictedLevel = _computeLevel();
+    _selectedLevel = _predictedLevel;
+    widget.data.confirmedLevel = _predictedLevel;
+  }
+
+  String _computeLevel() {
+    final good = (widget.data.squatLogger.setLogs['good_rep_count'] as int?) ?? 0;
+    final total = widget.data.squatLogger.repLogs.length;
+    final formRatio = total == 0 ? 0.0 : good / total;
+    final weightedScore = formRatio + (widget.data.frequencyScore * 0.12);
+
+    if (weightedScore >= 0.88) return 'advanced';
+    if (weightedScore >= 0.52) return 'intermediate';
+    return 'beginner';
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Get top issue from interpreter (if squat assessment ran)
     final issueQuestion = widget.data.squatInterpreter.getQuestion();
     final hasIssue = issueQuestion.isNotEmpty;
 
     return Column(
       children: [
+        VFProgressBar(current: 4, total: 7, onBack: widget.onBack),
         Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+          child: VFFitViewport(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header
-                const Text('BƯỚC TIẾP THEO',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: VF.textMuted,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 1,
-                    )),
-                const SizedBox(height: 6),
-                const Text('Chọn trình độ của bạn',
-                    style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        color: VF.text,
-                        letterSpacing: -0.5)),
-                const SizedBox(height: 4),
                 const Text(
-                    'AI gợi ý dựa trên 10 reps. Bạn luôn có thể thay đổi.',
-                    style: TextStyle(fontSize: 13, color: VF.textMuted)),
+                  'AI đề xuất điểm bắt đầu',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    color: VF.text,
+                    letterSpacing: -0.6,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Prediction này dùng cả squat result lẫn tần suất tập bạn đã chọn ở trang đầu.',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    color: VF.textMuted,
+                    height: 1.5,
+                  ),
+                ),
                 const SizedBox(height: 20),
-
-                // Level cards
-                ..._levels.map((l) => _buildLevelCard(l)),
-
-                // Issue spotlight (only if interpreter found something)
+                ..._levels.map(_buildLevelCard),
                 if (hasIssue) ...[
-                  const SizedBox(height: 16),
-                  _buildIssueCard(issueQuestion),
+                  const SizedBox(height: 14),
+                  _IssueCard(
+                    question: issueQuestion,
+                    answer: widget.data.issueAnswer,
+                    onChanged: (value) => setState(() {
+                      widget.data.issueAnswer = value;
+                    }),
+                  ),
                 ],
               ],
             ),
           ),
         ),
-
-        // CTA
         Padding(
-          padding: const EdgeInsets.fromLTRB(24, 14, 24, 28),
+          padding: const EdgeInsets.fromLTRB(24, 18, 24, 28),
           child: VFButton(label: 'Tiếp tục', onTap: widget.onNext),
         ),
       ],
     );
   }
 
-  Widget _buildLevelCard(_LevelOption l) {
-    final on = _level == l.id;
-    final isPredicted = l.id == _computeLevel();
+  Widget _buildLevelCard(
+    ({String id, String title, String desc, String preview}) level,
+  ) {
+    final on = _selectedLevel == level.id;
+    final predicted = _predictedLevel == level.id;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: GestureDetector(
         onTap: () => setState(() {
-          _level = l.id;
-          widget.data.confirmedLevel = l.id;
+          _selectedLevel = level.id;
+          widget.data.confirmedLevel = level.id;
         }),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            color: on ? VF.accentSoft : VF.surface,
+            borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: on ? l.color.withValues(alpha: 0.35) : VF.border,
-              width: 2,
+              color: on ? VF.accent.withValues(alpha: 0.28) : VF.border,
+              width: 1.5,
             ),
-            boxShadow: on
-                ? [
-                    BoxShadow(
-                        color: l.color.withValues(alpha: 0.1),
-                        blurRadius: 20,
-                        offset: const Offset(0, 4))
-                  ]
-                : [
-                    BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.03),
-                        blurRadius: 3,
-                        offset: const Offset(0, 1))
-                  ],
+            boxShadow: on ? VF.cardShadow : null,
           ),
-          clipBehavior: Clip.antiAlias,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Card top
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                decoration: BoxDecoration(
-                  gradient: on
-                      ? LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            l.color.withValues(alpha: 0.06),
-                            l.color.withValues(alpha: 0.02),
-                          ],
-                        )
-                      : null,
-                  color: on ? null : VF.surface,
-                ),
-                child: Row(
-                  children: [
-                    // Icon
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: on ? l.color.withValues(alpha: 0.12) : VF.bg,
-                        borderRadius: BorderRadius.circular(13),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(l.icon, style: const TextStyle(fontSize: 20)),
-                    ),
-                    const SizedBox(width: 14),
-
-                    // Text
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(children: [
-                            Text(l.label,
-                                style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w800,
-                                    color: VF.text)),
-                            if (isPredicted) ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: VF.brand.withValues(alpha: 0.08),
-                                  borderRadius: BorderRadius.circular(5),
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text('✨ ', style: TextStyle(fontSize: 8)),
-                                    Text('AI gợi ý',
-                                        style: TextStyle(
-                                            fontSize: 9,
-                                            fontWeight: FontWeight.w700,
-                                            color: VF.brand)),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ]),
-                          const SizedBox(height: 2),
-                          Text(l.desc,
-                              style: const TextStyle(
-                                  fontSize: 12, color: VF.textMuted)),
-                        ],
-                      ),
-                    ),
-
-                    // Radio
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: on ? l.color : Colors.transparent,
-                        border: Border.all(
-                          color: on ? l.color : VF.border,
-                          width: 2,
-                        ),
-                      ),
-                      child: on
-                          ? Center(
-                              child: Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            )
-                          : null,
-                    ),
-                  ],
-                ),
-              ),
-
-              // Expanded preview
-              if (on)
-                Container(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                  color: l.color.withValues(alpha: 0.02),
-                  child: Column(
-                    children: [
-                      Container(
-                        height: 1,
-                        color: l.color.withValues(alpha: 0.1),
-                        margin: const EdgeInsets.only(bottom: 10),
-                      ),
-                      Row(
-                        children: l.preview.map((p) {
-                          return Expanded(
-                            child: Container(
-                              margin: EdgeInsets.only(
-                                  right: p != l.preview.last ? 6 : 0),
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 8, horizontal: 6),
-                              decoration: BoxDecoration(
-                                color: VF.surface,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                    color: l.color.withValues(alpha: 0.1)),
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                p,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  fontSize: 10.5,
-                                  color: VF.textSec,
-                                  fontWeight: FontWeight.w500,
-                                  height: 1.4,
-                                ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              level.title,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: on ? VF.accent : VF.text,
                               ),
                             ),
-                          );
-                        }).toList(),
-                      ),
-                    ],
+                            if (predicted) ...[
+                              const SizedBox(width: 8),
+                              const VFPill(label: 'AI gợi ý'),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          level.desc,
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            color: VF.textMuted,
+                            height: 1.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  VFCheckIcon(size: 14, filled: on),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: on ? VF.surface : VF.bg,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: VF.border),
+                ),
+                child: Text(
+                  level.preview,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: VF.textSec,
+                    height: 1.45,
                   ),
                 ),
+              ),
             ],
           ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildIssueCard(String question) {
+class _IssueCard extends StatelessWidget {
+  final String question;
+  final String? answer;
+  final ValueChanged<String> onChanged;
+
+  const _IssueCard({
+    required this.question,
+    required this.answer,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [VF.amberBg, Color(0xFFFEF9EF)],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: VF.amber.withValues(alpha: 0.12)),
-        boxShadow: [
-          BoxShadow(
-              color: VF.amber.withValues(alpha: 0.05),
-              blurRadius: 12,
-              offset: const Offset(0, 2))
-        ],
+        color: VF.amberSoft,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: VF.amber.withValues(alpha: 0.18)),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
-          Row(children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(colors: [
-                  VF.amber.withValues(alpha: 0.2),
-                  VF.amber.withValues(alpha: 0.1),
-                ]),
-                borderRadius: BorderRadius.circular(11),
+          const Text(
+            'AI noticed one thing',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: VF.text,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            question,
+            style: const TextStyle(
+              fontSize: 12.8,
+              color: VF.textSec,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _IssueButton(
+                  label: 'Có, đúng vậy',
+                  selected: answer == 'yes',
+                  onTap: () => onChanged('yes'),
+                ),
               ),
-              alignment: Alignment.center,
-              child: const Text('👟', style: TextStyle(fontSize: 16)),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('AI phát hiện từ bài tập',
-                      style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: VF.text)),
-                  const SizedBox(height: 1),
-                  Text(question,
-                      style: const TextStyle(
-                          fontSize: 11, color: VF.textSec, height: 1.5)),
-                ],
+              const SizedBox(width: 10),
+              Expanded(
+                child: _IssueButton(
+                  label: 'Không, tôi ổn',
+                  selected: answer == 'no',
+                  onTap: () => onChanged('no'),
+                ),
               ),
-            ),
-          ]),
-          const SizedBox(height: 12),
-
-          // Buttons
-          Row(children: [
-            _IssueButton(
-              emoji: '😣',
-              label: 'Đúng',
-              selected: widget.data.issueAnswer == 'yes',
-              activeColor: VF.amber,
-              onTap: () => setState(() => widget.data.issueAnswer = 'yes'),
-            ),
-            const SizedBox(width: 8),
-            _IssueButton(
-              emoji: '👌',
-              label: 'Không',
-              selected: widget.data.issueAnswer == 'no',
-              activeColor: VF.brand,
-              onTap: () => setState(() => widget.data.issueAnswer = 'no'),
-            ),
-          ]),
+            ],
+          ),
         ],
       ),
     );
@@ -396,74 +281,52 @@ class _LevelIssuePageState extends State<LevelIssuePage> {
 }
 
 class _IssueButton extends StatelessWidget {
-  final String emoji, label;
+  final String label;
   final bool selected;
-  final Color activeColor;
   final VoidCallback onTap;
 
   const _IssueButton({
-    required this.emoji,
     required this.label,
     required this.selected,
-    required this.activeColor,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-          decoration: BoxDecoration(
-            color: selected ? activeColor.withValues(alpha: 0.1) : VF.surface,
-            borderRadius: BorderRadius.circular(11),
-            border: Border.all(
-              color: selected ? activeColor.withValues(alpha: 0.35) : VF.border,
-              width: 2,
-            ),
-            boxShadow: selected
-                ? [
-                    BoxShadow(
-                        color: activeColor.withValues(alpha: 0.1),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2))
-                  ]
-                : null,
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? VF.surface : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? VF.accent.withValues(alpha: 0.28) : VF.border,
+            width: 1.4,
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(emoji, style: const TextStyle(fontSize: 14)),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(label,
-                    style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                        color: selected ? activeColor : VF.textSec),
-                    overflow: TextOverflow.ellipsis),
-              ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (selected) ...[
+              const VFCheckIcon(size: 12),
+              const SizedBox(width: 8),
             ],
-          ),
+            Flexible(
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12.2,
+                  fontWeight: FontWeight.w700,
+                  color: selected ? VF.accent : VF.textSec,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
-}
-
-class _LevelOption {
-  final String id, label, desc, icon;
-  final Color color;
-  final List<String> preview;
-  const _LevelOption({
-    required this.id,
-    required this.label,
-    required this.desc,
-    required this.icon,
-    required this.color,
-    required this.preview,
-  });
 }

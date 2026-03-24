@@ -24,17 +24,9 @@ class OnboardingData {
     detectedIssues.addAll(squatInterpreter.detectedIssues);
   }
 
-  // void onPushUpComplete(ExerciseLogger logger) {
-  //   // pushUpLogger = logger;
-  // }
-
-  // ── Step 7: Level ──
   String? confirmedLevel;
+  String? issueAnswer;
 
-  // ── Step 8: Issue spotlight ──
-  String? issueAnswer; // user's yes/no
-
-  // ── Step 9-10: Signup + Body ──
   String? displayName;
   String? email;
   double? heightCm;
@@ -42,13 +34,22 @@ class OnboardingData {
   List<int> workoutDays = [];
   String? preferredTime;
 
-  // ── Step 11: time commitment ──
   String? timeCommitment;
-
-  // ── Step 12: Program ──
   String? program;
 
-  // ── Derived ──
+  int get frequencyScore {
+    switch (experience) {
+      case '5_plus':
+        return 3;
+      case '3_4':
+        return 2;
+      case '1_2':
+        return 1;
+      default:
+        return 0;
+    }
+  }
+
   double? get bmi {
     if (heightCm == null || weightKg == null) return null;
     if (heightCm! <= 0) return null;
