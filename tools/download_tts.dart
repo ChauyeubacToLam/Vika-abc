@@ -6,11 +6,14 @@ const String token = '3e96c274c2f6f3a20677b5464bd49446';
 
 Future<void> main() async {
   final phrases = {
+    "Sẵn sàng, xuống": "san_sang_xuong.mp3",
     "Xuống": "xuong.mp3",
     "Giữ": "giu.mp3",
     "Lên": "len.mp3",
     "Tốt lắm": "tot_lam.mp3",
+    "Tốt lắm, xuống": "tot_lam_xuong.mp3",
     "Sai tư thế, chú ý": "sai_tu_the.mp3",
+    "Sai tư thế, chú ý, xuống": "sai_tu_the_xuong.mp3",
     "Đứng thẳng": "dung_thang.mp3",
   };
 

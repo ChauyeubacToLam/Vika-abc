@@ -2286,8 +2286,10 @@ class PosePainter extends CustomPainter {
             y = lm.y;
             break;
           case InputImageRotation.rotation270deg:
-            x = imageW - lm.x;
-            y = imageH - lm.y;
+            // For front camera, ML Kit already returns upright landmarks.
+            // Minor mirroring is handled by the lensDirection check below.
+            x = lm.x;
+            y = lm.y;
             break;
           default:
             break;

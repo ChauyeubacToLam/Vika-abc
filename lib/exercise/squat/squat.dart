@@ -40,6 +40,7 @@ class Squat extends ExerciseBase {
   SquatState previousSquatState = SquatState.standing;
 
   final ViettelTTSService _ttsService = ViettelTTSService();
+  bool _spokenUp = false;
 
   // Debounce entry into rep — prevents false starts from noisy frames
   final Debouncer _entryDebouncer = Debouncer(requiredFrames: 2);
@@ -84,6 +85,12 @@ class Squat extends ExerciseBase {
   /* -----------------------------------------------------------------------
       INITIALIZATION 
   ----------------------------------------------------------------------- */
+  @override
+  void onExerciseActivated() {
+    super.onExerciseActivated();
+    _ttsService.speak("Sẵn sàng, xuống");
+  }
+
   @override
   bool isInStartPosition(
     Map<PoseLandmarkType, PoseLandmark> landmarks,
@@ -300,10 +307,18 @@ class Squat extends ExerciseBase {
       // UI feedback
       resultIssues.feedback['Result'] = correctForm ? 'Good Rep!' : 'Fix Form';
       
-      if (correctForm) {
-        _ttsService.speak("Tốt lắm");
+      if (repCount >= SquatConfig.MAX_REP) {
+        if (correctForm) {
+          _ttsService.speak("Tốt lắm");
+        } else {
+          _ttsService.speak("Sai tư thế, chú ý");
+        }
       } else {
-        _ttsService.speak("Sai tư thế, chú ý");
+        if (correctForm) {
+          _ttsService.speak("Tốt lắm, xuống");
+        } else {
+          _ttsService.speak("Sai tư thế, chú ý, xuống");
+        }
       }
 
       // Build fault map for set history
@@ -367,6 +382,10 @@ class Squat extends ExerciseBase {
             'bottom', 'Status', 'Hold! ${remaining.toStringAsFixed(1)}s');
       } else {
         resultIssues.addInstruction('bottom', 'Status', 'Push Up Now!');
+        if (!_spokenUp) {
+          _ttsService.speak("Lên");
+          _spokenUp = true;
+        }
       }
       if (progress != null) {
         debugData['bottomHoldProgress'] = progress;
@@ -408,11 +427,11 @@ class Squat extends ExerciseBase {
     // Instructions were shown during standing — no longer needed.
     if (newState == SquatState.descending) {
       resultIssues.instructions.clear();
-      _ttsService.speak("Xuống");
+      _spokenUp = false;
     } else if (newState == SquatState.bottom) {
       _ttsService.speak("Giữ");
     } else if (newState == SquatState.ascending) {
-      _ttsService.speak("Lên");
+      // Audio handled at the end of bottom hold
     }
 
     for (final metric in _metrics) {

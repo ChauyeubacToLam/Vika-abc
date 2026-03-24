@@ -1,4 +1,4 @@
-﻿// ignore_for_file: constant_identifier_names
+// ignore_for_file: constant_identifier_names
 
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:vinafit_mobile/utils/debouncer.dart';
@@ -431,6 +431,7 @@ abstract class ExerciseBase {
           if (elapsed >= HOLD_STILL_REQUIRED_DURATION) {
             exerciseState = ExerciseState.activated;
             _holdStillStartedAt = null;
+            onExerciseActivated();
           } else {
             resultIssues.feedback['System'] =
                 'Giữ yên... ${remaining.clamp(0.0, 99.0).toStringAsFixed(0)}s';
@@ -454,8 +455,10 @@ abstract class ExerciseBase {
   }
 
   /* -----------------------------------------------------------------------
-     ABSTRACT METHODS
+     ABSTRACT METHODS & LIFECYCLE HOOKS
      ----------------------------------------------------------------------- */
+
+  void onExerciseActivated() {}
 
   bool requestStop();
 

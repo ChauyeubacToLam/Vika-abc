@@ -13,11 +13,14 @@ class ViettelTTSService {
   final String _apiUrl = 'https://viettelai.vn/tts/speech_synthesis';
 
   final Map<String, String> _assetMap = {
+    "Sẵn sàng, xuống": "san_sang_xuong.mp3",
     "Xuống": "xuong.mp3",
     "Giữ": "giu.mp3",
     "Lên": "len.mp3",
     "Tốt lắm": "tot_lam.mp3",
+    "Tốt lắm, xuống": "tot_lam_xuong.mp3",
     "Sai tư thế, chú ý": "sai_tu_the.mp3",
+    "Sai tư thế, chú ý, xuống": "sai_tu_the_xuong.mp3",
   };
 
   Future<void> speak(String text) async {
