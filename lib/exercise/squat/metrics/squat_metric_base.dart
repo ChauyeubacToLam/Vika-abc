@@ -84,6 +84,8 @@ class FaultRecord {
 abstract class SquatMetricBase {
   /// Human-readable name for debug/logging.
   String get name;
+  // faults count for each metric
+  int faultsCount = 0;
 
   /// Called every frame during an active rep (squatState != standing).
   /// Writes feedback + instructions directly to ctx.resultIssues.
@@ -97,6 +99,14 @@ abstract class SquatMetricBase {
 
   /// Reset all internal state for the next rep.
   void reset();
+
+  /// Reset and count fault
+  void resetAndCountFault() {
+    if (faults.isNotEmpty) {
+      faultsCount++;
+    }
+    reset();
+  }
 
   /// Called when squat state transitions (e.g. descending → bottom).
   /// Override in metrics that care about transitions (tempo, sync).

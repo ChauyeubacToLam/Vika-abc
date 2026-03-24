@@ -5,31 +5,23 @@ import 'package:vinafit_mobile/utils/debouncer.dart';
 import 'package:vinafit_mobile/utils/person_detector.dart';
 import '../utils/pose_smoother.dart';
 import '../utils/pose_math_helpers.dart';
+import "../utils/frame_buffer.dart";
+import "../utils/exercise_logger.dart";
 
-/* =========================================================================
-   CONFIGURATION & THRESHOLDS
-   ========================================================================= */
+// --- Constants ---
 
-const double FRONT_FACING_SHOULDER_THRESHOLD = 0.57; // > 0.57 is Front
-const double SIDE_FACING_SHOULDER_THRESHOLD = 0.35; // < 0.35 is Side
+const double FRONT_FACING_SHOULDER_THRESHOLD = 0.57;
+const double SIDE_FACING_SHOULDER_THRESHOLD = 0.35;
 
-/* =========================================================================
-   ENUMS
-   ========================================================================= */
+// --- Enums ---
 
-enum ExerciseState {
-  notActivated,
-  activated,
-  completed,
-}
+enum ExerciseState { notActivated, activated, completed }
 
-enum CameraFacing {
-  front,
-  left,
-  right,
-  angled,
-  undefined,
-}
+enum CameraFacing { front, left, right, angled, undefined }
+
+enum AngleChange { increasing, decreasing, stable }
+
+// --- Result Tracking ---
 
 class ResultIssues {
   Map<String, String> feedback = {};
@@ -46,20 +38,29 @@ class ResultIssues {
   }
 }
 
-/* =========================================================================
-   ExerciseBase - abstract base class for all fitness exercises.
-   
-   Activation: hold-still (universal).
-   Each exercise overrides isInStartPosition() to define what
-   "ready" looks like (standing for squat, horizontal for plank/push-up).
-   User holds valid position for 3 seconds → exercise begins.
-   ========================================================================= */
+// --- ExerciseBase ---
+//
+// Abstract base class for all fitness exercises.
+// Activation: user holds valid position for 3s → exercise begins.
+// Each subclass overrides isInStartPosition() to define "ready" pose.
 
 abstract class ExerciseBase {
-  // -- Core State --
+  // Logger
+  ExerciseLogger logger = ExerciseLogger();
+  // Core state
   late PoseSmoother poseSmoother;
   int repCount = 0;
   static const MIN_CONFIDENCE = 0.92;
+
+  // Scale factor (shoulder-to-hip distance)
+  double scaleFactor = 1.0;
+
+  // Frame buffer
+  FrameBuffer frameBuffer = FrameBuffer();
+
+  // Centralized per-frame timestamp (set once at the start of each frame)
+  DateTime frameTimestamp = DateTime.now();
+  int get frameTimestampMs => frameTimestamp.millisecondsSinceEpoch;
 
   List<Map<bool, Map<String, Map<String, String>>>> setFeedback = [];
   ResultIssues resultIssues = ResultIssues();
@@ -67,12 +68,11 @@ abstract class ExerciseBase {
   ExerciseState exerciseState = ExerciseState.notActivated;
   CameraFacing cameraFacing = CameraFacing.front;
   bool correctForm = true;
-  double? distanceScaleFactor;
   double frontFacingRatio = 1.0;
 
   Map<String, dynamic> debugData = {};
 
-  // -- Orientation --
+  // Orientation debouncer
   StickyDebouncer leftRightDebouncer = StickyDebouncer(requiredFrames: 5);
 
   // -- FPS Tracking --
@@ -82,7 +82,7 @@ abstract class ExerciseBase {
   double get currentFps => _currentFps;
   double get fpsRatio => _currentFps / 30.0;
 
-  // -- Person Detection (Selfie Segmentation) --
+  // Person detection (selfie segmentation)
   final PersonDetector _personDetector = PersonDetector();
   bool _personConfirmed = false;
   DateTime? _personSeenSince;
@@ -96,12 +96,10 @@ abstract class ExerciseBase {
   static const Duration _PERSON_RESUME_CONFIRM_DURATION =
       Duration(milliseconds: 320);
 
-  /// Whether the exercise is currently paused (user left frame).
   bool get isPaused => _isPaused;
-
   double get personPresenceScore => _personDetector.presenceScore;
 
-  // -- Hold-Still Activation --
+  // Hold-still activation
   DateTime? _holdStillStartedAt;
   static const Duration HOLD_STILL_REQUIRED_DURATION = Duration(seconds: 3);
 
@@ -110,20 +108,17 @@ abstract class ExerciseBase {
     if (exerciseState != ExerciseState.notActivated) return null;
     if (!_personConfirmed) return null;
     if (_holdStillStartedAt == null) return null;
-    final elapsed = DateTime.now().difference(_holdStillStartedAt!);
+    final elapsed = frameTimestamp.difference(_holdStillStartedAt!);
     return (elapsed.inMilliseconds /
             HOLD_STILL_REQUIRED_DURATION.inMilliseconds)
         .clamp(0.0, 1.0);
   }
 
-  // -- Constructor --
   ExerciseBase() {
     poseSmoother = PoseSmoother(minCutoff: 0.5, beta: 0.005);
   }
 
-  /* -----------------------------------------------------------------------
-     MAIN PIPELINE
-     ----------------------------------------------------------------------- */
+  // --- Main Pipeline ---
 
   List<dynamic>? processPose(
     Map<PoseLandmarkType, PoseLandmark> landmarks, {
@@ -138,10 +133,10 @@ abstract class ExerciseBase {
       }
     }
     _lastFrameTime = now;
+    frameTimestamp = now; // for the person detection
 
     resultIssues.feedback.clear();
 
-    // 1. Smooth
     final smoothedLandmarks = poseSmoother.smoothing(landmarks);
 
     _syncPresenceState(hasPose: true);
@@ -151,11 +146,11 @@ abstract class ExerciseBase {
     debugData['personScore'] = _personDetector.presenceScore.toStringAsFixed(3);
     debugData['personDetected'] = _personDetector.personDetected;
 
-    // 2. Person Detection — only before activation
+    // Person detection — only before activation
     if (exerciseState == ExerciseState.notActivated && !_personConfirmed) {
       final stableFor = _personSeenSince == null
           ? 0
-          : DateTime.now().difference(_personSeenSince!).inMilliseconds;
+          : frameTimestamp.difference(_personSeenSince!).inMilliseconds;
       debugData['personStableMs'] = stableFor;
 
       if (!_personConfirmed) {
@@ -166,7 +161,7 @@ abstract class ExerciseBase {
       }
     }
 
-    // 2b. Presence re-check during active exercise
+    // Presence re-check during active exercise
     if (exerciseState == ExerciseState.activated) {
       debugData['isPaused'] = _isPaused;
 
@@ -178,18 +173,18 @@ abstract class ExerciseBase {
       }
     }
 
-    // 3. Auto-detect orientation
+    // Auto-detect orientation
     cameraFacing = detectCameraFacing(smoothedLandmarks);
 
-    // 4. Safety check (child class logic)
-    final safetyError = checkSafety(smoothedLandmarks, cameraFacing);
+    // Safety check (subclass logic)
+    final safetyError = checkSafety(smoothedLandmarks);
     if (safetyError != null) {
       resultIssues.feedback["System"] = safetyError;
       _populateBaseDebugData();
       return [repCount, resultIssues.feedback];
     }
 
-    // 5. Calculate Distance Scale Factor (Back Length)
+    // Calculate scale factor (shoulder-to-hip distance)
     final shoulder = getSideLandmark(
       landmarks: smoothedLandmarks,
       rightType: PoseLandmarkType.rightShoulder,
@@ -201,18 +196,17 @@ abstract class ExerciseBase {
       leftType: PoseLandmarkType.leftHip,
     );
     if (shoulder != null && hip != null) {
-      distanceScaleFactor = calculateDistance(shoulder, hip);
+      scaleFactor = calculateDistance(shoulder, hip);
     }
 
-    // 6. State Machine
-    checkExerciseState(smoothedLandmarks, exerciseState,
-        scaleFactor: distanceScaleFactor);
+    // State machine
+    checkExerciseState(smoothedLandmarks, exerciseState);
 
     _populateBaseDebugData();
-    debugData['scaleFactor'] = distanceScaleFactor?.toStringAsFixed(1) ?? 'N/A';
+    debugData['scaleFactor'] = scaleFactor.toStringAsFixed(1);
 
     if (exerciseState == ExerciseState.activated) {
-      checkingPose(smoothedLandmarks, cameraFacing, distanceScaleFactor);
+      checkingPose(smoothedLandmarks);
       return getRepCountAndFeedback();
     } else if (exerciseState == ExerciseState.completed) {
       return getSetFeedback();
@@ -223,6 +217,7 @@ abstract class ExerciseBase {
 
   /// Called when no pose is detected in the current frame.
   Map<String, String> processNoPoseFrame() {
+    frameTimestamp = DateTime.now();
     resultIssues.feedback.clear();
     _syncPresenceState(hasPose: false);
     _populateBaseDebugData();
@@ -254,11 +249,10 @@ abstract class ExerciseBase {
   /// Async person detection — call from camera stream handler.
   Future<void> runPersonDetection(InputImage inputImage) async {
     if (exerciseState == ExerciseState.completed) return;
-
     await _personDetector.detect(inputImage);
   }
 
-  /// Call when exercise screen is disposed to free native resources.
+  /// Free native resources on dispose.
   Future<void> disposeDetectors() async {
     await _personDetector.close();
   }
@@ -270,7 +264,7 @@ abstract class ExerciseBase {
   }
 
   void _syncPresenceState({required bool hasPose}) {
-    final now = DateTime.now();
+    final now = frameTimestamp;
     final segmentationPresent = _personDetector.personDetected;
     final presentNow = hasPose || segmentationPresent;
 
@@ -315,9 +309,7 @@ abstract class ExerciseBase {
     }
   }
 
-  /* -----------------------------------------------------------------------
-     ORIENTATION LOGIC
-     ----------------------------------------------------------------------- */
+  // --- Orientation Detection ---
 
   CameraFacing detectCameraFacing(
       Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
@@ -380,9 +372,7 @@ abstract class ExerciseBase {
     return leftRightDebouncer.update(leftVotes >= rightVotes);
   }
 
-  /* -----------------------------------------------------------------------
-     HELPERS
-     ----------------------------------------------------------------------- */
+  // --- Helpers ---
 
   PoseLandmark? getSideLandmark({
     required Map<PoseLandmarkType, PoseLandmark> landmarks,
@@ -399,26 +389,14 @@ abstract class ExerciseBase {
 
   List<dynamic> getSetFeedback() => setFeedback;
 
-  /* -----------------------------------------------------------------------
-     STATE MACHINE — Hold-Still Activation (universal)
-     
-     User gets into valid position → holds for 3s → exercise starts.
-     Each exercise defines "valid position" via isInStartPosition().
-     ----------------------------------------------------------------------- */
+  // --- State Machine (Hold-Still Activation) ---
 
-  void checkExerciseState(
-    Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks,
-    ExerciseState currentState, {
-    double? scaleFactor,
-  }) {
+  void checkExerciseState(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks,
+      ExerciseState currentState) {
     switch (currentState) {
       case ExerciseState.notActivated:
-        final inPosition = isInStartPosition(
-          smoothedLandmarks,
-          cameraFacing,
-          scaleFactor,
-        );
-        final now = DateTime.now();
+        final inPosition = isInStartPosition(smoothedLandmarks);
+        final now = frameTimestamp;
 
         if (inPosition) {
           _holdStillStartedAt ??= now;
@@ -446,6 +424,7 @@ abstract class ExerciseBase {
 
       case ExerciseState.activated:
         if (requestStop()) exerciseState = ExerciseState.completed;
+        onSetComplete();
         break;
 
       case ExerciseState.completed:
@@ -453,32 +432,21 @@ abstract class ExerciseBase {
     }
   }
 
-  /* -----------------------------------------------------------------------
-     ABSTRACT METHODS
-     ----------------------------------------------------------------------- */
+  // --- Abstract Methods ---
 
   bool requestStop();
 
-  String? checkSafety(
-    Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks,
-    CameraFacing cameraFacing,
-  );
+  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks);
 
-  void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks,
-      CameraFacing cameraFacing, double? scaleFactor);
+  void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks);
 
-  /// Define what "ready position" looks like for this exercise.
-  /// Called every frame during notActivated state.
   /// Return true if user is in valid starting position.
-  bool isInStartPosition(
-    Map<PoseLandmarkType, PoseLandmark> landmarks,
-    CameraFacing facing,
-    double? scaleFactor,
-  );
+  bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks);
 
-  /* -----------------------------------------------------------------------
-     UI BRIDGE
-     ----------------------------------------------------------------------- */
+  void onSetComplete();
+
+  // --- UI Bridge ---
+
   String get exerciseName;
   String get currentPhaseKey;
   String get currentPhaseLabel;
