@@ -69,11 +69,13 @@ class FaultRecord {
   final String type; // e.g. "Back", "Depth", "Feet", "Tempo"
   final String message; // e.g. "Leaned too forward"
   final bool affectsForm; // false = informational only (like heel rise)
+  final String? voiceMessage; // e.g. "Xuống thấp hơn"
 
   FaultRecord({
     required this.phase,
     required this.type,
     required this.message,
+    this.voiceMessage,
     this.affectsForm = true,
   });
 }

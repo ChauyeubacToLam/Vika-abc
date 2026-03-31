@@ -91,11 +91,13 @@ class FaultRecord {
   final String type; // e.g. "Arms", "Legs", "Tempo"
   final String message; // e.g. "Tay chưa đủ cao"
   final bool affectsForm; // false = informational only
+  final String? voiceMessage;
 
   FaultRecord({
     required this.phase,
     required this.type,
     required this.message,
+    this.voiceMessage,
     this.affectsForm = true,
   });
 }

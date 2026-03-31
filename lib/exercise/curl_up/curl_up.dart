@@ -86,6 +86,12 @@ class CurlUp extends ExerciseBase {
   // --- Start Position ---
 
   @override
+  void onExerciseActivated() {
+    super.onExerciseActivated();
+    ttsService.speak("Sẵn sàng");
+  }
+
+  @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     final shoulder = getSideLandmark(
       landmarks: landmarks,
@@ -287,6 +293,12 @@ class CurlUp extends ExerciseBase {
       }
       setFeedback.add({repCorrect: faultMap});
 
+      speakRepCompletion(
+        nextPhaseVoice: "Cuộn lên",
+        allFaults: allFaults,
+        correctForm: repCorrect,
+      );
+
       for (final metric in _metrics) {
         debugData.addAll(metric.debugData);
       }
@@ -376,10 +388,13 @@ class CurlUp extends ExerciseBase {
 
   void _transitionState(CurlUpState newState, int timestampMs) {
     previousCurlUpState = curlUpState;
-    curlUpState = newState;
-
-    if (newState == CurlUpState.ascending) {
+    if (newState == CurlUpState.ascending &&
+        previousCurlUpState == CurlUpState.resting) {
+      ttsService.clearQueue();
       resultIssues.instructions.clear();
+      ttsService.speak("Cuộn lên");
+    } else if (newState == CurlUpState.descending) {
+      ttsService.speak("Hạ xuống");
     }
 
     for (final metric in _metrics) {

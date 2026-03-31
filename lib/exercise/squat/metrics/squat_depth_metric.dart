@@ -65,18 +65,19 @@ class DepthMetric extends SquatMetricBase {
   void checkRepCompletion(SquatState finalState, RepContext ctx) {
     final phase = finalState.toString().split('.').last.toUpperCase();
     if (finalState != SquatState.ascending) {
-      _logFault(phase, 'Too Shallow (Missed Depth)');
+      _logFault(phase, 'Too Shallow (Missed Depth)', 'Thấp hơn nữa');
       ctx.resultIssues
           .addInstruction('standing', 'Depth', 'Go deeper next time!');
     }
   }
 
-  void _logFault(String phase, String message) {
+  void _logFault(String phase, String message, String? voiceMessage) {
     if (!_faults.any((f) => f.phase == phase && f.type == 'Depth')) {
       _faults.add(FaultRecord(
         phase: phase,
         type: 'Depth',
         message: message,
+        voiceMessage: voiceMessage,
         affectsForm: true,
       ));
     }

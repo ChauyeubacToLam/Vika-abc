@@ -14,7 +14,6 @@ import 'metrics/trunk_lean_metric.dart';
 import 'metrics/heel_rise_metric.dart';
 import 'metrics/tempo_metric.dart';
 import 'metrics/hip_shoulder_sync.dart';
-import '../../services/viettel_tts_service.dart';
 
 // --- Config ---
 
@@ -56,9 +55,6 @@ class Squat extends ExerciseBase {
   final int maxRep;
   SquatState squatState = SquatState.standing;
   SquatState previousSquatState = SquatState.standing;
-
-  final ViettelTTSService _ttsService = ViettelTTSService();
-  bool _spokenUp = false;
 
   // Debounce entry into rep — prevents false starts from noisy frames
   final Debouncer _entryDebouncer = Debouncer(requiredFrames: 2);
@@ -113,7 +109,7 @@ class Squat extends ExerciseBase {
   @override
   void onExerciseActivated() {
     super.onExerciseActivated();
-    _ttsService.speak("Sẵn sàng, xuống");
+    ttsService.speak("Sẵn sàng, xuống");
   }
 
   @override
@@ -342,30 +338,11 @@ class Squat extends ExerciseBase {
     correctForm = !allFaults.any((f) => f.affectsForm);
     resultIssues.feedback['Result'] = correctForm ? 'Good Rep!' : 'Fix Form';
 
-    // --- Voice feedback (queue-based) ---
-    // 1. Count rep number
-    _ttsService.speak(repCount.toString());
-
-    // 2. Specific error feedback or praise
-    bool hasDepthFault = allFaults.any((f) => f.type == 'Depth');
-    bool hasTrunkFault = allFaults.any((f) => f.type == 'Back');
-
-    if (hasDepthFault) {
-      _ttsService.speak("Thấp hơn nữa");
-    }
-    if (hasTrunkFault) {
-      _ttsService.speak("Ưỡn ngực lên");
-    }
-    if (correctForm) {
-      _ttsService.speak("Tốt lắm");
-    }
-
-    // 3. End or continue
-    if (repCount >= SquatConfig.MAX_REP) {
-      _ttsService.speak("Hoàn thành bài tập");
-    } else {
-      _ttsService.speak("Xuống");
-    }
+    speakRepCompletion(
+      nextPhaseVoice: "Xuống",
+      allFaults: allFaults,
+      correctForm: correctForm,
+    );
 
     // Build fault map grouped by phase
     final faultMap = <String, Map<String, String>>{};
@@ -424,10 +401,6 @@ class Squat extends ExerciseBase {
               'bottom', 'Status', 'Hold! ${remaining.toStringAsFixed(1)}s');
         } else {
           resultIssues.addInstruction('bottom', 'Status', 'Push Up Now!');
-          if (!_spokenUp) {
-            _ttsService.speak("Lên");
-            _spokenUp = true;
-          }
         }
         if (progress != null) debugData['bottomHoldProgress'] = progress;
         break;
@@ -478,13 +451,12 @@ class Squat extends ExerciseBase {
     squatState = newState;
 
     if (newState == SquatState.descending) {
-      _ttsService.clearQueue(); // Stop any pending voice to avoid overlap
+      ttsService.clearQueue(); // Stop any pending voice to avoid overlap
       resultIssues.instructions.clear();
-      _spokenUp = false;
     } else if (newState == SquatState.bottom) {
-      _ttsService.speak("Giữ");
+      ttsService.speak("Giữ");
     } else if (newState == SquatState.ascending) {
-      // Audio handled at the end of bottom hold
+      ttsService.speak("Lên");
     }
 
     for (final metric in _metrics) {

@@ -85,11 +85,13 @@ class FaultRecord {
   final String type;
   final String message;
   final bool affectsForm;
+  final String? voiceMessage;
 
   FaultRecord({
     required this.phase,
     required this.type,
     required this.message,
+    this.voiceMessage,
     this.affectsForm = true,
   });
 }

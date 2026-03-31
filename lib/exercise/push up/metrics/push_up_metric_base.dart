@@ -61,13 +61,15 @@ class RepContext {
 class FaultRecord {
   final String phase; // e.g. "DESCENDING", "BOTTOM"
   final String type; // e.g. "Back", "Depth", "Tempo"
-  final String message; // e.g. "Hip sag detected"
-  final bool affectsForm; // false = informational only
+  final String message; // e.g. "Leaned too forward"
+  final bool affectsForm; // false = informational only (like heel rise)
+  final String? voiceMessage;
 
   FaultRecord({
     required this.phase,
     required this.type,
     required this.message,
+    this.voiceMessage,
     this.affectsForm = true,
   });
 }

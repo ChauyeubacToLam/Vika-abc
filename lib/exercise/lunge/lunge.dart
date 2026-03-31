@@ -133,6 +133,12 @@ class Lunge extends ExerciseBase {
   // --- Stop Condition ---
 
   @override
+  void onExerciseActivated() {
+    super.onExerciseActivated();
+    ttsService.speak("Sẵn sàng, xuống");
+  }
+
+  @override
   bool requestStop() => repCount >= maxRep;
 
   @override
@@ -332,6 +338,12 @@ class Lunge extends ExerciseBase {
       }
       setFeedback.add({correctForm: faultMap});
 
+    speakRepCompletion(
+      nextPhaseVoice: "Xuống",
+      allFaults: allFaults,
+      correctForm: correctForm,
+    );
+
       for (final metric in _metrics) {
         debugData.addAll(metric.debugData);
       }
@@ -393,8 +405,13 @@ class Lunge extends ExerciseBase {
     // Lock lead leg at rep start, unlock on return to standing
     if (newState == LungeState.descending &&
         previousLungeState == LungeState.standing) {
+      ttsService.clearQueue();
       _leadLegLocked = true;
       resultIssues.instructions.clear();
+    } else if (newState == LungeState.bottom) {
+      ttsService.speak("Giữ");
+    } else if (newState == LungeState.ascending) {
+      ttsService.speak("Đứng lên");
     } else if (newState == LungeState.standing) {
       _leadLegLocked = false;
     }

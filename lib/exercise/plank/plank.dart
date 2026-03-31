@@ -49,6 +49,8 @@ class Plank extends ExerciseBase {
   int? _holdStartMs;
   int? _restStartMs;
   bool _ankleAvailable = true;
+  bool _spoken10 = false;
+  bool _spoken5 = false;
 
   final Debouncer _positionDebouncer = Debouncer(requiredFrames: 2);
 
@@ -80,6 +82,12 @@ class Plank extends ExerciseBase {
       case PlankState.resting:
         return 'Nghỉ';
     }
+  }
+
+  @override
+  void onExerciseActivated() {
+    super.onExerciseActivated();
+    ttsService.speak("Sẵn sàng");
   }
 
   // --- Start Position ---
@@ -273,6 +281,16 @@ class Plank extends ExerciseBase {
       final holdSecs = _currentHoldSeconds();
       final remaining = (PlankConfig.HOLD_DURATION - holdSecs)
           .clamp(0.0, PlankConfig.HOLD_DURATION);
+
+      if (remaining <= 10.0 && !_spoken10) {
+        ttsService.speak("10");
+        _spoken10 = true;
+      }
+      if (remaining <= 5.0 && !_spoken5) {
+        ttsService.speak("5");
+        _spoken5 = true;
+      }
+
       resultIssues.addInstruction(
           'holding', 'Status', 'Giữ! ${remaining.toStringAsFixed(1)}s');
       debugData['holdProgress'] =
@@ -326,12 +344,17 @@ class Plank extends ExerciseBase {
 
     switch (newState) {
       case PlankState.holding:
+        ttsService.clearQueue();
+        ttsService.speak("Giữ");
         _holdStartMs = timestampMs;
         _restStartMs = null;
         resultIssues.instructions.clear();
+        _spoken10 = false;
+        _spoken5 = false;
         break;
 
       case PlankState.resting:
+        ttsService.speak("Nghỉ");
         _restStartMs = timestampMs;
         _onHoldComplete();
         break;
@@ -371,6 +394,12 @@ class Plank extends ExerciseBase {
       faultMap['HOLDING']![fault.type] = fault.message;
     }
     setFeedback.add({correctForm: faultMap});
+
+    speakRepCompletion(
+      nextPhaseVoice: null,
+      allFaults: allFaults,
+      correctForm: correctForm,
+    );
 
     for (final metric in _metrics) {
       debugData.addAll(metric.debugData);

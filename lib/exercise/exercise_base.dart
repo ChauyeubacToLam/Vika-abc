@@ -7,6 +7,7 @@ import '../utils/pose_smoother.dart';
 import '../utils/pose_math_helpers.dart';
 import "../utils/frame_buffer.dart";
 import "../utils/exercise_logger.dart";
+import '../services/viettel_tts_service.dart';
 
 // --- Constants ---
 
@@ -51,6 +52,9 @@ abstract class ExerciseBase {
   late PoseSmoother poseSmoother;
   int repCount = 0;
   static const MIN_CONFIDENCE = 0.92;
+  
+  // Voice Service
+  final ViettelTTSService ttsService = ViettelTTSService();
 
   // Scale factor (shoulder-to-hip distance)
   double scaleFactor = 1.0;
@@ -388,6 +392,38 @@ abstract class ExerciseBase {
   List<dynamic> getRepCountAndFeedback() => [repCount, resultIssues.feedback];
 
   List<dynamic> getSetFeedback() => setFeedback;
+
+  /// Hook for unifying voice feedback on rep completion
+  void speakRepCompletion({
+    required String? nextPhaseVoice,
+    required List<dynamic> allFaults,
+    required bool correctForm,
+    bool countRep = true,
+  }) {
+    if (countRep) {
+      ttsService.speak(repCount.toString());
+    }
+
+    bool spokenFault = false;
+    for (final fault in allFaults) {
+      if (fault.affectsForm && fault.voiceMessage != null && fault.voiceMessage!.isNotEmpty) {
+        ttsService.speak(fault.voiceMessage!);
+        spokenFault = true;
+        break; // Only speak one fault to avoid overlapping TTS
+      }
+    }
+
+    if (correctForm && !spokenFault) {
+      ttsService.speak("Tốt lắm");
+    }
+
+    final int maxReps = (this as dynamic).maxRep as int? ?? 10;
+    if (repCount >= maxReps) {
+      ttsService.speak("Hoàn thành bài tập");
+    } else if (nextPhaseVoice != null) {
+      ttsService.speak(nextPhaseVoice);
+    }
+  }
 
   // --- State Machine (Hold-Still Activation) ---
 
