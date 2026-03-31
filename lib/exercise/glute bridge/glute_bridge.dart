@@ -143,8 +143,6 @@ class GluteBridge extends ExerciseBase {
   @override
   bool isInStartPosition(
     Map<PoseLandmarkType, PoseLandmark> landmarks,
-    CameraFacing facing,
-    double? scaleFactor,
   ) {
     final shoulder = getSideLandmark(
       landmarks: landmarks,
@@ -174,7 +172,7 @@ class GluteBridge extends ExerciseBase {
     // 1. Trunk must be roughly horizontal (clock angle near 90° or 270°).
     double trunkClockAngle =
         calculateVerticalAngle(pivot: hip, point: shoulder);
-    double horizontalTarget = facing == CameraFacing.right
+    double horizontalTarget = cameraFacing == CameraFacing.right
         ? GluteBridgeConfig.HORIZONTAL_CLOCK_RIGHT
         : GluteBridgeConfig.HORIZONTAL_CLOCK_LEFT;
     double diff = trunkClockAngle - horizontalTarget;
@@ -192,7 +190,7 @@ class GluteBridge extends ExerciseBase {
         kneeAngle > GluteBridgeConfig.KNEE_ANGLE_MAX) return false;
 
     // 3. Hip not elevated — hip.y close to shoulder.y (both at floor level).
-    double yTolerance = scaleFactor != null
+    double yTolerance = scaleFactor > 0
         ? scaleFactor * GluteBridgeConfig.HIP_SHOULDER_RATIO
         : GluteBridgeConfig.HIP_SHOULDER_PIXELS;
     if ((hip.y - shoulder.y).abs() > yTolerance) return false;
@@ -211,12 +209,16 @@ class GluteBridge extends ExerciseBase {
     return repCount >= GluteBridgeConfig.MAX_REP;
   }
 
+  @override
+  void onSetComplete() {}
+
   /* -----------------------------------------------------------------------
      SAFETY CHECKS
      ----------------------------------------------------------------------- */
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks,
-      CameraFacing cameraFacing) {
+  String? checkSafety(
+    Map<PoseLandmarkType, PoseLandmark> landmarks,
+  ) {
     if (cameraFacing == CameraFacing.front) {
       return "⚠️ Xin hãy quay nghiêng để theo dõi tư thế Glute Bridge";
     }
@@ -253,8 +255,6 @@ class GluteBridge extends ExerciseBase {
   @override
   void checkingPose(
     Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks,
-    CameraFacing cameraFacing,
-    double? scaleFactor,
   ) {
     // ---------- 1. Get Landmarks ----------
 
@@ -280,14 +280,15 @@ class GluteBridge extends ExerciseBase {
         rightType: PoseLandmarkType.rightEar,
         leftType: PoseLandmarkType.leftEar);
     final nose = smoothedLandmarks[PoseLandmarkType.nose];
-    
+
     // Explicit null fallback hierarchy to prevent bypass when head goes out of frame
-    final double? headY =
-        (ear != null && ear.likelihood >= ExerciseBase.MIN_CONFIDENCE)
-            ? ear.y
-            : (nose != null && nose.likelihood >= ExerciseBase.MIN_CONFIDENCE)
-                ? nose.y
-                : shoulder?.y; // Fallback to shoulder.y if head is totally lost to prevent metric crash
+    final double? headY = (ear != null &&
+            ear.likelihood >= ExerciseBase.MIN_CONFIDENCE)
+        ? ear.y
+        : (nose != null && nose.likelihood >= ExerciseBase.MIN_CONFIDENCE)
+            ? nose.y
+            : shoulder
+                ?.y; // Fallback to shoulder.y if head is totally lost to prevent metric crash
 
     if (shoulder == null || hip == null || knee == null) return;
 
@@ -335,7 +336,7 @@ class GluteBridge extends ExerciseBase {
     }
 
     // Derived thresholds normalised to body size.
-    final double hipElevatedThreshold = scaleFactor != null
+    final double hipElevatedThreshold = scaleFactor > 0
         ? scaleFactor * GluteBridgeConfig.HIP_ELEVATED_RATIO
         : GluteBridgeConfig.HIP_ELEVATED_PIXELS;
 
@@ -348,7 +349,7 @@ class GluteBridge extends ExerciseBase {
       shoulderHipKneeAngle: shoulderHipKneeAngle,
       normalizedHipDeviation: normalizedHipDeviation,
       kneeAngle: kneeAngle,
-      scaleFactor: scaleFactor,
+      scaleFactor: scaleFactor > 0 ? scaleFactor : null,
       headY: headY,
       state: gluteState,
       frameTimestamp: now,
@@ -422,7 +423,7 @@ class GluteBridge extends ExerciseBase {
       sum += _hipYHistory[i] - _hipYHistory[i - 1];
     }
     double rawVelocity = sum / (_hipYHistory.length - 1);
-    
+
     // Scale velocity to base 30 FPS logic
     return rawVelocity * fpsRatio;
   }
@@ -482,11 +483,11 @@ class GluteBridge extends ExerciseBase {
     double hipY,
     double hipVelocity,
     double hipElevatedThreshold,
-    double? scaleFactor,
+    double scaleFactor,
     int timestampMs,
   ) {
     final double baseline = _baselineHipY!;
-    final double bottomTolerance = scaleFactor != null
+    final double bottomTolerance = scaleFactor > 0
         ? scaleFactor * GluteBridgeConfig.BOTTOM_TOLERANCE_RATIO
         : GluteBridgeConfig.BOTTOM_TOLERANCE_PIXELS;
 

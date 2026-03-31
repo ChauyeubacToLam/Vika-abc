@@ -10,84 +10,48 @@ import 'metrics/trunk_alignment_metric.dart';
 import 'metrics/head_neck_metric.dart';
 import 'metrics/knee_extension_metric.dart';
 
-/* =========================================================================
-   PLANK EXERCISE — McGill Short-Hold Protocol
-   
-   Protocol: 3 holds × 10 seconds each, with 5s rest between holds.
-   State transitions are ANGLE-DRIVEN for real-time responsiveness.
-   Timer runs continuously during hold — fault percentage judges quality.
-   
-   Trunk assessment uses calculateVerticalAngle (shoulder + hip only).
-   Ankle is OPTIONAL — only needed for knee extension metric.
-   This solves the small Vietnamese apartment problem where full body
-   may not fit in frame from side view.
-   
-   Vietnamese context:
-   - Desk workers with Lower Crossed Syndrome fatigue around 40s
-   - Short holds (10s) prevent dangerous hip sag from fatigue
-   - Encouraging feedback, never auto-terminate
-   ========================================================================= */
+// --- Config (McGill Short-Hold Protocol: 3 holds × 10s, 5s rest) ---
 
 class PlankConfig {
   static const int MAX_REP = 5;
-
-  /// Hold duration in seconds (McGill protocol)
   static const double HOLD_DURATION = 15.0;
-
-  /// Rest duration in seconds between holds
   static const double REST_DURATION = 5.0;
 
-  // Hip to floor to be consider standing
-  static const double STANDING_HIP_FLOOR_THRESHOLD =
-      0.5; // in meters; > this = standing
+  // Hip-to-floor ratio above which user is considered standing
+  static const double STANDING_HIP_FLOOR_THRESHOLD = 0.5;
 
-  /// Trunk clock angle for "horizontal" per facing direction.
-  /// Left-facing: shoulder is left of hip → clock angle ~270°
-  /// Right-facing: shoulder is right of hip → clock angle ~90°
+  // Trunk horizontal targets per facing direction
   static const double HORIZONTAL_CLOCK_LEFT = 270.0;
   static const double HORIZONTAL_CLOCK_RIGHT = 90.0;
 
-  /// Max deviation from horizontal to count as valid plank position (degrees)
-  /// For state machine: wider tolerance to enter/stay in holding
+  // Max deviation from horizontal to count as valid plank (degrees)
   static const double PLANK_POSITION_TOLERANCE = 25.0;
 
-  /// Trunk deviation thresholds for form assessment (used by metric)
-  /// These are degrees of deviation from perfect horizontal
-  /// Sag (hips dropping) — more lenient, common issue
+  // Trunk deviation thresholds for form assessment
   static const double SAG_GOOD_MAX = 4.5;
-  static const double SAG_WARNING_MAX = 5.5; // adjust after testing
-
-  ///Pike (hips too high) — stricter, less common
+  static const double SAG_WARNING_MAX = 5.5;
   static const double PIKE_GOOD_MAX = 1.5;
-  static const double PIKE_WARNING_MAX = 3.0; // adjust after testing
-  // Above WARNING_MAX = error
+  static const double PIKE_WARNING_MAX = 3.0;
 }
 
-enum PlankState {
-  setup, // User getting into position
-  holding, // Active hold — timer running
-  resting, // Rest period between holds
-}
+enum PlankState { setup, holding, resting }
 
-/* =========================================================================
-   PLANK LOGIC
-   ========================================================================= */
+// --- Plank ---
 
 class Plank extends ExerciseBase {
+  final int maxRep;
+
+  Plank({this.maxRep = PlankConfig.MAX_REP});
+
   PlankState plankState = PlankState.setup;
   PlankState previousPlankState = PlankState.setup;
 
-  // -- Timer State --
   int? _holdStartMs;
   int? _restStartMs;
-
-  // -- Ankle availability --
   bool _ankleAvailable = true;
 
-  // Debounce plank-position detection — prevents false hold starts
   final Debouncer _positionDebouncer = Debouncer(requiredFrames: 2);
 
-  // -- Metrics --
   final TrunkAlignmentMetric trunkAlignmentMetric = TrunkAlignmentMetric();
   final HeadNeckMetric headNeckMetric = HeadNeckMetric();
   final KneeExtensionMetric kneeExtensionMetric = KneeExtensionMetric();
@@ -98,9 +62,8 @@ class Plank extends ExerciseBase {
     kneeExtensionMetric,
   ];
 
-  /* -----------------------------------------------------------------------
-     UI BRIDGE
-     ----------------------------------------------------------------------- */
+  // --- UI Bridge ---
+
   @override
   String get exerciseName => 'Plank';
 
@@ -119,19 +82,10 @@ class Plank extends ExerciseBase {
     }
   }
 
-  /* -----------------------------------------------------------------------
-     INITIALIZATION
-     ----------------------------------------------------------------------- */
-  /* =========================================================================
-   ADD THESE TO plank.dart (Plank class)
-   ========================================================================= */
+  // --- Start Position ---
+
   @override
-  bool isInStartPosition(
-    Map<PoseLandmarkType, PoseLandmark> landmarks,
-    CameraFacing facing,
-    double? scaleFactor,
-  ) {
-    // Check: user is in plank position (horizontal trunk)
+  bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     final shoulder = getSideLandmark(
       landmarks: landmarks,
       rightType: PoseLandmarkType.rightShoulder,
@@ -145,10 +99,10 @@ class Plank extends ExerciseBase {
 
     if (shoulder == null || hip == null) return false;
 
-    // Trunk must be roughly horizontal (within 25° of horizontal)
+    // Trunk must be roughly horizontal (within 25°)
     double trunkClockAngle =
         calculateVerticalAngle(pivot: hip, point: shoulder);
-    double horizontalTarget = facing == CameraFacing.right
+    double horizontalTarget = cameraFacing == CameraFacing.right
         ? PlankConfig.HORIZONTAL_CLOCK_RIGHT
         : PlankConfig.HORIZONTAL_CLOCK_LEFT;
     double diff = trunkClockAngle - horizontalTarget;
@@ -159,25 +113,22 @@ class Plank extends ExerciseBase {
     return true;
   }
 
-  /* -----------------------------------------------------------------------
-     STOP CONDITION
-     ----------------------------------------------------------------------- */
-  @override
-  bool requestStop() {
-    return repCount >= PlankConfig.MAX_REP;
-  }
+  // --- Stop Condition ---
 
-  /* -----------------------------------------------------------------------
-     SAFETY CHECKS
-     ----------------------------------------------------------------------- */
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks,
-      CameraFacing cameraFacing) {
+  bool requestStop() => repCount >= maxRep;
+
+  @override
+  void onSetComplete() {}
+
+  // --- Safety Checks ---
+
+  @override
+  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing == CameraFacing.front) {
       return "⚠️ Xin hãy quay nghiêng để theo dõi tư thế Plank";
     }
 
-    // Critical landmarks (always required)
     PoseLandmark? shoulder = getSideLandmark(
         landmarks: landmarks,
         rightType: PoseLandmarkType.rightShoulder,
@@ -205,7 +156,7 @@ class Plank extends ExerciseBase {
       return "⚠️ Hình ảnh không rõ. Điều chỉnh ánh sáng hoặc vị trí";
     }
 
-    // Optional landmarks (ankle + knee for knee extension metric)
+    // Ankle is optional — only for knee extension metric
     PoseLandmark? ankle = getSideLandmark(
         landmarks: landmarks,
         rightType: PoseLandmarkType.rightAnkle,
@@ -218,13 +169,11 @@ class Plank extends ExerciseBase {
     return null;
   }
 
-  /* -----------------------------------------------------------------------
-     MAIN PHYSICS LOOP — Called every frame when activated.
-     ----------------------------------------------------------------------- */
+  // --- Main Loop (called every frame when activated) ---
+
   @override
-  void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks,
-      CameraFacing cameraFacing, double? scaleFactor) {
-    // ---------- 1. Get Landmarks ----------
+  void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
+    // 1. Get landmarks
     PoseLandmark? shoulder = getSideLandmark(
         landmarks: smoothedLandmarks,
         rightType: PoseLandmarkType.rightShoulder,
@@ -244,48 +193,41 @@ class Plank extends ExerciseBase {
 
     if (shoulder == null || hip == null || ear == null || knee == null) return;
 
-    // Optional: knee + ankle for knee extension
     PoseLandmark? ankle = getSideLandmark(
         landmarks: smoothedLandmarks,
         rightType: PoseLandmarkType.rightAnkle,
         leftType: PoseLandmarkType.leftAnkle);
 
-    // ---------- 2. Calculate Geometry ----------
-
-    // Trunk: clock angle from vertical (0°=up, 90°=right, 270°=left)
+    // 2. Calculate geometry
     double trunkClockAngle =
         calculateVerticalAngle(pivot: hip, point: shoulder);
 
-    // Deviation from horizontal (positive = one direction, negative = other)
     double horizontalTarget = cameraFacing == CameraFacing.right
         ? PlankConfig.HORIZONTAL_CLOCK_RIGHT
         : PlankConfig.HORIZONTAL_CLOCK_LEFT;
     double trunkDeviation =
         clockAngleDeviation(trunkClockAngle, horizontalTarget);
 
-    // Neck: ear→shoulder→hip (unsigned 0–180° is fine)
     double neckAngle =
         calculateAngle(firstPoint: ear, midPoint: shoulder, lastPoint: hip);
 
-    // Knee: only if ankle visible
     double? kneeAngle;
     if (_ankleAvailable && ankle != null) {
       kneeAngle =
           calculateAngle(firstPoint: hip, midPoint: knee, lastPoint: ankle);
     }
-    // Get any foot-level landmark (doesn't need high confidence for floor reference)
+
     PoseLandmark? foot = smoothedLandmarks[PoseLandmarkType.leftFootIndex] ??
         smoothedLandmarks[PoseLandmarkType.rightFootIndex];
     PoseLandmark? heel = smoothedLandmarks[PoseLandmarkType.leftHeel] ??
         smoothedLandmarks[PoseLandmarkType.rightHeel];
 
     double floorY = foot?.y ?? heel?.y ?? knee.y;
-
-    double hipToFloor = (floorY - hip.y).abs() / (scaleFactor ?? 1.0);
+    double hipToFloor = (floorY - hip.y).abs() / scaleFactor;
     bool isStanding = hipToFloor > PlankConfig.STANDING_HIP_FLOOR_THRESHOLD;
-    int now = DateTime.now().millisecondsSinceEpoch;
+    int now = frameTimestampMs;
 
-    // ---------- 3. Build RepContext ----------
+    // 3. Build RepContext
     final ctx = RepContext(
       trunkDeviation: trunkDeviation,
       neckAngle: neckAngle,
@@ -295,7 +237,7 @@ class Plank extends ExerciseBase {
       resultIssues: resultIssues,
     );
 
-    // ---------- 4. Populate Debug Data ----------
+    // 4. Debug data
     debugData['plankState'] = plankState.toString().split('.').last;
     debugData['trunkClock'] = trunkClockAngle.toStringAsFixed(1);
     debugData['trunkDev'] =
@@ -307,10 +249,10 @@ class Plank extends ExerciseBase {
     debugData['isStanding'] = isStanding;
     debugData['ankleAvail'] = _ankleAvailable;
 
-    // ---------- 5. Update Plank State ----------
+    // 5. Update plank state
     _updatePlankState(trunkDeviation, now, isStanding);
 
-    // ---------- 6. Rest period feedback ----------
+    // 6. Rest period feedback
     if (plankState == PlankState.resting && _restStartMs != null) {
       final restElapsed = (now - _restStartMs!) / 1000.0;
       final restRemaining = (PlankConfig.REST_DURATION - restElapsed)
@@ -321,15 +263,13 @@ class Plank extends ExerciseBase {
       debugData['restRemaining'] = restRemaining.toStringAsFixed(1);
     }
 
-    // ---------- 7. Run Metrics (only during holding) ----------
+    // 7. Run metrics (only during holding)
     if (plankState == PlankState.holding) {
       for (final metric in _metrics) {
-        // Skip knee metric if ankle not visible
         if (metric == kneeExtensionMetric && !_ankleAvailable) continue;
         metric.update(ctx);
       }
 
-      // Hold timer feedback
       final holdSecs = _currentHoldSeconds();
       final remaining = (PlankConfig.HOLD_DURATION - holdSecs)
           .clamp(0.0, PlankConfig.HOLD_DURATION);
@@ -339,15 +279,14 @@ class Plank extends ExerciseBase {
           (holdSecs / PlankConfig.HOLD_DURATION).clamp(0.0, 1.0);
     }
 
-    // ---------- 8. Merge Metric Debug Data ----------
+    // 8. Merge metric debug data
     for (final metric in _metrics) {
       debugData.addAll(metric.debugData);
     }
   }
 
-  /* -----------------------------------------------------------------------
-     STATE MACHINE
-     ----------------------------------------------------------------------- */
+  // --- State Machine ---
+
   void _updatePlankState(
       double trunkDeviation, int timestampMs, bool isStanding) {
     bool isPlankPosition =
@@ -402,23 +341,19 @@ class Plank extends ExerciseBase {
     }
   }
 
-  /* -----------------------------------------------------------------------
-     HOLD COMPLETE
-     ----------------------------------------------------------------------- */
+  // --- Hold Complete ---
+
   void _onHoldComplete() {
     repCount += 1;
 
-    // Finalize and collect faults
     final allFaults = <FaultRecord>[];
     for (final metric in _metrics) {
       metric.finalizeHold();
       allFaults.addAll(metric.faults);
     }
 
-    // Determine correctForm
     correctForm = !allFaults.any((f) => f.affectsForm);
 
-    // UI feedback
     if (correctForm) {
       resultIssues.feedback['Result'] = 'Tốt lắm!';
     } else {
@@ -430,7 +365,6 @@ class Plank extends ExerciseBase {
       resultIssues.feedback['Result'] = summary;
     }
 
-    // Build fault map for set history
     final faultMap = <String, Map<String, String>>{};
     for (final fault in allFaults) {
       faultMap.putIfAbsent('HOLDING', () => {});
@@ -438,24 +372,20 @@ class Plank extends ExerciseBase {
     }
     setFeedback.add({correctForm: faultMap});
 
-    // Merge debug data before reset
     for (final metric in _metrics) {
       debugData.addAll(metric.debugData);
     }
 
-    // Reset metrics for next hold
     for (final metric in _metrics) {
       metric.reset();
     }
     correctForm = true;
   }
 
-  /* -----------------------------------------------------------------------
-     HELPERS
-     ----------------------------------------------------------------------- */
+  // --- Helpers ---
 
   double _currentHoldSeconds() {
     if (_holdStartMs == null) return 0.0;
-    return (DateTime.now().millisecondsSinceEpoch - _holdStartMs!) / 1000.0;
+    return (frameTimestampMs - _holdStartMs!) / 1000.0;
   }
 }

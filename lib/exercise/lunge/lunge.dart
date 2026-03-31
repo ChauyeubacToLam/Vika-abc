@@ -10,33 +10,25 @@ import 'metrics/lunge_heel_lift_metric.dart';
 import 'metrics/lunge_lumbar_proxy_metric.dart';
 import '../../utils/debouncer.dart';
 
-/* =========================================================================
-   CONFIGURATION & THRESHOLDS
-   ========================================================================= */
+// --- Config ---
+
 class LungeConfig {
   static const int MAX_REP = 15;
-
-  // Standing: lead knee angle > 160°
   static const int LUNGE_STAND_ANGLE_THRESHOLD = 160;
-
-  // Descending: lead knee angle < 150° AND was standing
   static const int LUNGE_DESCEND_ANGLE_THRESHOLD = 150;
-
-  // Bottom: lead knee angle in [70°, 110°]
   static const List<int> LUNGE_BOTTOM_ANGLE_THRESHOLD = [70, 110];
-
-  // Ascending: lead knee angle > 115° AND was bottom
   static const int LUNGE_ASCEND_ANGLE_THRESHOLD = 115;
 }
 
-enum LungeState {
-  standing, // start position
-  descending, // lowering
-  bottom, // maximum depth reached
-  ascending // pushing back up
-}
+enum LungeState { standing, descending, bottom, ascending }
+
+// --- Lunge ---
 
 class Lunge extends ExerciseBase {
+  final int maxRep;
+
+  Lunge({this.maxRep = LungeConfig.MAX_REP});
+
   LungeState lungeState = LungeState.standing;
   LungeState previousLungeState = LungeState.standing;
 
@@ -52,61 +44,34 @@ class Lunge extends ExerciseBase {
     lumbarProxyMetric,
   ];
 
-  /* -----------------------------------------------------------------------
-     LEAD LEG DETECTION
-     
-     In side view, the LEAD (front) leg is the ankle closest to the camera-
-     facing edge of the screen:
-       - CameraFacing.left  → lead ankle has LOWER x value  (closer to left edge)
-       - CameraFacing.right → lead ankle has HIGHER x value (closer to right edge)
-     
-     A StickyDebouncer (5 frames) prevents flickering.
-     The result is locked when transitioning from standing → descending
-     and held for the entire rep.
-  ----------------------------------------------------------------------- */
+  // --- Lead Leg Detection ---
+  //
+  // In side view, the lead (front) leg is the ankle closest to the
+  // camera-facing edge. Debounced (5 frames) and locked per rep.
 
-  /// true = left leg is lead, false = right leg is lead, null = not yet determined
   bool? _isLeftLegLead;
-
-  /// Locked at the start of each rep (standing → descending). Remains constant
-  /// until the rep completes (back to standing).
   bool _leadLegLocked = false;
-
-  /// Debouncer to stabilise lead-leg detection before locking.
   final StickyDebouncer _leadLegDebouncer =
       StickyDebouncer(requiredFrames: 5, currentState: true);
 
-  /// Determines which leg is the lead leg based on ankle x-coordinates
-  /// and the current camera facing direction.
-  ///
-  /// Returns `true` if the left leg is the lead leg, `false` otherwise.
-  /// Returns `null` if ankle landmarks are missing.
   bool? _detectLeadLeg(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     final leftAnkle = landmarks[PoseLandmarkType.leftAnkle];
     final rightAnkle = landmarks[PoseLandmarkType.rightAnkle];
 
     if (leftAnkle == null || rightAnkle == null) return _isLeftLegLead;
 
-    // Determine which ankle is closer to the camera-facing edge.
     bool leftIsLead;
     if (cameraFacing == CameraFacing.left) {
-      // Camera facing left → lead ankle has lower x (closer to left edge)
       leftIsLead = leftAnkle.x < rightAnkle.x;
     } else if (cameraFacing == CameraFacing.right) {
-      // Camera facing right → lead ankle has higher x (closer to right edge)
       leftIsLead = leftAnkle.x > rightAnkle.x;
     } else {
-      // Front / angled — cannot reliably determine lead leg in side view
       return _isLeftLegLead;
     }
 
-    // Debounce to avoid flickering between frames
-    final debouncedResult = _leadLegDebouncer.update(leftIsLead);
-    return debouncedResult;
+    return _leadLegDebouncer.update(leftIsLead);
   }
 
-  /// Returns the landmark references for the lead and trail legs.
-  /// Uses left/right based on [_isLeftLegLead].
   ({
     PoseLandmark? knee,
     PoseLandmark? hip,
@@ -133,7 +98,6 @@ class Lunge extends ExerciseBase {
     PoseLandmark? ankle,
   }) _getTrailLandmarks(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     final isLeft = _isLeftLegLead ?? true;
-    // Trail is the opposite side of lead
     return (
       knee: landmarks[
           isLeft ? PoseLandmarkType.rightKnee : PoseLandmarkType.leftKnee],
@@ -144,9 +108,8 @@ class Lunge extends ExerciseBase {
     );
   }
 
-  /* -----------------------------------------------------------------------
-     UI BRIDGE
-  ----------------------------------------------------------------------- */
+  // --- UI Bridge ---
+
   @override
   String get exerciseName => 'Lunge';
 
@@ -167,24 +130,23 @@ class Lunge extends ExerciseBase {
     }
   }
 
-  /* -----------------------------------------------------------------------
-     SAFETY CHECKS
-  ----------------------------------------------------------------------- */
-  @override
-  bool requestStop() {
-    return repCount >= LungeConfig.MAX_REP;
-  }
+  // --- Stop Condition ---
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks,
-      CameraFacing cameraFacing) {
-    // Only accept side view for lunge — front view cannot distinguish lead/trail legs.
+  bool requestStop() => repCount >= maxRep;
+
+  @override
+  void onSetComplete() {}
+
+  // --- Safety Checks ---
+
+  @override
+  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing == CameraFacing.front) {
       return "⚠️ Hãy quay sang bên để theo dõi Lunge tốt hơn";
     }
 
-    // Check visibility and confidence of critical landmarks on BOTH sides
-    // (lunge needs both legs unlike squat which uses getSideLandmark)
+    // Lunge needs BOTH sides (unlike squat which uses getSideLandmark)
     PoseLandmark? leftHip = landmarks[PoseLandmarkType.leftHip];
     PoseLandmark? rightHip = landmarks[PoseLandmarkType.rightHip];
     PoseLandmark? leftShoulder = landmarks[PoseLandmarkType.leftShoulder];
@@ -214,18 +176,9 @@ class Lunge extends ExerciseBase {
     }
 
     final allLandmarks = [
-      leftHip,
-      rightHip,
-      leftShoulder,
-      rightShoulder,
-      leftKnee,
-      rightKnee,
-      leftAnkle,
-      rightAnkle,
-      leftFoot,
-      rightFoot,
-      leftHeel,
-      rightHeel,
+      leftHip, rightHip, leftShoulder, rightShoulder,
+      leftKnee, rightKnee, leftAnkle, rightAnkle,
+      leftFoot, rightFoot, leftHeel, rightHeel,
     ];
 
     if (allLandmarks.any((l) => l.likelihood < ExerciseBase.MIN_CONFIDENCE)) {
@@ -235,17 +188,12 @@ class Lunge extends ExerciseBase {
     return null;
   }
 
-  /* -----------------------------------------------------------------------
-     START POSITION — Standing upright, side-on to camera.
-  ----------------------------------------------------------------------- */
+  // --- Start Position ---
+
   @override
-  bool isInStartPosition(
-    Map<PoseLandmarkType, PoseLandmark> landmarks,
-    CameraFacing facing,
-    double? scaleFactor,
-  ) {
+  bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     // Require side view
-    if (facing != CameraFacing.left && facing != CameraFacing.right) {
+    if (cameraFacing != CameraFacing.left && cameraFacing != CameraFacing.right) {
       return false;
     }
 
@@ -267,12 +215,12 @@ class Lunge extends ExerciseBase {
 
     if (shoulder == null || hip == null || knee == null) return false;
 
-    // Trunk roughly vertical (clock angle near 0°/360°)
+    // Trunk roughly vertical
     double trunkAngle = calculateVerticalAngle(pivot: hip, point: shoulder);
     double deviation = trunkAngle > 180 ? 360 - trunkAngle : trunkAngle;
     if (deviation > 25) return false;
 
-    // Legs roughly straight (knee angle > standing threshold)
+    // Legs roughly straight
     final hipKneeAngle =
         calculateAngle(firstPoint: shoulder, midPoint: hip, lastPoint: knee);
     if (hipKneeAngle < LungeConfig.LUNGE_STAND_ANGLE_THRESHOLD) return false;
@@ -280,20 +228,16 @@ class Lunge extends ExerciseBase {
     return true;
   }
 
-  /* -----------------------------------------------------------------------
-     MAIN PHYSICS LOOP — Called every frame when activated.
-  ----------------------------------------------------------------------- */
-  @override
-  void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks,
-      CameraFacing cameraFacing, double? scaleFactor) {
-    // ---------- 1. Detect Lead Leg (before locking) ----------
+  // --- Main Loop (called every frame when activated) ---
 
+  @override
+  void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
+    // 1. Detect lead leg (before locking)
     if (!_leadLegLocked) {
       _isLeftLegLead = _detectLeadLeg(smoothedLandmarks);
     }
 
-    // ---------- 2. Get Landmarks (lead + trail) ----------
-
+    // 2. Get landmarks (lead + trail)
     final lead = _getLeadLandmarks(smoothedLandmarks);
     final trail = _getTrailLandmarks(smoothedLandmarks);
 
@@ -307,22 +251,17 @@ class Lunge extends ExerciseBase {
       return;
     }
 
-    // ---------- 3. Calculate Geometry ----------
-
-    // Lead knee angle: Hip-Knee-Ankle on lead leg
+    // 3. Calculate geometry
     double leadKneeAngle = calculateAngleNormalized(
         firstPoint: lead.hip!, midPoint: lead.knee!, lastPoint: lead.ankle!);
 
-    // Trail knee angle: Hip-Knee-Ankle on trail leg
     double trailKneeAngle = calculateAngleNormalized(
         firstPoint: trail.hip!, midPoint: trail.knee!, lastPoint: trail.ankle!);
 
-    // Trunk lean: vertical angle of shoulder relative to hip
     double backAngle =
         calculateVerticalAngle(pivot: lead.hip!, point: lead.shoulder!);
     double trunkLean = convertClockAngleToTrunkLean(backAngle, cameraFacing);
 
-    // Heel distance: foot.y - heel.y on lead leg
     final leadFoot = smoothedLandmarks[(_isLeftLegLead ?? true)
         ? PoseLandmarkType.leftFootIndex
         : PoseLandmarkType.rightFootIndex];
@@ -332,16 +271,14 @@ class Lunge extends ExerciseBase {
     double heelDistance =
         (leadFoot != null && leadHeel != null) ? leadFoot.y - leadHeel.y : 0.0;
 
-    // Shoulder-Hip-TrailingKnee angle (for lumbar proxy)
     double shoulderHipTrailKneeAngle = calculateAngle(
         firstPoint: lead.shoulder!,
         midPoint: lead.hip!,
         lastPoint: trail.knee!);
 
-    int now = DateTime.now().millisecondsSinceEpoch;
+    int now = frameTimestampMs;
 
-    // ---------- 4. Build LungeRepContext ----------
-
+    // 4. Build LungeRepContext
     final ctx = LungeRepContext(
       leadKneeAngle: leadKneeAngle,
       trailKneeAngle: trailKneeAngle,
@@ -357,8 +294,7 @@ class Lunge extends ExerciseBase {
       resultIssues: resultIssues,
     );
 
-    // ---------- 5. Populate Debug Data ----------
-
+    // 5. Debug data
     debugData['lungeState'] = lungeState.toString().split('.').last;
     debugData['leadLeg'] = (_isLeftLegLead ?? true) ? 'Left' : 'Right';
     debugData['leadKneeAngle'] = leadKneeAngle.toStringAsFixed(1);
@@ -371,31 +307,22 @@ class Lunge extends ExerciseBase {
     debugData['heelDist'] = heelDistance.toStringAsFixed(2);
     debugData['correctForm'] = correctForm.toString();
 
-    // ---------- 6. Rep Completion (Standing Up) ----------
-
+    // 6. Rep completion (standing up)
     if (lungeState == LungeState.standing &&
         previousLungeState != LungeState.standing) {
       repCount += 1;
 
-      // Let depth check if rep was deep enough
       depthMetric.checkRepCompletion(lungeState, ctx);
-
-      // Fire final state transition
       _transitionState(LungeState.standing, now);
 
-      // Collect faults from all metrics
       final allFaults = <FaultRecord>[];
       for (final metric in _metrics) {
         allFaults.addAll(metric.faults);
       }
 
-      // Determine correctForm: true if no faults with affectsForm=true
       correctForm = !allFaults.any((f) => f.affectsForm);
-
-      // UI feedback
       resultIssues.feedback['Result'] = correctForm ? 'Good Rep!' : 'Fix Form';
 
-      // Build fault map for set history
       final faultMap = <String, Map<String, String>>{};
       for (final fault in allFaults) {
         if (!faultMap.containsKey(fault.phase)) {
@@ -405,12 +332,10 @@ class Lunge extends ExerciseBase {
       }
       setFeedback.add({correctForm: faultMap});
 
-      // Merge metric debug data BEFORE reset
       for (final metric in _metrics) {
         debugData.addAll(metric.debugData);
       }
 
-      // Reset metrics for next rep (instructions survive — shown during standing)
       correctForm = true;
       for (final metric in _metrics) {
         metric.reset();
@@ -418,24 +343,20 @@ class Lunge extends ExerciseBase {
       return;
     }
 
-    // ---------- 7. Update State Machine ----------
-
+    // 7. Update state machine
     _updateLungeState(leadKneeAngle, now);
 
-    // ---------- 8. Run All Metrics ----------
-
+    // 8. Run all metrics
     if (lungeState != LungeState.standing) {
       for (final metric in _metrics) {
         metric.update(ctx);
       }
     }
 
-    // Merge metric debug data
     for (final metric in _metrics) {
       debugData.addAll(metric.debugData);
     }
 
-    // Status instruction based on current lunge phase
     if (lungeState == LungeState.descending) {
       resultIssues.addInstruction('descending', 'Status', 'Đang xuống...');
     } else if (lungeState == LungeState.bottom) {
@@ -445,15 +366,7 @@ class Lunge extends ExerciseBase {
     }
   }
 
-  /* -----------------------------------------------------------------------
-     STATE MACHINE (with transition notifications)
-     
-     standing ──(leadKnee < 150°)──▶ descending
-                                        │
-                                 (leadKnee in [70°,110°])
-                                        ▼
-     standing ◀──(leadKnee > 160°)── ascending ◀──(leadKnee > 115°)── bottom
-  ----------------------------------------------------------------------- */
+  // --- State Machine ---
 
   void _updateLungeState(double leadKneeAngle, int timestampMs) {
     if (leadKneeAngle < LungeConfig.LUNGE_DESCEND_ANGLE_THRESHOLD &&
@@ -477,18 +390,15 @@ class Lunge extends ExerciseBase {
     previousLungeState = lungeState;
     lungeState = newState;
 
-    // Lock lead leg when starting a new rep (standing → descending).
-    // Unlock when returning to standing.
+    // Lock lead leg at rep start, unlock on return to standing
     if (newState == LungeState.descending &&
         previousLungeState == LungeState.standing) {
       _leadLegLocked = true;
-      // Clear coaching instructions for the new rep
       resultIssues.instructions.clear();
     } else if (newState == LungeState.standing) {
       _leadLegLocked = false;
     }
 
-    // Notify all metrics of the state transition
     for (final metric in _metrics) {
       metric.onStateTransition(previousLungeState, newState, timestampMs);
     }

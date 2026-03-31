@@ -224,20 +224,20 @@ class TempoMetric extends SquatMetricBase {
   }
 
   /// Progress 0.0–1.0 of bottom hold countdown. Null if not in bottom.
-  double? get bottomHoldProgress {
+  double? bottomHoldProgress(int nowMs) {
     if (_bottomReachedMs == null) return null;
     if (_ascentStartMs != null) return null;
     final elapsed =
-        (DateTime.now().millisecondsSinceEpoch - _bottomReachedMs!) / 1000.0;
+        (nowMs - _bottomReachedMs!) / 1000.0;
     return (elapsed / TempoConfig.BOTTOM_HOLD_MIN).clamp(0.0, 1.0);
   }
 
   /// Remaining seconds to hold. Counts down from BOTTOM_HOLD_MIN to 0.
-  double? get bottomHoldRemaining {
+  double? bottomHoldRemaining(int nowMs) {
     if (_bottomReachedMs == null) return null;
     if (_ascentStartMs != null) return null;
     final elapsed =
-        (DateTime.now().millisecondsSinceEpoch - _bottomReachedMs!) / 1000.0;
+        (nowMs - _bottomReachedMs!) / 1000.0;
     return (TempoConfig.BOTTOM_HOLD_MIN - elapsed)
         .clamp(0.0, TempoConfig.BOTTOM_HOLD_MIN);
   }

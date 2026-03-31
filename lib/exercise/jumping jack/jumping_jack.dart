@@ -13,59 +13,30 @@ import 'metrics/arm_extension_metric.dart';
 import 'metrics/leg_spread_metric.dart';
 import 'metrics/tempo_metric.dart';
 
-/* =========================================================================
-   CONFIGURATION & THRESHOLDS
-   ========================================================================= */
+// --- Config ---
+
 class JumpingJackConfig {
-  /// Max reps per set — office workers doing quick cardio bursts
   static const int MAX_REP = 30;
 
-  // -- State transition thresholds --
-  // All normalized to shoulder width for body-size independence.
-
-  /// Ankle spread (÷ shoulder width) to enter OPEN state
+  // All normalized to shoulder width for body-size independence
   static const double OPEN_ANKLE_SPREAD_THRESHOLD = 1.2;
-
-  /// Ankle spread (÷ shoulder width) to return to CLOSED state
   static const double CLOSED_ANKLE_SPREAD_THRESHOLD = 0.5;
-
-  /// Minimum arm elevation (degrees from horizontal) for OPEN state
-  /// Combined with ankle spread for robust OPEN detection
   static const double OPEN_ARM_ELEVATION_MIN = 105.0;
-
-  /// Maximum arm elevation for CLOSED state (arms at sides)
   static const double CLOSED_ARM_ELEVATION_MAX = 100.0;
 }
 
-/* =========================================================================
-   STATE ENUM
-   ========================================================================= */
-enum JJState {
-  closed,
-  open,
-}
+enum JJState { closed, open }
 
-/* =========================================================================
-   JUMPING JACK LOGIC — FRONT VIEW EXERCISE
-   
-   First front-facing exercise in VinaFit. Key differences from squat/plank:
-   - REQUIRES front view (rejects side view)
-   - Uses BOTH left + right landmarks simultaneously
-   - Scale factor = shoulder width (not back length)
-   - 2-state machine (closed/open) — simpler but FASTER (~1 rep/sec)
-   
-   Vietnamese context:
-   - Universal familiarity from school PE (Bài tập nhảy dạng)
-   - Minimal floor impact — apartment-friendly
-   - ~1m² floor space needed
-   - Land on balls of feet to reduce noise
-   ========================================================================= */
+// --- Jumping Jack (front-view exercise) ---
 
 class JumpingJack extends ExerciseBase {
+  final int maxRep;
+
+  JumpingJack({this.maxRep = JumpingJackConfig.MAX_REP});
+
   JJState jjState = JJState.closed;
   JJState previousJJState = JJState.closed;
 
-  // -- Metrics --
   final ArmExtensionMetric armExtensionMetric = ArmExtensionMetric();
   final LegSpreadMetric legSpreadMetric = LegSpreadMetric();
   final TempoMetric tempoMetric = TempoMetric();
@@ -79,12 +50,11 @@ class JumpingJack extends ExerciseBase {
     tempoMetric,
   ];
 
-  // -- Shoulder width as scale factor for front view --
+  // Shoulder width as scale factor for front view
   double? _shoulderWidth;
 
-  /* -----------------------------------------------------------------------
-     UI BRIDGE
-     ----------------------------------------------------------------------- */
+  // --- UI Bridge ---
+
   @override
   String get exerciseName => 'Nhảy Dạng';
 
@@ -101,15 +71,10 @@ class JumpingJack extends ExerciseBase {
     }
   }
 
-  /* -----------------------------------------------------------------------
-      INITIALIZATION 
-  ----------------------------------------------------------------------- */
+  // --- Start Position ---
+
   @override
-  bool isInStartPosition(
-    Map<PoseLandmarkType, PoseLandmark> landmarks,
-    CameraFacing facing,
-    double? scaleFactor,
-  ) {
+  bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     final leftShoulder = landmarks[PoseLandmarkType.leftShoulder];
     final rightShoulder = landmarks[PoseLandmarkType.rightShoulder];
     final leftHip = landmarks[PoseLandmarkType.leftHip];
@@ -159,16 +124,15 @@ class JumpingJack extends ExerciseBase {
       likelihood: math.min(leftAnkle.likelihood, rightAnkle.likelihood),
     );
 
-    // 1. Trunk must be roughly vertical (clock angle near 0°/360°)
+    // Trunk must be roughly vertical
     double trunkClockAngle =
         calculateVerticalAngle(pivot: hip, point: shoulder);
-    // Near vertical: clock angle close to 0° (or 360°)
     double deviationFromVertical = trunkClockAngle;
     if (deviationFromVertical > 180)
       deviationFromVertical = 360 - deviationFromVertical;
     if (deviationFromVertical > 25.0) return false;
 
-    // 2. Legs must be straight (knee angle > 155° = standing)
+    // Legs must be straight (knee angle > 155°)
     double kneeAngle = calculateAngleNormalized(
       firstPoint: hip,
       midPoint: knee,
@@ -179,27 +143,23 @@ class JumpingJack extends ExerciseBase {
     return true;
   }
 
-  /* -----------------------------------------------------------------------
-     STOP CONDITION
-     ----------------------------------------------------------------------- */
-  @override
-  bool requestStop() {
-    return repCount >= JumpingJackConfig.MAX_REP;
-  }
+  // --- Stop Condition ---
 
-  /* -----------------------------------------------------------------------
-     SAFETY CHECKS — REQUIRE FRONT VIEW
-     ----------------------------------------------------------------------- */
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks,
-      CameraFacing cameraFacing) {
-    // Jumping jacks REQUIRE front view — the opposite of squat/plank
+  bool requestStop() => repCount >= maxRep;
+
+  @override
+  void onSetComplete() {}
+
+  // --- Safety Checks (requires front view) ---
+
+  @override
+  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing == CameraFacing.left ||
         cameraFacing == CameraFacing.right) {
       return "⚠️ Xin hãy quay mặt về phía camera để theo dõi Nhảy Dạng";
     }
 
-    // Check visibility of ALL bilateral landmarks
     final leftShoulder = landmarks[PoseLandmarkType.leftShoulder];
     final rightShoulder = landmarks[PoseLandmarkType.rightShoulder];
     final leftElbow = landmarks[PoseLandmarkType.leftElbow];
@@ -224,7 +184,6 @@ class JumpingJack extends ExerciseBase {
       return "⚠️ Đảm bảo toàn thân trong khung hình";
     }
 
-    // Confidence check on critical landmarks
     if (leftShoulder.likelihood < ExerciseBase.MIN_CONFIDENCE ||
         rightShoulder.likelihood < ExerciseBase.MIN_CONFIDENCE ||
         leftWrist.likelihood < ExerciseBase.MIN_CONFIDENCE ||
@@ -237,16 +196,11 @@ class JumpingJack extends ExerciseBase {
     return null;
   }
 
-  /* -----------------------------------------------------------------------
-     MAIN PHYSICS LOOP — Called every frame when activated.
-     
-     FRONT VIEW: Uses BOTH left + right landmarks directly.
-     Does NOT use getSideLandmark() — that's for side-view exercises.
-     ----------------------------------------------------------------------- */
+  // --- Main Loop (called every frame when activated, front view) ---
+
   @override
-  void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks,
-      CameraFacing cameraFacing, double? scaleFactor) {
-    // ---------- 1. Get ALL Bilateral Landmarks ----------
+  void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
+    // 1. Get all bilateral landmarks
     final leftShoulder = smoothedLandmarks[PoseLandmarkType.leftShoulder];
     final rightShoulder = smoothedLandmarks[PoseLandmarkType.rightShoulder];
     final leftElbow = smoothedLandmarks[PoseLandmarkType.leftElbow];
@@ -272,39 +226,32 @@ class JumpingJack extends ExerciseBase {
         nose == null) return;
 
     _shoulderWidth = calculateDistance(leftShoulder, rightShoulder);
-    distanceScaleFactor = _shoulderWidth;
+    scaleFactor = _shoulderWidth ?? 1.0;
     if (_shoulderWidth == null || _shoulderWidth! <= 1.0) return;
 
-    // ---------- 3. Calculate Geometry ----------
-
-    // Arm angles (shoulder→elbow→wrist), unsigned 0–180°
+    // 2. Calculate geometry
     final leftArmAngle = calculateAngle(
         firstPoint: leftShoulder, midPoint: leftElbow, lastPoint: leftWrist);
     final rightArmAngle = calculateAngle(
         firstPoint: rightShoulder, midPoint: rightElbow, lastPoint: rightWrist);
 
-    // Arm elevation: angle of shoulder→wrist vector from horizontal
-    // 90° = horizontal (arms to side), 180° = straight up
     final leftArmElevation = calculateAngleNormalized(
         firstPoint: leftHip, midPoint: leftShoulder, lastPoint: leftWrist);
     final rightArmElevation = calculateAngleNormalized(
         firstPoint: rightHip, midPoint: rightShoulder, lastPoint: rightWrist);
 
-    // Ankle spread normalized to shoulder width
     final ankleDistance = calculateDistance(leftAnkle, rightAnkle);
     final ankleSpreadNorm = ankleDistance / _shoulderWidth!;
 
-    // Wrist positions relative to body
     final wristAboveHead = leftWrist.y < nose.y && rightWrist.y < nose.y;
     final wristBelowShoulders =
         leftWrist.y > leftShoulder.y && rightWrist.y > rightShoulder.y;
 
-    // Average arm elevation for state machine
     final avgArmElevation = (leftArmElevation + rightArmElevation) / 2.0;
 
-    int now = DateTime.now().millisecondsSinceEpoch;
+    int now = frameTimestampMs;
 
-    // ---------- 4. Build RepContext ----------
+    // 3. Build RepContext
     final ctx = RepContext(
       leftArmAngle: leftArmAngle,
       rightArmAngle: rightArmAngle,
@@ -319,7 +266,7 @@ class JumpingJack extends ExerciseBase {
       resultIssues: resultIssues,
     );
 
-    // ---------- 5. Populate Debug Data ----------
+    // 4. Debug data
     debugData['jjState'] = jjState.toString().split('.').last;
     debugData['ankleSpread'] = ankleSpreadNorm.toStringAsFixed(2);
     debugData['leftElev'] = leftArmElevation.toStringAsFixed(1);
@@ -327,30 +274,23 @@ class JumpingJack extends ExerciseBase {
     debugData['wristAbove'] = wristAboveHead.toString();
     debugData['correctForm'] = correctForm.toString();
 
-    // ---------- 6. Rep Completion (Return to CLOSED) ----------
-
+    // 5. Rep completion (return to closed)
     if (jjState == JJState.closed && previousJJState == JJState.open) {
       repCount += 1;
-      previousJJState = jjState; // Update previous state for next cycle
+      previousJJState = jjState;
 
-      // Evaluate rep quality via metrics
       armExtensionMetric.evaluateRep(ctx);
       legSpreadMetric.evaluateRep(ctx);
       tempoMetric.evaluateRep(ctx, now);
 
-      // Collect faults from all metrics
       final allFaults = <FaultRecord>[];
       for (final metric in _metrics) {
         allFaults.addAll(metric.faults);
       }
 
-      // Determine correctForm: true if no faults with affectsForm=true
       correctForm = !allFaults.any((f) => f.affectsForm);
-
-      // UI feedback
       resultIssues.feedback['Result'] = correctForm ? 'Tốt lắm!' : 'Sửa tư thế';
 
-      // Build fault map for set history
       final faultMap = <String, Map<String, String>>{};
       for (final fault in allFaults) {
         if (!faultMap.containsKey(fault.phase)) {
@@ -360,18 +300,15 @@ class JumpingJack extends ExerciseBase {
       }
       setFeedback.add({correctForm: faultMap});
 
-      // Merge metric debug data BEFORE reset
       for (final metric in _metrics) {
         debugData.addAll(metric.debugData);
       }
 
-      // Add tempo summary
       if (tempoMetric.lastRepDuration != null) {
         resultIssues.feedback['Tempo'] =
             '${tempoMetric.lastRepDuration!.toStringAsFixed(1)}s';
       }
 
-      // Reset metrics for next rep (instructions survive during closed phase)
       correctForm = true;
       for (final metric in _metrics) {
         metric.reset();
@@ -379,21 +316,20 @@ class JumpingJack extends ExerciseBase {
       return;
     }
 
-    // ---------- 7. Update State Machine ----------
+    // 6. Update state machine
     _updateJJState(ankleSpreadNorm, avgArmElevation, wristAboveHead,
         wristBelowShoulders, now);
 
-    // ---------- 8. Run All Metrics ----------
+    // 7. Run all metrics
     for (final metric in _metrics) {
       metric.update(ctx);
     }
 
-    // ---------- 9. Merge Metric Debug Data ----------
+    // 8. Merge metric debug data
     for (final metric in _metrics) {
       debugData.addAll(metric.debugData);
     }
 
-    // Status instructions
     if (jjState == JJState.closed) {
       resultIssues.addInstruction('closed', 'Status', 'Vào');
     } else if (jjState == JJState.open) {
@@ -401,12 +337,8 @@ class JumpingJack extends ExerciseBase {
     }
   }
 
-  /* -----------------------------------------------------------------------
-     STATE MACHINE — 2 states, fast transitions
-     
-     CLOSED → OPEN:  ankleSpread > threshold AND arms elevated
-     OPEN → CLOSED:  ankleSpread < threshold AND arms down
-     ----------------------------------------------------------------------- */
+  // --- State Machine (2-state, fast transitions) ---
+
   void _updateJJState(double ankleSpreadNorm, double avgArmElevation,
       bool wristAboveHead, bool wristBelowShoulders, int timestampMs) {
     final isOpenCandidate =
@@ -432,12 +364,10 @@ class JumpingJack extends ExerciseBase {
     previousJJState = jjState;
     jjState = newState;
 
-    // Clear coaching instructions when starting a new rep cycle
     if (newState == JJState.open && previousJJState == JJState.closed) {
       resultIssues.instructions.clear();
     }
 
-    // Notify all metrics
     for (final metric in _metrics) {
       metric.onStateTransition(previousJJState, newState, timestampMs);
     }
