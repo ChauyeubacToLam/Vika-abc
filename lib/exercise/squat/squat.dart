@@ -306,19 +306,30 @@ class Squat extends ExerciseBase {
 
       // UI feedback
       resultIssues.feedback['Result'] = correctForm ? 'Good Rep!' : 'Fix Form';
-      
+
+      // --- Voice feedback (queue-based) ---
+      // 1. Count rep number
+      _ttsService.speak(repCount.toString());
+
+      // 2. Specific error feedback or praise
+      bool hasDepthFault = allFaults.any((f) => f.type == 'Depth');
+      bool hasTrunkFault = allFaults.any((f) => f.type == 'Back');
+
+      if (hasDepthFault) {
+        _ttsService.speak("Thấp hơn nữa");
+      }
+      if (hasTrunkFault) {
+        _ttsService.speak("Ưỡn ngực lên");
+      }
+      if (correctForm) {
+        _ttsService.speak("Tốt lắm");
+      }
+
+      // 3. End or continue
       if (repCount >= SquatConfig.MAX_REP) {
-        if (correctForm) {
-          _ttsService.speak("Tốt lắm");
-        } else {
-          _ttsService.speak("Sai tư thế, chú ý");
-        }
+        _ttsService.speak("Hoàn thành bài tập");
       } else {
-        if (correctForm) {
-          _ttsService.speak("Tốt lắm, xuống");
-        } else {
-          _ttsService.speak("Sai tư thế, chú ý, xuống");
-        }
+        _ttsService.speak("Xuống");
       }
 
       // Build fault map for set history
@@ -426,6 +437,7 @@ class Squat extends ExerciseBase {
     // Clear coaching instructions when user starts a new rep.
     // Instructions were shown during standing — no longer needed.
     if (newState == SquatState.descending) {
+      _ttsService.clearQueue(); // Stop any pending voice to avoid overlap
       resultIssues.instructions.clear();
       _spokenUp = false;
     } else if (newState == SquatState.bottom) {

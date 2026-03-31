@@ -15,6 +15,26 @@ Future<void> main() async {
     "Sai tư thế, chú ý": "sai_tu_the.mp3",
     "Sai tư thế, chú ý, xuống": "sai_tu_the_xuong.mp3",
     "Đứng thẳng": "dung_thang.mp3",
+    // Rep counting (1-15)
+    "1": "1.mp3",
+    "2": "2.mp3",
+    "3": "3.mp3",
+    "4": "4.mp3",
+    "5": "5.mp3",
+    "6": "6.mp3",
+    "7": "7.mp3",
+    "8": "8.mp3",
+    "9": "9.mp3",
+    "10": "10.mp3",
+    "11": "11.mp3",
+    "12": "12.mp3",
+    "13": "13.mp3",
+    "14": "14.mp3",
+    "15": "15.mp3",
+    // Specific feedback
+    "Thấp hơn nữa": "thap_hon_nua.mp3",
+    "Ưỡn ngực lên": "uon_nguc_len.mp3",
+    "Hoàn thành bài tập": "hoan_thanh_bai_tap.mp3",
   };
 
   const String apiUrl = 'https://viettelai.vn/tts/speech_synthesis';
@@ -35,7 +55,7 @@ Future<void> main() async {
         body: jsonEncode({
           'text': text,
           'voice': 'hn-quynhanh',
-          'speed': 1.0,
+          'speed': 1.2,
           'tts_return_option': 3,
           'token': token,
           'without_filter': false,
