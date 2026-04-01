@@ -308,7 +308,6 @@ class JumpingJack extends ExerciseBase {
 
       speakRepCompletion(
         nextPhaseVoice: "Mở",
-        allFaults: allFaults,
         correctForm: correctForm,
       );
 

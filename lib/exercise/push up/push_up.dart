@@ -263,7 +263,6 @@ class PushUp extends ExerciseBase {
 
     speakRepCompletion(
       nextPhaseVoice: "Xuống",
-      allFaults: allFaults,
       correctForm: correctForm,
     );
 

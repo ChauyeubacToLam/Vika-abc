@@ -585,7 +585,6 @@ class GluteBridge extends ExerciseBase {
 
     speakRepCompletion(
       nextPhaseVoice: "Lên",
-      allFaults: allFaults,
       correctForm: correctForm,
     );
 

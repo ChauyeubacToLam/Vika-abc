@@ -397,7 +397,6 @@ class Plank extends ExerciseBase {
 
     speakRepCompletion(
       nextPhaseVoice: null,
-      allFaults: allFaults,
       correctForm: correctForm,
     );
 

@@ -117,7 +117,7 @@ class ArmExtensionMetric extends JJMetricBase {
             'closed', 'Arms elevation', 'Lần sau, vươn tay thật cao qua đầu!');
         _elevationInstructionSet = true;
       }
-      _logFault('OPEN', 'Tay chưa đủ cao', voiceMessage: 'Đưa tay cao hơn');
+      _logFault('OPEN', 'Tay chưa đủ cao');
     } else if (mediumArms) {
       ctx.resultIssues.feedback['Arms'] = 'Đưa tay cao hơn!';
       if (!_elevationInstructionSet) {
@@ -161,20 +161,19 @@ class ArmExtensionMetric extends JJMetricBase {
 
     if (peakMin < ArmExtensionConfig.ELEVATION_WARNING) {
       _logFault(
-          'REP_COMPLETE', 'Tay quá thấp (${peakMin.toStringAsFixed(0)}°)', voiceMessage: 'Đưa tay cao hơn');     
+          'REP_COMPLETE', 'Tay quá thấp (${peakMin.toStringAsFixed(0)}°)');     
     } else if (peakMin < ArmExtensionConfig.ELEVATION_GOOD) {
       _logFault(
-          'REP_COMPLETE', 'Tay chưa đủ cao (${peakMin.toStringAsFixed(0)}°)', voiceMessage: 'Đưa tay cao hơn');  
+          'REP_COMPLETE', 'Tay chưa đủ cao (${peakMin.toStringAsFixed(0)}°)');  
     }
   }
 
-  void _logFault(String phase, String message, {String? voiceMessage}) {
+  void _logFault(String phase, String message) {
     if (!_faults.any((f) => f.phase == phase && f.type == 'Arms')) {
       _faults.add(FaultRecord(
         phase: phase,
         type: 'Arms',
         message: message,
-        voiceMessage: voiceMessage,
         affectsForm: true,
       ));
     }

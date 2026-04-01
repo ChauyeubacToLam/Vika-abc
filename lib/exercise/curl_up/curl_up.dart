@@ -295,7 +295,6 @@ class CurlUp extends ExerciseBase {
 
       speakRepCompletion(
         nextPhaseVoice: "Cuộn lên",
-        allFaults: allFaults,
         correctForm: repCorrect,
       );
 

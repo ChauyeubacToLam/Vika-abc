@@ -119,7 +119,6 @@ class KneeAngleMetric extends GluteBridgeMetricBase {
         phase: 'topHold',
         type: 'KneeAngle',
         message: 'Di chân ra xa hông hơn — duỗi gối nhiều hơn',
-        voiceMessage: 'Chỉnh góc gối',
         affectsForm: true,
       ));
     } else if (kneeAngle < KneeAngleConfig.GOOD_MIN) {

@@ -396,7 +396,6 @@ abstract class ExerciseBase {
   /// Hook for unifying voice feedback on rep completion
   void speakRepCompletion({
     required String? nextPhaseVoice,
-    required List<dynamic> allFaults,
     required bool correctForm,
     bool countRep = true,
   }) {
@@ -404,16 +403,7 @@ abstract class ExerciseBase {
       ttsService.speak(repCount.toString());
     }
 
-    bool spokenFault = false;
-    for (final fault in allFaults) {
-      if (fault.affectsForm && fault.voiceMessage != null && fault.voiceMessage!.isNotEmpty) {
-        ttsService.speak(fault.voiceMessage!);
-        spokenFault = true;
-        break; // Only speak one fault to avoid overlapping TTS
-      }
-    }
-
-    if (correctForm && !spokenFault) {
+    if (correctForm) {
       ttsService.speak("Tốt lắm");
     }
 

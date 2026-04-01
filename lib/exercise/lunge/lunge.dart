@@ -340,7 +340,6 @@ class Lunge extends ExerciseBase {
 
     speakRepCompletion(
       nextPhaseVoice: "Xuống",
-      allFaults: allFaults,
       correctForm: correctForm,
     );
 

@@ -108,10 +108,10 @@ class LegSpreadMetric extends JJMetricBase {
   void evaluateRep(RepContext ctx) {
     if (_peakSpread < LegSpreadConfig.SPREAD_WARNING) {
       _logFault(
-          'REP_COMPLETE', 'Chân quá hẹp (${_peakSpread.toStringAsFixed(1)}×)', voiceMessage: 'Mở chân rộng hơn'); 
+          'REP_COMPLETE', 'Chân quá hẹp (${_peakSpread.toStringAsFixed(1)}×)');
     } else if (_peakSpread < LegSpreadConfig.SPREAD_GOOD) {
       _logFault('REP_COMPLETE',
-          'Chân chưa đủ rộng (${_peakSpread.toStringAsFixed(1)}×)', voiceMessage: 'Mở chân rộng hơn');
+          'Chân chưa đủ rộng (${_peakSpread.toStringAsFixed(1)}×)');
     }
   }
 
