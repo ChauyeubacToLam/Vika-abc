@@ -16,14 +16,13 @@ class StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = VFTheme.scale(context);
     return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: 10 * VFTheme.scale(context),
-        vertical: 12 * VFTheme.scale(context),
-      ),
+      padding: EdgeInsets.symmetric(horizontal: 12 * s, vertical: 14 * s),
       decoration: BoxDecoration(
         color: accent ? VFTheme.accentBg : VFTheme.surface,
-        borderRadius: BorderRadius.circular(10 * VFTheme.scale(context)),
+        borderRadius: BorderRadius.circular(12 * s),
+        boxShadow: VFTheme.cardShadow,
       ),
       child: Column(
         children: [
@@ -31,21 +30,21 @@ class StatCard extends StatelessWidget {
             value,
             style: TextStyle(
               fontSize: VFTheme.font(context, 22),
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
               color: accent ? VFTheme.accent : VFTheme.text,
               letterSpacing: -0.5,
               height: 1,
             ),
           ),
-          SizedBox(height: 4 * VFTheme.scale(context)),
+          SizedBox(height: 5 * s),
           Text(
             label.toUpperCase(),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: VFTheme.font(context, 10),
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
               color: accent ? VFTheme.accentText : VFTheme.textMuted,
-              letterSpacing: 0.3,
+              letterSpacing: 0.4,
               height: 1.15,
             ),
           ),

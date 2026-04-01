@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/vf_theme.dart';
+import '../widgets/vf_primitives.dart';
 import 'dashboard_home_screen.dart';
 import 'exercise_browser.dart';
 import 'plan_screen.dart';
@@ -23,46 +24,44 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
     final bottomInset = mediaQuery.padding.bottom;
-    final navHeight = VFTheme.navHeight(context);
-    final fabSize = VFTheme.fabSize(context);
-    final contentBottomPadding =
-        navHeight + bottomInset + fabSize * 0.72;
+    const navHeight = VFTheme.navHeight;
+    final s = VFTheme.scale(context);
+    final contentBottomPadding = navHeight + bottomInset + 26 * s;
 
     final screens = [
       DashboardHomeScreen(
         bottomPadding: contentBottomPadding,
-        onOpenBrowser: () => setState(() => _browserOpen = true),
+        onOpenBrowser: _toggleBrowser,
       ),
       PlanScreen(bottomPadding: contentBottomPadding),
       ProgressScreen(bottomPadding: contentBottomPadding),
       ProfileScreen(bottomPadding: contentBottomPadding),
     ];
 
-    return Theme(
-      data: VFTheme.lightTheme,
-      child: AnnotatedRegion<SystemUiOverlayStyle>(
-        value: const SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.dark,
-          statusBarBrightness: Brightness.light,
-        ),
-        child: Scaffold(
-          extendBody: true,
-          backgroundColor: VFTheme.bg,
-          body: Stack(
-            fit: StackFit.expand,
-            children: [
-              SafeArea(
-                bottom: false,
-                child: IndexedStack(
-                  index: _currentIndex,
-                  children: screens,
-                ),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+      ),
+      child: Scaffold(
+        extendBody: true,
+        backgroundColor: VFTheme.background,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            SafeArea(
+              bottom: false,
+              child: IndexedStack(
+                index: _currentIndex,
+                children: screens,
               ),
-              IgnorePointer(
+            ),
+            Positioned.fill(
+              child: IgnorePointer(
                 ignoring: !_browserOpen,
                 child: AnimatedSlide(
-                  duration: const Duration(milliseconds: 220),
+                  duration: const Duration(milliseconds: 260),
                   curve: Curves.easeOutCubic,
                   offset: _browserOpen ? Offset.zero : const Offset(0, 1),
                   child: AnimatedOpacity(
@@ -70,115 +69,103 @@ class _MainShellState extends State<MainShell> {
                     opacity: _browserOpen ? 1 : 0,
                     child: ExerciseBrowser(
                       bottomPadding: contentBottomPadding,
-                      onClose: () => setState(() => _browserOpen = false),
-                      onSelectExercise: (definition) {
-                        setState(() => _browserOpen = false);
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (!mounted) return;
-                          Navigator.of(context).pushNamed(
-                            '/exercise',
-                            arguments: definition,
-                          );
-                        });
-                      },
+                      onClose: _toggleBrowser,
+                      onSelectExercise: (_) {},
                     ),
                   ),
                 ),
               ),
-            ],
-          ),
-          bottomNavigationBar: _BottomNavBar(
-            currentIndex: _currentIndex,
-            navHeight: navHeight,
-            bottomInset: bottomInset,
-            onTabSelected: (index) {
-              setState(() {
-                _currentIndex = index;
-                _browserOpen = false;
-              });
-            },
-          ),
-          floatingActionButtonLocation:
-              FloatingActionButtonLocation.centerDocked,
-          floatingActionButton: _FabButton(
-            size: fabSize,
+            ),
+          ],
+        ),
+        bottomNavigationBar: _BottomNavBar(
+          currentIndex: _currentIndex,
+          browserOpen: _browserOpen,
+          bottomInset: bottomInset,
+          onTap: (index) {
+            setState(() {
+              _currentIndex = index;
+              _browserOpen = false;
+            });
+          },
+        ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+        floatingActionButton: Transform.translate(
+          offset: Offset(0, -18 * s),
+          child: _BrowserFab(
             isOpen: _browserOpen,
-            onTap: () => setState(() => _browserOpen = !_browserOpen),
+            onTap: _toggleBrowser,
           ),
         ),
       ),
     );
+  }
+
+  void _toggleBrowser() {
+    setState(() => _browserOpen = !_browserOpen);
   }
 }
 
 class _BottomNavBar extends StatelessWidget {
   const _BottomNavBar({
     required this.currentIndex,
-    required this.navHeight,
+    required this.browserOpen,
     required this.bottomInset,
-    required this.onTabSelected,
+    required this.onTap,
   });
 
   final int currentIndex;
-  final double navHeight;
+  final bool browserOpen;
   final double bottomInset;
-  final ValueChanged<int> onTabSelected;
+  final ValueChanged<int> onTap;
 
   @override
   Widget build(BuildContext context) {
+    final s = VFTheme.scale(context);
+
     return FrostedGlass(
-      decoration: VFTheme.glassBarDecoration(context),
-      child: Material(
-        color: Colors.transparent,
-        child: SizedBox(
-          height: navHeight + bottomInset,
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              6 * VFTheme.scale(context),
-              0,
-              6 * VFTheme.scale(context),
-              bottomInset,
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _NavItem(
-                    icon: Icons.home_rounded,
-                    label: 'Trang chủ',
-                    active: currentIndex == 0,
-                    onTap: () => onTabSelected(0),
-                  ),
+      sigma: 28,
+      decoration: VFTheme.navDecoration(),
+      child: SizedBox(
+        height: VFTheme.navHeight + bottomInset,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(8 * s, 0, 8 * s, bottomInset),
+          child: Row(
+            children: [
+              Expanded(
+                child: _NavItem(
+                  label: 'Trang chủ',
+                  glyph: VFNavGlyph.home,
+                  active: currentIndex == 0 && !browserOpen,
+                  onTap: () => onTap(0),
                 ),
-                Expanded(
-                  child: _NavItem(
-                    icon: Icons.calendar_month_rounded,
-                    label: 'Kế hoạch',
-                    active: currentIndex == 1,
-                    onTap: () => onTabSelected(1),
-                  ),
+              ),
+              Expanded(
+                child: _NavItem(
+                  label: 'Kế hoạch',
+                  glyph: VFNavGlyph.plan,
+                  active: currentIndex == 1 && !browserOpen,
+                  onTap: () => onTap(1),
                 ),
-                SizedBox(
-                  width:
-                      VFTheme.fabSize(context) + 14 * VFTheme.scale(context),
+              ),
+              SizedBox(width: VFTheme.fabSize + (12 * s)),
+              Expanded(
+                child: _NavItem(
+                  label: 'Tiến bộ',
+                  glyph: VFNavGlyph.progress,
+                  active: currentIndex == 2 && !browserOpen,
+                  onTap: () => onTap(2),
                 ),
-                Expanded(
-                  child: _NavItem(
-                    icon: Icons.query_stats_rounded,
-                    label: 'Tiến bộ',
-                    active: currentIndex == 2,
-                    onTap: () => onTabSelected(2),
-                  ),
+              ),
+              Expanded(
+                child: _NavItem(
+                  label: 'Tôi',
+                  glyph: VFNavGlyph.profile,
+                  active: currentIndex == 3 && !browserOpen,
+                  onTap: () => onTap(3),
                 ),
-                Expanded(
-                  child: _NavItem(
-                    icon: Icons.person_outline_rounded,
-                    label: 'Tôi',
-                    active: currentIndex == 3,
-                    onTap: () => onTabSelected(3),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -188,47 +175,56 @@ class _BottomNavBar extends StatelessWidget {
 
 class _NavItem extends StatelessWidget {
   const _NavItem({
-    required this.icon,
     required this.label,
+    required this.glyph,
     required this.active,
     required this.onTap,
   });
 
-  final IconData icon;
   final String label;
+  final VFNavGlyph glyph;
   final bool active;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final scale = VFTheme.scale(context);
+    final s = VFTheme.scale(context);
+    final opacity = active ? 1.0 : 0.3;
+    final color = active ? VFTheme.jade : VFTheme.textMuted;
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12 * scale),
-      child: Opacity(
-        opacity: active ? 1 : 0.45,
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            vertical: 4 * scale,
-            horizontal: 8 * scale,
-          ),
+      borderRadius: BorderRadius.circular(14 * s),
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: 8 * s),
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 160),
+          opacity: opacity,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                icon,
-                size: 22 * scale,
-                color: active ? VFTheme.accent : VFTheme.textMuted,
+              VFNavIcon(
+                glyph: glyph,
+                color: color,
               ),
-              SizedBox(height: 2 * scale),
+              SizedBox(height: 4 * s),
               Text(
                 label,
-                style: TextStyle(
-                  fontSize: VFTheme.font(context, 10),
-                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                  color: active ? VFTheme.accent : VFTheme.textMuted,
-                  letterSpacing: -0.1,
+                style: VFTheme.textStyle(
+                  context,
+                  size: 10,
+                  weight: active ? FontWeight.w700 : FontWeight.w500,
+                  color: color,
+                ),
+              ),
+              SizedBox(height: 2 * s),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                width: 4 * s,
+                height: 4 * s,
+                decoration: BoxDecoration(
+                  color: active ? VFTheme.jade : Colors.transparent,
+                  shape: BoxShape.circle,
                 ),
               ),
             ],
@@ -239,35 +235,45 @@ class _NavItem extends StatelessWidget {
   }
 }
 
-class _FabButton extends StatelessWidget {
-  const _FabButton({
-    required this.size,
+class _BrowserFab extends StatelessWidget {
+  const _BrowserFab({
     required this.isOpen,
     required this.onTap,
   });
 
-  final double size;
   final bool isOpen;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final s = VFTheme.scale(context);
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedRotation(
-        duration: const Duration(milliseconds: 200),
+        duration: const Duration(milliseconds: 220),
         turns: isOpen ? 0.125 : 0,
+        curve: Curves.easeOutCubic,
         child: Container(
-          width: size,
-          height: size,
+          width: VFTheme.fabSize,
+          height: VFTheme.fabSize,
           decoration: BoxDecoration(
-            color: isOpen ? VFTheme.text : VFTheme.accent,
-            borderRadius: BorderRadius.circular(14 * VFTheme.scale(context)),
+            gradient: VFTheme.jadeGradient,
+            borderRadius: BorderRadius.circular(17 * s),
+            boxShadow: [
+              BoxShadow(
+                color: VFTheme.jade.withValues(alpha: 0.28),
+                blurRadius: 18 * s,
+                offset: Offset(0, 4 * s),
+              ),
+            ],
           ),
-          child: Icon(
-            Icons.add_rounded,
-            color: Colors.white,
-            size: 24 * VFTheme.scale(context),
+          alignment: Alignment.center,
+          child: VFNavIcon(
+            glyph: VFNavGlyph.plus,
+            color: VFTheme.white,
+            size: 22 * s,
+            strokeWidth: 2.5,
           ),
         ),
       ),

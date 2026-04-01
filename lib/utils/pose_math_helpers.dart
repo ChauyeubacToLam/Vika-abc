@@ -118,7 +118,7 @@ double calculateHorizontalAngle(
 /* =========================================================================
    Calculate distance between two points
    ========================================================================= */
-double calculateDistance(var point1, var point2) {
+double calculateDistance(dynamic point1, dynamic point2) {
   double dx = point2.x - point1.x;
   double dy = point2.y - point1.y;
   return math.sqrt(dx * dx + dy * dy);
