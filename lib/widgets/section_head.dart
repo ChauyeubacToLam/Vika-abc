@@ -14,11 +14,10 @@ class SectionHead extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = VFTheme.scale(context);
+
     return Padding(
-      padding: EdgeInsets.only(
-        top: 20 * VFTheme.scale(context),
-        bottom: 10 * VFTheme.scale(context),
-      ),
+      padding: EdgeInsets.only(top: 22 * s, bottom: 12 * s),
       child: Row(
         children: [
           Expanded(
@@ -30,7 +29,7 @@ class SectionHead extends StatelessWidget {
               style: TextStyle(
                 fontSize: VFTheme.font(context, 12),
                 color: VFTheme.accent,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
               ),
             ),
         ],

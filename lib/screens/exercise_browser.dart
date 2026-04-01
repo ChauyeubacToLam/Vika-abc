@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../data/mock_data.dart';
 import '../models/exercise_definition.dart';
-import '../models/exercise_lookup.dart';
 import '../theme/vf_theme.dart';
+import '../widgets/pose_silhouette.dart';
+import '../widgets/vf_primitives.dart';
 
-class ExerciseBrowser extends StatefulWidget {
+class ExerciseBrowser extends StatelessWidget {
   const ExerciseBrowser({
     super.key,
     required this.onClose,
@@ -18,453 +18,151 @@ class ExerciseBrowser extends StatefulWidget {
   final ValueChanged<ExerciseDefinition> onSelectExercise;
 
   @override
-  State<ExerciseBrowser> createState() => _ExerciseBrowserState();
-}
-
-class _ExerciseBrowserState extends State<ExerciseBrowser> {
-  String _selectedGroupId = muscleGroups.first.id;
-
-  void _handleExerciseTap(ExerciseDefinition? definition) {
-    if (definition == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Bài tập này sẽ được mở trong bản cập nhật tới.'),
-        ),
-      );
-      return;
-    }
-
-    widget.onSelectExercise(definition);
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final padding = VFTheme.screenPadding(context);
-    final scale = VFTheme.scale(context);
-    final activeGroup =
-        muscleGroups.firstWhere((group) => group.id == _selectedGroupId);
-    final filteredExercises = browserExercises
-        .where((exercise) => exercise.groupId == _selectedGroupId)
-        .toList();
+    final s = VFTheme.scale(context);
 
-    return Container(
-      color: VFTheme.bg,
+    return Material(
+      color: VFTheme.background,
       child: SafeArea(
         bottom: false,
         child: Column(
           children: [
             Padding(
-              padding: EdgeInsets.fromLTRB(
-                padding.left,
-                14 * scale,
-                padding.right,
-                0,
-              ),
-              child: Column(
+              padding: EdgeInsets.fromLTRB(24 * s, 10 * s, 24 * s, 0),
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Bài tập',
-                          style: VFTheme.headerLarge(context),
-                        ),
+                  Expanded(
+                    child: Text(
+                      'Bài tập',
+                      style: VFTheme.textStyle(
+                        context,
+                        size: 26,
+                        weight: FontWeight.w900,
+                        color: VFTheme.text,
+                        letterSpacing: -1.2,
                       ),
-                      Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(10 * scale),
-                          onTap: widget.onClose,
-                          child: Container(
-                            width: 32 * scale,
-                            height: 32 * scale,
-                            decoration: BoxDecoration(
-                              color: VFTheme.surfaceAlt,
-                              borderRadius: BorderRadius.circular(10 * scale),
-                            ),
-                            child: Icon(
-                              Icons.close_rounded,
-                              size: 16 * scale,
-                              color: VFTheme.textMuted,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                  SizedBox(height: 14 * scale),
-                  Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.fromLTRB(
-                      10 * scale,
-                      14 * scale,
-                      10 * scale,
-                      10 * scale,
-                    ),
-                    decoration: BoxDecoration(
-                      color: VFTheme.surface,
-                      borderRadius:
-                          BorderRadius.circular(VFTheme.cardRadius(context)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Chọn nhóm cơ',
-                          style: TextStyle(
-                            fontSize: VFTheme.font(context, 11),
-                            fontWeight: FontWeight.w700,
-                            color: VFTheme.textMuted,
-                            letterSpacing: 0.3,
-                          ),
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: onClose,
+                      borderRadius: BorderRadius.circular(10 * s),
+                      child: Container(
+                        width: 32 * s,
+                        height: 32 * s,
+                        decoration: BoxDecoration(
+                          color: VFTheme.surface,
+                          borderRadius: BorderRadius.circular(10 * s),
+                          border: Border.all(color: VFTheme.hairline),
                         ),
-                        SizedBox(height: 10 * scale),
-                        SizedBox(
-                          height: 84 * scale,
-                          child: ListView.separated(
-                            scrollDirection: Axis.horizontal,
-                            physics: const BouncingScrollPhysics(
-                              parent: AlwaysScrollableScrollPhysics(),
-                            ),
-                            itemBuilder: (context, index) {
-                              final group = muscleGroups[index];
-                              final active = group.id == _selectedGroupId;
-
-                              return Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  borderRadius:
-                                      BorderRadius.circular(14 * scale),
-                                  onTap: () =>
-                                      setState(() => _selectedGroupId = group.id),
-                                  child: AnimatedOpacity(
-                                    duration: const Duration(milliseconds: 160),
-                                    opacity: active ? 1 : 0.55,
-                                    child: SizedBox(
-                                      width: 72 * scale,
-                                      child: Column(
-                                        children: [
-                                          AnimatedContainer(
-                                            duration: const Duration(
-                                                milliseconds: 180),
-                                            width: 44 * scale,
-                                            height: 44 * scale,
-                                            decoration: BoxDecoration(
-                                              color: active
-                                                  ? group.color
-                                                  : VFTheme.surfaceAlt,
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                      14 * scale),
-                                            ),
-                                            child: Icon(
-                                              group.icon,
-                                              size: 18 * scale,
-                                              color: active
-                                                  ? Colors.white
-                                                  : VFTheme.textMuted,
-                                            ),
-                                          ),
-                                          SizedBox(height: 6 * scale),
-                                          Text(
-                                            group.label,
-                                            style: TextStyle(
-                                              fontSize:
-                                                  VFTheme.font(context, 10),
-                                              fontWeight: FontWeight.w700,
-                                              color: active
-                                                  ? group.color
-                                                  : VFTheme.textMuted,
-                                            ),
-                                          ),
-                                          SizedBox(height: 1 * scale),
-                                          Text(
-                                            '${group.count} bài',
-                                            style: TextStyle(
-                                              fontSize:
-                                                  VFTheme.font(context, 9),
-                                              fontWeight: FontWeight.w500,
-                                              color: VFTheme.textMuted,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                            separatorBuilder: (_, __) =>
-                                SizedBox(width: 6 * scale),
-                            itemCount: muscleGroups.length,
-                          ),
+                        alignment: Alignment.center,
+                        child: Icon(
+                          Icons.close_rounded,
+                          size: 16 * s,
+                          color: VFTheme.textMuted,
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(18 * s, 12 * s, 18 * s, 0),
+              child: Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(
+                  horizontal: 14 * s,
+                  vertical: 10 * s,
+                ),
+                decoration: BoxDecoration(
+                  color: VFTheme.jadeMist,
+                  borderRadius: BorderRadius.circular(14 * s),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.auto_awesome_rounded,
+                      size: 14 * s,
+                      color: VFTheme.jade,
+                    ),
+                    SizedBox(width: 8 * s),
+                    Expanded(
+                      child: RichText(
+                        text: TextSpan(
+                          style: VFTheme.textStyle(
+                            context,
+                            size: 11,
+                            weight: FontWeight.w500,
+                            color: VFTheme.jadeDark,
+                            height: 1.45,
+                          ),
+                          children: [
+                            TextSpan(
+                              text: 'Core đang yếu nhất. ',
+                              style: VFTheme.textStyle(
+                                context,
+                                size: 11,
+                                weight: FontWeight.w700,
+                                color: VFTheme.jadeDark,
+                                height: 1.45,
+                              ),
+                            ),
+                            const TextSpan(
+                              text: 'Thử thêm Plank hoặc Curl-up.',
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             Expanded(
-              child: ListView(
+              child: ListView.builder(
                 physics: const BouncingScrollPhysics(
                   parent: AlwaysScrollableScrollPhysics(),
                 ),
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: EdgeInsets.fromLTRB(
-                  padding.left,
-                  12 * scale,
-                  padding.right,
-                  widget.bottomPadding,
-                ),
-                children: [
-                  Text(
-                    '${activeGroup.label.toUpperCase()} · ${filteredExercises.length} bài tập',
-                    style: VFTheme.label(context, color: activeGroup.color),
-                  ),
-                  SizedBox(height: 4 * scale),
-                  Text(
-                    'Chạm để mở bài có sẵn. Những bài chưa hỗ trợ sẽ được bổ sung sau.',
-                    style: VFTheme.muted(context, size: 11),
-                  ),
-                  SizedBox(height: 10 * scale),
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final cardHeight = (constraints.maxWidth * 0.24)
-                          .clamp(84.0, 96.0)
-                          .toDouble();
-
-                      return Column(
-                        children: filteredExercises.map((exercise) {
-                          final definition =
-                              lookupExerciseDefinition(exercise.name);
-                          final isSupported = definition != null;
-
-                          return Padding(
-                            padding: EdgeInsets.only(bottom: 6 * scale),
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(12 * scale),
-                                onTap: () => _handleExerciseTap(definition),
-                                child: Opacity(
-                                  opacity: isSupported ? 1 : 0.72,
-                                  child: Container(
-                                    height: cardHeight,
-                                    decoration: BoxDecoration(
-                                      color: VFTheme.surface,
-                                      borderRadius:
-                                          BorderRadius.circular(12 * scale),
-                                    ),
-                                    clipBehavior: Clip.antiAlias,
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          width: 4 * scale,
-                                          color: exercise.isAi
-                                              ? exercise.color
-                                              : VFTheme.surfaceAlt,
-                                        ),
-                                        Expanded(
-                                          child: Padding(
-                                            padding: EdgeInsets.fromLTRB(
-                                              14 * scale,
-                                              12 * scale,
-                                              12 * scale,
-                                              10 * scale,
-                                            ),
-                                            child: Row(
-                                              children: [
-                                                Container(
-                                                  width: 42 * scale,
-                                                  height: 42 * scale,
-                                                  decoration: BoxDecoration(
-                                                    color: exercise.background,
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            12 * scale),
-                                                  ),
-                                                  alignment: Alignment.center,
-                                                  child: Text(
-                                                    exercise.name.substring(0, 1),
-                                                    style: TextStyle(
-                                                      fontSize: VFTheme.font(
-                                                          context, 16),
-                                                      fontWeight:
-                                                          FontWeight.w800,
-                                                      color: exercise.color,
-                                                    ),
-                                                  ),
-                                                ),
-                                                SizedBox(width: 12 * scale),
-                                                Expanded(
-                                                  child: Column(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment.start,
-                                                    mainAxisAlignment:
-                                                        MainAxisAlignment.center,
-                                                    children: [
-                                                      Row(
-                                                        children: [
-                                                          Flexible(
-                                                            child: Text(
-                                                              exercise.name,
-                                                              overflow:
-                                                                  TextOverflow
-                                                                      .ellipsis,
-                                                              style: TextStyle(
-                                                                fontSize: VFTheme
-                                                                    .font(
-                                                                        context,
-                                                                        14),
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w800,
-                                                                color:
-                                                                    VFTheme.text,
-                                                                letterSpacing:
-                                                                    -0.2,
-                                                              ),
-                                                            ),
-                                                          ),
-                                                          SizedBox(
-                                                              width: 6 * scale),
-                                                          Container(
-                                                            padding: EdgeInsets
-                                                                .symmetric(
-                                                              horizontal:
-                                                                  6 * scale,
-                                                              vertical:
-                                                                  1 * scale,
-                                                            ),
-                                                            decoration:
-                                                                BoxDecoration(
-                                                              color: exercise
-                                                                  .background,
-                                                              borderRadius:
-                                                                  BorderRadius
-                                                                      .circular(4 *
-                                                                          scale),
-                                                            ),
-                                                            child: Text(
-                                                              isSupported
-                                                                  ? (exercise.isAi
-                                                                      ? 'AI'
-                                                                      : 'OPEN')
-                                                                  : 'SOON',
-                                                              style: TextStyle(
-                                                                fontSize: VFTheme
-                                                                    .font(
-                                                                        context,
-                                                                        9),
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w700,
-                                                                color: exercise
-                                                                    .color,
-                                                              ),
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                      SizedBox(height: 2 * scale),
-                                                      Text(
-                                                        exercise.muscles,
-                                                        style: TextStyle(
-                                                          fontSize:
-                                                              VFTheme.font(
-                                                                  context, 11),
-                                                          fontWeight:
-                                                              FontWeight.w500,
-                                                          color:
-                                                              VFTheme.textMuted,
-                                                        ),
-                                                      ),
-                                                      SizedBox(height: 4 * scale),
-                                                      Row(
-                                                        children: [
-                                                          ...List.generate(3,
-                                                              (index) {
-                                                            final active = index <
-                                                                exercise
-                                                                    .difficulty;
-                                                            return Container(
-                                                              width: 5 * scale,
-                                                              height: 5 * scale,
-                                                              margin:
-                                                                  EdgeInsets.only(
-                                                                right: 4 * scale,
-                                                              ),
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: active
-                                                                    ? (exercise
-                                                                            .isAi
-                                                                        ? exercise
-                                                                            .color
-                                                                        : VFTheme
-                                                                            .textMuted)
-                                                                    : VFTheme
-                                                                        .surfaceAlt,
-                                                                shape: BoxShape
-                                                                    .circle,
-                                                              ),
-                                                            );
-                                                          }),
-                                                          SizedBox(
-                                                              width: 2 * scale),
-                                                          Text(
-                                                            exercise.difficulty ==
-                                                                    1
-                                                                ? 'Cơ bản'
-                                                                : exercise.difficulty ==
-                                                                        2
-                                                                    ? 'Trung bình'
-                                                                    : 'Nâng cao',
-                                                            style: TextStyle(
-                                                              fontSize: VFTheme
-                                                                  .font(context,
-                                                                      9),
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w600,
-                                                              color: VFTheme
-                                                                  .textMuted,
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                                Icon(
-                                                  isSupported
-                                                      ? Icons
-                                                          .play_circle_fill_rounded
-                                                      : Icons
-                                                          .lock_outline_rounded,
-                                                  size: 18 * scale,
-                                                  color: isSupported
-                                                      ? exercise.color
-                                                      : VFTheme.textMuted,
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
+                padding: EdgeInsets.fromLTRB(0, 14 * s, 0, bottomPadding),
+                itemCount: _categories.length,
+                itemBuilder: (context, index) {
+                  final category = _categories[index];
+                  return Padding(
+                    padding: EdgeInsets.only(top: index == 0 ? 0 : 8 * s),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 14 * s),
+                          child: _CategoryHeader(category: category),
+                        ),
+                        SizedBox(height: 10 * s),
+                        SizedBox(
+                          height: 146 * s,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            physics: const BouncingScrollPhysics(
+                              parent: AlwaysScrollableScrollPhysics(),
                             ),
-                          );
-                        }).toList(),
-                      );
-                    },
-                  ),
-                ],
+                            padding: EdgeInsets.symmetric(horizontal: 14 * s),
+                            itemCount: category.items.length,
+                            separatorBuilder: (_, __) => SizedBox(width: 8 * s),
+                            itemBuilder: (context, itemIndex) {
+                              return _ExerciseCard(
+                                category: category,
+                                item: category.items[itemIndex],
+                                showAiBadge: index == 0,
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
           ],
@@ -473,3 +171,325 @@ class _ExerciseBrowserState extends State<ExerciseBrowser> {
     );
   }
 }
+
+class _CategoryHeader extends StatelessWidget {
+  const _CategoryHeader({required this.category});
+
+  final _ExerciseCategory category;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = VFTheme.scale(context);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20 * s),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(gradient: category.gradient),
+            ),
+          ),
+          const Positioned.fill(child: VFGrainOverlay()),
+          Positioned(
+            right: 6 * s,
+            bottom: -8 * s,
+            child: Opacity(
+              opacity: 0.07,
+              child: PoseSilhouette(
+                type: category.items.first.type,
+                size: 75 * s,
+                color: VFTheme.white,
+              ),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(18 * s, 18 * s, 18 * s, 14 * s),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  category.label,
+                  style: VFTheme.textStyle(
+                    context,
+                    size: 18,
+                    weight: FontWeight.w900,
+                    color: VFTheme.white,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                SizedBox(height: 2 * s),
+                Text(
+                  '${category.subtitle} · ${category.items.length} bài',
+                  style: VFTheme.textStyle(
+                    context,
+                    size: 10,
+                    weight: FontWeight.w500,
+                    color: Colors.white.withValues(alpha: 0.4),
+                  ),
+                ),
+                SizedBox(height: 10 * s),
+                Wrap(
+                  spacing: 4 * s,
+                  runSpacing: 4 * s,
+                  children: [
+                    for (final item in category.items.take(4))
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 8 * s,
+                          vertical: 3 * s,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6 * s),
+                        ),
+                        child: Text(
+                          item.name,
+                          style: VFTheme.textStyle(
+                            context,
+                            size: 9,
+                            weight: FontWeight.w600,
+                            color: Colors.white.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ),
+                    if (category.items.length > 4)
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 8 * s,
+                          vertical: 3 * s,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(6 * s),
+                        ),
+                        child: Text(
+                          '+${category.items.length - 4}',
+                          style: VFTheme.textStyle(
+                            context,
+                            size: 9,
+                            weight: FontWeight.w600,
+                            color: Colors.white.withValues(alpha: 0.3),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExerciseCard extends StatelessWidget {
+  const _ExerciseCard({
+    required this.category,
+    required this.item,
+    required this.showAiBadge,
+  });
+
+  final _ExerciseCategory category;
+  final _ExerciseItem item;
+  final bool showAiBadge;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = VFTheme.scale(context);
+    return Container(
+      width: 135 * s,
+      decoration: BoxDecoration(
+        color: VFTheme.surface,
+        borderRadius: BorderRadius.circular(18 * s),
+        border: Border.all(color: VFTheme.hairline),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          Container(
+            height: 68 * s,
+            color: category.color.withValues(alpha: 0.06),
+            child: Stack(
+              children: [
+                Center(
+                  child: PoseSilhouette(
+                    type: item.type,
+                    size: 40 * s,
+                    color: category.color.withValues(alpha: 0.25),
+                  ),
+                ),
+                if (showAiBadge)
+                  Positioned(
+                    top: 6 * s,
+                    right: 6 * s,
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 6 * s,
+                        vertical: 2 * s,
+                      ),
+                      decoration: BoxDecoration(
+                        color: category.color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(4 * s),
+                      ),
+                      child: Text(
+                        'AI',
+                        style: VFTheme.textStyle(
+                          context,
+                          size: 7,
+                          weight: FontWeight.w800,
+                          color: category.color,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(12 * s, 10 * s, 12 * s, 12 * s),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.name,
+                  style: VFTheme.textStyle(
+                    context,
+                    size: 13,
+                    weight: FontWeight.w800,
+                    color: VFTheme.text,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                SizedBox(height: 3 * s),
+                Text(
+                  item.description,
+                  style: VFTheme.textStyle(
+                    context,
+                    size: 9,
+                    weight: FontWeight.w500,
+                    color: VFTheme.textMuted,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExerciseCategory {
+  const _ExerciseCategory({
+    required this.label,
+    required this.subtitle,
+    required this.color,
+    required this.gradient,
+    required this.items,
+  });
+
+  final String label;
+  final String subtitle;
+  final Color color;
+  final LinearGradient gradient;
+  final List<_ExerciseItem> items;
+}
+
+class _ExerciseItem {
+  const _ExerciseItem({
+    required this.name,
+    required this.type,
+    required this.description,
+  });
+
+  final String name;
+  final String type;
+  final String description;
+}
+
+const List<_ExerciseCategory> _categories = [
+  _ExerciseCategory(
+    label: 'AI Form Check',
+    subtitle: 'Camera theo dõi form',
+    color: VFTheme.jade,
+    gradient: LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [VFTheme.jadeMid, VFTheme.jadeDark],
+    ),
+    items: [
+      _ExerciseItem(
+          name: 'Squat', type: 'squat', description: 'Đùi · Mông · Cơ bản'),
+      _ExerciseItem(
+          name: 'Lunge', type: 'lunge', description: 'Đùi · Hông · Cơ bản'),
+      _ExerciseItem(
+          name: 'Wall Push-up',
+          type: 'pushup',
+          description: 'Ngực · Vai · Cơ bản'),
+      _ExerciseItem(
+          name: 'Push-up',
+          type: 'pushup',
+          description: 'Ngực · Core · Trung bình'),
+      _ExerciseItem(
+          name: 'Glute Bridge',
+          type: 'bridge',
+          description: 'Mông · Đùi sau · Cơ bản'),
+      _ExerciseItem(
+          name: 'McGill Curl-up',
+          type: 'curlup',
+          description: 'Bụng trước · Cơ bản'),
+    ],
+  ),
+  _ExerciseCategory(
+    label: 'Video hướng dẫn',
+    subtitle: 'Xem và tập theo',
+    color: VFTheme.blue,
+    gradient: LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [VFTheme.blue, Color(0xFF1A3D6E)],
+    ),
+    items: [
+      _ExerciseItem(
+          name: 'Diamond Push-up',
+          type: 'pushup',
+          description: 'Tay sau · Nâng cao'),
+      _ExerciseItem(
+          name: 'Pike Push-up', type: 'pushup', description: 'Vai · Nâng cao'),
+      _ExerciseItem(
+          name: 'Donkey Kick', type: 'bridge', description: 'Mông · Cơ bản'),
+      _ExerciseItem(
+          name: 'Single-leg Bridge',
+          type: 'bridge',
+          description: 'Mông · Trung bình'),
+    ],
+  ),
+  _ExerciseCategory(
+    label: 'Đếm rep & Đồng hồ',
+    subtitle: 'Tự tập, app đếm giùm',
+    color: VFTheme.amber,
+    gradient: LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [VFTheme.amber, Color(0xFF7A4D12)],
+    ),
+    items: [
+      _ExerciseItem(
+          name: 'Plank', type: 'plank', description: 'Core · Vai · Timer'),
+      _ExerciseItem(
+          name: 'Side Plank', type: 'plank', description: 'Core bên · Timer'),
+      _ExerciseItem(
+          name: 'Jumping Jack', type: 'jump', description: 'Cardio · Đếm rep'),
+      _ExerciseItem(
+          name: 'Mountain Climber',
+          type: 'plank',
+          description: 'Core · Cardio'),
+      _ExerciseItem(
+          name: 'Calf Raise', type: 'squat', description: 'Bắp chân · Đếm rep'),
+      _ExerciseItem(
+          name: 'Wall Sit', type: 'squat', description: 'Đùi trước · Timer'),
+    ],
+  ),
+];

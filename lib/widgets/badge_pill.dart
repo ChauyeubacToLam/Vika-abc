@@ -30,7 +30,7 @@ class BadgePill extends StatelessWidget {
           ),
       decoration: BoxDecoration(
         color: background,
-        borderRadius: BorderRadius.circular(6 * VFTheme.scale(context)),
+        borderRadius: BorderRadius.circular(8 * VFTheme.scale(context)),
       ),
       child: Text(
         uppercase ? label.toUpperCase() : label,
