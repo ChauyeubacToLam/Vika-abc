@@ -89,7 +89,7 @@ class LegSpreadMetric extends JJMetricBase {
             'closed', 'Legs spread', 'Lần sau, bước rộng bằng vai hoặc hơn!');
         _instructionSet = true;
       }
-      _logFault('OPEN', 'Chân chưa đủ rộng');
+      _logFault('OPEN', 'Chân chưa đủ rộng', voiceMessage: 'Mở chân rộng hơn');
     } else if (mediumStance) {
       ctx.resultIssues.feedback['Legs'] = 'Rộng hơn chút!';
       if (!_instructionSet) {
@@ -108,19 +108,20 @@ class LegSpreadMetric extends JJMetricBase {
   void evaluateRep(RepContext ctx) {
     if (_peakSpread < LegSpreadConfig.SPREAD_WARNING) {
       _logFault(
-          'REP_COMPLETE', 'Chân quá hẹp (${_peakSpread.toStringAsFixed(1)}×)');
+          'REP_COMPLETE', 'Chân quá hẹp (${_peakSpread.toStringAsFixed(1)}×)', voiceMessage: 'Mở chân rộng hơn'); 
     } else if (_peakSpread < LegSpreadConfig.SPREAD_GOOD) {
       _logFault('REP_COMPLETE',
-          'Chân chưa đủ rộng (${_peakSpread.toStringAsFixed(1)}×)');
+          'Chân chưa đủ rộng (${_peakSpread.toStringAsFixed(1)}×)', voiceMessage: 'Mở chân rộng hơn');
     }
   }
 
-  void _logFault(String phase, String message) {
+  void _logFault(String phase, String message, {String? voiceMessage}) {
     if (!_faults.any((f) => f.phase == phase && f.type == 'Legs')) {
       _faults.add(FaultRecord(
         phase: phase,
         type: 'Legs',
         message: message,
+        voiceMessage: voiceMessage,
         affectsForm: true,
       ));
     }

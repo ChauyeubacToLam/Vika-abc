@@ -63,6 +63,7 @@ class KneeExtensionMetric extends CurlUpMetricBase {
         _logFault(
           ctx.curlUpState.toString().split('.').last.toUpperCase(),
           'Chân duỗi thẳng — co gối lại!',
+          voiceMessage: 'Giữ gối gập',
         );
         _faultLogged = true;
       }
@@ -73,12 +74,13 @@ class KneeExtensionMetric extends CurlUpMetricBase {
     }
   }
 
-  void _logFault(String phase, String message) {
+  void _logFault(String phase, String message, {String? voiceMessage}) {
     if (!_faults.any((f) => f.phase == phase && f.type == 'Knee')) {
       _faults.add(FaultRecord(
         phase: phase,
         type: 'Knee',
         message: message,
+        voiceMessage: voiceMessage,
         affectsForm: true,
       ));
     }

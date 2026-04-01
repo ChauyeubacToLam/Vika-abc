@@ -27,7 +27,8 @@
 
 import '../jumping_jack.dart';
 import '../../exercise_base.dart';
-
+import '../../fault_record.dart';
+export '../../fault_record.dart';
 /* =========================================================================
    RepContext — Shared per-frame state, passed to all metrics.
    Avoids each metric needing to recalculate the same geometry.
@@ -83,24 +84,6 @@ class RepContext {
   });
 }
 
-/* =========================================================================
-   FaultRecord — A single fault logged by a metric.
-   ========================================================================= */
-class FaultRecord {
-  final String phase; // e.g. "OPEN", "CLOSED", "REP_COMPLETE"
-  final String type; // e.g. "Arms", "Legs", "Tempo"
-  final String message; // e.g. "Tay chưa đủ cao"
-  final bool affectsForm; // false = informational only
-  final String? voiceMessage;
-
-  FaultRecord({
-    required this.phase,
-    required this.type,
-    required this.message,
-    this.voiceMessage,
-    this.affectsForm = true,
-  });
-}
 
 /* =========================================================================
    JJMetricBase — Interface every jumping jack metric implements.

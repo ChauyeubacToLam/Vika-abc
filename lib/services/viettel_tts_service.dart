@@ -30,6 +30,7 @@ class ViettelTTSService {
     "Tốt lắm, xuống": "tot_lam_xuong.mp3",
     "Sai tư thế, chú ý": "sai_tu_the.mp3",
     "Sai tư thế, chú ý, xuống": "sai_tu_the_xuong.mp3",
+    "Đứng thẳng": "dung_thang.mp3",
     // New: rep counting (1-15)
     "1": "1.mp3",
     "2": "2.mp3",

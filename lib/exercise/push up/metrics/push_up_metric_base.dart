@@ -18,7 +18,8 @@
 
 import '../push_up.dart';
 import '../../exercise_base.dart';
-
+import '../../fault_record.dart';
+export '../../fault_record.dart';
 /* =========================================================================
    RepContext — Shared per-frame state, passed to all metrics.
    Avoids each metric needing to recalculate the same geometry.
@@ -54,25 +55,6 @@ class RepContext {
   });
 }
 
-/* =========================================================================
-   FaultRecord — A single fault logged by a metric.
-   Same structure as squat's FaultRecord.
-   ========================================================================= */
-class FaultRecord {
-  final String phase; // e.g. "DESCENDING", "BOTTOM"
-  final String type; // e.g. "Back", "Depth", "Tempo"
-  final String message; // e.g. "Leaned too forward"
-  final bool affectsForm; // false = informational only (like heel rise)
-  final String? voiceMessage;
-
-  FaultRecord({
-    required this.phase,
-    required this.type,
-    required this.message,
-    this.voiceMessage,
-    this.affectsForm = true,
-  });
-}
 
 /* =========================================================================
    PushUpMetricBase — Interface every push-up metric implements.

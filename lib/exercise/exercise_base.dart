@@ -417,10 +417,7 @@ abstract class ExerciseBase {
       ttsService.speak("Tốt lắm");
     }
 
-    final int maxReps = (this as dynamic).maxRep as int? ?? 10;
-    if (repCount >= maxReps) {
-      ttsService.speak("Hoàn thành bài tập");
-    } else if (nextPhaseVoice != null) {
+    if (!requestStop() && nextPhaseVoice != null) {
       ttsService.speak(nextPhaseVoice);
     }
   }
@@ -460,8 +457,11 @@ abstract class ExerciseBase {
         break;
 
       case ExerciseState.activated:
-        if (requestStop()) exerciseState = ExerciseState.completed;
-        onSetComplete();
+        if (requestStop()) {
+          exerciseState = ExerciseState.completed;
+          ttsService.speak("Hoàn thành bài tập");
+          onSetComplete();
+        }
         break;
 
       case ExerciseState.completed:

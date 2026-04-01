@@ -145,6 +145,7 @@ class HipExtensionMetric extends GluteBridgeMetricBase {
         message: isError
             ? 'Nâng hông cao hơn — co mông tối đa'
             : 'Cố gắng nâng hông thêm một chút',
+        voiceMessage: 'Nâng hông cao hơn',
         affectsForm: isError, // error if < 150°, warning if 150–160°
       ));
     }

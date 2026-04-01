@@ -162,8 +162,7 @@ class SpeedControlMetric extends GluteBridgeMetricBase {
         _faults.add(FaultRecord(
           phase: 'descending',
           type: 'SpeedControl',
-          message: 'Hạ hông quá nhanh — siết cơ lõi để kiểm soát',
-          affectsForm: true,
+          message: 'Hạ hông quá nhanh — siết cơ lõi để kiểm soát',          voiceMessage: 'Chậm lại',          affectsForm: true,
         ));
         _velocityFaultAdded = true;
       } else if (_liveInstructionShown) {
