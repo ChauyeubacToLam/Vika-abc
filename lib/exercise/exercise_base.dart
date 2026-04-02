@@ -423,8 +423,10 @@ abstract class ExerciseBase {
         break;
 
       case ExerciseState.activated:
-        if (requestStop()) exerciseState = ExerciseState.completed;
-        onSetComplete();
+        if (requestStop()) {
+          exerciseState = ExerciseState.completed;
+          onSetComplete();
+        }
         break;
 
       case ExerciseState.completed:

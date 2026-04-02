@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../services/user_program_service.dart';
 import '../theme/vf_theme.dart';
 import '../widgets/vf_primitives.dart';
 import 'dashboard_home_screen.dart';
@@ -19,6 +20,19 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
   bool _browserOpen = false;
+  UserProgramData? _program;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProgram();
+  }
+
+  Future<void> _loadProgram() async {
+    final program = await UserProgramService.loadAssignedProgram();
+    if (!mounted) return;
+    setState(() => _program = program);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,8 +46,12 @@ class _MainShellState extends State<MainShell> {
       DashboardHomeScreen(
         bottomPadding: contentBottomPadding,
         onOpenBrowser: _toggleBrowser,
+        program: _program,
       ),
-      PlanScreen(bottomPadding: contentBottomPadding),
+      PlanScreen(
+        bottomPadding: contentBottomPadding,
+        program: _program,
+      ),
       ProgressScreen(bottomPadding: contentBottomPadding),
       ProfileScreen(bottomPadding: contentBottomPadding),
     ];

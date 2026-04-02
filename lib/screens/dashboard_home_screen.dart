@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/exercise_lookup.dart';
+import '../services/user_program_service.dart';
 import '../theme/vf_theme.dart';
 import '../widgets/pose_silhouette.dart';
 import '../widgets/vf_primitives.dart';
@@ -10,14 +11,25 @@ class DashboardHomeScreen extends StatelessWidget {
     super.key,
     required this.bottomPadding,
     required this.onOpenBrowser,
+    this.program,
   });
 
   final double bottomPadding;
   final VoidCallback onOpenBrowser;
+  final UserProgramData? program;
 
   @override
   Widget build(BuildContext context) {
     final s = VFTheme.scale(context);
+    final now = DateTime.now();
+    final activeWorkout = _resolveHeroWorkout(now);
+    final userName = (program?.userName ?? '').trim().isEmpty
+        ? 'Nam'
+        : program!.userName.trim();
+    final weekStrip = _buildWeekStrip(
+      program?.workoutDays ?? const [0, 2, 4],
+      now,
+    );
 
     return SingleChildScrollView(
       key: const PageStorageKey<String>('dashboard-home-scroll'),
@@ -39,7 +51,7 @@ class DashboardHomeScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Xin chào, Nam',
+                        'Xin chào, $userName',
                         style: VFTheme.textStyle(
                           context,
                           size: 26,
@@ -51,7 +63,7 @@ class DashboardHomeScreen extends StatelessWidget {
                       ),
                       SizedBox(height: 2 * s),
                       Text(
-                        'Thứ Tư, 22 tháng 3',
+                        _formatHeaderDate(now),
                         style: VFTheme.textStyle(
                           context,
                           size: 13,
@@ -75,7 +87,7 @@ class DashboardHomeScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
-                        '14 ngày 🔥',
+                        '${program?.workoutDays.length ?? 3} buổi/tuần',
                         style: VFTheme.textStyle(
                           context,
                           size: 12,
@@ -113,7 +125,9 @@ class DashboardHomeScreen extends StatelessWidget {
                   SizedBox(width: 10 * s),
                   Expanded(
                     child: Text(
-                      'Chuỗi 3 ngày liên tiếp',
+                      activeWorkout == null
+                          ? 'Sẵn sàng cho chương trình đầu tiên'
+                          : 'Bài tập hôm nay đã sẵn sàng',
                       style: VFTheme.textStyle(
                         context,
                         size: 13,
@@ -123,7 +137,7 @@ class DashboardHomeScreen extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'Kỷ lục: 5',
+                    UserProgramService.levelLabel(program?.level ?? 'beginner'),
                     style: VFTheme.textStyle(
                       context,
                       size: 11,
@@ -149,7 +163,7 @@ class DashboardHomeScreen extends StatelessWidget {
                 border: Border.all(color: VFTheme.hairline),
               ),
               child: Row(
-                children: _weekStrip
+                children: weekStrip
                     .map(
                       (day) => Expanded(
                         child: _WeekStripDay(
@@ -166,7 +180,16 @@ class DashboardHomeScreen extends StatelessWidget {
           Padding(
             padding: EdgeInsets.fromLTRB(18 * s, 0, 18 * s, 0),
             child: _WorkoutHero(
-              onStart: () => _startWorkout(context),
+              workout: activeWorkout,
+              isPro: program?.isPro ?? false,
+              levelLabel: UserProgramService.levelLabel(
+                program?.level ?? 'beginner',
+              ),
+              weekdayLabel: _heroWeekdayLabel(
+                now,
+                (program?.workoutDays ?? const <int>[]).contains(now.weekday - 1),
+              ),
+              onStart: () => _startWorkout(context, activeWorkout),
               onBrowse: onOpenBrowser,
             ),
           ),
@@ -175,22 +198,102 @@ class DashboardHomeScreen extends StatelessWidget {
             padding: EdgeInsets.fromLTRB(18 * s, 0, 18 * s, 0),
             child: _FormProgressCard(scale: s),
           ),
-          SizedBox(height: 8 * s),
-          Padding(
-            padding: EdgeInsets.fromLTRB(18 * s, 0, 18 * s, 0),
-            child: _PremiumCard(scale: s),
-          ),
           SizedBox(height: 24 * s),
         ],
       ),
     );
   }
 
-  void _startWorkout(BuildContext context) {
-    const names = ['Squat', 'Push-up', 'Plank', 'Lunge'];
-    for (final name in names) {
+  UserWorkoutData? _resolveHeroWorkout(DateTime now) {
+    final data = program;
+    if (data == null || data.workouts.isEmpty || data.workoutDays.isEmpty) {
+      return null;
+    }
+
+    final today = now.weekday - 1;
+    final todayIndex = data.workoutDays.indexOf(today);
+    if (todayIndex != -1) {
+      return data.workouts[todayIndex % data.workouts.length];
+    }
+
+    for (var index = 0; index < data.workoutDays.length; index++) {
+      if (data.workoutDays[index] > today) {
+        return data.workouts[index % data.workouts.length];
+      }
+    }
+
+    return data.workouts.first;
+  }
+
+  List<_WeekDayData> _buildWeekStrip(List<int> workoutDays, DateTime now) {
+    final today = now.weekday - 1;
+    return List.generate(7, (index) {
+      final status = index == today
+          ? _WeekDayStatus.today
+          : workoutDays.contains(index) && index < today
+              ? _WeekDayStatus.done
+              : _WeekDayStatus.future;
+      return _WeekDayData(_weekdayShort(index), status);
+    });
+  }
+
+  String _weekdayShort(int index) {
+    const labels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+    final safeIndex = index < 0
+        ? 0
+        : index >= labels.length
+            ? labels.length - 1
+            : index;
+    return labels[safeIndex];
+  }
+
+  String _heroWeekdayLabel(DateTime now, bool todayHasWorkout) {
+    if (todayHasWorkout) {
+      return 'HÔM NAY';
+    }
+    final today = now.weekday - 1;
+    final days = program?.workoutDays ?? const <int>[];
+    for (final day in days) {
+      if (day > today) {
+        return _weekdayShort(day);
+      }
+    }
+    return days.isEmpty ? 'T2' : _weekdayShort(days.first);
+  }
+
+  String _formatHeaderDate(DateTime now) {
+    const weekdays = [
+      'Thứ Hai',
+      'Thứ Ba',
+      'Thứ Tư',
+      'Thứ Năm',
+      'Thứ Sáu',
+      'Thứ Bảy',
+      'Chủ nhật',
+    ];
+    return '${weekdays[now.weekday - 1]}, ${now.day} tháng ${now.month}';
+  }
+
+  void _startWorkout(BuildContext context, [UserWorkoutData? workout]) {
+    final plannedExercises = workout?.exercises ?? const <UserExerciseData>[];
+    for (final exercise in plannedExercises) {
+      if (exercise.isCorrective) {
+        continue;
+      }
+      final definition = lookupExerciseDefinition(exercise.name);
+      if (definition == null) {
+        continue;
+      }
+      Navigator.of(context).pushNamed('/exercise', arguments: definition);
+      return;
+    }
+
+    const fallbackNames = ['Squat', 'Push-up', 'Plank', 'Lunge'];
+    for (final name in fallbackNames) {
       final definition = lookupExerciseDefinition(name);
-      if (definition == null) continue;
+      if (definition == null) {
+        continue;
+      }
       Navigator.of(context).pushNamed('/exercise', arguments: definition);
       return;
     }
@@ -203,14 +306,33 @@ class _WorkoutHero extends StatelessWidget {
   const _WorkoutHero({
     required this.onStart,
     required this.onBrowse,
+    required this.weekdayLabel,
+    required this.levelLabel,
+    required this.isPro,
+    this.workout,
   });
 
   final VoidCallback onStart;
   final VoidCallback onBrowse;
+  final String weekdayLabel;
+  final String levelLabel;
+  final bool isPro;
+  final UserWorkoutData? workout;
 
   @override
   Widget build(BuildContext context) {
     final s = VFTheme.scale(context);
+    final activeWorkout = workout;
+    final heroTitle = activeWorkout?.title ?? 'Toàn thân';
+    final heroDuration = activeWorkout?.duration ?? '15 phút';
+    final heroExercises = activeWorkout?.exercises ??
+        const [
+          UserExerciseData(name: 'Squat', sets: '3×8', pose: 'squat'),
+          UserExerciseData(name: 'Push-up', sets: '3×6', pose: 'pushup'),
+          UserExerciseData(name: 'Plank', sets: '3×20s', pose: 'plank'),
+          UserExerciseData(name: 'Lunge', sets: '3×8', pose: 'lunge'),
+        ];
+    final count = heroExercises.length;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(24 * s),
@@ -243,7 +365,7 @@ class _WorkoutHero extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        'NGÀY 5 · TUẦN 1',
+                        '$weekdayLabel · TUẦN 1',
                         style: VFTheme.textStyle(
                           context,
                           size: 10,
@@ -266,7 +388,7 @@ class _WorkoutHero extends StatelessWidget {
                         ),
                       ),
                       child: Text(
-                        'Cơ bản',
+                        levelLabel,
                         style: VFTheme.textStyle(
                           context,
                           size: 10,
@@ -280,7 +402,7 @@ class _WorkoutHero extends StatelessWidget {
                 ),
                 SizedBox(height: 10 * s),
                 Text(
-                  'Toàn thân',
+                  heroTitle,
                   style: VFTheme.textStyle(
                     context,
                     size: 30,
@@ -292,7 +414,7 @@ class _WorkoutHero extends StatelessWidget {
                 ),
                 SizedBox(height: 5 * s),
                 Text(
-                  '4 bài · 15 phút · Camera bên',
+                  '$count bài · $heroDuration · Camera bên',
                   style: VFTheme.textStyle(
                     context,
                     size: 13,
@@ -312,36 +434,21 @@ class _WorkoutHero extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      const Expanded(
-                        child: _HeroExerciseTile(
-                          name: 'Squat',
-                          type: 'squat',
-                          tracked: true,
+                      for (var index = 0; index < heroExercises.length; index++) ...[
+                        Expanded(
+                          child: _HeroExerciseTile(
+                            name: heroExercises[index].name,
+                            type: UserProgramService.silhouetteType(
+                              heroExercises[index].pose,
+                            ),
+                            tracked: !heroExercises[index].isCorrective,
+                            locked:
+                                heroExercises[index].isCorrective && !isPro,
+                          ),
                         ),
-                      ),
-                      SizedBox(width: 6 * s),
-                      const Expanded(
-                        child: _HeroExerciseTile(
-                          name: 'Push-up',
-                          type: 'pushup',
-                          tracked: true,
-                        ),
-                      ),
-                      SizedBox(width: 6 * s),
-                      const Expanded(
-                        child: _HeroExerciseTile(
-                          name: 'Plank',
-                          type: 'plank',
-                        ),
-                      ),
-                      SizedBox(width: 6 * s),
-                      const Expanded(
-                        child: _HeroExerciseTile(
-                          name: 'Lunge',
-                          type: 'lunge',
-                          tracked: true,
-                        ),
-                      ),
+                        if (index < heroExercises.length - 1)
+                          SizedBox(width: 6 * s),
+                      ],
                     ],
                   ),
                 ),
@@ -354,21 +461,11 @@ class _WorkoutHero extends StatelessWidget {
                           color: Colors.white.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(999),
                         ),
-                        clipBehavior: Clip.antiAlias,
-                        child: FractionallySizedBox(
-                          alignment: Alignment.centerLeft,
-                          widthFactor: 0.25,
-                          child: DecoratedBox(
-                            decoration: const BoxDecoration(
-                              gradient: VFTheme.jadeProgressGradient,
-                            ),
-                          ),
-                        ),
                       ),
                     ),
                     SizedBox(width: 10 * s),
                     Text(
-                      '1/4 bài',
+                      '0/$count bài',
                       style: VFTheme.textStyle(
                         context,
                         size: 9.5,
@@ -388,9 +485,7 @@ class _WorkoutHero extends StatelessWidget {
                       ),
                     ),
                     SizedBox(width: 8 * s),
-                    _HeroIconButton(
-                      onTap: onBrowse,
-                    ),
+                    _HeroIconButton(onTap: onBrowse),
                   ],
                 ),
               ],
@@ -407,43 +502,65 @@ class _HeroExerciseTile extends StatelessWidget {
     required this.name,
     required this.type,
     this.tracked = false,
+    this.locked = false,
   });
 
   final String name;
   final String type;
   final bool tracked;
+  final bool locked;
 
   @override
   Widget build(BuildContext context) {
     final s = VFTheme.scale(context);
+    final premium = const Color(0xFFCBB8F0);
 
     return Container(
       padding: EdgeInsets.fromLTRB(2 * s, 10 * s, 2 * s, 8 * s),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.035),
+        color: locked
+            ? const Color(0xFF101512)
+            : Colors.white.withValues(alpha: 0.035),
         borderRadius: BorderRadius.circular(14 * s),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.03)),
+        border: Border.all(
+          color: locked
+              ? premium.withValues(alpha: 0.12)
+              : Colors.white.withValues(alpha: 0.03),
+        ),
       ),
       child: Column(
         children: [
           PoseSilhouette(
             type: type,
             size: 38 * s,
-            color: VFTheme.jadeGlow.withValues(alpha: 0.55),
+            color: locked
+                ? premium.withValues(alpha: 0.72)
+                : VFTheme.jadeGlow.withValues(alpha: 0.55),
           ),
           SizedBox(height: 5 * s),
           Text(
             name,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: VFTheme.textStyle(
               context,
               size: 9.5,
               weight: FontWeight.w700,
-              color: Colors.white.withValues(alpha: 0.75),
+              color: locked
+                  ? Colors.white.withValues(alpha: 0.82)
+                  : Colors.white.withValues(alpha: 0.75),
               letterSpacing: -0.1,
             ),
-            textAlign: TextAlign.center,
           ),
-          if (tracked) ...[
+          if (locked) ...[
+            SizedBox(height: 3 * s),
+            Icon(
+              Icons.lock_outline_rounded,
+              size: 12 * s,
+              color: premium.withValues(alpha: 0.7),
+            ),
+          ] else if (tracked) ...[
             SizedBox(height: 3 * s),
             Container(
               padding: EdgeInsets.symmetric(
@@ -578,7 +695,7 @@ class _FormProgressCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Cải thiện nhất tuần này',
+                  'Cải thiện tốt nhất tuần này',
                   style: VFTheme.textStyle(
                     context,
                     size: 11,
@@ -642,148 +759,6 @@ class _FormProgressCard extends StatelessWidget {
               Icons.chevron_right_rounded,
               size: 18 * scale,
               color: VFTheme.jade,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PremiumCard extends StatelessWidget {
-  const _PremiumCard({required this.scale});
-
-  final double scale;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(22 * scale),
-      child: Stack(
-        children: [
-          const Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(gradient: VFTheme.purpleCardGradient),
-            ),
-          ),
-          const Positioned.fill(child: VFGrainOverlay()),
-          Positioned(
-            right: -15 * scale,
-            bottom: -15 * scale,
-            child: Container(
-              width: 90 * scale,
-              height: 90 * scale,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: VFTheme.purple.withValues(alpha: 0.06),
-              ),
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.fromLTRB(
-                20 * scale, 20 * scale, 20 * scale, 18 * scale),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'CÁ NHÂN HÓA BỞI AI',
-                        style: VFTheme.textStyle(
-                          context,
-                          size: 10,
-                          weight: FontWeight.w700,
-                          color: const Color(0xFFCBB8F0).withValues(alpha: 0.5),
-                          letterSpacing: 1.5,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 9 * scale,
-                        vertical: 3 * scale,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFCBB8F0).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(5 * scale),
-                        border: Border.all(
-                          color:
-                              const Color(0xFFCBB8F0).withValues(alpha: 0.06),
-                        ),
-                      ),
-                      child: Text(
-                        'PRO',
-                        style: VFTheme.textStyle(
-                          context,
-                          size: 9,
-                          weight: FontWeight.w800,
-                          color: const Color(0xFFCBB8F0).withValues(alpha: 0.7),
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 6 * scale),
-                Text(
-                  'Chân & Cổ chân',
-                  style: VFTheme.textStyle(
-                    context,
-                    size: 18,
-                    weight: FontWeight.w900,
-                    color: VFTheme.white,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                SizedBox(height: 3 * scale),
-                Text(
-                  'Dựa trên kết quả đánh giá: tập trung cải thiện cổ chân và squat depth',
-                  style: VFTheme.textStyle(
-                    context,
-                    size: 11.5,
-                    weight: FontWeight.w500,
-                    color: Colors.white.withValues(alpha: 0.4),
-                    height: 1.5,
-                  ),
-                ),
-                SizedBox(height: 14 * scale),
-                Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 16 * scale,
-                    vertical: 11 * scale,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFCBB8F0).withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(12 * scale),
-                    border: Border.all(
-                      color: const Color(0xFFCBB8F0).withValues(alpha: 0.05),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.lock_outline_rounded,
-                        size: 15 * scale,
-                        color: const Color(0xFFCBB8F0).withValues(alpha: 0.6),
-                      ),
-                      SizedBox(width: 10 * scale),
-                      Expanded(
-                        child: Text(
-                          'Mở khóa chương trình cá nhân',
-                          style: VFTheme.textStyle(
-                            context,
-                            size: 12.5,
-                            weight: FontWeight.w700,
-                            color: Colors.white.withValues(alpha: 0.75),
-                            letterSpacing: -0.1,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
             ),
           ),
         ],
@@ -880,10 +855,9 @@ class _AngleImprovementPainter extends CustomPainter {
       const Offset(22, 38),
       3,
       Paint()
-        ..color = Colors.transparent
+        ..color = VFTheme.coral.withValues(alpha: 0.15)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1
-        ..color = VFTheme.coral.withValues(alpha: 0.15),
+        ..strokeWidth = 1,
     );
     canvas.drawPath(after, solid);
     canvas.drawCircle(
@@ -931,13 +905,3 @@ class _WeekDayData {
   final String label;
   final _WeekDayStatus status;
 }
-
-const List<_WeekDayData> _weekStrip = [
-  _WeekDayData('T2', _WeekDayStatus.done),
-  _WeekDayData('T3', _WeekDayStatus.done),
-  _WeekDayData('T4', _WeekDayStatus.today),
-  _WeekDayData('T5', _WeekDayStatus.future),
-  _WeekDayData('T6', _WeekDayStatus.future),
-  _WeekDayData('T7', _WeekDayStatus.future),
-  _WeekDayData('CN', _WeekDayStatus.future),
-];
