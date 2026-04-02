@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vinafit_mobile/interpreter/intepreting_map.dart';
 import 'package:vinafit_mobile/widgets/pose_silhouette.dart';
 import 'package:vinafit_mobile/widgets/vf_primitives.dart';
@@ -147,6 +148,14 @@ class _ProgramPageState extends State<ProgramPage> {
   void initState() {
     super.initState();
     _workouts = _buildWorkouts();
+    _loadProState();
+  }
+
+  Future<void> _loadProState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isPro = prefs.getBool('user_is_pro') ?? false;
+    if (!mounted) return;
+    setState(() => _isPro = isPro);
   }
 
   List<int> get _workoutDays {
@@ -787,9 +796,13 @@ class _ProgramPageState extends State<ProgramPage> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
+                  final navigator = Navigator.of(context);
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setBool('user_is_pro', true);
+                  if (!mounted) return;
                   setState(() => _isPro = true);
-                  Navigator.pop(context);
+                  navigator.pop();
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: VF.jadeGlow,
