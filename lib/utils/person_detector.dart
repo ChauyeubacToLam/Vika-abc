@@ -71,6 +71,7 @@ class PersonDetector {
       final mask = await _segmenter.processImage(inputImage);
       if (mask == null) {
         lastPersonRatio = 0.0;
+
         smoothedPersonRatio *= 0.85;
         presenceScore = smoothedPersonRatio;
         personDetected = false;
