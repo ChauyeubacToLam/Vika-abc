@@ -94,6 +94,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (_data.detectedIssues.isNotEmpty) {
       await prefs.setStringList('detected_issues', _data.detectedIssues);
     }
+    if (_data.painAreas.isNotEmpty) {
+      await prefs.setStringList('pain_areas', _data.painAreas);
+    }
+    if (_data.painOtherText?.isNotEmpty == true) {
+      await prefs.setString('pain_other_text', _data.painOtherText!);
+    }
     if (_data.issueAnswer != null) {
       await prefs.setString('issue_answer', _data.issueAnswer!);
     }
@@ -106,7 +112,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         WhyPage(data: _data, onNext: _next),
         GoalPage(data: _data, onNext: _next, onBack: _back),
         TrustPage(onNext: _next, onBack: _back),
-        AssessmentIntroPage(onNext: _launchSquatAssessment, onBack: _back),
+        AssessmentIntroPage(
+          data: _data,
+          onNext: _launchSquatAssessment,
+          onBack: _back,
+        ),
         AnalyzingPage(active: _page == 5, onNext: _next),
         SquatResultPage(data: _data, onNext: _next, onBack: _back),
         LevelIssuePage(data: _data, onNext: _next, onBack: _back),

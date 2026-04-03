@@ -7,23 +7,35 @@ class MetricChip extends StatelessWidget {
     super.key,
     required this.label,
     required this.value,
-    required this.good,
+    required this.state,
   });
 
   final String label;
   final String value;
-  final bool good;
+  final MetricChipState state;
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = good
-        ? VF.jadeGlow.withValues(alpha: 0.14)
-        : Colors.white.withValues(alpha: 0.06);
-    final borderColor = good
-        ? VF.jadeGlow.withValues(alpha: 0.20)
-        : Colors.white.withValues(alpha: 0.08);
-    final valueColor =
-        good ? VF.jadeGlow : Colors.white.withValues(alpha: 0.82);
+    final bgColor = switch (state) {
+      MetricChipState.good => VF.jadeGlow.withValues(alpha: 0.14),
+      MetricChipState.warning => VF.coral.withValues(alpha: 0.14),
+      MetricChipState.neutral => Colors.white.withValues(alpha: 0.06),
+    };
+    final borderColor = switch (state) {
+      MetricChipState.good => VF.jadeGlow.withValues(alpha: 0.20),
+      MetricChipState.warning => VF.coral.withValues(alpha: 0.24),
+      MetricChipState.neutral => Colors.white.withValues(alpha: 0.08),
+    };
+    final valueColor = switch (state) {
+      MetricChipState.good => VF.jadeGlow,
+      MetricChipState.warning => VF.coral,
+      MetricChipState.neutral => Colors.white.withValues(alpha: 0.82),
+    };
+    final labelColor = switch (state) {
+      MetricChipState.good => VF.jadeGlow.withValues(alpha: 0.85),
+      MetricChipState.warning => VF.coral.withValues(alpha: 0.88),
+      MetricChipState.neutral => Colors.white.withValues(alpha: 0.40),
+    };
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -40,9 +52,7 @@ class MetricChip extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: good
-                  ? VF.jadeGlow.withValues(alpha: 0.85)
-                  : Colors.white.withValues(alpha: 0.40),
+              color: labelColor,
               fontSize: 9.5,
               fontWeight: FontWeight.w700,
               letterSpacing: 1,
@@ -82,3 +92,5 @@ class MetricChip extends StatelessWidget {
     );
   }
 }
+
+enum MetricChipState { good, warning, neutral }

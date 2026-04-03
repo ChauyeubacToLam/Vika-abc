@@ -4,19 +4,19 @@ import 'package:vinafit_mobile/utils/exercise_logger.dart';
 import 'onboarding_assessment_thresholds.dart';
 
 class OnboardingData {
-  // ── Step 1: Why ──
+  // Step 1: Why
   String? why; // 'pain', 'confidence', 'energy', 'health'
+  List<String> painAreas =
+      []; // 'none', 'lower_back', 'knee', 'shoulder_neck', 'hip', 'other'
+  String? painOtherText; // free text when 'other' selected (optional)
 
-  // ── Step 2: Goal ──
+  // Step 2: Goal
   String? goal;
 
-  // ── Step 3: Frequency ──
+  // Step 3: Frequency
   String? trainingDuration; // '<3m', '3-11m', '1y+'
 
-  // ── Step 4: Medical ──
-  bool medicalClear = false;
-
-  // ── Step 5-7: Assessment ──
+  // Step 5-7: Assessment
   List<String> detectedIssues = [];
   late ExerciseLogger squatLogger;
   // ExerciseLogger? pushUpLogger;

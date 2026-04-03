@@ -112,7 +112,12 @@ class _WhyPageState extends State<WhyPage> {
                           onTap: () =>
                               setState(() => widget.data.why = reason.id),
                           child: Padding(
-                            padding: EdgeInsets.fromLTRB(16 * s, 14 * s, 16 * s, 14 * s),
+                            padding: EdgeInsets.fromLTRB(
+                              16 * s,
+                              14 * s,
+                              16 * s,
+                              14 * s,
+                            ),
                             child: Row(
                               children: [
                                 Container(

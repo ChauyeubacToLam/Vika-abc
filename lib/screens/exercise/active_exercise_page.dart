@@ -594,7 +594,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                     child: MetricChip(
                       label: metric.label,
                       value: metric.value,
-                      good: metric.good,
+                      state: metric.state,
                     ),
                   ),
                 );
@@ -920,7 +920,13 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     }
 
     while (tiles.length < 4) {
-      tiles.add(const _MetricTileData(label: 'DỮ LIỆU', value: '—', good: false));
+      tiles.add(
+        const _MetricTileData(
+          label: 'DỮ LIỆU',
+          value: '—',
+          state: MetricChipState.neutral,
+        ),
+      );
     }
 
     return tiles.take(4).toList();
@@ -935,13 +941,15 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       'Feet' => 'CHÂN',
       _ => key.toUpperCase(),
     };
-    final good = key == 'Tempo'
-        ? true
-        : translatedValue.contains('Chuẩn') ||
-            translatedValue.contains('Tốt') ||
-            translatedValue.contains('Ổn');
+    final normalizedValue = value.toLowerCase();
+    final good = normalizedValue.contains('good') ||
+        normalizedValue.contains('deep squat');
 
-    return _MetricTileData(label: label, value: translatedValue, good: good);
+    return _MetricTileData(
+      label: label,
+      value: translatedValue,
+      state: good ? MetricChipState.good : MetricChipState.warning,
+    );
   }
 
   List<_MetricTileData> _buildSquatMetricTiles() {
@@ -963,25 +971,35 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         value: depthAngle == null
             ? _fallbackMetricValue('Depth', '—')
             : '${depthAngle.toStringAsFixed(0)}°',
-        good: depthAngle != null &&
-            depthAngle >= SquatConfig.SQUAT_BOTTOM_ANGLE_THRESHOLD[0] &&
-            depthAngle <= SquatConfig.SQUAT_BOTTOM_ANGLE_THRESHOLD[1],
+        state: depthAngle == null
+            ? MetricChipState.neutral
+            : (depthAngle >= SquatConfig.SQUAT_BOTTOM_ANGLE_THRESHOLD[0] &&
+                    depthAngle <= SquatConfig.SQUAT_BOTTOM_ANGLE_THRESHOLD[1]
+                ? MetricChipState.good
+                : MetricChipState.warning),
       ),
       _MetricTileData(
         label: 'GÓT CHÂN',
         value: heelNorm == null
             ? _fallbackMetricValue('Feet', '—')
             : '${(heelNorm * 100).toStringAsFixed(0)}%',
-        good: heelNorm != null && heelNorm < HeelRiseConfig.LIFT_THRESHOLD,
+        state: heelNorm == null
+            ? MetricChipState.neutral
+            : (heelNorm < HeelRiseConfig.LIFT_THRESHOLD
+                ? MetricChipState.good
+                : MetricChipState.warning),
       ),
       _MetricTileData(
         label: 'LƯNG',
         value: trunkLean == null
             ? _fallbackMetricValue('Back', '—')
             : '${trunkLean.toStringAsFixed(0)}°',
-        good: trunkLean != null &&
-            trunkLean >= TrunkLeanConfig.GOOD_LEAN_RANGE[0] &&
-            trunkLean <= TrunkLeanConfig.GOOD_LEAN_RANGE[1],
+        state: trunkLean == null
+            ? MetricChipState.neutral
+            : (trunkLean >= TrunkLeanConfig.GOOD_LEAN_RANGE[0] &&
+                    trunkLean <= TrunkLeanConfig.GOOD_LEAN_RANGE[1]
+                ? MetricChipState.good
+                : MetricChipState.warning),
       ),
       _MetricTileData(
         label: 'NHỊP',
@@ -991,19 +1009,26 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
           hold: hold,
           fallback: _fallbackMetricValue('Tempo', '—'),
         ),
-        good: _tempoGood(
-          descent: descent,
-          hold: hold,
-          fallbackFeedback: _feedback['Tempo'],
-        ),
+        state: descent == null && hold == null && _feedback['Tempo'] == null
+            ? MetricChipState.neutral
+            : (_tempoGood(
+                descent: descent,
+                hold: hold,
+                fallbackFeedback: _feedback['Tempo'],
+              )
+                ? MetricChipState.good
+                : MetricChipState.warning),
       ),
       _MetricTileData(
         label: 'ĐỒNG BỘ',
         value: syncRatio == null
             ? _fallbackMetricValue('Sync', '—')
             : '${syncRatio.toStringAsFixed(2)}x',
-        good: syncRatio != null &&
-            syncRatio <= HipShoulderSyncConfig.RATIO_GOOD_MAX,
+        state: syncRatio == null
+            ? MetricChipState.neutral
+            : (syncRatio <= HipShoulderSyncConfig.RATIO_GOOD_MAX
+                ? MetricChipState.good
+                : MetricChipState.warning),
       ),
     ];
   }
@@ -1260,12 +1285,16 @@ class _MetricTileData {
   const _MetricTileData({
     required this.label,
     required this.value,
-    required this.good,
-  });
+    MetricChipState? state,
+    bool? good,
+  }) : state = state ??
+            (good == null
+                ? MetricChipState.neutral
+                : (good ? MetricChipState.good : MetricChipState.warning));
 
   final String label;
   final String value;
-  final bool good;
+  final MetricChipState state;
 }
 
 class _BottomHoldCue {
