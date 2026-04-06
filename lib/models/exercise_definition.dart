@@ -5,7 +5,6 @@ import '../exercise/glute bridge/glute_bridge.dart';
 import '../exercise/jumping jack/jumping_jack.dart';
 import '../exercise/plank/plank.dart';
 import '../exercise/lunge/lunge.dart';
-import '../exercise/curl_up/curl_up.dart';
 import '../exercise/push up/push_up.dart';
 import '../exercise/squat/squat.dart';
 
@@ -103,7 +102,7 @@ final wallPushupAssessmentDefinition = ExerciseDefinition(
   primaryColor: const Color(0xFF00E5FF),
   secondaryColor: const Color(0xFF0091EA),
   difficulty: 'Dễ',
-  targetMuscles: ['Đùi', 'Mông', 'Core'],
+  targetMuscles: ['Ngực', 'Vai', 'Core'],
   duration: '5 reps',
   cameraHint: 'Đứng nghiêng người so với camera.',
   framingHint: 'Giữ vai, hông, gối, mắt cá và bàn chân trong khung hình.',
@@ -203,7 +202,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
   ),
   ExerciseDefinition(
     id: 'jumping_jack',
-    name: 'Jumping   Jack',
+    name: 'Jumping Jack',
     subtitle: 'Cardio nhẹ cho dân văn phòng',
     description:
         'AI phân tích tư thế nhảy dạng.\nTheo dõi tay, chân và nhịp độ.',

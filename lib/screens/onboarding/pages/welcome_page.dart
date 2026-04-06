@@ -1,366 +1,312 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:vinafit_mobile/widgets/vf_primitives.dart';
 
+import '../onboarding_primitives.dart';
 import '../vf_theme.dart';
 
 class WelcomePage extends StatelessWidget {
+  const WelcomePage({
+    super.key,
+    required this.onStart,
+  });
+
   final VoidCallback onStart;
 
-  const WelcomePage({super.key, required this.onStart});
-
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 18, 24, 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          RichText(
-            text: const TextSpan(
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.3,
-              ),
-              children: [
-                TextSpan(text: 'Vina', style: TextStyle(color: VF.accent)),
-                TextSpan(text: 'Fit', style: TextStyle(color: VF.text)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-          Expanded(
-            child: VFFitViewport(
-              padding: EdgeInsets.zero,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _HeroCard(),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'AI coach that\nwatches your form',
-                    style: TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w900,
-                      color: VF.text,
-                      letterSpacing: -0.8,
-                      height: 1.1,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Camera phân tích chuyển động theo rep, giữ mọi thứ gọn, rõ, và đủ nghiêm túc để tin tưởng mỗi ngày.',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: VF.textMuted,
-                      height: 1.6,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  const _FeatureRow(
-                    title: 'Real-time analysis',
-                    desc: 'Theo dõi form ngay trong lúc tập, không cần thiết bị ngoài điện thoại.',
-                  ),
-                  const SizedBox(height: 14),
-                  const _FeatureRow(
-                    title: 'Program built from your baseline',
-                    desc: 'Onboarding dùng mục tiêu, tần suất tập, và squat assessment để đề xuất trình độ.',
-                  ),
-                  const SizedBox(height: 14),
-                  const _FeatureRow(
-                    title: 'Designed for home workouts',
-                    desc: 'Giao diện sáng, sạch, tập trung vào coaching thay vì game hóa.',
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          VFButton(label: 'Bắt đầu', onTap: onStart),
-        ],
-      ),
-    );
-  }
-}
+    final s = VF.scale(context);
+    final media = MediaQuery.of(context);
 
-class _HeroCard extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 330,
-      decoration: BoxDecoration(
-        color: VF.surfaceDark,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.18),
-            blurRadius: 36,
-            offset: const Offset(0, 18),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              VF.surfaceDark,
+              VF.jadeDark,
+              Color(0xFF0A2E22),
+            ],
           ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(28),
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFF11262B),
-                    Color(0xFF102126),
-                    Color(0xFF0B1A1A),
+        ),
+        child: Stack(
+          children: [
+            const Positioned.fill(child: VFGrainOverlay(opacity: 0.035)),
+            Positioned(
+              top: -30 * s,
+              right: -40 * s,
+              child: const VFDecorativeRing(size: 160),
+            ),
+            Positioned(
+              top: media.size.height * 0.30,
+              left: 56 * s,
+              right: 56 * s,
+              child: Container(
+                width: 280 * s,
+                height: 280 * s,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: VF.jadeGlow.withValues(alpha: 0.04),
+                      blurRadius: 90 * s,
+                      spreadRadius: 32 * s,
+                    ),
                   ],
                 ),
               ),
             ),
-          ),
-          Positioned(
-            top: -10,
-            right: -20,
-            child: Container(
-              width: 140,
-              height: 140,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: VF.accent.withValues(alpha: 0.10),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -40,
-            left: -10,
-            child: Container(
-              width: 180,
-              height: 180,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.03),
-              ),
-            ),
-          ),
-          Positioned(
-            top: 18,
-            right: 18,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.34),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(
-                    width: 6,
-                    height: 6,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: VF.green,
-                        shape: BoxShape.circle,
-                      ),
+            Column(
+              children: [
+                Expanded(
+                  child: Padding(
+                    padding:
+                        EdgeInsets.fromLTRB(28 * s, media.padding.top + 20 * s, 28 * s, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'VINAFIT',
+                          style: VF.textStyle(
+                            context,
+                            size: 11,
+                            weight: FontWeight.w700,
+                            letterSpacing: 3.5,
+                            color: VF.jadeGlow.withValues(alpha: 0.40),
+                          ),
+                        ),
+                        SizedBox(height: 14 * s),
+                        ConstrainedBox(
+                          constraints: BoxConstraints(maxWidth: 300 * s),
+                          child: Text(
+                            'T\u1EADp \u1EDF nh\u00E0 kh\u00F4ng ai s\u1EEDa form. Thu\u00EA PT th\u00EC 300-500k m\u1ED7i bu\u1ED5i. B\u1EA1n \u0111\u00E1ng \u0111\u01B0\u1EE3c t\u1EADp \u0111\u00FAng m\u00E0 kh\u00F4ng c\u1EA7n tr\u1EA3 gi\u00E1 \u0111\u00F3.',
+                            style: VF.textStyle(
+                              context,
+                              size: 14,
+                              weight: FontWeight.w500,
+                              height: 1.65,
+                              color: Colors.white.withValues(alpha: 0.28),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Center(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 16 * s),
+                              child: Container(
+                                width: double.infinity,
+                                constraints:
+                                    BoxConstraints(maxHeight: 250 * s),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(24 * s),
+                                  color: Colors.white.withValues(alpha: 0.03),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.06),
+                                  ),
+                                ),
+                                child: Stack(
+                                  children: [
+                                    Positioned(
+                                      top: 12 * s,
+                                      left: 14 * s,
+                                      child: Container(
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 10 * s,
+                                          vertical: 4 * s,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          borderRadius:
+                                              BorderRadius.circular(7 * s),
+                                          color: VF.jadeGlow
+                                              .withValues(alpha: 0.12),
+                                          border: Border.all(
+                                            color: VF.jadeGlow
+                                                .withValues(alpha: 0.08),
+                                          ),
+                                        ),
+                                        child: Text(
+                                          'REAL-TIME AI',
+                                          style: VF.textStyle(
+                                            context,
+                                            size: 9,
+                                            weight: FontWeight.w700,
+                                            letterSpacing: 0.3,
+                                            color: VF.jadeGlow
+                                                .withValues(alpha: 0.55),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.videocam_outlined,
+                                            size: 44 * s,
+                                            color: Colors.white
+                                                .withValues(alpha: 0.12),
+                                          ),
+                                          SizedBox(height: 8 * s),
+                                          Text(
+                                            '\u1EA2nh: AI ph\u00E2n t\u00EDch form t\u1EADp',
+                                            style: VF.textStyle(
+                                              context,
+                                              size: 10,
+                                              weight: FontWeight.w600,
+                                              color: Colors.white
+                                                  .withValues(alpha: 0.08),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: EdgeInsets.only(bottom: 8 * s),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              RichText(
+                                text: TextSpan(
+                                  style: TextStyle(
+                                    fontSize: VF.sp(context, 30),
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: -1.5 * s,
+                                    height: 1.1,
+                                    color: Colors.white,
+                                  ),
+                                  children: [
+                                    const TextSpan(text: 'PT trong t\u00FAi. '),
+                                    TextSpan(
+                                      text: 'Mi\u1EC5n ph\u00ED.',
+                                      style: TextStyle(
+                                        color:
+                                            VF.jadeGlow.withValues(alpha: 0.85),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(height: 12 * s),
+                              ConstrainedBox(
+                                constraints:
+                                    BoxConstraints(maxWidth: 304 * s),
+                                child: Text(
+                                  'S\u1EEDa form b\u1EB1ng AI. L\u1ED9 tr\u00ECnh c\u00E1 nh\u00E2n. Th\u1EED th\u00E1ch c\u00F9ng b\u1EA1n b\u00E8.',
+                                  style: VF.textStyle(
+                                    context,
+                                    size: 13,
+                                    weight: FontWeight.w500,
+                                    height: 1.55,
+                                    color: Colors.white.withValues(alpha: 0.25),
+                                  ),
+                                ),
+                              ),
+                              SizedBox(height: 16 * s),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _WelcomeStat(
+                                      value: 'AI',
+                                      label: 's\u1EEDa form realtime',
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: _WelcomeStat(
+                                      value: '0\u0111',
+                                      label: 'thay PT',
+                                      showDivider: true,
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: _WelcomeStat(
+                                      value: '24/7',
+                                      label: 't\u1EADp m\u1ECDi l\u00FAc',
+                                      showDivider: true,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  SizedBox(width: 6),
-                  Text(
-                    'LIVE AI',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: VF.green,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Positioned(
-            left: 24,
-            top: 24,
-            child: Text(
-              'PHOTO-READY HERO',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.26),
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.1,
-              ),
-            ),
-          ),
-          Positioned(
-            left: 24,
-            right: 24,
-            bottom: 24,
-            child: Row(
-              children: const [
-                Expanded(
-                  child: _MetricCard(label: 'DEPTH', value: '108°', color: VF.accentSoftStrong),
                 ),
-                SizedBox(width: 10),
-                Expanded(
-                  child: _MetricCard(label: 'FORM', value: 'Good', color: VF.greenSoft),
-                ),
-                SizedBox(width: 10),
-                Expanded(
-                  child: _MetricCard(label: 'REPS', value: '3 / 5', color: Color(0x1AFFFFFF)),
+                VFOnboardingButton(
+                  label: 'B\u1EAFt \u0111\u1EA7u',
+                  onTap: onStart,
+                  tone: VFButtonTone.jade,
                 ),
               ],
             ),
-          ),
-          const Positioned.fill(
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _CameraBadge(),
-                  SizedBox(height: 10),
-                  Text(
-                    'Swap real squat photo later',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0x66FFFFFF),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CameraBadge extends StatelessWidget {
-  const _CameraBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 72,
-      height: 72,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: VF.accent.withValues(alpha: 0.45)),
-        color: Colors.black.withValues(alpha: 0.18),
-      ),
-      child: Center(
-        child: Container(
-          width: 26,
-          height: 20,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: VF.accentSoftStrong.withValues(alpha: 0.9)),
-          ),
-          child: const Center(
-            child: SizedBox(
-              width: 8,
-              height: 8,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: VF.accentSoftStrong,
-                ),
-              ),
-            ),
-          ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _MetricCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-
-  const _MetricCard({
-    required this.label,
+class _WelcomeStat extends StatelessWidget {
+  const _WelcomeStat({
     required this.value,
-    required this.color,
+    required this.label,
+    this.showDivider = false,
   });
+
+  final String value;
+  final String label;
+  final bool showDivider;
 
   @override
   Widget build(BuildContext context) {
+    final s = VF.scale(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      padding: EdgeInsets.only(left: showDivider ? 14 * s : 0),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.34),
-        borderRadius: BorderRadius.circular(12),
+        border: showDivider
+            ? Border(
+                left: BorderSide(
+                  color: Colors.white.withValues(alpha: 0.06),
+                ),
+              )
+            : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            label,
-            style: TextStyle(
-              fontSize: 8,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1,
-              color: Colors.white.withValues(alpha: 0.32),
+            value,
+            style: VF.textStyle(
+              context,
+              size: 17,
+              weight: FontWeight.w900,
+              color: Colors.white,
+              letterSpacing: -0.5,
             ),
           ),
-          const SizedBox(height: 5),
+          SizedBox(height: 2 * s),
           Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-              color: color.value == const Color(0x1AFFFFFF).value
-                  ? Colors.white
-                  : color,
+            label,
+            style: VF.textStyle(
+              context,
+              size: 9,
+              weight: FontWeight.w500,
+              color: Colors.white.withValues(alpha: 0.15),
             ),
           ),
         ],
       ),
-    );
-  }
-}
-
-class _FeatureRow extends StatelessWidget {
-  final String title;
-  final String desc;
-
-  const _FeatureRow({required this.title, required this.desc});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.only(top: 1),
-          child: VFCheckIcon(size: 14),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: VF.text,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                desc,
-                style: const TextStyle(
-                  fontSize: 12.5,
-                  color: VF.textMuted,
-                  height: 1.5,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

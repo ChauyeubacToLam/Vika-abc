@@ -9,6 +9,12 @@ class SquatInterpreter extends InterpreterBase {
       logger.setLogs["max_rep"] ?? 0,
     );
 
+    interpretForwardLeanWithHeelRise(
+      logger.repLogs,
+      logger.setLogs["max_rep"] ?? 0,
+      logger.setLogs["trunk_lean_fails_count"] ?? 0,
+    );
+
     // Avg peak depth across reps
     final depths = logger.repLogs
         .map((r) => r.data["peak_knee_angle"] as num?)
@@ -21,11 +27,8 @@ class SquatInterpreter extends InterpreterBase {
   }
 
   String getQuestion() {
-    for (var i = 0; i < questions.length; i++) {
-      if (questions[i].isNotEmpty) {
-        return questions[i][0];
-      }
-    }
-    return "";
+    return topEvidence()?.question ?? "";
   }
+
+  String? getPrimaryIssueId() => topEvidence()?.issueId;
 }

@@ -85,10 +85,10 @@ class _GlowRingPainter extends CustomPainter {
     final bounds = Rect.fromCircle(center: center, radius: radius);
 
     final glowPaint = Paint()
-      ..color = color.withValues(alpha: 0.12)
+      ..color = color.withValues(alpha: 0.22)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke + 3
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+      ..strokeWidth = stroke + 5
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
 
     final trackPaint = Paint()
       ..color = VFTheme.surfaceAlt
@@ -100,7 +100,7 @@ class _GlowRingPainter extends CustomPainter {
       ..shader = SweepGradient(
         startAngle: start,
         endAngle: start + sweep,
-        colors: [color.withValues(alpha: 0.65), color],
+        colors: [color.withValues(alpha: 0.5), color],
       ).createShader(bounds)
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round

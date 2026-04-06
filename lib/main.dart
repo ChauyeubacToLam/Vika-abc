@@ -15,6 +15,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'exercise/exercise_base.dart';
 import 'models/exercise_definition.dart';
+import 'screens/exercise/exercise_experience_screen.dart';
 import 'screens/main_shell.dart';
 import 'theme/vf_theme.dart';
 
@@ -91,13 +92,7 @@ class VinaFitApp extends StatelessWidget {
     return MaterialApp(
       title: 'VinaFit',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF080C1A),
-        colorSchemeSeed: const Color(0xFF00E5FF),
-        useMaterial3: true,
-        fontFamily: 'Roboto',
-      ),
+      theme: VFTheme.lightTheme,
       builder: (context, child) => ScrollConfiguration(
         behavior: const VFScrollBehavior(),
         child: child ?? const SizedBox.shrink(),
@@ -114,7 +109,7 @@ class VinaFitApp extends StatelessWidget {
           case '/exercise':
             final definition = settings.arguments as ExerciseDefinition;
             return MaterialPageRoute(
-              builder: (_) => ExerciseScreen(definition: definition),
+              builder: (_) => ExerciseExperienceScreen(definition: definition),
             );
           default:
             return MaterialPageRoute(builder: (_) => const MainShell());

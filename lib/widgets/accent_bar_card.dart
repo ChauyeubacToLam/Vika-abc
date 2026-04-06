@@ -24,6 +24,7 @@ class AccentBarCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: VFTheme.surface,
           borderRadius: BorderRadius.circular(VFTheme.cardRadius(context)),
+          boxShadow: VFTheme.cardShadow,
         ),
         clipBehavior: Clip.antiAlias,
         child: IntrinsicHeight(

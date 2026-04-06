@@ -1,17 +1,22 @@
 import 'package:vinafit_mobile/interpreter/squat_interpreter.dart';
 import 'package:vinafit_mobile/utils/exercise_logger.dart';
 
+import 'onboarding_assessment_thresholds.dart';
+
 class OnboardingData {
-  // ── Step 1: Goal ──
+  // Step 1: Why
+  String? why; // 'pain', 'confidence', 'energy', 'health'
+  List<String> painAreas =
+      []; // 'none', 'lower_back', 'knee', 'shoulder_neck', 'hip', 'other'
+  String? painOtherText; // free text when 'other' selected (optional)
+
+  // Step 2: Goal
   String? goal;
 
-  // ── Step 2: Experience ──
-  String? experience; // 'never', 'sometimes', 'regularly'
+  // Step 3: Frequency
+  String? trainingDuration; // '<3m', '3-11m', '1y+'
 
-  // ── Step 3: Medical ──
-  bool medicalClear = false;
-
-  // ── Step 4-5: Assessment ──
+  // Step 5-7: Assessment
   List<String> detectedIssues = [];
   late ExerciseLogger squatLogger;
   // ExerciseLogger? pushUpLogger;
@@ -21,7 +26,9 @@ class OnboardingData {
     squatLogger = logger;
     squatInterpreter = SquatInterpreter(logger: logger);
     squatInterpreter.analyze();
-    detectedIssues.addAll(squatInterpreter.detectedIssues);
+    detectedIssues
+      ..clear()
+      ..addAll(squatInterpreter.detectedIssues);
   }
 
   String? confirmedLevel;
@@ -38,16 +45,9 @@ class OnboardingData {
   String? program;
 
   int get frequencyScore {
-    switch (experience) {
-      case '5_plus':
-        return 3;
-      case '3_4':
-        return 2;
-      case '1_2':
-        return 1;
-      default:
-        return 0;
-    }
+    return OnboardingAssessmentThresholds.trainingDurationScore(
+      trainingDuration,
+    );
   }
 
   double? get bmi {

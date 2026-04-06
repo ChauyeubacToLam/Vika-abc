@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../data/mock_data.dart';
 import '../theme/vf_theme.dart';
-import '../widgets/section_head.dart';
-import '../widgets/stat_card.dart';
+import '../widgets/vf_primitives.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({
@@ -15,315 +13,322 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final padding = VFTheme.screenPadding(context);
-    final scale = VFTheme.scale(context);
+    final s = VFTheme.scale(context);
 
     return SingleChildScrollView(
       key: const PageStorageKey<String>('profile-scroll'),
       physics: const BouncingScrollPhysics(
         parent: AlwaysScrollableScrollPhysics(),
       ),
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      padding: EdgeInsets.fromLTRB(
-        padding.left,
-        14 * scale,
-        padding.right,
-        bottomPadding,
-      ),
+      padding: EdgeInsets.only(bottom: bottomPadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: 16 * scale,
-              vertical: 20 * scale,
-            ),
-            decoration: BoxDecoration(
-              color: VFTheme.surface,
-              borderRadius: BorderRadius.circular(VFTheme.cardRadius(context)),
-            ),
+          SizedBox(height: 14 * s),
+          Padding(
+            padding: EdgeInsets.fromLTRB(24 * s, 0, 24 * s, 0),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 60 * scale,
-                  height: 60 * scale,
-                  decoration: BoxDecoration(
-                    color: VFTheme.accent,
-                    borderRadius: BorderRadius.circular(16 * scale),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    dashboardUser.initial,
-                    style: TextStyle(
-                      fontSize: VFTheme.font(context, 24),
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
+                Row(
+                  children: [
+                    VFGradientAvatar(
+                      label: 'N',
+                      size: (56 * s).roundToDouble(),
+                      fontSize: 22 * s,
+                      fontWeight: FontWeight.w900,
                     ),
-                  ),
-                ),
-                SizedBox(height: 10 * scale),
-                Text(
-                  dashboardUser.name,
-                  style: TextStyle(
-                    fontSize: VFTheme.font(context, 18),
-                    fontWeight: FontWeight.w800,
-                    color: VFTheme.text,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-                SizedBox(height: 6 * scale),
-                Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 12 * scale,
-                    vertical: 4 * scale,
-                  ),
-                  decoration: BoxDecoration(
-                    color: VFTheme.accentBg,
-                    borderRadius: BorderRadius.circular(6 * scale),
-                  ),
-                  child: Text(
-                    'Level ${dashboardUser.level} · ${dashboardUser.levelTitle}',
-                    style: TextStyle(
-                      fontSize: VFTheme.font(context, 12),
-                      fontWeight: FontWeight.w700,
-                      color: VFTheme.accent,
-                    ),
-                  ),
-                ),
-                SizedBox(height: 10 * scale),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20 * scale),
-                  child: Column(
-                    children: [
-                      Container(
-                        height: 6 * scale,
-                        decoration: BoxDecoration(
-                          color: VFTheme.surfaceAlt,
-                          borderRadius: BorderRadius.circular(3 * scale),
-                        ),
-                        child: FractionallySizedBox(
-                          alignment: Alignment.centerLeft,
-                          widthFactor: dashboardUser.xpProgress,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [VFTheme.accent, Color(0xAA2E856E)],
-                              ),
-                              borderRadius: BorderRadius.circular(3 * scale),
-                            ),
-                          ),
-                        ),
-                      ),
-                      SizedBox(height: 4 * scale),
-                      Row(
-                        children: [
-                          Text(
-                            '${dashboardUser.xp} XP',
-                            style: TextStyle(
-                              fontSize: VFTheme.font(context, 10),
-                              fontWeight: FontWeight.w600,
-                              color: VFTheme.textMuted,
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            '${(dashboardUser.xpProgress * 100).round()}%',
-                            style: TextStyle(
-                              fontSize: VFTheme.font(context, 10),
-                              fontWeight: FontWeight.w700,
-                              color: VFTheme.accent,
-                            ),
-                          ),
-                          SizedBox(width: 8 * scale),
-                          Text(
-                            'Level 3: ${dashboardUser.nextLevelXp} XP',
-                            style: TextStyle(
-                              fontSize: VFTheme.font(context, 10),
-                              fontWeight: FontWeight.w600,
-                              color: VFTheme.textMuted,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(height: 10 * scale),
-          Row(
-            children: [
-              Expanded(
-                child: StatCard(
-                    value: '${dashboardUser.workoutCount}', label: 'Buổi tập'),
-              ),
-              SizedBox(width: 6 * scale),
-              Expanded(
-                child: StatCard(value: dashboardUser.totalTime, label: 'Tổng'),
-              ),
-              SizedBox(width: 6 * scale),
-              Expanded(
-                child: StatCard(
-                    value: dashboardUser.completionRate, label: 'Hoàn thành'),
-              ),
-            ],
-          ),
-          const SectionHead(title: 'Huy hiệu', action: 'Tất cả'),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: profileBadges.map((badge) {
-                return Padding(
-                  padding: EdgeInsets.only(right: 6 * scale),
-                  child: Opacity(
-                    opacity: badge.earned ? 1 : 0.35,
-                    child: Container(
-                      width: 62 * scale,
-                      padding: EdgeInsets.fromLTRB(
-                        6 * scale,
-                        10 * scale,
-                        6 * scale,
-                        8 * scale,
-                      ),
-                      decoration: BoxDecoration(
-                        color: badge.background,
-                        borderRadius: BorderRadius.circular(12 * scale),
-                      ),
+                    SizedBox(width: 16 * s),
+                    Expanded(
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(
-                            badge.icon,
-                            size: 20 * scale,
-                            color: badge.color,
-                          ),
-                          SizedBox(height: 4 * scale),
                           Text(
-                            badge.name,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: VFTheme.font(context, 9),
-                              fontWeight: FontWeight.w700,
-                              color: badge.color,
-                              letterSpacing: -0.1,
+                            'Nam',
+                            style: VFTheme.textStyle(
+                              context,
+                              size: 22,
+                              weight: FontWeight.w900,
+                              color: VFTheme.text,
+                              letterSpacing: -0.8,
+                            ),
+                          ),
+                          Text(
+                            'Thành viên từ tháng 3, 2026',
+                            style: VFTheme.textStyle(
+                              context,
+                              size: 11,
+                              weight: FontWeight.w500,
+                              color: VFTheme.textMuted,
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-          const SectionHead(title: 'Cài đặt'),
-          Column(
-            children: profileSettings.map((setting) {
-              return Padding(
-                padding: EdgeInsets.only(bottom: 4 * scale),
-                child: Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 14 * scale,
-                    vertical: 12 * scale,
-                  ),
-                  decoration: BoxDecoration(
-                    color: VFTheme.surface,
-                    borderRadius: BorderRadius.circular(10 * scale),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 34 * scale,
-                        height: 34 * scale,
-                        decoration: BoxDecoration(
-                          color: setting.background,
-                          borderRadius: BorderRadius.circular(10 * scale),
-                        ),
-                        child: Icon(
-                          setting.icon,
-                          size: 16 * scale,
-                          color: setting.color,
-                        ),
+                    Container(
+                      width: 34 * s,
+                      height: 34 * s,
+                      decoration: BoxDecoration(
+                        color: VFTheme.surface,
+                        borderRadius: BorderRadius.circular(11 * s),
+                        border: Border.all(color: VFTheme.hairline),
                       ),
-                      SizedBox(width: 12 * scale),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              setting.label,
-                              style: TextStyle(
-                                fontSize: VFTheme.font(context, 13),
-                                fontWeight: FontWeight.w600,
-                                color: VFTheme.text,
-                              ),
-                            ),
-                            SizedBox(height: 1 * scale),
-                            Text(
-                              setting.subtitle,
-                              style: TextStyle(
-                                fontSize: VFTheme.font(context, 11),
-                                fontWeight: FontWeight.w500,
-                                color: VFTheme.textMuted,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(
-                        Icons.chevron_right_rounded,
-                        size: 16 * scale,
+                      alignment: Alignment.center,
+                      child: Icon(
+                        Icons.settings_outlined,
+                        size: 16 * s,
                         color: VFTheme.textMuted,
                       ),
-                    ],
+                    ),
+                  ],
+                ),
+                SizedBox(height: 16 * s),
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 16 * s,
+                    vertical: 12 * s,
                   ),
-                ),
-              );
-            }).toList(),
-          ),
-          SizedBox(height: 12 * scale),
-          Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: 16 * scale,
-              vertical: 14 * scale,
-            ),
-            decoration: BoxDecoration(
-              color: VFTheme.accentBg,
-              borderRadius: BorderRadius.circular(10 * scale),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.refresh_rounded,
-                  size: 18 * scale,
-                  color: VFTheme.accent,
-                ),
-                SizedBox(width: 12 * scale),
-                Expanded(
+                  decoration: BoxDecoration(
+                    color: VFTheme.jadeMist,
+                    borderRadius: BorderRadius.circular(14 * s),
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Đánh giá lại',
-                        style: TextStyle(
-                          fontSize: VFTheme.font(context, 13),
-                          fontWeight: FontWeight.w700,
-                          color: VFTheme.accent,
+                        '2 tuần tập đều. Cổ chân cải thiện thấy rõ. Cứ giữ nhịp này.',
+                        style: VFTheme.textStyle(
+                          context,
+                          size: 13,
+                          weight: FontWeight.w500,
+                          color: VFTheme.jadeDark,
+                          fontStyle: FontStyle.italic,
+                          height: 1.55,
                         ),
                       ),
-                      SizedBox(height: 1 * scale),
+                      SizedBox(height: 5 * s),
                       Text(
-                        'Kiểm tra form sau mỗi 2 tuần',
-                        style: TextStyle(
-                          fontSize: VFTheme.font(context, 11),
-                          fontWeight: FontWeight.w500,
-                          color: VFTheme.accentText.withValues(alpha: 0.7),
+                        'HLV AI · Cập nhật thứ Hai',
+                        style: VFTheme.textStyle(
+                          context,
+                          size: 9,
+                          weight: FontWeight.w600,
+                          color: VFTheme.jade.withValues(alpha: 0.8),
                         ),
                       ),
                     ],
                   ),
                 ),
               ],
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(14 * s, 16 * s, 14 * s, 0),
+            child: Container(
+              decoration: BoxDecoration(
+                color: VFTheme.surface,
+                borderRadius: BorderRadius.circular(24 * s),
+                border: Border.all(color: VFTheme.hairline),
+              ),
+              child: Column(
+                children: [
+                  Padding(
+                    padding:
+                        EdgeInsets.fromLTRB(20 * s, 18 * s, 20 * s, 14 * s),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _BodyStat(
+                                value: '170',
+                                unit: 'cm',
+                                label: 'Chiều cao',
+                              ),
+                            ),
+                            Container(
+                                width: 1,
+                                height: 44 * s,
+                                color: VFTheme.background),
+                            Expanded(
+                              child: _BodyStat(
+                                value: '65',
+                                unit: 'kg',
+                                label: 'Cân nặng',
+                              ),
+                            ),
+                            Container(
+                                width: 1,
+                                height: 44 * s,
+                                color: VFTheme.background),
+                            Expanded(
+                              child: _BodyStat(
+                                value: '22.5',
+                                unit: '',
+                                label: 'BMI',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  _Divider(scale: s),
+                  Padding(
+                    padding:
+                        EdgeInsets.fromLTRB(20 * s, 14 * s, 20 * s, 14 * s),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Chương trình cơ bản',
+                                    style: VFTheme.textStyle(
+                                      context,
+                                      size: 15,
+                                      weight: FontWeight.w800,
+                                      color: VFTheme.text,
+                                      letterSpacing: -0.3,
+                                    ),
+                                  ),
+                                  SizedBox(height: 1 * s),
+                                  Text(
+                                    '4 tuần · 3 buổi/tuần',
+                                    style: VFTheme.textStyle(
+                                      context,
+                                      size: 11,
+                                      weight: FontWeight.w500,
+                                      color: VFTheme.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 10 * s,
+                                vertical: 4 * s,
+                              ),
+                              decoration: BoxDecoration(
+                                color: VFTheme.jadeMist,
+                                borderRadius: BorderRadius.circular(7 * s),
+                              ),
+                              child: Text(
+                                'Tuần 2/4',
+                                style: VFTheme.textStyle(
+                                  context,
+                                  size: 10,
+                                  weight: FontWeight.w700,
+                                  color: VFTheme.jade,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 10 * s),
+                        Container(
+                          height: 5 * s,
+                          decoration: BoxDecoration(
+                            color: VFTheme.jade.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: FractionallySizedBox(
+                            alignment: Alignment.centerLeft,
+                            widthFactor: 0.42,
+                            child: const DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: VFTheme.jadeProgressGradient,
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 4 * s),
+                        Text(
+                          '5 / 12 buổi hoàn thành',
+                          style: VFTheme.textStyle(
+                            context,
+                            size: 10,
+                            weight: FontWeight.w500,
+                            color: VFTheme.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _Divider(scale: s),
+                  Padding(
+                    padding:
+                        EdgeInsets.fromLTRB(20 * s, 14 * s, 20 * s, 16 * s),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'CỘT MỐC',
+                          style: VFTheme.textStyle(
+                            context,
+                            size: 10,
+                            weight: FontWeight.w700,
+                            color: VFTheme.textMuted,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                        SizedBox(height: 10 * s),
+                        Wrap(
+                          spacing: 6 * s,
+                          runSpacing: 6 * s,
+                          children: _milestones
+                              .map((milestone) =>
+                                  _MilestonePill(milestone: milestone))
+                              .toList(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(14 * s, 14 * s, 14 * s, 0),
+            child: Container(
+              decoration: BoxDecoration(
+                color: VFTheme.surface,
+                borderRadius: BorderRadius.circular(24 * s),
+                border: Border.all(color: VFTheme.hairline),
+              ),
+              child: Column(
+                children: [
+                  for (int index = 0; index < _settingRows.length; index++) ...[
+                    if (_settingRows[index].divider)
+                      _Divider(scale: s)
+                    else
+                      _SettingRow(item: _settingRows[index]),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(22 * s, 14 * s, 22 * s, 24 * s),
+            child: Center(
+              child: Text(
+                'VinaFit v1.0',
+                style: VFTheme.textStyle(
+                  context,
+                  size: 10,
+                  weight: FontWeight.w500,
+                  color: VFTheme.textMuted.withValues(alpha: 0.4),
+                ),
+              ),
             ),
           ),
         ],
@@ -331,3 +336,286 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 }
+
+class _BodyStat extends StatelessWidget {
+  const _BodyStat({
+    required this.value,
+    required this.unit,
+    required this.label,
+  });
+
+  final String value;
+  final String unit;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = VFTheme.scale(context);
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              value,
+              style: VFTheme.textStyle(
+                context,
+                size: 22,
+                weight: FontWeight.w900,
+                color: VFTheme.text,
+                letterSpacing: -1,
+              ),
+            ),
+            if (unit.isNotEmpty) ...[
+              SizedBox(width: 1 * s),
+              Padding(
+                padding: EdgeInsets.only(bottom: 2 * s),
+                child: Text(
+                  unit,
+                  style: VFTheme.textStyle(
+                    context,
+                    size: 11,
+                    weight: FontWeight.w500,
+                    color: VFTheme.textMuted,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        SizedBox(height: 2 * s),
+        Text(
+          label,
+          style: VFTheme.textStyle(
+            context,
+            size: 9,
+            weight: FontWeight.w500,
+            color: VFTheme.textMuted,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MilestonePill extends StatelessWidget {
+  const _MilestonePill({required this.milestone});
+
+  final _Milestone milestone;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = VFTheme.scale(context);
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: 10 * s,
+        vertical: 5 * s,
+      ),
+      decoration: BoxDecoration(
+        color: milestone.done
+            ? VFTheme.jade.withValues(alpha: 0.08)
+            : VFTheme.textMuted.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(8 * s),
+        border: Border.all(
+          color: milestone.done
+              ? VFTheme.jade.withValues(alpha: 0.1)
+              : VFTheme.textMuted.withValues(alpha: 0.2),
+          style: milestone.done ? BorderStyle.solid : BorderStyle.solid,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          milestone.done
+              ? Icon(
+                  Icons.check_rounded,
+                  size: 12 * s,
+                  color: VFTheme.jade,
+                )
+              : Container(
+                  width: 10 * s,
+                  height: 10 * s,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: VFTheme.textMuted.withValues(alpha: 0.4),
+                      width: 0.9 * s,
+                    ),
+                  ),
+                ),
+          SizedBox(width: 5 * s),
+          Text(
+            milestone.label,
+            style: VFTheme.textStyle(
+              context,
+              size: 11,
+              weight: milestone.done ? FontWeight.w600 : FontWeight.w500,
+              color: milestone.done ? VFTheme.text : VFTheme.textMuted,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingRow extends StatelessWidget {
+  const _SettingRow({required this.item});
+
+  final _SettingItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = VFTheme.scale(context);
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 20 * s),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 18 * s,
+            child: Icon(
+              item.icon,
+              size: 16 * s,
+              color: item.danger
+                  ? VFTheme.coral.withValues(alpha: 0.9)
+                  : item.accent
+                      ? VFTheme.jade
+                      : VFTheme.textMuted.withValues(alpha: 0.6),
+            ),
+          ),
+          SizedBox(width: 12 * s),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 13 * s),
+              child: Text(
+                item.label,
+                style: VFTheme.textStyle(
+                  context,
+                  size: 13,
+                  weight: item.accent
+                      ? FontWeight.w700
+                      : item.danger
+                          ? FontWeight.w600
+                          : FontWeight.w500,
+                  color: item.danger
+                      ? VFTheme.coral.withValues(alpha: 0.9)
+                      : item.accent
+                          ? VFTheme.jade
+                          : VFTheme.textSecondary,
+                ),
+              ),
+            ),
+          ),
+          if (item.value.isNotEmpty)
+            Text(
+              item.value,
+              style: VFTheme.textStyle(
+                context,
+                size: 12,
+                weight: FontWeight.w500,
+                color: VFTheme.textMuted,
+              ),
+            ),
+          if (!item.danger) ...[
+            SizedBox(width: 8 * s),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 14 * s,
+              color: VFTheme.textMuted.withValues(alpha: 0.5),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _Divider extends StatelessWidget {
+  const _Divider({required this.scale});
+
+  final double scale;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 1,
+      margin: EdgeInsets.symmetric(horizontal: 20 * scale),
+      color: VFTheme.background,
+    );
+  }
+}
+
+class _Milestone {
+  const _Milestone({
+    required this.label,
+    required this.done,
+  });
+
+  final String label;
+  final bool done;
+}
+
+class _SettingItem {
+  const _SettingItem({
+    this.icon = Icons.circle,
+    this.label = '',
+    this.value = '',
+    this.accent = false,
+    this.danger = false,
+    this.divider = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final bool accent;
+  final bool danger;
+  final bool divider;
+}
+
+const List<_Milestone> _milestones = [
+  _Milestone(label: 'Tuần đầu tiên', done: true),
+  _Milestone(label: 'Form 75%+', done: true),
+  _Milestone(label: '10 buổi', done: true),
+  _Milestone(label: '30 ngày liên tiếp', done: false),
+];
+
+const List<_SettingItem> _settingRows = [
+  _SettingItem(
+    icon: Icons.calendar_month_outlined,
+    label: 'Lịch tập',
+    value: 'T2, T4, T6',
+  ),
+  _SettingItem(
+    icon: Icons.notifications_none_rounded,
+    label: 'Nhắc nhở',
+    value: '18:30',
+  ),
+  _SettingItem(
+    icon: Icons.graphic_eq_rounded,
+    label: 'Giọng nói AI',
+    value: 'Giọng Bắc',
+  ),
+  _SettingItem(
+    icon: Icons.language_rounded,
+    label: 'Ngôn ngữ',
+    value: 'Tiếng Việt',
+  ),
+  _SettingItem(divider: true),
+  _SettingItem(
+    icon: Icons.auto_fix_high_rounded,
+    label: 'Đánh giá lại form',
+    accent: true,
+  ),
+  _SettingItem(
+    icon: Icons.help_outline_rounded,
+    label: 'Hỗ trợ',
+  ),
+  _SettingItem(divider: true),
+  _SettingItem(
+    icon: Icons.logout_rounded,
+    label: 'Đăng xuất',
+    danger: true,
+  ),
+];

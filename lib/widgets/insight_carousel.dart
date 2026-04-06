@@ -58,6 +58,7 @@ class _InsightCarouselState extends State<InsightCarousel> {
             decoration: BoxDecoration(
               color: VFTheme.surface,
               borderRadius: BorderRadius.circular(VFTheme.cardRadius(context)),
+              boxShadow: VFTheme.cardShadow,
             ),
             clipBehavior: Clip.antiAlias,
             child: Stack(
@@ -67,7 +68,7 @@ class _InsightCarouselState extends State<InsightCarousel> {
                   top: 0,
                   bottom: 0,
                   child: Container(
-                    width: 3 * VFTheme.scale(context),
+                    width: 4 * VFTheme.scale(context),
                     color: insight.color,
                   ),
                 ),
@@ -243,7 +244,7 @@ class _SparkPainter extends CustomPainter {
     }
 
     final fillPaint = Paint()
-      ..color = color.withValues(alpha: 0.06)
+      ..color = color.withValues(alpha: 0.10)
       ..style = PaintingStyle.fill;
 
     final linePaint = Paint()
