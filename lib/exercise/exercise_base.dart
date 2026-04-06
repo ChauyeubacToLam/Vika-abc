@@ -1,4 +1,4 @@
-// ignore_for_file: constant_identifier_names
+﻿// ignore_for_file: constant_identifier_names
 
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:vinafit_mobile/utils/debouncer.dart';
@@ -7,7 +7,6 @@ import '../utils/pose_smoother.dart';
 import '../utils/pose_math_helpers.dart';
 import "../utils/frame_buffer.dart";
 import "../utils/exercise_logger.dart";
-import '../services/viettel_tts_service.dart';
 
 // --- Constants ---
 
@@ -52,9 +51,6 @@ abstract class ExerciseBase {
   late PoseSmoother poseSmoother;
   int repCount = 0;
   static const MIN_CONFIDENCE = 0.92;
-  
-  // Voice Service
-  final ViettelTTSService ttsService = ViettelTTSService();
 
   // Scale factor (shoulder-to-hip distance)
   double scaleFactor = 1.0;
@@ -393,25 +389,6 @@ abstract class ExerciseBase {
 
   List<dynamic> getSetFeedback() => setFeedback;
 
-  /// Hook for unifying voice feedback on rep completion
-  void speakRepCompletion({
-    required String? nextPhaseVoice,
-    required bool correctForm,
-    bool countRep = true,
-  }) {
-    if (countRep) {
-      ttsService.speak(repCount.toString());
-    }
-
-    if (correctForm) {
-      ttsService.speak("Tốt lắm");
-    }
-
-    if (!requestStop() && nextPhaseVoice != null) {
-      ttsService.speak(nextPhaseVoice);
-    }
-  }
-
   // --- State Machine (Hold-Still Activation) ---
 
   void checkExerciseState(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks,
@@ -432,7 +409,6 @@ abstract class ExerciseBase {
           if (elapsed >= HOLD_STILL_REQUIRED_DURATION) {
             exerciseState = ExerciseState.activated;
             _holdStillStartedAt = null;
-            onExerciseActivated();
           } else {
             resultIssues.feedback['System'] =
                 'Giữ yên... ${remaining.clamp(0.0, 99.0).toStringAsFixed(0)}s';
@@ -449,7 +425,6 @@ abstract class ExerciseBase {
       case ExerciseState.activated:
         if (requestStop()) {
           exerciseState = ExerciseState.completed;
-          ttsService.speak("Hoàn thành bài tập");
           onSetComplete();
         }
         break;
@@ -459,11 +434,7 @@ abstract class ExerciseBase {
     }
   }
 
-  /* -----------------------------------------------------------------------
-     ABSTRACT METHODS & LIFECYCLE HOOKS
-     ----------------------------------------------------------------------- */
-
-  void onExerciseActivated() {}
+  // --- Abstract Methods ---
 
   bool requestStop();
 

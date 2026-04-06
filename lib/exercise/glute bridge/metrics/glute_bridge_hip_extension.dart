@@ -78,7 +78,9 @@ class HipExtensionMetric extends GluteBridgeMetricBase {
         '${ctx.normalizedHipDeviation >= 0 ? "+" : ""}${ctx.normalizedHipDeviation.toStringAsFixed(3)}';
 
     if (ctx.state != GluteBridgeState.ascending &&
-        ctx.state != GluteBridgeState.topHold) return;
+        ctx.state != GluteBridgeState.topHold) {
+      return;
+    }
 
     final bool isHyperextending =
         ctx.normalizedHipDeviation > HipExtensionConfig.HYPEREXT_THRESHOLD;

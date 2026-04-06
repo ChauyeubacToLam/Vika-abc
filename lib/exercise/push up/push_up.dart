@@ -74,12 +74,6 @@ class PushUp extends ExerciseBase {
   // --- Start Position ---
 
   @override
-  void onExerciseActivated() {
-    super.onExerciseActivated();
-    ttsService.speak("Sẵn sàng, xuống");
-  }
-
-  @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     final shoulder = getSideLandmark(
       landmarks: landmarks,
@@ -261,11 +255,6 @@ class PushUp extends ExerciseBase {
       }
       setFeedback.add({correctForm: faultMap});
 
-    speakRepCompletion(
-      nextPhaseVoice: "Xuống",
-      correctForm: correctForm,
-    );
-
       if (tempoMetric.descentDuration != null) {
         resultIssues.feedback['Tempo'] =
             '↓${tempoMetric.descentDuration!.toStringAsFixed(1)}s';
@@ -336,12 +325,7 @@ class PushUp extends ExerciseBase {
 
     if (newState == PushUpState.descending &&
         previousPushUpState == PushUpState.plank) {
-      ttsService.clearQueue();
       resultIssues.instructions.clear();
-    } else if (newState == PushUpState.bottom) {
-      ttsService.speak("Giữ");
-    } else if (newState == PushUpState.ascending) {
-      ttsService.speak("Đẩy lên");
     }
 
     for (final metric in _metrics) {

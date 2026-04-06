@@ -84,12 +84,6 @@ class Plank extends ExerciseBase {
     }
   }
 
-  @override
-  void onExerciseActivated() {
-    super.onExerciseActivated();
-    ttsService.speak("Sẵn sàng");
-  }
-
   // --- Start Position ---
 
   @override
@@ -283,11 +277,9 @@ class Plank extends ExerciseBase {
           .clamp(0.0, PlankConfig.HOLD_DURATION);
 
       if (remaining <= 10.0 && !_spoken10) {
-        ttsService.speak("10");
         _spoken10 = true;
       }
       if (remaining <= 5.0 && !_spoken5) {
-        ttsService.speak("5");
         _spoken5 = true;
       }
 
@@ -344,8 +336,6 @@ class Plank extends ExerciseBase {
 
     switch (newState) {
       case PlankState.holding:
-        ttsService.clearQueue();
-        ttsService.speak("Giữ");
         _holdStartMs = timestampMs;
         _restStartMs = null;
         resultIssues.instructions.clear();
@@ -354,7 +344,6 @@ class Plank extends ExerciseBase {
         break;
 
       case PlankState.resting:
-        ttsService.speak("Nghỉ");
         _restStartMs = timestampMs;
         _onHoldComplete();
         break;
@@ -394,11 +383,6 @@ class Plank extends ExerciseBase {
       faultMap['HOLDING']![fault.type] = fault.message;
     }
     setFeedback.add({correctForm: faultMap});
-
-    speakRepCompletion(
-      nextPhaseVoice: null,
-      correctForm: correctForm,
-    );
 
     for (final metric in _metrics) {
       debugData.addAll(metric.debugData);

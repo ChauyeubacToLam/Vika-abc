@@ -56,9 +56,6 @@ class Squat extends ExerciseBase {
   SquatState squatState = SquatState.standing;
   SquatState previousSquatState = SquatState.standing;
 
-  // Debounce entry into rep — prevents false starts from noisy frames
-  final Debouncer _entryDebouncer = Debouncer(requiredFrames: 2);
-
   Squat({this.maxRep = SquatConfig.MAX_REP});
 
   // Metrics
@@ -105,12 +102,6 @@ class Squat extends ExerciseBase {
 
   // --- Start Position ---
   // User must stand upright with straight legs to begin.
-
-  @override
-  void onExerciseActivated() {
-    super.onExerciseActivated();
-    ttsService.speak("Sẵn sàng, xuống");
-  }
 
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
@@ -169,6 +160,8 @@ class Squat extends ExerciseBase {
     logger.pushMin("peak_knee_angle", "min_knee_angle");
     logger.pushMin("ascending_time", "min_ascending_time");
     logger.pushMin("descending_time", "min_descending_time");
+    logger.pushAverage("ascending_time", "avg_ascending_time");
+    logger.pushAverage("descending_time", "avg_descending_time");
 
     // Count good reps
     logger.pushGoodRepCount();
@@ -264,6 +257,8 @@ class Squat extends ExerciseBase {
     final backAngle = calculateVerticalAngle(pivot: hip, point: shoulder);
     final trunkLean = convertClockAngleToTrunkLean(backAngle, cameraFacing);
     final heelDistanceToFloor = foot.y - heel.y;
+    final normalizedHeelLift =
+        heelDistanceToFloor / (scaleFactor == 0 ? 1 : scaleFactor);
     final now = frameTimestampMs;
 
     // 3. Build metric context
@@ -286,6 +281,11 @@ class Squat extends ExerciseBase {
     debugData['previousSquatState'] = previousSquatState.name;
     debugData['repCount'] = repCount;
     debugData['frameBuffer'] = frameBuffer.frameBuffer.length;
+    debugData['kneeAngle'] = kneeAngle.toStringAsFixed(1);
+    debugData['backAngle'] = backAngle.toStringAsFixed(1);
+    debugData['trunkLean'] = trunkLean.toStringAsFixed(1);
+    debugData['heelDistance'] = heelDistanceToFloor.toStringAsFixed(2);
+    debugData['heelLiftPct'] = (normalizedHeelLift * 100).toStringAsFixed(1);
 
     // 5. Handle rep completion (transition back to standing)
     if (squatState == SquatState.standing &&
@@ -338,11 +338,6 @@ class Squat extends ExerciseBase {
     correctForm = !allFaults.any((f) => f.affectsForm);
     resultIssues.feedback['Result'] = correctForm ? 'Good Rep!' : 'Fix Form';
 
-    speakRepCompletion(
-      nextPhaseVoice: "Xuống",
-      correctForm: correctForm,
-    );
-
     // Build fault map grouped by phase
     final faultMap = <String, Map<String, String>>{};
     for (final fault in allFaults) {
@@ -366,7 +361,7 @@ class Squat extends ExerciseBase {
       }
     }
 
-    // Log per-rep data for onboarding assessment
+    // Log per-rep data
     final peakKneeSnapshot = frameBuffer.getPeakMin("kneeAngle");
     logger
         .addRepLog(RepLog(correctForm: correctForm, repNumber: repCount, data: {
@@ -376,6 +371,7 @@ class Squat extends ExerciseBase {
       "trunk_lean_at_bottom": peakKneeSnapshot?.log["trunkLean"] ?? 0,
       "ascending_time": tempoMetric.ascentDuration ?? 0.0,
       "descending_time": tempoMetric.descentDuration ?? 0.0,
+      "fault_types": allFaults.map((f) => f.type).toSet().toList(),
     }));
 
     // Reset for next rep
@@ -450,12 +446,7 @@ class Squat extends ExerciseBase {
     squatState = newState;
 
     if (newState == SquatState.descending) {
-      ttsService.clearQueue(); // Stop any pending voice to avoid overlap
       resultIssues.instructions.clear();
-    } else if (newState == SquatState.bottom) {
-      ttsService.speak("Giữ");
-    } else if (newState == SquatState.ascending) {
-      ttsService.speak("Lên");
     }
 
     for (final metric in _metrics) {

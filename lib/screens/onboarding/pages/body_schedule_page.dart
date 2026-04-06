@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../onboarding_data.dart';
+import '../onboarding_primitives.dart';
 import '../vf_theme.dart';
 
 class BodySchedulePage extends StatefulWidget {
-  final OnboardingData data;
-  final VoidCallback onNext;
-  final VoidCallback onBack;
-
   const BodySchedulePage({
     super.key,
     required this.data,
@@ -16,381 +12,747 @@ class BodySchedulePage extends StatefulWidget {
     required this.onBack,
   });
 
+  final OnboardingData data;
+  final VoidCallback onNext;
+  final VoidCallback onBack;
+
   @override
   State<BodySchedulePage> createState() => _BodySchedulePageState();
 }
 
 class _BodySchedulePageState extends State<BodySchedulePage> {
-  late final TextEditingController _hCtrl;
-  late final TextEditingController _wCtrl;
-
   static const _dayLabels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-  static const _times = [
-    ('morning', 'Sáng', '6-9h'),
-    ('noon', 'Trưa', '11-13h'),
-    ('evening', 'Chiều tối', '17-20h'),
-    ('night', 'Tối', '20-22h'),
+  static const _timeOptions = [
+    (
+      id: 'morning',
+      title: 'Sáng',
+      subtitle: '6-9h',
+      hint: 'Khởi động ngày mới',
+      icon: Icons.wb_sunny_outlined,
+      color: Color(0xFFF3B54A),
+    ),
+    (
+      id: 'noon',
+      title: 'Trưa',
+      subtitle: '11-13h',
+      hint: 'Tập nhanh giữa ngày',
+      icon: Icons.light_mode_outlined,
+      color: Color(0xFFF08A4B),
+    ),
+    (
+      id: 'evening',
+      title: 'Chiều',
+      subtitle: '17-20h',
+      hint: 'Sau giờ học hoặc làm',
+      icon: Icons.wb_twilight_outlined,
+      color: Color(0xFF4F8EF7),
+    ),
+    (
+      id: 'night',
+      title: 'Tối',
+      subtitle: '20-22h',
+      hint: 'Nhịp tập nhẹ và đều',
+      icon: Icons.nights_stay_outlined,
+      color: Color(0xFF5E7BAA),
+    ),
   ];
+
+  late int _height;
+  late int _weight;
+  late List<int> _days;
+  late String _preferredTime;
 
   @override
   void initState() {
     super.initState();
-    _hCtrl = TextEditingController(
-      text: widget.data.heightCm?.toStringAsFixed(0) ?? '',
-    );
-    _wCtrl = TextEditingController(
-      text: widget.data.weightKg?.toStringAsFixed(0) ?? '',
-    );
-    if (widget.data.workoutDays.isEmpty) {
-      widget.data.workoutDays = [0, 2, 4];
-    }
-    widget.data.preferredTime ??= 'evening';
+    _height = (widget.data.heightCm ?? 165).round().clamp(140, 200);
+    _weight = (widget.data.weightKg ?? 60).round().clamp(35, 120);
+    _days = widget.data.workoutDays.isEmpty
+        ? [0, 2, 4]
+        : List<int>.from(widget.data.workoutDays)
+      ..sort();
+    _preferredTime = widget.data.preferredTime ?? 'evening';
+    _syncData();
   }
 
-  void _updateBodyData() {
-    widget.data.heightCm = double.tryParse(_hCtrl.text);
-    widget.data.weightKg = double.tryParse(_wCtrl.text);
+  void _syncData() {
+    widget.data.heightCm = _height.toDouble();
+    widget.data.weightKg = _weight.toDouble();
+    widget.data.workoutDays = List<int>.from(_days);
+    widget.data.preferredTime = _preferredTime;
   }
 
   void _toggleDay(int day) {
     setState(() {
-      if (widget.data.workoutDays.contains(day)) {
-        widget.data.workoutDays.remove(day);
+      if (_days.contains(day)) {
+        _days.remove(day);
       } else {
-        widget.data.workoutDays.add(day);
+        _days.add(day);
+        _days.sort();
       }
+      _syncData();
     });
   }
 
-  bool get _canProceed {
-    final h = double.tryParse(_hCtrl.text) ?? 0;
-    final w = double.tryParse(_wCtrl.text) ?? 0;
-    return h >= 100 &&
-        h <= 250 &&
-        w >= 25 &&
-        w <= 200 &&
-        widget.data.workoutDays.isNotEmpty &&
-        widget.data.preferredTime != null;
+  double get _bmi => _weight / ((_height / 100) * (_height / 100));
+
+  _BmiInfo get _bmiInfo {
+    final bmi = _bmi;
+    if (bmi < 18.5) {
+      return const _BmiInfo('Thiếu cân', Color(0xFF5B9BD5));
+    }
+    if (bmi < 23) {
+      return const _BmiInfo('Bình thường', VF.accent);
+    }
+    if (bmi < 25) {
+      return const _BmiInfo('Thừa cân', VF.amber);
+    }
+    return const _BmiInfo('Béo phì', VF.coral);
   }
+
+  double get _bmiPosition => ((_bmi - 15) / 20).clamp(0.0, 1.0).toDouble();
+
+  bool get _canContinue => _days.isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
-    _updateBodyData();
-    final bmi = widget.data.bmi;
-    final bmiValid = bmi != null && bmi >= 10 && bmi <= 50;
+    final s = VF.scale(context);
+    final bmiInfo = _bmiInfo;
 
-    return GestureDetector(
-      onTap: () => FocusScope.of(context).unfocus(),
+    return ColoredBox(
+      color: VF.bg,
       child: Column(
         children: [
-          VFProgressBar(current: 6, total: 7, onBack: widget.onBack),
+          VFOnboardingNavBar(
+            current: 9,
+            total: 10,
+            onBack: widget.onBack,
+          ),
           Expanded(
-            child: VFFitViewport(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(20 * s, 20 * s, 20 * s, 16 * s),
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Thông tin và lịch tập',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
-                      color: VF.text,
-                      letterSpacing: -0.6,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Phần cuối cùng trước khi hiện chương trình. Giữ mọi lựa chọn gọn, rõ, và thiên về planning hơn là decoration.',
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      color: VF.textMuted,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(child: _unitField('CHIỀU CAO', _hCtrl, 'cm')),
-                      const SizedBox(width: 10),
-                      Expanded(child: _unitField('CÂN NẶNG', _wCtrl, 'kg')),
-                    ],
-                  ),
-                  if (bmiValid) ...[
-                    const SizedBox(height: 12),
-                    _BmiCard(bmi: bmi),
-                  ],
-                  const SizedBox(height: 16),
-                  VFPanel(
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8 * s),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Ngày tập',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
+                        Text(
+                          'Thông tin cơ thể & lịch tập',
+                          style: VF.textStyle(
+                            context,
+                            size: 28,
+                            weight: FontWeight.w900,
                             color: VF.text,
+                            letterSpacing: -1.5,
+                            height: 1.1,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Chọn các ngày bạn có thể duy trì đều nhất.',
-                          style: TextStyle(
-                            fontSize: 12.5,
+                        SizedBox(height: 8 * s),
+                        Text(
+                          'Kéo để chọn chiều cao, cân nặng và khung giờ bạn dễ duy trì nhất.',
+                          style: VF.textStyle(
+                            context,
+                            size: 13,
+                            weight: FontWeight.w500,
                             color: VF.textMuted,
+                            height: 1.45,
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: List.generate(7, (i) {
-                            final on = widget.data.workoutDays.contains(i);
-                            return GestureDetector(
-                              onTap: () => _toggleDay(i),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 150),
-                                width: 40,
-                                height: 50,
-                                decoration: BoxDecoration(
-                                  color: on ? VF.accentSoft : VF.bg,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: on
-                                        ? VF.accent.withValues(alpha: 0.28)
-                                        : VF.border,
-                                    width: 1.4,
-                                  ),
-                                ),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      _dayLabels[i],
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                        color: on ? VF.accent : VF.textSec,
-                                      ),
-                                    ),
-                                    if (on) ...[
-                                      const SizedBox(height: 3),
-                                      const VFCheckIcon(size: 9),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            );
-                          }),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  VFPanel(
+                  SizedBox(height: 20 * s),
+                  _MeasurementCard(
+                    label: 'CHIỀU CAO',
+                    value: _height,
+                    unit: 'cm',
+                    picker: VFScrollableRulerPicker(
+                      value: _height,
+                      min: 140,
+                      max: 200,
+                      unit: 'cm',
+                      onChanged: (value) => setState(() {
+                        _height = value;
+                        _syncData();
+                      }),
+                    ),
+                  ),
+                  SizedBox(height: 12 * s),
+                  _MeasurementCard(
+                    label: 'CÂN NẶNG',
+                    value: _weight,
+                    unit: 'kg',
+                    picker: VFScrollableRulerPicker(
+                      value: _weight,
+                      min: 35,
+                      max: 120,
+                      unit: 'kg',
+                      onChanged: (value) => setState(() {
+                        _weight = value;
+                        _syncData();
+                      }),
+                    ),
+                  ),
+                  SizedBox(height: 12 * s),
+                  Container(
+                    padding:
+                        EdgeInsets.fromLTRB(16 * s, 16 * s, 16 * s, 14 * s),
+                    decoration: BoxDecoration(
+                      color: VF.surface,
+                      borderRadius: BorderRadius.circular(24 * s),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 8 * s,
+                          offset: Offset(0, 4 * s),
+                        ),
+                      ],
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Khung giờ ưu tiên',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            color: VF.text,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'VinaFit sẽ ưu tiên reminder và planning quanh khung giờ này.',
-                          style: TextStyle(
-                            fontSize: 12.5,
+                        Text(
+                          'BMI THAM CHIẾU',
+                          style: VF.textStyle(
+                            context,
+                            size: 11,
+                            weight: FontWeight.w700,
                             color: VF.textMuted,
+                            letterSpacing: 0.5,
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        ...List.generate(2, (rowIndex) {
-                          final start = rowIndex * 2;
-                          final rowItems = _times.skip(start).take(2).toList();
-
-                          return Padding(
-                            padding:
-                                EdgeInsets.only(bottom: rowIndex == 1 ? 0 : 8),
-                            child: Row(
-                              children: List.generate(rowItems.length, (index) {
-                                final item = rowItems[index];
-                                final isLast = index == rowItems.length - 1;
-                                return Expanded(
-                                  child: Padding(
-                                    padding:
-                                        EdgeInsets.only(right: isLast ? 0 : 8),
-                                    child: _TimeOptionCard(
-                                      label: item.$2,
-                                      subtitle: item.$3,
-                                      selected:
-                                          widget.data.preferredTime == item.$1,
-                                      onTap: () => setState(() {
-                                        widget.data.preferredTime = item.$1;
-                                      }),
+                        SizedBox(height: 14 * s),
+                        SizedBox(
+                          height: 34 * s,
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              final markerSize = 12 * s;
+                              final trackHeight = 18 * s;
+                              final trackInset = 2 * s;
+                              final markerLeft = (trackInset +
+                                      (_bmiPosition *
+                                          (constraints.maxWidth -
+                                              markerSize -
+                                              (trackInset * 2))))
+                                  .clamp(
+                                trackInset,
+                                constraints.maxWidth - markerSize - trackInset,
+                              );
+                              return Stack(
+                                children: [
+                                  Align(
+                                    alignment: Alignment.center,
+                                    child: Container(
+                                      height: trackHeight,
+                                      decoration: BoxDecoration(
+                                        color: VF.bg.withValues(alpha: 0.75),
+                                        borderRadius:
+                                            BorderRadius.circular(999),
+                                        border: Border.all(
+                                          color: Colors.black
+                                              .withValues(alpha: 0.05),
+                                        ),
+                                      ),
+                                      padding: EdgeInsets.all(trackInset),
+                                      child: const DecoratedBox(
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            begin: Alignment.centerLeft,
+                                            end: Alignment.centerRight,
+                                            colors: [
+                                              Color(0xFF5B9BD5),
+                                              Color(0xFF5B9BD5),
+                                              VF.accent,
+                                              VF.accent,
+                                              VF.amber,
+                                              VF.amber,
+                                              VF.coral,
+                                              VF.coral,
+                                            ],
+                                            stops: [
+                                              0.0,
+                                              0.18,
+                                              0.18,
+                                              0.41,
+                                              0.41,
+                                              0.51,
+                                              0.51,
+                                              1.0,
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  AnimatedPositioned(
+                                    duration: const Duration(milliseconds: 180),
+                                    curve: Curves.easeOutCubic,
+                                    left: markerLeft,
+                                    top: (34 * s - markerSize) / 2,
+                                    child: Container(
+                                      width: markerSize,
+                                      height: markerSize,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: bmiInfo.color,
+                                        border: Border.all(
+                                          color: Colors.white,
+                                          width: 2,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: bmiInfo.color.withValues(
+                                              alpha: 0.22,
+                                            ),
+                                            blurRadius: 10 * s,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                        ),
+                        SizedBox(height: 12 * s),
+                        RichText(
+                          text: TextSpan(
+                            style: TextStyle(
+                              fontSize: VF.sp(context, 13),
+                              fontWeight: FontWeight.w700,
+                            ),
+                            children: [
+                              TextSpan(
+                                text: 'BMI ${_bmi.toStringAsFixed(1)}',
+                                style: TextStyle(color: bmiInfo.color),
+                              ),
+                              const TextSpan(text: '  '),
+                              TextSpan(
+                                text: bmiInfo.label,
+                                style: const TextStyle(color: VF.textMuted),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 16 * s),
+                  Container(
+                    padding:
+                        EdgeInsets.fromLTRB(16 * s, 16 * s, 16 * s, 16 * s),
+                    decoration: BoxDecoration(
+                      color: VF.surface,
+                      borderRadius: BorderRadius.circular(24 * s),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 8 * s,
+                          offset: Offset(0, 4 * s),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'LỊCH TẬP',
+                          style: VF.textStyle(
+                            context,
+                            size: 11,
+                            weight: FontWeight.w700,
+                            color: VF.textMuted,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        SizedBox(height: 6 * s),
+                        Text(
+                          'Chọn những ngày và khung giờ bạn có thể giữ đều mỗi tuần.',
+                          style: VF.textStyle(
+                            context,
+                            size: 12,
+                            weight: FontWeight.w500,
+                            color: VF.textMuted,
+                            height: 1.45,
+                          ),
+                        ),
+                        SizedBox(height: 16 * s),
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final spacing = 6 * s;
+                            final chipSize =
+                                (constraints.maxWidth - (spacing * 6)) / 7;
+                            return Row(
+                              children:
+                                  List.generate(_dayLabels.length, (index) {
+                                final selected = _days.contains(index);
+                                return Padding(
+                                  padding: EdgeInsets.only(
+                                    right: index == _dayLabels.length - 1
+                                        ? 0
+                                        : spacing,
+                                  ),
+                                  child: GestureDetector(
+                                    onTap: () => _toggleDay(index),
+                                    child: AnimatedContainer(
+                                      duration:
+                                          const Duration(milliseconds: 160),
+                                      width: chipSize,
+                                      height: chipSize,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: selected ? VF.accent : VF.bg,
+                                        border: Border.all(
+                                          color: selected
+                                              ? VF.accent
+                                                  .withValues(alpha: 0.22)
+                                              : Colors.black
+                                                  .withValues(alpha: 0.05),
+                                        ),
+                                        boxShadow: selected
+                                            ? [
+                                                BoxShadow(
+                                                  color: VF.accent.withValues(
+                                                    alpha: 0.18,
+                                                  ),
+                                                  blurRadius: 14 * s,
+                                                  offset: Offset(0, 6 * s),
+                                                ),
+                                              ]
+                                            : null,
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        _dayLabels[index],
+                                        style: VF.textStyle(
+                                          context,
+                                          size: chipSize < 40 * s ? 10.5 : 11.5,
+                                          weight: selected
+                                              ? FontWeight.w800
+                                              : FontWeight.w600,
+                                          color: selected
+                                              ? Colors.white
+                                              : VF.textMuted,
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 );
                               }),
+                            );
+                          },
+                        ),
+                        SizedBox(height: 10 * s),
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 12 * s,
+                            vertical: 8 * s,
+                          ),
+                          decoration: BoxDecoration(
+                            color: VF.accent.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(12 * s),
+                          ),
+                          child: Text(
+                            '${_days.length} ngày/tuần',
+                            style: VF.textStyle(
+                              context,
+                              size: 11,
+                              weight: FontWeight.w700,
+                              color: VF.accent,
                             ),
-                          );
-                        }),
+                          ),
+                        ),
+                        SizedBox(height: 18 * s),
+                        Text(
+                          'Khung giờ ưu tiên',
+                          style: VF.textStyle(
+                            context,
+                            size: 13,
+                            weight: FontWeight.w700,
+                            color: VF.text,
+                          ),
+                        ),
+                        SizedBox(height: 10 * s),
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final spacing = 10 * s;
+                            final itemWidth =
+                                (constraints.maxWidth - spacing) / 2;
+                            return Wrap(
+                              spacing: spacing,
+                              runSpacing: spacing,
+                              children: _timeOptions.map((option) {
+                                final selected = _preferredTime == option.id;
+                                return SizedBox(
+                                  width: itemWidth,
+                                  child: _TimeOptionCard(
+                                    title: option.title,
+                                    subtitle: option.subtitle,
+                                    hint: option.hint,
+                                    icon: option.icon,
+                                    tone: option.color,
+                                    selected: selected,
+                                    onTap: () => setState(() {
+                                      _preferredTime = option.id;
+                                      _syncData();
+                                    }),
+                                  ),
+                                );
+                              }).toList(),
+                            );
+                          },
+                        ),
                       ],
                     ),
                   ),
+                  SizedBox(height: 8 * s),
                 ],
               ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 18, 24, 28),
-            child: VFButton(
-              label: 'Xem chương trình của tôi',
-              onTap: _canProceed ? widget.onNext : null,
-              enabled: _canProceed,
-            ),
+          VFOnboardingButton(
+            label: 'Xem chương trình',
+            onTap: _canContinue ? widget.onNext : null,
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _unitField(String label, TextEditingController ctrl, String unit) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 10.5,
-            fontWeight: FontWeight.w700,
-            color: VF.textMuted,
-            letterSpacing: 0.6,
+class _MeasurementCard extends StatelessWidget {
+  const _MeasurementCard({
+    required this.label,
+    required this.value,
+    required this.unit,
+    required this.picker,
+  });
+
+  final String label;
+  final int value;
+  final String unit;
+  final Widget picker;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = VF.scale(context);
+    return Container(
+      padding: EdgeInsets.fromLTRB(16 * s, 20 * s, 16 * s, 14 * s),
+      decoration: BoxDecoration(
+        color: VF.surface,
+        borderRadius: BorderRadius.circular(24 * s),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8 * s,
+            offset: Offset(0, 4 * s),
           ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          decoration: BoxDecoration(
-            color: VF.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: VF.border, width: 1.5),
-            boxShadow: VF.cardShadow,
+        ],
+      ),
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: VF.textStyle(
+              context,
+              size: 11,
+              weight: FontWeight.w700,
+              color: VF.textMuted,
+              letterSpacing: 0.5,
+            ),
           ),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: ctrl,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
-                  ],
-                  onChanged: (_) => setState(() {}),
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: VF.text,
-                  ),
-                  decoration: InputDecoration(
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 14,
-                    ),
-                    hintText: unit == 'cm' ? '165' : '60',
-                    hintStyle: TextStyle(
-                      color: VF.textMuted.withValues(alpha: 0.45),
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                    ),
+          SizedBox(height: 4 * s),
+          RichText(
+            text: TextSpan(
+              style: const TextStyle(
+                fontWeight: FontWeight.w900,
+                color: VF.text,
+              ),
+              children: [
+                TextSpan(
+                  text: '$value',
+                  style: TextStyle(
+                    fontSize: VF.sp(context, 48),
+                    letterSpacing: -3,
                   ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(right: 14),
-                child: Text(
-                  unit,
-                  style: const TextStyle(
-                    fontSize: 13,
+                TextSpan(
+                  text: ' $unit',
+                  style: TextStyle(
+                    fontSize: VF.sp(context, 16),
+                    fontWeight: FontWeight.w600,
                     color: VF.textMuted,
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
+          SizedBox(height: 12 * s),
+          picker,
+        ],
+      ),
     );
-  }
-
-  @override
-  void dispose() {
-    _hCtrl.dispose();
-    _wCtrl.dispose();
-    super.dispose();
   }
 }
 
 class _TimeOptionCard extends StatelessWidget {
-  final String label;
-  final String subtitle;
-  final bool selected;
-  final VoidCallback onTap;
-
   const _TimeOptionCard({
-    required this.label,
+    required this.title,
     required this.subtitle,
+    required this.hint,
+    required this.icon,
+    required this.tone,
     required this.selected,
     required this.onTap,
   });
 
+  final String title;
+  final String subtitle;
+  final String hint;
+  final IconData icon;
+  final Color tone;
+  final bool selected;
+  final VoidCallback onTap;
+
   @override
   Widget build(BuildContext context) {
+    final s = VF.scale(context);
+    final accent = selected ? VF.accent : tone;
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        padding: EdgeInsets.fromLTRB(14 * s, 14 * s, 14 * s, 12 * s),
         decoration: BoxDecoration(
-          color: selected ? VF.accentSoft : VF.bg,
-          borderRadius: BorderRadius.circular(14),
+          color: VF.surface,
+          borderRadius: BorderRadius.circular(22 * s),
           border: Border.all(
-            color:
-                selected ? VF.accent.withValues(alpha: 0.28) : VF.border,
-            width: 1.4,
+            color: selected
+                ? VF.accent.withValues(alpha: 0.20)
+                : Colors.black.withValues(alpha: 0.05),
+            width: selected ? 1.6 : 1,
           ),
+          gradient: selected
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    VF.accent.withValues(alpha: 0.10),
+                    VF.surface,
+                  ],
+                )
+              : null,
+          boxShadow: [
+            BoxShadow(
+              color: selected
+                  ? VF.accent.withValues(alpha: 0.10)
+                  : Colors.black.withValues(alpha: 0.03),
+              blurRadius: selected ? 18 : 8,
+              offset: Offset(0, 4 * s),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                if (selected) ...[
-                  const VFCheckIcon(size: 10),
-                  const SizedBox(width: 8),
-                ],
-                Expanded(
+                Container(
+                  width: 38 * s,
+                  height: 38 * s,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12 * s),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    icon,
+                    size: 19 * s,
+                    color: accent,
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 9 * s,
+                    vertical: 5 * s,
+                  ),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? VF.accentSoft
+                        : VF.bg.withValues(alpha: 0.55),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
                   child: Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: selected ? VF.accent : VF.text,
+                    subtitle,
+                    style: VF.textStyle(
+                      context,
+                      size: 10,
+                      weight: FontWeight.w700,
+                      color: selected ? VF.accent : VF.textMuted,
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: 12 * s),
             Text(
-              subtitle,
-              style: const TextStyle(
-                fontSize: 11,
-                color: VF.textMuted,
+              title,
+              style: VF.textStyle(
+                context,
+                size: 16,
+                weight: FontWeight.w800,
+                letterSpacing: -0.3,
+                color: selected ? VF.text : VF.textSec,
               ),
+            ),
+            SizedBox(height: 6 * s),
+            Text(
+              hint,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: VF.textStyle(
+                context,
+                size: 11,
+                weight: FontWeight.w500,
+                color: VF.textMuted,
+                height: 1.35,
+              ),
+            ),
+            SizedBox(height: 10 * s),
+            Row(
+              children: [
+                Icon(
+                  selected
+                      ? Icons.check_circle_rounded
+                      : Icons.arrow_forward_rounded,
+                  size: 14 * s,
+                  color: selected
+                      ? VF.accent
+                      : VF.textMuted.withValues(alpha: 0.6),
+                ),
+                SizedBox(width: 6 * s),
+                Text(
+                  selected ? 'Đã chọn' : 'Chạm để chọn',
+                  style: VF.textStyle(
+                    context,
+                    size: 10.5,
+                    weight: FontWeight.w700,
+                    color: selected
+                        ? VF.accent
+                        : VF.textMuted.withValues(alpha: 0.72),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -399,131 +761,9 @@ class _TimeOptionCard extends StatelessWidget {
   }
 }
 
-class _BmiCard extends StatelessWidget {
-  final double bmi;
-
-  const _BmiCard({required this.bmi});
-
-  @override
-  Widget build(BuildContext context) {
-    final info = _getBmiInfo(bmi);
-    final pos = ((bmi - 12) / 26).clamp(0.0, 1.0);
-
-    return VFPanel(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  const Text(
-                    'BMI ',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: VF.textMuted,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Text(
-                    bmi.toStringAsFixed(1),
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      color: info.color,
-                    ),
-                  ),
-                ],
-              ),
-              VFPill(
-                label: info.label,
-                color: info.color,
-                background: info.color.withValues(alpha: 0.10),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 10,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Row(
-                  children: [
-                    _seg(VF.amber.withValues(alpha: 0.35), 25, left: true),
-                    _seg(VF.green.withValues(alpha: 0.40), 17),
-                    _seg(VF.amber.withValues(alpha: 0.50), 8),
-                    _seg(VF.red.withValues(alpha: 0.30), 50, right: true),
-                  ],
-                ),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  top: -3,
-                  child: FractionallySizedBox(
-                    alignment: Alignment.centerLeft,
-                    widthFactor: pos,
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: Container(
-                        width: 16,
-                        height: 16,
-                        decoration: BoxDecoration(
-                          color: info.color,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Thiếu cân', style: TextStyle(fontSize: 9, color: VF.textMuted)),
-              Text('BT', style: TextStyle(fontSize: 9, color: VF.textMuted)),
-              Text('Thừa', style: TextStyle(fontSize: 9, color: VF.textMuted)),
-              Text('Béo phì', style: TextStyle(fontSize: 9, color: VF.textMuted)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _seg(Color color, int flex, {bool left = false, bool right = false}) {
-    return Expanded(
-      flex: flex,
-      child: Container(
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.only(
-            topLeft: left ? const Radius.circular(999) : Radius.zero,
-            bottomLeft: left ? const Radius.circular(999) : Radius.zero,
-            topRight: right ? const Radius.circular(999) : Radius.zero,
-            bottomRight: right ? const Radius.circular(999) : Radius.zero,
-          ),
-        ),
-      ),
-    );
-  }
-
-  static _BmiInfo _getBmiInfo(double bmi) {
-    if (bmi < 18.5) return const _BmiInfo('Thiếu cân', VF.amber);
-    if (bmi < 23) return const _BmiInfo('Bình thường', VF.green);
-    if (bmi < 25) return const _BmiInfo('Thừa cân', VF.amber);
-    return const _BmiInfo('Béo phì', VF.red);
-  }
-}
-
 class _BmiInfo {
+  const _BmiInfo(this.label, this.color);
+
   final String label;
   final Color color;
-
-  const _BmiInfo(this.label, this.color);
 }

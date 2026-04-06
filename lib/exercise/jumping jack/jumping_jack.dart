@@ -74,12 +74,6 @@ class JumpingJack extends ExerciseBase {
   // --- Start Position ---
 
   @override
-  void onExerciseActivated() {
-    super.onExerciseActivated();
-    ttsService.speak("Sẵn sàng, mở");
-  }
-
-  @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     final leftShoulder = landmarks[PoseLandmarkType.leftShoulder];
     final rightShoulder = landmarks[PoseLandmarkType.rightShoulder];
@@ -306,11 +300,6 @@ class JumpingJack extends ExerciseBase {
       }
       setFeedback.add({correctForm: faultMap});
 
-      speakRepCompletion(
-        nextPhaseVoice: "Mở",
-        correctForm: correctForm,
-      );
-
       for (final metric in _metrics) {
         debugData.addAll(metric.debugData);
       }
@@ -376,9 +365,7 @@ class JumpingJack extends ExerciseBase {
     jjState = newState;
 
     if (newState == JJState.open && previousJJState == JJState.closed) {
-      ttsService.clearQueue();
       resultIssues.instructions.clear();
-      ttsService.speak("Đóng");
     }
 
     for (final metric in _metrics) {

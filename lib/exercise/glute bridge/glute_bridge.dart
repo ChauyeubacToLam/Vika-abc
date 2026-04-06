@@ -141,12 +141,6 @@ class GluteBridge extends ExerciseBase {
           (hip is not already elevated).
      ----------------------------------------------------------------------- */
   @override
-  void onExerciseActivated() {
-    super.onExerciseActivated();
-    ttsService.speak("Sẵn sàng, lên");
-  }
-
-  @override
   bool isInStartPosition(
     Map<PoseLandmarkType, PoseLandmark> landmarks,
   ) {
@@ -583,11 +577,6 @@ class GluteBridge extends ExerciseBase {
     }
     setFeedback.add({correctForm: faultMap});
 
-    speakRepCompletion(
-      nextPhaseVoice: "Lên",
-      correctForm: correctForm,
-    );
-
     // Merge metric debug data BEFORE reset.
     for (final metric in _metrics) {
       debugData.addAll(metric.debugData);
@@ -613,12 +602,7 @@ class GluteBridge extends ExerciseBase {
 
     // Clear coaching instructions at the start of a new rep.
     if (newState == GluteBridgeState.ascending) {
-      ttsService.clearQueue();
       resultIssues.instructions.clear();
-    } else if (newState == GluteBridgeState.topHold) {
-      ttsService.speak("Giữ");
-    } else if (newState == GluteBridgeState.descending) {
-      ttsService.speak("Xuống");
     }
 
     // Reset all debouncers to ensure a clean slate for the new state.

@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
 
 import '../onboarding_data.dart';
+import '../onboarding_primitives.dart';
 import '../vf_theme.dart';
 
 class SignupPage extends StatefulWidget {
-  final OnboardingData data;
-  final VoidCallback onNext;
-  final VoidCallback onBack;
-
   const SignupPage({
     super.key,
     required this.data,
     required this.onNext,
     required this.onBack,
   });
+
+  final OnboardingData data;
+  final VoidCallback onNext;
+  final VoidCallback onBack;
 
   @override
   State<SignupPage> createState() => _SignupPageState();
@@ -22,7 +23,6 @@ class SignupPage extends StatefulWidget {
 class _SignupPageState extends State<SignupPage> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _emailCtrl;
-  String _method = 'email';
 
   @override
   void initState() {
@@ -31,168 +31,21 @@ class _SignupPageState extends State<SignupPage> {
     _emailCtrl = TextEditingController(text: widget.data.email ?? '');
   }
 
-  bool get _validEmailFlow =>
-      _nameCtrl.text.trim().length >= 2 &&
-      _emailCtrl.text.contains('@') &&
-      _emailCtrl.text.contains('.');
-
-  bool get _canContinue => _method == 'email' ? _validEmailFlow : true;
+  bool get _canSubmit {
+    final name = _nameCtrl.text.trim();
+    final email = _emailCtrl.text.trim();
+    return name.length >= 2 && email.contains('@') && email.contains('.');
+  }
 
   void _submit() {
-    if (!_canContinue) return;
-    widget.data.displayName =
-        _method == 'email' ? _nameCtrl.text.trim() : widget.data.displayName;
-    widget.data.email =
-        _method == 'email' ? _emailCtrl.text.trim() : widget.data.email;
+    if (!_canSubmit) return;
+    widget.data.displayName = _nameCtrl.text.trim();
+    widget.data.email = _emailCtrl.text.trim();
     widget.onNext();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => FocusScope.of(context).unfocus(),
-      child: Column(
-        children: [
-          VFProgressBar(current: 5, total: 7, onBack: widget.onBack),
-          Expanded(
-            child: VFFitViewport(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Lưu tiến trình của bạn',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
-                      color: VF.text,
-                      letterSpacing: -0.6,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Giữ phần này tối giản: card text-only, không icon màu, không game hóa.',
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      color: VF.textMuted,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  ...[
-                    ('email', 'Tiếp tục với Email'),
-                    ('google', 'Tiếp tục với Google'),
-                    ('apple', 'Tiếp tục với Apple'),
-                  ].map((option) => Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _MethodCard(
-                          label: option.$2,
-                          selected: _method == option.$1,
-                          onTap: () => setState(() => _method = option.$1),
-                        ),
-                      )),
-                  const SizedBox(height: 12),
-                  if (_method == 'email')
-                    VFPanel(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Chi tiết tài khoản',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              color: VF.text,
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          _label('TÊN'),
-                          const SizedBox(height: 6),
-                          _input(_nameCtrl, 'Ví dụ: Minh'),
-                          const SizedBox(height: 14),
-                          _label('EMAIL'),
-                          const SizedBox(height: 6),
-                          _input(
-                            _emailCtrl,
-                            'email@example.com',
-                            type: TextInputType.emailAddress,
-                          ),
-                        ],
-                      ),
-                    )
-                  else
-                    VFPanel(
-                      child: Text(
-                        'Auth cho $_method sẽ nối sau. Luồng onboarding vẫn tiếp tục để hoàn thiện lịch tập và chương trình.',
-                        style: const TextStyle(
-                          fontSize: 12.8,
-                          color: VF.textSec,
-                          height: 1.55,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 18, 24, 28),
-            child: VFButton(
-              label: 'Tiếp tục',
-              onTap: _canContinue ? _submit : null,
-              enabled: _canContinue,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _label(String text) {
-    return Text(
-      text,
-      style: const TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w700,
-        color: VF.textMuted,
-        letterSpacing: 0.8,
-      ),
-    );
-  }
-
-  Widget _input(
-    TextEditingController ctrl,
-    String hint, {
-    TextInputType? type,
-  }) {
-    return TextField(
-      controller: ctrl,
-      keyboardType: type,
-      onChanged: (_) => setState(() {}),
-      style: const TextStyle(fontSize: 15, color: VF.text),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: VF.textMuted),
-        filled: true,
-        fillColor: VF.bg,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: VF.border, width: 1.5),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: VF.border, width: 1.5),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(
-            color: VF.accent.withValues(alpha: 0.65),
-            width: 1.5,
-          ),
-        ),
-      ),
-    );
+  void _continueSocial() {
+    widget.onNext();
   }
 
   @override
@@ -201,50 +54,347 @@ class _SignupPageState extends State<SignupPage> {
     _emailCtrl.dispose();
     super.dispose();
   }
-}
-
-class _MethodCard extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _MethodCard({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
 
   @override
   Widget build(BuildContext context) {
+    final s = VF.scale(context);
+    final keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+
     return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
-        decoration: BoxDecoration(
-          color: selected ? VF.accentSoft : VF.surface,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: selected ? VF.accent.withValues(alpha: 0.28) : VF.border,
-            width: 1.5,
-          ),
-          boxShadow: selected ? VF.cardShadow : null,
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: ColoredBox(
+        color: VF.bg,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            VFOnboardingNavBar(
+              current: 8,
+              total: 10,
+              onBack: widget.onBack,
+            ),
+            Expanded(
+              child: keyboardOpen
+                  ? SingleChildScrollView(
+                      padding: EdgeInsets.fromLTRB(24 * s, 20 * s, 24 * s, 0),
+                      child: _SignupBody(
+                        nameCtrl: _nameCtrl,
+                        emailCtrl: _emailCtrl,
+                        canSubmit: _canSubmit,
+                        onNameChanged: (_) => setState(() {}),
+                        onEmailChanged: (_) => setState(() {}),
+                        onContinueSocial: _continueSocial,
+                        onSubmit: _submit,
+                        onSkip: widget.onNext,
+                      ),
+                    )
+                  : VFFitViewport(
+                      padding: EdgeInsets.fromLTRB(24 * s, 20 * s, 24 * s, 0),
+                      child: _SignupBody(
+                        nameCtrl: _nameCtrl,
+                        emailCtrl: _emailCtrl,
+                        canSubmit: _canSubmit,
+                        onNameChanged: (_) => setState(() {}),
+                        onEmailChanged: (_) => setState(() {}),
+                        onContinueSocial: _continueSocial,
+                        onSubmit: _submit,
+                        onSkip: widget.onNext,
+                      ),
+                    ),
+            ),
+          ],
         ),
-        child: Row(
+      ),
+    );
+  }
+}
+
+class _SignupBody extends StatelessWidget {
+  const _SignupBody({
+    required this.nameCtrl,
+    required this.emailCtrl,
+    required this.canSubmit,
+    required this.onNameChanged,
+    required this.onEmailChanged,
+    required this.onContinueSocial,
+    required this.onSubmit,
+    required this.onSkip,
+  });
+
+  final TextEditingController nameCtrl;
+  final TextEditingController emailCtrl;
+  final bool canSubmit;
+  final ValueChanged<String> onNameChanged;
+  final ValueChanged<String> onEmailChanged;
+  final VoidCallback onContinueSocial;
+  final VoidCallback onSubmit;
+  final VoidCallback onSkip;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = VF.scale(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.only(left: 4 * s),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Lưu tiến trình',
+                style: VF.textStyle(
+                  context,
+                  size: 28,
+                  weight: FontWeight.w900,
+                  color: VF.text,
+                  letterSpacing: -1.5,
+                  height: 1.1,
+                ),
+              ),
+              SizedBox(height: 8 * s),
+              Text(
+                'Tạo tài khoản để giữ chương trình và theo dõi tiến bộ',
+                style: VF.textStyle(
+                  context,
+                  size: 13,
+                  weight: FontWeight.w500,
+                  color: VF.textMuted,
+                  height: 1.6,
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 24 * s),
+        _SocialButton.google(
+          label: 'Tiếp tục với Google',
+          onTap: onContinueSocial,
+        ),
+        SizedBox(height: 10 * s),
+        _SocialButton.apple(
+          label: 'Tiếp tục với Apple',
+          onTap: onContinueSocial,
+        ),
+        SizedBox(height: 16 * s),
+        Row(
           children: [
             Expanded(
+              child: Divider(
+                color: VF.textMuted.withValues(alpha: 0.15),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 14 * s),
               child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: selected ? VF.accent : VF.text,
+                'hoặc',
+                style: VF.textStyle(
+                  context,
+                  size: 11,
+                  weight: FontWeight.w600,
+                  color: VF.textMuted,
                 ),
               ),
             ),
-            VFCheckIcon(size: 14, filled: selected),
+            Expanded(
+              child: Divider(
+                color: VF.textMuted.withValues(alpha: 0.15),
+              ),
+            ),
           ],
         ),
+        SizedBox(height: 16 * s),
+        _LabeledField(
+          label: 'TÊN',
+          controller: nameCtrl,
+          hintText: 'Tên hiển thị...',
+          onChanged: onNameChanged,
+        ),
+        SizedBox(height: 10 * s),
+        _LabeledField(
+          label: 'EMAIL',
+          controller: emailCtrl,
+          hintText: 'email@example.com',
+          keyboardType: TextInputType.emailAddress,
+          onChanged: onEmailChanged,
+        ),
+        SizedBox(height: 16 * s),
+        VFOnboardingButton(
+          label: 'Đăng ký',
+          onTap: canSubmit ? onSubmit : null,
+          padding: EdgeInsets.zero,
+        ),
+        SizedBox(height: 20 * s),
+        Center(
+          child: GestureDetector(
+            onTap: onSkip,
+            child: Text(
+              'Bỏ qua, tôi sẽ đăng ký sau',
+              style: VF.textStyle(
+                context,
+                size: 13,
+                weight: FontWeight.w600,
+                color: VF.textMuted,
+              ).copyWith(
+                decoration: TextDecoration.underline,
+                decorationColor: VF.textMuted.withValues(alpha: 0.30),
+                decorationThickness: 1.2 * s,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SocialButton extends StatelessWidget {
+  const _SocialButton._({
+    required this.label,
+    required this.background,
+    required this.foreground,
+    required this.onTap,
+    this.border,
+    required this.leadingBuilder,
+  });
+
+  factory _SocialButton.google({
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return _SocialButton._(
+      label: label,
+      background: Colors.white,
+      foreground: VF.text,
+      border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
+      onTap: onTap,
+      leadingBuilder: (s) => VFGoogleMark(size: 20 * s),
+    );
+  }
+
+  factory _SocialButton.apple({
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return _SocialButton._(
+      label: label,
+      background: Colors.black,
+      foreground: Colors.white,
+      onTap: onTap,
+      leadingBuilder: (s) => VFAppleMark(size: 18 * s),
+    );
+  }
+
+  final String label;
+  final Color background;
+  final Color foreground;
+  final Border? border;
+  final Widget Function(double s) leadingBuilder;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = VF.scale(context);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 56 * s,
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(16 * s),
+          border: border,
+          boxShadow: background == Colors.white
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 8 * s,
+                    offset: Offset(0, 4 * s),
+                  ),
+                ]
+              : null,
+        ),
+        alignment: Alignment.center,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            leadingBuilder(s),
+            SizedBox(width: 12 * s),
+            Text(
+              label,
+              style: VF.textStyle(
+                context,
+                size: 15,
+                weight: FontWeight.w700,
+                color: foreground,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LabeledField extends StatelessWidget {
+  const _LabeledField({
+    required this.label,
+    required this.controller,
+    required this.hintText,
+    required this.onChanged,
+    this.keyboardType,
+  });
+
+  final String label;
+  final TextEditingController controller;
+  final String hintText;
+  final ValueChanged<String> onChanged;
+  final TextInputType? keyboardType;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = VF.scale(context);
+    return Container(
+      padding: EdgeInsets.fromLTRB(16 * s, 14 * s, 16 * s, 14 * s),
+      decoration: BoxDecoration(
+        color: VF.surface,
+        borderRadius: BorderRadius.circular(16 * s),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: VF.textStyle(
+              context,
+              size: 10,
+              weight: FontWeight.w700,
+              color: VF.textMuted,
+              letterSpacing: 0.5,
+            ),
+          ),
+          TextField(
+            controller: controller,
+            keyboardType: keyboardType,
+            onChanged: onChanged,
+            style: VF.textStyle(
+              context,
+              size: 15,
+              weight: FontWeight.w600,
+              color: VF.text,
+            ),
+            decoration: InputDecoration(
+              isDense: true,
+              border: InputBorder.none,
+              hintText: hintText,
+              hintStyle: VF.textStyle(
+                context,
+                size: 15,
+                weight: FontWeight.w500,
+                color: VF.textMuted,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
