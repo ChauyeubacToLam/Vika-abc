@@ -38,13 +38,31 @@ source ~/.zshrc
 
 Verify Flutter works:
 ```bash
-flutter doctor --android-licenses
+flutter --version
 ```
-Accept everything with `y`.
 
 ---
 
-### Step 3: Install FVM (Flutter Version Manager)
+### Step 3: Accept Android Licenses
+
+Android requires you to accept its SDK licenses before building. Run:
+
+```bash
+flutter doctor --android-licenses
+```
+
+Press `y` and Enter for every prompt until it says "All SDK package licenses accepted."
+
+Then verify everything is green:
+```bash
+flutter doctor
+```
+
+Make sure you see ✅ for both **Flutter** and **Android toolchain**. Fix any issues it flags before continuing.
+
+---
+
+### Step 4: Install FVM (Flutter Version Manager)
 
 This ensures everyone runs the exact same Flutter version.
 
@@ -73,7 +91,7 @@ fvm --version
 
 ---
 
-### Step 4: Set JAVA_HOME
+### Step 5: Set JAVA_HOME
 
 Gradle needs to know where Android Studio's JDK is.
 
@@ -92,7 +110,7 @@ Close and reopen your terminal after running this.
 
 ---
 
-### Step 5: Clone and Run
+### Step 6: Clone and Run
 
 ```bash
 # Clone the project
@@ -158,7 +176,7 @@ sudo xcodebuild -runFirstLaunch
 → Flutter is not in your PATH. Re-do Step 2 for your OS, close and reopen the terminal after.
 
 ### "fvm is not recognized" / "fvm: command not found"
-→ FVM is not in your PATH. Re-do Step 3 for your OS, close and reopen the terminal after.
+→ FVM is not in your PATH. Re-do Step 4 for your OS, close and reopen the terminal after.
 
 ### "No connected devices"
 → Connect a phone with USB Debugging ON, or start an emulator in Android Studio.
@@ -171,7 +189,7 @@ fvm flutter run
 ```
 
 ### "Cannot find Java installation" error
-→ JAVA_HOME is not set correctly. Re-do Step 4 for your OS, close and reopen the terminal after.
+→ JAVA_HOME is not set correctly. Re-do Step 5 for your OS, close and reopen the terminal after.
 
 ### Still failing?
 ```bash
