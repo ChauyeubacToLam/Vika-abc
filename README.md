@@ -11,7 +11,7 @@ A Flutter fitness app with AI-powered pose detection for exercise tracking.
 | What to Install | Why You Need It | Download Link |
 |-----------------|-----------------|---------------|
 | **Android Studio** | Android SDK + JDK (required for builds) | [📥 Download](https://developer.android.com/studio) |
-| **Flutter SDK** | Framework (includes Dart) | [📥 Download](https://docs.flutter.dev/get-started/install/windows) |
+| **Flutter SDK** | Framework (includes Dart) | [📥 Download](https://docs.flutter.dev/get-started/install) |
 | **VS Code** | Code editor | [📥 Download](https://code.visualstudio.com/) |
 
 > ✅ You do NOT need to install Dart or Java separately.
@@ -33,10 +33,18 @@ dart pub global activate fvm
 ```
 
 Then add FVM to your PATH:
+
+**Windows:**
 - Open Start → search "environment variables"
 - Edit the **User** `Path` variable
 - Add: `C:\Users\[YOUR_NAME]\AppData\Local\Pub\Cache\bin`
 - Click OK, then **close and reopen your terminal**
+
+**Mac:**
+```bash
+echo 'export PATH="$PATH:$HOME/.pub-cache/bin"' >> ~/.zshrc
+source ~/.zshrc
+```
 
 Verify it works:
 ```bash
@@ -47,10 +55,17 @@ fvm --version
 
 ### Step 3: Set JAVA_HOME
 
-Gradle needs to know where Android Studio's JDK is. Run this in PowerShell:
+Gradle needs to know where Android Studio's JDK is.
 
+**Windows** — run this in PowerShell:
 ```powershell
 [System.Environment]::SetEnvironmentVariable("JAVA_HOME", "C:\Program Files\Android\Android Studio\jbr", [System.EnvironmentVariableTarget]::User)
+```
+
+**Mac** — run this in terminal:
+```bash
+echo 'export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"' >> ~/.zshrc
+source ~/.zshrc
 ```
 
 Close and reopen your terminal after running this.
@@ -93,6 +108,16 @@ fvm flutter run
 3. Start the emulator
 4. Run `fvm flutter run`
 
+### iOS (Mac only):
+1. Install Xcode from the App Store
+2. Run:
+```bash
+sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+sudo xcodebuild -runFirstLaunch
+```
+3. Open Simulator or connect an iPhone
+4. Run `fvm flutter run`
+
 ---
 
 ## 🛠️ Common Commands
@@ -109,8 +134,8 @@ fvm flutter run
 
 ## ❓ Troubleshooting
 
-### "fvm is not recognized"
-→ FVM is not in your PATH. Re-do Step 2 above, make sure to close and reopen the terminal after.
+### "fvm is not recognized" / "fvm: command not found"
+→ FVM is not in your PATH. Re-do Step 2 for your OS, close and reopen the terminal after.
 
 ### "No connected devices"
 → Connect a phone with USB Debugging ON, or start an emulator in Android Studio.
@@ -121,6 +146,9 @@ fvm flutter clean
 fvm flutter pub get
 fvm flutter run
 ```
+
+### "Cannot find Java installation" error
+→ JAVA_HOME is not set correctly. Re-do Step 3 for your OS, close and reopen the terminal after.
 
 ### Still failing?
 ```bash
