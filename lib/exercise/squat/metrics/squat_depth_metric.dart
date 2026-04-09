@@ -61,23 +61,26 @@ class DepthMetric extends SquatMetricBase {
   }
 
   /// Called by Squat when rep completes to check if depth was sufficient.
-  /// (User stood up from descending without reaching bottom = shallow)
-  void checkRepCompletion(SquatState finalState, RepContext ctx) {
+  /// If the user returned to standing without reaching bottom, mark it shallow.
+  void checkRepCompletion({
+    required SquatState finalState,
+    required bool reachedBottom,
+    required RepContext ctx,
+  }) {
     final phase = finalState.toString().split('.').last.toUpperCase();
-    if (finalState != SquatState.ascending) {
-      _logFault(phase, 'Too Shallow (Missed Depth)', 'Thấp hơn nữa');
+    if (!reachedBottom) {
+      _logFault(phase, 'Too Shallow (Missed Depth)');
       ctx.resultIssues
           .addInstruction('standing', 'Depth', 'Go deeper next time!');
     }
   }
 
-  void _logFault(String phase, String message, String? voiceMessage) {
+  void _logFault(String phase, String message) {
     if (!_faults.any((f) => f.phase == phase && f.type == 'Depth')) {
       _faults.add(FaultRecord(
         phase: phase,
         type: 'Depth',
         message: message,
-        voiceMessage: voiceMessage,
         affectsForm: true,
       ));
     }

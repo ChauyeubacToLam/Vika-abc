@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/exercise_definition.dart';
+import '../models/exercise_lookup.dart';
 import '../theme/vf_theme.dart';
 import '../widgets/pose_silhouette.dart';
 import '../widgets/vf_primitives.dart';
@@ -33,7 +34,7 @@ class ExerciseBrowser extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      'Bài tập',
+                      'Bai tap',
                       style: VFTheme.textStyle(
                         context,
                         size: 26,
@@ -101,7 +102,7 @@ class ExerciseBrowser extends StatelessWidget {
                           ),
                           children: [
                             TextSpan(
-                              text: 'Core đang yếu nhất. ',
+                              text: 'AI dang san sang. ',
                               style: VFTheme.textStyle(
                                 context,
                                 size: 11,
@@ -111,7 +112,8 @@ class ExerciseBrowser extends StatelessWidget {
                               ),
                             ),
                             const TextSpan(
-                              text: 'Thử thêm Plank hoặc Curl-up.',
+                              text:
+                                  'Chon bai tap co san de mo truc tiep giao dien tap.',
                             ),
                           ],
                         ),
@@ -141,7 +143,7 @@ class ExerciseBrowser extends StatelessWidget {
                         ),
                         SizedBox(height: 10 * s),
                         SizedBox(
-                          height: 146 * s,
+                          height: 158 * s,
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
                             physics: const BouncingScrollPhysics(
@@ -155,6 +157,7 @@ class ExerciseBrowser extends StatelessWidget {
                                 category: category,
                                 item: category.items[itemIndex],
                                 showAiBadge: index == 0,
+                                onSelectExercise: onSelectExercise,
                               );
                             },
                           ),
@@ -219,7 +222,7 @@ class _CategoryHeader extends StatelessWidget {
                 ),
                 SizedBox(height: 2 * s),
                 Text(
-                  '${category.subtitle} · ${category.items.length} bài',
+                  '${category.subtitle} · ${category.items.length} bai',
                   style: VFTheme.textStyle(
                     context,
                     size: 10,
@@ -288,94 +291,151 @@ class _ExerciseCard extends StatelessWidget {
     required this.category,
     required this.item,
     required this.showAiBadge,
+    required this.onSelectExercise,
   });
 
   final _ExerciseCategory category;
   final _ExerciseItem item;
   final bool showAiBadge;
+  final ValueChanged<ExerciseDefinition> onSelectExercise;
 
   @override
   Widget build(BuildContext context) {
     final s = VFTheme.scale(context);
-    return Container(
-      width: 135 * s,
-      decoration: BoxDecoration(
-        color: VFTheme.surface,
-        borderRadius: BorderRadius.circular(18 * s),
-        border: Border.all(color: VFTheme.hairline),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          Container(
-            height: 68 * s,
-            color: category.color.withValues(alpha: 0.06),
-            child: Stack(
+    final definition = item.definitionQuery == null
+        ? null
+        : lookupExerciseDefinition(item.definitionQuery!);
+    final available = definition != null;
+    final onTap = definition == null
+        ? null
+        : () => onSelectExercise(definition);
+
+    return Opacity(
+      opacity: available ? 1 : 0.58,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18 * s),
+          child: Container(
+            width: 135 * s,
+            decoration: BoxDecoration(
+              color: VFTheme.surface,
+              borderRadius: BorderRadius.circular(18 * s),
+              border: Border.all(
+                color: available
+                    ? category.color.withValues(alpha: 0.10)
+                    : VFTheme.hairline,
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
               children: [
-                Center(
-                  child: PoseSilhouette(
-                    type: item.type,
-                    size: 40 * s,
-                    color: category.color.withValues(alpha: 0.25),
-                  ),
-                ),
-                if (showAiBadge)
-                  Positioned(
-                    top: 6 * s,
-                    right: 6 * s,
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 6 * s,
-                        vertical: 2 * s,
-                      ),
-                      decoration: BoxDecoration(
-                        color: category.color.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(4 * s),
-                      ),
-                      child: Text(
-                        'AI',
-                        style: VFTheme.textStyle(
-                          context,
-                          size: 7,
-                          weight: FontWeight.w800,
-                          color: category.color,
+                Container(
+                  height: 68 * s,
+                  color: category.color.withValues(alpha: 0.06),
+                  child: Stack(
+                    children: [
+                      Center(
+                        child: PoseSilhouette(
+                          type: item.type,
+                          size: 40 * s,
+                          color: category.color.withValues(alpha: 0.25),
                         ),
                       ),
+                      if (showAiBadge)
+                        Positioned(
+                          top: 6 * s,
+                          right: 6 * s,
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 6 * s,
+                              vertical: 2 * s,
+                            ),
+                            decoration: BoxDecoration(
+                              color: category.color.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(4 * s),
+                            ),
+                            child: Text(
+                              'AI',
+                              style: VFTheme.textStyle(
+                                context,
+                                size: 7,
+                                weight: FontWeight.w800,
+                                color: category.color,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      12 * s,
+                      10 * s,
+                      12 * s,
+                      12 * s,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.name,
+                          style: VFTheme.textStyle(
+                            context,
+                            size: 13,
+                            weight: FontWeight.w800,
+                            color: VFTheme.text,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                        SizedBox(height: 3 * s),
+                        Text(
+                          item.description,
+                          style: VFTheme.textStyle(
+                            context,
+                            size: 9,
+                            weight: FontWeight.w500,
+                            color: VFTheme.textMuted,
+                            height: 1.35,
+                          ),
+                        ),
+                        const Spacer(),
+                        Row(
+                          children: [
+                            Icon(
+                              available
+                                  ? Icons.arrow_forward_rounded
+                                  : Icons.lock_outline_rounded,
+                              size: 12 * s,
+                              color: available
+                                  ? category.color
+                                  : VFTheme.textMuted,
+                            ),
+                            SizedBox(width: 4 * s),
+                            Text(
+                              available ? 'Mo bai tap' : 'Sap co',
+                              style: VFTheme.textStyle(
+                                context,
+                                size: 9,
+                                weight: FontWeight.w700,
+                                color: available
+                                    ? category.color
+                                    : VFTheme.textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.fromLTRB(12 * s, 10 * s, 12 * s, 12 * s),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.name,
-                  style: VFTheme.textStyle(
-                    context,
-                    size: 13,
-                    weight: FontWeight.w800,
-                    color: VFTheme.text,
-                    letterSpacing: -0.2,
-                  ),
-                ),
-                SizedBox(height: 3 * s),
-                Text(
-                  item.description,
-                  style: VFTheme.textStyle(
-                    context,
-                    size: 9,
-                    weight: FontWeight.w500,
-                    color: VFTheme.textMuted,
-                    height: 1.35,
-                  ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -402,17 +462,19 @@ class _ExerciseItem {
     required this.name,
     required this.type,
     required this.description,
+    this.definitionQuery,
   });
 
   final String name;
   final String type;
   final String description;
+  final String? definitionQuery;
 }
 
 const List<_ExerciseCategory> _categories = [
   _ExerciseCategory(
     label: 'AI Form Check',
-    subtitle: 'Camera theo dõi form',
+    subtitle: 'Camera theo doi form',
     color: VFTheme.jade,
     gradient: LinearGradient(
       begin: Alignment.topLeft,
@@ -421,30 +483,45 @@ const List<_ExerciseCategory> _categories = [
     ),
     items: [
       _ExerciseItem(
-          name: 'Squat', type: 'squat', description: 'Đùi · Mông · Cơ bản'),
+        name: 'Squat',
+        type: 'squat',
+        description: 'Dui · Mong · Co ban',
+        definitionQuery: 'squat',
+      ),
       _ExerciseItem(
-          name: 'Lunge', type: 'lunge', description: 'Đùi · Hông · Cơ bản'),
+        name: 'Lunge',
+        type: 'lunge',
+        description: 'Dui · Hong · Co ban',
+        definitionQuery: 'lunge',
+      ),
       _ExerciseItem(
-          name: 'Wall Push-up',
-          type: 'pushup',
-          description: 'Ngực · Vai · Cơ bản'),
+        name: 'Wall Push-up',
+        type: 'pushup',
+        description: 'Nguc · Vai · Co ban',
+      ),
       _ExerciseItem(
-          name: 'Push-up',
-          type: 'pushup',
-          description: 'Ngực · Core · Trung bình'),
+        name: 'Push-up',
+        type: 'pushup',
+        description: 'Nguc · Core · Trung binh',
+        definitionQuery: 'push_up',
+      ),
       _ExerciseItem(
-          name: 'Glute Bridge',
-          type: 'bridge',
-          description: 'Mông · Đùi sau · Cơ bản'),
+        name: 'Glute Bridge',
+        type: 'bridge',
+        description: 'Mong · Dui sau · Co ban',
+        definitionQuery: 'glute_bridge',
+      ),
       _ExerciseItem(
-          name: 'McGill Curl-up',
-          type: 'curlup',
-          description: 'Bụng trước · Cơ bản'),
+        name: 'McGill Curl-up',
+        type: 'curlup',
+        description: 'Bung truoc · Co ban',
+        definitionQuery: 'curl_up',
+      ),
     ],
   ),
   _ExerciseCategory(
-    label: 'Video hướng dẫn',
-    subtitle: 'Xem và tập theo',
+    label: 'Video huong dan',
+    subtitle: 'Xem va tap theo',
     color: VFTheme.blue,
     gradient: LinearGradient(
       begin: Alignment.topLeft,
@@ -453,22 +530,30 @@ const List<_ExerciseCategory> _categories = [
     ),
     items: [
       _ExerciseItem(
-          name: 'Diamond Push-up',
-          type: 'pushup',
-          description: 'Tay sau · Nâng cao'),
+        name: 'Diamond Push-up',
+        type: 'pushup',
+        description: 'Tay sau · Nang cao',
+      ),
       _ExerciseItem(
-          name: 'Pike Push-up', type: 'pushup', description: 'Vai · Nâng cao'),
+        name: 'Pike Push-up',
+        type: 'pushup',
+        description: 'Vai · Nang cao',
+      ),
       _ExerciseItem(
-          name: 'Donkey Kick', type: 'bridge', description: 'Mông · Cơ bản'),
+        name: 'Donkey Kick',
+        type: 'bridge',
+        description: 'Mong · Co ban',
+      ),
       _ExerciseItem(
-          name: 'Single-leg Bridge',
-          type: 'bridge',
-          description: 'Mông · Trung bình'),
+        name: 'Single-leg Bridge',
+        type: 'bridge',
+        description: 'Mong · Trung binh',
+      ),
     ],
   ),
   _ExerciseCategory(
-    label: 'Đếm rep & Đồng hồ',
-    subtitle: 'Tự tập, app đếm giùm',
+    label: 'Dem rep va Dong ho',
+    subtitle: 'Tu tap, app dem giup',
     color: VFTheme.amber,
     gradient: LinearGradient(
       begin: Alignment.topLeft,
@@ -477,19 +562,37 @@ const List<_ExerciseCategory> _categories = [
     ),
     items: [
       _ExerciseItem(
-          name: 'Plank', type: 'plank', description: 'Core · Vai · Timer'),
+        name: 'Plank',
+        type: 'plank',
+        description: 'Core · Vai · Timer',
+        definitionQuery: 'plank',
+      ),
       _ExerciseItem(
-          name: 'Side Plank', type: 'plank', description: 'Core bên · Timer'),
+        name: 'Side Plank',
+        type: 'plank',
+        description: 'Core ben · Timer',
+      ),
       _ExerciseItem(
-          name: 'Jumping Jack', type: 'jump', description: 'Cardio · Đếm rep'),
+        name: 'Jumping Jack',
+        type: 'jump',
+        description: 'Cardio · Dem rep',
+        definitionQuery: 'jumping_jack',
+      ),
       _ExerciseItem(
-          name: 'Mountain Climber',
-          type: 'plank',
-          description: 'Core · Cardio'),
+        name: 'Mountain Climber',
+        type: 'plank',
+        description: 'Core · Cardio',
+      ),
       _ExerciseItem(
-          name: 'Calf Raise', type: 'squat', description: 'Bắp chân · Đếm rep'),
+        name: 'Calf Raise',
+        type: 'squat',
+        description: 'Bap chan · Dem rep',
+      ),
       _ExerciseItem(
-          name: 'Wall Sit', type: 'squat', description: 'Đùi trước · Timer'),
+        name: 'Wall Sit',
+        type: 'squat',
+        description: 'Dui truoc · Timer',
+      ),
     ],
   ),
 ];

@@ -99,7 +99,7 @@ class VinaFitApp extends StatelessWidget {
         behavior: const VFScrollBehavior(),
         child: child ?? const SizedBox.shrink(),
       ),
-      initialRoute: _hasCompletedOnboarding ? '/' : '/onboarding',
+      initialRoute: _hasCompletedOnboarding ? '/' : '/',
       onGenerateRoute: (settings) {
         switch (settings.name) {
           case '/':

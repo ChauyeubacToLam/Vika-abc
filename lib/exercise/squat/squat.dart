@@ -56,6 +56,7 @@ class Squat extends ExerciseBase {
   SquatState squatState = SquatState.standing;
   SquatState previousSquatState = SquatState.standing;
   List<String> lastRepFaultVoiceMessages = [];
+  bool _reachedBottomThisRep = false;
 
   Squat({this.maxRep = SquatConfig.MAX_REP});
 
@@ -280,6 +281,7 @@ class Squat extends ExerciseBase {
     // 4. Debug overlay
     debugData['squatState'] = squatState.name;
     debugData['previousSquatState'] = previousSquatState.name;
+    debugData['reachedBottomThisRep'] = _reachedBottomThisRep;
     debugData['repCount'] = repCount;
     debugData['frameBuffer'] = frameBuffer.frameBuffer.length;
     debugData['kneeAngle'] = kneeAngle.toStringAsFixed(1);
@@ -288,14 +290,7 @@ class Squat extends ExerciseBase {
     debugData['heelDistance'] = heelDistanceToFloor.toStringAsFixed(2);
     debugData['heelLiftPct'] = (normalizedHeelLift * 100).toStringAsFixed(1);
 
-    // 5. Handle rep completion (transition back to standing)
-    if (squatState == SquatState.standing &&
-        previousSquatState != SquatState.standing) {
-      _completeRep(ctx, now);
-      return;
-    }
-
-    // 6. Buffer frame & update state machine
+    // 5. Buffer frame & update state machine
     frameBuffer.addFrame(FrameSnapshot(log: {
       "kneeAngle": kneeAngle,
       "trunkLean": trunkLean,
@@ -303,6 +298,13 @@ class Squat extends ExerciseBase {
     }, timeStamp: now));
 
     _updateStateBuffer(kneeAngle, now);
+
+    // 6. Handle rep completion immediately when the return-to-standing is detected.
+    if (squatState == SquatState.standing &&
+        previousSquatState != SquatState.standing) {
+      _completeRep(ctx);
+      return;
+    }
 
     // 7. Run all metrics (skip standing phase)
     if (squatState != SquatState.standing) {
@@ -321,12 +323,17 @@ class Squat extends ExerciseBase {
 
   // --- Rep Completion ---
 
-  void _completeRep(RepContext ctx, int now) {
+  void _completeRep(RepContext ctx) {
+    final finalState = previousSquatState;
+    final reachedBottom = _reachedBottomThisRep;
     repCount += 1;
 
     // Evaluate final metrics for this rep
-    depthMetric.checkRepCompletion(previousSquatState, ctx);
-    _transitionState(SquatState.standing, now);
+    depthMetric.checkRepCompletion(
+      finalState: finalState,
+      reachedBottom: reachedBottom,
+      ctx: ctx,
+    );
     tempoMetric.evaluateRep(ctx);
 
     // Collect faults from all metrics
@@ -382,6 +389,8 @@ class Squat extends ExerciseBase {
 
     // Reset for next rep
     correctForm = true;
+    _reachedBottomThisRep = false;
+    previousSquatState = SquatState.standing;
     for (final metric in _metrics) {
       metric.resetAndCountFault();
     }
@@ -423,18 +432,21 @@ class Squat extends ExerciseBase {
 
   void _updateStateBuffer(double kneeAngle, int timestampMs) {
     final angleChange = frameBuffer.getAngleChange("kneeAngle");
+    final isDescendingFrame = angleChange == AngleChangeState.decreasing;
+    final isAscendingFrame = angleChange == AngleChangeState.increasing;
 
     // Direction-based transitions
     if (angleChange != AngleChangeState.stable) {
-      final isIncreasing =
-          directionDetection.update(angleChange == AngleChangeState.increasing);
+      final isIncreasing = directionDetection.update(isAscendingFrame);
 
       if (!isIncreasing &&
           squatState == SquatState.standing &&
           kneeAngle < SquatConfig.SQUAT_STAND_ANGLE_THRESHOLD - 5) {
         _transitionState(SquatState.descending, timestampMs);
         frameBuffer.clear();
-      } else if (isIncreasing && squatState == SquatState.bottom) {
+      } else if (isIncreasing &&
+          (squatState == SquatState.bottom ||
+              squatState == SquatState.descending)) {
         _transitionState(SquatState.ascending, timestampMs);
       }
     }
@@ -446,18 +458,25 @@ class Squat extends ExerciseBase {
       _transitionState(SquatState.bottom, timestampMs);
     } else if (_standingDebouncer.update(
         kneeAngle > SquatConfig.SQUAT_STAND_ANGLE_THRESHOLD &&
-            (squatState == SquatState.ascending ||
-                squatState == SquatState.descending))) {
+            squatState == SquatState.ascending &&
+            !isDescendingFrame)) {
       _transitionState(SquatState.standing, timestampMs);
     }
   }
 
   void _transitionState(SquatState newState, int timestampMs) {
+    if (newState == squatState) {
+      return;
+    }
+
     previousSquatState = squatState;
     squatState = newState;
 
     if (newState == SquatState.descending) {
+      _reachedBottomThisRep = false;
       resultIssues.instructions.clear();
+    } else if (newState == SquatState.bottom) {
+      _reachedBottomThisRep = true;
     }
 
     for (final metric in _metrics) {
