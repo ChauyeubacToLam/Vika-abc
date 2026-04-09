@@ -1,4 +1,4 @@
-﻿// ignore_for_file: constant_identifier_names
+// ignore_for_file: constant_identifier_names
 
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:vinafit_mobile/utils/debouncer.dart';
@@ -207,7 +207,13 @@ abstract class ExerciseBase {
 
     if (exerciseState == ExerciseState.activated) {
       checkingPose(smoothedLandmarks);
-      return getRepCountAndFeedback();
+      if (exerciseState == ExerciseState.activated && requestStop()) {
+        exerciseState = ExerciseState.completed;
+        onSetComplete();
+      }
+      return exerciseState == ExerciseState.completed
+          ? getSetFeedback()
+          : getRepCountAndFeedback();
     } else if (exerciseState == ExerciseState.completed) {
       return getSetFeedback();
     }

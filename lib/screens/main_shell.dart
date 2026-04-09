@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../services/user_program_service.dart';
 import '../theme/vf_theme.dart';
 import '../widgets/vf_primitives.dart';
+import '../models/exercise_definition.dart';
 import 'dashboard_home_screen.dart';
 import 'exercise_browser.dart';
 import 'plan_screen.dart';
@@ -38,9 +39,9 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
     final bottomInset = mediaQuery.padding.bottom;
-    const navHeight = VFTheme.navHeight;
     final s = VFTheme.scale(context);
-    final contentBottomPadding = navHeight + bottomInset + 26 * s;
+    final navBarHeight = VFTheme.navHeight + 8 * s;
+    final contentBottomPadding = navBarHeight + bottomInset + 20 * s;
 
     final screens = [
       DashboardHomeScreen(
@@ -88,7 +89,7 @@ class _MainShellState extends State<MainShell> {
                     child: ExerciseBrowser(
                       bottomPadding: contentBottomPadding,
                       onClose: _toggleBrowser,
-                      onSelectExercise: (_) {},
+                      onSelectExercise: _openExerciseFromBrowser,
                     ),
                   ),
                 ),
@@ -115,6 +116,11 @@ class _MainShellState extends State<MainShell> {
   void _toggleBrowser() {
     setState(() => _browserOpen = !_browserOpen);
   }
+
+  void _openExerciseFromBrowser(ExerciseDefinition definition) {
+    setState(() => _browserOpen = false);
+    Navigator.of(context).pushNamed('/exercise', arguments: definition);
+  }
 }
 
 class _BottomNavBar extends StatelessWidget {
@@ -140,10 +146,11 @@ class _BottomNavBar extends StatelessWidget {
       sigma: 28,
       decoration: VFTheme.navDecoration(),
       child: SizedBox(
-        height: VFTheme.navHeight + bottomInset,
+        height: navBarHeight + bottomInset,
         child: Padding(
           padding: EdgeInsets.fromLTRB(8 * s, 0, 8 * s, bottomInset),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
                 child: _NavItem(

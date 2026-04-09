@@ -1,215 +1,111 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
-import '../../exercise/squat/squat.dart';
-import '../../utils/exercise_logger.dart';
-import '../onboarding/vf_theme.dart';
-import 'widgets/issue_question.dart';
-import 'widgets/shareable_card.dart';
+import '../../interpreter/interpreter_base.dart';
+import '../../models/post_exercise_data.dart';
+import '../../theme/vf_theme.dart';
+import 'widgets/form_score_arc.dart';
 
 class ExecutiveSummaryPage extends StatefulWidget {
   const ExecutiveSummaryPage({
     super.key,
-    required this.exerciseName,
-    required this.setLoggers,
+    required this.report,
+    required this.calories,
+    required this.userWeightKg,
     required this.totalDuration,
     required this.onDone,
-    this.onIssueAnswersChanged,
+    this.percentile,
+    this.vsLastWeekPct,
   });
 
-  final String exerciseName;
-  final List<ExerciseLogger> setLoggers;
+  final PostExerciseData report;
+  final int calories;
+  final double userWeightKg;
   final Duration totalDuration;
   final VoidCallback onDone;
-  final ValueChanged<Map<String, String>>? onIssueAnswersChanged;
+  final int? percentile;
+  final int? vsLastWeekPct;
 
   @override
   State<ExecutiveSummaryPage> createState() => _ExecutiveSummaryPageState();
 }
 
 class _ExecutiveSummaryPageState extends State<ExecutiveSummaryPage> {
-  final GlobalKey _shareBoundaryKey = GlobalKey();
-  final Map<String, String> _answers = {};
+  final GlobalKey<_DetailSectionState> _detailKey =
+      GlobalKey<_DetailSectionState>();
 
   @override
   Widget build(BuildContext context) {
-    final summary = _ExecutiveSummaryData.fromLoggers(
-      exerciseName: widget.exerciseName,
-      loggers: widget.setLoggers,
-      totalDuration: widget.totalDuration,
-    );
-    final media = MediaQuery.of(context);
+    final s = VFTheme.scale(context);
 
     return Container(
-      color: VF.bg,
+      color: const Color(0xFFF0EDE6),
       child: SafeArea(
         child: SingleChildScrollView(
-          padding: EdgeInsets.only(bottom: media.padding.bottom + 24),
+          padding: EdgeInsets.fromLTRB(16 * s, 16 * s, 16 * s, 28 * s),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 10, 24, 0),
-                child: Row(
-                  children: [
-                    const Text(
-                      'HOÀN THÀNH BÀI TẬP',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.5,
-                        color: VF.textMuted,
-                      ),
+              Text(
+                'TỔNG KẾT BUỔI TẬP',
+                style: VFTheme.textStyle(
+                  context,
+                  size: 11,
+                  weight: FontWeight.w800,
+                  color: const Color(0xFF9C9B94),
+                  letterSpacing: 1.4,
+                ),
+              ),
+              SizedBox(height: 12 * s),
+              _ShareableCard(
+                report: widget.report,
+                calories: widget.calories,
+                totalDuration: widget.totalDuration,
+                percentile: widget.percentile,
+                vsLastWeekPct: widget.vsLastWeekPct,
+                isShareable: false,
+                onOpenDetails: () {
+                  _detailKey.currentState?.expandAndReveal();
+                },
+              ),
+              SizedBox(height: 18 * s),
+              _SectionCard(
+                child: _SetQualitySection(setScores: widget.report.setScores),
+              ),
+              SizedBox(height: 14 * s),
+              _CoachCard(text: widget.report.coachText),
+              if (widget.report.issueQuestion != null) ...[
+                SizedBox(height: 14 * s),
+                _IssueQuestionCard(issue: widget.report.issueQuestion!),
+              ],
+              SizedBox(height: 14 * s),
+              _DetailSection(
+                key: _detailKey,
+                cards: widget.report.detailCards,
+                calories: widget.calories,
+              ),
+              SizedBox(height: 18 * s),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: widget.onDone,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF18594A),
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(vertical: 16 * s),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14 * s),
                     ),
-                    const Spacer(),
-                    GestureDetector(
-                      onTap: widget.onDone,
-                      child: Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: VF.surface,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: VF.border),
-                        ),
-                        child: const Icon(
-                          Icons.close_rounded,
-                          size: 16,
-                          color: VF.textMuted,
-                        ),
-                      ),
+                  ),
+                  child: Text(
+                    'Hoàn tất',
+                    style: VFTheme.textStyle(
+                      context,
+                      size: 15,
+                      weight: FontWeight.w800,
+                      color: Colors.white,
                     ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-                child: ShareableCard(
-                  boundaryKey: _shareBoundaryKey,
-                  formScore: summary.formScore,
-                  exerciseName: widget.exerciseName,
-                  dateText: summary.dateText,
-                  metaLine: summary.metaLine,
-                  winMessage: summary.winMessage,
-                  setScores: summary.setScores,
-                ),
-              ),
-              Container(
-                height: 20,
-                margin: const EdgeInsets.symmetric(horizontal: 14),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      VF.accentSoft.withValues(alpha: 0.32),
-                      Colors.transparent,
-                    ],
-                  ),
-                  borderRadius: const BorderRadius.vertical(
-                    bottom: Radius.circular(20),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(22, 0, 22, 0),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 28,
-                      height: 28,
-                      decoration: const BoxDecoration(
-                        color: VF.accentSoft,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.check_rounded,
-                        size: 14,
-                        color: VF.accent,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'HLV AI của bạn',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: VF.text,
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(22, 12, 22, 0),
-                child: RichText(
-                  text: TextSpan(
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      color: VF.textSec,
-                      height: 1.7,
-                    ),
-                    children: summary.coachSpans,
-                  ),
-                ),
-              ),
-              if (summary.issues.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-                  child: Column(
-                    children: summary.issues.map((issue) {
-                      return Padding(
-                        padding: EdgeInsets.only(
-                          bottom: issue == summary.issues.last ? 0 : 10,
-                        ),
-                        child: IssueQuestion(
-                          observation: issue.observation,
-                          question: issue.question,
-                          value: _answers[issue.key],
-                          onChanged: (value) {
-                            setState(() {
-                              _answers[issue.key] = value;
-                            });
-                            widget.onIssueAnswersChanged?.call(_answers);
-                          },
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 20, 18, 0),
-                child: const Text(
-                  'CHI TIẾT BÀI TẬP',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.5,
-                    color: VF.textMuted,
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: summary.metricCards.map((card) {
-                    return FractionallySizedBox(
-                      widthFactor: 0.5,
-                      child: _SummaryMetricCard(card: card),
-                    );
-                  }).toList(),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: VFButton(
-                    label: 'Hoàn tất',
-                    onTap: widget.onDone,
                   ),
                 ),
               ),
@@ -221,274 +117,317 @@ class _ExecutiveSummaryPageState extends State<ExecutiveSummaryPage> {
   }
 }
 
-class _IssueData {
-  const _IssueData({
-    required this.key,
-    required this.observation,
-    required this.question,
+class _ShareableCard extends StatelessWidget {
+  const _ShareableCard({
+    required this.report,
+    required this.calories,
+    required this.totalDuration,
+    required this.onOpenDetails,
+    this.percentile,
+    this.vsLastWeekPct,
+    this.isShareable = false,
   });
 
-  final String key;
-  final String observation;
-  final String question;
-}
-
-class _MetricCardData {
-  const _MetricCardData({
-    required this.value,
-    required this.label,
-    required this.color,
-  });
-
-  final String value;
-  final String label;
-  final Color color;
-}
-
-class _ExecutiveSummaryData {
-  _ExecutiveSummaryData({
-    required this.formScore,
-    required this.setScores,
-    required this.winMessage,
-    required this.dateText,
-    required this.metaLine,
-    required this.coachSpans,
-    required this.issues,
-    required this.metricCards,
-  });
-
-  final int formScore;
-  final List<int> setScores;
-  final String winMessage;
-  final String dateText;
-  final String metaLine;
-  final List<InlineSpan> coachSpans;
-  final List<_IssueData> issues;
-  final List<_MetricCardData> metricCards;
-
-  factory _ExecutiveSummaryData.fromLoggers({
-    required String exerciseName,
-    required List<ExerciseLogger> loggers,
-    required Duration totalDuration,
-  }) {
-    final allReps = loggers.expand((logger) => logger.repLogs).toList();
-    final totalReps = allReps.length;
-    final totalGood = allReps.where((rep) => rep.correctForm).length;
-    final formScore =
-        totalReps == 0 ? 0 : ((totalGood / totalReps) * 100).round();
-    final setScores = loggers.map((logger) {
-      final reps = logger.repLogs;
-      if (reps.isEmpty) {
-        return 0;
-      }
-      final good = (logger.setLogs['good_rep_count'] as num?)?.toInt() ??
-          reps.where((rep) => rep.correctForm).length;
-      return ((good / reps.length) * 100).round();
-    }).toList();
-
-    final improved = setScores.isNotEmpty && setScores.last >= setScores.first;
-    final winMessage = improved
-        ? 'Form cải thiện rõ rệt từ set đầu đến set cuối'
-        : 'Giữ form ổn định xuyên suốt buổi tập';
-    final dateText = _formatDate(DateTime.now());
-    final metaLine =
-        '${loggers.length} sets · $totalReps reps · ${_formatDuration(totalDuration)}';
-
-    final heelFailTotal = loggers.fold<int>(
-      0,
-      (sum, logger) =>
-          sum +
-          ((logger.setLogs['heel_fails'] as num?)?.toInt() ??
-              (logger.setLogs['heel_fails_count'] as num?)?.toInt() ??
-              0),
-    );
-    final shallowReps = allReps.where((rep) {
-      final depth = (rep.data['peak_knee_angle'] as num?)?.toDouble();
-      return depth != null &&
-          depth > SquatConfig.SQUAT_BOTTOM_ANGLE_THRESHOLD[1];
-    }).length;
-
-    final issues = <_IssueData>[
-      if (heelFailTotal > 0)
-        const _IssueData(
-          key: 'heel',
-          observation: 'AI nhận thấy gót chân nâng lên ở set đầu',
-          question:
-              'Bạn có cảm thấy căng hoặc khó chịu ở mắt cá chân khi ngồi xổm không?',
-        ),
-      if (shallowReps > 2)
-        _IssueData(
-          key: 'depth',
-          observation: '$shallowReps rep chưa đạt depth mục tiêu',
-          question:
-              'Bạn có thể ngồi xổm sâu thoải mái mà không mất thăng bằng không?',
-        ),
-    ];
-
-    final setDepths = loggers.map((logger) {
-      final reps = logger.repLogs
-          .map((rep) => (rep.data['peak_knee_angle'] as num?)?.toDouble() ?? 0)
-          .where((value) => value > 0)
-          .toList();
-      if (reps.isEmpty) {
-        return 0.0;
-      }
-      return reps.reduce((a, b) => a + b) / reps.length;
-    }).toList();
-    final allDepths = allReps
-        .map((rep) => (rep.data['peak_knee_angle'] as num?)?.toDouble() ?? 0)
-        .where((value) => value > 0)
-        .toList();
-    final bestDepth = allDepths.isEmpty
-        ? 0
-        : allDepths.reduce((a, b) => a < b ? a : b).round();
-    final avgTempo = _avgTempo(allReps);
-    final depthTrendText = setDepths.length >= 2
-        ? '${setDepths.first.round()}° → ${setDepths.last.round()}°'
-        : '${setDepths.firstOrNull?.round() ?? 0}°';
-
-    final coachSpans = <InlineSpan>[
-      const TextSpan(text: 'Form của bạn '),
-      TextSpan(
-        text: improved ? 'cải thiện rõ rệt' : 'đã giữ khá ổn định',
-        style: const TextStyle(
-          fontWeight: FontWeight.w800,
-          color: VF.text,
-        ),
-      ),
-      TextSpan(
-        text:
-            ' qua ${loggers.length} set. Nhịp tập dần đều hơn và depth ${improved ? 'ổn định hơn' : 'được duy trì khá tốt'}. ',
-      ),
-      if (heelFailTotal > 0)
-        const TextSpan(
-          text:
-              'Gót chân chỉ còn nhấc nhẹ ở giai đoạn đầu, cho thấy khả năng kiểm soát đã tốt hơn. ',
-          style: TextStyle(
-            fontWeight: FontWeight.w700,
-            color: VF.accent,
-          ),
-        ),
-      const TextSpan(
-        text:
-            'Buổi tới hãy tiếp tục hạ chậm và giữ đáy lâu hơn một nhịp để khóa form chắc hơn.',
-      ),
-    ];
-
-    final metricCards = [
-      _MetricCardData(
-        value: depthTrendText,
-        label: 'Depth cải thiện',
-        color: VF.accent,
-      ),
-      _MetricCardData(
-        value: '${avgTempo.toStringAsFixed(1)}s TB',
-        label: 'Nhịp kiểm soát',
-        color: VF.blue,
-      ),
-      _MetricCardData(
-        value: '$totalGood/$totalReps',
-        label: 'Reps đúng form',
-        color: VF.text,
-      ),
-      _MetricCardData(
-        value: '$bestDepth°',
-        label: 'Depth tốt nhất',
-        color: VF.text,
-      ),
-    ];
-
-    return _ExecutiveSummaryData(
-      formScore: formScore,
-      setScores: setScores,
-      winMessage: winMessage,
-      dateText: dateText,
-      metaLine: metaLine,
-      coachSpans: coachSpans,
-      issues: issues,
-      metricCards: metricCards,
-    );
-  }
-
-  static String _formatDate(DateTime date) {
-    const months = [
-      'Tháng 1',
-      'Tháng 2',
-      'Tháng 3',
-      'Tháng 4',
-      'Tháng 5',
-      'Tháng 6',
-      'Tháng 7',
-      'Tháng 8',
-      'Tháng 9',
-      'Tháng 10',
-      'Tháng 11',
-      'Tháng 12',
-    ];
-    return '${date.day} ${months[date.month - 1]}';
-  }
-
-  static String _formatDuration(Duration duration) {
-    final minutes = duration.inMinutes;
-    final seconds = duration.inSeconds % 60;
-    return '$minutes:${seconds.toString().padLeft(2, '0')}';
-  }
-
-  static double _avgTempo(List<RepLog> reps) {
-    final values = reps
-        .map((rep) {
-          final tempo = rep.data['tempo'];
-          if (tempo is num) {
-            return tempo.toDouble();
-          }
-          final down = (rep.data['descending_time'] as num?)?.toDouble() ?? 0;
-          final up = (rep.data['ascending_time'] as num?)?.toDouble() ?? 0;
-          return down + up;
-        })
-        .where((value) => value > 0)
-        .toList();
-    if (values.isEmpty) {
-      return 0;
-    }
-    return values.reduce((a, b) => a + b) / values.length;
-  }
-}
-
-class _SummaryMetricCard extends StatelessWidget {
-  const _SummaryMetricCard({required this.card});
-
-  final _MetricCardData card;
+  final PostExerciseData report;
+  final int calories;
+  final Duration totalDuration;
+  final VoidCallback onOpenDetails;
+  final int? percentile;
+  final int? vsLastWeekPct;
+  final bool isShareable;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 96),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: VF.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: VF.border),
+    final s = VFTheme.scale(context);
+    final accent = _accent(report.formScore);
+    final durationMinutes =
+        totalDuration.inMinutes > 0 ? totalDuration.inMinutes : 1;
+    final stats =
+        <({IconData icon, String value, String unit, double progress})>[
+      (
+        icon: Icons.local_fire_department_rounded,
+        value: '$calories',
+        unit: 'kcal',
+        progress: (calories / 80).clamp(0.0, 1.0),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
+      (
+        icon: Icons.schedule_rounded,
+        value: '$durationMinutes',
+        unit: 'phút',
+        progress: (durationMinutes / 20).clamp(0.0, 1.0),
+      ),
+      (
+        icon: Icons.fitness_center_rounded,
+        value: '${report.totalReps}',
+        unit: 'reps',
+        progress: (report.totalReps / 24).clamp(0.0, 1.0),
+      ),
+      (
+        icon: Icons.bar_chart_rounded,
+        value: '${report.sets.length}',
+        unit: 'sets',
+        progress: (report.sets.length / 5).clamp(0.0, 1.0),
+      ),
+    ];
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24 * s),
+      child: Stack(
         children: [
-          Text(
-            card.value,
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              color: card.color,
-              letterSpacing: -1,
+          Container(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF09120F),
+                  Color(0xFF10211B),
+                  Color(0xFF183128)
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0F3D33).withValues(alpha: 0.18),
+                  blurRadius: 28 * s,
+                  offset: Offset(0, 18 * s),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            card.label,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: card.color == VF.text ? VF.textMuted : card.color,
+            child: Stack(
+              children: [
+                Positioned.fill(child: CustomPaint(painter: _GrainPainter())),
+                Positioned(
+                  top: -24 * s,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Container(
+                      width: 220 * s,
+                      height: 220 * s,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            accent.withValues(alpha: 0.22),
+                            accent.withValues(alpha: 0.05),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(22 * s, 22 * s, 22 * s, 20 * s),
+                  child: Column(
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('VINAFIT',
+                                    style: VFTheme.textStyle(context,
+                                        size: 10,
+                                        weight: FontWeight.w900,
+                                        color: Colors.white
+                                            .withValues(alpha: 0.22),
+                                        letterSpacing: 3.8)),
+                                SizedBox(height: 6 * s),
+                                Text(report.exerciseName,
+                                    style: VFTheme.textStyle(context,
+                                        size: 20,
+                                        weight: FontWeight.w800,
+                                        color: Colors.white,
+                                        letterSpacing: -0.4)),
+                                SizedBox(height: 2 * s),
+                                Text(_formatDate(DateTime.now()),
+                                    style: VFTheme.textStyle(context,
+                                        size: 11,
+                                        weight: FontWeight.w600,
+                                        color: Colors.white
+                                            .withValues(alpha: 0.46))),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 10 * s, vertical: 7 * s),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.06)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.local_fire_department_rounded,
+                                    size: 14 * s, color: accent),
+                                SizedBox(width: 4 * s),
+                                Text('4',
+                                    style: VFTheme.textStyle(context,
+                                        size: 11,
+                                        weight: FontWeight.w800,
+                                        color: Colors.white
+                                            .withValues(alpha: 0.86))),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 22 * s),
+                      FormScoreArc(
+                        progress: report.formScore / 100,
+                        size: 176 * s,
+                        color: accent,
+                        trackColor: Colors.white.withValues(alpha: 0.05),
+                        strokeWidth: 7 * s,
+                        glow: true,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text('${report.formScore}',
+                                style: VFTheme.textStyle(context,
+                                    size: 58,
+                                    weight: FontWeight.w800,
+                                    color: Colors.white,
+                                    letterSpacing: -2.6)),
+                            SizedBox(height: 8 * s),
+                            Text('FORM SCORE',
+                                style: VFTheme.textStyle(context,
+                                    size: 9,
+                                    weight: FontWeight.w800,
+                                    color: Colors.white.withValues(alpha: 0.24),
+                                    letterSpacing: 3)),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: 18 * s),
+                      Text(_winMessage(report.formScore),
+                          textAlign: TextAlign.center,
+                          style: VFTheme.textStyle(context,
+                              size: 16,
+                              weight: FontWeight.w800,
+                              color: accent,
+                              height: 1.35)),
+                      if (percentile != null)
+                        Text('Top $percentile% người dùng',
+                            textAlign: TextAlign.center,
+                            style: VFTheme.textStyle(context,
+                                size: 16,
+                                weight: FontWeight.w800,
+                                color: accent,
+                                height: 1.35)),
+                      if (vsLastWeekPct != null) ...[
+                        SizedBox(height: 6 * s),
+                        RichText(
+                          text: TextSpan(
+                            children: [
+                              TextSpan(
+                                  text:
+                                      '${vsLastWeekPct! > 0 ? '+' : ''}$vsLastWeekPct%',
+                                  style: VFTheme.textStyle(context,
+                                      size: 12,
+                                      weight: FontWeight.w700,
+                                      color: accent)),
+                              TextSpan(
+                                  text: ' so với tuần trước',
+                                  style: VFTheme.textStyle(context,
+                                      size: 12,
+                                      weight: FontWeight.w700,
+                                      color: Colors.white
+                                          .withValues(alpha: 0.40))),
+                            ],
+                          ),
+                        ),
+                      ],
+                      SizedBox(height: 20 * s),
+                      Container(
+                        padding: EdgeInsets.symmetric(vertical: 16 * s),
+                        decoration: BoxDecoration(
+                            border: Border(
+                                top: BorderSide(
+                                    color:
+                                        Colors.white.withValues(alpha: 0.06)))),
+                        child: Row(
+                          children: stats
+                              .map(
+                                (item) => Expanded(
+                                  child: _ShareStat(
+                                    icon: item.icon,
+                                    value: item.value,
+                                    unit: item.unit,
+                                    progress: item.progress,
+                                    accent: accent,
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ),
+                      SizedBox(height: 2 * s),
+                      Row(
+                          children: report.setScores
+                              .asMap()
+                              .entries
+                              .map((entry) => Expanded(
+                                  child: Padding(
+                                      padding: EdgeInsets.only(
+                                          right: entry.key ==
+                                                  report.setScores.length - 1
+                                              ? 0
+                                              : 6 * s),
+                                      child: _SetStrip(score: entry.value))))
+                              .toList()),
+                      SizedBox(height: 18 * s),
+                      if (!isShareable) ...[
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                            onPressed: () => ScaffoldMessenger.of(context)
+                                .showSnackBar(const SnackBar(
+                                    content: Text(
+                                        'Tính năng chia sẻ card sẽ được bật ở bản sau.'))),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: accent,
+                              foregroundColor: Colors.black,
+                              padding: EdgeInsets.symmetric(vertical: 13 * s),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14 * s)),
+                            ),
+                            child: Text('Chia sẻ kết quả',
+                                style: VFTheme.textStyle(context,
+                                    size: 13,
+                                    weight: FontWeight.w800,
+                                    color: Colors.black)),
+                          ),
+                        ),
+                        SizedBox(height: 10 * s),
+                        GestureDetector(
+                          onTap: onOpenDetails,
+                          child: Text('Xem chi tiết buổi tập →',
+                              style: VFTheme.textStyle(context,
+                                  size: 11,
+                                  weight: FontWeight.w700,
+                                  color: Colors.white.withValues(alpha: 0.46))),
+                        ),
+                      ] else
+                        Padding(
+                          padding: EdgeInsets.only(top: 4 * s),
+                          child: Text('VINAFIT.APP',
+                              style: VFTheme.textStyle(context,
+                                  size: 8,
+                                  weight: FontWeight.w800,
+                                  color: Colors.white.withValues(alpha: 0.20),
+                                  letterSpacing: 2.4)),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -497,6 +436,690 @@ class _SummaryMetricCard extends StatelessWidget {
   }
 }
 
-extension<T> on List<T> {
-  T? get firstOrNull => isEmpty ? null : first;
+class _ShareStat extends StatelessWidget {
+  const _ShareStat({
+    required this.icon,
+    required this.value,
+    required this.unit,
+    required this.progress,
+    required this.accent,
+  });
+
+  final IconData icon;
+  final String value;
+  final String unit;
+  final double progress;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = VFTheme.scale(context);
+    return Column(
+      children: [
+        Icon(icon, size: 16 * s, color: accent.withValues(alpha: 0.88)),
+        SizedBox(height: 6 * s),
+        Text(value,
+            style: VFTheme.textStyle(context,
+                size: 17, weight: FontWeight.w800, color: Colors.white)),
+        SizedBox(height: 2 * s),
+        Text(unit,
+            style: VFTheme.textStyle(context,
+                size: 8,
+                weight: FontWeight.w700,
+                color: Colors.white.withValues(alpha: 0.30),
+                letterSpacing: 0.3)),
+        SizedBox(height: 8 * s),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: Container(
+            height: 3 * s,
+            color: Colors.white.withValues(alpha: 0.06),
+            child: FractionallySizedBox(
+              widthFactor: progress,
+              alignment: Alignment.centerLeft,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.82),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SetStrip extends StatelessWidget {
+  const _SetStrip({required this.score});
+
+  final int score;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = VFTheme.scale(context);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        height: 6 * s,
+        color: Colors.white.withValues(alpha: 0.06),
+        child: FractionallySizedBox(
+          widthFactor: (score / 100).clamp(0.0, 1.0),
+          alignment: Alignment.centerLeft,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: _accent(score),
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = VFTheme.scale(context);
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(16 * s),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16 * s),
+        border: Border.all(color: const Color(0xFFE5E2DB)),
+        boxShadow: VFTheme.cardShadow,
+      ),
+      child: child,
+    );
+  }
+}
+
+class _SetQualitySection extends StatelessWidget {
+  const _SetQualitySection({required this.setScores});
+
+  final List<int> setScores;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = VFTheme.scale(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('FORM QUALITY TỪNG SET',
+            style: VFTheme.textStyle(context,
+                size: 10,
+                weight: FontWeight.w800,
+                color: const Color(0xFF9C9B94),
+                letterSpacing: 1.2)),
+        SizedBox(height: 14 * s),
+        for (int i = 0; i < setScores.length; i++) ...[
+          Row(
+            children: [
+              SizedBox(
+                  width: 46 * s,
+                  child: Text('Set ${i + 1}',
+                      style: VFTheme.textStyle(context,
+                          size: 12,
+                          weight: FontWeight.w700,
+                          color: const Color(0xFF5A5A52)))),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: Container(
+                    height: 10 * s,
+                    color: const Color(0xFFE8E4DD),
+                    child: FractionallySizedBox(
+                      widthFactor: (setScores[i] / 100).clamp(0.0, 1.0),
+                      alignment: Alignment.centerLeft,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: _accent(setScores[i]),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(width: 10 * s),
+              Text('${setScores[i]}%',
+                  style: VFTheme.textStyle(context,
+                      size: 12,
+                      weight: FontWeight.w800,
+                      color: _accent(setScores[i]))),
+            ],
+          ),
+          if (i != setScores.length - 1) SizedBox(height: 12 * s),
+        ],
+      ],
+    );
+  }
+}
+
+class _CoachCard extends StatelessWidget {
+  const _CoachCard({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = VFTheme.scale(context);
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(16 * s),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8F0ED),
+        borderRadius: BorderRadius.circular(16 * s),
+        border: Border.all(color: const Color(0xFFD7E2DE)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 9 * s, vertical: 5 * s),
+            decoration: BoxDecoration(
+              color: const Color(0xFF18594A),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text('AI',
+                style: VFTheme.textStyle(context,
+                    size: 10,
+                    weight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: 0.8)),
+          ),
+          SizedBox(height: 10 * s),
+          Text(text,
+              style: VFTheme.textStyle(context,
+                  size: 14,
+                  weight: FontWeight.w600,
+                  color: const Color(0xFF0F3D33),
+                  height: 1.5)),
+        ],
+      ),
+    );
+  }
+}
+
+class _IssueQuestionCard extends StatefulWidget {
+  const _IssueQuestionCard({required this.issue});
+
+  final DetectedEvidence issue;
+
+  @override
+  State<_IssueQuestionCard> createState() => _IssueQuestionCardState();
+}
+
+class _IssueQuestionCardState extends State<_IssueQuestionCard> {
+  String? _answer;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = VFTheme.scale(context);
+    Widget answerButton(String label, String value) {
+      final selected = _answer == value;
+      return Expanded(
+        child: InkWell(
+          onTap: () => setState(() => _answer = value),
+          borderRadius: BorderRadius.circular(12 * s),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: EdgeInsets.symmetric(vertical: 12 * s),
+            decoration: BoxDecoration(
+              color: selected ? const Color(0xFFC4841D) : Colors.white,
+              borderRadius: BorderRadius.circular(12 * s),
+              border: Border.all(
+                  color: selected
+                      ? const Color(0xFFC4841D)
+                      : const Color(0xFFE8D4A7)),
+            ),
+            alignment: Alignment.center,
+            child: Text(label,
+                style: VFTheme.textStyle(context,
+                    size: 13,
+                    weight: FontWeight.w800,
+                    color: selected ? Colors.white : const Color(0xFFC4841D))),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(16 * s),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF5E4),
+        borderRadius: BorderRadius.circular(16 * s),
+        border: Border.all(color: const Color(0xFFE8D4A7)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(_issueObservation(widget.issue),
+              style: VFTheme.textStyle(context,
+                  size: 12,
+                  weight: FontWeight.w800,
+                  color: const Color(0xFFC4841D))),
+          SizedBox(height: 6 * s),
+          Text(widget.issue.question,
+              style: VFTheme.textStyle(context,
+                  size: 14,
+                  weight: FontWeight.w700,
+                  color: const Color(0xFF1A1A1A),
+                  height: 1.45)),
+          SizedBox(height: 12 * s),
+          Row(children: [
+            answerButton('Có', 'yes'),
+            SizedBox(width: 8 * s),
+            answerButton('Không', 'no')
+          ]),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailSection extends StatefulWidget {
+  const _DetailSection({
+    super.key,
+    required this.cards,
+    required this.calories,
+  });
+
+  final List<DetailCard> cards;
+  final int calories;
+
+  @override
+  State<_DetailSection> createState() => _DetailSectionState();
+}
+
+class _DetailSectionState extends State<_DetailSection> {
+  final GlobalKey _contentAnchorKey = GlobalKey();
+  bool _expanded = false;
+
+  void expand() {
+    if (_expanded) return;
+    setState(() => _expanded = true);
+  }
+
+  void expandAndReveal() {
+    void reveal() {
+      final anchorContext = _contentAnchorKey.currentContext;
+      if (anchorContext == null) return;
+      Scrollable.ensureVisible(
+        anchorContext,
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeOutCubic,
+        alignment: 0.06,
+      );
+    }
+
+    if (_expanded) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => reveal());
+      return;
+    }
+
+    setState(() => _expanded = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      reveal();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = VFTheme.scale(context);
+    return _SectionCard(
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () => setState(() => _expanded = !_expanded),
+            borderRadius: BorderRadius.circular(12 * s),
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 2 * s),
+              child: Row(
+                children: [
+                  Text('Chi tiết buổi tập',
+                      style: VFTheme.textStyle(context,
+                          size: 15,
+                          weight: FontWeight.w800,
+                          color: const Color(0xFF1A1A1A))),
+                  const Spacer(),
+                  Icon(
+                      _expanded
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      color: const Color(0xFF9C9B94)),
+                ],
+              ),
+            ),
+          ),
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 220),
+            crossFadeState: _expanded
+                ? CrossFadeState.showFirst
+                : CrossFadeState.showSecond,
+            firstChild: LayoutBuilder(
+              builder: (context, constraints) {
+                final itemWidth = (constraints.maxWidth - (12 * s)) / 2;
+                final tiles = <Widget>[
+                  ...widget.cards.map((card) => _DetailTile(card: card)),
+                  _CaloriesTile(calories: widget.calories),
+                ];
+                return Padding(
+                  key: _contentAnchorKey,
+                  padding: EdgeInsets.only(top: 14 * s),
+                  child: Wrap(
+                    spacing: 12 * s,
+                    runSpacing: 12 * s,
+                    children: tiles
+                        .map((tile) => SizedBox(width: itemWidth, child: tile))
+                        .toList(),
+                  ),
+                );
+              },
+            ),
+            secondChild: const SizedBox.shrink(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailTile extends StatelessWidget {
+  const _DetailTile({required this.card});
+
+  final DetailCard card;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = VFTheme.scale(context);
+    final tone = _detailTone(card.color);
+    return Container(
+      constraints: BoxConstraints(minHeight: 176 * s),
+      padding: EdgeInsets.all(14 * s),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14 * s),
+        border: Border.all(color: const Color(0xFFE5E2DB)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(card.label,
+                  style: VFTheme.textStyle(context,
+                      size: 11,
+                      weight: FontWeight.w700,
+                      color: const Color(0xFF9C9B94))),
+              SizedBox(height: 8 * s),
+              Text(card.value,
+                  style: VFTheme.textStyle(context,
+                      size: 24,
+                      weight: FontWeight.w900,
+                      color: tone,
+                      letterSpacing: -0.8)),
+              if ((card.subLabel ?? '').isNotEmpty) ...[
+                SizedBox(height: 4 * s),
+                Text(card.subLabel!,
+                    style: VFTheme.textStyle(context,
+                        size: 11,
+                        weight: FontWeight.w600,
+                        color: const Color(0xFF5A5A52))),
+              ],
+            ],
+          ),
+          SizedBox(height: 14 * s),
+          if (card.useRadial)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FormScoreArc(
+                progress: ((card.radialValue ?? 0) / 100).clamp(0.0, 1.0),
+                size: 56 * s,
+                color: tone,
+                trackColor: tone.withValues(alpha: 0.14),
+                strokeWidth: 5 * s,
+                child: Text('${(card.radialValue ?? 0).round()}',
+                    style: VFTheme.textStyle(context,
+                        size: 10, weight: FontWeight.w800, color: tone)),
+              ),
+            )
+          else if ((card.miniBarValues ?? const <double>[]).isNotEmpty)
+            SizedBox(
+              height: 56 * s,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: card.miniBarValues!.asMap().entries.map((entry) {
+                  final max = card.miniBarMax == null || card.miniBarMax == 0
+                      ? 1.0
+                      : card.miniBarMax!;
+                  final ratio = (entry.value / max).clamp(0.0, 1.0);
+                  final height = (card.lowerIsBetter ? (1 - ratio) : ratio)
+                      .clamp(0.12, 1.0);
+                  return Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(
+                          right: entry.key == card.miniBarValues!.length - 1
+                              ? 0
+                              : 5 * s),
+                      child: Align(
+                        alignment: Alignment.bottomCenter,
+                        child: Container(
+                          height: 56 * s * height,
+                          decoration: BoxDecoration(
+                              color: tone,
+                              borderRadius: BorderRadius.circular(999)),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            )
+          else
+            Container(
+              height: 10 * s,
+              decoration: BoxDecoration(
+                color: tone.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CaloriesTile extends StatelessWidget {
+  const _CaloriesTile({required this.calories});
+
+  final int calories;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = VFTheme.scale(context);
+    final fill = (calories / 90).clamp(0.0, 1.0);
+    return Container(
+      constraints: BoxConstraints(minHeight: 176 * s),
+      padding: EdgeInsets.all(14 * s),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14 * s),
+        border: Border.all(color: const Color(0xFFE5E2DB)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 30 * s,
+                height: 30 * s,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8EACF),
+                  borderRadius: BorderRadius.circular(10 * s),
+                ),
+                child: Icon(
+                  Icons.local_fire_department_rounded,
+                  size: 16 * s,
+                  color: const Color(0xFFC4841D),
+                ),
+              ),
+              SizedBox(height: 12 * s),
+              Text('Calories',
+                  style: VFTheme.textStyle(context,
+                      size: 11,
+                      weight: FontWeight.w700,
+                      color: const Color(0xFF9C9B94))),
+              SizedBox(height: 8 * s),
+              RichText(
+                text: TextSpan(
+                  children: [
+                    TextSpan(
+                      text: '$calories',
+                      style: VFTheme.textStyle(context,
+                          size: 24,
+                          weight: FontWeight.w900,
+                          color: const Color(0xFFC4841D),
+                          letterSpacing: -0.8),
+                    ),
+                    TextSpan(
+                      text: ' kcal',
+                      style: VFTheme.textStyle(context,
+                          size: 12,
+                          weight: FontWeight.w700,
+                          color: const Color(0xFF8C6A1A)),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 4 * s),
+              Text('Ước tính theo MET và thời lượng buổi tập',
+                  style: VFTheme.textStyle(context,
+                      size: 11,
+                      weight: FontWeight.w600,
+                      color: const Color(0xFF5A5A52))),
+            ],
+          ),
+          SizedBox(height: 14 * s),
+          Container(
+            padding: EdgeInsets.all(10 * s),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF7E8),
+              borderRadius: BorderRadius.circular(12 * s),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: Container(
+                    height: 10 * s,
+                    color: const Color(0xFFF3E2BE),
+                    child: FractionallySizedBox(
+                      widthFactor: fill,
+                      alignment: Alignment.centerLeft,
+                      child: const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                            colors: [Color(0xFFF2B454), Color(0xFFC4841D)],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 8 * s),
+                Text('Năng lượng tiêu hao ước tính',
+                    style: VFTheme.textStyle(context,
+                        size: 10,
+                        weight: FontWeight.w700,
+                        color: const Color(0xFF8C6A1A))),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GrainPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = Colors.white.withValues(alpha: 0.035);
+    final random = math.Random(7);
+    for (int i = 0; i < 160; i++) {
+      canvas.drawCircle(
+        Offset(random.nextDouble() * size.width,
+            random.nextDouble() * size.height),
+        0.5 + random.nextDouble() * 0.7,
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+Color _accent(int score) => score >= 80
+    ? const Color(0xFF4ADE80)
+    : score >= 50
+        ? const Color(0xFFFBBF24)
+        : const Color(0xFFF87171);
+
+Color _detailTone(String color) => switch (color) {
+      'amber' => const Color(0xFFC4841D),
+      'coral' => const Color(0xFFD4553A),
+      _ => const Color(0xFF18594A),
+    };
+
+String _winMessage(int score) => score >= 80
+    ? 'Xuất sắc. Form rất chắc.'
+    : score >= 50
+        ? 'Đang tiến bộ rõ rồi.'
+        : 'Hoàn thành đủ buổi tập.';
+
+String _issueObservation(DetectedEvidence issue) => switch (issue.issueId) {
+      'ankle_mobility' => 'AI thấy gót chân nhấc lên nhiều trong lúc squat.',
+      'ankle_mobility_restriction' =>
+        'AI thấy cổ chân và thân trên cùng mất ổn định khi xuống sâu.',
+      'hip_flexor_overactivity' =>
+        'AI thấy thân trên đổ về trước khá nhiều khi xuống squat.',
+      'limited_mobility' => 'AI thấy độ sâu hiện tại vẫn còn bị giới hạn.',
+      _ => 'AI ghi nhận tín hiệu: ${issue.rawSignal.replaceAll('_', ' ')}.',
+    };
+
+String _formatDate(DateTime date) {
+  const months = [
+    'Thg 1',
+    'Thg 2',
+    'Thg 3',
+    'Thg 4',
+    'Thg 5',
+    'Thg 6',
+    'Thg 7',
+    'Thg 8',
+    'Thg 9',
+    'Thg 10',
+    'Thg 11',
+    'Thg 12'
+  ];
+  return '${date.day} ${months[date.month - 1]}';
 }
