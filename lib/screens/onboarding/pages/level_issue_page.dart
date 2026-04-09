@@ -150,7 +150,7 @@ class _LevelIssuePageState extends State<LevelIssuePage> {
     );
   }
 
-  String _issueQuestion() {
+  String? _issueQuestion() {
     try {
       return widget.data.squatInterpreter.getQuestion();
     } catch (_) {
@@ -239,7 +239,7 @@ class _LevelIssuePageState extends State<LevelIssuePage> {
   Widget build(BuildContext context) {
     final s = VF.scale(context);
     final issueQuestion = _issueQuestion();
-    final hasIssue = issueQuestion.isNotEmpty;
+    final hasIssue = issueQuestion != null && issueQuestion.isNotEmpty;
     final metrics = _metrics();
 
     return ColoredBox(

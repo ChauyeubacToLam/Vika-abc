@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../services/user_program_service.dart';
 import '../theme/vf_theme.dart';
 import '../widgets/vf_primitives.dart';
+import '../models/exercise_definition.dart';
 import 'dashboard_home_screen.dart';
 import 'exercise_browser.dart';
 import 'plan_screen.dart';
@@ -88,7 +89,7 @@ class _MainShellState extends State<MainShell> {
                     child: ExerciseBrowser(
                       bottomPadding: contentBottomPadding,
                       onClose: _toggleBrowser,
-                      onSelectExercise: (_) {},
+                      onSelectExercise: _openExerciseFromBrowser,
                     ),
                   ),
                 ),
@@ -115,6 +116,11 @@ class _MainShellState extends State<MainShell> {
 
   void _toggleBrowser() {
     setState(() => _browserOpen = !_browserOpen);
+  }
+
+  void _openExerciseFromBrowser(ExerciseDefinition definition) {
+    setState(() => _browserOpen = false);
+    Navigator.of(context).pushNamed('/exercise', arguments: definition);
   }
 }
 
