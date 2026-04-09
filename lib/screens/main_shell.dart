@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../services/user_program_service.dart';
 import '../theme/vf_theme.dart';
 import '../widgets/vf_primitives.dart';
+import '../models/exercise_definition.dart';
 import 'dashboard_home_screen.dart';
 import 'exercise_browser.dart';
 import 'plan_screen.dart';
@@ -38,9 +39,9 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
     final bottomInset = mediaQuery.padding.bottom;
-    const navHeight = VFTheme.navHeight;
     final s = VFTheme.scale(context);
-    final contentBottomPadding = navHeight + bottomInset + 26 * s;
+    final navBarHeight = VFTheme.navHeight + 8 * s;
+    final contentBottomPadding = navBarHeight + bottomInset + 20 * s;
 
     final screens = [
       DashboardHomeScreen(
@@ -88,7 +89,7 @@ class _MainShellState extends State<MainShell> {
                     child: ExerciseBrowser(
                       bottomPadding: contentBottomPadding,
                       onClose: _toggleBrowser,
-                      onSelectExercise: (_) {},
+                      onSelectExercise: _openExerciseFromBrowser,
                     ),
                   ),
                 ),
@@ -100,20 +101,13 @@ class _MainShellState extends State<MainShell> {
           currentIndex: _currentIndex,
           browserOpen: _browserOpen,
           bottomInset: bottomInset,
+          onToggleBrowser: _toggleBrowser,
           onTap: (index) {
             setState(() {
               _currentIndex = index;
               _browserOpen = false;
             });
           },
-        ),
-        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-        floatingActionButton: Transform.translate(
-          offset: Offset(0, -18 * s),
-          child: _BrowserFab(
-            isOpen: _browserOpen,
-            onTap: _toggleBrowser,
-          ),
         ),
       ),
     );
@@ -122,6 +116,11 @@ class _MainShellState extends State<MainShell> {
   void _toggleBrowser() {
     setState(() => _browserOpen = !_browserOpen);
   }
+
+  void _openExerciseFromBrowser(ExerciseDefinition definition) {
+    setState(() => _browserOpen = false);
+    Navigator.of(context).pushNamed('/exercise', arguments: definition);
+  }
 }
 
 class _BottomNavBar extends StatelessWidget {
@@ -129,12 +128,14 @@ class _BottomNavBar extends StatelessWidget {
     required this.currentIndex,
     required this.browserOpen,
     required this.bottomInset,
+    required this.onToggleBrowser,
     required this.onTap,
   });
 
   final int currentIndex;
   final bool browserOpen;
   final double bottomInset;
+  final VoidCallback onToggleBrowser;
   final ValueChanged<int> onTap;
 
   @override
@@ -145,10 +146,11 @@ class _BottomNavBar extends StatelessWidget {
       sigma: 28,
       decoration: VFTheme.navDecoration(),
       child: SizedBox(
-        height: VFTheme.navHeight + bottomInset,
+        height: navBarHeight + bottomInset,
         child: Padding(
           padding: EdgeInsets.fromLTRB(8 * s, 0, 8 * s, bottomInset),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
                 child: _NavItem(
@@ -166,7 +168,12 @@ class _BottomNavBar extends StatelessWidget {
                   onTap: () => onTap(1),
                 ),
               ),
-              SizedBox(width: VFTheme.fabSize + (12 * s)),
+              Expanded(
+                child: _CenterNavAction(
+                  active: browserOpen,
+                  onTap: onToggleBrowser,
+                ),
+              ),
               Expanded(
                 child: _NavItem(
                   label: 'Tiến bộ',
@@ -253,46 +260,101 @@ class _NavItem extends StatelessWidget {
   }
 }
 
-class _BrowserFab extends StatelessWidget {
-  const _BrowserFab({
-    required this.isOpen,
+class _CenterNavAction extends StatelessWidget {
+  const _CenterNavAction({
+    required this.active,
     required this.onTap,
   });
 
-  final bool isOpen;
+  final bool active;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final s = VFTheme.scale(context);
+    final iconColor = active ? VFTheme.white : VFTheme.jadeDark;
+    final labelColor = active ? VFTheme.jade : VFTheme.textMuted;
 
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
-      child: AnimatedRotation(
-        duration: const Duration(milliseconds: 220),
-        turns: isOpen ? 0.125 : 0,
-        curve: Curves.easeOutCubic,
-        child: Container(
-          width: VFTheme.fabSize,
-          height: VFTheme.fabSize,
-          decoration: BoxDecoration(
-            gradient: VFTheme.jadeGradient,
-            borderRadius: BorderRadius.circular(17 * s),
-            boxShadow: [
-              BoxShadow(
-                color: VFTheme.jade.withValues(alpha: 0.28),
-                blurRadius: 18 * s,
-                offset: Offset(0, 4 * s),
+      borderRadius: BorderRadius.circular(18 * s),
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: 6 * s),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              width: VFTheme.fabSize,
+              height: VFTheme.fabSize,
+              transform: Matrix4.translationValues(
+                0,
+                active ? -4 * s : -2 * s,
+                0,
               ),
-            ],
-          ),
-          alignment: Alignment.center,
-          child: VFNavIcon(
-            glyph: VFNavGlyph.plus,
-            color: VFTheme.white,
-            size: 22 * s,
-            strokeWidth: 2.5,
-          ),
+              decoration: BoxDecoration(
+                gradient: active
+                    ? VFTheme.jadeGradient
+                    : LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          VFTheme.surface.withValues(alpha: 0.96),
+                          VFTheme.jadeLight,
+                        ],
+                      ),
+                borderRadius: BorderRadius.circular(17 * s),
+                border: Border.all(
+                  color: active
+                      ? VFTheme.jadeGlow.withValues(alpha: 0.18)
+                      : VFTheme.jade.withValues(alpha: 0.10),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: active
+                        ? VFTheme.jade.withValues(alpha: 0.26)
+                        : const Color(0xFF181B19).withValues(alpha: 0.08),
+                    blurRadius: active ? 22 * s : 12 * s,
+                    offset: Offset(0, active ? 8 * s : 4 * s),
+                  ),
+                ],
+              ),
+              alignment: Alignment.center,
+              child: AnimatedRotation(
+                duration: const Duration(milliseconds: 220),
+                turns: active ? 0.125 : 0,
+                curve: Curves.easeOutCubic,
+                child: VFNavIcon(
+                  glyph: VFNavGlyph.plus,
+                  color: iconColor,
+                  size: 22 * s,
+                  strokeWidth: 2.5,
+                ),
+              ),
+            ),
+            SizedBox(height: 2 * s),
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 180),
+              style: VFTheme.textStyle(
+                context,
+                size: 10,
+                weight: active ? FontWeight.w800 : FontWeight.w600,
+                color: labelColor,
+              ),
+              child: const Text('Khám phá'),
+            ),
+            SizedBox(height: 2 * s),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              width: 4 * s,
+              height: 4 * s,
+              decoration: BoxDecoration(
+                color: active ? VFTheme.jade : Colors.transparent,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ],
         ),
       ),
     );

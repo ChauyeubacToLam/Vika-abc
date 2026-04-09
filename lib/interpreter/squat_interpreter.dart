@@ -26,9 +26,8 @@ class SquatInterpreter extends InterpreterBase {
     }
   }
 
-  String getQuestion() {
-    return topEvidence()?.question ?? "";
-  }
-
+  String? getQuestion() => topEvidence()?.question;
   String? getPrimaryIssueId() => topEvidence()?.issueId;
+
+  String? getPrimaryIssueReason() => topEvidence()?.rawSignal;
 }

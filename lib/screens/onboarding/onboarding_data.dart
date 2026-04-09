@@ -22,6 +22,8 @@ class OnboardingData {
   // ExerciseLogger? pushUpLogger;
   late SquatInterpreter squatInterpreter;
 
+  bool medicalClear = false;
+
   void onSquatComplete(ExerciseLogger logger) {
     squatLogger = logger;
     squatInterpreter = SquatInterpreter(logger: logger);

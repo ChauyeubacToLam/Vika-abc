@@ -1,22 +1,27 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../exercise/exercise_base.dart';
+import '../../exercise/calorie_estimator_registry.dart';
 import '../../exercise/glute bridge/glute_bridge.dart';
 import '../../exercise/jumping jack/jumping_jack.dart';
 import '../../exercise/lunge/lunge.dart';
 import '../../exercise/plank/plank.dart';
 import '../../exercise/push up/push_up.dart';
+import '../../exercise/report_builder_registry.dart';
 import '../../exercise/squat/metrics/heel_rise_metric.dart';
 import '../../exercise/squat/metrics/tempo_metric.dart';
 import '../../exercise/squat/metrics/trunk_lean_metric.dart';
 import '../../exercise/squat/squat.dart';
 import '../../models/exercise_definition.dart';
+import '../../models/post_exercise_data.dart';
 import '../../utils/exercise_logger.dart';
 import 'active_exercise_page.dart';
 import 'exercise_intro_page.dart';
 import 'executive_summary_page.dart';
-import 'set_summary_page.dart';
+import 'rest_screen.dart';
 import 'widgets/skeleton_annotation.dart';
 
 class ExerciseExperienceScreen extends StatefulWidget {
@@ -36,8 +41,19 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
   late final _ExerciseExperienceSpec _spec;
   _WorkoutFlowPhase _phase = _WorkoutFlowPhase.intro;
   final List<ExerciseLogger> _setLoggers = [];
+  final Map<int, Map<String, dynamic>> _difficultyLogs = {};
+
   ExerciseBase? _activeExercise;
+  PostExerciseData? _fullReport;
+  SetReportData? _currentSetReport;
+  ExerciseLogger? _currentSetLogger;
+  Duration? _completedDuration;
+  int? _estimatedCalories;
+
   int _currentSet = 1;
+  int _currentRepsTarget = 0;
+  int? _pendingNextRepsTarget;
+  double _userWeightKg = 60;
   DateTime? _startedAt;
   String _coachNote =
       'Buổi này AI sẽ ưu tiên nhịp chậm, form chắc và sự ổn định trong từng rep.';
@@ -48,7 +64,16 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
   void initState() {
     super.initState();
     _spec = _ExerciseExperienceSpec.fromDefinition(widget.definition);
+    _currentRepsTarget = _spec.repsPerSet;
     _loadCoachNote();
+    _loadUserWeight();
+  }
+
+  Future<void> _loadUserWeight() async {
+    final prefs = await SharedPreferences.getInstance();
+    final storedWeight = prefs.getDouble('user_weight');
+    if (!mounted || storedWeight == null) return;
+    setState(() => _userWeightKg = storedWeight);
   }
 
   Future<void> _loadCoachNote() async {
@@ -78,66 +103,146 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     }
 
     if (mounted) {
-      setState(() {
-        _coachNote = note;
-      });
+      setState(() => _coachNote = note);
     }
   }
 
   void _beginWorkout() {
-    _setLoggers.clear();
-    _currentSet = 1;
-    _startedAt = DateTime.now();
-    _startSet();
-  }
-
-  void _startSet() {
     setState(() {
-      _activeExercise = _spec.createExercise();
-      _phase = _WorkoutFlowPhase.active;
+      _setLoggers.clear();
+      _difficultyLogs.clear();
+      _fullReport = null;
+      _currentSetReport = null;
+      _currentSetLogger = null;
+      _completedDuration = null;
+      _estimatedCalories = null;
+      _currentSet = 1;
+      _currentRepsTarget = _spec.repsPerSet;
+      _pendingNextRepsTarget = null;
+      _startedAt = DateTime.now();
+      _prepareActiveSet();
     });
   }
 
+  void _prepareActiveSet() {
+    _currentSetReport = null;
+    _currentSetLogger = null;
+    _activeExercise = _spec.createExercise(_currentRepsTarget);
+    _phase = _WorkoutFlowPhase.active;
+  }
+
+  ({ExerciseReportBuilder builder, double met}) _resolveReportEntry() {
+    return reportBuilders[widget.definition.id] ??
+        (builder: GenericReportBuilder(), met: 3.5);
+  }
+
+  PostExerciseData _buildReport() {
+    final entry = _resolveReportEntry();
+    return entry.builder.buildReport(
+      setLoggers: _setLoggers,
+      exerciseName: widget.definition.name,
+      metValue: entry.met,
+    );
+  }
+
+  int _estimateCalories({
+    required PostExerciseData report,
+    required Duration totalDuration,
+  }) {
+    final estimator = calorieEstimators[widget.definition.id] ??
+        const GenericMetCalorieEstimator();
+    return estimator.estimateCalories(
+      setLoggers: _setLoggers,
+      report: report,
+      userWeightKg: _userWeightKg,
+      totalDuration: totalDuration,
+    );
+  }
+
   void _handleSetComplete(ExerciseLogger logger) {
+    _setLoggers.add(logger);
+
     if (_isAssessment) {
       Navigator.of(context).pop({'logger': logger});
       return;
     }
 
+    final report = _buildReport();
+
     setState(() {
-      _setLoggers.add(logger);
-      _phase = _WorkoutFlowPhase.summary;
+      _currentSetReport = report.sets.last;
+      _currentSetLogger = logger;
+      _activeExercise = null;
+      _phase = _WorkoutFlowPhase.rest;
+    });
+  }
+
+  Future<void> _persistDifficultyLog(Map<String, dynamic> payload) async {
+    _difficultyLogs[payload['set_index'] as int] = payload;
+    final prefs = await SharedPreferences.getInstance();
+    final orderedLogs = _difficultyLogs.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    await prefs.setStringList(
+      'exercise_difficulty_${widget.definition.id}',
+      orderedLogs.map((entry) => jsonEncode(entry.value)).toList(),
+    );
+  }
+
+  void _handleDifficultyAnswer(String difficulty) {
+    final isLastSet = _currentSet >= _spec.sets;
+    final restSeconds =
+        (isLastSet ? 10 : 45) + (difficulty == 'heavy' ? 15 : 0);
+    final nextReps = switch (difficulty) {
+      'light' => _currentRepsTarget + 2,
+      'heavy' => _currentRepsTarget > 1 ? _currentRepsTarget - 1 : 1,
+      _ => _currentRepsTarget,
+    };
+
+    _pendingNextRepsTarget = nextReps;
+    _persistDifficultyLog({
+      'set_index': _currentSetReport?.setIndex ?? (_currentSet - 1),
+      'set_score': _currentSetReport?.score ?? 0,
+      'difficulty': difficulty,
+      'reps_completed': _currentSetReport?.totalReps ?? 0,
+      'rest_time_seconds': restSeconds,
     });
   }
 
   void _handleSummaryNext() {
     if (_currentSet >= _spec.sets) {
+      final report = _buildReport();
+      final completedDuration =
+          DateTime.now().difference(_startedAt ?? DateTime.now());
       setState(() {
+        _fullReport = report;
+        _completedDuration = completedDuration;
+        _estimatedCalories = _estimateCalories(
+          report: report,
+          totalDuration: completedDuration,
+        );
+        _activeExercise = null;
         _phase = _WorkoutFlowPhase.executive;
       });
       return;
     }
 
-    _currentSet += 1;
-    _startSet();
-  }
-
-  Future<void> _persistIssueAnswers(Map<String, String> answers) async {
-    final prefs = await SharedPreferences.getInstance();
-    final payload =
-        answers.entries.map((entry) => '${entry.key}:${entry.value}').toList();
-    await prefs.setStringList(
-      'exercise_feedback_${widget.definition.id}',
-      payload,
-    );
+    setState(() {
+      _currentSet += 1;
+      _currentRepsTarget = _pendingNextRepsTarget ?? _currentRepsTarget;
+      _pendingNextRepsTarget = null;
+      _prepareActiveSet();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final backgroundColor = switch (_phase) {
+      _WorkoutFlowPhase.active => const Color(0xFF080C1A),
+      _ => const Color(0xFFF0EDE6),
+    };
+
     return Scaffold(
-      backgroundColor: _phase == _WorkoutFlowPhase.active
-          ? const Color(0xFF080C1A)
-          : const Color(0xFFF0EDE6),
+      backgroundColor: backgroundColor,
       body: switch (_phase) {
         _WorkoutFlowPhase.intro => ExerciseIntroPage(
             title: widget.definition.name,
@@ -154,43 +259,49 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
             onBack: () => Navigator.of(context).pop(),
           ),
         _WorkoutFlowPhase.active => ActiveExercisePage(
+            key: ValueKey(
+              'active-${widget.definition.id}-$_currentSet-$_currentRepsTarget',
+            ),
             definition: widget.definition,
             exercise: _activeExercise!,
             currentSet: _currentSet,
             totalSets: _spec.sets,
-            totalReps: _spec.repsPerSet,
+            totalReps: _currentRepsTarget,
             onSetComplete: _handleSetComplete,
             onBack: () => Navigator.of(context).pop(),
           ),
-        _WorkoutFlowPhase.summary => SetSummaryPage(
-            logger: _setLoggers.last,
+        _WorkoutFlowPhase.rest => RestScreen(
+            key: ValueKey('rest-${widget.definition.id}-$_currentSet'),
+            setReport: _currentSetReport!,
             setIndex: _currentSet - 1,
-            isLastSet: _currentSet == _spec.sets,
-            restDuration: _spec.restDuration,
+            totalSets: _spec.sets,
+            currentReps: _currentRepsTarget,
+            isLastSet: _currentSet >= _spec.sets,
+            setLogger: _currentSetLogger,
             onNext: _handleSummaryNext,
+            onDifficultyAnswer: _handleDifficultyAnswer,
           ),
         _WorkoutFlowPhase.executive => ExecutiveSummaryPage(
-            exerciseName: widget.definition.name,
-            setLoggers: _setLoggers,
-            totalDuration:
-                DateTime.now().difference(_startedAt ?? DateTime.now()),
+            key: ValueKey('executive-${widget.definition.id}'),
+            report: _fullReport!,
+            calories: _estimatedCalories ?? 0,
+            userWeightKg: _userWeightKg,
+            totalDuration: _completedDuration ?? Duration.zero,
             onDone: () => Navigator.of(context).pop(),
-            onIssueAnswersChanged: (answers) {
-              _persistIssueAnswers(answers);
-            },
+            percentile: 27,
+            vsLastWeekPct: 12,
           ),
       },
     );
   }
 }
 
-enum _WorkoutFlowPhase { intro, active, summary, executive }
+enum _WorkoutFlowPhase { intro, active, rest, executive }
 
 class _ExerciseExperienceSpec {
   const _ExerciseExperienceSpec({
     required this.sets,
     required this.repsPerSet,
-    required this.restDuration,
     required this.videoDuration,
     required this.muscles,
     required this.tips,
@@ -201,22 +312,21 @@ class _ExerciseExperienceSpec {
 
   final int sets;
   final int repsPerSet;
-  final int restDuration;
   final String videoDuration;
   final List<String> muscles;
   final List<String> tips;
   final List<ExerciseIntroBadge> badges;
   final List<SkeletonCallout> callouts;
-  final ExerciseBase Function() createExercise;
+  final ExerciseBase Function(int repsPerSet) createExercise;
 
   factory _ExerciseExperienceSpec.fromDefinition(
-      ExerciseDefinition definition) {
+    ExerciseDefinition definition,
+  ) {
     switch (definition.id) {
       case 'squat_assessment':
         return _ExerciseExperienceSpec(
           sets: 1,
           repsPerSet: 5,
-          restDuration: 0,
           videoDuration: '1:18',
           muscles: definition.targetMuscles,
           tips: definition.setupTips,
@@ -258,22 +368,20 @@ class _ExerciseExperienceSpec {
               anchor: const Offset(0.20, 0.88),
             ),
           ],
-          createExercise: () => Squat(maxRep: 5),
+          createExercise: (repsPerSet) => Squat(maxRep: repsPerSet),
         );
       case 'wall_pushup_assessment':
         return _generic(
           definition: definition,
           sets: 1,
           repsPerSet: 5,
-          restDuration: 0,
           videoDuration: '1:12',
-          createExercise: () => PushUp(maxRep: 5),
+          createExercise: (repsPerSet) => PushUp(maxRep: repsPerSet),
         );
       case 'squat':
         return _ExerciseExperienceSpec(
           sets: 3,
           repsPerSet: 8,
-          restDuration: 45,
           videoDuration: '2:15',
           muscles: definition.targetMuscles,
           tips: definition.setupTips,
@@ -315,55 +423,49 @@ class _ExerciseExperienceSpec {
               anchor: const Offset(0.20, 0.88),
             ),
           ],
-          createExercise: () => Squat(maxRep: 8),
+          createExercise: (repsPerSet) => Squat(maxRep: repsPerSet),
         );
       case 'lunge':
         return _generic(
           definition: definition,
           repsPerSet: 8,
-          restDuration: 40,
           videoDuration: '1:58',
-          createExercise: () => Lunge(maxRep: 8),
+          createExercise: (repsPerSet) => Lunge(maxRep: repsPerSet),
         );
       case 'push_up':
         return _generic(
           definition: definition,
           repsPerSet: 6,
-          restDuration: 45,
           videoDuration: '1:42',
-          createExercise: () => PushUp(maxRep: 6),
+          createExercise: (repsPerSet) => PushUp(maxRep: repsPerSet),
         );
       case 'plank':
         return _generic(
           definition: definition,
           repsPerSet: 3,
-          restDuration: 30,
           videoDuration: '1:28',
-          createExercise: () => Plank(maxRep: 3),
+          createExercise: (repsPerSet) => Plank(maxRep: repsPerSet),
         );
       case 'jumping_jack':
         return _generic(
           definition: definition,
           repsPerSet: 15,
-          restDuration: 25,
           videoDuration: '1:10',
-          createExercise: () => JumpingJack(maxRep: 15),
+          createExercise: (repsPerSet) => JumpingJack(maxRep: repsPerSet),
         );
       case 'glute_bridge':
         return _generic(
           definition: definition,
           repsPerSet: 15,
-          restDuration: 35,
           videoDuration: '1:36',
-          createExercise: () => GluteBridge(),
+          createExercise: (_) => GluteBridge(),
         );
       default:
         return _generic(
           definition: definition,
           repsPerSet: 8,
-          restDuration: 40,
           videoDuration: '1:30',
-          createExercise: definition.createExercise,
+          createExercise: (_) => definition.createExercise(),
         );
     }
   }
@@ -372,14 +474,12 @@ class _ExerciseExperienceSpec {
     required ExerciseDefinition definition,
     int sets = 3,
     required int repsPerSet,
-    required int restDuration,
     required String videoDuration,
-    required ExerciseBase Function() createExercise,
+    required ExerciseBase Function(int repsPerSet) createExercise,
   }) {
     return _ExerciseExperienceSpec(
       sets: sets,
       repsPerSet: repsPerSet,
-      restDuration: restDuration,
       videoDuration: videoDuration,
       muscles: definition.targetMuscles,
       tips: definition.setupTips,
