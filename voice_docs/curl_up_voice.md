@@ -1,6 +1,6 @@
-1. Đếm số sau mỗi rep, nói "Hoàn thành bài tập" sau khi kết thúc
-2. Hướng dẫn người tập khi nào cần "Cuộn lên", "Hạ xuống" một cách hợp lý
-3. Khi phát hiện error trong metric trunk_elevation (cuộn chưa đủ), báo "Cuộn lên thêm"
-4. Khi phát hiện error trong metric neck_pulling, báo "Không kéo cổ"
-5. Khi phát hiện error trong metric knee_extension, báo "Giữ gối gập"
-6. Xử lí conflict bằng Queue, các câu voice xếp hàng phát tuần tự, clearQueue khi bắt đầu rep mới
+1. Count reps after each completed rep, and say "Hoàn thành bài tập" when the set ends.
+2. Provide phase guidance cues at the right time: "Cuộn lên" and "Hạ xuống".
+3. When `trunk_elevation` detects insufficient curl-up, say "Cuộn lên thêm".
+4. When `neck_pulling` detects neck pulling, say "Không kéo cổ".
+5. When `knee_extension` detects knee extension, say "Giữ gối gập".
+6. Handle voice conflicts with a queue: play messages sequentially, and call `clearQueue()` when a new rep starts.

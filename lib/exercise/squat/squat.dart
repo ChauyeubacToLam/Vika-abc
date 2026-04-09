@@ -55,6 +55,7 @@ class Squat extends ExerciseBase {
   final int maxRep;
   SquatState squatState = SquatState.standing;
   SquatState previousSquatState = SquatState.standing;
+  List<String> lastRepFaultVoiceMessages = [];
 
   Squat({this.maxRep = SquatConfig.MAX_REP});
 
@@ -340,10 +341,15 @@ class Squat extends ExerciseBase {
 
     // Build fault map grouped by phase
     final faultMap = <String, Map<String, String>>{};
+    final faultVoiceMessages = <String>[];
     for (final fault in allFaults) {
       faultMap.putIfAbsent(fault.phase, () => {});
       faultMap[fault.phase]![fault.type] = fault.message;
+      if (fault.voiceMessage != null && fault.voiceMessage!.isNotEmpty) {
+        faultVoiceMessages.add(fault.voiceMessage!);
+      }
     }
+    lastRepFaultVoiceMessages = faultVoiceMessages.toSet().toList();
     setFeedback.add({correctForm: faultMap});
 
     // Update debug data with metric outputs
@@ -385,8 +391,13 @@ class Squat extends ExerciseBase {
 
   void _updatePhaseInstructions(int now) {
     switch (squatState) {
+      case SquatState.standing:
+        // Anticipatory cue: while standing, guide user to start the next rep.
+        resultIssues.addInstruction('standing', 'Status', 'Xuống');
+        break;
       case SquatState.descending:
-        resultIssues.addInstruction('descending', 'Status', 'Going Down...');
+        // Anticipatory cue: while descending, prepare user to hold at bottom.
+        resultIssues.addInstruction('descending', 'Status', 'Giữ');
         break;
       case SquatState.bottom:
         final remaining = tempoMetric.bottomHoldRemaining(now);
@@ -395,14 +406,14 @@ class Squat extends ExerciseBase {
           resultIssues.addInstruction(
               'bottom', 'Status', 'Hold! ${remaining.toStringAsFixed(1)}s');
         } else {
-          resultIssues.addInstruction('bottom', 'Status', 'Push Up Now!');
+          // Anticipatory cue: when hold is complete, tell user to go up.
+          resultIssues.addInstruction('bottom', 'Status', 'Đứng lên');
         }
         if (progress != null) debugData['bottomHoldProgress'] = progress;
         break;
       case SquatState.ascending:
-        resultIssues.addInstruction('ascending', 'Status', 'Push Up!');
-        break;
-      case SquatState.standing:
+        // Anticipatory cue: while ascending, finish to upright stance.
+        resultIssues.addInstruction('ascending', 'Status', 'Đứng thẳng');
         break;
     }
   }

@@ -14,9 +14,11 @@ import 'screens/onboarding/onboarding_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'exercise/exercise_base.dart';
+import 'exercise/squat/squat.dart';
 import 'models/exercise_definition.dart';
 import 'screens/exercise/exercise_experience_screen.dart';
 import 'screens/main_shell.dart';
+import 'services/viettel_tts_service.dart';
 import 'theme/vf_theme.dart';
 
 /* =========================================================================
@@ -199,6 +201,20 @@ class _ExerciseScreenState extends State<ExerciseScreen>
   // ── Completion guard ──
   bool _didComplete = false;
 
+  // ── Voice (Squat only) ──
+  final ViettelTTSService _ttsService = ViettelTTSService();
+  ExerciseState? _lastVoiceExerciseState;
+  String _lastVoicePhaseKey = '';
+  String? _lastVoiceStatusText;
+  int _lastVoiceRepCount = 0;
+  int _lastPhaseCueAtMs = 0;
+  bool _didAnnounceSetCompleteVoice = false;
+  final Map<String, int> _lastFaultVoiceAtMs = {};
+  static const int _PHASE_CUE_COOLDOWN_MS = 700;
+  static const int _FAULT_CUE_COOLDOWN_MS = 3000;
+
+  bool get _isSquatExercise => _exercise is Squat;
+
   @override
   void initState() {
     super.initState();
@@ -230,6 +246,9 @@ class _ExerciseScreenState extends State<ExerciseScreen>
 
   @override
   void dispose() {
+    if (_isSquatExercise) {
+      _ttsService.clearQueue();
+    }
     WidgetsBinding.instance.removeObserver(this);
     _cameraController?.stopImageStream();
     _cameraController?.dispose();
@@ -460,9 +479,11 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         }
 
         _logStateChanges();
+        _processSquatVoiceFrame(hasPose: true);
       } else {
         _detectedPose = null;
         _feedback = _exercise.processNoPoseFrame();
+        _processSquatVoiceFrame(hasPose: false);
       }
 
       // FPS
@@ -484,6 +505,109 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     } catch (e) {
       debugPrint('[VinaFit] Detection error: $e');
     }
+  }
+
+  void _processSquatVoiceFrame({required bool hasPose}) {
+    if (!_isSquatExercise) return;
+
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final currentExerciseState = _exercise.exerciseState;
+    final currentPhaseKey = _exercise.currentPhaseKey;
+
+    if (currentExerciseState == ExerciseState.completed) {
+      if (!_didAnnounceSetCompleteVoice) {
+        _ttsService.clearQueue();
+        _ttsService.speak('Hoàn thành bài tập');
+        _didAnnounceSetCompleteVoice = true;
+      }
+      _lastVoiceExerciseState = currentExerciseState;
+      _lastVoicePhaseKey = currentPhaseKey;
+      _lastVoiceStatusText = null;
+      _lastVoiceRepCount = _repCount;
+      return;
+    }
+
+    if (currentExerciseState != ExerciseState.activated ||
+        _exercise.isPaused ||
+        !hasPose) {
+      _lastVoiceExerciseState = currentExerciseState;
+      _lastVoicePhaseKey = currentPhaseKey;
+      _lastVoiceStatusText = null;
+      _lastVoiceRepCount = _repCount;
+      return;
+    }
+
+    final phaseInstr = _exercise.resultIssues.instructions[currentPhaseKey];
+    final statusText = phaseInstr?['Status'];
+
+    final phaseChanged = currentPhaseKey != _lastVoicePhaseKey;
+    final statusChanged = statusText != _lastVoiceStatusText;
+    final canSpeakPhaseCue =
+        nowMs - _lastPhaseCueAtMs >= _PHASE_CUE_COOLDOWN_MS;
+
+    if ((phaseChanged || statusChanged) && canSpeakPhaseCue) {
+      final phasePhrase = _phasePhraseFromStatus(statusText);
+      if (phasePhrase != null) {
+        _ttsService.speak(phasePhrase);
+        _lastPhaseCueAtMs = nowMs;
+      }
+    }
+
+    // Speak fault cues as soon as faults are observed in live feedback.
+    final liveFaultVoices = _liveFaultVoicesFromFeedback(_feedback);
+    for (final voice in liveFaultVoices) {
+      final lastSpokenAt = _lastFaultVoiceAtMs[voice] ?? 0;
+      if (nowMs - lastSpokenAt < _FAULT_CUE_COOLDOWN_MS) continue;
+      _lastFaultVoiceAtMs[voice] = nowMs;
+      _ttsService.speak(voice);
+    }
+
+    if (_repCount > _lastVoiceRepCount) {
+      // New rep should prioritize count and drop stale pending phase cues.
+      _ttsService.clearQueue();
+
+      _ttsService.speak('$_repCount');
+    }
+
+    _lastVoiceExerciseState = currentExerciseState;
+    _lastVoicePhaseKey = currentPhaseKey;
+    _lastVoiceStatusText = statusText;
+    _lastVoiceRepCount = _repCount;
+  }
+
+  String? _phasePhraseFromStatus(String? statusText) {
+    if (statusText == null || statusText.isEmpty) return null;
+
+    if (statusText.startsWith('Hold') || statusText.contains('Giữ')) {
+      return 'Giữ';
+    }
+    if (statusText.contains('Xuống')) {
+      return 'Xuống';
+    }
+    if (statusText.contains('Đứng lên') || statusText.contains('Lên')) {
+      return 'Đứng lên';
+    }
+    if (statusText.contains('Đứng thẳng')) {
+      return 'Đứng thẳng';
+    }
+
+    return null;
+  }
+
+  List<String> _liveFaultVoicesFromFeedback(Map<String, String> feedback) {
+    final voices = <String>[];
+
+    final depth = feedback['Depth'] ?? '';
+    if (depth.contains('Go Lower')) {
+      voices.add('Thấp hơn nữa');
+    }
+
+    final back = feedback['Back'] ?? '';
+    if (back.contains('Chest up')) {
+      voices.add('Ưỡn ngực lên');
+    }
+
+    return voices;
   }
 
   /* -----------------------------------------------------------------------
@@ -2265,6 +2389,7 @@ class PosePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final landmarks = pose.landmarks;
     if (landmarks.isEmpty) return;
+    final shouldFlipY = _shouldFlipOverlayVertically(landmarks);
 
     final double imageW = imageSize.width;
     final double imageH = imageSize.height;
@@ -2294,8 +2419,20 @@ class PosePainter extends CustomPainter {
       double x = lm.x;
       double y = lm.y;
 
+      if (shouldFlipY) {
+        // Device-specific streams can arrive vertically inverted.
+        // Keep logic untouched and correct only the rendered overlay.
+        y = imageH - y;
+      }
+
       if (Platform.isAndroid) {
         switch (rotation) {
+          case InputImageRotation.rotation180deg:
+            // Some Android devices report a 180deg stream orientation.
+            // Rotate landmarks in painter space so overlay stays upright.
+            x = imageW - lm.x;
+            y = imageH - lm.y;
+            break;
           case InputImageRotation.rotation90deg:
             x = lm.x;
             y = lm.y;
@@ -2366,6 +2503,40 @@ class PosePainter extends CustomPainter {
     }
 
     _drawAngleLabels(canvas, landmarks, transformPoint);
+  }
+
+  bool _shouldFlipOverlayVertically(
+    Map<PoseLandmarkType, PoseLandmark> landmarks,
+  ) {
+    final shoulderY = _averageY(landmarks, const [
+      PoseLandmarkType.leftShoulder,
+      PoseLandmarkType.rightShoulder,
+    ]);
+    final hipY = _averageY(landmarks, const [
+      PoseLandmarkType.leftHip,
+      PoseLandmarkType.rightHip,
+    ]);
+
+    if (shoulderY == null || hipY == null) return false;
+
+    // In normal camera coordinates, shoulders are above hips.
+    return shoulderY > hipY;
+  }
+
+  double? _averageY(
+    Map<PoseLandmarkType, PoseLandmark> landmarks,
+    List<PoseLandmarkType> types,
+  ) {
+    double sum = 0;
+    int count = 0;
+    for (final type in types) {
+      final lm = landmarks[type];
+      if (lm == null || lm.likelihood < 0.5) continue;
+      sum += lm.y;
+      count += 1;
+    }
+    if (count == 0) return null;
+    return sum / count;
   }
 
   void _drawAngleLabels(

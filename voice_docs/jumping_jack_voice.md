@@ -1,4 +1,4 @@
-1. Đếm số sau mỗi rep, nói "Hoàn thành bài tập" sau khi kết thúc
-2. Hướng dẫn người tập khi nào cần "Mở", "Đóng" một cách hợp lý
-3. Khi phát hiện error trong metric leg_spread (chân chưa đủ rộng), báo "Mở chân rộng hơn"
-4. Xử lí conflict bằng Queue, các câu voice xếp hàng phát tuần tự, clearQueue khi bắt đầu rep mới
+1. Count reps after each completed rep, and say "Hoàn thành bài tập" when the set ends.
+2. Provide phase guidance cues at the right time: "Mở" and "Đóng".
+3. When `leg_spread` detects insufficient leg width, say "Mở chân rộng hơn".
+4. Handle voice conflicts with a queue: play messages sequentially, and call `clearQueue()` when a new rep starts.
