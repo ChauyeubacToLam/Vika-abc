@@ -203,7 +203,6 @@ class _ExerciseScreenState extends State<ExerciseScreen>
 
   // ── Voice (Squat only) ──
   final ViettelTTSService _ttsService = ViettelTTSService();
-  ExerciseState? _lastVoiceExerciseState;
   String _lastVoicePhaseKey = '';
   String? _lastVoiceStatusText;
   int _lastVoiceRepCount = 0;
@@ -520,7 +519,6 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         _ttsService.speak('Hoàn thành bài tập');
         _didAnnounceSetCompleteVoice = true;
       }
-      _lastVoiceExerciseState = currentExerciseState;
       _lastVoicePhaseKey = currentPhaseKey;
       _lastVoiceStatusText = null;
       _lastVoiceRepCount = _repCount;
@@ -530,7 +528,6 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     if (currentExerciseState != ExerciseState.activated ||
         _exercise.isPaused ||
         !hasPose) {
-      _lastVoiceExerciseState = currentExerciseState;
       _lastVoicePhaseKey = currentPhaseKey;
       _lastVoiceStatusText = null;
       _lastVoiceRepCount = _repCount;
@@ -539,6 +536,13 @@ class _ExerciseScreenState extends State<ExerciseScreen>
 
     final phaseInstr = _exercise.resultIssues.instructions[currentPhaseKey];
     final statusText = phaseInstr?['Status'];
+
+    if (_repCount > _lastVoiceRepCount) {
+      // New rep should prioritize count and drop stale pending phase cues.
+      _ttsService.clearQueue();
+
+      _ttsService.speak('$_repCount');
+    }
 
     final phaseChanged = currentPhaseKey != _lastVoicePhaseKey;
     final statusChanged = statusText != _lastVoiceStatusText;
@@ -562,14 +566,6 @@ class _ExerciseScreenState extends State<ExerciseScreen>
       _ttsService.speak(voice);
     }
 
-    if (_repCount > _lastVoiceRepCount) {
-      // New rep should prioritize count and drop stale pending phase cues.
-      _ttsService.clearQueue();
-
-      _ttsService.speak('$_repCount');
-    }
-
-    _lastVoiceExerciseState = currentExerciseState;
     _lastVoicePhaseKey = currentPhaseKey;
     _lastVoiceStatusText = statusText;
     _lastVoiceRepCount = _repCount;

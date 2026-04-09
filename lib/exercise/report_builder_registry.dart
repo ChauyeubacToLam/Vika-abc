@@ -1,6 +1,5 @@
 import '../models/post_exercise_data.dart';
 import '../utils/exercise_logger.dart';
-import '../interpreter/interpreter_base.dart';
 import 'squat/squat_report_builder.dart';
 
 // ═══════════════════════════════════════════════════════════════
@@ -121,11 +120,15 @@ final Map<String, ({ExerciseReportBuilder builder, double met})>
 class GenericReportBuilder extends ExerciseReportBuilder {
   @override
   (String, String, String?) pickInsight(
-    ExerciseLogger logger,
-    ExerciseLogger? prevLogger,
+    dynamic logger,
+    dynamic prevLogger,
     int score,
     int? prevScore,
   ) {
+    if (logger is! ExerciseLogger) {
+      return ('⚠️', 'Không có dữ liệu set.', null);
+    }
+
     final maxRep = (logger.setLogs["max_rep"] as num?)?.toInt() ?? 0;
     final goodReps = (logger.setLogs["good_rep_count"] as num?)?.toInt() ?? 0;
     if (maxRep == 0) return ('⚠️', 'Không có rep nào.', null);
@@ -135,11 +138,12 @@ class GenericReportBuilder extends ExerciseReportBuilder {
   }
 
   @override
-  DetectedEvidence? detectIssue(List<ExerciseLogger> setLoggers) => null;
+  IssueQuestion? detectIssue(List<dynamic> setLoggers) => null;
 
   @override
-  List<DetailCard> buildDetailCards(List<ExerciseLogger> setLoggers) {
-    final allReps = setLoggers.expand((l) => l.repLogs).toList();
+  List<DetailCard> buildDetailCards(List<dynamic> setLoggers) {
+    final typedLoggers = setLoggers.whereType<ExerciseLogger>().toList();
+    final allReps = typedLoggers.expand((l) => l.repLogs).toList();
     if (allReps.isEmpty) return [];
     final totalGood = allReps.where((r) => r.correctForm).length;
     final accuracy = (totalGood / allReps.length * 100).roundToDouble();

@@ -14,6 +14,7 @@ import '../../exercise/squat/metrics/tempo_metric.dart';
 import '../../exercise/squat/metrics/trunk_lean_metric.dart';
 import '../../exercise/squat/squat.dart';
 import '../../models/exercise_definition.dart';
+import '../../services/viettel_tts_service.dart';
 import '../../utils/exercise_logger.dart';
 import '../onboarding/vf_theme.dart';
 import 'widgets/form_score_arc.dart';
@@ -71,6 +72,17 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   InputImageRotation _imageRotation = InputImageRotation.rotation0deg;
   late final AnimationController _pulseController;
   late final AnimationController _voiceController;
+  final ViettelTTSService _ttsService = ViettelTTSService();
+  String _lastVoicePhaseKey = '';
+  String? _lastVoicePhrase;
+  int _lastVoiceRepCount = 0;
+  int _lastPhaseCueAtMs = 0;
+  bool _didAnnounceSetCompleteVoice = false;
+  bool _didAnnounceVoiceReady = false;
+  final Map<String, int> _lastFaultVoiceAtMs = {};
+
+  static const int _PHASE_CUE_MIN_GAP_MS = 250;
+  static const int _FAULT_CUE_COOLDOWN_MS = 3000;
 
   @override
   void initState() {
@@ -88,6 +100,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
   @override
   void dispose() {
+    _ttsService.clearQueue();
     _cameraController?.stopImageStream();
     _cameraController?.dispose();
     _poseDetector.close();
@@ -222,14 +235,133 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
           }
         });
       }
+      _processSquatVoiceFrame(hasPose: true);
     } else {
       _detectedPose = null;
       _feedback = widget.exercise.processNoPoseFrame();
+      _processSquatVoiceFrame(hasPose: false);
     }
 
     if (mounted) {
       setState(() {});
     }
+  }
+
+  bool get _isSquatExercise => widget.definition.id.startsWith('squat');
+
+  void _processSquatVoiceFrame({required bool hasPose}) {
+    if (!_isSquatExercise) return;
+
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final currentExerciseState = widget.exercise.exerciseState;
+    final currentPhaseKey = widget.exercise.currentPhaseKey;
+    final repCount = widget.exercise.repCount;
+    final repIncreased = repCount > _lastVoiceRepCount;
+
+    if (currentExerciseState == ExerciseState.completed) {
+      if (repIncreased) {
+        _ttsService.clearPendingButKeepCurrent();
+        _ttsService.speak('$repCount');
+      } else if (!_didAnnounceSetCompleteVoice) {
+        _ttsService.clearPendingButKeepCurrent();
+      }
+
+      if (!_didAnnounceSetCompleteVoice) {
+        _ttsService.speak('Hoàn thành bài tập');
+        _didAnnounceSetCompleteVoice = true;
+      }
+      _lastVoicePhaseKey = currentPhaseKey;
+      _lastVoicePhrase = null;
+      _lastVoiceRepCount = repCount;
+      return;
+    }
+
+    if (currentExerciseState != ExerciseState.activated ||
+        widget.exercise.isPaused ||
+        !hasPose) {
+      _lastVoicePhaseKey = currentPhaseKey;
+      _lastVoicePhrase = null;
+      _lastVoiceRepCount = repCount;
+      return;
+    }
+
+    if (!_didAnnounceVoiceReady) {
+      _ttsService.clearQueue();
+      _ttsService.speak('Sẵn sàng');
+      _didAnnounceVoiceReady = true;
+    }
+
+    final phaseInstr =
+        widget.exercise.resultIssues.instructions[currentPhaseKey];
+    final statusText = phaseInstr?['Status'];
+    final phasePhrase = _phasePhraseFromStatus(statusText);
+
+    if (repIncreased) {
+      _ttsService.clearPendingButKeepCurrent();
+      _ttsService.speak('$repCount');
+      _lastVoicePhaseKey = currentPhaseKey;
+      _lastVoicePhrase = phasePhrase;
+      _lastVoiceRepCount = repCount;
+      return;
+    }
+
+    final phaseKeyChanged = currentPhaseKey != _lastVoicePhaseKey;
+    final phraseChanged = phasePhrase != null && phasePhrase != _lastVoicePhrase;
+    final canSpeakPhaseCue = nowMs - _lastPhaseCueAtMs >= _PHASE_CUE_MIN_GAP_MS;
+
+    if (phasePhrase != null &&
+        (phaseKeyChanged || phraseChanged) &&
+        canSpeakPhaseCue) {
+      _ttsService.speak(phasePhrase);
+      _lastPhaseCueAtMs = nowMs;
+    }
+
+    final liveFaultVoices = _liveFaultVoicesFromFeedback(_feedback);
+    for (final voice in liveFaultVoices) {
+      final lastSpokenAt = _lastFaultVoiceAtMs[voice] ?? 0;
+      if (nowMs - lastSpokenAt < _FAULT_CUE_COOLDOWN_MS) continue;
+      _lastFaultVoiceAtMs[voice] = nowMs;
+      _ttsService.speak(voice);
+    }
+
+    _lastVoicePhaseKey = currentPhaseKey;
+    _lastVoicePhrase = phasePhrase;
+    _lastVoiceRepCount = repCount;
+  }
+
+  String? _phasePhraseFromStatus(String? statusText) {
+    if (statusText == null || statusText.isEmpty) return null;
+
+    if (statusText.startsWith('Hold') || statusText.contains('Giữ')) {
+      return 'Giữ';
+    }
+    if (statusText.contains('Xuống')) {
+      return 'Xuống';
+    }
+    if (statusText.contains('Đứng lên') || statusText.contains('Lên')) {
+      return 'Đứng lên';
+    }
+    if (statusText.contains('Đứng thẳng')) {
+      return 'Đứng thẳng';
+    }
+
+    return null;
+  }
+
+  List<String> _liveFaultVoicesFromFeedback(Map<String, String> feedback) {
+    final voices = <String>[];
+
+    final depth = feedback['Depth'] ?? '';
+    if (depth.contains('Go Lower')) {
+      voices.add('Thấp hơn nữa');
+    }
+
+    final back = feedback['Back'] ?? '';
+    if (back.contains('Chest up')) {
+      voices.add('Ưỡn ngực lên');
+    }
+
+    return voices;
   }
 
   InputImage? _buildInputImage(CameraImage image) {

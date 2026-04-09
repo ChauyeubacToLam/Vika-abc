@@ -43,11 +43,21 @@ class SquatReportBuilderConfig {
 class SquatReportBuilder extends ExerciseReportBuilder {
   @override
   (String, String, String?) pickInsight(
-    ExerciseLogger logger,
-    ExerciseLogger? prevLogger,
+    dynamic logger,
+    dynamic prevLogger,
     int setScore,
     int? prevScore,
   ) {
+    if (logger is! ExerciseLogger) {
+      return (
+        '⚠️',
+        'Không có dữ liệu set nào được ghi lại.',
+        'Hoàn thành ít nhất 1 rep để nhận phân tích.',
+      );
+    }
+
+    final previousLogger = prevLogger is ExerciseLogger ? prevLogger : null;
+
     final maxRep = (logger.setLogs["max_rep"] as num?)?.toInt() ?? 0;
     if (logger.repLogs.isEmpty || maxRep == 0) {
       return (
@@ -69,9 +79,9 @@ class SquatReportBuilder extends ExerciseReportBuilder {
     }
 
     // ── 2. Improved vs previous set ──
-    if (prevLogger != null && prevLogger.repLogs.isNotEmpty) {
+    if (previousLogger != null && previousLogger.repLogs.isNotEmpty) {
       final result =
-          _findMetricChange(logger, prevLogger, maxRep, improved: true);
+          _findMetricChange(logger, previousLogger, maxRep, improved: true);
       if (result != null) return result;
     }
 
@@ -97,9 +107,9 @@ class SquatReportBuilder extends ExerciseReportBuilder {
     }
 
     // ── 5. Got worse vs previous set ──
-    if (prevLogger != null && prevLogger.repLogs.isNotEmpty) {
+    if (previousLogger != null && previousLogger.repLogs.isNotEmpty) {
       final result =
-          _findMetricChange(logger, prevLogger, maxRep, improved: false);
+          _findMetricChange(logger, previousLogger, maxRep, improved: false);
       if (result != null) return result;
     }
 
@@ -112,21 +122,31 @@ class SquatReportBuilder extends ExerciseReportBuilder {
   }
 
   @override
-  DetectedEvidence? detectIssue(List<ExerciseLogger> setLoggers) {
+  IssueQuestion? detectIssue(List<dynamic> setLoggers) {
+    final typedLoggers = setLoggers.whereType<ExerciseLogger>().toList();
+
     // NOTE: Re-runs interpreter analysis. OK for 3-5 sets.
     // TODO: Read from cached evidences when logger stores them.
-    final questions = <DetectedEvidence>[];
-    for (final setLogger in setLoggers) {
+    final evidences = <DetectedEvidence>[];
+    for (final setLogger in typedLoggers) {
       final interpreter = SquatInterpreter(logger: setLogger);
       interpreter.analyze();
-      questions.addAll(interpreter.evidences.expand((e) => e));
+      evidences.addAll(interpreter.evidences.expand((e) => e));
     }
-    return questions.isNotEmpty ? questions.first : null;
+
+    if (evidences.isEmpty) return null;
+    final top = evidences.first;
+    return IssueQuestion(
+      observation: _issueObservation(top),
+      question: top.question,
+      key: top.issueId,
+    );
   }
 
   @override
-  List<DetailCard> buildDetailCards(List<ExerciseLogger> setLoggers) {
-    final allReps = setLoggers.expand((l) => l.repLogs).toList();
+  List<DetailCard> buildDetailCards(List<dynamic> setLoggers) {
+    final typedLoggers = setLoggers.whereType<ExerciseLogger>().toList();
+    final allReps = typedLoggers.expand((l) => l.repLogs).toList();
     final totalReps = allReps.length;
     final totalGood = allReps.where((r) => r.correctForm).length;
 
@@ -141,7 +161,7 @@ class SquatReportBuilder extends ExerciseReportBuilder {
     final bestDepth =
         allDepths.isEmpty ? 0.0 : allDepths.reduce((a, b) => a < b ? a : b);
 
-    final setAvgDepths = setLoggers.map((l) {
+    final setAvgDepths = typedLoggers.map((l) {
       final ds = l.repLogs
           .map((r) => (r.data['peak_knee_angle'] as num?)?.toDouble())
           .where((d) => d != null && d > 0)
@@ -160,7 +180,7 @@ class SquatReportBuilder extends ExerciseReportBuilder {
         ? 0.0
         : allTempos.reduce((a, b) => a + b) / allTempos.length;
 
-    final setAvgTempos = setLoggers.map((l) {
+    final setAvgTempos = typedLoggers.map((l) {
       final ts = l.repLogs
           .map((r) => (r.data['descending_time'] as num?)?.toDouble())
           .where((t) => t != null && t > 0)
@@ -200,6 +220,19 @@ class SquatReportBuilder extends ExerciseReportBuilder {
       ),
     ];
   }
+
+  String _issueObservation(DetectedEvidence issue) => switch (issue.issueId) {
+        'ankle_mobility' =>
+          'AI thấy gót chân nhấc lên nhiều trong lúc squat.',
+        'ankle_mobility_restriction' =>
+          'AI thấy cổ chân và thân trên cùng mất ổn định khi xuống sâu.',
+        'hip_flexor_overactivity' =>
+          'AI thấy thân trên đổ về trước khá nhiều khi xuống squat.',
+        'limited_mobility' =>
+          'AI thấy độ sâu hiện tại vẫn còn bị giới hạn.',
+        _ =>
+          'AI ghi nhận tín hiệu: ${issue.rawSignal.replaceAll('_', ' ')}.',
+      };
 
   // ── Private helper ──
 

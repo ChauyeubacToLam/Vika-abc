@@ -405,8 +405,9 @@ class Squat extends ExerciseBase {
         resultIssues.addInstruction('standing', 'Status', 'Xuống');
         break;
       case SquatState.descending:
-        // Anticipatory cue: while descending, prepare user to hold at bottom.
-        resultIssues.addInstruction('descending', 'Status', 'Giữ');
+        // Keep the on-screen cue aligned with the current motion.
+        // Voice should only say "Giữ" after the user actually reaches bottom.
+        resultIssues.addInstruction('descending', 'Status', 'Going Down...');
         break;
       case SquatState.bottom:
         final remaining = tempoMetric.bottomHoldRemaining(now);
@@ -451,6 +452,11 @@ class Squat extends ExerciseBase {
       }
     }
 
+    if (squatState == SquatState.bottom &&
+        kneeAngle > SquatConfig.SQUAT_BOTTOM_ANGLE_THRESHOLD[1] + 5) {
+      _transitionState(SquatState.ascending, timestampMs);
+    }
+
     // Debounced threshold transitions
     if (_bottomDebouncer.update(
         kneeAngle <= SquatConfig.SQUAT_BOTTOM_ANGLE_THRESHOLD[1] &&
@@ -458,7 +464,8 @@ class Squat extends ExerciseBase {
       _transitionState(SquatState.bottom, timestampMs);
     } else if (_standingDebouncer.update(
         kneeAngle > SquatConfig.SQUAT_STAND_ANGLE_THRESHOLD &&
-            squatState == SquatState.ascending &&
+            (squatState == SquatState.ascending ||
+                squatState == SquatState.descending) &&
             !isDescendingFrame)) {
       _transitionState(SquatState.standing, timestampMs);
     }

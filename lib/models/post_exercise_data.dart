@@ -164,13 +164,67 @@ abstract class ExerciseReportBuilder {
     required List<dynamic> setLoggers, // List<ExerciseLogger>
     required String exerciseName,
     required double metValue,
-  });
+  }) {
+    final sets = <SetReportData>[];
+
+    for (var i = 0; i < setLoggers.length; i++) {
+      final logger = setLoggers[i];
+      final prevLogger = i > 0 ? setLoggers[i - 1] : null;
+
+      final repLogs = _tryReadRepLogs(logger);
+      final repResults = repLogs.map((rep) => _tryReadCorrectForm(rep)).toList();
+
+      final maxRep = _tryReadIntFromSetLogs(logger, 'max_rep') ?? repResults.length;
+      final totalReps = maxRep > 0 ? maxRep : repResults.length;
+      final inferredGood = repResults.where((ok) => ok).length;
+      final loggedGood = _tryReadIntFromSetLogs(logger, 'good_rep_count') ?? inferredGood;
+      final goodReps = loggedGood.clamp(0, totalReps);
+
+      final score = totalReps > 0 ? ((goodReps / totalReps) * 100).round() : 0;
+      final prevScore = sets.isNotEmpty ? sets.last.score : null;
+
+      final fatigue = detectFatigue(logger);
+      final insight = pickInsight(logger, prevLogger, score, prevScore);
+
+      sets.add(
+        SetReportData(
+          setIndex: i,
+          score: score,
+          goodReps: goodReps,
+          totalReps: totalReps,
+          repResults: repResults,
+          fatigueDetected: fatigue.$1,
+          fatigueText: fatigue.$2,
+          fatigueQuestion: fatigue.$3,
+          insightIcon: insight.$1,
+          insightText: insight.$2,
+          insightTip: insight.$3,
+        ),
+      );
+    }
+
+    final setScores = sets.map((set) => set.score).toList();
+    final avgScore =
+        setScores.isEmpty ? 0 : (setScores.reduce((a, b) => a + b) / setScores.length).round();
+    final improved = sets.length >= 2 && sets.last.score >= sets.first.score;
+
+    return PostExerciseData(
+      exerciseName: exerciseName,
+      metValue: metValue,
+      sets: sets,
+      formScore: avgScore,
+      coachText: generateCoachText(setScores, improved),
+      issueQuestion: detectIssue(setLoggers),
+      detailCards: buildDetailCards(setLoggers),
+    );
+  }
 
   // ── Helpers that subclasses implement ──
 
   /// Detect fatigue from per-rep data within a single set.
   /// Returns (detected, text, question) or (false, null, null).
-  (bool, String?, String?) detectFatigue(dynamic logger);
+  (bool, String?, String?) detectFatigue(dynamic logger) =>
+      (false, null, null);
 
   /// Pick the best insight for a set, given optional previous set.
   /// Returns (icon, text, tip?).
@@ -186,8 +240,55 @@ abstract class ExerciseReportBuilder {
   IssueQuestion? detectIssue(List<dynamic> setLoggers);
 
   /// Generate the template-based coach text (no API call).
-  String generateCoachText(List<int> setScores, bool improved);
+  String generateCoachText(List<int> setScores, bool improved) {
+    if (setScores.isEmpty) {
+      return 'Buổi tập đã hoàn tất. Tiếp tục duy trì đều đặn để cải thiện form.';
+    }
+
+    final avg = setScores.reduce((a, b) => a + b) / setScores.length;
+    final latest = setScores.last;
+
+    if (latest >= 85) {
+      return 'Form rất ổn định. Tiếp tục duy trì nhịp hiện tại ở các buổi sau.';
+    }
+    if (improved) {
+      return 'Form đã cải thiện qua các set. Giữ nhịp này để tiến bộ nhanh hơn.';
+    }
+    if (avg < 50) {
+      return 'Kỹ thuật chưa ổn định. Giảm tốc độ và ưu tiên kiểm soát động tác.';
+    }
+    return 'Buổi tập ổn định. Tập trung thêm vào kỹ thuật để nâng độ chính xác.';
+  }
 
   /// Build exercise-specific detail cards.
   List<DetailCard> buildDetailCards(List<dynamic> setLoggers);
+
+  List<dynamic> _tryReadRepLogs(dynamic logger) {
+    try {
+      final logs = logger.repLogs;
+      return logs is List ? logs : const [];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  bool _tryReadCorrectForm(dynamic repLog) {
+    try {
+      return repLog.correctForm == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  int? _tryReadIntFromSetLogs(dynamic logger, String key) {
+    try {
+      final setLogs = logger.setLogs;
+      if (setLogs is! Map) return null;
+      final value = setLogs[key];
+      if (value is num) return value.toInt();
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
 }

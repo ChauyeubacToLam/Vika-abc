@@ -7,13 +7,18 @@ allprojects {
 
 val newBuildDir: Directory =
     rootProject.layout.buildDirectory
-        .dir("../../build")
+    .dir("../../build")
         .get()
 rootProject.layout.buildDirectory.value(newBuildDir)
 
 subprojects {
-    val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
-    project.layout.buildDirectory.value(newSubprojectBuildDir)
+    // Only map the app module to Flutter's expected workspace build path.
+    // Leave pub-cache plugin modules on their defaults to avoid cross-root
+    // Java compile path issues on Windows.
+    if (project.path == ":app") {
+        val appBuildDir: Directory = newBuildDir.dir("app")
+        project.layout.buildDirectory.value(appBuildDir)
+    }
 }
 subprojects {
     project.evaluationDependsOn(":app")

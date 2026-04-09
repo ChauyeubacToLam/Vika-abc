@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../../interpreter/interpreter_base.dart';
 import '../../models/post_exercise_data.dart';
 import '../../theme/vf_theme.dart';
 import 'widgets/form_score_arc.dart';
@@ -651,7 +650,7 @@ class _CoachCard extends StatelessWidget {
 class _IssueQuestionCard extends StatefulWidget {
   const _IssueQuestionCard({required this.issue});
 
-  final DetectedEvidence issue;
+  final IssueQuestion issue;
 
   @override
   State<_IssueQuestionCard> createState() => _IssueQuestionCardState();
@@ -1096,14 +1095,14 @@ String _winMessage(int score) => score >= 80
         ? 'Đang tiến bộ rõ rồi.'
         : 'Hoàn thành đủ buổi tập.';
 
-String _issueObservation(DetectedEvidence issue) => switch (issue.issueId) {
-      'ankle_mobility' => 'AI thấy gót chân nhấc lên nhiều trong lúc squat.',
+String _issueObservation(IssueQuestion issue) => switch (issue.key) {
+      'ankle_mobility' => issue.observation,
       'ankle_mobility_restriction' =>
         'AI thấy cổ chân và thân trên cùng mất ổn định khi xuống sâu.',
       'hip_flexor_overactivity' =>
         'AI thấy thân trên đổ về trước khá nhiều khi xuống squat.',
       'limited_mobility' => 'AI thấy độ sâu hiện tại vẫn còn bị giới hạn.',
-      _ => 'AI ghi nhận tín hiệu: ${issue.rawSignal.replaceAll('_', ' ')}.',
+      _ => issue.observation,
     };
 
 String _formatDate(DateTime date) {

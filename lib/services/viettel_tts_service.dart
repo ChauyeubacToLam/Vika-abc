@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import '../utils/constants.dart';
 
@@ -8,10 +9,43 @@ class ViettelTTSService {
   static final ViettelTTSService _instance = ViettelTTSService._internal();
   factory ViettelTTSService() => _instance;
   ViettelTTSService._internal() {
+    _configFuture = _configurePlayer();
+
+    _audioPlayer.onPlayerStateChanged.listen((state) {
+      debugPrint('[TTS] player state: $state');
+    });
+
     _audioPlayer.onPlayerComplete.listen((_) {
+      debugPrint('[TTS] completed');
       _isPlaying = false;
       _processQueue();
     });
+  }
+
+  Future<void> _configurePlayer() async {
+    try {
+      await _audioPlayer.setPlayerMode(PlayerMode.mediaPlayer);
+      await _audioPlayer.setReleaseMode(ReleaseMode.stop);
+      await _audioPlayer.setVolume(1.0);
+      await _audioPlayer.setAudioContext(
+        AudioContext(
+          android: const AudioContextAndroid(
+            isSpeakerphoneOn: true,
+            stayAwake: false,
+            contentType: AndroidContentType.speech,
+            usageType: AndroidUsageType.media,
+            audioFocus: AndroidAudioFocus.gain,
+          ),
+          iOS: AudioContextIOS(
+            category: AVAudioSessionCategory.playback,
+            options: {AVAudioSessionOptions.defaultToSpeaker},
+          ),
+        ),
+      );
+      _isConfigured = true;
+    } catch (e) {
+      debugPrint('[TTS] configure failed: $e');
+    }
   }
 
   final AudioPlayer _audioPlayer = AudioPlayer();
@@ -20,6 +54,8 @@ class ViettelTTSService {
   // Voice queue for sequential playback (Approach A)
   final List<String> _queue = [];
   bool _isPlaying = false;
+  bool _isConfigured = false;
+  Future<void>? _configFuture;
 
   final Map<String, String> _assetMap = {
     "Sẵn sàng, xuống": "san_sang_xuong.mp3",
@@ -98,24 +134,41 @@ class ViettelTTSService {
     if (!_isPlaying) {
       _processQueue();
     }
+    debugPrint('[TTS] queued: $text');
   }
 
   /// Clear pending queue and stop current playback.
   /// Call when starting a new rep to prevent stale commands.
-  void clearQueue() {
+  void clearQueue() async {
     _queue.clear();
-    _audioPlayer.stop();
+    try {
+      await _audioPlayer.stop();
+    } catch (_) {}
     _isPlaying = false;
+    debugPrint('[TTS] queue cleared');
+    _processQueue();
+  }
+
+  /// Drop queued phrases but let the current phrase finish.
+  /// Useful when a higher-priority cue should play next without cutting audio mid-word.
+  void clearPendingButKeepCurrent() {
+    _queue.clear();
+    debugPrint('[TTS] pending queue cleared');
   }
 
   Future<void> _processQueue() async {
     if (_queue.isEmpty || _isPlaying) return;
     _isPlaying = true;
+    
+    if (!_isConfigured && _configFuture != null) {
+      await _configFuture;
+    }
+
     final text = _queue.removeAt(0);
     try {
       await _playText(text);
     } catch (e) {
-      print('TTS Exception: $e');
+      debugPrint('[TTS] process queue exception: $e');
       _isPlaying = false;
       _processQueue(); // Try next in queue
     }
@@ -130,8 +183,10 @@ class ViettelTTSService {
         try {
           await rootBundle.load(assetPath);
           await _audioPlayer.play(AssetSource('audio/$filename'));
+          debugPrint('[TTS] asset played: $assetPath');
           return;
-        } catch (_) {
+        } catch (e) {
+          debugPrint('[TTS] asset fallback for "$text": $e');
           // Fall back to API if not cached locally
         }
       }
@@ -155,13 +210,14 @@ class ViettelTTSService {
 
       if (response.statusCode == 200) {
         await _audioPlayer.play(BytesSource(response.bodyBytes));
+        debugPrint('[TTS] API bytes played for: $text');
       } else {
-        print('TTS Error: ${response.statusCode} - ${response.body}');
+        debugPrint('[TTS] API error: ${response.statusCode} - ${response.body}');
         _isPlaying = false;
         _processQueue();
       }
     } catch (e) {
-      print('TTS Exception: $e');
+      debugPrint('[TTS] play exception: $e');
       _isPlaying = false;
       _processQueue();
     }
