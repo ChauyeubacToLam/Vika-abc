@@ -10,6 +10,7 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 enum SkeletonStyle {
   constellation,
   classic,
+  tetGold,
 }
 
 class _PoseConnection {
@@ -33,12 +34,20 @@ class PoseOverlayPainter extends CustomPainter {
   static const Color jadeGlow = Color(0xFF2DD4A0);
   static const Color jadeBright = Color(0xFF5BFFB0);
   static const Color jade = Color(0xFF18594A);
+  static const Color gold = Color(0xFFD4AF37);
+  static const Color goldLight = Color(0xFFFFE9A3);
+  static const Color goldDark = Color(0xFF8C6D1F);
+  static const Color tetGreen = Color(0xFF0F2E20);
 
   static const double _minLikelihood = 0.5;
   static const double _coreDashLength = 3.0;
   static const double _coreGapLength = 6.0;
   static const double _limbDashLength = 2.0;
   static const double _limbGapLength = 8.0;
+  static const double _tetCoreDashLength = 5.0;
+  static const double _tetCoreGapLength = 8.0;
+  static const double _tetLimbDashLength = 3.0;
+  static const double _tetLimbGapLength = 8.0;
 
   final Pose pose;
   final Size imageSize;
@@ -102,6 +111,47 @@ class PoseOverlayPainter extends CustomPainter {
   final Paint _neckPaint = Paint()
     ..style = PaintingStyle.fill
     ..color = jadeGlow.withValues(alpha: 0.60);
+
+  final Paint _tetLinePaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeCap = StrokeCap.round
+    ..strokeWidth = 1.4
+    ..color = gold.withValues(alpha: 0.6);
+
+  final Paint _tetLimbLinePaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeCap = StrokeCap.round
+    ..strokeWidth = 1.0
+    ..color = gold.withValues(alpha: 0.4);
+
+  final Paint _tetOuterGlowPaint = Paint()
+    ..style = PaintingStyle.fill
+    ..color = gold.withValues(alpha: 0.06);
+
+  final Paint _tetPetalFillPaint = Paint()
+    ..style = PaintingStyle.fill
+    ..color = gold.withValues(alpha: 0.12);
+
+  final Paint _tetPetalStrokePaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 0.6
+    ..color = gold.withValues(alpha: 0.7);
+
+  final Paint _tetCenterPaint = Paint()
+    ..style = PaintingStyle.fill
+    ..color = goldLight.withValues(alpha: 0.9);
+
+  final Paint _tetCenterHighlightPaint = Paint()
+    ..style = PaintingStyle.fill
+    ..color = const Color(0xFFFFFFFF).withValues(alpha: 0.7);
+
+  final Paint _tetMinorPaint = Paint()
+    ..style = PaintingStyle.fill
+    ..color = gold.withValues(alpha: 0.4);
+
+  final Paint _tetWristPaint = Paint()
+    ..style = PaintingStyle.fill
+    ..color = gold.withValues(alpha: 0.25);
 
   static const List<List<PoseLandmarkType>> _bodyConnections = [
     [PoseLandmarkType.leftShoulder, PoseLandmarkType.rightShoulder],
@@ -341,6 +391,9 @@ class PoseOverlayPainter extends CustomPainter {
       case SkeletonStyle.classic:
         _drawClassicSkeleton(canvas, landmarks, projectedPoints);
         break;
+      case SkeletonStyle.tetGold:
+        _drawTetGoldSkeleton(canvas, projectedPoints);
+        break;
     }
 
     _drawMetricLabels(canvas, projectedPoints);
@@ -458,6 +511,80 @@ class PoseOverlayPainter extends CustomPainter {
     }
   }
 
+  void _drawTetGoldSkeleton(
+    Canvas canvas,
+    Map<PoseLandmarkType, Offset> projectedPoints,
+  ) {
+    final neck = _resolveNeck(projectedPoints);
+    final head = _resolveHead(projectedPoints);
+
+    if (neck != null) {
+      final leftShoulder = projectedPoints[PoseLandmarkType.leftShoulder];
+      final rightShoulder = projectedPoints[PoseLandmarkType.rightShoulder];
+
+      if (leftShoulder != null) {
+        _drawDashedLine(
+          canvas,
+          neck,
+          leftShoulder,
+          _tetLinePaint,
+          dashLength: _tetCoreDashLength,
+          gapLength: _tetCoreGapLength,
+        );
+      }
+      if (rightShoulder != null) {
+        _drawDashedLine(
+          canvas,
+          neck,
+          rightShoulder,
+          _tetLinePaint,
+          dashLength: _tetCoreDashLength,
+          gapLength: _tetCoreGapLength,
+        );
+      }
+    }
+
+    for (final connection in _constellationConnections) {
+      final start = projectedPoints[connection.start];
+      final end = projectedPoints[connection.end];
+      if (start == null || end == null) continue;
+
+      _drawDashedLine(
+        canvas,
+        start,
+        end,
+        connection.isCore ? _tetLinePaint : _tetLimbLinePaint,
+        dashLength: connection.isCore ? _tetCoreDashLength : _tetLimbDashLength,
+        gapLength: connection.isCore ? _tetCoreGapLength : _tetLimbGapLength,
+      );
+    }
+
+    for (final jointType in _majorJointTypes) {
+      final joint = projectedPoints[jointType];
+      if (joint == null) continue;
+      _drawGoldLotus(canvas, joint, 8.0);
+    }
+
+    if (head != null) {
+      _drawGoldLotus(canvas, head, 10.0);
+    }
+    if (neck != null) {
+      canvas.drawCircle(neck, 2.0, _tetMinorPaint);
+    }
+
+    for (final jointType in _elbowJointTypes) {
+      final joint = projectedPoints[jointType];
+      if (joint == null) continue;
+      canvas.drawCircle(joint, 2.0, _tetMinorPaint);
+    }
+
+    for (final jointType in _wristJointTypes) {
+      final joint = projectedPoints[jointType];
+      if (joint == null) continue;
+      canvas.drawCircle(joint, 1.5, _tetWristPaint);
+    }
+  }
+
   void _drawMajorJoint(Canvas canvas, Offset center) {
     canvas.drawCircle(center, 10.0, _majorOuterHaloPaint);
     canvas.drawCircle(center, 5.0, _majorInnerHaloPaint);
@@ -477,6 +604,28 @@ class PoseOverlayPainter extends CustomPainter {
   void _drawHeadJoint(Canvas canvas, Offset center) {
     canvas.drawCircle(center, 8.0, _headOuterHaloPaint);
     canvas.drawCircle(center, 3.5, _headCorePaint);
+  }
+
+  void _drawGoldLotus(Canvas canvas, Offset center, double size) {
+    canvas.drawCircle(center, size * 2, _tetOuterGlowPaint);
+
+    for (var i = 0; i < 8; i++) {
+      final angle = i * (math.pi / 4);
+      canvas.save();
+      canvas.translate(center.dx, center.dy);
+      canvas.rotate(angle);
+      final petalRect = Rect.fromCenter(
+        center: Offset(0, -size * 0.55),
+        width: size * 0.4,
+        height: size * 1.1,
+      );
+      canvas.drawOval(petalRect, _tetPetalFillPaint);
+      canvas.drawOval(petalRect, _tetPetalStrokePaint);
+      canvas.restore();
+    }
+
+    canvas.drawCircle(center, size * 0.22, _tetCenterPaint);
+    canvas.drawCircle(center, size * 0.08, _tetCenterHighlightPaint);
   }
 
   void _drawDashedLine(

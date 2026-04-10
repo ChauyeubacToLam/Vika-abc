@@ -400,14 +400,13 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                   return CustomPaint(
                     size: constraints.biggest,
                     painter: PoseOverlayPainter(
-                      pose: _detectedPose!,
-                      imageSize: _imageSize,
-                      rotation: _imageRotation,
-                      lensDirection:
-                          _cameraController!.description.lensDirection,
-                      debugData: widget.exercise.debugData,
-                      style: SkeletonStyle.constellation,
-                    ),
+                        pose: _detectedPose!,
+                        imageSize: _imageSize,
+                        rotation: _imageRotation,
+                        lensDirection:
+                            _cameraController!.description.lensDirection,
+                        debugData: widget.exercise.debugData,
+                        style: SkeletonStyle.classic),
                   );
                 },
               ),
