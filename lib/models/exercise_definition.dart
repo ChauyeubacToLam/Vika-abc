@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../exercise/curl_up/curl_up.dart';
 import '../exercise/exercise_base.dart';
 import '../exercise/glute bridge/glute_bridge.dart';
 import '../exercise/jumping jack/jumping_jack.dart';
@@ -276,6 +277,33 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'bottom': const Color(0xFF00E676),
       'ascending': const Color(0xFFFFD600),
       'topHold': const Color(0xFFE040FB),
+      'descending': const Color(0xFF00B0FF),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'curl_up',
+    name: 'McGill Curl-up',
+    subtitle: 'Core on dinh va gap than co kiem soat',
+    description:
+        'AI theo doi bai curl-up theo thoi gian thuc.\nTap trung vao goc gap than, co va dau goi.',
+    icon: Icons.accessibility_new_rounded,
+    primaryColor: const Color(0xFF26A69A),
+    secondaryColor: const Color(0xFF00695C),
+    difficulty: 'De - Trung binh',
+    targetMuscles: ['Core', 'Bung truoc', 'Hong'],
+    duration: '12 reps',
+    cameraHint: 'Quay nghieng nguoi so voi camera.',
+    framingHint: 'Giu vai, hong, dau goi va tai trong khung hinh.',
+    setupTips: [
+      'Dat camera thap ngang than de thay ro duong vai-hong.',
+      'Giu dau, vai va dau goi du sang truoc khi bat dau.',
+      'Nam ngang tren san, gap mot dau goi theo dung tu the McGill.',
+    ],
+    createExercise: () => CurlUp(maxRep: 12),
+    phaseColors: {
+      'resting': const Color(0xFF00E676),
+      'ascending': const Color(0xFFFFD600),
+      'apex': const Color(0xFFFF6D00),
       'descending': const Color(0xFF00B0FF),
     },
   ),

@@ -208,7 +208,10 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       final pose = poses.first;
       _detectedPose = pose;
       final result = widget.exercise.processPose(pose.landmarks);
-      if (result != null && result.length == 2) {
+      if (result != null &&
+          widget.exercise.exerciseState == ExerciseState.activated &&
+          result.length == 2 &&
+          result[1] is Map) {
         _feedback = Map<String, String>.from(result[1] as Map);
       } else if (widget.exercise.exerciseState == ExerciseState.completed &&
           !_didComplete) {
@@ -397,13 +400,13 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                   return CustomPaint(
                     size: constraints.biggest,
                     painter: PoseOverlayPainter(
-                      pose: _detectedPose!,
-                      imageSize: _imageSize,
-                      rotation: _imageRotation,
-                      lensDirection:
-                          _cameraController!.description.lensDirection,
-                      debugData: widget.exercise.debugData,
-                    ),
+                        pose: _detectedPose!,
+                        imageSize: _imageSize,
+                        rotation: _imageRotation,
+                        lensDirection:
+                            _cameraController!.description.lensDirection,
+                        debugData: widget.exercise.debugData,
+                        style: SkeletonStyle.classic),
                   );
                 },
               ),
@@ -798,8 +801,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     }
   }
 
-  bool _isScanningMessage(String message) =>
-      message.contains('Đang tìm người');
+  bool _isScanningMessage(String message) => message.contains('Đang tìm người');
 
   bool _isSafetyMessage(String message) {
     return message.contains('Quay nghiêng') ||
@@ -892,7 +894,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
   List<_MetricTileData> get _metricTiles {
     if (widget.definition.id.startsWith('squat')) {
-      return _buildSquatMetricTiles();
+      return _buildLiveSquatMetricTiles();
     }
 
     final feedback = Map<String, String>.from(_feedback)
@@ -952,6 +954,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     );
   }
 
+  // ignore: unused_element
   List<_MetricTileData> _buildSquatMetricTiles() {
     final debug = widget.exercise.debugData;
     final depthAngle =
@@ -1037,6 +1040,131 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     final raw = _feedback[key];
     if (raw == null || raw.isEmpty) return fallback;
     return _translateFeedbackValue(key, raw);
+  }
+
+  List<_MetricTileData> _buildLiveSquatMetricTiles() {
+    final debug = widget.exercise.debugData;
+    final depthAngle =
+        _readDebugNumber(debug['kneeAngle'] ?? debug['minKneeAngle']);
+    final heelNorm = _readDebugNumber(debug['heelNorm']);
+    final trunkLean =
+        _readDebugNumber(debug['trunkLean'] ?? debug['maxTrunkLean']);
+    final descent = _readDebugNumber(debug['descentDur']);
+    final ascent = _readDebugNumber(debug['ascentDur']);
+    final hold = _readDebugNumber(debug['bottomHold']);
+    final syncRatio =
+        _readDebugNumber(debug['syncRatio'] ?? debug['peakSyncRatio']);
+
+    return [
+      _buildLiveSquatMetricTile(
+        metric: _SquatMetric.depth,
+        label: 'ĐỘ SÂU',
+        activeValue:
+            depthAngle == null ? '—' : '${depthAngle.toStringAsFixed(0)}°',
+        hasValue: depthAngle != null,
+        state: _liveSquatMetricState(_SquatMetric.depth),
+      ),
+      _buildLiveSquatMetricTile(
+        metric: _SquatMetric.heel,
+        label: 'GÓT CHÂN',
+        activeValue:
+            heelNorm == null ? '—' : '${(heelNorm * 100).toStringAsFixed(0)}%',
+        hasValue: heelNorm != null,
+        state: _liveSquatMetricState(_SquatMetric.heel),
+      ),
+      _buildLiveSquatMetricTile(
+        metric: _SquatMetric.trunk,
+        label: 'LƯNG',
+        activeValue:
+            trunkLean == null ? '—' : '${trunkLean.toStringAsFixed(0)}°',
+        hasValue: trunkLean != null,
+        state: _liveSquatMetricState(_SquatMetric.trunk),
+      ),
+      _buildLiveSquatMetricTile(
+        metric: _SquatMetric.tempo,
+        label: 'NHỊP',
+        activeValue: _tempoValue(
+          descent: descent,
+          ascent: ascent,
+          hold: hold,
+          fallback: '—',
+        ),
+        hasValue: descent != null || hold != null || _feedback['Tempo'] != null,
+        state: _liveSquatMetricState(_SquatMetric.tempo),
+      ),
+      _buildLiveSquatMetricTile(
+        metric: _SquatMetric.sync,
+        label: 'ĐỒNG BỘ',
+        activeValue:
+            syncRatio == null ? '—' : '${syncRatio.toStringAsFixed(2)}x',
+        hasValue: syncRatio != null,
+        state: _liveSquatMetricState(_SquatMetric.sync),
+      ),
+    ];
+  }
+
+  _MetricTileData _buildLiveSquatMetricTile({
+    required _SquatMetric metric,
+    required String label,
+    required String activeValue,
+    required bool hasValue,
+    required MetricChipState state,
+  }) {
+    final active = _isSquatMetricActive(metric);
+    return _MetricTileData(
+      label: label,
+      value: active && hasValue ? activeValue : '—',
+      state: !active || !hasValue ? MetricChipState.neutral : state,
+    );
+  }
+
+  MetricChipState _liveSquatMetricState(_SquatMetric metric) {
+    if (!_isSquatMetricActive(metric)) {
+      return MetricChipState.neutral;
+    }
+
+    final feedbackKey = switch (metric) {
+      _SquatMetric.depth => 'Depth',
+      _SquatMetric.heel => 'Feet',
+      _SquatMetric.trunk => 'Back',
+      _SquatMetric.tempo => 'Tempo',
+      _SquatMetric.sync => 'Sync',
+    };
+    final feedback = _feedback[feedbackKey];
+    if (feedback == null || feedback.isEmpty) {
+      return MetricChipState.neutral;
+    }
+
+    final normalized = feedback.toLowerCase();
+    final isFaulting = switch (metric) {
+      _SquatMetric.depth => normalized.contains('go lower'),
+      _SquatMetric.heel => normalized.contains('lifting'),
+      _SquatMetric.trunk =>
+        normalized.contains('chest up') || normalized.contains("don't lean"),
+      _SquatMetric.tempo =>
+        normalized.contains('dropping') || normalized.contains('not pausing'),
+      _SquatMetric.sync => normalized.contains('drive chest up') ||
+          normalized.contains('keep chest up'),
+    };
+
+    return isFaulting ? MetricChipState.warning : MetricChipState.neutral;
+  }
+
+  bool _isSquatMetricActive(_SquatMetric metric) {
+    if (widget.exercise.exerciseState != ExerciseState.activated ||
+        widget.exercise.isPaused) {
+      return false;
+    }
+
+    final phase = widget.exercise.currentPhaseKey;
+    return switch (metric) {
+      _SquatMetric.depth => phase == 'descending' || phase == 'bottom',
+      _SquatMetric.heel ||
+      _SquatMetric.trunk =>
+        phase == 'descending' || phase == 'bottom' || phase == 'ascending',
+      _SquatMetric.tempo => phase == 'bottom' || phase == 'ascending',
+      _SquatMetric.sync => phase == 'ascending',
+    };
   }
 
   double? _readDebugNumber(dynamic value) {
@@ -1166,6 +1294,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     }
     return _translateInstruction(value);
   }
+
   double? _extractDurationSeconds(String value) {
     final match = RegExp(r'(\d+(?:\.\d+)?)s').firstMatch(value);
     if (match == null) {
@@ -1385,8 +1514,7 @@ class _CenterOverlay extends StatelessWidget {
                   Text(
                     cue.readyToPush
                         ? 'LÊN'
-                        : cue.remaining?.toStringAsFixed(1) ??
-                            'GIỮ',
+                        : cue.remaining?.toStringAsFixed(1) ?? 'GIỮ',
                     style: const TextStyle(
                       fontSize: 30,
                       fontWeight: FontWeight.w900,
@@ -1396,9 +1524,7 @@ class _CenterOverlay extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    cue.readyToPush
-                        ? 'Đẩy lên ngay'
-                        : 'Giữ đáy',
+                    cue.readyToPush ? 'Đẩy lên ngay' : 'Giữ đáy',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -1411,7 +1537,15 @@ class _CenterOverlay extends StatelessWidget {
           );
         }
         final clamped = progress?.clamp(0.0, 1.0) ?? 0.0;
-        final remaining = (3 - (clamped * 3)).ceil().clamp(1, 3);
+        final remainingSeconds =
+            (ExerciseBase.HOLD_STILL_REQUIRED_DURATION.inMilliseconds *
+                    (1 - clamped)) /
+                1000;
+        final remainingLabel = remainingSeconds <= 0
+            ? '0.0'
+            : (remainingSeconds < 1
+                ? remainingSeconds.toStringAsFixed(1)
+                : remainingSeconds.ceil().toString());
         return FormScoreArc(
           progress: clamped,
           size: 132,
@@ -1422,7 +1556,7 @@ class _CenterOverlay extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                '$remaining',
+                remainingLabel,
                 style: const TextStyle(
                   fontSize: 36,
                   fontWeight: FontWeight.w900,
@@ -1629,3 +1763,5 @@ class _FrostedPill extends StatelessWidget {
     );
   }
 }
+
+enum _SquatMetric { depth, heel, trunk, tempo, sync }
