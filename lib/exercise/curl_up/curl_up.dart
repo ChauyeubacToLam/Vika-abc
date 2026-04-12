@@ -1,7 +1,5 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, non_constant_identifier_names, constant_identifier_names
 
-
-
 import 'package:vinafit_mobile/utils/debouncer.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
@@ -376,6 +374,7 @@ class CurlUp extends ExerciseBase {
 
   void _transitionState(CurlUpState newState, int timestampMs) {
     previousCurlUpState = curlUpState;
+    curlUpState = newState;
     if (newState == CurlUpState.ascending &&
         previousCurlUpState == CurlUpState.resting) {
       resultIssues.instructions.clear();

@@ -159,7 +159,7 @@ class ViettelTTSService {
   Future<void> _processQueue() async {
     if (_queue.isEmpty || _isPlaying) return;
     _isPlaying = true;
-    
+
     if (!_isConfigured && _configFuture != null) {
       await _configFuture;
     }
@@ -192,6 +192,15 @@ class ViettelTTSService {
       }
 
       // 2. Fall back to Viettel API
+      if (Constants.viettelTtsToken.isEmpty) {
+        debugPrint(
+          '[TTS] missing VIETTEL_TTS_TOKEN. Provide it with --dart-define.',
+        );
+        _isPlaying = false;
+        _processQueue();
+        return;
+      }
+
       final response = await http.post(
         Uri.parse(_apiUrl),
         headers: {
@@ -212,7 +221,8 @@ class ViettelTTSService {
         await _audioPlayer.play(BytesSource(response.bodyBytes));
         debugPrint('[TTS] API bytes played for: $text');
       } else {
-        debugPrint('[TTS] API error: ${response.statusCode} - ${response.body}');
+        debugPrint(
+            '[TTS] API error: ${response.statusCode} - ${response.body}');
         _isPlaying = false;
         _processQueue();
       }

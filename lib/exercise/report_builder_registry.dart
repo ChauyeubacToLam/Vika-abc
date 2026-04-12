@@ -132,8 +132,9 @@ class GenericReportBuilder extends ExerciseReportBuilder {
     final maxRep = (logger.setLogs["max_rep"] as num?)?.toInt() ?? 0;
     final goodReps = (logger.setLogs["good_rep_count"] as num?)?.toInt() ?? 0;
     if (maxRep == 0) return ('⚠️', 'Không có rep nào.', null);
-    if (goodReps == maxRep)
+    if (goodReps == maxRep) {
       return ('✨', 'Hoàn hảo! $maxRep/$maxRep đúng form.', null);
+    }
     return ('📊', '$goodReps/$maxRep rep đúng form.', null);
   }
 

@@ -41,16 +41,16 @@ Phần quan trọng nhất của design này là không để một class ôm to
 5. Tăng `repCount` đúng thời điểm.
 6. Chuyển `exerciseState` sang `completed` khi đủ rep.
 
-### 2.2. Screen layer điều phối voice
+### 2.2. `SquatVoiceCoach` điều phối voice runtime
 
-`ActiveExercisePage` là nơi quyết định:
+`SquatVoiceCoach` là nơi quyết định:
 
 1. Frame hiện tại có được phép nói không.
 2. Nên ưu tiên phase cue, fault cue hay rep count.
 3. Khi nào cần dọn queue.
 4. Khi nào cần throttle để tránh spam.
 
-Đây là ý đồ đúng. Voice coordinator nên ở layer gần UI/runtime nhất vì nó phải nhìn được toàn bộ bối cảnh: pose có đang mất hay không, exercise có pause hay không, rep có vừa tăng không, set có vừa complete không.
+`ActiveExercisePage` chỉ còn nhiệm vụ gọi `processFrame(...)` sau mỗi frame. Nhờ vậy logic ưu tiên voice không còn bị dính chặt vào screen và không còn copy-paste sang flow khác.
 
 ### 2.3. TTS service chỉ lo queue và playback
 
@@ -69,13 +69,14 @@ Các file quan trọng của flow này:
 3. `lib/exercise/squat/metrics/squat_depth_metric.dart`
 4. `lib/exercise/squat/metrics/trunk_lean_metric.dart`
 5. `lib/exercise/squat/metrics/tempo_metric.dart`
-6. `lib/screens/exercise/active_exercise_page.dart`
-7. `lib/services/viettel_tts_service.dart`
+6. `lib/services/squat_voice_coach.dart`
+7. `lib/screens/exercise/active_exercise_page.dart`
+8. `lib/services/viettel_tts_service.dart`
 
 Nếu dev muốn copy pattern sang bài khác, gần như chắc chắn sẽ phải chạm vào đúng 3 tầng này:
 
 1. exercise + metrics
-2. screen coordinator
+2. voice coach
 3. TTS phrase/assets
 
 ## 4. Data contract mà voice đang đọc
@@ -142,7 +143,7 @@ Flow thực tế của Squat hiện tại như sau:
 4. `Squat._updatePhaseInstructions()` ghi `Status` cho phase hiện tại.
 5. Metric layer ghi live feedback như `Depth=Go Lower`, `Back=Chest up!`.
 6. Nếu rep hoàn thành, `Squat._completeRep()` tăng `repCount`.
-7. Sau khi exercise xử lý xong frame, `ActiveExercisePage._processSquatVoiceFrame()` đọc lại state hiện tại và quyết định phát gì.
+7. Sau khi exercise xử lý xong frame, `ActiveExercisePage._processSquatVoiceFrame()` forward dữ liệu sang `SquatVoiceCoach.processFrame(...)`.
 8. `ViettelTTSService` xếp câu nói vào queue và phát lần lượt.
 
 ## 7. Timeline nghiệp vụ của một rep squat chuẩn
@@ -189,7 +190,7 @@ Các phrase dưới đây phải khớp với key trong `_assetMap` của `Viett
 | Phase cue | Có `Status` map được sang phrase và `phaseKey` hoặc phrase thay đổi | `Xuống` / `Giữ` / `Đứng lên` / `Đứng thẳng` | Cooldown tối thiểu 250ms |
 | Live depth fault | `_feedback['Depth']` chứa `Go Lower` | `Thấp hơn nữa` | Cooldown 3000ms theo từng phrase |
 | Live trunk fault | `_feedback['Back']` chứa `Chest up` | `Ưỡn ngực lên` | Cooldown 3000ms theo từng phrase |
-| Rep complete | `repCount > _lastVoiceRepCount` | số rep | `clearPendingButKeepCurrent()` rồi enqueue số rep |
+| Rep complete | `repCount > _lastRepCount` | số rep | `clearPendingButKeepCurrent()` rồi enqueue số rep |
 | Set complete | `exerciseState == completed` và chưa announce complete | `Hoàn thành bài tập` | `clearPendingButKeepCurrent()` trước completion flow, chỉ 1 lần |
 
 Lưu ý rất quan trọng:
@@ -286,13 +287,13 @@ Nó:
 
 Voice không tự phát hiện rep bằng landmark. Voice chỉ nhìn `repCount` sau khi method này chạy xong. Đây là pattern nên giữ cho bài khác.
 
-### 10.7. `ActiveExercisePage._processSquatVoiceFrame({required bool hasPose})`
+### 10.7. `SquatVoiceCoach.processFrame(...)`
 
 Đây là voice coordinator của Squat.
 
 Thứ tự ưu tiên trong method này:
 
-1. Nếu không phải squat thì return ngay.
+1. Screen chỉ gọi coach cho bài `Squat`.
 2. Nếu bài đã `completed`, ưu tiên rep cuối và completion.
 3. Nếu chưa `activated`, đang `paused`, hoặc mất pose thì im lặng.
 4. Nếu đây là frame active đầu tiên thì phát `Sẵn sàng`.
@@ -305,7 +306,9 @@ Quyết định "rep count return sớm" là có chủ đích:
 1. Rep count có giá trị cao hơn phase cue và fault cue.
 2. Khi rep vừa hoàn thành, queue cũ thường đã lỗi thời.
 
-### 10.8. `String? _phasePhraseFromStatus(String? statusText)`
+`ActiveExercisePage._processSquatVoiceFrame()` giờ chỉ còn làm một việc: nếu bài hiện tại là `Squat` thì gọi `SquatVoiceCoach.processFrame(...)` với `exercise`, `repCount`, `hasPose` và `feedback`.
+
+### 10.8. `String? SquatVoiceCoach._phasePhraseFromStatus(String? statusText)`
 
 Method này map text business sang canonical phrase để TTS hiểu.
 
@@ -322,7 +325,7 @@ Mapping hiện tại:
 2. Điều này là chủ động, không phải bug.
 3. Vì cue đi xuống đã được phát từ phase `standing` với status `Xuống`.
 
-### 10.9. `List<String> _liveFaultVoicesFromFeedback(Map<String, String> feedback)`
+### 10.9. `List<String> SquatVoiceCoach._liveFaultVoicesFromFeedback(Map<String, String> feedback)`
 
 Method này convert feedback runtime sang voice fault có thể phát ngay.
 
@@ -424,23 +427,27 @@ Exercise phải tự quyết định status text cho từng phase, ví dụ:
 
 Screen chỉ nên map status text sang canonical phrase, không nên tự nghĩ business wording.
 
-### Bước 5. Viết voice coordinator ở screen layer
+### Bước 5. Viết voice coach ở runtime layer
 
-Coordinator cho bài mới nên giữ skeleton gần giống Squat:
+Voice coach cho bài mới nên giữ skeleton gần giống Squat:
 
 ```dart
-void _processExerciseVoiceFrame({required bool hasPose}) {
-  final state = widget.exercise.exerciseState;
-  final phaseKey = widget.exercise.currentPhaseKey;
-  final repCount = widget.exercise.repCount;
-  final repIncreased = repCount > _lastVoiceRepCount;
+void processFrame({
+  required ExerciseBase exercise,
+  required int repCount,
+  required bool hasPose,
+  required Map<String, String> feedback,
+}) {
+  final state = exercise.exerciseState;
+  final phaseKey = exercise.currentPhaseKey;
+  final repIncreased = repCount > _lastRepCount;
 
   if (state == ExerciseState.completed) {
     // rep cuối + completion
     return;
   }
 
-  if (state != ExerciseState.activated || widget.exercise.isPaused || !hasPose) {
+  if (state != ExerciseState.activated || exercise.isPaused || !hasPose) {
     // gate toàn bộ voice
     return;
   }
@@ -479,11 +486,11 @@ Nếu chỉ nhìn "nghe có vẻ ổn", dev rất dễ bỏ sót lỗi race cond
 
 ### 13.1. Phần có thể copy gần như nguyên mẫu
 
-1. Cấu trúc coordinator trong screen
-2. Biến state phục vụ voice như `_lastVoicePhaseKey`, `_lastVoiceRepCount`, `_lastFaultVoiceAtMs`
+1. Cấu trúc của `SquatVoiceCoach`
+2. Biến state phục vụ voice như `_lastPhaseKey`, `_lastRepCount`, `_lastFaultVoiceAtMs`
 3. Cơ chế throttle theo phrase
 4. TTS queue policy
-5. Quy ước rep count lấy từ `repCount` thay vì tự detect lại trong screen
+5. Quy ước rep count lấy từ `repCount` thay vì tự detect lại ngoài exercise layer
 
 ### 13.2. Phần phải customize cho từng bài
 
@@ -518,7 +525,7 @@ Implementation được xem là đúng khi thỏa tất cả điều sau:
 
 ## 15. Gợi ý refactor cho tương lai
 
-Design hiện tại chạy tốt cho Squat, nhưng nếu số bài có voice tăng lên, nên cân nhắc tách một abstraction chung như:
+Design hiện tại đã đi được một bước đúng: logic Squat đã được tách ra `SquatVoiceCoach`, không còn nằm trực tiếp trong screen. Nếu số bài có voice tăng lên, bước tiếp theo nên cân nhắc abstraction chung như:
 
 1. `ExerciseVoiceCoordinator`
 2. `ExerciseVoiceConfig`
@@ -531,10 +538,10 @@ Khi đó mỗi bài chỉ cần cung cấp:
 2. live fault resolver
 3. rep/completion phrase config
 
-Tuy nhiên ở thời điểm hiện tại, việc giữ logic ngay trong `ActiveExercisePage` vẫn chấp nhận được vì:
+Ở thời điểm hiện tại, việc giữ logic trong một `SquatVoiceCoach` chuyên biệt vẫn hợp lý vì:
 
 1. Squat là bài đầu tiên có flow voice hoàn chỉnh nhất.
-2. Logic đang còn mang tính khám phá nghiệp vụ.
+2. Mapping phrase và queue policy vẫn còn mang tính bài-specific.
 3. Chúng ta vẫn cần thêm 1-2 bài nữa để rút ra abstraction đủ đúng.
 
 ## 16. Kết luận
@@ -542,7 +549,8 @@ Tuy nhiên ở thời điểm hiện tại, việc giữ logic ngay trong `Activ
 Voice của Squat đang đi theo một pattern tốt và đáng tái sử dụng:
 
 1. Exercise layer sinh dữ liệu nghiệp vụ.
-2. Screen layer điều phối thứ tự ưu tiên và queue policy.
-3. TTS service chỉ lo playback.
+2. `SquatVoiceCoach` điều phối thứ tự ưu tiên và queue policy.
+3. Screen chỉ forward runtime context vào voice coach.
+4. TTS service chỉ lo playback.
 
 Nếu dev khác muốn implement voice cho bài mới, hãy giữ nguyên triết lý đó. Đừng bắt đầu từ việc "thêm vài câu speak()". Hãy bắt đầu từ việc xác định event contract giữa exercise, UI coordinator và TTS.

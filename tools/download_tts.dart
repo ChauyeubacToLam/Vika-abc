@@ -1,10 +1,17 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
-
-const String token = '3e96c274c2f6f3a20677b5464bd49446';
+import 'package:vinafit_mobile/utils/constants.dart';
 
 Future<void> main() async {
+  if (Constants.viettelTtsToken.isEmpty) {
+    stderr.writeln(
+      'Missing VIETTEL_TTS_TOKEN. Run with: dart run -DVIETTEL_TTS_TOKEN=... tools/download_tts.dart',
+    );
+    exitCode = 64;
+    return;
+  }
+
   final phrases = {
     "Sẵn sàng, xuống": "san_sang_xuong.mp3",
     "Xuống": "xuong.mp3",
@@ -83,7 +90,7 @@ Future<void> main() async {
     final filename = entry.value;
     final path = 'assets/audio/$filename';
 
-    print('Downloading $text to $path...');
+    stdout.writeln('Downloading $text to $path...');
     try {
       final response = await http.post(
         Uri.parse(apiUrl),
@@ -96,7 +103,7 @@ Future<void> main() async {
           'voice': 'hn-quynhanh',
           'speed': 1.2,
           'tts_return_option': 3,
-          'token': token,
+          'token': Constants.viettelTtsToken,
           'without_filter': false,
         }),
       );
@@ -104,12 +111,13 @@ Future<void> main() async {
       if (response.statusCode == 200) {
         final file = File(path);
         await file.writeAsBytes(response.bodyBytes);
-        print('Saved $path successfully.');
+        stdout.writeln('Saved $path successfully.');
       } else {
-        print('Failed to download $text: ${response.statusCode} - ${response.body}');
+        stderr.writeln(
+            'Failed to download $text: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
-      print('Error downloading $text: $e');
+      stderr.writeln('Error downloading $text: $e');
     }
   }
 }
