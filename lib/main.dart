@@ -1,5 +1,6 @@
 // ignore_for_file: curly_braces_in_flow_control_structures
 
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
@@ -10,13 +11,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'screens/onboarding/onboarding_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'exercise/exercise_base.dart';
 import 'models/exercise_definition.dart';
 import 'screens/exercise/exercise_experience_screen.dart';
 import 'screens/main_shell.dart';
+import 'screens/onboarding/onboarding_screen.dart';
 import 'theme/vf_theme.dart';
 
 /* =========================================================================
@@ -28,6 +30,13 @@ late bool _hasCompletedOnboarding;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await Supabase.initialize(
+    url: "https://frjtlfzbvdgwgzegfzxh.supabase.co",
+    anonKey:
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZyanRsZnpidmRnd2d6ZWdmenhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4Mjk2NjUsImV4cCI6MjA5MTQwNTY2NX0.Eprv5NtWbZqigYPZdOEeRIyvYVxp0l2hmbXXyEdh8nI',
+  );
+
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -36,14 +45,44 @@ Future<void> main() async {
     ),
   );
   _cameras = await availableCameras();
-  final prefs = await SharedPreferences.getInstance();
-  _hasCompletedOnboarding = prefs.getBool('onboarding_complete') ?? false;
+  _hasCompletedOnboarding = await isOnboardingComplete();
   runApp(const VinaFitApp());
+}
+
+// Add this at the top level of the file for easy access everywhere
+final supabase = Supabase.instance.client;
+
+Future<bool> _readStoredOnboardingCompletion() async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.getBool('onboarding_complete') ?? false;
+}
+
+Future<bool> isOnboardingComplete() async {
+  final localValue = await _readStoredOnboardingCompletion();
+  final user = supabase.auth.currentUser;
+
+  if (user == null) {
+    return false;
+  }
+
+  try {
+    final data = await supabase
+        .from('profiles')
+        .select('onboarding_complete')
+        .eq('id', user.id)
+        .maybeSingle();
+
+    return data?['onboarding_complete'] as bool? ?? localValue;
+  } catch (_) {
+    return localValue;
+  }
 }
 
 /* =========================================================================
    UI REP LOG — For debug panel display only. Not the data pipeline.
    ========================================================================= */
+
+enum _AppEntryState { onboarding, home, loading }
 
 class UIRepLog {
   final int repNumber;
@@ -97,11 +136,15 @@ class VinaFitApp extends StatelessWidget {
         behavior: const VFScrollBehavior(),
         child: child ?? const SizedBox.shrink(),
       ),
-      initialRoute: _hasCompletedOnboarding ? '/' : '/',
+      initialRoute: '/',
       onGenerateRoute: (settings) {
         switch (settings.name) {
           case '/':
-            return MaterialPageRoute(builder: (_) => const MainShell());
+            return MaterialPageRoute(
+              builder: (_) => AppEntryGate(
+                initialOnboardingComplete: _hasCompletedOnboarding,
+              ),
+            );
           case '/onboarding':
             return MaterialPageRoute(
               builder: (_) => const OnboardingScreen(),
@@ -112,9 +155,156 @@ class VinaFitApp extends StatelessWidget {
               builder: (_) => ExerciseExperienceScreen(definition: definition),
             );
           default:
-            return MaterialPageRoute(builder: (_) => const MainShell());
+            return MaterialPageRoute(
+              builder: (_) => AppEntryGate(
+                initialOnboardingComplete: _hasCompletedOnboarding,
+              ),
+            );
         }
       },
+    );
+  }
+}
+
+class AppEntryGate extends StatefulWidget {
+  const AppEntryGate({
+    super.key,
+    required this.initialOnboardingComplete,
+  });
+
+  final bool initialOnboardingComplete;
+
+  @override
+  State<AppEntryGate> createState() => _AppEntryGateState();
+}
+
+class _AppEntryGateState extends State<AppEntryGate> {
+  StreamSubscription<AuthState>? _authSubscription;
+  late _AppEntryState _entryState;
+
+  @override
+  void initState() {
+    super.initState();
+    _entryState = _initialEntryState();
+    _authSubscription = supabase.auth.onAuthStateChange.listen(
+      _handleAuthStateChange,
+    );
+    _resolveEntryState();
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
+  }
+
+  _AppEntryState _initialEntryState() {
+    final session = supabase.auth.currentSession;
+    if (session == null) {
+      return _AppEntryState.onboarding;
+    }
+
+    return widget.initialOnboardingComplete
+        ? _AppEntryState.home
+        : _AppEntryState.onboarding;
+  }
+
+  Future<void> _resolveEntryState() async {
+    final session = supabase.auth.currentSession;
+    if (session == null) {
+      _setEntryState(_AppEntryState.onboarding);
+      return;
+    }
+
+    final complete = await isOnboardingComplete();
+    _setEntryState(
+      complete ? _AppEntryState.home : _AppEntryState.onboarding,
+    );
+  }
+
+  void _handleAuthStateChange(AuthState data) {
+    switch (data.event.name) {
+      case 'signedIn':
+      case 'initialSession':
+      case 'passwordRecovery':
+      case 'userUpdated':
+      case 'mfaChallengeVerified':
+        _setEntryState(_AppEntryState.loading);
+        _resolveEntryState();
+        break;
+      case 'signedOut':
+      case 'userDeleted':
+        _setEntryState(_AppEntryState.onboarding);
+        break;
+      case 'tokenRefreshed':
+        break;
+      default:
+        _setEntryState(_AppEntryState.loading);
+        _resolveEntryState();
+    }
+  }
+
+  void _setEntryState(_AppEntryState state) {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() => _entryState = state);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    switch (_entryState) {
+      case _AppEntryState.onboarding:
+        return const OnboardingScreen();
+      case _AppEntryState.home:
+        return const MainShell();
+      case _AppEntryState.loading:
+        return const _AuthLoadingScreen();
+    }
+  }
+}
+
+class _AuthLoadingScreen extends StatelessWidget {
+  const _AuthLoadingScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+      ),
+      child: Scaffold(
+        backgroundColor: VFTheme.bg,
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.4,
+                  valueColor: const AlwaysStoppedAnimation<Color>(VFTheme.jade),
+                  backgroundColor: VFTheme.jadeMist,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Đang đồng bộ tài khoản...',
+                style: VFTheme.textStyle(
+                  context,
+                  size: 13,
+                  weight: FontWeight.w600,
+                  color: VFTheme.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
