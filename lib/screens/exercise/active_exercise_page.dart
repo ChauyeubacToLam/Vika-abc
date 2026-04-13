@@ -646,12 +646,20 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         fit: StackFit.expand,
         children: [
           RepaintBoundary(
-            child: Center(
-              child: _runtime == _PoseRuntime.nativeMediaPipe
-                  ? Texture(textureId: _textureId!)
-                  : (_cameraController != null
-                      ? CameraPreview(_cameraController!)
-                      : const SizedBox.shrink()),
+            child: SizedBox.expand(
+              child: FittedBox(
+                fit: BoxFit.contain,
+                alignment: Alignment.center,
+                child: SizedBox(
+                  width: _previewRenderSize.width,
+                  height: _previewRenderSize.height,
+                  child: _runtime == _PoseRuntime.nativeMediaPipe
+                      ? Texture(textureId: _textureId!)
+                      : (_cameraController != null
+                          ? CameraPreview(_cameraController!)
+                          : const SizedBox.shrink()),
+                ),
+              ),
             ),
           ),
           Positioned.fill(
@@ -1668,6 +1676,22 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         ),
       ),
     );
+  }
+
+  Size get _previewRenderSize {
+    if (_imageSize != Size.zero) {
+      return _imageSize;
+    }
+
+    final previewSize = _cameraController?.value.previewSize;
+    if (previewSize != null) {
+      if (previewSize.width > previewSize.height) {
+        return Size(previewSize.height, previewSize.width);
+      }
+      return previewSize;
+    }
+
+    return const Size(480, 640);
   }
 }
 

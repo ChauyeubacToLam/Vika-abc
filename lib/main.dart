@@ -1025,6 +1025,22 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     }
   }
 
+  Size get _legacyPreviewRenderSize {
+    if (_imageSize != Size.zero) {
+      return _imageSize;
+    }
+
+    final previewSize = _cameraController?.value.previewSize;
+    if (previewSize != null) {
+      if (previewSize.width > previewSize.height) {
+        return Size(previewSize.height, previewSize.width);
+      }
+      return previewSize;
+    }
+
+    return const Size(480, 640);
+  }
+
   /* =======================================================================
      BUILD
      ======================================================================= */
@@ -1394,7 +1410,19 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         return Stack(
           fit: StackFit.expand,
           children: [
-            RepaintBoundary(child: Center(child: CameraPreview(controller))),
+            RepaintBoundary(
+              child: SizedBox.expand(
+                child: FittedBox(
+                  fit: BoxFit.contain,
+                  alignment: Alignment.center,
+                  child: SizedBox(
+                    width: _legacyPreviewRenderSize.width,
+                    height: _legacyPreviewRenderSize.height,
+                    child: CameraPreview(controller),
+                  ),
+                ),
+              ),
+            ),
             if (_detectedPose != null)
               RepaintBoundary(
                 child: CustomPaint(
@@ -2484,21 +2512,8 @@ class PosePainter extends CustomPainter {
       double x = lm.x;
       double y = lm.y;
 
-      if (Platform.isAndroid) {
-        switch (rotation) {
-          case InputImageRotation.rotation90deg:
-            x = lm.x;
-            y = lm.y;
-            break;
-          case InputImageRotation.rotation270deg:
-            x = imageW - lm.x;
-            y = imageH - lm.y;
-            break;
-          default:
-            break;
-        }
-      }
-
+      // Landmarks are already in oriented image space. Applying an extra
+      // Android-only rotation here can invert the skeleton on some devices.
       if (lensDirection == CameraLensDirection.front) {
         x = imageW - x;
       }
