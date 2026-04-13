@@ -3,6 +3,7 @@ package com.vinafit.mobile
 import android.annotation.SuppressLint
 import android.os.Handler
 import android.os.Looper
+import android.os.Build
 import android.util.Size
 import android.view.Surface
 import androidx.camera.core.CameraSelector
@@ -99,6 +100,8 @@ class PoseLandmarkerPlugin(
         detectionEnabled = true
 
         try {
+            ensureRuntimeSupport()
+
             if (textureEntry == null) {
                 textureEntry = textureRegistry.createSurfaceTexture()
             }
@@ -126,9 +129,30 @@ class PoseLandmarkerPlugin(
                 },
                 ContextCompat.getMainExecutor(activity),
             )
+        } catch (error: UnsatisfiedLinkError) {
+            disposeResources(releaseTexture = false)
+            result.error("pose_landmarker_init", errorMessageForRuntime(error), null)
         } catch (exception: Exception) {
+            disposeResources(releaseTexture = false)
             result.error("pose_landmarker_init", exception.message, null)
         }
+    }
+
+    private fun ensureRuntimeSupport() {
+        val supportedAbis = Build.SUPPORTED_ABIS?.toList().orEmpty()
+        if (supportedAbis.any { it.equals("x86_64", ignoreCase = true) }) {
+            throw IllegalStateException(
+                "MediaPipe Pose Landmarker is not available on x86_64 Android emulators. Use a physical ARM phone or an ARM emulator image."
+            )
+        }
+    }
+
+    private fun errorMessageForRuntime(error: Throwable): String {
+        val message = error.message.orEmpty()
+        if (message.contains("libmediapipe_tasks_vision_jni.so")) {
+            return "MediaPipe Pose Landmarker native library could not be loaded on this device. Use a physical ARM phone or an ARM emulator image."
+        }
+        return message.ifBlank { "Failed to initialize MediaPipe Pose Landmarker." }
     }
 
     @SuppressLint("UnsafeOptInUsageError")
@@ -140,11 +164,7 @@ class PoseLandmarkerPlugin(
         val helper =
             poseLandmarkerHelper ?: throw IllegalStateException("Pose landmarker helper is not initialized.")
 
-        val cameraSelector = if (useFrontCamera) {
-            CameraSelector.DEFAULT_FRONT_CAMERA
-        } else {
-            CameraSelector.DEFAULT_BACK_CAMERA
-        }
+        val cameraSelector = resolveCameraSelector(provider)
 
         provider.unbindAll()
 
@@ -193,6 +213,37 @@ class PoseLandmarkerPlugin(
         imageAnalysis = analysisUseCase
 
         provider.bindToLifecycle(activity, cameraSelector, previewUseCase, analysisUseCase)
+    }
+
+    private fun resolveCameraSelector(provider: ProcessCameraProvider): CameraSelector {
+        val preferredSelector = if (useFrontCamera) {
+            CameraSelector.DEFAULT_FRONT_CAMERA
+        } else {
+            CameraSelector.DEFAULT_BACK_CAMERA
+        }
+        if (provider.hasCameraSafely(preferredSelector)) {
+            return preferredSelector
+        }
+
+        val fallbackSelector = if (useFrontCamera) {
+            CameraSelector.DEFAULT_BACK_CAMERA
+        } else {
+            CameraSelector.DEFAULT_FRONT_CAMERA
+        }
+        if (provider.hasCameraSafely(fallbackSelector)) {
+            useFrontCamera = !useFrontCamera
+            return fallbackSelector
+        }
+
+        throw IllegalStateException("No compatible camera is available on this device.")
+    }
+
+    private fun ProcessCameraProvider.hasCameraSafely(selector: CameraSelector): Boolean {
+        return try {
+            hasCamera(selector)
+        } catch (_: Exception) {
+            false
+        }
     }
 
     private fun emitResult(payload: Map<String, Any?>) {
