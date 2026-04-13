@@ -34,6 +34,8 @@ claude/
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
+.appdata/
+.dart-home/
 /build/
 /coverage/
 .packages

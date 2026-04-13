@@ -101,6 +101,7 @@ class _MainShellState extends State<MainShell> {
           currentIndex: _currentIndex,
           browserOpen: _browserOpen,
           bottomInset: bottomInset,
+          navBarHeight: navBarHeight,
           onToggleBrowser: _toggleBrowser,
           onTap: (index) {
             setState(() {
@@ -128,6 +129,7 @@ class _BottomNavBar extends StatelessWidget {
     required this.currentIndex,
     required this.browserOpen,
     required this.bottomInset,
+    required this.navBarHeight,
     required this.onToggleBrowser,
     required this.onTap,
   });
@@ -135,6 +137,7 @@ class _BottomNavBar extends StatelessWidget {
   final int currentIndex;
   final bool browserOpen;
   final double bottomInset;
+  final double navBarHeight;
   final VoidCallback onToggleBrowser;
   final ValueChanged<int> onTap;
 
@@ -279,70 +282,53 @@ class _CenterNavAction extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(18 * s),
       child: Padding(
-        padding: EdgeInsets.symmetric(vertical: 6 * s),
+        padding: EdgeInsets.symmetric(vertical: 4 * s),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutCubic,
-              width: VFTheme.fabSize,
-              height: VFTheme.fabSize,
-              transform: Matrix4.translationValues(
-                0,
-                active ? -4 * s : -2 * s,
-                0,
-              ),
-              decoration: BoxDecoration(
-                gradient: active
-                    ? VFTheme.jadeGradient
-                    : LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          VFTheme.surface.withValues(alpha: 0.96),
-                          VFTheme.jadeLight,
-                        ],
-                      ),
-                borderRadius: BorderRadius.circular(17 * s),
-                border: Border.all(
-                  color: active
-                      ? VFTheme.jadeGlow.withValues(alpha: 0.18)
-                      : VFTheme.jade.withValues(alpha: 0.10),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: active
-                        ? VFTheme.jade.withValues(alpha: 0.26)
-                        : const Color(0xFF181B19).withValues(alpha: 0.08),
-                    blurRadius: active ? 22 * s : 12 * s,
-                    offset: Offset(0, active ? 8 * s : 4 * s),
-                  ),
-                ],
-              ),
-              alignment: Alignment.center,
-              child: AnimatedRotation(
+            Transform.translate(
+              offset: Offset(0, active ? -4 * s : -2 * s),
+              child: AnimatedContainer(
                 duration: const Duration(milliseconds: 220),
-                turns: active ? 0.125 : 0,
                 curve: Curves.easeOutCubic,
-                child: VFNavIcon(
-                  glyph: VFNavGlyph.plus,
-                  color: iconColor,
-                  size: 22 * s,
-                  strokeWidth: 2.5,
+                width: VFTheme.fabSize,
+                height: VFTheme.fabSize,
+                decoration: BoxDecoration(
+                  gradient: VFTheme.jadeGradient,
+                  borderRadius: BorderRadius.circular(17 * s),
+                  boxShadow: [
+                    BoxShadow(
+                      color: VFTheme.jade.withValues(
+                        alpha: active ? 0.30 : 0.24,
+                      ),
+                      blurRadius: active ? 22 * s : 18 * s,
+                      offset: Offset(0, active ? 8 * s : 4 * s),
+                    ),
+                  ],
+                ),
+                alignment: Alignment.center,
+                child: AnimatedRotation(
+                  duration: const Duration(milliseconds: 220),
+                  turns: active ? 0.125 : 0,
+                  curve: Curves.easeOutCubic,
+                  child: VFNavIcon(
+                    glyph: VFNavGlyph.plus,
+                    color: VFTheme.white,
+                    size: 22 * s,
+                    strokeWidth: 2.5,
+                  ),
                 ),
               ),
             ),
             SizedBox(height: 2 * s),
-            AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 180),
+            Text(
+              'Khám phá',
               style: VFTheme.textStyle(
                 context,
                 size: 10,
                 weight: active ? FontWeight.w800 : FontWeight.w600,
-                color: labelColor,
+                color: active ? VFTheme.jade : VFTheme.textMuted,
               ),
-              child: const Text('Khám phá'),
             ),
             SizedBox(height: 2 * s),
             AnimatedContainer(

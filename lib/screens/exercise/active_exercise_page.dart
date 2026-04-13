@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 
@@ -8,6 +9,8 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../exercise/exercise_base.dart';
+import '../../pose/pose_landmarker_adapter.dart';
+import '../../pose/pose_landmarker_channel.dart';
 import '../../exercise/squat/metrics/heel_rise_metric.dart';
 import '../../exercise/squat/metrics/hip_shoulder_sync.dart';
 import '../../exercise/squat/metrics/tempo_metric.dart';
@@ -47,6 +50,7 @@ class ActiveExercisePage extends StatefulWidget {
 
 class _ActiveExercisePageState extends State<ActiveExercisePage>
     with TickerProviderStateMixin {
+  final PoseLandmarkerChannel _poseChannel = PoseLandmarkerChannel();
   final PoseDetector _poseDetector = PoseDetector(
     options: PoseDetectorOptions(
       model: PoseDetectionModel.accurate,
@@ -54,12 +58,15 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     ),
   );
 
+  StreamSubscription<Map<String, dynamic>>? _landmarkSubscription;
   CameraController? _cameraController;
-  List<CameraDescription> _cameras = const [];
+  List<CameraDescription> _availableCameras = const [];
+  int? _textureId;
+  int _cameraIndex = -1;
   CameraLensDirection _currentLens = CameraLensDirection.back;
   PermissionStatus? _permissionStatus;
   bool _isInitializing = false;
-  bool _isDetecting = false;
+  bool _isProcessingFrame = false;
   bool _isCameraReady = false;
   bool _didComplete = false;
   bool _showReference = true;
@@ -71,6 +78,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   InputImageRotation _imageRotation = InputImageRotation.rotation0deg;
   late final AnimationController _pulseController;
   late final AnimationController _voiceController;
+  _PoseRuntime _runtime = _PoseRuntime.nativeMediaPipe;
 
   @override
   void initState() {
@@ -88,20 +96,26 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
   @override
   void dispose() {
-    _cameraController?.stopImageStream();
-    _cameraController?.dispose();
+    final landmarkSubscription = _landmarkSubscription;
+    _landmarkSubscription = null;
+    unawaited(landmarkSubscription?.cancel() ?? Future<void>.value());
+    unawaited(_disposeFallbackCamera());
+    unawaited(_poseChannel.dispose());
     _poseDetector.close();
-    widget.exercise.disposeDetectors();
+    unawaited(widget.exercise.disposeDetectors());
     _pulseController.dispose();
     _voiceController.dispose();
     super.dispose();
   }
 
   Future<void> _initCamera() async {
+    await _disposeFallbackCamera();
     if (mounted) {
       setState(() {
         _isInitializing = true;
+        _isCameraReady = false;
         _cameraErrorMessage = null;
+        _textureId = null;
       });
     }
 
@@ -121,12 +135,211 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     }
 
     try {
-      _cameras = await availableCameras();
-      final preferredIndex = _cameras.indexWhere(
-        (camera) => camera.lensDirection == _currentLens,
+      _ensureLandmarkSubscription();
+      final textureId = await _poseChannel.initialize(
+        useFrontCamera: _currentLens == CameraLensDirection.front,
       );
-      final camera = _cameras[preferredIndex >= 0 ? preferredIndex : 0];
+      await _poseChannel.startDetection();
+      if (!mounted) return;
 
+      setState(() {
+        _runtime = _PoseRuntime.nativeMediaPipe;
+        _textureId = textureId;
+        _isCameraReady = true;
+        _isInitializing = false;
+      });
+    } on PlatformException catch (error) {
+      if (_shouldUseMlKitFallback(error)) {
+        await _startMlKitFallback(error.message);
+        return;
+      }
+      if (mounted) {
+        setState(() {
+          _isInitializing = false;
+          _isCameraReady = false;
+          _textureId = null;
+          _cameraErrorMessage = error.message ??
+              'Khong the khoi dong MediaPipe tren thiet bi nay.';
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isInitializing = false;
+          _isCameraReady = false;
+          _textureId = null;
+          _cameraErrorMessage =
+              'Không thể khởi động camera. Hãy thử lại hoặc đổi camera.';
+        });
+      }
+    }
+  }
+
+  Future<void> _toggleCamera() async {
+    final nextLens = _currentLens == CameraLensDirection.back
+        ? CameraLensDirection.front
+        : CameraLensDirection.back;
+    if (mounted) {
+      setState(() {
+        _isInitializing = true;
+        _cameraErrorMessage = null;
+      });
+    }
+
+    try {
+      if (_runtime == _PoseRuntime.mlKitFallback) {
+        await _switchMlKitCamera(nextLens);
+        if (!mounted) return;
+        setState(() {
+          _isInitializing = false;
+        });
+        return;
+      }
+
+      await _poseChannel.switchCamera();
+      if (!mounted) return;
+
+      setState(() {
+        _currentLens = nextLens;
+        _isInitializing = false;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isInitializing = false;
+          _cameraErrorMessage = 'Khong the chuyen camera. Hay thu lai.';
+        });
+      }
+    }
+  }
+
+  void _ensureLandmarkSubscription() {
+    if (_landmarkSubscription != null) {
+      return;
+    }
+
+    _landmarkSubscription = _poseChannel.landmarkStream.listen(
+      _handleLandmarkEvent,
+      onError: _handleLandmarkStreamError,
+    );
+  }
+
+  Future<void> _handleLandmarkEvent(Map<String, dynamic> data) async {
+    if (_isProcessingFrame || _didComplete) {
+      return;
+    }
+
+    _isProcessingFrame = true;
+
+    try {
+      final inputImage = PoseLandmarkerAdapter.inputImageFromChannelData(data);
+      if (inputImage != null) {
+        await widget.exercise.runPersonDetection(inputImage);
+      }
+
+      _currentLens = PoseLandmarkerAdapter.lensDirectionFromChannelData(data);
+      _imageRotation =
+          PoseLandmarkerAdapter.inputImageRotationFromChannelData(data);
+      _imageSize =
+          PoseLandmarkerAdapter.imageSizeFromChannelData(data) ?? Size.zero;
+
+      final pose = PoseLandmarkerAdapter.fromChannelData(data);
+      if (pose != null) {
+        _handlePose(pose);
+      } else {
+        _detectedPose = null;
+        _feedback = widget.exercise.processNoPoseFrame();
+      }
+
+      if (mounted) {
+        setState(() {});
+      }
+    } finally {
+      _isProcessingFrame = false;
+    }
+  }
+
+  void _handlePoseResult(List<dynamic>? result) {
+    if (result != null &&
+        widget.exercise.exerciseState == ExerciseState.activated &&
+        result.length == 2 &&
+        result[1] is Map) {
+      _feedback = Map<String, String>.from(result[1] as Map);
+      return;
+    }
+
+    if (widget.exercise.exerciseState == ExerciseState.completed &&
+        !_didComplete) {
+      _didComplete = true;
+      unawaited(_poseChannel.stopDetection());
+      Future.delayed(const Duration(milliseconds: 700), () {
+        if (mounted) {
+          widget.onSetComplete(widget.exercise.logger);
+        }
+      });
+    }
+  }
+
+  void _handleLandmarkStreamError(Object error) {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isInitializing = false;
+      _isCameraReady = false;
+      _cameraErrorMessage = 'Khong the nhan du lieu pose. Hay thu lai.';
+    });
+  }
+
+  Future<void> _startMlKitFallback(String? nativeErrorMessage) async {
+    debugPrint(
+      '[VinaFit] Falling back to Flutter camera + ML Kit: ${nativeErrorMessage ?? "unknown native init error"}',
+    );
+    await _poseChannel.dispose();
+    await _initMlKitCamera();
+  }
+
+  bool _shouldUseMlKitFallback(PlatformException error) {
+    final message = (error.message ?? '').toLowerCase();
+    return message.contains('mediapipe') ||
+        message.contains('x86_64') ||
+        message.contains('native library') ||
+        message.contains('pose landmarker') ||
+        message.contains('unsupported');
+  }
+
+  Future<void> _initMlKitCamera() async {
+    await _disposeFallbackCamera();
+
+    final cameras = await availableCameras();
+    if (cameras.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _runtime = _PoseRuntime.mlKitFallback;
+        _isInitializing = false;
+        _isCameraReady = false;
+        _cameraErrorMessage = 'Khong tim thay camera tren thiet bi nay.';
+      });
+      return;
+    }
+
+    _availableCameras = cameras;
+    final camerasToTry = <int>[];
+    final preferredIndex = cameras.indexWhere(
+      (camera) => camera.lensDirection == _currentLens,
+    );
+    if (preferredIndex != -1) {
+      camerasToTry.add(preferredIndex);
+    }
+    for (int index = 0; index < cameras.length; index++) {
+      if (!camerasToTry.contains(index)) {
+        camerasToTry.add(index);
+      }
+    }
+
+    for (final index in camerasToTry) {
+      final camera = cameras[index];
       final controller = CameraController(
         camera,
         ResolutionPreset.medium,
@@ -136,137 +349,175 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
             : ImageFormatGroup.bgra8888,
       );
 
-      await controller.initialize();
-      await controller.startImageStream(_processCameraImage);
+      try {
+        await controller.initialize();
+        await controller.startImageStream(_processFallbackCameraImage);
+        if (!mounted) {
+          await controller.dispose();
+          return;
+        }
 
-      if (!mounted) {
-        controller.dispose();
+        setState(() {
+          _runtime = _PoseRuntime.mlKitFallback;
+          _cameraController = controller;
+          _cameraIndex = index;
+          _currentLens = camera.lensDirection;
+          _textureId = null;
+          _isCameraReady = true;
+          _isInitializing = false;
+          _cameraErrorMessage = null;
+        });
+        return;
+      } catch (_) {
+        await controller.dispose();
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _runtime = _PoseRuntime.mlKitFallback;
+      _isInitializing = false;
+      _isCameraReady = false;
+      _cameraErrorMessage = 'Khong the khoi dong camera fallback. Hay thu lai.';
+    });
+  }
+
+  Future<void> _switchMlKitCamera(CameraLensDirection nextLens) async {
+    if (_availableCameras.isEmpty) {
+      _availableCameras = await availableCameras();
+    }
+    final newIndex = _availableCameras.indexWhere(
+      (camera) => camera.lensDirection == nextLens,
+    );
+    if (newIndex == -1) {
+      throw StateError('Requested camera is not available.');
+    }
+
+    await _disposeFallbackCamera();
+
+    final camera = _availableCameras[newIndex];
+    final controller = CameraController(
+      camera,
+      ResolutionPreset.medium,
+      enableAudio: false,
+      imageFormatGroup: Platform.isAndroid
+          ? ImageFormatGroup.nv21
+          : ImageFormatGroup.bgra8888,
+    );
+    await controller.initialize();
+    await controller.startImageStream(_processFallbackCameraImage);
+    if (!mounted) {
+      await controller.dispose();
+      return;
+    }
+
+    setState(() {
+      _cameraController = controller;
+      _cameraIndex = newIndex;
+      _currentLens = camera.lensDirection;
+      _isCameraReady = true;
+    });
+  }
+
+  Future<void> _disposeFallbackCamera() async {
+    final controller = _cameraController;
+    _cameraController = null;
+    if (controller == null) {
+      return;
+    }
+    try {
+      if (controller.value.isStreamingImages) {
+        await controller.stopImageStream();
+      }
+    } catch (_) {}
+    try {
+      await controller.dispose();
+    } catch (_) {}
+  }
+
+  void _processFallbackCameraImage(CameraImage cameraImage) {
+    if (_isProcessingFrame || _didComplete) {
+      return;
+    }
+    _isProcessingFrame = true;
+    _detectPoseFromFallback(cameraImage).whenComplete(() {
+      _isProcessingFrame = false;
+    });
+  }
+
+  Future<void> _detectPoseFromFallback(CameraImage cameraImage) async {
+    try {
+      final inputImage = _buildInputImage(cameraImage);
+      if (inputImage == null) {
         return;
       }
 
-      setState(() {
-        _cameraController = controller;
-        _currentLens = camera.lensDirection;
-        _isCameraReady = true;
-        _isInitializing = false;
-      });
-    } catch (_) {
+      await widget.exercise.runPersonDetection(inputImage);
+      final poses = await _poseDetector.processImage(inputImage);
+
+      if (poses.isNotEmpty) {
+        _handlePose(poses.first);
+      } else {
+        _detectedPose = null;
+        _feedback = widget.exercise.processNoPoseFrame();
+      }
+
       if (mounted) {
-        setState(() {
-          _isInitializing = false;
-          _isCameraReady = false;
-          _cameraErrorMessage =
-              'Không thể khởi động camera. Hãy thử lại hoặc đổi camera.';
-        });
+        setState(() {});
       }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isCameraReady = false;
+        _cameraErrorMessage = 'Khong the nhan du lieu pose. Hay thu lai.';
+      });
     }
   }
 
-  Future<void> _toggleCamera() async {
-    if (_cameras.isEmpty) {
-      return;
-    }
-
-    final nextLens = _currentLens == CameraLensDirection.back
-        ? CameraLensDirection.front
-        : CameraLensDirection.back;
-    final nextIndex =
-        _cameras.indexWhere((camera) => camera.lensDirection == nextLens);
-    if (nextIndex < 0) {
-      return;
-    }
-
-    await _cameraController?.stopImageStream();
-    await _cameraController?.dispose();
-    _cameraController = null;
-    _isCameraReady = false;
-    _currentLens = nextLens;
-    if (mounted) {
-      setState(() {});
-    }
-    await _initCamera();
-  }
-
-  void _processCameraImage(CameraImage cameraImage) {
-    if (_isDetecting || _didComplete) {
-      return;
-    }
-    _isDetecting = true;
-    _detectPose(cameraImage).whenComplete(() => _isDetecting = false);
-  }
-
-  Future<void> _detectPose(CameraImage cameraImage) async {
-    final inputImage = _buildInputImage(cameraImage);
-    if (inputImage == null) {
-      return;
-    }
-
-    await widget.exercise.runPersonDetection(inputImage);
-    final poses = await _poseDetector.processImage(inputImage);
-
-    if (poses.isNotEmpty) {
-      final pose = poses.first;
-      _detectedPose = pose;
-      final result = widget.exercise.processPose(pose.landmarks);
-      if (result != null &&
-          widget.exercise.exerciseState == ExerciseState.activated &&
-          result.length == 2 &&
-          result[1] is Map) {
-        _feedback = Map<String, String>.from(result[1] as Map);
-      } else if (widget.exercise.exerciseState == ExerciseState.completed &&
-          !_didComplete) {
-        _didComplete = true;
-        Future.delayed(const Duration(milliseconds: 700), () {
-          if (mounted) {
-            widget.onSetComplete(widget.exercise.logger);
-          }
-        });
-      }
-    } else {
-      _detectedPose = null;
-      _feedback = widget.exercise.processNoPoseFrame();
-    }
-
-    if (mounted) {
-      setState(() {});
-    }
+  void _handlePose(Pose pose) {
+    _detectedPose = pose;
+    _handlePoseResult(widget.exercise.processPose(pose.landmarks));
   }
 
   InputImage? _buildInputImage(CameraImage image) {
-    final controller = _cameraController;
-    if (controller == null) {
+    if (_cameraIndex < 0 || _cameraIndex >= _availableCameras.length) {
       return null;
     }
 
-    _imageRotation =
-        _rotationFromSensor(controller.description.sensorOrientation);
-    if (_imageRotation == InputImageRotation.rotation90deg ||
-        _imageRotation == InputImageRotation.rotation270deg) {
+    final camera = _availableCameras[_cameraIndex];
+    final rotation = _rotationFromSensor(camera.sensorOrientation);
+    _imageRotation = rotation;
+
+    if (rotation == InputImageRotation.rotation90deg ||
+        rotation == InputImageRotation.rotation270deg) {
       _imageSize = Size(image.height.toDouble(), image.width.toDouble());
     } else {
       _imageSize = Size(image.width.toDouble(), image.height.toDouble());
     }
+
     final format =
         Platform.isAndroid ? InputImageFormat.nv21 : InputImageFormat.bgra8888;
+
     final allBytes = WriteBuffer();
     for (final plane in image.planes) {
       allBytes.putUint8List(plane.bytes);
     }
     final bytes = allBytes.done().buffer.asUint8List();
 
-    return InputImage.fromBytes(
-      bytes: bytes,
-      metadata: InputImageMetadata(
-        size: Size(image.width.toDouble(), image.height.toDouble()),
-        rotation: _imageRotation,
-        format: format,
-        bytesPerRow: image.planes.first.bytesPerRow,
-      ),
+    final metadata = InputImageMetadata(
+      size: Size(image.width.toDouble(), image.height.toDouble()),
+      rotation: rotation,
+      format: format,
+      bytesPerRow: image.planes.first.bytesPerRow,
     );
+
+    return InputImage.fromBytes(bytes: bytes, metadata: metadata);
   }
 
   InputImageRotation _rotationFromSensor(int sensorOrientation) {
     switch (sensorOrientation) {
+      case 0:
+        return InputImageRotation.rotation0deg;
       case 90:
         return InputImageRotation.rotation90deg;
       case 180:
@@ -296,7 +547,16 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       );
     }
 
-    if (!_isCameraReady || _cameraController == null) {
+    if (!_isCameraReady || _textureId == null) {
+      final waitingForFallback =
+          _runtime == _PoseRuntime.mlKitFallback && _cameraController == null;
+      final nativeReady =
+          _runtime == _PoseRuntime.nativeMediaPipe && _textureId != null;
+      final fallbackReady =
+          _runtime == _PoseRuntime.mlKitFallback && _cameraController != null;
+      if (nativeReady || fallbackReady) {
+        return _buildActiveLayout(context);
+      }
       return _buildCameraFallback(
         icon: _cameraErrorMessage == null
             ? Icons.videocam_outlined
@@ -305,7 +565,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
             ? 'Đang chuẩn bị camera'
             : 'Camera chưa sẵn sàng',
         subtitle: _cameraErrorMessage ??
-            (_isInitializing
+            (_isInitializing || waitingForFallback
                 ? 'AI đang kết nối camera và chuẩn bị theo dõi form của bạn.'
                 : 'Đang chờ camera sẵn sàng...'),
         actionLabel: _cameraErrorMessage == null ? null : 'Thử lại',
@@ -387,7 +647,11 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         children: [
           RepaintBoundary(
             child: Center(
-              child: CameraPreview(_cameraController!),
+              child: _runtime == _PoseRuntime.nativeMediaPipe
+                  ? Texture(textureId: _textureId!)
+                  : (_cameraController != null
+                      ? CameraPreview(_cameraController!)
+                      : const SizedBox.shrink()),
             ),
           ),
           Positioned.fill(
@@ -400,14 +664,12 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                   return CustomPaint(
                     size: constraints.biggest,
                     painter: PoseOverlayPainter(
-                      pose: _detectedPose!,
-                      imageSize: _imageSize,
-                      rotation: _imageRotation,
-                      lensDirection:
-                          _cameraController!.description.lensDirection,
-                      debugData: widget.exercise.debugData,
-                      style: SkeletonStyle.constellation,
-                    ),
+                        pose: _detectedPose!,
+                        imageSize: _imageSize,
+                        rotation: _imageRotation,
+                        lensDirection: _currentLens,
+                        debugData: widget.exercise.debugData,
+                        style: SkeletonStyle.constellation),
                   );
                 },
               ),
@@ -1407,6 +1669,11 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       ),
     );
   }
+}
+
+enum _PoseRuntime {
+  nativeMediaPipe,
+  mlKitFallback,
 }
 
 enum _LiveOverlayState { scan, warn, position, hold, paused, active }

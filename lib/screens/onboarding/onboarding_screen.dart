@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vinafit_mobile/models/exercise_definition.dart';
 import 'package:vinafit_mobile/utils/exercise_logger.dart';
 
@@ -103,11 +104,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (_data.issueAnswer != null) {
       await prefs.setString('issue_answer', _data.issueAnswer!);
     }
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user != null) {
+      try {
+        await Supabase.instance.client.from('profiles').upsert({
+          'id': user.id,
+          'onboarding_complete': true,
+        }, onConflict: 'id');
+      } catch (_) {}
+    }
 
     if (mounted) Navigator.of(context).pushReplacementNamed('/');
   }
 
   List<Widget> get _pages => [
+        SignupPage(data: _data, onNext: _next, onBack: _back),
         WelcomePage(onStart: _next),
         WhyPage(data: _data, onNext: _next),
         GoalPage(data: _data, onNext: _next, onBack: _back),
@@ -120,7 +131,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         AnalyzingPage(active: _page == 5, onNext: _next),
         SquatResultPage(data: _data, onNext: _next, onBack: _back),
         LevelIssuePage(data: _data, onNext: _next, onBack: _back),
-        SignupPage(data: _data, onNext: _next, onBack: _back),
         BodySchedulePage(data: _data, onNext: _next, onBack: _back),
         ProgramPage(data: _data, onComplete: _complete),
       ];
