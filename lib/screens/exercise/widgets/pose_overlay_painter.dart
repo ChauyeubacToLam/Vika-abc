@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -356,21 +355,10 @@ class PoseOverlayPainter extends CustomPainter {
       var x = landmark.x;
       var y = landmark.y;
 
-      if (Platform.isAndroid) {
-        switch (rotation) {
-          case InputImageRotation.rotation90deg:
-            x = landmark.x;
-            y = landmark.y;
-            break;
-          case InputImageRotation.rotation270deg:
-            x = imageW - landmark.x;
-            y = imageH - landmark.y;
-            break;
-          default:
-            break;
-        }
-      }
-
+      // Landmarks are already delivered in the oriented image space for both
+      // the native MediaPipe path and the ML Kit fallback path, so applying an
+      // extra Android-side rotation here can invert the skeleton on devices
+      // that report rotation 270.
       if (lensDirection == CameraLensDirection.front) {
         x = imageW - x;
       }
