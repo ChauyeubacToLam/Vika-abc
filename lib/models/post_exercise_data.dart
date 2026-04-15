@@ -41,9 +41,8 @@ class SetReportData {
   final int goodReps;
   final int totalReps;
   final List<bool> repResults;
-  final String insightIcon;
-  final String insightText;
-  final String? insightTip;
+  final String? praiseSentence; // B4: "Sâu chuẩn 8/10 rep — đẹp lắm!"
+  final String? coachTip; // B4: "Đẩy sàn ra xa khi đứng lên"
 
   const SetReportData({
     required this.setIndex,
@@ -51,9 +50,8 @@ class SetReportData {
     required this.goodReps,
     required this.totalReps,
     required this.repResults,
-    required this.insightIcon,
-    required this.insightText,
-    this.insightTip,
+    this.praiseSentence,
+    this.coachTip,
   });
 }
 
@@ -87,27 +85,111 @@ class DetailCard {
 
 /// Base class for exercise report builders.
 ///
-/// Subclasses implement 3 exercise-specific methods:
-///   - pickInsight()
+/// Subclasses implement 2 exercise-specific methods + 3 B4 maps:
 ///   - detectIssue()
 ///   - buildDetailCards()
+///   - praiseMetricNames()   ← B4: which metrics can be praised
+///   - faultToTipMap()       ← B4: fault → coaching tip
+///   - praiseSentenceMap()   ← B4: metric label → Vietnamese sentence
 ///
-/// buildReport() and generateCoachText() are shared.
-/// Override generateCoachText() only if an exercise needs
-/// custom coach text logic.
+/// buildReport(), generateCoachText(), buildPraiseSentence(),
+/// and buildCoachTip() are shared.
 abstract class ExerciseReportBuilder {
-  // ── Subclasses MUST implement these 3 ──
-
-  (String, String, String?) pickInsight(
-    ExerciseLogger logger,
-    ExerciseLogger? prevLogger,
-    int setScore,
-    int? prevScore,
-  );
+  // ── Subclasses MUST implement these 2 ──
 
   DetectedEvidence? detectIssue(List<ExerciseLogger> setLoggers);
 
   List<DetailCard> buildDetailCards(List<ExerciseLogger> setLoggers);
+
+  // ── B4: Subclasses override these 3 maps ──
+
+  /// Maps fault count keys in setLogs to display labels.
+  /// E.g. {'depth_fails_count': 'Depth', 'heel_fails_count': 'Gót chân'}
+  /// Values are FAIL counts: high number = bad.
+  Map<String, String> praiseMetricNames() => {};
+
+  /// Maps fault count keys to forward-looking coaching tips.
+  /// Tips use external cueing (B3): "push the floor" not "extend your knees".
+  Map<String, String> faultToTipMap() => {};
+
+  /// Maps metric labels to Vietnamese praise sentence templates.
+  /// Labels must match values in praiseMetricNames().
+  Map<String, String Function(int count, int total)> praiseSentenceMap() => {};
+
+  // ── B4: Shared praise + coaching logic ──
+
+  /// Finds the best-performing metric and generates a praise sentence.
+  /// "Best" = fewest fails relative to total reps.
+  /// Only praises metrics where >50% of reps were good.
+  String? buildPraiseSentence(ExerciseLogger logger) {
+    final totalReps = (logger.setLogs['max_rep'] as num?)?.toInt() ?? 0;
+    final goodReps = (logger.setLogs['good_rep_count'] as num?)?.toInt() ?? 0;
+    if (totalReps == 0) return null;
+
+    // Perfect set
+    if (goodReps == totalReps) {
+      return 'Hoàn hảo! Tất cả $totalReps rep đúng form! 🎯';
+    }
+
+    // No reps correct at all
+    if (goodReps == 0) {
+      return 'Hoàn thành $totalReps rep! Set sau sẽ tốt hơn.';
+    }
+
+    // Find the metric with the FEWEST fails (= best performance)
+    final metrics = praiseMetricNames();
+    String? bestLabel;
+    int bestGood = -1;
+    double bestRatio = -1;
+
+    for (final entry in metrics.entries) {
+      final fails = (logger.setLogs[entry.key] as num?)?.toInt() ?? 0;
+      final good = totalReps - fails;
+      final ratio = good / totalReps;
+
+      // Only praise if more than half were good
+      if (ratio > 0.5 && ratio > bestRatio) {
+        bestRatio = ratio;
+        bestGood = good;
+        bestLabel = entry.value;
+      }
+    }
+
+    // No metric passed 50% threshold
+    if (bestLabel == null || bestGood < 0) {
+      return 'Hoàn thành $totalReps rep! Set sau sẽ tốt hơn.';
+    }
+
+    // Look up sentence template
+    final template = praiseSentenceMap()[bestLabel];
+    if (template != null) {
+      return template(bestGood, totalReps);
+    }
+
+    // Generic fallback
+    return '$bestLabel đạt $bestGood/$totalReps rep — tốt lắm!';
+  }
+
+  /// Returns the forward-looking tip for the highest-count fault.
+  /// Returns null if no faults (perfect set).
+  String? buildCoachTip(ExerciseLogger logger) {
+    final tipMap = faultToTipMap();
+    if (tipMap.isEmpty) return null;
+
+    String? worstKey;
+    int worstCount = 0;
+
+    for (final key in tipMap.keys) {
+      final count = (logger.setLogs[key] as num?)?.toInt() ?? 0;
+      if (count > worstCount) {
+        worstCount = count;
+        worstKey = key;
+      }
+    }
+
+    if (worstKey == null || worstCount == 0) return null;
+    return tipMap[worstKey];
+  }
 
   // ── Shared: override only if needed ──
 
@@ -158,23 +240,12 @@ abstract class ExerciseReportBuilder {
 
     for (int i = 0; i < setLoggers.length; i++) {
       final logger = setLoggers[i];
-      final prevLogger = i > 0 ? setLoggers[i - 1] : null;
 
       final maxRep = (logger.setLogs["max_rep"] as num?)?.toInt() ?? 0;
       final goodReps = (logger.setLogs["good_rep_count"] as num?)?.toInt() ?? 0;
       final score = maxRep > 0 ? (goodReps / maxRep * 100).round() : 0;
 
-      int? prevScore;
-      if (prevLogger != null) {
-        final prevMax = (prevLogger.setLogs["max_rep"] as num?)?.toInt() ?? 0;
-        final prevGood =
-            (prevLogger.setLogs["good_rep_count"] as num?)?.toInt() ?? 0;
-        prevScore = prevMax > 0 ? (prevGood / prevMax * 100).round() : 0;
-      }
-
       final repResults = logger.repLogs.map((r) => r.correctForm).toList();
-      final (insIcon, insText, insTip) =
-          pickInsight(logger, prevLogger, score, prevScore);
 
       sets.add(SetReportData(
         setIndex: i,
@@ -182,9 +253,8 @@ abstract class ExerciseReportBuilder {
         goodReps: goodReps,
         totalReps: maxRep,
         repResults: repResults,
-        insightIcon: insIcon,
-        insightText: insText,
-        insightTip: insTip,
+        praiseSentence: buildPraiseSentence(logger),
+        coachTip: buildCoachTip(logger),
       ));
     }
 

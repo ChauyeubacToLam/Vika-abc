@@ -2,10 +2,10 @@ import 'package:flutter/services.dart';
 
 class PoseLandmarkerChannel {
   static const MethodChannel _methodChannel = MethodChannel(
-    'com.vinafit.mobile/pose_landmarker',
+    'com.vikavn.app/pose_landmarker',
   );
   static const EventChannel _eventChannel = EventChannel(
-    'com.vinafit.mobile/pose_landmarker_stream',
+    'com.vikavn.app/pose_landmarker_stream',
   );
 
   Stream<Map<String, dynamic>> get landmarkStream {

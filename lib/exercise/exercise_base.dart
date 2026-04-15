@@ -1,8 +1,8 @@
 // ignore_for_file: constant_identifier_names
 
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
-import 'package:vinafit_mobile/utils/debouncer.dart';
-import 'package:vinafit_mobile/utils/person_detector.dart';
+import 'package:vika/utils/debouncer.dart';
+import 'package:vika/utils/person_detector.dart';
 import '../utils/pose_smoother.dart';
 import '../utils/pose_math_helpers.dart';
 import "../utils/frame_buffer.dart";

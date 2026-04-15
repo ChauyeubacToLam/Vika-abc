@@ -1,5 +1,5 @@
-import 'package:vinafit_mobile/interpreter/squat_interpreter.dart';
-import 'package:vinafit_mobile/utils/exercise_logger.dart';
+import 'package:vika/interpreter/squat_interpreter.dart';
+import 'package:vika/utils/exercise_logger.dart';
 
 import 'onboarding_assessment_thresholds.dart';
 
