@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Vinafit Mobile is a Flutter fitness app with AI-powered real-time pose detection. It uses Google ML Kit for pose estimation and selfie segmentation to analyze exercise form and provide coaching feedback. All user-facing strings are in Vietnamese.
+Vika is a Flutter fitness app with AI-powered real-time pose detection. It uses Google ML Kit for pose estimation and selfie segmentation to analyze exercise form and provide coaching feedback. All user-facing strings are in Vietnamese.
 
 ## Commands
 

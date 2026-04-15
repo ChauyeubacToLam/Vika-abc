@@ -294,7 +294,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
   Future<void> _startMlKitFallback(String? nativeErrorMessage) async {
     debugPrint(
-      '[VinaFit] Falling back to Flutter camera + ML Kit: ${nativeErrorMessage ?? "unknown native init error"}',
+      '[Vika] Falling back to Flutter camera + ML Kit: ${nativeErrorMessage ?? "unknown native init error"}',
     );
     await _poseChannel.dispose();
     await _initMlKitCamera();

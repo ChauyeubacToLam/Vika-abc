@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:vinafit_mobile/widgets/vf_primitives.dart';
+import 'package:vika/widgets/vf_primitives.dart';
 
 import '../onboarding_primitives.dart';
 import '../vf_theme.dart';
@@ -69,7 +69,7 @@ class WelcomePage extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'VINAFIT',
+                          'VIKA',
                           style: VF.textStyle(
                             context,
                             size: 11,

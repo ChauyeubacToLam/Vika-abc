@@ -56,7 +56,7 @@ class ShareableCard extends StatelessWidget {
             Row(
               children: [
                 Text(
-                  'VINAFIT',
+                  'VIKA',
                   style: TextStyle(
                     fontSize: 9,
                     fontWeight: FontWeight.w700,

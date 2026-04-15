@@ -321,7 +321,7 @@ class ProfileScreen extends StatelessWidget {
             padding: EdgeInsets.fromLTRB(22 * s, 14 * s, 22 * s, 24 * s),
             child: Center(
               child: Text(
-                'VinaFit v1.0',
+                'Vika v1.0',
                 style: VFTheme.textStyle(
                   context,
                   size: 10,

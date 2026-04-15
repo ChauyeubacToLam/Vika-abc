@@ -1,0 +1,2 @@
+-dontwarn javax.lang.model.**
+-dontwarn autovalue.shaded.**
