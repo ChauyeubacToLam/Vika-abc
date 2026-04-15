@@ -8,15 +8,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:vinafit_mobile/main.dart';
+import 'package:vika/main.dart';
 
 void main() {
-  testWidgets('VinaFit home screen renders exercise cards',
+  testWidgets('Vika home screen renders exercise cards',
       (WidgetTester tester) async {
-    await tester.pumpWidget(const VinaFitApp());
+    await tester.pumpWidget(const VikaApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('VINAFIT'), findsOneWidget);
+    expect(find.text('VIKA'), findsOneWidget);
     expect(find.text('Chọn bài tập'), findsOneWidget);
     expect(find.text('Squat'), findsOneWidget);
     expect(find.text('Plank'), findsOneWidget);

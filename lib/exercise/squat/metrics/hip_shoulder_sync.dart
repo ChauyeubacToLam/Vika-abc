@@ -25,7 +25,7 @@
   
    ========================================================================= */
 
-import 'package:vinafit_mobile/utils/debouncer.dart';
+import 'package:vika/utils/debouncer.dart';
 
 import 'squat_metric_base.dart';
 import '../squat.dart';

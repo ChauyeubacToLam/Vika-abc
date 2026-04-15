@@ -1,5 +1,5 @@
-import 'package:vinafit_mobile/utils/exercise_logger.dart';
-import 'package:vinafit_mobile/interpreter/intepreting_map.dart';
+import 'package:vika/utils/exercise_logger.dart';
+import 'package:vika/interpreter/intepreting_map.dart';
 
 class InterpreterConfig {
   static const double heelRiseRatio = 0.6;

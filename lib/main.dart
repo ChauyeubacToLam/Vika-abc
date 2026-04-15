@@ -46,7 +46,7 @@ Future<void> main() async {
   );
   _cameras = await availableCameras();
   _hasCompletedOnboarding = await isOnboardingComplete();
-  runApp(const VinaFitApp());
+  runApp(const VikaApp());
 }
 
 // Add this at the top level of the file for easy access everywhere
@@ -123,13 +123,13 @@ class UIRepLog {
    APP
    ========================================================================= */
 
-class VinaFitApp extends StatelessWidget {
-  const VinaFitApp({super.key});
+class VikaApp extends StatelessWidget {
+  const VikaApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'VinaFit',
+      title: 'Vika',
       debugShowCheckedModeBanner: false,
       theme: VFTheme.lightTheme,
       builder: (context, child) => ScrollConfiguration(
@@ -218,7 +218,7 @@ class _AppEntryGateState extends State<AppEntryGate> {
 
     final complete = await isOnboardingComplete();
     _setEntryState(
-      complete ? _AppEntryState.home : _AppEntryState.onboarding,
+      complete ? _AppEntryState.home : _AppEntryState.home,
     );
   }
 
@@ -457,7 +457,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     final status = await Permission.camera.request();
     _cameraPermissionStatus = status;
     if (!status.isGranted) {
-      debugPrint('[VinaFit] Camera permission not granted: $status');
+      debugPrint('[Vika] Camera permission not granted: $status');
       if (mounted) {
         setState(() {
           _isInitializingCamera = false;
@@ -479,7 +479,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     }
 
     if (_cameras.isEmpty) {
-      debugPrint('[VinaFit] No cameras available');
+      debugPrint('[Vika] No cameras available');
       if (mounted) {
         setState(() {
           _isInitializingCamera = false;
@@ -502,7 +502,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     for (final idx in camerasToTry) {
       final camera = _cameras[idx];
       debugPrint(
-        '[VinaFit] Trying camera $idx: ${camera.lensDirection} (${camera.name})',
+        '[Vika] Trying camera $idx: ${camera.lensDirection} (${camera.name})',
       );
 
       final controller = CameraController(
@@ -525,7 +525,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         _currentLensDirection = camera.lensDirection;
         _isCameraReady = true;
         await controller.startImageStream(_processCameraImage);
-        debugPrint('[VinaFit] Camera $idx initialized successfully');
+        debugPrint('[Vika] Camera $idx initialized successfully');
         if (mounted) {
           setState(() {
             _isInitializingCamera = false;
@@ -534,7 +534,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         }
         return;
       } catch (e) {
-        debugPrint('[VinaFit] Camera $idx init error: $e');
+        debugPrint('[Vika] Camera $idx init error: $e');
         try {
           await controller.dispose();
         } catch (_) {}
@@ -544,12 +544,12 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     if (retryCount < 3 && mounted) {
       final delay = Duration(seconds: 1 + retryCount);
       debugPrint(
-          '[VinaFit] Camera open failed, retrying in ${delay.inSeconds}s (attempt ${retryCount + 1}/3)');
+          '[Vika] Camera open failed, retrying in ${delay.inSeconds}s (attempt ${retryCount + 1}/3)');
       await Future.delayed(delay);
       if (mounted) return _initCamera(retryCount: retryCount + 1);
     }
 
-    debugPrint('[VinaFit] Camera open failed after all retries');
+    debugPrint('[Vika] Camera open failed after all retries');
     if (mounted) {
       setState(() {
         _isInitializingCamera = false;
@@ -602,7 +602,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         _cameraErrorMessage = null;
       });
     } catch (e) {
-      debugPrint('[VinaFit] Camera toggle error: $e');
+      debugPrint('[Vika] Camera toggle error: $e');
       if (mounted) {
         setState(() {
           _cameraErrorMessage = 'Không thể chuyển camera. Hãy thử lại.';
@@ -672,7 +672,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         setState(() {});
       }
     } catch (e) {
-      debugPrint('[VinaFit] Detection error: $e');
+      debugPrint('[Vika] Detection error: $e');
     }
   }
 
@@ -697,12 +697,12 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     final exState = _exercise.exerciseState.toString().split('.').last;
     final phaseState = _exercise.currentPhaseKey;
     if (exState != _lastLoggedState) {
-      debugPrint('[VinaFit][State] Exercise: $_lastLoggedState -> $exState');
+      debugPrint('[Vika][State] Exercise: $_lastLoggedState -> $exState');
       _lastLoggedState = exState;
     }
     if (phaseState != _lastLoggedPhaseState) {
       debugPrint(
-        '[VinaFit][State] ${_exercise.exerciseName}: $_lastLoggedPhaseState -> $phaseState',
+        '[Vika][State] ${_exercise.exerciseName}: $_lastLoggedPhaseState -> $phaseState',
       );
       _lastLoggedPhaseState = phaseState;
     }
@@ -755,9 +755,9 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     );
     _repLogs.add(log);
 
-    debugPrint('[VinaFit][Rep] $log');
+    debugPrint('[Vika][Rep] $log');
     debugPrint(
-      '[VinaFit][Feedback] ${_feedback.entries.map((e) => '${e.key}: ${e.value}').join(' | ')}',
+      '[Vika][Feedback] ${_feedback.entries.map((e) => '${e.key}: ${e.value}').join(' | ')}',
     );
 
     _repBannerGood = log.correctForm;
@@ -775,9 +775,9 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     debugPrint('');
     debugPrint('============================================');
     debugPrint(
-      '[VinaFit][SET COMPLETE] ${_exercise.exerciseName} — $_repCount reps total',
+      '[Vika][SET COMPLETE] ${_exercise.exerciseName} — $_repCount reps total',
     );
-    debugPrint('[VinaFit][SET] Good: $goodReps | Bad: $badReps');
+    debugPrint('[Vika][SET] Good: $goodReps | Bad: $badReps');
     debugPrint('--------------------------------------------');
     for (final log in _repLogs) {
       final status = log.correctForm ? 'OK' : 'BAD';
@@ -785,7 +785,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
           ? 'No issues'
           : log.allFaultMessages.join(', ');
       debugPrint(
-        '[VinaFit][SET] Rep ${log.repNumber} [$status] '
+        '[Vika][SET] Rep ${log.repNumber} [$status] '
         'Tempo: ${log.tempo ?? "N/A"} | $faultStr',
       );
     }

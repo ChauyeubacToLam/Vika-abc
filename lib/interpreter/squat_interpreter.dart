@@ -1,4 +1,4 @@
-import 'package:vinafit_mobile/interpreter/interpreter_base.dart';
+import 'package:vika/interpreter/interpreter_base.dart';
 
 class SquatInterpreter extends InterpreterBase {
   SquatInterpreter({required super.logger}) : super(exerciseSource: "squat");

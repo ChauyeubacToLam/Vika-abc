@@ -82,7 +82,7 @@ class _SignupPageState extends State<SignupPage> {
           ),
           Expanded(
             child: user == null
-                ? VinaFitLoginPanel(
+                ? VikaLoginPanel(
                     onAuthenticated: _advanceIfAuthenticated,
                     padding: EdgeInsets.fromLTRB(20 * s, 0, 20 * s, 0),
                   )
@@ -118,7 +118,7 @@ class _SignupPageState extends State<SignupPage> {
                           ),
                           SizedBox(height: 8 * s),
                           Text(
-                            'VinaFit đang chuyển bạn sang bước tiếp theo.',
+                            'Vika đang chuyển bạn sang bước tiếp theo.',
                             textAlign: TextAlign.center,
                             style: VF.textStyle(
                               context,

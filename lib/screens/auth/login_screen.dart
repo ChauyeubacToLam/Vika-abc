@@ -28,7 +28,7 @@ class LoginScreen extends StatelessWidget {
       child: Scaffold(
         backgroundColor: VFTheme.bg,
         body: SafeArea(
-          child: VinaFitLoginPanel(
+          child: VikaLoginPanel(
             onAuthenticated: onAuthenticated,
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
           ),
@@ -38,8 +38,8 @@ class LoginScreen extends StatelessWidget {
   }
 }
 
-class VinaFitLoginPanel extends StatefulWidget {
-  const VinaFitLoginPanel({
+class VikaLoginPanel extends StatefulWidget {
+  const VikaLoginPanel({
     super.key,
     this.onAuthenticated,
     this.padding = EdgeInsets.zero,
@@ -49,10 +49,10 @@ class VinaFitLoginPanel extends StatefulWidget {
   final EdgeInsets padding;
 
   @override
-  State<VinaFitLoginPanel> createState() => _VinaFitLoginPanelState();
+  State<VikaLoginPanel> createState() => _VikaLoginPanelState();
 }
 
-class _VinaFitLoginPanelState extends State<VinaFitLoginPanel> {
+class _VikaLoginPanelState extends State<VikaLoginPanel> {
   final AuthService _authService = AuthService();
   final TextEditingController _emailController = TextEditingController();
   final FocusNode _emailFocusNode = FocusNode();
@@ -371,7 +371,7 @@ class _BrandBadge extends StatelessWidget {
           ),
           SizedBox(width: 6 * s),
           Text(
-            'VINAFIT',
+            'VIKA',
             style: VFTheme.textStyle(
               context,
               size: 11,
