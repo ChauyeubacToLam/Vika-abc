@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:vinafit_mobile/widgets/vf_primitives.dart';
+import 'package:vika/widgets/vf_primitives.dart';
 
 import 'vf_theme.dart';
 

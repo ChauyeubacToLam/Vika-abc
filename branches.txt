@@ -1,0 +1,15 @@
+  glute_bridge
+* main
+  voice
+  remotes/origin/HEAD -> origin/main
+  remotes/origin/Seaw24-patch-1
+  remotes/origin/cameras
+  remotes/origin/curl_up
+  remotes/origin/exercise_summary
+  remotes/origin/glute_bridge
+  remotes/origin/lunge
+  remotes/origin/main
+  remotes/origin/new_ai
+  remotes/origin/onboarding
+  remotes/origin/squat
+  remotes/origin/voice

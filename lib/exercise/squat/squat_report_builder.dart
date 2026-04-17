@@ -1,152 +1,57 @@
-import 'package:vinafit_mobile/models/post_exercise_data.dart';
-import 'package:vinafit_mobile/interpreter/squat_interpreter.dart';
-import 'package:vinafit_mobile/interpreter/interpreter_base.dart';
-import 'package:vinafit_mobile/utils/exercise_logger.dart';
-
-class SquatReportBuilderConfig {
-  static const double metricFailRatioThreshold = 0.2;
-  static const double improvementRatioThreshold = 0.2;
-  static const double badRepRatioThreshold = 0.5;
-
-  static const List<({String key, String name, String tip, String declineTip})>
-      metricPriority = [
-    (
-      key: 'trunk_lean_fails_count',
-      name: 'lưng',
-      tip: 'Giữ lưng thẳng, đẩy hông ra sau.',
-      declineTip: 'Giữ lưng thẳng, đẩy hông ra sau.',
-    ),
-    (
-      key: 'depth_fails_count',
-      name: 'độ sâu',
-      tip: 'Hạ hông thấp hơn, đùi song song sàn.',
-      declineTip: 'Hạ hông thấp hơn, đùi song song sàn.',
-    ),
-    (
-      key: 'heel_fails_count',
-      name: 'gót chân',
-      tip: 'Giữ trọng lượng dồn vào gót.',
-      declineTip: 'Giữ trọng lượng dồn vào gót.',
-    ),
-    (
-      key: 'hip_shoulder_sync_fails_count',
-      name: 'đồng bộ hông-vai',
-      tip: 'Giữ vai và hông di chuyển cùng nhau.',
-      declineTip: 'Tránh để hông nâng lên quá sớm.',
-    ),
-  ];
-}
+import 'package:vika/models/post_exercise_data.dart';
+import 'package:vika/interpreter/squat_interpreter.dart';
+import 'package:vika/interpreter/interpreter_base.dart';
+import 'package:vika/utils/exercise_logger.dart';
 
 /// Squat-specific report builder.
 /// Inherits buildReport() and generateCoachText() from base.
-/// Only implements the 3 exercise-specific methods.
+/// Only implements squat-specific analysis plus B4 praise/tip maps.
 class SquatReportBuilder extends ExerciseReportBuilder {
   @override
-  (String, String, String?) pickInsight(
-    dynamic logger,
-    dynamic prevLogger,
-    int setScore,
-    int? prevScore,
-  ) {
-    if (logger is! ExerciseLogger) {
-      return (
-        '⚠️',
-        'Không có dữ liệu set nào được ghi lại.',
-        'Hoàn thành ít nhất 1 rep để nhận phân tích.',
-      );
-    }
-
-    final previousLogger = prevLogger is ExerciseLogger ? prevLogger : null;
-
-    final maxRep = (logger.setLogs["max_rep"] as num?)?.toInt() ?? 0;
-    if (logger.repLogs.isEmpty || maxRep == 0) {
-      return (
-        '⚠️',
-        'Không có rep nào được ghi lại.',
-        'Hoàn thành ít nhất 1 rep để nhận phân tích.',
-      );
-    }
-
-    final goodReps = (logger.setLogs["good_rep_count"] as num?)?.toInt() ?? 0;
-
-    // ── 1. Perfect set ──
-    if (goodReps == maxRep) {
-      return (
-        '✨',
-        'Hoàn hảo! $maxRep/$maxRep rep đúng form.',
-        'Tiếp tục giữ kỹ thuật này!',
-      );
-    }
-
-    // ── 2. Improved vs previous set ──
-    if (previousLogger != null && previousLogger.repLogs.isNotEmpty) {
-      final result =
-          _findMetricChange(logger, previousLogger, maxRep, improved: true);
-      if (result != null) return result;
-    }
-
-    // ── 3. Metric faults above threshold ──
-    for (final metric in SquatReportBuilderConfig.metricPriority) {
-      final fails = (logger.setLogs[metric.key] as num?)?.toInt() ?? 0;
-      if (fails / maxRep > SquatReportBuilderConfig.metricFailRatioThreshold) {
-        return (
-          '👁',
-          'Lỗi ${metric.name}: $fails/$maxRep rep.',
-          metric.tip,
-        );
-      }
-    }
-
-    // ── 4. Low overall score ──
-    if (goodReps / maxRep < SquatReportBuilderConfig.badRepRatioThreshold) {
-      return (
-        '💪',
-        'Chỉ $goodReps/$maxRep rep đúng form.',
-        'Tập trung kỹ thuật, cải thiện từng chút!',
-      );
-    }
-
-    // ── 5. Got worse vs previous set ──
-    if (previousLogger != null && previousLogger.repLogs.isNotEmpty) {
-      final result =
-          _findMetricChange(logger, previousLogger, maxRep, improved: false);
-      if (result != null) return result;
-    }
-
-    // ── 6. Default ──
-    return (
-      '📊',
-      '$goodReps/$maxRep rep đúng form.',
-      null,
-    );
-  }
+  Map<String, String> faultToTipMap() => {
+        'heel_fails_count': 'Giữ trọng lượng dồn vào gót, đẩy đầu gối ra ngoài',
+        'trunk_lean_fails_count': 'Mang lưng về phía sau khi ngồi xuống',
+        'depth_fails_count': 'Ngồi xuống sâu hơn nữa',
+        'tempo_fails_count': 'Kiểm soát chuyển động, giữ 2 giây trước khi lên',
+        'hip_shoulder_sync_fails_count':
+            'Chỉ đầu gối chuyển động, hông vai phải giữ nguyên',
+      };
 
   @override
-  IssueQuestion? detectIssue(List<dynamic> setLoggers) {
-    final typedLoggers = setLoggers.whereType<ExerciseLogger>().toList();
+  Map<String, String Function(int count, int total)> praiseSentenceMap() => {
+        'Độ sâu': (c, t) => 'Sâu chuẩn $c/$t rep - được đấy!',
+        'Gót chân': (c, t) => 'Gót chân vững $c/$t rep - cổ chân khá ổn định!',
+        'Lưng': (c, t) => 'Lưng thẳng $c/$t rep - rất tốt!',
+        'Nhịp': (c, t) => 'Nhịp ổn định $c/$t rep - kiểm soát tốt!',
+        'Đồng bộ hông-vai': (c, t) =>
+            'Hông và vai đồng bộ $c/$t rep - rất chuẩn!',
+      };
 
+  @override
+  Map<String, String> praiseMetricNames() => {
+        'depth_fails_count': 'Độ sâu',
+        'heel_fails_count': 'Gót chân',
+        'trunk_lean_fails_count': 'Lưng',
+        'tempo_fails_count': 'Nhịp',
+        'hip_shoulder_sync_fails_count': 'Đồng bộ hông-vai',
+      };
+
+  @override
+  DetectedEvidence? detectIssue(List<ExerciseLogger> setLoggers) {
     // NOTE: Re-runs interpreter analysis. OK for 3-5 sets.
     // TODO: Read from cached evidences when logger stores them.
-    final evidences = <DetectedEvidence>[];
-    for (final setLogger in typedLoggers) {
+    final questions = <DetectedEvidence>[];
+    for (final setLogger in setLoggers) {
       final interpreter = SquatInterpreter(logger: setLogger);
       interpreter.analyze();
-      evidences.addAll(interpreter.evidences.expand((e) => e));
+      questions.addAll(interpreter.evidences.expand((e) => e));
     }
-
-    if (evidences.isEmpty) return null;
-    final top = evidences.first;
-    return IssueQuestion(
-      observation: _issueObservation(top),
-      question: top.question,
-      key: top.issueId,
-    );
+    return questions.isNotEmpty ? questions.first : null;
   }
 
   @override
-  List<DetailCard> buildDetailCards(List<dynamic> setLoggers) {
-    final typedLoggers = setLoggers.whereType<ExerciseLogger>().toList();
-    final allReps = typedLoggers.expand((l) => l.repLogs).toList();
+  List<DetailCard> buildDetailCards(List<ExerciseLogger> setLoggers) {
+    final allReps = setLoggers.expand((l) => l.repLogs).toList();
     final totalReps = allReps.length;
     final totalGood = allReps.where((r) => r.correctForm).length;
 
@@ -161,7 +66,7 @@ class SquatReportBuilder extends ExerciseReportBuilder {
     final bestDepth =
         allDepths.isEmpty ? 0.0 : allDepths.reduce((a, b) => a < b ? a : b);
 
-    final setAvgDepths = typedLoggers.map((l) {
+    final setAvgDepths = setLoggers.map((l) {
       final ds = l.repLogs
           .map((r) => (r.data['peak_knee_angle'] as num?)?.toDouble())
           .where((d) => d != null && d > 0)
@@ -180,7 +85,7 @@ class SquatReportBuilder extends ExerciseReportBuilder {
         ? 0.0
         : allTempos.reduce((a, b) => a + b) / allTempos.length;
 
-    final setAvgTempos = typedLoggers.map((l) {
+    final setAvgTempos = setLoggers.map((l) {
       final ts = l.repLogs
           .map((r) => (r.data['descending_time'] as num?)?.toDouble())
           .where((t) => t != null && t > 0)
@@ -219,80 +124,5 @@ class SquatReportBuilder extends ExerciseReportBuilder {
         color: 'jade',
       ),
     ];
-  }
-
-  String _issueObservation(DetectedEvidence issue) => switch (issue.issueId) {
-        'ankle_mobility' =>
-          'AI thấy gót chân nhấc lên nhiều trong lúc squat.',
-        'ankle_mobility_restriction' =>
-          'AI thấy cổ chân và thân trên cùng mất ổn định khi xuống sâu.',
-        'hip_flexor_overactivity' =>
-          'AI thấy thân trên đổ về trước khá nhiều khi xuống squat.',
-        'limited_mobility' =>
-          'AI thấy độ sâu hiện tại vẫn còn bị giới hạn.',
-        _ =>
-          'AI ghi nhận tín hiệu: ${issue.rawSignal.replaceAll('_', ' ')}.',
-      };
-
-  // ── Private helper ──
-
-  (String, String, String?)? _findMetricChange(
-    ExerciseLogger logger,
-    ExerciseLogger prevLogger,
-    int maxRep, {
-    required bool improved,
-  }) {
-    for (final metric in SquatReportBuilderConfig.metricPriority) {
-      final prev = (prevLogger.setLogs[metric.key] as num?)?.toInt() ?? 0;
-      final curr = (logger.setLogs[metric.key] as num?)?.toInt() ?? 0;
-      final denominator = prev.toDouble() + 1;
-
-      if (improved) {
-        final ratio = (prev - curr) / denominator;
-        if (ratio > SquatReportBuilderConfig.improvementRatioThreshold) {
-          return (
-            '📈',
-            'Lỗi ${metric.name} giảm: $prev → $curr rep.',
-            metric.tip,
-          );
-        }
-      } else {
-        final ratio = (curr - prev) / denominator;
-        if (ratio > SquatReportBuilderConfig.improvementRatioThreshold) {
-          return (
-            '📉',
-            'Lỗi ${metric.name} tăng: $prev → $curr rep.',
-            metric.declineTip,
-          );
-        }
-      }
-    }
-
-    final prevGood =
-        (prevLogger.setLogs["good_rep_count"] as num?)?.toInt() ?? 0;
-    final currGood = (logger.setLogs["good_rep_count"] as num?)?.toInt() ?? 0;
-    final denominator = prevGood.toDouble() + 1;
-
-    if (improved) {
-      if ((currGood - prevGood) / denominator >
-          SquatReportBuilderConfig.improvementRatioThreshold) {
-        return (
-          '📈',
-          'Rep đúng tăng: $prevGood → $currGood.',
-          'Tiếp tục giữ phong độ!',
-        );
-      }
-    } else {
-      if ((prevGood - currGood) / denominator >
-          SquatReportBuilderConfig.improvementRatioThreshold) {
-        return (
-          '📉',
-          'Rep đúng giảm: $prevGood → $currGood.',
-          'Bình thường khi mệt. Tập trung set sau!',
-        );
-      }
-    }
-
-    return null;
   }
 }

@@ -1,4 +1,4 @@
-package com.vinafit.mobile
+package com.vikavn.app
 
 import android.annotation.SuppressLint
 import android.os.Handler
@@ -280,8 +280,8 @@ class PoseLandmarkerPlugin(
     }
 
     companion object {
-        private const val METHOD_CHANNEL_NAME = "com.vinafit.mobile/pose_landmarker"
-        private const val EVENT_CHANNEL_NAME = "com.vinafit.mobile/pose_landmarker_stream"
+        private const val METHOD_CHANNEL_NAME = "com.vikavn.app/pose_landmarker"
+        private const val EVENT_CHANNEL_NAME = "com.vikavn.app/pose_landmarker_stream"
         private const val TARGET_WIDTH = 640
         private const val TARGET_HEIGHT = 480
     }

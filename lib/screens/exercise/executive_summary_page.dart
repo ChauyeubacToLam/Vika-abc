@@ -227,7 +227,7 @@ class _ShareableCard extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('VINAFIT',
+                                Text('VIKA',
                                     style: VFTheme.textStyle(context,
                                         size: 10,
                                         weight: FontWeight.w900,
@@ -416,7 +416,7 @@ class _ShareableCard extends StatelessWidget {
                       ] else
                         Padding(
                           padding: EdgeInsets.only(top: 4 * s),
-                          child: Text('VINAFIT.APP',
+                          child: Text('VIKAVN.APP',
                               style: VFTheme.textStyle(context,
                                   size: 8,
                                   weight: FontWeight.w800,

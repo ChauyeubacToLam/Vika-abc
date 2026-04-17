@@ -1,7 +1,7 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, non_constant_identifier_names, constant_identifier_names
 
-import 'package:vinafit_mobile/exercise/exercise_base.dart';
-import 'package:vinafit_mobile/utils/debouncer.dart';
+import 'package:vika/exercise/exercise_base.dart';
+import 'package:vika/utils/debouncer.dart';
 
 import '../../utils/pose_math_helpers.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';

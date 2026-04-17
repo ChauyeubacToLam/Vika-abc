@@ -1,4 +1,4 @@
-# Vinafit — Interface Design System
+# Vika — Interface Design System
 
 ## Intent
 

@@ -1,5 +1,6 @@
 import '../models/post_exercise_data.dart';
 import '../utils/exercise_logger.dart';
+import '../interpreter/interpreter_base.dart';
 import 'squat/squat_report_builder.dart';
 
 // ═══════════════════════════════════════════════════════════════
@@ -8,7 +9,7 @@ import 'squat/squat_report_builder.dart';
 
 /// When adding a new exercise:
 /// 1. Create FooReportBuilder extending ExerciseReportBuilder
-/// 2. Implement pickInsight(), detectIssue(), buildDetailCards()
+/// 2. Implement detectIssue(), buildDetailCards(), and any B4 tip/praise maps
 /// 3. Add entry here
 /// 4. Done — buildReport(), generateCoachText() inherited from base
 final Map<String, ({ExerciseReportBuilder builder, double met})>
@@ -116,35 +117,14 @@ final Map<String, ({ExerciseReportBuilder builder, double met})>
 
 /// Minimal builder for exercises without a custom implementation.
 /// Inherits buildReport() and generateCoachText() from base.
-/// Only implements the 3 required methods with simple defaults.
+/// Only implements the 2 required methods with simple defaults.
 class GenericReportBuilder extends ExerciseReportBuilder {
   @override
-  (String, String, String?) pickInsight(
-    dynamic logger,
-    dynamic prevLogger,
-    int score,
-    int? prevScore,
-  ) {
-    if (logger is! ExerciseLogger) {
-      return ('⚠️', 'Không có dữ liệu set.', null);
-    }
-
-    final maxRep = (logger.setLogs["max_rep"] as num?)?.toInt() ?? 0;
-    final goodReps = (logger.setLogs["good_rep_count"] as num?)?.toInt() ?? 0;
-    if (maxRep == 0) return ('⚠️', 'Không có rep nào.', null);
-    if (goodReps == maxRep) {
-      return ('✨', 'Hoàn hảo! $maxRep/$maxRep đúng form.', null);
-    }
-    return ('📊', '$goodReps/$maxRep rep đúng form.', null);
-  }
+  DetectedEvidence? detectIssue(List<ExerciseLogger> setLoggers) => null;
 
   @override
-  IssueQuestion? detectIssue(List<dynamic> setLoggers) => null;
-
-  @override
-  List<DetailCard> buildDetailCards(List<dynamic> setLoggers) {
-    final typedLoggers = setLoggers.whereType<ExerciseLogger>().toList();
-    final allReps = typedLoggers.expand((l) => l.repLogs).toList();
+  List<DetailCard> buildDetailCards(List<ExerciseLogger> setLoggers) {
+    final allReps = setLoggers.expand((l) => l.repLogs).toList();
     if (allReps.isEmpty) return [];
     final totalGood = allReps.where((r) => r.correctForm).length;
     final accuracy = (totalGood / allReps.length * 100).roundToDouble();

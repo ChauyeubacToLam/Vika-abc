@@ -1,4 +1,4 @@
-package com.vinafit.mobile
+package com.vikavn.app
 
 import android.content.Context
 import android.graphics.Bitmap

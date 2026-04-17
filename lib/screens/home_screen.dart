@@ -123,7 +123,7 @@ class _HomeScreenState extends State<HomeScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'VINAFIT',
+                    'VIKA',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 22,
