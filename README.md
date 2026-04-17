@@ -1,4 +1,4 @@
-# Vinafit Mobile 💪
+# Vika 💪
 
 A Flutter fitness app with AI-powered pose detection for exercise tracking.
 
@@ -114,8 +114,8 @@ Close and reopen your terminal after running this.
 
 ```bash
 # Clone the project
-git clone https://github.com/Seaw24/Vinafit-mobile.git
-cd Vinafit-mobile
+git clone https://github.com/Seaw24/Vika.git
+cd Vika
 
 # Install the pinned Flutter version
 fvm install

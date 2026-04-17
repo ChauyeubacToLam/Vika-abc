@@ -133,7 +133,7 @@ class _StreakHero extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      'VINAFIT',
+                      'VIKA',
                       style: VFTheme.textStyle(
                         context,
                         size: 9,

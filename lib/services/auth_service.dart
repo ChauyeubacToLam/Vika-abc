@@ -1,6 +1,7 @@
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../config/auth_config.dart';
 
 class AuthService {
   AuthService({SupabaseClient? client})
@@ -9,11 +10,8 @@ class AuthService {
   final SupabaseClient _supabase;
 
   static const String _magicLinkRedirectUrl =
-      'com.vinafit.mobile://login-callback/';
-  static const String _googleWebClientId = String.fromEnvironment(
-    'VINAFIT_GOOGLE_WEB_CLIENT_ID',
-    defaultValue: 'YOUR_WEB_CLIENT_ID.apps.googleusercontent.com',
-  );
+      'com.vikavn.app://login-callback/';
+  static const String _googleWebClientId = googleWebClientId;
 
   User? get currentUser => _supabase.auth.currentUser;
   Stream<AuthState> get onAuthStateChange => _supabase.auth.onAuthStateChange;
@@ -45,7 +43,7 @@ class AuthService {
     try {
       if (_googleWebClientId.startsWith('YOUR_WEB_CLIENT_ID')) {
         throw Exception(
-          'Thiếu Google Web Client ID. Hãy cấu hình VINAFIT_GOOGLE_WEB_CLIENT_ID.',
+          'Thiếu Google Web Client ID. Hãy cấu hình VIKA_GOOGLE_WEB_CLIENT_ID.',
         );
       }
 

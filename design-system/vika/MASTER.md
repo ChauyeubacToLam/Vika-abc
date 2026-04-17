@@ -1,4 +1,4 @@
-# Vinafit Design System — Master Reference
+# Vika Design System — Master Reference
 
 ## Brand Identity
 
@@ -11,7 +11,7 @@
 
 ## Dual-Theme Architecture
 
-Vinafit uses **two distinct visual modes** by design:
+Vika uses **two distinct visual modes** by design:
 
 | Context | Theme | Rationale |
 |---------|-------|-----------|
