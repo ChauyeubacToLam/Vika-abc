@@ -52,13 +52,13 @@ class _SplashScreenState extends State<SplashScreen>
 
   Color get _scoreColor {
     if (widget.report.formScore >= 80) return const Color(0xFF4ADE80);
-    if (widget.report.formScore >= 50) return const Color(0xFFFBBF24);
+    if (widget.report.formScore > 55) return const Color(0xFFFBBF24);
     return const Color(0xFFF87171);
   }
 
   String get _message {
     if (widget.report.formScore >= 80) return 'Xuất sắc';
-    if (widget.report.formScore >= 50) return 'Tốt lắm';
+    if (widget.report.formScore > 55) return 'Tốt lắm';
     return 'Hoàn thành';
   }
 
@@ -293,3 +293,4 @@ class _ConfettiPainter extends CustomPainter {
     return oldDelegate.progress != progress;
   }
 }
+

@@ -16,7 +16,7 @@ class RepLog {
 ///   3. Use [pushKey] for direct set-level values (e.g. total fault counts).
 class ExerciseLogger {
   final List<RepLog> _repLogs = [];
-  final Map<String, dynamic> _setLogs = {};
+  final Map<String, dynamic> _setLog = {};
 
   // --- Per-rep ---
 
@@ -27,7 +27,7 @@ class ExerciseLogger {
   // --- Set-level: direct values ---
 
   /// Store a direct key-value pair in set logs (e.g. fault counts).
-  void pushKey(String key, dynamic value) => _setLogs[key] = value;
+  void pushKey(String key, dynamic value) => _setLog[key] = value;
 
   // --- Set-level: aggregates across all reps ---
 
@@ -43,20 +43,20 @@ class ExerciseLogger {
   void pushAverage(String repKey, String label) {
     final values = _numericValues(repKey);
     if (values.isEmpty) return;
-    _setLogs[label] = values.reduce((a, b) => a + b) / values.length;
+    _setLog[label] = values.reduce((a, b) => a + b) / values.length;
   }
 
   void pushGoodRepCount() {
-    _setLogs['good_rep_count'] = repLogs.where((r) => r.correctForm).length;
+    _setLog['good_rep_count'] = repLogs.where((r) => r.correctForm).length;
   }
 
   // --- Output ---
 
-  Map<String, dynamic> get setLogs => Map.unmodifiable(_setLogs);
+  Map<String, dynamic> get setLogs => Map.unmodifiable(_setLog);
 
   void clear() {
     _repLogs.clear();
-    _setLogs.clear();
+    _setLog.clear();
   }
 
   // --- Internal ---
@@ -69,6 +69,6 @@ class ExerciseLogger {
   void _aggregate(String repKey, String label, num Function(num, num) fn) {
     final values = _numericValues(repKey);
     if (values.isEmpty) return;
-    _setLogs[label] = values.reduce(fn);
+    _setLog[label] = values.reduce(fn);
   }
 }

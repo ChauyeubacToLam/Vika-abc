@@ -128,7 +128,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           onNext: _launchSquatAssessment,
           onBack: _back,
         ),
-        AnalyzingPage(active: _page == 5, onNext: _next),
+        AnalyzingPage(active: _page == 6, onNext: _next),
         SquatResultPage(data: _data, onNext: _next, onBack: _back),
         LevelIssuePage(data: _data, onNext: _next, onBack: _back),
         BodySchedulePage(data: _data, onNext: _next, onBack: _back),
