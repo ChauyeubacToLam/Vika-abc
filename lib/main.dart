@@ -218,7 +218,7 @@ class _AppEntryGateState extends State<AppEntryGate> {
 
     final complete = await isOnboardingComplete();
     _setEntryState(
-      complete ? _AppEntryState.home : _AppEntryState.home,
+      complete ? _AppEntryState.home : _AppEntryState.onboarding,
     );
   }
 

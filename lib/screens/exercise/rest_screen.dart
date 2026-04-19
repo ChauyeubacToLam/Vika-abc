@@ -9,6 +9,7 @@ import '../../models/post_exercise_data.dart';
 import '../../theme/vf_theme.dart';
 import '../../utils/exercise_logger.dart';
 import 'widgets/form_score_arc.dart';
+import '../../services/session_persistence.dart';
 
 class RestScreen extends StatefulWidget {
   const RestScreen({
@@ -21,6 +22,7 @@ class RestScreen extends StatefulWidget {
     required this.onNext,
     this.onDifficultyAnswer,
     this.setLogger,
+    this.previousSession,
   });
 
   final SetReportData setReport;
@@ -31,7 +33,7 @@ class RestScreen extends StatefulWidget {
   final VoidCallback onNext;
   final Function(String difficulty)? onDifficultyAnswer;
   final ExerciseLogger? setLogger;
-
+  final List<PreviousSessionSummary>? previousSession;
   @override
   State<RestScreen> createState() => _RestScreenState();
 }
@@ -159,216 +161,207 @@ class _RestScreenState extends State<RestScreen> with TickerProviderStateMixin {
     final s = VFTheme.scale(context);
     final verticalPadding = 28 * s;
 
-    return Scaffold(
-      backgroundColor: _parchment,
-      body: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFF4F1EB),
-              Color(0xFFEBE7DF),
-              _parchment,
-            ],
-            stops: [0.0, 0.4, 1.0],
-          ),
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFFF4F1EB),
+            Color(0xFFEBE7DF),
+            _parchment,
+          ],
+          stops: [0.0, 0.4, 1.0],
         ),
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: IgnorePointer(
-                child: Opacity(
-                  opacity: 0.025,
-                  child: CustomPaint(
-                    painter: const _PaperGrainPainter(),
-                  ),
+      ),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: IgnorePointer(
+              child: Opacity(
+                opacity: 0.025,
+                child: CustomPaint(
+                  painter: const _PaperGrainPainter(),
                 ),
               ),
             ),
-            SafeArea(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return SingleChildScrollView(
-                    padding: EdgeInsets.fromLTRB(
-                      28 * s,
-                      18 * s,
-                      28 * s,
-                      24 * s,
+          ),
+          SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(
+                    28 * s,
+                    18 * s,
+                    28 * s,
+                    24 * s,
+                  ),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: math
+                          .max(
+                            0,
+                            constraints.maxHeight -
+                                (verticalPadding + (14 * s)),
+                          )
+                          .toDouble(),
                     ),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: math
-                            .max(
-                              0,
-                              constraints.maxHeight -
-                                  (verticalPadding + (14 * s)),
-                            )
-                            .toDouble(),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _TopBar(
-                            setIndex: widget.setIndex,
-                            totalSets: widget.totalSets,
-                            exerciseLabel: _exerciseLabel,
-                          ),
-                          Padding(
-                            padding: EdgeInsets.symmetric(vertical: 18 * s),
-                            child: Column(
-                              children: [
-                                _TimerRing(
-                                  scale: s,
-                                  progress: _progress,
-                                  remaining: _remaining,
-                                ),
-                                SizedBox(height: 20 * s),
-                                _ScoreSummary(
-                                  goodReps: widget.setReport.goodReps,
-                                  totalReps: widget.setReport.totalReps,
-                                ),
-                                if (widget.setReport.repResults.isNotEmpty) ...[
-                                  SizedBox(height: 16 * s),
-                                  Wrap(
-                                    alignment: WrapAlignment.center,
-                                    spacing: 6 * s,
-                                    runSpacing: 6 * s,
-                                    children: [
-                                      for (int i = 0;
-                                          i <
-                                              widget
-                                                  .setReport.repResults.length;
-                                          i++)
-                                        _RepResultDot(
-                                          scale: s,
-                                          isGood:
-                                              widget.setReport.repResults[i],
-                                          animation: _dotAnimation(i),
-                                        ),
-                                    ],
-                                  ),
-                                ],
-                                if ((widget.setReport.praiseSentence ?? '')
-                                    .trim()
-                                    .isNotEmpty) ...[
-                                  SizedBox(height: 16 * s),
-                                  ConstrainedBox(
-                                    constraints:
-                                        BoxConstraints(maxWidth: 300 * s),
-                                    child: Text(
-                                      widget.setReport.praiseSentence!,
-                                      textAlign: TextAlign.center,
-                                      style: GoogleFonts.fraunces(
-                                        textStyle: VFTheme.textStyle(
-                                          context,
-                                          size: 14,
-                                          weight: FontWeight.w600,
-                                          color: const Color(0xFF18594A),
-                                          height: 1.45,
-                                          fontStyle: FontStyle.italic,
-                                        ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _TopBar(
+                          setIndex: widget.setIndex,
+                          totalSets: widget.totalSets,
+                          exerciseLabel: _exerciseLabel,
+                        ),
+                        Padding(
+                          padding: EdgeInsets.symmetric(vertical: 18 * s),
+                          child: Column(
+                            children: [
+                              _TimerRing(
+                                scale: s,
+                                progress: _progress,
+                                remaining: _remaining,
+                              ),
+                              SizedBox(height: 20 * s),
+                              _ScoreSummary(
+                                goodReps: widget.setReport.goodReps,
+                                totalReps: widget.setReport.totalReps,
+                              ),
+                              if (widget.setReport.repResults.isNotEmpty) ...[
+                                SizedBox(height: 16 * s),
+                                Wrap(
+                                  alignment: WrapAlignment.center,
+                                  spacing: 6 * s,
+                                  runSpacing: 6 * s,
+                                  children: [
+                                    for (int i = 0;
+                                        i < widget.setReport.repResults.length;
+                                        i++)
+                                      _RepResultDot(
+                                        scale: s,
+                                        isGood: widget.setReport.repResults[i],
+                                        animation: _dotAnimation(i),
                                       ),
-                                    ),
-                                  ),
-                                ],
-                                if ((widget.setReport.coachTip ?? '')
-                                    .trim()
-                                    .isNotEmpty) ...[
-                                  SizedBox(height: 16 * s),
-                                  ConstrainedBox(
-                                    constraints:
-                                        BoxConstraints(maxWidth: 320 * s),
-                                    child: _CoachTipCard(
-                                      text: widget.setReport.coachTip!,
-                                    ),
-                                  ),
-                                ],
-                                if (_faultObservations.isNotEmpty) ...[
-                                  SizedBox(height: 12 * s),
-                                  TextButton(
-                                    onPressed: () {
-                                      setState(
-                                          () => _showFaults = !_showFaults);
-                                    },
-                                    style: TextButton.styleFrom(
-                                      padding: EdgeInsets.zero,
-                                      foregroundColor: const Color(0xFFB5B3AC),
-                                      minimumSize: Size.zero,
-                                      tapTargetSize:
-                                          MaterialTapTargetSize.shrinkWrap,
-                                    ),
-                                    child: Text(
-                                      '${_showFaults ? '▾' : '▸'} Cần cải thiện (${_faultObservations.length})',
-                                      style: VFTheme.textStyle(
-                                        context,
-                                        size: 11,
-                                        weight: FontWeight.w600,
-                                        color: const Color(0xFFB5B3AC),
-                                      ),
-                                    ),
-                                  ),
-                                  AnimatedSize(
-                                    duration: const Duration(milliseconds: 220),
-                                    curve: Curves.easeOutCubic,
-                                    child: _showFaults
-                                        ? Padding(
-                                            padding:
-                                                EdgeInsets.only(top: 8 * s),
-                                            child: ConstrainedBox(
-                                              constraints: BoxConstraints(
-                                                maxWidth: 320 * s,
-                                              ),
-                                              child: Column(
-                                                children: _faultObservations
-                                                    .map(
-                                                      (fault) => Padding(
-                                                        padding:
-                                                            EdgeInsets.only(
-                                                          bottom: 6 * s,
-                                                        ),
-                                                        child: _FaultRow(
-                                                          fault: fault,
-                                                          totalReps: widget
-                                                              .setReport
-                                                              .totalReps,
-                                                        ),
-                                                      ),
-                                                    )
-                                                    .toList(),
-                                              ),
-                                            ),
-                                          )
-                                        : const SizedBox.shrink(),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ],
-                            ),
+                              if ((widget.setReport.praiseSentence ?? '')
+                                  .trim()
+                                  .isNotEmpty) ...[
+                                SizedBox(height: 16 * s),
+                                ConstrainedBox(
+                                  constraints:
+                                      BoxConstraints(maxWidth: 300 * s),
+                                  child: Text(
+                                    widget.setReport.praiseSentence!,
+                                    textAlign: TextAlign.center,
+                                    style: GoogleFonts.fraunces(
+                                      textStyle: VFTheme.textStyle(
+                                        context,
+                                        size: 14,
+                                        weight: FontWeight.w600,
+                                        color: const Color(0xFF18594A),
+                                        height: 1.45,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              if ((widget.setReport.coachTip ?? '')
+                                  .trim()
+                                  .isNotEmpty) ...[
+                                SizedBox(height: 16 * s),
+                                ConstrainedBox(
+                                  constraints:
+                                      BoxConstraints(maxWidth: 320 * s),
+                                  child: _CoachTipCard(
+                                    text: widget.setReport.coachTip!,
+                                  ),
+                                ),
+                              ],
+                              if (_faultObservations.isNotEmpty) ...[
+                                SizedBox(height: 12 * s),
+                                TextButton(
+                                  onPressed: () {
+                                    setState(() => _showFaults = !_showFaults);
+                                  },
+                                  style: TextButton.styleFrom(
+                                    padding: EdgeInsets.zero,
+                                    foregroundColor: const Color(0xFFB5B3AC),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: Text(
+                                    '${_showFaults ? '▾' : '▸'} Cần cải thiện (${_faultObservations.length})',
+                                    style: VFTheme.textStyle(
+                                      context,
+                                      size: 11,
+                                      weight: FontWeight.w600,
+                                      color: const Color(0xFFB5B3AC),
+                                    ),
+                                  ),
+                                ),
+                                AnimatedSize(
+                                  duration: const Duration(milliseconds: 220),
+                                  curve: Curves.easeOutCubic,
+                                  child: _showFaults
+                                      ? Padding(
+                                          padding: EdgeInsets.only(top: 8 * s),
+                                          child: ConstrainedBox(
+                                            constraints: BoxConstraints(
+                                              maxWidth: 320 * s,
+                                            ),
+                                            child: Column(
+                                              children: _faultObservations
+                                                  .map(
+                                                    (fault) => Padding(
+                                                      padding: EdgeInsets.only(
+                                                        bottom: 6 * s,
+                                                      ),
+                                                      child: _FaultRow(
+                                                        fault: fault,
+                                                        totalReps: widget
+                                                            .setReport
+                                                            .totalReps,
+                                                      ),
+                                                    ),
+                                                  )
+                                                  .toList(),
+                                            ),
+                                          ),
+                                        )
+                                      : const SizedBox.shrink(),
+                                ),
+                              ],
+                            ],
                           ),
-                          AnimatedBuilder(
-                            animation: _shimmerController,
-                            builder: (context, child) {
-                              return _BottomSection(
-                                selectedDifficulty: _selectedDifficulty,
-                                lockedDifficulty: _lockedDifficulty,
-                                adjustmentText: _adjustmentText,
-                                isLastSet: widget.isLastSet,
-                                shimmerValue: _shimmerController.value,
-                                onSelectDifficulty: _selectDifficulty,
-                                onAdvance: _advance,
-                              );
-                            },
-                          ),
-                        ],
-                      ),
+                        ),
+                        AnimatedBuilder(
+                          animation: _shimmerController,
+                          builder: (context, child) {
+                            return _BottomSection(
+                              selectedDifficulty: _selectedDifficulty,
+                              lockedDifficulty: _lockedDifficulty,
+                              adjustmentText: _adjustmentText,
+                              isLastSet: widget.isLastSet,
+                              shimmerValue: _shimmerController.value,
+                              onSelectDifficulty: _selectDifficulty,
+                              onAdvance: _advance,
+                            );
+                          },
+                        ),
+                      ],
                     ),
-                  );
-                },
-              ),
+                  ),
+                );
+              },
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

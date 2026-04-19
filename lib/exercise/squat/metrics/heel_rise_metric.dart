@@ -49,23 +49,23 @@ class HeelRiseMetric extends SquatMetricBase {
     final phase = ctx.squatState.toString().split('.').last.toUpperCase();
 
     if (_heelDebouncer.update(normalized >= HeelRiseConfig.LIFT_THRESHOLD)) {
-      ctx.resultIssues.feedback['Feet'] = 'Heels lifting';
+      ctx.resultIssues.feedback['Heels'] = 'Heels lifting';
       if (!_instructionSet) {
         ctx.resultIssues.addInstruction(
-            'standing', 'Feet', 'Heels lifting — try elevating heels');
+            'standing', 'Heels', 'Heels lifting — try elevating heels');
         _instructionSet = true;
       }
       _logFault(phase, 'Heels lifting');
     } else {
-      ctx.resultIssues.feedback['Feet'] = 'Good Heels';
+      ctx.resultIssues.feedback['Heels'] = 'Good Heels';
     }
   }
 
   void _logFault(String phase, String message) {
-    if (!_faults.any((f) => f.phase == phase && f.type == 'Feet')) {
+    if (!_faults.any((f) => f.phase == phase && f.type == 'Heel')) {
       _faults.add(FaultRecord(
         phase: phase,
-        type: 'Feet',
+        type: 'Heel',
         message: message,
         affectsForm: true,
       ));
