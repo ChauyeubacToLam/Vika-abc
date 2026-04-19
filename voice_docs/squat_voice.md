@@ -1,174 +1,251 @@
 # Squat Voice
 
-Tài liệu này mô tả cách voice của bài Squat đang được implement trong runtime hiện tại, đồng thời đóng vai trò khuôn mẫu để dev khác có thể dựa vào đó triển khai voice cho các bài tập khác.
+Tài liệu này mô tả voice của bài Squat theo đúng code hiện tại trong repo.
 
-Mục tiêu của tài liệu không phải chỉ ghi "phát câu gì", mà là làm rõ 4 thứ:
+Mục tiêu của tài liệu không chỉ là ghi "phát câu gì", mà là chốt rõ:
 
-1. Event nào trong exercise pipeline được xem là nguồn sự thật cho voice.
-2. Layer nào chịu trách nhiệm sinh dữ liệu, layer nào chịu trách nhiệm phát tiếng.
-3. Vì sao một số câu được phát ngay theo frame, còn một số câu phải chờ theo rep hoặc theo phase.
-4. Checklist nào cần giữ nguyên khi port pattern này sang bài tập khác.
+1. Event nào là nguồn sự thật cho voice.
+2. Layer nào sinh dữ liệu, layer nào điều phối playback.
+3. Phần nào đã chạy thật trên runtime, phần nào mới dừng ở dữ liệu nền.
+4. `feedback`, `instructions` và dữ liệu chốt cuối rep khác nhau ở đâu.
+5. Nếu tiếp tục mở rộng, đâu là hướng đi ít rủi ro nhất.
 
 ## 1. Bối cảnh nghiệp vụ
 
-Voice của Squat phải giải quyết đồng thời 5 nhu cầu:
+Voice của Squat hiện đang phục vụ 6 nhu cầu:
 
-1. Báo cho user biết khi nào đã bắt đầu buổi tập thật sự.
-2. Hướng dẫn phase tiếp theo đủ sớm để user kịp phản ứng.
-3. Đếm rep đúng một lần, không bị lặp.
-4. Nhắc lỗi form quan trọng khi lỗi đang xảy ra, nhưng không spam.
-5. Kết thúc set gọn gàng, không để queue cũ chen vào sau câu hoàn thành.
+1. Báo thời điểm bài tập bắt đầu thật sự.
+2. Gợi phase tiếp theo đủ sớm để user kịp phản ứng.
+3. Đếm rep đúng một lần.
+4. Nhắc lỗi live quan trọng nhưng có cooldown để tránh spam.
+5. Phát feedback sau rep dựa trên dữ liệu đã chốt cuối rep.
+6. Báo hoàn thành set.
 
-Khi nhìn dưới góc độ product, voice ở bài Squat được chia thành 4 nhóm:
+Ở mức product, flow voice hiện tại của Squat gồm 6 nhóm:
 
-1. `ready cue`: "Sẵn sàng"
-2. `phase cue`: "Xuống", "Giữ", "Đứng lên", "Đứng thẳng"
-3. `live fault cue`: "Thấp hơn nữa", "Ưỡn ngực lên"
-4. `rep / completion cue`: số rep và "Hoàn thành bài tập"
+1. `ready cue`: `Sẵn sàng`
+2. `phase cue`: `Xuống`, `Giữ`, `Đứng lên`, `Đứng thẳng`
+3. `live fault cue`: `Thấp hơn nữa`, `Ưỡn ngực lên`
+4. `rep cue`: số rep
+5. `post-rep feedback cue`: hiện chỉ phát 1 câu top-priority nếu rep vừa xong không sạch
+6. `completion cue`: `Hoàn thành bài tập`
 
-## 2. Phạm vi responsibility giữa các layer
-
-Phần quan trọng nhất của design này là không để một class ôm toàn bộ logic.
+## 2. Responsibility giữa các layer
 
 ### 2.1. Exercise layer sinh dữ liệu nghiệp vụ
 
-`Squat` và các metric con không trực tiếp gọi TTS. Nhiệm vụ của layer này là:
+`Squat` và các metric không gọi TTS trực tiếp. Layer này chịu trách nhiệm:
 
 1. Duy trì state machine của rep.
 2. Sinh `currentPhaseKey`.
-3. Cập nhật `resultIssues.instructions` cho cue theo phase.
-4. Cập nhật `resultIssues.feedback` cho lỗi live theo frame.
-5. Tăng `repCount` đúng thời điểm.
-6. Chuyển `exerciseState` sang `completed` khi đủ rep.
+3. Ghi `resultIssues.instructions[currentPhase]['Status']`.
+4. Ghi live feedback vào `resultIssues.feedback`.
+5. Tăng `repCount` khi rep hoàn thành.
+6. Chốt fault cuối rep trong `_completeRep()`.
+7. Build dữ liệu rep-level như:
+   - `lastRepFaultVoiceMessages`
+   - `lastRepTopVoiceMessage`
+   - `lastRepTopVoicePriority`
+   - `lastRepWasClean`
+   - `setFeedback`
 
-### 2.2. `SquatVoiceCoach` điều phối voice runtime
+Điểm quan trọng: `priority` được dùng ngay trong `Squat._completeRep()` để sort các fault có `voiceMessage`, rồi chọn ra câu top voice cho rep vừa kết thúc.
 
-`SquatVoiceCoach` là nơi quyết định:
+### 2.2. `ActiveExercisePage` đã wire Squat voice vào runtime
 
-1. Frame hiện tại có được phép nói không.
-2. Nên ưu tiên phase cue, fault cue hay rep count.
-3. Khi nào cần dọn queue.
-4. Khi nào cần throttle để tránh spam.
+Khác với version mô tả cũ, screen tập hiện đã nằm trên hot path của voice:
 
-`ActiveExercisePage` chỉ còn nhiệm vụ gọi `processFrame(...)` sau mỗi frame. Nhờ vậy logic ưu tiên voice không còn bị dính chặt vào screen và không còn copy-paste sang flow khác.
+1. Tạo `SquatVoiceCoach` trong `initState()` khi `widget.exercise is Squat`.
+2. Forward frame vào coach qua `_processSquatVoiceFrame(...)`.
+3. Gọi `_processSquatVoiceFrame(hasPose: true)` sau mỗi `processPose(...)` hợp lệ.
+4. Gọi `_processSquatVoiceFrame(hasPose: false)` khi `processNoPoseFrame()` chạy.
+5. Dispose coach khi page bị hủy.
 
-### 2.3. TTS service chỉ lo queue và playback
+Nói ngắn gọn: voice squat hiện không còn là helper "để đó chưa dùng"; nó đã được nối vào runtime của màn tập.
 
-`ViettelTTSService` không hiểu squat, không hiểu metric, không hiểu rep. Service này chỉ làm 3 việc:
+### 2.3. `SquatVoiceCoach` là runtime coordinator
 
-1. Nhận text.
-2. Đưa text vào queue.
-3. Phát asset local trước, fallback sang API nếu asset chưa có.
+`SquatVoiceCoach` hiện chịu trách nhiệm:
+
+1. Gate voice theo `exerciseState`, `isPaused`, `hasPose`.
+2. Phát `Sẵn sàng` ở active frame đầu tiên.
+3. Ưu tiên rep count và completion hơn phase/live cue.
+4. Phát post-rep feedback ngay sau số rep nếu đủ điều kiện.
+5. Map `Status` sang phrase canonical cho TTS.
+6. Chọn live fault có ưu tiên cao nhất.
+7. Điều phối queue bằng `clearQueue()` và `clearPendingButKeepCurrent()`.
+8. Áp cooldown để giảm spam.
+
+Thứ tự ưu tiên thực tế trong `processFrame(...)` là:
+
+1. Nếu set đã `completed`: ưu tiên rep cuối, rồi completion, rồi return.
+2. Nếu chưa `activated`, đang `paused`, hoặc mất pose: im lặng và return.
+3. Nếu chưa báo ready: phát `Sẵn sàng`.
+4. Nếu `repCount` vừa tăng: phát số rep, thử enqueue post-rep feedback, rồi return.
+5. Nếu phase/status đổi và không bị trunk cue chặn: phát phase cue.
+6. Cuối cùng mới xét live fault cue.
+
+### 2.4. `ViettelTTSService` chỉ lo queue và playback
+
+`ViettelTTSService` không biết squat là gì. Service này chỉ:
+
+1. Nhận text phrase.
+2. Ưu tiên phát asset local nếu phrase có trong `_assetMap`.
+3. Fallback sang Viettel API nếu asset không có.
+4. Quản lý queue playback tuần tự.
 
 ## 3. File chịu trách nhiệm chính
 
 Các file quan trọng của flow này:
 
 1. `lib/exercise/exercise_base.dart`
-2. `lib/exercise/squat/squat.dart`
-3. `lib/exercise/squat/metrics/squat_depth_metric.dart`
-4. `lib/exercise/squat/metrics/trunk_lean_metric.dart`
-5. `lib/exercise/squat/metrics/tempo_metric.dart`
-6. `lib/services/squat_voice_coach.dart`
-7. `lib/screens/exercise/active_exercise_page.dart`
+2. `lib/exercise/fault_record.dart`
+3. `lib/exercise/squat/squat.dart`
+4. `lib/exercise/squat/metrics/squat_depth_metric.dart`
+5. `lib/exercise/squat/metrics/trunk_lean_metric.dart`
+6. `lib/exercise/squat/metrics/tempo_metric.dart`
+7. `lib/services/squat_voice_coach.dart`
 8. `lib/services/viettel_tts_service.dart`
+9. `lib/screens/exercise/active_exercise_page.dart`
 
-Nếu dev muốn copy pattern sang bài khác, gần như chắc chắn sẽ phải chạm vào đúng 3 tầng này:
+Nếu tiếp tục mở rộng voice squat mà không phá workflow hiện có, gần như chắc chắn sẽ chạm vào đúng 3 tầng:
 
 1. exercise + metrics
-2. voice coach
-3. TTS phrase/assets
+2. screen wiring
+3. voice coach + TTS queue
 
 ## 4. Data contract mà voice đang đọc
 
-Voice của squat không tự tính toán từ landmark. Nó chỉ đọc dữ liệu đã được exercise layer chuẩn hóa sẵn.
+Voice của squat không tự tính lại landmark. Nó chỉ đọc dữ liệu đã được exercise layer chuẩn hóa.
 
-### 4.1. Dữ liệu bắt buộc
+### 4.1. Dữ liệu đang được dùng trực tiếp
 
-1. `widget.exercise.exerciseState`
-2. `widget.exercise.currentPhaseKey`
-3. `widget.exercise.repCount`
-4. `widget.exercise.isPaused`
+1. `exercise.exerciseState`
+2. `exercise.currentPhaseKey`
+3. `exercise.repCount`
+4. `exercise.isPaused`
 5. `hasPose`
-6. `widget.exercise.resultIssues.instructions[currentPhaseKey]?['Status']`
-7. `_feedback['Depth']`
-8. `_feedback['Back']`
+6. `exercise.resultIssues.instructions[currentPhaseKey]?['Status']`
+7. `feedback['Depth']`
+8. `feedback['Back']`
+9. `exercise.lastRepWasClean`
+10. `exercise.lastRepTopVoiceMessage`
 
-### 4.2. Ý nghĩa của từng nguồn
+### 4.2. Dữ liệu đã có nhưng chưa được coach dùng hết
 
-1. `exerciseState` quyết định có đang ở `notActivated`, `activated` hay `completed`.
-2. `currentPhaseKey` cho biết rep đang ở `standing`, `descending`, `bottom` hay `ascending`.
-3. `repCount` là nguồn sự thật duy nhất cho việc đọc số rep.
-4. `isPaused` và `hasPose` là gate để không phát voice khi người dùng ra khỏi khung hình.
-5. `instructions[currentPhase]['Status']` là nguồn sinh phase cue.
-6. `feedback['Depth']` và `feedback['Back']` là nguồn sinh live fault cue.
+1. `lastRepFaultVoiceMessages`
+2. `lastRepTopVoicePriority`
+3. `setFeedback`
+4. `FaultRecord.priority`
 
-## 5. Điểm quan trọng nhất: phân biệt `feedback` và `instructions`
+Lưu ý:
 
-Đây là chỗ dev rất dễ implement sai khi làm bài mới.
+1. `FaultRecord.priority` có hiệu lực upstream khi `Squat` chọn `lastRepTopVoiceMessage`.
+2. `SquatVoiceCoach` không đọc trực tiếp `priority`; coach chỉ đọc câu top voice đã được exercise layer chọn sẵn.
+3. `lastRepFaultVoiceMessages` hiện được build đầy đủ nhưng chưa được phát lần lượt; coach chỉ dùng 1 câu top voice.
+
+## 5. Phân biệt `feedback`, `instructions` và dữ liệu sau rep
+
+Đây là chỗ dễ implement sai nhất.
 
 ### 5.1. `resultIssues.feedback`
 
-`feedback` bị clear mỗi frame ở `ExerciseBase.processPose()`.
+`feedback` bị clear mỗi frame ở `ExerciseBase.processPose()` và `processNoPoseFrame()`.
 
 Điều đó có nghĩa:
 
-1. `feedback` chỉ nên dùng cho tín hiệu live, có giá trị ngay ở frame hiện tại.
-2. Nếu frame sau không còn lỗi thì message biến mất ngay.
-3. Đây là nơi phù hợp để map ra các câu cảnh báo ngắn như "Thấp hơn nữa" hoặc "Ưỡn ngực lên".
+1. `feedback` chỉ hợp cho tín hiệu live.
+2. Frame sau hết lỗi là message biến mất ngay.
+3. Đây là nơi đúng để map live cue như `Thấp hơn nữa` hoặc `Ưỡn ngực lên`.
 
 ### 5.2. `resultIssues.instructions`
 
-`instructions` không bị clear mỗi frame. Nó tồn tại qua nhiều frame cho đến khi exercise chủ động clear.
+`instructions` không bị clear mỗi frame. Nó sống qua nhiều frame cho tới khi exercise chủ động reset.
 
-Ở Squat, `instructions` được dùng cho:
+Ở Squat:
 
-1. Status theo phase hiện tại.
-2. Coaching để rep sau sửa lỗi.
+1. `standing` ghi `Status = Xuống`
+2. `descending` ghi `Status = Going Down...`
+3. `bottom` ghi `Status = Hold! x.xs` hoặc `Đứng lên`
+4. `ascending` ghi `Status = Đứng thẳng`
 
-Khi bắt đầu rep mới (`standing -> descending`), `Squat._transitionState()` gọi `resultIssues.instructions.clear()`. Đây là cơ chế reset rất quan trọng để voice không đọc lại chỉ dẫn cũ của rep trước.
+Khi bắt đầu rep mới (`standing -> descending`), `Squat._transitionState()` gọi `resultIssues.instructions.clear()`.
 
-Kết luận:
+### 5.3. Dữ liệu sau rep
 
-1. `feedback` dành cho live fault đang xảy ra.
-2. `instructions` dành cho cue mang tính điều hướng hoặc coaching kéo dài hơn một frame.
+Dữ liệu sau rep phải được chốt ở `_completeRep()`, không suy ngược từ UI.
 
-## 6. Workflow runtime từ camera frame đến câu nói
+Ở code hiện tại:
 
-Flow thực tế của Squat hiện tại như sau:
+1. `Squat` gom toàn bộ fault của rep.
+2. Sort các fault có `voiceMessage` theo `priority`.
+3. Build `lastRepFaultVoiceMessages`.
+4. Chọn `lastRepTopVoiceMessage`.
+5. Ghi `lastRepWasClean`.
 
-1. Camera stream đẩy frame vào `ActiveExercisePage._detectPose()`.
-2. `ExerciseBase.processPose()` xử lý pose, clear `feedback`, sync presence, check activation, check safety.
-3. Nếu bài đã `activated`, `Squat.checkingPose()` chạy state machine và metric update.
+`SquatVoiceCoach` hiện đã consume một phần dữ liệu này: nếu rep không clean và đủ cooldown, coach sẽ enqueue đúng 1 câu `lastRepTopVoiceMessage` sau khi đọc số rep.
+
+## 6. Trạng thái implementation hiện tại
+
+### 6.1. Phần đã có và đang chạy thật
+
+1. `Squat` đã có state machine ổn định.
+2. `Squat._updatePhaseInstructions()` đã sinh `Status` theo phase.
+3. Metrics đã sinh live feedback cho `Depth`, `Back`, `Feet`, `Tempo`, `Sync`.
+4. `Squat._completeRep()` đã tăng `repCount` và chốt rep-level voice data.
+5. `SquatVoiceCoach` đã xử lý `ready`, `phase`, `live fault`, `rep count`, `post-rep feedback`, `completion`.
+6. `ActiveExercisePage` đã forward frame runtime vào `SquatVoiceCoach`.
+7. `ViettelTTSService` đã có queue và asset map cho các phrase squat đang dùng.
+
+### 6.2. Phần đã có dữ liệu nhưng chưa được dùng hết
+
+1. `lastRepFaultVoiceMessages` đã có nhưng chưa được đọc tuần tự.
+2. `lastRepTopVoicePriority` đã có nhưng coach chưa cần đọc trực tiếp.
+3. `FaultRecord.priority` đã có và đang ảnh hưởng upstream, nhưng chưa thành business rule độc lập trong coach.
+
+### 6.3. Phần chưa có trong flow hiện tại
+
+1. Live voice hiện chỉ đọc `Depth` và `Back`; chưa có live voice cho `Feet`, `Tempo`, `Sync`.
+2. Post-rep hiện chỉ đọc 1 câu top voice; chưa có multi-message summary.
+3. Chưa có user setting riêng cho mute / volume của squat voice.
+
+## 7. Workflow runtime thực tế hiện tại
+
+Flow hiện tại của app là:
+
+1. Camera stream đẩy frame vào `ActiveExercisePage`.
+2. `ExerciseBase.processPose()` hoặc `processNoPoseFrame()` update presence, pause state và `feedback`.
+3. Nếu bài đã `activated`, `Squat.checkingPose()` chạy state machine và metrics.
 4. `Squat._updatePhaseInstructions()` ghi `Status` cho phase hiện tại.
-5. Metric layer ghi live feedback như `Depth=Go Lower`, `Back=Chest up!`.
-6. Nếu rep hoàn thành, `Squat._completeRep()` tăng `repCount`.
-7. Sau khi exercise xử lý xong frame, `ActiveExercisePage._processSquatVoiceFrame()` forward dữ liệu sang `SquatVoiceCoach.processFrame(...)`.
-8. `ViettelTTSService` xếp câu nói vào queue và phát lần lượt.
+5. Nếu rep hoàn thành, `Squat._completeRep()` tăng `repCount` và chốt dữ liệu rep-level cho voice.
+6. `ActiveExercisePage._processSquatVoiceFrame(...)` forward frame hiện tại sang `SquatVoiceCoach`.
+7. `SquatVoiceCoach` quyết định có phát `ready`, `phase`, `live fault`, `rep`, `post-rep`, `completion` hay không.
+8. `ViettelTTSService` nhận text phrase, xếp queue và playback.
 
-## 7. Timeline nghiệp vụ của một rep squat chuẩn
+Điểm quan trọng: voice squat hiện đã là flow runtime thật, không còn dừng ở mức "data pipeline có, playback chưa nối".
 
-Đây là timeline chuẩn mà dev nên hình dung khi đọc code:
+## 8. Timeline nghiệp vụ của một rep squat
 
-1. User vào đúng tư thế start position và giữ yên đủ 3 giây.
-2. Frame activated đầu tiên phát "Sẵn sàng".
-3. Khi đang đứng thẳng chờ rep mới, status là "Xuống", voice phát "Xuống".
-4. User đi xuống. Trong phase `descending`, UI status là `Going Down...`, nhưng voice không đọc câu này.
-5. Khi chạm đáy, status bắt đầu là `Hold! ...s`, voice map thành "Giữ".
-6. Khi hold đủ lâu, vẫn ở phase `bottom` nhưng status đổi thành "Đứng lên", voice phát "Đứng lên".
-7. Khi user đi lên, phase chuyển sang `ascending`, status là "Đứng thẳng", voice phát "Đứng thẳng".
-8. Khi trở lại standing, `repCount` tăng. Voice đọc số rep.
-9. Nếu đó là rep cuối cùng, sau số rep sẽ phát "Hoàn thành bài tập".
+Đây là timeline đúng với code hiện tại:
 
-Điểm đáng chú ý:
+1. User vào đúng start position và giữ yên đủ `3s`.
+2. Exercise chuyển từ `notActivated` sang `activated`.
+3. Ở active frame đầu tiên có pose và không paused, coach phát `Sẵn sàng`.
+4. Trong phase `standing`, `Status = Xuống`, coach có thể phát `Xuống`.
+5. Trong phase `descending`, UI ghi `Going Down...` nhưng coach không đọc câu này.
+6. Nếu đang xuống mà `feedback['Depth']` chứa `Go Lower`, coach có thể phát `Thấp hơn nữa`.
+7. Nếu `feedback['Back']` chứa `Chest up!`, coach ưu tiên phát `Ưỡn ngực lên`.
+8. Khi vào `bottom`, `Status = Hold! x.xs`, coach map thành `Giữ`.
+9. Khi hold đủ, `Status` đổi sang `Đứng lên`, coach phát `Đứng lên`.
+10. Trong `ascending`, `Status = Đứng thẳng`, coach phát `Đứng thẳng` nếu không bị cue ưu tiên cao hơn chặn.
+11. Khi quay về `standing`, `Squat._completeRep()` tăng `repCount`.
+12. Coach phát số rep.
+13. Nếu rep vừa rồi không clean và top voice đủ điều kiện cooldown, coach enqueue thêm 1 câu post-rep ngay sau số rep.
+14. Nếu set kết thúc, coach phát `Hoàn thành bài tập`.
 
-1. Voice phase không bám cứng vào enum state.
-2. Voice phase bám vào `Status` vì `Status` cho phép cue mang tính anticipatory.
-3. Một phase có thể đổi câu voice ngay bên trong cùng phase, ví dụ phase `bottom` đổi từ "Giữ" sang "Đứng lên".
+## 9. Phrase dictionary hiện đang được Squat voice dùng thật
 
-## 8. Phrase dictionary hiện tại của Squat
-
-Các phrase dưới đây phải khớp với key trong `_assetMap` của `ViettelTTSService`.
+### 9.1. Phrase đang được coach gọi
 
 | Nhóm | Phrase |
 | --- | --- |
@@ -177,380 +254,174 @@ Các phrase dưới đây phải khớp với key trong `_assetMap` của `Viett
 | Phase | `Giữ` |
 | Phase | `Đứng lên` |
 | Phase | `Đứng thẳng` |
-| Rep | `1` ... `30` |
-| Completion | `Hoàn thành bài tập` |
 | Live fault | `Thấp hơn nữa` |
 | Live fault | `Ưỡn ngực lên` |
+| Rep | `1` ... `30` |
+| Post-rep | `Ưỡn ngực lên` |
+| Post-rep | `Xuống thấp hơn` |
+| Post-rep | `Chậm lại` |
+| Completion | `Hoàn thành bài tập` |
 
-## 9. Trigger matrix bám đúng runtime hiện tại
+### 9.2. Asset có trong TTS nhưng Squat coach hiện không gọi
 
-| Event | Điều kiện | Câu nói | Chính sách queue / cooldown |
+Ví dụ: `Sẵn sàng, xuống`, `Lên`, `Tốt lắm`, `Sai tư thế, chú ý`, `Sẵn sàng, lên`.
+
+Những phrase này có trong `_assetMap`, nhưng không nằm trên flow hiện tại của `SquatVoiceCoach`.
+
+## 10. Trigger matrix bám đúng code hiện tại
+
+| Event | Dữ liệu nguồn | Câu nói | Trạng thái hiện tại |
 | --- | --- | --- | --- |
-| Ready | Frame đầu tiên thỏa `activated && hasPose && !isPaused` và chưa từng announce ready | `Sẵn sàng` | `clearQueue()` trước khi nói, chỉ 1 lần mỗi session |
-| Phase cue | Có `Status` map được sang phrase và `phaseKey` hoặc phrase thay đổi | `Xuống` / `Giữ` / `Đứng lên` / `Đứng thẳng` | Cooldown tối thiểu 250ms |
-| Live depth fault | `_feedback['Depth']` chứa `Go Lower` | `Thấp hơn nữa` | Cooldown 3000ms theo từng phrase |
-| Live trunk fault | `_feedback['Back']` chứa `Chest up` | `Ưỡn ngực lên` | Cooldown 3000ms theo từng phrase |
-| Rep complete | `repCount > _lastRepCount` | số rep | `clearPendingButKeepCurrent()` rồi enqueue số rep |
-| Set complete | `exerciseState == completed` và chưa announce complete | `Hoàn thành bài tập` | `clearPendingButKeepCurrent()` trước completion flow, chỉ 1 lần |
+| Ready | `exerciseState == activated`, `!isPaused`, `hasPose`, `_didAnnounceReady == false` | `Sẵn sàng` | Đã chạy thật |
+| Phase cue | `instructions[currentPhase]['Status']` qua `_phasePhraseFromStatus(...)` | `Xuống` / `Giữ` / `Đứng lên` / `Đứng thẳng` | Đã chạy thật |
+| Live depth fault | `feedback['Depth']` chứa `Go Lower` | `Thấp hơn nữa` | Đã chạy thật |
+| Live trunk fault | `feedback['Back']` chứa `Chest up` | `Ưỡn ngực lên` | Đã chạy thật, có ưu tiên cao nhất |
+| Rep complete | `repCount > _lastRepCount` | số rep | Đã chạy thật |
+| Post-rep feedback | `exercise is Squat`, `!lastRepWasClean`, `lastRepTopVoiceMessage != null`, qua cooldown riêng | top voice của rep | Đã chạy thật |
+| Set complete | `exerciseState == completed` | `Hoàn thành bài tập` | Đã chạy thật |
 
-Lưu ý rất quan trọng:
+## 11. Giải thích các method quan trọng
 
-1. Runtime hiện tại dùng `clearPendingButKeepCurrent()`, không dùng `clearQueue()`, cho rep count và completion.
-2. Điều này tránh cắt ngang câu đang phát dở, nhưng vẫn loại bỏ phần queue cũ không còn giá trị.
-
-## 10. Giải thích các method quan trọng
-
-### 10.1. `ExerciseBase.processPose()`
-
-Method này là cổng vào chung của mọi exercise.
+### 11.1. `ExerciseBase.processPose()`
 
 Vai trò với voice:
 
 1. Clear `resultIssues.feedback` mỗi frame.
-2. Đồng bộ person presence để biết khi nào cần pause.
-3. Chuyển bài từ `notActivated` sang `activated`.
-4. Chạy `checkingPose()` của Squat khi bài đang active.
+2. Sync presence / pause state.
+3. Giữ logic activation `hold still 3s`.
+4. Gọi `checkingPose()` khi bài đang active.
 
-Nếu dev triển khai voice cho bài khác mà quên đặc tính "feedback bị clear mỗi frame", rất dễ chọn sai nguồn dữ liệu cho voice.
+Nếu quên tính chất "feedback bị clear mỗi frame", rất dễ chọn sai nguồn dữ liệu cho live voice.
 
-### 10.2. `Squat.checkingPose()`
+### 11.2. `ExerciseBase.processNoPoseFrame()`
 
-Đây là main loop của bài Squat khi đã active.
+Method này cũng clear `feedback`, sync presence và sinh system message khi:
 
-Method này:
+1. chưa detect được người
+2. user ra khỏi khung hình
+3. exercise đang bị pause
 
-1. Tính geometry từ landmark.
-2. Build `RepContext`.
-3. Đẩy snapshot vào `frameBuffer`.
-4. Cập nhật state machine qua `_updateStateBuffer()`.
-5. Nếu vừa về standing thì gọi `_completeRep()`.
-6. Nếu chưa kết thúc rep thì chạy toàn bộ metric.
-7. Ghi `Status` cho phase hiện tại bằng `_updatePhaseInstructions()`.
+`ActiveExercisePage` vẫn forward frame kiểu này sang coach với `hasPose: false`, nên coach sẽ im lặng đúng cách khi user mất pose.
 
-Nói ngắn gọn: nếu `checkingPose()` chưa sinh đủ dữ liệu chuẩn hóa, voice coordinator sẽ không có gì đáng tin để nói.
+### 11.3. `Squat._updatePhaseInstructions(int now)`
 
-### 10.3. `Squat._updatePhaseInstructions(int now)`
+Đây là nơi định nghĩa wording cho phase cue:
 
-Đây là method định nghĩa "business wording" cho từng phase.
+1. `standing` -> `Xuống`
+2. `descending` -> `Going Down...`
+3. `bottom` -> `Hold! x.xs` hoặc `Đứng lên`
+4. `ascending` -> `Đứng thẳng`
 
-Logic hiện tại:
+Vì vậy coach nên đọc `Status`, không nên đọc thẳng enum phase.
 
-1. `standing` ghi `Status = Xuống`
-2. `descending` ghi `Status = Going Down...`
-3. `bottom` ghi `Status = Hold! x.xs` nếu còn thời gian giữ, ngược lại ghi `Status = Đứng lên`
-4. `ascending` ghi `Status = Đứng thẳng`
+### 11.4. `Squat._completeRep(RepContext ctx)`
 
-Đây là lý do voice coordinator không đọc thẳng `currentPhaseLabel`.
+Đây là nơi chốt rep-level data thật sự:
 
-`Status` mới là contract đúng cho voice vì:
+1. `repCount += 1`
+2. evaluate depth + tempo cuối rep
+3. gom fault từ toàn bộ metrics
+4. sort fault có `voiceMessage` theo `priority`
+5. build `lastRepFaultVoiceMessages`
+6. set `lastRepTopVoiceMessage`
+7. set `lastRepTopVoicePriority`
+8. set `lastRepWasClean`
+9. reset metric cho rep tiếp theo
 
-1. Nó cho phép anticipatory cue.
-2. Nó cho phép thay câu trong cùng một phase.
-3. Nó gom business wording vào exercise layer thay vì hard-code ở UI.
+### 11.5. `ActiveExercisePage._processSquatVoiceFrame({required bool hasPose})`
 
-### 10.4. `Squat._updateStateBuffer(double kneeAngle, int timestampMs)`
+Đây là call site runtime của squat voice.
 
-Method này đảm bảo state machine đủ ổn định để voice không bị giật.
+Screen hiện tại:
 
-Nó kết hợp:
+1. chỉ tạo coach cho `Squat`
+2. đưa `exercise`, `repCount`, `hasPose`, `_feedback` vào `processFrame(...)`
+3. gọi cả ở nhánh có pose lẫn no-pose
 
-1. Hướng thay đổi của góc gối từ `frameBuffer`
-2. `StickyDebouncer` để xác nhận đang đi lên hay đi xuống
-3. `Debouncer` cho threshold vào bottom và trở lại standing
+### 11.6. `SquatVoiceCoach.processFrame(...)`
 
-Nếu state machine nhiễu, phase cue sẽ nhiễu theo. Vì vậy với bài mới, chất lượng voice phụ thuộc trực tiếp vào độ ổn định của state machine.
+Đây là coordinator thật sự của voice squat.
 
-### 10.5. `Squat._transitionState(SquatState newState, int timestampMs)`
+Điểm cần ghi đúng với code:
 
-Đây là hook quan trọng khi đổi phase.
+1. `ready` chỉ được báo một lần cho mỗi instance của coach.
+2. Khi rep tăng, coach `return` sớm sau khi phát rep count và enqueue post-rep feedback.
+3. Khi set complete, coach ưu tiên nhánh completion và không xét phase/live cue nữa.
+4. Nếu trunk cue đủ điều kiện, phase cue cùng frame có thể bị chặn.
 
-Nó làm 4 việc:
-
-1. Cập nhật `previousSquatState`
-2. Chuyển `squatState`
-3. Clear `instructions` khi bắt đầu rep mới (`descending`)
-4. Báo cho toàn bộ metric biết state đã đổi qua `metric.onStateTransition(...)`
-
-Việc clear `instructions` ở đây là quyết định đúng, vì rep mới không nên kế thừa coaching text cũ một cách mù quáng.
-
-### 10.6. `Squat._completeRep(RepContext ctx)`
-
-Method này là nguồn sinh event rep-complete thực sự.
-
-Nó:
-
-1. Tăng `repCount`
-2. Chốt fault cuối rep
-3. Ghi `Result`
-4. Log dữ liệu rep
-5. Reset metric cho rep tiếp theo
-
-Voice không tự phát hiện rep bằng landmark. Voice chỉ nhìn `repCount` sau khi method này chạy xong. Đây là pattern nên giữ cho bài khác.
-
-### 10.7. `SquatVoiceCoach.processFrame(...)`
-
-Đây là voice coordinator của Squat.
-
-Thứ tự ưu tiên trong method này:
-
-1. Screen chỉ gọi coach cho bài `Squat`.
-2. Nếu bài đã `completed`, ưu tiên rep cuối và completion.
-3. Nếu chưa `activated`, đang `paused`, hoặc mất pose thì im lặng.
-4. Nếu đây là frame active đầu tiên thì phát `Sẵn sàng`.
-5. Nếu `repCount` vừa tăng thì phát số rep và return sớm.
-6. Nếu phase/status đổi thì cân nhắc phát phase cue.
-7. Sau cùng mới xét live fault cue.
-
-Quyết định "rep count return sớm" là có chủ đích:
-
-1. Rep count có giá trị cao hơn phase cue và fault cue.
-2. Khi rep vừa hoàn thành, queue cũ thường đã lỗi thời.
-
-`ActiveExercisePage._processSquatVoiceFrame()` giờ chỉ còn làm một việc: nếu bài hiện tại là `Squat` thì gọi `SquatVoiceCoach.processFrame(...)` với `exercise`, `repCount`, `hasPose` và `feedback`.
-
-### 10.8. `String? SquatVoiceCoach._phasePhraseFromStatus(String? statusText)`
-
-Method này map text business sang canonical phrase để TTS hiểu.
+### 11.7. `String? SquatVoiceCoach._phasePhraseFromStatus(String? statusText)`
 
 Mapping hiện tại:
 
-1. Status bắt đầu bằng `Hold` hoặc chứa `Giữ` thì đọc `Giữ`
-2. Status chứa `Xuống` thì đọc `Xuống`
-3. Status chứa `Đứng lên` hoặc `Lên` thì đọc `Đứng lên`
-4. Status chứa `Đứng thẳng` thì đọc `Đứng thẳng`
+1. `Hold...` hoặc chứa `Giữ` -> `Giữ`
+2. chứa `Xuống` -> `Xuống`
+3. chứa `Đứng lên` hoặc `Lên` -> `Đứng lên`
+4. chứa `Đứng thẳng` -> `Đứng thẳng`
 
 Điểm cần nhớ:
 
-1. `Going Down...` hiện tại không map ra voice.
-2. Điều này là chủ động, không phải bug.
-3. Vì cue đi xuống đã được phát từ phase `standing` với status `Xuống`.
+1. `Going Down...` hiện không map ra voice.
+2. Đây là chủ đích, không phải bug.
+3. Cue xuống đã được phát anticipatory từ phase `standing`.
 
-### 10.9. `List<String> SquatVoiceCoach._liveFaultVoicesFromFeedback(Map<String, String> feedback)`
+### 11.8. `String? SquatVoiceCoach._highestPriorityLiveFaultVoice(...)`
 
-Method này convert feedback runtime sang voice fault có thể phát ngay.
+Business rule hiện tại:
 
-Mapping hiện tại:
+1. `Back=Chest up!` -> `Ưỡn ngực lên`
+2. nếu không có trunk fault, `Depth=Go Lower` -> `Thấp hơn nữa`
 
-1. `Depth=Go Lower` -> `Thấp hơn nữa`
-2. `Back=Chest up!` -> `Ưỡn ngực lên`
+Điều đó có nghĩa:
 
-Không phải mọi feedback đều được phát ra voice. Chỉ những lỗi:
+1. trunk cue đang có ưu tiên cao nhất trong live faults
+2. live voice hiện chưa xét `Feet`, `Tempo`, `Sync`
 
-1. Đang xảy ra ở frame hiện tại
-2. Có hành động sửa rõ ràng
-3. Đủ ngắn để không cản nhịp tập
+### 11.9. `void SquatVoiceCoach._enqueuePostRepFeedbackIfAllowed(...)`
 
-### 10.10. `ViettelTTSService.speak()`, `clearQueue()`, `clearPendingButKeepCurrent()`
+Đây là phần quan trọng mà version tài liệu cũ mô tả thiếu.
 
-Đây là 3 API chính mà coordinator đang dùng.
+Coach hiện đã có post-rep feedback với 3 lớp gate:
 
-1. `speak(text)` thêm text vào queue tuần tự.
-2. `clearQueue()` xóa toàn bộ pending queue và stop luôn audio hiện tại.
-3. `clearPendingButKeepCurrent()` chỉ xóa phần pending, còn audio đang nói dở thì để phát xong.
+1. chỉ chạy khi `exercise is Squat` và `lastRepWasClean == false`
+2. chỉ chạy khi có `lastRepTopVoiceMessage`
+3. cùng một câu phải cách nhau ít nhất `3 reps`
+4. nếu câu đó vừa được nói live trong `1.5s` gần nhất thì suppress
 
-Pattern dùng hiện tại:
+Kết quả: post-rep feedback hiện có thật, nhưng mới ở mức một câu top voice cho mỗi rep.
 
-1. Dùng `clearQueue()` cho moment bắt đầu session với câu `Sẵn sàng`.
-2. Dùng `clearPendingButKeepCurrent()` cho rep count và completion.
+### 11.10. `ViettelTTSService.clearQueue()` và `clearPendingButKeepCurrent()`
 
-Đây là trade-off hợp lý:
+Policy queue hiện tại:
 
-1. Lúc bắt đầu bài, cần reset sạch queue cũ.
-2. Khi đang tập, không nên cắt ngang âm thanh giữa chừng nếu không thật sự cần thiết.
+1. `clearQueue()` dùng khi bắt đầu session với `Sẵn sàng`, và khi dispose coach.
+2. `clearPendingButKeepCurrent()` dùng trước rep count, completion, và trunk cue để ưu tiên cue quan trọng mà không cắt ngang audio đang nói.
 
-## 11. Vì sao phase cue của Squat dùng kiểu "anticipatory"
+## 12. Những chỗ còn "nửa bước"
 
-Nếu chỉ đọc tên phase hiện tại, voice sẽ thường chậm hơn chuyển động của user.
+Đây là các điểm vẫn còn dở dang nếu muốn nâng cấp thêm:
 
-Ví dụ:
+1. `lastRepFaultVoiceMessages` đã có nhưng chưa đọc hết danh sách.
+2. `Feet`, `Tempo`, `Sync` đã có feedback/instruction nhưng chưa có live voice mapping trong coach.
+3. `lastRepTopVoicePriority` chưa được coach dùng cho rule riêng ngoài việc chọn top voice ở exercise layer.
+4. Chưa có cấu hình user-facing cho mute / volume / voice style riêng của squat.
 
-1. Đợi user thật sự bắt đầu xuống rồi mới đọc "Xuống" thì cue bị muộn.
-2. Đợi user thật sự đứng hẳn rồi mới đọc "Đứng thẳng" thì không còn tác dụng dẫn động tác.
+## 13. Acceptance criteria đúng với pha tiếp theo
 
-Thiết kế hiện tại giải quyết bằng cách:
+Nếu tiếp tục implement mà vẫn giữ cấu trúc hiện tại, bước kế tiếp được xem là đúng khi:
 
-1. Khi user đang đứng ở đầu rep thì nói `Xuống`
-2. Khi user đang giữ đáy xong thì nói `Đứng lên`
-3. Khi user đang đi lên thì nói `Đứng thẳng`
+1. Không chuyển TTS xuống metric.
+2. Không nhét business logic voice vào screen ngoài việc wiring.
+3. Nếu muốn post-rep phong phú hơn, consume `lastRepFaultVoiceMessages` thay vì suy từ UI.
+4. Nếu thêm live cue mới, update cả `SquatVoiceCoach` lẫn `_assetMap`.
+5. Vẫn giữ rep count và completion là cue ưu tiên cao hơn phase/live cue.
 
-Với bài mới, dev nên nghĩ theo câu hỏi:
+## 14. Kết luận
 
-1. User cần nghe câu nào để làm hành động kế tiếp?
-2. Chứ không phải: phase hiện tại tên là gì?
+Trạng thái đúng của Squat voice ở repo hiện tại là:
 
-## 12. Workflow implement để port sang bài tập khác
+1. Exercise layer đã sinh đúng dữ liệu.
+2. `SquatVoiceCoach` đã điều phối được `ready`, `phase`, `live`, `rep`, `post-rep`, `completion`.
+3. `ActiveExercisePage` đã wire coach vào runtime.
+4. `ViettelTTSService` đã có queue và asset cho các phrase chính.
 
-Đây là workflow mình khuyến nghị giữ nguyên.
-
-### Bước 1. Chốt phrase nghiệp vụ trước khi code
-
-Trả lời rõ 4 câu hỏi:
-
-1. Bài này có những phase cue nào?
-2. Live fault nào đủ quan trọng để phát voice?
-3. Rep complete đọc gì?
-4. Set complete đọc gì?
-
-Nguyên tắc:
-
-1. Mỗi phrase phải ngắn.
-2. Mỗi phrase phải mang hành động sửa rõ ràng.
-3. Phrase text phải khớp key TTS asset nếu muốn chạy offline nhanh.
-
-### Bước 2. Chuẩn hóa state machine của exercise
-
-Exercise mới phải expose được:
-
-1. `currentPhaseKey`
-2. `currentPhaseLabel`
-3. thời điểm rep complete
-4. điều kiện set complete
-
-Nếu state machine còn rung, đừng implement voice quá sớm. Sửa state machine trước.
-
-### Bước 3. Tách nguồn dữ liệu phase cue và live fault cue
-
-Nên follow đúng pattern của Squat:
-
-1. `instructions[currentPhase]['Status']` cho phase cue
-2. `feedback[key]` cho live fault cue
-
-Không nên dùng chung một map cho cả hai nhóm vì vòng đời dữ liệu khác nhau.
-
-### Bước 4. Đặt business wording ở exercise layer
-
-Exercise phải tự quyết định status text cho từng phase, ví dụ:
-
-1. phase nào thì nói "Mở"
-2. phase nào thì nói "Đóng"
-3. phase nào thì nói "Đẩy lên"
-
-Screen chỉ nên map status text sang canonical phrase, không nên tự nghĩ business wording.
-
-### Bước 5. Viết voice coach ở runtime layer
-
-Voice coach cho bài mới nên giữ skeleton gần giống Squat:
-
-```dart
-void processFrame({
-  required ExerciseBase exercise,
-  required int repCount,
-  required bool hasPose,
-  required Map<String, String> feedback,
-}) {
-  final state = exercise.exerciseState;
-  final phaseKey = exercise.currentPhaseKey;
-  final repIncreased = repCount > _lastRepCount;
-
-  if (state == ExerciseState.completed) {
-    // rep cuối + completion
-    return;
-  }
-
-  if (state != ExerciseState.activated || exercise.isPaused || !hasPose) {
-    // gate toàn bộ voice
-    return;
-  }
-
-  // ready cue
-  // rep cue
-  // phase cue
-  // live fault cue
-}
-```
-
-Điều quan trọng không phải tên method, mà là thứ tự ưu tiên ở bên trong.
-
-### Bước 6. Thêm asset và mapping vào TTS service
-
-Nếu bài mới có phrase mới:
-
-1. thêm file mp3 vào `assets/audio`
-2. thêm key vào `_assetMap`
-3. bảo đảm text phrase trong coordinator khớp tuyệt đối với key map
-
-Sai 1 dấu cách hoặc khác text là app sẽ fallback sang API, gây tăng độ trễ.
-
-### Bước 7. Kiểm thử theo event timeline, không chỉ nhìn UI
-
-Với bài mới, luôn test theo dạng timeline:
-
-1. event nào phát sinh
-2. câu nào được enqueue
-3. câu nào bị drop vì cooldown
-4. câu nào bị xóa khỏi pending queue
-
-Nếu chỉ nhìn "nghe có vẻ ổn", dev rất dễ bỏ sót lỗi race condition hoặc stale queue.
-
-## 13. Checklist để dùng Squat làm template cho bài khác
-
-### 13.1. Phần có thể copy gần như nguyên mẫu
-
-1. Cấu trúc của `SquatVoiceCoach`
-2. Biến state phục vụ voice như `_lastPhaseKey`, `_lastRepCount`, `_lastFaultVoiceAtMs`
-3. Cơ chế throttle theo phrase
-4. TTS queue policy
-5. Quy ước rep count lấy từ `repCount` thay vì tự detect lại ngoài exercise layer
-
-### 13.2. Phần phải customize cho từng bài
-
-1. State machine
-2. Status text theo phase
-3. Mapping từ feedback sang live fault voice
-4. Phrase dictionary
-5. Điều kiện rep complete
-6. Điều kiện set complete
-
-### 13.3. Những lỗi phổ biến cần tránh
-
-1. Gọi TTS trực tiếp trong metric.
-2. Dùng text UI dài dòng làm voice phrase.
-3. Không clear instruction khi rep mới bắt đầu.
-4. Dùng `feedback` cho dữ liệu cần sống qua nhiều frame.
-5. Không throttle live fault cue.
-6. Cắt ngang audio quá mạnh bằng `clearQueue()` ở mọi event.
-7. Tự suy rep complete ở screen thay vì tin vào `repCount`.
-
-## 14. Acceptance criteria cho Squat hiện tại
-
-Implementation được xem là đúng khi thỏa tất cả điều sau:
-
-1. Sau khi activate thành công, app chỉ nói `Sẵn sàng` đúng một lần.
-2. Trong rep chuẩn, user nghe được chuỗi cue hợp lý theo nhịp: `Xuống` -> `Giữ` -> `Đứng lên` -> `Đứng thẳng` -> số rep.
-3. `Thấp hơn nữa` không lặp liên tục từng frame khi user đang shallow squat.
-4. `Ưỡn ngực lên` không spam liên tục khi user đang gập thân trước.
-5. Khi mất pose hoặc bài bị pause, voice im lặng.
-6. Khi rep vừa hoàn thành, số rep có ưu tiên cao hơn phase cue/fault cue còn tồn trong queue.
-7. Khi hoàn thành set, `Hoàn thành bài tập` chỉ phát một lần.
-
-## 15. Gợi ý refactor cho tương lai
-
-Design hiện tại đã đi được một bước đúng: logic Squat đã được tách ra `SquatVoiceCoach`, không còn nằm trực tiếp trong screen. Nếu số bài có voice tăng lên, bước tiếp theo nên cân nhắc abstraction chung như:
-
-1. `ExerciseVoiceCoordinator`
-2. `ExerciseVoiceConfig`
-3. `VoiceEvent`
-4. `VoicePhraseResolver`
-
-Khi đó mỗi bài chỉ cần cung cấp:
-
-1. phase status resolver
-2. live fault resolver
-3. rep/completion phrase config
-
-Ở thời điểm hiện tại, việc giữ logic trong một `SquatVoiceCoach` chuyên biệt vẫn hợp lý vì:
-
-1. Squat là bài đầu tiên có flow voice hoàn chỉnh nhất.
-2. Mapping phrase và queue policy vẫn còn mang tính bài-specific.
-3. Chúng ta vẫn cần thêm 1-2 bài nữa để rút ra abstraction đủ đúng.
-
-## 16. Kết luận
-
-Voice của Squat đang đi theo một pattern tốt và đáng tái sử dụng:
-
-1. Exercise layer sinh dữ liệu nghiệp vụ.
-2. `SquatVoiceCoach` điều phối thứ tự ưu tiên và queue policy.
-3. Screen chỉ forward runtime context vào voice coach.
-4. TTS service chỉ lo playback.
-
-Nếu dev khác muốn implement voice cho bài mới, hãy giữ nguyên triết lý đó. Đừng bắt đầu từ việc "thêm vài câu speak()". Hãy bắt đầu từ việc xác định event contract giữa exercise, UI coordinator và TTS.
+Nói ngắn gọn: bài toán hiện tại không còn là "nối cho có voice". Voice squat đã chạy trên đường runtime. Việc tiếp theo, nếu cần, là mở rộng độ phong phú của cue và tận dụng nốt dữ liệu rep-level đã có sẵn.

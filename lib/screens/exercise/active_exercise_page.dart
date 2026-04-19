@@ -17,6 +17,7 @@ import '../../exercise/squat/metrics/tempo_metric.dart';
 import '../../exercise/squat/metrics/trunk_lean_metric.dart';
 import '../../exercise/squat/squat.dart';
 import '../../models/exercise_definition.dart';
+import '../../services/squat_voice_coach.dart';
 import '../../utils/exercise_logger.dart';
 import '../onboarding/vf_theme.dart';
 import 'widgets/form_score_arc.dart';
@@ -78,6 +79,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   InputImageRotation _imageRotation = InputImageRotation.rotation0deg;
   late final AnimationController _pulseController;
   late final AnimationController _voiceController;
+  SquatVoiceCoach? _squatVoiceCoach;
   _PoseRuntime _runtime = _PoseRuntime.nativeMediaPipe;
 
   @override
@@ -91,6 +93,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       vsync: this,
       duration: const Duration(milliseconds: 1100),
     )..repeat();
+    if (widget.exercise is Squat) {
+      _squatVoiceCoach = SquatVoiceCoach();
+    }
     _initCamera();
   }
 
@@ -103,6 +108,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     unawaited(_poseChannel.dispose());
     _poseDetector.close();
     unawaited(widget.exercise.disposeDetectors());
+    _squatVoiceCoach?.dispose();
     _pulseController.dispose();
     _voiceController.dispose();
     super.dispose();
@@ -249,6 +255,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       } else {
         _detectedPose = null;
         _feedback = widget.exercise.processNoPoseFrame();
+        _processSquatVoiceFrame(hasPose: false);
       }
 
       if (mounted) {
@@ -265,8 +272,11 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         result.length == 2 &&
         result[1] is Map) {
       _feedback = Map<String, String>.from(result[1] as Map);
+      _processSquatVoiceFrame(hasPose: true);
       return;
     }
+
+    _processSquatVoiceFrame(hasPose: _detectedPose != null);
 
     if (widget.exercise.exerciseState == ExerciseState.completed &&
         !_didComplete) {
@@ -460,6 +470,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       } else {
         _detectedPose = null;
         _feedback = widget.exercise.processNoPoseFrame();
+        _processSquatVoiceFrame(hasPose: false);
       }
 
       if (mounted) {
@@ -477,6 +488,21 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   void _handlePose(Pose pose) {
     _detectedPose = pose;
     _handlePoseResult(widget.exercise.processPose(pose.landmarks));
+  }
+
+  void _processSquatVoiceFrame({required bool hasPose}) {
+    final coach = _squatVoiceCoach;
+    final exercise = widget.exercise;
+    if (coach == null || exercise is! Squat) {
+      return;
+    }
+
+    coach.processFrame(
+      exercise: exercise,
+      repCount: exercise.repCount,
+      hasPose: hasPose,
+      feedback: _feedback,
+    );
   }
 
   InputImage? _buildInputImage(CameraImage image) {

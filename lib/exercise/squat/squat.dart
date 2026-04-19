@@ -56,6 +56,9 @@ class Squat extends ExerciseBase {
   SquatState squatState = SquatState.standing;
   SquatState previousSquatState = SquatState.standing;
   List<String> lastRepFaultVoiceMessages = [];
+  String? lastRepTopVoiceMessage;
+  int? lastRepTopVoicePriority;
+  bool lastRepWasClean = true;
   bool _reachedBottomThisRep = false;
 
   Squat({this.maxRep = SquatConfig.MAX_REP});
@@ -348,15 +351,33 @@ class Squat extends ExerciseBase {
 
     // Build fault map grouped by phase
     final faultMap = <String, Map<String, String>>{};
-    final faultVoiceMessages = <String>[];
     for (final fault in allFaults) {
       faultMap.putIfAbsent(fault.phase, () => {});
       faultMap[fault.phase]![fault.type] = fault.message;
-      if (fault.voiceMessage != null && fault.voiceMessage!.isNotEmpty) {
-        faultVoiceMessages.add(fault.voiceMessage!);
+    }
+
+    final voicedFaults = allFaults
+        .where((fault) =>
+            fault.voiceMessage != null && fault.voiceMessage!.isNotEmpty)
+        .toList()
+      ..sort((a, b) => a.priority.compareTo(b.priority));
+
+    final orderedVoiceMessages = <String>[];
+    final seenVoiceMessages = <String>{};
+    for (final fault in voicedFaults) {
+      final voiceMessage = fault.voiceMessage!;
+      if (seenVoiceMessages.add(voiceMessage)) {
+        orderedVoiceMessages.add(voiceMessage);
       }
     }
-    lastRepFaultVoiceMessages = faultVoiceMessages.toSet().toList();
+
+    lastRepFaultVoiceMessages = orderedVoiceMessages;
+    lastRepTopVoiceMessage =
+        voicedFaults.isNotEmpty ? voicedFaults.first.voiceMessage : null;
+    lastRepTopVoicePriority =
+        voicedFaults.isNotEmpty ? voicedFaults.first.priority : null;
+    lastRepWasClean = correctForm;
+
     setFeedback.add({correctForm: faultMap});
 
     // Update debug data with metric outputs

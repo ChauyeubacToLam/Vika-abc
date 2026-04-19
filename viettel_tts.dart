@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
-import '../utils/constants.dart';
+import 'package:vika/utils/constants.dart';
 
 class ViettelTTSService {
   static final ViettelTTSService _instance = ViettelTTSService._internal();

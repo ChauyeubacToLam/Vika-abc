@@ -65,7 +65,12 @@ class TrunkLeanMetric extends SquatMetricBase {
             .addInstruction('standing', 'Back', 'Keep chest up next time!');
         _instructionSet = true;
       }
-      _logFault(phase, 'Leaned too forward', 'Ưỡn ngực lên');
+      _logFault(
+        phase,
+        'Leaned too forward',
+        'Ưỡn ngực lên',
+        priority: 0,
+      );
     } else if (backwardConfirmed) {
       ctx.resultIssues.feedback['Back'] = "Don't lean back!";
       if (!_instructionSet) {
@@ -73,13 +78,18 @@ class TrunkLeanMetric extends SquatMetricBase {
             .addInstruction('standing', 'Back', "Don't lean back next time!");
         _instructionSet = true;
       }
-      _logFault(phase, 'Leaned backward', null);
+      _logFault(phase, 'Leaned backward', null, priority: 3);
     } else {
       ctx.resultIssues.feedback['Back'] = 'Good back';
     }
   }
 
-  void _logFault(String phase, String message, String? voiceMessage) {
+  void _logFault(
+    String phase,
+    String message,
+    String? voiceMessage, {
+    required int priority,
+  }) {
     if (!_faults.any((f) => f.phase == phase && f.type == 'Back')) {
       _faults.add(FaultRecord(
         phase: phase,
@@ -87,6 +97,7 @@ class TrunkLeanMetric extends SquatMetricBase {
         message: message,
         voiceMessage: voiceMessage,
         affectsForm: true,
+        priority: priority,
       ));
     }
   }

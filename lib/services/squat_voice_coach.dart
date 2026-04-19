@@ -1,4 +1,5 @@
 import '../exercise/exercise_base.dart';
+import '../exercise/squat/squat.dart';
 import 'viettel_tts_service.dart';
 
 class SquatVoiceCoach {
@@ -7,6 +8,10 @@ class SquatVoiceCoach {
 
   static const int _phaseCueMinGapMs = 250;
   static const int _faultCueCooldownMs = 3000;
+  static const int _postRepCueCooldownReps = 3;
+  static const int _postRepRepeatSuppressMs = 1500;
+
+  static const String _trunkPriorityCue = 'Ưỡn ngực lên';
 
   final ViettelTTSService _ttsService;
 
@@ -17,6 +22,7 @@ class SquatVoiceCoach {
   bool _didAnnounceSetComplete = false;
   bool _didAnnounceReady = false;
   final Map<String, int> _lastFaultVoiceAtMs = {};
+  final Map<String, int> _lastPostRepVoiceRep = {};
 
   void processFrame({
     required ExerciseBase exercise,
@@ -66,10 +72,18 @@ class SquatVoiceCoach {
     final phaseInstr = exercise.resultIssues.instructions[currentPhaseKey];
     final statusText = phaseInstr?['Status'];
     final phasePhrase = _phasePhraseFromStatus(statusText);
+    final liveFaultVoice = _highestPriorityLiveFaultVoice(feedback);
+    final canSpeakLiveFault = liveFaultVoice != null &&
+        _canSpeakLiveFaultVoice(liveFaultVoice, nowMs);
 
     if (repIncreased) {
       _ttsService.clearPendingButKeepCurrent();
       _ttsService.speak('$repCount');
+      _enqueuePostRepFeedbackIfAllowed(
+        exercise: exercise,
+        repCount: repCount,
+        nowMs: nowMs,
+      );
       _lastPhaseKey = currentPhaseKey;
       _lastPhasePhrase = phasePhrase;
       _lastRepCount = repCount;
@@ -80,20 +94,24 @@ class SquatVoiceCoach {
     final phraseChanged =
         phasePhrase != null && phasePhrase != _lastPhasePhrase;
     final canSpeakPhaseCue = nowMs - _lastPhaseCueAtMs >= _phaseCueMinGapMs;
+    final trunkCueTakesPriority =
+        liveFaultVoice == _trunkPriorityCue && canSpeakLiveFault;
 
-    if (phasePhrase != null &&
+    if (!trunkCueTakesPriority &&
+        phasePhrase != null &&
         (phaseKeyChanged || phraseChanged) &&
         canSpeakPhaseCue) {
       _ttsService.speak(phasePhrase);
       _lastPhaseCueAtMs = nowMs;
     }
 
-    final liveFaultVoices = _liveFaultVoicesFromFeedback(feedback);
-    for (final voice in liveFaultVoices) {
-      final lastSpokenAt = _lastFaultVoiceAtMs[voice] ?? 0;
-      if (nowMs - lastSpokenAt < _faultCueCooldownMs) continue;
-      _lastFaultVoiceAtMs[voice] = nowMs;
-      _ttsService.speak(voice);
+    if (liveFaultVoice != null && canSpeakLiveFault) {
+      if (liveFaultVoice == _trunkPriorityCue) {
+        // Let the current phrase finish, but bring chest cue to the front.
+        _ttsService.clearPendingButKeepCurrent();
+      }
+      _lastFaultVoiceAtMs[liveFaultVoice] = nowMs;
+      _ttsService.speak(liveFaultVoice);
     }
 
     _lastPhaseKey = currentPhaseKey;
@@ -124,19 +142,50 @@ class SquatVoiceCoach {
     return null;
   }
 
-  List<String> _liveFaultVoicesFromFeedback(Map<String, String> feedback) {
-    final voices = <String>[];
+  bool _canSpeakLiveFaultVoice(String voice, int nowMs) {
+    final lastSpokenAt = _lastFaultVoiceAtMs[voice] ?? 0;
+    return nowMs - lastSpokenAt >= _faultCueCooldownMs;
+  }
+
+  String? _highestPriorityLiveFaultVoice(Map<String, String> feedback) {
+    final back = feedback['Back'] ?? '';
+    if (back.contains('Chest up')) {
+      return _trunkPriorityCue;
+    }
 
     final depth = feedback['Depth'] ?? '';
     if (depth.contains('Go Lower')) {
-      voices.add('Thấp hơn nữa');
+      return 'Thấp hơn nữa';
     }
 
-    final back = feedback['Back'] ?? '';
-    if (back.contains('Chest up')) {
-      voices.add('Ưỡn ngực lên');
+    return null;
+  }
+
+  void _enqueuePostRepFeedbackIfAllowed({
+    required ExerciseBase exercise,
+    required int repCount,
+    required int nowMs,
+  }) {
+    if (exercise is! Squat || exercise.lastRepWasClean) {
+      return;
     }
 
-    return voices;
+    final voice = exercise.lastRepTopVoiceMessage;
+    if (voice == null || voice.isEmpty) {
+      return;
+    }
+
+    final lastPostRepRep = _lastPostRepVoiceRep[voice] ?? -99;
+    if (repCount - lastPostRepRep < _postRepCueCooldownReps) {
+      return;
+    }
+
+    final lastLiveVoiceAt = _lastFaultVoiceAtMs[voice] ?? 0;
+    if (nowMs - lastLiveVoiceAt < _postRepRepeatSuppressMs) {
+      return;
+    }
+
+    _lastPostRepVoiceRep[voice] = repCount;
+    _ttsService.speak(voice);
   }
 }

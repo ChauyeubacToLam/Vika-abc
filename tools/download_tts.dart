@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
-import 'package:vinafit_mobile/utils/constants.dart';
+import 'package:vika/utils/constants.dart';
 
 Future<void> main() async {
   if (Constants.viettelTtsToken.isEmpty) {
