@@ -15,13 +15,15 @@ import '../../../utils/debouncer.dart';
 
 class HeelRiseConfig {
   /// Heel lift threshold normalized to back length (shoulder-to-hip).
-  /// 0.15 = "If heel lifts more than 10% of back length."
+  /// 0.15 filters out the normal toe-vs-heel height offset and only flags
+  /// a clearly visible heel pop.
   // ignore: constant_identifier_names
-  static const double LIFT_THRESHOLD = 0.1;
+  static const double LIFT_THRESHOLD = 0.15;
 }
 
 class HeelRiseMetric extends SquatMetricBase {
-  static const String _postRepVoiceCue = 'Nhớ không nâng gót chân';
+  // Reuse the shared heel cue so post-rep playback matches the rest of the voice set.
+  static const String _postRepVoiceCue = 'Giữ gót chân';
 
   @override
   String get name => 'HeelRise';
@@ -29,8 +31,8 @@ class HeelRiseMetric extends SquatMetricBase {
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
 
-  // 3 frames  ~0.1875s at 16fps — prevents false triggers from floor jitter
-  final Debouncer _heelDebouncer = Debouncer(requiredFrames: 3);
+  // 4 frames gives the heel a moment to settle before we call it a true lift.
+  final Debouncer _heelDebouncer = Debouncer(requiredFrames: 4);
 
   /// Prevent instruction spam — only set coaching once per rep.
   bool _instructionSet = false;

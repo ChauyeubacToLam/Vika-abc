@@ -22,6 +22,7 @@ class SquatConfig {
   static const int SQUAT_STAND_ANGLE_THRESHOLD = 160;
   static const int SQUAT_DESCEND_ANGLE_THRESHOLD = 152;
   static const List<int> SQUAT_BOTTOM_ANGLE_THRESHOLD = [80, 100];
+  static const double BOTTOM_RELEASE_READY_TOLERANCE_SECONDS = 0.05;
   static const double SIDE_SCORE_TIE_THRESHOLD = 0.2;
   static const double SIDE_SWITCH_MARGIN = 0.75;
 }
@@ -167,6 +168,17 @@ class Squat extends ExerciseBase {
       case SquatState.ascending:
         return 'Đứng lên';
     }
+  }
+
+  bool get hasCompletedBottomHold {
+    final holdDuration = tempoMetric.bottomHoldDuration;
+    if (holdDuration != null) {
+      return holdDuration >= TempoConfig.BOTTOM_HOLD_MIN;
+    }
+
+    final remaining = tempoMetric.bottomHoldRemaining(frameTimestampMs);
+    return remaining != null &&
+        remaining <= SquatConfig.BOTTOM_RELEASE_READY_TOLERANCE_SECONDS;
   }
 
   // --- Start Position ---
@@ -593,7 +605,7 @@ class Squat extends ExerciseBase {
       case SquatState.bottom:
         final remaining = tempoMetric.bottomHoldRemaining(now);
         final progress = tempoMetric.bottomHoldProgress(now);
-        if (remaining != null && remaining > 0.05) {
+        if (!hasCompletedBottomHold && remaining != null) {
           resultIssues.addInstruction(
               'bottom', 'Status', bottomHoldStatus(remaining));
         } else {

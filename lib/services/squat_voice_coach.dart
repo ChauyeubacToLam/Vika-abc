@@ -42,15 +42,9 @@ class SquatVoiceCoach {
   int _lastPhaseCueAtMs = 0;
   bool _didAnnounceSetComplete = false;
   bool _didAnnounceReady = false;
+  bool _wasTrunkFaultActive = false;
   final Map<String, int> _lastFaultVoiceAtMs = {};
   final Map<String, int> _lastPostRepVoiceRep = {};
-
-  String? _deferredPhasePhraseAfterPriorityCue(String? phasePhrase) {
-    if (phasePhrase == 'Xuống') {
-      return null;
-    }
-    return phasePhrase;
-  }
 
   void processFrame({
     required ExerciseBase exercise,
@@ -77,6 +71,7 @@ class SquatVoiceCoach {
       }
 
       _lastPhasePhrase = null;
+      _wasTrunkFaultActive = false;
       _lastRepCount = repCount;
       return;
     }
@@ -85,13 +80,17 @@ class SquatVoiceCoach {
         exercise.isPaused ||
         !hasPose) {
       _lastPhasePhrase = null;
+      _wasTrunkFaultActive = false;
       _lastRepCount = repCount;
       return;
     }
 
     final phaseInstr = exercise.resultIssues.instructions[currentPhaseKey];
     final statusText = phaseInstr?['Status'];
-    final phasePhrase = _phasePhraseFromStatus(statusText);
+    final phasePhrase = _effectivePhasePhrase(
+      statusText,
+      exercise: exercise,
+    );
     var deferStandingCueUntilNextFrame = false;
 
     if (!_didAnnounceReady) {
@@ -100,18 +99,20 @@ class SquatVoiceCoach {
       _ttsService.speak('Sẵn sàng');
       _didAnnounceReady = true;
       if (phasePhrase != null) {
-        final deferredPhrase =
-            _deferredPhasePhraseAfterPriorityCue(phasePhrase);
-        _lastPhasePhrase = deferredPhrase;
-        deferStandingCueUntilNextFrame =
-            deferredPhrase == null && phasePhrase == 'Xuống';
+        if (phasePhrase == 'Xuống') {
+          _ttsService.speak(phasePhrase);
+        }
+        _lastPhasePhrase = phasePhrase;
         _lastPhaseCueAtMs = nowMs;
       }
     }
 
     final liveFaultVoice = _highestPriorityLiveFaultVoice(feedback);
+    final trunkFaultActive = liveFaultVoice == _trunkPriorityCue;
+    final trunkFaultJustDetected = trunkFaultActive && !_wasTrunkFaultActive;
     final canSpeakLiveFault = liveFaultVoice != null &&
-        _canSpeakLiveFaultVoice(liveFaultVoice, nowMs);
+        (trunkFaultJustDetected ||
+            _canSpeakLiveFaultVoice(liveFaultVoice, nowMs));
 
     if (repIncreased) {
       _ttsService.clearPendingButKeepCurrent();
@@ -121,7 +122,8 @@ class SquatVoiceCoach {
         repCount: repCount,
         nowMs: nowMs,
       );
-      _lastPhasePhrase = _deferredPhasePhraseAfterPriorityCue(phasePhrase);
+      _lastPhasePhrase = phasePhrase == 'Xuống' ? null : phasePhrase;
+      _wasTrunkFaultActive = trunkFaultActive;
       _lastRepCount = repCount;
       return;
     }
@@ -129,18 +131,31 @@ class SquatVoiceCoach {
     final phraseChanged =
         phasePhrase != null && phasePhrase != _lastPhasePhrase;
     final canSpeakPhaseCue = nowMs - _lastPhaseCueAtMs >= _phaseCueMinGapMs;
-    final trunkCueTakesPriority =
-        liveFaultVoice == _trunkPriorityCue && canSpeakLiveFault;
+    final releaseCueJustUnlocked = _isBottomReleaseCue(
+          phasePhrase,
+          exercise: exercise,
+        ) &&
+        phraseChanged;
+    final suppressLiveFaultForReleaseCue = releaseCueJustUnlocked;
+    final trunkCueTakesPriority = !releaseCueJustUnlocked &&
+        liveFaultVoice == _trunkPriorityCue &&
+        canSpeakLiveFault;
 
     if (!trunkCueTakesPriority &&
         phasePhrase != null &&
         phraseChanged &&
-        canSpeakPhaseCue) {
+        (canSpeakPhaseCue || releaseCueJustUnlocked)) {
+      if (releaseCueJustUnlocked) {
+        // Release cue should jump ahead as soon as the hold is completed.
+        _ttsService.clearPendingButKeepCurrent();
+      }
       _ttsService.speak(phasePhrase);
       _lastPhaseCueAtMs = nowMs;
     }
 
-    if (liveFaultVoice != null && canSpeakLiveFault) {
+    if (!suppressLiveFaultForReleaseCue &&
+        liveFaultVoice != null &&
+        canSpeakLiveFault) {
       if (liveFaultVoice == _trunkPriorityCue) {
         // Let the current phrase finish, but bring chest cue to the front.
         _ttsService.clearPendingButKeepCurrent();
@@ -150,6 +165,7 @@ class SquatVoiceCoach {
     }
 
     _lastPhasePhrase = deferStandingCueUntilNextFrame ? null : phasePhrase;
+    _wasTrunkFaultActive = trunkFaultActive;
     _lastRepCount = repCount;
   }
 
@@ -157,7 +173,42 @@ class SquatVoiceCoach {
     _ttsService.clearQueue();
   }
 
-  String? _phasePhraseFromStatus(String? statusText) {
+  String? _effectivePhasePhrase(
+    String? statusText, {
+    required ExerciseBase exercise,
+  }) {
+    final derivedReleasePhrase = _derivedBottomReleasePhrase(exercise);
+    if (derivedReleasePhrase != null) {
+      return derivedReleasePhrase;
+    }
+    return _phasePhraseFromStatus(statusText, exercise: exercise);
+  }
+
+  String? _derivedBottomReleasePhrase(ExerciseBase exercise) {
+    if (exercise is! Squat) {
+      return null;
+    }
+    if (exercise.squatState == SquatState.bottom &&
+        exercise.hasCompletedBottomHold) {
+      return 'Đứng lên';
+    }
+    return null;
+  }
+
+  bool _isBottomReleaseCue(
+    String? phasePhrase, {
+    required ExerciseBase exercise,
+  }) {
+    return phasePhrase == 'Đứng lên' &&
+        exercise is Squat &&
+        exercise.squatState == SquatState.bottom &&
+        exercise.hasCompletedBottomHold;
+  }
+
+  String? _phasePhraseFromStatus(
+    String? statusText, {
+    required ExerciseBase exercise,
+  }) {
     if (statusText == null || statusText.isEmpty) return null;
 
     if (Squat.isHoldStatus(statusText)) {
@@ -167,6 +218,9 @@ class SquatVoiceCoach {
       return 'Xuống';
     }
     if (Squat.isReleaseStatus(statusText) || statusText.contains('Lên')) {
+      if (exercise is Squat && !exercise.hasCompletedBottomHold) {
+        return null;
+      }
       return 'Đứng lên';
     }
     if (statusText.contains('Đứng thẳng')) {
@@ -182,13 +236,18 @@ class SquatVoiceCoach {
   }
 
   String? _highestPriorityLiveFaultVoice(Map<String, String> feedback) {
-    final back = feedback['Back'] ?? '';
-    if (back.contains('Chest up')) {
+    final back = (feedback['Back'] ?? '').toLowerCase();
+    if (back.contains('chest up')) {
       return _trunkPriorityCue;
     }
 
-    final depth = feedback['Depth'] ?? '';
-    if (depth.contains('Go Lower')) {
+    final sync = (feedback['Sync'] ?? '').toLowerCase();
+    if (sync.contains('chest up')) {
+      return _trunkPriorityCue;
+    }
+
+    final depth = (feedback['Depth'] ?? '').toLowerCase();
+    if (depth.contains('go lower')) {
       return 'Thấp hơn nữa';
     }
 

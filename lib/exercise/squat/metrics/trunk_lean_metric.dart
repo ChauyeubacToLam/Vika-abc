@@ -11,8 +11,12 @@ import '../../../utils/debouncer.dart';
 
 class TrunkLeanConfig {
   /// Good forward lean range (degrees from vertical)
-  /// Wide for Vietnamese Group 1 males (short torso, long femurs)
-  static const List<int> GOOD_LEAN_RANGE = [15, 40];
+  /// Keep the upper bound slightly lower so we catch obvious chest drop sooner.
+  static const List<int> GOOD_LEAN_RANGE = [15, 35];
+
+  /// Require fewer consecutive frames so the live cue reacts while the user
+  /// is still in the bad position instead of after they start recovering.
+  static const int FORWARD_CONFIRM_FRAMES = 3;
 
   /// Backward lean threshold (degrees). Below this = leaning back.
   static const double BACKWARD_LIMIT = 0.02;
@@ -26,7 +30,8 @@ class TrunkLeanMetric extends SquatMetricBase {
   final Map<String, dynamic> _debugData = {};
 
   // IMPORTANT: Separate debouncers for forward/backward — they can't share!
-  final Debouncer _forwardDebouncer = Debouncer(requiredFrames: 5);
+  final Debouncer _forwardDebouncer =
+      Debouncer(requiredFrames: TrunkLeanConfig.FORWARD_CONFIRM_FRAMES);
   final Debouncer _backwardDebouncer = Debouncer(requiredFrames: 5);
 
   /// Track maximum trunk lean this rep (for post-rep analysis)

@@ -1,8 +1,14 @@
 # Squat Voice — Current Runtime Spec
 
 **For:** dev team maintenance and future extension  
-**Status:** synced to current code path in `Squat`, `SquatVoiceCoach`, and `ViettelTTSService`  
-**Depends on:** `Squat` state machine, `ActiveExercisePage` wiring, `SquatVoiceCoach`, `ViettelTTSService`
+**Status:** synced to the current code path in `Squat`, `SquatVoiceCoach`, `ViettelTTSService`, and `ActiveExercisePage`  
+**Source of truth:**
+
+- `lib/exercise/squat/squat.dart`
+- `lib/exercise/squat/metrics/*.dart`
+- `lib/services/squat_voice_coach.dart`
+- `lib/services/viettel_tts_service.dart`
+- `lib/screens/exercise/active_exercise_page.dart`
 
 ---
 
@@ -14,12 +20,15 @@
 class ResultIssues {
   Map<String, String> feedback = {};
   Map<String, Map<String, String>> instructions = {};
+
+  void addInstruction(String phase, String type, String message) { ... }
+  void clear() { ... }
 }
 ```
 
-- `feedback{}` is per-frame and cleared every frame in the exercise runtime.
-- `instructions{}` is phase-scoped coaching and can survive across frames until Squat overwrites or clears it.
-- Squat voice reads this data. It does not recalculate pose landmarks for speech decisions.
+- `feedback{}` is per-frame. It is cleared at the start of `processPose()` and `processNoPoseFrame()`.
+- `instructions{}` survives across frames until a new rep clears it or Squat overwrites a value.
+- Squat voice reads this normalized data. It does not recalculate pose landmarks for speech.
 
 ### FaultRecord (`lib/exercise/fault_record.dart`)
 
@@ -34,8 +43,9 @@ class FaultRecord {
 }
 ```
 
-- `voiceMessage` is the rep-end spoken candidate for that fault.
-- `priority` is finalized upstream in Squat fault collection. Lower number means the cue is more important.
+- `voiceMessage` is the spoken candidate for post-rep feedback.
+- `priority` is finalized upstream in Squat fault collection.
+- Post-rep voice selection only considers faults with non-empty `voiceMessage`.
 
 ### Squat fault priority (`lib/exercise/squat/metrics/squat_metric_base.dart`)
 
@@ -50,7 +60,7 @@ class SquatFaultVoicePriority {
 }
 ```
 
-This is the current source of truth for post-rep priority.
+This remains the current source of truth for post-rep voice priority.
 
 ### Squat state machine (`lib/exercise/squat/squat.dart`)
 
@@ -61,28 +71,36 @@ enum SquatState { standing, descending, bottom, ascending }
 What Squat already does today:
 
 - `_updatePhaseInstructions()` writes the current `Status` instruction.
-- `_completeRep()` increments `repCount`, collects faults, orders voiced faults, and stores:
+- `_completeRep()` increments `repCount`, evaluates rep-end faults, and stores:
   - `lastRepFaultVoiceMessages`
   - `lastRepTopVoiceMessage`
   - `lastRepTopVoicePriority`
   - `lastRepWasClean`
 - `Squat.topVoicedFault(...)` and `Squat.orderedUniqueVoiceMessages(...)` centralize post-rep voice selection.
+- `Squat.hasCompletedBottomHold` lets the coach derive the release cue even before a new phase transition happens.
 
 ### Runtime voice wiring (`lib/screens/exercise/active_exercise_page.dart`)
 
 This path is live:
 
-- `ActiveExercisePage` creates `SquatVoiceCoach` when the exercise is a `Squat`
+- `ActiveExercisePage` creates `SquatVoiceCoach` in `initState()` when `widget.exercise is Squat`
 - `_processSquatVoiceFrame(...)` forwards runtime context into `coach.processFrame(...)`
-- forwarding happens on pose and no-pose frames
+- forwarding happens on:
+  - pose frames
+  - no-pose frames
+  - completed frames
+
+Note:
+
+- on a completed pose frame, `_feedback` may still be the last activated-frame map, but the completion branch in `SquatVoiceCoach` does not depend on live feedback.
 
 ### Playback stack (`lib/services/squat_voice_coach.dart` + `lib/services/viettel_tts_service.dart`)
 
 What already exists:
 
-- `SquatVoiceCoach`: gating, priority, cooldown, queue policy
-- `ViettelTTSService`: singleton playback queue, local asset lookup, Viettel API fallback
-- local asset playback is used when a phrase exists in `_assetMap`; otherwise the system falls back to Viettel TTS API
+- `SquatVoiceCoach`: gating, priority, cooldown, and queue policy
+- `ViettelTTSService`: singleton playback queue, local asset lookup, and Viettel API fallback
+- local asset playback is used when a phrase exists in `_assetMap`; otherwise the system falls back to the Viettel TTS API
 
 ---
 
@@ -102,7 +120,8 @@ Key rules:
 
 1. Metrics never call TTS directly.
 2. The screen does not infer rep completion or fault priority on its own.
-3. Voice only reads normalized exercise-layer data after Squat has already decided phase, faults, and rep completion.
+3. Voice reads exercise-layer data after Squat has already decided phase, faults, and rep completion.
+4. Completion speech is decided inside the coach, not in the UI.
 
 ---
 
@@ -112,13 +131,13 @@ Key rules:
 
 | # | Layer | When | Source | Current behavior |
 |---|---|---|---|---|
-| 1 | Completion branch | `exerciseState == completed` | `exerciseState`, `repCount` | final rep count can be spoken first, then completion |
+| 1 | Completion branch | `exercise.exerciseState == completed` | `exerciseState`, `repCount` | final rep count can be queued first, then `Hoàn thành bài tập` |
 | 2 | Silent gate | not activated, paused, or no pose | `exerciseState`, `isPaused`, `hasPose` | no speech |
-| 3 | Ready cue | first active frame only | `_didAnnounceReady == false` | `clearQueue()` then `Sẵn sàng` |
-| 4 | Rep count | `repCount > _lastRepCount` | `repCount` | `clearPendingButKeepCurrent()`, speak count, then return |
-| 5 | Post-rep feedback | same frame as rep increase | `lastRepWasClean`, `lastRepTopVoiceMessage` | enqueued after count if allowed |
-| 6 | Phase cue | phase phrase changed | `instructions[currentPhase]['Status']` | spoken if gap allows and trunk live cue is not taking priority |
-| 7 | Live fault cue | after phase evaluation | `feedback['Back']`, `feedback['Depth']` | trunk live cue can preempt queued phase speech |
+| 3 | Ready branch | first active frame only | `_didAnnounceReady == false` | `clearQueue()`, speak `Sẵn sàng`, and if current phase phrase is `Xuống`, queue `Xuống` immediately |
+| 4 | Live fault candidate | every active frame | `feedback` | pick the highest-priority live phrase first |
+| 5 | Rep branch | `repCount > _lastRepCount` | `repCount`, Squat post-rep fields | `clearPendingButKeepCurrent()`, speak rep count, optionally enqueue one post-rep phrase, then return |
+| 6 | Phase cue | phrase changed | `instructions[currentPhase]['Status']` plus derived bottom-release logic | speak if gap allows, or immediately if the bottom release cue just unlocked |
+| 7 | Live fault cue | after phase evaluation | `feedback['Back']`, `feedback['Sync']`, `feedback['Depth']` | release cue can suppress live fault on that frame; otherwise trunk cue can preempt normal phase speech |
 
 ### 3.2 Completed-set behavior
 
@@ -132,19 +151,24 @@ Key rules:
 
 No Squat voice should fire when:
 
-1. `exerciseState != activated` and the exercise is not yet completed
+1. `exercise.exerciseState != activated` and the exercise is not yet completed
 2. `exercise.isPaused == true`
 3. `hasPose == false`
 
 Exception:
 
-- completion logic still runs when `exerciseState == completed`
+- completion logic still runs when `exercise.exerciseState == completed`
+
+Resume behavior:
+
+- pause / no-pose resets `_lastPhasePhrase`, so the current phase cue can be spoken again after resume
+- pause / no-pose does **not** reset `_didAnnounceReady`, so `Sẵn sàng` is not replayed mid-set
 
 ---
 
 ## 4. Phase Cue Behavior
 
-Squat voice does not read raw enum names. It reads `Status` text written by Squat.
+Squat voice does not read raw enum names. It reads `Status` text written by Squat and also derives a bottom-release cue from `Squat.hasCompletedBottomHold`.
 
 Current status writers in `Squat`:
 
@@ -156,21 +180,36 @@ Current status writers in `Squat`:
 | `bottom` after hold completes | `Đứng lên` |
 | `ascending` | `Đứng lên` |
 
-Current mapping in `SquatVoiceCoach._phasePhraseFromStatus(...)`:
+Current mapping in `SquatVoiceCoach`:
 
-| Status text | Spoken phrase |
+| Source | Spoken phrase |
 |---|---|
-| starts with `Hold` or contains `Giữ` | `Giữ` |
-| contains `Xuống` | `Xuống` |
-| `Squat.isReleaseStatus(...)` or contains `Lên` | `Đứng lên` |
-| contains `Đứng thẳng` | `Đứng thẳng` |
+| `Squat.hasCompletedBottomHold == true` while still in `bottom` | `Đứng lên` |
+| status starts with `Hold` or contains `Giữ` | `Giữ` |
+| status contains `Xuống` | `Xuống` |
+| `Squat.isReleaseStatus(status)` or status contains `Lên` | `Đứng lên` |
+| status contains `Đứng thẳng` | `Đứng thẳng` |
 | `Going Down...` | no spoken phase cue |
 
-Notes:
+Important notes:
 
-- `Going Down...` is intentionally silent. The anticipatory descent cue already comes from `standing -> Xuống`.
-- Current squat flow does not actively emit `Đứng thẳng` as a phase cue anymore. Ascending now uses `Đứng lên`.
-- On the very first active frame, after `Sẵn sàng`, the coach defers storing `Xuống` as the last phase phrase so the anticipatory descent cue can still play on the next standing frame.
+- `Going Down...` is intentionally silent. The anticipatory descent cue comes from `standing -> Xuống`.
+- On the first active frame, the coach can queue `Sẵn sàng` then `Xuống` in the same pass.
+- The previous version of this doc said the coach defers storing `Xuống` so it can replay on the next standing frame. That is **not** the current behavior. The current code stores `Xuống` immediately.
+- `Đứng thẳng` is still recognized by `_phasePhraseFromStatus(...)`, but the current Squat flow does not actively emit it.
+
+### 4.1 Release cue priority
+
+The bottom release cue has special handling:
+
+- if `Đứng lên` becomes available because the bottom hold just completed, the coach can speak it immediately even if the normal 250ms phase gap has not elapsed
+- in that case the coach calls `clearPendingButKeepCurrent()` before queueing `Đứng lên`
+- the release cue suppresses live-fault speech on that same frame
+
+This means:
+
+- normal trunk live voice beats ordinary phase speech
+- the bottom release cue beats live-fault speech on the exact unlock frame
 
 ---
 
@@ -181,13 +220,15 @@ Current live-fault source is limited to `feedback`.
 | Source | Condition | Spoken phrase | Cooldown |
 |---|---|---|---|
 | Back | `feedback['Back']` contains `Chest up` | `Ưỡn ngực lên` | 3000ms |
+| Sync | `feedback['Sync']` contains `chest up` | `Ưỡn ngực lên` | 3000ms |
 | Depth | `feedback['Depth']` contains `Go Lower` | `Thấp hơn nữa` | 3000ms |
 
 Priority rules already implemented:
 
 1. `Ưỡn ngực lên` is the highest-priority live fault cue.
-2. If trunk live cue is eligible on the current frame, phase cue can be blocked for that frame.
-3. When trunk cue fires, pending queue is cleared but the currently playing phrase is allowed to finish.
+2. If trunk live cue is eligible on the current frame, ordinary phase cue can be blocked for that frame.
+3. If the bottom release cue just unlocked, release cue wins and live fault is suppressed on that frame.
+4. When trunk cue fires, pending queue is cleared but the currently playing phrase is allowed to finish.
 
 No other squat metrics currently produce live voice.
 
@@ -199,47 +240,68 @@ No other squat metrics currently produce live voice.
 
 Post-rep voice is decided upstream in `Squat._completeRep()`:
 
-1. collect all metric faults for the completed rep
-2. keep only faults with non-empty `voiceMessage`
-3. sort by `priority`, then `type`, then `message`
-4. store:
-   - `lastRepFaultVoiceMessages`: ordered unique list of all rep-end voice messages
-   - `lastRepTopVoiceMessage`: only the single top-priority phrase
+1. complete depth and tempo rep-end evaluation
+2. collect all metric faults for the completed rep
+3. keep only faults with non-empty `voiceMessage`
+4. sort by `priority`, then `type`, then `message`
+5. store:
+   - `lastRepFaultVoiceMessages`: ordered unique list of all spoken candidates
+   - `lastRepTopVoiceMessage`: only the single highest-priority spoken phrase
    - `lastRepTopVoicePriority`
-5. `SquatVoiceCoach` speaks only `lastRepTopVoiceMessage`
+6. `SquatVoiceCoach` speaks only `lastRepTopVoiceMessage`
 
 This means the current runtime rule is:
 
 - only 1 post-rep instruction is spoken
-- that instruction is the highest-priority voiced fault for the rep
+- the spoken instruction is the highest-priority **voiced** fault for that rep
+- silent faults do not block lower-priority voiced faults
 
 ### 6.2 Current post-rep fault-to-voice mapping
 
 | Metric | `voiceMessage` | Priority | Spoken today |
 |---|---|---|---|
-| HeelRise | `Nhớ không nâng gót chân` | `0` | post-rep only |
+| HeelRise | `Giữ gót chân` | `0` | post-rep only |
 | TrunkLean forward | none | `1` | live only |
 | Depth | `Xuống thấp hơn` | `2` | live uses a different phrase, post-rep uses this phrase |
-| HipShoulderSync | `Đừng nhấc hông lên trước` | `3` | post-rep only |
+| HipShoulderSync | `Ưỡn ngực lên` | `3` | can be both live and post-rep |
 | Tempo | `Chậm lại` | `4` | post-rep only |
 | TrunkLean backward | none | `5` | not spoken |
 
 Important:
 
 - `heel_rise` is the highest-priority post-rep cue.
-- `hip_shoulder_sync` now has a post-rep cue.
+- `hip_shoulder_sync` now reuses the chest-up phrase `Ưỡn ngực lên`.
 - `tempo` still only speaks after the rep, never live.
 - trunk backward lean still has no spoken phrase.
 
-### 6.3 Post-rep gating in `SquatVoiceCoach`
+### 6.3 Notes about `lastRepWasClean`
+
+The current code treats all current spoken squat faults as form-affecting, including heel rise:
+
+- `correctForm = !allFaults.any((f) => f.affectsForm)`
+- `lastRepWasClean = correctForm`
+
+So even though `HeelRiseMetric` still has an old comment saying it is "informational only", the runtime behavior today is:
+
+- heel rise makes the rep unclean
+- heel rise can trigger post-rep voice
+
+### 6.4 Post-rep gating in `SquatVoiceCoach`
 
 Post-rep feedback is only enqueued when:
 
 1. `exercise is Squat`
-2. `lastRepWasClean == false`
-3. `lastRepTopVoiceMessage` is not null or empty
+2. `exercise.lastRepWasClean == false`
+3. `exercise.lastRepTopVoiceMessage` is not null or empty
 4. the same post-rep phrase was not already used within the last 3 reps
 5. the same phrase was not spoken live within the last 1500ms
+
+The cooldown is phrase-based, not metric-based.
+
+This matters because:
+
+- `Ưỡn ngực lên` spoken live from `Back` or `Sync` can suppress a post-rep `Ưỡn ngực lên`
+- the 3-rep cooldown also applies by phrase, not by fault type
 
 ---
 
@@ -256,33 +318,49 @@ Post-rep feedback is only enqueued when:
 | Rep count | `1` ... `30` | Yes |
 | Completion | `Hoàn thành bài tập` | Yes |
 
-### 7.2 Live and post-rep fault phrases
+Notes:
+
+- default squat uses `maxRep = 15`, so all default rep counts are locally cached
+- counts `16` ... `30` are also present in `_assetMap`
+- if a future squat variant goes above `30`, counts beyond `30` would fall back to the API
+
+### 7.2 Live and post-rep fault phrases emitted by the current squat flow
 
 | Phrase | Used by current squat flow | Local asset in `_assetMap` |
 |---|---|---|
 | `Ưỡn ngực lên` | Yes | Yes |
 | `Thấp hơn nữa` | Yes | Yes |
 | `Xuống thấp hơn` | Yes | Yes |
+| `Giữ gót chân` | Yes | Yes |
 | `Chậm lại` | Yes | Yes |
-| `Nhớ không nâng gót chân` | Yes | Yes |
-| `Đừng nhấc hông lên trước` | Yes | Yes |
 
-Notes:
+### 7.3 Phrases present in `_assetMap` but not emitted by the current squat flow
 
-- If a phrase is missing from `_assetMap`, `ViettelTTSService` falls back to Viettel API.
-- Squat now has local audio coverage for every phrase the current coach emits.
+These phrases still exist in `_assetMap`, but the current squat runtime does not emit them:
 
-### 7.3 Legacy Squat Assets Removed
+- `Nhớ không nâng gót chân`
+- `Đừng nhấc hông lên trước`
 
-Removed legacy local phrases that the current squat runtime no longer emits:
+This distinction matters:
 
+- `_assetMap` is larger than the active squat phrase set
+- the current source of truth for emitted phrases is the coach + metric code, not the asset map alone
+
+### 7.4 Legacy or parseable phrases that are not part of the current emitted asset-backed flow
+
+These phrases show up in older docs, older flow assumptions, or parser branches, but they are not part of the current emitted local-audio squat flow:
+
+- `Đứng thẳng`
 - `Sẵn sàng, xuống`
+- `Sẵn sàng, lên`
 - `Lên`
 - `Tốt lắm`
 - `Sai tư thế, chú ý`
-- `Sẵn sàng, lên`
 
-These phrases were previously cached locally but are no longer part of the active squat voice flow.
+Notes:
+
+- `Đứng thẳng` is still parseable in the coach but is not actively emitted by the current Squat implementation.
+- the other phrases above are not part of the current coach path and are not needed for the current squat runtime.
 
 ---
 
@@ -305,12 +383,14 @@ void processFrame({
 |---|---|
 | `exercise.exerciseState` | activation and completion gate |
 | `exercise.currentPhaseKey` | current phase lookup |
-| `exercise.repCount` | rep count source of truth |
+| `exercise.repCount` / `repCount` | rep count source of truth for voice transitions |
 | `exercise.isPaused` | silence when paused |
 | `hasPose` | silence when pose is missing |
 | `exercise.resultIssues.instructions[currentPhaseKey]?['Status']` | phase cue source |
-| `feedback['Depth']` | live depth cue source |
+| `exercise is Squat && exercise.hasCompletedBottomHold` | derived bottom-release cue source |
 | `feedback['Back']` | live trunk cue source |
+| `feedback['Sync']` | live chest-up cue source from hip/shoulder sync |
+| `feedback['Depth']` | live depth cue source |
 
 ### 8.3 Rep-end data read by the coach
 
@@ -319,7 +399,7 @@ void processFrame({
 | `lastRepWasClean` | decides whether post-rep feedback is eligible |
 | `lastRepTopVoiceMessage` | single post-rep spoken phrase |
 
-### 8.4 Data already produced upstream but not fully consumed yet
+### 8.4 Data produced upstream but not fully consumed yet
 
 | Field | Current state |
 |---|---|
@@ -336,7 +416,7 @@ void processFrame({
 | API | Current use |
 |---|---|
 | `clearQueue()` | start of session (`Sẵn sàng`), coach `dispose()` |
-| `clearPendingButKeepCurrent()` | rep count, completion, trunk live cue |
+| `clearPendingButKeepCurrent()` | rep count, completion, release cue, trunk live cue |
 | `speak(text)` | enqueue next phrase in order |
 
 ### 9.2 Cooldown constants already in code
@@ -353,9 +433,10 @@ void processFrame({
 1. Completion branch wins over all other branches.
 2. Rep count wins over phase and live-fault cues because `processFrame(...)` returns early after the rep branch.
 3. `Ưỡn ngực lên` has the highest live-fault priority.
-4. Post-rep priority is decided upstream by `SquatFaultVoicePriority`, with `heel_rise` highest.
-5. Only one post-rep instruction is spoken.
-6. When trunk live cue fires, pending queue is cleared but the current phrase is allowed to finish.
+4. Bottom release cue can override the normal phase gap and suppress live fault on the unlock frame.
+5. Post-rep priority is decided upstream by `SquatFaultVoicePriority`, with `heel_rise` highest among voiced faults.
+6. Only one post-rep instruction is spoken.
+7. When trunk live cue fires, pending queue is cleared but the current phrase is allowed to finish.
 
 ---
 
@@ -365,17 +446,18 @@ void processFrame({
 
 1. Squat voice is wired into `ActiveExercisePage`.
 2. Ready, phase, live, rep, post-rep, and completion all exist in the same runtime path.
-3. Rep-end speech is based on finalized rep data in `_completeRep()`, not guessed in UI.
-4. Trunk cue already has highest live priority.
-5. Heel rise now has the highest post-rep priority.
-6. Hip-shoulder sync now has a post-rep cue.
+3. The first active frame can queue `Sẵn sàng` and `Xuống` back-to-back.
+4. Rep-end speech is based on finalized rep data in `_completeRep()`, not guessed in UI.
+5. Live chest-up voice can come from either `Back` or `Sync`.
+6. Heel rise now speaks `Giữ gót chân`.
+7. Hip-shoulder sync now speaks `Ưỡn ngực lên` post-rep.
+8. All phrases currently emitted by squat have local audio in `_assetMap`.
 
 ### 10.2 Still partial
 
 1. Only one post-rep phrase is spoken, even though `lastRepFaultVoiceMessages` stores the full ordered list.
-2. Live speech still only covers `Depth` and `Back`.
-3. `Nhớ không nâng gót chân` and `Đừng nhấc hông lên trước` do not have local audio assets yet and rely on API fallback.
-4. There is still no squat-specific mute or per-exercise volume setting.
+2. Live speech is still limited to chest-up and depth cues.
+3. There is still no squat-specific mute or per-exercise volume setting.
 
 ---
 
@@ -386,8 +468,9 @@ If squat voice is extended further, keep these rules:
 1. Do not move TTS calls into metrics.
 2. Do not teach the screen to infer rep completion or fault priority.
 3. If multi-message post-rep feedback is added, consume `lastRepFaultVoiceMessages` instead of rebuilding the fault list from UI data.
-4. If a new spoken phrase is added, update both the coach path and `_assetMap` if local cached audio is wanted.
-5. Keep rep count and completion higher priority than phase and live-fault cues.
+4. If a new spoken phrase is added, update both the emitting code path and `_assetMap` if local cached audio is wanted.
+5. Keep completion and rep count higher priority than phase and live-fault cues.
+6. Preserve the special-case release cue behavior at bottom-hold completion unless product deliberately changes it.
 
 ---
 
@@ -396,21 +479,25 @@ If squat voice is extended further, keep these rules:
 ### Activation / ready
 
 - [ ] `Sẵn sàng` fires exactly once after the exercise becomes `activated`
+- [ ] if the first active frame is already on `standing -> Xuống`, `Xuống` can be queued immediately after `Sẵn sàng`
 - [ ] no voice fires before activation completes
 
 ### Phase cues
 
 - [ ] `standing` status `Xuống` can produce `Xuống`
 - [ ] bottom hold status maps to `Giữ`
-- [ ] bottom release status maps to `Đứng lên`
+- [ ] bottom release can produce `Đứng lên` while still in `bottom`
 - [ ] ascending status maps to `Đứng lên`
 - [ ] `Going Down...` does not produce spoken phase audio
+- [ ] after pause / no-pose, current phase cue can replay because `_lastPhasePhrase` resets
 
 ### Live faults
 
 - [ ] `feedback['Depth'] = Go Lower` produces `Thấp hơn nữa`
 - [ ] `feedback['Back'] = Chest up!` produces `Ưỡn ngực lên`
-- [ ] trunk cue wins over depth cue when both are present
+- [ ] `feedback['Sync'] = Drive chest up!` or `Try to keep chest up` can also produce `Ưỡn ngực lên`
+- [ ] trunk cue wins over ordinary phase cue when both are present
+- [ ] bottom release cue suppresses live fault on the exact unlock frame
 - [ ] same live phrase does not repeat faster than every 3 seconds
 
 ### Rep-end flow
@@ -418,7 +505,8 @@ If squat voice is extended further, keep these rules:
 - [ ] every rep increase speaks the rep number once
 - [ ] post-rep feedback only plays when `lastRepWasClean == false`
 - [ ] post-rep feedback chooses exactly one phrase: `lastRepTopVoiceMessage`
-- [ ] heel rise wins over all other post-rep voiced faults
+- [ ] heel rise wins over all other voiced post-rep faults
+- [ ] silent faults do not block lower-priority voiced faults
 - [ ] post-rep feedback is suppressed if the same phrase was already spoken live within 1.5 seconds
 - [ ] same post-rep phrase does not repeat within 3 reps
 
@@ -426,7 +514,7 @@ If squat voice is extended further, keep these rules:
 
 - [ ] final rep count can still be heard on the completion frame
 - [ ] `Hoàn thành bài tập` fires once per set
-- [ ] completion does not keep replaying on later frames
+- [ ] completion does not keep replaying on later frames, including no-pose frames
 
 ### Silent gates
 
@@ -440,9 +528,9 @@ If squat voice is extended further, keep these rules:
 
 The correct mental model for the current squat voice implementation is:
 
-1. `Squat` generates business data.
-2. `ActiveExercisePage` forwards runtime context.
-3. `SquatVoiceCoach` decides priority, cooldown, and queue behavior.
-4. `ViettelTTSService` plays local audio if available, otherwise falls back to Viettel API.
+1. `Squat` and its metrics generate business data.
+2. `ActiveExercisePage` forwards runtime context on pose and no-pose frames.
+3. `SquatVoiceCoach` decides gating, priority, cooldown, and queue behavior.
+4. `ViettelTTSService` plays local audio if available, otherwise falls back to the Viettel API.
 
 This file documents the current implementation. Further work should extend this path, not redesign it from scratch.

@@ -34,19 +34,36 @@ void main() {
   test('heel rise fault adds a post-rep voice cue with highest priority', () {
     final metric = HeelRiseMetric();
 
-    for (var i = 0; i < 3; i++) {
+    for (var i = 0; i < 4; i++) {
       metric.update(
         _buildRepContext(
           squatState: SquatState.bottom,
-          heelDistance: 12,
+          heelDistance: 16,
           scaleFactor: 100,
         ),
       );
     }
 
     expect(metric.faults, hasLength(1));
-    expect(metric.faults.single.voiceMessage, 'Nhớ không nâng gót chân');
+    expect(metric.faults.single.voiceMessage, 'Giữ gót chân');
     expect(metric.faults.single.priority, SquatFaultVoicePriority.heelRise);
+  });
+
+  test('heel rise ignores minor heel offset while heel is still on the floor',
+      () {
+    final metric = HeelRiseMetric();
+
+    for (var i = 0; i < 6; i++) {
+      metric.update(
+        _buildRepContext(
+          squatState: SquatState.bottom,
+          heelDistance: 14,
+          scaleFactor: 100,
+        ),
+      );
+    }
+
+    expect(metric.faults, isEmpty);
   });
 
   test('hip-shoulder sync fault adds a post-rep voice cue', () {
@@ -85,7 +102,7 @@ void main() {
     }
 
     expect(metric.faults, hasLength(1));
-    expect(metric.faults.single.voiceMessage, 'Đừng nhấc hông lên trước');
+    expect(metric.faults.single.voiceMessage, 'Ưỡn ngực lên');
     expect(
       metric.faults.single.priority,
       SquatFaultVoicePriority.hipShoulderSync,
@@ -97,11 +114,11 @@ void main() {
       () {
     final metric = TrunkLeanMetric();
 
-    for (var i = 0; i < 5; i++) {
+    for (var i = 0; i < 3; i++) {
       metric.update(
         _buildRepContext(
           squatState: SquatState.descending,
-          trunkLean: 45,
+          trunkLean: 38,
         ),
       );
     }
@@ -124,7 +141,7 @@ void main() {
         phase: 'BOTTOM',
         type: 'Feet',
         message: 'Heels lifting',
-        voiceMessage: 'Nhớ không nâng gót chân',
+        voiceMessage: 'Giữ gót chân',
         priority: SquatFaultVoicePriority.heelRise,
       ),
       FaultRecord(
@@ -146,9 +163,9 @@ void main() {
     final topFault = Squat.topVoicedFault(faults);
     final orderedMessages = Squat.orderedUniqueVoiceMessages(faults);
 
-    expect(topFault?.voiceMessage, 'Nhớ không nâng gót chân');
+    expect(topFault?.voiceMessage, 'Giữ gót chân');
     expect(topFault?.priority, SquatFaultVoicePriority.heelRise);
-    expect(orderedMessages.first, 'Nhớ không nâng gót chân');
+    expect(orderedMessages.first, 'Giữ gót chân');
     expect(orderedMessages, isNot(contains('Ưỡn ngực lên')));
   });
 }

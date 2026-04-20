@@ -23,7 +23,7 @@ class _FakeSquatVoicePlayer implements SquatVoicePlayer {
 }
 
 void main() {
-  test('Squat ready cue says "Sẵn sàng" exactly once on activation', () {
+  test('Squat says "Sẵn sàng" then "Xuống" once on activation', () {
     final player = _FakeSquatVoicePlayer();
     final coach = SquatVoiceCoach(ttsService: player);
     final squat = Squat()..exerciseState = ExerciseState.activated;
@@ -41,7 +41,7 @@ void main() {
       feedback: const {},
     );
 
-    expect(player.events, ['clearQueue', 'speak:Sẵn sàng']);
+    expect(player.events, ['clearQueue', 'speak:Sẵn sàng', 'speak:Xuống']);
 
     coach.processFrame(
       exercise: squat,
@@ -50,10 +50,10 @@ void main() {
       feedback: const {},
     );
 
-    expect(player.events, ['clearQueue', 'speak:Sẵn sàng']);
+    expect(player.events, ['clearQueue', 'speak:Sẵn sàng', 'speak:Xuống']);
   });
 
-  test('Squat says "Xuống" shortly after ready while staying in standing phase',
+  test('Squat does not repeat "Xuống" on the next standing frame after ready',
       () async {
     final player = _FakeSquatVoicePlayer();
     final coach = SquatVoiceCoach(ttsService: player);
@@ -129,9 +129,313 @@ void main() {
       [
         'clearQueue',
         'speak:Sẵn sàng',
+        'speak:Xuống',
         'clearPendingButKeepCurrent',
         'speak:1',
         'speak:Xuống',
+      ],
+    );
+  });
+
+  test('Squat says "Đứng lên" as soon as the bottom hold is complete',
+      () async {
+    final player = _FakeSquatVoicePlayer();
+    final coach = SquatVoiceCoach(ttsService: player);
+    final squat = Squat()..exerciseState = ExerciseState.activated;
+
+    squat.resultIssues.addInstruction(
+      squat.currentPhaseKey,
+      'Status',
+      Squat.standingStatus,
+    );
+
+    coach.processFrame(
+      exercise: squat,
+      repCount: squat.repCount,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 275));
+
+    coach.processFrame(
+      exercise: squat,
+      repCount: squat.repCount,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    squat.tempoMetric.onStateTransition(
+      SquatState.descending,
+      SquatState.bottom,
+      0,
+    );
+    squat.squatState = SquatState.bottom;
+    squat.frameTimestamp = DateTime.fromMillisecondsSinceEpoch(650);
+    squat.resultIssues.instructions.clear();
+    squat.resultIssues.addInstruction(
+      squat.currentPhaseKey,
+      'Status',
+      Squat.ascendingStatus,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 275));
+
+    coach.processFrame(
+      exercise: squat,
+      repCount: squat.repCount,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    expect(
+      player.events,
+      [
+        'clearQueue',
+        'speak:Sẵn sàng',
+        'speak:Xuống',
+        'clearPendingButKeepCurrent',
+        'speak:Đứng lên',
+      ],
+    );
+  });
+
+  test(
+      'Squat still says "Đứng lên" when hold is complete even if status text is stale',
+      () async {
+    final player = _FakeSquatVoicePlayer();
+    final coach = SquatVoiceCoach(ttsService: player);
+    final squat = Squat()..exerciseState = ExerciseState.activated;
+
+    squat.resultIssues.addInstruction(
+      squat.currentPhaseKey,
+      'Status',
+      Squat.standingStatus,
+    );
+
+    coach.processFrame(
+      exercise: squat,
+      repCount: squat.repCount,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    squat.tempoMetric.onStateTransition(
+      SquatState.descending,
+      SquatState.bottom,
+      0,
+    );
+    squat.squatState = SquatState.bottom;
+    squat.frameTimestamp = DateTime.fromMillisecondsSinceEpoch(650);
+    squat.resultIssues.instructions.clear();
+    squat.resultIssues.addInstruction(
+      squat.currentPhaseKey,
+      'Status',
+      Squat.bottomHoldStatus(0.1),
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 275));
+
+    coach.processFrame(
+      exercise: squat,
+      repCount: squat.repCount,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    expect(
+      player.events,
+      [
+        'clearQueue',
+        'speak:Sẵn sàng',
+        'speak:Xuống',
+        'clearPendingButKeepCurrent',
+        'speak:Đứng lên',
+      ],
+    );
+  });
+
+  test('Squat does not say "Đứng lên" when the user starts ascending too early',
+      () async {
+    final player = _FakeSquatVoicePlayer();
+    final coach = SquatVoiceCoach(ttsService: player);
+    final squat = Squat()..exerciseState = ExerciseState.activated;
+
+    squat.resultIssues.addInstruction(
+      squat.currentPhaseKey,
+      'Status',
+      Squat.standingStatus,
+    );
+
+    coach.processFrame(
+      exercise: squat,
+      repCount: squat.repCount,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 275));
+
+    coach.processFrame(
+      exercise: squat,
+      repCount: squat.repCount,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    squat.tempoMetric.onStateTransition(
+      SquatState.descending,
+      SquatState.bottom,
+      0,
+    );
+    squat.tempoMetric.onStateTransition(
+      SquatState.bottom,
+      SquatState.ascending,
+      300,
+    );
+    squat.squatState = SquatState.ascending;
+    squat.frameTimestamp = DateTime.fromMillisecondsSinceEpoch(300);
+    squat.resultIssues.instructions.clear();
+    squat.resultIssues.addInstruction(
+      squat.currentPhaseKey,
+      'Status',
+      Squat.ascendingStatus,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 275));
+
+    coach.processFrame(
+      exercise: squat,
+      repCount: squat.repCount,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    expect(
+      player.events,
+      [
+        'clearQueue',
+        'speak:Sẵn sàng',
+        'speak:Xuống',
+      ],
+    );
+  });
+
+  test(
+      'Squat prioritizes "Ưỡn ngực lên" over phase and depth cues and replays it when detected again',
+      () async {
+    final player = _FakeSquatVoicePlayer();
+    final coach = SquatVoiceCoach(ttsService: player);
+    final squat = Squat()..exerciseState = ExerciseState.activated;
+
+    squat.resultIssues.addInstruction(
+      squat.currentPhaseKey,
+      'Status',
+      Squat.standingStatus,
+    );
+
+    coach.processFrame(
+      exercise: squat,
+      repCount: squat.repCount,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 275));
+
+    coach.processFrame(
+      exercise: squat,
+      repCount: squat.repCount,
+      hasPose: true,
+      feedback: const {
+        'Back': 'Chest up!',
+        'Depth': 'Go Lower',
+      },
+    );
+
+    coach.processFrame(
+      exercise: squat,
+      repCount: squat.repCount,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    coach.processFrame(
+      exercise: squat,
+      repCount: squat.repCount,
+      hasPose: true,
+      feedback: const {
+        'Sync': 'Drive chest up!',
+      },
+    );
+
+    expect(
+      player.events,
+      [
+        'clearQueue',
+        'speak:Sẵn sàng',
+        'speak:Xuống',
+        'clearPendingButKeepCurrent',
+        'speak:Ưỡn ngực lên',
+        'clearPendingButKeepCurrent',
+        'speak:Ưỡn ngực lên',
+      ],
+    );
+  });
+
+  test(
+      'Squat lets the bottom release cue win over "Ưỡn ngực lên" once hold is complete',
+      () async {
+    final player = _FakeSquatVoicePlayer();
+    final coach = SquatVoiceCoach(ttsService: player);
+    final squat = Squat()..exerciseState = ExerciseState.activated;
+
+    squat.resultIssues.addInstruction(
+      squat.currentPhaseKey,
+      'Status',
+      Squat.standingStatus,
+    );
+
+    coach.processFrame(
+      exercise: squat,
+      repCount: squat.repCount,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    squat.tempoMetric.onStateTransition(
+      SquatState.descending,
+      SquatState.bottom,
+      0,
+    );
+    squat.squatState = SquatState.bottom;
+    squat.frameTimestamp = DateTime.fromMillisecondsSinceEpoch(650);
+    squat.resultIssues.instructions.clear();
+    squat.resultIssues.addInstruction(
+      squat.currentPhaseKey,
+      'Status',
+      Squat.bottomHoldStatus(0.1),
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 275));
+
+    coach.processFrame(
+      exercise: squat,
+      repCount: squat.repCount,
+      hasPose: true,
+      feedback: const {
+        'Back': 'Chest up!',
+      },
+    );
+
+    expect(
+      player.events,
+      [
+        'clearQueue',
+        'speak:Sẵn sàng',
+        'speak:Xuống',
+        'clearPendingButKeepCurrent',
+        'speak:Đứng lên',
       ],
     );
   });
