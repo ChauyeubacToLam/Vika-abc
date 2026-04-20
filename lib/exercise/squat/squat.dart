@@ -72,6 +72,7 @@ class Squat extends ExerciseBase {
   _TrackedSquatSide? _trackedSide;
   double _lastLeftSideScore = 0.0;
   double _lastRightSideScore = 0.0;
+  String _lastTrackedSideSource = 'visibility';
 
   Squat({this.maxRep = SquatConfig.MAX_REP});
 
@@ -297,12 +298,18 @@ class Squat extends ExerciseBase {
       CameraFacing.right => _TrackedSquatSide.right,
       _ => null,
     };
+    if (orientationSide != null) {
+      _lastTrackedSideSource = 'cameraFacing';
+      _trackedSide = orientationSide;
+      return orientationSide;
+    }
 
     final candidate = _pickTrackedSideCandidate(
       leftScore: leftScore,
       rightScore: rightScore,
-      fallback: orientationSide ?? _trackedSide,
+      fallback: _trackedSide,
     );
+    _lastTrackedSideSource = 'visibility';
 
     if (_trackedSide == null) {
       _trackedSide = candidate;
@@ -473,6 +480,7 @@ class Squat extends ExerciseBase {
     debugData['repCount'] = repCount;
     debugData['frameBuffer'] = frameBuffer.frameBuffer.length;
     debugData['trackedSide'] = _trackedSide?.name ?? 'unknown';
+    debugData['trackedSideSource'] = _lastTrackedSideSource;
     debugData['leftSideScore'] = _lastLeftSideScore.toStringAsFixed(2);
     debugData['rightSideScore'] = _lastRightSideScore.toStringAsFixed(2);
     debugData['kneeAngle'] = kneeAngle.toStringAsFixed(1);

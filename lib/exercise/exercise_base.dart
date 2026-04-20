@@ -347,35 +347,14 @@ abstract class ExerciseBase {
   }
 
   bool _isLeftSide(Map<PoseLandmarkType, PoseLandmark>? smoothedLandmarks) {
-    if (smoothedLandmarks == null) return false;
+    if (smoothedLandmarks == null) return leftRightDebouncer.currentState;
 
-    const pairs = [
-      [PoseLandmarkType.leftShoulder, PoseLandmarkType.rightShoulder],
-      [PoseLandmarkType.leftElbow, PoseLandmarkType.rightElbow],
-      [PoseLandmarkType.leftWrist, PoseLandmarkType.rightWrist],
-      [PoseLandmarkType.leftHip, PoseLandmarkType.rightHip],
-      [PoseLandmarkType.leftKnee, PoseLandmarkType.rightKnee],
-      [PoseLandmarkType.leftAnkle, PoseLandmarkType.rightAnkle],
-    ];
-
-    int leftVotes = 0;
-    int rightVotes = 0;
-    for (final pair in pairs) {
-      final leftLM = smoothedLandmarks[pair[0]];
-      final rightLM = smoothedLandmarks[pair[1]];
-      if (leftLM == null || rightLM == null) continue;
-
-      final zDiff = leftLM.z - rightLM.z;
-      double threshold = 0.01;
-      if (zDiff.abs() > threshold) {
-        if (zDiff < 0) {
-          leftVotes++;
-        } else {
-          rightVotes++;
-        }
-      }
+    final zScoreDecision = estimateIsLeftSideFromZScores(smoothedLandmarks);
+    if (zScoreDecision == null) {
+      return leftRightDebouncer.currentState;
     }
-    return leftRightDebouncer.update(leftVotes >= rightVotes);
+
+    return leftRightDebouncer.update(zScoreDecision);
   }
 
   // --- Helpers ---

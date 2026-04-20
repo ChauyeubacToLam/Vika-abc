@@ -11,8 +11,9 @@ import '../../../utils/debouncer.dart';
 
 class TrunkLeanConfig {
   /// Good forward lean range (degrees from vertical)
-  /// Keep the upper bound slightly lower so we catch obvious chest drop sooner.
-  static const List<int> GOOD_LEAN_RANGE = [15, 35];
+  /// Keep a bit more tolerance here so the chest-up cue is less trigger-happy
+  /// on natural forward lean during descent.
+  static const List<int> GOOD_LEAN_RANGE = [15, 40];
 
   /// Require fewer consecutive frames so the live cue reacts while the user
   /// is still in the bad position instead of after they start recovering.

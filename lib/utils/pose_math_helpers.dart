@@ -2,6 +2,182 @@ import 'dart:math' as math;
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../exercise/exercise_base.dart';
 
+class _DepthSidePairSpec {
+  const _DepthSidePairSpec(
+    this.leftType,
+    this.rightType, {
+    required this.weight,
+  });
+
+  final PoseLandmarkType leftType;
+  final PoseLandmarkType rightType;
+  final double weight;
+}
+
+class _ObservedDepthSidePair {
+  const _ObservedDepthSidePair({
+    required this.left,
+    required this.right,
+    required this.weight,
+  });
+
+  final PoseLandmark left;
+  final PoseLandmark right;
+  final double weight;
+
+  double get reliability =>
+      ((left.likelihood + right.likelihood) / 2).clamp(0.25, 1.0).toDouble();
+}
+
+const List<_DepthSidePairSpec> _depthSidePairSpecs = [
+  _DepthSidePairSpec(
+    PoseLandmarkType.leftShoulder,
+    PoseLandmarkType.rightShoulder,
+    weight: 1.4,
+  ),
+  _DepthSidePairSpec(
+    PoseLandmarkType.leftHip,
+    PoseLandmarkType.rightHip,
+    weight: 1.35,
+  ),
+  _DepthSidePairSpec(
+    PoseLandmarkType.leftKnee,
+    PoseLandmarkType.rightKnee,
+    weight: 1.15,
+  ),
+  _DepthSidePairSpec(
+    PoseLandmarkType.leftAnkle,
+    PoseLandmarkType.rightAnkle,
+    weight: 1.0,
+  ),
+  _DepthSidePairSpec(
+    PoseLandmarkType.leftElbow,
+    PoseLandmarkType.rightElbow,
+    weight: 0.8,
+  ),
+  _DepthSidePairSpec(
+    PoseLandmarkType.leftWrist,
+    PoseLandmarkType.rightWrist,
+    weight: 0.6,
+  ),
+];
+
+const double _depthPairZScoreGapThreshold = 0.35;
+const double _depthDecisionMarginThreshold = 0.25;
+const double _rawDepthGapThreshold = 0.01;
+
+/// Returns:
+/// - `true` when the user's left side is closer to camera
+/// - `false` when the user's right side is closer to camera
+/// - `null` when the depth signal is too weak to trust
+///
+/// Landmark Z values can vary in scale across frames and devices, so this
+/// normalizes the observed depth spread before comparing paired left/right
+/// joints. That makes left/right classification much more stable than using
+/// a fixed raw-Z threshold alone.
+bool? estimateIsLeftSideFromZScores(
+  Map<PoseLandmarkType, PoseLandmark> landmarks,
+) {
+  final observedPairs = <_ObservedDepthSidePair>[];
+  final allDepths = <double>[];
+
+  for (final spec in _depthSidePairSpecs) {
+    final left = landmarks[spec.leftType];
+    final right = landmarks[spec.rightType];
+    if (left == null || right == null) {
+      continue;
+    }
+
+    observedPairs.add(
+      _ObservedDepthSidePair(left: left, right: right, weight: spec.weight),
+    );
+    allDepths
+      ..add(left.z)
+      ..add(right.z);
+  }
+
+  if (observedPairs.length < 2) {
+    return _estimateIsLeftSideFromRawDepth(observedPairs);
+  }
+
+  final meanDepth =
+      allDepths.reduce((sum, value) => sum + value) / allDepths.length;
+  final variance = allDepths.fold<double>(0, (sum, value) {
+        final delta = value - meanDepth;
+        return sum + delta * delta;
+      }) /
+      allDepths.length;
+  final stdDev = math.sqrt(variance);
+
+  if (stdDev <= 1e-6) {
+    return _estimateIsLeftSideFromRawDepth(observedPairs);
+  }
+
+  var leftEvidence = 0.0;
+  var rightEvidence = 0.0;
+  var totalWeight = 0.0;
+
+  for (final pair in observedPairs) {
+    final leftZScore = (pair.left.z - meanDepth) / stdDev;
+    final rightZScore = (pair.right.z - meanDepth) / stdDev;
+    final zScoreGap = leftZScore - rightZScore;
+    final pairWeight = pair.weight * pair.reliability;
+
+    if (zScoreGap <= -_depthPairZScoreGapThreshold) {
+      leftEvidence += (-zScoreGap) * pairWeight;
+      totalWeight += pairWeight;
+    } else if (zScoreGap >= _depthPairZScoreGapThreshold) {
+      rightEvidence += zScoreGap * pairWeight;
+      totalWeight += pairWeight;
+    }
+  }
+
+  final normalizedMargin = totalWeight == 0
+      ? 0.0
+      : (leftEvidence - rightEvidence).abs() / totalWeight;
+
+  if (normalizedMargin >= _depthDecisionMarginThreshold &&
+      leftEvidence != rightEvidence) {
+    return leftEvidence > rightEvidence;
+  }
+
+  return _estimateIsLeftSideFromRawDepth(observedPairs);
+}
+
+bool? _estimateIsLeftSideFromRawDepth(List<_ObservedDepthSidePair> pairs) {
+  if (pairs.isEmpty) {
+    return null;
+  }
+
+  var leftEvidence = 0.0;
+  var rightEvidence = 0.0;
+  var totalWeight = 0.0;
+
+  for (final pair in pairs) {
+    final depthGap = pair.left.z - pair.right.z;
+    final pairWeight = pair.weight * pair.reliability;
+
+    if (depthGap <= -_rawDepthGapThreshold) {
+      leftEvidence += (-depthGap) * pairWeight;
+      totalWeight += pairWeight;
+    } else if (depthGap >= _rawDepthGapThreshold) {
+      rightEvidence += depthGap * pairWeight;
+      totalWeight += pairWeight;
+    }
+  }
+
+  final normalizedMargin = totalWeight == 0
+      ? 0.0
+      : (leftEvidence - rightEvidence).abs() / totalWeight;
+
+  if (normalizedMargin < _rawDepthGapThreshold ||
+      leftEvidence == rightEvidence) {
+    return null;
+  }
+
+  return leftEvidence > rightEvidence;
+}
+
 /* ---------------------------------------------------------------------------
   PART 1: JOINT FLEXION (0 - 180 degrees)
   ---------------------------------------------------------------------------

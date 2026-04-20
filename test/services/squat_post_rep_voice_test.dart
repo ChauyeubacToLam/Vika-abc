@@ -118,7 +118,7 @@ void main() {
       metric.update(
         _buildRepContext(
           squatState: SquatState.descending,
-          trunkLean: 38,
+          trunkLean: 41,
         ),
       );
     }
@@ -126,6 +126,22 @@ void main() {
     expect(metric.faults, hasLength(1));
     expect(metric.faults.single.priority, SquatFaultVoicePriority.trunkLean);
     expect(metric.faults.single.voiceMessage, isNull);
+  });
+
+  test('forward trunk lean ignores mild chest drop below the new threshold',
+      () {
+    final metric = TrunkLeanMetric();
+
+    for (var i = 0; i < 4; i++) {
+      metric.update(
+        _buildRepContext(
+          squatState: SquatState.descending,
+          trunkLean: 39,
+        ),
+      );
+    }
+
+    expect(metric.faults, isEmpty);
   });
 
   test('top post-rep voice picks the highest-priority fault only', () {

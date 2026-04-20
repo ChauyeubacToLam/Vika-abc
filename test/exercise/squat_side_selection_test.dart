@@ -190,6 +190,114 @@ Map<PoseLandmarkType, PoseLandmark> _buildSquatLandmarks({
   };
 }
 
+Map<PoseLandmarkType, PoseLandmark> _buildDepthFacingLandmarks({
+  required bool leftSideCloser,
+}) {
+  final leftNear = leftSideCloser;
+
+  double leftDepth(double near, double far) => leftNear ? near : far;
+  double rightDepth(double near, double far) => leftNear ? far : near;
+
+  return {
+    PoseLandmarkType.leftShoulder: _landmark(
+      PoseLandmarkType.leftShoulder,
+      154,
+      110,
+      z: leftDepth(-0.58, 0.41),
+    ),
+    PoseLandmarkType.rightShoulder: _landmark(
+      PoseLandmarkType.rightShoulder,
+      164,
+      112,
+      z: rightDepth(-0.54, 0.46),
+    ),
+    PoseLandmarkType.leftElbow: _landmark(
+      PoseLandmarkType.leftElbow,
+      150,
+      170,
+      z: leftDepth(-0.46, 0.30),
+    ),
+    PoseLandmarkType.rightElbow: _landmark(
+      PoseLandmarkType.rightElbow,
+      168,
+      172,
+      z: rightDepth(-0.43, 0.34),
+    ),
+    PoseLandmarkType.leftWrist: _landmark(
+      PoseLandmarkType.leftWrist,
+      147,
+      220,
+      z: leftDepth(-0.38, 0.22),
+    ),
+    PoseLandmarkType.rightWrist: _landmark(
+      PoseLandmarkType.rightWrist,
+      171,
+      224,
+      z: rightDepth(-0.34, 0.26),
+    ),
+    PoseLandmarkType.leftHip: _landmark(
+      PoseLandmarkType.leftHip,
+      156,
+      200,
+      z: leftDepth(-0.52, 0.36),
+    ),
+    PoseLandmarkType.rightHip: _landmark(
+      PoseLandmarkType.rightHip,
+      162,
+      202,
+      z: rightDepth(-0.48, 0.39),
+    ),
+    PoseLandmarkType.leftKnee: _landmark(
+      PoseLandmarkType.leftKnee,
+      156,
+      290,
+      z: leftDepth(-0.44, 0.28),
+    ),
+    PoseLandmarkType.rightKnee: _landmark(
+      PoseLandmarkType.rightKnee,
+      163,
+      292,
+      z: rightDepth(-0.40, 0.31),
+    ),
+    PoseLandmarkType.leftAnkle: _landmark(
+      PoseLandmarkType.leftAnkle,
+      157,
+      380,
+      z: leftDepth(-0.36, 0.18),
+    ),
+    PoseLandmarkType.rightAnkle: _landmark(
+      PoseLandmarkType.rightAnkle,
+      164,
+      382,
+      z: rightDepth(-0.33, 0.21),
+    ),
+    PoseLandmarkType.leftHeel: _landmark(
+      PoseLandmarkType.leftHeel,
+      152,
+      390,
+      z: leftDepth(-0.34, 0.16),
+    ),
+    PoseLandmarkType.rightHeel: _landmark(
+      PoseLandmarkType.rightHeel,
+      159,
+      392,
+      z: rightDepth(-0.30, 0.20),
+    ),
+    PoseLandmarkType.leftFootIndex: _landmark(
+      PoseLandmarkType.leftFootIndex,
+      171,
+      390,
+      z: leftDepth(-0.31, 0.13),
+    ),
+    PoseLandmarkType.rightFootIndex: _landmark(
+      PoseLandmarkType.rightFootIndex,
+      179,
+      392,
+      z: rightDepth(-0.27, 0.17),
+    ),
+  };
+}
+
 void main() {
   test(
       'squat stays valid when the right side is visible but orientation is only angled',
@@ -227,5 +335,32 @@ void main() {
       squat.isInStartPosition(_buildSquatLandmarks(rightSideVisible: false)),
       isTrue,
     );
+  });
+
+  test('camera facing uses z-score depth to switch from right to left side',
+      () {
+    final squat = Squat();
+    final rightFacingLandmarks =
+        _buildDepthFacingLandmarks(leftSideCloser: false);
+    final leftFacingLandmarks =
+        _buildDepthFacingLandmarks(leftSideCloser: true);
+
+    CameraFacing facing = CameraFacing.undefined;
+    for (var i = 0; i < 5; i++) {
+      facing = squat.detectCameraFacing(rightFacingLandmarks);
+    }
+    expect(facing, CameraFacing.right);
+
+    squat.cameraFacing = facing;
+    expect(squat.checkSafety(rightFacingLandmarks), isNull);
+
+    for (var i = 0; i < 5; i++) {
+      facing = squat.detectCameraFacing(leftFacingLandmarks);
+    }
+    expect(facing, CameraFacing.left);
+
+    squat.cameraFacing = facing;
+    expect(squat.checkSafety(leftFacingLandmarks), isNull);
+    expect(squat.isInStartPosition(leftFacingLandmarks), isTrue);
   });
 }

@@ -223,6 +223,11 @@ Current live-fault source is limited to `feedback`.
 | Sync | `feedback['Sync']` contains `chest up` | `Ưỡn ngực lên` | 3000ms |
 | Depth | `feedback['Depth']` contains `Go Lower` | `Thấp hơn nữa` | 3000ms |
 
+Notes:
+
+- the `Back -> Chest up!` signal now comes from a slightly less aggressive forward trunk-lean threshold: `trunkLean > 40`
+- side-facing left/right is stabilized from landmark depth `z-score` analysis before Squat chooses which side landmarks to track, so the chest-up cue stays consistent when the user turns either side
+
 Priority rules already implemented:
 
 1. `Ưỡn ngực lên` is the highest-priority live fault cue.
