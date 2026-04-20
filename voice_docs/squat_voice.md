@@ -170,7 +170,7 @@ Notes:
 
 - `Going Down...` is intentionally silent. The anticipatory descent cue already comes from `standing -> Xuống`.
 - Current squat flow does not actively emit `Đứng thẳng` as a phase cue anymore. Ascending now uses `Đứng lên`.
-- On the very first active frame, after `Sẵn sàng`, the coach stores the current phase phrase as `_lastPhasePhrase` so it does not immediately replay the same phase cue.
+- On the very first active frame, after `Sẵn sàng`, the coach defers storing `Xuống` as the last phase phrase so the anticipatory descent cue can still play on the next standing frame.
 
 ---
 
@@ -218,7 +218,7 @@ This means the current runtime rule is:
 | Metric | `voiceMessage` | Priority | Spoken today |
 |---|---|---|---|
 | HeelRise | `Nhớ không nâng gót chân` | `0` | post-rep only |
-| TrunkLean forward | `Ưỡn ngực lên` | `1` | live + post-rep |
+| TrunkLean forward | none | `1` | live only |
 | Depth | `Xuống thấp hơn` | `2` | live uses a different phrase, post-rep uses this phrase |
 | HipShoulderSync | `Đừng nhấc hông lên trước` | `3` | post-rep only |
 | Tempo | `Chậm lại` | `4` | post-rep only |
@@ -253,7 +253,6 @@ Post-rep feedback is only enqueued when:
 | Phase | `Xuống` | Yes |
 | Phase | `Giữ` | Yes |
 | Phase | `Đứng lên` | Yes |
-| Phase | `Đứng thẳng` | Yes, but not used by current squat phase flow |
 | Rep count | `1` ... `30` | Yes |
 | Completion | `Hoàn thành bài tập` | Yes |
 
@@ -265,17 +264,17 @@ Post-rep feedback is only enqueued when:
 | `Thấp hơn nữa` | Yes | Yes |
 | `Xuống thấp hơn` | Yes | Yes |
 | `Chậm lại` | Yes | Yes |
-| `Nhớ không nâng gót chân` | Yes | No |
-| `Đừng nhấc hông lên trước` | Yes | No |
+| `Nhớ không nâng gót chân` | Yes | Yes |
+| `Đừng nhấc hông lên trước` | Yes | Yes |
 
 Notes:
 
 - If a phrase is missing from `_assetMap`, `ViettelTTSService` falls back to Viettel API.
-- As of the current code, `Nhớ không nâng gót chân` and `Đừng nhấc hông lên trước` are real runtime phrases but do not have local pre-recorded assets yet.
+- Squat now has local audio coverage for every phrase the current coach emits.
 
-### 7.3 Assets present in TTS but not used by current Squat coach
+### 7.3 Legacy Squat Assets Removed
 
-Examples:
+Removed legacy local phrases that the current squat runtime no longer emits:
 
 - `Sẵn sàng, xuống`
 - `Lên`
@@ -283,7 +282,7 @@ Examples:
 - `Sai tư thế, chú ý`
 - `Sẵn sàng, lên`
 
-These keys exist in `_assetMap`, but `SquatVoiceCoach` does not call them in the current squat flow.
+These phrases were previously cached locally but are no longer part of the active squat voice flow.
 
 ---
 

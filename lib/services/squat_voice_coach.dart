@@ -45,6 +45,13 @@ class SquatVoiceCoach {
   final Map<String, int> _lastFaultVoiceAtMs = {};
   final Map<String, int> _lastPostRepVoiceRep = {};
 
+  String? _deferredPhasePhraseAfterPriorityCue(String? phasePhrase) {
+    if (phasePhrase == 'Xuống') {
+      return null;
+    }
+    return phasePhrase;
+  }
+
   void processFrame({
     required ExerciseBase exercise,
     required int repCount,
@@ -85,6 +92,7 @@ class SquatVoiceCoach {
     final phaseInstr = exercise.resultIssues.instructions[currentPhaseKey];
     final statusText = phaseInstr?['Status'];
     final phasePhrase = _phasePhraseFromStatus(statusText);
+    var deferStandingCueUntilNextFrame = false;
 
     if (!_didAnnounceReady) {
       _ttsService.clearQueue();
@@ -92,7 +100,11 @@ class SquatVoiceCoach {
       _ttsService.speak('Sẵn sàng');
       _didAnnounceReady = true;
       if (phasePhrase != null) {
-        _lastPhasePhrase = phasePhrase;
+        final deferredPhrase =
+            _deferredPhasePhraseAfterPriorityCue(phasePhrase);
+        _lastPhasePhrase = deferredPhrase;
+        deferStandingCueUntilNextFrame =
+            deferredPhrase == null && phasePhrase == 'Xuống';
         _lastPhaseCueAtMs = nowMs;
       }
     }
@@ -109,7 +121,7 @@ class SquatVoiceCoach {
         repCount: repCount,
         nowMs: nowMs,
       );
-      _lastPhasePhrase = phasePhrase;
+      _lastPhasePhrase = _deferredPhasePhraseAfterPriorityCue(phasePhrase);
       _lastRepCount = repCount;
       return;
     }
@@ -137,7 +149,7 @@ class SquatVoiceCoach {
       _ttsService.speak(liveFaultVoice);
     }
 
-    _lastPhasePhrase = phasePhrase;
+    _lastPhasePhrase = deferStandingCueUntilNextFrame ? null : phasePhrase;
     _lastRepCount = repCount;
   }
 

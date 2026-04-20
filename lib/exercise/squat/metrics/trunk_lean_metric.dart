@@ -68,7 +68,7 @@ class TrunkLeanMetric extends SquatMetricBase {
       _logFault(
         phase,
         'Leaned too forward',
-        'Ưỡn ngực lên',
+        null,
         priority: SquatFaultVoicePriority.trunkLean,
       );
     } else if (backwardConfirmed) {

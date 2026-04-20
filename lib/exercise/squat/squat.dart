@@ -22,9 +22,13 @@ class SquatConfig {
   static const int SQUAT_STAND_ANGLE_THRESHOLD = 160;
   static const int SQUAT_DESCEND_ANGLE_THRESHOLD = 152;
   static const List<int> SQUAT_BOTTOM_ANGLE_THRESHOLD = [80, 100];
+  static const double SIDE_SCORE_TIE_THRESHOLD = 0.2;
+  static const double SIDE_SWITCH_MARGIN = 0.75;
 }
 
 enum SquatState { standing, descending, bottom, ascending }
+
+enum _TrackedSquatSide { left, right }
 
 // --- Squat ---
 //
@@ -64,6 +68,9 @@ class Squat extends ExerciseBase {
   int? lastRepTopVoicePriority;
   bool lastRepWasClean = true;
   bool _reachedBottomThisRep = false;
+  _TrackedSquatSide? _trackedSide;
+  double _lastLeftSideScore = 0.0;
+  double _lastRightSideScore = 0.0;
 
   Squat({this.maxRep = SquatConfig.MAX_REP});
 
@@ -167,23 +174,13 @@ class Squat extends ExerciseBase {
 
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    final shoulder = getSideLandmark(
-      landmarks: landmarks,
-      rightType: PoseLandmarkType.rightShoulder,
-      leftType: PoseLandmarkType.leftShoulder,
-    );
-    final hip = getSideLandmark(
-      landmarks: landmarks,
-      rightType: PoseLandmarkType.rightHip,
-      leftType: PoseLandmarkType.leftHip,
-    );
-    final knee = getSideLandmark(
-      landmarks: landmarks,
-      rightType: PoseLandmarkType.rightKnee,
-      leftType: PoseLandmarkType.leftKnee,
-    );
+    final requiredLandmarks = _getRequiredLandmarks(landmarks);
+    if (requiredLandmarks == null) return false;
 
-    if (shoulder == null || hip == null || knee == null) return false;
+    final shoulder = requiredLandmarks['shoulder']!;
+    final hip = requiredLandmarks['hip']!;
+    final knee = requiredLandmarks['knee']!;
+    final ankle = requiredLandmarks['ankle']!;
 
     // Trunk must be roughly vertical (< 25° deviation)
     double deviation = calculateVerticalAngle(pivot: hip, point: shoulder);
@@ -194,11 +191,7 @@ class Squat extends ExerciseBase {
     final kneeAngle = calculateAngleNormalized(
       firstPoint: hip,
       midPoint: knee,
-      lastPoint: getSideLandmark(
-        landmarks: landmarks,
-        rightType: PoseLandmarkType.rightAnkle,
-        leftType: PoseLandmarkType.leftAnkle,
-      )!,
+      lastPoint: ankle,
     );
     if (kneeAngle < 155.0) return false;
 
@@ -256,37 +249,158 @@ class Squat extends ExerciseBase {
   /// Returns all 6 required landmarks, or null if any is missing.
   Map<String, PoseLandmark>? _getRequiredLandmarks(
       Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    final hip = getSideLandmark(
-        landmarks: landmarks,
-        rightType: PoseLandmarkType.rightHip,
-        leftType: PoseLandmarkType.leftHip);
-    final shoulder = getSideLandmark(
-        landmarks: landmarks,
-        rightType: PoseLandmarkType.rightShoulder,
-        leftType: PoseLandmarkType.leftShoulder);
-    final knee = getSideLandmark(
-        landmarks: landmarks,
-        rightType: PoseLandmarkType.rightKnee,
-        leftType: PoseLandmarkType.leftKnee);
-    final ankle = getSideLandmark(
-        landmarks: landmarks,
-        rightType: PoseLandmarkType.rightAnkle,
-        leftType: PoseLandmarkType.leftAnkle);
-    final foot = getSideLandmark(
-        landmarks: landmarks,
-        rightType: PoseLandmarkType.rightFootIndex,
-        leftType: PoseLandmarkType.leftFootIndex);
-    final heel = getSideLandmark(
-        landmarks: landmarks,
-        rightType: PoseLandmarkType.rightHeel,
-        leftType: PoseLandmarkType.leftHeel);
+    final preferredSide = _resolveTrackedSide(landmarks);
+    final preferredLandmarks =
+        _buildRequiredLandmarksForSide(landmarks, preferredSide);
+    if (preferredLandmarks != null) {
+      _trackedSide = preferredSide;
+      return preferredLandmarks;
+    }
+
+    final fallbackSide = preferredSide == _TrackedSquatSide.right
+        ? _TrackedSquatSide.left
+        : _TrackedSquatSide.right;
+    final fallbackLandmarks =
+        _buildRequiredLandmarksForSide(landmarks, fallbackSide);
+    if (fallbackLandmarks != null) {
+      _trackedSide = fallbackSide;
+      return fallbackLandmarks;
+    }
+
+    return null;
+  }
+
+  _TrackedSquatSide _resolveTrackedSide(
+      Map<PoseLandmarkType, PoseLandmark> landmarks) {
+    final leftScore =
+        _scoreSideVisibility(landmarks, side: _TrackedSquatSide.left);
+    final rightScore =
+        _scoreSideVisibility(landmarks, side: _TrackedSquatSide.right);
+
+    _lastLeftSideScore = leftScore;
+    _lastRightSideScore = rightScore;
+
+    final orientationSide = switch (cameraFacing) {
+      CameraFacing.left => _TrackedSquatSide.left,
+      CameraFacing.right => _TrackedSquatSide.right,
+      _ => null,
+    };
+
+    final candidate = _pickTrackedSideCandidate(
+      leftScore: leftScore,
+      rightScore: rightScore,
+      fallback: orientationSide ?? _trackedSide,
+    );
+
+    if (_trackedSide == null) {
+      _trackedSide = candidate;
+      return candidate;
+    }
+
+    if (_trackedSide == candidate) {
+      return candidate;
+    }
+
+    final currentScore =
+        _trackedSide == _TrackedSquatSide.right ? rightScore : leftScore;
+    final candidateScore =
+        candidate == _TrackedSquatSide.right ? rightScore : leftScore;
+
+    final shouldFollowOrientation =
+        orientationSide == candidate && candidateScore >= currentScore;
+    if (candidateScore >= currentScore + SquatConfig.SIDE_SWITCH_MARGIN ||
+        shouldFollowOrientation) {
+      _trackedSide = candidate;
+    }
+
+    return _trackedSide!;
+  }
+
+  _TrackedSquatSide _pickTrackedSideCandidate({
+    required double leftScore,
+    required double rightScore,
+    _TrackedSquatSide? fallback,
+  }) {
+    if ((rightScore - leftScore).abs() <=
+            SquatConfig.SIDE_SCORE_TIE_THRESHOLD &&
+        fallback != null) {
+      return fallback;
+    }
+
+    if (rightScore == 0 && leftScore == 0) {
+      return fallback ?? _TrackedSquatSide.left;
+    }
+
+    return rightScore >= leftScore
+        ? _TrackedSquatSide.right
+        : _TrackedSquatSide.left;
+  }
+
+  double _scoreSideVisibility(
+    Map<PoseLandmarkType, PoseLandmark> landmarks, {
+    required _TrackedSquatSide side,
+  }) {
+    final types = side == _TrackedSquatSide.right
+        ? const [
+            PoseLandmarkType.rightShoulder,
+            PoseLandmarkType.rightHip,
+            PoseLandmarkType.rightKnee,
+            PoseLandmarkType.rightAnkle,
+            PoseLandmarkType.rightHeel,
+            PoseLandmarkType.rightFootIndex,
+          ]
+        : const [
+            PoseLandmarkType.leftShoulder,
+            PoseLandmarkType.leftHip,
+            PoseLandmarkType.leftKnee,
+            PoseLandmarkType.leftAnkle,
+            PoseLandmarkType.leftHeel,
+            PoseLandmarkType.leftFootIndex,
+          ];
+
+    var score = 0.0;
+    for (final type in types) {
+      final landmark = landmarks[type];
+      if (landmark == null) continue;
+      score += 0.25 + (landmark.likelihood.clamp(0.0, 1.0) as num).toDouble();
+    }
+    return score;
+  }
+
+  Map<String, PoseLandmark>? _buildRequiredLandmarksForSide(
+    Map<PoseLandmarkType, PoseLandmark> landmarks,
+    _TrackedSquatSide side,
+  ) {
+    final isRightSide = side == _TrackedSquatSide.right;
+
+    PoseLandmark? read(
+      PoseLandmarkType rightType,
+      PoseLandmarkType leftType,
+    ) {
+      return landmarks[isRightSide ? rightType : leftType];
+    }
+
+    final hip = read(PoseLandmarkType.rightHip, PoseLandmarkType.leftHip);
+    final shoulder = read(
+      PoseLandmarkType.rightShoulder,
+      PoseLandmarkType.leftShoulder,
+    );
+    final knee = read(PoseLandmarkType.rightKnee, PoseLandmarkType.leftKnee);
+    final ankle = read(PoseLandmarkType.rightAnkle, PoseLandmarkType.leftAnkle);
+    final foot = read(
+      PoseLandmarkType.rightFootIndex,
+      PoseLandmarkType.leftFootIndex,
+    );
+    final heel = read(PoseLandmarkType.rightHeel, PoseLandmarkType.leftHeel);
 
     if (hip == null ||
         shoulder == null ||
         knee == null ||
         ankle == null ||
         foot == null ||
-        heel == null) return null;
+        heel == null) {
+      return null;
+    }
 
     return {
       'hip': hip,
@@ -312,6 +426,8 @@ class Squat extends ExerciseBase {
     final shoulder = lm['shoulder']!;
     final foot = lm['foot']!;
     final heel = lm['heel']!;
+
+    scaleFactor = calculateDistance(shoulder, hip);
 
     // 2. Calculate geometry
     final kneeAngle = calculateAngleNormalized(
@@ -344,6 +460,9 @@ class Squat extends ExerciseBase {
     debugData['reachedBottomThisRep'] = _reachedBottomThisRep;
     debugData['repCount'] = repCount;
     debugData['frameBuffer'] = frameBuffer.frameBuffer.length;
+    debugData['trackedSide'] = _trackedSide?.name ?? 'unknown';
+    debugData['leftSideScore'] = _lastLeftSideScore.toStringAsFixed(2);
+    debugData['rightSideScore'] = _lastRightSideScore.toStringAsFixed(2);
     debugData['kneeAngle'] = kneeAngle.toStringAsFixed(1);
     debugData['backAngle'] = backAngle.toStringAsFixed(1);
     debugData['trunkLean'] = trunkLean.toStringAsFixed(1);

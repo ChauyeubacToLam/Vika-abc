@@ -62,15 +62,8 @@ class ViettelTTSService {
   Future<void>? _configFuture;
 
   final Map<String, String> _assetMap = {
-    "Sẵn sàng, xuống": "san_sang_xuong.mp3",
     "Xuống": "xuong.mp3",
     "Giữ": "giu.mp3",
-    "Lên": "len.mp3",
-    "Tốt lắm": "tot_lam.mp3",
-    "Tốt lắm, xuống": "tot_lam_xuong.mp3",
-    "Sai tư thế, chú ý": "sai_tu_the.mp3",
-    "Sai tư thế, chú ý, xuống": "sai_tu_the_xuong.mp3",
-    "Đứng thẳng": "dung_thang.mp3",
     // New: rep counting (1-15)
     "1": "1.mp3",
     "2": "2.mp3",
@@ -109,7 +102,6 @@ class ViettelTTSService {
     "30": "30.mp3",
     // New exercises feedback
     "Nâng hông cao hơn": "nang_hong_cao_hon.mp3",
-    "Chỉnh góc gối": "chinh_goc_goi.mp3",
     "Chậm lại": "cham_lai.mp3",
     "Cuộn lên thêm": "cuon_len_them.mp3",
     "Không kéo cổ": "khong_keo_co.mp3",
@@ -121,15 +113,15 @@ class ViettelTTSService {
     "Mở": "mo.mp3",
     "Đóng": "dong.mp3",
     "Xuống thấp hơn": "xuong_thap_hon.mp3",
+    "Nhớ không nâng gót chân": "nho_khong_nang_got_chan.mp3",
+    "Đừng nhấc hông lên trước": "dung_nhac_hong_len_truoc.mp3",
     "Giữ gót chân": "giu_got_chan.mp3",
     "Đứng lên": "dung_len.mp3",
     "Siết cơ bụng": "siet_co_bung.mp3",
     "Hạ hông xuống": "ha_hong_xuong.mp3",
     "Nghỉ": "nghi.mp3",
     "Đẩy lên": "day_len.mp3",
-    "Sẵn sàng, lên": "san_sang_len.mp3",
     "Sẵn sàng": "san_sang.mp3",
-    "Sẵn sàng, mở": "san_sang_mo.mp3",
   };
 
   /// Add text to the voice queue. Plays sequentially.

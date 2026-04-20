@@ -52,4 +52,87 @@ void main() {
 
     expect(player.events, ['clearQueue', 'speak:Sẵn sàng']);
   });
+
+  test('Squat says "Xuống" shortly after ready while staying in standing phase',
+      () async {
+    final player = _FakeSquatVoicePlayer();
+    final coach = SquatVoiceCoach(ttsService: player);
+    final squat = Squat()..exerciseState = ExerciseState.activated;
+
+    squat.resultIssues.addInstruction(
+      squat.currentPhaseKey,
+      'Status',
+      Squat.standingStatus,
+    );
+
+    coach.processFrame(
+      exercise: squat,
+      repCount: squat.repCount,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 275));
+
+    coach.processFrame(
+      exercise: squat,
+      repCount: squat.repCount,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    expect(
+      player.events,
+      ['clearQueue', 'speak:Sẵn sàng', 'speak:Xuống'],
+    );
+  });
+
+  test('Squat says "Xuống" again after rep count when user returns to standing',
+      () async {
+    final player = _FakeSquatVoicePlayer();
+    final coach = SquatVoiceCoach(ttsService: player);
+    final squat = Squat()..exerciseState = ExerciseState.activated;
+
+    squat.resultIssues.addInstruction(
+      squat.currentPhaseKey,
+      'Status',
+      Squat.standingStatus,
+    );
+
+    coach.processFrame(
+      exercise: squat,
+      repCount: squat.repCount,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 275));
+
+    coach.processFrame(
+      exercise: squat,
+      repCount: 1,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 275));
+
+    coach.processFrame(
+      exercise: squat,
+      repCount: 1,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    expect(
+      player.events,
+      [
+        'clearQueue',
+        'speak:Sẵn sàng',
+        'clearPendingButKeepCurrent',
+        'speak:1',
+        'speak:Xuống',
+      ],
+    );
+  });
 }

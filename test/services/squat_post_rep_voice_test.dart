@@ -4,18 +4,20 @@ import 'package:vika/exercise/fault_record.dart';
 import 'package:vika/exercise/squat/metrics/heel_rise_metric.dart';
 import 'package:vika/exercise/squat/metrics/hip_shoulder_sync.dart';
 import 'package:vika/exercise/squat/metrics/squat_metric_base.dart';
+import 'package:vika/exercise/squat/metrics/trunk_lean_metric.dart';
 import 'package:vika/exercise/squat/squat.dart';
 
 RepContext _buildRepContext({
   required SquatState squatState,
   double heelDistance = 0,
   double scaleFactor = 100,
+  double trunkLean = 20,
   double hipY = 100,
   double shoulderY = 100,
 }) {
   return RepContext(
     kneeAngle: 90,
-    trunkLean: 20,
+    trunkLean: trunkLean,
     clockAngle: 0,
     heelDistance: heelDistance,
     scaleFactor: scaleFactor,
@@ -90,6 +92,25 @@ void main() {
     );
   });
 
+  test(
+      'forward trunk lean stays live-only and is not available for post-rep voice',
+      () {
+    final metric = TrunkLeanMetric();
+
+    for (var i = 0; i < 5; i++) {
+      metric.update(
+        _buildRepContext(
+          squatState: SquatState.descending,
+          trunkLean: 45,
+        ),
+      );
+    }
+
+    expect(metric.faults, hasLength(1));
+    expect(metric.faults.single.priority, SquatFaultVoicePriority.trunkLean);
+    expect(metric.faults.single.voiceMessage, isNull);
+  });
+
   test('top post-rep voice picks the highest-priority fault only', () {
     final faults = <FaultRecord>[
       FaultRecord(
@@ -110,7 +131,7 @@ void main() {
         phase: 'ASCENDING',
         type: 'Back',
         message: 'Leaned too forward',
-        voiceMessage: 'Ưỡn ngực lên',
+        voiceMessage: null,
         priority: SquatFaultVoicePriority.trunkLean,
       ),
       FaultRecord(
@@ -128,5 +149,6 @@ void main() {
     expect(topFault?.voiceMessage, 'Nhớ không nâng gót chân');
     expect(topFault?.priority, SquatFaultVoicePriority.heelRise);
     expect(orderedMessages.first, 'Nhớ không nâng gót chân');
+    expect(orderedMessages, isNot(contains('Ưỡn ngực lên')));
   });
 }
