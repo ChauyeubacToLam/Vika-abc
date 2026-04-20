@@ -416,8 +416,8 @@ abstract class ExerciseBase {
             exerciseState = ExerciseState.activated;
             _holdStillStartedAt = null;
           } else {
-            resultIssues.feedback['System'] =
-                'Giữ yên... ${remaining.clamp(0.0, 99.0).toStringAsFixed(0)}s';
+            final displaySeconds = remaining.ceil().clamp(1, 99);
+            resultIssues.feedback['System'] = 'Giữ yên... ${displaySeconds}s';
           }
         } else {
           if (_holdStillStartedAt != null) {

@@ -2,9 +2,31 @@ import '../exercise/exercise_base.dart';
 import '../exercise/squat/squat.dart';
 import 'viettel_tts_service.dart';
 
-class SquatVoiceCoach {
-  SquatVoiceCoach({ViettelTTSService? ttsService})
+abstract class SquatVoicePlayer {
+  Future<void> speak(String text);
+  void clearQueue();
+  void clearPendingButKeepCurrent();
+}
+
+class _ViettelSquatVoicePlayer implements SquatVoicePlayer {
+  _ViettelSquatVoicePlayer({ViettelTTSService? ttsService})
       : _ttsService = ttsService ?? ViettelTTSService();
+
+  final ViettelTTSService _ttsService;
+
+  @override
+  Future<void> speak(String text) => _ttsService.speak(text);
+
+  @override
+  void clearQueue() => _ttsService.clearQueue();
+
+  @override
+  void clearPendingButKeepCurrent() => _ttsService.clearPendingButKeepCurrent();
+}
+
+class SquatVoiceCoach {
+  SquatVoiceCoach({SquatVoicePlayer? ttsService})
+      : _ttsService = ttsService ?? _ViettelSquatVoicePlayer();
 
   static const int _phaseCueMinGapMs = 250;
   static const int _faultCueCooldownMs = 3000;
@@ -13,9 +35,8 @@ class SquatVoiceCoach {
 
   static const String _trunkPriorityCue = 'Ưỡn ngực lên';
 
-  final ViettelTTSService _ttsService;
+  final SquatVoicePlayer _ttsService;
 
-  String _lastPhaseKey = '';
   String? _lastPhasePhrase;
   int _lastRepCount = 0;
   int _lastPhaseCueAtMs = 0;
@@ -48,7 +69,6 @@ class SquatVoiceCoach {
         _didAnnounceSetComplete = true;
       }
 
-      _lastPhaseKey = currentPhaseKey;
       _lastPhasePhrase = null;
       _lastRepCount = repCount;
       return;
@@ -57,21 +77,26 @@ class SquatVoiceCoach {
     if (currentExerciseState != ExerciseState.activated ||
         exercise.isPaused ||
         !hasPose) {
-      _lastPhaseKey = currentPhaseKey;
       _lastPhasePhrase = null;
       _lastRepCount = repCount;
       return;
     }
 
-    if (!_didAnnounceReady) {
-      _ttsService.clearQueue();
-      _ttsService.speak('Sẵn sàng');
-      _didAnnounceReady = true;
-    }
-
     final phaseInstr = exercise.resultIssues.instructions[currentPhaseKey];
     final statusText = phaseInstr?['Status'];
     final phasePhrase = _phasePhraseFromStatus(statusText);
+
+    if (!_didAnnounceReady) {
+      _ttsService.clearQueue();
+      // Keep the activation cue stable so Squat always opens with the same phrase.
+      _ttsService.speak('Sẵn sàng');
+      _didAnnounceReady = true;
+      if (phasePhrase != null) {
+        _lastPhasePhrase = phasePhrase;
+        _lastPhaseCueAtMs = nowMs;
+      }
+    }
+
     final liveFaultVoice = _highestPriorityLiveFaultVoice(feedback);
     final canSpeakLiveFault = liveFaultVoice != null &&
         _canSpeakLiveFaultVoice(liveFaultVoice, nowMs);
@@ -84,13 +109,11 @@ class SquatVoiceCoach {
         repCount: repCount,
         nowMs: nowMs,
       );
-      _lastPhaseKey = currentPhaseKey;
       _lastPhasePhrase = phasePhrase;
       _lastRepCount = repCount;
       return;
     }
 
-    final phaseKeyChanged = currentPhaseKey != _lastPhaseKey;
     final phraseChanged =
         phasePhrase != null && phasePhrase != _lastPhasePhrase;
     final canSpeakPhaseCue = nowMs - _lastPhaseCueAtMs >= _phaseCueMinGapMs;
@@ -99,7 +122,7 @@ class SquatVoiceCoach {
 
     if (!trunkCueTakesPriority &&
         phasePhrase != null &&
-        (phaseKeyChanged || phraseChanged) &&
+        phraseChanged &&
         canSpeakPhaseCue) {
       _ttsService.speak(phasePhrase);
       _lastPhaseCueAtMs = nowMs;
@@ -114,7 +137,6 @@ class SquatVoiceCoach {
       _ttsService.speak(liveFaultVoice);
     }
 
-    _lastPhaseKey = currentPhaseKey;
     _lastPhasePhrase = phasePhrase;
     _lastRepCount = repCount;
   }
@@ -126,13 +148,13 @@ class SquatVoiceCoach {
   String? _phasePhraseFromStatus(String? statusText) {
     if (statusText == null || statusText.isEmpty) return null;
 
-    if (statusText.startsWith('Hold') || statusText.contains('Giữ')) {
+    if (Squat.isHoldStatus(statusText)) {
       return 'Giữ';
     }
     if (statusText.contains('Xuống')) {
       return 'Xuống';
     }
-    if (statusText.contains('Đứng lên') || statusText.contains('Lên')) {
+    if (Squat.isReleaseStatus(statusText) || statusText.contains('Lên')) {
       return 'Đứng lên';
     }
     if (statusText.contains('Đứng thẳng')) {

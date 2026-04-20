@@ -1147,8 +1147,8 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       return null;
     }
 
-    final isHolding = status.contains('Hold!');
-    final isRelease = status.contains('Push Up Now!');
+    final isHolding = Squat.isHoldStatus(status);
+    final isRelease = Squat.isReleaseStatus(status);
     if (!isHolding && !isRelease) {
       return null;
     }
@@ -1554,6 +1554,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     if (value == 'Going Down...') {
       return 'Hạ người chậm và kiểm soát.';
     }
+    if (value == Squat.ascendingStatus) {
+      return 'Đứng lên dứt khoát.';
+    }
     if (value == 'Push Up!') {
       return 'Đứng lên mạnh nhưng vẫn giữ thân chắc.';
     }
@@ -1575,12 +1578,12 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
   String _translateStatus(String value) {
     final seconds = _extractDurationSeconds(value);
-    if (value.contains('Hold!')) {
+    if (Squat.isHoldStatus(value)) {
       return seconds == null
           ? 'Giữ đáy rồi đẩy lên.'
           : 'Giữ đáy ${seconds.toStringAsFixed(1)} giây rồi đẩy lên.';
     }
-    if (value.contains('Push Up Now!')) {
+    if (Squat.isReleaseStatus(value)) {
       return 'Đẩy lên ngay.';
     }
     if (value.contains('Push Up!')) {
@@ -1859,8 +1862,9 @@ class _CenterOverlay extends StatelessWidget {
             (ExerciseBase.HOLD_STILL_REQUIRED_DURATION.inMilliseconds *
                     (1 - clamped)) /
                 1000;
-        final remainingLabel = remainingSeconds <= 0
-            ? '0.0'
+        final isReadyToStart = remainingSeconds <= 0;
+        final remainingLabel = isReadyToStart
+            ? 'SẴN'
             : (remainingSeconds < 1
                 ? remainingSeconds.toStringAsFixed(1)
                 : remainingSeconds.ceil().toString());
@@ -1876,14 +1880,14 @@ class _CenterOverlay extends StatelessWidget {
               Text(
                 remainingLabel,
                 style: const TextStyle(
-                  fontSize: 36,
+                  fontSize: 34,
                   fontWeight: FontWeight.w900,
                   color: Colors.white,
                   height: 1,
                 ),
               ),
               Text(
-                'Giữ yên',
+                isReadyToStart ? 'Bắt đầu' : 'Giữ yên',
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w600,

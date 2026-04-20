@@ -18,6 +18,9 @@ class ViettelTTSService {
     _audioPlayer.onPlayerComplete.listen((_) {
       debugPrint('[TTS] completed');
       _isPlaying = false;
+      if (_isClearingQueue) {
+        return;
+      }
       _processQueue();
     });
   }
@@ -54,6 +57,7 @@ class ViettelTTSService {
   // Voice queue for sequential playback (Approach A)
   final List<String> _queue = [];
   bool _isPlaying = false;
+  bool _isClearingQueue = false;
   bool _isConfigured = false;
   Future<void>? _configFuture;
 
@@ -131,7 +135,7 @@ class ViettelTTSService {
   /// Add text to the voice queue. Plays sequentially.
   Future<void> speak(String text) async {
     _queue.add(text);
-    if (!_isPlaying) {
+    if (!_isPlaying && !_isClearingQueue) {
       _processQueue();
     }
     debugPrint('[TTS] queued: $text');
@@ -141,10 +145,21 @@ class ViettelTTSService {
   /// Call when starting a new rep to prevent stale commands.
   void clearQueue() async {
     _queue.clear();
+    if (_isClearingQueue) {
+      debugPrint('[TTS] queue clear already in progress');
+      return;
+    }
+    if (!_isPlaying) {
+      debugPrint('[TTS] queue cleared (idle)');
+      return;
+    }
+
+    _isClearingQueue = true;
     try {
       await _audioPlayer.stop();
     } catch (_) {}
     _isPlaying = false;
+    _isClearingQueue = false;
     debugPrint('[TTS] queue cleared');
     _processQueue();
   }
@@ -157,7 +172,7 @@ class ViettelTTSService {
   }
 
   Future<void> _processQueue() async {
-    if (_queue.isEmpty || _isPlaying) return;
+    if (_queue.isEmpty || _isPlaying || _isClearingQueue) return;
     _isPlaying = true;
 
     if (!_isConfigured && _configFuture != null) {

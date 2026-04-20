@@ -52,6 +52,10 @@ enum SquatState { standing, descending, bottom, ascending }
 //    - hip_shoulder_sync_fails_count: from the sum of all hip_shoulder_sync_fails_count
 
 class Squat extends ExerciseBase {
+  static const String standingStatus = 'Xuống';
+  static const String descendingStatus = 'Going Down...';
+  static const String ascendingStatus = 'Đứng lên';
+
   final int maxRep;
   SquatState squatState = SquatState.standing;
   SquatState previousSquatState = SquatState.standing;
@@ -62,6 +66,59 @@ class Squat extends ExerciseBase {
   bool _reachedBottomThisRep = false;
 
   Squat({this.maxRep = SquatConfig.MAX_REP});
+
+  static String bottomHoldStatus(double remainingSeconds) =>
+      'Hold! ${remainingSeconds.toStringAsFixed(1)}s';
+
+  static bool isHoldStatus(String statusText) {
+    return statusText.startsWith('Hold') || statusText.contains('Giữ');
+  }
+
+  static bool isReleaseStatus(String statusText) {
+    return statusText.contains('Push Up Now!') ||
+        statusText.contains(ascendingStatus);
+  }
+
+  static List<FaultRecord> orderedVoicedFaults(Iterable<FaultRecord> faults) {
+    final voicedFaults = faults
+        .where((fault) =>
+            fault.voiceMessage != null && fault.voiceMessage!.isNotEmpty)
+        .toList()
+      ..sort((a, b) {
+        final priorityCompare = a.priority.compareTo(b.priority);
+        if (priorityCompare != 0) {
+          return priorityCompare;
+        }
+
+        final typeCompare = a.type.compareTo(b.type);
+        if (typeCompare != 0) {
+          return typeCompare;
+        }
+
+        return a.message.compareTo(b.message);
+      });
+
+    return voicedFaults;
+  }
+
+  static FaultRecord? topVoicedFault(Iterable<FaultRecord> faults) {
+    final voicedFaults = orderedVoicedFaults(faults);
+    return voicedFaults.isEmpty ? null : voicedFaults.first;
+  }
+
+  static List<String> orderedUniqueVoiceMessages(Iterable<FaultRecord> faults) {
+    final orderedVoiceMessages = <String>[];
+    final seenVoiceMessages = <String>{};
+
+    for (final fault in orderedVoicedFaults(faults)) {
+      final voiceMessage = fault.voiceMessage!;
+      if (seenVoiceMessages.add(voiceMessage)) {
+        orderedVoiceMessages.add(voiceMessage);
+      }
+    }
+
+    return orderedVoiceMessages;
+  }
 
   // Metrics
   final DepthMetric depthMetric = DepthMetric();
@@ -356,26 +413,10 @@ class Squat extends ExerciseBase {
       faultMap[fault.phase]![fault.type] = fault.message;
     }
 
-    final voicedFaults = allFaults
-        .where((fault) =>
-            fault.voiceMessage != null && fault.voiceMessage!.isNotEmpty)
-        .toList()
-      ..sort((a, b) => a.priority.compareTo(b.priority));
-
-    final orderedVoiceMessages = <String>[];
-    final seenVoiceMessages = <String>{};
-    for (final fault in voicedFaults) {
-      final voiceMessage = fault.voiceMessage!;
-      if (seenVoiceMessages.add(voiceMessage)) {
-        orderedVoiceMessages.add(voiceMessage);
-      }
-    }
-
-    lastRepFaultVoiceMessages = orderedVoiceMessages;
-    lastRepTopVoiceMessage =
-        voicedFaults.isNotEmpty ? voicedFaults.first.voiceMessage : null;
-    lastRepTopVoicePriority =
-        voicedFaults.isNotEmpty ? voicedFaults.first.priority : null;
+    final topVoicedFault = Squat.topVoicedFault(allFaults);
+    lastRepFaultVoiceMessages = Squat.orderedUniqueVoiceMessages(allFaults);
+    lastRepTopVoiceMessage = topVoicedFault?.voiceMessage;
+    lastRepTopVoicePriority = topVoicedFault?.priority;
     lastRepWasClean = correctForm;
 
     setFeedback.add({correctForm: faultMap});
@@ -423,28 +464,28 @@ class Squat extends ExerciseBase {
     switch (squatState) {
       case SquatState.standing:
         // Anticipatory cue: while standing, guide user to start the next rep.
-        resultIssues.addInstruction('standing', 'Status', 'Xuống');
+        resultIssues.addInstruction('standing', 'Status', standingStatus);
         break;
       case SquatState.descending:
         // Keep the on-screen cue aligned with the current motion.
         // Voice should only say "Giữ" after the user actually reaches bottom.
-        resultIssues.addInstruction('descending', 'Status', 'Going Down...');
+        resultIssues.addInstruction('descending', 'Status', descendingStatus);
         break;
       case SquatState.bottom:
         final remaining = tempoMetric.bottomHoldRemaining(now);
         final progress = tempoMetric.bottomHoldProgress(now);
         if (remaining != null && remaining > 0.05) {
           resultIssues.addInstruction(
-              'bottom', 'Status', 'Hold! ${remaining.toStringAsFixed(1)}s');
+              'bottom', 'Status', bottomHoldStatus(remaining));
         } else {
           // Anticipatory cue: when hold is complete, tell user to go up.
-          resultIssues.addInstruction('bottom', 'Status', 'Đứng lên');
+          resultIssues.addInstruction('bottom', 'Status', ascendingStatus);
         }
         if (progress != null) debugData['bottomHoldProgress'] = progress;
         break;
       case SquatState.ascending:
-        // Anticipatory cue: while ascending, finish to upright stance.
-        resultIssues.addInstruction('ascending', 'Status', 'Đứng thẳng');
+        // The ascent cue should stay consistent with the main voice flow.
+        resultIssues.addInstruction('ascending', 'Status', ascendingStatus);
         break;
     }
   }

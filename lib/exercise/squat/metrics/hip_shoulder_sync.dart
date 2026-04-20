@@ -51,6 +51,8 @@ class HipShoulderSyncConfig {
 }
 
 class HipShoulderSyncMetric extends SquatMetricBase {
+  static const String _postRepVoiceCue = 'Đừng nhấc hông lên trước';
+
   @override
   String get name => 'HipShoulderSync';
 
@@ -171,6 +173,8 @@ class HipShoulderSyncMetric extends SquatMetricBase {
       type: 'HipShoulderSync',
       message: message,
       affectsForm: true,
+      voiceMessage: _postRepVoiceCue,
+      priority: SquatFaultVoicePriority.hipShoulderSync,
     ));
   }
 

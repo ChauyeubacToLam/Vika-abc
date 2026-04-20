@@ -21,6 +21,8 @@ class HeelRiseConfig {
 }
 
 class HeelRiseMetric extends SquatMetricBase {
+  static const String _postRepVoiceCue = 'Nhớ không nâng gót chân';
+
   @override
   String get name => 'HeelRise';
 
@@ -67,7 +69,9 @@ class HeelRiseMetric extends SquatMetricBase {
         phase: phase,
         type: 'Feet',
         message: message,
+        voiceMessage: _postRepVoiceCue,
         affectsForm: true,
+        priority: SquatFaultVoicePriority.heelRise,
       ));
     }
   }

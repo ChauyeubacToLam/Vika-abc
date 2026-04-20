@@ -73,7 +73,7 @@ class DepthMetric extends SquatMetricBase {
         phase,
         'Too Shallow (Missed Depth)',
         voiceMessage: 'Xuống thấp hơn',
-        priority: 1,
+        priority: SquatFaultVoicePriority.depth,
       );
       ctx.resultIssues
           .addInstruction('standing', 'Depth', 'Go deeper next time!');

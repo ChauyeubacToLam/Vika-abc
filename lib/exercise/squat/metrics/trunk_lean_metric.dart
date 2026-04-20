@@ -69,7 +69,7 @@ class TrunkLeanMetric extends SquatMetricBase {
         phase,
         'Leaned too forward',
         'Ưỡn ngực lên',
-        priority: 0,
+        priority: SquatFaultVoicePriority.trunkLean,
       );
     } else if (backwardConfirmed) {
       ctx.resultIssues.feedback['Back'] = "Don't lean back!";
@@ -78,7 +78,12 @@ class TrunkLeanMetric extends SquatMetricBase {
             .addInstruction('standing', 'Back', "Don't lean back next time!");
         _instructionSet = true;
       }
-      _logFault(phase, 'Leaned backward', null, priority: 3);
+      _logFault(
+        phase,
+        'Leaned backward',
+        null,
+        priority: SquatFaultVoicePriority.trunkLeanBackward,
+      );
     } else {
       ctx.resultIssues.feedback['Back'] = 'Good back';
     }

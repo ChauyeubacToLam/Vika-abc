@@ -38,7 +38,8 @@ class TempoConfig {
   static const double DESCENT_MIN_ERROR = 0.35;
 
   /* --- Bottom Hold (seconds) --- */
-  static const double BOTTOM_HOLD_MIN = 0.8;
+  // Keep the bottom cue snappy for bodyweight squats while preserving a clear pause.
+  static const double BOTTOM_HOLD_MIN = 0.6;
 
   /* --- Descent:Ascent Ratio --- */
   static const double RATIO_GOOD = 2.0;
@@ -170,7 +171,7 @@ class TempoMetric extends SquatMetricBase {
         phase,
         'Dropped too fast (${_descentDuration!.toStringAsFixed(1)}s)',
         voiceMessage: 'Chậm lại',
-        priority: 2,
+        priority: SquatFaultVoicePriority.tempo,
       );
       ctx.resultIssues.addInstruction(
           'standing', 'Tempo descent', 'Dropped too fast last rep, go slower');
@@ -179,7 +180,7 @@ class TempoMetric extends SquatMetricBase {
         phase,
         'Descent a bit fast (${_descentDuration!.toStringAsFixed(1)}s)',
         voiceMessage: 'Chậm lại',
-        priority: 2,
+        priority: SquatFaultVoicePriority.tempo,
       );
       ctx.resultIssues.addInstruction('standing', 'Tempo descent',
           'A bit fast last rep, try 2-3 seconds down');
@@ -192,7 +193,7 @@ class TempoMetric extends SquatMetricBase {
         phase,
         'Bounced at bottom (${_bottomHoldDuration!.toStringAsFixed(2)}s hold)',
         voiceMessage: 'Chậm lại',
-        priority: 2,
+        priority: SquatFaultVoicePriority.tempo,
       );
       ctx.resultIssues.addInstruction('standing', 'Tempo bottom hold',
           'Not holding at bottom, pause this time!');
@@ -205,7 +206,7 @@ class TempoMetric extends SquatMetricBase {
           phase,
           'No eccentric control (ratio ${_descentAscentRatio!.toStringAsFixed(1)})',
           voiceMessage: 'Chậm lại',
-          priority: 2,
+          priority: SquatFaultVoicePriority.tempo,
         );
         ctx.resultIssues.addInstruction(
             'standing', 'Tempo eccentric', 'Control the way down this time');
