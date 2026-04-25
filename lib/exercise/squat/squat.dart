@@ -56,8 +56,8 @@ class Squat extends ExerciseBase {
   SquatState squatState = SquatState.standing;
   SquatState previousSquatState = SquatState.standing;
 
-  // Debounce entry into rep — prevents false starts from noisy frames
-  final Debouncer _entryDebouncer = Debouncer(requiredFrames: 2);
+  // Tracks whether the current rep reached the debounced bottom state
+  bool _reachedBottomThisRep = false;
 
   Squat({this.maxRep = SquatConfig.MAX_REP});
 
@@ -288,7 +288,6 @@ class Squat extends ExerciseBase {
     // 4. Debug overlay
     debugData['squatState'] = squatState.name;
     debugData['previousSquatState'] = previousSquatState.name;
-    debugData['reachedBottomThisRep'] = _reachedBottomThisRep;
     debugData['repCount'] = repCount;
     debugData['frameBuffer'] = frameBuffer.frameBuffer.length;
     debugData['kneeAngle'] = kneeAngle.toStringAsFixed(1);
@@ -475,9 +474,11 @@ class Squat extends ExerciseBase {
     squatState = newState;
 
     if (newState == SquatState.descending) {
+      _reachedBottomThisRep = false;
       ttsService.clearQueue(); // Stop any pending voice to avoid overlap
       resultIssues.instructions.clear();
     } else if (newState == SquatState.bottom) {
+      _reachedBottomThisRep = true;
       ttsService.speak("Giữ");
     } else if (newState == SquatState.ascending) {
       ttsService.speak("Lên");
