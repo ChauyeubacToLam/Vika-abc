@@ -340,6 +340,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
     for (final index in camerasToTry) {
       final camera = cameras[index];
+      debugPrint(
+        '[Vika] Trying fallback camera ${camera.name} (${camera.lensDirection.name})',
+      );
       final controller = CameraController(
         camera,
         ResolutionPreset.medium,
@@ -350,7 +353,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       );
 
       try {
-        await controller.initialize();
+        await controller.initialize().timeout(const Duration(seconds: 6));
         await controller.startImageStream(_processFallbackCameraImage);
         if (!mounted) {
           await controller.dispose();
@@ -368,8 +371,11 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
           _cameraErrorMessage = null;
         });
         return;
-      } catch (_) {
-        await controller.dispose();
+      } catch (error) {
+        debugPrint('[Vika] Fallback camera ${camera.name} failed: $error');
+        try {
+          await controller.dispose();
+        } catch (_) {}
       }
     }
 
