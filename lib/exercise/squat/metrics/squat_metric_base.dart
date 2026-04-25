@@ -24,8 +24,8 @@
 
 import '../squat.dart';
 import '../../exercise_base.dart';
-
-/* =========================================================================
+import '../../fault_record.dart';
+export '../../fault_record.dart';/* =========================================================================
    RepContext — Shared per-frame state, passed to all metrics.
    Avoids each metric needing to recalculate the same geometry.
    ========================================================================= */
@@ -61,22 +61,7 @@ class RepContext {
   });
 }
 
-/* =========================================================================
-   FaultRecord — A single fault logged by a metric.
-   ========================================================================= */
-class FaultRecord {
-  final String phase; // e.g. "DESCENDING", "BOTTOM"
-  final String type; // e.g. "Back", "Depth", "Feet", "Tempo"
-  final String message; // e.g. "Leaned too forward"
-  final bool affectsForm; // false = informational only (like heel rise)
 
-  FaultRecord({
-    required this.phase,
-    required this.type,
-    required this.message,
-    this.affectsForm = true,
-  });
-}
 
 /* =========================================================================
    SquatMetricBase — Interface every metric implements.

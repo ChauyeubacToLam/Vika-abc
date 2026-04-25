@@ -55,7 +55,9 @@ class Squat extends ExerciseBase {
   final int maxRep;
   SquatState squatState = SquatState.standing;
   SquatState previousSquatState = SquatState.standing;
-  bool _reachedBottomThisRep = false;
+
+  // Debounce entry into rep — prevents false starts from noisy frames
+  final Debouncer _entryDebouncer = Debouncer(requiredFrames: 2);
 
   Squat({this.maxRep = SquatConfig.MAX_REP});
 
@@ -103,6 +105,12 @@ class Squat extends ExerciseBase {
 
   // --- Start Position ---
   // User must stand upright with straight legs to begin.
+
+  @override
+  void onExerciseActivated() {
+    super.onExerciseActivated();
+    ttsService.speak("Sẵn sàng, xuống");
+  }
 
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
@@ -345,6 +353,11 @@ class Squat extends ExerciseBase {
     correctForm = !allFaults.any((f) => f.affectsForm);
     resultIssues.feedback['Result'] = correctForm ? 'Good Rep!' : 'Fix Form';
 
+    speakRepCompletion(
+      nextPhaseVoice: "Xuống",
+      correctForm: correctForm,
+    );
+
     // Build fault map grouped by phase
     final faultMap = <String, Map<String, String>>{};
     for (final fault in allFaults) {
@@ -462,10 +475,12 @@ class Squat extends ExerciseBase {
     squatState = newState;
 
     if (newState == SquatState.descending) {
-      _reachedBottomThisRep = false;
+      ttsService.clearQueue(); // Stop any pending voice to avoid overlap
       resultIssues.instructions.clear();
     } else if (newState == SquatState.bottom) {
-      _reachedBottomThisRep = true;
+      ttsService.speak("Giữ");
+    } else if (newState == SquatState.ascending) {
+      ttsService.speak("Lên");
     }
 
     for (final metric in _metrics) {

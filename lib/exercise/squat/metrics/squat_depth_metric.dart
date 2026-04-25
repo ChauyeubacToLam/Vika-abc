@@ -2,8 +2,8 @@
 
 /* =========================================================================
    Metric 1: Squat Depth (Knee Flexion Angle)
-   Priority: CRITICAL — Ship Day 1
-   
+   Priority: CRITICAL - Ship Day 1
+
    Measures interior angle at the knee joint (hip-knee-ankle).
    Primary indicator of squat depth + gates rep counting.
    ========================================================================= */
@@ -69,18 +69,19 @@ class DepthMetric extends SquatMetricBase {
   }) {
     final phase = finalState.toString().split('.').last.toUpperCase();
     if (!reachedBottom) {
-      _logFault(phase, 'Too Shallow (Missed Depth)');
+      _logFault(phase, 'Too Shallow (Missed Depth)', 'Thap hon nua');
       ctx.resultIssues
           .addInstruction('standing', 'Depth', 'Go deeper next time!');
     }
   }
 
-  void _logFault(String phase, String message) {
+  void _logFault(String phase, String message, String? voiceMessage) {
     if (!_faults.any((f) => f.phase == phase && f.type == 'Depth')) {
       _faults.add(FaultRecord(
         phase: phase,
         type: 'Depth',
         message: message,
+        voiceMessage: voiceMessage,
         affectsForm: true,
       ));
     }

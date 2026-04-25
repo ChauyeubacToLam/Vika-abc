@@ -51,11 +51,13 @@ class FaultRecord {
   final String type; // e.g. "Back", "Neck", "Knees"
   final String message; // e.g. "Hông chùng xuống"
   final bool affectsForm; // false = informational only
+  final String? voiceMessage;
 
   FaultRecord({
     required this.faultPercentage,
     required this.type,
     required this.message,
+    this.voiceMessage,
     this.affectsForm = true,
   });
 }

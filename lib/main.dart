@@ -2512,8 +2512,23 @@ class PosePainter extends CustomPainter {
       double x = lm.x;
       double y = lm.y;
 
-      // Landmarks are already in oriented image space. Applying an extra
-      // Android-only rotation here can invert the skeleton on some devices.
+      if (Platform.isAndroid) {
+        switch (rotation) {
+          case InputImageRotation.rotation90deg:
+            x = lm.x;
+            y = lm.y;
+            break;
+          case InputImageRotation.rotation270deg:
+            // For front camera, ML Kit already returns upright landmarks.
+            // Minor mirroring is handled by the lensDirection check below.
+            x = lm.x;
+            y = lm.y;
+            break;
+          default:
+            break;
+        }
+      }
+
       if (lensDirection == CameraLensDirection.front) {
         x = imageW - x;
       }

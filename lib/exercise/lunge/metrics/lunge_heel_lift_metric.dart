@@ -71,12 +71,12 @@ class LungeHeelLiftMetric extends LungeMetricBase {
         );
         _instructionSet = true;
       }
-      _logFault(phase, 'Keep your heel down!');
+      _logFault(phase, 'Keep your heel down!', voiceMessage: 'Giữ gót chân');
     }
     // Warning: ratio 0.05 – 0.08
     else if (_heelWarnDebouncer
         .update(ratio > LungeHeelLiftConfig.WARNING_THRESHOLD)) {
-      ctx.resultIssues.feedback['Feet'] = 'Gót hơi nhấc — ấn gót xuống';
+      ctx.resultIssues.feedback['Feet'] = 'Gót hơi nhấc — ấn gót xuống';        
 
       if (!_instructionSet) {
         ctx.resultIssues.addInstruction(
@@ -86,7 +86,7 @@ class LungeHeelLiftMetric extends LungeMetricBase {
         );
         _instructionSet = true;
       }
-      _logFault(phase, 'Heel slightly lifting');
+      _logFault(phase, 'Heel slightly lifting', voiceMessage: 'Giữ gót chân');
     }
     // Good: ratio < 0.05
     else {
@@ -94,13 +94,14 @@ class LungeHeelLiftMetric extends LungeMetricBase {
     }
   }
 
-  void _logFault(String phase, String message) {
+  void _logFault(String phase, String message, {String? voiceMessage}) {
     // Only log one fault per phase to avoid spam
     if (!_faults.any((f) => f.phase == phase && f.type == 'Feet')) {
       _faults.add(FaultRecord(
         phase: phase,
         type: 'Feet',
         message: message,
+        voiceMessage: voiceMessage,
         // Heel lift DOES affect form for lunges (unlike squat where it's informational)
         affectsForm: true,
       ));

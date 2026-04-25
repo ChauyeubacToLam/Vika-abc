@@ -118,16 +118,24 @@ class TrunkElevationMetric extends CurlUpMetricBase {
         'Giữ biên độ ngắn để bảo vệ lưng.',
         affectsForm: true,
       );
+    } else if (_peakElevation! < 15.0) {
+      _logFault(
+        'APEX',
+        'Cuộn chưa đủ - nâng cao vai hơn một chút',
+        voiceMessage: 'Cuộn lên thêm',
+        affectsForm: true,
+      );
     }
     // < 30° = good, no fault logged
   }
 
-  void _logFault(String phase, String message, {bool affectsForm = true}) {
+void _logFault(String phase, String message, {bool affectsForm = true, String? voiceMessage}) {     
     if (!_faults.any((f) => f.phase == phase && f.type == 'Range')) {
       _faults.add(FaultRecord(
         phase: phase,
         type: 'Range',
         message: message,
+        voiceMessage: voiceMessage,
         affectsForm: affectsForm,
       ));
     }
@@ -148,6 +156,12 @@ class TrunkElevationMetric extends CurlUpMetricBase {
         'resting',
         'Range',
         'Giữ biên độ ngắn để bảo vệ lưng.',
+      );
+    } else if (_peakElevation! < 15.0) {
+      ctx.resultIssues.addInstruction(
+        'resting',
+        'Range',
+        'Cuộn chưa đủ - nâng cao vai hơn một chút',
       );
     } else {
       ctx.resultIssues.addInstruction(
