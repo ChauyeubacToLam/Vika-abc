@@ -6,7 +6,15 @@ import 'package:vika/utils/exercise_logger.dart';
 /// Squat-specific report builder.
 /// Inherits buildReport() and generateCoachText() from base.
 /// Only implements squat-specific analysis plus B4 praise/tip maps.
+
 class SquatReportBuilder extends ExerciseReportBuilder {
+  @override
+  Map<String, List<String>> painToFaultMap() => {
+        'ankle': ['heel_fails_count'],
+        'lower_back': ['trunk_lean_fails_count'],
+        'knee': ['depth_fails_count'],
+        'hip': ['hip_shoulder_sync_fails_count', 'depth_fails_count'],
+      };
   @override
   Map<String, String> faultToTipMap() => {
         'heel_fails_count': 'Giữ trọng lượng dồn vào gót, đẩy đầu gối ra ngoài',

@@ -1,9 +1,11 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../interpreter/interpreter_base.dart';
 import '../../models/post_exercise_data.dart';
+import '../../services/exercise_comparison_service.dart';
 import '../../theme/vf_theme.dart';
 import 'widgets/form_score_arc.dart';
 
@@ -15,8 +17,13 @@ class ExecutiveSummaryPage extends StatefulWidget {
     required this.userWeightKg,
     required this.totalDuration,
     required this.onDone,
+    this.isFirstSession = false,
+    this.comparison,
+    this.streakDays = 0,
     this.percentile,
     this.vsLastWeekPct,
+    this.lastOverallDifficulty,
+    this.onOverallDifficulty,
   });
 
   final PostExerciseData report;
@@ -24,16 +31,72 @@ class ExecutiveSummaryPage extends StatefulWidget {
   final double userWeightKg;
   final Duration totalDuration;
   final VoidCallback onDone;
+  final bool isFirstSession;
+  final SessionComparison? comparison;
+  final int streakDays;
   final int? percentile;
   final int? vsLastWeekPct;
+  final String? lastOverallDifficulty;
+  final ValueChanged<String>? onOverallDifficulty;
 
   @override
   State<ExecutiveSummaryPage> createState() => _ExecutiveSummaryPageState();
 }
 
-class _ExecutiveSummaryPageState extends State<ExecutiveSummaryPage> {
-  final GlobalKey<_DetailSectionState> _detailKey =
-      GlobalKey<_DetailSectionState>();
+class _ExecutiveSummaryPageState extends State<ExecutiveSummaryPage>
+    with TickerProviderStateMixin {
+  late final AnimationController _entryController;
+  late final AnimationController _shimmerController;
+
+  /// Tracks which difficulty the user selected. Null = not yet answered.
+  /// Done button stays disabled until this is non-null.
+  String? _selectedDifficulty;
+
+  @override
+  void initState() {
+    super.initState();
+    _entryController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 950),
+    );
+    _shimmerController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 4),
+    )..repeat();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _entryController.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _entryController.dispose();
+    _shimmerController.dispose();
+    super.dispose();
+  }
+
+  Animation<double> _beatAnimation(double begin, double end) {
+    return CurvedAnimation(
+      parent: _entryController,
+      curve: Interval(begin, end, curve: Curves.easeOutCubic),
+    );
+  }
+
+  /// Called when user taps a difficulty emoji on the executive summary.
+  /// Writes to DB via screen callback and locks selection.
+  void _handleDifficultyTap(String difficulty) {
+    if (_selectedDifficulty != null) return;
+    setState(() => _selectedDifficulty = difficulty);
+    widget.onOverallDifficulty?.call(difficulty);
+  }
+
+  void _showShareStub(String label) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$label sẽ được bật ở bản sau.')),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,70 +106,66 @@ class _ExecutiveSummaryPageState extends State<ExecutiveSummaryPage> {
       color: const Color(0xFFF0EDE6),
       child: SafeArea(
         child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(16 * s, 16 * s, 16 * s, 28 * s),
+          padding: EdgeInsets.fromLTRB(24 * s, 48 * s, 24 * s, 40 * s),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'TỔNG KẾT BUỔI TẬP',
-                style: VFTheme.textStyle(
-                  context,
-                  size: 11,
-                  weight: FontWeight.w800,
-                  color: const Color(0xFF9C9B94),
-                  letterSpacing: 1.4,
+              _BeatReveal(
+                animation: _beatAnimation(0.0, 0.24),
+                child: _HeroPhotoCard(
+                  report: widget.report,
+                  calories: widget.calories,
+                  totalDuration: widget.totalDuration,
+                  isFirstSession: widget.isFirstSession,
+                  comparison: widget.comparison,
+                  streakDays: widget.streakDays,
+                  onShare: () => _showShareStub('Chỉnh ảnh & chia sẻ'),
+                  onShareToZalo: () => _showShareStub('Chia sẻ qua Zalo'),
                 ),
               ),
-              SizedBox(height: 12 * s),
-              _ShareableCard(
-                report: widget.report,
-                calories: widget.calories,
-                totalDuration: widget.totalDuration,
-                percentile: widget.percentile,
-                vsLastWeekPct: widget.vsLastWeekPct,
-                isShareable: false,
-                onOpenDetails: () {
-                  _detailKey.currentState?.expandAndReveal();
-                },
+              SizedBox(height: 24 * s),
+              if (widget.comparison != null)
+                _BeatReveal(
+                  animation: _beatAnimation(0.14, 0.38),
+                  child: _ComparisonBanner(comparison: widget.comparison!),
+                ),
+              _BeatReveal(
+                animation: _beatAnimation(0.24, 0.58),
+                child: _FormTerrainSection(
+                  setScores: widget.report.setScores,
+                  totalDuration: widget.totalDuration,
+                ),
               ),
-              SizedBox(height: 18 * s),
-              _SectionCard(
-                child: _SetQualitySection(setScores: widget.report.setScores),
+              SizedBox(height: 24 * s),
+              _BeatReveal(
+                animation: _beatAnimation(0.46, 0.78),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _CoachSection(text: widget.report.coachText),
+                    if (widget.report.issueQuestion != null) ...[
+                      SizedBox(height: 18 * s),
+                      _IssueQuestionCard(issue: widget.report.issueQuestion!),
+                    ],
+                  ],
+                ),
               ),
-              SizedBox(height: 14 * s),
-              _CoachCard(text: widget.report.coachText),
-              if (widget.report.issueQuestion != null) ...[
-                SizedBox(height: 14 * s),
-                _IssueQuestionCard(issue: widget.report.issueQuestion!),
-              ],
-              SizedBox(height: 14 * s),
-              _DetailSection(
-                key: _detailKey,
-                cards: widget.report.detailCards,
-                calories: widget.calories,
+              SizedBox(height: 24 * s),
+              _BeatReveal(
+                animation: _beatAnimation(0.58, 0.86),
+                child: _OverallDifficultySection(
+                  lastDifficulty: widget.lastOverallDifficulty,
+                  selected: _selectedDifficulty,
+                  onTap: _handleDifficultyTap,
+                ),
               ),
-              SizedBox(height: 18 * s),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: widget.onDone,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF18594A),
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(vertical: 16 * s),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14 * s),
-                    ),
-                  ),
-                  child: Text(
-                    'Hoàn tất',
-                    style: VFTheme.textStyle(
-                      context,
-                      size: 15,
-                      weight: FontWeight.w800,
-                      color: Colors.white,
-                    ),
-                  ),
+              SizedBox(height: 24 * s),
+              _BeatReveal(
+                animation: _beatAnimation(0.68, 1.0),
+                child: _DoneSection(
+                  shimmer: _shimmerController,
+                  disabled: _selectedDifficulty == null,
+                  onDone: widget.onDone,
                 ),
               ),
             ],
@@ -117,317 +176,348 @@ class _ExecutiveSummaryPageState extends State<ExecutiveSummaryPage> {
   }
 }
 
-class _ShareableCard extends StatelessWidget {
-  const _ShareableCard({
+class _BeatReveal extends StatelessWidget {
+  const _BeatReveal({
+    required this.animation,
+    required this.child,
+  });
+
+  final Animation<double> animation;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final distance = 18 * VFTheme.scale(context);
+    return AnimatedBuilder(
+      animation: animation,
+      child: child,
+      builder: (context, child) {
+        final value = animation.value.clamp(0.0, 1.0);
+        final eased = Curves.easeOutCubic.transform(value);
+        return Opacity(
+          opacity: eased,
+          child: Transform.translate(
+            offset: Offset(0, (1 - eased) * distance),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _HeroPhotoCard extends StatelessWidget {
+  const _HeroPhotoCard({
     required this.report,
     required this.calories,
     required this.totalDuration,
-    required this.onOpenDetails,
-    this.percentile,
-    this.vsLastWeekPct,
-    this.isShareable = false,
+    required this.isFirstSession,
+    required this.comparison,
+    required this.streakDays,
+    required this.onShare,
+    required this.onShareToZalo,
   });
 
   final PostExerciseData report;
   final int calories;
   final Duration totalDuration;
-  final VoidCallback onOpenDetails;
-  final int? percentile;
-  final int? vsLastWeekPct;
-  final bool isShareable;
+  final bool isFirstSession;
+  final SessionComparison? comparison;
+  final int streakDays;
+  final VoidCallback onShare;
+  final VoidCallback onShareToZalo;
 
   @override
   Widget build(BuildContext context) {
     final s = VFTheme.scale(context);
     final accent = _accent(report.formScore);
-    final durationMinutes =
-        totalDuration.inMinutes > 0 ? totalDuration.inMinutes : 1;
-    final stats =
-        <({IconData icon, String value, String unit, double progress})>[
-      (
-        icon: Icons.local_fire_department_rounded,
-        value: '$calories',
-        unit: 'kcal',
-        progress: (calories / 80).clamp(0.0, 1.0),
-      ),
-      (
-        icon: Icons.schedule_rounded,
-        value: '$durationMinutes',
-        unit: 'phút',
-        progress: (durationMinutes / 20).clamp(0.0, 1.0),
-      ),
-      (
-        icon: Icons.fitness_center_rounded,
-        value: '${report.totalReps}',
-        unit: 'reps',
-        progress: (report.totalReps / 24).clamp(0.0, 1.0),
-      ),
-      (
-        icon: Icons.bar_chart_rounded,
-        value: '${report.sets.length}',
-        unit: 'sets',
-        progress: (report.sets.length / 5).clamp(0.0, 1.0),
-      ),
-    ];
+    final headline = _scoreHeadline(report.formScore);
+    final subtitle = _heroSubtitle(
+      score: report.formScore,
+      comparison: comparison,
+      isFirstSession: isFirstSession,
+    );
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24 * s),
+    return Container(
+      height: 420 * s,
+      clipBehavior: Clip.hardEdge,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22 * s),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 60 * s,
+            offset: Offset(0, 20 * s),
+          ),
+        ],
+      ),
       child: Stack(
         children: [
-          Container(
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF09120F),
-                  Color(0xFF10211B),
-                  Color(0xFF183128)
-                ],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF0F3D33).withValues(alpha: 0.18),
-                  blurRadius: 28 * s,
-                  offset: Offset(0, 18 * s),
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF1A2A3A),
+                    Color(0xFF0D1925),
+                    Color(0xFF0A1520),
+                    Color(0xFF0E1D16),
+                  ],
+                  stops: [0, 0.3, 0.6, 1.0],
                 ),
-              ],
+              ),
             ),
-            child: Stack(
-              children: [
-                Positioned.fill(child: CustomPaint(painter: _GrainPainter())),
-                Positioned(
-                  top: -24 * s,
-                  left: 0,
-                  right: 0,
-                  child: Center(
-                    child: Container(
-                      width: 220 * s,
-                      height: 220 * s,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: RadialGradient(
-                          colors: [
-                            accent.withValues(alpha: 0.22),
-                            accent.withValues(alpha: 0.05),
-                            Colors.transparent,
-                          ],
+          ),
+          Positioned(
+            top: 84 * s,
+            right: 95 * s,
+            child: _HeroGlow(
+              width: 120 * s,
+              height: 200 * s,
+              opacity: 0.04,
+            ),
+          ),
+          Positioned(
+            top: 126 * s,
+            right: 108 * s,
+            child: _HeroGlow(
+              width: 60 * s,
+              height: 80 * s,
+              opacity: 0.06,
+            ),
+          ),
+          Positioned.fill(
+            child: CustomPaint(painter: _HeroSkeletonPainter()),
+          ),
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.05),
+                    Colors.black.withValues(alpha: 0.15),
+                    Colors.black.withValues(alpha: 0.65),
+                    Colors.black.withValues(alpha: 0.88),
+                  ],
+                  stops: const [0, 0.3, 0.6, 1.0],
+                ),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: Padding(
+              padding: EdgeInsets.all(18 * s),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 32 * s,
+                        height: 32 * s,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Color(0xFF18594A), Color(0xFF34D399)],
+                          ),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            width: 2,
+                          ),
+                        ),
+                        child: Text(
+                          'N',
+                          style: VFTheme.textStyle(
+                            context,
+                            size: 13,
+                            weight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: EdgeInsets.fromLTRB(22 * s, 22 * s, 22 * s, 20 * s),
-                  child: Column(
-                    children: [
-                      Row(
+                      SizedBox(width: 8 * s),
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          Text(
+                            'Người tập',
+                            style: VFTheme.textStyle(
+                              context,
+                              size: 13,
+                              weight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                          SizedBox(height: 2 * s),
+                          Text(
+                            _formatHeroDate(DateTime.now()),
+                            style: VFTheme.textStyle(
+                              context,
+                              size: 9,
+                              color: Colors.white.withValues(alpha: 0.45),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${report.exerciseName} · ${report.sets.length} hiệp · ${report.totalReps} reps',
+                        style: VFTheme.textStyle(
+                          context,
+                          size: 10,
+                          weight: FontWeight.w500,
+                          color: Colors.white.withValues(alpha: 0.55),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      SizedBox(height: 6 * s),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          FormScoreArc(
+                            progress: report.formScore / 100,
+                            size: 52 * s,
+                            strokeWidth: 3.5 * s,
+                            color: accent,
+                            trackColor: Colors.white.withValues(alpha: 0.12),
+                            duration: const Duration(milliseconds: 1800),
+                            child: Text(
+                              '${report.formScore}',
+                              style: VFTheme.textStyle(
+                                context,
+                                size: 15,
+                                weight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 12 * s),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('VIKA',
-                                    style: VFTheme.textStyle(context,
-                                        size: 10,
-                                        weight: FontWeight.w900,
-                                        color: Colors.white
-                                            .withValues(alpha: 0.22),
-                                        letterSpacing: 3.8)),
-                                SizedBox(height: 6 * s),
-                                Text(report.exerciseName,
-                                    style: VFTheme.textStyle(context,
-                                        size: 20,
-                                        weight: FontWeight.w800,
-                                        color: Colors.white,
-                                        letterSpacing: -0.4)),
+                                Text(
+                                  headline,
+                                  style: VFTheme.textStyle(
+                                    context,
+                                    size: 20,
+                                    weight: FontWeight.w700,
+                                    color: Colors.white,
+                                    height: 1.15,
+                                  ),
+                                ),
                                 SizedBox(height: 2 * s),
-                                Text(_formatDate(DateTime.now()),
-                                    style: VFTheme.textStyle(context,
-                                        size: 11,
-                                        weight: FontWeight.w600,
-                                        color: Colors.white
-                                            .withValues(alpha: 0.46))),
-                              ],
-                            ),
-                          ),
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 10 * s, vertical: 7 * s),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.05),
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.06)),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.local_fire_department_rounded,
-                                    size: 14 * s, color: accent),
-                                SizedBox(width: 4 * s),
-                                Text('4',
-                                    style: VFTheme.textStyle(context,
-                                        size: 11,
-                                        weight: FontWeight.w800,
-                                        color: Colors.white
-                                            .withValues(alpha: 0.86))),
+                                Text(
+                                  subtitle,
+                                  style: VFTheme.textStyle(
+                                    context,
+                                    size: 11,
+                                    color: Colors.white.withValues(alpha: 0.5),
+                                  ),
+                                ),
                               ],
                             ),
                           ),
                         ],
                       ),
-                      SizedBox(height: 22 * s),
-                      FormScoreArc(
-                        progress: report.formScore / 100,
-                        size: 176 * s,
-                        color: accent,
-                        trackColor: Colors.white.withValues(alpha: 0.05),
-                        strokeWidth: 7 * s,
-                        glow: true,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                      SizedBox(height: 10 * s),
+                      Container(
+                        padding: EdgeInsets.only(top: 10 * s),
+                        decoration: BoxDecoration(
+                          border: Border(
+                            top: BorderSide(
+                              color: Colors.white.withValues(alpha: 0.1),
+                            ),
+                          ),
+                        ),
+                        child: Row(
                           children: [
-                            Text('${report.formScore}',
-                                style: VFTheme.textStyle(context,
-                                    size: 58,
-                                    weight: FontWeight.w800,
-                                    color: Colors.white,
-                                    letterSpacing: -2.6)),
-                            SizedBox(height: 8 * s),
-                            Text('FORM SCORE',
-                                style: VFTheme.textStyle(context,
-                                    size: 9,
-                                    weight: FontWeight.w800,
-                                    color: Colors.white.withValues(alpha: 0.24),
-                                    letterSpacing: 3)),
+                            Expanded(
+                              child: _HeroStat(
+                                label: 'Thời gian',
+                                value: _formatClock(totalDuration),
+                              ),
+                            ),
+                            Expanded(
+                              child: _HeroStat(
+                                label: 'Calories',
+                                value: '~$calories',
+                              ),
+                            ),
+                            Expanded(
+                              child: _HeroStat(
+                                label: 'Chuỗi',
+                                value: _heroStreakValue(streakDays),
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                      SizedBox(height: 18 * s),
-                      Text(_winMessage(report.formScore),
-                          textAlign: TextAlign.center,
-                          style: VFTheme.textStyle(context,
-                              size: 16,
-                              weight: FontWeight.w800,
-                              color: accent,
-                              height: 1.35)),
-                      if (percentile != null)
-                        Text('Top $percentile% người dùng',
-                            textAlign: TextAlign.center,
-                            style: VFTheme.textStyle(context,
-                                size: 16,
-                                weight: FontWeight.w800,
-                                color: accent,
-                                height: 1.35)),
-                      if (vsLastWeekPct != null) ...[
-                        SizedBox(height: 6 * s),
-                        RichText(
-                          text: TextSpan(
-                            children: [
-                              TextSpan(
-                                  text:
-                                      '${vsLastWeekPct! > 0 ? '+' : ''}$vsLastWeekPct%',
-                                  style: VFTheme.textStyle(context,
-                                      size: 12,
-                                      weight: FontWeight.w700,
-                                      color: accent)),
-                              TextSpan(
-                                  text: ' so với tuần trước',
-                                  style: VFTheme.textStyle(context,
-                                      size: 12,
-                                      weight: FontWeight.w700,
-                                      color: Colors.white
-                                          .withValues(alpha: 0.40))),
-                            ],
-                          ),
-                        ),
-                      ],
-                      SizedBox(height: 20 * s),
-                      Container(
-                        padding: EdgeInsets.symmetric(vertical: 16 * s),
-                        decoration: BoxDecoration(
-                            border: Border(
-                                top: BorderSide(
-                                    color:
-                                        Colors.white.withValues(alpha: 0.06)))),
-                        child: Row(
-                          children: stats
-                              .map(
-                                (item) => Expanded(
-                                  child: _ShareStat(
-                                    icon: item.icon,
-                                    value: item.value,
-                                    unit: item.unit,
-                                    progress: item.progress,
-                                    accent: accent,
-                                  ),
-                                ),
-                              )
-                              .toList(),
-                        ),
-                      ),
-                      SizedBox(height: 2 * s),
+                      SizedBox(height: 12 * s),
                       Row(
-                          children: report.setScores
-                              .asMap()
-                              .entries
-                              .map((entry) => Expanded(
-                                  child: Padding(
-                                      padding: EdgeInsets.only(
-                                          right: entry.key ==
-                                                  report.setScores.length - 1
-                                              ? 0
-                                              : 6 * s),
-                                      child: _SetStrip(score: entry.value))))
-                              .toList()),
-                      SizedBox(height: 18 * s),
-                      if (!isShareable) ...[
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton(
-                            onPressed: () => ScaffoldMessenger.of(context)
-                                .showSnackBar(const SnackBar(
-                                    content: Text(
-                                        'Tính năng chia sẻ card sẽ được bật ở bản sau.'))),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: accent,
-                              foregroundColor: Colors.black,
-                              padding: EdgeInsets.symmetric(vertical: 13 * s),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14 * s)),
+                        children: [
+                          Expanded(
+                            child: _HeroActionButton(
+                              onTap: onShare,
+                              label: 'Chỉnh ảnh & chia sẻ',
+                              icon: Icons.edit_outlined,
+                              fillColor: Colors.white.withValues(alpha: 0.1),
+                              borderColor: Colors.white.withValues(alpha: 0.12),
+                              textColor: Colors.white,
                             ),
-                            child: Text('Chia sẻ kết quả',
-                                style: VFTheme.textStyle(context,
-                                    size: 13,
-                                    weight: FontWeight.w800,
-                                    color: Colors.black)),
                           ),
-                        ),
-                        SizedBox(height: 10 * s),
-                        GestureDetector(
-                          onTap: onOpenDetails,
-                          child: Text('Xem chi tiết buổi tập →',
-                              style: VFTheme.textStyle(context,
-                                  size: 11,
-                                  weight: FontWeight.w700,
-                                  color: Colors.white.withValues(alpha: 0.46))),
-                        ),
-                      ] else
-                        Padding(
-                          padding: EdgeInsets.only(top: 4 * s),
-                          child: Text('VIKAVN.APP',
-                              style: VFTheme.textStyle(context,
-                                  size: 8,
-                                  weight: FontWeight.w800,
-                                  color: Colors.white.withValues(alpha: 0.20),
-                                  letterSpacing: 2.4)),
-                        ),
+                          SizedBox(width: 8 * s),
+                          _HeroActionButton(
+                            onTap: onShareToZalo,
+                            label: 'Zalo',
+                            fillColor: Colors.white.withValues(alpha: 0.06),
+                            borderColor: Colors.white.withValues(alpha: 0.08),
+                            textColor: Colors.white.withValues(alpha: 0.45),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            top: 18 * s,
+            right: 20 * s,
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: 10 * s,
+                vertical: 4 * s,
+              ),
+              decoration: BoxDecoration(
+                color: const Color(0xFF34D399).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8 * s),
+                border: Border.all(
+                  color: const Color(0xFF34D399).withValues(alpha: 0.18),
                 ),
-              ],
+              ),
+              child: Text(
+                'Rep 7 · 95đ ★',
+                style: VFTheme.textStyle(
+                  context,
+                  size: 9,
+                  weight: FontWeight.w700,
+                  color: const Color(0xFF34D399),
+                ),
+              ),
             ),
           ),
         ],
@@ -436,115 +526,43 @@ class _ShareableCard extends StatelessWidget {
   }
 }
 
-class _ShareStat extends StatelessWidget {
-  const _ShareStat({
-    required this.icon,
-    required this.value,
-    required this.unit,
-    required this.progress,
-    required this.accent,
+class _HeroGlow extends StatelessWidget {
+  const _HeroGlow({
+    required this.width,
+    required this.height,
+    required this.opacity,
   });
 
-  final IconData icon;
-  final String value;
-  final String unit;
-  final double progress;
-  final Color accent;
+  final double width;
+  final double height;
+  final double opacity;
 
   @override
   Widget build(BuildContext context) {
-    final s = VFTheme.scale(context);
-    return Column(
-      children: [
-        Icon(icon, size: 16 * s, color: accent.withValues(alpha: 0.88)),
-        SizedBox(height: 6 * s),
-        Text(value,
-            style: VFTheme.textStyle(context,
-                size: 17, weight: FontWeight.w800, color: Colors.white)),
-        SizedBox(height: 2 * s),
-        Text(unit,
-            style: VFTheme.textStyle(context,
-                size: 8,
-                weight: FontWeight.w700,
-                color: Colors.white.withValues(alpha: 0.30),
-                letterSpacing: 0.3)),
-        SizedBox(height: 8 * s),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(999),
-          child: Container(
-            height: 3 * s,
-            color: Colors.white.withValues(alpha: 0.06),
-            child: FractionallySizedBox(
-              widthFactor: progress,
-              alignment: Alignment.centerLeft,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.82),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SetStrip extends StatelessWidget {
-  const _SetStrip({required this.score});
-
-  final int score;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = VFTheme.scale(context);
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(999),
-      child: Container(
-        height: 6 * s,
-        color: Colors.white.withValues(alpha: 0.06),
-        child: FractionallySizedBox(
-          widthFactor: (score / 100).clamp(0.0, 1.0),
-          alignment: Alignment.centerLeft,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: _accent(score),
-              borderRadius: BorderRadius.circular(999),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = VFTheme.scale(context);
     return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(16 * s),
+      width: width,
+      height: height,
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16 * s),
-        border: Border.all(color: const Color(0xFFE5E2DB)),
-        boxShadow: VFTheme.cardShadow,
+        borderRadius: BorderRadius.circular(999),
+        gradient: RadialGradient(
+          colors: [
+            Colors.white.withValues(alpha: opacity),
+            Colors.transparent,
+          ],
+        ),
       ),
-      child: child,
     );
   }
 }
 
-class _SetQualitySection extends StatelessWidget {
-  const _SetQualitySection({required this.setScores});
+class _HeroStat extends StatelessWidget {
+  const _HeroStat({
+    required this.label,
+    required this.value,
+  });
 
-  final List<int> setScores;
+  final String label;
+  final String value;
 
   @override
   Widget build(BuildContext context) {
@@ -552,59 +570,615 @@ class _SetQualitySection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('FORM QUALITY TỪNG SET',
-            style: VFTheme.textStyle(context,
-                size: 10,
-                weight: FontWeight.w800,
-                color: const Color(0xFF9C9B94),
-                letterSpacing: 1.2)),
-        SizedBox(height: 14 * s),
-        for (int i = 0; i < setScores.length; i++) ...[
-          Row(
-            children: [
-              SizedBox(
-                  width: 46 * s,
-                  child: Text('Set ${i + 1}',
-                      style: VFTheme.textStyle(context,
-                          size: 12,
-                          weight: FontWeight.w700,
-                          color: const Color(0xFF5A5A52)))),
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: Container(
-                    height: 10 * s,
-                    color: const Color(0xFFE8E4DD),
-                    child: FractionallySizedBox(
-                      widthFactor: (setScores[i] / 100).clamp(0.0, 1.0),
-                      alignment: Alignment.centerLeft,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: _accent(setScores[i]),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              SizedBox(width: 10 * s),
-              Text('${setScores[i]}%',
-                  style: VFTheme.textStyle(context,
-                      size: 12,
-                      weight: FontWeight.w800,
-                      color: _accent(setScores[i]))),
-            ],
+        /* Text(
+          value,
+          style: VFTheme.textStyle(
+            context,
+            size: 15,
+            weight: FontWeight.w700,
+            color: Colors.white,
           ),
-          if (i != setScores.length - 1) SizedBox(height: 12 * s),
-        ],
+        ), */
+        SizedBox(height: 2 * s),
+        if (DateTime.now().millisecondsSinceEpoch < 0)
+          Text(
+            label,
+            style: VFTheme.textStyle(
+              context,
+              size: 8,
+              weight: FontWeight.w600,
+              color: Colors.white.withValues(alpha: 0.35),
+              letterSpacing: 0.5,
+            ),
+          ),
       ],
     );
   }
 }
 
-class _CoachCard extends StatelessWidget {
-  const _CoachCard({required this.text});
+class _HeroActionButton extends StatelessWidget {
+  const _HeroActionButton({
+    required this.onTap,
+    required this.label,
+    required this.fillColor,
+    required this.borderColor,
+    required this.textColor,
+    this.icon,
+  });
+
+  final VoidCallback onTap;
+  final String label;
+  final Color fillColor;
+  final Color borderColor;
+  final Color textColor;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = VFTheme.scale(context);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12 * s),
+        onTap: onTap,
+        child: Ink(
+          padding: EdgeInsets.symmetric(horizontal: 14 * s, vertical: 10 * s),
+          decoration: BoxDecoration(
+            color: fillColor,
+            borderRadius: BorderRadius.circular(12 * s),
+            border: Border.all(color: borderColor),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 14 * s, color: textColor),
+                SizedBox(width: 6 * s),
+              ],
+              Text(
+                label,
+                style: VFTheme.textStyle(
+                  context,
+                  size: 12,
+                  weight: FontWeight.w700,
+                  color: textColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ComparisonBanner extends StatelessWidget {
+  const _ComparisonBanner({required this.comparison});
+
+  final SessionComparison comparison;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = VFTheme.scale(context);
+    final style = _stylingFor(comparison.type);
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(14 * s, 12 * s, 14 * s, 12 * s),
+      margin: EdgeInsets.only(bottom: 24 * s),
+      decoration: BoxDecoration(
+        color: style.background,
+        borderRadius: BorderRadius.circular(16 * s),
+        border: Border.all(color: style.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      style.icon,
+                      size: 18 * s,
+                      color: style.primaryColor,
+                    ),
+                    SizedBox(width: 8 * s),
+                    Expanded(
+                      child: Text(
+                        comparison.primaryLine,
+                        style: VFTheme.textStyle(
+                          context,
+                          size: 14,
+                          weight: FontWeight.w700,
+                          color: style.primaryColor,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (comparison.isPainLinked) ...[
+                SizedBox(width: 8 * s),
+                _PainLinkedChip(color: style.primaryColor),
+              ],
+            ],
+          ),
+          if (comparison.secondaryLine != null) ...[
+            SizedBox(height: 5 * s),
+            Padding(
+              padding: EdgeInsets.only(left: 26 * s),
+              child: Text(
+                comparison.secondaryLine!,
+                style: VFTheme.textStyle(
+                  context,
+                  size: 11,
+                  weight: FontWeight.w500,
+                  color: style.primaryColor.withValues(alpha: 0.7),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  _BannerStyling _stylingFor(ComparisonType type) {
+    switch (type) {
+      case ComparisonType.personalBestFormScore:
+      case ComparisonType.personalBestFault:
+        return const _BannerStyling(
+          background: Color(0xFFE8F0ED),
+          border: Color(0xFFC5D9CF),
+          primaryColor: Color(0xFF0F3D33),
+          icon: Icons.emoji_events_rounded,
+        );
+      case ComparisonType.improvementStreak:
+      case ComparisonType.consistencyStreak:
+        return const _BannerStyling(
+          background: Color(0xFFF5EEE0),
+          border: Color(0xFFE4D6B8),
+          primaryColor: Color(0xFF8A5A20),
+          icon: Icons.local_fire_department_rounded,
+        );
+      case ComparisonType.aboveAverage:
+        return const _BannerStyling(
+          background: Color(0xFFF0EBF5),
+          border: Color(0xFFD7CCE0),
+          primaryColor: Color(0xFF5E3E8A),
+          icon: Icons.trending_up_rounded,
+        );
+      case ComparisonType.deltaPositive:
+        return const _BannerStyling(
+          background: Color(0xFFFFFFFF),
+          border: Color(0xFFE5E2DB),
+          primaryColor: Color(0xFF18594A),
+          icon: Icons.auto_awesome_rounded,
+        );
+      case ComparisonType.formSolid:
+        return const _BannerStyling(
+          background: Color(0xFFF4F1EA),
+          border: Color(0xFFDCD8CF),
+          primaryColor: Color(0xFF18594A),
+          icon: Icons.check_circle_outline_rounded,
+        );
+      case ComparisonType.sessionComplete:
+        return const _BannerStyling(
+          background: Color(0xFFEEEBE5),
+          border: Color(0xFFD8D4CB),
+          primaryColor: Color(0xFF5A5A52),
+          icon: Icons.check_circle_outline_rounded,
+        );
+      case ComparisonType.none:
+        return const _BannerStyling(
+          background: Color(0xFFFFFFFF),
+          border: Color(0xFFE5E2DB),
+          primaryColor: Color(0xFF18594A),
+          icon: Icons.auto_awesome_rounded,
+        );
+    }
+  }
+}
+
+class _BannerStyling {
+  const _BannerStyling({
+    required this.background,
+    required this.border,
+    required this.primaryColor,
+    required this.icon,
+  });
+
+  final Color background;
+  final Color border;
+  final Color primaryColor;
+  final IconData icon;
+}
+
+class _PainLinkedChip extends StatelessWidget {
+  const _PainLinkedChip({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = VFTheme.scale(context);
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 9 * s, vertical: 4 * s),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.center_focus_strong_rounded, size: 10 * s, color: color),
+          SizedBox(width: 4 * s),
+          Text(
+            'Vùng bạn tập trung',
+            style: VFTheme.textStyle(
+              context,
+              size: 9,
+              weight: FontWeight.w700,
+              color: color,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FormTerrainSection extends StatelessWidget {
+  const _FormTerrainSection({
+    required this.setScores,
+    required this.totalDuration,
+  });
+
+  final List<int> setScores;
+  final Duration totalDuration;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = VFTheme.scale(context);
+    final durationMinutes = math.max(totalDuration.inMinutes, 1);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'HÀNH TRÌNH FORM',
+              style: VFTheme.textStyle(
+                context,
+                size: 10,
+                weight: FontWeight.w700,
+                color: const Color(0xFFB5B3AC),
+                letterSpacing: 1.5,
+              ),
+            ),
+            Text(
+              '${setScores.length} set · $durationMinutes phút',
+              style: VFTheme.textStyle(
+                context,
+                size: 11,
+                weight: FontWeight.w600,
+                color: const Color(0xFF9C9B94),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 16 * s),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth;
+            final height = 196 * s;
+            return SizedBox(
+              width: width,
+              height: height,
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: 1),
+                duration: const Duration(milliseconds: 1500),
+                curve: Curves.easeOutCubic,
+                builder: (context, progress, _) {
+                  return CustomPaint(
+                    painter: _FormTerrainPainter(
+                      setScores: setScores,
+                      progress: progress,
+                      scale: s,
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _FormTerrainPainter extends CustomPainter {
+  const _FormTerrainPainter({
+    required this.setScores,
+    required this.progress,
+    required this.scale,
+  });
+
+  final List<int> setScores;
+  final double progress;
+  final double scale;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (setScores.isEmpty) return;
+
+    final isDense = setScores.length >= 5;
+    final chartTop = 22 * scale;
+    final chartBottom = size.height - (20 * scale);
+    final padY = 20 * scale;
+    final pointRadius = (isDense ? 6 : 7) * scale;
+    final bestPointRadius = (isDense ? 8.5 : 10) * scale;
+    final bestGlowRadius = (isDense ? 14 : 18) * scale;
+    final padX = math.max((isDense ? 28 : 36) * scale, bestGlowRadius);
+    final chartLeft = padX;
+    final chartRight = size.width - padX;
+    final innerTop = chartTop + padY;
+    final innerBottom = chartBottom - padY;
+    final innerHeight = innerBottom - innerTop;
+    final chartWidth = chartRight - chartLeft;
+    final scoreLabelGap = (isDense ? 16 : 18) * scale;
+    final setLabelGap = (isDense ? 24 : 28) * scale;
+    final bestLabelGap = (isDense ? 35 : 40) * scale;
+    final scoreFontSize = (isDense ? 11.5 : 13) * scale;
+    final bestScoreFontSize = (isDense ? 13 : 16) * scale;
+    final setLabelFontSize = (isDense ? 8.5 : 10) * scale;
+    final bestLabelFontSize = (isDense ? 7 : 8) * scale;
+
+    final gridPaint = Paint()
+      ..color = const Color(0xFFE5E2DB)
+      ..strokeWidth = 1;
+
+    for (final pct in const [0.25, 0.5, 0.75]) {
+      final y = innerBottom - (pct * innerHeight);
+      _drawDashedLine(
+        canvas,
+        Offset(chartLeft - (10 * scale), y),
+        Offset(chartRight + (10 * scale), y),
+        gridPaint,
+      );
+    }
+
+    final minScore = setScores.reduce(math.min);
+    final maxScore = setScores.reduce(math.max);
+    final range = math.max(maxScore - minScore, 1);
+    final bestIndex = setScores.indexOf(maxScore);
+    final stepX =
+        setScores.length <= 1 ? 0.0 : chartWidth / (setScores.length - 1);
+
+    final points = <Offset>[];
+    for (int i = 0; i < setScores.length; i++) {
+      final x =
+          setScores.length == 1 ? size.width / 2 : chartLeft + (stepX * i);
+      final normalized = (setScores[i] - minScore) / range;
+      final y = innerBottom - (normalized * innerHeight);
+      points.add(Offset(x, y));
+    }
+
+    final strokePath = _buildSmoothPath(points);
+    final fillPath = Path.from(strokePath)
+      ..lineTo(points.last.dx, chartBottom)
+      ..lineTo(points.first.dx, chartBottom)
+      ..close();
+
+    final fillPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          const Color(0xFF2E856E)
+              .withValues(alpha: 0.18 * progress.clamp(0.0, 1.0)),
+          const Color(0xFF2E856E)
+              .withValues(alpha: 0.06 * progress.clamp(0.0, 1.0)),
+          Colors.transparent,
+        ],
+      ).createShader(Rect.fromLTRB(0, chartTop, size.width, chartBottom));
+    canvas.drawPath(fillPath, fillPaint);
+
+    final animatedStroke = _extractPath(strokePath, progress);
+    final strokePaint = Paint()
+      ..color = const Color(0xFF2E856E)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5 * scale
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    canvas.drawPath(animatedStroke, strokePaint);
+
+    final pointRevealDivisor = math.max(points.length.toDouble(), 1.0);
+    for (int i = 0; i < points.length; i++) {
+      final point = points[i];
+      final score = setScores[i];
+      final pointRevealStart = i / pointRevealDivisor;
+      final pointProgress = ((progress - pointRevealStart) * 4).clamp(0.0, 1.0);
+      if (pointProgress <= 0) continue;
+
+      final color = _accentSoft(score);
+      final isBest = i == bestIndex;
+
+      if (isBest) {
+        final glowPaint = Paint()
+          ..color = color.withValues(alpha: 0.08 * pointProgress);
+        canvas.drawCircle(point, bestGlowRadius, glowPaint);
+      }
+
+      final outerPaint = Paint()
+        ..color = Colors.white.withValues(alpha: pointProgress);
+      canvas.drawCircle(
+          point, isBest ? bestPointRadius : pointRadius, outerPaint);
+
+      final borderPaint = Paint()
+        ..color = color.withValues(alpha: pointProgress)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = (isBest ? 3 : 2) * scale;
+      canvas.drawCircle(
+        point,
+        isBest ? bestPointRadius : pointRadius,
+        borderPaint,
+      );
+
+      _paintLabel(
+        canvas,
+        bounds: size,
+        text: '$score%',
+        offset: Offset(point.dx, point.dy - scoreLabelGap),
+        style: GoogleFonts.dmSans(
+          fontSize: isBest ? bestScoreFontSize : scoreFontSize,
+          fontWeight: isBest ? FontWeight.w900 : FontWeight.w700,
+          color: color.withValues(alpha: pointProgress),
+        ),
+      );
+      _paintLabel(
+        canvas,
+        bounds: size,
+        text: 'Set ${i + 1}',
+        offset: Offset(point.dx, point.dy + setLabelGap),
+        style: GoogleFonts.dmSans(
+          fontSize: setLabelFontSize,
+          fontWeight: FontWeight.w600,
+          color: const Color(0xFFB5B3AC).withValues(alpha: pointProgress),
+        ),
+      );
+      if (isBest) {
+        _paintLabel(
+          canvas,
+          bounds: size,
+          text: 'Tốt nhất',
+          offset: Offset(point.dx, point.dy + bestLabelGap),
+          style: GoogleFonts.dmSans(
+            fontSize: bestLabelFontSize,
+            fontWeight: FontWeight.w700,
+            color: color.withValues(alpha: pointProgress),
+          ),
+        );
+      }
+    }
+  }
+
+  Path _buildSmoothPath(List<Offset> points) {
+    if (points.length == 1) {
+      return Path()
+        ..moveTo(points.first.dx, points.first.dy)
+        ..lineTo(points.first.dx, points.first.dy);
+    }
+
+    final path = Path()..moveTo(points.first.dx, points.first.dy);
+    for (int i = 1; i < points.length; i++) {
+      final previous = points[i - 1];
+      final current = points[i];
+      final controlX = previous.dx + ((current.dx - previous.dx) * 0.5);
+      path.cubicTo(
+        controlX,
+        previous.dy,
+        controlX,
+        current.dy,
+        current.dx,
+        current.dy,
+      );
+    }
+    return path;
+  }
+
+  Path _extractPath(Path source, double drawProgress) {
+    final metrics = source.computeMetrics().toList();
+    if (metrics.isEmpty) return source;
+
+    final targetLength = metrics.fold<double>(
+          0,
+          (sum, metric) => sum + metric.length,
+        ) *
+        drawProgress.clamp(0.0, 1.0);
+
+    final path = Path();
+    var currentLength = 0.0;
+    for (final metric in metrics) {
+      final nextLength = currentLength + metric.length;
+      if (targetLength >= nextLength) {
+        path.addPath(metric.extractPath(0, metric.length), Offset.zero);
+      } else {
+        final remaining =
+            (targetLength - currentLength).clamp(0.0, metric.length);
+        path.addPath(metric.extractPath(0, remaining), Offset.zero);
+        break;
+      }
+      currentLength = nextLength;
+    }
+    return path;
+  }
+
+  void _drawDashedLine(
+    Canvas canvas,
+    Offset start,
+    Offset end,
+    Paint paint,
+  ) {
+    const dash = 4.0;
+    const gap = 6.0;
+    final totalWidth = end.dx - start.dx;
+    var x = start.dx;
+    while (x < end.dx) {
+      final next = math.min(x + (dash * scale), start.dx + totalWidth);
+      canvas.drawLine(Offset(x, start.dy), Offset(next, end.dy), paint);
+      x = next + (gap * scale);
+    }
+  }
+
+  void _paintLabel(
+    Canvas canvas, {
+    required Size bounds,
+    required String text,
+    required Offset offset,
+    required TextStyle style,
+  }) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textAlign: TextAlign.center,
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    painter.paint(
+      canvas,
+      Offset(
+        (offset.dx - (painter.width / 2)).clamp(
+          4 * scale,
+          bounds.width - painter.width - (4 * scale),
+        ),
+        (offset.dy - (painter.height / 2)).clamp(
+          4 * scale,
+          bounds.height - painter.height - (4 * scale),
+        ),
+      ),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _FormTerrainPainter oldDelegate) {
+    return oldDelegate.setScores != setScores ||
+        oldDelegate.progress != progress ||
+        oldDelegate.scale != scale;
+  }
+}
+
+class _CoachSection extends StatelessWidget {
+  const _CoachSection({required this.text});
 
   final String text;
 
@@ -612,36 +1186,60 @@ class _CoachCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = VFTheme.scale(context);
     return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(16 * s),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE8F0ED),
-        borderRadius: BorderRadius.circular(16 * s),
-        border: Border.all(color: const Color(0xFFD7E2DE)),
+      padding: EdgeInsets.only(left: 16 * s),
+      decoration: const BoxDecoration(
+        border: Border(
+          left: BorderSide(color: Color(0x402E856E), width: 3),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 9 * s, vertical: 5 * s),
-            decoration: BoxDecoration(
-              color: const Color(0xFF18594A),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text('AI',
-                style: VFTheme.textStyle(context,
-                    size: 10,
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 20 * s,
+                height: 20 * s,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF18594A),
+                  borderRadius: BorderRadius.circular(6 * s),
+                ),
+                child: Text(
+                  'AI',
+                  style: VFTheme.textStyle(
+                    context,
+                    size: 8,
                     weight: FontWeight.w800,
                     color: Colors.white,
-                    letterSpacing: 0.8)),
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              SizedBox(width: 6 * s),
+              Text(
+                'HLV AI',
+                style: VFTheme.textStyle(
+                  context,
+                  size: 10,
+                  weight: FontWeight.w700,
+                  color: const Color(0xFF2E856E),
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
           ),
-          SizedBox(height: 10 * s),
-          Text(text,
-              style: VFTheme.textStyle(context,
-                  size: 14,
-                  weight: FontWeight.w600,
-                  color: const Color(0xFF0F3D33),
-                  height: 1.5)),
+          SizedBox(height: 8 * s),
+          Text(
+            text,
+            style: GoogleFonts.fraunces(
+              fontSize: VFTheme.sp(context, 14),
+              fontWeight: FontWeight.w500,
+              color: const Color(0xFF3D3D35),
+              height: 1.75,
+            ),
+          ),
         ],
       ),
     );
@@ -663,415 +1261,729 @@ class _IssueQuestionCardState extends State<_IssueQuestionCard> {
   @override
   Widget build(BuildContext context) {
     final s = VFTheme.scale(context);
-    Widget answerButton(String label, String value) {
-      final selected = _answer == value;
-      return Expanded(
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(18 * s, 16 * s, 18 * s, 16 * s),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFFC4841D).withValues(alpha: 0.04),
+            const Color(0xFFC4841D).withValues(alpha: 0.08),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16 * s),
+        border: Border.all(
+          color: const Color(0xFFC4841D).withValues(alpha: 0.12),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _issueObservation(widget.issue),
+            style: VFTheme.textStyle(
+              context,
+              size: 12,
+              weight: FontWeight.w700,
+              color: const Color(0xFFC4841D),
+            ),
+          ),
+          SizedBox(height: 4 * s),
+          Text(
+            widget.issue.question,
+            style: VFTheme.textStyle(
+              context,
+              size: 14,
+              weight: FontWeight.w600,
+              color: const Color(0xFF1A1A1A),
+              height: 1.5,
+            ),
+          ),
+          SizedBox(height: 14 * s),
+          Row(
+            children: [
+              Expanded(
+                child: _IssueAnswerButton(
+                  label: 'Có',
+                  selected: _answer == 'yes',
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFFD4553A), Color(0xFFB83A2A)],
+                  ),
+                  onTap: () => setState(() => _answer = 'yes'),
+                ),
+              ),
+              SizedBox(width: 8 * s),
+              Expanded(
+                child: _IssueAnswerButton(
+                  label: 'Không',
+                  selected: _answer == 'no',
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF18594A), Color(0xFF2E856E)],
+                  ),
+                  onTap: () => setState(() => _answer = 'no'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IssueAnswerButton extends StatelessWidget {
+  const _IssueAnswerButton({
+    required this.label,
+    required this.selected,
+    required this.gradient,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final Gradient gradient;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = VFTheme.scale(context);
+
+    return AnimatedScale(
+      scale: selected ? 1.02 : 1,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+      child: Material(
+        color: Colors.transparent,
         child: InkWell(
-          onTap: () => setState(() => _answer = value),
-          borderRadius: BorderRadius.circular(12 * s),
+          borderRadius: BorderRadius.circular(14 * s),
+          onTap: onTap,
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOutCubic,
             padding: EdgeInsets.symmetric(vertical: 12 * s),
             decoration: BoxDecoration(
-              color: selected ? const Color(0xFFC4841D) : Colors.white,
-              borderRadius: BorderRadius.circular(12 * s),
-              border: Border.all(
-                  color: selected
-                      ? const Color(0xFFC4841D)
-                      : const Color(0xFFE8D4A7)),
+              gradient: selected ? gradient : null,
+              color: selected ? null : Colors.white,
+              borderRadius: BorderRadius.circular(14 * s),
+              border: selected
+                  ? null
+                  : Border.all(
+                      color: const Color(0xFFE5E2DB),
+                      width: 1.5,
+                    ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: selected ? 0.1 : 0.03),
+                  blurRadius: selected ? 14 * s : 3 * s,
+                  offset: Offset(0, selected ? 4 * s : 1 * s),
+                ),
+              ],
             ),
             alignment: Alignment.center,
-            child: Text(label,
-                style: VFTheme.textStyle(context,
-                    size: 13,
-                    weight: FontWeight.w800,
-                    color: selected ? Colors.white : const Color(0xFFC4841D))),
+            child: Text(
+              label,
+              style: VFTheme.textStyle(
+                context,
+                size: 14,
+                weight: FontWeight.w700,
+                color: selected ? Colors.white : const Color(0xFF1A1A1A),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DoneSection extends StatelessWidget {
+  const _DoneSection({
+    required this.shimmer,
+    required this.onDone,
+    this.disabled = false,
+  });
+
+  final Animation<double> shimmer;
+  final VoidCallback onDone;
+  final bool disabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = VFTheme.scale(context);
+    final borderRadius = BorderRadius.circular(16 * s);
+
+    Widget buildButton(double shimmerValue) {
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF18594A), Color(0xFF2E856E)],
+          ),
+          borderRadius: borderRadius,
+          boxShadow: disabled
+              ? const []
+              : [
+                  BoxShadow(
+                    color: const Color(0xFF18594A).withValues(alpha: 0.25),
+                    blurRadius: 24 * s,
+                    offset: Offset(0, 6 * s),
+                  ),
+                ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: borderRadius,
+            onTap: disabled ? null : onDone,
+            child: ClipRRect(
+              borderRadius: borderRadius,
+              child: Stack(
+                children: [
+                  if (!disabled)
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment(
+                              -1.6 + (shimmerValue * 3.2),
+                              -1.0,
+                            ),
+                            end: Alignment(
+                              -0.6 + (shimmerValue * 3.2),
+                              1.0,
+                            ),
+                            colors: [
+                              Colors.white.withValues(alpha: 0),
+                              Colors.white.withValues(alpha: 0.08),
+                              Colors.white.withValues(alpha: 0),
+                            ],
+                            stops: const [0.35, 0.5, 0.65],
+                          ),
+                        ),
+                      ),
+                    ),
+                  Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16 * s),
+                    child: Center(
+                      child: Text(
+                        'Hoàn tất',
+                        style: VFTheme.textStyle(
+                          context,
+                          size: 15,
+                          weight: FontWeight.w700,
+                          color: Colors.white,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       );
     }
 
+    /* final button = DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF18594A), Color(0xFF2E856E)],
+        ),
+        borderRadius: borderRadius,
+        boxShadow: disabled
+            ? null
+            : [
+                BoxShadow(
+                  color: const Color(0xFF18594A).withValues(alpha: 0.25),
+                  blurRadius: 24 * s,
+                  offset: Offset(0, 6 * s),
+                ),
+              ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: borderRadius,
+          onTap: disabled ? null : onDone,
+          child: ClipRRect(
+            borderRadius: borderRadius,
+            child: Stack(
+              children: [
+                if (!disabled)
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment(
+                            -1.6 + (shimmer.value * 3.2),
+                            -1.0,
+                          ),
+                          end: Alignment(
+                            -0.6 + (shimmer.value * 3.2),
+                            1.0,
+                          ),
+                          colors: [
+                            Colors.white.withValues(alpha: 0),
+                            Colors.white.withValues(alpha: 0.08),
+                            Colors.white.withValues(alpha: 0),
+                          ],
+                          stops: const [0.35, 0.5, 0.65],
+                        ),
+                      ),
+                    ),
+                  ),
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16 * s),
+                  child: Center(
+                    child: Text(
+                      'HoÃ n táº¥t',
+                      style: VFTheme.textStyle(
+                        context,
+                        size: 15,
+                        weight: FontWeight.w700,
+                        color: Colors.white,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ); */
+    final button = buildButton(0);
+
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            opacity: disabled ? 0.4 : 1,
+            child: disabled
+                ? button
+                : AnimatedBuilder(
+                    animation: shimmer,
+                    builder: (context, _) {
+                      return buildButton(shimmer
+                          .value); /*
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF18594A), Color(0xFF2E856E)],
+                  ),
+                  borderRadius: borderRadius,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF18594A).withValues(alpha: 0.25),
+                      blurRadius: 24 * s,
+                      offset: Offset(0, 6 * s),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: borderRadius,
+                    onTap: onDone,
+                    child: ClipRRect(
+                      borderRadius: borderRadius,
+                      child: Stack(
+                        children: [
+                          Positioned.fill(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment(
+                                    -1.6 + (shimmer.value * 3.2),
+                                    -1.0,
+                                  ),
+                                  end: Alignment(
+                                    -0.6 + (shimmer.value * 3.2),
+                                    1.0,
+                                  ),
+                                  colors: [
+                                    Colors.white.withValues(alpha: 0),
+                                    Colors.white.withValues(alpha: 0.08),
+                                    Colors.white.withValues(alpha: 0),
+                                  ],
+                                  stops: const [0.35, 0.5, 0.65],
+                                ),
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: EdgeInsets.symmetric(vertical: 16 * s),
+                            child: Center(
+                              child: Text(
+                                'Hoàn tất',
+                                style: VFTheme.textStyle(
+                                  context,
+                                  size: 15,
+                                  weight: FontWeight.w700,
+                                  color: Colors.white,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ); */
+                    },
+                  ),
+          ),
+        ),
+        SizedBox(height: 10 * s),
+        Text(
+          disabled ? 'Chọn cảm giác buổi tập để tiếp tục' : 'Hẹn buổi sau! 👋',
+          style: VFTheme.textStyle(
+            context,
+            size: 11,
+            weight: FontWeight.w600,
+            color: const Color(0xFFB5B3AC),
+          ),
+        ),
+        if (DateTime.now().millisecondsSinceEpoch < 0)
+          Text(
+            disabled
+                ? 'Chọn cảm giác buổi tập để tiếp tục'
+                : 'Hẹn buổi sau! 👋',
+            style: VFTheme.textStyle(
+              context,
+              size: 11,
+              weight: FontWeight.w600,
+              color: const Color(0xFFB5B3AC),
+            ),
+          ),
+        if (DateTime.now().millisecondsSinceEpoch < 0)
+          Text(
+            'Hẹn buổi sau! 👋',
+            style: VFTheme.textStyle(
+              context,
+              size: 11,
+              weight: FontWeight.w600,
+              color: const Color(0xFFB5B3AC),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _OverallDifficultySection extends StatelessWidget {
+  const _OverallDifficultySection({
+    required this.lastDifficulty,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String? lastDifficulty;
+  final String? selected;
+  final ValueChanged<String> onTap;
+
+  String _prompt(String? lastDifficulty) {
+    switch (lastDifficulty) {
+      case 'light':
+        return 'Lần trước bạn thấy nhẹ. Hôm nay thì sao?';
+      case 'medium':
+        return 'Lần trước bạn thấy vừa sức. Hôm nay thì sao?';
+      case 'heavy':
+        return 'Lần trước bạn thấy nặng. Hôm nay thì sao?';
+      default:
+        return 'Buổi này thế nào?';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = VFTheme.scale(context);
+    const options = [
+      (id: 'light', label: 'Nhẹ', emoji: '😌'),
+      (id: 'medium', label: 'Vừa', emoji: '💪'),
+      (id: 'heavy', label: 'Nặng', emoji: '🥵'),
+    ];
+
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(16 * s),
+      padding: EdgeInsets.fromLTRB(18 * s, 16 * s, 18 * s, 18 * s),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF5E4),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16 * s),
-        border: Border.all(color: const Color(0xFFE8D4A7)),
+        border: Border.all(color: const Color(0xFFE5E2DB)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 16 * s,
+            offset: Offset(0, 6 * s),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(_issueObservation(widget.issue),
-              style: VFTheme.textStyle(context,
-                  size: 12,
-                  weight: FontWeight.w800,
-                  color: const Color(0xFFC4841D))),
-          SizedBox(height: 6 * s),
-          Text(widget.issue.question,
-              style: VFTheme.textStyle(context,
-                  size: 14,
-                  weight: FontWeight.w700,
-                  color: const Color(0xFF1A1A1A),
-                  height: 1.45)),
-          SizedBox(height: 12 * s),
-          Row(children: [
-            answerButton('Có', 'yes'),
-            SizedBox(width: 8 * s),
-            answerButton('Không', 'no')
-          ]),
+          Text(
+            'CẢM GIÁC BUỔI TẬP',
+            style: VFTheme.textStyle(
+              context,
+              size: 10,
+              weight: FontWeight.w700,
+              color: const Color(0xFFB5B3AC),
+              letterSpacing: 1.5,
+            ),
+          ),
+          SizedBox(height: 8 * s),
+          Text(
+            _prompt(lastDifficulty),
+            style: VFTheme.textStyle(
+              context,
+              size: 16,
+              weight: FontWeight.w700,
+              color: const Color(0xFF1A1A1A),
+              height: 1.35,
+            ),
+          ),
+          SizedBox(height: 14 * s),
+          Row(
+            children: [
+              for (int i = 0; i < options.length; i++) ...[
+                if (i > 0) SizedBox(width: 8 * s),
+                Expanded(
+                  child: _DifficultyOption(
+                    emoji: options[i].emoji,
+                    label: options[i].label,
+                    selected: selected == options[i].id,
+                    locked: selected != null && selected != options[i].id,
+                    onTap: () => onTap(options[i].id),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
-class _DetailSection extends StatefulWidget {
-  const _DetailSection({
-    super.key,
-    required this.cards,
-    required this.calories,
+class _DifficultyOption extends StatelessWidget {
+  const _DifficultyOption({
+    required this.emoji,
+    required this.label,
+    required this.selected,
+    required this.locked,
+    required this.onTap,
   });
 
-  final List<DetailCard> cards;
-  final int calories;
-
-  @override
-  State<_DetailSection> createState() => _DetailSectionState();
-}
-
-class _DetailSectionState extends State<_DetailSection> {
-  final GlobalKey _contentAnchorKey = GlobalKey();
-  bool _expanded = false;
-
-  void expand() {
-    if (_expanded) return;
-    setState(() => _expanded = true);
-  }
-
-  void expandAndReveal() {
-    void reveal() {
-      final anchorContext = _contentAnchorKey.currentContext;
-      if (anchorContext == null) return;
-      Scrollable.ensureVisible(
-        anchorContext,
-        duration: const Duration(milliseconds: 420),
-        curve: Curves.easeOutCubic,
-        alignment: 0.06,
-      );
-    }
-
-    if (_expanded) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => reveal());
-      return;
-    }
-
-    setState(() => _expanded = true);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      reveal();
-    });
-  }
+  final String emoji;
+  final String label;
+  final bool selected;
+  final bool locked;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final s = VFTheme.scale(context);
-    return _SectionCard(
-      child: Column(
-        children: [
-          InkWell(
-            onTap: () => setState(() => _expanded = !_expanded),
-            borderRadius: BorderRadius.circular(12 * s),
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 2 * s),
-              child: Row(
+
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      opacity: locked ? 0.3 : 1,
+      child: AnimatedScale(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        scale: selected ? 1.04 : 1,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16 * s),
+            onTap: (locked || selected) ? null : onTap,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              padding: EdgeInsets.symmetric(vertical: 14 * s),
+              decoration: BoxDecoration(
+                color: selected ? null : const Color(0xFFF8F6F1),
+                gradient: selected
+                    ? const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFF18594A), Color(0xFF2E856E)],
+                      )
+                    : null,
+                borderRadius: BorderRadius.circular(16 * s),
+                border: Border.all(
+                  color:
+                      selected ? Colors.transparent : const Color(0xFFE5E2DB),
+                ),
+                boxShadow: selected
+                    ? [
+                        BoxShadow(
+                          color:
+                              const Color(0xFF18594A).withValues(alpha: 0.18),
+                          blurRadius: 16 * s,
+                          offset: Offset(0, 5 * s),
+                        ),
+                      ]
+                    : [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 4 * s,
+                          offset: Offset(0, 1.5 * s),
+                        ),
+                      ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('Chi tiết buổi tập',
-                      style: VFTheme.textStyle(context,
-                          size: 15,
-                          weight: FontWeight.w800,
-                          color: const Color(0xFF1A1A1A))),
-                  const Spacer(),
-                  Icon(
-                      _expanded
-                          ? Icons.keyboard_arrow_up_rounded
-                          : Icons.keyboard_arrow_down_rounded,
-                      color: const Color(0xFF9C9B94)),
+                  Text(
+                    emoji,
+                    style: TextStyle(fontSize: 22 * s),
+                  ),
+                  SizedBox(height: 4 * s),
+                  Text(
+                    label,
+                    style: VFTheme.textStyle(
+                      context,
+                      size: 12,
+                      weight: FontWeight.w700,
+                      color: selected ? Colors.white : const Color(0xFF5A5A52),
+                    ),
+                  ),
                 ],
               ),
             ),
           ),
-          AnimatedCrossFade(
-            duration: const Duration(milliseconds: 220),
-            crossFadeState: _expanded
-                ? CrossFadeState.showFirst
-                : CrossFadeState.showSecond,
-            firstChild: LayoutBuilder(
-              builder: (context, constraints) {
-                final itemWidth = (constraints.maxWidth - (12 * s)) / 2;
-                final tiles = <Widget>[
-                  ...widget.cards.map((card) => _DetailTile(card: card)),
-                  _CaloriesTile(calories: widget.calories),
-                ];
-                return Padding(
-                  key: _contentAnchorKey,
-                  padding: EdgeInsets.only(top: 14 * s),
-                  child: Wrap(
-                    spacing: 12 * s,
-                    runSpacing: 12 * s,
-                    children: tiles
-                        .map((tile) => SizedBox(width: itemWidth, child: tile))
-                        .toList(),
-                  ),
-                );
-              },
-            ),
-            secondChild: const SizedBox.shrink(),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _DetailTile extends StatelessWidget {
-  const _DetailTile({required this.card});
+class _HeroSkeletonPainter extends CustomPainter {
+  // TODO: wire up to captured best-rep landmark data.
+  static const List<List<double>> _boneSegments = [
+    [255, 95, 255, 140],
+    [255, 140, 235, 155],
+    [235, 155, 220, 175],
+    [255, 140, 270, 160],
+    [270, 160, 260, 185],
+    [255, 140, 255, 200],
+    [255, 200, 230, 260],
+    [230, 260, 215, 320],
+    [255, 200, 275, 260],
+    [275, 260, 265, 320],
+    [265, 320, 255, 330],
+    [215, 320, 205, 330],
+  ];
 
-  final DetailCard card;
+  // TODO: wire up to captured best-rep landmark data.
+  static const List<List<double>> _joints = [
+    [255, 95, 8],
+    [255, 140, 5],
+    [235, 155, 4],
+    [220, 175, 4],
+    [270, 160, 4],
+    [260, 185, 4],
+    [255, 200, 5],
+    [230, 260, 4],
+    [215, 320, 4],
+    [275, 260, 4],
+    [265, 320, 4],
+    [255, 330, 3],
+    [205, 330, 3],
+  ];
 
-  @override
-  Widget build(BuildContext context) {
-    final s = VFTheme.scale(context);
-    final tone = _detailTone(card.color);
-    return Container(
-      constraints: BoxConstraints(minHeight: 176 * s),
-      padding: EdgeInsets.all(14 * s),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14 * s),
-        border: Border.all(color: const Color(0xFFE5E2DB)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(card.label,
-                  style: VFTheme.textStyle(context,
-                      size: 11,
-                      weight: FontWeight.w700,
-                      color: const Color(0xFF9C9B94))),
-              SizedBox(height: 8 * s),
-              Text(card.value,
-                  style: VFTheme.textStyle(context,
-                      size: 24,
-                      weight: FontWeight.w900,
-                      color: tone,
-                      letterSpacing: -0.8)),
-              if ((card.subLabel ?? '').isNotEmpty) ...[
-                SizedBox(height: 4 * s),
-                Text(card.subLabel!,
-                    style: VFTheme.textStyle(context,
-                        size: 11,
-                        weight: FontWeight.w600,
-                        color: const Color(0xFF5A5A52))),
-              ],
-            ],
-          ),
-          SizedBox(height: 14 * s),
-          if (card.useRadial)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: FormScoreArc(
-                progress: ((card.radialValue ?? 0) / 100).clamp(0.0, 1.0),
-                size: 56 * s,
-                color: tone,
-                trackColor: tone.withValues(alpha: 0.14),
-                strokeWidth: 5 * s,
-                child: Text('${(card.radialValue ?? 0).round()}',
-                    style: VFTheme.textStyle(context,
-                        size: 10, weight: FontWeight.w800, color: tone)),
-              ),
-            )
-          else if ((card.miniBarValues ?? const <double>[]).isNotEmpty)
-            SizedBox(
-              height: 56 * s,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: card.miniBarValues!.asMap().entries.map((entry) {
-                  final max = card.miniBarMax == null || card.miniBarMax == 0
-                      ? 1.0
-                      : card.miniBarMax!;
-                  final ratio = (entry.value / max).clamp(0.0, 1.0);
-                  final height = (card.lowerIsBetter ? (1 - ratio) : ratio)
-                      .clamp(0.12, 1.0);
-                  return Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.only(
-                          right: entry.key == card.miniBarValues!.length - 1
-                              ? 0
-                              : 5 * s),
-                      child: Align(
-                        alignment: Alignment.bottomCenter,
-                        child: Container(
-                          height: 56 * s * height,
-                          decoration: BoxDecoration(
-                              color: tone,
-                              borderRadius: BorderRadius.circular(999)),
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            )
-          else
-            Container(
-              height: 10 * s,
-              decoration: BoxDecoration(
-                color: tone.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CaloriesTile extends StatelessWidget {
-  const _CaloriesTile({required this.calories});
-
-  final int calories;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = VFTheme.scale(context);
-    final fill = (calories / 90).clamp(0.0, 1.0);
-    return Container(
-      constraints: BoxConstraints(minHeight: 176 * s),
-      padding: EdgeInsets.all(14 * s),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14 * s),
-        border: Border.all(color: const Color(0xFFE5E2DB)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 30 * s,
-                height: 30 * s,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8EACF),
-                  borderRadius: BorderRadius.circular(10 * s),
-                ),
-                child: Icon(
-                  Icons.local_fire_department_rounded,
-                  size: 16 * s,
-                  color: const Color(0xFFC4841D),
-                ),
-              ),
-              SizedBox(height: 12 * s),
-              Text('Calories',
-                  style: VFTheme.textStyle(context,
-                      size: 11,
-                      weight: FontWeight.w700,
-                      color: const Color(0xFF9C9B94))),
-              SizedBox(height: 8 * s),
-              RichText(
-                text: TextSpan(
-                  children: [
-                    TextSpan(
-                      text: '$calories',
-                      style: VFTheme.textStyle(context,
-                          size: 24,
-                          weight: FontWeight.w900,
-                          color: const Color(0xFFC4841D),
-                          letterSpacing: -0.8),
-                    ),
-                    TextSpan(
-                      text: ' kcal',
-                      style: VFTheme.textStyle(context,
-                          size: 12,
-                          weight: FontWeight.w700,
-                          color: const Color(0xFF8C6A1A)),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(height: 4 * s),
-              Text('Ước tính theo MET và thời lượng buổi tập',
-                  style: VFTheme.textStyle(context,
-                      size: 11,
-                      weight: FontWeight.w600,
-                      color: const Color(0xFF5A5A52))),
-            ],
-          ),
-          SizedBox(height: 14 * s),
-          Container(
-            padding: EdgeInsets.all(10 * s),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFF7E8),
-              borderRadius: BorderRadius.circular(12 * s),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: Container(
-                    height: 10 * s,
-                    color: const Color(0xFFF3E2BE),
-                    child: FractionallySizedBox(
-                      widthFactor: fill,
-                      alignment: Alignment.centerLeft,
-                      child: const DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                            colors: [Color(0xFFF2B454), Color(0xFFC4841D)],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(height: 8 * s),
-                Text('Năng lượng tiêu hao ước tính',
-                    style: VFTheme.textStyle(context,
-                        size: 10,
-                        weight: FontWeight.w700,
-                        color: const Color(0xFF8C6A1A))),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _GrainPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.white.withValues(alpha: 0.035);
-    final random = math.Random(7);
-    for (int i = 0; i < 160; i++) {
-      canvas.drawCircle(
-        Offset(random.nextDouble() * size.width,
-            random.nextDouble() * size.height),
-        0.5 + random.nextDouble() * 0.7,
-        paint,
-      );
+    final xScale = size.width / 375;
+    final yScale = size.height / 420;
+    final stroke = 2.5 * math.min(xScale, yScale);
+    final gradient = const LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [Color(0xFF34D399), Color(0xFF18594A)],
+    ).createShader(Offset.zero & size);
+
+    for (final segment in _boneSegments) {
+      final start = Offset(segment[0] * xScale, segment[1] * yScale);
+      final end = Offset(segment[2] * xScale, segment[3] * yScale);
+
+      final glowPaint = Paint()
+        ..color = const Color(0xFF34D399).withValues(alpha: 0.22)
+        ..strokeWidth = stroke * 2.5
+        ..strokeCap = StrokeCap.round
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+      canvas.drawLine(start, end, glowPaint);
+
+      final bonePaint = Paint()
+        ..shader = gradient
+        ..strokeWidth = stroke
+        ..strokeCap = StrokeCap.round;
+      canvas.drawLine(start, end, bonePaint);
     }
+
+    for (final joint in _joints) {
+      final center = Offset(joint[0] * xScale, joint[1] * yScale);
+      final radius = joint[2] * math.min(xScale, yScale);
+
+      final glowPaint = Paint()
+        ..color = const Color(0xFF34D399).withValues(alpha: 0.22)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+      canvas.drawCircle(
+        center,
+        radius + (1.5 * math.min(xScale, yScale)),
+        glowPaint,
+      );
+
+      final jointPaint = Paint()
+        ..color = const Color(0xFF34D399).withValues(alpha: 0.6);
+      canvas.drawCircle(center, radius, jointPaint);
+    }
+
+    final arcRect = Rect.fromCircle(
+      center: Offset(245 * xScale, 290 * yScale),
+      radius: 25 * math.min(xScale, yScale),
+    );
+    final arcPaint = Paint()
+      ..color = const Color(0xFF34D399).withValues(alpha: 0.5)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5 * math.min(xScale, yScale);
+    canvas.drawArc(arcRect, 0.0, math.pi / 2.5, false, arcPaint);
+
+    final anglePainter = TextPainter(
+      text: TextSpan(
+        text: '94°',
+        style: GoogleFonts.dmSans(
+          fontSize: 11 * math.min(xScale, yScale),
+          fontWeight: FontWeight.w700,
+          color: const Color(0xFF34D399).withValues(alpha: 0.6),
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    anglePainter.paint(
+      canvas,
+      Offset((248 * xScale) - (anglePainter.width / 2), 295 * yScale),
+    );
   }
 
   @override
@@ -1080,21 +1992,70 @@ class _GrainPainter extends CustomPainter {
 
 Color _accent(int score) => score >= 80
     ? const Color(0xFF4ADE80)
-    : score >= 50
+    : score > 55
         ? const Color(0xFFFBBF24)
         : const Color(0xFFF87171);
 
-Color _detailTone(String color) => switch (color) {
-      'amber' => const Color(0xFFC4841D),
-      'coral' => const Color(0xFFD4553A),
-      _ => const Color(0xFF18594A),
-    };
+Color _accentSoft(int score) {
+  if (score >= 80) return const Color(0xFF2E856E);
+  if (score > 55) return const Color(0xFFC4841D);
+  return const Color(0xFFD4553A);
+}
 
-String _winMessage(int score) => score >= 80
-    ? 'Xuất sắc. Form rất chắc.'
-    : score >= 50
-        ? 'Đang tiến bộ rõ rồi.'
-        : 'Hoàn thành đủ buổi tập.';
+String _scoreHeadline(int score) {
+  if (score >= 80) return 'Xuất sắc!';
+  if (score >= 50) return 'Tốt lắm!';
+  return 'Cần cải thiện thêm';
+}
+
+String _heroSubtitle({
+  required int score,
+  required SessionComparison? comparison,
+  required bool isFirstSession,
+}) {
+  if (comparison != null) {
+    switch (comparison.type) {
+      case ComparisonType.personalBestFormScore:
+        return 'Kỷ lục form mới cho riêng bạn';
+      case ComparisonType.personalBestFault:
+        return comparison.isPainLinked
+            ? 'Buổi tốt nhất ở vùng bạn đang tập trung'
+            : 'Bạn vừa chạm mức tốt nhất ở chỉ số đang theo dõi';
+      case ComparisonType.improvementStreak:
+        return comparison.isPainLinked
+            ? 'Chuỗi tiến bộ ở vùng bạn tập trung vẫn tiếp tục'
+            : 'Chuỗi tiến bộ của bạn vẫn đang tiếp tục';
+      case ComparisonType.aboveAverage:
+        return comparison.secondaryLine ??
+            'Bạn đang vượt mức trung bình gần đây';
+      case ComparisonType.deltaPositive:
+        return comparison.primaryLine;
+      case ComparisonType.formSolid:
+        return 'Form hôm nay ổn, giữ nhịp này nhé';
+      case ComparisonType.consistencyStreak:
+        return 'Đều đặn quan trọng hơn hoàn hảo';
+      case ComparisonType.sessionComplete:
+        return 'Buổi tập đã xong, hẹn bạn lần sau';
+      case ComparisonType.none:
+        break;
+    }
+  }
+
+  if (isFirstSession) {
+    if (score >= 80) return 'Buổi đầu rất chắc, baseline này quá ổn';
+    if (score >= 50) return 'Buổi đầu ổn rồi, mình đã có baseline tốt';
+    return 'Buổi đầu đã xong, từ đây mình cải thiện từng buổi';
+  }
+
+  if (score >= 80) return 'Form hôm nay rất chắc, giữ nhịp này nhé';
+  if (score >= 50) return 'Nền form ổn, buổi sau mình đẩy thêm một chút';
+  return 'Cần cải thiện thêm, nhưng mình đã có hướng để sửa';
+}
+
+String _heroStreakValue(int streakDays) {
+  if (streakDays <= 0) return '1 ngày';
+  return '$streakDays ngày';
+}
 
 String _issueObservation(DetectedEvidence issue) => switch (issue.issueId) {
       'ankle_mobility' => 'AI thấy gót chân nhấc lên ở khá nhiều rep.',
@@ -1106,20 +2067,16 @@ String _issueObservation(DetectedEvidence issue) => switch (issue.issueId) {
       _ => 'AI thấy một điểm cần cải thiện trong buổi tập.',
     };
 
-String _formatDate(DateTime date) {
-  const months = [
-    'Thg 1',
-    'Thg 2',
-    'Thg 3',
-    'Thg 4',
-    'Thg 5',
-    'Thg 6',
-    'Thg 7',
-    'Thg 8',
-    'Thg 9',
-    'Thg 10',
-    'Thg 11',
-    'Thg 12'
-  ];
-  return '${date.day} ${months[date.month - 1]}';
+String _formatHeroDate(DateTime date) {
+  return '${date.day} Thg ${date.month}, ${date.year}';
+}
+
+String _formatClock(Duration duration) {
+  final hours = duration.inHours;
+  final minutes = duration.inMinutes.remainder(60);
+  final seconds = duration.inSeconds.remainder(60);
+  if (hours > 0) {
+    return '$hours:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+  return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
 }

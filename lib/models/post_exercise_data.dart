@@ -6,6 +6,7 @@ library;
 
 import '../utils/exercise_logger.dart';
 import '../interpreter/interpreter_base.dart';
+import '../services/session_persistence.dart';
 
 // ═══════════════════════════════════════════════════════════════
 // CORE DATA CLASSES
@@ -41,8 +42,8 @@ class SetReportData {
   final int goodReps;
   final int totalReps;
   final List<bool> repResults;
-  final String? praiseSentence; // B4: "Sâu chuẩn 8/10 rep — đẹp lắm!"
-  final String? coachTip; // B4: "Đẩy sàn ra xa khi đứng lên"
+  final String? praiseSentence;
+  final String? coachTip;
 
   const SetReportData({
     required this.setIndex,
@@ -85,15 +86,16 @@ class DetailCard {
 
 /// Base class for exercise report builders.
 ///
-/// Subclasses implement 2 exercise-specific methods + 3 B4 maps:
+/// Subclasses implement 2 exercise-specific methods + 4 maps:
 ///   - detectIssue()
 ///   - buildDetailCards()
-///   - praiseMetricNames()   ← B4: which metrics can be praised
-///   - faultToTipMap()       ← B4: fault → coaching tip
-///   - praiseSentenceMap()   ← B4: metric label → Vietnamese sentence
+///   - praiseMetricNames()
+///   - faultToTipMap()
+///   - praiseSentenceMap()
+///   - painToFaultMap()  (B7 — optional, defaults to {})
 ///
 /// buildReport(), generateCoachText(), buildPraiseSentence(),
-/// and buildCoachTip() are shared.
+/// and buildCoachTip() are shared across all exercises.
 abstract class ExerciseReportBuilder {
   // ── Subclasses MUST implement these 2 ──
 
@@ -101,10 +103,14 @@ abstract class ExerciseReportBuilder {
 
   List<DetailCard> buildDetailCards(List<ExerciseLogger> setLoggers);
 
-  // ── B4: Subclasses override these 3 maps ──
+  // ── Subclasses override these maps ──
+
+  /// B7: Maps user pain area IDs to fault count keys this exercise tracks.
+  /// Empty default for exercises without relevant pain mappings.
+  Map<String, List<String>> painToFaultMap() => {};
 
   /// Maps fault count keys in setLogs to display labels.
-  /// E.g. {'depth_fails_count': 'Depth', 'heel_fails_count': 'Gót chân'}
+  /// E.g. {'depth_fails_count': 'Độ sâu', 'heel_fails_count': 'Gót chân'}
   /// Values are FAIL counts: high number = bad.
   Map<String, String> praiseMetricNames() => {};
 
@@ -116,58 +122,107 @@ abstract class ExerciseReportBuilder {
   /// Labels must match values in praiseMetricNames().
   Map<String, String Function(int count, int total)> praiseSentenceMap() => {};
 
-  // ── B4: Shared praise + coaching logic ──
+  // ── Praise priority ladder (shared, do not override) ──
 
-  /// Finds the best-performing metric and generates a praise sentence.
-  /// "Best" = fewest fails relative to total reps.
-  /// Only praises metrics where >50% of reps were good.
-  String? buildPraiseSentence(ExerciseLogger logger) {
+  /// Threshold above which a metric is considered "habitually clean" and
+  /// should be skipped in the generic metric tier to prevent repeat praise.
+  static const double _habitualStrengthThreshold = 0.7;
+
+  /// Number of past sessions to scan for habitual-strength detection.
+  static const int _habitualStrengthWindow = 3;
+
+  /// Percentage of reps clean in current set to qualify as a "win" for
+  /// pain-linked or historically-weak metric tiers.
+  static const double _metricWinThreshold = 0.7;
+
+  /// Build a praise sentence for this set using a priority ladder.
+  ///
+  /// Walks tiers in order. First match wins. Returns null if nothing
+  /// triggers — rest screen will hide the praise line.
+  ///
+  /// Tier 0: Perfect set (100% clean)
+  /// Tier 1: Closed the coaching loop from previous set
+  /// Tier 2: Pain-linked metric win (>70% clean this set)
+  /// Tier 3: Historically weak metric improved (<50% clean in past, >70% now)
+  /// Tier 4: Set-over-set improvement (score +10 or more vs previous set)
+  /// Tier 5: Generic metric win, excluding habitual strengths
+  /// null:   Nothing notable — skip the praise line
+  String? buildPraiseSentence(
+    ExerciseLogger logger, {
+    required int setIndex,
+    ExerciseLogger? previousSetLogger,
+    int? previousSetIndex,
+    String? previousSetCoachTip,
+    List<PreviousSessionSummary> history = const [],
+    List<String> userPainAreas = const [],
+  }) {
     final totalReps = (logger.setLogs['max_rep'] as num?)?.toInt() ?? 0;
     final goodReps = (logger.setLogs['good_rep_count'] as num?)?.toInt() ?? 0;
     if (totalReps == 0) return null;
 
-    // Perfect set
+    // ─── Tier 0: Perfect set ───
     if (goodReps == totalReps) {
-      return 'Hoàn hảo! Tất cả $totalReps rep đúng form! 🎯';
+      return 'Hoàn hảo! Tất cả $totalReps rep đúng form.';
     }
 
-    // No reps correct at all
-    if (goodReps == 0) {
-      return 'Hoàn thành $totalReps rep! Set sau sẽ tốt hơn.';
-    }
-
-    // Find the metric with the FEWEST fails (= best performance)
     final metrics = praiseMetricNames();
-    String? bestLabel;
-    int bestGood = -1;
-    double bestRatio = -1;
+    final painFaultKeys = _painFaultKeys(userPainAreas);
 
-    for (final entry in metrics.entries) {
-      final fails = (logger.setLogs[entry.key] as num?)?.toInt() ?? 0;
-      final good = totalReps - fails;
-      final ratio = good / totalReps;
-
-      // Only praise if more than half were good
-      if (ratio > 0.5 && ratio > bestRatio) {
-        bestRatio = ratio;
-        bestGood = good;
-        bestLabel = entry.value;
+    // ─── Tier 1: Closed the coaching loop ───
+    if (previousSetLogger != null && previousSetCoachTip != null) {
+      final closedKey = _closedCoachingLoop(
+        previousSetLogger: previousSetLogger,
+        previousSetCoachTip: previousSetCoachTip,
+        currentLogger: logger,
+      );
+      if (closedKey != null) {
+        final label = metrics[closedKey] ?? closedKey;
+        return 'Set trước bị lỗi $label, set này đã cải thiện rõ.';
       }
     }
 
-    // No metric passed 50% threshold
-    if (bestLabel == null || bestGood < 0) {
-      return 'Hoàn thành $totalReps rep! Set sau sẽ tốt hơn.';
+    // ─── Tier 2: Pain-linked metric win ───
+    for (final faultKey in painFaultKeys) {
+      if (!metrics.containsKey(faultKey)) continue;
+      final ratio = _cleanRatio(logger, faultKey, totalReps);
+      if (ratio >= _metricWinThreshold) {
+        final label = metrics[faultKey]!;
+        return '$label hôm nay tốt — vùng bạn đang tập trung.';
+      }
     }
 
-    // Look up sentence template
-    final template = praiseSentenceMap()[bestLabel];
-    if (template != null) {
-      return template(bestGood, totalReps);
+    // ─── Tier 3: Historically weak metric improved ───
+    if (history.isNotEmpty) {
+      for (final faultKey in metrics.keys) {
+        if (!_wasHistoricallyWeak(faultKey, history)) continue;
+        final currentRatio = _cleanRatio(logger, faultKey, totalReps);
+        if (currentRatio >= _metricWinThreshold) {
+          final label = metrics[faultKey]!;
+          return '$label hôm nay tốt hơn hẳn mọi khi.';
+        }
+      }
     }
 
-    // Generic fallback
-    return '$bestLabel đạt $bestGood/$totalReps rep — tốt lắm!';
+    // ─── Tier 4: Set-over-set improvement ───
+    if (previousSetLogger != null && previousSetIndex != null) {
+      final improved = _setOverSetImprovement(previousSetLogger, logger);
+      if (improved) {
+        return 'Set ${setIndex + 1} tốt hơn set ${previousSetIndex + 1} rõ rệt.';
+      }
+    }
+
+    // tier 4.5: Correct rep count > 60% of max rep count
+    final ratio = goodReps / totalReps;
+    if (ratio >= 0.65) {
+      return '$goodReps/$totalReps rep đúng form — tốt đấy.';
+    }
+
+    // ─── Tier 5: Generic metric win (filtered) ───
+    return _genericMetricPraise(
+      logger: logger,
+      totalReps: totalReps,
+      history: history,
+    );
   }
 
   /// Returns the forward-looking tip for the highest-count fault.
@@ -191,7 +246,176 @@ abstract class ExerciseReportBuilder {
     return tipMap[worstKey];
   }
 
-  // ── Shared: override only if needed ──
+  // ── Helpers for praise ladder ──
+
+  Set<String> _painFaultKeys(List<String> userPainAreas) {
+    final keys = <String>{};
+    final map = painToFaultMap();
+    for (final pain in userPainAreas) {
+      keys.addAll(map[pain] ?? const []);
+    }
+    return keys;
+  }
+
+  /// Ratio of clean reps in this set for the given fault key.
+  /// 0.0 = every rep had the fault, 1.0 = no rep had it.
+  double _cleanRatio(ExerciseLogger logger, String faultKey, int totalReps) {
+    if (totalReps == 0) return 0;
+    final fails = (logger.setLogs[faultKey] as num?)?.toInt() ?? 0;
+    return (totalReps - fails) / totalReps;
+  }
+
+  /// Did the previous set's coach tip correspond to a fault that dropped
+  /// in the current set? If yes, returns the fault key. Else null.
+  String? _closedCoachingLoop({
+    required ExerciseLogger previousSetLogger,
+    required String previousSetCoachTip,
+    required ExerciseLogger currentLogger,
+  }) {
+    // Reverse-lookup: which fault key produced this tip?
+    final tipMap = faultToTipMap();
+    String? matchingFaultKey;
+    for (final entry in tipMap.entries) {
+      if (entry.value == previousSetCoachTip) {
+        matchingFaultKey = entry.key;
+        break;
+      }
+    }
+    if (matchingFaultKey == null) return null;
+
+    final previousCount =
+        (previousSetLogger.setLogs[matchingFaultKey] as num?)?.toInt() ?? 0;
+    final currentCount =
+        (currentLogger.setLogs[matchingFaultKey] as num?)?.toInt() ?? 0;
+
+    // Previous set had the fault, current set has fewer — loop closed.
+    if (previousCount > 0 && currentCount < previousCount) {
+      return matchingFaultKey;
+    }
+    return null;
+  }
+
+  /// Metric is historically weak if clean ratio across last N sessions
+  /// is below 50%.
+  bool _wasHistoricallyWeak(
+    String faultKey,
+    List<PreviousSessionSummary> history,
+  ) {
+    final window = history.length >= _habitualStrengthWindow
+        ? history.sublist(history.length - _habitualStrengthWindow)
+        : history;
+    if (window.isEmpty) return false;
+
+    int totalReps = 0;
+    int totalFails = 0;
+    for (final session in window) {
+      totalReps += session.totalReps;
+      totalFails += session.faultCounts[faultKey] ?? 0;
+    }
+    if (totalReps == 0) return false;
+
+    final cleanRatio = (totalReps - totalFails) / totalReps;
+    return cleanRatio < 0.5;
+  }
+
+  /// Metric is a habitual strength if clean ratio across last N sessions
+  /// is at or above [_habitualStrengthThreshold].
+  bool _isHabitualStrength(
+    String faultKey,
+    List<PreviousSessionSummary> history,
+  ) {
+    final window = history.length >= _habitualStrengthWindow
+        ? history.sublist(history.length - _habitualStrengthWindow)
+        : history;
+    if (window.isEmpty) return false;
+
+    int totalReps = 0;
+    int totalFails = 0;
+    for (final session in window) {
+      totalReps += session.totalReps;
+      totalFails += session.faultCounts[faultKey] ?? 0;
+    }
+    if (totalReps == 0) return false;
+
+    final cleanRatio = (totalReps - totalFails) / totalReps;
+    return cleanRatio >= _habitualStrengthThreshold;
+  }
+
+  /// Returns true if current set score is at least 10 points higher than
+  /// previous set score. Triggers the set-over-set praise tier.
+  bool _setOverSetImprovement(
+    ExerciseLogger previousSet,
+    ExerciseLogger currentSet,
+  ) {
+    final previousMax = (previousSet.setLogs['max_rep'] as num?)?.toInt() ?? 0;
+    final previousGood =
+        (previousSet.setLogs['good_rep_count'] as num?)?.toInt() ?? 0;
+    final currentMax = (currentSet.setLogs['max_rep'] as num?)?.toInt() ?? 0;
+    final currentGood =
+        (currentSet.setLogs['good_rep_count'] as num?)?.toInt() ?? 0;
+
+    if (previousMax == 0 || currentMax == 0) return false;
+
+    final previousScore = (previousGood / previousMax * 100).round();
+    final currentScore = (currentGood / currentMax * 100).round();
+
+    return currentScore >= previousScore + 10;
+  }
+
+  /// Tier 5: generic metric-first praise with habitual-strength filter.
+  ///
+  /// Walks praiseMetricNames() in order, finds highest clean ratio > 50%,
+  /// BUT skips metrics that are clean in ≥70% of reps across the last 3
+  /// sessions (habitual strengths produce hollow repeat praise).
+  ///
+  /// Returns null if all candidates are filtered out — rest screen hides
+  /// the praise line.
+  String? _genericMetricPraise({
+    required ExerciseLogger logger,
+    required int totalReps,
+    required List<PreviousSessionSummary> history,
+  }) {
+    final metrics = praiseMetricNames();
+    if (metrics.isEmpty) return null;
+
+    String? bestLabel;
+    String? bestKey;
+    int bestGood = -1;
+    double bestRatio = -1;
+
+    for (final entry in metrics.entries) {
+      final faultKey = entry.key;
+
+      // Skip habitual strengths — prevents depth-always-praised failure mode.
+      if (_isHabitualStrength(faultKey, history)) continue;
+
+      final fails = (logger.setLogs[faultKey] as num?)?.toInt() ?? 0;
+      final good = totalReps - fails;
+      final ratio = good / totalReps;
+
+      if (ratio > 0.5 && ratio > bestRatio) {
+        bestRatio = ratio;
+        bestGood = good;
+        bestLabel = entry.value;
+        bestKey = faultKey;
+      }
+    }
+
+    if (bestLabel == null || bestKey == null || bestGood < 0) {
+      // Everything was a habitual strength or nothing passed 50%.
+      // Return null — rest screen hides praise line.
+      return 'Xong set này rồi, tốt lắm.';
+    }
+
+    final template = praiseSentenceMap()[bestLabel];
+    if (template != null) {
+      return template(bestGood, totalReps);
+    }
+
+    return '$bestLabel đạt $bestGood/$totalReps rep — tốt lắm.';
+  }
+
+  // ── Coach text (shared, override only if needed) ──
 
   String generateCoachText(List<int> setScores) {
     if (setScores.isEmpty) return 'Hoàn thành buổi tập!';
@@ -229,17 +453,22 @@ abstract class ExerciseReportBuilder {
     return 'Form ổn định ($scoreStr%). Buổi tập chắc chắn.';
   }
 
-  // ── Fully shared: no override needed ──
+  // ── Report builder (entry point) ──
 
   PostExerciseData buildReport({
     required List<ExerciseLogger> setLoggers,
     required String exerciseName,
     required double metValue,
+    List<PreviousSessionSummary> history = const [],
+    List<String> userPainAreas = const [],
   }) {
     final sets = <SetReportData>[];
 
     for (int i = 0; i < setLoggers.length; i++) {
       final logger = setLoggers[i];
+      final previousSetLogger = i > 0 ? setLoggers[i - 1] : null;
+      final previousSetCoachTip =
+          previousSetLogger != null ? buildCoachTip(previousSetLogger) : null;
 
       final maxRep = (logger.setLogs["max_rep"] as num?)?.toInt() ?? 0;
       final goodReps = (logger.setLogs["good_rep_count"] as num?)?.toInt() ?? 0;
@@ -253,7 +482,15 @@ abstract class ExerciseReportBuilder {
         goodReps: goodReps,
         totalReps: maxRep,
         repResults: repResults,
-        praiseSentence: buildPraiseSentence(logger),
+        praiseSentence: buildPraiseSentence(
+          logger,
+          setIndex: i,
+          previousSetLogger: previousSetLogger,
+          previousSetIndex: i > 0 ? i - 1 : null,
+          previousSetCoachTip: previousSetCoachTip,
+          history: history,
+          userPainAreas: userPainAreas,
+        ),
         coachTip: buildCoachTip(logger),
       ));
     }

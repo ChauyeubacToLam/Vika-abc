@@ -7,6 +7,7 @@ import '../utils/pose_smoother.dart';
 import '../utils/pose_math_helpers.dart';
 import "../utils/frame_buffer.dart";
 import "../utils/exercise_logger.dart";
+import '../services/viettel_tts_service.dart';
 
 // --- Constants ---
 
@@ -51,6 +52,9 @@ abstract class ExerciseBase {
   late PoseSmoother poseSmoother;
   int repCount = 0;
   static const MIN_CONFIDENCE = 0.92;
+
+  // Voice Service
+  final ViettelTTSService ttsService = ViettelTTSService();
 
   // Scale factor (shoulder-to-hip distance)
   double scaleFactor = 1.0;
@@ -347,14 +351,35 @@ abstract class ExerciseBase {
   }
 
   bool _isLeftSide(Map<PoseLandmarkType, PoseLandmark>? smoothedLandmarks) {
-    if (smoothedLandmarks == null) return leftRightDebouncer.currentState;
+    if (smoothedLandmarks == null) return false;
 
-    final zScoreDecision = estimateIsLeftSideFromZScores(smoothedLandmarks);
-    if (zScoreDecision == null) {
-      return leftRightDebouncer.currentState;
+    const pairs = [
+      [PoseLandmarkType.leftShoulder, PoseLandmarkType.rightShoulder],
+      [PoseLandmarkType.leftElbow, PoseLandmarkType.rightElbow],
+      [PoseLandmarkType.leftWrist, PoseLandmarkType.rightWrist],
+      [PoseLandmarkType.leftHip, PoseLandmarkType.rightHip],
+      [PoseLandmarkType.leftKnee, PoseLandmarkType.rightKnee],
+      [PoseLandmarkType.leftAnkle, PoseLandmarkType.rightAnkle],
+    ];
+
+    int leftVotes = 0;
+    int rightVotes = 0;
+    for (final pair in pairs) {
+      final leftLM = smoothedLandmarks[pair[0]];
+      final rightLM = smoothedLandmarks[pair[1]];
+      if (leftLM == null || rightLM == null) continue;
+
+      final zDiff = leftLM.z - rightLM.z;
+      double threshold = 0.01;
+      if (zDiff.abs() > threshold) {
+        if (zDiff < 0) {
+          leftVotes++;
+        } else {
+          rightVotes++;
+        }
+      }
     }
-
-    return leftRightDebouncer.update(zScoreDecision);
+    return leftRightDebouncer.update(leftVotes >= rightVotes);
   }
 
   // --- Helpers ---
@@ -373,6 +398,25 @@ abstract class ExerciseBase {
   List<dynamic> getRepCountAndFeedback() => [repCount, resultIssues.feedback];
 
   List<dynamic> getSetFeedback() => setFeedback;
+
+  /// Hook for unifying voice feedback on rep completion
+  void speakRepCompletion({
+    required String? nextPhaseVoice,
+    required bool correctForm,
+    bool countRep = true,
+  }) {
+    if (countRep) {
+      ttsService.speak(repCount.toString());
+    }
+
+    if (correctForm) {
+      ttsService.speak("Tốt lắm");
+    }
+
+    if (!requestStop() && nextPhaseVoice != null) {
+      ttsService.speak(nextPhaseVoice);
+    }
+  }
 
   // --- State Machine (Hold-Still Activation) ---
 
@@ -394,9 +438,10 @@ abstract class ExerciseBase {
           if (elapsed >= HOLD_STILL_REQUIRED_DURATION) {
             exerciseState = ExerciseState.activated;
             _holdStillStartedAt = null;
+            onExerciseActivated();
           } else {
-            final displaySeconds = remaining.ceil().clamp(1, 99);
-            resultIssues.feedback['System'] = 'Giữ yên... ${displaySeconds}s';
+            resultIssues.feedback['System'] =
+                'Giữ yên... ${remaining.clamp(0.0, 99.0).toStringAsFixed(0)}s';
           }
         } else {
           if (_holdStillStartedAt != null) {
@@ -410,6 +455,7 @@ abstract class ExerciseBase {
       case ExerciseState.activated:
         if (requestStop()) {
           exerciseState = ExerciseState.completed;
+          ttsService.speak("Hoàn thành bài tập");
           onSetComplete();
         }
         break;
@@ -419,7 +465,11 @@ abstract class ExerciseBase {
     }
   }
 
-  // --- Abstract Methods ---
+  /* -----------------------------------------------------------------------
+     ABSTRACT METHODS & LIFECYCLE HOOKS
+     ----------------------------------------------------------------------- */
+
+  void onExerciseActivated() {}
 
   bool requestStop();
 

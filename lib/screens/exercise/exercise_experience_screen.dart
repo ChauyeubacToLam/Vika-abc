@@ -23,6 +23,8 @@ import 'exercise_intro_page.dart';
 import 'executive_summary_page.dart';
 import 'rest_screen.dart';
 import 'widgets/skeleton_annotation.dart';
+import 'package:vika/services/session_persistence.dart';
+import 'package:vika/services/exercise_comparison_service.dart';
 
 class ExerciseExperienceScreen extends StatefulWidget {
   const ExerciseExperienceScreen({
@@ -49,16 +51,33 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
   ExerciseLogger? _currentSetLogger;
   Duration? _completedDuration;
   int? _estimatedCalories;
+  SessionComparison? _comparison;
+  String? _currentSessionId;
+  String? _pendingOverallDifficulty;
 
   int _currentSet = 1;
   int _currentRepsTarget = 0;
   int? _pendingNextRepsTarget;
   double _userWeightKg = 60;
   DateTime? _startedAt;
+
   String _coachNote =
       'Buổi này AI sẽ ưu tiên nhịp chậm, form chắc và sự ổn định trong từng rep.';
 
+  // User-level data loaded once at screen init, passed to comparison service.
+  UserStats? _userStats;
+  List<String> _painAreas = [];
+  List<PreviousSessionSummary> _sessionHistory = [];
+
   bool get _isAssessment => widget.definition.id.endsWith('_assessment');
+
+  void _setFlowState(VoidCallback mutation) {
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(mutation);
+    });
+  }
 
   @override
   void initState() {
@@ -67,6 +86,9 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     _currentRepsTarget = _spec.repsPerSet;
     _loadCoachNote();
     _loadUserWeight();
+    _loadSessionHistory();
+    _loadUserStats();
+    _loadPainAreas();
   }
 
   Future<void> _loadUserWeight() async {
@@ -74,6 +96,40 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     final storedWeight = prefs.getDouble('user_weight');
     if (!mounted || storedWeight == null) return;
     setState(() => _userWeightKg = storedWeight);
+  }
+
+  Future<void> _loadUserStats() async {
+    final stats = await SessionPersistence().getUserStats();
+    if (!mounted) return;
+    setState(() => _userStats = stats);
+  }
+
+  Future<void> _loadPainAreas() async {
+    final areas = await SessionPersistence().getActivePainAreas();
+    if (!mounted) return;
+    setState(() => _painAreas = areas);
+  }
+
+  Future<void> _loadSessionHistory() async {
+    if (_isAssessment) return;
+    final history =
+        await SessionPersistence().getSessionHistory(widget.definition.id);
+    if (!mounted) return;
+    setState(() {
+      _sessionHistory = history;
+      // Apply conservative adjustment from last session's self-reported
+      // difficulty: heavy = -1 rep, light = +1 rep, else no change.
+      // Only applied before workout starts (intro phase).
+      if (_phase == _WorkoutFlowPhase.intro && history.isNotEmpty) {
+        final lastDifficulty = history.last.overallDifficulty;
+        final base = _spec.repsPerSet;
+        _currentRepsTarget = switch (lastDifficulty) {
+          'heavy' => (base - 1).clamp(1, base),
+          'light' => base + 1,
+          _ => base,
+        };
+      }
+    });
   }
 
   Future<void> _loadCoachNote() async {
@@ -116,6 +172,9 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       _currentSetLogger = null;
       _completedDuration = null;
       _estimatedCalories = null;
+      _comparison = null;
+      _currentSessionId = null;
+      _pendingOverallDifficulty = null;
       _currentSet = 1;
       _currentRepsTarget = _spec.repsPerSet;
       _pendingNextRepsTarget = null;
@@ -142,6 +201,8 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       setLoggers: _setLoggers,
       exerciseName: widget.definition.name,
       metValue: entry.met,
+      history: _sessionHistory,
+      userPainAreas: _painAreas,
     );
   }
 
@@ -169,7 +230,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
 
     final report = _buildReport();
 
-    setState(() {
+    _setFlowState(() {
       _currentSetReport = report.sets.last;
       _currentSetLogger = logger;
       _activeExercise = null;
@@ -208,25 +269,142 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     });
   }
 
+  /// Aggregate fault counts across all sets. Pure function: returns a map,
+  /// doesn't mutate fields. Call this whenever fresh totals are needed.
+  Map<String, int> _aggregateFaultCounts(List<ExerciseLogger> setLoggers) {
+    final counts = <String, int>{};
+    for (final logger in setLoggers) {
+      for (final entry in logger.setLogs.entries) {
+        if (entry.key.endsWith('_fails_count') && entry.value is num) {
+          counts[entry.key] =
+              (counts[entry.key] ?? 0) + (entry.value as num).toInt();
+        }
+      }
+    }
+    return counts;
+  }
+
+  List<Map<String, dynamic>> _buildSetData(List<ExerciseLogger> setLogs) {
+    return setLogs.asMap().entries.map((entry) {
+      final i = entry.key;
+      final logger = entry.value;
+      return {
+        'set_index': i,
+        'good_reps': logger.setLogs['good_rep_count'] ?? 0,
+        'total_reps': logger.repLogs.length,
+        'rep_data': logger.repLogs
+            .map((r) => {
+                  'rep_number': r.repNumber,
+                  'correct_form': r.correctForm,
+                  'data': r.data,
+                })
+            .toList(),
+      };
+    }).toList();
+  }
+
+  Future<void> _persistSession(PostExerciseData report) async {
+    final faultCounts = _aggregateFaultCounts(_setLoggers);
+    final setData = _buildSetData(_setLoggers);
+
+    // Fixed-length list: one slot per set, null if user skipped rating that set.
+    // Preserves set ordering so set 2's rating is always at index 1.
+    final ratings = List<String?>.generate(
+      report.sets.length,
+      (i) => _difficultyLogs[i]?['difficulty'] as String?,
+    );
+
+    final sessionId = await SessionPersistence().saveSession(
+      exerciseId: widget.definition.id,
+      startedAt: _startedAt ?? DateTime.now(),
+      formScore: report.formScore,
+      totalReps: report.sets.fold(0, (sum, s) => sum + s.totalReps),
+      totalGoodReps: report.sets.fold(0, (sum, s) => sum + s.goodReps),
+      totalSets: report.sets.length,
+      calories: _estimatedCalories,
+      faultCounts: faultCounts,
+      difficultyRatings: ratings,
+      setData: setData,
+    );
+
+    debugPrint('[Vika] Session persisted: $sessionId');
+
+    if (sessionId != null) {
+      _currentSessionId = sessionId;
+
+      // Flush queued difficulty even if the screen has already been popped.
+      final pending = _pendingOverallDifficulty;
+      if (pending != null) {
+        _pendingOverallDifficulty = null;
+        await SessionPersistence().updateSessionDifficulty(
+          sessionId: sessionId,
+          difficulty: pending,
+        );
+      }
+    }
+
+    // Update streak on profiles after successful session write.
+    // Fire-and-forget — errors don't block UX.
+    await SessionPersistence().updateStreak();
+  }
+
+  /// Called from ExecutiveSummaryPage when user taps a difficulty emoji.
+  /// Writes to exercise_sessions.overall_difficulty for the current session.
+  /// If the session save hasn't completed yet, queues the answer and flushes
+  /// it once _currentSessionId becomes available.
+  void _handleOverallDifficulty(String difficulty) {
+    final sessionId = _currentSessionId;
+    if (sessionId == null) {
+      debugPrint('[Vika] Queueing difficulty until session save completes');
+      _pendingOverallDifficulty = difficulty;
+      return;
+    }
+    SessionPersistence().updateSessionDifficulty(
+      sessionId: sessionId,
+      difficulty: difficulty,
+    );
+  }
+
   void _handleSummaryNext() {
     if (_currentSet >= _spec.sets) {
       final report = _buildReport();
+      final faultCounts = _aggregateFaultCounts(_setLoggers);
       final completedDuration =
           DateTime.now().difference(_startedAt ?? DateTime.now());
-      setState(() {
+
+      final builderEntry = reportBuilders[widget.definition.id];
+      SessionComparison? comparison;
+      if (builderEntry != null) {
+        comparison = ExerciseComparisonService().buildExecutiveComparison(
+          currentFormScore: report.formScore,
+          currentFaultCounts: faultCounts,
+          history: _sessionHistory,
+          userPainAreas: _painAreas,
+          painToFaultMap: builderEntry.builder.painToFaultMap(),
+          faultLabels: builderEntry.builder.praiseMetricNames(),
+          streakLength: _userStats?.streakDays ?? 0,
+        );
+      }
+
+      _setFlowState(() {
         _fullReport = report;
         _completedDuration = completedDuration;
         _estimatedCalories = _estimateCalories(
           report: report,
           totalDuration: completedDuration,
         );
+        _comparison = comparison;
         _activeExercise = null;
         _phase = _WorkoutFlowPhase.executive;
       });
+
+      if (!_isAssessment) {
+        _persistSession(report);
+      }
       return;
     }
 
-    setState(() {
+    _setFlowState(() {
       _currentSet += 1;
       _currentRepsTarget = _pendingNextRepsTarget ?? _currentRepsTarget;
       _pendingNextRepsTarget = null;
@@ -240,58 +418,60 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       _WorkoutFlowPhase.active => const Color(0xFF080C1A),
       _ => const Color(0xFFF0EDE6),
     };
+    final phaseBody = switch (_phase) {
+      _WorkoutFlowPhase.intro => ExerciseIntroPage(
+          title: widget.definition.name,
+          difficulty: widget.definition.difficulty,
+          totalSets: _spec.sets,
+          repsPerSet: _spec.repsPerSet,
+          videoDuration: _spec.videoDuration,
+          muscles: _spec.muscles,
+          tips: _spec.tips,
+          badges: _spec.badges,
+          callouts: _spec.callouts,
+          coachNote: _coachNote,
+          onStart: _beginWorkout,
+          onBack: () => Navigator.of(context).pop(),
+        ),
+      _WorkoutFlowPhase.active => ActiveExercisePage(
+          definition: widget.definition,
+          exercise: _activeExercise!,
+          currentSet: _currentSet,
+          totalSets: _spec.sets,
+          totalReps: _currentRepsTarget,
+          onSetComplete: _handleSetComplete,
+          onBack: () => Navigator.of(context).pop(),
+        ),
+      _WorkoutFlowPhase.rest => RestScreen(
+          setReport: _currentSetReport!,
+          setIndex: _currentSet - 1,
+          totalSets: _spec.sets,
+          currentReps: _currentRepsTarget,
+          isLastSet: _currentSet >= _spec.sets,
+          setLogger: _currentSetLogger,
+          onNext: _handleSummaryNext,
+          previousSession: _sessionHistory,
+          onDifficultyAnswer: _handleDifficultyAnswer,
+        ),
+      _WorkoutFlowPhase.executive => ExecutiveSummaryPage(
+          report: _fullReport!,
+          comparison: _comparison,
+          calories: _estimatedCalories ?? 0,
+          userWeightKg: _userWeightKg,
+          totalDuration: _completedDuration ?? Duration.zero,
+          isFirstSession: _sessionHistory.isEmpty,
+          streakDays: _userStats?.streakDays ?? 0,
+          lastOverallDifficulty: _sessionHistory.isNotEmpty
+              ? _sessionHistory.last.overallDifficulty
+              : null,
+          onOverallDifficulty: _handleOverallDifficulty,
+          onDone: () => Navigator.of(context).pop(),
+        ),
+    };
 
     return Scaffold(
       backgroundColor: backgroundColor,
-      body: switch (_phase) {
-        _WorkoutFlowPhase.intro => ExerciseIntroPage(
-            title: widget.definition.name,
-            difficulty: widget.definition.difficulty,
-            totalSets: _spec.sets,
-            repsPerSet: _spec.repsPerSet,
-            videoDuration: _spec.videoDuration,
-            muscles: _spec.muscles,
-            tips: _spec.tips,
-            badges: _spec.badges,
-            callouts: _spec.callouts,
-            coachNote: _coachNote,
-            onStart: _beginWorkout,
-            onBack: () => Navigator.of(context).pop(),
-          ),
-        _WorkoutFlowPhase.active => ActiveExercisePage(
-            key: ValueKey(
-              'active-${widget.definition.id}-$_currentSet-$_currentRepsTarget',
-            ),
-            definition: widget.definition,
-            exercise: _activeExercise!,
-            currentSet: _currentSet,
-            totalSets: _spec.sets,
-            totalReps: _currentRepsTarget,
-            onSetComplete: _handleSetComplete,
-            onBack: () => Navigator.of(context).pop(),
-          ),
-        _WorkoutFlowPhase.rest => RestScreen(
-            key: ValueKey('rest-${widget.definition.id}-$_currentSet'),
-            setReport: _currentSetReport!,
-            setIndex: _currentSet - 1,
-            totalSets: _spec.sets,
-            currentReps: _currentRepsTarget,
-            isLastSet: _currentSet >= _spec.sets,
-            setLogger: _currentSetLogger,
-            onNext: _handleSummaryNext,
-            onDifficultyAnswer: _handleDifficultyAnswer,
-          ),
-        _WorkoutFlowPhase.executive => ExecutiveSummaryPage(
-            key: ValueKey('executive-${widget.definition.id}'),
-            report: _fullReport!,
-            calories: _estimatedCalories ?? 0,
-            userWeightKg: _userWeightKg,
-            totalDuration: _completedDuration ?? Duration.zero,
-            onDone: () => Navigator.of(context).pop(),
-            percentile: 27,
-            vsLastWeekPct: 12,
-          ),
-      },
+      body: phaseBody,
     );
   }
 }
