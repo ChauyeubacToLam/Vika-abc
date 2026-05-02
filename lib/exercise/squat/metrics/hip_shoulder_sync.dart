@@ -51,9 +51,6 @@ class HipShoulderSyncConfig {
 }
 
 class HipShoulderSyncMetric extends SquatMetricBase {
-  // Reuse the chest-up cue so post-rep playback stays on the same voice profile.
-  static const String _postRepVoiceCue = 'Ưỡn ngực lên';
-
   @override
   String get name => 'HipShoulderSync';
 
@@ -174,7 +171,7 @@ class HipShoulderSyncMetric extends SquatMetricBase {
       type: 'HipShoulderSync',
       message: message,
       affectsForm: true,
-      voiceMessage: _postRepVoiceCue,
+      voiceMessage: null,
       priority: SquatFaultVoicePriority.hipShoulderSync,
     ));
   }
