@@ -282,7 +282,10 @@ class PoseLandmarkerPlugin(
     companion object {
         private const val METHOD_CHANNEL_NAME = "com.vikavn.app/pose_landmarker"
         private const val EVENT_CHANNEL_NAME = "com.vikavn.app/pose_landmarker_stream"
-        private const val TARGET_WIDTH = 640
-        private const val TARGET_HEIGHT = 480
+        // 16:9 to maximize horizontal FOV / "widest range" framing the camera can offer.
+        // CameraX picks the closest supported size; on most phones this lands at 1280x720
+        // which is plenty for MediaPipe pose detection.
+        private const val TARGET_WIDTH = 1280
+        private const val TARGET_HEIGHT = 720
     }
 }

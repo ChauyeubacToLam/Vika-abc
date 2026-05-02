@@ -101,6 +101,19 @@ abstract class ExerciseBase {
       Duration(milliseconds: 320);
 
   bool get isPaused => _isPaused;
+
+  /// Manually pause the exercise (e.g. user tapped pause button).
+  void manualPause() {
+    if (exerciseState != ExerciseState.activated) return;
+    _isPaused = true;
+  }
+
+  /// Manually resume after a manual pause.
+  void manualResume() {
+    _isPaused = false;
+    _resumePresenceSince = DateTime.now();
+    _personLostSince = null;
+  }
   double get personPresenceScore => _personDetector.presenceScore;
 
   // Hold-still activation

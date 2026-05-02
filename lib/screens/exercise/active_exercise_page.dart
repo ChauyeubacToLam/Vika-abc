@@ -11,17 +11,13 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../exercise/exercise_base.dart';
 import '../../pose/pose_landmarker_adapter.dart';
 import '../../pose/pose_landmarker_channel.dart';
-import '../../exercise/squat/metrics/heel_rise_metric.dart';
-import '../../exercise/squat/metrics/hip_shoulder_sync.dart';
-import '../../exercise/squat/metrics/tempo_metric.dart';
-import '../../exercise/squat/metrics/trunk_lean_metric.dart';
 import '../../exercise/squat/squat.dart';
 import '../../models/exercise_definition.dart';
 import '../../services/squat_voice_coach.dart';
 import '../../utils/exercise_logger.dart';
-import '../onboarding/vf_theme.dart';
+import '../../theme/vf_theme.dart';
 import 'widgets/form_score_arc.dart';
-import 'widgets/metric_chip.dart';
+import 'widgets/ivory_chrome.dart';
 import 'widgets/pose_overlay_painter.dart';
 import 'widgets/system_banner.dart';
 
@@ -70,16 +66,25 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   bool _isProcessingFrame = false;
   bool _isCameraReady = false;
   bool _didComplete = false;
-  bool _showReference = true;
-  bool _showDebug = false;
+  final bool _showDebug = false;
   String? _cameraErrorMessage;
   Map<String, String> _feedback = {};
   Pose? _detectedPose;
   Size _imageSize = Size.zero;
   InputImageRotation _imageRotation = InputImageRotation.rotation0deg;
   late final AnimationController _pulseController;
-  late final AnimationController _voiceController;
   SquatVoiceCoach? _squatVoiceCoach;
+
+  // ─── Ivory v8 state ───
+  int _setElapsedSeconds = 0;
+  Timer? _setTimer;
+  // TODO(form-score): Replace with real computed form score from ML pipeline
+  static const int _hardcodedFormScore = 82;
+  // TODO(chart): Replace with real sparkline data from primaryAngleForChart
+  static const List<int> _hardcodedSparkData = [72, 78, 84, 80, 76, 82, 86, 88, 84, 82];
+  // TODO(integration): Replace with real fault indices from RepLog.faults
+  static const List<int> _hardcodedFaultIndices = [2];
+  bool _isManualPause = false;
   _PoseRuntime _runtime = _PoseRuntime.nativeMediaPipe;
 
   @override
@@ -89,18 +94,16 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
-    _voiceController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1100),
-    )..repeat();
     if (widget.exercise is Squat) {
       _squatVoiceCoach = SquatVoiceCoach();
     }
+    _startSetTimer();
     _initCamera();
   }
 
   @override
   void dispose() {
+    _setTimer?.cancel();
     final landmarkSubscription = _landmarkSubscription;
     _landmarkSubscription = null;
     unawaited(landmarkSubscription?.cancel() ?? Future<void>.value());
@@ -110,7 +113,6 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     unawaited(widget.exercise.disposeDetectors());
     _squatVoiceCoach?.dispose();
     _pulseController.dispose();
-    _voiceController.dispose();
     super.dispose();
   }
 
@@ -355,7 +357,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       );
       final controller = CameraController(
         camera,
-        ResolutionPreset.medium,
+        // High = 1280x720, gives the widest 16:9 framing while staying within ML Kit's
+        // performance envelope on iOS (the fallback path).
+        ResolutionPreset.high,
         enableAudio: false,
         imageFormatGroup: Platform.isAndroid
             ? ImageFormatGroup.nv21
@@ -414,7 +418,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     final camera = _availableCameras[newIndex];
     final controller = CameraController(
       camera,
-      ResolutionPreset.medium,
+      ResolutionPreset.high,
       enableAudio: false,
       imageFormatGroup: Platform.isAndroid
           ? ImageFormatGroup.nv21
@@ -561,6 +565,17 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     }
   }
 
+  void _startSetTimer() {
+    _setElapsedSeconds = 0;
+    _setTimer?.cancel();
+    _setTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      if (widget.exercise.isPaused) return;
+      if (widget.exercise.exerciseState != ExerciseState.activated) return;
+      setState(() => _setElapsedSeconds++);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final permissionGranted = _permissionStatus?.isGranted ?? true;
@@ -623,7 +638,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 52, color: VF.jadeGlow),
+              Icon(icon, size: 52, color: VFTheme.jadeGlow),
               const SizedBox(height: 18),
               Text(
                 title,
@@ -648,9 +663,24 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                 const SizedBox(height: 20),
                 SizedBox(
                   width: double.infinity,
-                  child: VFButton(
-                    label: actionLabel,
-                    onTap: onAction,
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: onAction,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: VFTheme.jade,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: Text(
+                      actionLabel,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -667,20 +697,44 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     final bottomHoldCue = _bottomHoldCue;
     final translatedSystem = _translatedSystemMessage;
     final coachMessage = _coachMessage;
-    final showSetPill = _showSetPill;
     final activeState =
         widget.exercise.exerciseState == ExerciseState.activated &&
             !widget.exercise.isPaused;
+
+    // Derive ivory phase verb from squat state machine phases.
+    // Standing = default resting position (not a "ready" state).
+    final phaseKey = widget.exercise.currentPhaseKey;
+    final isHoldPhase = bottomHoldCue != null;
+    String phaseVerb;
+    String phaseHint;
+    switch (phaseKey) {
+      case 'descending':
+        phaseVerb = 'XUỐNG';
+        phaseHint = 'Hạ chậm, kiểm soát';
+      case 'bottom':
+        phaseVerb = 'GIỮ';
+        phaseHint = 'Giữ đáy, ổn định';
+      case 'ascending':
+        phaseVerb = 'LÊN';
+        phaseHint = 'Đẩy sàn xuống';
+      default: // 'standing' or any other
+        phaseVerb = 'XUỐNG';
+        phaseHint = 'Bắt đầu hạ người';
+    }
+
+    // TODO(caption): Wire mid-rep fault detection caption here
+    final showCaption = activeState && coachMessage.isNotEmpty;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Stack(
         fit: StackFit.expand,
         children: [
+          // ── Layer 1: Camera preview ──
           RepaintBoundary(
             child: SizedBox.expand(
               child: FittedBox(
-                fit: BoxFit.contain,
+                fit: BoxFit.cover,
                 alignment: Alignment.center,
                 child: SizedBox(
                   width: _previewRenderSize.width,
@@ -694,6 +748,8 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
               ),
             ),
           ),
+
+          // ── Layer 2: Skeleton overlay (unchanged — jade colors preserved) ──
           Positioned.fill(
             child: IgnorePointer(
               child: LayoutBuilder(
@@ -715,123 +771,133 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
               ),
             ),
           ),
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.24),
-                    Colors.black.withValues(alpha: 0.06),
-                    Colors.black.withValues(alpha: 0.12),
-                    Colors.black.withValues(alpha: 0.58),
-                  ],
-                  stops: const [0, 0.22, 0.58, 1],
-                ),
-              ),
-            ),
-          ),
-          Positioned.fill(
+
+          // ── Layer 3: Top scrim — anchors the status bar + top chrome
+          // row against the camera scene. Fades to transparent by ~140 px
+          // so the live body area stays bright.
+          const Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 140,
             child: IgnorePointer(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(22, 96, 22, 110),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: widget.exercise.isPaused
-                          ? VF.coral.withValues(alpha: 0.55)
-                          : Colors.white.withValues(alpha: 0.18),
-                      width: 1.4,
-                    ),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color.fromRGBO(15, 11, 9, 0.78),
+                      Colors.transparent,
+                    ],
                   ),
                 ),
               ),
             ),
           ),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-              child: Row(
-                children: [
-                  _FrostedIconButton(
-                    icon: Icons.arrow_back_ios_new_rounded,
-                    onTap: widget.onBack,
+
+          // ── Layer 4: Bottom scrim — anchors the phase verb + rep
+          // counter. Stronger alpha than the top scrim because the bottom
+          // carries more glass-on-bright-scene text and a wider safe-area.
+          const Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 200,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [
+                      Color.fromRGBO(15, 11, 9, 0.92),
+                      Colors.transparent,
+                    ],
                   ),
-                  Expanded(
-                    child: Center(
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 180),
-                        child: showSetPill
-                            ? KeyedSubtree(
-                                key: const ValueKey('set-pill'),
-                                child: _FrostedPill(
-                                  child: Text.rich(
-                                    TextSpan(
-                                      children: [
-                                        TextSpan(
-                                          text: 'Hi\u1ec7p ',
-                                          style: TextStyle(
-                                            color: Colors.white.withValues(
-                                              alpha: 0.42,
-                                            ),
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                        TextSpan(
-                                          text: '${widget.currentSet}',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w900,
-                                          ),
-                                        ),
-                                        TextSpan(
-                                          text: ' / ${widget.totalSets}',
-                                          style: TextStyle(
-                                            color: Colors.white.withValues(
-                                              alpha: 0.32,
-                                            ),
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              )
-                            : const SizedBox(key: ValueKey('set-pill-empty')),
-                      ),
-                    ),
-                  ),
-                  _FrostedIconButton(
-                    icon: Icons.bug_report_outlined,
-                    active: _showDebug,
-                    onTap: () => setState(() => _showDebug = !_showDebug),
-                  ),
-                  const SizedBox(width: 10),
-                  _FrostedIconButton(
-                    icon: _currentLens == CameraLensDirection.back
-                        ? Icons.camera_front_rounded
-                        : Icons.camera_rear_rounded,
-                    onTap: _toggleCamera,
-                  ),
-                ],
+                ),
               ),
             ),
           ),
-          if (_showReference && activeState)
+
+          // ── Layer 4: Top chrome left (back + HIỆP pill) ──
+          Positioned(
+            top: media.padding.top + 10,
+            left: 16,
+            child: IvoryTopChromeLeft(
+              currentSet: widget.currentSet,
+              totalSets: widget.totalSets,
+              setSeconds: _setElapsedSeconds,
+              onBack: widget.onBack,
+            ),
+          ),
+
+          // ── Layer 5: Top chrome right (form arc + flip + pause) ──
+          // JSX v8: form arc lives inline with the icon buttons. The pulse pill
+          // is the "minimal richness" alternative and is deliberately omitted —
+          // we ship at the medium-richness default (form arc visible).
+          Positioned(
+            top: media.padding.top + 10,
+            right: 16,
+            child: IvoryTopChromeRight(
+              // TODO(form-score): Replace _hardcodedFormScore with the real
+              // computed form score from the ML pipeline (per-rep average or
+              // rolling window).
+              formScore: _hardcodedFormScore,
+              onPause: () {
+                _isManualPause = true;
+                widget.exercise.manualPause();
+                setState(() {});
+              },
+              onFlipCamera: _toggleCamera,
+            ),
+          ),
+
+          // ── Layer 6: Sparkline (below top-right chrome row) ──
+          // JSX positions sparkline ~6px under the chrome row (top:112 with
+          // chrome at top:64). In Flutter that maps to chrome top + chrome
+          // height (44) + 4 ≈ media.padding.top + 58.
+          if (activeState)
             Positioned(
-              top: media.padding.top + 82,
+              top: media.padding.top + 58,
               right: 16,
-              child: _ReferenceCard(
-                exerciseName: widget.definition.name,
-                onClose: () => setState(() => _showReference = false),
+              // TODO(chart): Replace _hardcodedSparkData with the real rolling
+              // 10s form-score history coming out of the ML pipeline.
+              child: const IvoryFormScoreSparkline(data: _hardcodedSparkData),
+            ),
+
+          // ── Layer 7: PT reference loop (top-left, just below chrome row) ──
+          // JSX places it at top:116 (16px below chrome bottom). chrome bottom
+          // = media.padding.top + 10 + 36 = +46, so PT loop sits at +56.
+          if (activeState)
+            Positioned(
+              top: media.padding.top + 56,
+              left: 16,
+              child: const IvoryPTReferenceLoop(),
+            ),
+
+          // ── Layer 8: Coach caption (center lower-third) ──
+          if (showCaption)
+            Positioned(
+              left: 24,
+              right: 24,
+              bottom: media.padding.bottom + 156,
+              child: IvoryCoachCaption(message: coachMessage),
+            ),
+
+          // ── Layer 9: System banner for non-active states ──
+          if (translatedSystem != null && overlayState != _LiveOverlayState.active)
+            Positioned(
+              left: 20,
+              right: 20,
+              bottom: activeState ? 214 : media.padding.bottom + 18,
+              child: SystemBanner(
+                message: translatedSystem,
+                mode: _bannerModeFor(overlayState),
               ),
             ),
+
+          // ── Layer 10: Center overlay (scan/warn/position/hold) ──
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 260),
             child: overlayState == _LiveOverlayState.active
@@ -846,17 +912,8 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                     ),
                   ),
           ),
-          if (translatedSystem != null &&
-              overlayState != _LiveOverlayState.active)
-            Positioned(
-              left: 20,
-              right: 20,
-              bottom: activeState ? 214 : media.padding.bottom + 18,
-              child: SystemBanner(
-                message: translatedSystem,
-                mode: _bannerModeFor(overlayState),
-              ),
-            ),
+
+          // ── Layer 11: Debug panel ──
           if (_showDebug)
             Positioned(
               left: 16,
@@ -866,197 +923,41 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                   : media.padding.bottom + 104,
               child: _buildDebugPanel(),
             ),
+
+          // ── Layer 12: Bottom chrome (phase verb + rep counter) ──
           if (activeState)
             Positioned(
-              left: 16,
-              right: 16,
-              bottom: media.padding.bottom + 20,
-              child: _buildActiveHud(coachMessage),
+              left: 24,
+              right: 24,
+              bottom: media.padding.bottom + 36,
+              child: IvoryBottomChrome(
+                phaseVerb: phaseVerb,
+                phaseHint: phaseHint,
+                repCount: widget.exercise.repCount,
+                totalReps: widget.totalReps,
+                isHoldPhase: isHoldPhase,
+                holdProgress: bottomHoldCue?.progress,
+                holdRemaining: bottomHoldCue?.remaining,
+                // TODO(integration): Wire RepLog.faults into faultIndices
+                faultIndices: _hardcodedFaultIndices,
+              ),
+            ),
+
+          // ── Layer 13: Pause overlay ──
+          if (widget.exercise.isPaused)
+            Positioned.fill(
+              child: IvoryPauseOverlay(
+                isManualPause: _isManualPause,
+                onResume: () {
+                  _isManualPause = false;
+                  widget.exercise.manualResume();
+                  setState(() {});
+                },
+                onEnd: widget.onBack,
+              ),
             ),
         ],
       ),
-    );
-  }
-
-  Widget _buildActiveHud(String coachMessage) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          height: 62,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            child: Row(
-              children: _metricTiles.asMap().entries.map((entry) {
-                final index = entry.key;
-                final metric = entry.value;
-                return Padding(
-                  padding: EdgeInsets.only(
-                    right: index == _metricTiles.length - 1 ? 0 : 8,
-                  ),
-                  child: SizedBox(
-                    width: 112,
-                    child: MetricChip(
-                      label: metric.label,
-                      value: metric.value,
-                      state: metric.state,
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            FormScoreArc(
-              progress: widget.totalReps == 0
-                  ? 0
-                  : widget.exercise.repCount / widget.totalReps,
-              size: 72,
-              color: VF.jadeGlow,
-              trackColor: Colors.white.withValues(alpha: 0.08),
-              strokeWidth: 4,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    '${widget.exercise.repCount}',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                      height: 1,
-                    ),
-                  ),
-                  Text(
-                    '/${widget.totalReps}',
-                    style: TextStyle(
-                      fontSize: 8.5,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white.withValues(alpha: 0.34),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                  child: Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.08),
-                      ),
-                    ),
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 240),
-                      transitionBuilder: (child, animation) {
-                        return FadeTransition(
-                          opacity: animation,
-                          child: SlideTransition(
-                            position: Tween<Offset>(
-                              begin: const Offset(0.08, 0),
-                              end: Offset.zero,
-                            ).animate(animation),
-                            child: child,
-                          ),
-                        );
-                      },
-                      child: Column(
-                        key: ValueKey<String>(coachMessage),
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 6,
-                                height: 6,
-                                decoration: const BoxDecoration(
-                                  color: VF.jadeGlow,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                'HLV AI',
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 1,
-                                  color: VF.jadeGlow.withValues(alpha: 0.62),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 5),
-                          Text(
-                            coachMessage,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white.withValues(alpha: 0.80),
-                              height: 1.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        AnimatedBuilder(
-          animation: _voiceController,
-          builder: (context, _) {
-            return Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: List.generate(5, (index) {
-                    final phase = (_voiceController.value + (index * 0.12)) % 1;
-                    final height =
-                        6 + (phase < 0.5 ? phase * 16 : (1 - phase) * 16);
-                    return Padding(
-                      padding: EdgeInsets.only(right: index == 4 ? 0 : 2),
-                      child: Container(
-                        width: 3,
-                        height: height,
-                        decoration: BoxDecoration(
-                          color: VF.jadeGlow.withValues(alpha: 0.7),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    );
-                  }),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Giọng nói đang bật',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white.withValues(alpha: 0.24),
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-      ],
     );
   }
 
@@ -1081,12 +982,6 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       return _LiveOverlayState.scan;
     }
     return _LiveOverlayState.position;
-  }
-
-  bool get _showSetPill {
-    final isCountingDown = widget.exercise.activationProgress != null;
-    final isActive = widget.exercise.exerciseState == ExerciseState.activated;
-    return !isCountingDown && !isActive && _detectedPose == null;
   }
 
   SystemBannerMode _bannerModeFor(_LiveOverlayState state) {
@@ -1195,281 +1090,6 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     return 'Giữ nhịp đều và kiểm soát toàn bộ chuyển động.';
   }
 
-  List<_MetricTileData> get _metricTiles {
-    if (widget.definition.id.startsWith('squat')) {
-      return _buildLiveSquatMetricTiles();
-    }
-
-    final feedback = Map<String, String>.from(_feedback)
-      ..remove('System')
-      ..remove('Result');
-
-    final preferredKeys = <String>['Depth', 'Back', 'Tempo'];
-    final tiles = <_MetricTileData>[];
-
-    for (final key in preferredKeys) {
-      final value = feedback[key];
-      if (value != null) {
-        tiles.add(_metricFrom(key, value));
-      }
-    }
-
-    for (final entry in feedback.entries) {
-      if (tiles.length >= 4) {
-        break;
-      }
-      if (preferredKeys.contains(entry.key)) {
-        continue;
-      }
-      tiles.add(_metricFrom(entry.key, entry.value));
-    }
-
-    while (tiles.length < 4) {
-      tiles.add(
-        const _MetricTileData(
-          label: 'DỮ LIỆU',
-          value: '—',
-          state: MetricChipState.neutral,
-        ),
-      );
-    }
-
-    return tiles.take(4).toList();
-  }
-
-  _MetricTileData _metricFrom(String key, String value) {
-    final translatedValue = _translateFeedbackValue(key, value);
-    final label = switch (key) {
-      'Depth' => 'ĐỘ SÂU',
-      'Back' => 'LƯNG',
-      'Tempo' => 'NHỊP',
-      'Feet' => 'CHÂN',
-      _ => key.toUpperCase(),
-    };
-    final normalizedValue = value.toLowerCase();
-    final good = normalizedValue.contains('good') ||
-        normalizedValue.contains('deep squat');
-
-    return _MetricTileData(
-      label: label,
-      value: translatedValue,
-      state: good ? MetricChipState.good : MetricChipState.warning,
-    );
-  }
-
-  // ignore: unused_element
-  List<_MetricTileData> _buildSquatMetricTiles() {
-    final debug = widget.exercise.debugData;
-    final depthAngle =
-        _readDebugNumber(debug['kneeAngle'] ?? debug['minKneeAngle']);
-    final heelNorm = _readDebugNumber(debug['heelNorm']);
-    final trunkLean =
-        _readDebugNumber(debug['trunkLean'] ?? debug['maxTrunkLean']);
-    final descent = _readDebugNumber(debug['descentDur']);
-    final ascent = _readDebugNumber(debug['ascentDur']);
-    final hold = _readDebugNumber(debug['bottomHold']);
-    final syncRatio =
-        _readDebugNumber(debug['syncRatio'] ?? debug['peakSyncRatio']);
-
-    return [
-      _MetricTileData(
-        label: 'ĐỘ SÂU',
-        value: depthAngle == null
-            ? _fallbackMetricValue('Depth', '—')
-            : '${depthAngle.toStringAsFixed(0)}°',
-        state: depthAngle == null
-            ? MetricChipState.neutral
-            : (depthAngle >= SquatConfig.SQUAT_BOTTOM_ANGLE_THRESHOLD[0] &&
-                    depthAngle <= SquatConfig.SQUAT_BOTTOM_ANGLE_THRESHOLD[1]
-                ? MetricChipState.good
-                : MetricChipState.warning),
-      ),
-      _MetricTileData(
-        label: 'GÓT CHÂN',
-        value: heelNorm == null
-            ? _fallbackMetricValue('Feet', '—')
-            : '${(heelNorm * 100).toStringAsFixed(0)}%',
-        state: heelNorm == null
-            ? MetricChipState.neutral
-            : (heelNorm < HeelRiseConfig.LIFT_THRESHOLD
-                ? MetricChipState.good
-                : MetricChipState.warning),
-      ),
-      _MetricTileData(
-        label: 'LƯNG',
-        value: trunkLean == null
-            ? _fallbackMetricValue('Back', '—')
-            : '${trunkLean.toStringAsFixed(0)}°',
-        state: trunkLean == null
-            ? MetricChipState.neutral
-            : (trunkLean >= TrunkLeanConfig.GOOD_LEAN_RANGE[0] &&
-                    trunkLean <= TrunkLeanConfig.GOOD_LEAN_RANGE[1]
-                ? MetricChipState.good
-                : MetricChipState.warning),
-      ),
-      _MetricTileData(
-        label: 'NHỊP',
-        value: _tempoValue(
-          descent: descent,
-          ascent: ascent,
-          hold: hold,
-          fallback: _fallbackMetricValue('Tempo', '—'),
-        ),
-        state: descent == null && hold == null && _feedback['Tempo'] == null
-            ? MetricChipState.neutral
-            : (_tempoGood(
-                descent: descent,
-                hold: hold,
-                fallbackFeedback: _feedback['Tempo'],
-              )
-                ? MetricChipState.good
-                : MetricChipState.warning),
-      ),
-      _MetricTileData(
-        label: 'ĐỒNG BỘ',
-        value: syncRatio == null
-            ? _fallbackMetricValue('Sync', '—')
-            : '${syncRatio.toStringAsFixed(2)}x',
-        state: syncRatio == null
-            ? MetricChipState.neutral
-            : (syncRatio <= HipShoulderSyncConfig.RATIO_GOOD_MAX
-                ? MetricChipState.good
-                : MetricChipState.warning),
-      ),
-    ];
-  }
-
-  String _fallbackMetricValue(String key, String fallback) {
-    final raw = _feedback[key];
-    if (raw == null || raw.isEmpty) return fallback;
-    return _translateFeedbackValue(key, raw);
-  }
-
-  List<_MetricTileData> _buildLiveSquatMetricTiles() {
-    final debug = widget.exercise.debugData;
-    final depthAngle =
-        _readDebugNumber(debug['kneeAngle'] ?? debug['minKneeAngle']);
-    final heelNorm = _readDebugNumber(debug['heelNorm']);
-    final trunkLean =
-        _readDebugNumber(debug['trunkLean'] ?? debug['maxTrunkLean']);
-    final descent = _readDebugNumber(debug['descentDur']);
-    final ascent = _readDebugNumber(debug['ascentDur']);
-    final hold = _readDebugNumber(debug['bottomHold']);
-    final syncRatio =
-        _readDebugNumber(debug['syncRatio'] ?? debug['peakSyncRatio']);
-
-    return [
-      _buildLiveSquatMetricTile(
-        metric: _SquatMetric.depth,
-        label: 'ĐỘ SÂU',
-        activeValue:
-            depthAngle == null ? '—' : '${depthAngle.toStringAsFixed(0)}°',
-        hasValue: depthAngle != null,
-        state: _liveSquatMetricState(_SquatMetric.depth),
-      ),
-      _buildLiveSquatMetricTile(
-        metric: _SquatMetric.heel,
-        label: 'GÓT CHÂN',
-        activeValue:
-            heelNorm == null ? '—' : '${(heelNorm * 100).toStringAsFixed(0)}%',
-        hasValue: heelNorm != null,
-        state: _liveSquatMetricState(_SquatMetric.heel),
-      ),
-      _buildLiveSquatMetricTile(
-        metric: _SquatMetric.trunk,
-        label: 'LƯNG',
-        activeValue:
-            trunkLean == null ? '—' : '${trunkLean.toStringAsFixed(0)}°',
-        hasValue: trunkLean != null,
-        state: _liveSquatMetricState(_SquatMetric.trunk),
-      ),
-      _buildLiveSquatMetricTile(
-        metric: _SquatMetric.tempo,
-        label: 'NHỊP',
-        activeValue: _tempoValue(
-          descent: descent,
-          ascent: ascent,
-          hold: hold,
-          fallback: '—',
-        ),
-        hasValue: descent != null || hold != null || _feedback['Tempo'] != null,
-        state: _liveSquatMetricState(_SquatMetric.tempo),
-      ),
-      _buildLiveSquatMetricTile(
-        metric: _SquatMetric.sync,
-        label: 'ĐỒNG BỘ',
-        activeValue:
-            syncRatio == null ? '—' : '${syncRatio.toStringAsFixed(2)}x',
-        hasValue: syncRatio != null,
-        state: _liveSquatMetricState(_SquatMetric.sync),
-      ),
-    ];
-  }
-
-  _MetricTileData _buildLiveSquatMetricTile({
-    required _SquatMetric metric,
-    required String label,
-    required String activeValue,
-    required bool hasValue,
-    required MetricChipState state,
-  }) {
-    final active = _isSquatMetricActive(metric);
-    return _MetricTileData(
-      label: label,
-      value: active && hasValue ? activeValue : '—',
-      state: !active || !hasValue ? MetricChipState.neutral : state,
-    );
-  }
-
-  MetricChipState _liveSquatMetricState(_SquatMetric metric) {
-    if (!_isSquatMetricActive(metric)) {
-      return MetricChipState.neutral;
-    }
-
-    final feedbackKey = switch (metric) {
-      _SquatMetric.depth => 'Depth',
-      _SquatMetric.heel => 'Feet',
-      _SquatMetric.trunk => 'Back',
-      _SquatMetric.tempo => 'Tempo',
-      _SquatMetric.sync => 'Sync',
-    };
-    final feedback = _feedback[feedbackKey];
-    if (feedback == null || feedback.isEmpty) {
-      return MetricChipState.neutral;
-    }
-
-    final normalized = feedback.toLowerCase();
-    final isFaulting = switch (metric) {
-      _SquatMetric.depth => normalized.contains('go lower'),
-      _SquatMetric.heel => normalized.contains('lifting'),
-      _SquatMetric.trunk =>
-        normalized.contains('chest up') || normalized.contains("don't lean"),
-      _SquatMetric.tempo =>
-        normalized.contains('dropping') || normalized.contains('not pausing'),
-      _SquatMetric.sync => normalized.contains('drive chest up') ||
-          normalized.contains('keep chest up'),
-    };
-
-    return isFaulting ? MetricChipState.warning : MetricChipState.neutral;
-  }
-
-  bool _isSquatMetricActive(_SquatMetric metric) {
-    if (widget.exercise.exerciseState != ExerciseState.activated ||
-        widget.exercise.isPaused) {
-      return false;
-    }
-
-    final phase = widget.exercise.currentPhaseKey;
-    return switch (metric) {
-      _SquatMetric.depth => phase == 'descending' || phase == 'bottom',
-      _SquatMetric.heel ||
-      _SquatMetric.trunk =>
-        phase == 'descending' || phase == 'bottom' || phase == 'ascending',
-      _SquatMetric.tempo => phase == 'bottom' || phase == 'ascending',
-      _SquatMetric.sync => phase == 'ascending',
-    };
-  }
-
   double? _readDebugNumber(dynamic value) {
     if (value is num) return value.toDouble();
     if (value is String) {
@@ -1477,71 +1097,6 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       return double.tryParse(cleaned);
     }
     return null;
-  }
-
-  String _tempoValue({
-    required double? descent,
-    required double? ascent,
-    required double? hold,
-    required String fallback,
-  }) {
-    if (descent != null && ascent != null) {
-      return '${descent.toStringAsFixed(1)}/${ascent.toStringAsFixed(1)}s';
-    }
-    if (descent != null) {
-      return '${descent.toStringAsFixed(1)}s';
-    }
-    if (hold != null) {
-      return 'giữ ${hold.toStringAsFixed(1)}s';
-    }
-    return fallback;
-  }
-
-  bool _tempoGood({
-    required double? descent,
-    required double? hold,
-    required String? fallbackFeedback,
-  }) {
-    if (descent != null) {
-      final goodDescent = descent >= TempoConfig.DESCENT_MIN_GOOD;
-      final goodHold = hold == null || hold >= TempoConfig.BOTTOM_HOLD_MIN;
-      return goodDescent && goodHold;
-    }
-    if (fallbackFeedback == null) return false;
-    if (fallbackFeedback.contains('Good')) return true;
-    return _translateFeedbackValue('Tempo', fallbackFeedback).contains('Ổn');
-  }
-
-  String _translateFeedbackValue(String key, String value) {
-    switch ('$key::$value') {
-      case 'Depth::Good Depth':
-      case 'Depth::Deep Squat!':
-        return 'Chuẩn';
-      case 'Depth::Go Lower':
-        return 'Hạ thấp hơn';
-      case 'Back::Good back':
-        return 'Tốt';
-      case 'Back::Chest up!':
-        return 'Giữ ngực mở';
-      case "Back::Don't lean back!":
-        return 'Đừng ngả ra sau';
-      case 'Feet::Heels lifting':
-        return 'Gót đang nhấc';
-      case 'Feet::Good Heels':
-        return 'Ổn';
-      case 'Tempo::Good tempo':
-        return 'Ổn';
-      case 'Tempo::Not pausing at bottom!':
-        return 'Giữ đáy lâu hơn';
-      default:
-        if (value.contains('Dropping')) {
-          return 'Xuống chậm hơn';
-        }
-        if (value.contains('Good')) {
-          return 'Tốt';
-        }
-        return value;
-    }
   }
 
   String _translateInstruction(String value) {
@@ -1643,7 +1198,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                           Icon(
                             Icons.terminal_rounded,
                             size: 12,
-                            color: VF.jadeGlow.withValues(alpha: 0.74),
+                            color: VFTheme.jadeGlow.withValues(alpha: 0.74),
                           ),
                           const SizedBox(width: 6),
                           Text(
@@ -1737,22 +1292,6 @@ enum _PoseRuntime {
 
 enum _LiveOverlayState { scan, warn, position, hold, paused, active }
 
-class _MetricTileData {
-  const _MetricTileData({
-    required this.label,
-    required this.value,
-    MetricChipState? state,
-    bool? good,
-  }) : state = state ??
-            (good == null
-                ? MetricChipState.neutral
-                : (good ? MetricChipState.good : MetricChipState.warning));
-
-  final String label;
-  final String value;
-  final MetricChipState state;
-}
-
 class _BottomHoldCue {
   const _BottomHoldCue({
     required this.progress,
@@ -1816,53 +1355,13 @@ class _CenterOverlay extends StatelessWidget {
           outlineColor: Color(0x1AFFFFFF),
         );
       case _LiveOverlayState.hold:
+        // Mid-rep bottom hold is owned by IvoryBottomChrome — don't render
+        // a duplicate centered ring during squat-bottom holds.
         if (holdCue != null) {
-          final cue = holdCue!;
-          final color = cue.readyToPush ? VF.jadeGlow : VF.amber;
-          return AnimatedBuilder(
-            animation: pulseController,
-            builder: (context, child) {
-              final scale =
-                  cue.readyToPush ? 1 + (pulseController.value * 0.04) : 1.0;
-              return Transform.scale(
-                scale: scale,
-                child: child,
-              );
-            },
-            child: FormScoreArc(
-              progress: cue.progress,
-              size: 136,
-              color: color,
-              trackColor: Colors.white.withValues(alpha: 0.10),
-              strokeWidth: 5,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    cue.readyToPush
-                        ? 'LÊN'
-                        : cue.remaining?.toStringAsFixed(1) ?? 'GIỮ',
-                    style: const TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                      height: 1,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    cue.readyToPush ? 'Đẩy lên ngay' : 'Giữ đáy',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: color,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
+          return const SizedBox.shrink();
         }
+        // Activation countdown (user holding still in starting position).
+        // Ivory yellow with smooth interpolated progress + glowing dial.
         final clamped = progress?.clamp(0.0, 1.0) ?? 0.0;
         final remainingSeconds =
             (ExerciseBase.HOLD_STILL_REQUIRED_DURATION.inMilliseconds *
@@ -1876,28 +1375,43 @@ class _CenterOverlay extends StatelessWidget {
                 : remainingSeconds.ceil().toString());
         return FormScoreArc(
           progress: clamped,
-          size: 132,
-          color: VF.jadeGlow,
-          trackColor: Colors.white.withValues(alpha: 0.10),
-          strokeWidth: 4,
+          size: 144,
+          color: VikaIvory.yellow,
+          trackColor: VikaIvory.glass12,
+          strokeWidth: 5,
+          glow: true,
+          // Snappier than the default 900 ms — this is a live activation
+          // gauge, not a one-shot reveal.
+          duration: const Duration(milliseconds: 240),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
                 remainingLabel,
-                style: const TextStyle(
-                  fontSize: 34,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
+                style: TextStyle(
+                  fontFamily: VikaIvory.fontFamily,
+                  fontSize: 38,
+                  fontWeight: FontWeight.w800,
+                  color: VikaIvory.yellow,
+                  letterSpacing: -1.6,
                   height: 1,
+                  shadows: [
+                    Shadow(
+                      color: VikaIvory.yellowGlow,
+                      blurRadius: 18,
+                    ),
+                  ],
                 ),
               ),
+              const SizedBox(height: 4),
               Text(
                 isReadyToStart ? 'Bắt đầu' : 'Giữ yên',
                 style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white.withValues(alpha: 0.34),
+                  fontFamily: VikaIvory.fontFamily,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: VikaIvory.invInkSoft,
+                  letterSpacing: 0.6,
                 ),
               ),
             ],
@@ -1937,159 +1451,3 @@ class _OverlayBubble extends StatelessWidget {
   }
 }
 
-class _ReferenceCard extends StatelessWidget {
-  const _ReferenceCard({
-    required this.exerciseName,
-    required this.onClose,
-  });
-
-  final String exerciseName;
-  final VoidCallback onClose;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          width: 104,
-          height: 144,
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.52),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-          ),
-          child: Stack(
-            children: [
-              Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.play_circle_outline_rounded,
-                      color: Colors.white.withValues(alpha: 0.36),
-                      size: 34,
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      exerciseName,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white.withValues(alpha: 0.22),
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Video mẫu',
-                      style: TextStyle(
-                        fontSize: 8,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white.withValues(alpha: 0.20),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Positioned(
-                top: 4,
-                right: 4,
-                child: GestureDetector(
-                  onTap: onClose,
-                  child: Container(
-                    width: 20,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.4),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Icon(
-                      Icons.close_rounded,
-                      size: 12,
-                      color: Colors.white.withValues(alpha: 0.5),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FrostedIconButton extends StatelessWidget {
-  const _FrostedIconButton({
-    required this.icon,
-    required this.onTap,
-    this.active = false,
-  });
-
-  final IconData icon;
-  final VoidCallback onTap;
-  final bool active;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: GestureDetector(
-          onTap: onTap,
-          child: Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: active
-                  ? VF.jadeGlow.withValues(alpha: 0.12)
-                  : Colors.white.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: active
-                    ? VF.jadeGlow.withValues(alpha: 0.28)
-                    : Colors.white.withValues(alpha: 0.07),
-              ),
-            ),
-            child: Icon(
-              icon,
-              size: 18,
-              color:
-                  active ? VF.jadeGlow : Colors.white.withValues(alpha: 0.74),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FrostedPill extends StatelessWidget {
-  const _FrostedPill({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
-          ),
-          child: child,
-        ),
-      ),
-    );
-  }
-}
-
-enum _SquatMetric { depth, heel, trunk, tempo, sync }

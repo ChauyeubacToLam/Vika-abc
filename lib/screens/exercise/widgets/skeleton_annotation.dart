@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../onboarding/vf_theme.dart';
+import '../../../theme/vf_theme.dart';
 
 class SkeletonCallout {
   const SkeletonCallout({
@@ -168,18 +168,18 @@ class _SkeletonPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final linePaint = Paint()
-      ..color = VF.surfaceDark.withValues(alpha: 0.42)
+      ..color = VFTheme.jadeMid.withValues(alpha: 0.42)
       ..strokeWidth = 3
       ..strokeCap = StrokeCap.round;
     final softPaint = Paint()
-      ..color = VF.surfaceDark.withValues(alpha: 0.22)
+      ..color = VFTheme.jadeMid.withValues(alpha: 0.22)
       ..strokeWidth = 2
       ..strokeCap = StrokeCap.round;
     final jointPaint = Paint()
-      ..color = VF.accent
+      ..color = VFTheme.jade
       ..style = PaintingStyle.fill;
     final leaderPaint = Paint()
-      ..color = VF.textMuted.withValues(alpha: 0.35)
+      ..color = VFTheme.textMuted.withValues(alpha: 0.35)
       ..strokeWidth = 1.1
       ..style = PaintingStyle.stroke;
 
@@ -197,9 +197,9 @@ class _SkeletonPainter extends CustomPainter {
     canvas.drawLine(
       Offset(size.width * 0.06, groundY),
       Offset(size.width * 0.54, groundY),
-      leaderPaint..color = VF.textMuted.withValues(alpha: 0.24),
+      leaderPaint..color = VFTheme.textMuted.withValues(alpha: 0.24),
     );
-    leaderPaint.color = VF.textMuted.withValues(alpha: 0.35);
+    leaderPaint.color = VFTheme.textMuted.withValues(alpha: 0.35);
 
     canvas.drawCircle(
       head,
@@ -225,7 +225,7 @@ class _SkeletonPainter extends CustomPainter {
       radius: size.width * 0.08,
       startAngle: -0.9,
       sweepAngle: 0.68,
-      color: VF.amber,
+      color: VFTheme.amber,
     );
     _drawAngleArc(
       canvas,
@@ -233,7 +233,7 @@ class _SkeletonPainter extends CustomPainter {
       radius: size.width * 0.07,
       startAngle: -0.16,
       sweepAngle: 0.98,
-      color: VF.accent,
+      color: VFTheme.jade,
     );
 
     for (var i = 0; i < callouts.length; i++) {

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../onboarding/vf_theme.dart';
+import '../../../theme/vf_theme.dart';
 
 class IssueQuestion extends StatelessWidget {
   const IssueQuestion({
@@ -21,8 +21,8 @@ class IssueQuestion extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: VF.amber.withValues(alpha: 0.06),
-        border: Border.all(color: VF.amber.withValues(alpha: 0.10)),
+        color: VFTheme.amber.withValues(alpha: 0.06),
+        border: Border.all(color: VFTheme.amber.withValues(alpha: 0.10)),
         borderRadius: BorderRadius.circular(18),
       ),
       child: Row(
@@ -32,13 +32,13 @@ class IssueQuestion extends StatelessWidget {
             width: 24,
             height: 24,
             decoration: BoxDecoration(
-              color: VF.amber.withValues(alpha: 0.12),
+              color: VFTheme.amber.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(
               Icons.tips_and_updates_outlined,
               size: 14,
-              color: VF.amber,
+              color: VFTheme.amber,
             ),
           ),
           const SizedBox(width: 10),
@@ -48,21 +48,21 @@ class IssueQuestion extends StatelessWidget {
               children: [
                 Text(
                   observation,
-                  style: VF.textStyle(
+                  style: VFTheme.textStyle(
                     context,
                     size: 12,
                     weight: FontWeight.w600,
-                    color: VF.amber,
+                    color: VFTheme.amber,
                   ),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   question,
-                  style: VF.textStyle(
+                  style: VFTheme.textStyle(
                     context,
                     size: 13,
                     weight: FontWeight.w700,
-                    color: VF.text.withValues(alpha: 0.88),
+                    color: VFTheme.text.withValues(alpha: 0.88),
                     height: 1.5,
                   ),
                 ),
@@ -81,23 +81,23 @@ class IssueQuestion extends StatelessWidget {
                         ),
                         decoration: BoxDecoration(
                           color: selected
-                              ? VF.amber.withValues(alpha: 0.16)
-                              : VF.textMuted.withValues(alpha: 0.06),
+                              ? VFTheme.amber.withValues(alpha: 0.16)
+                              : VFTheme.textMuted.withValues(alpha: 0.06),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                             color: selected
-                                ? VF.amber.withValues(alpha: 0.26)
+                                ? VFTheme.amber.withValues(alpha: 0.26)
                                 : Colors.transparent,
                             width: 1.5,
                           ),
                         ),
                         child: Text(
                           option,
-                          style: VF.textStyle(
+                          style: VFTheme.textStyle(
                             context,
                             size: 13,
                             weight: FontWeight.w700,
-                            color: selected ? VF.amber : VF.textMuted,
+                            color: selected ? VFTheme.amber : VFTheme.textMuted,
                           ),
                         ),
                       ),
