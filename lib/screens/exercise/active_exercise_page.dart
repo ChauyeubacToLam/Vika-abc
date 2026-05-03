@@ -1248,12 +1248,23 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     };
     final normalizedValue = value.toLowerCase();
     final good = normalizedValue.contains('good') ||
-        normalizedValue.contains('deep squat');
+        normalizedValue.contains('deep squat') ||
+        value.contains('✅');
+    final bad = value.contains('🔴') || value.contains('⚠️');
+
+    final MetricChipState state;
+    if (bad) {
+      state = MetricChipState.warning;
+    } else if (good) {
+      state = MetricChipState.good;
+    } else {
+      state = MetricChipState.neutral;
+    }
 
     return _MetricTileData(
       label: label,
       value: translatedValue,
-      state: good ? MetricChipState.good : MetricChipState.warning,
+      state: state,
     );
   }
 
@@ -1619,7 +1630,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
         child: Container(
           padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-          constraints: const BoxConstraints(maxHeight: 148),
+          constraints: const BoxConstraints(maxHeight: 320),
           decoration: BoxDecoration(
             color: Colors.black.withValues(alpha: 0.48),
             borderRadius: BorderRadius.circular(18),

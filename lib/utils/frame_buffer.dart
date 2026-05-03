@@ -6,7 +6,7 @@ enum AngleChangeState {
   stable,
 }
 
-const int ANGLE_GATE = 2;
+const double ANGLE_GATE = 0.5;
 
 class FrameBuffer {
   List<FrameSnapshot> frameBuffer = [];
