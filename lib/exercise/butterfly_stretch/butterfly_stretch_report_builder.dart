@@ -1,6 +1,6 @@
-import 'package:vinafit_mobile/models/post_exercise_data.dart';
-import 'package:vinafit_mobile/utils/exercise_logger.dart';
-import 'package:vinafit_mobile/interpreter/interpreter_base.dart';
+import 'package:vika/models/post_exercise_data.dart';
+import 'package:vika/utils/exercise_logger.dart';
+import 'package:vika/interpreter/interpreter_base.dart';
 
 class ButterflyReportBuilder extends ExerciseReportBuilder {
   
