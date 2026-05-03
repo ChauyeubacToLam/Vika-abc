@@ -199,27 +199,13 @@ class _AppEntryGateState extends State<AppEntryGate> {
   }
 
   _AppEntryState _initialEntryState() {
-    final session = supabase.auth.currentSession;
-    if (session == null) {
-      return _AppEntryState.onboarding;
-    }
-
     return widget.initialOnboardingComplete
         ? _AppEntryState.home
-        : _AppEntryState.onboarding;
+        : _AppEntryState.home;
   }
 
   Future<void> _resolveEntryState() async {
-    final session = supabase.auth.currentSession;
-    if (session == null) {
-      _setEntryState(_AppEntryState.onboarding);
-      return;
-    }
-
-    final complete = await isOnboardingComplete();
-    _setEntryState(
-      complete ? _AppEntryState.home : _AppEntryState.onboarding,
-    );
+    _setEntryState(_AppEntryState.home);
   }
 
   void _handleAuthStateChange(AuthState data) {
