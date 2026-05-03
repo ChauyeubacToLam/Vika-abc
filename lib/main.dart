@@ -139,12 +139,10 @@ class VinaFitApp extends StatelessWidget {
       initialRoute: '/',
       onGenerateRoute: (settings) {
         switch (settings.name) {
-          case '/':
-            return MaterialPageRoute(
-              builder: (_) => AppEntryGate(
-                initialOnboardingComplete: _hasCompletedOnboarding,
-              ),
-            );
+case '/':
+  return MaterialPageRoute(
+    builder: (_) => const MainShell(),
+  );
           case '/onboarding':
             return MaterialPageRoute(
               builder: (_) => const OnboardingScreen(),

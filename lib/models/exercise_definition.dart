@@ -8,6 +8,7 @@ import '../exercise/plank/plank.dart';
 import '../exercise/lunge/lunge.dart';
 import '../exercise/push up/push_up.dart';
 import '../exercise/squat/squat.dart';
+import '../exercise/butterfly_stretch/butterfly_stretch.dart';
 
 /* =========================================================================
    ExerciseDefinition — Metadata + factory for each exercise type.
@@ -305,6 +306,33 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'ascending': const Color(0xFFFFD600),
       'apex': const Color(0xFFFF6D00),
       'descending': const Color(0xFF00B0FF),
+    },
+  ),
+
+ExerciseDefinition(
+    id: 'butterfly_stretch',
+    name: 'Butterfly Stretch',
+    subtitle: 'Ep deo khop hang',
+    description: 'Gian co khep hong, giam cang thang that lung.\nTap trung vao khoang cach 2 goi va tu the lung.',
+    icon: Icons.accessibility_new_rounded,
+    primaryColor: const Color(0xFF2B5EA6),
+    secondaryColor: const Color(0xFF5CEAA8),
+    difficulty: 'Co ban',
+    targetMuscles: ['Hong', 'Dui trong', 'Lung duoi'],
+    duration: '30s',
+    cameraHint: 'Dat dien thoai chinh dien.',
+    framingHint: 'Dam bao thay toan bo co the tu dau den chan.',
+    setupTips: [
+      'Ngoi thang, vuon cao cot song.',
+      'Hai long ban chan ap sat vao nhau.',
+      'Tu tu ep hai dau goi huong xuong san.',
+    ],
+    createExercise: () => ButterflyStretch(),
+    phaseColors: {
+      'setup': const Color(0xFF97958D),
+      'stretching': const Color(0xFFB87320),
+      'isometric_hold': const Color(0xFF1B6B52),
+      'release': const Color(0xFF2B5EA6),
     },
   ),
 ];

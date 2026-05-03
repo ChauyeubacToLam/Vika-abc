@@ -517,6 +517,12 @@ const List<_ExerciseCategory> _categories = [
         description: 'Bung truoc · Co ban',
         definitionQuery: 'curl_up',
       ),
+      _ExerciseItem(
+         name: 'Butterfly Stretch',
+          type: 'lunge', // Khai báo Silhouette Icon (dùng tạm lunge hoặc tự vẽ thêm case 'stretch' trong pose_silhouette.dart)
+          description: 'Giãn cơ • Phục hồi',
+          definitionQuery: 'butterfly_stretch', // <--- Phải khớp với 'id' bạn khai báo ở bước 1
+),
     ],
   ),
   _ExerciseCategory(
