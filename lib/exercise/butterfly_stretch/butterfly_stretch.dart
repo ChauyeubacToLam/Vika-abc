@@ -3,38 +3,39 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/frame_snapshot.dart';
 import '../exercise_base.dart';
 import 'metrics/butterfly_metric_base.dart';
+import 'metrics/knee_separation_metric.dart';
+import 'metrics/posture_metric.dart';
+import 'metrics/hold_duration_metric.dart';
 
 class ButterflyConfig {
   static const int TARGET_HOLD_SECONDS = 30;
-  static const double MAX_ANKLE_SEPARATION_NORM = 0.2; 
-  
-  // TĂNG MẠNH NGƯỠNG ỔN ĐỊNH: Chấp nhận dao động dưới 4.0 pixel vẫn tính là đang Hold
-  static const double HOLD_STABILITY_THRESHOLD = 4.0; 
-  
-  // Gối ép xuống > 3.0 pixel thì tính là đang Stretching
+  static const double MAX_ANKLE_SEPARATION_NORM = 0.2;
+  static const double HOLD_STABILITY_THRESHOLD = 4.0;
   static const double STRETCH_THRESHOLD = 3.0;
-  
-  // Gối nhấc lên < -4.0 pixel (âm) thì mới tính là Release (Thả lỏng)
-  static const double RELEASE_THRESHOLD = -4.0; 
+  static const double RELEASE_THRESHOLD = -4.0;
 }
 
 class ButterflyStretch extends ExerciseBase {
   ButterflyState stretchState = ButterflyState.setup;
   ButterflyState previousState = ButterflyState.setup;
-  
-  // Biến đếm tổng thời gian hold hợp lệ
-  double totalValidHoldTime = 0.0; 
 
-  // Khi nào hoàn thiện các file metrics, hãy bỏ comment các dòng dưới
-  // final KneeSeparationMetric kneeMetric = KneeSeparationMetric();
-  // final PostureMetric postureMetric = PostureMetric();
-  // final HoldDurationMetric holdMetric = HoldDurationMetric();
-  
+  // Thời gian tích lũy các lần hold hợp lệ
+  double totalValidHoldTime = 0.0;
+
+  // Timestamp lúc bắt đầu vào trạng thái hold
+  int? _holdStartMs;
+
+  final KneeSeparationMetric kneeMetric = KneeSeparationMetric();
+  final PostureMetric postureMetric = PostureMetric();
+  final HoldDurationMetric holdMetric = HoldDurationMetric();
+
   late final List<ButterflyMetricBase> _metrics = [
-    // kneeMetric, postureMetric, holdMetric
+    kneeMetric,
+    postureMetric,
+    holdMetric,
   ];
 
-  final Debouncer _holdDebouncer = Debouncer(requiredFrames: 10); // ~0.3s ổn định thì coi là hold
+  final Debouncer _holdDebouncer = Debouncer(requiredFrames: 10);
   final Debouncer _releaseDebouncer = Debouncer(requiredFrames: 5);
 
   @override
@@ -46,15 +47,17 @@ class ButterflyStretch extends ExerciseBase {
   @override
   String get currentPhaseLabel {
     switch (stretchState) {
-      case ButterflyState.setup: return 'Chuẩn bị';
-      case ButterflyState.stretching: return 'Đang ép';
-      case ButterflyState.isometric_hold: return 'Giữ nguyên!';
-      case ButterflyState.release: return 'Thả lỏng';
+      case ButterflyState.setup:
+        return 'Chuẩn bị';
+      case ButterflyState.stretching:
+        return 'Đang ép';
+      case ButterflyState.isometric_hold:
+        return 'Giữ nguyên!';
+      case ButterflyState.release:
+        return 'Thả lỏng';
     }
   }
 
-  // --- Điều kiện bắt đầu ---
- // --- Điều kiện bắt đầu (Đã tinh chỉnh cho ML Kit) ---
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.front) return false;
@@ -66,24 +69,18 @@ class ButterflyStretch extends ExerciseBase {
     final lShoulder = landmarks[PoseLandmarkType.leftShoulder];
     final rShoulder = landmarks[PoseLandmarkType.rightShoulder];
 
-    // Chấp nhận rủi ro: Mắt cá chân có thể bị che khuất, nên chỉ cần lấy được tọa độ, không cần likelihood quá cao
     if (lKnee == null || rKnee == null || lAnkle == null || rAnkle == null || lShoulder == null || rShoulder == null) return false;
 
-    // 1. Khoảng cách VAI (Dùng làm mốc chuẩn thay vì hông vì hông lúc ngồi trực diện rất khó đo)
     double shoulderDist = (lShoulder.x - rShoulder.x).abs();
-    if (shoulderDist < 10) return false; // Tránh lỗi chia cho 0
+    if (shoulderDist < 10) return false;
 
-    // 2. Hai mắt cá chân gần nhau
-    // Nới lỏng: Chấp nhận khoảng cách mắt cá lên tới 60% chiều rộng vai (vì ML Kit đo mắt cá ngoài)
     double ankleDist = (lAnkle.x - rAnkle.x).abs();
     if ((ankleDist / shoulderDist) > 0.6) return false;
 
-    // 3. Hai gối mở rộng (Dấu hiệu đặc trưng của Butterfly Stretch)
-    // Đầu gối phải mở rộng hơn ít nhất 80% chiều rộng của vai
     double kneeDist = (lKnee.x - rKnee.x).abs();
     if (kneeDist < shoulderDist * 0.8) return false;
 
-    return true; // Pass hết thì cho tập!
+    return true;
   }
 
   @override
@@ -91,10 +88,12 @@ class ButterflyStretch extends ExerciseBase {
 
   @override
   void onSetComplete() {
-    // Log dữ liệu cho Report Builder (Mở comment khi đã gắn Metrics)
-    // logger.pushKey("total_hold_time", totalValidHoldTime);
-    // logger.pushMax("max_knee_separation", "max_separation");
-    // logger.pushKey("posture_fails_count", postureMetric.faultsCount);
+    // Flush thời gian hold cuối cùng nếu vẫn đang trong trạng thái hold lúc set kết thúc
+    _flushHoldTime(frameTimestampMs);
+
+    logger.pushKey("total_hold_time", totalValidHoldTime);
+    logger.pushKey("max_knee_separation", kneeMetric.maxSeparation);
+    logger.pushKey("posture_fails_count", postureMetric.faultsCount);
   }
 
   @override
@@ -120,7 +119,7 @@ class ButterflyStretch extends ExerciseBase {
     double avgKneeY = (lKnee.y + rKnee.y) / 2;
     double avgShoulderY = (lShoulder.y + rShoulder.y) / 2;
     double torsoHeight = (avgShoulderY - lHip.y).abs();
-    
+
     final now = frameTimestampMs;
 
     final ctx = StretchContext(
@@ -128,7 +127,7 @@ class ButterflyStretch extends ExerciseBase {
       leftKneeY: lKnee.y,
       rightKneeY: rKnee.y,
       ankleSeparation: ankleSep,
-      shoulderToHipRatio: torsoHeight, 
+      shoulderToHipRatio: torsoHeight,
       shoulderTilt: (lShoulder.y - rShoulder.y).abs(),
       currentState: stretchState,
       frameTimestamp: now,
@@ -144,12 +143,13 @@ class ButterflyStretch extends ExerciseBase {
         debugData.addAll(metric.debugData);
       }
     }
-    
+
+    // Hiển thị thời gian hold tích lũy lên UI
+    _updateHoldDisplay(now);
     _updatePhaseInstructions();
   }
 
- void _updateStateBuffer(double avgKneeY, double kneeSep, int timestampMs) {
-    // 1. Tính biến thiên Y của gối trong tối đa 10 frame gần nhất
+  void _updateStateBuffer(double avgKneeY, double kneeSep, int timestampMs) {
     double yChange = 0.0;
     final buffer = frameBuffer.frameBuffer;
     if (buffer.length >= 2) {
@@ -159,32 +159,60 @@ class ButterflyStretch extends ExerciseBase {
       yChange = currentY - pastY;
     }
 
-    // 2. Logic chuyển pha (State Machine)
-    
-    // Đang Setup -> Ép xuống (yChange dương và đủ lớn)
-    if (stretchState == ButterflyState.setup && yChange > ButterflyConfig.STRETCH_THRESHOLD) { 
+    if (stretchState == ButterflyState.setup && yChange > ButterflyConfig.STRETCH_THRESHOLD) {
       _transitionState(ButterflyState.stretching, timestampMs);
-    } 
-    // Đang Ép/Thả lỏng -> Chuyển sang Hold khi gối dừng lại (dao động nhỏ hơn 4.0 pixel)
-    else if ((stretchState == ButterflyState.stretching || stretchState == ButterflyState.release) && 
-             _holdDebouncer.update(yChange.abs() < ButterflyConfig.HOLD_STABILITY_THRESHOLD)) {
+    } else if ((stretchState == ButterflyState.stretching || stretchState == ButterflyState.release) &&
+        _holdDebouncer.update(yChange.abs() < ButterflyConfig.HOLD_STABILITY_THRESHOLD)) {
       _transitionState(ButterflyState.isometric_hold, timestampMs);
-    }
-    // Đang Hold -> Chuyển sang Thả lỏng nếu gối thực sự bị nhấc lên mạnh (yChange âm và vượt ngưỡng)
-    else if (stretchState == ButterflyState.isometric_hold && 
-             _releaseDebouncer.update(yChange < ButterflyConfig.RELEASE_THRESHOLD)) { 
+    } else if (stretchState == ButterflyState.isometric_hold &&
+        _releaseDebouncer.update(yChange < ButterflyConfig.RELEASE_THRESHOLD)) {
       _transitionState(ButterflyState.release, timestampMs);
     }
   }
 
   void _transitionState(ButterflyState newState, int timestampMs) {
     if (newState == stretchState) return;
+
+    // Thoát khỏi hold → cộng dồn thời gian vào tổng
+    if (stretchState == ButterflyState.isometric_hold) {
+      _flushHoldTime(timestampMs);
+    }
+
+    // Vào hold → ghi nhớ thời điểm bắt đầu
+    if (newState == ButterflyState.isometric_hold) {
+      _holdStartMs = timestampMs;
+    }
+
     previousState = stretchState;
     stretchState = newState;
 
     for (final metric in _metrics) {
       metric.onStateTransition(previousState, newState, timestampMs);
     }
+  }
+
+  /// Cộng dồn thời gian hold hiện tại vào totalValidHoldTime rồi reset
+  void _flushHoldTime(int nowMs) {
+    if (_holdStartMs != null) {
+      final elapsed = (nowMs - _holdStartMs!) / 1000.0;
+      if (elapsed > 0) totalValidHoldTime += elapsed;
+      _holdStartMs = null;
+    }
+  }
+
+  /// Tính thời gian hold đang chạy (chưa flush) để hiển thị realtime
+  double get _currentSessionHoldSeconds {
+    if (stretchState == ButterflyState.isometric_hold && _holdStartMs != null) {
+      return (frameTimestampMs - _holdStartMs!) / 1000.0;
+    }
+    return 0.0;
+  }
+
+  void _updateHoldDisplay(int now) {
+    final displayed = totalValidHoldTime + _currentSessionHoldSeconds;
+    resultIssues.feedback['Thời gian'] =
+        '${displayed.toStringAsFixed(1)}s / ${ButterflyConfig.TARGET_HOLD_SECONDS}s';
+    debugData['total_hold'] = displayed.toStringAsFixed(1);
   }
 
   void _updatePhaseInstructions() {
