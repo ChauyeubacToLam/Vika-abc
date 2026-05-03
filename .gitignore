@@ -24,7 +24,7 @@ claude/
 # The .vscode folder contains launch configuration and tasks you configure in
 # VS Code which you may wish to be included in version control, so this line
 # is commented out by default.
-#.vscode/
+.vscode/
 
 # Flutter/Dart/Pub related
 **/doc/api/
@@ -40,6 +40,7 @@ claude/
 /coverage/
 .packages
 .metadata
+analyze_output.txt
 
 # Symbolication related
 app.*.symbols
@@ -51,6 +52,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/app/build/
+/android/build/
 
 # Android local properties (contains SDK path specific to your machine)
 /android/local.properties
@@ -72,3 +75,7 @@ secrets.json
 # FVM Version Cache
 .fvm/
 .fvm/flutter_sdk
+
+# Android signing keys 
+android/key.properties
+android/app/vika-release.keystore

@@ -4,7 +4,8 @@
 
 import '../curl_up.dart';
 import '../../exercise_base.dart';
-
+import '../../fault_record.dart';
+export '../../fault_record.dart';
 /* =========================================================================
    RepContext — Shared per-frame state, passed to all metrics.
    Avoids each metric needing to recalculate the same geometry.
@@ -47,22 +48,6 @@ class RepContext {
   });
 }
 
-/* =========================================================================
-   FaultRecord — A single fault logged by a metric.
-   ========================================================================= */
-class FaultRecord {
-  final String phase; // e.g. "ASCENDING", "APEX"
-  final String type; // e.g. "Neck", "Range", "Knee"
-  final String message; // e.g. "Kéo cổ quá mạnh"
-  final bool affectsForm; // false = informational only
-
-  FaultRecord({
-    required this.phase,
-    required this.type,
-    required this.message,
-    this.affectsForm = true,
-  });
-}
 
 /* =========================================================================
    CurlUpMetricBase — Interface every metric implements.

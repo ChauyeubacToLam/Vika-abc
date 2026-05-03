@@ -2,9 +2,9 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:vinafit_mobile/interpreter/intepreting_map.dart';
-import 'package:vinafit_mobile/widgets/pose_silhouette.dart';
-import 'package:vinafit_mobile/widgets/vf_primitives.dart';
+import 'package:vika/interpreter/intepreting_map.dart';
+import 'package:vika/widgets/pose_silhouette.dart';
+import 'package:vika/widgets/vf_primitives.dart';
 
 import '../onboarding_data.dart';
 import '../onboarding_primitives.dart';
@@ -406,6 +406,10 @@ class _ProgramPageState extends State<ProgramPage> {
     }
   }
 
+  int _weekTileColumns(double width) => width >= 330 ? 4 : 2;
+
+  int _exerciseTileColumns(double width) => width >= 360 ? 2 : 1;
+
   Widget _buildExerciseTile(BuildContext context, _ExerciseData exercise) {
     if (exercise.isCorrective && !_isPro) {
       return GestureDetector(
@@ -547,7 +551,7 @@ class _ProgramPageState extends State<ProgramPage> {
                 Row(
                   children: [
                     Text(
-                      'Ai FORM',
+                      'AI FORM',
                       style: VF.textStyle(
                         context,
                         size: 9,
@@ -1113,17 +1117,31 @@ class _ProgramPageState extends State<ProgramPage> {
                                   ),
                                 ),
                                 SizedBox(height: 14 * s),
-                                GridView.count(
-                                  crossAxisCount: 2,
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  crossAxisSpacing: 8 * s,
-                                  mainAxisSpacing: 8 * s,
-                                  childAspectRatio: 1.9,
-                                  children: selectedWorkout.exercises
-                                      .map((exercise) =>
-                                          _buildExerciseTile(context, exercise))
-                                      .toList(),
+                                LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    return GridView.builder(
+                                      shrinkWrap: true,
+                                      physics:
+                                          const NeverScrollableScrollPhysics(),
+                                      itemCount:
+                                          selectedWorkout.exercises.length,
+                                      gridDelegate:
+                                          SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: _exerciseTileColumns(
+                                          constraints.maxWidth,
+                                        ),
+                                        crossAxisSpacing: 8 * s,
+                                        mainAxisSpacing: 8 * s,
+                                        mainAxisExtent: 64 * s,
+                                      ),
+                                      itemBuilder: (context, index) {
+                                        return _buildExerciseTile(
+                                          context,
+                                          selectedWorkout.exercises[index],
+                                        );
+                                      },
+                                    );
+                                  },
                                 ),
                                 SizedBox(height: 12 * s),
                                 Wrap(
@@ -1176,18 +1194,25 @@ class _ProgramPageState extends State<ProgramPage> {
                     ),
                   ),
                   SizedBox(height: 12 * s),
-                  Row(
-                    children: _weekTiles.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final tile = entry.value;
-                      final active = index == 0;
-                      final sessions = days.length + tile.sessions;
-                      return Expanded(
-                        child: Padding(
-                          padding: EdgeInsets.only(
-                            right: index == _weekTiles.length - 1 ? 0 : 6 * s,
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      return GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _weekTiles.length,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: _weekTileColumns(
+                            constraints.maxWidth,
                           ),
-                          child: Container(
+                          crossAxisSpacing: 8 * s,
+                          mainAxisSpacing: 8 * s,
+                          mainAxisExtent: 104 * s,
+                        ),
+                        itemBuilder: (context, index) {
+                          final tile = _weekTiles[index];
+                          final active = index == 0;
+                          final sessions = days.length + tile.sessions;
+                          return Container(
                             clipBehavior: Clip.antiAlias,
                             decoration: BoxDecoration(
                               color: VF.surface,
@@ -1201,59 +1226,90 @@ class _ProgramPageState extends State<ProgramPage> {
                             ),
                             child: Stack(
                               children: [
-                                Padding(
-                                  padding: EdgeInsets.fromLTRB(
-                                      6 * s, 12 * s, 6 * s, 13 * s),
-                                  child: Column(
-                                    children: [
-                                      Container(
-                                        width: 28 * s,
-                                        height: 28 * s,
-                                        decoration: BoxDecoration(
-                                          borderRadius:
-                                              BorderRadius.circular(9 * s),
-                                          color: active
-                                              ? VF.accent
-                                              : VF.textMuted
-                                                  .withValues(alpha: 0.08),
-                                        ),
-                                        alignment: Alignment.center,
-                                        child: Text(
-                                          tile.number,
-                                          style: VF.textStyle(
-                                            context,
-                                            size: 12,
-                                            weight: FontWeight.w800,
+                                Positioned.fill(
+                                  child: Padding(
+                                    padding: EdgeInsets.fromLTRB(
+                                      10 * s,
+                                      12 * s,
+                                      10 * s,
+                                      15 * s,
+                                    ),
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
+                                      children: [
+                                        Container(
+                                          width: 30 * s,
+                                          height: 30 * s,
+                                          decoration: BoxDecoration(
+                                            borderRadius:
+                                                BorderRadius.circular(9 * s),
                                             color: active
-                                                ? Colors.white
-                                                : VF.textMuted,
+                                                ? VF.accent
+                                                : VF.textMuted.withValues(
+                                                    alpha: 0.08,
+                                                  ),
+                                          ),
+                                          alignment: Alignment.center,
+                                          child: Text(
+                                            tile.number,
+                                            style: VF.textStyle(
+                                              context,
+                                              size: 12,
+                                              weight: FontWeight.w800,
+                                              color: active
+                                                  ? Colors.white
+                                                  : VF.textMuted,
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                      SizedBox(height: 6 * s),
-                                      Text(
-                                        tile.title,
-                                        textAlign: TextAlign.center,
-                                        style: VF.textStyle(
-                                          context,
-                                          size: 10,
-                                          weight: FontWeight.w700,
-                                          color:
-                                              active ? VF.accent : VF.textSec,
+                                        SizedBox(height: 8 * s),
+                                        Text(
+                                          tile.title,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          textAlign: TextAlign.center,
+                                          style: VF.textStyle(
+                                            context,
+                                            size: 10.5,
+                                            weight: FontWeight.w700,
+                                            color:
+                                                active ? VF.accent : VF.textSec,
+                                            height: 1.25,
+                                          ),
                                         ),
-                                      ),
-                                      SizedBox(height: 2 * s),
-                                      Text(
-                                        '$sessions buổi',
-                                        textAlign: TextAlign.center,
-                                        style: VF.textStyle(
-                                          context,
-                                          size: 8,
-                                          weight: FontWeight.w500,
-                                          color: VF.textMuted,
+                                        SizedBox(height: 5 * s),
+                                        Container(
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: 8 * s,
+                                            vertical: 3 * s,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            borderRadius:
+                                                BorderRadius.circular(999),
+                                            color: active
+                                                ? VF.accentSoft
+                                                : VF.bg.withValues(
+                                                    alpha: 0.75,
+                                                  ),
+                                          ),
+                                          child: Text(
+                                            '$sessions buoi',
+                                            textAlign: TextAlign.center,
+                                            style: VF.textStyle(
+                                              context,
+                                              size: 8.5,
+                                              weight: FontWeight.w700,
+                                              color: active
+                                                  ? VF.accent
+                                                  : VF.textMuted,
+                                            ),
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 ),
                                 Positioned(
@@ -1269,11 +1325,113 @@ class _ProgramPageState extends State<ProgramPage> {
                                 ),
                               ],
                             ),
-                          ),
-                        ),
+                          );
+                        },
                       );
-                    }).toList(),
+                    },
                   ),
+                  /*
+                  if (DateTime.now().millisecondsSinceEpoch < 0)
+                    Row(
+                      children: _weekTiles.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final tile = entry.value;
+                        final active = index == 0;
+                        final sessions = days.length + tile.sessions;
+                        return Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(
+                              right: index == _weekTiles.length - 1 ? 0 : 6 * s,
+                            ),
+                            child: Container(
+                              clipBehavior: Clip.antiAlias,
+                              decoration: BoxDecoration(
+                                color: VF.surface,
+                                borderRadius: BorderRadius.circular(18 * s),
+                                border: Border.all(
+                                  color: active
+                                      ? VF.accent.withValues(alpha: 0.20)
+                                      : Colors.transparent,
+                                  width: 2 * s,
+                                ),
+                              ),
+                              child: Stack(
+                                children: [
+                                  Padding(
+                                    padding: EdgeInsets.fromLTRB(
+                                        6 * s, 12 * s, 6 * s, 13 * s),
+                                    child: Column(
+                                      children: [
+                                        Container(
+                                          width: 28 * s,
+                                          height: 28 * s,
+                                          decoration: BoxDecoration(
+                                            borderRadius:
+                                                BorderRadius.circular(9 * s),
+                                            color: active
+                                                ? VF.accent
+                                                : VF.textMuted
+                                                    .withValues(alpha: 0.08),
+                                          ),
+                                          alignment: Alignment.center,
+                                          child: Text(
+                                            tile.number,
+                                            style: VF.textStyle(
+                                              context,
+                                              size: 12,
+                                              weight: FontWeight.w800,
+                                              color: active
+                                                  ? Colors.white
+                                                  : VF.textMuted,
+                                            ),
+                                          ),
+                                        ),
+                                        SizedBox(height: 6 * s),
+                                        Text(
+                                          tile.title,
+                                          textAlign: TextAlign.center,
+                                          style: VF.textStyle(
+                                            context,
+                                            size: 10,
+                                            weight: FontWeight.w700,
+                                            color:
+                                                active ? VF.accent : VF.textSec,
+                                          ),
+                                        ),
+                                        SizedBox(height: 2 * s),
+                                        Text(
+                                          '$sessions buổi',
+                                          textAlign: TextAlign.center,
+                                          style: VF.textStyle(
+                                            context,
+                                            size: 8,
+                                            weight: FontWeight.w500,
+                                            color: VF.textMuted,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Positioned(
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0,
+                                    child: Container(
+                                      height: 3 * s,
+                                      color: active
+                                          ? VF.accent
+                                          : VF.textMuted
+                                              .withValues(alpha: 0.06),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  */
                   SizedBox(height: 16 * s),
                   Container(
                     padding: EdgeInsets.all(16 * s),

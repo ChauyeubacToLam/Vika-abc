@@ -126,7 +126,7 @@ class _GoalPageState extends State<GoalPage> {
                             ),
                             SizedBox(height: 8 * s),
                             Text(
-                              'Chọn 1 để VinaFit xây lộ trình phù hợp',
+                              'Chọn 1 để Vika xây lộ trình phù hợp',
                               style: VF.textStyle(
                                 context,
                                 size: 13,

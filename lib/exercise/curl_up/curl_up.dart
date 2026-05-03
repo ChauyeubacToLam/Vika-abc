@@ -2,7 +2,7 @@
 
 
 
-import 'package:vinafit_mobile/utils/debouncer.dart';
+import 'package:vika/utils/debouncer.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
 import '../exercise_base.dart';

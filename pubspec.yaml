@@ -1,5 +1,5 @@
-name: vinafit_mobile
-description: A new Flutter project.
+name: vika
+description: Vika - AI fitness coaching for Vietnamese home exercisers
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -23,6 +23,8 @@ dependencies:
   cupertino_icons: ^1.0.2
   #5. segmentation
   google_mlkit_selfie_segmentation: ^0.10.1
+  http: ^1.6.0
+  audioplayers: ^6.6.0
 
   #6. For storing onboarding completion status
   shared_preferences: ^2.2.0
@@ -40,3 +42,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/audio/

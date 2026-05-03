@@ -15,12 +15,14 @@ import '../../../utils/debouncer.dart';
 
 class HeelRiseConfig {
   /// Heel lift threshold normalized to back length (shoulder-to-hip).
-  /// 0.15 = "If heel lifts more than 10% of back length."
   // ignore: constant_identifier_names
   static const double LIFT_THRESHOLD = 0.1;
 }
 
 class HeelRiseMetric extends SquatMetricBase {
+  // Reuse the shared heel cue so post-rep playback matches the rest of the voice set.
+  static const String _postRepVoiceCue = 'Giữ gót chân';
+
   @override
   String get name => 'HeelRise';
 
@@ -49,25 +51,27 @@ class HeelRiseMetric extends SquatMetricBase {
     final phase = ctx.squatState.toString().split('.').last.toUpperCase();
 
     if (_heelDebouncer.update(normalized >= HeelRiseConfig.LIFT_THRESHOLD)) {
-      ctx.resultIssues.feedback['Feet'] = 'Heels lifting';
+      ctx.resultIssues.feedback['Heels'] = 'Heels lifting';
       if (!_instructionSet) {
         ctx.resultIssues.addInstruction(
-            'standing', 'Feet', 'Heels lifting — try elevating heels');
+            'standing', 'Heels', 'Heels lifting — try elevating heels');
         _instructionSet = true;
       }
       _logFault(phase, 'Heels lifting');
     } else {
-      ctx.resultIssues.feedback['Feet'] = 'Good Heels';
+      ctx.resultIssues.feedback['Heels'] = 'Good Heels';
     }
   }
 
   void _logFault(String phase, String message) {
-    if (!_faults.any((f) => f.phase == phase && f.type == 'Feet')) {
+    if (!_faults.any((f) => f.phase == phase && f.type == 'Heel')) {
       _faults.add(FaultRecord(
         phase: phase,
-        type: 'Feet',
+        type: 'Heel',
         message: message,
+        voiceMessage: _postRepVoiceCue,
         affectsForm: true,
+        priority: SquatFaultVoicePriority.heelRise,
       ));
     }
   }

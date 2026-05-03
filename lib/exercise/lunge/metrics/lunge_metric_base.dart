@@ -6,7 +6,8 @@
 
 import '../lunge.dart';
 import '../../exercise_base.dart';
-
+import '../../fault_record.dart';
+export '../../fault_record.dart';
 /* =========================================================================
    LungeRepContext — Shared per-frame state, passed to all metrics.
    Avoids each metric needing to recalculate the same geometry.
@@ -45,22 +46,6 @@ class LungeRepContext {
   });
 }
 
-/* =========================================================================
-   FaultRecord — A single fault logged by a metric.
-   ========================================================================= */
-class FaultRecord {
-  final String phase; // e.g. "DESCENDING", "BOTTOM"
-  final String type; // e.g. "Back", "Depth", "Knees"
-  final String message; // e.g. " "
-  final bool affectsForm; // false = informational only
-
-  FaultRecord({
-    required this.phase,
-    required this.type,
-    required this.message,
-    this.affectsForm = true,
-  });
-}
 
 /* =========================================================================
    LungeMetricBase — Interface every lunge metric implements.

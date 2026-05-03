@@ -89,7 +89,7 @@ class LegSpreadMetric extends JJMetricBase {
             'closed', 'Legs spread', 'Lần sau, bước rộng bằng vai hoặc hơn!');
         _instructionSet = true;
       }
-      _logFault('OPEN', 'Chân chưa đủ rộng');
+      _logFault('OPEN', 'Chân chưa đủ rộng', voiceMessage: 'Mở chân rộng hơn');
     } else if (mediumStance) {
       ctx.resultIssues.feedback['Legs'] = 'Rộng hơn chút!';
       if (!_instructionSet) {
@@ -115,12 +115,13 @@ class LegSpreadMetric extends JJMetricBase {
     }
   }
 
-  void _logFault(String phase, String message) {
+  void _logFault(String phase, String message, {String? voiceMessage}) {
     if (!_faults.any((f) => f.phase == phase && f.type == 'Legs')) {
       _faults.add(FaultRecord(
         phase: phase,
         type: 'Legs',
         message: message,
+        voiceMessage: voiceMessage,
         affectsForm: true,
       ));
     }

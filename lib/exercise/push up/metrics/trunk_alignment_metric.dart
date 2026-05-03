@@ -97,7 +97,7 @@ class TrunkAlignmentMetric extends PushUpMetricBase {
               'plank', 'Back', 'Lưng võng nguy hiểm — siết cơ bụng mạnh hơn!');
           _sagInstructionSet = true;
         }
-        _logFault(phase, 'Lưng võng quá mức — nguy hiểm');
+        _logFault(phase, 'Lưng võng quá mức — nguy hiểm', voiceMessage: 'Siết cơ bụng');
       } else if (isSagError) {
         ctx.resultIssues.feedback['Back'] = 'Hông hơi võng — siết cơ bụng!';
         if (!_sagInstructionSet) {
@@ -105,7 +105,7 @@ class TrunkAlignmentMetric extends PushUpMetricBase {
               'plank', 'Back', 'Hông hơi võng — gồng bụng nhiều hơn!');
           _sagInstructionSet = true;
         }
-        _logFault(phase, 'Hông hơi võng');
+        _logFault(phase, 'Hông hơi võng', voiceMessage: 'Siết cơ bụng');
       } else {
         ctx.resultIssues.feedback['Back'] = 'Gồng cơ bụng!';
         if (!_sagInstructionSet) {
@@ -113,7 +113,7 @@ class TrunkAlignmentMetric extends PushUpMetricBase {
               'plank', 'Back', 'Gồng bụng lại, giữ thân thẳng!');
           _sagInstructionSet = true;
         }
-        _logFault(phase, 'Hông hơi chùng');
+        _logFault(phase, 'Hông hơi chùng', voiceMessage: 'Siết cơ bụng');
       }
     }
     // --- Debounced pike ---
@@ -125,7 +125,7 @@ class TrunkAlignmentMetric extends PushUpMetricBase {
               'plank', 'Back', 'Hạ hông xuống, giữ thân thẳng!');
           _pikeInstructionSet = true;
         }
-        _logFault(phase, 'Hông quá cao');
+        _logFault(phase, 'Hông quá cao', voiceMessage: 'Hạ hông xuống');
       } else {
         ctx.resultIssues.feedback['Back'] = 'Hạ hông xuống một chút!';
         if (!_pikeInstructionSet) {
@@ -133,7 +133,7 @@ class TrunkAlignmentMetric extends PushUpMetricBase {
               'plank', 'Back', 'Hông hơi cao — hạ thấp một chút!');
           _pikeInstructionSet = true;
         }
-        _logFault(phase, 'Hông hơi cao');
+        _logFault(phase, 'Hông hơi cao', voiceMessage: 'Hạ hông xuống');
       }
     }
     // --- Good form ---
@@ -145,12 +145,13 @@ class TrunkAlignmentMetric extends PushUpMetricBase {
         _faults.isNotEmpty ? '⚠️ ${_faults.last.message}' : '✅';
   }
 
-  void _logFault(String phase, String message) {
-    if (!_faults.any((f) => f.phase == phase && f.message == message)) {
+void _logFault(String phase, String message, {String? voiceMessage}) {
+    if (!_faults.any((f) => f.phase == phase && f.message == message)) {        
       _faults.add(FaultRecord(
         phase: phase,
         type: 'Back',
         message: message,
+        voiceMessage: voiceMessage,
         affectsForm: true,
       ));
     }

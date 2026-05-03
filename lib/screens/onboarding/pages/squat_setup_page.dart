@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:vinafit_mobile/widgets/pose_silhouette.dart';
-import 'package:vinafit_mobile/widgets/vf_primitives.dart';
+import 'package:vika/widgets/pose_silhouette.dart';
+import 'package:vika/widgets/vf_primitives.dart';
 
 import '../onboarding_data.dart';
 import '../onboarding_primitives.dart';

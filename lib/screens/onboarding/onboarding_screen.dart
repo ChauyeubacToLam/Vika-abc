@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:vinafit_mobile/models/exercise_definition.dart';
-import 'package:vinafit_mobile/utils/exercise_logger.dart';
+import 'package:vika/models/exercise_definition.dart';
+import 'package:vika/utils/exercise_logger.dart';
 
 import 'onboarding_data.dart';
 import 'pages/analyzing_page.dart';
@@ -128,7 +128,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           onNext: _launchSquatAssessment,
           onBack: _back,
         ),
-        AnalyzingPage(active: _page == 5, onNext: _next),
+        AnalyzingPage(active: _page == 6, onNext: _next),
         SquatResultPage(data: _data, onNext: _next, onBack: _back),
         LevelIssuePage(data: _data, onNext: _next, onBack: _back),
         BodySchedulePage(data: _data, onNext: _next, onBack: _back),

@@ -9,7 +9,7 @@ import 'squat/squat_report_builder.dart';
 
 /// When adding a new exercise:
 /// 1. Create FooReportBuilder extending ExerciseReportBuilder
-/// 2. Implement pickInsight(), detectIssue(), buildDetailCards()
+/// 2. Implement detectIssue(), buildDetailCards(), and any B4 tip/praise maps
 /// 3. Add entry here
 /// 4. Done — buildReport(), generateCoachText() inherited from base
 final Map<String, ({ExerciseReportBuilder builder, double met})>
@@ -117,23 +117,8 @@ final Map<String, ({ExerciseReportBuilder builder, double met})>
 
 /// Minimal builder for exercises without a custom implementation.
 /// Inherits buildReport() and generateCoachText() from base.
-/// Only implements the 3 required methods with simple defaults.
+/// Only implements the 2 required methods with simple defaults.
 class GenericReportBuilder extends ExerciseReportBuilder {
-  @override
-  (String, String, String?) pickInsight(
-    ExerciseLogger logger,
-    ExerciseLogger? prevLogger,
-    int score,
-    int? prevScore,
-  ) {
-    final maxRep = (logger.setLogs["max_rep"] as num?)?.toInt() ?? 0;
-    final goodReps = (logger.setLogs["good_rep_count"] as num?)?.toInt() ?? 0;
-    if (maxRep == 0) return ('⚠️', 'Không có rep nào.', null);
-    if (goodReps == maxRep)
-      return ('✨', 'Hoàn hảo! $maxRep/$maxRep đúng form.', null);
-    return ('📊', '$goodReps/$maxRep rep đúng form.', null);
-  }
-
   @override
   DetectedEvidence? detectIssue(List<ExerciseLogger> setLoggers) => null;
 

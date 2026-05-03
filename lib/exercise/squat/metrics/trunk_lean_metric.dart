@@ -11,8 +11,13 @@ import '../../../utils/debouncer.dart';
 
 class TrunkLeanConfig {
   /// Good forward lean range (degrees from vertical)
-  /// Wide for Vietnamese Group 1 males (short torso, long femurs)
+  /// Keep a bit more tolerance here so the chest-up cue is less trigger-happy
+  /// on natural forward lean during descent.
   static const List<int> GOOD_LEAN_RANGE = [15, 40];
+
+  /// Require fewer consecutive frames so the live cue reacts while the user
+  /// is still in the bad position instead of after they start recovering.
+  static const int FORWARD_CONFIRM_FRAMES = 3;
 
   /// Backward lean threshold (degrees). Below this = leaning back.
   static const double BACKWARD_LIMIT = 0.02;
@@ -26,7 +31,8 @@ class TrunkLeanMetric extends SquatMetricBase {
   final Map<String, dynamic> _debugData = {};
 
   // IMPORTANT: Separate debouncers for forward/backward — they can't share!
-  final Debouncer _forwardDebouncer = Debouncer(requiredFrames: 5);
+  final Debouncer _forwardDebouncer =
+      Debouncer(requiredFrames: TrunkLeanConfig.FORWARD_CONFIRM_FRAMES);
   final Debouncer _backwardDebouncer = Debouncer(requiredFrames: 5);
 
   /// Track maximum trunk lean this rep (for post-rep analysis)
@@ -65,7 +71,12 @@ class TrunkLeanMetric extends SquatMetricBase {
             .addInstruction('standing', 'Back', 'Keep chest up next time!');
         _instructionSet = true;
       }
-      _logFault(phase, 'Leaned too forward');
+      _logFault(
+        phase,
+        'Leaned too forward',
+        null,
+        priority: SquatFaultVoicePriority.trunkLean,
+      );
     } else if (backwardConfirmed) {
       ctx.resultIssues.feedback['Back'] = "Don't lean back!";
       if (!_instructionSet) {
@@ -73,19 +84,31 @@ class TrunkLeanMetric extends SquatMetricBase {
             .addInstruction('standing', 'Back', "Don't lean back next time!");
         _instructionSet = true;
       }
-      _logFault(phase, 'Leaned backward');
+      _logFault(
+        phase,
+        'Leaned backward',
+        null,
+        priority: SquatFaultVoicePriority.trunkLeanBackward,
+      );
     } else {
       ctx.resultIssues.feedback['Back'] = 'Good back';
     }
   }
 
-  void _logFault(String phase, String message) {
+  void _logFault(
+    String phase,
+    String message,
+    String? voiceMessage, {
+    required int priority,
+  }) {
     if (!_faults.any((f) => f.phase == phase && f.type == 'Back')) {
       _faults.add(FaultRecord(
         phase: phase,
         type: 'Back',
         message: message,
+        voiceMessage: voiceMessage,
         affectsForm: true,
+        priority: priority,
       ));
     }
   }
