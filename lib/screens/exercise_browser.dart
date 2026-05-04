@@ -522,7 +522,19 @@ const List<_ExerciseCategory> _categories = [
           type: 'lunge', // Khai báo Silhouette Icon (dùng tạm lunge hoặc tự vẽ thêm case 'stretch' trong pose_silhouette.dart)
           description: 'Giãn cơ • Phục hồi',
           definitionQuery: 'butterfly_stretch', // <--- Phải khớp với 'id' bạn khai báo ở bước 1
-),
+      ),
+       _ExerciseItem(
+          name: 'Sphinx Pose',
+          type: 'bridge', // Dùng tạm silhouette của bài bridge vì form khá giống
+          description: 'Lưng dưới   Cột sống   Trị liệu',
+          definitionQuery: 'sphinx_pose', // <--- Bắt buộc phải trùng với 'id' ở Bước 1
+), 
+_ExerciseItem(
+        name: 'Seated Forward Fold',
+        type: 'stretch', // Render silhouette stretch
+        description: 'Gân kheo   Lưng   Cơ bản', // Format theo chuẩn UI Vika
+        definitionQuery: 'seated_forward_fold', // Map đúng với id trong ExerciseDefinition
+      ),
     ],
   ),
   _ExerciseCategory(

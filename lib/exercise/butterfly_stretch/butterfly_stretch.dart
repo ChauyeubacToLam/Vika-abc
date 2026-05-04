@@ -19,10 +19,10 @@ class ButterflyStretch extends ExerciseBase {
   ButterflyState stretchState = ButterflyState.setup;
   ButterflyState previousState = ButterflyState.setup;
 
-  // Thời gian tích lũy các lần hold hợp lệ
+  // Tổng thời gian hold hợp lệ đã flush (giây)
   double totalValidHoldTime = 0.0;
 
-  // Timestamp lúc bắt đầu vào trạng thái hold
+  // Timestamp lúc bắt đầu vào trạng thái hold (ms)
   int? _holdStartMs;
 
   final KneeSeparationMetric kneeMetric = KneeSeparationMetric();
@@ -69,7 +69,8 @@ class ButterflyStretch extends ExerciseBase {
     final lShoulder = landmarks[PoseLandmarkType.leftShoulder];
     final rShoulder = landmarks[PoseLandmarkType.rightShoulder];
 
-    if (lKnee == null || rKnee == null || lAnkle == null || rAnkle == null || lShoulder == null || rShoulder == null) return false;
+    if (lKnee == null || rKnee == null || lAnkle == null || rAnkle == null ||
+        lShoulder == null || rShoulder == null) return false;
 
     double shoulderDist = (lShoulder.x - rShoulder.x).abs();
     if (shoulderDist < 10) return false;
@@ -88,8 +89,9 @@ class ButterflyStretch extends ExerciseBase {
 
   @override
   void onSetComplete() {
-    // Flush thời gian hold cuối cùng nếu vẫn đang trong trạng thái hold lúc set kết thúc
-    _flushHoldTime(frameTimestampMs);
+    // Dùng DateTime.now() thay vì frameTimestampMs để tránh thiếu thời gian
+    // do delay giữa frame cuối cùng và thời điểm set thực sự kết thúc.
+    _flushHoldTime(DateTime.now().millisecondsSinceEpoch);
 
     logger.pushKey("total_hold_time", totalValidHoldTime);
     logger.pushKey("max_knee_separation", kneeMetric.maxSeparation);
@@ -112,7 +114,8 @@ class ButterflyStretch extends ExerciseBase {
     final rShoulder = smoothedLandmarks[PoseLandmarkType.rightShoulder];
     final lHip = smoothedLandmarks[PoseLandmarkType.leftHip];
 
-    if (lKnee == null || rKnee == null || lAnkle == null || rAnkle == null || lShoulder == null || rShoulder == null || lHip == null) return;
+    if (lKnee == null || rKnee == null || lAnkle == null || rAnkle == null ||
+        lShoulder == null || rShoulder == null || lHip == null) return;
 
     double kneeSep = (lKnee.x - rKnee.x).abs();
     double ankleSep = (lAnkle.x - rAnkle.x).abs();
@@ -122,6 +125,9 @@ class ButterflyStretch extends ExerciseBase {
 
     final now = frameTimestampMs;
 
+    // ButterflyStretch là nguồn sự thật cho hold time.
+    // Tính _currentSessionHoldSeconds rồi truyền vào ctx để các metric đọc,
+    // không để metric tự tính lại từ timestamp riêng của chúng.
     final ctx = StretchContext(
       kneeSeparation: kneeSep,
       leftKneeY: lKnee.y,
@@ -132,6 +138,7 @@ class ButterflyStretch extends ExerciseBase {
       currentState: stretchState,
       frameTimestamp: now,
       resultIssues: resultIssues,
+      currentHoldSeconds: _currentSessionHoldSeconds, // <-- truyền vào ctx
     );
 
     frameBuffer.addFrame(FrameSnapshot(log: {"avgKneeY": avgKneeY, "kneeSep": kneeSep}, timeStamp: now));
@@ -144,7 +151,6 @@ class ButterflyStretch extends ExerciseBase {
       }
     }
 
-    // Hiển thị thời gian hold tích lũy lên UI
     _updateHoldDisplay(now);
     _updatePhaseInstructions();
   }
@@ -173,12 +179,10 @@ class ButterflyStretch extends ExerciseBase {
   void _transitionState(ButterflyState newState, int timestampMs) {
     if (newState == stretchState) return;
 
-    // Thoát khỏi hold → cộng dồn thời gian vào tổng
     if (stretchState == ButterflyState.isometric_hold) {
       _flushHoldTime(timestampMs);
     }
 
-    // Vào hold → ghi nhớ thời điểm bắt đầu
     if (newState == ButterflyState.isometric_hold) {
       _holdStartMs = timestampMs;
     }
@@ -191,7 +195,7 @@ class ButterflyStretch extends ExerciseBase {
     }
   }
 
-  /// Cộng dồn thời gian hold hiện tại vào totalValidHoldTime rồi reset
+  /// Cộng dồn thời gian hold hiện tại vào totalValidHoldTime rồi reset con trỏ.
   void _flushHoldTime(int nowMs) {
     if (_holdStartMs != null) {
       final elapsed = (nowMs - _holdStartMs!) / 1000.0;
@@ -200,7 +204,7 @@ class ButterflyStretch extends ExerciseBase {
     }
   }
 
-  /// Tính thời gian hold đang chạy (chưa flush) để hiển thị realtime
+  /// Thời gian hold đang chạy (chưa flush) — dùng để hiển thị realtime và truyền vào ctx.
   double get _currentSessionHoldSeconds {
     if (stretchState == ButterflyState.isometric_hold && _holdStartMs != null) {
       return (frameTimestampMs - _holdStartMs!) / 1000.0;
@@ -208,6 +212,7 @@ class ButterflyStretch extends ExerciseBase {
     return 0.0;
   }
 
+  /// Duy nhất nơi ghi feedback['Thời gian'] — không còn HoldDurationMetric ghi đè.
   void _updateHoldDisplay(int now) {
     final displayed = totalValidHoldTime + _currentSessionHoldSeconds;
     resultIssues.feedback['Thời gian'] =

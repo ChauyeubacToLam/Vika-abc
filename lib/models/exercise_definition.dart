@@ -9,6 +9,8 @@ import '../exercise/lunge/lunge.dart';
 import '../exercise/push up/push_up.dart';
 import '../exercise/squat/squat.dart';
 import '../exercise/butterfly_stretch/butterfly_stretch.dart';
+import '../exercise/Sphinx_Pose/sphinx_stretch.dart';
+import '../exercise/seated_forward_fold/seated_forward_fold.dart';
 
 /* =========================================================================
    ExerciseDefinition — Metadata + factory for each exercise type.
@@ -334,5 +336,58 @@ ExerciseDefinition(
       'isometric_hold': const Color(0xFF1B6B52),
       'release': const Color(0xFF2B5EA6),
     },
+  ),
+ExerciseDefinition(
+  id: 'sphinx_pose',
+  name: 'Sphinx Pose',
+  subtitle: 'Tư thế nhân sư - Trị liệu cột sống',
+  description: 'Bài tập kéo giãn tĩnh giúp giảm áp lực đĩa đệm, giải tỏa căng thẳng vùng thắt lưng và định tuyến lại cột sống.', // <--- Đã thêm
+  icon: Icons.self_improvement_rounded,
+  primaryColor: const Color(0xFFCBB8F0),
+  secondaryColor: const Color(0xFF9575CD),
+  cameraHint: 'Quay ngang hông (Side View)',
+  framingHint: 'Đảm bảo thấy rõ từ vai đến mũi chân',
+  duration: '30s - 1m',
+  difficulty: 'Cơ bản',
+  targetMuscles: const ['Lưng dưới', 'Cột sống', 'Core'],
+  setupTips: const [
+    'Nằm sấp hoàn toàn trên thảm',
+    'Tỳ cẳng tay xuống sàn, cùi chỏ dưới vai',
+    'Hít sâu, từ từ nâng ngực lên, vươn dài cổ'
+  ],
+  safetyWarning: 'Không ngửa cổ quá gắt. Dừng lại ngay nếu thấy đau nhói ở thắt lưng.',
+  phaseColors: const { // <--- Đã thêm Map màu cho UI Bridge
+    'proneSetup': Colors.grey,
+    'ascending': Color(0xFF29B6F6),
+    'isometricHold': Color(0xFF00E676),
+    'descending': Color(0xFFFF9800),
+  },
+  createExercise: () => SphinxStretch(), 
+),
+ExerciseDefinition(
+    id: 'seated_forward_fold',
+    name: 'Seated Forward Fold',
+    subtitle: 'Kéo giãn gân kheo và cột sống',
+    difficulty: 'Cơ bản',
+    duration: '2 phút',
+    description: 'Bài tập kéo giãn tĩnh giúp tăng độ dẻo dai cho cơ gân kheo và cột sống. Rất tốt cho người làm việc văn phòng cần nới lỏng cơ bắp.',
+    targetMuscles: const ['Gân kheo', 'Lưng dưới'],
+    cameraHint: 'Đặt điện thoại quay ngang người (Side View), để lộ rõ từ vai đến bàn chân.',
+    framingHint: 'Đảm bảo toàn thân từ đầu đến gót chân nằm gọn trong khung hình.',
+    setupTips: const [
+      'Ngồi thẳng lưng trên thảm, hai chân duỗi thẳng ép sát sàn.',
+      'Gập người bắt nguồn từ khớp hông (hip hinge), đẩy ngực về phía trước mũi chân.',
+      'Bẻ gập mũi chân hướng lên trần nhà để tăng hiệu quả kéo giãn.',
+    ],
+    phaseColors: const {
+      'setup': Color(0xFFFF9800),         // Amber (Chuẩn bị)
+      'descending': Color(0xFF2B5EA6),    // Blue (Gập người)
+      'isometricHold': Color(0xFF1B6B52), // Jade (Giữ tĩnh)
+      'ascending': Color(0xFF7040B8),     // Purple (Nhả cơ)
+    },
+    icon: Icons.accessibility_new_rounded,
+    primaryColor: const Color(0xFF2B5EA6), // VFTheme.blue
+    secondaryColor: const Color(0xFF00E5FF),
+    createExercise: () => SeatedForwardFold(),
   ),
 ];
