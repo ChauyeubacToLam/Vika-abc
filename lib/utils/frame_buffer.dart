@@ -6,7 +6,8 @@ enum AngleChangeState {
   stable,
 }
 
-const int ANGLE_GATE = 2;
+const double ANGLE_GATE =
+    0.5; // degrees of change required to count as increasing/decreasing
 
 class FrameBuffer {
   List<FrameSnapshot> frameBuffer = [];

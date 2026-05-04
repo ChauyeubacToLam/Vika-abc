@@ -105,7 +105,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     _landmarkSubscription = null;
     unawaited(landmarkSubscription?.cancel() ?? Future<void>.value());
     unawaited(_disposeFallbackCamera());
-    unawaited(_poseChannel.dispose());
+    unawaited(_poseChannel.dispose().catchError((_) {}));
     _poseDetector.close();
     unawaited(widget.exercise.disposeDetectors());
     _squatVoiceCoach?.dispose();
@@ -168,16 +168,13 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
               'Khong the khoi dong MediaPipe tren thiet bi nay.';
         });
       }
+    } on MissingPluginException catch (_) {
+      // Native MediaPipe channel not implemented on this platform (e.g. iOS)
+      // → fallback to Flutter camera + ML Kit
+      await _startMlKitFallback('Native pose landmarker not available on iOS');
     } catch (_) {
-      if (mounted) {
-        setState(() {
-          _isInitializing = false;
-          _isCameraReady = false;
-          _textureId = null;
-          _cameraErrorMessage =
-              'Không thể khởi động camera. Hãy thử lại hoặc đổi camera.';
-        });
-      }
+      // Any other error → also try ML Kit fallback
+      await _startMlKitFallback('Unknown camera init error');
     }
   }
 
@@ -306,7 +303,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     debugPrint(
       '[Vika] Falling back to Flutter camera + ML Kit: ${nativeErrorMessage ?? "unknown native init error"}',
     );
-    await _poseChannel.dispose();
+    try {
+      await _poseChannel.dispose();
+    } catch (_) {}
     await _initMlKitCamera();
   }
 
@@ -1248,12 +1247,23 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     };
     final normalizedValue = value.toLowerCase();
     final good = normalizedValue.contains('good') ||
-        normalizedValue.contains('deep squat');
+        normalizedValue.contains('deep squat') ||
+        value.contains('✅');
+    final bad = value.contains('🔴') || value.contains('⚠️');
+
+    final MetricChipState state;
+    if (bad) {
+      state = MetricChipState.warning;
+    } else if (good) {
+      state = MetricChipState.good;
+    } else {
+      state = MetricChipState.neutral;
+    }
 
     return _MetricTileData(
       label: label,
       value: translatedValue,
-      state: good ? MetricChipState.good : MetricChipState.warning,
+      state: state,
     );
   }
 
@@ -1619,7 +1629,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
         child: Container(
           padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-          constraints: const BoxConstraints(maxHeight: 148),
+          constraints: const BoxConstraints(maxHeight: 320),
           decoration: BoxDecoration(
             color: Colors.black.withValues(alpha: 0.48),
             borderRadius: BorderRadius.circular(18),

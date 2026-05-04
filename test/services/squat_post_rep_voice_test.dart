@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vika/exercise/exercise_base.dart';
-import 'package:vika/exercise/fault_record.dart';
 import 'package:vika/exercise/squat/metrics/heel_rise_metric.dart';
 import 'package:vika/exercise/squat/metrics/hip_shoulder_sync.dart';
 import 'package:vika/exercise/squat/metrics/squat_metric_base.dart';
@@ -57,7 +56,7 @@ void main() {
       metric.update(
         _buildRepContext(
           squatState: SquatState.bottom,
-          heelDistance: 14,
+          heelDistance: 9,
           scaleFactor: 100,
         ),
       );
@@ -66,7 +65,7 @@ void main() {
     expect(metric.faults, isEmpty);
   });
 
-  test('hip-shoulder sync fault adds a post-rep voice cue', () {
+  test('hip-shoulder sync fault stays live-only for voice', () {
     final metric = HipShoulderSyncMetric();
 
     final contexts = [
@@ -102,7 +101,7 @@ void main() {
     }
 
     expect(metric.faults, hasLength(1));
-    expect(metric.faults.single.voiceMessage, 'Ưỡn ngực lên');
+    expect(metric.faults.single.voiceMessage, isNull);
     expect(
       metric.faults.single.priority,
       SquatFaultVoicePriority.hipShoulderSync,
@@ -181,6 +180,7 @@ void main() {
 
     expect(topFault?.voiceMessage, 'Giữ gót chân');
     expect(topFault?.priority, SquatFaultVoicePriority.heelRise);
+    expect(SquatFaultVoicePriority.depth, SquatFaultVoicePriority.heelRise + 1);
     expect(orderedMessages.first, 'Giữ gót chân');
     expect(orderedMessages, isNot(contains('Ưỡn ngực lên')));
   });
