@@ -7,6 +7,7 @@ import '../utils/pose_smoother.dart';
 import '../utils/pose_math_helpers.dart';
 import "../utils/frame_buffer.dart";
 import "../utils/exercise_logger.dart";
+import '../services/viettel_tts_service.dart';
 
 // --- Constants ---
 
@@ -51,6 +52,9 @@ abstract class ExerciseBase {
   late PoseSmoother poseSmoother;
   int repCount = 0;
   static const MIN_CONFIDENCE = 0.92;
+
+  // Voice Service
+  final ViettelTTSService ttsService = ViettelTTSService();
 
   // Scale factor (shoulder-to-hip distance)
   double scaleFactor = 1.0;
@@ -141,10 +145,10 @@ abstract class ExerciseBase {
 
     _syncPresenceState(hasPose: true);
 
-    debugData['personRatio'] =
-        _personDetector.lastPersonRatio.toStringAsFixed(3);
-    debugData['personScore'] = _personDetector.presenceScore.toStringAsFixed(3);
-    debugData['personDetected'] = _personDetector.personDetected;
+    // debugData['personRatio'] =
+    //     _personDetector.lastPersonRatio.toStringAsFixed(3);
+    // debugData['personScore'] = _personDetector.presenceScore.toStringAsFixed(3);
+    // debugData['personDetected'] = _personDetector.personDetected;
 
     // Person detection — only before activation
     if (exerciseState == ExerciseState.notActivated && !_personConfirmed) {
@@ -163,8 +167,6 @@ abstract class ExerciseBase {
 
     // Presence re-check during active exercise
     if (exerciseState == ExerciseState.activated) {
-      debugData['isPaused'] = _isPaused;
-
       if (_isPaused) {
         resultIssues.feedback["System"] =
             "⏸ Tạm dừng — Quay lại khung hình để tiếp tục";
@@ -203,7 +205,7 @@ abstract class ExerciseBase {
     checkExerciseState(smoothedLandmarks, exerciseState);
 
     _populateBaseDebugData();
-    debugData['scaleFactor'] = scaleFactor.toStringAsFixed(1);
+    // debugData['scaleFactor'] = scaleFactor.toStringAsFixed(1);
 
     if (exerciseState == ExerciseState.activated) {
       checkingPose(smoothedLandmarks);
@@ -227,11 +229,11 @@ abstract class ExerciseBase {
     resultIssues.feedback.clear();
     _syncPresenceState(hasPose: false);
     _populateBaseDebugData();
-    debugData['personRatio'] =
-        _personDetector.lastPersonRatio.toStringAsFixed(3);
-    debugData['personScore'] = _personDetector.presenceScore.toStringAsFixed(3);
-    debugData['personDetected'] = _personDetector.personDetected;
-    debugData['isPaused'] = _isPaused;
+    // debugData['personRatio'] =
+    //     _personDetector.lastPersonRatio.toStringAsFixed(3);
+    // debugData['personScore'] = _personDetector.presenceScore.toStringAsFixed(3);
+    // debugData['personDetected'] = _personDetector.personDetected;
+    // debugData['isPaused'] = _isPaused;
 
     if (exerciseState == ExerciseState.completed) {
       return {'Result': 'Hoàn thành! $repCount reps'};
@@ -264,9 +266,9 @@ abstract class ExerciseBase {
   }
 
   void _populateBaseDebugData() {
-    debugData['exerciseState'] = exerciseState.toString().split('.').last;
+    // debugData['exerciseState'] = exerciseState.toString().split('.').last;
     debugData['cameraFacing'] = cameraFacing.toString().split('.').last;
-    debugData['personConfirmed'] = _personConfirmed;
+    // debugData['personConfirmed'] = _personConfirmed;
   }
 
   void _syncPresenceState({required bool hasPose}) {
@@ -395,6 +397,25 @@ abstract class ExerciseBase {
 
   List<dynamic> getSetFeedback() => setFeedback;
 
+  /// Hook for unifying voice feedback on rep completion
+  void speakRepCompletion({
+    required String? nextPhaseVoice,
+    required bool correctForm,
+    bool countRep = true,
+  }) {
+    if (countRep) {
+      ttsService.speak(repCount.toString());
+    }
+
+    if (correctForm) {
+      ttsService.speak("Tốt lắm");
+    }
+
+    if (!requestStop() && nextPhaseVoice != null) {
+      ttsService.speak(nextPhaseVoice);
+    }
+  }
+
   // --- State Machine (Hold-Still Activation) ---
 
   void checkExerciseState(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks,
@@ -410,19 +431,17 @@ abstract class ExerciseBase {
           final remaining = (HOLD_STILL_REQUIRED_DURATION.inMilliseconds -
                   elapsed.inMilliseconds) /
               1000.0;
-          debugData['holdStill'] = '${remaining.toStringAsFixed(1)}s';
 
           if (elapsed >= HOLD_STILL_REQUIRED_DURATION) {
             exerciseState = ExerciseState.activated;
             _holdStillStartedAt = null;
+            onExerciseActivated();
           } else {
             resultIssues.feedback['System'] =
                 'Giữ yên... ${remaining.clamp(0.0, 99.0).toStringAsFixed(0)}s';
           }
         } else {
-          if (_holdStillStartedAt != null) {
-            debugData['holdStill'] = 'reset';
-          }
+          if (_holdStillStartedAt != null) {}
           _holdStillStartedAt = null;
           resultIssues.feedback['System'] = 'Vào tư thế và giữ yên để bắt đầu';
         }
@@ -431,6 +450,7 @@ abstract class ExerciseBase {
       case ExerciseState.activated:
         if (requestStop()) {
           exerciseState = ExerciseState.completed;
+          ttsService.speak("Hoàn thành bài tập");
           onSetComplete();
         }
         break;
@@ -440,7 +460,11 @@ abstract class ExerciseBase {
     }
   }
 
-  // --- Abstract Methods ---
+  /* -----------------------------------------------------------------------
+     ABSTRACT METHODS & LIFECYCLE HOOKS
+     ----------------------------------------------------------------------- */
+
+  void onExerciseActivated() {}
 
   bool requestStop();
 

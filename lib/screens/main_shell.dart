@@ -144,6 +144,7 @@ class _BottomNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = VFTheme.scale(context);
+    final navBarHeight = VFTheme.navHeight + 8 * s;
 
     return FrostedGlass(
       sigma: 28,

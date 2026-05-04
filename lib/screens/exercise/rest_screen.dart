@@ -49,6 +49,10 @@ class _RestScreenState extends State<RestScreen> with TickerProviderStateMixin {
   late int _remaining;
   late final AnimationController _dotController;
   late final AnimationController _shimmerController;
+  // Cache one CurvedAnimation per rep dot — creating them inside build() leaves
+  // listeners attached to _dotController and trips framework assertions on
+  // teardown.
+  late final List<CurvedAnimation> _dotAnimations;
 
   List<_FaultObservation> get _faultObservations =>
       _groupFaultObservations(widget.setLogger);
@@ -90,12 +94,26 @@ class _RestScreenState extends State<RestScreen> with TickerProviderStateMixin {
       vsync: this,
       duration: const Duration(milliseconds: 3800),
     )..repeat();
+    _dotAnimations = List.generate(
+      widget.setReport.repResults.length,
+      (i) {
+        final start = (i * 0.04).clamp(0.0, 0.82).toDouble();
+        final end = (start + 0.24).clamp(start + 0.01, 1.0).toDouble();
+        return CurvedAnimation(
+          parent: _dotController,
+          curve: Interval(start, end, curve: Curves.easeOutBack),
+        );
+      },
+    );
     _startTimer();
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    for (final anim in _dotAnimations) {
+      anim.dispose();
+    }
     _dotController.dispose();
     _shimmerController.dispose();
     super.dispose();
@@ -147,14 +165,6 @@ class _RestScreenState extends State<RestScreen> with TickerProviderStateMixin {
     };
   }
 
-  Animation<double> _dotAnimation(int index) {
-    final start = (index * 0.04).clamp(0.0, 0.82).toDouble();
-    final end = (start + 0.24).clamp(start + 0.01, 1.0).toDouble();
-    return CurvedAnimation(
-      parent: _dotController,
-      curve: Interval(start, end, curve: Curves.easeOutBack),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -242,7 +252,7 @@ class _RestScreenState extends State<RestScreen> with TickerProviderStateMixin {
                                       _RepResultDot(
                                         scale: s,
                                         isGood: widget.setReport.repResults[i],
-                                        animation: _dotAnimation(i),
+                                        animation: _dotAnimations[i],
                                       ),
                                   ],
                                 ),

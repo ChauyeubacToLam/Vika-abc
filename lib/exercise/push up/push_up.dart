@@ -323,7 +323,8 @@ class PushUp extends ExerciseBase {
     previousPushUpState = pushUpState;
     pushUpState = newState;
 
-    if (newState == PushUpState.descending) {
+    if (newState == PushUpState.descending &&
+        previousPushUpState == PushUpState.plank) {
       resultIssues.instructions.clear();
     }
 

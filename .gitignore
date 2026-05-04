@@ -52,6 +52,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/app/build/
+/android/build/
 
 # Android local properties (contains SDK path specific to your machine)
 /android/local.properties

@@ -48,6 +48,16 @@ class _ExecutiveSummaryPageState extends State<ExecutiveSummaryPage>
   late final AnimationController _entryController;
   late final AnimationController _shimmerController;
 
+  // Cache CurvedAnimations so we don't allocate a fresh listener on every
+  // rebuild — undisposed CurvedAnimations stay attached to _entryController
+  // and trip framework assertions during teardown.
+  late final CurvedAnimation _beat0;
+  late final CurvedAnimation _beat1;
+  late final CurvedAnimation _beat2;
+  late final CurvedAnimation _beat3;
+  late final CurvedAnimation _beat4;
+  late final CurvedAnimation _beat5;
+
   /// Tracks which difficulty the user selected. Null = not yet answered.
   /// Done button stays disabled until this is non-null.
   String? _selectedDifficulty;
@@ -64,6 +74,13 @@ class _ExecutiveSummaryPageState extends State<ExecutiveSummaryPage>
       duration: const Duration(seconds: 4),
     )..repeat();
 
+    _beat0 = _makeBeat(0.0, 0.24);
+    _beat1 = _makeBeat(0.14, 0.38);
+    _beat2 = _makeBeat(0.24, 0.58);
+    _beat3 = _makeBeat(0.46, 0.78);
+    _beat4 = _makeBeat(0.58, 0.86);
+    _beat5 = _makeBeat(0.68, 1.0);
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _entryController.forward();
@@ -72,12 +89,18 @@ class _ExecutiveSummaryPageState extends State<ExecutiveSummaryPage>
 
   @override
   void dispose() {
+    _beat0.dispose();
+    _beat1.dispose();
+    _beat2.dispose();
+    _beat3.dispose();
+    _beat4.dispose();
+    _beat5.dispose();
     _entryController.dispose();
     _shimmerController.dispose();
     super.dispose();
   }
 
-  Animation<double> _beatAnimation(double begin, double end) {
+  CurvedAnimation _makeBeat(double begin, double end) {
     return CurvedAnimation(
       parent: _entryController,
       curve: Interval(begin, end, curve: Curves.easeOutCubic),
@@ -111,7 +134,7 @@ class _ExecutiveSummaryPageState extends State<ExecutiveSummaryPage>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _BeatReveal(
-                animation: _beatAnimation(0.0, 0.24),
+                animation: _beat0,
                 child: _HeroPhotoCard(
                   report: widget.report,
                   calories: widget.calories,
@@ -126,11 +149,11 @@ class _ExecutiveSummaryPageState extends State<ExecutiveSummaryPage>
               SizedBox(height: 24 * s),
               if (widget.comparison != null)
                 _BeatReveal(
-                  animation: _beatAnimation(0.14, 0.38),
+                  animation: _beat1,
                   child: _ComparisonBanner(comparison: widget.comparison!),
                 ),
               _BeatReveal(
-                animation: _beatAnimation(0.24, 0.58),
+                animation: _beat2,
                 child: _FormTerrainSection(
                   setScores: widget.report.setScores,
                   totalDuration: widget.totalDuration,
@@ -138,7 +161,7 @@ class _ExecutiveSummaryPageState extends State<ExecutiveSummaryPage>
               ),
               SizedBox(height: 24 * s),
               _BeatReveal(
-                animation: _beatAnimation(0.46, 0.78),
+                animation: _beat3,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -152,7 +175,7 @@ class _ExecutiveSummaryPageState extends State<ExecutiveSummaryPage>
               ),
               SizedBox(height: 24 * s),
               _BeatReveal(
-                animation: _beatAnimation(0.58, 0.86),
+                animation: _beat4,
                 child: _OverallDifficultySection(
                   lastDifficulty: widget.lastOverallDifficulty,
                   selected: _selectedDifficulty,
@@ -161,7 +184,7 @@ class _ExecutiveSummaryPageState extends State<ExecutiveSummaryPage>
               ),
               SizedBox(height: 24 * s),
               _BeatReveal(
-                animation: _beatAnimation(0.68, 1.0),
+                animation: _beat5,
                 child: _DoneSection(
                   shimmer: _shimmerController,
                   disabled: _selectedDifficulty == null,
@@ -2058,13 +2081,13 @@ String _heroStreakValue(int streakDays) {
 }
 
 String _issueObservation(DetectedEvidence issue) => switch (issue.issueId) {
-      'ankle_mobility' => 'AI thấy gót chân nhấc lên nhiều trong lúc squat.',
+      'ankle_mobility' => 'AI thấy gót chân nhấc lên ở khá nhiều rep.',
       'ankle_mobility_restriction' =>
         'AI thấy cổ chân và thân trên cùng mất ổn định khi xuống sâu.',
       'hip_flexor_overactivity' =>
         'AI thấy thân trên đổ về trước khá nhiều khi xuống squat.',
       'limited_mobility' => 'AI thấy độ sâu hiện tại vẫn còn bị giới hạn.',
-      _ => 'AI ghi nhận tín hiệu: ${issue.rawSignal.replaceAll('_', ' ')}.',
+      _ => 'AI thấy một điểm cần cải thiện trong buổi tập.',
     };
 
 String _formatHeroDate(DateTime date) {

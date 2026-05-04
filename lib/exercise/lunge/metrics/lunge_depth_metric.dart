@@ -84,7 +84,7 @@ class LungeDepthMetric extends LungeMetricBase {
 
     if (minKneeAngle! > LungeDepthConfig.GOOD_DEPTH_RANGE[1]) {
       // Never reached good depth
-      _logFault(phase, 'Not deep enough');
+      _logFault(phase, 'Not deep enough', voiceMessage: 'Xuống thấp hơn');
       ctx.resultIssues
           .addInstruction('standing', 'Depth', 'Xuống sâu hơn lần sau!');
     } else if (minKneeAngle! < LungeDepthConfig.TOO_DEEP_THRESHOLD) {
@@ -95,12 +95,13 @@ class LungeDepthMetric extends LungeMetricBase {
     }
   }
 
-  void _logFault(String phase, String message) {
+  void _logFault(String phase, String message, {String? voiceMessage}) {
     if (!_faults.any((f) => f.phase == phase && f.type == 'Depth')) {
       _faults.add(FaultRecord(
         phase: phase,
         type: 'Depth',
         message: message,
+        voiceMessage: voiceMessage,
         affectsForm: true,
       ));
     }

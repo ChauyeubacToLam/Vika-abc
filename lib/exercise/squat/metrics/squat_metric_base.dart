@@ -24,11 +24,12 @@
 
 import '../squat.dart';
 import '../../exercise_base.dart';
-
-/* =========================================================================
+import '../../fault_record.dart';
+export '../../fault_record.dart'; /* =========================================================================
    RepContext — Shared per-frame state, passed to all metrics.
    Avoids each metric needing to recalculate the same geometry.
    ========================================================================= */
+
 class RepContext {
   final double kneeAngle;
   final double trunkLean; // Positive = forward, negative = backward
@@ -61,21 +62,14 @@ class RepContext {
   });
 }
 
-/* =========================================================================
-   FaultRecord — A single fault logged by a metric.
-   ========================================================================= */
-class FaultRecord {
-  final String phase; // e.g. "DESCENDING", "BOTTOM"
-  final String type; // e.g. "Back", "Depth", "Feet", "Tempo"
-  final String message; // e.g. "Leaned too forward"
-  final bool affectsForm; // false = informational only (like heel rise)
-
-  FaultRecord({
-    required this.phase,
-    required this.type,
-    required this.message,
-    this.affectsForm = true,
-  });
+/// Lower number means the voice cue is more important for post-rep playback.
+class SquatFaultVoicePriority {
+  static const int heelRise = 0;
+  static const int depth = 1;
+  static const int trunkLean = 2;
+  static const int hipShoulderSync = 3;
+  static const int tempo = 4;
+  static const int trunkLeanBackward = 5;
 }
 
 /* =========================================================================

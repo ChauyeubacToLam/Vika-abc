@@ -15,7 +15,7 @@ import '../exercise/squat/squat.dart';
    To add a new exercise:
    1. Create the exercise class extending ExerciseBase
    2. Add a new ExerciseDefinition entry to [exerciseDefinitions]
-   3. Done — the HomeScreen and ExerciseScreen will pick it up
+   3. Done — the HomeScreen and exercise flow will pick it up
    ========================================================================= */
 
 class ExerciseDefinition {
@@ -303,7 +303,6 @@ final List<ExerciseDefinition> exerciseDefinitions = [
     phaseColors: {
       'resting': const Color(0xFF00E676),
       'ascending': const Color(0xFFFFD600),
-      'apex': const Color(0xFFFF6D00),
       'descending': const Color(0xFF00B0FF),
     },
   ),

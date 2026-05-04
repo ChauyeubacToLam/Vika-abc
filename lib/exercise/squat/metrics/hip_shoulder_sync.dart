@@ -171,6 +171,8 @@ class HipShoulderSyncMetric extends SquatMetricBase {
       type: 'HipShoulderSync',
       message: message,
       affectsForm: true,
+      voiceMessage: null,
+      priority: SquatFaultVoicePriority.hipShoulderSync,
     ));
   }
 

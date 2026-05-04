@@ -17,6 +17,7 @@ import '../../exercise/squat/metrics/tempo_metric.dart';
 import '../../exercise/squat/metrics/trunk_lean_metric.dart';
 import '../../exercise/squat/squat.dart';
 import '../../models/exercise_definition.dart';
+import '../../services/squat_voice_coach.dart';
 import '../../utils/exercise_logger.dart';
 import '../onboarding/vf_theme.dart';
 import 'widgets/form_score_arc.dart';
@@ -78,6 +79,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   InputImageRotation _imageRotation = InputImageRotation.rotation0deg;
   late final AnimationController _pulseController;
   late final AnimationController _voiceController;
+  SquatVoiceCoach? _squatVoiceCoach;
   _PoseRuntime _runtime = _PoseRuntime.nativeMediaPipe;
 
   @override
@@ -91,6 +93,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       vsync: this,
       duration: const Duration(milliseconds: 1100),
     )..repeat();
+    if (widget.exercise is Squat) {
+      _squatVoiceCoach = SquatVoiceCoach();
+    }
     _initCamera();
   }
 
@@ -103,6 +108,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     unawaited(_poseChannel.dispose().catchError((_) {}));
     _poseDetector.close();
     unawaited(widget.exercise.disposeDetectors());
+    _squatVoiceCoach?.dispose();
     _pulseController.dispose();
     _voiceController.dispose();
     super.dispose();
@@ -246,6 +252,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       } else {
         _detectedPose = null;
         _feedback = widget.exercise.processNoPoseFrame();
+        _processSquatVoiceFrame(hasPose: false);
       }
 
       if (mounted) {
@@ -262,8 +269,11 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         result.length == 2 &&
         result[1] is Map) {
       _feedback = Map<String, String>.from(result[1] as Map);
+      _processSquatVoiceFrame(hasPose: true);
       return;
     }
+
+    _processSquatVoiceFrame(hasPose: _detectedPose != null);
 
     if (widget.exercise.exerciseState == ExerciseState.completed &&
         !_didComplete) {
@@ -339,6 +349,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
     for (final index in camerasToTry) {
       final camera = cameras[index];
+      debugPrint(
+        '[Vika] Trying fallback camera ${camera.name} (${camera.lensDirection.name})',
+      );
       final controller = CameraController(
         camera,
         ResolutionPreset.medium,
@@ -349,7 +362,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       );
 
       try {
-        await controller.initialize();
+        await controller.initialize().timeout(const Duration(seconds: 6));
         await controller.startImageStream(_processFallbackCameraImage);
         if (!mounted) {
           await controller.dispose();
@@ -367,8 +380,11 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
           _cameraErrorMessage = null;
         });
         return;
-      } catch (_) {
-        await controller.dispose();
+      } catch (error) {
+        debugPrint('[Vika] Fallback camera ${camera.name} failed: $error');
+        try {
+          await controller.dispose();
+        } catch (_) {}
       }
     }
 
@@ -459,6 +475,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       } else {
         _detectedPose = null;
         _feedback = widget.exercise.processNoPoseFrame();
+        _processSquatVoiceFrame(hasPose: false);
       }
 
       if (mounted) {
@@ -476,6 +493,21 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   void _handlePose(Pose pose) {
     _detectedPose = pose;
     _handlePoseResult(widget.exercise.processPose(pose.landmarks));
+  }
+
+  void _processSquatVoiceFrame({required bool hasPose}) {
+    final coach = _squatVoiceCoach;
+    final exercise = widget.exercise;
+    if (coach == null || exercise is! Squat) {
+      return;
+    }
+
+    coach.processFrame(
+      exercise: exercise,
+      repCount: exercise.repCount,
+      hasPose: hasPose,
+      feedback: _feedback,
+    );
   }
 
   InputImage? _buildInputImage(CameraImage image) {
@@ -1120,8 +1152,8 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       return null;
     }
 
-    final isHolding = status.contains('Hold!');
-    final isRelease = status.contains('Push Up Now!');
+    final isHolding = Squat.isHoldStatus(status);
+    final isRelease = Squat.isReleaseStatus(status);
     if (!isHolding && !isRelease) {
       return null;
     }
@@ -1215,12 +1247,23 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     };
     final normalizedValue = value.toLowerCase();
     final good = normalizedValue.contains('good') ||
-        normalizedValue.contains('deep squat');
+        normalizedValue.contains('deep squat') ||
+        value.contains('✅');
+    final bad = value.contains('🔴') || value.contains('⚠️');
+
+    final MetricChipState state;
+    if (bad) {
+      state = MetricChipState.warning;
+    } else if (good) {
+      state = MetricChipState.good;
+    } else {
+      state = MetricChipState.neutral;
+    }
 
     return _MetricTileData(
       label: label,
       value: translatedValue,
-      state: good ? MetricChipState.good : MetricChipState.warning,
+      state: state,
     );
   }
 
@@ -1527,6 +1570,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     if (value == 'Going Down...') {
       return 'Hạ người chậm và kiểm soát.';
     }
+    if (value == Squat.ascendingStatus) {
+      return 'Đứng lên dứt khoát.';
+    }
     if (value == 'Push Up!') {
       return 'Đứng lên mạnh nhưng vẫn giữ thân chắc.';
     }
@@ -1548,12 +1594,12 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
   String _translateStatus(String value) {
     final seconds = _extractDurationSeconds(value);
-    if (value.contains('Hold!')) {
+    if (Squat.isHoldStatus(value)) {
       return seconds == null
           ? 'Giữ đáy rồi đẩy lên.'
           : 'Giữ đáy ${seconds.toStringAsFixed(1)} giây rồi đẩy lên.';
     }
-    if (value.contains('Push Up Now!')) {
+    if (Squat.isReleaseStatus(value)) {
       return 'Đẩy lên ngay.';
     }
     if (value.contains('Push Up!')) {
@@ -1583,7 +1629,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
         child: Container(
           padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-          constraints: const BoxConstraints(maxHeight: 148),
+          constraints: const BoxConstraints(maxHeight: 320),
           decoration: BoxDecoration(
             color: Colors.black.withValues(alpha: 0.48),
             borderRadius: BorderRadius.circular(18),
@@ -1832,8 +1878,9 @@ class _CenterOverlay extends StatelessWidget {
             (ExerciseBase.HOLD_STILL_REQUIRED_DURATION.inMilliseconds *
                     (1 - clamped)) /
                 1000;
-        final remainingLabel = remainingSeconds <= 0
-            ? '0.0'
+        final isReadyToStart = remainingSeconds <= 0;
+        final remainingLabel = isReadyToStart
+            ? 'SẴN'
             : (remainingSeconds < 1
                 ? remainingSeconds.toStringAsFixed(1)
                 : remainingSeconds.ceil().toString());
@@ -1849,14 +1896,14 @@ class _CenterOverlay extends StatelessWidget {
               Text(
                 remainingLabel,
                 style: const TextStyle(
-                  fontSize: 36,
+                  fontSize: 34,
                   fontWeight: FontWeight.w900,
                   color: Colors.white,
                   height: 1,
                 ),
               ),
               Text(
-                'Giữ yên',
+                isReadyToStart ? 'Bắt đầu' : 'Giữ yên',
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w600,

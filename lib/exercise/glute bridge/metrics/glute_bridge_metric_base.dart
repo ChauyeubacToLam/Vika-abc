@@ -15,7 +15,8 @@
 
 import '../glute_bridge.dart';
 import '../../exercise_base.dart';
-
+import '../../fault_record.dart';
+export '../../fault_record.dart';
 /* =========================================================================
    RepContext — Shared per-frame state passed to all metrics.
    ========================================================================= */
@@ -77,22 +78,6 @@ class RepContext {
   });
 }
 
-/* =========================================================================
-   FaultRecord — A single fault logged by a metric.
-   ========================================================================= */
-class FaultRecord {
-  final String phase;
-  final String type;
-  final String message;
-  final bool affectsForm;
-
-  FaultRecord({
-    required this.phase,
-    required this.type,
-    required this.message,
-    this.affectsForm = true,
-  });
-}
 
 /* =========================================================================
    GluteBridgeMetricBase — Interface every glute-bridge metric implements.

@@ -49,6 +49,8 @@ class Plank extends ExerciseBase {
   int? _holdStartMs;
   int? _restStartMs;
   bool _ankleAvailable = true;
+  bool _spoken10 = false;
+  bool _spoken5 = false;
 
   final Debouncer _positionDebouncer = Debouncer(requiredFrames: 2);
 
@@ -273,6 +275,14 @@ class Plank extends ExerciseBase {
       final holdSecs = _currentHoldSeconds();
       final remaining = (PlankConfig.HOLD_DURATION - holdSecs)
           .clamp(0.0, PlankConfig.HOLD_DURATION);
+
+      if (remaining <= 10.0 && !_spoken10) {
+        _spoken10 = true;
+      }
+      if (remaining <= 5.0 && !_spoken5) {
+        _spoken5 = true;
+      }
+
       resultIssues.addInstruction(
           'holding', 'Status', 'Giữ! ${remaining.toStringAsFixed(1)}s');
       debugData['holdProgress'] =
@@ -329,6 +339,8 @@ class Plank extends ExerciseBase {
         _holdStartMs = timestampMs;
         _restStartMs = null;
         resultIssues.instructions.clear();
+        _spoken10 = false;
+        _spoken5 = false;
         break;
 
       case PlankState.resting:

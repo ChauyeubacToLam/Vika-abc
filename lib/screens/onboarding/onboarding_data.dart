@@ -22,8 +22,6 @@ class OnboardingData {
   // ExerciseLogger? pushUpLogger;
   late SquatInterpreter squatInterpreter;
 
-  bool medicalClear = false;
-
   void onSquatComplete(ExerciseLogger logger) {
     squatLogger = logger;
     squatInterpreter = SquatInterpreter(logger: logger);
@@ -35,6 +33,7 @@ class OnboardingData {
 
   String? confirmedLevel;
   String? issueAnswer;
+  bool medicalClear = false;
 
   String? displayName;
   String? email;

@@ -8,6 +8,7 @@ import '../../utils/pose_math_helpers.dart';
 import '../../utils/frame_snapshot.dart';
 import '../../utils/exercise_logger.dart';
 import '../exercise_base.dart';
+import '../side_tracked_exercise_mixin.dart';
 import 'metrics/squat_metric_base.dart';
 import 'metrics/squat_depth_metric.dart';
 import 'metrics/trunk_lean_metric.dart';
@@ -22,9 +23,12 @@ class SquatConfig {
   static const int SQUAT_STAND_ANGLE_THRESHOLD = 160;
   static const int SQUAT_DESCEND_ANGLE_THRESHOLD = 152;
   static const List<int> SQUAT_BOTTOM_ANGLE_THRESHOLD = [80, 100];
+  static const double BOTTOM_RELEASE_READY_TOLERANCE_SECONDS = 0.05;
 }
 
 enum SquatState { standing, descending, bottom, ascending }
+
+
 
 // --- Squat ---
 //
@@ -51,13 +55,75 @@ enum SquatState { standing, descending, bottom, ascending }
 //    - tempo_fails_count: from the sum of all tempo_fails_count
 //    - hip_shoulder_sync_fails_count: from the sum of all hip_shoulder_sync_fails_count
 
-class Squat extends ExerciseBase {
+class Squat extends ExerciseBase with SideTrackedExerciseMixin {
+  static const String standingStatus = 'Xuống';
+  static const String descendingStatus = 'Going Down...';
+  static const String ascendingStatus = 'Đứng lên';
+
   final int maxRep;
   SquatState squatState = SquatState.standing;
   SquatState previousSquatState = SquatState.standing;
+  List<String> lastRepFaultVoiceMessages = [];
+  String? lastRepTopVoiceMessage;
+  int? lastRepTopVoicePriority;
+  bool lastRepWasClean = true;
   bool _reachedBottomThisRep = false;
 
+
   Squat({this.maxRep = SquatConfig.MAX_REP});
+
+  static String bottomHoldStatus(double remainingSeconds) =>
+      'Hold! ${remainingSeconds.toStringAsFixed(1)}s';
+
+  static bool isHoldStatus(String statusText) {
+    return statusText.startsWith('Hold') || statusText.contains('Giữ');
+  }
+
+  static bool isReleaseStatus(String statusText) {
+    return statusText.contains('Push Up Now!') ||
+        statusText.contains(ascendingStatus);
+  }
+
+  static List<FaultRecord> orderedVoicedFaults(Iterable<FaultRecord> faults) {
+    final voicedFaults = faults
+        .where((fault) =>
+            fault.voiceMessage != null && fault.voiceMessage!.isNotEmpty)
+        .toList()
+      ..sort((a, b) {
+        final priorityCompare = a.priority.compareTo(b.priority);
+        if (priorityCompare != 0) {
+          return priorityCompare;
+        }
+
+        final typeCompare = a.type.compareTo(b.type);
+        if (typeCompare != 0) {
+          return typeCompare;
+        }
+
+        return a.message.compareTo(b.message);
+      });
+
+    return voicedFaults;
+  }
+
+  static FaultRecord? topVoicedFault(Iterable<FaultRecord> faults) {
+    final voicedFaults = orderedVoicedFaults(faults);
+    return voicedFaults.isEmpty ? null : voicedFaults.first;
+  }
+
+  static List<String> orderedUniqueVoiceMessages(Iterable<FaultRecord> faults) {
+    final orderedVoiceMessages = <String>[];
+    final seenVoiceMessages = <String>{};
+
+    for (final fault in orderedVoicedFaults(faults)) {
+      final voiceMessage = fault.voiceMessage!;
+      if (seenVoiceMessages.add(voiceMessage)) {
+        orderedVoiceMessages.add(voiceMessage);
+      }
+    }
+
+    return orderedVoiceMessages;
+  }
 
   // Metrics
   final DepthMetric depthMetric = DepthMetric();
@@ -73,6 +139,25 @@ class Squat extends ExerciseBase {
     tempoMetric,
     hipShoulderSyncMetric,
   ];
+
+  @override
+  Map<String, SideLandmarkPair> get requiredSideLandmarks => const {
+    'hip': (right: PoseLandmarkType.rightHip, left: PoseLandmarkType.leftHip),
+    'shoulder': (
+      right: PoseLandmarkType.rightShoulder,
+      left: PoseLandmarkType.leftShoulder,
+    ),
+    'knee': (right: PoseLandmarkType.rightKnee, left: PoseLandmarkType.leftKnee),
+    'ankle': (
+      right: PoseLandmarkType.rightAnkle,
+      left: PoseLandmarkType.leftAnkle,
+    ),
+    'foot': (
+      right: PoseLandmarkType.rightFootIndex,
+      left: PoseLandmarkType.leftFootIndex,
+    ),
+    'heel': (right: PoseLandmarkType.rightHeel, left: PoseLandmarkType.leftHeel),
+  };
 
   // Debouncers for state transitions
   final Debouncer _bottomDebouncer = Debouncer(requiredFrames: 2);
@@ -101,28 +186,29 @@ class Squat extends ExerciseBase {
     }
   }
 
+  bool get hasCompletedBottomHold {
+    final holdDuration = tempoMetric.bottomHoldDuration;
+    if (holdDuration != null) {
+      return holdDuration >= TempoConfig.BOTTOM_HOLD_MIN;
+    }
+
+    final remaining = tempoMetric.bottomHoldRemaining(frameTimestampMs);
+    return remaining != null &&
+        remaining <= SquatConfig.BOTTOM_RELEASE_READY_TOLERANCE_SECONDS;
+  }
+
   // --- Start Position ---
   // User must stand upright with straight legs to begin.
 
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    final shoulder = getSideLandmark(
-      landmarks: landmarks,
-      rightType: PoseLandmarkType.rightShoulder,
-      leftType: PoseLandmarkType.leftShoulder,
-    );
-    final hip = getSideLandmark(
-      landmarks: landmarks,
-      rightType: PoseLandmarkType.rightHip,
-      leftType: PoseLandmarkType.leftHip,
-    );
-    final knee = getSideLandmark(
-      landmarks: landmarks,
-      rightType: PoseLandmarkType.rightKnee,
-      leftType: PoseLandmarkType.leftKnee,
-    );
+    final requiredLandmarks = getSideTrackedLandmarks(landmarks);
+    if (requiredLandmarks == null) return false;
 
-    if (shoulder == null || hip == null || knee == null) return false;
+    final shoulder = requiredLandmarks['shoulder']!;
+    final hip = requiredLandmarks['hip']!;
+    final knee = requiredLandmarks['knee']!;
+    final ankle = requiredLandmarks['ankle']!;
 
     // Trunk must be roughly vertical (< 25° deviation)
     double deviation = calculateVerticalAngle(pivot: hip, point: shoulder);
@@ -133,11 +219,7 @@ class Squat extends ExerciseBase {
     final kneeAngle = calculateAngleNormalized(
       firstPoint: hip,
       midPoint: knee,
-      lastPoint: getSideLandmark(
-        landmarks: landmarks,
-        rightType: PoseLandmarkType.rightAnkle,
-        leftType: PoseLandmarkType.leftAnkle,
-      )!,
+      lastPoint: ankle,
     );
     if (kneeAngle < 155.0) return false;
 
@@ -182,7 +264,7 @@ class Squat extends ExerciseBase {
       return "⚠️ Please turn to the side for better tracking for Squat";
     }
 
-    final requiredLandmarks = _getRequiredLandmarks(landmarks);
+    final requiredLandmarks = getSideTrackedLandmarks(landmarks);
     if (requiredLandmarks == null) return "⚠️ Body not fully visible.";
 
     final allConfident = requiredLandmarks.values
@@ -192,57 +274,14 @@ class Squat extends ExerciseBase {
     return null;
   }
 
-  /// Returns all 6 required landmarks, or null if any is missing.
-  Map<String, PoseLandmark>? _getRequiredLandmarks(
-      Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    final hip = getSideLandmark(
-        landmarks: landmarks,
-        rightType: PoseLandmarkType.rightHip,
-        leftType: PoseLandmarkType.leftHip);
-    final shoulder = getSideLandmark(
-        landmarks: landmarks,
-        rightType: PoseLandmarkType.rightShoulder,
-        leftType: PoseLandmarkType.leftShoulder);
-    final knee = getSideLandmark(
-        landmarks: landmarks,
-        rightType: PoseLandmarkType.rightKnee,
-        leftType: PoseLandmarkType.leftKnee);
-    final ankle = getSideLandmark(
-        landmarks: landmarks,
-        rightType: PoseLandmarkType.rightAnkle,
-        leftType: PoseLandmarkType.leftAnkle);
-    final foot = getSideLandmark(
-        landmarks: landmarks,
-        rightType: PoseLandmarkType.rightFootIndex,
-        leftType: PoseLandmarkType.leftFootIndex);
-    final heel = getSideLandmark(
-        landmarks: landmarks,
-        rightType: PoseLandmarkType.rightHeel,
-        leftType: PoseLandmarkType.leftHeel);
 
-    if (hip == null ||
-        shoulder == null ||
-        knee == null ||
-        ankle == null ||
-        foot == null ||
-        heel == null) return null;
-
-    return {
-      'hip': hip,
-      'shoulder': shoulder,
-      'knee': knee,
-      'ankle': ankle,
-      'foot': foot,
-      'heel': heel,
-    };
-  }
 
   // --- Main Loop (called every frame when activated) ---
 
   @override
   void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
     // 1. Extract landmarks
-    final lm = _getRequiredLandmarks(smoothedLandmarks);
+    final lm = getSideTrackedLandmarks(smoothedLandmarks);
     if (lm == null) return;
 
     final hip = lm['hip']!;
@@ -251,6 +290,8 @@ class Squat extends ExerciseBase {
     final shoulder = lm['shoulder']!;
     final foot = lm['foot']!;
     final heel = lm['heel']!;
+
+    scaleFactor = calculateDistance(shoulder, hip);
 
     // 2. Calculate geometry
     final kneeAngle = calculateAngleNormalized(
@@ -283,6 +324,10 @@ class Squat extends ExerciseBase {
     debugData['reachedBottomThisRep'] = _reachedBottomThisRep;
     debugData['repCount'] = repCount;
     debugData['frameBuffer'] = frameBuffer.frameBuffer.length;
+    debugData['trackedSide'] = trackedSide?.name ?? 'unknown';
+    debugData['trackedSideSource'] = lastTrackedSideSource;
+    debugData['leftSideScore'] = lastLeftSideScore.toStringAsFixed(2);
+    debugData['rightSideScore'] = lastRightSideScore.toStringAsFixed(2);
     debugData['kneeAngle'] = kneeAngle.toStringAsFixed(1);
     debugData['backAngle'] = backAngle.toStringAsFixed(1);
     debugData['trunkLean'] = trunkLean.toStringAsFixed(1);
@@ -351,6 +396,13 @@ class Squat extends ExerciseBase {
       faultMap.putIfAbsent(fault.phase, () => {});
       faultMap[fault.phase]![fault.type] = fault.message;
     }
+
+    final topVoicedFault = Squat.topVoicedFault(allFaults);
+    lastRepFaultVoiceMessages = Squat.orderedUniqueVoiceMessages(allFaults);
+    lastRepTopVoiceMessage = topVoicedFault?.voiceMessage;
+    lastRepTopVoicePriority = topVoicedFault?.priority;
+    lastRepWasClean = correctForm;
+
     setFeedback.add({correctForm: faultMap});
 
     // Update debug data with metric outputs
@@ -394,24 +446,30 @@ class Squat extends ExerciseBase {
 
   void _updatePhaseInstructions(int now) {
     switch (squatState) {
+      case SquatState.standing:
+        // Anticipatory cue: while standing, guide user to start the next rep.
+        resultIssues.addInstruction('standing', 'Status', standingStatus);
+        break;
       case SquatState.descending:
-        resultIssues.addInstruction('descending', 'Status', 'Going Down...');
+        // Keep the on-screen cue aligned with the current motion.
+        // Voice should only say "Giữ" after the user actually reaches bottom.
+        resultIssues.addInstruction('descending', 'Status', descendingStatus);
         break;
       case SquatState.bottom:
         final remaining = tempoMetric.bottomHoldRemaining(now);
         final progress = tempoMetric.bottomHoldProgress(now);
-        if (remaining != null && remaining > 0.05) {
+        if (!hasCompletedBottomHold && remaining != null) {
           resultIssues.addInstruction(
-              'bottom', 'Status', 'Hold! ${remaining.toStringAsFixed(1)}s');
+              'bottom', 'Status', bottomHoldStatus(remaining));
         } else {
-          resultIssues.addInstruction('bottom', 'Status', 'Push Up Now!');
+          // Anticipatory cue: when hold is complete, tell user to go up.
+          resultIssues.addInstruction('bottom', 'Status', ascendingStatus);
         }
         if (progress != null) debugData['bottomHoldProgress'] = progress;
         break;
       case SquatState.ascending:
-        resultIssues.addInstruction('ascending', 'Status', 'Push Up!');
-        break;
-      case SquatState.standing:
+        // The ascent cue should stay consistent with the main voice flow.
+        resultIssues.addInstruction('ascending', 'Status', ascendingStatus);
         break;
     }
   }
@@ -440,6 +498,11 @@ class Squat extends ExerciseBase {
       }
     }
 
+    if (squatState == SquatState.bottom &&
+        kneeAngle > SquatConfig.SQUAT_BOTTOM_ANGLE_THRESHOLD[1] + 5) {
+      _transitionState(SquatState.ascending, timestampMs);
+    }
+
     // Debounced threshold transitions
     if (_bottomDebouncer.update(
         kneeAngle <= SquatConfig.SQUAT_BOTTOM_ANGLE_THRESHOLD[1] &&
@@ -447,7 +510,8 @@ class Squat extends ExerciseBase {
       _transitionState(SquatState.bottom, timestampMs);
     } else if (_standingDebouncer.update(
         kneeAngle > SquatConfig.SQUAT_STAND_ANGLE_THRESHOLD &&
-            squatState == SquatState.ascending &&
+            (squatState == SquatState.ascending ||
+                squatState == SquatState.descending) &&
             !isDescendingFrame)) {
       _transitionState(SquatState.standing, timestampMs);
     }
