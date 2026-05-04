@@ -44,7 +44,6 @@
    ========================================================================= */
 
 import 'curl_up_metric_base.dart';
-import '../curl_up.dart';
 
 class TrunkElevationConfig {
   /// Peak elevation above which the rep is a full sit-up — fail the rep.
