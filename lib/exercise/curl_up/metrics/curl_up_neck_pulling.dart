@@ -48,7 +48,6 @@
    ========================================================================= */
 
 import 'curl_up_metric_base.dart';
-import '../curl_up.dart';
 
 class NeckPullingConfig {
   /// Deviation from personal baseline that triggers a warning.

@@ -14,49 +14,62 @@ import 'metrics/curl_up_trunk_elevation.dart';
 import 'metrics/curl_up_neck_pulling.dart';
 import 'metrics/curl_up_knee_extension.dart';
 
-// --- Config ---
+// =========================================================================
+// CURL-UP STATE MACHINE OVERVIEW
+//
+// State machine drives off TRUNK ANGLE (shoulder-hip from horizontal).
+// This is knee-invariant — only depends on shoulder.y and hip.y. Knee
+// flexion/extension cannot contaminate trunk angle, so the user can't
+// fake reps by moving their leg.
+//
+// Trunk angle direction:
+//   - Lying flat:  trunkAngle ≈ baseline (whatever camera tilt is at
+//                  activation; baseline cancels the constant offset)
+//   - Curling up:  trunkAngle INCREASES
+//   - Returning:   trunkAngle DECREASES back toward baseline
+//
+// Camera tilt: trunkAngle includes camera-tilt offset, but baseline
+// cancels it via subtraction. As long as the camera doesn't move during
+// a set (phone on floor, doesn't slide), this works. Future ticket: AR
+// sagittal calibration to make this fully tilt-invariant by overlay.
+//
+// Other metrics (trunk_elevation, neck_pulling, knee_extension) still
+// use their own joint-frame angles for grading. State machine concerns
+// are decoupled from grading.
+// =========================================================================
 
 class CurlUpConfig {
   static const int MAX_REP = 12;
 
-  // Personal-baseline-relative entry/exit thresholds (degrees).
-  // Baseline = shoulder-hip-knee interior angle captured during hold-still
-  // activation. As the user curls up, this interior angle DECREASES.
-  //
-  // ASCEND_DELTA: how far the angle must drop below baseline to register
-  //               as actively curling. Below 5° = noise/breath movement.
-  // REST_TOLERANCE: how close the angle must return to baseline before we
-  //                 call the rep complete and arm the next one.
-  static const double ASCEND_DELTA_THRESHOLD = 3.0;
+  /// Trunk elevation past baseline that triggers ascending state, and
+  /// the tolerance for declaring rep complete. Both in degrees.
+  /// Real curl-ups produce 10-25° trunk lift, so 4° entry is generous
+  /// and 3° rest tolerance lets minor jitter clear the gate.
+  static const double ASCEND_DELTA_THRESHOLD = 4.0;
   static const double REST_TOLERANCE = 3.0;
 
-  // Bent knee elevation (fraction of torso length) for McGill setup check.
-  // 0.15 = knee raised at least 15 % of shoulder-to-hip distance above hip.
+  /// Bent knee elevation gate at activation (fraction of torso length).
   static const double BENT_KNEE_ELEVATION = 0.15;
+
+  /// Strict knee gate at activation: interior angle ≤ 100° required.
+  static const double KNEE_MAX_AT_START = 100.0;
+
+  /// Max ear-to-hip vertical separation, normalized by torso length.
+  /// Confirms whole body is supine, not just shoulder-hip segment.
+  static const double EAR_HIP_VERTICAL_MAX = 0.3;
+
+  /// Required stable frames at baseline to call rep complete.
+  static const int RESTING_DEBOUNCE_FRAMES = 2;
+
+  /// Max allowed knee displacement from baseline before knee is flagged
+  /// "out of position." Used to gate state machine entry and exit.
+  /// Smoothed by 10-frame StickyDebouncer to filter ML Kit landmark noise.
+  static const double KNEE_DISPLACEMENT_MAX = 15.0;
 }
 
 enum CurlUpState { resting, ascending, descending }
 
-// --- Curl Up ---
-//
-// DATA LOGGING PIPELINE:
-// 1. frameBuffer (Per-Frame):
-//    - shoulderHipKneeAngle: drives state transitions, finds peak (min) angle
-//    - earShoulderHipAngle: tracks neck deviation peak
-//    - hipKneeAnkleAngle: tracks knee straightening peak (when ankle visible)
-// 2. RepLog (Per-Rep):
-//    - peak_trunk_elevation: max (baseline - SHK) reached during the rep
-//    - peak_neck_deviation: max (baseline - ESH) during ascending
-//    - max_knee_angle: largest hip-knee-ankle reached (knee extension creep)
-//    - fault_types: list of fault types logged this rep
-// 3. Set-Level Summaries (onSetComplete):
-//    - trunk_elev_fails_count, neck_pull_fails_count, knee_ext_fails_count
-//    - max_peak_trunk_elevation, max_peak_neck_deviation
-//    - good_rep_count, max_rep
-
 class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
-  // Anticipatory cues (what the user should do next while in this state),
-  // mirrored on Squat's standingStatus / descendingStatus / ascendingStatus.
   static const String restingStatus = 'Cuộn lên';
   static const String ascendingStatus = 'Lên...';
   static const String descendingStatus = 'Hạ từ từ';
@@ -65,16 +78,34 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
   CurlUpState curlUpState = CurlUpState.resting;
   CurlUpState previousCurlUpState = CurlUpState.resting;
 
-  // Voice-coach handoff state (mirror of squat).
+  // Voice-coach handoff state.
   List<String> lastRepFaultVoiceMessages = [];
   String? lastRepTopVoiceMessage;
   int? lastRepTopVoicePriority;
   bool lastRepWasClean = true;
 
-  // Hold-still baselines captured during isInStartPosition.
-  // These persist for the whole set — resting posture doesn't change mid-set.
+  // ── Baselines ──
+  // All captured at activation. Trunk and knee baselines additionally
+  // refresh during STABLE resting frames (per-signal stability gate)
+  // so they track the user's natural rest pose, not the activation
+  // snapshot which can be tense / off-pose.
+  //
+  // Note: holdStillShoulderHipKnee and holdStillEarShoulderHip are
+  // initial seeds passed to metrics via RepContext. The metrics maintain
+  // their own internal baselines after activation. We don't refresh
+  // those fields here — that's the metric's concern.
+
   double? _holdStillShoulderHipKnee;
   double? _holdStillEarShoulderHip;
+  double? _holdStillHipKneeAnkle;
+
+  /// Baseline for state machine — trunk angle from horizontal at rest.
+  /// Refreshes during stable resting frames.
+  double? _baselineTrunkAngle;
+
+  /// True when current knee displacement from baseline exceeds threshold.
+  /// Smoothed via StickyDebouncer. Gates state machine transitions.
+  bool _kneeIsDisplaced = false;
 
   CurlUp({this.maxRep = CurlUpConfig.MAX_REP});
 
@@ -150,15 +181,20 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
         ),
       };
 
-  // ── Debouncers for state transitions ──
+  // ── Debouncers ──
 
-  // Confirms the user has truly returned to resting (filters jitter near
-  // baseline at the end of a rep).
-  final Debouncer _restingDebouncer = Debouncer(requiredFrames: 2);
+  final Debouncer _restingDebouncer =
+      Debouncer(requiredFrames: CurlUpConfig.RESTING_DEBOUNCE_FRAMES);
 
-  // Tracks sustained direction reversal of shoulderHipKneeAngle. Filters
-  // single-frame noise reversals during slow ascent.
-  final StickyDebouncer directionDetection = StickyDebouncer();
+  final StickyDebouncer directionDetection =
+      StickyDebouncer(requiredFrames: CurlUpConfig.RESTING_DEBOUNCE_FRAMES);
+
+  /// Smooths the knee displacement signal. Starts unblocked
+  /// (currentState: false). Flips to true after 10 consecutive frames
+  /// of displacement > KNEE_DISPLACEMENT_MAX. Flips back after 10
+  /// consecutive frames of recovery. Hysteresis filters ML Kit noise.
+  final StickyDebouncer kneeDisplacementDebouncer =
+      StickyDebouncer(requiredFrames: 10, currentState: false);
 
   // --- UI Bridge ---
 
@@ -181,8 +217,6 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
   }
 
   // --- Start Position ---
-  // User must lie flat in a side view with the camera-side knee bent
-  // (McGill setup: hands under lumbar spine, one knee bent ~90°).
 
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
@@ -194,22 +228,35 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
     final knee = lm['knee']!;
     final ear = lm['ear']!;
 
-    // Trunk roughly horizontal in the camera frame (lying flat).
-    final double trunkAngle =
-        calculateHorizontalAngle(point1: shoulder, point2: hip);
-    if (trunkAngle > 8.0) return false;
+    // Compute knee angle once — used for the strict gate AND captured
+    // as baseline if ankle is visible.
+    final ankle = lm['ankle'];
+    double? hka;
+    if (ankle != null && ankle.likelihood >= ExerciseBase.MIN_CONFIDENCE) {
+      hka = calculateAngleNormalized(
+        firstPoint: hip,
+        midPoint: knee,
+        lastPoint: ankle,
+      );
+      if (hka > CurlUpConfig.KNEE_MAX_AT_START) return false;
+    }
 
-    // Camera-side knee must be bent — knee raised above hip in screen coords.
-    // Use Euclidean torso length (not Δy) — when lying flat in side view,
-    // shoulder.y ≈ hip.y so the y-axis projection collapses to ~0.
-    final double torsoLen = calculateDistance(shoulder, hip);
+    // Trunk segment must be roughly horizontal.
+    final double trunkAngle =
+        calculateHorizontalAngle(point1: hip, point2: shoulder);
+    if (trunkAngle > 7.0) return false;
+
+    // Camera-side knee must be raised above hip in screen coords.
+    final double torsoLen = calculateDistance(hip, shoulder);
     if (torsoLen < 2.5) return false;
     final double kneeElevation = (hip.y - knee.y) / torsoLen;
     if (kneeElevation < CurlUpConfig.BENT_KNEE_ELEVATION) return false;
 
-    // Capture hold-still baselines. Used by metrics for personalized
-    // thresholds (especially neck — kyphotic users have non-neutral resting
-    // baselines).
+    // Whole-body lying-flat check (head must be at hip level).
+    final double earHipDelta = (ear.y - hip.y).abs() / torsoLen;
+    if (earHipDelta > CurlUpConfig.EAR_HIP_VERTICAL_MAX) return false;
+
+    // Capture baselines.
     _holdStillShoulderHipKnee = calculateAngleNormalized(
       firstPoint: shoulder,
       midPoint: hip,
@@ -220,26 +267,24 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
       midPoint: shoulder,
       lastPoint: hip,
     );
+    _holdStillHipKneeAnkle = hka; // null if ankle wasn't visible
+    _baselineTrunkAngle = trunkAngle;
 
     return true;
   }
 
   // --- Stop Condition & Set-Level Logging ---
-  // Aggregates per-rep data into set-level summaries when the set ends.
 
   @override
   void onSetComplete() {
-    // Fault counts per metric
     logger.pushKey("trunk_elev_fails_count", trunkElevationMetric.faultsCount);
     logger.pushKey("neck_pull_fails_count", neckPullingMetric.faultsCount);
     logger.pushKey("knee_ext_fails_count", kneeExtensionMetric.faultsCount);
 
-    // Aggregated per-rep stats
     logger.pushMax("peak_trunk_elevation", "max_peak_trunk_elevation");
     logger.pushMax("peak_neck_deviation", "max_peak_neck_deviation");
     logger.pushMax("max_knee_angle", "max_max_knee_angle");
 
-    // Count good reps & push max rep
     logger.pushGoodRepCount();
     logger.pushKey("max_rep", maxRep);
   }
@@ -248,7 +293,6 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
   bool requestStop() => repCount >= maxRep;
 
   // --- Safety Checks ---
-  // Side-facing camera; all required landmarks visible with high confidence.
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
@@ -284,10 +328,8 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
     final ankleVisible =
         ankle != null && ankle.likelihood >= ExerciseBase.MIN_CONFIDENCE;
 
-    scaleFactor = calculateDistance(shoulder, hip);
-
     // 2. Calculate geometry
-    final trunkAngle = calculateHorizontalAngle(point1: shoulder, point2: hip);
+    final trunkAngle = calculateHorizontalAngle(point1: hip, point2: shoulder);
     final shoulderHipKneeAngle = calculateAngleNormalized(
         firstPoint: shoulder, midPoint: hip, lastPoint: knee);
     final earShoulderHipAngle = calculateAngleNormalized(
@@ -315,41 +357,67 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
       resultIssues: resultIssues,
     );
 
-    // // 4. Debug overlay
-    // debugData['curlUpState'] = curlUpState.name;
-    // debugData['previousCurlUpState'] = previousCurlUpState.name;
-    // debugData['repCount'] = repCount;
-    // debugData['frameBuffer'] = frameBuffer.frameBuffer.length;
-    // debugData['trackedSide'] = trackedSide?.name ?? 'unknown';
-    // debugData['trackedSideSource'] = lastTrackedSideSource;
-    // debugData['leftSideScore'] = lastLeftSideScore.toStringAsFixed(2);
-    // debugData['rightSideScore'] = lastRightSideScore.toStringAsFixed(2);
-    // debugData['trunkAngle'] = trunkAngle.toStringAsFixed(1);
-    // debugData['shAngle'] = shoulderHipKneeAngle.toStringAsFixed(1);
-    // debugData['neckAngle'] = earShoulderHipAngle.toStringAsFixed(1);
-    // debugData['kneeAngle'] = hipKneeAnkleAngle?.toStringAsFixed(1) ?? 'n/a';
-    // debugData['baselineSHK'] =
-    //     _holdStillShoulderHipKnee?.toStringAsFixed(1) ?? 'n/a';
-
-    // 5. Buffer frame & update state machine
+    // 4. Buffer frame. Includes trunkAngle (state machine signal),
+    //    SHK / ESH (metric signals), and HKA (knee displacement signal).
     frameBuffer.addFrame(FrameSnapshot(log: {
+      "trunkAngle": trunkAngle,
       "shoulderHipKneeAngle": shoulderHipKneeAngle,
       "earShoulderHipAngle": earShoulderHipAngle,
       if (hipKneeAnkleAngle != null) "hipKneeAnkleAngle": hipKneeAnkleAngle,
     }, timeStamp: now));
 
-    _updateStateBuffer(shoulderHipKneeAngle, now);
+    // 5. Refresh baselines during STABLE resting frames.
+    //    Each baseline is gated on its OWN signal's stability:
+    //    - trunk baseline gates on trunkAngle stable (so a knee-only
+    //      cheat doesn't drift trunk baseline)
+    //    - knee baseline gates on hipKneeAnkleAngle stable (so a slow
+    //      flex-and-hold cheat doesn't drift knee baseline either)
+    //    The activation snapshot is one frame and can be off if the
+    //    user is tense at hold-still and relaxes during the set.
+    //    Per-signal stable refresh tracks natural rest without letting
+    //    movement drift the baseline.
+    if (curlUpState == CurlUpState.resting) {
+      final trunkChange = frameBuffer.getAngleChange("trunkAngle");
+      if (trunkChange == AngleChangeState.stable) {
+        _baselineTrunkAngle = trunkAngle;
+      }
+      if (hipKneeAnkleAngle != null) {
+        final kneeChange = frameBuffer.getAngleChange("hipKneeAnkleAngle");
+        if (kneeChange == AngleChangeState.stable) {
+          _holdStillHipKneeAnkle = hipKneeAnkleAngle;
+        }
+      }
+    }
 
-    // 6. Rep completion fires once per cycle: descending → resting.
-    //    previousCurlUpState != resting filter ensures we only complete once,
-    //    even though resting is a sticky state.
+    // 6. Knee displacement check. Static deviation from baseline,
+    //    smoothed by 10-frame StickyDebouncer to filter landmark noise.
+    final baselineKnee = _holdStillHipKneeAnkle;
+    if (baselineKnee != null && hipKneeAnkleAngle != null) {
+      final displacement = (hipKneeAnkleAngle - baselineKnee).abs();
+      final isDisplacedFrame =
+          displacement > CurlUpConfig.KNEE_DISPLACEMENT_MAX;
+      _kneeIsDisplaced = kneeDisplacementDebouncer.update(isDisplacedFrame);
+      debugData['kneeDispl'] = '${displacement.toStringAsFixed(1)}°';
+    } else {
+      _kneeIsDisplaced = kneeDisplacementDebouncer.update(false);
+      debugData['kneeDispl'] = 'n/a';
+    }
+    debugData['kneeBlocked'] = _kneeIsDisplaced.toString();
+    debugData['trunkAngle'] = trunkAngle.toStringAsFixed(1);
+    debugData['trunkBaseline'] =
+        _baselineTrunkAngle?.toStringAsFixed(1) ?? 'n/a';
+
+    // 7. State machine.
+    _updateStateBuffer(trunkAngle, now);
+
+    // 8. Rep completion fires once per cycle: descending → resting.
     if (curlUpState == CurlUpState.resting &&
         previousCurlUpState != CurlUpState.resting) {
       _completeRep(ctx);
       return;
     }
 
-    // 7. Run metrics. Resting frames refine baselines; active frames evaluate.
+    // 9. Run metrics. Resting frames refine baselines; active frames evaluate.
     if (curlUpState == CurlUpState.resting) {
       for (final metric in _metrics) {
         metric.onRestingFrame(ctx);
@@ -361,10 +429,10 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
     }
 
     for (final metric in _metrics) {
-      // debugData.addAll(metric.debugData);
+      debugData.addAll(metric.debugData);
     }
 
-    // 8. Phase-specific UI instructions
+    // 10. Phase-specific UI instructions
     _updatePhaseInstructions();
   }
 
@@ -373,29 +441,22 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
   void _completeRep(RepContext ctx) {
     repCount += 1;
 
-    // Per-spec: trunk elevation is evaluated at the apex (= the
-    // ascending→descending transition, or here at end-of-rep using the
-    // peak captured in the buffer).
     trunkElevationMetric.checkRepCompletion(ctx);
 
-    // Collect faults from all metrics
     final allFaults = <FaultRecord>[];
     for (final metric in _metrics) {
       allFaults.addAll(metric.faults);
     }
 
-    // Determine rep quality
     correctForm = !allFaults.any((f) => f.affectsForm);
     resultIssues.feedback['Result'] = correctForm ? 'Tốt lắm!' : 'Sửa tư thế';
 
-    // Build fault map grouped by phase (consumed by setFeedback / report)
     final faultMap = <String, Map<String, String>>{};
     for (final fault in allFaults) {
       faultMap.putIfAbsent(fault.phase, () => {});
       faultMap[fault.phase]![fault.type] = fault.message;
     }
 
-    // Voice-coach handoff
     final topVoiced = CurlUp.topVoicedFault(allFaults);
     lastRepFaultVoiceMessages = CurlUp.orderedUniqueVoiceMessages(allFaults);
     lastRepTopVoiceMessage = topVoiced?.voiceMessage;
@@ -405,20 +466,20 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
     setFeedback.add({correctForm: faultMap});
 
     for (final metric in _metrics) {
-      // debugData.addAll(metric.debugData);
+      debugData.addAll(metric.debugData);
     }
 
-    // Per-rep log: pull peak values out of the frame buffer and convert to
-    // baseline-relative deltas (the actual signal the report cares about).
-    final peakSHKSnap = frameBuffer.getPeakMin("shoulderHipKneeAngle");
+// Peak elevation now from trunkAngle (max during rep) — knee-invariant.
+// Neck deviation still on ear-shoulder-hip (separate signal, no knee).
+    final peakTrunkSnap = frameBuffer.getPeakMax("trunkAngle");
     final peakESHSnap = frameBuffer.getPeakMin("earShoulderHipAngle");
     final peakKneeSnap = frameBuffer.getPeakMax("hipKneeAnkleAngle");
 
-    final baseSHK = _holdStillShoulderHipKnee;
+    final baseTrunk = _baselineTrunkAngle;
     final baseESH = _holdStillEarShoulderHip;
 
-    final peakTrunkElev = (baseSHK != null && peakSHKSnap != null)
-        ? (baseSHK - (peakSHKSnap.log["shoulderHipKneeAngle"] as double))
+    final peakTrunkElev = (baseTrunk != null && peakTrunkSnap != null)
+        ? ((peakTrunkSnap.log["trunkAngle"] as double) - baseTrunk)
             .clamp(0.0, 90.0)
         : 0.0;
     final peakNeckDev = (baseESH != null && peakESHSnap != null)
@@ -438,7 +499,6 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
       },
     ));
 
-    // Reset for next rep
     correctForm = true;
     previousCurlUpState = CurlUpState.resting;
     for (final metric in _metrics) {
@@ -452,7 +512,6 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
   void _updatePhaseInstructions() {
     switch (curlUpState) {
       case CurlUpState.resting:
-        // Anticipatory: while user is flat, prompt them to begin curling.
         resultIssues.addInstruction('resting', 'Status', restingStatus);
         break;
       case CurlUpState.ascending:
@@ -464,62 +523,59 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
     }
   }
 
-  // --- State Machine (buffer-based) ---
-  // Drives transitions off shoulderHipKneeAngle (SHK):
-  //   - SHK DECREASES as user curls up (back rounds, hip closes)
-  //   - SHK at minimum = apex
-  //   - SHK INCREASES back toward baseline as user lowers
+  // --- State Machine (trunk-angle-based, knee-invariant) ---
   //
-  // resting → ascending : actively curling AND past entry threshold
-  // ascending → descending : sustained direction reversal (apex)
-  // descending → ascending : user reverses again mid-descent (allowed)
-  // descending → resting   : SHK back within tolerance of baseline (debounced)
+  // trunkAngle = angle of shoulder→hip segment from horizontal.
+  //   Curling UP increases trunkAngle.
+  //   Returning DOWN decreases trunkAngle.
+  //
+  // Knee position is irrelevant — trunkAngle only depends on shoulder.y
+  // and hip.y. This is the whole reason we switched off SHK.
+  //
+  // Both ENTRY and EXIT gates additionally require !_kneeIsDisplaced
+  // so knee position must be at baseline (within KNEE_DISPLACEMENT_MAX)
+  // for reps to start or complete.
 
-  void _updateStateBuffer(double shkAngle, int timestampMs) {
-    final base = _holdStillShoulderHipKnee;
-    if (base == null)
-      return; // No baseline yet — should not happen post-activation.
+  void _updateStateBuffer(double trunkAngle, int timestampMs) {
+    final base = _baselineTrunkAngle;
+    if (base == null) return;
 
-    final angleChange = frameBuffer.getAngleChange("shoulderHipKneeAngle");
-    debugData['angleChange'] = angleChange.toString().split('.').last;
-    final isCurlingUpFrame = angleChange == AngleChangeState.decreasing;
-    final isReturningFrame = angleChange == AngleChangeState.increasing;
+    final trunkElev = trunkAngle - base; // positive = curled up
+
+    final angleChange = frameBuffer.getAngleChange("trunkAngle");
+    debugData["angleChange"] = angleChange.toString().split('.').last;
+    final isCurlingUpFrame = angleChange == AngleChangeState.increasing;
+    final isReturningFrame = angleChange == AngleChangeState.decreasing;
 
     if (angleChange != AngleChangeState.stable) {
-      // StickyDebouncer turns frame-to-frame direction into sustained
-      // "is the user returning toward flat?" — filters noise reversals.
       final isReturning = directionDetection.update(isReturningFrame);
 
-      debugData['delta Angle'] =
-          (base - CurlUpConfig.ASCEND_DELTA_THRESHOLD).toStringAsFixed(1);
-      debugData['shkAngle'] = shkAngle.toStringAsFixed(1);
-      // resting → ascending
+      // resting → ascending: real trunk lift past entry threshold,
+      // not currently returning, knee at baseline.
       if (!isReturning &&
           curlUpState == CurlUpState.resting &&
-          shkAngle < base - CurlUpConfig.ASCEND_DELTA_THRESHOLD) {
+          trunkElev > CurlUpConfig.ASCEND_DELTA_THRESHOLD &&
+          !_kneeIsDisplaced) {
         _transitionState(CurlUpState.ascending, timestampMs);
         frameBuffer.clear();
       }
-      // ascending → descending (kinematic apex). No minimum-elevation gate
-      // here — the StickyDebouncer already filters jitter, and gating would
-      // re-introduce the shallow-rep ghost bug.
+      // ascending → descending (kinematic apex)
       else if (isReturning && curlUpState == CurlUpState.ascending) {
         _transitionState(CurlUpState.descending, timestampMs);
       }
-      // descending → ascending: user reversed mid-descent and is curling
-      // again. Mirrors squat's bottom/descending → ascending allowance.
+      // descending → ascending (mid-rep reversal)
       else if (!isReturning && curlUpState == CurlUpState.descending) {
         _transitionState(CurlUpState.ascending, timestampMs);
       }
     }
 
-    // descending → resting: SHK has returned to within REST_TOLERANCE of
-    // baseline and we're not actively curling again. Debounced to filter
-    // breath/jitter at the floor.
-    if (_restingDebouncer.update(
-        shkAngle >= base - CurlUpConfig.REST_TOLERANCE &&
-            curlUpState == CurlUpState.descending &&
-            !isCurlingUpFrame)) {
+    // descending → resting: trunk back near baseline AND not curling up
+    // again AND knee at baseline. All four conditions must hold for
+    // RESTING_DEBOUNCE_FRAMES consecutive frames.
+    if (_restingDebouncer.update(trunkElev <= CurlUpConfig.REST_TOLERANCE &&
+        curlUpState == CurlUpState.descending &&
+        !isCurlingUpFrame &&
+        !_kneeIsDisplaced)) {
       _transitionState(CurlUpState.resting, timestampMs);
     }
   }
@@ -530,8 +586,6 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
     previousCurlUpState = curlUpState;
     curlUpState = newState;
 
-    // Wipe stale instructions when a new rep cycle begins so old coaching
-    // doesn't bleed into the new rep.
     if (newState == CurlUpState.ascending &&
         previousCurlUpState == CurlUpState.resting) {
       resultIssues.instructions.clear();
