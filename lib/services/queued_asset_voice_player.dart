@@ -51,7 +51,7 @@ class QueuedAssetVoicePlayer {
             audioFocus: AndroidAudioFocus.gain,
           ),
           iOS: AudioContextIOS(
-            category: AVAudioSessionCategory.playback,
+            category: AVAudioSessionCategory.playAndRecord,
             options: {AVAudioSessionOptions.defaultToSpeaker},
           ),
         ),
