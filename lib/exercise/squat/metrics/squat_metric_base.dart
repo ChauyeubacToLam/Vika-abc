@@ -67,8 +67,8 @@ class RepContext {
 /// Lower number means the voice cue is more important for post-rep playback.
 class SquatFaultVoicePriority {
   static const int heelRise = 0;
-  static const int trunkLean = 1;
-  static const int depth = 2;
+  static const int depth = 1;
+  static const int trunkLean = 2;
   static const int hipShoulderSync = 3;
   static const int tempo = 4;
   static const int trunkLeanBackward = 5;

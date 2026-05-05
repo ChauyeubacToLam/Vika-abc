@@ -199,8 +199,6 @@ abstract class ExerciseBase {
 
     // Presence re-check during active exercise
     if (exerciseState == ExerciseState.activated) {
-      debugData['isPaused'] = _isPaused;
-
       if (_isPaused) {
         resultIssues.feedback["System"] =
             "⏸ Tạm dừng — Quay lại khung hình để tiếp tục";
@@ -308,9 +306,9 @@ abstract class ExerciseBase {
   ExerciseVoiceCoach? createVoiceCoach() => _PhaseInstructionVoiceCoach();
 
   void _populateBaseDebugData() {
-    debugData['exerciseState'] = exerciseState.toString().split('.').last;
+    // debugData['exerciseState'] = exerciseState.toString().split('.').last;
     debugData['cameraFacing'] = cameraFacing.toString().split('.').last;
-    debugData['personConfirmed'] = _personConfirmed;
+    // debugData['personConfirmed'] = _personConfirmed;
   }
 
   void _trackDebugFrame() {
@@ -477,7 +475,6 @@ abstract class ExerciseBase {
           final remaining = (HOLD_STILL_REQUIRED_DURATION.inMilliseconds -
                   elapsed.inMilliseconds) /
               1000.0;
-          debugData['holdStill'] = '${remaining.toStringAsFixed(1)}s';
 
           if (elapsed >= HOLD_STILL_REQUIRED_DURATION) {
             exerciseState = ExerciseState.activated;
@@ -488,9 +485,7 @@ abstract class ExerciseBase {
                 'Giữ yên... ${remaining.clamp(0.0, 99.0).toStringAsFixed(0)}s';
           }
         } else {
-          if (_holdStillStartedAt != null) {
-            debugData['holdStill'] = 'reset';
-          }
+          if (_holdStillStartedAt != null) {}
           _holdStillStartedAt = null;
           resultIssues.feedback['System'] = 'Vào tư thế và giữ yên để bắt đầu';
         }

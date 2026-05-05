@@ -1560,7 +1560,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
         child: Container(
           padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-          constraints: const BoxConstraints(maxHeight: 148),
+          constraints: const BoxConstraints(maxHeight: 320),
           decoration: BoxDecoration(
             color: Colors.black.withValues(alpha: 0.48),
             borderRadius: BorderRadius.circular(18),

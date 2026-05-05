@@ -3,25 +3,51 @@
 /* =========================================================================
    Curl Up Metric: Neck Pulling (Cervical Hyperflexion)
 
-   Head/neck angle relative to a personalized resting baseline — detects
-   chin-to-chest pulling that stresses the cervical spine.
+   Priority: 🔴 CRITICAL (acute injury risk to the cervical spine)
+
+   What it measures:
+   How far the head/neck has flexed relative to the personal resting
+   baseline. Detects chin-to-chest pulling, the classic compensation
+   when abs fatigue and the user uses their arms to yank the head up.
+   The cervical spine is highly susceptible to structural buckling under
+   combined axial and shear loads — pulling the neck places profound strain
+   on intervertebral discs and the sternocleidomastoid muscles.
 
    Landmarks: EAR (#7/#8), SHOULDER (#11/#12), HIP (#23/#24)
-   Calculation: 3-point angle at the shoulder (ear-shoulder-hip)
+   Calculation: Interior angle at shoulder — calculateAngle(Ear, Shoulder, Hip).
+                Joint-frame measurement. Pulling chin to chest moves the ear
+                toward the shoulder, decreasing the angle. Subtraction
+                against personal baseline cancels world-frame effects.
 
-   Baseline source priority:
-   1. Hold-still activation (3s motionless, captured in isInStartPosition)
-   2. Resting frame averaging (accumulated between reps)
-   Baseline persists across reps — head posture doesn't change mid-set.
+   Why a personalized baseline (Vietnamese desk-worker context):
+   Thoracic kyphosis (forward head posture) is highly prevalent in
+   desk-bound office workers — the 25-45 ICP cohort. Their resting neck
+   posture already shows partial flexion compared to a textbook neutral
+   spine. A hardcoded absolute angle threshold would either mislabel
+   their normal resting posture as "pulled" (false positive) or be too
+   lenient for users with neutral posture (false negative). Baseline
+   captured at hold-still adapts to the individual.
 
-   When to check: Continuously during ascending and apex phases.
-   Deviation > 15° from resting baseline triggers an error; > 12° a warning.
-   Vietnamese adjustment: personalized baseline accounts for pre-existing
-   thoracic kyphosis common in desk workers.
+   Baseline source priority (set ONCE per set):
+   1. Hold-still activation snapshot (3s motionless capture). Strongest signal.
+   2. Resting-frame averaging (5 samples). Fallback when hold-still missing.
+   Once set, baseline does NOT refine — head posture during a set is stable
+   enough that further refinement would just track within-set drift noise.
+
+   Threshold table:
+     Deviation > 15°: ERROR    — chin-to-chest pull (affectsForm=true)
+     Deviation 12-15°: WARNING — neck flexing, coach toward neutral (affectsForm=false)
+     Deviation < 12°: GOOD
+
+   Evaluation timing:
+   Continuous during ascending AND descending. update() logs the fault the
+   moment the threshold crosses; upgrades from warning → error in-place if
+   the user keeps pulling. Spec mentions "concentric phase" but a held
+   chin-tuck during descent is the same cervical strain — checking both
+   active phases catches it without missing anything.
    ========================================================================= */
 
 import 'curl_up_metric_base.dart';
-import '../curl_up.dart';
 
 class NeckPullingConfig {
   /// Deviation from personal baseline that triggers a warning.
@@ -29,25 +55,19 @@ class NeckPullingConfig {
 
   /// Deviation from personal baseline that triggers an error.
   static const double ERROR_DEVIATION = 15.0;
+
+  /// Number of resting frames averaged when hold-still snapshot is missing.
+  static const int BASELINE_SAMPLE_COUNT = 5;
 }
+
+/// Tracks the highest fault level reached so far this rep.
+enum _NeckFaultLevel { warning, error }
 
 class NeckPullingMetric extends CurlUpMetricBase {
   @override
   String get name => 'NeckPulling';
-
-  final List<FaultRecord> _faults = [];
-  final Map<String, dynamic> _debugData = {};
-
-  /// Personalized resting baseline. Set from hold-still or resting frames.
-  /// Persists across reps — never cleared by reset().
-  double? _baselineAngle;
-  int _baselineFrames = 0;
-  double _baselineSum = 0.0;
-  static const int _BASELINE_SAMPLE_COUNT = 5;
-
-  /// Whether a neck-pull fault was already logged this rep.
-  bool _faultLogged = false;
-
+  @override
+  String? get nameVi => 'Gập cổ';
   @override
   List<FaultRecord> get faults => _faults;
 
@@ -55,75 +75,127 @@ class NeckPullingMetric extends CurlUpMetricBase {
   Map<String, dynamic> get debugData => _debugData;
 
   @override
+  double? get value => _neckDeviation;
+
+  @override
+  ThresholdBand? get threshold => const ThresholdBand(
+        warningAbove: NeckPullingConfig.WARNING_DEVIATION,
+        faultAbove: NeckPullingConfig.ERROR_DEVIATION,
+      );
+
+  @override
+  MetricStatus get status => _status;
+
+  final List<FaultRecord> _faults = [];
+  final Map<String, dynamic> _debugData = {};
+  double? _neckAngle;
+  double? _neckDeviation;
+  MetricStatus _status = MetricStatus.pass;
+
+  /// Personal baseline — ear-shoulder-hip interior angle while lying flat.
+  /// Persists across reps; never cleared by reset().
+  double? _baselineAngle;
+
+  /// Fallback averaging state — used only when hold-still is unavailable.
+  double _baselineSum = 0.0;
+  int _baselineFrames = 0;
+
+  /// Highest fault level logged this rep, or null if none.
+  _NeckFaultLevel? _loggedLevel;
+
+  /// Establish the personal baseline. Hold-still wins; averaging is a
+  /// fallback. Once a baseline is set, it stays for the whole set.
+  @override
   void onRestingFrame(RepContext ctx) {
-    // Use hold-still baseline as primary if we don't have one yet.
-    // 3 seconds of guaranteed stillness beats any averaging window.
-    if (_baselineAngle == null && ctx.holdStillEarShoulderHip != null) {
+    if (_baselineAngle != null) return;
+
+    if (ctx.holdStillEarShoulderHip != null) {
       _baselineAngle = ctx.holdStillEarShoulderHip;
-      _debugData['neckBaseline'] =
-          '${_baselineAngle!.toStringAsFixed(1)} (hold)';
+      _debugData['neckBaseline'] = _baselineAngle;
       return;
     }
 
-    // Refine with resting frame averaging.
-    final angle = ctx.earShoulderHipAngle;
-    _baselineSum += angle;
+    // Hold-still missing — average across multiple resting frames.
+    _baselineSum += ctx.earShoulderHipAngle;
     _baselineFrames++;
-    if (_baselineFrames >= _BASELINE_SAMPLE_COUNT) {
+    if (_baselineFrames >= NeckPullingConfig.BASELINE_SAMPLE_COUNT) {
       _baselineAngle = _baselineSum / _baselineFrames;
-      _debugData['neckBaseline'] = _baselineAngle!.toStringAsFixed(1);
+      _debugData['neckBaseline'] = _baselineAngle;
     } else {
       _debugData['neckBaseline'] = 'sampling...';
     }
   }
 
+  /// Active rep — compute deviation from baseline, write live feedback,
+  /// log faults the moment thresholds cross.
   @override
   void update(RepContext ctx) {
-    final angle = ctx.earShoulderHipAngle;
+    _neckAngle = ctx.earShoulderHipAngle;
+    _debugData['neckAngle'] = _neckAngle;
 
-    if (_baselineAngle == null) {
-      _debugData['neckBaseline'] = 'no baseline';
+    final base = _baselineAngle;
+    if (base == null) {
+      _debugData['neckDev'] = 'no baseline';
       return;
     }
 
-    // Deviation: baseline is large (flat), angle decreases when neck flexes.
-    final deviation = (_baselineAngle! - angle).clamp(0.0, 90.0);
-
-    _debugData['neckBaseline'] = _baselineAngle!.toStringAsFixed(1);
-    _debugData['neckDev'] = '${deviation.toStringAsFixed(1)}°';
-
-    // Only evaluate during concentric phase.
-    if (ctx.curlUpState != CurlUpState.ascending &&
-        ctx.curlUpState != CurlUpState.apex) {
-      return;
-    }
+    // Deviation: baseline is the relaxed (large) angle. Pulling chin to
+    // chest moves the ear toward the shoulder, shrinking the interior
+    // angle, so deviation = baseline - current.
+    final deviation = (base - _neckAngle!).clamp(0.0, 90.0);
+    _neckDeviation = deviation;
+    _debugData['neckDev'] = deviation;
 
     if (deviation >= NeckPullingConfig.ERROR_DEVIATION) {
+      _status = MetricStatus.fault;
       ctx.resultIssues.feedback['Neck'] = '🔴 Đừng kéo cổ!';
-      if (!_faultLogged) {
-        _logFault(
-          ctx.curlUpState.toString().split('.').last.toUpperCase(),
-          'Kéo cổ quá mạnh — giữ đầu trung tính!',
-          voiceMessage: 'Không kéo cổ',
-        );
-        _faultLogged = true;
-      }
+      _ensureLevel(ctx, _NeckFaultLevel.error);
     } else if (deviation >= NeckPullingConfig.WARNING_DEVIATION) {
+      _status = MetricStatus.near;
       ctx.resultIssues.feedback['Neck'] = '⚠️ Giữ cổ thẳng';
+      _ensureLevel(ctx, _NeckFaultLevel.warning);
     } else {
+      _status = MetricStatus.pass;
       ctx.resultIssues.feedback['Neck'] = '✅ Cổ tốt';
     }
   }
 
-  void _logFault(String phase, String message, {String? voiceMessage}) {
-    if (!_faults.any((f) => f.phase == phase && f.type == 'Neck')) {
+  /// Idempotent fault logger. Logs warning if no fault yet; upgrades to
+  /// error in-place if a warning was logged earlier and deviation kept
+  /// climbing.
+  void _ensureLevel(RepContext ctx, _NeckFaultLevel level) {
+    if (_loggedLevel == _NeckFaultLevel.error) return;
+
+    final phase = ctx.curlUpState.toString().split('.').last.toUpperCase();
+
+    if (level == _NeckFaultLevel.error) {
+      _faults.clear();
       _faults.add(FaultRecord(
         phase: phase,
         type: 'Neck',
-        message: message,
-        voiceMessage: voiceMessage,
+        message: 'Kéo cổ quá mạnh — giữ đầu trung tính',
         affectsForm: true,
+        voiceMessage: 'Không kéo cổ',
+        priority: CurlUpFaultVoicePriority.neckPulling,
       ));
+      ctx.resultIssues.addInstruction('resting', 'Neck',
+          'Rep tới giữ cằm trung tính — đừng dùng tay kéo đầu lên.');
+      _loggedLevel = _NeckFaultLevel.error;
+      return;
+    }
+
+    if (_loggedLevel == null) {
+      _faults.add(FaultRecord(
+        phase: phase,
+        type: 'Neck',
+        message: 'Hơi căng cổ — giữ đầu thẳng hàng với lưng',
+        affectsForm: false,
+        priority: CurlUpFaultVoicePriority.neckPulling,
+        // No voiceMessage — yellow-band warnings stay quiet to avoid TTS spam.
+      ));
+      ctx.resultIssues.addInstruction(
+          'resting', 'Neck', 'Rep tới giữ cổ thẳng tự nhiên — đừng gập cằm.');
+      _loggedLevel = _NeckFaultLevel.warning;
     }
   }
 
@@ -131,8 +203,11 @@ class NeckPullingMetric extends CurlUpMetricBase {
   void reset() {
     _faults.clear();
     _debugData.clear();
-    _faultLogged = false;
-    // Baseline persists across reps — head posture doesn't change mid-set.
-    // _baselineAngle, _baselineSum, _baselineFrames intentionally kept.
+    _loggedLevel = null;
+    _neckAngle = null;
+    _neckDeviation = null;
+    _status = MetricStatus.pass;
+    // _baselineAngle and averaging state intentionally preserved —
+    // resting neck posture doesn't change mid-set.
   }
 }

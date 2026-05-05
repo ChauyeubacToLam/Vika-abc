@@ -17,12 +17,28 @@ class _FakeSquatVoicePlayer implements SquatVoicePlayer {
   }
 
   @override
+  void dispose() {
+    events.add('dispose');
+  }
+
+  @override
   Future<void> speak(String text) async {
     events.add('speak:$text');
   }
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  final readyEvents = [
+    'clearQueue',
+    'speak:3',
+    'speak:2',
+    'speak:1',
+    'speak:Sẵn sàng',
+    'speak:Xuống',
+  ];
+
   test('Squat says "Sẵn sàng" then "Xuống" once on activation', () {
     final player = _FakeSquatVoicePlayer();
     final coach = SquatVoiceCoach(ttsService: player);
@@ -41,7 +57,7 @@ void main() {
       feedback: const {},
     );
 
-    expect(player.events, ['clearQueue', 'speak:Sẵn sàng', 'speak:Xuống']);
+    expect(player.events, readyEvents);
 
     coach.processFrame(
       exercise: squat,
@@ -50,7 +66,7 @@ void main() {
       feedback: const {},
     );
 
-    expect(player.events, ['clearQueue', 'speak:Sẵn sàng', 'speak:Xuống']);
+    expect(player.events, readyEvents);
   });
 
   test('Squat does not repeat "Xuống" on the next standing frame after ready',
@@ -83,7 +99,7 @@ void main() {
 
     expect(
       player.events,
-      ['clearQueue', 'speak:Sẵn sàng', 'speak:Xuống'],
+      readyEvents,
     );
   });
 
@@ -127,11 +143,10 @@ void main() {
     expect(
       player.events,
       [
-        'clearQueue',
-        'speak:Sẵn sàng',
-        'speak:Xuống',
+        ...readyEvents,
         'clearPendingButKeepCurrent',
         'speak:1',
+        'speak:tốt',
         'speak:Xuống',
       ],
     );
@@ -191,9 +206,7 @@ void main() {
     expect(
       player.events,
       [
-        'clearQueue',
-        'speak:Sẵn sàng',
-        'speak:Xuống',
+        ...readyEvents,
         'clearPendingButKeepCurrent',
         'speak:Đứng lên',
       ],
@@ -246,9 +259,7 @@ void main() {
     expect(
       player.events,
       [
-        'clearQueue',
-        'speak:Sẵn sàng',
-        'speak:Xuống',
+        ...readyEvents,
         'clearPendingButKeepCurrent',
         'speak:Đứng lên',
       ],
@@ -314,15 +325,13 @@ void main() {
     expect(
       player.events,
       [
-        'clearQueue',
-        'speak:Sẵn sàng',
-        'speak:Xuống',
+        ...readyEvents,
       ],
     );
   });
 
   test(
-      'Squat prioritizes "Ưỡn ngực lên" over phase and depth cues and replays it when detected again',
+      'Squat prioritizes "Ưỡn ngực lên" over phase and depth cues once per rep',
       () async {
     final player = _FakeSquatVoicePlayer();
     final coach = SquatVoiceCoach(ttsService: player);
@@ -372,15 +381,133 @@ void main() {
     expect(
       player.events,
       [
-        'clearQueue',
-        'speak:Sẵn sàng',
-        'speak:Xuống',
-        'clearPendingButKeepCurrent',
-        'speak:Ưỡn ngực lên',
+        ...readyEvents,
         'clearPendingButKeepCurrent',
         'speak:Ưỡn ngực lên',
       ],
     );
+  });
+
+  test('Squat does not speak live depth correction during a rep', () async {
+    final player = _FakeSquatVoicePlayer();
+    final coach = SquatVoiceCoach(ttsService: player);
+    final squat = Squat()..exerciseState = ExerciseState.activated;
+
+    squat.resultIssues.addInstruction(
+      squat.currentPhaseKey,
+      'Status',
+      Squat.standingStatus,
+    );
+
+    coach.processFrame(
+      exercise: squat,
+      repCount: squat.repCount,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 275));
+
+    coach.processFrame(
+      exercise: squat,
+      repCount: squat.repCount,
+      hasPose: true,
+      feedback: const {
+        'Depth': 'Go Lower',
+      },
+    );
+
+    expect(player.events, readyEvents);
+  });
+
+  test('Squat prefixes post-rep cues and suppresses consecutive repeats', () {
+    final player = _FakeSquatVoicePlayer();
+    final coach = SquatVoiceCoach(ttsService: player);
+    final squat = Squat()..exerciseState = ExerciseState.activated;
+
+    squat.resultIssues.addInstruction(
+      squat.currentPhaseKey,
+      'Status',
+      Squat.standingStatus,
+    );
+
+    coach.processFrame(
+      exercise: squat,
+      repCount: squat.repCount,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    squat
+      ..lastRepWasClean = false
+      ..lastRepTopVoiceMessage = 'Giữ gót chân';
+
+    coach.processFrame(
+      exercise: squat,
+      repCount: 1,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    coach.processFrame(
+      exercise: squat,
+      repCount: 2,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    coach.processFrame(
+      exercise: squat,
+      repCount: 3,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    expect(
+      player.events,
+      [
+        ...readyEvents,
+        'clearPendingButKeepCurrent',
+        'speak:1',
+        'speak:nhớ giữ gót chân',
+        'clearPendingButKeepCurrent',
+        'speak:2',
+        'clearPendingButKeepCurrent',
+        'speak:3',
+        'speak:nhớ giữ gót chân',
+      ],
+    );
+  });
+
+  test('Squat does not count a new rep after the set is completed', () {
+    final player = _FakeSquatVoicePlayer();
+    final coach = SquatVoiceCoach(ttsService: player);
+    final squat = Squat();
+
+    coach.processFrame(
+      exercise: squat,
+      repCount: 5,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    squat.exerciseState = ExerciseState.completed;
+    coach.processFrame(
+      exercise: squat,
+      repCount: 6,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    expect(
+      player.events,
+      [
+        'clearPendingButKeepCurrent',
+        'speak:tốt',
+        'speak:Hoàn thành bài tập',
+      ],
+    );
+    expect(player.events, isNot(contains('speak:6')));
   });
 
   test(
@@ -431,9 +558,7 @@ void main() {
     expect(
       player.events,
       [
-        'clearQueue',
-        'speak:Sẵn sàng',
-        'speak:Xuống',
+        ...readyEvents,
         'clearPendingButKeepCurrent',
         'speak:Đứng lên',
       ],
