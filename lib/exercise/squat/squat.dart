@@ -27,7 +27,6 @@ class SquatConfig {
   static const double BOTTOM_RELEASE_READY_TOLERANCE_SECONDS = 0.05;
   static const double SIDE_SCORE_TIE_THRESHOLD = 0.2;
   static const double SIDE_SWITCH_MARGIN = 0.75;
-  static const double MIN_TRACKING_CONFIDENCE = 0.45;
 }
 
 enum SquatState { standing, descending, bottom, ascending }
@@ -272,7 +271,7 @@ class Squat extends ExerciseBase {
     if (requiredLandmarks == null) return "⚠️ Body not fully visible.";
 
     final allConfident = requiredLandmarks.values
-        .every((lm) => lm.likelihood >= SquatConfig.MIN_TRACKING_CONFIDENCE);
+        .every((lm) => lm.likelihood >= ExerciseBase.MIN_CONFIDENCE);
     if (!allConfident) return "⚠️ Adjust lighting/position.";
 
     return null;
