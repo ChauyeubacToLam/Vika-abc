@@ -35,7 +35,7 @@ class _SquatAssetVoicePlayer implements SquatVoicePlayer {
   void dispose() => _player.dispose();
 }
 
-class SquatVoiceCoach {
+class SquatVoiceCoach implements ExerciseVoiceCoach {
   SquatVoiceCoach({SquatVoicePlayer? ttsService})
       : _ttsService = ttsService ?? _SquatAssetVoicePlayer();
 

@@ -1,0 +1,263 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'package:vika/models/exercise_definition.dart';
+import 'package:vika/utils/exercise_logger.dart';
+
+import '../onboarding_data.dart';
+import 'screens/s01_welcome.dart';
+import 'screens/s02_why.dart';
+import 'screens/s03_goal.dart';
+import 'screens/s04_pain_check.dart';
+import 'screens/s05_fork.dart';
+import 'screens/s06_trust.dart';
+import 'screens/s07_assessment_intro.dart';
+import 'screens/s08_analyzing.dart';
+import 'screens/s09_phase1.dart';
+import 'screens/s10_level_issue.dart';
+import 'screens/s11_body_info.dart';
+import 'screens/s12_schedule.dart';
+import 'screens/s13_signup.dart';
+import 'screens/s14_outcomes.dart';
+import 'screens/s15_journey.dart';
+import 'screens/s16_closer.dart';
+import 'v5_theme.dart';
+
+/// 16-screen v5 onboarding host. Owns [OnboardingData], threads next/back,
+/// launches the live squat assessment between S07 and S08, and persists the
+/// collected profile on the S16 CTA.
+class V5OnboardingNavigator extends StatefulWidget {
+  const V5OnboardingNavigator({super.key});
+
+  @override
+  State<V5OnboardingNavigator> createState() => _V5OnboardingNavigatorState();
+}
+
+class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
+  final PageController _pc = PageController();
+  final OnboardingData _data = OnboardingData();
+  int _page = 0;
+  bool _completing = false;
+
+  // Page indices used for special-case logic.
+  static const _idxAssessmentIntro = 6; // S07
+  static const _idxAnalyzing = 7;       // S08
+
+  // Screens with dark/inverted backgrounds — drives the status bar overlay.
+  static const _darkPages = <int>{0, 7, 15}; // S01, S08, S16
+
+  @override
+  void dispose() {
+    _pc.dispose();
+    super.dispose();
+  }
+
+  void _next() {
+    if (!_pc.hasClients) return;
+    if (_page < 15) {
+      _pc.nextPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  void _back() {
+    if (!_pc.hasClients) return;
+    // Skip back across S08 Analyzing — it's a transition screen, not a stop.
+    if (_page == _idxAnalyzing) {
+      _pc.animateToPage(
+        _idxAssessmentIntro - 1, // back to S06 Trust
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+      return;
+    }
+    if (_page > 0) {
+      _pc.previousPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  /// S07 CTA: launch the real squat assessment for the home-workout fork,
+  /// then advance to S08. For the yoga fork the squat path doesn't apply yet
+  /// (Warrior I + Forward Fold interpreters aren't built), so we just advance
+  /// and S09 Phase1 falls back to the yoga mock.
+  Future<void> _launchSquatAssessment() async {
+    if (_data.fork == 'yoga') {
+      _next();
+      return;
+    }
+
+    final result = await Navigator.of(context).pushNamed(
+      '/exercise',
+      arguments: squatAssessmentDefinition,
+    ) as Map<String, dynamic>?;
+
+    if (result != null && result['logger'] is ExerciseLogger) {
+      _data.onSquatComplete(result['logger'] as ExerciseLogger);
+    }
+    if (mounted) _next();
+  }
+
+  /// S16 CTA. Persists everything OnboardingData carries to SharedPreferences +
+  /// the Supabase `profiles` row, then routes back through `/` so the entry
+  /// gate switches to home.
+  Future<void> _complete() async {
+    if (_completing) return;
+    _completing = true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('onboarding_complete', true);
+
+      // Why
+      if (_data.whyStep1 != null) {
+        await prefs.setString('user_why_primary', _data.whyStep1!);
+      }
+      if (_data.whyStep2 != null) {
+        await prefs.setString('user_why_secondary', _data.whyStep2!);
+      }
+      if (_data.whyCustomText.isNotEmpty) {
+        await prefs.setString('user_why_custom', _data.whyCustomText);
+      }
+
+      // Plan + body
+      await prefs.setString('user_goal', _data.goal ?? '');
+      await prefs.setString('user_freq', _data.trainingDuration ?? '');
+      await prefs.setString('user_experience', _data.trainingDuration ?? '');
+      await prefs.setString('user_level', _data.confirmedLevel ?? 'beginner');
+      await prefs.setString('user_fork', _data.fork ?? 'home');
+      await prefs.setString('user_email', _data.email ?? '');
+      await prefs.setString('user_gender', _data.gender ?? '');
+      if (_data.heightCm != null) {
+        await prefs.setDouble('user_height', _data.heightCm!);
+      }
+      if (_data.weightKg != null) {
+        await prefs.setDouble('user_weight', _data.weightKg!);
+      }
+      if (_data.age != null) {
+        await prefs.setInt('user_age', _data.age!);
+      }
+      if (_data.bmi != null) {
+        await prefs.setDouble('user_bmi', _data.bmi!);
+      }
+
+      // Schedule (v5 replaces the old separate days+time fields)
+      if (_data.scheduleSessions.isNotEmpty) {
+        await prefs.setStringList(
+          'user_schedule_sessions',
+          _data.scheduleSessions,
+        );
+      }
+
+      // Pain
+      if (_data.painAreas.isNotEmpty) {
+        await prefs.setStringList('pain_areas', _data.painAreas);
+      }
+      await prefs.setBool('no_pain', _data.noPain);
+      if (_data.painOtherText?.isNotEmpty == true) {
+        await prefs.setString('pain_other_text', _data.painOtherText!);
+      }
+
+      // Assessment-driven
+      if (_data.detectedIssues.isNotEmpty) {
+        await prefs.setStringList('detected_issues', _data.detectedIssues);
+      }
+      if (_data.feedbackByExercise.isNotEmpty) {
+        for (final entry in _data.feedbackByExercise.entries) {
+          if (entry.value.isEmpty) continue;
+          await prefs.setStringList(
+            'feedback_${entry.key}',
+            entry.value,
+          );
+        }
+      }
+
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        try {
+          // Conservative upsert — only fields we're sure exist on `profiles`.
+          // Everything else stays in SharedPreferences until columns ship.
+          // See BACKEND-GAP list in the migration notes.
+          await Supabase.instance.client.from('profiles').upsert({
+            'id': user.id,
+            'onboarding_complete': true,
+          }, onConflict: 'id');
+        } catch (_) {
+          // Non-fatal — continue to home even if profile sync fails. The
+          // SharedPreferences flag is enough for the entry gate.
+        }
+      }
+
+      if (!mounted) return;
+      Navigator.of(context).pushReplacementNamed('/');
+    } finally {
+      _completing = false;
+    }
+  }
+
+  SystemUiOverlayStyle get _overlayStyle {
+    final dark = _darkPages.contains(_page);
+    return SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
+      statusBarBrightness: dark ? Brightness.dark : Brightness.light,
+    );
+  }
+
+  List<Widget> get _pages => [
+        S01Welcome(onNext: _next),
+        S02Why(data: _data, onNext: _next, onBack: _back),
+        S03Goal(data: _data, onNext: _next, onBack: _back),
+        S04PainCheck(data: _data, onNext: _next, onBack: _back),
+        S05Fork(data: _data, onNext: _next, onBack: _back),
+        S06Trust(onNext: _next, onBack: _back),
+        S07AssessmentIntro(
+          data: _data,
+          onNext: _launchSquatAssessment,
+          onBack: _back,
+        ),
+        S08Analyzing(
+          data: _data,
+          active: _page == _idxAnalyzing,
+          onNext: _next,
+          onBack: _back,
+        ),
+        S09Phase1(data: _data, onNext: _next, onBack: _back),
+        S10LevelIssue(data: _data, onNext: _next, onBack: _back),
+        S11BodyInfo(data: _data, onNext: _next, onBack: _back),
+        S12Schedule(data: _data, onNext: _next, onBack: _back),
+        S13Signup(data: _data, onNext: _next, onBack: _back),
+        S14Outcomes(data: _data, onNext: _next, onBack: _back),
+        S15Journey(data: _data, onNext: _next, onBack: _back),
+        S16Closer(
+          data: _data,
+          onComplete: _complete,
+          onBack: _back,
+          busy: _completing,
+        ),
+      ];
+
+  @override
+  Widget build(BuildContext context) {
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: _overlayStyle,
+      child: Scaffold(
+        backgroundColor: V5.bg,
+        // S13 has a TextField — let the keyboard resize the body so the field
+        // stays visible above it.
+        resizeToAvoidBottomInset: true,
+        body: PageView(
+          controller: _pc,
+          physics: const NeverScrollableScrollPhysics(),
+          onPageChanged: (i) => setState(() => _page = i),
+          children: _pages,
+        ),
+      ),
+    );
+  }
+}

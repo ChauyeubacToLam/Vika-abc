@@ -25,11 +25,16 @@ class DepthMetric extends SquatMetricBase {
   @override
   String get name => 'Depth';
 
+  @override
+  String? get nameVi => 'Độ sâu';
+
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
 
   /// Tracks minimum knee angle this rep (for post-rep analysis & tempo)
   double? minKneeAngle;
+  double? _kneeAngle;
+  MetricStatus _status = MetricStatus.pass;
 
   @override
   List<FaultRecord> get faults => _faults;
@@ -38,24 +43,43 @@ class DepthMetric extends SquatMetricBase {
   Map<String, dynamic> get debugData => _debugData;
 
   @override
+  double? get value => _kneeAngle;
+
+  @override
+  ThresholdBand? get threshold => ThresholdBand(
+        warningAbove: DepthMetricConfig.GOOD_DEPTH_RANGE[1].toDouble(),
+        faultAbove: SquatConfig.SQUAT_DESCEND_ANGLE_THRESHOLD.toDouble(),
+      );
+
+  @override
+  MetricStatus get status => _status;
+
+  @override
   void update(RepContext ctx) {
+    _kneeAngle = ctx.kneeAngle;
+
     // Track minimum knee angle across the rep
     if (minKneeAngle == null || ctx.kneeAngle < minKneeAngle!) {
       minKneeAngle = ctx.kneeAngle;
     }
 
-    _debugData['minKneeAngle'] = minKneeAngle?.toStringAsFixed(1) ?? 'N/A';
+    _debugData['kneeAngle'] = ctx.kneeAngle;
+    _debugData['minKneeAngle'] = minKneeAngle ?? 'N/A';
 
     if (ctx.kneeAngle < DepthMetricConfig.DEEP_SQUAT_THRESHOLD) {
+      _status = MetricStatus.pass;
       ctx.resultIssues.feedback['Depth'] = 'Deep Squat!';
     } else if (ctx.kneeAngle >= DepthMetricConfig.GOOD_DEPTH_RANGE[0] &&
         ctx.kneeAngle <= DepthMetricConfig.GOOD_DEPTH_RANGE[1]) {
+      _status = MetricStatus.pass;
       ctx.resultIssues.feedback['Depth'] = 'Good Depth';
     } else if (ctx.squatState == SquatState.descending &&
         ctx.kneeAngle > DepthMetricConfig.GOOD_DEPTH_RANGE[1] &&
         ctx.kneeY >= ctx.hipY) {
+      _status = MetricStatus.near;
       ctx.resultIssues.feedback['Depth'] = 'Go Lower';
     } else {
+      _status = MetricStatus.pass;
       ctx.resultIssues.feedback['Depth'] = 'Good Depth';
     }
   }
@@ -69,6 +93,7 @@ class DepthMetric extends SquatMetricBase {
   }) {
     final phase = finalState.toString().split('.').last.toUpperCase();
     if (!reachedBottom) {
+      _status = MetricStatus.fault;
       _logFault(
         phase,
         'Too Shallow (Missed Depth)',
@@ -103,5 +128,7 @@ class DepthMetric extends SquatMetricBase {
     _faults.clear();
     _debugData.clear();
     minKneeAngle = null;
+    _kneeAngle = null;
+    _status = MetricStatus.pass;
   }
 }

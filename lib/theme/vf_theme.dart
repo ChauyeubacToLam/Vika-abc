@@ -344,3 +344,181 @@ class FrostedGlass extends StatelessWidget {
     );
   }
 }
+
+/// Primary jade-pill CTA. Ported from the deleted onboarding/vf_theme.dart so
+/// the rest of the codebase keeps working off a single theme module.
+class VFButton extends StatelessWidget {
+  const VFButton({
+    super.key,
+    required this.label,
+    this.onTap,
+    this.enabled = true,
+  });
+
+  final String label;
+  final VoidCallback? onTap;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = VFTheme.scale(context);
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: double.infinity,
+        height: 54 * s,
+        decoration: BoxDecoration(
+          color: enabled ? VFTheme.jade : VFTheme.bgDeep,
+          borderRadius: BorderRadius.circular(16 * s),
+          boxShadow: enabled ? VFTheme.jadeShadow : null,
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: VFTheme.textStyle(
+            context,
+            size: 15,
+            weight: FontWeight.w800,
+            color: enabled ? Colors.white : VFTheme.textMuted,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VikaIvory — Premium Ivory register for the active-exercise v8 screen.
+//
+// Added alongside VFTheme (not replacing it). All hex values come from the
+// locked JSX prototype (vika-active-exercise-ivory-v8.jsx) and the Canonical
+// Numbers doc. Pure black (#000000) is intentionally absent.
+//
+// Font: Plus Jakarta Sans, bundled as asset font in assets/fonts/.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class VikaIvory {
+  const VikaIvory._();
+
+  // ─── Page & scaffold ───
+
+  /// Page background (outside the camera view). JSX: pageBg '#EBE3D2'
+  static const Color bg = Color(0xFFEBE3D2);
+
+  /// Soft page bg variant.
+  static const Color bgSoft = Color(0xFFF5F0E5);
+
+  /// White surface for cards / pause overlay. JSX: surface '#FFFFFF'
+  static const Color surface = Color(0xFFFFFFFF);
+
+  /// Soft surface, cream. JSX: surfaceSoft '#FBF6EA'
+  static const Color surfaceSoft = Color(0xFFFBF6EA);
+
+  /// Dark scaffold behind camera. JSX: scaffoldBg '#15110D'
+  static const Color heroBg = Color(0xFF15110D);
+
+  /// Slightly lighter scaffold. JSX: scaffoldMid '#1F1812'
+  static const Color heroBgDeep = Color(0xFF1F1812);
+
+  // ─── Ink (light-on-dark) ───
+
+  /// Inverted ink, near-white cream. JSX: invInk '#FBF6EA'
+  static const Color ink = Color(0xFF2A1F12);
+
+  /// Dark ink at 0.62 opacity. JSX: inkSoft 'rgba(42, 31, 18, 0.62)'
+  static Color get inkSoft => ink.withValues(alpha: 0.62);
+
+  /// Dark ink at 0.38 opacity. JSX: inkFaint 'rgba(42, 31, 18, 0.38)'
+  static Color get inkFaint => ink.withValues(alpha: 0.38);
+
+  /// Inverted ink (cream white on dark). JSX: invInk '#FBF6EA'
+  static const Color invInk = Color(0xFFFBF6EA);
+
+  /// Inverted ink at 0.70 opacity.
+  static Color get invInkSoft => invInk.withValues(alpha: 0.70);
+
+  /// Inverted ink at 0.45 opacity.
+  static Color get invInkDim => invInk.withValues(alpha: 0.45);
+
+  /// Inverted ink at 0.30 opacity. JSX: invInkFaint 'rgba(251, 246, 234, 0.38)'
+  static Color get invInkFaint => invInk.withValues(alpha: 0.30);
+
+  // ─── Glass layers ───
+
+  /// JSX: glass06 'rgba(255, 255, 255, 0.06)'
+  static Color get glass06 => const Color(0xFFFFFFFF).withValues(alpha: 0.06);
+
+  /// JSX: glass08 'rgba(255, 255, 255, 0.08)'
+  static Color get glass08 => const Color(0xFFFFFFFF).withValues(alpha: 0.08);
+
+  /// JSX: glass12 'rgba(255, 255, 255, 0.12)'
+  static Color get glass12 => const Color(0xFFFFFFFF).withValues(alpha: 0.12);
+
+  /// JSX: glassBorderHi 'rgba(255, 255, 255, 0.16)'
+  static Color get glassBorderHi =>
+      const Color(0xFFFFFFFF).withValues(alpha: 0.16);
+
+  // ─── Yellow / Amber accent ───
+
+  /// Primary yellow. JSX: yellow '#FFB701'
+  static const Color yellow = Color(0xFFFFB701);
+
+  /// Deep yellow. JSX: yellowDeep '#C18800'
+  static const Color yellowDeep = Color(0xFFC18800);
+
+  /// Yellow at 0.18 opacity. JSX: yellowSoft
+  static Color get yellowSoft => yellow.withValues(alpha: 0.18);
+
+  /// Yellow glow at 0.60 opacity. JSX: yellowGlow 'rgba(255, 183, 1, 0.45)'
+  static Color get yellowGlow => yellow.withValues(alpha: 0.60);
+
+  /// Weak yellow glow at 0.18. JSX: yellowGlowWeak 'rgba(255, 183, 1, 0.22)'
+  static Color get yellowGlowWeak => yellow.withValues(alpha: 0.18);
+
+  /// Dark ink on yellow buttons. JSX: yellowInk '#1F1812'
+  static const Color yellowInk = Color(0xFF1F1812);
+
+  // ─── Semantic ───
+
+  /// Attention / fault color. JSX: attention '#D67B3E'
+  static const Color attention = Color(0xFFD67B3E);
+
+  /// Attention at 0.18 opacity.
+  static Color get attentionSoft => attention.withValues(alpha: 0.18);
+
+  /// Live / active color. JSX: live '#22C55E'
+  static const Color live = Color(0xFF22C55E);
+
+  /// Live at 0.22 opacity.
+  static Color get liveSoft => live.withValues(alpha: 0.22);
+
+  // ─── Typography ───
+
+  /// Plus Jakarta Sans, bundled as asset font.
+  static const String fontFamily = 'PlusJakartaSans';
+
+  // ─── Convenience shadows ───
+
+  static List<BoxShadow> get glassIconShadow => [
+        BoxShadow(
+          color: const Color(0xFF15110D).withValues(alpha: 0.30),
+          blurRadius: 8,
+          offset: const Offset(0, 2),
+        ),
+      ];
+
+  /// Warm vignette gradient for overlay on camera feed.
+  static LinearGradient get warmVignette => LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          heroBg.withValues(alpha: 0.55),
+          heroBg.withValues(alpha: 0.06),
+          heroBg.withValues(alpha: 0.04),
+          heroBg.withValues(alpha: 0.22),
+          heroBg.withValues(alpha: 0.78),
+        ],
+        stops: const [0.0, 0.18, 0.60, 0.80, 1.0],
+      );
+}

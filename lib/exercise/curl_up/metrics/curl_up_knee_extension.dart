@@ -25,7 +25,6 @@
    ========================================================================= */
 
 import 'curl_up_metric_base.dart';
-import '../curl_up.dart';
 
 class KneeExtensionConfig {
   /// Knee angle at or above which the leg is locked — fault, fail rep.
@@ -47,9 +46,13 @@ enum _KneeFaultLevel { warning, error }
 class KneeExtensionMetric extends CurlUpMetricBase {
   @override
   String get name => 'KneeExtension';
+  @override
+  String? get nameVi => 'Gối';
 
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
+  double? _kneeAngle;
+  MetricStatus _status = MetricStatus.pass;
 
   /// Highest fault level logged this rep (absolute check), or null.
   _KneeFaultLevel? _loggedLevel;
@@ -64,13 +67,25 @@ class KneeExtensionMetric extends CurlUpMetricBase {
   @override
   Map<String, dynamic> get debugData => _debugData;
 
+  @override
+  double? get value => _kneeAngle;
+
+  @override
+  ThresholdBand? get threshold => const ThresholdBand(
+        warningAbove: KneeExtensionConfig.WARNING_THRESHOLD,
+        faultAbove: KneeExtensionConfig.ERROR_THRESHOLD,
+      );
+
+  @override
+  MetricStatus get status => _status;
+
   /// Capture the user's resting knee angle once. The strict activation
   /// gate (≤ 100°) means this baseline is guaranteed close to McGill 90°.
   @override
   void onRestingFrame(RepContext ctx) {
     if (_baselineKnee == null && ctx.hipKneeAnkleAngle != null) {
       _baselineKnee = ctx.hipKneeAnkleAngle;
-      _debugData['kneeBase'] = _baselineKnee!.toStringAsFixed(1);
+      _debugData['kneeBase'] = _baselineKnee;
     }
   }
 
@@ -80,26 +95,33 @@ class KneeExtensionMetric extends CurlUpMetricBase {
 
     if (angle == null) {
       _debugData['kneeExt'] = 'ankle hidden';
+      _kneeAngle = null;
+      _status = MetricStatus.pass;
       return;
     }
 
-    _debugData['kneeExt'] = '${angle.toStringAsFixed(1)}°';
+    _kneeAngle = angle;
+    _debugData['kneeExt'] = angle;
 
     // Order matters: absolute checks first (highest severity), then
     // deviation chip (informational), then "good."
     if (angle >= KneeExtensionConfig.ERROR_THRESHOLD) {
+      _status = MetricStatus.fault;
       ctx.resultIssues.feedback['Knee'] = '🔴 Chân thẳng quá!';
       _ensureLevel(ctx, _KneeFaultLevel.error);
     } else if (angle >= KneeExtensionConfig.WARNING_THRESHOLD) {
+      _status = MetricStatus.near;
       ctx.resultIssues.feedback['Knee'] = '⚠️ Co gối thêm';
       _ensureLevel(ctx, _KneeFaultLevel.warning);
     } else if (_baselineKnee != null &&
         (angle - _baselineKnee!).abs() >
             KneeExtensionConfig.DEVIATION_WARNING) {
+      _status = MetricStatus.near;
       // Out of acceptable deviation band but below absolute warning band.
       // Live nudge only — no fault logged.
       ctx.resultIssues.feedback['Knee'] = '⚠️ Đưa chân về 90°';
     } else {
+      _status = MetricStatus.pass;
       ctx.resultIssues.feedback['Knee'] = '✅ Gối tốt';
     }
   }
@@ -145,6 +167,8 @@ class KneeExtensionMetric extends CurlUpMetricBase {
     _faults.clear();
     _debugData.clear();
     _loggedLevel = null;
+    _kneeAngle = null;
+    _status = MetricStatus.pass;
     // _baselineKnee intentionally preserved across reps — set once
     // at first resting frame, doesn't change within a set.
   }

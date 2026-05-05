@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../onboarding/vf_theme.dart';
+import '../../../theme/vf_theme.dart';
 import 'form_score_arc.dart';
 
 class ShareableCard extends StatelessWidget {
@@ -28,10 +28,10 @@ class ShareableCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scoreColor = formScore >= 80
-        ? VF.jadeGlow
+        ? VFTheme.jadeGlow
         : formScore >= 60
-            ? VF.amber
-            : VF.coral;
+            ? VFTheme.amber
+            : VFTheme.coral;
     final bestIndex = setScores.isEmpty
         ? -1
         : setScores.indexOf(setScores.reduce((a, b) => a > b ? a : b));
@@ -61,7 +61,7 @@ class ShareableCard extends StatelessWidget {
                     fontSize: 9,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 3,
-                    color: VF.jadeGlow.withValues(alpha: 0.28),
+                    color: VFTheme.jadeGlow.withValues(alpha: 0.28),
                   ),
                 ),
                 const Spacer(),
@@ -187,7 +187,7 @@ class ShareableCard extends StatelessWidget {
                           progress: score / 100,
                           size: 48,
                           color: isBest
-                              ? VF.jadeGlow
+                              ? VFTheme.jadeGlow
                               : Colors.white.withValues(alpha: 0.38),
                           trackColor: Colors.white.withValues(alpha: 0.06),
                           strokeWidth: 3.5,
@@ -197,7 +197,7 @@ class ShareableCard extends StatelessWidget {
                               fontSize: 12,
                               fontWeight: FontWeight.w800,
                               color: isBest
-                                  ? VF.jadeGlow.withValues(alpha: 0.86)
+                                  ? VFTheme.jadeGlow.withValues(alpha: 0.86)
                                   : Colors.white.withValues(alpha: 0.64),
                             ),
                           ),
@@ -209,7 +209,7 @@ class ShareableCard extends StatelessWidget {
                             fontSize: 9,
                             fontWeight: FontWeight.w600,
                             color: isBest
-                                ? VF.jadeGlow.withValues(alpha: 0.45)
+                                ? VFTheme.jadeGlow.withValues(alpha: 0.45)
                                 : Colors.white.withValues(alpha: 0.24),
                           ),
                         ),

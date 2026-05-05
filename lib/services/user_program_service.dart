@@ -171,7 +171,7 @@ class UserProgramService {
       ..sort();
 
     return buildProgram(
-      userName: (prefs.getString('user_name') ?? '').trim(),
+      userName: (prefs.getString('display_name') ?? '').trim(),
       level: prefs.getString('user_level') ?? 'beginner',
       goal: prefs.getString('user_goal'),
       workoutDays: workoutDays.isEmpty ? _defaultWorkoutDays : workoutDays,
@@ -190,7 +190,8 @@ class UserProgramService {
   }) {
     final sortedDays = workoutDays.isEmpty
         ? List<int>.from(_defaultWorkoutDays)
-        : List<int>.from(workoutDays)..sort();
+        : List<int>.from(workoutDays)
+      ..sort();
     final goalKey = normalizeGoal(goal);
     final goalPatterns =
         goalExercisePatterns[goalKey] ?? goalExercisePatterns['health']!;
@@ -215,8 +216,9 @@ class UserProgramService {
         title: summary.title,
         duration: summary.duration,
         muscles: summary.muscles,
-        issueTag:
-            corrective == null ? '' : issueSubtitleForRegion(corrective.bodyRegion),
+        issueTag: corrective == null
+            ? ''
+            : issueSubtitleForRegion(corrective.bodyRegion),
         exercises: [
           ...mainExercises,
           corrective ?? fallback,
@@ -366,7 +368,8 @@ class UserProgramService {
     );
   }
 
-  static _WorkoutSummary _summarizeWorkout(List<UserExerciseData> mainExercises) {
+  static _WorkoutSummary _summarizeWorkout(
+      List<UserExerciseData> mainExercises) {
     const lowerBody = {'Squat', 'Lunge', 'Glute Bridge'};
     const coreHeavy = {
       'Plank',
