@@ -13,7 +13,9 @@ class TrunkLeanConfig {
   /// Good forward lean range (degrees from vertical)
   /// Keep a bit more tolerance here so the chest-up cue is less trigger-happy
   /// on natural forward lean during descent.
-  static const List<int> GOOD_LEAN_RANGE = [15, 40];
+  static const List<double> GOOD_LEAN_RANGE = [15, 40];
+  static const double WarningLean =
+      30.0; // Leaning forward but not past good range yet
 
   /// Require fewer consecutive frames so the live cue reacts while the user
   /// is still in the bad position instead of after they start recovering.
@@ -37,6 +39,7 @@ class TrunkLeanMetric extends SquatMetricBase {
   final Debouncer _forwardDebouncer =
       Debouncer(requiredFrames: TrunkLeanConfig.FORWARD_CONFIRM_FRAMES);
   final Debouncer _backwardDebouncer = Debouncer(requiredFrames: 5);
+  final Debouncer _warningDebouncer = Debouncer(requiredFrames: 5);
 
   /// Track maximum trunk lean this rep (for post-rep analysis)
   double? maxTrunkLean;
@@ -57,8 +60,9 @@ class TrunkLeanMetric extends SquatMetricBase {
 
   @override
   ThresholdBand? get threshold => ThresholdBand(
-        faultAbove: TrunkLeanConfig.GOOD_LEAN_RANGE[1].toDouble(),
+        faultAbove: TrunkLeanConfig.GOOD_LEAN_RANGE[1],
         faultBelow: -TrunkLeanConfig.BACKWARD_LIMIT,
+        warningAbove: TrunkLeanConfig.WarningLean,
       );
 
   @override
@@ -80,9 +84,11 @@ class TrunkLeanMetric extends SquatMetricBase {
 
     bool leanForward = ctx.trunkLean > TrunkLeanConfig.GOOD_LEAN_RANGE[1];
     bool leanBackward = ctx.trunkLean < -TrunkLeanConfig.BACKWARD_LIMIT;
+    bool warningForward = ctx.trunkLean > TrunkLeanConfig.WarningLean;
 
     bool forwardConfirmed = _forwardDebouncer.update(leanForward);
     bool backwardConfirmed = _backwardDebouncer.update(leanBackward);
+    bool warningConfirmed = _warningDebouncer.update(warningForward);
 
     if (forwardConfirmed) {
       _status = MetricStatus.fault;
@@ -98,6 +104,9 @@ class TrunkLeanMetric extends SquatMetricBase {
         null,
         priority: SquatFaultVoicePriority.trunkLean,
       );
+    } else if (warningConfirmed) {
+      _status = MetricStatus.near;
+      ctx.resultIssues.feedback['Back'] = 'Try to keep chest up';
     } else if (backwardConfirmed) {
       _status = MetricStatus.fault;
       ctx.resultIssues.feedback['Back'] = "Don't lean back!";

@@ -9,6 +9,7 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../app/app_metadata.dart';
 import '../../debug/debug_panel.dart';
 import '../../debug/debug_preferences.dart';
 import '../../debug/debug_types.dart';
@@ -1260,6 +1261,8 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                 fps: widget.exercise.currentFps,
                 frameTimestampMs: widget.exercise.frameTimestampMs,
                 confidence: widget.exercise.personPresenceScore,
+                footerLabel:
+                    '${widget.exercise.exerciseName} · ${AppMetadata.displayVersion}',
                 onMinimize: () {
                   setState(() => _debugPanelOpen = false);
                 },

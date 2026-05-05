@@ -21,6 +21,7 @@ class DebugPanel extends StatelessWidget {
     required this.fps,
     required this.frameTimestampMs,
     required this.confidence,
+    required this.footerLabel,
     required this.onMinimize,
   });
 
@@ -35,6 +36,7 @@ class DebugPanel extends StatelessWidget {
   final double fps;
   final int frameTimestampMs;
   final double confidence;
+  final String footerLabel;
   final VoidCallback onMinimize;
 
   @override
@@ -142,6 +144,7 @@ class DebugPanel extends StatelessWidget {
                         (sum, tracked) => sum + tracked.faultCount,
                       ),
                       confidence: confidence,
+                      footerLabel: footerLabel,
                     ),
                 ],
               ),
@@ -1451,10 +1454,12 @@ class _DebugFooter extends StatelessWidget {
   const _DebugFooter({
     required this.totalFaults,
     required this.confidence,
+    required this.footerLabel,
   });
 
   final int totalFaults;
   final double confidence;
+  final String footerLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -1486,7 +1491,7 @@ class _DebugFooter extends StatelessWidget {
           ),
           const Spacer(),
           Text(
-            'squat · v1.2.0',
+            footerLabel,
             style: TextStyle(
               fontFamily: 'monospace',
               fontSize: 8,
