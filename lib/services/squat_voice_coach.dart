@@ -24,7 +24,7 @@ class _ViettelSquatVoicePlayer implements SquatVoicePlayer {
   void clearPendingButKeepCurrent() => _ttsService.clearPendingButKeepCurrent();
 }
 
-class SquatVoiceCoach {
+class SquatVoiceCoach implements ExerciseVoiceCoach {
   SquatVoiceCoach({SquatVoicePlayer? ttsService})
       : _ttsService = ttsService ?? _ViettelSquatVoicePlayer();
 

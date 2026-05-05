@@ -27,6 +27,9 @@ class TrunkLeanMetric extends SquatMetricBase {
   @override
   String get name => 'TrunkLean';
 
+  @override
+  String? get nameVi => 'Thân trên';
+
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
 
@@ -37,6 +40,8 @@ class TrunkLeanMetric extends SquatMetricBase {
 
   /// Track maximum trunk lean this rep (for post-rep analysis)
   double? maxTrunkLean;
+  double? _trunkLean;
+  MetricStatus _status = MetricStatus.pass;
 
   /// Prevent instruction spam — only set coaching once per rep.
   bool _instructionSet = false;
@@ -48,13 +53,28 @@ class TrunkLeanMetric extends SquatMetricBase {
   Map<String, dynamic> get debugData => _debugData;
 
   @override
+  double? get value => _trunkLean;
+
+  @override
+  ThresholdBand? get threshold => ThresholdBand(
+        faultAbove: TrunkLeanConfig.GOOD_LEAN_RANGE[1].toDouble(),
+        faultBelow: -TrunkLeanConfig.BACKWARD_LIMIT,
+      );
+
+  @override
+  MetricStatus get status => _status;
+
+  @override
   void update(RepContext ctx) {
+    _trunkLean = ctx.trunkLean;
+
     // Track max lean per rep
     if (maxTrunkLean == null || ctx.trunkLean > maxTrunkLean!) {
       maxTrunkLean = ctx.trunkLean;
     }
 
-    _debugData['maxTrunkLean'] = maxTrunkLean?.toStringAsFixed(1) ?? 'N/A';
+    _debugData['trunkLean'] = ctx.trunkLean;
+    _debugData['maxTrunkLean'] = maxTrunkLean ?? 'N/A';
 
     final phase = ctx.squatState.toString().split('.').last.toUpperCase();
 
@@ -65,6 +85,7 @@ class TrunkLeanMetric extends SquatMetricBase {
     bool backwardConfirmed = _backwardDebouncer.update(leanBackward);
 
     if (forwardConfirmed) {
+      _status = MetricStatus.fault;
       ctx.resultIssues.feedback['Back'] = 'Chest up!';
       if (!_instructionSet) {
         ctx.resultIssues
@@ -78,6 +99,7 @@ class TrunkLeanMetric extends SquatMetricBase {
         priority: SquatFaultVoicePriority.trunkLean,
       );
     } else if (backwardConfirmed) {
+      _status = MetricStatus.fault;
       ctx.resultIssues.feedback['Back'] = "Don't lean back!";
       if (!_instructionSet) {
         ctx.resultIssues
@@ -91,6 +113,8 @@ class TrunkLeanMetric extends SquatMetricBase {
         priority: SquatFaultVoicePriority.trunkLeanBackward,
       );
     } else {
+      _status =
+          leanForward || leanBackward ? MetricStatus.near : MetricStatus.pass;
       ctx.resultIssues.feedback['Back'] = 'Good back';
     }
   }
@@ -120,6 +144,8 @@ class TrunkLeanMetric extends SquatMetricBase {
     _forwardDebouncer.reset();
     _backwardDebouncer.reset();
     maxTrunkLean = null;
+    _trunkLean = null;
+    _status = MetricStatus.pass;
     _instructionSet = false;
   }
 }

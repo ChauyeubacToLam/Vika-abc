@@ -2,6 +2,7 @@
 
 import 'package:vika/utils/debouncer.dart';
 import 'package:vika/utils/frame_buffer.dart';
+import 'package:vika/debug/tracked_metric.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
 import '../../utils/pose_math_helpers.dart';
@@ -14,6 +15,7 @@ import 'metrics/trunk_lean_metric.dart';
 import 'metrics/heel_rise_metric.dart';
 import 'metrics/tempo_metric.dart';
 import 'metrics/hip_shoulder_sync.dart';
+import '../../services/squat_voice_coach.dart';
 
 // --- Config ---
 
@@ -25,6 +27,7 @@ class SquatConfig {
   static const double BOTTOM_RELEASE_READY_TOLERANCE_SECONDS = 0.05;
   static const double SIDE_SCORE_TIE_THRESHOLD = 0.2;
   static const double SIDE_SWITCH_MARGIN = 0.75;
+  static const double MIN_TRACKING_CONFIDENCE = 0.45;
 }
 
 enum SquatState { standing, descending, bottom, ascending }
@@ -143,6 +146,19 @@ class Squat extends ExerciseBase {
     tempoMetric,
     hipShoulderSyncMetric,
   ];
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  List<TrackedMetric> get trackedMetrics => List.unmodifiable(_trackedMetrics);
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
 
   // Debouncers for state transitions
   final Debouncer _bottomDebouncer = Debouncer(requiredFrames: 2);
@@ -153,6 +169,9 @@ class Squat extends ExerciseBase {
 
   @override
   String get exerciseName => 'Squat';
+
+  @override
+  ExerciseVoiceCoach? createVoiceCoach() => SquatVoiceCoach();
 
   @override
   String get currentPhaseKey => squatState.toString().split('.').last;
@@ -253,7 +272,7 @@ class Squat extends ExerciseBase {
     if (requiredLandmarks == null) return "⚠️ Body not fully visible.";
 
     final allConfident = requiredLandmarks.values
-        .every((lm) => lm.likelihood >= ExerciseBase.MIN_CONFIDENCE);
+        .every((lm) => lm.likelihood >= SquatConfig.MIN_TRACKING_CONFIDENCE);
     if (!allConfident) return "⚠️ Adjust lighting/position.";
 
     return null;
@@ -481,13 +500,13 @@ class Squat extends ExerciseBase {
     debugData['frameBuffer'] = frameBuffer.frameBuffer.length;
     debugData['trackedSide'] = _trackedSide?.name ?? 'unknown';
     debugData['trackedSideSource'] = _lastTrackedSideSource;
-    debugData['leftSideScore'] = _lastLeftSideScore.toStringAsFixed(2);
-    debugData['rightSideScore'] = _lastRightSideScore.toStringAsFixed(2);
-    debugData['kneeAngle'] = kneeAngle.toStringAsFixed(1);
-    debugData['backAngle'] = backAngle.toStringAsFixed(1);
-    debugData['trunkLean'] = trunkLean.toStringAsFixed(1);
-    debugData['heelDistance'] = heelDistanceToFloor.toStringAsFixed(2);
-    debugData['heelLiftPct'] = (normalizedHeelLift * 100).toStringAsFixed(1);
+    debugData['leftSideScore'] = _lastLeftSideScore;
+    debugData['rightSideScore'] = _lastRightSideScore;
+    debugData['kneeAngle'] = kneeAngle;
+    debugData['backAngle'] = backAngle;
+    debugData['trunkLean'] = trunkLean;
+    debugData['heelDistance'] = heelDistanceToFloor;
+    debugData['heelLiftPct'] = normalizedHeelLift * 100;
 
     // 5. Buffer frame & update state machine
     frameBuffer.addFrame(FrameSnapshot(log: {
@@ -507,8 +526,9 @@ class Squat extends ExerciseBase {
 
     // 7. Run all metrics (skip standing phase)
     if (squatState != SquatState.standing) {
-      for (final metric in _metrics) {
-        metric.update(ctx);
+      for (var i = 0; i < _metrics.length; i++) {
+        _metrics[i].update(ctx);
+        _trackedMetrics[i].onTick(now);
       }
     }
 
@@ -534,6 +554,9 @@ class Squat extends ExerciseBase {
       ctx: ctx,
     );
     tempoMetric.evaluateRep(ctx);
+    for (final trackedMetric in _trackedMetrics) {
+      trackedMetric.onTick(ctx.frameTimestamp);
+    }
 
     // Collect faults from all metrics
     final allFaults = <FaultRecord>[];

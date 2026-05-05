@@ -27,7 +27,8 @@ class IvoryGlassIconButton extends StatelessWidget {
         child: GestureDetector(
           onTap: onTap,
           child: Container(
-            width: 36, height: 36,
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
               color: VikaIvory.glass08,
               borderRadius: BorderRadius.circular(18),
@@ -84,26 +85,44 @@ class IvoryTopChromeLeft extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.baseline,
                 textBaseline: TextBaseline.alphabetic,
                 children: [
-                  Text('Hiệp ', style: TextStyle(
-                    fontFamily: _font, fontSize: 9, fontWeight: FontWeight.w700,
-                    color: VikaIvory.invInkFaint, letterSpacing: 1.2,
-                  )),
-                  Text('$currentSet', style: TextStyle(
-                    fontFamily: _font, fontSize: 12, fontWeight: FontWeight.w800,
-                    color: VikaIvory.invInk, letterSpacing: -0.2,
-                  )),
-                  Text(' / $totalSets', style: TextStyle(
-                    fontFamily: _font, fontSize: 12, fontWeight: FontWeight.w800,
-                    color: VikaIvory.invInkFaint,
-                  )),
-                  Text(' · ', style: TextStyle(
-                    fontFamily: _font, fontSize: 11, fontWeight: FontWeight.w600,
-                    color: VikaIvory.invInkDim,
-                  )),
-                  Text(timer, style: TextStyle(
-                    fontFamily: _font, fontSize: 11, fontWeight: FontWeight.w700,
-                    color: VikaIvory.invInkSoft, letterSpacing: -0.1,
-                  )),
+                  Text('Hiệp ',
+                      style: TextStyle(
+                        fontFamily: _font,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        color: VikaIvory.invInkFaint,
+                        letterSpacing: 1.2,
+                      )),
+                  Text('$currentSet',
+                      style: TextStyle(
+                        fontFamily: _font,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: VikaIvory.invInk,
+                        letterSpacing: -0.2,
+                      )),
+                  Text(' / $totalSets',
+                      style: TextStyle(
+                        fontFamily: _font,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: VikaIvory.invInkFaint,
+                      )),
+                  Text(' · ',
+                      style: TextStyle(
+                        fontFamily: _font,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: VikaIvory.invInkDim,
+                      )),
+                  Text(timer,
+                      style: TextStyle(
+                        fontFamily: _font,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: VikaIvory.invInkSoft,
+                        letterSpacing: -0.1,
+                      )),
                 ],
               ),
             ),
@@ -126,7 +145,8 @@ class IvoryLiveFormScoreArc extends StatelessWidget {
     // score >= 75 → yellow, 60-74 → #E89A4B, <60 → attention
     final arcColor = VikaIvory.yellow;
     return SizedBox(
-      width: 44, height: 44,
+      width: 44,
+      height: 44,
       child: Stack(
         alignment: Alignment.center,
         children: [
@@ -137,14 +157,23 @@ class IvoryLiveFormScoreArc extends StatelessWidget {
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('$score', style: TextStyle(
-                fontFamily: _font, fontSize: 13, fontWeight: FontWeight.w800,
-                color: VikaIvory.invInk, letterSpacing: -0.6, height: 1,
-              )),
-              Text('FORM', style: TextStyle(
-                fontFamily: _font, fontSize: 6, fontWeight: FontWeight.w700,
-                color: VikaIvory.invInkFaint, letterSpacing: 0.6,
-              )),
+              Text('$score',
+                  style: TextStyle(
+                    fontFamily: _font,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: VikaIvory.invInk,
+                    letterSpacing: -0.6,
+                    height: 1,
+                  )),
+              Text('FORM',
+                  style: TextStyle(
+                    fontFamily: _font,
+                    fontSize: 6,
+                    fontWeight: FontWeight.w700,
+                    color: VikaIvory.invInkFaint,
+                    letterSpacing: 0.6,
+                  )),
             ],
           ),
         ],
@@ -175,7 +204,8 @@ class IvoryAILivePulsePill extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 5, height: 5,
+                width: 5,
+                height: 5,
                 decoration: BoxDecoration(
                   color: VikaIvory.live,
                   shape: BoxShape.circle,
@@ -183,10 +213,14 @@ class IvoryAILivePulsePill extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 6),
-              Text('AI THEO DÕI', style: TextStyle(
-                fontFamily: _font, fontSize: 9, fontWeight: FontWeight.w700,
-                color: VikaIvory.invInk, letterSpacing: 1.0,
-              )),
+              Text('AI THEO DÕI',
+                  style: TextStyle(
+                    fontFamily: _font,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color: VikaIvory.invInk,
+                    letterSpacing: 1.0,
+                  )),
             ],
           ),
         ),
@@ -203,10 +237,12 @@ class IvoryTopChromeRight extends StatelessWidget {
     required this.formScore,
     required this.onPause,
     required this.onFlipCamera,
+    this.debugBadge,
   });
   final int formScore;
   final VoidCallback onPause;
   final VoidCallback onFlipCamera;
+  final Widget? debugBadge;
 
   @override
   Widget build(BuildContext context) {
@@ -214,7 +250,7 @@ class IvoryTopChromeRight extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         // TODO(form-score): Wire real form score here
-        IvoryLiveFormScoreArc(score: formScore),
+        debugBadge ?? IvoryLiveFormScoreArc(score: formScore),
         const SizedBox(width: 8),
         IvoryGlassIconButton(
           onTap: onFlipCamera,
@@ -248,10 +284,14 @@ class IvoryFormScoreSparkline extends StatelessWidget {
           painter: SparklinePainter(data: data),
         ),
         const SizedBox(height: 2),
-        Text('10s qua', style: TextStyle(
-          fontFamily: _font, fontSize: 7, fontWeight: FontWeight.w700,
-          color: VikaIvory.invInkFaint, letterSpacing: 0.8,
-        )),
+        Text('10s qua',
+            style: TextStyle(
+              fontFamily: _font,
+              fontSize: 7,
+              fontWeight: FontWeight.w700,
+              color: VikaIvory.invInkFaint,
+              letterSpacing: 0.8,
+            )),
       ],
     );
   }
@@ -269,11 +309,13 @@ class IvoryPTReferenceLoop extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 80, height: 108,
+          width: 80,
+          height: 108,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             gradient: const LinearGradient(
-              begin: Alignment.topCenter, end: Alignment.bottomCenter,
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
               colors: [Color(0xFF2A1F18), Color(0xFF15110D)],
             ),
             border: Border.all(
@@ -295,17 +337,23 @@ class IvoryPTReferenceLoop extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 5, height: 5,
+                width: 5,
+                height: 5,
                 decoration: BoxDecoration(
-                  color: VikaIvory.yellow, shape: BoxShape.circle,
+                  color: VikaIvory.yellow,
+                  shape: BoxShape.circle,
                   boxShadow: [BoxShadow(color: VikaIvory.yellowGlow, blurRadius: 6)],
                 ),
               ),
               const SizedBox(width: 5),
-              Text('HLV MẪU', style: TextStyle(
-                fontFamily: _font, fontSize: 9, fontWeight: FontWeight.w700,
-                color: VikaIvory.invInk, letterSpacing: 1.6,
-              )),
+              Text('HLV MẪU',
+                  style: TextStyle(
+                    fontFamily: _font,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color: VikaIvory.invInk,
+                    letterSpacing: 1.6,
+                  )),
             ],
           ),
         ),
@@ -342,17 +390,23 @@ class IvoryCoachCaption extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 6, height: 6,
+                width: 6,
+                height: 6,
                 decoration: BoxDecoration(
-                  color: VikaIvory.yellow, shape: BoxShape.circle,
+                  color: VikaIvory.yellow,
+                  shape: BoxShape.circle,
                   boxShadow: [BoxShadow(color: VikaIvory.yellowGlow, blurRadius: 8)],
                 ),
               ),
               const SizedBox(width: 6),
-              Text('HLV AI', style: TextStyle(
-                fontFamily: _font, fontSize: 10, fontWeight: FontWeight.w800,
-                color: VikaIvory.yellow, letterSpacing: 1.6,
-              )),
+              Text('HLV AI',
+                  style: TextStyle(
+                    fontFamily: _font,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: VikaIvory.yellow,
+                    letterSpacing: 1.6,
+                  )),
             ],
           ),
         ),
@@ -361,8 +415,12 @@ class IvoryCoachCaption extends StatelessWidget {
           message,
           textAlign: TextAlign.center,
           style: TextStyle(
-            fontFamily: _font, fontSize: 17, fontWeight: FontWeight.w700,
-            color: VikaIvory.invInk, letterSpacing: -0.2, height: 1.35,
+            fontFamily: _font,
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            color: VikaIvory.invInk,
+            letterSpacing: -0.2,
+            height: 1.35,
             shadows: [
               Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.95), blurRadius: 16),
               Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.7), blurRadius: 4),
@@ -400,18 +458,13 @@ class IvoryRepTallyDots extends StatelessWidget {
         return Padding(
           padding: EdgeInsets.only(left: i == 0 ? 0 : 5),
           child: Container(
-            width: dotSize, height: dotSize,
+            width: dotSize,
+            height: dotSize,
             decoration: BoxDecoration(
               color: filled ? VikaIvory.yellow : VikaIvory.invInkDim,
               shape: BoxShape.circle,
-              border: hasFault && filled
-                  ? Border.all(color: VikaIvory.attention, width: 1.5)
-                  : null,
-              boxShadow: isCurrent
-                  ? [BoxShadow(color: VikaIvory.yellowGlow, blurRadius: 8)]
-                  : (hasFault && filled
-                      ? [BoxShadow(color: VikaIvory.attention.withValues(alpha: 0.5), blurRadius: 4)]
-                      : null),
+              border: hasFault && filled ? Border.all(color: VikaIvory.attention, width: 1.5) : null,
+              boxShadow: isCurrent ? [BoxShadow(color: VikaIvory.yellowGlow, blurRadius: 8)] : (hasFault && filled ? [BoxShadow(color: VikaIvory.attention.withValues(alpha: 0.5), blurRadius: 4)] : null),
             ),
           ),
         );
@@ -459,26 +512,40 @@ class IvoryBottomChrome extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text('Giai đoạn', style: TextStyle(
-          fontFamily: _font, fontSize: 8, fontWeight: FontWeight.w700,
-          color: VikaIvory.invInkFaint, letterSpacing: 1.6,
-          shadows: [Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.6), blurRadius: 6)],
-        )),
+        Text('Giai đoạn',
+            style: TextStyle(
+              fontFamily: _font,
+              fontSize: 8,
+              fontWeight: FontWeight.w700,
+              color: VikaIvory.invInkFaint,
+              letterSpacing: 1.6,
+              shadows: [Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.6), blurRadius: 6)],
+            )),
         const SizedBox(height: 3),
-        Text(phaseVerb, style: TextStyle(
-          fontFamily: _font, fontSize: 32, fontWeight: FontWeight.w800,
-          color: VikaIvory.yellow, letterSpacing: -1.6, height: 0.9,
-          shadows: [
-            Shadow(color: VikaIvory.yellowGlowWeak, blurRadius: 14),
-            Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.6), blurRadius: 4),
-          ],
-        )),
+        Text(phaseVerb,
+            style: TextStyle(
+              fontFamily: _font,
+              fontSize: 32,
+              fontWeight: FontWeight.w800,
+              color: VikaIvory.yellow,
+              letterSpacing: -1.6,
+              height: 0.9,
+              shadows: [
+                Shadow(color: VikaIvory.yellowGlowWeak, blurRadius: 14),
+                Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.6), blurRadius: 4),
+              ],
+            )),
         const SizedBox(height: 4),
-        Text(phaseHint, style: TextStyle(
-          fontFamily: _font, fontSize: 12, fontWeight: FontWeight.w600,
-          color: VikaIvory.invInkSoft, letterSpacing: -0.1, height: 1.3,
-          shadows: [Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.6), blurRadius: 6)],
-        )),
+        Text(phaseHint,
+            style: TextStyle(
+              fontFamily: _font,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: VikaIvory.invInkSoft,
+              letterSpacing: -0.1,
+              height: 1.3,
+              shadows: [Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.6), blurRadius: 6)],
+            )),
       ],
     );
   }
@@ -490,16 +557,21 @@ class IvoryBottomChrome extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text('Giữ đáy', style: TextStyle(
-          fontFamily: _font, fontSize: 9, fontWeight: FontWeight.w700,
-          color: VikaIvory.yellow, letterSpacing: 1.8,
-          shadows: [Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.6), blurRadius: 6)],
-        )),
+        Text('Giữ đáy',
+            style: TextStyle(
+              fontFamily: _font,
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              color: VikaIvory.yellow,
+              letterSpacing: 1.8,
+              shadows: [Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.6), blurRadius: 6)],
+            )),
         const SizedBox(height: 4),
         Row(
           children: [
             SizedBox(
-              width: 68, height: 68,
+              width: 68,
+              height: 68,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
@@ -527,8 +599,12 @@ class IvoryBottomChrome extends StatelessWidget {
                       return Text(
                         value.toStringAsFixed(1),
                         style: TextStyle(
-                          fontFamily: _font, fontSize: 22, fontWeight: FontWeight.w800,
-                          color: VikaIvory.yellow, letterSpacing: -1.0, height: 1,
+                          fontFamily: _font,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: VikaIvory.yellow,
+                          letterSpacing: -1.0,
+                          height: 1,
                           shadows: [Shadow(color: VikaIvory.yellowGlow, blurRadius: 10)],
                         ),
                       );
@@ -542,20 +618,29 @@ class IvoryBottomChrome extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('GIỮ', style: TextStyle(
-                  fontFamily: _font, fontSize: 30, fontWeight: FontWeight.w800,
-                  color: VikaIvory.yellow, letterSpacing: -1.4, height: 0.9,
-                  shadows: [
-                    Shadow(color: VikaIvory.yellowGlowWeak, blurRadius: 14),
-                    Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.6), blurRadius: 4),
-                  ],
-                )),
+                Text('GIỮ',
+                    style: TextStyle(
+                      fontFamily: _font,
+                      fontSize: 30,
+                      fontWeight: FontWeight.w800,
+                      color: VikaIvory.yellow,
+                      letterSpacing: -1.4,
+                      height: 0.9,
+                      shadows: [
+                        Shadow(color: VikaIvory.yellowGlowWeak, blurRadius: 14),
+                        Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.6), blurRadius: 4),
+                      ],
+                    )),
                 const SizedBox(height: 3),
-                Text('Cố thêm 1 nhịp nữa', style: TextStyle(
-                  fontFamily: _font, fontSize: 12, fontWeight: FontWeight.w600,
-                  color: VikaIvory.invInkSoft, letterSpacing: -0.1,
-                  shadows: [Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.6), blurRadius: 6)],
-                )),
+                Text('Cố thêm 1 nhịp nữa',
+                    style: TextStyle(
+                      fontFamily: _font,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: VikaIvory.invInkSoft,
+                      letterSpacing: -0.1,
+                      shadows: [Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.6), blurRadius: 6)],
+                    )),
               ],
             ),
           ],
@@ -569,31 +654,44 @@ class IvoryBottomChrome extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.end,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text('LẦN', style: TextStyle(
-          fontFamily: _font, fontSize: 9, fontWeight: FontWeight.w700,
-          color: VikaIvory.invInkSoft, letterSpacing: 1.8,
-          shadows: [Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.6), blurRadius: 6)],
-        )),
+        Text('LẦN',
+            style: TextStyle(
+              fontFamily: _font,
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              color: VikaIvory.invInkSoft,
+              letterSpacing: 1.8,
+              shadows: [Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.6), blurRadius: 6)],
+            )),
         const SizedBox(height: 4),
         Row(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.baseline,
           textBaseline: TextBaseline.alphabetic,
           children: [
-            Text(repCount.toString().padLeft(2, '0'), style: TextStyle(
-              fontFamily: _font, fontSize: 36, fontWeight: FontWeight.w800,
-              color: VikaIvory.yellow, letterSpacing: -1.8, height: 0.9,
-              shadows: [
-                Shadow(color: VikaIvory.yellowGlow, blurRadius: 16),
-                Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.6), blurRadius: 4),
-              ],
-            )),
+            Text(repCount.toString().padLeft(2, '0'),
+                style: TextStyle(
+                  fontFamily: _font,
+                  fontSize: 36,
+                  fontWeight: FontWeight.w800,
+                  color: VikaIvory.yellow,
+                  letterSpacing: -1.8,
+                  height: 0.9,
+                  shadows: [
+                    Shadow(color: VikaIvory.yellowGlow, blurRadius: 16),
+                    Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.6), blurRadius: 4),
+                  ],
+                )),
             const SizedBox(width: 4),
-            Text('/$totalReps', style: TextStyle(
-              fontFamily: _font, fontSize: 16, fontWeight: FontWeight.w700,
-              color: VikaIvory.invInkSoft, letterSpacing: -0.4,
-              shadows: [Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.6), blurRadius: 4)],
-            )),
+            Text('/$totalReps',
+                style: TextStyle(
+                  fontFamily: _font,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: VikaIvory.invInkSoft,
+                  letterSpacing: -0.4,
+                  shadows: [Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.6), blurRadius: 4)],
+                )),
           ],
         ),
         const SizedBox(height: 8),
@@ -644,7 +742,8 @@ class IvoryPauseOverlay extends StatelessWidget {
               children: [
                 // Pause icon
                 Container(
-                  width: 48, height: 48,
+                  width: 48,
+                  height: 48,
                   decoration: BoxDecoration(
                     color: VikaIvory.attention.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
@@ -659,27 +758,36 @@ class IvoryPauseOverlay extends StatelessWidget {
                 Text(
                   isManualPause ? 'ĐÃ TẠM NGHỈ' : 'MẤT TÍN HIỆU',
                   style: TextStyle(
-                    fontFamily: _font, fontSize: 9, fontWeight: FontWeight.w700,
-                    color: VikaIvory.attention, letterSpacing: 1.6,
+                    fontFamily: _font,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color: VikaIvory.attention,
+                    letterSpacing: 1.6,
                   ),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   isManualPause ? 'Tạm nghỉ một chút?' : 'Bạn ở đâu rồi?',
                   style: TextStyle(
-                    fontFamily: _font, fontSize: 22, fontWeight: FontWeight.w800,
-                    color: VikaIvory.ink, letterSpacing: -0.6, height: 1.1,
+                    fontFamily: _font,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: VikaIvory.ink,
+                    letterSpacing: -0.6,
+                    height: 1.1,
                   ),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  isManualPause
-                    ? 'Tiến độ set này được giữ nguyên.\nẤn nút bên dưới để tiếp tục tập.'
-                    : 'Quay lại khung hình để AI tiếp tục theo dõi, hoặc ấn nút bên dưới.',
+                  isManualPause ? 'Tiến độ set này được giữ nguyên.\nẤn nút bên dưới để tiếp tục tập.' : 'Quay lại khung hình để AI tiếp tục theo dõi, hoặc ấn nút bên dưới.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontFamily: _font, fontSize: 12, fontWeight: FontWeight.w500,
-                    color: VikaIvory.inkSoft, letterSpacing: -0.1, height: 1.5,
+                    fontFamily: _font,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: VikaIvory.inkSoft,
+                    letterSpacing: -0.1,
+                    height: 1.5,
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -687,7 +795,8 @@ class IvoryPauseOverlay extends StatelessWidget {
                 GestureDetector(
                   onTap: onResume,
                   child: Container(
-                    width: double.infinity, height: 52,
+                    width: double.infinity,
+                    height: 52,
                     decoration: BoxDecoration(
                       color: VikaIvory.ink,
                       borderRadius: BorderRadius.circular(26),
@@ -695,13 +804,18 @@ class IvoryPauseOverlay extends StatelessWidget {
                     padding: const EdgeInsets.fromLTRB(22, 0, 6, 0),
                     child: Row(
                       children: [
-                        Text('Tiếp tục tập', style: TextStyle(
-                          fontFamily: _font, fontSize: 14, fontWeight: FontWeight.w800,
-                          color: VikaIvory.invInk, letterSpacing: -0.2,
-                        )),
+                        Text('Tiếp tục tập',
+                            style: TextStyle(
+                              fontFamily: _font,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              color: VikaIvory.invInk,
+                              letterSpacing: -0.2,
+                            )),
                         const Spacer(),
                         Container(
-                          width: 40, height: 40,
+                          width: 40,
+                          height: 40,
                           decoration: BoxDecoration(
                             color: VikaIvory.yellow,
                             borderRadius: BorderRadius.circular(20),
@@ -718,10 +832,14 @@ class IvoryPauseOverlay extends StatelessWidget {
                   onTap: onEnd,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-                    child: Text('Kết thúc buổi tập', style: TextStyle(
-                      fontFamily: _font, fontSize: 12, fontWeight: FontWeight.w600,
-                      color: VikaIvory.inkFaint, letterSpacing: -0.1,
-                    )),
+                    child: Text('Kết thúc buổi tập',
+                        style: TextStyle(
+                          fontFamily: _font,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: VikaIvory.inkFaint,
+                          letterSpacing: -0.1,
+                        )),
                   ),
                 ),
               ],
@@ -732,4 +850,3 @@ class IvoryPauseOverlay extends StatelessWidget {
     );
   }
 }
-

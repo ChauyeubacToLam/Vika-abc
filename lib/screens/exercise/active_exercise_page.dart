@@ -7,13 +7,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../debug/debug_panel.dart';
+import '../../debug/debug_preferences.dart';
+import '../../debug/debug_types.dart';
 import '../../exercise/exercise_base.dart';
 import '../../pose/pose_landmarker_adapter.dart';
 import '../../pose/pose_landmarker_channel.dart';
-import '../../exercise/squat/squat.dart';
 import '../../models/exercise_definition.dart';
-import '../../services/squat_voice_coach.dart';
 import '../../utils/exercise_logger.dart';
 import '../../theme/vf_theme.dart';
 import 'widgets/form_score_arc.dart';
@@ -66,14 +68,13 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   bool _isProcessingFrame = false;
   bool _isCameraReady = false;
   bool _didComplete = false;
-  final bool _showDebug = false;
   String? _cameraErrorMessage;
   Map<String, String> _feedback = {};
   Pose? _detectedPose;
   Size _imageSize = Size.zero;
   InputImageRotation _imageRotation = InputImageRotation.rotation0deg;
   late final AnimationController _pulseController;
-  SquatVoiceCoach? _squatVoiceCoach;
+  ExerciseVoiceCoach? _voiceCoach;
 
   // ─── Ivory v8 state ───
   int _setElapsedSeconds = 0;
@@ -81,11 +82,32 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   // TODO(form-score): Replace with real computed form score from ML pipeline
   static const int _hardcodedFormScore = 82;
   // TODO(chart): Replace with real sparkline data from primaryAngleForChart
-  static const List<int> _hardcodedSparkData = [72, 78, 84, 80, 76, 82, 86, 88, 84, 82];
+  static const List<int> _hardcodedSparkData = [
+    72,
+    78,
+    84,
+    80,
+    76,
+    82,
+    86,
+    88,
+    84,
+    82
+  ];
   // TODO(integration): Replace with real fault indices from RepLog.faults
   static const List<int> _hardcodedFaultIndices = [2];
   bool _isManualPause = false;
   _PoseRuntime _runtime = _PoseRuntime.nativeMediaPipe;
+  DebugMode _settingsDebugMode = DebugMode.off;
+  bool _isStaffUser = false;
+  bool _debugPanelOpen = false;
+  String? _expandedMetricId;
+  int _debugBackTapCount = 0;
+  DateTime? _debugFirstBackTap;
+  Timer? _pendingStaffBackTimer;
+  DateTime? _lastPersonDetectionAt;
+  bool _personDetectionInFlight = false;
+  static const Duration _personDetectionInterval = Duration(milliseconds: 450);
 
   @override
   void initState() {
@@ -94,9 +116,8 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
-    if (widget.exercise is Squat) {
-      _squatVoiceCoach = SquatVoiceCoach();
-    }
+    _voiceCoach = widget.exercise.createVoiceCoach();
+    _loadDebugMode();
     _startSetTimer();
     _initCamera();
   }
@@ -104,6 +125,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   @override
   void dispose() {
     _setTimer?.cancel();
+    _pendingStaffBackTimer?.cancel();
     final landmarkSubscription = _landmarkSubscription;
     _landmarkSubscription = null;
     unawaited(landmarkSubscription?.cancel() ?? Future<void>.value());
@@ -111,9 +133,186 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     unawaited(_poseChannel.dispose());
     _poseDetector.close();
     unawaited(widget.exercise.disposeDetectors());
-    _squatVoiceCoach?.dispose();
+    _voiceCoach?.dispose();
     _pulseController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadDebugMode() async {
+    final isStaff = await _loadStaffFlag();
+    final mode = await DebugPreferences.loadMode();
+    if (!mounted) return;
+    _isStaffUser = isStaff;
+    final resolved = _resolveDebugMode(mode);
+    setState(() {
+      _settingsDebugMode = mode;
+      _isStaffUser = isStaff;
+      _debugPanelOpen = resolved != DebugMode.off;
+    });
+  }
+
+  DebugMode _resolveDebugMode(DebugMode settingsValue) {
+    return DebugModeResolver.resolve(
+      isStaff: _isStaffUser,
+      settingsValue: settingsValue,
+    );
+  }
+
+  Future<bool> _loadStaffFlag() async {
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) return false;
+
+    try {
+      final row = await client
+          .from('profiles')
+          .select('is_staff')
+          .eq('id', user.id)
+          .maybeSingle();
+      final value = row?['is_staff'];
+      if (value == true || value == 'true') {
+        return true;
+      }
+    } catch (_) {
+      // Keep the dev menu non-fatal if the column has not shipped yet.
+    }
+
+    final metadataValue = user.appMetadata['is_staff'];
+    return metadataValue == true || metadataValue == 'true';
+  }
+
+  Future<void> _applyDebugMode(DebugMode mode) async {
+    await DebugPreferences.saveMode(mode);
+    if (!mounted) return;
+    final resolved = _resolveDebugMode(mode);
+    setState(() {
+      _settingsDebugMode = mode;
+      _debugPanelOpen = resolved != DebugMode.off;
+      if (resolved == DebugMode.off) {
+        _expandedMetricId = null;
+      }
+    });
+  }
+
+  void _handleBackChromeTap() {
+    if (!_isStaffUser) {
+      widget.onBack();
+      return;
+    }
+
+    final openedMenu = _recordStaffBackTap();
+    _pendingStaffBackTimer?.cancel();
+    if (openedMenu) return;
+
+    _pendingStaffBackTimer = Timer(const Duration(milliseconds: 360), () {
+      if (!mounted) return;
+      _debugBackTapCount = 0;
+      _debugFirstBackTap = null;
+      widget.onBack();
+    });
+  }
+
+  bool _recordStaffBackTap() {
+    final now = DateTime.now();
+    if (_debugFirstBackTap == null ||
+        now.difference(_debugFirstBackTap!) > const Duration(seconds: 3)) {
+      _debugFirstBackTap = now;
+      _debugBackTapCount = 1;
+    } else {
+      _debugBackTapCount++;
+    }
+
+    if (_debugBackTapCount < 5) return false;
+
+    _debugBackTapCount = 0;
+    _debugFirstBackTap = null;
+    _showDevModeSheet();
+    return true;
+  }
+
+  void _showDevModeSheet() {
+    if (!_isStaffUser) return;
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return SafeArea(
+          top: false,
+          child: Container(
+            margin: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(18, 14, 18, 12),
+            decoration: BoxDecoration(
+              color: VikaIvory.surface,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.22),
+                  blurRadius: 28,
+                  offset: const Offset(0, 12),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Debug mode',
+                  style: TextStyle(
+                    fontFamily: VikaIvory.fontFamily,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: VikaIvory.ink,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                for (final mode in DebugMode.values)
+                  InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () {
+                      Navigator.of(sheetContext).pop();
+                      unawaited(_applyDebugMode(mode));
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 8,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _settingsDebugMode == mode
+                                ? Icons.radio_button_checked_rounded
+                                : Icons.radio_button_unchecked_rounded,
+                            size: 20,
+                            color: _settingsDebugMode == mode
+                                ? VikaIvory.yellowDeep
+                                : VikaIvory.inkFaint,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            switch (mode) {
+                              DebugMode.off => 'Off',
+                              DebugMode.user => 'User',
+                              DebugMode.dev => 'Dev',
+                            },
+                            style: TextStyle(
+                              fontFamily: VikaIvory.fontFamily,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: VikaIvory.ink,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _initCamera() async {
@@ -241,9 +440,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
     try {
       final inputImage = PoseLandmarkerAdapter.inputImageFromChannelData(data);
-      if (inputImage != null) {
-        await widget.exercise.runPersonDetection(inputImage);
-      }
+      _schedulePersonDetection(inputImage);
 
       _currentLens = PoseLandmarkerAdapter.lensDirectionFromChannelData(data);
       _imageRotation =
@@ -257,7 +454,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       } else {
         _detectedPose = null;
         _feedback = widget.exercise.processNoPoseFrame();
-        _processSquatVoiceFrame(hasPose: false);
+        _processVoiceFrame(hasPose: false);
       }
 
       if (mounted) {
@@ -270,15 +467,15 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
   void _handlePoseResult(List<dynamic>? result) {
     if (result != null &&
-        widget.exercise.exerciseState == ExerciseState.activated &&
         result.length == 2 &&
+        result.first is int &&
         result[1] is Map) {
       _feedback = Map<String, String>.from(result[1] as Map);
-      _processSquatVoiceFrame(hasPose: true);
+      _processVoiceFrame(hasPose: true);
       return;
     }
 
-    _processSquatVoiceFrame(hasPose: _detectedPose != null);
+    _processVoiceFrame(hasPose: _detectedPose != null);
 
     if (widget.exercise.exerciseState == ExerciseState.completed &&
         !_didComplete) {
@@ -472,7 +669,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         return;
       }
 
-      await widget.exercise.runPersonDetection(inputImage);
+      _schedulePersonDetection(inputImage);
       final poses = await _poseDetector.processImage(inputImage);
 
       if (poses.isNotEmpty) {
@@ -480,7 +677,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       } else {
         _detectedPose = null;
         _feedback = widget.exercise.processNoPoseFrame();
-        _processSquatVoiceFrame(hasPose: false);
+        _processVoiceFrame(hasPose: false);
       }
 
       if (mounted) {
@@ -500,16 +697,40 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     _handlePoseResult(widget.exercise.processPose(pose.landmarks));
   }
 
-  void _processSquatVoiceFrame({required bool hasPose}) {
-    final coach = _squatVoiceCoach;
-    final exercise = widget.exercise;
-    if (coach == null || exercise is! Squat) {
+  void _schedulePersonDetection(InputImage? inputImage) {
+    if (inputImage == null ||
+        _personDetectionInFlight ||
+        widget.exercise.exerciseState == ExerciseState.completed) {
+      return;
+    }
+
+    final now = DateTime.now();
+    final lastRun = _lastPersonDetectionAt;
+    if (lastRun != null && now.difference(lastRun) < _personDetectionInterval) {
+      return;
+    }
+
+    _lastPersonDetectionAt = now;
+    _personDetectionInFlight = true;
+    unawaited(
+      widget.exercise
+          .runPersonDetection(inputImage)
+          .catchError((Object _) {})
+          .whenComplete(() {
+        _personDetectionInFlight = false;
+      }),
+    );
+  }
+
+  void _processVoiceFrame({required bool hasPose}) {
+    final coach = _voiceCoach;
+    if (coach == null) {
       return;
     }
 
     coach.processFrame(
-      exercise: exercise,
-      repCount: exercise.repCount,
+      exercise: widget.exercise,
+      repCount: widget.exercise.repCount,
       hasPose: hasPose,
       feedback: _feedback,
     );
@@ -695,11 +916,19 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     final media = MediaQuery.of(context);
     final overlayState = _overlayState;
     final bottomHoldCue = _bottomHoldCue;
-    final translatedSystem = _translatedSystemMessage;
+    final guidanceCopy = _currentGuidanceCopy;
     final coachMessage = _coachMessage;
     final activeState =
         widget.exercise.exerciseState == ExerciseState.activated &&
             !widget.exercise.isPaused;
+    final trackedMetrics = widget.exercise.trackedDebugMetrics;
+    final debugMode = trackedMetrics.isEmpty
+        ? DebugMode.off
+        : _resolveDebugMode(_settingsDebugMode);
+    final debugEnabled = debugMode != DebugMode.off;
+    final showDebugEntryBadge =
+        trackedMetrics.isNotEmpty && (debugEnabled || _isStaffUser);
+    final showDebugPanel = debugEnabled && _debugPanelOpen;
 
     // Derive ivory phase verb from squat state machine phases.
     // Standing = default resting position (not a "ready" state).
@@ -723,7 +952,10 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     }
 
     // TODO(caption): Wire mid-rep fault detection caption here
-    final showCaption = activeState && coachMessage.isNotEmpty;
+    final showCaption = activeState &&
+        coachMessage.isNotEmpty &&
+        !showDebugPanel &&
+        guidanceCopy == null;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
@@ -732,18 +964,23 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         children: [
           // ── Layer 1: Camera preview ──
           RepaintBoundary(
-            child: SizedBox.expand(
-              child: FittedBox(
-                fit: BoxFit.cover,
-                alignment: Alignment.center,
-                child: SizedBox(
-                  width: _previewRenderSize.width,
-                  height: _previewRenderSize.height,
-                  child: _runtime == _PoseRuntime.nativeMediaPipe
-                      ? Texture(textureId: _textureId!)
-                      : (_cameraController != null
-                          ? CameraPreview(_cameraController!)
-                          : const SizedBox.shrink()),
+            child: ColoredBox(
+              color: Colors.black,
+              child: ClipRect(
+                child: SizedBox.expand(
+                  child: FittedBox(
+                    fit: BoxFit.cover,
+                    alignment: Alignment.center,
+                    child: SizedBox(
+                      width: _previewRenderSize.width,
+                      height: _previewRenderSize.height,
+                      child: _runtime == _PoseRuntime.nativeMediaPipe
+                          ? Texture(textureId: _textureId!)
+                          : (_cameraController != null
+                              ? CameraPreview(_cameraController!)
+                              : const SizedBox.shrink()),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -828,7 +1065,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
               currentSet: widget.currentSet,
               totalSets: widget.totalSets,
               setSeconds: _setElapsedSeconds,
-              onBack: widget.onBack,
+              onBack: _handleBackChromeTap,
             ),
           ),
 
@@ -850,6 +1087,21 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                 setState(() {});
               },
               onFlipCamera: _toggleCamera,
+              debugBadge: showDebugEntryBadge
+                  ? DebugIndicatorBadge(
+                      mode: debugEnabled ? debugMode : DebugMode.dev,
+                      panelOpen: debugEnabled && _debugPanelOpen,
+                      onToggle: () {
+                        if (!debugEnabled) {
+                          _showDevModeSheet();
+                          return;
+                        }
+                        setState(() {
+                          _debugPanelOpen = !_debugPanelOpen;
+                        });
+                      },
+                    )
+                  : null,
             ),
           ),
 
@@ -857,7 +1109,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
           // JSX positions sparkline ~6px under the chrome row (top:112 with
           // chrome at top:64). In Flutter that maps to chrome top + chrome
           // height (44) + 4 ≈ media.padding.top + 58.
-          if (activeState)
+          if (activeState && !debugEnabled && guidanceCopy == null)
             Positioned(
               top: media.padding.top + 58,
               right: 16,
@@ -869,7 +1121,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
           // ── Layer 7: PT reference loop (top-left, just below chrome row) ──
           // JSX places it at top:116 (16px below chrome bottom). chrome bottom
           // = media.padding.top + 10 + 36 = +46, so PT loop sits at +56.
-          if (activeState)
+          if (activeState &&
+              !(debugEnabled && _debugPanelOpen) &&
+              guidanceCopy == null)
             Positioned(
               top: media.padding.top + 56,
               left: 16,
@@ -885,47 +1139,40 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
               child: IvoryCoachCaption(message: coachMessage),
             ),
 
-          // ── Layer 9: System banner for non-active states ──
-          if (translatedSystem != null && overlayState != _LiveOverlayState.active)
+          // ── Layer 9: Setup/safety guidance panel ──
+          if (guidanceCopy != null && !widget.exercise.isPaused)
             Positioned(
               left: 20,
               right: 20,
-              bottom: activeState ? 214 : media.padding.bottom + 18,
-              child: SystemBanner(
-                message: translatedSystem,
-                mode: _bannerModeFor(overlayState),
+              top: media.padding.top + 78,
+              child: IgnorePointer(
+                child: _SetupGuidancePanel(
+                  copy: guidanceCopy,
+                ),
               ),
             ),
 
           // ── Layer 10: Center overlay (scan/warn/position/hold) ──
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 260),
-            child: overlayState == _LiveOverlayState.active
-                ? const SizedBox.shrink()
-                : Center(
-                    key: ValueKey<_LiveOverlayState>(overlayState),
-                    child: _CenterOverlay(
-                      state: overlayState,
-                      pulseController: _pulseController,
-                      progress: widget.exercise.activationProgress,
-                      holdCue: bottomHoldCue,
+          IgnorePointer(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 260),
+              child: overlayState == _LiveOverlayState.active ||
+                      guidanceCopy != null
+                  ? const SizedBox.shrink()
+                  : Center(
+                      key: ValueKey<_LiveOverlayState>(overlayState),
+                      child: _CenterOverlay(
+                        state: overlayState,
+                        pulseController: _pulseController,
+                        progress: widget.exercise.activationProgress,
+                        holdCue: bottomHoldCue,
+                      ),
                     ),
-                  ),
+            ),
           ),
 
-          // ── Layer 11: Debug panel ──
-          if (_showDebug)
-            Positioned(
-              left: 16,
-              right: 16,
-              bottom: activeState
-                  ? media.padding.bottom + 212
-                  : media.padding.bottom + 104,
-              child: _buildDebugPanel(),
-            ),
-
           // ── Layer 12: Bottom chrome (phase verb + rep counter) ──
-          if (activeState)
+          if (activeState && !showDebugPanel)
             Positioned(
               left: 24,
               right: 24,
@@ -956,6 +1203,68 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                 onEnd: widget.onBack,
               ),
             ),
+
+          // ── Layer 14: Debug/back escape chrome above blocking overlays ──
+          if (widget.exercise.isPaused)
+            Positioned(
+              top: media.padding.top + 10,
+              left: 16,
+              child: IvoryTopChromeLeft(
+                currentSet: widget.currentSet,
+                totalSets: widget.totalSets,
+                setSeconds: _setElapsedSeconds,
+                onBack: widget.onBack,
+              ),
+            ),
+          if (widget.exercise.isPaused && showDebugEntryBadge)
+            Positioned(
+              top: media.padding.top + 10,
+              right: 16,
+              child: DebugIndicatorBadge(
+                mode: debugEnabled ? debugMode : DebugMode.dev,
+                panelOpen: debugEnabled && _debugPanelOpen,
+                onToggle: () {
+                  if (!debugEnabled) {
+                    _showDevModeSheet();
+                    return;
+                  }
+                  setState(() {
+                    _debugPanelOpen = !_debugPanelOpen;
+                  });
+                },
+              ),
+            ),
+
+          // ── Layer 15: Debug panel ──
+          if (showDebugPanel)
+            Positioned(
+              left: 12,
+              right: 12,
+              bottom: media.padding.bottom + 16,
+              child: DebugPanel(
+                mode: debugMode,
+                metrics: trackedMetrics,
+                expandedMetricId: _expandedMetricId,
+                onToggleExpand: (metricId) {
+                  setState(() {
+                    _expandedMetricId =
+                        _expandedMetricId == metricId ? null : metricId;
+                  });
+                },
+                phaseLabel: debugMode == DebugMode.dev
+                    ? widget.exercise.currentPhaseKey
+                    : widget.exercise.currentPhaseLabel,
+                repCount: widget.exercise.repCount,
+                totalReps: widget.totalReps,
+                setSeconds: _setElapsedSeconds,
+                fps: widget.exercise.currentFps,
+                frameTimestampMs: widget.exercise.frameTimestampMs,
+                confidence: widget.exercise.personPresenceScore,
+                onMinimize: () {
+                  setState(() => _debugPanelOpen = false);
+                },
+              ),
+            ),
         ],
       ),
     );
@@ -965,6 +1274,22 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     if (widget.exercise.isPaused) {
       return _LiveOverlayState.paused;
     }
+
+    final guidance = _currentGuidanceCopy;
+    if (guidance != null) {
+      return switch (guidance.mode) {
+        SystemBannerMode.scan => _LiveOverlayState.scan,
+        SystemBannerMode.warn => _LiveOverlayState.warn,
+        SystemBannerMode.pause => _LiveOverlayState.paused,
+        SystemBannerMode.info => _LiveOverlayState.position,
+      };
+    }
+
+    if ((_feedback['System'] ?? '').isNotEmpty &&
+        widget.exercise.exerciseState == ExerciseState.activated) {
+      return _LiveOverlayState.position;
+    }
+
     if (widget.exercise.exerciseState == ExerciseState.activated) {
       if (_bottomHoldCue != null) {
         return _LiveOverlayState.hold;
@@ -974,47 +1299,95 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     if (widget.exercise.activationProgress != null) {
       return _LiveOverlayState.hold;
     }
-    final system = _translatedSystemMessage ?? '';
-    if (_isSafetyMessage(system)) {
-      return _LiveOverlayState.warn;
-    }
-    if (_isScanningMessage(system)) {
-      return _LiveOverlayState.scan;
-    }
     return _LiveOverlayState.position;
   }
 
-  SystemBannerMode _bannerModeFor(_LiveOverlayState state) {
-    switch (state) {
-      case _LiveOverlayState.scan:
-        return SystemBannerMode.scan;
-      case _LiveOverlayState.warn:
-        return SystemBannerMode.warn;
-      case _LiveOverlayState.paused:
-        return SystemBannerMode.pause;
-      case _LiveOverlayState.position:
-      case _LiveOverlayState.hold:
-      case _LiveOverlayState.active:
-        return SystemBannerMode.info;
-    }
-  }
-
-  bool _isScanningMessage(String message) => message.contains('Đang tìm người');
-
-  bool _isSafetyMessage(String message) {
-    return message.contains('Quay nghiêng') ||
-        message.contains('ánh sáng') ||
-        message.contains('Giữ toàn thân') ||
-        message.contains('theo dõi tốt hơn');
-  }
-
-  String? get _translatedSystemMessage {
+  _GuidanceCopy? get _currentGuidanceCopy {
     final raw = _feedback['System'];
-    if (raw == null || raw.isEmpty) {
+    if (raw == null || raw.trim().isEmpty) return null;
+    return _guidanceForSystemMessage(raw);
+  }
+
+  _GuidanceCopy? _guidanceForSystemMessage(String rawMessage) {
+    final message = _translateSystemMessage(rawMessage);
+    final normalized = message.toLowerCase();
+    final rawNormalized = rawMessage.toLowerCase();
+
+    if (normalized.contains('giữ yên')) {
       return null;
     }
+
+    if (rawNormalized.contains('turn to the side') ||
+        normalized.contains('quay ngang') ||
+        normalized.contains('quay nghiêng') ||
+        normalized.contains('quay sang bên')) {
+      return const _GuidanceCopy(
+        icon: Icons.screen_rotation_alt_rounded,
+        title: 'Quay ngang người',
+        body:
+            'Đứng ngang với camera để AI thấy vai, hông, gối và cổ chân rõ hơn.',
+        mode: SystemBannerMode.warn,
+      );
+    }
+    if (normalized.contains('quay mặt')) {
+      return const _GuidanceCopy(
+        icon: Icons.center_focus_strong_rounded,
+        title: 'Quay mặt về camera',
+        body: 'Đứng đối diện camera để AI thấy hai bên cơ thể rõ hơn.',
+        mode: SystemBannerMode.warn,
+      );
+    }
+    if (rawNormalized.contains('adjust lighting') ||
+        rawNormalized.contains('lighting') ||
+        normalized.contains('ánh sáng') ||
+        normalized.contains('hình ảnh không rõ')) {
+      return const _GuidanceCopy(
+        icon: Icons.light_mode_rounded,
+        title: 'Tăng ánh sáng',
+        body:
+            'Đứng nơi sáng hơn hoặc tránh ngược sáng để AI nhận landmark ổn định.',
+        mode: SystemBannerMode.warn,
+      );
+    }
+    if (rawNormalized.contains('body not fully visible') ||
+        normalized.contains('toàn thân') ||
+        normalized.contains('phần trên cơ thể') ||
+        normalized.contains('trong khung hình') ||
+        normalized.contains('vai, hông') ||
+        normalized.contains('vai, hông và gối')) {
+      return const _GuidanceCopy(
+        icon: Icons.fit_screen_rounded,
+        title: 'Đưa toàn thân vào khung',
+        body:
+            'Lùi lại một chút hoặc hạ máy để thấy vai, hông, gối, cổ chân và bàn chân.',
+        mode: SystemBannerMode.warn,
+      );
+    }
+    if (normalized.contains('đang tìm người')) {
+      return const _GuidanceCopy(
+        icon: Icons.person_search_rounded,
+        title: 'Đang tìm người',
+        body: 'Đứng trong khung hình và giữ toàn thân rõ để bắt đầu theo dõi.',
+        mode: SystemBannerMode.scan,
+      );
+    }
+    if (normalized.contains('vào tư thế') ||
+        normalized.contains('đứng trong khung') ||
+        normalized.contains('bắt đầu')) {
+      return _GuidanceCopy(
+        icon: Icons.accessibility_new_rounded,
+        title: 'Vào tư thế bắt đầu',
+        body: message,
+        mode: SystemBannerMode.info,
+      );
+    }
+
+    return null;
+  }
+
+  String _translateSystemMessage(String raw) {
     if (raw.contains('Please turn to the side')) {
-      return 'Quay nghiêng người để AI theo dõi tốt hơn';
+      return 'Quay ngang người để AI theo dõi tốt hơn';
     }
     if (raw.contains('Body not fully visible')) {
       return 'Giữ toàn thân trong khung hình';
@@ -1022,10 +1395,10 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     if (raw.contains('Adjust lighting/position')) {
       return 'Điều chỉnh ánh sáng hoặc vị trí để AI nhận rõ hơn';
     }
-    if (raw.contains('⚸')) {
+    if (raw.contains('⏸') || raw.contains('⚸')) {
       return 'Tạm dừng. Quay lại khung hình để tiếp tục';
     }
-    return raw.replaceAll('⚸ ', '');
+    return raw.replaceAll('⚠️ ', '').replaceAll('⏸ ', '').replaceAll('⚸ ', '');
   }
 
   Map<String, String>? get _currentPhaseInstructions {
@@ -1036,9 +1409,6 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   String? get _currentPhaseStatus => _currentPhaseInstructions?['Status'];
 
   _BottomHoldCue? get _bottomHoldCue {
-    if (!widget.definition.id.startsWith('squat')) {
-      return null;
-    }
     if (widget.exercise.exerciseState != ExerciseState.activated) {
       return null;
     }
@@ -1048,14 +1418,15 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       return null;
     }
 
-    final isHolding = Squat.isHoldStatus(status);
-    final isRelease = Squat.isReleaseStatus(status);
+    final isHolding = _isHoldStatus(status);
+    final isRelease = _isReleaseStatus(status);
     if (!isHolding && !isRelease) {
       return null;
     }
 
     final progress =
         (_readDebugNumber(widget.exercise.debugData['bottomHoldProgress']) ??
+                _readDebugNumber(widget.exercise.debugData['holdProgress']) ??
                 0.0)
             .clamp(0.0, 1.0)
             .toDouble();
@@ -1065,6 +1436,17 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       remaining: _extractDurationSeconds(status),
       readyToPush: isRelease,
     );
+  }
+
+  bool _isHoldStatus(String value) =>
+      value.contains('Hold') || value.contains('Giữ');
+
+  bool _isReleaseStatus(String value) {
+    return value.contains('Push Up Now!') ||
+        value.contains('Push Up!') ||
+        value.contains('Đứng lên') ||
+        value.contains('Lên') ||
+        value.contains('đẩy lên');
   }
 
   String get _coachMessage {
@@ -1115,7 +1497,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     if (value == 'Going Down...') {
       return 'Hạ người chậm và kiểm soát.';
     }
-    if (value == Squat.ascendingStatus) {
+    if (value == 'Đứng lên') {
       return 'Đứng lên dứt khoát.';
     }
     if (value == 'Push Up!') {
@@ -1139,12 +1521,12 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
   String _translateStatus(String value) {
     final seconds = _extractDurationSeconds(value);
-    if (Squat.isHoldStatus(value)) {
+    if (_isHoldStatus(value)) {
       return seconds == null
           ? 'Giữ đáy rồi đẩy lên.'
           : 'Giữ đáy ${seconds.toStringAsFixed(1)} giây rồi đẩy lên.';
     }
-    if (Squat.isReleaseStatus(value)) {
+    if (_isReleaseStatus(value)) {
       return 'Đẩy lên ngay.';
     }
     if (value.contains('Push Up!')) {
@@ -1164,6 +1546,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     return double.tryParse(match.group(1)!);
   }
 
+  // ignore: unused_element
   Widget _buildDebugPanel() {
     final debugEntries = widget.exercise.debugData.entries.toList()
       ..sort((a, b) => a.key.compareTo(b.key));
@@ -1231,6 +1614,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     );
   }
 
+  // ignore: unused_element
   Widget _debugChip({
     required String label,
     required String value,
@@ -1269,6 +1653,16 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   Size get _previewRenderSize {
+    if (_runtime == _PoseRuntime.mlKitFallback) {
+      final previewSize = _cameraController?.value.previewSize;
+      if (previewSize != null) {
+        if (previewSize.width > previewSize.height) {
+          return Size(previewSize.height, previewSize.width);
+        }
+        return previewSize;
+      }
+    }
+
     if (_imageSize != Size.zero) {
       return _imageSize;
     }
@@ -1292,6 +1686,20 @@ enum _PoseRuntime {
 
 enum _LiveOverlayState { scan, warn, position, hold, paused, active }
 
+class _GuidanceCopy {
+  const _GuidanceCopy({
+    required this.icon,
+    required this.title,
+    required this.body,
+    required this.mode,
+  });
+
+  final IconData icon;
+  final String title;
+  final String body;
+  final SystemBannerMode mode;
+}
+
 class _BottomHoldCue {
   const _BottomHoldCue({
     required this.progress,
@@ -1302,6 +1710,105 @@ class _BottomHoldCue {
   final double progress;
   final double? remaining;
   final bool readyToPush;
+}
+
+class _SetupGuidancePanel extends StatelessWidget {
+  const _SetupGuidancePanel({
+    required this.copy,
+  });
+
+  final _GuidanceCopy copy;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = switch (copy.mode) {
+      SystemBannerMode.warn => const Color(0xFFFFB4A8),
+      SystemBannerMode.scan => const Color(0xCCFFFFFF),
+      SystemBannerMode.pause => const Color(0xCCFFFFFF),
+      SystemBannerMode.info => VikaIvory.yellow,
+    };
+    final background = switch (copy.mode) {
+      SystemBannerMode.warn => const Color(0xD1150C09),
+      SystemBannerMode.scan => const Color(0xC914100D),
+      SystemBannerMode.pause => const Color(0xC914100D),
+      SystemBannerMode.info => const Color(0xD1150C09),
+    };
+    final border = switch (copy.mode) {
+      SystemBannerMode.warn => const Color(0x4DFFB4A8),
+      SystemBannerMode.scan => const Color(0x22FFFFFF),
+      SystemBannerMode.pause => const Color(0x22FFFFFF),
+      SystemBannerMode.info => VikaIvory.yellowGlowWeak,
+    };
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: border),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.34),
+                blurRadius: 28,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.13),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: accent.withValues(alpha: 0.24)),
+                ),
+                child: Icon(copy.icon, size: 20, color: accent),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      copy.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: VikaIvory.fontFamily,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: VikaIvory.invInk,
+                        height: 1.15,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      copy.body,
+                      style: TextStyle(
+                        fontFamily: VikaIvory.fontFamily,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: VikaIvory.invInkSoft,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _CenterOverlay extends StatelessWidget {
@@ -1369,7 +1876,7 @@ class _CenterOverlay extends StatelessWidget {
                 1000;
         final isReadyToStart = remainingSeconds <= 0;
         final remainingLabel = isReadyToStart
-            ? 'SẴN'
+            ? 'Sẵn sàng'
             : (remainingSeconds < 1
                 ? remainingSeconds.toStringAsFixed(1)
                 : remainingSeconds.ceil().toString());
@@ -1390,10 +1897,10 @@ class _CenterOverlay extends StatelessWidget {
                 remainingLabel,
                 style: TextStyle(
                   fontFamily: VikaIvory.fontFamily,
-                  fontSize: 38,
+                  fontSize: isReadyToStart ? 22 : 38,
                   fontWeight: FontWeight.w800,
                   color: VikaIvory.yellow,
-                  letterSpacing: -1.6,
+                  letterSpacing: isReadyToStart ? 0.1 : -1.6,
                   height: 1,
                   shadows: [
                     Shadow(
@@ -1405,7 +1912,7 @@ class _CenterOverlay extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                isReadyToStart ? 'Bắt đầu' : 'Giữ yên',
+                isReadyToStart ? 'Bắt đầu tập' : 'Giữ yên',
                 style: TextStyle(
                   fontFamily: VikaIvory.fontFamily,
                   fontSize: 11,
@@ -1450,4 +1957,3 @@ class _OverlayBubble extends StatelessWidget {
     );
   }
 }
-
