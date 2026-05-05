@@ -39,18 +39,25 @@ final class PoseLandmarkerService: NSObject,
             )
         }
 
-        let options = PoseLandmarkerOptions()
+       let options = PoseLandmarkerOptions()
         options.baseOptions.modelAssetPath = modelPath
+        options.baseOptions.delegate = .GPU
         options.runningMode = .liveStream
         options.numPoses = 1
         options.minPoseDetectionConfidence = 0.5
         options.minPosePresenceConfidence = 0.5
-        options.minTrackingConfidence = 0.5
+        options.minTrackingConfidence = 0.7
         options.poseLandmarkerLiveStreamDelegate = self
-        // Neu ban muon mask nguoi/nen bang MediaPipe luon:
-        // options.shouldOutputSegmentationMasks = true
 
-        poseLandmarker = try PoseLandmarker(options: options)
+        do {
+            poseLandmarker = try PoseLandmarker(options: options)
+        } catch {
+            // GPU init failed (e.g., simulator, older device, Metal shader compile issue).
+            // Fall back to CPU. If CPU also fails, throw to native init handler.
+            print("[PoseLandmarker] GPU init failed: \(error.localizedDescription). Falling back to CPU.")
+            options.baseOptions.delegate = .CPU
+            poseLandmarker = try PoseLandmarker(options: options)
+        }
     }
 
     func start(camera: String = "front", completion: @escaping (Result<Void, Error>) -> Void) {
@@ -80,7 +87,7 @@ final class PoseLandmarkerService: NSObject,
     // MARK: - Camera
     private func configureCaptureSession() throws {
         captureSession.beginConfiguration()
-        captureSession.sessionPreset = .high
+        captureSession.sessionPreset = .vga640x480
 
         for input in captureSession.inputs {
             captureSession.removeInput(input)
