@@ -2,6 +2,7 @@
 
 import 'package:vika/utils/debouncer.dart';
 import 'package:vika/utils/frame_buffer.dart';
+import 'package:vika/debug/tracked_metric.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
 import '../../utils/pose_math_helpers.dart';
@@ -15,6 +16,7 @@ import 'metrics/trunk_lean_metric.dart';
 import 'metrics/heel_rise_metric.dart';
 import 'metrics/tempo_metric.dart';
 import 'metrics/hip_shoulder_sync.dart';
+import '../../services/squat_voice_coach.dart';
 
 // --- Config ---
 
@@ -27,8 +29,6 @@ class SquatConfig {
 }
 
 enum SquatState { standing, descending, bottom, ascending }
-
-
 
 // --- Squat ---
 //
@@ -68,7 +68,6 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
   int? lastRepTopVoicePriority;
   bool lastRepWasClean = true;
   bool _reachedBottomThisRep = false;
-
 
   Squat({this.maxRep = SquatConfig.MAX_REP});
 
@@ -139,25 +138,47 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
     tempoMetric,
     hipShoulderSyncMetric,
   ];
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  List<TrackedMetric> get trackedMetrics => List.unmodifiable(_trackedMetrics);
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
 
   @override
   Map<String, SideLandmarkPair> get requiredSideLandmarks => const {
-    'hip': (right: PoseLandmarkType.rightHip, left: PoseLandmarkType.leftHip),
-    'shoulder': (
-      right: PoseLandmarkType.rightShoulder,
-      left: PoseLandmarkType.leftShoulder,
-    ),
-    'knee': (right: PoseLandmarkType.rightKnee, left: PoseLandmarkType.leftKnee),
-    'ankle': (
-      right: PoseLandmarkType.rightAnkle,
-      left: PoseLandmarkType.leftAnkle,
-    ),
-    'foot': (
-      right: PoseLandmarkType.rightFootIndex,
-      left: PoseLandmarkType.leftFootIndex,
-    ),
-    'heel': (right: PoseLandmarkType.rightHeel, left: PoseLandmarkType.leftHeel),
-  };
+        'hip': (
+          right: PoseLandmarkType.rightHip,
+          left: PoseLandmarkType.leftHip
+        ),
+        'shoulder': (
+          right: PoseLandmarkType.rightShoulder,
+          left: PoseLandmarkType.leftShoulder,
+        ),
+        'knee': (
+          right: PoseLandmarkType.rightKnee,
+          left: PoseLandmarkType.leftKnee
+        ),
+        'ankle': (
+          right: PoseLandmarkType.rightAnkle,
+          left: PoseLandmarkType.leftAnkle,
+        ),
+        'foot': (
+          right: PoseLandmarkType.rightFootIndex,
+          left: PoseLandmarkType.leftFootIndex,
+        ),
+        'heel': (
+          right: PoseLandmarkType.rightHeel,
+          left: PoseLandmarkType.leftHeel
+        ),
+      };
 
   // Debouncers for state transitions
   final Debouncer _bottomDebouncer = Debouncer(requiredFrames: 2);
@@ -168,6 +189,9 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
 
   @override
   String get exerciseName => 'Squat';
+
+  @override
+  ExerciseVoiceCoach? createVoiceCoach() => SquatVoiceCoach();
 
   @override
   String get currentPhaseKey => squatState.toString().split('.').last;
@@ -274,8 +298,6 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
     return null;
   }
 
-
-
   // --- Main Loop (called every frame when activated) ---
 
   @override
@@ -324,15 +346,11 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
     debugData['reachedBottomThisRep'] = _reachedBottomThisRep;
     debugData['repCount'] = repCount;
     debugData['frameBuffer'] = frameBuffer.frameBuffer.length;
-    debugData['trackedSide'] = trackedSide?.name ?? 'unknown';
-    debugData['trackedSideSource'] = lastTrackedSideSource;
-    debugData['leftSideScore'] = lastLeftSideScore.toStringAsFixed(2);
-    debugData['rightSideScore'] = lastRightSideScore.toStringAsFixed(2);
-    debugData['kneeAngle'] = kneeAngle.toStringAsFixed(1);
-    debugData['backAngle'] = backAngle.toStringAsFixed(1);
-    debugData['trunkLean'] = trunkLean.toStringAsFixed(1);
-    debugData['heelDistance'] = heelDistanceToFloor.toStringAsFixed(2);
-    debugData['heelLiftPct'] = (normalizedHeelLift * 100).toStringAsFixed(1);
+    debugData['kneeAngle'] = kneeAngle;
+    debugData['backAngle'] = backAngle;
+    debugData['trunkLean'] = trunkLean;
+    debugData['heelDistance'] = heelDistanceToFloor;
+    debugData['heelLiftPct'] = normalizedHeelLift * 100;
 
     // 5. Buffer frame & update state machine
     frameBuffer.addFrame(FrameSnapshot(log: {
@@ -352,8 +370,9 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
 
     // 7. Run all metrics (skip standing phase)
     if (squatState != SquatState.standing) {
-      for (final metric in _metrics) {
-        metric.update(ctx);
+      for (var i = 0; i < _metrics.length; i++) {
+        _metrics[i].update(ctx);
+        _trackedMetrics[i].onTick(now);
       }
     }
 
@@ -379,6 +398,9 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
       ctx: ctx,
     );
     tempoMetric.evaluateRep(ctx);
+    for (final trackedMetric in _trackedMetrics) {
+      trackedMetric.onTick(ctx.frameTimestamp);
+    }
 
     // Collect faults from all metrics
     final allFaults = <FaultRecord>[];

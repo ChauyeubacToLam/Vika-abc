@@ -54,6 +54,9 @@ class HipShoulderSyncMetric extends SquatMetricBase {
   @override
   String get name => 'HipShoulderSync';
 
+  @override
+  String? get nameVi => 'Đồng bộ hông-vai';
+
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
 
@@ -75,6 +78,8 @@ class HipShoulderSyncMetric extends SquatMetricBase {
   bool _instructionSet = false;
 
   double _peakRatio = 0.0;
+  double? _ratio;
+  MetricStatus _status = MetricStatus.pass;
 
   @override
   List<FaultRecord> get faults => _faults;
@@ -83,8 +88,21 @@ class HipShoulderSyncMetric extends SquatMetricBase {
   Map<String, dynamic> get debugData => _debugData;
 
   @override
+  double? get value => _ratio;
+
+  @override
+  ThresholdBand? get threshold => const ThresholdBand(
+        warningAbove: HipShoulderSyncConfig.RATIO_GOOD_MAX,
+        faultAbove: HipShoulderSyncConfig.RATIO_WARNING_MAX,
+      );
+
+  @override
+  MetricStatus get status => _status;
+
+  @override
   void update(RepContext ctx) {
     if (ctx.squatState != SquatState.ascending) {
+      _status = MetricStatus.pass;
       return;
     }
 
@@ -92,6 +110,7 @@ class HipShoulderSyncMetric extends SquatMetricBase {
 
     // Only evaluate first 50% of ascent — signal normalizes near standing
     if (_ascentFrameCount > HipShoulderSyncConfig.MAX_ASCENT_FRAMES) {
+      _status = MetricStatus.pass;
       _debugData['syncStatus'] = 'past window';
       return;
     }
@@ -108,6 +127,7 @@ class HipShoulderSyncMetric extends SquatMetricBase {
     }
 
     if (_hipYWindow.length < HipShoulderSyncConfig.WINDOW_SIZE) {
+      _status = MetricStatus.pass;
       _debugData['syncStatus'] = 'filling window';
       return;
     }
@@ -117,13 +137,22 @@ class HipShoulderSyncMetric extends SquatMetricBase {
     final shoulderSpeed =
         (_shoulderYWindow.first - _shoulderYWindow.last) / frameCount;
 
-    _debugData['hipSpeed'] = hipSpeed.toStringAsFixed(2);
-    _debugData['shoulderSpeed'] = shoulderSpeed.toStringAsFixed(2);
+    _debugData['hipSpeed'] = hipSpeed;
+    _debugData['shoulderSpeed'] = shoulderSpeed;
+
+    final ratio = shoulderSpeed.abs() < HipShoulderSyncConfig.MIN_SHOULDER_SPEED
+        ? hipSpeed / HipShoulderSyncConfig.MIN_SHOULDER_SPEED
+        : hipSpeed / shoulderSpeed;
+    _ratio = ratio;
+    if (ratio > _peakRatio) _peakRatio = ratio;
+    _debugData['syncRatio'] = ratio;
+    _debugData['peakSyncRatio'] = _peakRatio;
 
     // Edge case: shoulders barely moving while hips shoot up
     if (_warningEdgeDebouncer.update(
         shoulderSpeed < HipShoulderSyncConfig.MIN_SHOULDER_SPEED &&
             hipSpeed > HipShoulderSyncConfig.MIN_SHOULDER_SPEED)) {
+      _status = MetricStatus.fault;
       _debugData['syncStatus'] = 'ERROR (shoulders still, hips up)';
       _maybeLogFault(ctx, 'Shoulders stalled while hips rose');
       ctx.resultIssues.feedback['Sync'] = 'Drive chest up!';
@@ -132,18 +161,14 @@ class HipShoulderSyncMetric extends SquatMetricBase {
     }
 
     if (shoulderSpeed < HipShoulderSyncConfig.MIN_SHOULDER_SPEED) {
+      _status = MetricStatus.pass;
       _debugData['syncStatus'] = 'minimal movement';
       return;
     }
 
-    final ratio = hipSpeed / shoulderSpeed;
-    if (ratio > _peakRatio) _peakRatio = ratio;
-
-    _debugData['syncRatio'] = ratio.toStringAsFixed(2);
-    _debugData['peakSyncRatio'] = _peakRatio.toStringAsFixed(2);
-
     if (_warningMaxDebouncer
         .update(ratio > HipShoulderSyncConfig.RATIO_WARNING_MAX)) {
+      _status = MetricStatus.fault;
       _debugData['syncStatus'] = 'ERROR (hip-leading)';
       _maybeLogFault(ctx, 'Hips rising much faster than shoulders');
       ctx.resultIssues.feedback['Sync'] = 'Drive chest up!';
@@ -151,11 +176,13 @@ class HipShoulderSyncMetric extends SquatMetricBase {
           ctx, 'Hips too fast, move hips and shoulders together');
     } else if (_warningMildDebouncer
         .update(ratio > HipShoulderSyncConfig.RATIO_GOOD_MAX)) {
+      _status = MetricStatus.near;
       _debugData['syncStatus'] = 'WARNING';
       _maybeLogFault(ctx, 'Hips rising a bit faster than shoulders');
       ctx.resultIssues.feedback['Sync'] = 'Try to keep chest up';
       _maybeSetInstruction(ctx, 'Hips a bit fast, try keeping chest up');
     } else {
+      _status = MetricStatus.pass;
       _debugData['syncStatus'] = 'good';
       ctx.resultIssues.feedback['Sync'] = 'Good sync';
     }
@@ -191,6 +218,8 @@ class HipShoulderSyncMetric extends SquatMetricBase {
     _faultLogged = false;
     _instructionSet = false;
     _peakRatio = 0.0;
+    _ratio = null;
+    _status = MetricStatus.pass;
     _faults.clear();
     _debugData.clear();
   }

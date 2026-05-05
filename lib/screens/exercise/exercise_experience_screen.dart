@@ -415,7 +415,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
   @override
   Widget build(BuildContext context) {
     final backgroundColor = switch (_phase) {
-      _WorkoutFlowPhase.active => const Color(0xFF080C1A),
+      _WorkoutFlowPhase.active => const Color(0xFF15110D),
       _ => const Color(0xFFF0EDE6),
     };
     final phaseBody = switch (_phase) {

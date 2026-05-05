@@ -26,6 +26,9 @@ class HeelRiseMetric extends SquatMetricBase {
   @override
   String get name => 'HeelRise';
 
+  @override
+  String? get nameVi => 'Gót chân';
+
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
 
@@ -34,6 +37,8 @@ class HeelRiseMetric extends SquatMetricBase {
 
   /// Prevent instruction spam — only set coaching once per rep.
   bool _instructionSet = false;
+  double? _normalizedHeelLift;
+  MetricStatus _status = MetricStatus.pass;
 
   @override
   List<FaultRecord> get faults => _faults;
@@ -42,15 +47,28 @@ class HeelRiseMetric extends SquatMetricBase {
   Map<String, dynamic> get debugData => _debugData;
 
   @override
+  double? get value => _normalizedHeelLift;
+
+  @override
+  ThresholdBand? get threshold => const ThresholdBand(
+        faultAbove: HeelRiseConfig.LIFT_THRESHOLD,
+      );
+
+  @override
+  MetricStatus get status => _status;
+
+  @override
   void update(RepContext ctx) {
     double normalized = ctx.heelDistance / (ctx.scaleFactor ?? 1.0);
+    _normalizedHeelLift = normalized;
 
-    _debugData['heelNorm'] = normalized.toStringAsFixed(3);
-    _debugData['heelRaw'] = ctx.heelDistance.toStringAsFixed(2);
+    _debugData['heelNorm'] = normalized;
+    _debugData['heelRaw'] = ctx.heelDistance;
 
     final phase = ctx.squatState.toString().split('.').last.toUpperCase();
 
     if (_heelDebouncer.update(normalized >= HeelRiseConfig.LIFT_THRESHOLD)) {
+      _status = MetricStatus.fault;
       ctx.resultIssues.feedback['Heels'] = 'Heels lifting';
       if (!_instructionSet) {
         ctx.resultIssues.addInstruction(
@@ -59,6 +77,7 @@ class HeelRiseMetric extends SquatMetricBase {
       }
       _logFault(phase, 'Heels lifting');
     } else {
+      _status = MetricStatus.pass;
       ctx.resultIssues.feedback['Heels'] = 'Good Heels';
     }
   }
@@ -82,5 +101,7 @@ class HeelRiseMetric extends SquatMetricBase {
     _debugData.clear();
     _heelDebouncer.reset();
     _instructionSet = false;
+    _normalizedHeelLift = null;
+    _status = MetricStatus.pass;
   }
 }

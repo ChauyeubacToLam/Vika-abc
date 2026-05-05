@@ -1,15 +1,43 @@
 import 'package:flutter/material.dart';
 
+import '../debug/debug_preferences.dart';
+import '../debug/debug_types.dart';
 import '../theme/vf_theme.dart';
 import '../widgets/vf_primitives.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({
     super.key,
     required this.bottomPadding,
   });
 
   final double bottomPadding;
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  bool _debugDetailsEnabled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDebugMode();
+  }
+
+  Future<void> _loadDebugMode() async {
+    final mode = await DebugPreferences.loadMode();
+    if (!mounted) return;
+    setState(() {
+      _debugDetailsEnabled = mode != DebugMode.off;
+    });
+  }
+
+  Future<void> _setDebugDetailsEnabled(bool enabled) async {
+    setState(() => _debugDetailsEnabled = enabled);
+    await DebugPreferences.saveMode(enabled ? DebugMode.user : DebugMode.off);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +48,7 @@ class ProfileScreen extends StatelessWidget {
       physics: const BouncingScrollPhysics(
         parent: AlwaysScrollableScrollPhysics(),
       ),
-      padding: EdgeInsets.only(bottom: bottomPadding),
+      padding: EdgeInsets.only(bottom: widget.bottomPadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -307,6 +335,11 @@ class ProfileScreen extends StatelessWidget {
               ),
               child: Column(
                 children: [
+                  _DebugDetailsToggle(
+                    enabled: _debugDetailsEnabled,
+                    onChanged: _setDebugDetailsEnabled,
+                  ),
+                  _Divider(scale: s),
                   for (int index = 0; index < _settingRows.length; index++) ...[
                     if (_settingRows[index].divider)
                       _Divider(scale: s)
@@ -453,6 +486,78 @@ class _MilestonePill extends StatelessWidget {
               weight: milestone.done ? FontWeight.w600 : FontWeight.w500,
               color: milestone.done ? VFTheme.text : VFTheme.textMuted,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DebugDetailsToggle extends StatelessWidget {
+  const _DebugDetailsToggle({
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final bool enabled;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = VFTheme.scale(context);
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 20 * s),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 18 * s,
+            child: Icon(
+              Icons.tune_rounded,
+              size: 16 * s,
+              color: enabled
+                  ? VFTheme.jade
+                  : VFTheme.textMuted.withValues(alpha: 0.6),
+            ),
+          ),
+          SizedBox(width: 12 * s),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 12 * s),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Hiển thị chi tiết khi tập',
+                    style: VFTheme.textStyle(
+                      context,
+                      size: 13,
+                      weight: FontWeight.w700,
+                      color: VFTheme.textSecondary,
+                    ),
+                  ),
+                  SizedBox(height: 2 * s),
+                  Text(
+                    'Theo dõi các chỉ số form và lịch sử trong lúc tập.',
+                    style: VFTheme.textStyle(
+                      context,
+                      size: 10,
+                      weight: FontWeight.w500,
+                      color: VFTheme.textMuted,
+                      height: 1.25,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(width: 10 * s),
+          Switch.adaptive(
+            value: enabled,
+            onChanged: onChanged,
+            activeThumbColor: VFTheme.jade,
+            activeTrackColor: VFTheme.jade.withValues(alpha: 0.28),
+            inactiveThumbColor: VFTheme.textMuted.withValues(alpha: 0.7),
+            inactiveTrackColor: VFTheme.textMuted.withValues(alpha: 0.16),
           ),
         ],
       ),

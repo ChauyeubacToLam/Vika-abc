@@ -25,6 +25,8 @@
 import '../squat.dart';
 import '../../exercise_base.dart';
 import '../../fault_record.dart';
+import '../../../debug/debug_types.dart';
+export '../../../debug/debug_types.dart';
 export '../../fault_record.dart'; /* =========================================================================
    RepContext — Shared per-frame state, passed to all metrics.
    Avoids each metric needing to recalculate the same geometry.
@@ -75,8 +77,9 @@ class SquatFaultVoicePriority {
 /* =========================================================================
    SquatMetricBase — Interface every metric implements.
    ========================================================================= */
-abstract class SquatMetricBase {
+abstract class SquatMetricBase implements DebugMetricSource {
   /// Human-readable name for debug/logging.
+  @override
   String get name;
   // faults count for each metric
   int faultsCount = 0;
@@ -89,7 +92,29 @@ abstract class SquatMetricBase {
   List<FaultRecord> get faults;
 
   /// Debug data for the overlay. Keys should be metric-specific.
+  @override
   Map<String, dynamic> get debugData;
+
+  /// Primary threshold-checked scalar shown in the debug panel.
+  @override
+  double? get value => null;
+
+  /// Warning/fault bounds used by debug sparklines. The metric's own status
+  /// remains the source of truth for current pass/near/fault state.
+  @override
+  ThresholdBand? get threshold => null;
+
+  /// Current metric decision. Override when a metric has a primary value.
+  @override
+  MetricStatus get status => MetricStatus.pass;
+
+  /// Friendly Vietnamese label for user-facing debug mode.
+  @override
+  String? get nameVi => null;
+
+  /// Hide highly technical metrics from user-facing debug mode.
+  @override
+  bool get devOnly => false;
 
   /// Reset all internal state for the next rep.
   void reset();

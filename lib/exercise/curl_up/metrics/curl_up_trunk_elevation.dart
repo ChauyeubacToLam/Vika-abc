@@ -61,9 +61,12 @@ enum _HighFaultLevel { warning, error }
 class TrunkElevationMetric extends CurlUpMetricBase {
   @override
   String get name => 'TrunkElevation';
+  @override
+  String? get nameVi => 'Biên độ cuộn';
 
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
+  MetricStatus _status = MetricStatus.pass;
 
   /// Personal baseline for trunk angle from horizontal at rest.
   /// Persists across reps; refreshes during resting frames.
@@ -84,12 +87,25 @@ class TrunkElevationMetric extends CurlUpMetricBase {
   @override
   Map<String, dynamic> get debugData => _debugData;
 
+  @override
+  double? get value => _peakElevation;
+
+  @override
+  ThresholdBand? get threshold => const ThresholdBand(
+        warningBelow: TrunkElevationConfig.WARNING_LOW,
+        warningAbove: TrunkElevationConfig.WARNING_HIGH,
+        faultAbove: TrunkElevationConfig.ERROR_HIGH,
+      );
+
+  @override
+  MetricStatus get status => _status;
+
   /// Refresh baseline whenever the user is at rest. Single-frame
   /// replacement is fine — resting trunk angle is stable signal.
   @override
   void onRestingFrame(RepContext ctx) {
     _baselineTrunkAngle = ctx.trunkAngle;
-    _debugData['trunkBase'] = _baselineTrunkAngle!.toStringAsFixed(1);
+    _debugData['trunkBase'] = _baselineTrunkAngle;
   }
 
   /// Active rep — track peak (max), write live feedback, log faults
@@ -107,21 +123,26 @@ class TrunkElevationMetric extends CurlUpMetricBase {
     if (base == null) return;
 
     final liveElevation = (angle - base).clamp(0.0, 90.0);
+    _peakElevation = liveElevation;
 
-    _debugData['trunkAngle'] = angle.toStringAsFixed(1);
-    _debugData['trunkElev'] = '${liveElevation.toStringAsFixed(1)}°';
+    _debugData['trunkAngle'] = angle;
+    _debugData['trunkElev'] = liveElevation;
 
     if (liveElevation > TrunkElevationConfig.ERROR_HIGH) {
+      _status = MetricStatus.fault;
       ctx.resultIssues.feedback['Range'] = '🔴 Lên quá cao!';
       _ensureLevel(ctx, _HighFaultLevel.error);
     } else if (liveElevation > TrunkElevationConfig.WARNING_HIGH) {
+      _status = MetricStatus.near;
       ctx.resultIssues.feedback['Range'] = '⚠️ Hơi cao';
       _ensureLevel(ctx, _HighFaultLevel.warning);
     } else if (liveElevation < TrunkElevationConfig.WARNING_LOW) {
+      _status = MetricStatus.near;
       // Could just be early in ascent — don't log "too shallow" here,
       // that's a rep-end check.
       ctx.resultIssues.feedback['Range'] = '⚠️ Cuộn cao thêm';
     } else {
+      _status = MetricStatus.pass;
       ctx.resultIssues.feedback['Range'] = '✅ Biên độ tốt';
     }
   }
@@ -169,13 +190,14 @@ class TrunkElevationMetric extends CurlUpMetricBase {
     if (base == null || peak == null) return;
 
     _peakElevation = (peak - base).clamp(0.0, 90.0);
-    _debugData['peakElev'] = '${_peakElevation!.toStringAsFixed(1)}°';
+    _debugData['peakElev'] = _peakElevation;
 
     // High-elevation fault already logged in update() — that takes
     // precedence over a too-shallow check.
     if (_loggedLevel != null) return;
 
     if (_peakElevation! < TrunkElevationConfig.WARNING_LOW) {
+      _status = MetricStatus.near;
       _faults.add(FaultRecord(
         phase: 'APEX',
         type: 'Range',
@@ -187,6 +209,7 @@ class TrunkElevationMetric extends CurlUpMetricBase {
       ctx.resultIssues
           .addInstruction('resting', 'Range', 'Rep tới cuộn cao hơn một chút.');
     } else {
+      _status = MetricStatus.pass;
       ctx.resultIssues.addInstruction('resting', 'Range', 'Biên độ rất chuẩn!');
     }
   }
@@ -198,6 +221,7 @@ class TrunkElevationMetric extends CurlUpMetricBase {
     _peakTrunkAngle = null;
     _peakElevation = null;
     _loggedLevel = null;
+    _status = MetricStatus.pass;
     // _baselineTrunkAngle preserved across reps — resting trunk angle
     // is stable within a set.
   }

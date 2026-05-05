@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../onboarding/vf_theme.dart';
-
+import '/theme/vf_theme.dart';
 class DepthBarDatum {
   const DepthBarDatum({
     required this.label,
@@ -39,9 +38,8 @@ class DepthChart extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
       decoration: BoxDecoration(
-        color: VF.surface,
+        color: VFTheme.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: VF.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -51,7 +49,7 @@ class DepthChart extends StatelessWidget {
             style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: VF.text,
+              color: VFTheme.text,
             ),
           ),
           const SizedBox(height: 14),
@@ -76,7 +74,7 @@ class DepthChart extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.w700,
-                            color: item.good ? VF.accent : VF.textMuted,
+                            color: item.good ? VFTheme.accent : VFTheme.textMuted,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -103,11 +101,11 @@ class DepthChart extends StatelessWidget {
                                         begin: Alignment.topCenter,
                                         end: Alignment.bottomCenter,
                                         colors: item.good
-                                            ? const [VF.accent, VF.surfaceDark]
-                                            : [
-                                                VF.textMuted
+                                          ? const [VFTheme.accent, VFTheme.surface]
+                                          : [
+                                                VFTheme.textMuted
                                                     .withValues(alpha: 0.45),
-                                                VF.textMuted
+                                                VFTheme.textMuted
                                                     .withValues(alpha: 0.2),
                                               ],
                                       ),
@@ -124,7 +122,7 @@ class DepthChart extends StatelessWidget {
                           style: const TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.w500,
-                            color: VF.textMuted,
+                            color: VFTheme.textMuted,
                           ),
                         ),
                       ],

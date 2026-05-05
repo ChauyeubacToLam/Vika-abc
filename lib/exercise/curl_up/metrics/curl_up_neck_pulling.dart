@@ -66,9 +66,31 @@ enum _NeckFaultLevel { warning, error }
 class NeckPullingMetric extends CurlUpMetricBase {
   @override
   String get name => 'NeckPulling';
+  @override
+  String? get nameVi => 'Gập cổ';
+  @override
+  List<FaultRecord> get faults => _faults;
+
+  @override
+  Map<String, dynamic> get debugData => _debugData;
+
+  @override
+  double? get value => _neckDeviation;
+
+  @override
+  ThresholdBand? get threshold => const ThresholdBand(
+        warningAbove: NeckPullingConfig.WARNING_DEVIATION,
+        faultAbove: NeckPullingConfig.ERROR_DEVIATION,
+      );
+
+  @override
+  MetricStatus get status => _status;
 
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
+  double? _neckAngle;
+  double? _neckDeviation;
+  MetricStatus _status = MetricStatus.pass;
 
   /// Personal baseline — ear-shoulder-hip interior angle while lying flat.
   /// Persists across reps; never cleared by reset().
@@ -81,12 +103,6 @@ class NeckPullingMetric extends CurlUpMetricBase {
   /// Highest fault level logged this rep, or null if none.
   _NeckFaultLevel? _loggedLevel;
 
-  @override
-  List<FaultRecord> get faults => _faults;
-
-  @override
-  Map<String, dynamic> get debugData => _debugData;
-
   /// Establish the personal baseline. Hold-still wins; averaging is a
   /// fallback. Once a baseline is set, it stays for the whole set.
   @override
@@ -95,8 +111,7 @@ class NeckPullingMetric extends CurlUpMetricBase {
 
     if (ctx.holdStillEarShoulderHip != null) {
       _baselineAngle = ctx.holdStillEarShoulderHip;
-      _debugData['neckBaseline'] =
-          '${_baselineAngle!.toStringAsFixed(1)} (hold)';
+      _debugData['neckBaseline'] = _baselineAngle;
       return;
     }
 
@@ -105,8 +120,7 @@ class NeckPullingMetric extends CurlUpMetricBase {
     _baselineFrames++;
     if (_baselineFrames >= NeckPullingConfig.BASELINE_SAMPLE_COUNT) {
       _baselineAngle = _baselineSum / _baselineFrames;
-      _debugData['neckBaseline'] =
-          '${_baselineAngle!.toStringAsFixed(1)} (avg)';
+      _debugData['neckBaseline'] = _baselineAngle;
     } else {
       _debugData['neckBaseline'] = 'sampling...';
     }
@@ -116,8 +130,8 @@ class NeckPullingMetric extends CurlUpMetricBase {
   /// log faults the moment thresholds cross.
   @override
   void update(RepContext ctx) {
-    final angle = ctx.earShoulderHipAngle;
-    _debugData['neckAngle'] = angle.toStringAsFixed(1);
+    _neckAngle = ctx.earShoulderHipAngle;
+    _debugData['neckAngle'] = _neckAngle;
 
     final base = _baselineAngle;
     if (base == null) {
@@ -128,16 +142,20 @@ class NeckPullingMetric extends CurlUpMetricBase {
     // Deviation: baseline is the relaxed (large) angle. Pulling chin to
     // chest moves the ear toward the shoulder, shrinking the interior
     // angle, so deviation = baseline - current.
-    final deviation = (base - angle).clamp(0.0, 90.0);
-    _debugData['neckDev'] = '${deviation.toStringAsFixed(1)}°';
+    final deviation = (base - _neckAngle!).clamp(0.0, 90.0);
+    _neckDeviation = deviation;
+    _debugData['neckDev'] = deviation;
 
     if (deviation >= NeckPullingConfig.ERROR_DEVIATION) {
+      _status = MetricStatus.fault;
       ctx.resultIssues.feedback['Neck'] = '🔴 Đừng kéo cổ!';
       _ensureLevel(ctx, _NeckFaultLevel.error);
     } else if (deviation >= NeckPullingConfig.WARNING_DEVIATION) {
+      _status = MetricStatus.near;
       ctx.resultIssues.feedback['Neck'] = '⚠️ Giữ cổ thẳng';
       _ensureLevel(ctx, _NeckFaultLevel.warning);
     } else {
+      _status = MetricStatus.pass;
       ctx.resultIssues.feedback['Neck'] = '✅ Cổ tốt';
     }
   }
@@ -186,6 +204,9 @@ class NeckPullingMetric extends CurlUpMetricBase {
     _faults.clear();
     _debugData.clear();
     _loggedLevel = null;
+    _neckAngle = null;
+    _neckDeviation = null;
+    _status = MetricStatus.pass;
     // _baselineAngle and averaging state intentionally preserved —
     // resting neck posture doesn't change mid-set.
   }
