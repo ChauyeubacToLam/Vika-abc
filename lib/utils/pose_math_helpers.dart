@@ -291,6 +291,13 @@ double calculateHorizontalAngle(
   return degrees.clamp(0.0, 90.0);
 }
 
+/// Calculate the absolute angle to horizontal without clamping to 0-90
+double calculateAngleToHorizontal(PoseLandmark point1, PoseLandmark point2) {
+  double dy = point1.y - point2.y;
+  double dx = point2.x - point1.x;
+  return math.atan2(dy, dx) * (180.0 / math.pi);
+}
+
 /* =========================================================================
    Calculate distance between two points
    ========================================================================= */

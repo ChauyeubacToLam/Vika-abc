@@ -1,5 +1,4 @@
 // ignore_for_file: constant_identifier_names
-import '../bow_pose.dart';
 import '../../exercise_base.dart';
 import '../../fault_record.dart';
 

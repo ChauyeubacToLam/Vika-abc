@@ -609,9 +609,10 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     }
   }
 
-  /* -----------------------------------------------------------------------
+ /* -----------------------------------------------------------------------
      POSE PIPELINE
      ----------------------------------------------------------------------- */
+
   void _processCameraImage(CameraImage cameraImage) {
     if (_isDetecting) return;
     _isDetecting = true;
@@ -622,15 +623,14 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     try {
       final inputImage = _buildInputImage(cameraImage);
       if (inputImage == null) return;
-
       await _exercise.runPersonDetection(inputImage);
       final poses = await _poseDetector.processImage(inputImage);
-
+      
       if (poses.isNotEmpty) {
         final pose = poses.first;
         _detectedPose = pose;
         _result = _exercise.processPose(pose.landmarks);
-
+        
         if (_result != null) {
           if (_exercise.exerciseState == ExerciseState.completed) {
             _repCount = _exercise.repCount;
@@ -646,12 +646,26 @@ class _ExerciseScreenState extends State<ExerciseScreen>
             }
           }
         }
-
         _logStateChanges();
       } else {
         _detectedPose = null;
         _feedback = _exercise.processNoPoseFrame();
       }
+
+      // ============================================================
+      // 👉 ĐOẠN CODE MỚI THÊM: BẮT LỖI HẾT GIỜ / YÊU CẦU DỪNG TỪ AI
+      // ============================================================
+      if (_exercise.requestStop() && !_didComplete) {
+        if (mounted) {
+          setState(() {
+            _feedback = {'Result': 'Kết thúc bài tập!'};
+          });
+        }
+        // Buộc lưu lại Rep hiện tại và pop màn hình về bảng Table (Report)
+        _logSetComplete();
+        _popWithLogger();
+      }
+      // ============================================================
 
       // FPS
       _frameCount++;
@@ -662,7 +676,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         _frameCount = 0;
         _lastFpsTime = now;
       }
-
+      
       final nowMs = DateTime.now().millisecondsSinceEpoch;
       if (mounted &&
           nowMs - _lastUiRefreshAtMs >= _MIN_UI_REFRESH_INTERVAL_MS) {
@@ -673,7 +687,6 @@ class _ExerciseScreenState extends State<ExerciseScreen>
       debugPrint('[Vika] Detection error: $e');
     }
   }
-
   /* -----------------------------------------------------------------------
      COMPLETION — Pop with logger after short delay
      ----------------------------------------------------------------------- */

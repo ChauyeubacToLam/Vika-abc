@@ -40,7 +40,7 @@ class SphinxReportBuilder extends ExerciseReportBuilder {
       ),
       DetailCard(
         label: 'Ổn định',
-        value: '${stability.toStringAsFixed(0)}',
+        value: stability.toStringAsFixed(0),
         subLabel: 'Điểm thăng bằng',
         color: 'amber',
         useRadial: true,

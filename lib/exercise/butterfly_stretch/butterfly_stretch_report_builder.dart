@@ -35,7 +35,6 @@ class ButterflyReportBuilder extends ExerciseReportBuilder {
     ];
   }
 
-  @override
   (String, String, String?) pickInsight(ExerciseLogger logger, ExerciseLogger? prevLogger, int setScore, int? prevScore) {
     final postureFails = (logger.setLogs["posture_fails_count"] as num?)?.toInt() ?? 0;
 

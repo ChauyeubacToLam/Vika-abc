@@ -529,11 +529,89 @@ const List<_ExerciseCategory> _categories = [
           description: 'Lưng dưới   Cột sống   Trị liệu',
           definitionQuery: 'sphinx_pose', // <--- Bắt buộc phải trùng với 'id' ở Bước 1
 ), 
-_ExerciseItem(
+      _ExerciseItem(
         name: 'Seated Forward Fold',
         type: 'stretch', // Render silhouette stretch
         description: 'Gân kheo   Lưng   Cơ bản', // Format theo chuẩn UI Vika
         definitionQuery: 'seated_forward_fold', // Map đúng với id trong ExerciseDefinition
+      ),
+      _ExerciseItem(
+        name: 'Bird Dog',
+        type: 'bridge',
+        description: 'Core · Cân bằng',
+        definitionQuery: 'bird_dog',
+      ),
+      _ExerciseItem(
+        name: 'Sit-Up',
+        type: 'curlup',
+        description: 'Cơ bụng · Cơ bản',
+        definitionQuery: 'sit_up',
+      ),
+      _ExerciseItem(
+        name: 'High Plank',
+        type: 'plank',
+        description: 'Core · Tĩnh',
+        definitionQuery: 'high_plank',
+      ),
+      _ExerciseItem(
+        name: 'Mountain Climber',
+        type: 'plank',
+        description: 'Core · Cardio',
+        definitionQuery: 'mountain_climber',
+      ),
+      _ExerciseItem(
+        name: 'Superman',
+        type: 'bridge',
+        description: 'Lưng dưới',
+        definitionQuery: 'superman',
+      ),
+      _ExerciseItem(
+        name: 'Plank Shoulder Tap',
+        type: 'plank',
+        description: 'Core · Chống xoay',
+        definitionQuery: 'plank_shoulder_tap',
+      ),
+      _ExerciseItem(
+        name: 'Leg Raises',
+        type: 'curlup',
+        description: 'Bụng dưới',
+        definitionQuery: 'leg_raise',
+      ),
+      _ExerciseItem(
+        name: 'Reverse Crunch',
+        type: 'curlup',
+        description: 'Bụng dưới',
+        definitionQuery: 'reverse_crunch',
+      ),
+      _ExerciseItem(
+        name: 'V-Up',
+        type: 'curlup',
+        description: 'Bụng toàn diện',
+        definitionQuery: 'v_up',
+      ),
+      _ExerciseItem(
+        name: 'Lying Leg Raise',
+        type: 'curlup',
+        description: 'Bụng dưới',
+        definitionQuery: 'lying_leg_raise',
+      ),
+      _ExerciseItem(
+        name: 'Dead Bug',
+        type: 'bridge',
+        description: 'Thần kinh cơ chéo',
+        definitionQuery: 'dead_bug',
+      ),
+      _ExerciseItem(
+        name: 'Plank Up-Down',
+        type: 'plank',
+        description: 'Vai · Core',
+        definitionQuery: 'plank_up_down',
+      ),
+      _ExerciseItem(
+        name: 'Bear Plank',
+        type: 'plank',
+        description: 'Đùi trước · Core tĩnh',
+        definitionQuery: 'bear_plank',
       ),
     ],
   ),
