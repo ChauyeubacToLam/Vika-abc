@@ -131,7 +131,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     _landmarkSubscription = null;
     unawaited(landmarkSubscription?.cancel() ?? Future<void>.value());
     unawaited(_disposeFallbackCamera());
-    unawaited(_poseChannel.dispose());
+    unawaited(_poseChannel.dispose().catchError((_) {}));
     _poseDetector.close();
     unawaited(widget.exercise.disposeDetectors());
     _voiceCoach?.dispose();
@@ -370,16 +370,13 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
               'Khong the khoi dong MediaPipe tren thiet bi nay.';
         });
       }
+    } on MissingPluginException catch (_) {
+      // Native MediaPipe channel not implemented on this platform (e.g. iOS)
+      // → fallback to Flutter camera + ML Kit
+      await _startMlKitFallback('Native pose landmarker not available on iOS');
     } catch (_) {
-      if (mounted) {
-        setState(() {
-          _isInitializing = false;
-          _isCameraReady = false;
-          _textureId = null;
-          _cameraErrorMessage =
-              'Không thể khởi động camera. Hãy thử lại hoặc đổi camera.';
-        });
-      }
+      // Any other error → also try ML Kit fallback
+      await _startMlKitFallback('Unknown camera init error');
     }
   }
 
@@ -506,7 +503,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     debugPrint(
       '[Vika] Falling back to Flutter camera + ML Kit: ${nativeErrorMessage ?? "unknown native init error"}',
     );
-    await _poseChannel.dispose();
+    try {
+      await _poseChannel.dispose();
+    } catch (_) {}
     await _initMlKitCamera();
   }
 
