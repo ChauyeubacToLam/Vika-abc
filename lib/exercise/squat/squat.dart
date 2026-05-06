@@ -2,18 +2,21 @@
 
 import 'package:vika/utils/debouncer.dart';
 import 'package:vika/utils/frame_buffer.dart';
+import 'package:vika/debug/tracked_metric.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/frame_snapshot.dart';
 import '../../utils/exercise_logger.dart';
 import '../exercise_base.dart';
+import '../side_tracked_exercise_mixin.dart';
 import 'metrics/squat_metric_base.dart';
 import 'metrics/squat_depth_metric.dart';
 import 'metrics/trunk_lean_metric.dart';
 import 'metrics/heel_rise_metric.dart';
 import 'metrics/tempo_metric.dart';
 import 'metrics/hip_shoulder_sync.dart';
+import '../../services/squat_voice_coach.dart';
 
 // --- Config ---
 
@@ -23,13 +26,9 @@ class SquatConfig {
   static const int SQUAT_DESCEND_ANGLE_THRESHOLD = 152;
   static const List<int> SQUAT_BOTTOM_ANGLE_THRESHOLD = [80, 100];
   static const double BOTTOM_RELEASE_READY_TOLERANCE_SECONDS = 0.05;
-  static const double SIDE_SCORE_TIE_THRESHOLD = 0.2;
-  static const double SIDE_SWITCH_MARGIN = 0.75;
 }
 
 enum SquatState { standing, descending, bottom, ascending }
-
-enum _TrackedSquatSide { left, right }
 
 // --- Squat ---
 //
@@ -56,7 +55,7 @@ enum _TrackedSquatSide { left, right }
 //    - tempo_fails_count: from the sum of all tempo_fails_count
 //    - hip_shoulder_sync_fails_count: from the sum of all hip_shoulder_sync_fails_count
 
-class Squat extends ExerciseBase {
+class Squat extends ExerciseBase with SideTrackedExerciseMixin {
   static const String standingStatus = 'Xuống';
   static const String descendingStatus = 'Going Down...';
   static const String ascendingStatus = 'Đứng lên';
@@ -69,10 +68,6 @@ class Squat extends ExerciseBase {
   int? lastRepTopVoicePriority;
   bool lastRepWasClean = true;
   bool _reachedBottomThisRep = false;
-  _TrackedSquatSide? _trackedSide;
-  double _lastLeftSideScore = 0.0;
-  double _lastRightSideScore = 0.0;
-  String _lastTrackedSideSource = 'visibility';
 
   Squat({this.maxRep = SquatConfig.MAX_REP});
 
@@ -143,6 +138,47 @@ class Squat extends ExerciseBase {
     tempoMetric,
     hipShoulderSyncMetric,
   ];
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  List<TrackedMetric> get trackedMetrics => List.unmodifiable(_trackedMetrics);
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
+
+  @override
+  Map<String, SideLandmarkPair> get requiredSideLandmarks => const {
+        'hip': (
+          right: PoseLandmarkType.rightHip,
+          left: PoseLandmarkType.leftHip
+        ),
+        'shoulder': (
+          right: PoseLandmarkType.rightShoulder,
+          left: PoseLandmarkType.leftShoulder,
+        ),
+        'knee': (
+          right: PoseLandmarkType.rightKnee,
+          left: PoseLandmarkType.leftKnee
+        ),
+        'ankle': (
+          right: PoseLandmarkType.rightAnkle,
+          left: PoseLandmarkType.leftAnkle,
+        ),
+        'foot': (
+          right: PoseLandmarkType.rightFootIndex,
+          left: PoseLandmarkType.leftFootIndex,
+        ),
+        'heel': (
+          right: PoseLandmarkType.rightHeel,
+          left: PoseLandmarkType.leftHeel
+        ),
+      };
 
   // Debouncers for state transitions
   final Debouncer _bottomDebouncer = Debouncer(requiredFrames: 2);
@@ -153,6 +189,9 @@ class Squat extends ExerciseBase {
 
   @override
   String get exerciseName => 'Squat';
+
+  @override
+  ExerciseVoiceCoach? createVoiceCoach() => SquatVoiceCoach();
 
   @override
   String get currentPhaseKey => squatState.toString().split('.').last;
@@ -187,7 +226,7 @@ class Squat extends ExerciseBase {
 
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    final requiredLandmarks = _getRequiredLandmarks(landmarks);
+    final requiredLandmarks = getSideTrackedLandmarks(landmarks);
     if (requiredLandmarks == null) return false;
 
     final shoulder = requiredLandmarks['shoulder']!;
@@ -249,7 +288,7 @@ class Squat extends ExerciseBase {
       return "⚠️ Please turn to the side for better tracking for Squat";
     }
 
-    final requiredLandmarks = _getRequiredLandmarks(landmarks);
+    final requiredLandmarks = getSideTrackedLandmarks(landmarks);
     if (requiredLandmarks == null) return "⚠️ Body not fully visible.";
 
     final allConfident = requiredLandmarks.values
@@ -259,184 +298,12 @@ class Squat extends ExerciseBase {
     return null;
   }
 
-  /// Returns all 6 required landmarks, or null if any is missing.
-  Map<String, PoseLandmark>? _getRequiredLandmarks(
-      Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    final preferredSide = _resolveTrackedSide(landmarks);
-    final preferredLandmarks =
-        _buildRequiredLandmarksForSide(landmarks, preferredSide);
-    if (preferredLandmarks != null) {
-      _trackedSide = preferredSide;
-      return preferredLandmarks;
-    }
-
-    final fallbackSide = preferredSide == _TrackedSquatSide.right
-        ? _TrackedSquatSide.left
-        : _TrackedSquatSide.right;
-    final fallbackLandmarks =
-        _buildRequiredLandmarksForSide(landmarks, fallbackSide);
-    if (fallbackLandmarks != null) {
-      _trackedSide = fallbackSide;
-      return fallbackLandmarks;
-    }
-
-    return null;
-  }
-
-  _TrackedSquatSide _resolveTrackedSide(
-      Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    final leftScore =
-        _scoreSideVisibility(landmarks, side: _TrackedSquatSide.left);
-    final rightScore =
-        _scoreSideVisibility(landmarks, side: _TrackedSquatSide.right);
-
-    _lastLeftSideScore = leftScore;
-    _lastRightSideScore = rightScore;
-
-    final orientationSide = switch (cameraFacing) {
-      CameraFacing.left => _TrackedSquatSide.left,
-      CameraFacing.right => _TrackedSquatSide.right,
-      _ => null,
-    };
-    if (orientationSide != null) {
-      _lastTrackedSideSource = 'cameraFacing';
-      _trackedSide = orientationSide;
-      return orientationSide;
-    }
-
-    final candidate = _pickTrackedSideCandidate(
-      leftScore: leftScore,
-      rightScore: rightScore,
-      fallback: _trackedSide,
-    );
-    _lastTrackedSideSource = 'visibility';
-
-    if (_trackedSide == null) {
-      _trackedSide = candidate;
-      return candidate;
-    }
-
-    if (_trackedSide == candidate) {
-      return candidate;
-    }
-
-    final currentScore =
-        _trackedSide == _TrackedSquatSide.right ? rightScore : leftScore;
-    final candidateScore =
-        candidate == _TrackedSquatSide.right ? rightScore : leftScore;
-
-    final shouldFollowOrientation =
-        orientationSide == candidate && candidateScore >= currentScore;
-    if (candidateScore >= currentScore + SquatConfig.SIDE_SWITCH_MARGIN ||
-        shouldFollowOrientation) {
-      _trackedSide = candidate;
-    }
-
-    return _trackedSide!;
-  }
-
-  _TrackedSquatSide _pickTrackedSideCandidate({
-    required double leftScore,
-    required double rightScore,
-    _TrackedSquatSide? fallback,
-  }) {
-    if ((rightScore - leftScore).abs() <=
-            SquatConfig.SIDE_SCORE_TIE_THRESHOLD &&
-        fallback != null) {
-      return fallback;
-    }
-
-    if (rightScore == 0 && leftScore == 0) {
-      return fallback ?? _TrackedSquatSide.left;
-    }
-
-    return rightScore >= leftScore
-        ? _TrackedSquatSide.right
-        : _TrackedSquatSide.left;
-  }
-
-  double _scoreSideVisibility(
-    Map<PoseLandmarkType, PoseLandmark> landmarks, {
-    required _TrackedSquatSide side,
-  }) {
-    final types = side == _TrackedSquatSide.right
-        ? const [
-            PoseLandmarkType.rightShoulder,
-            PoseLandmarkType.rightHip,
-            PoseLandmarkType.rightKnee,
-            PoseLandmarkType.rightAnkle,
-            PoseLandmarkType.rightHeel,
-            PoseLandmarkType.rightFootIndex,
-          ]
-        : const [
-            PoseLandmarkType.leftShoulder,
-            PoseLandmarkType.leftHip,
-            PoseLandmarkType.leftKnee,
-            PoseLandmarkType.leftAnkle,
-            PoseLandmarkType.leftHeel,
-            PoseLandmarkType.leftFootIndex,
-          ];
-
-    var score = 0.0;
-    for (final type in types) {
-      final landmark = landmarks[type];
-      if (landmark == null) continue;
-      score += 0.25 + (landmark.likelihood.clamp(0.0, 1.0) as num).toDouble();
-    }
-    return score;
-  }
-
-  Map<String, PoseLandmark>? _buildRequiredLandmarksForSide(
-    Map<PoseLandmarkType, PoseLandmark> landmarks,
-    _TrackedSquatSide side,
-  ) {
-    final isRightSide = side == _TrackedSquatSide.right;
-
-    PoseLandmark? read(
-      PoseLandmarkType rightType,
-      PoseLandmarkType leftType,
-    ) {
-      return landmarks[isRightSide ? rightType : leftType];
-    }
-
-    final hip = read(PoseLandmarkType.rightHip, PoseLandmarkType.leftHip);
-    final shoulder = read(
-      PoseLandmarkType.rightShoulder,
-      PoseLandmarkType.leftShoulder,
-    );
-    final knee = read(PoseLandmarkType.rightKnee, PoseLandmarkType.leftKnee);
-    final ankle = read(PoseLandmarkType.rightAnkle, PoseLandmarkType.leftAnkle);
-    final foot = read(
-      PoseLandmarkType.rightFootIndex,
-      PoseLandmarkType.leftFootIndex,
-    );
-    final heel = read(PoseLandmarkType.rightHeel, PoseLandmarkType.leftHeel);
-
-    if (hip == null ||
-        shoulder == null ||
-        knee == null ||
-        ankle == null ||
-        foot == null ||
-        heel == null) {
-      return null;
-    }
-
-    return {
-      'hip': hip,
-      'shoulder': shoulder,
-      'knee': knee,
-      'ankle': ankle,
-      'foot': foot,
-      'heel': heel,
-    };
-  }
-
   // --- Main Loop (called every frame when activated) ---
 
   @override
   void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
     // 1. Extract landmarks
-    final lm = _getRequiredLandmarks(smoothedLandmarks);
+    final lm = getSideTrackedLandmarks(smoothedLandmarks);
     if (lm == null) return;
 
     final hip = lm['hip']!;
@@ -479,15 +346,11 @@ class Squat extends ExerciseBase {
     debugData['reachedBottomThisRep'] = _reachedBottomThisRep;
     debugData['repCount'] = repCount;
     debugData['frameBuffer'] = frameBuffer.frameBuffer.length;
-    debugData['trackedSide'] = _trackedSide?.name ?? 'unknown';
-    debugData['trackedSideSource'] = _lastTrackedSideSource;
-    debugData['leftSideScore'] = _lastLeftSideScore.toStringAsFixed(2);
-    debugData['rightSideScore'] = _lastRightSideScore.toStringAsFixed(2);
-    debugData['kneeAngle'] = kneeAngle.toStringAsFixed(1);
-    debugData['backAngle'] = backAngle.toStringAsFixed(1);
-    debugData['trunkLean'] = trunkLean.toStringAsFixed(1);
-    debugData['heelDistance'] = heelDistanceToFloor.toStringAsFixed(2);
-    debugData['heelLiftPct'] = (normalizedHeelLift * 100).toStringAsFixed(1);
+    debugData['kneeAngle'] = kneeAngle;
+    debugData['backAngle'] = backAngle;
+    debugData['trunkLean'] = trunkLean;
+    debugData['heelDistance'] = heelDistanceToFloor;
+    debugData['heelLiftPct'] = normalizedHeelLift * 100;
 
     // 5. Buffer frame & update state machine
     frameBuffer.addFrame(FrameSnapshot(log: {
@@ -507,8 +370,9 @@ class Squat extends ExerciseBase {
 
     // 7. Run all metrics (skip standing phase)
     if (squatState != SquatState.standing) {
-      for (final metric in _metrics) {
-        metric.update(ctx);
+      for (var i = 0; i < _metrics.length; i++) {
+        _metrics[i].update(ctx);
+        _trackedMetrics[i].onTick(now);
       }
     }
 
@@ -534,6 +398,9 @@ class Squat extends ExerciseBase {
       ctx: ctx,
     );
     tempoMetric.evaluateRep(ctx);
+    for (final trackedMetric in _trackedMetrics) {
+      trackedMetric.onTick(ctx.frameTimestamp);
+    }
 
     // Collect faults from all metrics
     final allFaults = <FaultRecord>[];

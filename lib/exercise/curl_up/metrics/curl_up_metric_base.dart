@@ -1,29 +1,83 @@
 /* =========================================================================
    CurlUpMetricBase — Abstract base for all curl-up form metrics.
+
+   Each metric is a self-contained unit that:
+   - Receives frame data via update() (active rep) or onRestingFrame() (between reps)
+   - Writes feedback + instructions to ctx.resultIssues
+   - Logs faults into its own fault list
+   - Resets cleanly between reps
+
+   Architecture (mirrors SquatMetricBase):
+   ┌──────────┐     ┌──────────────┐     ┌──────────────┐
+   │  CurlUp  │────▶│  RepContext   │◀────│  MetricBase  │
+   │ (owner)  │     │ (shared state)│     │  (per metric)│
+   └──────────┘     └──────────────┘     └──────────────┘
+
+   Data flow:
+   - feedback{}  → cleared every frame in checkingPose()
+                  → metrics write live cards here (Range, Neck, Knee)
+   - instructions{phase → {type → message}}
+                  → coaching from rep evaluation or per-frame faults
+                  → cleared when new rep begins (resting → ascending)
+                  → UI reads instructions[currentPhase] for coaching chips
+
+   Why curl-up has onRestingFrame:
+   Unlike squat, curl-up uses PERSONAL BASELINES for two metrics (trunk
+   elevation, neck pulling). The hold-still snapshot captured at activation
+   provides a strong baseline, and onRestingFrame lets metrics refine it
+   between reps if the user shifts position.
    ========================================================================= */
 
 import '../curl_up.dart';
 import '../../exercise_base.dart';
 import '../../fault_record.dart';
+import '../../../debug/debug_types.dart';
+export '../../../debug/debug_types.dart';
 export '../../fault_record.dart';
+
 /* =========================================================================
    RepContext — Shared per-frame state, passed to all metrics.
    Avoids each metric needing to recalculate the same geometry.
    ========================================================================= */
+
 class RepContext {
-  final double trunkAngle; // Degrees from horizontal (0 = flat, + = curling up)
-  final double
-      shoulderHipKneeAngle; // Interior angle at hip (Shoulder-Hip-Knee)
-  final double
-      earShoulderHipAngle; // Interior angle at shoulder (Ear-Shoulder-Hip)
-  final double?
-      hipKneeAnkleAngle; // Bent-leg knee angle — min(left, right) to always track the bent knee
+  /// Shoulder-hip line angle from horizontal (degrees).
+  /// Lying flat = ~0°. Curling up rotates the line so this increases.
+  /// World-frame measurement: sensitive to camera tilt.
+  /// Provided for DEBUG/comparison with shoulderHipKneeAngle, not for
+  /// primary metric thresholds.
+  final double trunkAngle;
+
+  /// Interior angle at hip: shoulder→hip→knee (degrees).
+  /// Joint-frame measurement: invariant to camera tilt and hip drift.
+  /// PRIMARY signal for trunk-elevation: peak elevation = baseline - min angle.
+  final double shoulderHipKneeAngle;
+
+  /// Interior angle at shoulder: ear→shoulder→hip (degrees).
+  /// Rotation-invariant measure of head-vs-torso. Decreases when the user
+  /// pulls their chin forward / down (cervical hyperflexion).
+  final double earShoulderHipAngle;
+
+  /// Interior angle at knee: hip→knee→ankle (degrees).
+  /// Camera-side knee only (the bent knee in McGill setup). Null when the
+  /// ankle is below confidence — knee-extension metric skips those frames.
+  final double? hipKneeAnkleAngle;
+
+  /// Shoulder-to-hip Euclidean distance. Used as scale factor for any
+  /// metric that needs to normalize pixel distances to body size.
   final double? scaleFactor;
+
   final CurlUpState curlUpState;
   final int frameTimestamp; // millisecondsSinceEpoch
-  final double? holdStillEarShoulderHip;
-  final double? holdStillShoulderHipKnee;
 
+  /// Hold-still baselines captured during isInStartPosition. Persist for
+  /// the whole set. Optional — null until activation completes.
+  final double? holdStillShoulderHipKnee;
+  final double? holdStillEarShoulderHip;
+
+  // Landmark Y positions — kept for any metric that needs a y-displacement
+  // signal (e.g. apex detection via shoulder.y reversal, future hip-lift
+  // momentum check from spec phase 2).
   final double shoulderY;
   final double hipY;
   final double kneeY;
@@ -43,18 +97,40 @@ class RepContext {
     required this.hipY,
     required this.kneeY,
     required this.resultIssues,
-    this.holdStillEarShoulderHip,
     this.holdStillShoulderHipKnee,
+    this.holdStillEarShoulderHip,
   });
 }
 
+/* =========================================================================
+   CurlUpFaultVoicePriority — Lower number = higher voice playback priority.
+
+   Ordering reflects spec safety ranking:
+     - Neck pulling: CRITICAL (acute cervical injury)
+     - Trunk too high: CRITICAL (chronic disc herniation, full sit-up territory)
+     - Knee extension: IMPORTANT (chronic lumbar shear)
+     - Trunk too shallow: effectiveness coaching, not a safety issue
+   ========================================================================= */
+
+class CurlUpFaultVoicePriority {
+  static const int neckPulling = 0;
+  static const int trunkTooHigh = 1;
+  static const int kneeExtension = 2;
+  static const int trunkTooShallow = 3;
+}
 
 /* =========================================================================
    CurlUpMetricBase — Interface every metric implements.
    ========================================================================= */
-abstract class CurlUpMetricBase {
+
+abstract class CurlUpMetricBase implements DebugMetricSource {
   /// Human-readable name for debug/logging.
+  @override
   String get name;
+
+  /// Cumulative count of reps in which this metric logged at least one fault.
+  /// Set-level: incremented by resetAndCountFault() after each rep.
+  int faultsCount = 0;
 
   /// Called every frame during an active rep (curlUpState != resting).
   /// Writes feedback + instructions directly to ctx.resultIssues.
@@ -64,16 +140,50 @@ abstract class CurlUpMetricBase {
   List<FaultRecord> get faults;
 
   /// Debug data for the overlay. Keys should be metric-specific.
+  @override
   Map<String, dynamic> get debugData;
 
-  /// Reset all internal state for the next rep.
-  void reset();
+  /// Primary threshold-checked scalar shown in the debug panel.
+  @override
+  double? get value => null;
 
-  /// Called every frame while in the resting state (before rep starts).
-  /// Override in metrics that sample a personal baseline from lying frames.
+  /// Warning/fault bounds used by debug sparklines. The metric's own status
+  /// remains the source of truth for current pass/near/fault state.
+  @override
+  ThresholdBand? get threshold => null;
+
+  /// Current metric decision. Override when a metric has a primary value.
+  @override
+  MetricStatus get status => MetricStatus.pass;
+
+  /// Friendly Vietnamese label for user-facing debug mode.
+  @override
+  String? get nameVi => null;
+
+  /// Hide highly technical metrics from user-facing debug mode.
+  @override
+  bool get devOnly => false;
+
+  /// Called every frame while the user is in resting state (between reps).
+  /// Override in metrics that refine personal baselines from lying frames.
+  /// Default: no-op.
   void onRestingFrame(RepContext ctx) {}
 
-  /// Called when curl-up state transitions (e.g. ascending → apex).
-  /// Override in metrics that care about transitions.
+  /// Reset all internal state for the next rep.
+  /// Persistent baselines (e.g. _baselineAngle) should NOT be cleared here.
+  void reset();
+
+  /// Called by CurlUp at rep completion. Increments faultsCount if any
+  /// fault was logged this rep, then resets.
+  void resetAndCountFault() {
+    if (faults.isNotEmpty) {
+      faultsCount++;
+    }
+    reset();
+  }
+
+  /// Called when curl-up state transitions (e.g. ascending → descending).
+  /// Override in metrics that care about transitions (e.g. trunk elevation
+  /// snapshots its peak at the apex transition).
   void onStateTransition(CurlUpState from, CurlUpState to, int timestampMs) {}
 }

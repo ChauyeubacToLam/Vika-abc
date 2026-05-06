@@ -319,7 +319,6 @@ final List<ExerciseDefinition> exerciseDefinitions = [
     phaseColors: {
       'resting': const Color(0xFF00E676),
       'ascending': const Color(0xFFFFD600),
-      'apex': const Color(0xFFFF6D00),
       'descending': const Color(0xFF00B0FF),
     },
   ),

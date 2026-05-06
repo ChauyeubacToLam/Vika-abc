@@ -7,6 +7,8 @@ import '../utils/pose_smoother.dart';
 import '../utils/pose_math_helpers.dart';
 import "../utils/frame_buffer.dart";
 import "../utils/exercise_logger.dart";
+import '../debug/debug_types.dart';
+import '../debug/tracked_metric.dart';
 import '../services/viettel_tts_service.dart';
 
 // --- Constants ---
@@ -21,6 +23,17 @@ enum ExerciseState { notActivated, activated, completed }
 enum CameraFacing { front, left, right, angled, undefined }
 
 enum AngleChange { increasing, decreasing, stable }
+
+abstract class ExerciseVoiceCoach {
+  void processFrame({
+    required ExerciseBase exercise,
+    required int repCount,
+    required bool hasPose,
+    required Map<String, String> feedback,
+  });
+
+  void dispose();
+}
 
 // --- Result Tracking ---
 
@@ -75,6 +88,11 @@ abstract class ExerciseBase {
   double frontFacingRatio = 1.0;
 
   Map<String, dynamic> debugData = {};
+  late final TrackedMetric _exerciseDebugTracker =
+      TrackedMetric(_ExerciseDebugMetricSource(this));
+
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable([_exerciseDebugTracker]);
 
   // Orientation debouncer
   StickyDebouncer leftRightDebouncer = StickyDebouncer(requiredFrames: 5);
@@ -101,6 +119,20 @@ abstract class ExerciseBase {
       Duration(milliseconds: 320);
 
   bool get isPaused => _isPaused;
+
+  /// Manually pause the exercise (e.g. user tapped pause button).
+  void manualPause() {
+    if (exerciseState != ExerciseState.activated) return;
+    _isPaused = true;
+  }
+
+  /// Manually resume after a manual pause.
+  void manualResume() {
+    _isPaused = false;
+    _resumePresenceSince = DateTime.now();
+    _personLostSince = null;
+  }
+
   double get personPresenceScore => _personDetector.presenceScore;
 
   // Hold-still activation
@@ -145,9 +177,8 @@ abstract class ExerciseBase {
 
     _syncPresenceState(hasPose: true);
 
-    debugData['personRatio'] =
-        _personDetector.lastPersonRatio.toStringAsFixed(3);
-    debugData['personScore'] = _personDetector.presenceScore.toStringAsFixed(3);
+    debugData['personRatio'] = _personDetector.lastPersonRatio;
+    debugData['personScore'] = _personDetector.presenceScore;
     debugData['personDetected'] = _personDetector.personDetected;
 
     // Person detection — only before activation
@@ -161,18 +192,18 @@ abstract class ExerciseBase {
         resultIssues.feedback["System"] =
             "Đang tìm người... Vui lòng đứng trong khung hình.";
         _populateBaseDebugData();
+        _trackDebugFrame();
         return [repCount, resultIssues.feedback];
       }
     }
 
     // Presence re-check during active exercise
     if (exerciseState == ExerciseState.activated) {
-      debugData['isPaused'] = _isPaused;
-
       if (_isPaused) {
         resultIssues.feedback["System"] =
             "⏸ Tạm dừng — Quay lại khung hình để tiếp tục";
         _populateBaseDebugData();
+        _trackDebugFrame();
         return [repCount, resultIssues.feedback];
       }
     }
@@ -185,6 +216,7 @@ abstract class ExerciseBase {
     if (safetyError != null) {
       resultIssues.feedback["System"] = safetyError;
       _populateBaseDebugData();
+      _trackDebugFrame();
       return [repCount, resultIssues.feedback];
     }
 
@@ -207,10 +239,11 @@ abstract class ExerciseBase {
     checkExerciseState(smoothedLandmarks, exerciseState);
 
     _populateBaseDebugData();
-    debugData['scaleFactor'] = scaleFactor.toStringAsFixed(1);
+    debugData['scaleFactor'] = scaleFactor;
 
     if (exerciseState == ExerciseState.activated) {
       checkingPose(smoothedLandmarks);
+      _trackDebugFrame();
       if (exerciseState == ExerciseState.activated && requestStop()) {
         exerciseState = ExerciseState.completed;
         onSetComplete();
@@ -219,10 +252,12 @@ abstract class ExerciseBase {
           ? getSetFeedback()
           : getRepCountAndFeedback();
     } else if (exerciseState == ExerciseState.completed) {
+      _trackDebugFrame();
       return getSetFeedback();
     }
 
-    return null;
+    _trackDebugFrame();
+    return [repCount, resultIssues.feedback];
   }
 
   /// Called when no pose is detected in the current frame.
@@ -231,13 +266,13 @@ abstract class ExerciseBase {
     resultIssues.feedback.clear();
     _syncPresenceState(hasPose: false);
     _populateBaseDebugData();
-    debugData['personRatio'] =
-        _personDetector.lastPersonRatio.toStringAsFixed(3);
-    debugData['personScore'] = _personDetector.presenceScore.toStringAsFixed(3);
+    debugData['personRatio'] = _personDetector.lastPersonRatio;
+    debugData['personScore'] = _personDetector.presenceScore;
     debugData['personDetected'] = _personDetector.personDetected;
     debugData['isPaused'] = _isPaused;
 
     if (exerciseState == ExerciseState.completed) {
+      _trackDebugFrame();
       return {'Result': 'Hoàn thành! $repCount reps'};
     }
 
@@ -253,6 +288,7 @@ abstract class ExerciseBase {
           'Giữ toàn thân trong khung hình để AI theo dõi ổn định hơn.';
     }
 
+    _trackDebugFrame();
     return Map<String, String>.from(resultIssues.feedback);
   }
 
@@ -267,10 +303,16 @@ abstract class ExerciseBase {
     await _personDetector.close();
   }
 
+  ExerciseVoiceCoach? createVoiceCoach() => _PhaseInstructionVoiceCoach();
+
   void _populateBaseDebugData() {
-    debugData['exerciseState'] = exerciseState.toString().split('.').last;
+    // debugData['exerciseState'] = exerciseState.toString().split('.').last;
     debugData['cameraFacing'] = cameraFacing.toString().split('.').last;
-    debugData['personConfirmed'] = _personConfirmed;
+    // debugData['personConfirmed'] = _personConfirmed;
+  }
+
+  void _trackDebugFrame() {
+    _exerciseDebugTracker.onTick(frameTimestampMs);
   }
 
   void _syncPresenceState({required bool hasPose}) {
@@ -433,7 +475,6 @@ abstract class ExerciseBase {
           final remaining = (HOLD_STILL_REQUIRED_DURATION.inMilliseconds -
                   elapsed.inMilliseconds) /
               1000.0;
-          debugData['holdStill'] = '${remaining.toStringAsFixed(1)}s';
 
           if (elapsed >= HOLD_STILL_REQUIRED_DURATION) {
             exerciseState = ExerciseState.activated;
@@ -444,9 +485,7 @@ abstract class ExerciseBase {
                 'Giữ yên... ${remaining.clamp(0.0, 99.0).toStringAsFixed(0)}s';
           }
         } else {
-          if (_holdStillStartedAt != null) {
-            debugData['holdStill'] = 'reset';
-          }
+          if (_holdStillStartedAt != null) {}
           _holdStillStartedAt = null;
           resultIssues.feedback['System'] = 'Vào tư thế và giữ yên để bắt đầu';
         }
@@ -487,4 +526,136 @@ abstract class ExerciseBase {
   String get exerciseName;
   String get currentPhaseKey;
   String get currentPhaseLabel;
+}
+
+class _ExerciseDebugMetricSource implements DebugMetricSource {
+  const _ExerciseDebugMetricSource(this.exercise);
+
+  final ExerciseBase exercise;
+
+  @override
+  String get name => exercise.exerciseName;
+
+  @override
+  String? get nameVi => null;
+
+  @override
+  Map<String, dynamic> get debugData => exercise.debugData;
+
+  @override
+  double? get value => exercise.currentFps;
+
+  @override
+  ThresholdBand? get threshold =>
+      const ThresholdBand(warningBelow: 24, faultBelow: 18);
+
+  @override
+  MetricStatus get status {
+    if (exercise.currentFps < 18) return MetricStatus.fault;
+    if (exercise.currentFps < 24) return MetricStatus.near;
+    return MetricStatus.pass;
+  }
+
+  @override
+  bool get devOnly => false;
+}
+
+class _PhaseInstructionVoiceCoach implements ExerciseVoiceCoach {
+  static const int _phaseCueMinGapMs = 450;
+
+  String? _lastPhasePhrase;
+  int _lastPhaseCueAtMs = 0;
+  int _lastRepCount = 0;
+  bool _didAnnounceReady = false;
+  bool _didAnnounceSetComplete = false;
+
+  @override
+  void processFrame({
+    required ExerciseBase exercise,
+    required int repCount,
+    required bool hasPose,
+    required Map<String, String> feedback,
+  }) {
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final repIncreased = repCount > _lastRepCount;
+
+    if (exercise.exerciseState == ExerciseState.completed) {
+      if (repIncreased) {
+        exercise.ttsService.clearPendingButKeepCurrent();
+        exercise.ttsService.speak('$repCount');
+      }
+      if (!_didAnnounceSetComplete) {
+        exercise.ttsService.clearPendingButKeepCurrent();
+        exercise.ttsService.speak('Hoàn thành bài tập');
+        _didAnnounceSetComplete = true;
+      }
+      _lastPhasePhrase = null;
+      _lastRepCount = repCount;
+      return;
+    }
+
+    if (exercise.exerciseState != ExerciseState.activated ||
+        exercise.isPaused ||
+        !hasPose) {
+      _lastPhasePhrase = null;
+      _lastRepCount = repCount;
+      return;
+    }
+
+    if (!_didAnnounceReady) {
+      exercise.ttsService.clearQueue();
+      exercise.ttsService.speak('Sẵn sàng');
+      _didAnnounceReady = true;
+    }
+
+    if (repIncreased) {
+      exercise.ttsService.clearPendingButKeepCurrent();
+      exercise.ttsService.speak('$repCount');
+      _lastRepCount = repCount;
+      _lastPhasePhrase = null;
+      return;
+    }
+
+    final phasePhrase = _phasePhraseFor(exercise);
+    if (phasePhrase == null || phasePhrase == _lastPhasePhrase) {
+      _lastRepCount = repCount;
+      return;
+    }
+
+    if (nowMs - _lastPhaseCueAtMs >= _phaseCueMinGapMs) {
+      exercise.ttsService.speak(phasePhrase);
+      _lastPhasePhrase = phasePhrase;
+      _lastPhaseCueAtMs = nowMs;
+    }
+    _lastRepCount = repCount;
+  }
+
+  String? _phasePhraseFor(ExerciseBase exercise) {
+    final phaseInstructions =
+        exercise.resultIssues.instructions[exercise.currentPhaseKey];
+    final status = phaseInstructions?['Status'];
+    final phrase =
+        status == null || status.isEmpty ? exercise.currentPhaseLabel : status;
+    return _normalizePhrase(phrase);
+  }
+
+  String? _normalizePhrase(String phrase) {
+    final value = phrase.trim();
+    if (value.isEmpty) return null;
+
+    if (value.contains('Going Down')) return 'Xuống';
+    if (value.contains('Push Up') || value.contains('Đứng lên')) {
+      return 'Đứng lên';
+    }
+    if (value.contains('Hold') || value.contains('Giữ')) return 'Giữ';
+    if (value.contains('Sẵn sàng')) return 'Sẵn sàng';
+    if (value.contains('Vào tư thế') || value.contains('giữ yên')) return null;
+
+    return value;
+  }
+
+  @override
+  void dispose() {
+    _lastPhasePhrase = null;
+  }
 }

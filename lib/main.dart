@@ -18,7 +18,7 @@ import 'exercise/exercise_base.dart';
 import 'models/exercise_definition.dart';
 import 'screens/exercise/exercise_experience_screen.dart';
 import 'screens/main_shell.dart';
-import 'screens/onboarding/onboarding_screen.dart';
+import 'screens/onboarding/v5/v5_onboarding_navigator.dart';
 import 'theme/vf_theme.dart';
 
 /* =========================================================================
@@ -145,7 +145,7 @@ case '/':
   );
           case '/onboarding':
             return MaterialPageRoute(
-              builder: (_) => const OnboardingScreen(),
+              builder: (_) => const V5OnboardingNavigator(),
             );
           case '/exercise':
             final definition = settings.arguments as ExerciseDefinition;
@@ -227,8 +227,12 @@ class _AppEntryGateState extends State<AppEntryGate> {
       case 'passwordRecovery':
       case 'userUpdated':
       case 'mfaChallengeVerified':
-        _setEntryState(_AppEntryState.loading);
-        _resolveEntryState();
+        // If the user is mid-onboarding, do NOT flash to loading and
+        // rebuild the navigator — that disposes its State and resets the
+        // PageController back to S01. The signup screen has its own auth
+        // listener that advances the page in place. Only swap to home
+        // if onboarding is actually complete.
+        _quietResolveEntryState();
         break;
       case 'signedOut':
       case 'userDeleted':
@@ -237,8 +241,27 @@ class _AppEntryGateState extends State<AppEntryGate> {
       case 'tokenRefreshed':
         break;
       default:
-        _setEntryState(_AppEntryState.loading);
-        _resolveEntryState();
+        _quietResolveEntryState();
+    }
+  }
+
+  /// Re-resolves the entry state without flashing through `loading`. Stays
+  /// in the current state if no transition is required — preserves the
+  /// V5OnboardingNavigator's State (PageController + OnboardingData) when
+  /// the signup screen completes auth mid-flow.
+  Future<void> _quietResolveEntryState() async {
+    final session = supabase.auth.currentSession;
+    if (session == null) {
+      if (_entryState != _AppEntryState.onboarding) {
+        _setEntryState(_AppEntryState.onboarding);
+      }
+      return;
+    }
+
+    final complete = await isOnboardingComplete();
+    final target = complete ? _AppEntryState.home : _AppEntryState.onboarding;
+    if (target != _entryState) {
+      _setEntryState(target);
     }
   }
 
@@ -254,7 +277,7 @@ class _AppEntryGateState extends State<AppEntryGate> {
   Widget build(BuildContext context) {
     switch (_entryState) {
       case _AppEntryState.onboarding:
-        return const OnboardingScreen();
+        return const V5OnboardingNavigator();
       case _AppEntryState.home:
         return const MainShell();
       case _AppEntryState.loading:
@@ -329,7 +352,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
   CameraController? _cameraController;
   int _cameraIndex = -1;
   bool _isCameraReady = false;
-  CameraLensDirection _currentLensDirection = CameraLensDirection.back;
+  CameraLensDirection _currentLensDirection = CameraLensDirection.front;
 
   // ── ML Kit ──
   final PoseDetector _poseDetector = PoseDetector(

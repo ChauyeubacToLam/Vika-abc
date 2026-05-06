@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../onboarding/vf_theme.dart';
+import '../../theme/vf_theme.dart';
 import 'widgets/skeleton_annotation.dart';
 
 class ExerciseIntroBadge {
@@ -55,7 +55,7 @@ class ExerciseIntroPage extends StatelessWidget {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Container(
-        color: VF.bg,
+        color: VFTheme.background,
         child: SafeArea(
           top: false,
           child: SingleChildScrollView(
@@ -75,8 +75,8 @@ class ExerciseIntroPage extends StatelessWidget {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
-                        VF.surfaceDark,
-                        VF.jadeDark,
+                        VFTheme.jadeMid,
+                        VFTheme.jadeDark,
                         Color(0xFF0A2E22),
                       ],
                     ),
@@ -232,12 +232,12 @@ class ExerciseIntroPage extends StatelessWidget {
                             ),
                             decoration: BoxDecoration(
                               color: primary
-                                  ? VF.jadeGlow.withValues(alpha: 0.10)
+                                  ? VFTheme.jadeGlow.withValues(alpha: 0.10)
                                   : Colors.white.withValues(alpha: 0.05),
                               borderRadius: BorderRadius.circular(9),
                               border: Border.all(
                                 color: primary
-                                    ? VF.jadeGlow.withValues(alpha: 0.12)
+                                    ? VFTheme.jadeGlow.withValues(alpha: 0.12)
                                     : Colors.white.withValues(alpha: 0.06),
                               ),
                             ),
@@ -248,7 +248,7 @@ class ExerciseIntroPage extends StatelessWidget {
                                 fontWeight:
                                     primary ? FontWeight.w700 : FontWeight.w600,
                                 color: primary
-                                    ? VF.jadeGlow.withValues(alpha: 0.78)
+                                    ? VFTheme.jadeGlow.withValues(alpha: 0.78)
                                     : Colors.white.withValues(alpha: 0.34),
                               ),
                             ),
@@ -277,9 +277,9 @@ class ExerciseIntroPage extends StatelessWidget {
                             vertical: 14,
                           ),
                           decoration: BoxDecoration(
-                            color: VF.surface,
+                            color: VFTheme.surface,
                             borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: VF.border),
+                            border: Border.all(color: VFTheme.bgDeep),
                           ),
                           child: Row(
                             children: [
@@ -287,7 +287,7 @@ class ExerciseIntroPage extends StatelessWidget {
                                 width: 28,
                                 height: 28,
                                 decoration: BoxDecoration(
-                                  color: VF.accent.withValues(alpha: 0.10),
+                                  color: VFTheme.jade.withValues(alpha: 0.10),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Center(
@@ -296,7 +296,7 @@ class ExerciseIntroPage extends StatelessWidget {
                                     style: const TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w800,
-                                      color: VF.accent,
+                                      color: VFTheme.jade,
                                     ),
                                   ),
                                 ),
@@ -308,7 +308,7 @@ class ExerciseIntroPage extends StatelessWidget {
                                   style: const TextStyle(
                                     fontSize: 12.5,
                                     fontWeight: FontWeight.w500,
-                                    color: VF.textSec,
+                                    color: VFTheme.textSecondary,
                                     height: 1.5,
                                   ),
                                 ),
@@ -329,9 +329,9 @@ class ExerciseIntroPage extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
                     decoration: BoxDecoration(
-                      color: VF.surface,
+                      color: VFTheme.surface,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: VF.border),
+                      border: Border.all(color: VFTheme.bgDeep),
                     ),
                     child: Column(
                       children: [
@@ -357,10 +357,10 @@ class ExerciseIntroPage extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: VF.amber.withValues(alpha: 0.05),
+                      color: VFTheme.amber.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(16),
                       border:
-                          Border.all(color: VF.amber.withValues(alpha: 0.12)),
+                          Border.all(color: VFTheme.amber.withValues(alpha: 0.12)),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -369,13 +369,13 @@ class ExerciseIntroPage extends StatelessWidget {
                           width: 28,
                           height: 28,
                           decoration: BoxDecoration(
-                            color: VF.amber.withValues(alpha: 0.14),
+                            color: VFTheme.amber.withValues(alpha: 0.14),
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(
                             Icons.tips_and_updates_outlined,
                             size: 16,
-                            color: VF.amber,
+                            color: VFTheme.amber,
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -388,7 +388,7 @@ class ExerciseIntroPage extends StatelessWidget {
                                 style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w700,
-                                  color: VF.amber,
+                                  color: VFTheme.amber,
                                   letterSpacing: 1,
                                 ),
                               ),
@@ -398,7 +398,7 @@ class ExerciseIntroPage extends StatelessWidget {
                                 style: const TextStyle(
                                   fontSize: 12.5,
                                   fontWeight: FontWeight.w500,
-                                  color: VF.textSec,
+                                  color: VFTheme.textSecondary,
                                   height: 1.55,
                                 ),
                               ),
@@ -442,7 +442,7 @@ class _SectionLabel extends StatelessWidget {
         fontSize: 11,
         fontWeight: FontWeight.w700,
         letterSpacing: 1.5,
-        color: VF.textMuted,
+        color: VFTheme.textMuted,
       ),
     );
   }
