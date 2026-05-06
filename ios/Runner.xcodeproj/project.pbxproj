@@ -17,6 +17,7 @@
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
+		A6F3D7CA2C00100100D8F001 /* pose_landmarker_lite.task in Resources */ = {isa = PBXBuildFile; fileRef = A6F3D7C92C00100100D8F001 /* pose_landmarker_lite.task */; };
 		F688E414D6A9A6E97FD31478 /* PoseLandmarkerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC83E519973398FC25EDE409 /* PoseLandmarkerService.swift */; };
 /* End PBXBuildFile section */
 
@@ -65,6 +66,7 @@
 		97C146FD1CF9000F007C117D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		97C147001CF9000F007C117D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		97C147021CF9000F007C117D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A6F3D7C92C00100100D8F001 /* pose_landmarker_lite.task */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; path = pose_landmarker_lite.task; sourceTree = "<group>"; };
 		A02C1EF88969558B6BE38AC6 /* Pods-RunnerTests.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.profile.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.profile.xcconfig"; sourceTree = "<group>"; };
 		A5096B010BB925A72E413B78 /* Pods-RunnerTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.debug.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.debug.xcconfig"; sourceTree = "<group>"; };
 		DC83E519973398FC25EDE409 /* PoseLandmarkerService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PoseLandmarkerService.swift; sourceTree = "<group>"; };
@@ -166,6 +168,7 @@
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
 				DC83E519973398FC25EDE409 /* PoseLandmarkerService.swift */,
 				8C1DE7AF2BFD4A2B9F5C7101 /* SegmentationService.swift */,
+				A6F3D7C92C00100100D8F001 /* pose_landmarker_lite.task */,
 			);
 			path = Runner;
 			sourceTree = "<group>";
@@ -270,6 +273,7 @@
 				3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */,
 				97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */,
 				97C146FC1CF9000F007C117D /* Main.storyboard in Resources */,
+				A6F3D7CA2C00100100D8F001 /* pose_landmarker_lite.task in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

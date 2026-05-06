@@ -6,18 +6,32 @@ import MediaPipeTasksVision
 
 final class PoseLandmarkerService: NSObject,
                                    FlutterStreamHandler,
+                                   FlutterTexture,
                                    AVCaptureVideoDataOutputSampleBufferDelegate,
                                    PoseLandmarkerLiveStreamDelegate {
 
     private static var didFinishDiagnosticLogging = false
     private static var diagnosticFrameIndex = 0
 
+    private let textureRegistry: FlutterTextureRegistry
     private var eventSink: FlutterEventSink?
     private let captureSession = AVCaptureSession()
-    private let sessionQueue = DispatchQueue(label: "com.vika.pose.session")
+    private let sessionQueue = DispatchQueue(label: "com.vikavn.app.pose.session")
+    private let pixelBufferQueue = DispatchQueue(label: "com.vikavn.app.pose.texture")
+    private let pendingFrameQueue = DispatchQueue(label: "com.vikavn.app.pose.pending_frames")
+    private var latestPixelBuffer: CVPixelBuffer?
+    private var textureId: Int64?
     private var videoOutput = AVCaptureVideoDataOutput()
     private var poseLandmarker: PoseLandmarker?
-    private var currentCameraPosition: AVCaptureDevice.Position = .front
+    private var currentCameraPosition: AVCaptureDevice.Position = .back
+    private var detectionEnabled = true
+    private var lastSubmittedTimestampMs = Int.min
+    private var pendingFrames: [Int: FramePayload] = [:]
+
+    init(textureRegistry: FlutterTextureRegistry) {
+        self.textureRegistry = textureRegistry
+        super.init()
+    }
 
     // MARK: - Flutter stream handler
     func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
@@ -30,8 +44,105 @@ final class PoseLandmarkerService: NSObject,
         return nil
     }
 
-    // MARK: - Public API
-    func initialize() throws {
+    // MARK: - Flutter texture
+    func copyPixelBuffer() -> Unmanaged<CVPixelBuffer>? {
+        var pixelBuffer: CVPixelBuffer?
+        pixelBufferQueue.sync {
+            pixelBuffer = latestPixelBuffer
+            latestPixelBuffer = nil
+        }
+
+        guard let pixelBuffer = pixelBuffer else {
+            return nil
+        }
+        return Unmanaged.passRetained(pixelBuffer)
+    }
+
+    // MARK: - Public API matching lib/pose/pose_landmarker_channel.dart
+    func initialize(useFrontCamera: Bool, completion: @escaping (Result<Int64, Error>) -> Void) {
+        sessionQueue.async {
+            do {
+                try self.initializeLandmarker()
+                self.currentCameraPosition = useFrontCamera ? .front : .back
+                self.detectionEnabled = true
+                let textureId = self.ensureTexture()
+                try self.configureCaptureSession()
+                if !self.captureSession.isRunning {
+                    self.captureSession.startRunning()
+                }
+                completion(.success(textureId))
+            } catch {
+                completion(.failure(error))
+            }
+        }
+    }
+
+    func startDetection() {
+        sessionQueue.async {
+            self.detectionEnabled = true
+        }
+    }
+
+    func stopDetection() {
+        sessionQueue.async {
+            self.detectionEnabled = false
+        }
+    }
+
+    func switchCamera(completion: @escaping (Result<Void, Error>) -> Void) {
+        sessionQueue.async {
+            let previousPosition = self.currentCameraPosition
+            self.currentCameraPosition = previousPosition == .front ? .back : .front
+
+            do {
+                try self.configureCaptureSession()
+                if !self.captureSession.isRunning {
+                    self.captureSession.startRunning()
+                }
+                completion(.success(()))
+            } catch {
+                self.currentCameraPosition = previousPosition
+                completion(.failure(error))
+            }
+        }
+    }
+
+    func dispose() {
+        sessionQueue.async {
+            self.detectionEnabled = false
+            if self.captureSession.isRunning {
+                self.captureSession.stopRunning()
+            }
+            self.videoOutput.setSampleBufferDelegate(nil, queue: nil)
+            self.captureSession.beginConfiguration()
+            for input in self.captureSession.inputs {
+                self.captureSession.removeInput(input)
+            }
+            for output in self.captureSession.outputs {
+                self.captureSession.removeOutput(output)
+            }
+            self.captureSession.commitConfiguration()
+            self.poseLandmarker = nil
+            self.pendingFrameQueue.sync {
+                self.pendingFrames.removeAll()
+            }
+            self.lastSubmittedTimestampMs = Int.min
+            self.pixelBufferQueue.sync {
+                self.latestPixelBuffer = nil
+            }
+
+            DispatchQueue.main.async {
+                if let textureId = self.textureId {
+                    self.textureRegistry.unregisterTexture(textureId)
+                    self.textureId = nil
+                }
+                self.eventSink = nil
+            }
+        }
+    }
+
+    // MARK: - Pose landmarker
+    private func initializeLandmarker() throws {
         if poseLandmarker != nil { return }
 
         guard let modelPath = Bundle.main.path(forResource: "pose_landmarker_lite", ofType: "task") else {
@@ -42,7 +153,7 @@ final class PoseLandmarkerService: NSObject,
             )
         }
 
-       let options = PoseLandmarkerOptions()
+        let options = PoseLandmarkerOptions()
         options.baseOptions.modelAssetPath = modelPath
         options.baseOptions.delegate = .GPU
         options.runningMode = .liveStream
@@ -55,41 +166,31 @@ final class PoseLandmarkerService: NSObject,
         do {
             poseLandmarker = try PoseLandmarker(options: options)
         } catch {
-            // GPU init failed (e.g., simulator, older device, Metal shader compile issue).
-            // Fall back to CPU. If CPU also fails, throw to native init handler.
             print("[PoseLandmarker] GPU init failed: \(error.localizedDescription). Falling back to CPU.")
             options.baseOptions.delegate = .CPU
             poseLandmarker = try PoseLandmarker(options: options)
         }
     }
 
-    func start(camera: String = "front", completion: @escaping (Result<Void, Error>) -> Void) {
-        sessionQueue.async {
-            do {
-                try self.initialize()
-                self.currentCameraPosition = camera.lowercased() == "back" ? .back : .front
-                try self.configureCaptureSession()
-                if !self.captureSession.isRunning {
-                    self.captureSession.startRunning()
-                }
-                completion(.success(()))
-            } catch {
-                completion(.failure(error))
-            }
+    private func ensureTexture() -> Int64 {
+        if let textureId = textureId {
+            return textureId
         }
-    }
 
-    func stop() {
-        sessionQueue.async {
-            if self.captureSession.isRunning {
-                self.captureSession.stopRunning()
-            }
+        var registeredTextureId: Int64 = 0
+        DispatchQueue.main.sync {
+            registeredTextureId = textureRegistry.register(self)
+            textureId = registeredTextureId
         }
+        return registeredTextureId
     }
 
     // MARK: - Camera
     private func configureCaptureSession() throws {
         captureSession.beginConfiguration()
+        defer {
+            captureSession.commitConfiguration()
+        }
         captureSession.sessionPreset = .vga640x480
 
         for input in captureSession.inputs {
@@ -138,29 +239,59 @@ final class PoseLandmarkerService: NSObject,
         if let connection = videoOutput.connection(with: .video) {
             connection.videoOrientation = .portrait
             if connection.isVideoMirroringSupported {
-                connection.isVideoMirrored = (currentCameraPosition == .front)
+                connection.isVideoMirrored = currentCameraPosition == .front
             }
         }
 
-        captureSession.commitConfiguration()
     }
 
     // MARK: - AVCaptureVideoDataOutputSampleBufferDelegate
     func captureOutput(_ output: AVCaptureOutput,
                        didOutput sampleBuffer: CMSampleBuffer,
                        from connection: AVCaptureConnection) {
-        guard let poseLandmarker = poseLandmarker else { return }
+        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
+            return
+        }
+
+        pixelBufferQueue.sync {
+            latestPixelBuffer = pixelBuffer
+        }
+        if let textureId = textureId {
+            DispatchQueue.main.async {
+                self.textureRegistry.textureFrameAvailable(textureId)
+            }
+        }
+
+        guard detectionEnabled, let poseLandmarker = poseLandmarker else {
+            return
+        }
 
         let timestampMs = Int(CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds * 1000.0)
+        if timestampMs <= lastSubmittedTimestampMs {
+            return
+        }
+
+        let frameWidth = CVPixelBufferGetWidth(pixelBuffer)
+        let frameHeight = CVPixelBufferGetHeight(pixelBuffer)
+        storePendingFrame(
+            timestampMs: timestampMs,
+            payload: FramePayload(
+                frameWidth: frameWidth,
+                frameHeight: frameHeight,
+                imageWidth: frameWidth,
+                imageHeight: frameHeight,
+                rotationDegrees: 0,
+                isFrontCamera: currentCameraPosition == .front
+            )
+        )
 
         do {
-            // Portrait-first.
-            // Neu thay trai/phai dao, doi .leftMirrored -> .right cho camera truoc.
-            let orientation: UIImage.Orientation = currentCameraPosition == .front ? .leftMirrored : .right
-            let mpImage = try MPImage(sampleBuffer: sampleBuffer, orientation: orientation)
+            let mpImage = try MPImage(sampleBuffer: sampleBuffer, orientation: .up)
+            lastSubmittedTimestampMs = timestampMs
             try poseLandmarker.detectAsync(image: mpImage, timestampInMilliseconds: timestampMs)
         } catch {
-            sendError(code: "POSE_STREAM_ERROR", message: error.localizedDescription)
+            _ = removePendingFrame(timestampMs: timestampMs)
+            sendError(code: "pose_landmarker_detection", message: error.localizedDescription)
         }
     }
 
@@ -172,36 +303,76 @@ final class PoseLandmarkerService: NSObject,
         Self.logDiagnosticFrame(result: result)
 
         if let error = error {
-            sendError(code: "POSE_DETECTION_FAILED", message: error.localizedDescription)
+            sendError(code: "pose_landmarker_stream", message: error.localizedDescription)
             return
         }
 
-        guard let firstPose = result?.landmarks.first else {
-            DispatchQueue.main.async {
-                self.eventSink?([
-                    "timestamp": timestampInMilliseconds,
-                    "poseDetected": false,
-                    "landmarks": []
-                ])
-            }
+        guard let framePayload = removePendingFrame(timestampMs: timestampInMilliseconds) else {
             return
         }
 
-        let landmarks: [[String: Any]] = firstPose.enumerated().map { index, landmark in
-            [
-                "index": index,
-                "x": landmark.x,
-                "y": landmark.y,
-                "z": landmark.z
-            ]
-        }
+        let firstPose = result?.landmarks.first
+        let firstWorldPose = result?.worldLandmarks.first
+        let landmarks = firstPose?.enumerated().map { index, landmark in
+            landmarkToMap(index: index, landmark: landmark)
+        } ?? []
+        let worldLandmarks = firstWorldPose?.enumerated().map { index, landmark in
+            worldLandmarkToMap(index: index, landmark: landmark)
+        } ?? []
 
         DispatchQueue.main.async {
-            self.eventSink?([
-                "timestamp": timestampInMilliseconds,
-                "poseDetected": true,
-                "landmarks": landmarks
-            ])
+            self.eventSink?(
+                framePayload.toEventPayload(
+                    timestampMs: timestampInMilliseconds,
+                    landmarks: landmarks,
+                    worldLandmarks: worldLandmarks
+                )
+            )
+        }
+    }
+
+    private func landmarkToMap(index: Int, landmark: NormalizedLandmark) -> [String: Any] {
+        [
+            "type": index,
+            "x": landmark.x,
+            "y": landmark.y,
+            "z": landmark.z,
+            "likelihood": landmarkScore(visibility: landmark.visibility, presence: landmark.presence),
+        ]
+    }
+
+    private func worldLandmarkToMap(index: Int, landmark: Landmark) -> [String: Any] {
+        [
+            "type": index,
+            "x": landmark.x,
+            "y": landmark.y,
+            "z": landmark.z,
+            "likelihood": landmarkScore(visibility: landmark.visibility, presence: landmark.presence),
+        ]
+    }
+
+    private func landmarkScore(visibility: NSNumber?, presence: NSNumber?) -> Float {
+        (visibility ?? presence)?.floatValue ?? 0.0
+    }
+
+    private func storePendingFrame(timestampMs: Int, payload: FramePayload) {
+        pendingFrameQueue.sync {
+            pendingFrames[timestampMs] = payload
+            trimPendingFrames()
+        }
+    }
+
+    private func removePendingFrame(timestampMs: Int) -> FramePayload? {
+        pendingFrameQueue.sync {
+            pendingFrames.removeValue(forKey: timestampMs)
+        }
+    }
+
+    private func trimPendingFrames(maxEntries: Int = 4) {
+        guard pendingFrames.count > maxEntries else { return }
+        let keysToDrop = pendingFrames.keys.sorted().prefix(pendingFrames.count - maxEntries)
+        for key in keysToDrop {
+            pendingFrames.removeValue(forKey: key)
         }
     }
 
@@ -229,6 +400,31 @@ final class PoseLandmarkerService: NSObject,
         diagnosticFrameIndex += 1
         if diagnosticFrameIndex >= 30 {
             didFinishDiagnosticLogging = true
+        }
+    }
+
+    private struct FramePayload {
+        let frameWidth: Int
+        let frameHeight: Int
+        let imageWidth: Int
+        let imageHeight: Int
+        let rotationDegrees: Int
+        let isFrontCamera: Bool
+
+        func toEventPayload(timestampMs: Int,
+                            landmarks: [[String: Any]],
+                            worldLandmarks: [[String: Any]]) -> [String: Any] {
+            [
+                "landmarks": landmarks,
+                "worldLandmarks": worldLandmarks,
+                "imageWidth": imageWidth,
+                "imageHeight": imageHeight,
+                "frameWidth": frameWidth,
+                "frameHeight": frameHeight,
+                "rotationDegrees": rotationDegrees,
+                "isFrontCamera": isFrontCamera,
+                "timestampMs": timestampMs,
+            ]
         }
     }
 }

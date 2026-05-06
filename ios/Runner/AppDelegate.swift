@@ -3,7 +3,7 @@ import Flutter
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
-    private let poseService = PoseLandmarkerService()
+    private var poseService: PoseLandmarkerService?
     private let segmentationService = SegmentationService()
 
     override func application(
@@ -16,13 +16,17 @@ import Flutter
             return super.application(application, didFinishLaunchingWithOptions: launchOptions)
         }
 
+        let poseRegistrar = registrar(forPlugin: "PoseLandmarkerService")
+        let poseService = PoseLandmarkerService(textureRegistry: poseRegistrar.textures())
+        self.poseService = poseService
+
         let methodChannel = FlutterMethodChannel(
-            name: "com.vika.pose/methods",
+            name: "com.vikavn.app/pose_landmarker",
             binaryMessenger: controller.binaryMessenger
         )
 
         let eventChannel = FlutterEventChannel(
-            name: "com.vika.pose/stream",
+            name: "com.vikavn.app/pose_landmarker_stream",
             binaryMessenger: controller.binaryMessenger
         )
 
@@ -39,29 +43,16 @@ import Flutter
 
             switch call.method {
             case "initialize":
-                do {
-                    try self.poseService.initialize()
-                    result(true)
-                } catch {
-                    result(FlutterError(
-                        code: "INIT_FAILED",
-                        message: error.localizedDescription,
-                        details: nil
-                    ))
-                }
-
-            case "start":
                 let args = call.arguments as? [String: Any]
-                let camera = (args?["camera"] as? String) ?? "front"
-
-                self.poseService.start(camera: camera) { startResult in
+                let useFrontCamera = (args?["useFrontCamera"] as? Bool) ?? false
+                self.poseService?.initialize(useFrontCamera: useFrontCamera) { initializeResult in
                     DispatchQueue.main.async {
-                        switch startResult {
-                        case .success:
-                            result(true)
+                        switch initializeResult {
+                        case .success(let textureId):
+                            result(textureId)
                         case .failure(let error):
                             result(FlutterError(
-                                code: "START_FAILED",
+                                code: "pose_landmarker_init",
                                 message: error.localizedDescription,
                                 details: nil
                             ))
@@ -69,9 +60,33 @@ import Flutter
                     }
                 }
 
-            case "stop":
-                self.poseService.stop()
-                result(true)
+            case "dispose":
+                self.poseService?.dispose()
+                result(nil)
+
+            case "switchCamera":
+                self.poseService?.switchCamera { switchResult in
+                    DispatchQueue.main.async {
+                        switch switchResult {
+                        case .success:
+                            result(nil)
+                        case .failure(let error):
+                            result(FlutterError(
+                                code: "pose_landmarker_switch_camera",
+                                message: error.localizedDescription,
+                                details: nil
+                            ))
+                        }
+                    }
+                }
+
+            case "startDetection":
+                self.poseService?.startDetection()
+                result(nil)
+
+            case "stopDetection":
+                self.poseService?.stopDetection()
+                result(nil)
 
             default:
                 result(FlutterMethodNotImplemented)
