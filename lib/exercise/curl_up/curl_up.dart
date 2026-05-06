@@ -514,7 +514,7 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
         "peak_trunk_elevation": peakTrunkElev,
         "peak_neck_deviation": peakNeckDev,
         "max_knee_angle":
-            peakKneeSnap?.log["hipKneeAnkleAngle"] as double? ?? 0.0,
+            peakKneeSnap?.log["hipKneeAnkleAngle"] ?? 0.0,
         "fault_types": allFaults.map((f) => f.type).toSet().toList(),
       },
     ));
