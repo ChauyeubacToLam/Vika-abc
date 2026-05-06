@@ -4,6 +4,7 @@ import Flutter
 @main
 @objc class AppDelegate: FlutterAppDelegate {
     private let poseService = PoseLandmarkerService()
+    private let segmentationService = SegmentationService()
 
     override func application(
         _ application: UIApplication,
@@ -25,7 +26,13 @@ import Flutter
             binaryMessenger: controller.binaryMessenger
         )
 
+        let segmentationEventChannel = FlutterEventChannel(
+            name: "com.vikavn.app/segmentation",
+            binaryMessenger: controller.binaryMessenger
+        )
+
         eventChannel.setStreamHandler(poseService)
+        segmentationEventChannel.setStreamHandler(segmentationService)
 
         methodChannel.setMethodCallHandler { [weak self] call, result in
             guard let self = self else { return }

@@ -1002,7 +1002,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                         rotation: _imageRotation,
                         lensDirection: _currentLens,
                         debugData: widget.exercise.debugData,
-                        style: SkeletonStyle.constellation),
+                        style: SkeletonStyle.vikaCream),
                   );
                 },
               ),

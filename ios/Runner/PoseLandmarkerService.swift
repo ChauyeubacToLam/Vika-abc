@@ -9,6 +9,9 @@ final class PoseLandmarkerService: NSObject,
                                    AVCaptureVideoDataOutputSampleBufferDelegate,
                                    PoseLandmarkerLiveStreamDelegate {
 
+    private static var didFinishDiagnosticLogging = false
+    private static var diagnosticFrameIndex = 0
+
     private var eventSink: FlutterEventSink?
     private let captureSession = AVCaptureSession()
     private let sessionQueue = DispatchQueue(label: "com.vika.pose.session")
@@ -166,6 +169,8 @@ final class PoseLandmarkerService: NSObject,
                         didFinishDetection result: PoseLandmarkerResult?,
                         timestampInMilliseconds: Int,
                         error: Error?) {
+        Self.logDiagnosticFrame(result: result)
+
         if let error = error {
             sendError(code: "POSE_DETECTION_FAILED", message: error.localizedDescription)
             return
@@ -203,6 +208,27 @@ final class PoseLandmarkerService: NSObject,
     private func sendError(code: String, message: String) {
         DispatchQueue.main.async {
             self.eventSink?(FlutterError(code: code, message: message, details: nil))
+        }
+    }
+
+    private static func logDiagnosticFrame(result: PoseLandmarkerResult?) {
+        guard !didFinishDiagnosticLogging else { return }
+
+        let frameIndex = diagnosticFrameIndex
+        let poses = result?.landmarks ?? []
+
+        if poses.isEmpty {
+            print("[VIKA-DIAG] frame=\(frameIndex) landmarks=empty")
+        } else {
+            let landmark = poses[0][0]
+            print(
+                "[VIKA-DIAG] frame=\(frameIndex) landmarks=poses count=\(poses.count) landmark[0][0]=\(String(describing: landmark)) x=\(String(describing: landmark.x)) y=\(String(describing: landmark.y)) z=\(String(describing: landmark.z)) visibility=\(String(describing: landmark.visibility)) presence=\(String(describing: landmark.presence))"
+            )
+        }
+
+        diagnosticFrameIndex += 1
+        if diagnosticFrameIndex >= 30 {
+            didFinishDiagnosticLogging = true
         }
     }
 }
