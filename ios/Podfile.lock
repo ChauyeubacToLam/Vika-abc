@@ -39,10 +39,6 @@ PODS:
     - google_mlkit_commons
     - GoogleMLKit/PoseDetection (~> 9.0.0)
     - GoogleMLKit/PoseDetectionAccurate (~> 9.0.0)
-  - google_mlkit_selfie_segmentation (0.10.1):
-    - Flutter
-    - google_mlkit_commons
-    - GoogleMLKit/SegmentationSelfie (~> 9.0.0)
   - google_sign_in_ios (0.0.1):
     - AppAuth (>= 1.7.4)
     - Flutter
@@ -149,8 +145,8 @@ DEPENDENCIES:
   - flutter_secure_storage_darwin (from `.symlinks/plugins/flutter_secure_storage_darwin/darwin`)
   - google_mlkit_commons (from `.symlinks/plugins/google_mlkit_commons/ios`)
   - google_mlkit_pose_detection (from `.symlinks/plugins/google_mlkit_pose_detection/ios`)
-  - google_mlkit_selfie_segmentation (from `.symlinks/plugins/google_mlkit_selfie_segmentation/ios`)
   - google_sign_in_ios (from `.symlinks/plugins/google_sign_in_ios/darwin`)
+  - GoogleMLKit/SegmentationSelfie (~> 9.0.0)
   - MediaPipeTasksVision (~> 0.10.21)
   - permission_handler_apple (from `.symlinks/plugins/permission_handler_apple/ios`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
@@ -202,8 +198,6 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/google_mlkit_commons/ios"
   google_mlkit_pose_detection:
     :path: ".symlinks/plugins/google_mlkit_pose_detection/ios"
-  google_mlkit_selfie_segmentation:
-    :path: ".symlinks/plugins/google_mlkit_selfie_segmentation/ios"
   google_sign_in_ios:
     :path: ".symlinks/plugins/google_sign_in_ios/darwin"
   permission_handler_apple:
@@ -228,7 +222,6 @@ SPEC CHECKSUMS:
   flutter_secure_storage_darwin: 557817588b80e60213cbecb573c45c76b788018d
   google_mlkit_commons: 1e6ef6605d7281f35baf2b355e6049b9984fd624
   google_mlkit_pose_detection: 765dbe5fc48366b3472379f64d891652ed606835
-  google_mlkit_selfie_segmentation: e1c74c1433e36a23ca6799d24fa66e31a38d0068
   google_sign_in_ios: 7411fab6948df90490dc4620ecbcabdc3ca04017
   GoogleDataTransport: aae35b7ea0c09004c3797d53c8c41f66f219d6a7
   GoogleMLKit: b1eee21a41c57704fe72483b15c85cb2c0cd7444
@@ -254,6 +247,6 @@ SPEC CHECKSUMS:
   shared_preferences_foundation: 5086985c1d43c5ba4d5e69a4e8083a389e2909e6
   url_launcher_ios: bb13df5870e8c4234ca12609d04010a21be43dfa
 
-PODFILE CHECKSUM: 197a84f3ff898b04daa91a405904defe3fdbdf01
+PODFILE CHECKSUM: 9e99d495d373294bb8e76463b7f7e69a57f1f092
 
 COCOAPODS: 1.16.2

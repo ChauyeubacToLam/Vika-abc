@@ -60,6 +60,7 @@ class SquatVoiceCoach implements ExerciseVoiceCoach {
   final Map<String, int> _lastPostRepVoiceRep = {};
   final Set<String> _liveFaultVoicesSpokenThisRep = {};
 
+  @override
   void processFrame({
     required ExerciseBase exercise,
     required int repCount,
@@ -193,6 +194,7 @@ class SquatVoiceCoach implements ExerciseVoiceCoach {
     _lastRepCount = repCount;
   }
 
+  @override
   void dispose() {
     _ttsService.clearQueue();
     _ttsService.dispose();

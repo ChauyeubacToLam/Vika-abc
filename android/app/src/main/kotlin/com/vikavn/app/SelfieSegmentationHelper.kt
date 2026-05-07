@@ -1,27 +1,90 @@
 package com.vikavn.app
 
+import android.graphics.Bitmap
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.segmentation.Segmentation
 import com.google.mlkit.vision.segmentation.SegmentationMask
 import com.google.mlkit.vision.segmentation.Segmenter
 import com.google.mlkit.vision.segmentation.selfie.SelfieSegmenterOptions
 import io.flutter.plugin.common.EventChannel
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
+import io.flutter.plugin.common.MethodCall
+import io.flutter.plugin.common.MethodChannel
 
-class SelfieSegmentationHelper : EventChannel.StreamHandler {
+/*
+ * Native selfie segmentation channel contract.
+ *
+ * MethodChannel("com.vikavn.app/segmentation"):
+ * - initialize({ pixelConfidenceThreshold?, softPixelConfidenceThreshold?,
+ *                minProcessIntervalMs? }) -> { success: true }
+ * - start() -> { success: true }
+ * - stop() -> { success: true }
+ * - dispose() -> { success: true }
+ *
+ * EventChannel("com.vikavn.app/segmentation_stream") emits:
+ * {
+ *   timestampMs: Long,
+ *   imageWidth: Int,
+ *   imageHeight: Int,
+ *   personRatio: Double,
+ *   softPersonRatio: Double
+ * }
+ *
+ * The pose camera pipeline owns frames and calls detectLiveStream(). Raw masks
+ * and camera bytes never cross the Flutter platform channel.
+ */
+class SelfieSegmentationHelper : MethodChannel.MethodCallHandler, EventChannel.StreamHandler {
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val segmenter: Segmenter
+    private var segmenter: Segmenter? = null
     private var eventSink: EventChannel.EventSink? = null
+    @Volatile private var isRunning = false
+    @Volatile private var isProcessing = false
+    @Volatile private var lastProcessedTimestampMs = Long.MIN_VALUE
+    @Volatile private var pixelConfidenceThreshold = DEFAULT_PIXEL_CONFIDENCE_THRESHOLD
+    @Volatile private var softPixelConfidenceThreshold = DEFAULT_SOFT_PIXEL_CONFIDENCE_THRESHOLD
+    @Volatile private var minProcessIntervalMs = DEFAULT_MIN_PROCESS_INTERVAL_MS
 
     init {
-        val options = SelfieSegmenterOptions.Builder()
-            .setDetectorMode(SelfieSegmenterOptions.STREAM_MODE)
-            .build()
+        setupSegmenter()
+    }
 
-        segmenter = Segmentation.getClient(options)
+    override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
+        when (call.method) {
+            "initialize" -> {
+                pixelConfidenceThreshold =
+                    (call.argument<Double>("pixelConfidenceThreshold") ?: pixelConfidenceThreshold)
+                        .toFloat()
+                softPixelConfidenceThreshold =
+                    (call.argument<Double>("softPixelConfidenceThreshold")
+                        ?: softPixelConfidenceThreshold).toFloat()
+                minProcessIntervalMs =
+                    call.argument<Int>("minProcessIntervalMs") ?: minProcessIntervalMs
+                setupSegmenter()
+                result.success(mapOf("success" to true))
+            }
+            "start" -> {
+                isRunning = true
+                result.success(mapOf("success" to true))
+            }
+            "stop" -> {
+                isRunning = false
+                result.success(mapOf("success" to true))
+            }
+            "dispose" -> {
+                disposeSegmenter()
+                result.success(mapOf("success" to true))
+            }
+            "debugLog" -> {
+                val message = call.argument<String>("message")
+                if (message != null) {
+                    Log.d(TAG, "[VIKA-DIAG] $message")
+                }
+                result.success(mapOf("success" to true))
+            }
+            else -> result.notImplemented()
+        }
     }
 
     override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
@@ -32,31 +95,105 @@ class SelfieSegmentationHelper : EventChannel.StreamHandler {
         eventSink = null
     }
 
-    fun detectLiveStream(inputImage: InputImage, timestampMs: Long) {
-        segmenter.process(inputImage)
-            .addOnSuccessListener { mask ->
-                emitResult(mask, timestampMs)
-            }
-            .addOnFailureListener { exception ->
-                emitError("segmentation_failed", exception.message)
-            }
+    fun detectLiveStream(
+        bitmap: Bitmap,
+        timestampMs: Long,
+        onComplete: () -> Unit,
+    ): Boolean {
+        if (!isRunning || isProcessing) {
+            return false
+        }
+        if (
+            lastProcessedTimestampMs != Long.MIN_VALUE &&
+            timestampMs - lastProcessedTimestampMs < minProcessIntervalMs
+        ) {
+            return false
+        }
+
+        val activeSegmenter = segmenter ?: return false
+        isProcessing = true
+        lastProcessedTimestampMs = timestampMs
+
+        val inputImage = InputImage.fromBitmap(bitmap, 0)
+        return try {
+            activeSegmenter.process(inputImage)
+                .addOnSuccessListener { mask ->
+                    emitResult(mask, timestampMs, bitmap.width, bitmap.height)
+                }
+                .addOnFailureListener { exception ->
+                    emitError("segmentation_failed", exception.message)
+                }
+                .addOnCompleteListener {
+                    isProcessing = false
+                    onComplete()
+                }
+            true
+        } catch (exception: Exception) {
+            isProcessing = false
+            emitError("segmentation_failed", exception.message)
+            false
+        }
     }
 
     fun close() {
-        segmenter.close()
+        disposeSegmenter()
         eventSink = null
     }
 
-    private fun emitResult(mask: SegmentationMask, timestampMs: Long) {
-        val maskWidth = mask.width
-        val maskHeight = mask.height
-        val maskData = copyFloatMaskToLittleEndianBytes(mask)
+    private fun setupSegmenter() {
+        if (segmenter != null) {
+            return
+        }
+
+        val options = SelfieSegmenterOptions.Builder()
+            .setDetectorMode(SelfieSegmenterOptions.STREAM_MODE)
+            .enableRawSizeMask()
+            .build()
+
+        segmenter = Segmentation.getClient(options)
+    }
+
+    private fun disposeSegmenter() {
+        isRunning = false
+        isProcessing = false
+        lastProcessedTimestampMs = Long.MIN_VALUE
+        segmenter?.close()
+        segmenter = null
+    }
+
+    private fun emitResult(
+        mask: SegmentationMask,
+        timestampMs: Long,
+        imageWidth: Int,
+        imageHeight: Int,
+    ) {
+        val totalPixels = mask.width * mask.height
+        if (totalPixels <= 0) {
+            emitError("segmentation_empty", "ML Kit returned an empty segmentation mask.")
+            return
+        }
+
+        val maskBuffer = mask.buffer.duplicate()
+        maskBuffer.rewind()
+
+        var personPixels = 0
+        var softPersonPixels = 0
+        repeat(totalPixels) {
+            val confidence = maskBuffer.float
+            if (confidence >= pixelConfidenceThreshold) {
+                personPixels += 1
+            }
+            if (confidence >= softPixelConfidenceThreshold) {
+                softPersonPixels += 1
+            }
+        }
 
         val payload = mapOf(
-            "maskWidth" to maskWidth,
-            "maskHeight" to maskHeight,
-            "maskData" to maskData,
             "timestampMs" to timestampMs,
+            "imageWidth" to imageWidth,
+            "imageHeight" to imageHeight,
+            "personRatio" to personPixels.toDouble() / totalPixels.toDouble(),
+            "softPersonRatio" to softPersonPixels.toDouble() / totalPixels.toDouble(),
         )
 
         mainHandler.post {
@@ -70,21 +207,10 @@ class SelfieSegmentationHelper : EventChannel.StreamHandler {
         }
     }
 
-    private fun copyFloatMaskToLittleEndianBytes(mask: SegmentationMask): ByteArray {
-        val inputBuffer = mask.buffer.duplicate()
-        inputBuffer.rewind()
-
-        val outputBytes = ByteArray(mask.width * mask.height * FLOAT_BYTE_COUNT)
-        val outputBuffer = ByteBuffer.wrap(outputBytes).order(ByteOrder.LITTLE_ENDIAN)
-
-        repeat(mask.width * mask.height) {
-            outputBuffer.putFloat(inputBuffer.getFloat())
-        }
-
-        return outputBytes
-    }
-
     companion object {
-        private const val FLOAT_BYTE_COUNT = 4
+        private const val TAG = "VikaSegmentation"
+        private const val DEFAULT_PIXEL_CONFIDENCE_THRESHOLD = 0.92f
+        private const val DEFAULT_SOFT_PIXEL_CONFIDENCE_THRESHOLD = 0.55f
+        private const val DEFAULT_MIN_PROCESS_INTERVAL_MS = 140
     }
 }

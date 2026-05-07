@@ -176,12 +176,21 @@ class Lunge extends ExerciseBase {
     }
 
     final allLandmarks = [
-      leftHip, rightHip, leftShoulder, rightShoulder,
-      leftKnee, rightKnee, leftAnkle, rightAnkle,
-      leftFoot, rightFoot, leftHeel, rightHeel,
+      leftHip,
+      rightHip,
+      leftShoulder,
+      rightShoulder,
+      leftKnee,
+      rightKnee,
+      leftAnkle,
+      rightAnkle,
+      leftFoot,
+      rightFoot,
+      leftHeel,
+      rightHeel,
     ];
 
-    if (allLandmarks.any((l) => l.likelihood < ExerciseBase.MIN_CONFIDENCE)) {
+    if (allLandmarks.any((l) => !ExerciseBase.isLandmarkConfident(l))) {
       return "⚠️ Điều chỉnh ánh sáng/vị trí.";
     }
 
@@ -193,7 +202,8 @@ class Lunge extends ExerciseBase {
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     // Require side view
-    if (cameraFacing != CameraFacing.left && cameraFacing != CameraFacing.right) {
+    if (cameraFacing != CameraFacing.left &&
+        cameraFacing != CameraFacing.right) {
       return false;
     }
 

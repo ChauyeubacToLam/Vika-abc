@@ -152,9 +152,9 @@ class Plank extends ExerciseBase {
       return "⚠️ Đảm bảo phần trên cơ thể trong khung hình";
     }
 
-    if (shoulder.likelihood < ExerciseBase.MIN_CONFIDENCE ||
-        hip.likelihood < ExerciseBase.MIN_CONFIDENCE ||
-        ear.likelihood < ExerciseBase.MIN_CONFIDENCE) {
+    if (!ExerciseBase.isLandmarkConfident(shoulder) ||
+        !ExerciseBase.isLandmarkConfident(hip) ||
+        !ExerciseBase.isLandmarkConfident(ear)) {
       return "⚠️ Hình ảnh không rõ. Điều chỉnh ánh sáng hoặc vị trí";
     }
 
@@ -165,8 +165,8 @@ class Plank extends ExerciseBase {
         leftType: PoseLandmarkType.leftAnkle);
 
     _ankleAvailable = ankle != null &&
-        ankle.likelihood >= ExerciseBase.MIN_CONFIDENCE &&
-        knee.likelihood >= ExerciseBase.MIN_CONFIDENCE;
+        ExerciseBase.isLandmarkConfident(ankle) &&
+        ExerciseBase.isLandmarkConfident(knee);
 
     return null;
   }

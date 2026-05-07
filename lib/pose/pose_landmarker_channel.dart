@@ -14,7 +14,7 @@ class PoseLandmarkerChannel {
         );
   }
 
-  Future<int> initialize({required bool useFrontCamera}) async {
+  Future<int> initialize({bool useFrontCamera = true}) async {
     final textureId = await _methodChannel.invokeMethod<int>(
       'initialize',
       <String, dynamic>{'useFrontCamera': useFrontCamera},

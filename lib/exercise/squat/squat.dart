@@ -292,7 +292,7 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
     if (requiredLandmarks == null) return "⚠️ Body not fully visible.";
 
     final allConfident = requiredLandmarks.values
-        .every((lm) => lm.likelihood >= ExerciseBase.MIN_CONFIDENCE);
+        .every((lm) => ExerciseBase.isLandmarkConfident(lm));
     if (!allConfident) return "⚠️ Adjust lighting/position.";
 
     return null;

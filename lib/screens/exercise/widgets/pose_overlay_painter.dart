@@ -27,6 +27,7 @@ class PoseOverlayPainter extends CustomPainter {
     required this.imageSize,
     required this.rotation,
     required this.lensDirection,
+    this.mirrorHorizontally,
     this.debugData = const {},
     this.style = SkeletonStyle.constellation,
   });
@@ -56,6 +57,7 @@ class PoseOverlayPainter extends CustomPainter {
   final Size imageSize;
   final InputImageRotation rotation;
   final CameraLensDirection lensDirection;
+  final bool? mirrorHorizontally;
   final Map<String, dynamic> debugData;
   final SkeletonStyle style;
 
@@ -387,7 +389,9 @@ class PoseOverlayPainter extends CustomPainter {
       // the native MediaPipe path and the ML Kit fallback path, so applying an
       // extra Android-side rotation here can invert the skeleton on devices
       // that report rotation 270.
-      if (lensDirection == CameraLensDirection.front) {
+      final shouldMirror =
+          mirrorHorizontally ?? lensDirection == CameraLensDirection.front;
+      if (shouldMirror) {
         x = imageW - x;
       }
 

@@ -248,7 +248,7 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
     // as baseline if ankle is visible.
     final ankle = lm['ankle'];
     double? hka;
-    if (ankle != null && ankle.likelihood >= ExerciseBase.MIN_CONFIDENCE) {
+    if (ankle != null && ExerciseBase.isLandmarkConfident(ankle)) {
       hka = calculateAngleNormalized(
         firstPoint: hip,
         midPoint: knee,
@@ -319,8 +319,8 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
     final required = getSideTrackedLandmarks(landmarks);
     if (required == null) return "⚠️ Cơ thể chưa hiện đủ trong khung hình";
 
-    final allConfident = required.values
-        .every((lm) => lm.likelihood >= ExerciseBase.MIN_CONFIDENCE);
+    final allConfident =
+        required.values.every((lm) => ExerciseBase.isLandmarkConfident(lm));
     if (!allConfident) return "⚠️ Điều chỉnh ánh sáng/vị trí";
 
     return null;
@@ -342,7 +342,7 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
 
     debugData["shoulderY"] = shoulder.y;
     final ankleVisible =
-        ankle != null && ankle.likelihood >= ExerciseBase.MIN_CONFIDENCE;
+        ankle != null && ExerciseBase.isLandmarkConfident(ankle);
 
     // 2. Calculate geometry
     final trunkAngle = calculateHorizontalAngle(point1: hip, point2: shoulder);
@@ -513,8 +513,7 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
       data: {
         "peak_trunk_elevation": peakTrunkElev,
         "peak_neck_deviation": peakNeckDev,
-        "max_knee_angle":
-            peakKneeSnap?.log["hipKneeAnkleAngle"] ?? 0.0,
+        "max_knee_angle": peakKneeSnap?.log["hipKneeAnkleAngle"] ?? 0.0,
         "fault_types": allFaults.map((f) => f.type).toSet().toList(),
       },
     ));

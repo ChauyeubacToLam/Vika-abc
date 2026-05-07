@@ -1,11 +1,14 @@
 package com.vikavn.app
 
 import android.annotation.SuppressLint
+import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.os.Handler
 import android.os.Looper
 import android.os.Build
 import android.util.Size
 import android.view.Surface
+import androidx.camera.core.ImageProxy
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
@@ -17,12 +20,15 @@ import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.view.TextureRegistry
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 class PoseLandmarkerPlugin(
     private val activity: FlutterActivity,
     flutterEngine: FlutterEngine,
+    private val segmentationHelper: SelfieSegmentationHelper?,
 ) : MethodChannel.MethodCallHandler, EventChannel.StreamHandler {
     private val methodChannel = MethodChannel(
         flutterEngine.dartExecutor.binaryMessenger,
@@ -43,7 +49,7 @@ class PoseLandmarkerPlugin(
     private var preview: Preview? = null
     private var imageAnalysis: ImageAnalysis? = null
     private var poseLandmarkerHelper: PoseLandmarkerHelper? = null
-    private var useFrontCamera = false
+    private var useFrontCamera = true
     private var detectionEnabled = true
 
     init {
@@ -96,7 +102,7 @@ class PoseLandmarkerPlugin(
     }
 
     private fun initialize(call: MethodCall, result: MethodChannel.Result) {
-        useFrontCamera = call.argument<Boolean>("useFrontCamera") ?: false
+        useFrontCamera = call.argument<Boolean>("useFrontCamera") ?: true
         detectionEnabled = true
 
         try {
@@ -193,6 +199,7 @@ class PoseLandmarkerPlugin(
 
         val analysisUseCase = ImageAnalysis.Builder()
             .setTargetResolution(Size(TARGET_WIDTH, TARGET_HEIGHT))
+            .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
             .build()
             .also { configuredAnalysis ->
@@ -202,9 +209,9 @@ class PoseLandmarkerPlugin(
                         return@setAnalyzer
                     }
 
-                    helper.detectLiveStream(
+                    analyzeFrame(
                         imageProxy = imageProxy,
-                        isFrontCamera = useFrontCamera,
+                        helper = helper,
                     )
                 }
             }
@@ -213,6 +220,121 @@ class PoseLandmarkerPlugin(
         imageAnalysis = analysisUseCase
 
         provider.bindToLifecycle(activity, cameraSelector, previewUseCase, analysisUseCase)
+    }
+
+    private fun analyzeFrame(
+        imageProxy: ImageProxy,
+        helper: PoseLandmarkerHelper,
+    ) {
+        try {
+            val timestampMs = imageProxy.imageInfo.timestamp / 1_000_000L
+            val rotationDegrees = imageProxy.imageInfo.rotationDegrees
+            val rawBitmap = rgbaImageProxyToBitmap(imageProxy)
+            val rotatedBitmap = rotateBitmap(rawBitmap, rotationDegrees)
+            if (rotatedBitmap !== rawBitmap) {
+                rawBitmap.recycle()
+            }
+
+            val frameOwner = SharedBitmapFrame(rotatedBitmap)
+
+            frameOwner.retain()
+            val segmentationRelease = frameOwner.releaseCallback()
+            val segmentationStarted = segmentationHelper?.detectLiveStream(
+                bitmap = rotatedBitmap,
+                timestampMs = timestampMs,
+                onComplete = segmentationRelease,
+            ) ?: false
+            if (!segmentationStarted) {
+                segmentationRelease()
+            }
+
+            frameOwner.retain()
+            val poseRelease = frameOwner.releaseCallback()
+            val poseStarted = helper.detectLiveStream(
+                bitmap = rotatedBitmap,
+                timestampMs = timestampMs,
+                frameWidth = imageProxy.width,
+                frameHeight = imageProxy.height,
+                rotationDegrees = rotationDegrees,
+                isFrontCamera = useFrontCamera,
+                onComplete = poseRelease,
+            )
+            if (!poseStarted) {
+                poseRelease()
+            }
+
+            frameOwner.release()
+        } catch (exception: Exception) {
+            emitError("pose_landmarker_frame", exception.message)
+        } finally {
+            imageProxy.close()
+        }
+    }
+
+    private fun rgbaImageProxyToBitmap(imageProxy: ImageProxy): Bitmap {
+        val plane = imageProxy.planes.firstOrNull()
+            ?: throw IllegalStateException("RGBA camera frame has no image plane.")
+        val width = imageProxy.width
+        val height = imageProxy.height
+        val pixelStride = plane.pixelStride
+        val rowStride = plane.rowStride
+        val rowPadding = rowStride - pixelStride * width
+        val bitmapWidth = width + rowPadding / pixelStride
+
+        plane.buffer.rewind()
+        val paddedBitmap = Bitmap.createBitmap(bitmapWidth, height, Bitmap.Config.ARGB_8888)
+        paddedBitmap.copyPixelsFromBuffer(plane.buffer)
+
+        if (bitmapWidth == width) {
+            return paddedBitmap
+        }
+
+        val croppedBitmap = Bitmap.createBitmap(paddedBitmap, 0, 0, width, height)
+        paddedBitmap.recycle()
+        return croppedBitmap
+    }
+
+    private fun rotateBitmap(bitmap: Bitmap, rotationDegrees: Int): Bitmap {
+        if (rotationDegrees == 0) {
+            return bitmap
+        }
+
+        val matrix = Matrix().apply {
+            postRotate(rotationDegrees.toFloat())
+        }
+
+        return Bitmap.createBitmap(
+            bitmap,
+            0,
+            0,
+            bitmap.width,
+            bitmap.height,
+            matrix,
+            true,
+        )
+    }
+
+    private class SharedBitmapFrame(private val bitmap: Bitmap) {
+        private val references = AtomicInteger(1)
+
+        fun retain() {
+            references.incrementAndGet()
+        }
+
+        fun release() {
+            if (references.decrementAndGet() == 0 && !bitmap.isRecycled) {
+                bitmap.recycle()
+            }
+        }
+
+        fun releaseCallback(): () -> Unit {
+            val didRelease = AtomicBoolean(false)
+            return {
+                if (didRelease.compareAndSet(false, true)) {
+                    release()
+                }
+            }
+        }
     }
 
     private fun resolveCameraSelector(provider: ProcessCameraProvider): CameraSelector {

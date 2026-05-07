@@ -63,12 +63,14 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   List<CameraDescription> _availableCameras = const [];
   int? _textureId;
   int _cameraIndex = -1;
-  CameraLensDirection _currentLens = CameraLensDirection.back;
+  CameraLensDirection _currentLens = CameraLensDirection.front;
   PermissionStatus? _permissionStatus;
   bool _isInitializing = false;
   bool _isProcessingFrame = false;
   bool _isCameraReady = false;
   bool _didComplete = false;
+  bool _isDisposed = false;
+  bool _isCompletingSet = false;
   String? _cameraErrorMessage;
   Map<String, String> _feedback = {};
   Pose? _detectedPose;
@@ -106,8 +108,10 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   int _debugBackTapCount = 0;
   DateTime? _debugFirstBackTap;
   Timer? _pendingStaffBackTimer;
+  Timer? _setCompleteTimer;
   DateTime? _lastPersonDetectionAt;
   bool _personDetectionInFlight = false;
+  Future<void>? _pipelineShutdownFuture;
   static const Duration _personDetectionInterval = Duration(milliseconds: 450);
 
   @override
@@ -125,18 +129,48 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
   @override
   void dispose() {
+    _isDisposed = true;
+    _didComplete = true;
+    _isCompletingSet = true;
     _setTimer?.cancel();
     _pendingStaffBackTimer?.cancel();
-    final landmarkSubscription = _landmarkSubscription;
-    _landmarkSubscription = null;
-    unawaited(landmarkSubscription?.cancel() ?? Future<void>.value());
-    unawaited(_disposeFallbackCamera());
-    unawaited(_poseChannel.dispose().catchError((_) {}));
+    _setCompleteTimer?.cancel();
     _poseDetector.close();
-    unawaited(widget.exercise.disposeDetectors());
     _voiceCoach?.dispose();
+    _voiceCoach = null;
+    unawaited(_shutdownPipelines());
     _pulseController.dispose();
     super.dispose();
+  }
+
+  Future<void> _stopAndDisposePoseChannel() async {
+    try {
+      await _poseChannel.stopDetection();
+    } catch (_) {}
+    try {
+      await _poseChannel.dispose();
+    } catch (_) {}
+  }
+
+  Future<void> _shutdownPipelines() {
+    return _pipelineShutdownFuture ??= _shutdownPipelinesOnce();
+  }
+
+  Future<void> _shutdownPipelinesOnce() async {
+    _setTimer?.cancel();
+    _pendingStaffBackTimer?.cancel();
+
+    final landmarkSubscription = _landmarkSubscription;
+    _landmarkSubscription = null;
+    try {
+      await landmarkSubscription?.cancel();
+    } catch (_) {}
+
+    try {
+      await widget.exercise.disposeDetectors();
+    } catch (_) {}
+    await _stopAndDisposePoseChannel();
+    await _disposeFallbackCamera();
   }
 
   Future<void> _loadDebugMode() async {
@@ -317,8 +351,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   Future<void> _initCamera() async {
+    if (_isDisposed) return;
     await _disposeFallbackCamera();
-    if (mounted) {
+    if (!_isDisposed && mounted) {
       setState(() {
         _isInitializing = true;
         _isCameraReady = false;
@@ -328,9 +363,10 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     }
 
     final status = await Permission.camera.request();
+    if (_isDisposed || !mounted) return;
     _permissionStatus = status;
     if (!status.isGranted) {
-      if (mounted) {
+      if (!_isDisposed && mounted) {
         setState(() {
           _isInitializing = false;
           _isCameraReady = false;
@@ -347,8 +383,15 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       final textureId = await _poseChannel.initialize(
         useFrontCamera: _currentLens == CameraLensDirection.front,
       );
+      if (_isDisposed || !mounted) {
+        await _stopAndDisposePoseChannel();
+        return;
+      }
       await _poseChannel.startDetection();
-      if (!mounted) return;
+      if (_isDisposed || !mounted) {
+        await _stopAndDisposePoseChannel();
+        return;
+      }
 
       setState(() {
         _runtime = _PoseRuntime.nativeMediaPipe;
@@ -357,11 +400,12 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         _isInitializing = false;
       });
     } on PlatformException catch (error) {
+      if (_isDisposed || !mounted) return;
       if (_shouldUseMlKitFallback(error)) {
         await _startMlKitFallback(error.message);
         return;
       }
-      if (mounted) {
+      if (!_isDisposed && mounted) {
         setState(() {
           _isInitializing = false;
           _isCameraReady = false;
@@ -373,14 +417,17 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     } on MissingPluginException catch (_) {
       // Native MediaPipe channel not implemented on this platform (e.g. iOS)
       // → fallback to Flutter camera + ML Kit
+      if (_isDisposed || !mounted) return;
       await _startMlKitFallback('Native pose landmarker not available on iOS');
     } catch (_) {
       // Any other error → also try ML Kit fallback
+      if (_isDisposed || !mounted) return;
       await _startMlKitFallback('Unknown camera init error');
     }
   }
 
   Future<void> _toggleCamera() async {
+    if (_isDisposed || _isCompletingSet) return;
     final nextLens = _currentLens == CameraLensDirection.back
         ? CameraLensDirection.front
         : CameraLensDirection.back;
@@ -430,15 +477,20 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   Future<void> _handleLandmarkEvent(Map<String, dynamic> data) async {
-    if (_isProcessingFrame || _didComplete) {
+    if (_isDisposed ||
+        _isCompletingSet ||
+        _didComplete ||
+        (_isProcessingFrame && !ExerciseBase.kDiagnosticMode)) {
       return;
     }
 
-    _isProcessingFrame = true;
+    if (!ExerciseBase.kDiagnosticMode) {
+      _isProcessingFrame = true;
+    }
 
     try {
-      final inputImage = PoseLandmarkerAdapter.inputImageFromChannelData(data);
-      _schedulePersonDetection(inputImage);
+      if (_isDisposed) return;
+      _schedulePersonDetection();
 
       _currentLens = PoseLandmarkerAdapter.lensDirectionFromChannelData(data);
       _imageRotation =
@@ -450,20 +502,27 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       if (pose != null) {
         _handlePose(pose);
       } else {
+        if (_isDisposed) return;
         _detectedPose = null;
         _feedback = widget.exercise.processNoPoseFrame();
         _processVoiceFrame(hasPose: false);
       }
 
-      if (mounted) {
+      if (!_isDisposed && mounted) {
         setState(() {});
       }
     } finally {
-      _isProcessingFrame = false;
+      if (!ExerciseBase.kDiagnosticMode) {
+        _isProcessingFrame = false;
+      }
     }
   }
 
   void _handlePoseResult(List<dynamic>? result) {
+    if (_isDisposed) {
+      return;
+    }
+
     if (result != null &&
         result.length == 2 &&
         result.first is int &&
@@ -477,18 +536,39 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
     if (widget.exercise.exerciseState == ExerciseState.completed &&
         !_didComplete) {
-      _didComplete = true;
-      unawaited(_poseChannel.stopDetection());
-      Future.delayed(const Duration(milliseconds: 700), () {
-        if (mounted) {
-          widget.onSetComplete(widget.exercise.logger);
-        }
-      });
+      _scheduleSetCompletion();
     }
   }
 
+  void _scheduleSetCompletion() {
+    if (_didComplete || _isCompletingSet || _isDisposed) {
+      return;
+    }
+
+    _didComplete = true;
+    _isCompletingSet = true;
+    _setCompleteTimer?.cancel();
+    unawaited(_poseChannel.stopDetection().catchError((Object _) {}));
+
+    // Give the completion cue a short breath, then make teardown deterministic
+    // before the parent swaps this active page out of the tree.
+    _setCompleteTimer = Timer(const Duration(milliseconds: 250), () {
+      unawaited(_finishSetAndNotifyParent());
+    });
+  }
+
+  Future<void> _finishSetAndNotifyParent() async {
+    if (_isDisposed) return;
+    await _shutdownPipelines();
+    _voiceCoach?.dispose();
+    _voiceCoach = null;
+
+    if (_isDisposed || !mounted) return;
+    widget.onSetComplete(widget.exercise.logger);
+  }
+
   void _handleLandmarkStreamError(Object error) {
-    if (!mounted) {
+    if (_isDisposed || !mounted) {
       return;
     }
 
@@ -500,12 +580,14 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   Future<void> _startMlKitFallback(String? nativeErrorMessage) async {
+    if (_isDisposed) return;
     debugPrint(
       '[Vika] Falling back to Flutter camera + ML Kit: ${nativeErrorMessage ?? "unknown native init error"}',
     );
     try {
       await _poseChannel.dispose();
     } catch (_) {}
+    if (_isDisposed || !mounted) return;
     await _initMlKitCamera();
   }
 
@@ -519,11 +601,13 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   Future<void> _initMlKitCamera() async {
+    if (_isDisposed) return;
     await _disposeFallbackCamera();
+    if (_isDisposed || !mounted) return;
 
     final cameras = await availableCameras();
+    if (_isDisposed || !mounted) return;
     if (cameras.isEmpty) {
-      if (!mounted) return;
       setState(() {
         _runtime = _PoseRuntime.mlKitFallback;
         _isInitializing = false;
@@ -565,8 +649,12 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
       try {
         await controller.initialize().timeout(const Duration(seconds: 6));
+        if (_isDisposed || !mounted) {
+          await controller.dispose();
+          return;
+        }
         await controller.startImageStream(_processFallbackCameraImage);
-        if (!mounted) {
+        if (_isDisposed || !mounted) {
           await controller.dispose();
           return;
         }
@@ -590,7 +678,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       }
     }
 
-    if (!mounted) return;
+    if (_isDisposed || !mounted) return;
     setState(() {
       _runtime = _PoseRuntime.mlKitFallback;
       _isInitializing = false;
@@ -600,9 +688,11 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   Future<void> _switchMlKitCamera(CameraLensDirection nextLens) async {
+    if (_isDisposed) return;
     if (_availableCameras.isEmpty) {
       _availableCameras = await availableCameras();
     }
+    if (_isDisposed || !mounted) return;
     final newIndex = _availableCameras.indexWhere(
       (camera) => camera.lensDirection == nextLens,
     );
@@ -622,8 +712,12 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
           : ImageFormatGroup.bgra8888,
     );
     await controller.initialize();
+    if (_isDisposed || !mounted) {
+      await controller.dispose();
+      return;
+    }
     await controller.startImageStream(_processFallbackCameraImage);
-    if (!mounted) {
+    if (_isDisposed || !mounted) {
       await controller.dispose();
       return;
     }
@@ -653,16 +747,24 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   void _processFallbackCameraImage(CameraImage cameraImage) {
-    if (_isProcessingFrame || _didComplete) {
+    if (_isDisposed ||
+        _isCompletingSet ||
+        _didComplete ||
+        (_isProcessingFrame && !ExerciseBase.kDiagnosticMode)) {
       return;
     }
-    _isProcessingFrame = true;
+    if (!ExerciseBase.kDiagnosticMode) {
+      _isProcessingFrame = true;
+    }
     _detectPoseFromFallback(cameraImage).whenComplete(() {
-      _isProcessingFrame = false;
+      if (!ExerciseBase.kDiagnosticMode) {
+        _isProcessingFrame = false;
+      }
     });
   }
 
   Future<void> _detectPoseFromFallback(CameraImage cameraImage) async {
+    if (_isDisposed || _isCompletingSet) return;
     try {
       final inputImage = _buildInputImage(cameraImage);
       if (inputImage == null) {
@@ -671,20 +773,22 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
       _schedulePersonDetection(inputImage);
       final poses = await _poseDetector.processImage(inputImage);
+      if (_isDisposed || _isCompletingSet || !mounted) return;
 
       if (poses.isNotEmpty) {
         _handlePose(poses.first);
       } else {
+        if (_isDisposed) return;
         _detectedPose = null;
         _feedback = widget.exercise.processNoPoseFrame();
         _processVoiceFrame(hasPose: false);
       }
 
-      if (mounted) {
+      if (!_isDisposed && mounted) {
         setState(() {});
       }
     } catch (_) {
-      if (!mounted) return;
+      if (_isDisposed || !mounted) return;
       setState(() {
         _isCameraReady = false;
         _cameraErrorMessage = 'Khong the nhan du lieu pose. Hay thu lai.';
@@ -693,12 +797,17 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   void _handlePose(Pose pose) {
+    if (_isDisposed) {
+      return;
+    }
+
     _detectedPose = pose;
     _handlePoseResult(widget.exercise.processPose(pose.landmarks));
   }
 
-  void _schedulePersonDetection(InputImage? inputImage) {
-    if (inputImage == null ||
+  void _schedulePersonDetection([InputImage? inputImage]) {
+    if (_isDisposed ||
+        _isCompletingSet ||
         _personDetectionInFlight ||
         widget.exercise.exerciseState == ExerciseState.completed) {
       return;
@@ -717,12 +826,17 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
           .runPersonDetection(inputImage)
           .catchError((Object _) {})
           .whenComplete(() {
+        if (_isDisposed) return;
         _personDetectionInFlight = false;
       }),
     );
   }
 
   void _processVoiceFrame({required bool hasPose}) {
+    if (_isDisposed) {
+      return;
+    }
+
     final coach = _voiceCoach;
     if (coach == null) {
       return;
@@ -791,6 +905,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     _setTimer?.cancel();
     _setTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
+      if (_isDisposed || _isCompletingSet) return;
       if (widget.exercise.isPaused) return;
       if (widget.exercise.exerciseState != ExerciseState.activated) return;
       setState(() => _setElapsedSeconds++);
@@ -1001,6 +1116,13 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                         imageSize: _imageSize,
                         rotation: _imageRotation,
                         lensDirection: _currentLens,
+                        // Native texture preview and native pose landmarks
+                        // are produced from the same oriented frame. The old
+                        // Flutter camera fallback still needs front-camera
+                        // mirroring to match CameraPreview.
+                        mirrorHorizontally:
+                            _runtime == _PoseRuntime.mlKitFallback &&
+                                _currentLens == CameraLensDirection.front,
                         debugData: widget.exercise.debugData,
                         style: SkeletonStyle.vikaCream),
                   );

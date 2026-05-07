@@ -14,22 +14,25 @@ final class PoseLandmarkerService: NSObject,
     private static var diagnosticFrameIndex = 0
 
     private let textureRegistry: FlutterTextureRegistry
+    private weak var segmentationService: SegmentationService?
     private var eventSink: FlutterEventSink?
     private let captureSession = AVCaptureSession()
     private let sessionQueue = DispatchQueue(label: "com.vikavn.app.pose.session")
     private let pixelBufferQueue = DispatchQueue(label: "com.vikavn.app.pose.texture")
     private let pendingFrameQueue = DispatchQueue(label: "com.vikavn.app.pose.pending_frames")
-    private var latestPixelBuffer: CVPixelBuffer?
+    private var latestPixelBuffer: Unmanaged<CVPixelBuffer>?
     private var textureId: Int64?
     private var videoOutput = AVCaptureVideoDataOutput()
     private var poseLandmarker: PoseLandmarker?
-    private var currentCameraPosition: AVCaptureDevice.Position = .back
+    private var currentCameraPosition: AVCaptureDevice.Position = .front
     private var detectionEnabled = true
     private var lastSubmittedTimestampMs = Int.min
     private var pendingFrames: [Int: FramePayload] = [:]
 
-    init(textureRegistry: FlutterTextureRegistry) {
+    init(textureRegistry: FlutterTextureRegistry,
+         segmentationService: SegmentationService? = nil) {
         self.textureRegistry = textureRegistry
+        self.segmentationService = segmentationService
         super.init()
     }
 
@@ -46,16 +49,13 @@ final class PoseLandmarkerService: NSObject,
 
     // MARK: - Flutter texture
     func copyPixelBuffer() -> Unmanaged<CVPixelBuffer>? {
-        var pixelBuffer: CVPixelBuffer?
+        var pixelBuffer: Unmanaged<CVPixelBuffer>?
         pixelBufferQueue.sync {
             pixelBuffer = latestPixelBuffer
             latestPixelBuffer = nil
         }
 
-        guard let pixelBuffer = pixelBuffer else {
-            return nil
-        }
-        return Unmanaged.passRetained(pixelBuffer)
+        return pixelBuffer
     }
 
     // MARK: - Public API matching lib/pose/pose_landmarker_channel.dart
@@ -128,6 +128,9 @@ final class PoseLandmarkerService: NSObject,
             }
             self.lastSubmittedTimestampMs = Int.min
             self.pixelBufferQueue.sync {
+                if let latestPixelBuffer = self.latestPixelBuffer {
+                    latestPixelBuffer.release()
+                }
                 self.latestPixelBuffer = nil
             }
 
@@ -253,8 +256,12 @@ final class PoseLandmarkerService: NSObject,
             return
         }
 
+        let retainedPixelBuffer = Unmanaged.passRetained(pixelBuffer)
         pixelBufferQueue.sync {
-            latestPixelBuffer = pixelBuffer
+            if let latestPixelBuffer = latestPixelBuffer {
+                latestPixelBuffer.release()
+            }
+            latestPixelBuffer = retainedPixelBuffer
         }
         if let textureId = textureId {
             DispatchQueue.main.async {
@@ -273,6 +280,14 @@ final class PoseLandmarkerService: NSObject,
 
         let frameWidth = CVPixelBufferGetWidth(pixelBuffer)
         let frameHeight = CVPixelBufferGetHeight(pixelBuffer)
+        segmentationService?.detect(
+            sampleBuffer: sampleBuffer,
+            timestampMs: timestampMs,
+            imageWidth: frameWidth,
+            imageHeight: frameHeight,
+            orientation: .up
+        )
+
         storePendingFrame(
             timestampMs: timestampMs,
             payload: FramePayload(
@@ -337,6 +352,14 @@ final class PoseLandmarkerService: NSObject,
             "x": landmark.x,
             "y": landmark.y,
             "z": landmark.z,
+            "presence": landmarkPresence(
+                visibility: landmark.visibility,
+                presence: landmark.presence
+            ),
+            "visibility": landmarkVisibility(
+                visibility: landmark.visibility,
+                presence: landmark.presence
+            ),
             "likelihood": landmarkScore(visibility: landmark.visibility, presence: landmark.presence),
         ]
     }
@@ -347,11 +370,27 @@ final class PoseLandmarkerService: NSObject,
             "x": landmark.x,
             "y": landmark.y,
             "z": landmark.z,
+            "presence": landmarkPresence(
+                visibility: landmark.visibility,
+                presence: landmark.presence
+            ),
+            "visibility": landmarkVisibility(
+                visibility: landmark.visibility,
+                presence: landmark.presence
+            ),
             "likelihood": landmarkScore(visibility: landmark.visibility, presence: landmark.presence),
         ]
     }
 
     private func landmarkScore(visibility: NSNumber?, presence: NSNumber?) -> Float {
+        (visibility ?? presence)?.floatValue ?? 0.0
+    }
+
+    private func landmarkPresence(visibility: NSNumber?, presence: NSNumber?) -> Float {
+        (presence ?? visibility)?.floatValue ?? 0.0
+    }
+
+    private func landmarkVisibility(visibility: NSNumber?, presence: NSNumber?) -> Float {
         (visibility ?? presence)?.floatValue ?? 0.0
     }
 
@@ -383,25 +422,21 @@ final class PoseLandmarkerService: NSObject,
     }
 
     private static func logDiagnosticFrame(result: PoseLandmarkerResult?) {
-        guard !didFinishDiagnosticLogging else { return }
+    let frameIndex = diagnosticFrameIndex
+    let poses = result?.landmarks ?? []
 
-        let frameIndex = diagnosticFrameIndex
-        let poses = result?.landmarks ?? []
-
-        if poses.isEmpty {
-            print("[VIKA-DIAG] frame=\(frameIndex) landmarks=empty")
-        } else {
-            let landmark = poses[0][0]
-            print(
-                "[VIKA-DIAG] frame=\(frameIndex) landmarks=poses count=\(poses.count) landmark[0][0]=\(String(describing: landmark)) x=\(String(describing: landmark.x)) y=\(String(describing: landmark.y)) z=\(String(describing: landmark.z)) visibility=\(String(describing: landmark.visibility)) presence=\(String(describing: landmark.presence))"
-            )
-        }
-
-        diagnosticFrameIndex += 1
-        if diagnosticFrameIndex >= 30 {
-            didFinishDiagnosticLogging = true
+    if poses.isEmpty {
+        print("[VIKA-DIAG] f=\(frameIndex) empty")
+    } else {
+        for (idx, lm) in poses[0].enumerated() {
+            let v = lm.visibility?.floatValue ?? -1
+            let p = lm.presence?.floatValue ?? -1
+            print("[VIKA-DIAG] f=\(frameIndex) idx=\(idx) v=\(v) p=\(p)")
         }
     }
+
+    diagnosticFrameIndex += 1
+}
 
     private struct FramePayload {
         let frameWidth: Int

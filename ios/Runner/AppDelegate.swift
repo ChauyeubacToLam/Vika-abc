@@ -16,8 +16,13 @@ import Flutter
             return super.application(application, didFinishLaunchingWithOptions: launchOptions)
         }
 
-        let poseRegistrar = registrar(forPlugin: "PoseLandmarkerService")
-        let poseService = PoseLandmarkerService(textureRegistry: poseRegistrar.textures())
+        guard let poseRegistrar = registrar(forPlugin: "PoseLandmarkerService") else {
+            fatalError("Failed to get FlutterPluginRegistrar for PoseLandmarkerService")
+        }
+        let poseService = PoseLandmarkerService(
+            textureRegistry: poseRegistrar.textures(),
+            segmentationService: segmentationService
+        )
         self.poseService = poseService
 
         let methodChannel = FlutterMethodChannel(
@@ -30,13 +35,21 @@ import Flutter
             binaryMessenger: controller.binaryMessenger
         )
 
-        let segmentationEventChannel = FlutterEventChannel(
+        let segmentationMethodChannel = FlutterMethodChannel(
             name: "com.vikavn.app/segmentation",
+            binaryMessenger: controller.binaryMessenger
+        )
+
+        let segmentationEventChannel = FlutterEventChannel(
+            name: "com.vikavn.app/segmentation_stream",
             binaryMessenger: controller.binaryMessenger
         )
 
         eventChannel.setStreamHandler(poseService)
         segmentationEventChannel.setStreamHandler(segmentationService)
+        segmentationMethodChannel.setMethodCallHandler { [weak self] call, result in
+            self?.segmentationService.handle(call, result: result)
+        }
 
         methodChannel.setMethodCallHandler { [weak self] call, result in
             guard let self = self else { return }
@@ -44,7 +57,7 @@ import Flutter
             switch call.method {
             case "initialize":
                 let args = call.arguments as? [String: Any]
-                let useFrontCamera = (args?["useFrontCamera"] as? Bool) ?? false
+                let useFrontCamera = (args?["useFrontCamera"] as? Bool) ?? true
                 self.poseService?.initialize(useFrontCamera: useFrontCamera) { initializeResult in
                     DispatchQueue.main.async {
                         switch initializeResult {
