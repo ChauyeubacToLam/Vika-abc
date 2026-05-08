@@ -802,7 +802,12 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     }
 
     _detectedPose = pose;
-    _handlePoseResult(widget.exercise.processPose(pose.landmarks));
+    _handlePoseResult(
+      widget.exercise.processPose(
+        pose.landmarks,
+        imageSize: _imageSize == Size.zero ? null : _imageSize,
+      ),
+    );
   }
 
   void _schedulePersonDetection([InputImage? inputImage]) {
@@ -1282,7 +1287,6 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                       guidanceCopy != null
                   ? const SizedBox.shrink()
                   : Center(
-                      key: ValueKey<_LiveOverlayState>(overlayState),
                       child: _CenterOverlay(
                         state: overlayState,
                         pulseController: _pulseController,
@@ -1473,12 +1477,33 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         mode: SystemBannerMode.warn,
       );
     }
+    if (normalized.contains('đang tìm người')) {
+      return const _GuidanceCopy(
+        icon: Icons.person_search_rounded,
+        title: 'Đang tìm người',
+        body: 'Đứng trong khung hình để bắt đầu theo dõi.',
+        mode: SystemBannerMode.scan,
+      );
+    }
+    if (normalized.contains('tạm dừng') ||
+        normalized.contains('quay lại khung hình')) {
+      return const _GuidanceCopy(
+        icon: Icons.pause_circle_filled_rounded,
+        title: 'Tạm dừng',
+        body: 'Quay lại khung hình để AI tiếp tục theo dõi.',
+        mode: SystemBannerMode.pause,
+      );
+    }
+    if (normalized.contains('phần trên cơ thể')) {
+      return const _GuidanceCopy(
+        icon: Icons.fit_screen_rounded,
+        title: 'Đưa thân trên vào khung',
+        body: 'Lùi lại một chút để thấy rõ vai, khuỷu tay, cổ tay và hông.',
+        mode: SystemBannerMode.warn,
+      );
+    }
     if (rawNormalized.contains('body not fully visible') ||
-        normalized.contains('toàn thân') ||
-        normalized.contains('phần trên cơ thể') ||
-        normalized.contains('trong khung hình') ||
-        normalized.contains('vai, hông') ||
-        normalized.contains('vai, hông và gối')) {
+        normalized.contains('toàn thân')) {
       return const _GuidanceCopy(
         icon: Icons.fit_screen_rounded,
         title: 'Đưa toàn thân vào khung',
@@ -1487,12 +1512,14 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         mode: SystemBannerMode.warn,
       );
     }
-    if (normalized.contains('đang tìm người')) {
+    if (normalized.contains('trong khung hình') ||
+        normalized.contains('vai, hông') ||
+        normalized.contains('vai, hông và gối')) {
       return const _GuidanceCopy(
-        icon: Icons.person_search_rounded,
-        title: 'Đang tìm người',
-        body: 'Đứng trong khung hình và giữ toàn thân rõ để bắt đầu theo dõi.',
-        mode: SystemBannerMode.scan,
+        icon: Icons.fit_screen_rounded,
+        title: 'Đưa cơ thể vào khung',
+        body: 'Lùi lại hoặc chỉnh góc máy để các mốc cần theo dõi hiện rõ.',
+        mode: SystemBannerMode.warn,
       );
     }
     if (normalized.contains('vào tư thế') ||

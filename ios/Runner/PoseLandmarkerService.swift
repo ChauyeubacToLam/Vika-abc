@@ -10,9 +10,6 @@ final class PoseLandmarkerService: NSObject,
                                    AVCaptureVideoDataOutputSampleBufferDelegate,
                                    PoseLandmarkerLiveStreamDelegate {
 
-    private static var didFinishDiagnosticLogging = false
-    private static var diagnosticFrameIndex = 0
-
     private let textureRegistry: FlutterTextureRegistry
     private weak var segmentationService: SegmentationService?
     private var eventSink: FlutterEventSink?
@@ -315,8 +312,6 @@ final class PoseLandmarkerService: NSObject,
                         didFinishDetection result: PoseLandmarkerResult?,
                         timestampInMilliseconds: Int,
                         error: Error?) {
-        Self.logDiagnosticFrame(result: result)
-
         if let error = error {
             sendError(code: "pose_landmarker_stream", message: error.localizedDescription)
             return
@@ -420,23 +415,6 @@ final class PoseLandmarkerService: NSObject,
             self.eventSink?(FlutterError(code: code, message: message, details: nil))
         }
     }
-
-    private static func logDiagnosticFrame(result: PoseLandmarkerResult?) {
-    let frameIndex = diagnosticFrameIndex
-    let poses = result?.landmarks ?? []
-
-    if poses.isEmpty {
-        print("[VIKA-DIAG] f=\(frameIndex) empty")
-    } else {
-        for (idx, lm) in poses[0].enumerated() {
-            let v = lm.visibility?.floatValue ?? -1
-            let p = lm.presence?.floatValue ?? -1
-            print("[VIKA-DIAG] f=\(frameIndex) idx=\(idx) v=\(v) p=\(p)")
-        }
-    }
-
-    diagnosticFrameIndex += 1
-}
 
     private struct FramePayload {
         let frameWidth: Int

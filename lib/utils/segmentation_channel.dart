@@ -48,14 +48,9 @@ class SegmentationChannel {
     return response ?? const <String, dynamic>{'success': true};
   }
 
-  Future<void> debugLog(String message) async {
-    try {
-      await _methodChannel.invokeMethod<void>(
-        'debugLog',
-        <String, dynamic>{'message': message},
-      );
-    } catch (_) {
-      // Diagnostic logging is best-effort and must never affect detection.
-    }
+  Future<Map<String, dynamic>> requestSample() async {
+    final response =
+        await _methodChannel.invokeMapMethod<String, dynamic>('requestSample');
+    return response ?? const <String, dynamic>{'success': true};
   }
 }

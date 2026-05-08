@@ -30,6 +30,7 @@ private final class RetainedSampleBuffer: @unchecked Sendable {
  *                minProcessIntervalMs? }) -> { success: true }
  * - start() -> { success: true }
  * - stop() -> { success: true }
+ * - requestSample() -> { success: true }
  * - dispose() -> { success: true }
  *
  * EventChannel("com.vikavn.app/segmentation_stream") emits:
@@ -54,6 +55,8 @@ final class SegmentationService: NSObject, FlutterStreamHandler {
     private var pixelConfidenceThreshold: Float = 0.92
     private var softPixelConfidenceThreshold: Float = 0.55
     private var minProcessIntervalMs = 140
+    private var bypassThrottleOnce = false
+    private let bypassLock = NSLock()
 
     override init() {
         super.init()
@@ -89,15 +92,12 @@ final class SegmentationService: NSObject, FlutterStreamHandler {
             }
             result(["success": true])
 
-        case "dispose":
-            disposeSegmenter()
+        case "requestSample":
+            requestSample()
             result(["success": true])
 
-        case "debugLog":
-            if let args = call.arguments as? [String: Any],
-               let message = args["message"] as? String {
-                print("[VIKA-DIAG] \(message)")
-            }
+        case "dispose":
+            disposeSegmenter()
             result(["success": true])
 
         default:
@@ -117,24 +117,30 @@ final class SegmentationService: NSObject, FlutterStreamHandler {
     }
 
     // MARK: - Public API
+    @objc func requestSample() {
+        bypassLock.lock()
+        bypassThrottleOnce = true
+        bypassLock.unlock()
+    }
+
     func detect(sampleBuffer: CMSampleBuffer,
                 timestampMs: Int,
                 imageWidth: Int,
                 imageHeight: Int,
                 orientation: UIImage.Orientation = .up) {
+        guard let activeSegmenter = segmenter else {
+            return
+        }
+
         var shouldProcess = false
         stateQueue.sync {
-            if isRunning &&
-                !isProcessing &&
-                (lastProcessedTimestampMs == Int.min ||
-                    timestampMs - lastProcessedTimestampMs >= minProcessIntervalMs) {
+            if isRunning && !isProcessing && self.shouldProcess(timestampMs: timestampMs) {
                 isProcessing = true
-                lastProcessedTimestampMs = timestampMs
                 shouldProcess = true
             }
         }
 
-        guard shouldProcess, let activeSegmenter = segmenter else {
+        guard shouldProcess else {
             return
         }
 
@@ -301,7 +307,32 @@ final class SegmentationService: NSObject, FlutterStreamHandler {
             isProcessing = false
             lastProcessedTimestampMs = Int.min
         }
+        bypassLock.lock()
+        bypassThrottleOnce = false
+        bypassLock.unlock()
         segmenter = nil
+    }
+
+    private func shouldProcess(timestampMs: Int) -> Bool {
+        bypassLock.lock()
+        let bypass = bypassThrottleOnce
+        if bypass {
+            bypassThrottleOnce = false
+        }
+        bypassLock.unlock()
+
+        if bypass {
+            lastProcessedTimestampMs = timestampMs
+            return true
+        }
+
+        if lastProcessedTimestampMs != Int.min &&
+            timestampMs - lastProcessedTimestampMs < minProcessIntervalMs {
+            return false
+        }
+
+        lastProcessedTimestampMs = timestampMs
+        return true
     }
 
     private func emit(mask: SegmentationMask,

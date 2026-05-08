@@ -3,7 +3,6 @@ package com.vikavn.app
 import android.graphics.Bitmap
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.segmentation.Segmentation
 import com.google.mlkit.vision.segmentation.SegmentationMask
@@ -21,6 +20,7 @@ import io.flutter.plugin.common.MethodChannel
  *                minProcessIntervalMs? }) -> { success: true }
  * - start() -> { success: true }
  * - stop() -> { success: true }
+ * - requestSample() -> { success: true }
  * - dispose() -> { success: true }
  *
  * EventChannel("com.vikavn.app/segmentation_stream") emits:
@@ -45,6 +45,7 @@ class SelfieSegmentationHelper : MethodChannel.MethodCallHandler, EventChannel.S
     @Volatile private var pixelConfidenceThreshold = DEFAULT_PIXEL_CONFIDENCE_THRESHOLD
     @Volatile private var softPixelConfidenceThreshold = DEFAULT_SOFT_PIXEL_CONFIDENCE_THRESHOLD
     @Volatile private var minProcessIntervalMs = DEFAULT_MIN_PROCESS_INTERVAL_MS
+    @Volatile private var bypassThrottleOnce = false
 
     init {
         setupSegmenter()
@@ -72,15 +73,12 @@ class SelfieSegmentationHelper : MethodChannel.MethodCallHandler, EventChannel.S
                 isRunning = false
                 result.success(mapOf("success" to true))
             }
-            "dispose" -> {
-                disposeSegmenter()
+            "requestSample" -> {
+                requestSample()
                 result.success(mapOf("success" to true))
             }
-            "debugLog" -> {
-                val message = call.argument<String>("message")
-                if (message != null) {
-                    Log.d(TAG, "[VIKA-DIAG] $message")
-                }
+            "dispose" -> {
+                disposeSegmenter()
                 result.success(mapOf("success" to true))
             }
             else -> result.notImplemented()
@@ -103,16 +101,13 @@ class SelfieSegmentationHelper : MethodChannel.MethodCallHandler, EventChannel.S
         if (!isRunning || isProcessing) {
             return false
         }
-        if (
-            lastProcessedTimestampMs != Long.MIN_VALUE &&
-            timestampMs - lastProcessedTimestampMs < minProcessIntervalMs
-        ) {
+
+        val activeSegmenter = segmenter ?: return false
+        if (!shouldProcess(timestampMs)) {
             return false
         }
 
-        val activeSegmenter = segmenter ?: return false
         isProcessing = true
-        lastProcessedTimestampMs = timestampMs
 
         val inputImage = InputImage.fromBitmap(bitmap, 0)
         return try {
@@ -133,6 +128,10 @@ class SelfieSegmentationHelper : MethodChannel.MethodCallHandler, EventChannel.S
             emitError("segmentation_failed", exception.message)
             false
         }
+    }
+
+    fun requestSample() {
+        bypassThrottleOnce = true
     }
 
     fun close() {
@@ -157,8 +156,27 @@ class SelfieSegmentationHelper : MethodChannel.MethodCallHandler, EventChannel.S
         isRunning = false
         isProcessing = false
         lastProcessedTimestampMs = Long.MIN_VALUE
+        bypassThrottleOnce = false
         segmenter?.close()
         segmenter = null
+    }
+
+    private fun shouldProcess(nowMs: Long): Boolean {
+        if (bypassThrottleOnce) {
+            bypassThrottleOnce = false
+            lastProcessedTimestampMs = nowMs
+            return true
+        }
+
+        if (
+            lastProcessedTimestampMs != Long.MIN_VALUE &&
+            nowMs - lastProcessedTimestampMs < minProcessIntervalMs
+        ) {
+            return false
+        }
+
+        lastProcessedTimestampMs = nowMs
+        return true
     }
 
     private fun emitResult(
@@ -208,7 +226,6 @@ class SelfieSegmentationHelper : MethodChannel.MethodCallHandler, EventChannel.S
     }
 
     companion object {
-        private const val TAG = "VikaSegmentation"
         private const val DEFAULT_PIXEL_CONFIDENCE_THRESHOLD = 0.92f
         private const val DEFAULT_SOFT_PIXEL_CONFIDENCE_THRESHOLD = 0.55f
         private const val DEFAULT_MIN_PROCESS_INTERVAL_MS = 140
