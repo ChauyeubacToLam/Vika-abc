@@ -7,11 +7,7 @@
     ========================================================================= */
 
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 import 'dart:math' as math;
-
-import 'package:flutter/foundation.dart';
 
 import 'segmentation_channel.dart';
 
@@ -46,10 +42,6 @@ class PersonDetectorConfig {
   /// Soft mask fallback weight. Soft pixels help, but weak confidence alone
   /// should not count as the same evidence as high-confidence person pixels.
   static const double SOFT_RATIO_SCORE_WEIGHT = 0.45;
-
-  static const bool SEGMENT_REQUEST_FILE_LOG_ENABLED = true;
-  static const String SEGMENT_REQUEST_LOG_FILE_NAME =
-      'vika_segment_requests.jsonl';
 }
 
 class PersonDetector {
@@ -155,20 +147,7 @@ class PersonDetector {
 
   /// Counters for trigger frequency, keyed by reason.
   final Map<String, int> _triggerCountByReason = <String, int>{};
-  final Map<String, int> _cooldownSkipCountByReason = <String, int>{};
   DateTime? _lastTriggerAt;
-  Future<void> _lastLogWrite = Future<void>.value();
-  bool _didPrintSegmentRequestLogPath = false;
-
-  String get segmentRequestLogPath {
-    final tempDirectory = Directory.systemTemp;
-    final documentsDirectory = Directory(
-      '${tempDirectory.parent.path}/Documents',
-    );
-    final logDirectory =
-        documentsDirectory.existsSync() ? documentsDirectory : tempDirectory;
-    return '${logDirectory.path}/${PersonDetectorConfig.SEGMENT_REQUEST_LOG_FILE_NAME}';
-  }
 
   /// Trigger frequency map for debug overlay.
   Map<String, int> get triggerCountByReason =>
@@ -180,46 +159,21 @@ class PersonDetector {
   /// Self-rate-limited at 200ms to prevent thrashing if multiple triggers
   /// fire simultaneously.
   Future<void> triggerCheck({String reason = 'unknown'}) async {
-    if (_isClosed || !_isStarted) {
-      unawaited(
-        _appendSegmentRequestLog(
-          reason: reason,
-          status: _isClosed ? 'ignored_closed' : 'ignored_not_started',
-        ),
-      );
-      return;
-    }
+    if (_isClosed || !_isStarted) return;
 
     final now = DateTime.now();
     final last = _lastTriggerAt;
     if (last != null &&
         now.difference(last) < PersonDetectorConfig.REQUEST_SAMPLE_COOLDOWN) {
-      _cooldownSkipCountByReason[reason] =
-          (_cooldownSkipCountByReason[reason] ?? 0) + 1;
       return;
     }
     _lastTriggerAt = now;
 
     _triggerCountByReason[reason] = (_triggerCountByReason[reason] ?? 0) + 1;
-    final skippedByCooldown = _cooldownSkipCountByReason.remove(reason) ?? 0;
-    await _appendSegmentRequestLog(
-      reason: reason,
-      status: 'requested',
-      extra: <String, dynamic>{
-        'cooldownSkipsSinceLastRequest': skippedByCooldown,
-      },
-    );
 
     try {
       await _channel.requestSample();
-    } catch (error) {
-      unawaited(
-        _appendSegmentRequestLog(
-          reason: reason,
-          status: 'request_failed',
-          extra: <String, dynamic>{'error': error.toString()},
-        ),
-      );
+    } catch (_) {
       // Trigger is best-effort. Native may be temporarily unavailable.
     }
   }
@@ -263,13 +217,11 @@ class PersonDetector {
       smoothedSoftPersonRatio = lastSoftPersonRatio;
       presenceScore = currentScore;
       personDetected = false;
-      _logSegmentationEvent();
       return;
     }
 
     if (currentScore >= PersonDetectorConfig.MIN_PERSON_RATIO) {
       personDetected = true;
-      _logSegmentationEvent();
       return;
     }
 
@@ -279,63 +231,6 @@ class PersonDetector {
     } else {
       personDetected = presenceScore >= PersonDetectorConfig.MIN_PERSON_RATIO;
     }
-
-    _logSegmentationEvent();
-  }
-
-  void _logSegmentationEvent() {
-    unawaited(
-      _appendSegmentRequestLog(
-        reason: 'segmentation_event',
-        status: personDetected ? 'person_detected' : 'person_missing',
-      ),
-    );
-  }
-
-  Future<void> _appendSegmentRequestLog({
-    required String reason,
-    required String status,
-    Map<String, dynamic>? extra,
-  }) {
-    if (!PersonDetectorConfig.SEGMENT_REQUEST_FILE_LOG_ENABLED) {
-      return Future<void>.value();
-    }
-
-    final entry = <String, dynamic>{
-      'timestamp': DateTime.now().toIso8601String(),
-      'status': status,
-      'reason': reason,
-      'personDetected': personDetected,
-      'personRatio': lastPersonRatio,
-      'softPersonRatio': lastSoftPersonRatio,
-      'smoothedPersonRatio': smoothedPersonRatio,
-      'smoothedSoftPersonRatio': smoothedSoftPersonRatio,
-      'presenceScore': presenceScore,
-      'segmentationEvents': segmentationEventCount,
-      'lastSegmentationEventAgeMs': lastSegmentationEventAgeMs,
-      'configuredMinProcessIntervalMs': configuredMinProcessIntervalMs,
-      'triggerCounts': _triggerCountByReason,
-    };
-    if (extra != null) {
-      entry.addAll(extra);
-    }
-
-    final logLine = '${jsonEncode(entry)}\n';
-    if (!_didPrintSegmentRequestLogPath) {
-      _didPrintSegmentRequestLogPath = true;
-      debugPrint('[VIKA-SEG-LOG] $segmentRequestLogPath');
-    }
-    debugPrint('[VIKA-SEG] ${logLine.trimRight()}');
-    final write = _lastLogWrite
-        .catchError((_) {})
-        .then((_) => File(segmentRequestLogPath).writeAsString(
-              logLine,
-              mode: FileMode.append,
-              flush: false,
-            ))
-        .then<void>((_) {});
-    _lastLogWrite = write;
-    return write;
   }
 
   /// Free native resources. Call when exercise is activated or app disposes.

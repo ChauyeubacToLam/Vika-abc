@@ -244,7 +244,6 @@ abstract class ExerciseBase {
     debugData['segEventAgeMs'] =
         _personDetector.lastSegmentationEventAgeMs ?? '-';
     debugData['segTriggerCounts'] = _personDetector.triggerCountByReason;
-    debugData['segLogPath'] = _personDetector.segmentRequestLogPath;
     debugData['isPaused'] = _isPaused;
 
     // Person detection — only before activation
@@ -335,7 +334,6 @@ abstract class ExerciseBase {
     debugData['segEventAgeMs'] =
         _personDetector.lastSegmentationEventAgeMs ?? '-';
     debugData['segTriggerCounts'] = _personDetector.triggerCountByReason;
-    debugData['segLogPath'] = _personDetector.segmentRequestLogPath;
     debugData['scaleFactor'] = scaleFactor;
 
     if (exerciseState == ExerciseState.activated) {
@@ -398,7 +396,6 @@ abstract class ExerciseBase {
     debugData['segEventAgeMs'] =
         _personDetector.lastSegmentationEventAgeMs ?? '-';
     debugData['segTriggerCounts'] = _personDetector.triggerCountByReason;
-    debugData['segLogPath'] = _personDetector.segmentRequestLogPath;
     debugData['isPaused'] = _isPaused;
 
     if (exerciseState == ExerciseState.completed) {
