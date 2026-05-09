@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../services/user_program_service.dart';
 import '../theme/vf_theme.dart';
+import '../utils/orientation_lock.dart';
 import '../widgets/vf_primitives.dart';
 import '../models/exercise_definition.dart';
 import 'dashboard_home_screen.dart';
@@ -26,6 +29,7 @@ class _MainShellState extends State<MainShell> {
   @override
   void initState() {
     super.initState();
+    unawaited(OrientationLock.portraitOnly());
     _loadProgram();
   }
 
@@ -276,8 +280,6 @@ class _CenterNavAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = VFTheme.scale(context);
-    final iconColor = active ? VFTheme.white : VFTheme.jadeDark;
-    final labelColor = active ? VFTheme.jade : VFTheme.textMuted;
 
     return InkWell(
       onTap: onTap,

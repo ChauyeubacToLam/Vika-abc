@@ -1,4 +1,6 @@
 import 'package:flutter/services.dart';
+import 'package:vika/exercise/exercise_base.dart';
+import 'package:vika/pose/vika_image_orientation.dart';
 
 class PoseLandmarkerChannel {
   static const MethodChannel _methodChannel = MethodChannel(
@@ -14,10 +16,22 @@ class PoseLandmarkerChannel {
         );
   }
 
-  Future<int> initialize({bool useFrontCamera = true}) async {
+  Future<int> initialize({
+    bool useFrontCamera = true,
+    VikaImageOrientation initialOrientation = VikaImageOrientation.portrait,
+    bool? isFrontCamera,
+  }) async {
+    final arguments = <String, dynamic>{'useFrontCamera': useFrontCamera};
+    if (ExerciseBase.kLandscapeRotationEnabled) {
+      arguments.addAll(<String, dynamic>{
+        'initialOrientation': initialOrientation.channelCode,
+        'isFrontCamera': isFrontCamera ?? useFrontCamera,
+      });
+    }
+
     final textureId = await _methodChannel.invokeMethod<int>(
       'initialize',
-      <String, dynamic>{'useFrontCamera': useFrontCamera},
+      arguments,
     );
     if (textureId == null) {
       throw PlatformException(
@@ -26,6 +40,17 @@ class PoseLandmarkerChannel {
       );
     }
     return textureId;
+  }
+
+  Future<void> setOrientation({
+    required VikaImageOrientation orientation,
+    required bool isFrontCamera,
+  }) async {
+    if (!ExerciseBase.kLandscapeRotationEnabled) return;
+    await _methodChannel.invokeMethod<void>('setOrientation', <String, dynamic>{
+      'orientation': orientation.channelCode,
+      'isFrontCamera': isFrontCamera,
+    });
   }
 
   Future<void> dispose() => _methodChannel.invokeMethod<void>('dispose');

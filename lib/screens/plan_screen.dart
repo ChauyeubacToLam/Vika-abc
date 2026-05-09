@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/exercise_lookup.dart';
 import '../services/user_program_service.dart';
 import '../theme/vf_theme.dart';
+import '../utils/orientation_lock.dart';
 import '../widgets/pose_silhouette.dart';
 import '../widgets/vf_primitives.dart';
 
@@ -27,6 +30,7 @@ class _PlanScreenState extends State<PlanScreen> {
   @override
   void initState() {
     super.initState();
+    unawaited(OrientationLock.portraitOnly());
     selected = DateTime.now().weekday - 1;
   }
 
@@ -307,9 +311,8 @@ class _PlanScreenState extends State<PlanScreen> {
                 (exercise) => _PlanExercise(
                   name: exercise.name,
                   type: UserProgramService.silhouetteType(exercise.pose),
-                  color: exercise.isCorrective
-                      ? const Color(0xFFCBB8F0)
-                      : color,
+                  color:
+                      exercise.isCorrective ? const Color(0xFFCBB8F0) : color,
                   ai: !exercise.isCorrective,
                   locked: exercise.isCorrective && !program.isPro,
                 ),
@@ -391,9 +394,8 @@ class _DateSelectorDay extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = VFTheme.scale(context);
     final hasWorkout = !day.rest;
-    final selectedColor = day.rest
-        ? VFTheme.textMuted.withValues(alpha: 0.15)
-        : VFTheme.jade;
+    final selectedColor =
+        day.rest ? VFTheme.textMuted.withValues(alpha: 0.15) : VFTheme.jade;
 
     final labelColor = selected
         ? (hasWorkout
@@ -693,7 +695,8 @@ class _WorkoutStage extends StatelessWidget {
                               for (final exercise in day.exercises)
                                 SizedBox(
                                   width: itemWidth,
-                                  child: _WorkoutExerciseTile(exercise: exercise),
+                                  child:
+                                      _WorkoutExerciseTile(exercise: exercise),
                                 ),
                             ],
                           );
@@ -708,11 +711,12 @@ class _WorkoutStage extends StatelessWidget {
                           vertical: 4 * s,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFCBB8F0).withValues(alpha: 0.12),
+                          color:
+                              const Color(0xFFCBB8F0).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(8 * s),
                           border: Border.all(
-                            color: const Color(0xFFCBB8F0)
-                                .withValues(alpha: 0.16),
+                            color:
+                                const Color(0xFFCBB8F0).withValues(alpha: 0.16),
                           ),
                         ),
                         child: Text(
@@ -721,8 +725,8 @@ class _WorkoutStage extends StatelessWidget {
                             context,
                             size: 10,
                             weight: FontWeight.w700,
-                            color: const Color(0xFFCBB8F0)
-                                .withValues(alpha: 0.88),
+                            color:
+                                const Color(0xFFCBB8F0).withValues(alpha: 0.88),
                           ),
                         ),
                       ),

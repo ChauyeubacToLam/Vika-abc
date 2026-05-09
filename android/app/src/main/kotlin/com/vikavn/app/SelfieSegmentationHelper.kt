@@ -46,6 +46,8 @@ class SelfieSegmentationHelper : MethodChannel.MethodCallHandler, EventChannel.S
     @Volatile private var softPixelConfidenceThreshold = DEFAULT_SOFT_PIXEL_CONFIDENCE_THRESHOLD
     @Volatile private var minProcessIntervalMs = DEFAULT_MIN_PROCESS_INTERVAL_MS
     @Volatile private var bypassThrottleOnce = false
+    @Volatile private var currentOrientationCode: String? = null
+    @Volatile private var currentOrientationIsFrontCamera = false
 
     init {
         setupSegmenter()
@@ -62,6 +64,10 @@ class SelfieSegmentationHelper : MethodChannel.MethodCallHandler, EventChannel.S
                         ?: softPixelConfidenceThreshold).toFloat()
                 minProcessIntervalMs =
                     call.argument<Int>("minProcessIntervalMs") ?: minProcessIntervalMs
+                setOrientation(
+                    call.argument<String>("initialOrientation"),
+                    call.argument<Boolean>("isFrontCamera") ?: currentOrientationIsFrontCamera,
+                )
                 setupSegmenter()
                 result.success(mapOf("success" to true))
             }
@@ -75,6 +81,18 @@ class SelfieSegmentationHelper : MethodChannel.MethodCallHandler, EventChannel.S
             }
             "requestSample" -> {
                 requestSample()
+                result.success(mapOf("success" to true))
+            }
+            "setOrientation" -> {
+                val orientation = call.argument<String>("orientation")
+                if (orientation == null) {
+                    result.error("segmentation_orientation", "Missing orientation.", null)
+                    return
+                }
+                setOrientation(
+                    orientation,
+                    call.argument<Boolean>("isFrontCamera") ?: currentOrientationIsFrontCamera,
+                )
                 result.success(mapOf("success" to true))
             }
             "dispose" -> {
@@ -132,6 +150,11 @@ class SelfieSegmentationHelper : MethodChannel.MethodCallHandler, EventChannel.S
 
     fun requestSample() {
         bypassThrottleOnce = true
+    }
+
+    fun setOrientation(orientation: String?, isFrontCamera: Boolean) {
+        currentOrientationCode = orientation
+        currentOrientationIsFrontCamera = isFrontCamera
     }
 
     fun close() {
@@ -212,6 +235,8 @@ class SelfieSegmentationHelper : MethodChannel.MethodCallHandler, EventChannel.S
             "imageHeight" to imageHeight,
             "personRatio" to personPixels.toDouble() / totalPixels.toDouble(),
             "softPersonRatio" to softPersonPixels.toDouble() / totalPixels.toDouble(),
+            "orientation" to currentOrientationCode,
+            "isFrontCamera" to currentOrientationIsFrontCamera,
         )
 
         mainHandler.post {

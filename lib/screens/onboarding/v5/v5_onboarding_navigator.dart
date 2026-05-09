@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -5,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:vika/models/exercise_definition.dart';
 import 'package:vika/utils/exercise_logger.dart';
+import 'package:vika/utils/orientation_lock.dart';
 
 import '../onboarding_data.dart';
 import 'screens/s01_welcome.dart';
@@ -43,10 +46,16 @@ class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
 
   // Page indices used for special-case logic.
   static const _idxAssessmentIntro = 6; // S07
-  static const _idxAnalyzing = 7;       // S08
+  static const _idxAnalyzing = 7; // S08
 
   // Screens with dark/inverted backgrounds — drives the status bar overlay.
   static const _darkPages = <int>{0, 7, 15}; // S01, S08, S16
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(OrientationLock.portraitOnly());
+  }
 
   @override
   void dispose() {

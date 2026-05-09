@@ -1,6 +1,7 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, non_constant_identifier_names, constant_identifier_names
 
 import 'package:vika/utils/debouncer.dart';
+import 'package:vika/pose/vika_image_orientation.dart';
 
 import '../../utils/pose_math_helpers.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
@@ -113,6 +114,13 @@ class GluteBridge extends ExerciseBase {
      ----------------------------------------------------------------------- */
   @override
   String get exerciseName => 'Glute Bridge';
+
+  @override
+  Set<VikaImageOrientation> get supportedOrientations =>
+      const <VikaImageOrientation>{
+        VikaImageOrientation.landscapeLeft,
+        VikaImageOrientation.landscapeRight,
+      };
 
   @override
   String get currentPhaseKey => gluteState.toString().split('.').last;

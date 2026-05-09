@@ -27,6 +27,7 @@ class PoseOverlayPainter extends CustomPainter {
     required this.imageSize,
     required this.rotation,
     required this.lensDirection,
+    this.fit = BoxFit.cover,
     this.mirrorHorizontally,
     this.debugData = const {},
     this.style = SkeletonStyle.constellation,
@@ -57,6 +58,7 @@ class PoseOverlayPainter extends CustomPainter {
   final Size imageSize;
   final InputImageRotation rotation;
   final CameraLensDirection lensDirection;
+  final BoxFit fit;
   final bool? mirrorHorizontally;
   final Map<String, dynamic> debugData;
   final SkeletonStyle style;
@@ -375,7 +377,9 @@ class PoseOverlayPainter extends CustomPainter {
     final canvasW = size.width;
     final canvasH = size.height;
 
-    final scale = math.max(canvasW / imageW, canvasH / imageH);
+    final scale = fit == BoxFit.contain
+        ? math.min(canvasW / imageW, canvasH / imageH)
+        : math.max(canvasW / imageW, canvasH / imageH);
     final previewW = imageW * scale;
     final previewH = imageH * scale;
     final offsetX = (canvasW - previewW) / 2;
@@ -1073,6 +1077,8 @@ class PoseOverlayPainter extends CustomPainter {
         oldDelegate.imageSize != imageSize ||
         oldDelegate.rotation != rotation ||
         oldDelegate.lensDirection != lensDirection ||
+        oldDelegate.fit != fit ||
+        oldDelegate.mirrorHorizontally != mirrorHorizontally ||
         oldDelegate.style != style ||
         !mapEquals(oldDelegate.debugData, debugData);
   }

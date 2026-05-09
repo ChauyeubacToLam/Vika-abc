@@ -22,9 +22,16 @@ class PoseLandmarkerHelper(
     private var poseLandmarker: PoseLandmarker? = null
     private var lastSubmittedTimestampMs: Long = Long.MIN_VALUE
     private val pendingFrames = ConcurrentHashMap<Long, FramePayload>()
+    @Volatile private var currentOrientationCode: String? = null
+    @Volatile private var currentOrientationIsFrontCamera = true
 
     init {
         setupPoseLandmarker()
+    }
+
+    fun setOrientation(orientation: String?, isFrontCamera: Boolean) {
+        currentOrientationCode = orientation
+        currentOrientationIsFrontCamera = isFrontCamera
     }
 
     fun setupPoseLandmarker() {
@@ -63,6 +70,7 @@ class PoseLandmarkerHelper(
         frameWidth: Int,
         frameHeight: Int,
         rotationDegrees: Int,
+        rotationDurationMs: Double,
         isFrontCamera: Boolean,
         onComplete: () -> Unit,
     ): Boolean {
@@ -82,7 +90,9 @@ class PoseLandmarkerHelper(
                 imageWidth = bitmap.width,
                 imageHeight = bitmap.height,
                 rotationDegrees = rotationDegrees,
+                rotationDurationMs = rotationDurationMs,
                 isFrontCamera = isFrontCamera,
+                orientation = currentOrientationCode,
                 onComplete = onComplete,
             )
             trimPendingFrames()
@@ -184,7 +194,9 @@ class PoseLandmarkerHelper(
         val imageWidth: Int,
         val imageHeight: Int,
         val rotationDegrees: Int,
+        val rotationDurationMs: Double,
         val isFrontCamera: Boolean,
+        val orientation: String?,
         val onComplete: () -> Unit,
     ) {
         fun toEventPayload(
@@ -200,7 +212,9 @@ class PoseLandmarkerHelper(
                 "frameWidth" to frameWidth,
                 "frameHeight" to frameHeight,
                 "rotationDegrees" to rotationDegrees,
+                "rotationDurationMs" to rotationDurationMs,
                 "isFrontCamera" to isFrontCamera,
+                "orientation" to orientation,
                 "timestampMs" to timestampMs,
             )
         }

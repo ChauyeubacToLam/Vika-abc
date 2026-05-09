@@ -3,9 +3,11 @@ package com.vikavn.app
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.os.Build
+import android.os.SystemClock
+import android.util.Log
 import android.util.Size
 import android.view.Surface
 import androidx.camera.core.ImageProxy
@@ -50,6 +52,10 @@ class PoseLandmarkerPlugin(
     private var imageAnalysis: ImageAnalysis? = null
     private var poseLandmarkerHelper: PoseLandmarkerHelper? = null
     private var useFrontCamera = true
+    @Volatile private var currentOrientationCode: String? = null
+    @Volatile private var currentOrientationIsFrontCamera = true
+    @Volatile private var currentTargetRotation: Int? = null
+    private var rotationLogFrameCount = 0
     private var detectionEnabled = true
 
     init {
@@ -60,6 +66,16 @@ class PoseLandmarkerPlugin(
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "initialize" -> initialize(call, result)
+            "setOrientation" -> {
+                val orientation = call.argument<String>("orientation")
+                if (orientation == null) {
+                    result.error("pose_landmarker_orientation", "Missing orientation.", null)
+                    return
+                }
+                val isFrontCamera = call.argument<Boolean>("isFrontCamera") ?: useFrontCamera
+                setOrientation(orientation, isFrontCamera)
+                result.success(null)
+            }
             "dispose" -> {
                 disposeResources(releaseTexture = true)
                 result.success(null)
@@ -68,6 +84,9 @@ class PoseLandmarkerPlugin(
                 val previousLens = useFrontCamera
                 try {
                     useFrontCamera = !useFrontCamera
+                    currentOrientationCode?.let { orientation ->
+                        setOrientation(orientation, useFrontCamera)
+                    }
                     bindCameraUseCases()
                     result.success(null)
                 } catch (exception: Exception) {
@@ -103,6 +122,7 @@ class PoseLandmarkerPlugin(
 
     private fun initialize(call: MethodCall, result: MethodChannel.Result) {
         useFrontCamera = call.argument<Boolean>("useFrontCamera") ?: true
+        applyInitialOrientation(call)
         detectionEnabled = true
 
         try {
@@ -121,6 +141,14 @@ class PoseLandmarkerPlugin(
                     onError = ::emitError,
                 )
             }
+            poseLandmarkerHelper?.setOrientation(
+                currentOrientationCode,
+                currentOrientationIsFrontCamera,
+            )
+            segmentationHelper?.setOrientation(
+                currentOrientationCode,
+                currentOrientationIsFrontCamera,
+            )
 
             val cameraProviderFuture = ProcessCameraProvider.getInstance(activity)
             cameraProviderFuture.addListener(
@@ -142,6 +170,33 @@ class PoseLandmarkerPlugin(
             disposeResources(releaseTexture = false)
             result.error("pose_landmarker_init", exception.message, null)
         }
+    }
+
+    private fun applyInitialOrientation(call: MethodCall) {
+        val initialOrientation = call.argument<String>("initialOrientation")
+        if (initialOrientation == null) {
+            currentOrientationCode = null
+            currentOrientationIsFrontCamera = useFrontCamera
+            currentTargetRotation = null
+            poseLandmarkerHelper?.setOrientation(null, useFrontCamera)
+            segmentationHelper?.setOrientation(null, useFrontCamera)
+            return
+        }
+
+        val isFrontCamera = call.argument<Boolean>("isFrontCamera") ?: useFrontCamera
+        setOrientation(initialOrientation, isFrontCamera)
+    }
+
+    private fun setOrientation(orientation: String, isFrontCamera: Boolean) {
+        currentOrientationCode = orientation
+        currentOrientationIsFrontCamera = isFrontCamera
+        currentTargetRotation = targetRotationForOrientation(orientation)
+        currentTargetRotation?.let { targetRotation ->
+            preview?.targetRotation = targetRotation
+            imageAnalysis?.targetRotation = targetRotation
+        }
+        poseLandmarkerHelper?.setOrientation(orientation, isFrontCamera)
+        segmentationHelper?.setOrientation(orientation, isFrontCamera)
     }
 
     private fun ensureRuntimeSupport() {
@@ -171,6 +226,9 @@ class PoseLandmarkerPlugin(
             poseLandmarkerHelper ?: throw IllegalStateException("Pose landmarker helper is not initialized.")
 
         val cameraSelector = resolveCameraSelector(provider)
+        currentOrientationIsFrontCamera = useFrontCamera
+        poseLandmarkerHelper?.setOrientation(currentOrientationCode, useFrontCamera)
+        segmentationHelper?.setOrientation(currentOrientationCode, useFrontCamera)
 
         provider.unbindAll()
 
@@ -178,6 +236,7 @@ class PoseLandmarkerPlugin(
             .setTargetResolution(Size(TARGET_WIDTH, TARGET_HEIGHT))
             .build()
             .also { configuredPreview ->
+                currentTargetRotation?.let { configuredPreview.targetRotation = it }
                 configuredPreview.setSurfaceProvider { request ->
                     val surfaceTexture = surfaceTextureEntry.surfaceTexture()
                     surfaceTexture.setDefaultBufferSize(
@@ -203,6 +262,7 @@ class PoseLandmarkerPlugin(
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
             .build()
             .also { configuredAnalysis ->
+                currentTargetRotation?.let { configuredAnalysis.targetRotation = it }
                 configuredAnalysis.setAnalyzer(executor) { imageProxy ->
                     if (!detectionEnabled) {
                         imageProxy.close()
@@ -230,17 +290,21 @@ class PoseLandmarkerPlugin(
             val timestampMs = imageProxy.imageInfo.timestamp / 1_000_000L
             val rotationDegrees = imageProxy.imageInfo.rotationDegrees
             val rawBitmap = rgbaImageProxyToBitmap(imageProxy)
-            val rotatedBitmap = rotateBitmap(rawBitmap, rotationDegrees)
-            if (rotatedBitmap !== rawBitmap) {
+            val rotationStartedNs = SystemClock.elapsedRealtimeNanos()
+            val processedBitmap = rotateBitmap(rawBitmap, rotationDegrees)
+            val rotationDurationMs =
+                (SystemClock.elapsedRealtimeNanos() - rotationStartedNs) / 1_000_000.0
+            logRotationDuration(rotationDegrees, rotationDurationMs)
+            if (processedBitmap !== rawBitmap) {
                 rawBitmap.recycle()
             }
 
-            val frameOwner = SharedBitmapFrame(rotatedBitmap)
+            val frameOwner = SharedBitmapFrame(processedBitmap)
 
             frameOwner.retain()
             val segmentationRelease = frameOwner.releaseCallback()
             val segmentationStarted = segmentationHelper?.detectLiveStream(
-                bitmap = rotatedBitmap,
+                bitmap = processedBitmap,
                 timestampMs = timestampMs,
                 onComplete = segmentationRelease,
             ) ?: false
@@ -251,11 +315,12 @@ class PoseLandmarkerPlugin(
             frameOwner.retain()
             val poseRelease = frameOwner.releaseCallback()
             val poseStarted = helper.detectLiveStream(
-                bitmap = rotatedBitmap,
+                bitmap = processedBitmap,
                 timestampMs = timestampMs,
                 frameWidth = imageProxy.width,
                 frameHeight = imageProxy.height,
                 rotationDegrees = rotationDegrees,
+                rotationDurationMs = rotationDurationMs,
                 isFrontCamera = useFrontCamera,
                 onComplete = poseRelease,
             )
@@ -301,6 +366,10 @@ class PoseLandmarkerPlugin(
 
         val matrix = Matrix().apply {
             postRotate(rotationDegrees.toFloat())
+            // Prompt 3 (Revised), Option A: do not mirror front-camera frames here.
+            // iOS Pose Landmarker cannot consume mirrored orientation tokens, so both
+            // platforms intentionally keep un-mirrored inference input and let the
+            // existing painter mirror only the visual preview/skeleton.
         }
 
         return Bitmap.createBitmap(
@@ -311,6 +380,25 @@ class PoseLandmarkerPlugin(
             bitmap.height,
             matrix,
             true,
+        )
+    }
+
+    private fun logRotationDuration(rotationDegrees: Int, rotationDurationMs: Double) {
+        if (currentOrientationCode == null && rotationDurationMs < ROTATION_SLOW_FRAME_MS) {
+            return
+        }
+
+        rotationLogFrameCount = (rotationLogFrameCount + 1) % ROTATION_LOG_SAMPLE_RATE
+        if (rotationLogFrameCount != 0 && rotationDurationMs < ROTATION_SLOW_FRAME_MS) {
+            return
+        }
+
+        Log.d(
+            TAG,
+            "rotationDegrees=$rotationDegrees " +
+                "rotationDurationMs=${"%.3f".format(rotationDurationMs)} " +
+                "orientation=${currentOrientationCode ?: "cameraX"} " +
+                "isFrontCamera=$useFrontCamera",
         )
     }
 
@@ -402,12 +490,24 @@ class PoseLandmarkerPlugin(
     }
 
     companion object {
+        private const val TAG = "PoseLandmarkerPlugin"
         private const val METHOD_CHANNEL_NAME = "com.vikavn.app/pose_landmarker"
         private const val EVENT_CHANNEL_NAME = "com.vikavn.app/pose_landmarker_stream"
-        // 16:9 to maximize horizontal FOV / "widest range" framing the camera can offer.
-        // CameraX picks the closest supported size; on most phones this lands at 1280x720
-        // which is plenty for MediaPipe pose detection.
-        private const val TARGET_WIDTH = 1280
-        private const val TARGET_HEIGHT = 720
+        private const val ROTATION_LOG_SAMPLE_RATE = 30
+        private const val ROTATION_SLOW_FRAME_MS = 12.0
+        // 16:9 keeps the wide exercise framing while avoiding the per-frame 720p
+        // bitmap allocation/rotation cost on mid and low-range Android phones.
+        // CameraX picks the closest supported size when 960x540 is unavailable.
+        private const val TARGET_WIDTH = 960
+        private const val TARGET_HEIGHT = 540
+
+        private fun targetRotationForOrientation(orientation: String): Int {
+            return when (orientation) {
+                "landscapeLeft" -> Surface.ROTATION_90
+                "portraitUpsideDown" -> Surface.ROTATION_180
+                "landscapeRight" -> Surface.ROTATION_270
+                else -> Surface.ROTATION_0
+            }
+        }
     }
 }

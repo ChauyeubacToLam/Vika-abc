@@ -58,7 +58,13 @@ import Flutter
             case "initialize":
                 let args = call.arguments as? [String: Any]
                 let useFrontCamera = (args?["useFrontCamera"] as? Bool) ?? true
-                self.poseService?.initialize(useFrontCamera: useFrontCamera) { initializeResult in
+                let initialOrientation = args?["initialOrientation"] as? String
+                let isFrontCamera = args?["isFrontCamera"] as? Bool
+                self.poseService?.initialize(
+                    useFrontCamera: useFrontCamera,
+                    initialOrientation: initialOrientation,
+                    isFrontCamera: isFrontCamera
+                ) { initializeResult in
                     DispatchQueue.main.async {
                         switch initializeResult {
                         case .success(let textureId):
@@ -99,6 +105,20 @@ import Flutter
 
             case "stopDetection":
                 self.poseService?.stopDetection()
+                result(nil)
+
+            case "setOrientation":
+                let args = call.arguments as? [String: Any]
+                guard let orientation = args?["orientation"] as? String else {
+                    result(FlutterError(
+                        code: "pose_landmarker_orientation",
+                        message: "Missing orientation.",
+                        details: nil
+                    ))
+                    return
+                }
+                let isFrontCamera = (args?["isFrontCamera"] as? Bool) ?? false
+                self.poseService?.setOrientation(orientation, isFrontCamera: isFrontCamera)
                 result(nil)
 
             default:

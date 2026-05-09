@@ -57,6 +57,7 @@ final class SegmentationService: NSObject, FlutterStreamHandler {
     private var minProcessIntervalMs = 140
     private var bypassThrottleOnce = false
     private let bypassLock = NSLock()
+    private var currentOrientation: UIImage.Orientation = .up
 
     override init() {
         super.init()
@@ -77,6 +78,12 @@ final class SegmentationService: NSObject, FlutterStreamHandler {
             if let interval = args?["minProcessIntervalMs"] as? NSNumber {
                 minProcessIntervalMs = interval.intValue
             }
+            if let orientation = args?["initialOrientation"] as? String {
+                let isFrontCamera = (args?["isFrontCamera"] as? Bool) ?? false
+                setOrientation(orientation, isFrontCamera: isFrontCamera)
+            } else {
+                setOrientation(.up)
+            }
             setupSegmenter()
             result(["success": true])
 
@@ -94,6 +101,20 @@ final class SegmentationService: NSObject, FlutterStreamHandler {
 
         case "requestSample":
             requestSample()
+            result(["success": true])
+
+        case "setOrientation":
+            let args = call.arguments as? [String: Any]
+            guard let orientation = args?["orientation"] as? String else {
+                result(FlutterError(
+                    code: "segmentation_orientation",
+                    message: "Missing orientation.",
+                    details: nil
+                ))
+                return
+            }
+            let isFrontCamera = (args?["isFrontCamera"] as? Bool) ?? false
+            setOrientation(orientation, isFrontCamera: isFrontCamera)
             result(["success": true])
 
         case "dispose":
@@ -123,11 +144,24 @@ final class SegmentationService: NSObject, FlutterStreamHandler {
         bypassLock.unlock()
     }
 
+    func setOrientation(_ orientation: String, isFrontCamera: Bool) {
+        setOrientation(PoseLandmarkerService.imageOrientation(
+            from: orientation,
+            isFrontCamera: isFrontCamera
+        ))
+    }
+
+    func setOrientation(_ orientation: UIImage.Orientation) {
+        stateQueue.async {
+            self.currentOrientation = orientation
+        }
+    }
+
     func detect(sampleBuffer: CMSampleBuffer,
                 timestampMs: Int,
                 imageWidth: Int,
                 imageHeight: Int,
-                orientation: UIImage.Orientation = .up) {
+                orientation: UIImage.Orientation? = nil) {
         guard let activeSegmenter = segmenter else {
             return
         }
@@ -157,7 +191,8 @@ final class SegmentationService: NSObject, FlutterStreamHandler {
 
         let retainedSampleBuffer = RetainedSampleBuffer(copiedSampleBuffer)
         let image = VisionImage(buffer: retainedSampleBuffer.value)
-        image.orientation = orientation
+        let imageOrientation = orientation ?? stateQueue.sync { currentOrientation }
+        image.orientation = imageOrientation
 
         activeSegmenter.process(image) { [weak self, retainedSampleBuffer] mask, error in
             _ = retainedSampleBuffer

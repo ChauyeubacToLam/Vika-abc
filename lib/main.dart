@@ -20,6 +20,7 @@ import 'screens/exercise/exercise_experience_screen.dart';
 import 'screens/main_shell.dart';
 import 'screens/onboarding/v5/v5_onboarding_navigator.dart';
 import 'theme/vf_theme.dart';
+import 'utils/orientation_lock.dart';
 
 /* =========================================================================
    APP ENTRY POINT
@@ -37,7 +38,7 @@ Future<void> main() async {
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZyanRsZnpidmRnd2d6ZWdmenhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4Mjk2NjUsImV4cCI6MjA5MTQwNTY2NX0.Eprv5NtWbZqigYPZdOEeRIyvYVxp0l2hmbXXyEdh8nI',
   );
 
-  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  await OrientationLock.portraitOnly();
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -185,6 +186,7 @@ class _AppEntryGateState extends State<AppEntryGate> {
   @override
   void initState() {
     super.initState();
+    unawaited(OrientationLock.portraitOnly());
     _entryState = _initialEntryState();
     _authSubscription = supabase.auth.onAuthStateChange.listen(
       _handleAuthStateChange,
@@ -265,7 +267,7 @@ class _AppEntryGateState extends State<AppEntryGate> {
   Widget build(BuildContext context) {
     switch (_entryState) {
       case _AppEntryState.onboarding:
-        return const V5OnboardingNavigator();
+        return const MainShell();
       case _AppEntryState.home:
         return const MainShell();
       case _AppEntryState.loading:

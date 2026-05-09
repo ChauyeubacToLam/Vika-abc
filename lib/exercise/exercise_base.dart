@@ -9,6 +9,7 @@
 
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:vika/pose/vika_pose_landmark.dart';
+import 'package:vika/pose/vika_image_orientation.dart';
 import 'package:vika/utils/debouncer.dart';
 import 'package:vika/utils/person_detector.dart';
 import '../utils/pose_smoother.dart';
@@ -94,6 +95,21 @@ abstract class ExerciseBase {
   /// Keep false in production; enabling this disables pause paths while
   /// collecting continuity diagnostics.
   static const bool kDiagnosticMode = false;
+
+  /// Master toggle for landscape orientation support across pose pipeline.
+  /// When false, all paths fall through to portrait behavior identical to
+  /// pre-spec production.
+  static const bool kLandscapeRotationEnabled = true;
+
+  /// Device orientations under which this exercise is designed to work.
+  /// Defaults to portrait. Floor, prone, and seated exercises should override
+  /// this with the tested orientations as they are added.
+  ///
+  /// Convention for future floor/prone/seated work such as Cobra, Sphinx,
+  /// Seated Forward Fold, or Butterfly: declare both supported landscape
+  /// orientations once the exercise metrics and framing are validated there.
+  Set<VikaImageOrientation> get supportedOrientations =>
+      const <VikaImageOrientation>{VikaImageOrientation.portrait};
 
   // Trigger segmentation
   bool _wasPoseAnomaly = false;

@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../debug/debug_preferences.dart';
 import '../debug/debug_types.dart';
 import '../theme/vf_theme.dart';
+import '../utils/orientation_lock.dart';
 import '../widgets/vf_primitives.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -23,6 +26,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    unawaited(OrientationLock.portraitOnly());
     _loadDebugMode();
   }
 

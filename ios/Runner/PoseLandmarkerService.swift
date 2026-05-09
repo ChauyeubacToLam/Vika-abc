@@ -22,6 +22,9 @@ final class PoseLandmarkerService: NSObject,
     private var videoOutput = AVCaptureVideoDataOutput()
     private var poseLandmarker: PoseLandmarker?
     private var currentCameraPosition: AVCaptureDevice.Position = .front
+    private var currentOrientation: UIImage.Orientation = .up
+    private var currentSegmentationOrientation: UIImage.Orientation = .up
+    private var currentOrientationCode: String?
     private var detectionEnabled = true
     private var lastSubmittedTimestampMs = Int.min
     private var pendingFrames: [Int: FramePayload] = [:]
@@ -56,11 +59,18 @@ final class PoseLandmarkerService: NSObject,
     }
 
     // MARK: - Public API matching lib/pose/pose_landmarker_channel.dart
-    func initialize(useFrontCamera: Bool, completion: @escaping (Result<Int64, Error>) -> Void) {
+    func initialize(useFrontCamera: Bool,
+                    initialOrientation: String?,
+                    isFrontCamera: Bool?,
+                    completion: @escaping (Result<Int64, Error>) -> Void) {
         sessionQueue.async {
             do {
                 try self.initializeLandmarker()
                 self.currentCameraPosition = useFrontCamera ? .front : .back
+                self.applyOrientation(
+                    initialOrientation,
+                    isFrontCamera: isFrontCamera ?? useFrontCamera
+                )
                 self.detectionEnabled = true
                 let textureId = self.ensureTexture()
                 try self.configureCaptureSession()
@@ -71,6 +81,12 @@ final class PoseLandmarkerService: NSObject,
             } catch {
                 completion(.failure(error))
             }
+        }
+    }
+
+    func setOrientation(_ orientation: String, isFrontCamera: Bool) {
+        sessionQueue.async {
+            self.applyOrientation(orientation, isFrontCamera: isFrontCamera)
         }
     }
 
@@ -90,6 +106,12 @@ final class PoseLandmarkerService: NSObject,
         sessionQueue.async {
             let previousPosition = self.currentCameraPosition
             self.currentCameraPosition = previousPosition == .front ? .back : .front
+            if let currentOrientationCode = self.currentOrientationCode {
+                self.applyOrientation(
+                    currentOrientationCode,
+                    isFrontCamera: self.currentCameraPosition == .front
+                )
+            }
 
             do {
                 try self.configureCaptureSession()
@@ -142,6 +164,68 @@ final class PoseLandmarkerService: NSObject,
     }
 
     // MARK: - Pose landmarker
+    private func applyOrientation(_ orientation: String?, isFrontCamera: Bool) {
+        guard let orientation = orientation else {
+            currentOrientationCode = nil
+            currentOrientation = .up
+            currentSegmentationOrientation = .up
+            segmentationService?.setOrientation(.up)
+            return
+        }
+
+        currentOrientationCode = orientation
+
+        // Rotate the AVCapture connection to match the device orientation.
+        // With this the pixel buffer comes out already oriented for the
+        // current device rotation (portrait stays portrait, landscape comes
+        // out landscape), so MediaPipe only has to handle the front-camera
+        // mirror — no 90° rotation gymnastics needed.
+        if let connection = videoOutput.connection(with: .video) {
+            let videoOrientation = Self.captureVideoOrientation(from: orientation)
+            if connection.isVideoOrientationSupported {
+                connection.videoOrientation = videoOrientation
+            }
+            if connection.isVideoMirroringSupported {
+                connection.isVideoMirrored = isFrontCamera
+            }
+        }
+
+        let resolvedOrientation: UIImage.Orientation =
+            isFrontCamera ? .upMirrored : .up
+        currentOrientation = resolvedOrientation.withoutMirroring
+        currentSegmentationOrientation = resolvedOrientation
+        segmentationService?.setOrientation(resolvedOrientation)
+    }
+
+    static func imageOrientation(from orientation: String, isFrontCamera: Bool) -> UIImage.Orientation {
+        // Kept for SegmentationService compatibility. Always returns the
+        // mirror-only orientation since the capture connection now rotates
+        // the buffer to match the device.
+        return isFrontCamera ? .upMirrored : .up
+    }
+
+    private static func captureVideoOrientation(
+        from orientation: String
+    ) -> AVCaptureVideoOrientation {
+        // Apple's AVCaptureVideoOrientation uses the convention where
+        // `.landscapeLeft` means the home button is on the LEFT, which is
+        // the OPPOSITE of UIDeviceOrientation/Flutter's `landscapeLeft`
+        // (top of phone tilts to the LEFT, home button on RIGHT). So the
+        // landscape values are intentionally swapped here.
+        switch orientation {
+        case "portrait":
+            return .portrait
+        case "portraitUpsideDown":
+            return .portraitUpsideDown
+        case "landscapeLeft":
+            return .landscapeRight
+        case "landscapeRight":
+            return .landscapeLeft
+        default:
+            return .portrait
+        }
+    }
+
     private func initializeLandmarker() throws {
         if poseLandmarker != nil { return }
 
@@ -237,7 +321,15 @@ final class PoseLandmarkerService: NSObject,
         captureSession.addOutput(videoOutput)
 
         if let connection = videoOutput.connection(with: .video) {
-            connection.videoOrientation = .portrait
+            // Default to portrait; applyOrientation() updates this whenever
+            // Flutter sends a new device orientation.
+            let initialVideoOrientation: AVCaptureVideoOrientation = {
+                guard let code = currentOrientationCode else { return .portrait }
+                return Self.captureVideoOrientation(from: code)
+            }()
+            if connection.isVideoOrientationSupported {
+                connection.videoOrientation = initialVideoOrientation
+            }
             if connection.isVideoMirroringSupported {
                 connection.isVideoMirrored = currentCameraPosition == .front
             }
@@ -277,12 +369,17 @@ final class PoseLandmarkerService: NSObject,
 
         let frameWidth = CVPixelBufferGetWidth(pixelBuffer)
         let frameHeight = CVPixelBufferGetHeight(pixelBuffer)
+        let imageDimensions = Self.orientedImageDimensions(
+            frameWidth: frameWidth,
+            frameHeight: frameHeight,
+            orientationCode: currentOrientationCode
+        )
         segmentationService?.detect(
             sampleBuffer: sampleBuffer,
             timestampMs: timestampMs,
-            imageWidth: frameWidth,
-            imageHeight: frameHeight,
-            orientation: .up
+            imageWidth: imageDimensions.width,
+            imageHeight: imageDimensions.height,
+            orientation: currentSegmentationOrientation
         )
 
         storePendingFrame(
@@ -290,15 +387,15 @@ final class PoseLandmarkerService: NSObject,
             payload: FramePayload(
                 frameWidth: frameWidth,
                 frameHeight: frameHeight,
-                imageWidth: frameWidth,
-                imageHeight: frameHeight,
+                imageWidth: imageDimensions.width,
+                imageHeight: imageDimensions.height,
                 rotationDegrees: 0,
                 isFrontCamera: currentCameraPosition == .front
             )
         )
 
         do {
-            let mpImage = try MPImage(sampleBuffer: sampleBuffer, orientation: .up)
+            let mpImage = try MPImage(sampleBuffer: sampleBuffer, orientation: currentOrientation)
             lastSubmittedTimestampMs = timestampMs
             try poseLandmarker.detectAsync(image: mpImage, timestampInMilliseconds: timestampMs)
         } catch {
@@ -416,6 +513,15 @@ final class PoseLandmarkerService: NSObject,
         }
     }
 
+    private static func orientedImageDimensions(frameWidth: Int,
+                                                frameHeight: Int,
+                                                orientationCode: String?) -> (width: Int, height: Int) {
+        // The capture connection now rotates the buffer to match the device,
+        // so frameWidth/frameHeight already reflect the visible orientation.
+        // Landmarks are normalized to the same buffer, so just pass through.
+        return (width: frameWidth, height: frameHeight)
+    }
+
     private struct FramePayload {
         let frameWidth: Int
         let frameHeight: Int
@@ -438,6 +544,23 @@ final class PoseLandmarkerService: NSObject,
                 "isFrontCamera": isFrontCamera,
                 "timestampMs": timestampMs,
             ]
+        }
+    }
+}
+
+private extension UIImage.Orientation {
+    var withoutMirroring: UIImage.Orientation {
+        switch self {
+        case .upMirrored:
+            return .up
+        case .downMirrored:
+            return .down
+        case .leftMirrored:
+            return .left
+        case .rightMirrored:
+            return .right
+        default:
+            return self
         }
     }
 }

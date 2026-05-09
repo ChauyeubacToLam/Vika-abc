@@ -1,8 +1,11 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, non_constant_identifier_names, constant_identifier_names
 
+import 'dart:math' as math;
+
 import 'package:vika/utils/debouncer.dart';
 import 'package:vika/utils/frame_buffer.dart';
 import 'package:vika/debug/tracked_metric.dart';
+import 'package:vika/pose/vika_image_orientation.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
 import '../../utils/pose_math_helpers.dart';
@@ -218,6 +221,13 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
   String get exerciseName => 'McGill Curl-up';
 
   @override
+  Set<VikaImageOrientation> get supportedOrientations =>
+      const <VikaImageOrientation>{
+        VikaImageOrientation.landscapeLeft,
+        VikaImageOrientation.landscapeRight,
+      };
+
+  @override
   String get currentPhaseKey => curlUpState.toString().split('.').last;
 
   @override
@@ -259,13 +269,15 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
 
     // Trunk segment must be roughly horizontal.
     final double trunkAngle =
-        calculateHorizontalAngle(point1: hip, point2: shoulder);
+        _calculateTrunkHorizontalAngle(hip: hip, shoulder: shoulder);
     if (trunkAngle > 7.0) return false;
 
-    // Camera-side knee must be raised above hip in screen coords.
+    // Camera-side knee must be bent away from the torso line. Depending on
+    // landscape side and camera placement, the bent knee can appear above or
+    // below the hip in screen coordinates.
     final double torsoLen = calculateDistance(hip, shoulder);
     if (torsoLen < 2.5) return false;
-    final double kneeElevation = (hip.y - knee.y) / torsoLen;
+    final double kneeElevation = (hip.y - knee.y).abs() / torsoLen;
     if (kneeElevation < CurlUpConfig.BENT_KNEE_ELEVATION) return false;
 
     // Whole-body lying-flat check (head must be at hip level).
@@ -345,7 +357,8 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
         ankle != null && ExerciseBase.isLandmarkConfident(ankle);
 
     // 2. Calculate geometry
-    final trunkAngle = calculateHorizontalAngle(point1: hip, point2: shoulder);
+    final trunkAngle =
+        _calculateTrunkHorizontalAngle(hip: hip, shoulder: shoulder);
     final shoulderHipKneeAngle = calculateAngleNormalized(
         firstPoint: shoulder, midPoint: hip, lastPoint: knee);
     final earShoulderHipAngle = calculateAngleNormalized(
@@ -613,5 +626,16 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
     for (final metric in _metrics) {
       metric.onStateTransition(previousCurlUpState, newState, timestampMs);
     }
+  }
+
+  double _calculateTrunkHorizontalAngle({
+    required PoseLandmark hip,
+    required PoseLandmark shoulder,
+  }) {
+    final dy = (hip.y - shoulder.y).abs();
+    final dx = (shoulder.x - hip.x).abs();
+    if (dx == 0 && dy == 0) return 0.0;
+    final degrees = math.atan2(dy, dx) * (180.0 / math.pi);
+    return degrees.clamp(0.0, 90.0).toDouble();
   }
 }
