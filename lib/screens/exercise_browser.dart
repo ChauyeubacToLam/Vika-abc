@@ -22,8 +22,6 @@
 //     /exercise via the `onSelectExercise` callback.
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-
 import '../data/library_mock.dart';
 import '../models/exercise_definition.dart';
 import '../models/exercise_lookup.dart';
@@ -34,6 +32,7 @@ import '../widgets/library/intent_collection.dart';
 import '../widgets/library/programs_rail.dart';
 import '../widgets/library/sheet_chrome.dart';
 import '../widgets/plan/plan_typography.dart';
+import '../theme/app_colors.dart';
 
 class ExerciseBrowser extends StatefulWidget {
   const ExerciseBrowser({
@@ -125,6 +124,7 @@ class _ExerciseBrowserState extends State<ExerciseBrowser>
 
   @override
   Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
     return Stack(
       children: [
         // Dimmed scrim — tapping it closes the sheet. Opacity follows
@@ -133,7 +133,7 @@ class _ExerciseBrowserState extends State<ExerciseBrowser>
           child: GestureDetector(
             onTap: widget.onClose,
             child: Container(
-              color: VikaIvoryMain.ink.withValues(
+              color: c.ink.withValues(
                 alpha: (0.4 * (1 - (_dragOffset / 400))).clamp(0.0, 0.4),
               ),
             ),
@@ -148,8 +148,8 @@ class _ExerciseBrowserState extends State<ExerciseBrowser>
               heightFactor: 0.94,
               child: Container(
                 clipBehavior: Clip.antiAlias,
-                decoration: const BoxDecoration(
-                  color: VikaIvoryMain.bg,
+                decoration: BoxDecoration(
+                  color: c.bg,
                   borderRadius: BorderRadius.only(
                     topLeft: Radius.circular(32),
                     topRight: Radius.circular(32),
@@ -197,6 +197,7 @@ class _SheetBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -249,38 +250,36 @@ class _SheetBody extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(40, 32, 40, 0),
           child: Container(
             padding: const EdgeInsets.only(top: 20),
-            decoration: const BoxDecoration(
-              border: Border(top: BorderSide(color: VikaIvoryMain.border)),
+            decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: c.border)),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
                   'VIKA · CAT.01',
-                  style: GoogleFonts.beVietnamPro(
-                    textStyle: TextStyle(
+                  style: TextStyle(
+                    fontFamily: 'BeVietnamPro',
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 1.6,
-                      color: VikaIvoryMain.inkFaint,
+                      color: c.inkFaint,
                       fontFeatures: VikaIvoryMain.tabularFigures,
-                    ),
                   ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
-                  child: Container(height: 1, color: VikaIvoryMain.border),
+                  child: Container(height: 1, color: c.border),
                 ),
                 const SizedBox(width: 14),
                 Text(
                   'Mỗi tuần thêm bài mới.',
-                  style: GoogleFonts.oswald(
-                    textStyle: const TextStyle(
+                  style: TextStyle(
+                    fontFamily: 'BeVietnamPro',
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                       fontStyle: FontStyle.italic,
-                      color: VikaIvoryMain.inkFaint,
-                    ),
+                      color: c.inkFaint,
                   ),
                 ),
               ],
@@ -309,6 +308,7 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
       child: Row(
@@ -329,14 +329,13 @@ class _SectionHeader extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 2),
             child: Text(
               meta.toUpperCase(),
-              style: GoogleFonts.beVietnamPro(
-                textStyle: const TextStyle(
+              style: TextStyle(
+                fontFamily: 'BeVietnamPro',
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 1,
-                  color: VikaIvoryMain.inkFaint,
+                  color: c.inkFaint,
                   fontFeatures: VikaIvoryMain.tabularFigures,
-                ),
               ),
             ),
           ),

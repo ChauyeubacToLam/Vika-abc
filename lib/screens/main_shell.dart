@@ -3,7 +3,7 @@
 // central FAB. Premium Ivory v1.
 //
 // Replaces the legacy jade-green VFTheme shell. The new shell:
-//   • Background = VikaIvoryMain.bg (#F4EEE2 cream)
+//   • Background = c.bg (#F4EEE2 cream)
 //   • Frosted-glass IvoryBottomNav with 4 tabs + central yellow FAB
 //   • IndexedStack so each tab keeps its scroll state
 //   • Library sheet animates up via AnimatedSlide / AnimatedOpacity
@@ -19,7 +19,6 @@ import 'package:flutter/services.dart';
 
 import '../models/exercise_definition.dart';
 import '../services/user_program_service.dart';
-import '../theme/vf_theme.dart';
 import '../utils/orientation_lock.dart';
 import '../widgets/ivory/bottom_nav.dart';
 import 'dashboard_home_screen.dart';
@@ -27,6 +26,8 @@ import 'exercise_browser.dart';
 import 'plan_screen.dart';
 import 'profile_screen.dart';
 import 'progress_screen.dart';
+import '../theme/app_colors.dart';
+import '../theme/responsive.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -64,11 +65,14 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    final r = Responsive.of(context);
     final mediaQuery = MediaQuery.of(context);
     final bottomInset = mediaQuery.padding.bottom;
+    final isDark = MediaQuery.platformBrightnessOf(context) == Brightness.dark;
     // Capsule height (~76) + drop shadow + capsule top margin.
-    const navCapsule = 100.0;
-    final contentBottomPadding = navCapsule + bottomInset + 8;
+    final navCapsule = r.w(100);
+    final contentBottomPadding = navCapsule + bottomInset + r.w(8);
 
     final screens = [
       DashboardHomeScreen(
@@ -85,14 +89,14 @@ class _MainShellState extends State<MainShell> {
     ];
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
+      value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
       ),
       child: Scaffold(
         extendBody: true,
-        backgroundColor: VikaIvoryMain.bg,
+        backgroundColor: c.bg,
         body: Stack(
           fit: StackFit.expand,
           children: [

@@ -19,6 +19,7 @@ import 'models/exercise_definition.dart';
 import 'screens/exercise/exercise_experience_screen.dart';
 import 'screens/main_shell.dart';
 import 'screens/onboarding/v5/v5_onboarding_navigator.dart';
+import 'theme/typography.dart';
 import 'theme/vf_theme.dart';
 import 'utils/orientation_lock.dart';
 
@@ -135,7 +136,10 @@ class VikaApp extends StatelessWidget {
       theme: VFTheme.lightTheme,
       builder: (context, child) => ScrollConfiguration(
         behavior: const VFScrollBehavior(),
-        child: child ?? const SizedBox.shrink(),
+        // Clamp the user's text scale to [0.9, 1.3]. Respects accessibility
+        // settings within reason; prevents 2× scales from breaking the
+        // tight Premium Ivory layouts. See lib/theme/typography.dart.
+        child: VikaType.clampTextScaler(context, child),
       ),
       initialRoute: '/',
       onGenerateRoute: (settings) {

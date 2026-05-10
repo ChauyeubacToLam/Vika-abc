@@ -47,10 +47,49 @@ flutter:
     - assets/images/
 
   # ─── Fonts ───
-  # Vika uses Fraunces (italic display) + Be Vietnam Pro (sans body) per
-  # DESIGN.md. Both are loaded at runtime via the `google_fonts` package
-  # — no manual .ttf bundling required. The package caches to disk after
-  # first fetch, so second app launch is instant.
+  # Vika uses Be Vietnam Pro as a single family for the whole main app
+  # (display + body + labels). Designed in Hanoi by Lâm Bảo for proper
+  # Vietnamese diacritic stacks at every weight/style.
   #
-  # See lib/widgets/plan/plan_typography.dart for the helper functions
-  # (frauncesItalic, beVietnamPro) that wrap GoogleFonts.X(textStyle:).
+  # *** ACTION REQUIRED: drop the 8 .ttf files below into
+  #     assets/fonts/be_vietnam_pro/, then UNCOMMENT the `fonts:` block
+  #     to register them with Flutter. Until you do, all
+  #     `TextStyle(fontFamily: 'BeVietnamPro', …)` references silently
+  #     fall back to the iOS/Android system sans-serif (San Francisco /
+  #     Roboto), which DOES render Vietnamese diacritics correctly but
+  #     loses the Be Vietnam Pro character.
+  #
+  # Free download: https://fonts.google.com/specimen/Be+Vietnam+Pro
+  #   BeVietnamPro-Regular.ttf       BeVietnamPro-Italic.ttf       (400)
+  #   BeVietnamPro-Medium.ttf        BeVietnamPro-MediumItalic.ttf (500)
+  #   BeVietnamPro-Bold.ttf          BeVietnamPro-BoldItalic.ttf   (700)
+  #   BeVietnamPro-ExtraBold.ttf     BeVietnamPro-ExtraBoldItalic.ttf (800)
+  #
+  fonts:
+    - family: BeVietnamPro
+      fonts:
+        - asset: assets/fonts/be_vietnam_pro/BeVietnamPro-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/be_vietnam_pro/BeVietnamPro-Italic.ttf
+          weight: 400
+          style: italic
+        - asset: assets/fonts/be_vietnam_pro/BeVietnamPro-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/be_vietnam_pro/BeVietnamPro-MediumItalic.ttf
+          weight: 500
+          style: italic
+        - asset: assets/fonts/be_vietnam_pro/BeVietnamPro-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/be_vietnam_pro/BeVietnamPro-SemiBoldItalic.ttf
+          weight: 600
+          style: italic
+        - asset: assets/fonts/be_vietnam_pro/BeVietnamPro-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/be_vietnam_pro/BeVietnamPro-BoldItalic.ttf
+          weight: 700
+          style: italic
+        - asset: assets/fonts/be_vietnam_pro/BeVietnamPro-ExtraBold.ttf
+          weight: 800
+        - asset: assets/fonts/be_vietnam_pro/BeVietnamPro-ExtraBoldItalic.ttf
+          weight: 800
+          style: italic

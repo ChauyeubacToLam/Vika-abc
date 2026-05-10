@@ -26,8 +26,7 @@ import '../widgets/progress/headline_hero.dart';
 import '../widgets/progress/period_tabs.dart';
 import '../widgets/progress/progress_streak_card.dart';
 import '../widgets/progress/ranked_insights.dart';
-import 'package:google_fonts/google_fonts.dart';
-
+import '../theme/app_colors.dart';
 class ProgressScreen extends StatefulWidget {
   const ProgressScreen({super.key, required this.bottomPadding});
 
@@ -48,6 +47,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
     final periodKey = switch (_period) {
       PeriodTab.week => 'week',
       PeriodTab.month => 'month',
@@ -58,7 +58,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     final totalSessions = planTotalSessions(phaseWeeksMock);
 
     return Container(
-      color: VikaIvoryMain.bg,
+      color: c.bg,
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
         padding: EdgeInsets.only(bottom: widget.bottomPadding),
@@ -93,15 +93,14 @@ class _ProgressScreenState extends State<ProgressScreen> {
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
               child: Text(
                 '$totalDone / $totalSessions buổi đã xong · Đang ở Tuần 03',
-                style: GoogleFonts.beVietnamPro(
-  textStyle: TextStyle(
+                style: TextStyle(
+                  fontFamily: 'BeVietnamPro',
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.1,
-                  color: VikaIvoryMain.inkSoft,
+                  color: c.inkSoft,
                   fontFeatures: VikaIvoryMain.tabularFigures,
                 ),
-),
               ),
             ),
             // Period tabs.
@@ -136,15 +135,14 @@ class _ProgressScreenState extends State<ProgressScreen> {
                       ),
                       Text(
                         '4 vùng',
-                        style: GoogleFonts.beVietnamPro(
-  textStyle: TextStyle(
+                        style: TextStyle(
+                          fontFamily: 'BeVietnamPro',
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 1,
-                          color: VikaIvoryMain.inkFaint,
+                          color: c.inkFaint,
                           fontFeatures: VikaIvoryMain.tabularFigures,
                         ),
-),
                       ),
                     ],
                   ),
@@ -175,15 +173,14 @@ class _ProgressScreenState extends State<ProgressScreen> {
                       ),
                       Text(
                         '${progressMockInsights.length} đo được · 3 nổi bật',
-                        style: GoogleFonts.beVietnamPro(
-  textStyle: TextStyle(
+                        style: TextStyle(
+                          fontFamily: 'BeVietnamPro',
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 1,
-                          color: VikaIvoryMain.inkFaint,
+                          color: c.inkFaint,
                           fontFeatures: VikaIvoryMain.tabularFigures,
                         ),
-),
                       ),
                     ],
                   ),
@@ -208,15 +205,14 @@ class _ProgressScreenState extends State<ProgressScreen> {
                       ),
                       Text(
                         '$progressMockStreakDays ngày',
-                        style: GoogleFonts.beVietnamPro(
-  textStyle: TextStyle(
+                        style: TextStyle(
+                          fontFamily: 'BeVietnamPro',
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 1,
-                          color: VikaIvoryMain.inkFaint,
+                          color: c.inkFaint,
                           fontFeatures: VikaIvoryMain.tabularFigures,
                         ),
-),
                       ),
                     ],
                   ),

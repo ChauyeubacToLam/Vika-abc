@@ -25,13 +25,13 @@ import 'package:flutter/material.dart';
 
 import '../data/plan_mock.dart';
 import '../services/user_program_service.dart';
-import '../theme/vf_theme.dart';
 import '../utils/orientation_lock.dart';
 import '../widgets/plan/editorial_closer.dart';
 import '../widgets/plan/page_hero.dart';
 import '../widgets/plan/section_mark.dart';
 import '../widgets/plan/week_page.dart';
 import '../widgets/plan/wordmark_header.dart';
+import '../theme/app_colors.dart';
 
 class PlanScreen extends StatefulWidget {
   const PlanScreen({
@@ -78,8 +78,9 @@ class _PlanScreenState extends State<PlanScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
     return Container(
-      color: VikaIvoryMain.bg,
+      color: c.bg,
       child: Column(
         children: [
           const WordmarkHeader(),

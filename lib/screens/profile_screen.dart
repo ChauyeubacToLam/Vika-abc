@@ -25,8 +25,7 @@ import '../widgets/profile/body_card.dart';
 import '../widgets/profile/identity_block.dart';
 import '../widgets/profile/lifetime_hero.dart';
 import '../widgets/profile/settings_group.dart';
-import 'package:google_fonts/google_fonts.dart';
-
+import '../theme/app_colors.dart';
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key, required this.bottomPadding});
 
@@ -45,8 +44,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
     return Container(
-      color: VikaIvoryMain.bg,
+      color: c.bg,
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
         padding: EdgeInsets.only(bottom: widget.bottomPadding),
@@ -150,8 +150,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               padding: const EdgeInsets.fromLTRB(24, 36, 24, 24),
               child: Container(
                 padding: const EdgeInsets.only(top: 20),
-                decoration: const BoxDecoration(
-                  border: Border(top: BorderSide(color: VikaIvoryMain.border)),
+                decoration: BoxDecoration(
+                  border: Border(top: BorderSide(color: c.border)),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
@@ -160,49 +160,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       width: 18,
                       height: 18,
                       decoration: BoxDecoration(
-                        color: VikaIvoryMain.yellow,
+                        color: c.yellow,
                         borderRadius: BorderRadius.circular(5),
                       ),
                       alignment: Alignment.center,
                       child: Text(
                         'V',
-                        style: GoogleFonts.beVietnamPro(
-  textStyle: TextStyle(
+                        style: TextStyle(
+                          fontFamily: 'BeVietnamPro',
                           fontSize: 11,
                           fontWeight: FontWeight.w800,
-                          color: VikaIvoryMain.ink,
+                          color: c.ink,
                         ),
-),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Text(
                       'VIKA · HỒ SƠ',
-                      style: GoogleFonts.beVietnamPro(
-  textStyle: TextStyle(
+                      style: TextStyle(
+                        fontFamily: 'BeVietnamPro',
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 1.6,
-                        color: VikaIvoryMain.ink,
+                        color: c.ink,
                       ),
-),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
                         child: Container(
-                            height: 1, color: VikaIvoryMain.border)),
+                            height: 1, color: c.border)),
                     const SizedBox(width: 14),
                     Text(
                       'v0.1.0 · Beta',
-                      style: GoogleFonts.oswald(
-  textStyle: TextStyle(
+                      style: TextStyle(
+                        fontFamily: 'BeVietnamPro',
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                         fontStyle: FontStyle.italic,
-                        color: VikaIvoryMain.inkFaint,
+                        color: c.inkFaint,
                         fontFeatures: VikaIvoryMain.tabularFigures,
                       ),
-),
                     ),
                   ],
                 ),

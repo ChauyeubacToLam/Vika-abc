@@ -15,11 +15,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../data/home_mock.dart';
 import '../models/exercise_lookup.dart';
 import '../services/user_program_service.dart';
-import '../theme/vf_theme.dart';
+import '../theme/app_colors.dart';
 import '../utils/orientation_lock.dart';
 import '../widgets/home/browse_shortcut.dart';
 import '../widgets/home/form_week_chart.dart';
@@ -30,8 +31,6 @@ import '../widgets/home/streak_ring.dart';
 import '../widgets/plan/editorial_closer.dart';
 import '../widgets/plan/section_mark.dart';
 import '../widgets/plan/wordmark_header.dart';
-import 'package:google_fonts/google_fonts.dart';
-
 class DashboardHomeScreen extends StatefulWidget {
   const DashboardHomeScreen({
     super.key,
@@ -60,52 +59,68 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: VikaIvoryMain.bg,
-      child: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: EdgeInsets.only(bottom: widget.bottomPadding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const WordmarkHeader(
-              trailingIcon: Icons.notifications_none_rounded,
-            ),
-            GreetingBlock(
-              userName: homeMockUser.name,
-              dayLabel: homeMockUser.dayLabel,
-              sessionLabel: homeMockUser.sessionLabel,
-            ),
-            const SectionMark(num: '01', label: 'Hôm nay', total: '02'),
-            const SizedBox(height: 18),
-            _HeroDayRail(onCta: () {
-              // Push /exercise with the first available real
-              // ExerciseDefinition (Squat). Replace with first-of-today's-
-              // workout once per-day exercise lists are wired.
-              final def = lookupExerciseDefinition('Squat');
-              if (def != null) {
-                Navigator.of(context).pushNamed('/exercise', arguments: def);
-              } else {
-                debugPrint(
-                    '[Home] No ExerciseDefinition for Squat — stubbed.');
-              }
-            }),
-            const SectionMark(num: '02', label: 'Đang tiến bộ', total: '02'),
-            const _ProgressRow(),
-            JournalEntry(
-              dateLabel: homeMockJournalDate,
-              quote: homeMockJournalQuote,
-            ),
-            BrowseShortcut(onTap: widget.onOpenBrowser),
-            const EditorialCloser(
-              section: 'TRANG CHỦ',
-              tagline: 'Thứ Sáu · 8/5.',
-            ),
-            const SizedBox(height: 24),
-          ],
+    final c = VikaColors.of(context);
+    // Status-bar overlay flips per theme. Light theme = dark icons on
+    // cream; dark theme = light icons on warm-dark.
+    final overlayStyle = c.isDark
+        ? SystemUiOverlayStyle.light.copyWith(
+            statusBarColor: Colors.transparent,
+          )
+        : SystemUiOverlayStyle.dark.copyWith(
+            statusBarColor: Colors.transparent,
+          );
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: overlayStyle,
+      child: Container(
+        color: c.bg,
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: EdgeInsets.only(bottom: widget.bottomPadding),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const WordmarkHeader(
+                trailingIcon: Icons.notifications_none_rounded,
+              ),
+              GreetingBlock(
+                userName: homeMockUser.name,
+                dayLabel: homeMockUser.dayLabel,
+                sessionLabel: homeMockUser.sessionLabel,
+              ),
+              const SectionMark(num: '01', label: 'Hôm nay', total: '02'),
+              const SizedBox(height: 18),
+              _HeroDayRail(onCta: () => _startTodayWorkout(context)),
+              const SectionMark(num: '02', label: 'Đang tiến bộ', total: '02'),
+              const _ProgressRow(),
+              JournalEntry(
+                dateLabel: homeMockJournalDate,
+                quote: homeMockJournalQuote,
+              ),
+              BrowseShortcut(onTap: widget.onOpenBrowser),
+              const EditorialCloser(
+                section: 'TRANG CHỦ',
+                tagline: 'Thứ Sáu · 8/5.',
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  /// Start today's workout. Defaults to the Squat ExerciseDefinition until
+  /// per-day workout sequences are wired (see PREMIUM_IVORY_WIRING.md).
+  /// Fires light haptic feedback on tap so the press registers physically
+  /// — important for a fitness app where the user is bracing to start.
+  void _startTodayWorkout(BuildContext context) {
+    HapticFeedback.lightImpact();
+    final def = lookupExerciseDefinition('Squat');
+    if (def != null) {
+      Navigator.of(context).pushNamed('/exercise', arguments: def);
+    } else {
+      debugPrint('[Home] No ExerciseDefinition for Squat — stubbed.');
+    }
   }
 }
 
@@ -116,6 +131,7 @@ class _HeroDayRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
     // Stack draws bottom-up. Cards sit underneath; the sticker is drawn
     // LAST so it floats over the top edge of the first card — matches
     // the JSX intent (sticker overlaps the top of the today card).
@@ -169,11 +185,11 @@ class _HeroDayRail extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
               decoration: BoxDecoration(
-                color: VikaIvoryMain.yellow,
+                color: c.yellow,
                 borderRadius: BorderRadius.circular(8),
                 boxShadow: [
                   BoxShadow(
-                    color: VikaIvoryMain.ink.withValues(alpha: 0.16),
+                    color: c.ink.withValues(alpha: 0.16),
                     blurRadius: 14,
                     offset: const Offset(0, 4),
                   ),
@@ -181,14 +197,13 @@ class _HeroDayRail extends StatelessWidget {
               ),
               child: Text(
                 'GỢI Ý CHO BẠN',
-                style: GoogleFonts.beVietnamPro(
-  textStyle: TextStyle(
+                style: TextStyle(
+                  fontFamily: 'BeVietnamPro',
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 1.4,
-                  color: VikaIvoryMain.yellowInk,
+                  color: c.yellowInk,
                 ),
-),
               ),
             ),
           ),
@@ -206,6 +221,7 @@ class _RailDots extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -215,8 +231,8 @@ class _RailDots extends StatelessWidget {
             height: 4,
             decoration: BoxDecoration(
               color: i == activeIndex
-                  ? VikaIvoryMain.ink
-                  : VikaIvoryMain.inkGhost,
+                  ? c.ink
+                  : c.inkGhost,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
