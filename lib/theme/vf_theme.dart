@@ -522,3 +522,110 @@ class VikaIvory {
         stops: const [0.0, 0.18, 0.60, 0.80, 1.0],
       );
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VikaIvoryMain — Premium Ivory register for the main-app screens (Home, Plan,
+// Progress, Profile, Library). Sibling to VikaIvory; values come from the
+// vika-main-app-ivory-v1.jsx prototype. Calibrated separately because the
+// active-exercise-v8 prototype uses subtly different cream tones (#EBE3D2 vs
+// #F4EEE2) and a darker ink (#2A1F12 vs #1F1812).
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class VikaIvoryMain {
+  const VikaIvoryMain._();
+
+  // ─── Surfaces ───
+  static const Color bg = Color(0xFFF4EEE2);
+  static const Color bgRaised = Color(0xFFFBF7EE);
+  static const Color bgInverse = Color(0xFF1F1812);
+  static const Color bgInverseHi = Color(0xFF2A1F12);
+  static const Color powder = Color(0xFFEDE2CD);
+
+  // ─── Ink (always warm, never pure black) ───
+  static const Color ink = Color(0xFF1F1812);
+  static const Color inkSoft = Color(0xFF5A4A3A);
+  static const Color inkFaint = Color(0xFF8B7A66);
+  static const Color inkGhost = Color(0xFFC9BBA6);
+
+  // ─── Inverse ink (on warm-dark surfaces) ───
+  static const Color invInk = Color(0xFFF4EEE2);
+  static Color get invInkSoft => invInk.withValues(alpha: 0.72);
+  static Color get invInkFaint => invInk.withValues(alpha: 0.42);
+
+  // ─── Borders (warm, ivory-aware) ───
+  static const Color border = Color(0xFFE6DCC8);
+  static const Color borderHi = Color(0xFFD4C8B0);
+  static Color get borderDark => invInk.withValues(alpha: 0.10);
+
+  // ─── Yellow — RESERVED for 4 uses only (stat / dot / underline / CTA) ───
+  static const Color yellow = Color(0xFFFFB701);
+  static const Color yellowInk = Color(0xFF1F1812);
+  static Color get yellowGhost => yellow.withValues(alpha: 0.14);
+
+  // ─── Status (used outside Plan, but lives here for completeness) ───
+  static const Color attention = Color(0xFFD67B3E);
+  static const Color live = Color(0xFF22C55E);
+
+  // ─── Phase-distinct accents (used SPARINGLY, only for phase identity) ───
+  static const Color phase1 = Color(0xFFA8C5B1); // sage — Khởi đầu
+  static const Color phase2 = Color(0xFFE89A4B); // amber — Củng cố
+  static const Color phase3 = Color(0xFFD67B3E); // earth — Đẩy mạnh
+  static const Color phase4 = Color(0xFF7DA3D9); // dusk — Đỉnh cao
+
+  // ─── Typography ───
+  // Two-family pairing — see DESIGN.md § Typography.
+  //
+  //   serif  → Fraunces. Used in italic at display sizes (18–80pt).
+  //            The signature editorial-coaching tone.
+  //   sans   → BeVietnamPro. Workhorse for body, eyebrows, numerals.
+  //            Designed for Vietnamese diacritics.
+  //
+  // `fontFamily` aliases the sans family — most usages (body / eyebrow /
+  // labels) want the sans, so it stays the default.
+  static const String serifFamily = 'Fraunces';
+  static const String sansFamily = 'BeVietnamPro';
+  static const String fontFamily = sansFamily;
+
+  /// Tabular figures — stat numbers and dates need column-aligned digits.
+  static const List<FontFeature> tabularFigures = [
+    FontFeature.tabularFigures(),
+  ];
+
+  /// Phone-frame max width as referenced in the JSX (390pt iPhone). The plan
+  /// screen lays out at this width; SafeArea + scaling handles smaller phones.
+  static const double phoneWidth = 390;
+
+  // ─── Card decorations ───
+  static BoxDecoration creamCard({double radius = 22}) => BoxDecoration(
+        color: bgRaised,
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(color: border),
+      );
+
+  static BoxDecoration darkCard({double radius = 24}) => BoxDecoration(
+        gradient: LinearGradient(
+          begin: const Alignment(-0.4, -1),
+          end: const Alignment(0.4, 1),
+          colors: const [bgInverse, bgInverseHi],
+        ),
+        borderRadius: BorderRadius.circular(radius),
+      );
+
+  // ─── Yellow radial wash (top-right of warm-dark cards) ───
+  static Decoration yellowWashTopRight({
+    double topOffset = -50,
+    double rightOffset = -60,
+    double size = 200,
+    double opacity = 0.18,
+  }) {
+    return BoxDecoration(
+      gradient: RadialGradient(
+        colors: [
+          yellow.withValues(alpha: opacity),
+          yellow.withValues(alpha: 0),
+        ],
+        stops: const [0, 0.65],
+      ),
+    );
+  }
+}

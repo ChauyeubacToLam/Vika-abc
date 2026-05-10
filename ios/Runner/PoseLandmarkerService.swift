@@ -207,11 +207,26 @@ final class PoseLandmarkerService: NSObject,
     private static func captureVideoOrientation(
         from orientation: String
     ) -> AVCaptureVideoOrientation {
-        // Apple's AVCaptureVideoOrientation uses the convention where
-        // `.landscapeLeft` means the home button is on the LEFT, which is
-        // the OPPOSITE of UIDeviceOrientation/Flutter's `landscapeLeft`
-        // (top of phone tilts to the LEFT, home button on RIGHT). So the
-        // landscape values are intentionally swapped here.
+        // Convention swap on landscape only.
+        //
+        // The string we receive comes from `native_device_orientation`, which
+        // follows `UIDeviceOrientation` semantics (per the package's iOS
+        // DisplayOrientationListener: "landscapeLeft = home button on RIGHT").
+        //
+        // `AVCaptureVideoOrientation` shares enum values with
+        // `UIInterfaceOrientation`, and per Apple's UIOrientation.h header,
+        //   UIInterfaceOrientationLandscapeLeft  = UIDeviceOrientationLandscapeRight,
+        //   UIInterfaceOrientationLandscapeRight = UIDeviceOrientationLandscapeLeft
+        // — i.e. the landscape names are inverted between the two enums.
+        //
+        // To rotate the buffer to the user's *actual* physical view, we map:
+        //   sensor "landscapeLeft" (UIDevice.landscapeLeft, home button RIGHT)
+        //     → AVCapture.landscapeRight (= UIInterface.landscapeRight, home button RIGHT)
+        //   sensor "landscapeRight" (UIDevice.landscapeRight, home button LEFT)
+        //     → AVCapture.landscapeLeft (= UIInterface.landscapeLeft, home button LEFT)
+        //
+        // Portrait and portraitUpsideDown share enum values across both
+        // conventions, so they don't need to be swapped.
         switch orientation {
         case "portrait":
             return .portrait

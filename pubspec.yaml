@@ -44,15 +44,13 @@ flutter:
   assets:
     - assets/audio/
     - assets/audio/squat/
+    - assets/images/
 
-  fonts:
-    - family: PlusJakartaSans
-      fonts:
-        - asset: assets/fonts/PlusJakartaSans-Medium.ttf
-          weight: 500
-        - asset: assets/fonts/PlusJakartaSans-SemiBold.ttf
-          weight: 600
-        - asset: assets/fonts/PlusJakartaSans-Bold.ttf
-          weight: 700
-        - asset: assets/fonts/PlusJakartaSans-ExtraBold.ttf
-          weight: 800
+  # ─── Fonts ───
+  # Vika uses Fraunces (italic display) + Be Vietnam Pro (sans body) per
+  # DESIGN.md. Both are loaded at runtime via the `google_fonts` package
+  # — no manual .ttf bundling required. The package caches to disk after
+  # first fetch, so second app launch is instant.
+  #
+  # See lib/widgets/plan/plan_typography.dart for the helper functions
+  # (frauncesItalic, beVietnamPro) that wrap GoogleFonts.X(textStyle:).

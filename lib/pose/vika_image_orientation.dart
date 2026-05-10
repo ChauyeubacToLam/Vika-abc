@@ -53,14 +53,50 @@ extension VikaImageOrientationCodes on VikaImageOrientation {
     }
   }
 
+  /// Quarter-turns to apply with `RotatedBox` to rotate the *entire UI* into
+  /// alignment with the user's view, when the OS is locked to portraitUp and
+  /// we're driving rotation manually from the sensor.
+  ///
+  /// Reasoning per orientation (the OS keeps the screen pixel grid pinned to
+  /// device-portrait; we rotate the painted UI to compensate):
+  /// - **landscapeLeft** (sensor): bottom of device on user's RIGHT = device
+  ///   rotated 90° CCW from portrait. The user's top corresponds to the
+  ///   device's natural RIGHT edge, so we rotate the UI 90° CW
+  ///   (`quarterTurns:1`) to put child y=0 at screen x=max_x.
+  /// - **landscapeRight**: bottom of device on user's LEFT = device 90° CW.
+  ///   User's top is the device's LEFT edge → 90° CCW rotation
+  ///   (`quarterTurns:3`).
+  /// - **portraitUpsideDown**: 180° rotation (`quarterTurns:2`).
+  /// - **portrait**: no rotation (`quarterTurns:0`).
+  int get uiQuarterTurns {
+    switch (this) {
+      case VikaImageOrientation.portrait:
+        return 0;
+      case VikaImageOrientation.landscapeLeft:
+        return 1;
+      case VikaImageOrientation.landscapeRight:
+        return 3;
+      case VikaImageOrientation.portraitUpsideDown:
+        return 2;
+    }
+  }
+
+  /// Degrees corresponding to `Surface.ROTATION_X` for this orientation.
+  ///
+  /// Convention swap: `native_device_orientation.landscapeLeft` corresponds to
+  /// the device being rotated 90° CCW (home button on RIGHT), which Android's
+  /// Display.getRotation() reports as `Surface.ROTATION_270`. The landscape
+  /// names are inverted between the sensor package's convention and Android's
+  /// Surface rotation convention, matching the swap in
+  /// `PoseLandmarkerPlugin.targetRotationForOrientation`.
   int get androidSurfaceRotationDegrees {
     switch (this) {
       case VikaImageOrientation.portrait:
         return 0;
       case VikaImageOrientation.landscapeLeft:
-        return 90;
-      case VikaImageOrientation.landscapeRight:
         return 270;
+      case VikaImageOrientation.landscapeRight:
+        return 90;
       case VikaImageOrientation.portraitUpsideDown:
         return 180;
     }

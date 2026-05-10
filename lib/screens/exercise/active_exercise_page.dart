@@ -121,12 +121,8 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   bool _personDetectionInFlight = false;
   bool _orientationPauseActive = false;
   VikaImageOrientation _currentOrientation = VikaImageOrientation.portrait;
-  VikaImageOrientation _lastLandscapeOrientation =
-      VikaImageOrientation.landscapeLeft;
   VikaImageOrientation? _lastSentOrientation;
   bool? _lastSentOrientationFrontCamera;
-  Size? _layoutSurfaceSize;
-  bool _orientationSyncScheduled = false;
   Future<void>? _pipelineShutdownFuture;
   static const Duration _personDetectionInterval = Duration(milliseconds: 450);
 
@@ -201,24 +197,6 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       if (_isDisposed) return;
       await _applyDeviceOrientation(_currentOrientation);
     }
-  }
-
-  void _trackLayoutSurfaceSize(Size size) {
-    if (size.width <= 0 || size.height <= 0) return;
-    final previous = _layoutSurfaceSize;
-    if (previous != null &&
-        (previous.width - size.width).abs() < 0.5 &&
-        (previous.height - size.height).abs() < 0.5) {
-      return;
-    }
-    _layoutSurfaceSize = size;
-    if (_orientationSyncScheduled) return;
-    _orientationSyncScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _orientationSyncScheduled = false;
-      if (_isDisposed || !mounted) return;
-      unawaited(_applyDeviceOrientation(_currentOrientation));
-    });
   }
 
   Future<void> _stopAndDisposePoseChannel() async {
@@ -320,12 +298,23 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       return;
     }
 
+    // Hard-cap the sensor read at 1.5s. On iOS, asking
+    // NativeDeviceOrientationCommunicator with useSensor:true spins up
+    // CMMotionManager which (per system console) reads
+    // /private/var/Managed Preferences/mobile/com.apple.CoreMotion.plist.
+    // On some iPhones that read can stall (managed-prefs sandbox check)
+    // and never returns. Without the timeout, _initCamera() never
+    // proceeds and the user sits forever on "Đang chuẩn bị camera".
     try {
-      final nativeOrientation =
-          await _orientationCommunicator.orientation(useSensor: true);
+      final nativeOrientation = await _orientationCommunicator
+          .orientation(useSensor: true)
+          .timeout(const Duration(milliseconds: 1500));
       _setCurrentOrientation(
           VikaImageOrientation.fromNative(nativeOrientation));
     } catch (_) {
+      // Sensor read failed or timed out — default to portrait. The
+      // orientation stream subscription (_orientationSubscription) will
+      // still fire async updates once CMMotionManager warms up.
       _setCurrentOrientation(VikaImageOrientation.portrait);
     }
   }
@@ -340,7 +329,6 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   ) async {
     if (_isDisposed) return;
 
-    final previousSessionOrientation = _sessionOrientation;
     final wasGated = _orientationPauseActive;
     final changed = newOrientation != _currentOrientation;
     if (changed) {
@@ -351,42 +339,20 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     }
 
     final blocked = _syncOrientationGate();
-    final sessionChanged = previousSessionOrientation != _sessionOrientation;
     final gateChanged = wasGated != _orientationPauseActive;
-    if (!_isDisposed &&
-        mounted &&
-        (changed || sessionChanged || blocked || gateChanged)) {
+    if (!_isDisposed && mounted && (changed || blocked || gateChanged)) {
       setState(() {});
     }
   }
 
   void _setCurrentOrientation(VikaImageOrientation orientation) {
     _currentOrientation = orientation;
-    if (orientation.isLandscape) {
-      _lastLandscapeOrientation = orientation;
-    }
   }
 
-  Size? get _flutterSurfaceSize {
-    // Prefer the layout-time MediaQuery size captured during build. It is in
-    // logical pixels but `resolveForSurface` only checks width vs height, and
-    // the layout size is guaranteed to reflect the rotated window even on
-    // platforms where `physicalSize` lags or does not swap reliably.
-    final layout = _layoutSurfaceSize;
-    if (layout != null && layout.width > 0 && layout.height > 0) {
-      return layout;
-    }
-    final views = WidgetsBinding.instance.platformDispatcher.views;
-    if (views.isEmpty) return null;
-    return views.first.physicalSize;
-  }
-
-  VikaImageOrientation get _sessionOrientation {
-    return _currentOrientation.resolveForSurface(
-      _flutterSurfaceSize,
-      fallbackLandscape: _lastLandscapeOrientation,
-    );
-  }
+  // The Flutter window is locked to portraitUp; the page rotates manually via
+  // `RotatedBox`. So the session orientation is just the latest sensor
+  // reading — there's no surface-vs-sensor reconciliation to do.
+  VikaImageOrientation get _sessionOrientation => _currentOrientation;
 
   bool get _isCurrentOrientationSupported {
     if (!ExerciseBase.kLandscapeRotationEnabled) {
@@ -651,18 +617,31 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
     try {
       _ensureLandmarkSubscription();
-      final textureId = await _poseChannel.initialize(
-        useFrontCamera: _isFrontCamera,
-        initialOrientation: _isCurrentOrientationSupported
-            ? _sessionOrientation
-            : VikaImageOrientation.portrait,
-        isFrontCamera: _isFrontCamera,
-      );
+      // Hard-timeout the native init so a hung PoseLandmarkerService
+      // (completion handler never called, deadlocked Swift queue)
+      // doesn't strand the UI on "Đang chuẩn bị camera" forever. After
+      // 8 seconds we throw and surface a real error with a Retry button.
+      //
+      // ML Kit fallback intentionally NOT triggered here on real devices
+      // (iPhone/Android). It's for simulator/emulator only — see
+      // _shouldUseMlKitFallback() which gates on specific error strings
+      // ("x86_64", "native library", etc.) emitted by emulator builds.
+      final textureId = await _poseChannel
+          .initialize(
+            useFrontCamera: _isFrontCamera,
+            initialOrientation: _isCurrentOrientationSupported
+                ? _sessionOrientation
+                : VikaImageOrientation.portrait,
+            isFrontCamera: _isFrontCamera,
+          )
+          .timeout(const Duration(seconds: 8));
       if (_isDisposed || !mounted) {
         await _stopAndDisposePoseChannel();
         return;
       }
-      await _poseChannel.startDetection();
+      await _poseChannel
+          .startDetection()
+          .timeout(const Duration(seconds: 4));
       if (_isDisposed || !mounted) {
         await _stopAndDisposePoseChannel();
         return;
@@ -674,9 +653,29 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         _isCameraReady = true;
         _isInitializing = false;
       });
+    } on TimeoutException catch (_) {
+      // Native side never responded. Surface an error so the user can
+      // retry — don't auto-fallback to ML Kit on real device.
+      if (_isDisposed || !mounted) return;
+      debugPrint('[Vika] Native pose init timed out after 8s.');
+      try {
+        await _poseChannel.dispose();
+      } catch (_) {}
+      if (!_isDisposed && mounted) {
+        setState(() {
+          _isInitializing = false;
+          _isCameraReady = false;
+          _textureId = null;
+          _cameraErrorMessage =
+              'Camera khoi dong qua lau. Hay thu lai.';
+        });
+      }
     } on PlatformException catch (error) {
       if (_isDisposed || !mounted) return;
       if (_shouldUseMlKitFallback(error)) {
+        // Emulator-only path. _shouldUseMlKitFallback gates on error
+        // strings emitted by simulator builds where the native MediaPipe
+        // dylib isn't shipped (x86_64, missing native library).
         await _startMlKitFallback(error.message);
         return;
       }
@@ -690,14 +689,27 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         });
       }
     } on MissingPluginException catch (_) {
-      // Native MediaPipe channel not implemented on this platform (e.g. iOS)
-      // → fallback to Flutter camera + ML Kit
+      // Native MediaPipe channel not implemented for this build target
+      // (typically simulator without native pods). Use ML Kit fallback —
+      // emulator path only.
       if (_isDisposed || !mounted) return;
-      await _startMlKitFallback('Native pose landmarker not available on iOS');
+      await _startMlKitFallback('Native pose landmarker not registered');
     } catch (_) {
-      // Any other error → also try ML Kit fallback
+      // Any other error — surface to the user with retry instead of
+      // silently swapping engines on a real device.
       if (_isDisposed || !mounted) return;
-      await _startMlKitFallback('Unknown camera init error');
+      try {
+        await _poseChannel.dispose();
+      } catch (_) {}
+      if (!_isDisposed && mounted) {
+        setState(() {
+          _isInitializing = false;
+          _isCameraReady = false;
+          _textureId = null;
+          _cameraErrorMessage =
+              'Loi khi khoi dong camera. Hay thu lai.';
+        });
+      }
     }
   }
 
@@ -886,12 +898,20 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   bool _shouldUseMlKitFallback(PlatformException error) {
+    // ML Kit is for simulator/emulator only — real iPhones and Android phones
+    // must use the native MediaPipe Pose Landmarker. We only swap engines
+    // when the native error matches one of the emulator-specific signals
+    // emitted by:
+    //   • Android x86_64 emulator: ensureRuntimeSupport() throws
+    //     "is not available on x86_64 Android emulators"
+    //   • Android emulator missing native lib: "libmediapipe_tasks_vision_jni"
+    //   • iOS simulator: handled separately via MissingPluginException
+    // Any other PlatformException (model load failure, GPU init, etc.) on a
+    // real device surfaces a retry UI instead of silently falling back to a
+    // less accurate engine.
     final message = (error.message ?? '').toLowerCase();
-    return message.contains('mediapipe') ||
-        message.contains('x86_64') ||
-        message.contains('native library') ||
-        message.contains('pose landmarker') ||
-        message.contains('unsupported');
+    return message.contains('x86_64 android emulators') ||
+        message.contains('libmediapipe_tasks_vision_jni');
   }
 
   Future<void> _initMlKitCamera() async {
@@ -1254,10 +1274,10 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
   @override
   Widget build(BuildContext context) {
-    _trackLayoutSurfaceSize(MediaQuery.of(context).size);
     final permissionGranted = _permissionStatus?.isGranted ?? true;
+    final Widget inner;
     if (!permissionGranted) {
-      return _buildCameraFallback(
+      inner = _buildCameraFallback(
         icon: Icons.camera_alt_outlined,
         title: 'Cần quyền camera',
         subtitle: _cameraErrorMessage ??
@@ -1269,9 +1289,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
             ? openAppSettings
             : _initCamera,
       );
-    }
-
-    if (!_isCameraReady || _textureId == null) {
+    } else if (!_isCameraReady || _textureId == null) {
       final waitingForFallback =
           _runtime == _PoseRuntime.mlKitFallback && _cameraController == null;
       final nativeReady =
@@ -1279,25 +1297,41 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       final fallbackReady =
           _runtime == _PoseRuntime.mlKitFallback && _cameraController != null;
       if (nativeReady || fallbackReady) {
-        return _buildActiveLayout(context);
+        inner = _buildActiveLayout(context);
+      } else {
+        inner = _buildCameraFallback(
+          icon: _cameraErrorMessage == null
+              ? Icons.videocam_outlined
+              : Icons.videocam_off_outlined,
+          title: _cameraErrorMessage == null
+              ? 'Đang chuẩn bị camera'
+              : 'Camera chưa sẵn sàng',
+          subtitle: _cameraErrorMessage ??
+              (_isInitializing || waitingForFallback
+                  ? 'AI đang kết nối camera và chuẩn bị theo dõi form của bạn.'
+                  : 'Đang chờ camera sẵn sàng...'),
+          actionLabel: _cameraErrorMessage == null ? null : 'Thử lại',
+          onAction: _cameraErrorMessage == null ? null : _initCamera,
+        );
       }
-      return _buildCameraFallback(
-        icon: _cameraErrorMessage == null
-            ? Icons.videocam_outlined
-            : Icons.videocam_off_outlined,
-        title: _cameraErrorMessage == null
-            ? 'Đang chuẩn bị camera'
-            : 'Camera chưa sẵn sàng',
-        subtitle: _cameraErrorMessage ??
-            (_isInitializing || waitingForFallback
-                ? 'AI đang kết nối camera và chuẩn bị theo dõi form của bạn.'
-                : 'Đang chờ camera sẵn sàng...'),
-        actionLabel: _cameraErrorMessage == null ? null : 'Thử lại',
-        onAction: _cameraErrorMessage == null ? null : _initCamera,
-      );
+    } else {
+      inner = _buildActiveLayout(context);
     }
 
-    return _buildActiveLayout(context);
+    // Manually rotate the entire page to match the device sensor. The OS is
+    // locked to portraitUp (see OrientationLock); this RotatedBox is the
+    // single rotation point — it wraps the chrome, the camera Texture, and
+    // the skeleton overlay as one unit, so they always stay in sync. The
+    // native camera buffer is rotated server-side to match the same sensor
+    // reading (see PoseLandmarkerService.applyOrientation), so the image
+    // inside the rotated UI is already upright for the user's view.
+    if (!ExerciseBase.kLandscapeRotationEnabled) {
+      return inner;
+    }
+    return RotatedBox(
+      quarterTurns: _currentOrientation.uiQuarterTurns,
+      child: inner,
+    );
   }
 
   Widget _buildCameraFallback({

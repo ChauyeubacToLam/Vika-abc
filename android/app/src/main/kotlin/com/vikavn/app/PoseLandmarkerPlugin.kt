@@ -188,15 +188,42 @@ class PoseLandmarkerPlugin(
     }
 
     private fun setOrientation(orientation: String, isFrontCamera: Boolean) {
+        val previousTargetRotation = currentTargetRotation
         currentOrientationCode = orientation
         currentOrientationIsFrontCamera = isFrontCamera
         currentTargetRotation = targetRotationForOrientation(orientation)
+
+        // Push the new rotation onto the existing use cases. For
+        // ImageAnalysis this is enough — `imageInfo.rotationDegrees` updates
+        // for subsequent frames, and the analyzer rotates the bitmap before
+        // handing it to MediaPipe. For Preview the targetRotation property is
+        // best-effort metadata (CameraX only re-rotates the Surface buffer
+        // when the SurfaceRequest is re-issued), so the actual rebind below
+        // is what makes the on-screen preview follow the device.
         currentTargetRotation?.let { targetRotation ->
             preview?.targetRotation = targetRotation
             imageAnalysis?.targetRotation = targetRotation
         }
+
         poseLandmarkerHelper?.setOrientation(orientation, isFrontCamera)
         segmentationHelper?.setOrientation(orientation, isFrontCamera)
+
+        // When the device actually rotates we re-bind the use cases so
+        // CameraX issues a new SurfaceRequest. The new SurfaceTexture frames
+        // carry an updated transform matrix encoding the new rotation, and
+        // Flutter's engine applies that matrix during shader sampling — same
+        // mechanism native TextureView uses. This keeps the GPU camera
+        // pipeline intact (no per-frame CPU blit) and matches the pattern the
+        // canonical CameraX "transform-output" guidance recommends.
+        if (currentTargetRotation != previousTargetRotation &&
+            cameraProvider != null
+        ) {
+            try {
+                bindCameraUseCases()
+            } catch (exception: Exception) {
+                emitError("pose_landmarker_orientation_rebind", exception.message)
+            }
+        }
     }
 
     private fun ensureRuntimeSupport() {
@@ -232,6 +259,13 @@ class PoseLandmarkerPlugin(
 
         provider.unbindAll()
 
+        // Preview writes camera frames straight to the Flutter SurfaceTexture
+        // through CameraX's GPU pipeline. The SurfaceTexture's transform
+        // matrix carries the rotation information; Flutter Android's engine
+        // (`SurfaceTextureExternalTexture::DrawFrame`) applies that matrix
+        // when sampling the OES texture, so no per-frame CPU work is needed
+        // to display the preview correctly. Re-binding on rotation change
+        // (in `setOrientation`) is what keeps that matrix up to date.
         val previewUseCase = Preview.Builder()
             .setTargetResolution(Size(TARGET_WIDTH, TARGET_HEIGHT))
             .build()
@@ -502,10 +536,18 @@ class PoseLandmarkerPlugin(
         private const val TARGET_HEIGHT = 540
 
         private fun targetRotationForOrientation(orientation: String): Int {
+            // Convention swap on landscape only.
+            //
+            // The string comes from `native_device_orientation`, which uses
+            // UIDeviceOrientation-style naming where "landscapeLeft" = home
+            // button on RIGHT. Android's Surface.ROTATION_90 represents
+            // device 90° CW (= home button on LEFT) — i.e. the opposite
+            // physical orientation. Swap so CameraX's targetRotation
+            // matches the user's actual view.
             return when (orientation) {
-                "landscapeLeft" -> Surface.ROTATION_90
+                "landscapeLeft" -> Surface.ROTATION_270
                 "portraitUpsideDown" -> Surface.ROTATION_180
-                "landscapeRight" -> Surface.ROTATION_270
+                "landscapeRight" -> Surface.ROTATION_90
                 else -> Surface.ROTATION_0
             }
         }
