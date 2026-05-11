@@ -1,0 +1,171 @@
+import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'package:vika/interpreter/intepreting_map.dart';
+
+import '../screens/onboarding/onboarding_data.dart';
+import 'issues_service.dart';
+
+/// Persists v5 onboarding outputs on S16 completion.
+///
+/// Writes split across three tables:
+///   profiles            — identity + plan inputs (single upsert)
+///   user_pain_areas     — S04 painAreas + S09 candidate-derived regions,
+///                         all source='self_reported'
+///   user_detected_issues — camera detections from squat assessment
+///                         (delegated to IssuesService)
+///
+/// All Supabase writes are best-effort; failures are logged and the
+/// SharedPreferences flag set in `_complete()` is enough for the entry
+/// gate to route to home. A failed sync retries on next launch.
+class OnboardingPersistence {
+  final _client = Supabase.instance.client;
+  final _issues = IssuesService();
+
+  Future<bool> persist(OnboardingData data) async {
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      debugPrint('[OnboardingPersistence] no auth user, skipping persist');
+      return false;
+    }
+
+    final ok = await _writeProfile(user.id, data);
+    if (!ok) return false;
+
+    await _writePainAreas(user.id, data);
+
+    // Camera-detected from squat assessment. Future interpreters
+    // (push-up, warrior, fold) plug in here as they exist.
+    final interpreter = data.squatInterpreterOrNull;
+    if (interpreter != null) {
+      await _issues.insertCameraDetectedIssues(
+        userId: user.id,
+        interpreter: interpreter,
+        sessionId: null,
+      );
+    }
+
+    return true;
+  }
+
+  // ─── profiles ─────────────────────────────────────────────────────
+
+  Future<bool> _writeProfile(String userId, OnboardingData data) async {
+    final payload = <String, dynamic>{
+      'id': userId,
+      'onboarding_complete': true,
+    };
+
+    if (data.gender != null) payload['gender'] = data.gender;
+    if (data.heightCm != null) payload['height_cm'] = data.heightCm;
+    if (data.weightKg != null) payload['weight_kg'] = data.weightKg;
+    if (data.age != null) payload['age'] = data.age;
+
+    if (data.whyStep1 != null) payload['why_primary'] = data.whyStep1;
+    if (data.whyStep2 != null) payload['why_secondary'] = data.whyStep2;
+    if (data.whyCustomText.trim().isNotEmpty) {
+      payload['intent_quote'] = data.whyCustomText.trim();
+    }
+
+    // `goals` is text[] in schema. Onboarding picks one today;
+    // writing a 1-element array keeps future multi-goal cheap.
+    if (data.goal != null) payload['goals'] = [data.goal];
+    if (data.trainingDuration != null) {
+      payload['training_duration'] = data.trainingDuration;
+    }
+    if (data.fork != null) payload['fork'] = data.fork;
+    if (data.level != null) payload['fitness_level'] = data.level;
+    if (data.scheduleSessions.isNotEmpty) {
+      payload['schedule_sessions'] = data.scheduleSessions;
+    }
+
+    try {
+      await _client.from('profiles').upsert(payload, onConflict: 'id');
+      return true;
+    } catch (e) {
+      debugPrint('[OnboardingPersistence] profile upsert failed: $e');
+      return false;
+    }
+  }
+
+  // ─── user_pain_areas (S04 + S09) ──────────────────────────────────
+
+ Future<void> _writePainAreas(String userId, OnboardingData data) async {
+  // Count occurrences per body region across S04 + S09. The same region
+  // flagged twice in one onboarding (e.g. S04 'lower_back' + S09
+  // 'low_back_pain') counts as two flags — both are genuine user signals.
+  final regionCounts = <String, int>{};
+  final regionNotes = <String, String?>{};
+
+  if (!data.noPain) {
+    for (final region in data.painAreas) {
+      regionCounts[region] = (regionCounts[region] ?? 0) + 1;
+      if (region == 'other' &&
+          (data.painOtherText?.trim().isNotEmpty ?? false)) {
+        regionNotes[region] = data.painOtherText!.trim();
+      }
+    }
+  }
+
+  for (final picks in data.feedbackByExercise.values) {
+    for (final candidateId in picks) {
+      final def = interpretingMap[candidateId];
+      if (def == null) continue; // 'none' or unknown candidate id
+      regionCounts[def.bodyRegion] = (regionCounts[def.bodyRegion] ?? 0) + 1;
+    }
+  }
+
+  if (regionCounts.isEmpty) return;
+
+  try {
+    final existing = await _client
+        .from('user_pain_areas')
+        .select('id, body_region, flag_count')
+        .eq('user_id', userId)
+        .eq('status', 'active');
+
+    final existingByRegion = <String, Map<String, dynamic>>{
+      for (final row in (existing as List))
+        (row as Map<String, dynamic>)['body_region'] as String: row,
+    };
+
+    final now = DateTime.now().toIso8601String();
+    final toInsert = <Map<String, dynamic>>[];
+
+    for (final entry in regionCounts.entries) {
+      final region = entry.key;
+      final count = entry.value;
+      final notes = regionNotes[region];
+
+      if (existingByRegion.containsKey(region)) {
+        // Reaffirm: increment flag_count by this onboarding's contribution.
+        // Read-modify-write — not atomic, but onboarding is single-user
+        // single-call so contention isn't a concern.
+        final row = existingByRegion[region]!;
+        final newCount = ((row['flag_count'] as int?) ?? 1) + count;
+        await _client.from('user_pain_areas').update({
+          'last_reaffirmed_at': now,
+          'flag_count': newCount,
+        }).eq('id', row['id']);
+      } else {
+        toInsert.add({
+          'user_id': userId,
+          'body_region': region,
+          'source': 'self_reported',
+          'status': 'active',
+          'first_flagged_at': now,
+          'last_reaffirmed_at': now,
+          'flag_count': count, // not 1 — could be 2+ from S04+S09 merge
+          if (notes != null) 'notes': notes,
+        });
+      }
+    }
+
+    if (toInsert.isNotEmpty) {
+      await _client.from('user_pain_areas').insert(toInsert);
+    }
+  } catch (e) {
+    debugPrint('[OnboardingPersistence] pain areas write failed: $e');
+  }
+}
+}

@@ -64,4 +64,84 @@ final interpretingMap = {
     ],
     bodyRegion: 'hip',
   ),
+   // ─── S09 self-report candidates ──────────────────────────────────
+  // priority=99: only surfaced via explicit user picks, never emitted
+  // by an interpreter. correctives/overactive/underactive omitted —
+  // clinical metadata doesn't apply to self-reported sensations.
+
+  'knee_pain': IssueDefinition(
+    priority: 99,
+    questions: ['Đau gối khi xuống'],
+    bodyRegion: 'knee',
+  ),
+  'ankle_tight': IssueDefinition(
+    priority: 99,
+    questions: ['Cứng cổ chân'],
+    bodyRegion: 'ankle',
+  ),
+  'hip_tight': IssueDefinition(
+    priority: 99,
+    questions: ['Cứng hông'],
+    bodyRegion: 'hip',
+  ),
+  'thigh_fatigue': IssueDefinition(
+    priority: 99,
+    questions: ['Đùi mỏi nhanh'],
+    bodyRegion: 'leg',
+  ),
+  'shoulder_pain': IssueDefinition(
+    priority: 99,
+    questions: ['Đau vai khi đẩy'],
+    bodyRegion: 'shoulder',
+  ),
+  'wrist_discomfort': IssueDefinition(
+    priority: 99,
+    questions: ['Cổ tay khó chịu'],
+    bodyRegion: 'wrist',
+  ),
+  'shoulder_fatigue': IssueDefinition(
+    priority: 99,
+    questions: ['Vai mỏi nhanh'],
+    bodyRegion: 'shoulder',
+  ),
+  'chest_tight': IssueDefinition(
+    priority: 99,
+    questions: ['Cứng ngực/vai trước'],
+    bodyRegion: 'chest',
+  ),
+  'hip_pain': IssueDefinition(
+    priority: 99,
+    questions: ['Đau hông trước'],
+    bodyRegion: 'hip',
+  ),
+  'shoulder_high': IssueDefinition(
+    priority: 99,
+    questions: ['Vai bị cao/căng'],
+    bodyRegion: 'shoulder',
+  ),
+  'leg_shake': IssueDefinition(
+    priority: 99,
+    questions: ['Đùi run nhiều'],
+    bodyRegion: 'leg',
+  ),
+  'breath': IssueDefinition(
+    priority: 99,
+    questions: ['Hụt hơi'],
+    bodyRegion: 'core',
+  ),
+  'hamstring_tight': IssueDefinition(
+    priority: 99,
+    questions: ['Căng gân kheo'],
+    bodyRegion: 'leg',
+  ),
+  'low_back_pain': IssueDefinition(
+    priority: 99,
+    questions: ['Đau lưng dưới'],
+    bodyRegion: 'lower_back',
+  ),
+  'calf_tight': IssueDefinition(
+    priority: 99,
+    questions: ['Cứng bắp chân'],
+    bodyRegion: 'leg',
+  ),
 };
