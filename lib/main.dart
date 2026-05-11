@@ -271,7 +271,7 @@ class _AppEntryGateState extends State<AppEntryGate> {
   Widget build(BuildContext context) {
     switch (_entryState) {
       case _AppEntryState.onboarding:
-        return const MainShell();
+        return const V5OnboardingNavigator();
       case _AppEntryState.home:
         return const MainShell();
       case _AppEntryState.loading:
