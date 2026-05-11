@@ -6,7 +6,7 @@ import 'onboarding_assessment_thresholds.dart';
 class OnboardingData {
   // Step 1: Why
   String? why; // Legacy alias retained for older unused onboarding pages.
-  String? whyStep1; // 'pain', 'confidence', 'energy', 'health'
+  String? whyStep1; // 'body', 'pain', 'energy', 'strength'
   String? whyStep2;
   String whyCustomText = '';
 

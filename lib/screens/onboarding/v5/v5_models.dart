@@ -23,47 +23,66 @@ class V5WhyOption {
 
 const whyOptions = [
   V5WhyOption(
-    id: 'pain',
-    label: 'Hết đau mỏi',
-    sub: 'Lưng, cổ, vai, gáy',
-    pose: 'reach',
-    stat: '47%',
-    statLabel: 'Giảm đau lưng sau 4 tuần',
-  ),
-  V5WhyOption(
-    id: 'confidence',
-    label: 'Tự tin trong gương',
-    sub: 'Cơ thể bạn muốn',
-    pose: 'tree',
-    stat: '+12cm',
-    statLabel: 'Vai mở rộng & thẳng',
-  ),
-  V5WhyOption(
-    id: 'energy',
-    label: 'Năng lượng cả ngày',
-    sub: 'Hết kiệt sức buổi chiều',
-    pose: 'lunge',
-    stat: '+3.2h',
-    statLabel: 'Tỉnh táo mỗi ngày',
-  ),
-  V5WhyOption(
-    id: 'health',
-    label: 'Khỏe đến 60',
-    sub: 'Cho 10 năm tới',
-    pose: 'squat',
-    stat: '12yr+',
-    statLabel: 'Tuổi khớp tương đương',
-  ),
+  id: 'body',
+  label: 'Cải thiện vóc dáng',
+  sub: 'Cơ thể bạn mong muốn',
+  pose: 'squat',
+  stat: '-2kg',
+  statLabel: 'Trung bình sau 4 tuần',
+),
+V5WhyOption(
+  id: 'pain',
+  label: 'Giảm đau, tư thế tốt',
+  sub: 'Lưng, cổ, vai, gối',
+  pose: 'reach',
+  stat: '47%',
+  statLabel: 'Giảm đau lưng sau 4 tuần',
+),
+V5WhyOption(
+  id: 'energy',
+  label: 'Năng lượng cho cả ngày',
+  sub: 'Hết kiệt sức sau giờ làm',
+  pose: 'lunge',
+  stat: '+20%',
+  statLabel: 'Năng lượng & tinh thần',
+),
+V5WhyOption(
+  id: 'strength',
+  label: 'Khoẻ & tự tin hơn',
+  sub: 'Cho công việc và cuộc sống',
+  pose: 'tree',
+  stat: '+66%',
+  statLabel: 'Sức bền chống đẩy',
+),
 ];
 
-// TODO(LOGIC-REFINEMENT-#1): S02 Why — sentence builder follow-ups (`WHY_FOLLOWUPS`) are hardcoded 3 sub-options per primary why.
-// Currently using v1 placeholder from JSX prototype. Real logic deferred to Phase 2.
-// See Notion: Vika State > Onboarding Logic Refinement block for full context.
 const whyFollowups = {
-  'pain': ['Ngồi cả ngày không nhức', 'Ngủ ngon hơn', 'Cúi nhặt đồ không kêu'],
-  'confidence': ['Mặc đồ vừa hơn', 'Đứng thẳng vai', 'Chụp ảnh không né'],
-  'energy': ['Không kiệt sức buổi chiều', 'Tỉnh táo cả ngày', 'Về nhà vẫn vui'],
-  'health': ['Chơi với con sau này', 'Leo cầu thang không thở', 'Ít ốm vặt'],
+  'body': [
+    'Giảm cân, gọn người hơn',
+    'Săn chắc tay, chân, bụng',
+    'Tăng cơ, lên dáng',
+    'Tự tin mặc đồ mình thích',
+  ],
+  'pain': [
+    'Đau lưng do ngồi văn phòng cả ngày',
+    'Vai/cổ căng cứng sau giờ làm',
+    'Đầu gối khó chịu khi đứng lên xuống',
+    'Tư thế xấu, gù lưng / đầu cúi',
+    'Hồi phục sau chấn thương cũ',
+  ],
+  'energy': [
+    'Đi làm về vẫn còn năng lượng cho cuộc sống',
+    'Ngủ ngon hơn, dậy tỉnh táo hơn',
+    'Phòng bệnh, khoẻ lâu dài',
+    'Giảm căng thẳng, tinh thần ổn định',
+  ],
+  'strength': [
+    'Tăng sức bền cho công việc bận',
+    'Tăng cơ chắc, khoẻ hơn',
+    'Theo đuổi môn thể thao tôi thích (đá bóng, chạy bộ, ...)',
+    'Tự tin với cơ thể mình hơn',
+  ],
+
 };
 
 class V5GoalOption {
