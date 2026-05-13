@@ -29,10 +29,12 @@ class OnboardingPersistence {
       return false;
     }
 
-    final ok = await _writeProfile(user.id, data);
+    final ok = await _writeProfile(user.id, data) ;
+    
     if (!ok) return false;
 
     await _writePainAreas(user.id, data);
+    await _writeForkDecision(user.id, data);
 
     // Camera-detected from squat assessment. Future interpreters
     // (push-up, warrior, fold) plug in here as they exist.
@@ -50,43 +52,36 @@ class OnboardingPersistence {
 
   // ─── profiles ─────────────────────────────────────────────────────
 
-  Future<bool> _writeProfile(String userId, OnboardingData data) async {
-    final payload = <String, dynamic>{
-      'id': userId,
-      'onboarding_complete': true,
-    };
+Future<bool> _writeProfile(String userId, OnboardingData data) async {
+  final payload = <String, dynamic>{
+    'id': userId,
+    'onboarding_complete': true,
+    'gender': data.gender,
+    'height_cm': data.heightCm,
+    'weight_kg': data.weightKg,
+    'age': data.age,
+    'why_primary': data.whyStep1,
+    'why_secondary': data.whyStep2,
+    'intent_quote': data.whyCustomText.trim().isNotEmpty 
+      ? data.whyCustomText.trim() 
+      : null,
+    'goals': data.goal != null ? [data.goal] : null,
+    'training_duration': data.trainingDuration,
+    'fork': data.fork,
+    'fitness_level': data.level,
+    'schedule_sessions': data.scheduleSessions.isNotEmpty 
+      ? data.scheduleSessions 
+      : null,
+  };
 
-    if (data.gender != null) payload['gender'] = data.gender;
-    if (data.heightCm != null) payload['height_cm'] = data.heightCm;
-    if (data.weightKg != null) payload['weight_kg'] = data.weightKg;
-    if (data.age != null) payload['age'] = data.age;
-
-    if (data.whyStep1 != null) payload['why_primary'] = data.whyStep1;
-    if (data.whyStep2 != null) payload['why_secondary'] = data.whyStep2;
-    if (data.whyCustomText.trim().isNotEmpty) {
-      payload['intent_quote'] = data.whyCustomText.trim();
-    }
-
-    // `goals` is text[] in schema. Onboarding picks one today;
-    // writing a 1-element array keeps future multi-goal cheap.
-    if (data.goal != null) payload['goals'] = [data.goal];
-    if (data.trainingDuration != null) {
-      payload['training_duration'] = data.trainingDuration;
-    }
-    if (data.fork != null) payload['fork'] = data.fork;
-    if (data.level != null) payload['fitness_level'] = data.level;
-    if (data.scheduleSessions.isNotEmpty) {
-      payload['schedule_sessions'] = data.scheduleSessions;
-    }
-
-    try {
-      await _client.from('profiles').upsert(payload, onConflict: 'id');
-      return true;
-    } catch (e) {
-      debugPrint('[OnboardingPersistence] profile upsert failed: $e');
-      return false;
-    }
+  try {
+    await _client.from('profiles').upsert(payload, onConflict: 'id');
+    return true;
+  } catch (e) {
+    debugPrint('[OnboardingPersistence] profile upsert failed: $e');
+    return false;
   }
+}
 
   // ─── user_pain_areas (S04 + S09) ──────────────────────────────────
 
@@ -167,5 +162,34 @@ class OnboardingPersistence {
   } catch (e) {
     debugPrint('[OnboardingPersistence] pain areas write failed: $e');
   }
+} 
+
+Future<void> _writeForkDecision(String userId, OnboardingData data) async {
+  final rec = data.forkRec;
+  if (rec == null || data.fork == null) {
+    debugPrint('[OnboardingPersistence] no forkRec, skipping fork_decisions');
+    return;
+  }
+
+  try {
+    await _client.from('fork_decisions').insert({
+      'user_id': userId,
+      'fork_recommended': rec.fork,
+      'fork_chosen': data.fork,
+      'raw_score': rec.rawScore,
+      'confidence': rec.confidence,
+      'dominant_signal': rec.dominantSignal,
+      'reason_text': rec.reason,
+      'contribution_goal': rec.signalContributions['goal'],
+      'contribution_pain': rec.signalContributions['pain'],
+      'contribution_why': rec.signalContributions['why'],
+      'contribution_duration': rec.signalContributions['duration'],
+      'algorithm_version': 'v1.0',
+    });
+  } catch (e) {
+    debugPrint('[OnboardingPersistence] fork_decision insert failed: $e');
+  }
+
 }
+
 }

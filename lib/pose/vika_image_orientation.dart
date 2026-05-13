@@ -83,20 +83,19 @@ extension VikaImageOrientationCodes on VikaImageOrientation {
 
   /// Degrees corresponding to `Surface.ROTATION_X` for this orientation.
   ///
-  /// Convention swap: `native_device_orientation.landscapeLeft` corresponds to
-  /// the device being rotated 90° CCW (home button on RIGHT), which Android's
-  /// Display.getRotation() reports as `Surface.ROTATION_270`. The landscape
-  /// names are inverted between the sensor package's convention and Android's
-  /// Surface rotation convention, matching the swap in
-  /// `PoseLandmarkerPlugin.targetRotationForOrientation`.
+  /// Android CameraX follows Flutter's camera plugin convention:
+  /// `DeviceOrientation.landscapeLeft` maps to `Surface.ROTATION_90`, and
+  /// `DeviceOrientation.landscapeRight` maps to `Surface.ROTATION_270`.
+  /// The native pose plugin uses the same table for Preview/ImageAnalysis, so
+  /// the ML Kit fallback must use the same degrees when building InputImages.
   int get androidSurfaceRotationDegrees {
     switch (this) {
       case VikaImageOrientation.portrait:
         return 0;
       case VikaImageOrientation.landscapeLeft:
-        return 270;
-      case VikaImageOrientation.landscapeRight:
         return 90;
+      case VikaImageOrientation.landscapeRight:
+        return 270;
       case VikaImageOrientation.portraitUpsideDown:
         return 180;
     }

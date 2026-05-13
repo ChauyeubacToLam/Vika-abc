@@ -34,9 +34,9 @@
 			</dict>
 		</array>
 		<key>CFBundleVersion</key>
-		<string>3</string>
+		<string>4</string>
 		<key>GIDClientID</key>
-    <string>com.googleusercontent.apps.842720056940-6de5r778b6gqjspmhrn5u347od5oqhmc</string>
+    <string>842720056940-6de5r778b6gqjspmhrn5u347od5oqhmc.apps.googleusercontent.com</string>
 		<key>ITSAppUsesNonExemptEncryption</key>
 		<false/>
 		<key>LSRequiresIPhoneOS</key>

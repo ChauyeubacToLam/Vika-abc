@@ -94,6 +94,24 @@ void main() {
     });
   });
 
+  group('VikaImageOrientation Android surface rotation', () {
+    test('matches CameraX targetRotation constants', () {
+      expect(VikaImageOrientation.portrait.androidSurfaceRotationDegrees, 0);
+      expect(
+        VikaImageOrientation.landscapeLeft.androidSurfaceRotationDegrees,
+        90,
+      );
+      expect(
+        VikaImageOrientation.landscapeRight.androidSurfaceRotationDegrees,
+        270,
+      );
+      expect(
+        VikaImageOrientation.portraitUpsideDown.androidSurfaceRotationDegrees,
+        180,
+      );
+    });
+  });
+
   group('CurlUp landscape orientation tolerance', () {
     test('start position accepts bent knee above or below hip', () {
       final kneeAbove = CurlUp()..cameraFacing = CameraFacing.right;

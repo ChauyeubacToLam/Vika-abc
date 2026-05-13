@@ -179,8 +179,9 @@ class ForkChoice {
     required this.stat,
     required this.statLabel,
     required this.pose,
-    required this.desc,
     required this.highlights,
+    required this.caveats,
+    required this.equipment,
   });
 
   final String id;
@@ -189,32 +190,53 @@ class ForkChoice {
   final String stat;
   final String statLabel;
   final String pose;
-  final String desc;
+
+  /// "Phù hợp khi bạn muốn" — positive-fit bullets.
   final List<String> highlights;
+
+  /// "Chưa lý tưởng nếu" — honest caveats so the user can self-select.
+  final List<String> caveats;
+
+  /// Equipment line shown in the footer chip strip (e.g. "Cần thảm").
+  final String equipment;
 }
 
 const forkChoices = {
   'home': ForkChoice(
     id: 'home',
-    title: 'Tập tại nhà',
-    sub: 'Sức mạnh & vóc dáng',
-    stat: '180+',
+    title: 'Home Workout',
+    sub: 'Khoẻ · Săn chắc · Năng lượng',
+    stat: '30+',
     statLabel: 'bài tập',
     pose: 'squat',
-    desc:
-        'Tập trung phát triển sức mạnh, săn chắc cơ và đốt mỡ. Phù hợp khi bạn muốn thấy thay đổi rõ rệt về vóc dáng.',
-    highlights: ['Squat, Push-up, Plank và 180+ bài', '5 nhóm cơ chính', '15–30 phút/ngày'],
+    highlights: [
+      'Săn cơ, tăng sức mạnh',
+      'Giảm mỡ, cải thiện vóc dáng',
+      'Tăng sức bền và năng lượng hàng ngày',
+    ],
+    caveats: [
+      'Mục tiêu là giảm đau lưng / cổ',
+      'Muốn tập trung vào sự dẻo dai, linh hoạt',
+    ],
+    equipment: 'Không cần thiết bị',
   ),
   'yoga': ForkChoice(
     id: 'yoga',
     title: 'Yoga',
-    sub: 'Linh hoạt & cân bằng',
-    stat: '60+',
-    statLabel: 'asanas',
+    sub: 'Linh hoạt · Cân bằng · Thư giãn',
+    stat: '30+',
+    statLabel: 'bài yoga',
     pose: 'tree',
-    desc:
-        'Giãn cơ, phục hồi và cải thiện linh hoạt. Tốt cho người ngồi nhiều, đau cổ vai gáy.',
-    highlights: ['Warrior, Tree, Forward Fold', 'Mọi cấp độ', '15–25 phút/ngày'],
+    highlights: [
+      'Tăng linh hoạt và biên độ chuyển động',
+      'Giảm đau lưng / cổ / vai do ngồi nhiều',
+      'Thư giãn, giảm stress, kiểm soát hơi thở',
+    ],
+    caveats: [
+      'Tăng cơ bắp rõ rệt',
+      'Đốt mỡ nhanh, tập cường độ cao',
+    ],
+    equipment: 'Cần thảm',
   ),
 };
 
