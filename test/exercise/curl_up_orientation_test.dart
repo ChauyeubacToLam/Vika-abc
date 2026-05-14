@@ -110,6 +110,27 @@ void main() {
         180,
       );
     });
+
+    test('corrects native Android landscape camera scene presentation', () {
+      expect(
+        VikaImageOrientation.portrait.androidNativeCameraSceneQuarterTurns,
+        0,
+      );
+      expect(
+        VikaImageOrientation.landscapeLeft.androidNativeCameraSceneQuarterTurns,
+        2,
+      );
+      expect(
+        VikaImageOrientation
+            .landscapeRight.androidNativeCameraSceneQuarterTurns,
+        2,
+      );
+      expect(
+        VikaImageOrientation
+            .portraitUpsideDown.androidNativeCameraSceneQuarterTurns,
+        0,
+      );
+    });
   });
 
   group('CurlUp landscape orientation tolerance', () {
