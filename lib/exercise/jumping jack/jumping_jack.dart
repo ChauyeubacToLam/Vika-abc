@@ -184,12 +184,12 @@ class JumpingJack extends ExerciseBase {
       return "⚠️ Đảm bảo toàn thân trong khung hình";
     }
 
-    if (leftShoulder.likelihood < ExerciseBase.MIN_CONFIDENCE ||
-        rightShoulder.likelihood < ExerciseBase.MIN_CONFIDENCE ||
-        leftWrist.likelihood < ExerciseBase.MIN_CONFIDENCE ||
-        rightWrist.likelihood < ExerciseBase.MIN_CONFIDENCE ||
-        leftAnkle.likelihood < ExerciseBase.MIN_CONFIDENCE ||
-        rightAnkle.likelihood < ExerciseBase.MIN_CONFIDENCE) {
+    if (!ExerciseBase.isLandmarkConfident(leftShoulder) ||
+        !ExerciseBase.isLandmarkConfident(rightShoulder) ||
+        !ExerciseBase.isLandmarkConfident(leftWrist) ||
+        !ExerciseBase.isLandmarkConfident(rightWrist) ||
+        !ExerciseBase.isLandmarkConfident(leftAnkle) ||
+        !ExerciseBase.isLandmarkConfident(rightAnkle)) {
       return "⚠️ Hình ảnh không rõ. Điều chỉnh ánh sáng hoặc vị trí";
     }
 

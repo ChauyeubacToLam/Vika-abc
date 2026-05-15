@@ -22,7 +22,8 @@ class S04PainCheck extends StatefulWidget {
 }
 
 class _S04PainCheckState extends State<S04PainCheck> {
-  bool get _canContinue => widget.data.noPain || widget.data.painAreas.isNotEmpty;
+  bool get _canContinue =>
+      widget.data.noPain || widget.data.painAreas.isNotEmpty;
 
   void _togglePain(String id) {
     // TODO(LOGIC-REFINEMENT-#10): S04→S14 painAreas → exercise modification wiring stores painAreas but Journey does not adjust suggested exercises.
@@ -47,6 +48,10 @@ class _S04PainCheckState extends State<S04PainCheck> {
 
   @override
   Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).height < 720;
+    final heroTop = compact ? 126.0 : 144.0;
+    final heroHeight = compact ? 180.0 : 200.0;
+    final contentTop = compact ? 318.0 : 360.0;
     final statusText = widget.data.noPain
         ? 'Tất cả ổn — Vika sẽ thiết kế bài an toàn'
         : widget.data.painAreas.isNotEmpty
@@ -57,10 +62,10 @@ class _S04PainCheckState extends State<S04PainCheck> {
       onBack: widget.onBack,
       children: [
         Positioned(
-          top: 144,
+          top: heroTop,
           left: 16,
           right: 16,
-          height: 200,
+          height: heroHeight,
           child: V5FadeIn(
             child: V5HeroCard(
               child: Stack(
@@ -128,14 +133,14 @@ class _S04PainCheckState extends State<S04PainCheck> {
           ),
         ),
         Positioned(
-          top: 360,
+          top: contentTop,
           left: 0,
           right: 0,
           bottom: 0,
           child: Column(
             children: [
               Expanded(
-                child: Padding(
+                child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
                   child: Column(
                     children: [
@@ -143,13 +148,14 @@ class _S04PainCheckState extends State<S04PainCheck> {
                         crossAxisCount: 2,
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        childAspectRatio: 3.2,
-                        crossAxisSpacing: 8,
-                        mainAxisSpacing: 8,
+                        childAspectRatio: 2.75,
+                        crossAxisSpacing: 10,
+                        mainAxisSpacing: 10,
                         children: painAreaOptions.asMap().entries.map((entry) {
                           final i = entry.key;
                           final area = entry.value;
-                          final selected = widget.data.painAreas.contains(area.id);
+                          final selected =
+                              widget.data.painAreas.contains(area.id);
                           return V5FadeIn(
                             delay: Duration(milliseconds: i * 30),
                             slideY: 8,
@@ -168,8 +174,9 @@ class _S04PainCheckState extends State<S04PainCheck> {
                         centered: true,
                         onTap: _toggleNoPain,
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
                       _HealthNote(),
+                      const SizedBox(height: 16),
                     ],
                   ),
                 ),
@@ -206,39 +213,44 @@ class _PainButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-        decoration: BoxDecoration(
-          color: selected ? V5.ink : V5.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: selected ? V5.ink : V5.border),
-          boxShadow: [selected ? V5.cardShadow(0.18) : V5.cardShadow(0.08)],
-        ),
-        child: Row(
-          mainAxisAlignment:
-              centered ? MainAxisAlignment.center : MainAxisAlignment.spaceBetween,
-          children: [
-            if (centered) ...[
-              V5CheckCircle(selected: selected, size: 18),
-              const SizedBox(width: 10),
-            ],
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: V5.text(
-                  context,
-                  size: 13,
-                  weight: FontWeight.w700,
-                  color: selected ? V5.invInk : V5.ink,
-                  letterSpacing: -0.2,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: centered ? 58 : 54),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+          decoration: BoxDecoration(
+            color: selected ? V5.ink : V5.surface,
+            borderRadius: BorderRadius.circular(17),
+            border: Border.all(color: selected ? V5.ink : V5.border),
+            boxShadow: [selected ? V5.cardShadow(0.18) : V5.cardShadow(0.08)],
+          ),
+          child: Row(
+            mainAxisAlignment: centered
+                ? MainAxisAlignment.center
+                : MainAxisAlignment.spaceBetween,
+            children: [
+              if (centered) ...[
+                V5CheckCircle(selected: selected, size: 20),
+                const SizedBox(width: 10),
+              ],
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: V5.text(
+                    context,
+                    size: 14,
+                    weight: FontWeight.w800,
+                    color: selected ? V5.invInk : V5.ink,
+                    letterSpacing: -0.2,
+                    height: 1.1,
+                  ),
                 ),
               ),
-            ),
-            if (!centered) V5CheckCircle(selected: selected, size: 18),
-          ],
+              if (!centered) V5CheckCircle(selected: selected, size: 20),
+            ],
+          ),
         ),
       ),
     );

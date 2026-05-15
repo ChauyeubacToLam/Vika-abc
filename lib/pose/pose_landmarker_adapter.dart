@@ -1,8 +1,9 @@
-import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:camera/camera.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+
+import 'vika_pose_landmark.dart';
 
 class PoseLandmarkerAdapter {
   static Pose? fromChannelData(Map<String, dynamic> data) {
@@ -27,12 +28,17 @@ class PoseLandmarkerAdapter {
       }
 
       final type = PoseLandmarkType.values[typeIndex];
-      landmarkMap[type] = PoseLandmark(
+      final visibility = (landmark['visibility'] as num?)?.toDouble() ??
+          (landmark['likelihood'] as num?)?.toDouble() ??
+          0;
+      final presence = (landmark['presence'] as num?)?.toDouble() ?? visibility;
+      landmarkMap[type] = poseLandmarkWithVikaConfidence(
         type: type,
         x: (landmark['x'] as num).toDouble() * imageWidth,
         y: (landmark['y'] as num).toDouble() * imageHeight,
         z: (landmark['z'] as num).toDouble(),
-        likelihood: (landmark['likelihood'] as num?)?.toDouble() ?? 0,
+        presence: presence,
+        visibility: visibility,
       );
     }
 
@@ -51,25 +57,6 @@ class PoseLandmarkerAdapter {
     }
 
     return Size(width.toDouble(), height.toDouble());
-  }
-
-  static InputImage? inputImageFromChannelData(Map<String, dynamic> data) {
-    final frameBytes = _frameBytesFromChannelData(data);
-    final frameWidth = data['frameWidth'] as num?;
-    final frameHeight = data['frameHeight'] as num?;
-    if (frameBytes == null || frameWidth == null || frameHeight == null) {
-      return null;
-    }
-
-    return InputImage.fromBytes(
-      bytes: frameBytes,
-      metadata: InputImageMetadata(
-        size: Size(frameWidth.toDouble(), frameHeight.toDouble()),
-        rotation: inputImageRotationFromChannelData(data),
-        format: InputImageFormat.nv21,
-        bytesPerRow: frameWidth.toInt(),
-      ),
-    );
   }
 
   static InputImageRotation inputImageRotationFromChannelData(
@@ -93,16 +80,5 @@ class PoseLandmarkerAdapter {
     return data['isFrontCamera'] == true
         ? CameraLensDirection.front
         : CameraLensDirection.back;
-  }
-
-  static Uint8List? _frameBytesFromChannelData(Map<String, dynamic> data) {
-    final rawBytes = data['frameBytes'];
-    if (rawBytes is Uint8List) {
-      return rawBytes;
-    }
-    if (rawBytes is List) {
-      return Uint8List.fromList(rawBytes.cast<int>());
-    }
-    return null;
   }
 }

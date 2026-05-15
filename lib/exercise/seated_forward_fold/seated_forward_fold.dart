@@ -49,7 +49,7 @@ class SeatedForwardFold extends ExerciseBase {
       PoseLandmarkType.leftKnee, PoseLandmarkType.leftHeel, PoseLandmarkType.leftFootIndex,
     ];
     for (final type in req) {
-      if (landmarks[type] == null || landmarks[type]!.likelihood < ExerciseBase.MIN_CONFIDENCE) {
+      if (landmarks[type] == null || !ExerciseBase.isLandmarkConfident(landmarks[type]!)) {
         return "Các điểm khớp bị khuất. Hãy ngồi trọn trong khung hình.";
       }
     }

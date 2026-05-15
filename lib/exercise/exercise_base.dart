@@ -1,6 +1,15 @@
+/* =========================================================================
+      ExerciseBase: abstract base class for all exercises. Centralizes common
+      logic such as activation, person detection, orientation detection, and
+      rep counting. Subclasses implement specific exercises by overriding the
+      abstract methods at the bottom of this file.
+      ========================================================================= */
+
 // ignore_for_file: constant_identifier_names
 
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:vika/pose/vika_pose_landmark.dart';
+import 'package:vika/pose/vika_image_orientation.dart';
 import 'package:vika/utils/debouncer.dart';
 import 'package:vika/utils/person_detector.dart';
 import '../utils/pose_smoother.dart';
@@ -10,6 +19,10 @@ import "../utils/exercise_logger.dart";
 import '../debug/debug_types.dart';
 import '../debug/tracked_metric.dart';
 import '../services/viettel_tts_service.dart';
+import '../pose/presence_anomaly_detector.dart';
+import 'dart:math' as math;
+import 'dart:async';
+import 'dart:ui' show Size;
 
 // --- Constants ---
 
@@ -64,7 +77,52 @@ abstract class ExerciseBase {
   // Core state
   late PoseSmoother poseSmoother;
   int repCount = 0;
-  static const MIN_CONFIDENCE = 0.92;
+
+  /// Probability the landmark actually exists in the predicted skeleton.
+  /// Drops cleanly when a person leaves frame; stays high for legitimately
+  /// occluded landmarks such as the back leg in side-view squats.
+  static const double MIN_PRESENCE = 0.7;
+
+  /// Average presence below this threshold may indicate a faulty pose or that the
+  /// person is not fully in frame.
+  static const double AVG_LOW_PRESENCE_THRESHOLD = 0.35;
+
+  /// Probability the landmark is unoccluded given that it exists.
+  /// Used only as a secondary gate to reject fully extrapolated landmarks.
+  static const double MIN_VISIBILITY = 0.3;
+
+  /// Diagnostic-only bypass for auto-pause and pose-event backpressure.
+  /// Keep false in production; enabling this disables pause paths while
+  /// collecting continuity diagnostics.
+  static const bool kDiagnosticMode = false;
+
+  /// Master toggle for landscape orientation support across pose pipeline.
+  /// When false, all paths fall through to portrait behavior identical to
+  /// pre-spec production.
+  static const bool kLandscapeRotationEnabled = true;
+
+  /// Device orientations under which this exercise is designed to work.
+  /// Defaults to portrait. Floor, prone, and seated exercises should override
+  /// this with the tested orientations as they are added.
+  ///
+  /// Convention for future floor/prone/seated work such as Cobra, Sphinx,
+  /// Seated Forward Fold, or Butterfly: declare both supported landscape
+  /// orientations once the exercise metrics and framing are validated there.
+  Set<VikaImageOrientation> get supportedOrientations =>
+      const <VikaImageOrientation>{VikaImageOrientation.portrait};
+
+  // Trigger segmentation
+  bool _wasPoseAnomaly = false;
+  bool _wasPoseFrameEdgeRisk = false;
+  bool _wasPoseLowPresence = false;
+  bool _wasNoLandmarks = false;
+  final PresenceAnomalyDetector _posePresenceDetector =
+      PresenceAnomalyDetector();
+
+  static bool isLandmarkConfident(PoseLandmark landmark) {
+    return landmark.presence >= MIN_PRESENCE &&
+        landmark.visibility >= MIN_VISIBILITY;
+  }
 
   // Voice Service
   final ViettelTTSService ttsService = ViettelTTSService();
@@ -131,6 +189,8 @@ abstract class ExerciseBase {
     _isPaused = false;
     _resumePresenceSince = DateTime.now();
     _personLostSince = null;
+    _resetPresenceDetectors();
+    unawaited(_personDetector.triggerCheck(reason: 'manual_resume'));
   }
 
   double get personPresenceScore => _personDetector.presenceScore;
@@ -159,6 +219,7 @@ abstract class ExerciseBase {
   List<dynamic>? processPose(
     Map<PoseLandmarkType, PoseLandmark> landmarks, {
     InputImage? inputImage,
+    Size? imageSize,
   }) {
     final now = DateTime.now();
     if (_lastFrameTime != null) {
@@ -175,11 +236,31 @@ abstract class ExerciseBase {
 
     final smoothedLandmarks = poseSmoother.smoothing(landmarks);
 
+    // Pose returned after a no-landmark run. Ask segmentation for a fresh frame
+    // before any paused/not-confirmed early return can block this path.
+    if (_wasNoLandmarks) {
+      unawaited(_personDetector.triggerCheck(reason: 'pose_returned'));
+      _wasNoLandmarks = false;
+    }
+
     _syncPresenceState(hasPose: true);
 
+    debugData['hasPose'] = true;
     debugData['personRatio'] = _personDetector.lastPersonRatio;
+    debugData['personSoftRatio'] = _personDetector.lastSoftPersonRatio;
+    debugData['personSmoothedRatio'] = _personDetector.smoothedPersonRatio;
+    debugData['personSmoothedSoftRatio'] =
+        _personDetector.smoothedSoftPersonRatio;
     debugData['personScore'] = _personDetector.presenceScore;
     debugData['personDetected'] = _personDetector.personDetected;
+    debugData['personPresent'] = _personDetector.personDetected;
+    debugData['segIntervalMs'] =
+        _personDetector.configuredMinProcessIntervalMs ?? '-';
+    debugData['segEvents'] = _personDetector.segmentationEventCount;
+    debugData['segEventAgeMs'] =
+        _personDetector.lastSegmentationEventAgeMs ?? '-';
+    debugData['segTriggerCounts'] = _personDetector.triggerCountByReason;
+    debugData['isPaused'] = _isPaused;
 
     // Person detection — only before activation
     if (exerciseState == ExerciseState.notActivated && !_personConfirmed) {
@@ -192,6 +273,7 @@ abstract class ExerciseBase {
         resultIssues.feedback["System"] =
             "Đang tìm người... Vui lòng đứng trong khung hình.";
         _populateBaseDebugData();
+
         _trackDebugFrame();
         return [repCount, resultIssues.feedback];
       }
@@ -200,6 +282,7 @@ abstract class ExerciseBase {
     // Presence re-check during active exercise
     if (exerciseState == ExerciseState.activated) {
       if (_isPaused) {
+        unawaited(_personDetector.triggerCheck(reason: 'paused_pose_present'));
         resultIssues.feedback["System"] =
             "⏸ Tạm dừng — Quay lại khung hình để tiếp tục";
         _populateBaseDebugData();
@@ -207,6 +290,33 @@ abstract class ExerciseBase {
         return [repCount, resultIssues.feedback];
       }
     }
+
+    final avgPosePresence = _computeAvgPresence(smoothedLandmarks);
+    final poseLowPresence = avgPosePresence < AVG_LOW_PRESENCE_THRESHOLD;
+    if (exerciseState == ExerciseState.activated &&
+        poseLowPresence &&
+        !_wasPoseLowPresence) {
+      unawaited(_personDetector.triggerCheck(reason: 'pose_low_presence'));
+    }
+    _wasPoseLowPresence = poseLowPresence;
+
+    final poseFrameEdgeRisk =
+        _isPoseFrameEdgeRisk(smoothedLandmarks, imageSize: imageSize);
+    if (exerciseState == ExerciseState.activated &&
+        poseFrameEdgeRisk &&
+        !_wasPoseFrameEdgeRisk) {
+      unawaited(_personDetector.triggerCheck(reason: 'pose_frame_edge'));
+    }
+    _wasPoseFrameEdgeRisk = poseFrameEdgeRisk;
+
+    _posePresenceDetector.update(avgPosePresence);
+
+    // Trigger seg on anomaly transition (false -> true).
+    final nowAnomaly = _posePresenceDetector.isAnomalyConfirmed;
+    if (nowAnomaly && !_wasPoseAnomaly) {
+      unawaited(_personDetector.triggerCheck(reason: 'pose_anomaly'));
+    }
+    _wasPoseAnomaly = nowAnomaly;
 
     // Auto-detect orientation
     cameraFacing = detectCameraFacing(smoothedLandmarks);
@@ -221,24 +331,25 @@ abstract class ExerciseBase {
     }
 
     // Calculate scale factor (shoulder-to-hip distance)
-    final shoulder = getSideLandmark(
-      landmarks: smoothedLandmarks,
-      rightType: PoseLandmarkType.rightShoulder,
-      leftType: PoseLandmarkType.leftShoulder,
-    );
-    final hip = getSideLandmark(
-      landmarks: smoothedLandmarks,
-      rightType: PoseLandmarkType.rightHip,
-      leftType: PoseLandmarkType.leftHip,
-    );
-    if (shoulder != null && hip != null) {
-      scaleFactor = calculateDistance(shoulder, hip);
-    }
+    calScaleFacrtor(smoothedLandmarks);
 
     // State machine
     checkExerciseState(smoothedLandmarks, exerciseState);
 
     _populateBaseDebugData();
+    debugData['posePresenceBaseline'] = _posePresenceDetector.baseline;
+    debugData['posePresenceRecent'] = _posePresenceDetector.recent;
+    debugData['posePresenceDelta'] = _posePresenceDetector.currentDelta;
+    debugData['posePresenceAnomaly'] = _posePresenceDetector.isAnomalyConfirmed;
+    debugData['poseLowPresence'] = poseLowPresence;
+    debugData['poseFrameEdgeRisk'] = poseFrameEdgeRisk;
+    debugData['personPresent'] = _personDetector.personDetected;
+    debugData['segIntervalMs'] =
+        _personDetector.configuredMinProcessIntervalMs ?? '-';
+    debugData['segEvents'] = _personDetector.segmentationEventCount;
+    debugData['segEventAgeMs'] =
+        _personDetector.lastSegmentationEventAgeMs ?? '-';
+    debugData['segTriggerCounts'] = _personDetector.triggerCountByReason;
     debugData['scaleFactor'] = scaleFactor;
 
     if (exerciseState == ExerciseState.activated) {
@@ -264,11 +375,43 @@ abstract class ExerciseBase {
   Map<String, String> processNoPoseFrame() {
     frameTimestamp = DateTime.now();
     resultIssues.feedback.clear();
+
+    // Ask segmentation to catch up immediately when pose disappears but the
+    // cached segmentation state still says a person is present.
+    final hadLandmarksLastFrame = !_wasNoLandmarks;
+    if (hadLandmarksLastFrame || _personDetector.personDetected) {
+      unawaited(
+        _personDetector.triggerCheck(
+          reason: hadLandmarksLastFrame
+              ? 'no_landmarks'
+              : 'no_landmarks_stale_present',
+        ),
+      );
+    }
+    _wasNoLandmarks = true;
+    _wasPoseAnomaly =
+        false; // reset; if pose returns and is anomalous it'll re-trigger
+    _wasPoseLowPresence = false;
+    _wasPoseFrameEdgeRisk = false;
+
     _syncPresenceState(hasPose: false);
     _populateBaseDebugData();
+
+    debugData['hasPose'] = false;
     debugData['personRatio'] = _personDetector.lastPersonRatio;
+    debugData['personSoftRatio'] = _personDetector.lastSoftPersonRatio;
+    debugData['personSmoothedRatio'] = _personDetector.smoothedPersonRatio;
+    debugData['personSmoothedSoftRatio'] =
+        _personDetector.smoothedSoftPersonRatio;
     debugData['personScore'] = _personDetector.presenceScore;
     debugData['personDetected'] = _personDetector.personDetected;
+    debugData['personPresent'] = _personDetector.personDetected;
+    debugData['segIntervalMs'] =
+        _personDetector.configuredMinProcessIntervalMs ?? '-';
+    debugData['segEvents'] = _personDetector.segmentationEventCount;
+    debugData['segEventAgeMs'] =
+        _personDetector.lastSegmentationEventAgeMs ?? '-';
+    debugData['segTriggerCounts'] = _personDetector.triggerCountByReason;
     debugData['isPaused'] = _isPaused;
 
     if (exerciseState == ExerciseState.completed) {
@@ -293,7 +436,7 @@ abstract class ExerciseBase {
   }
 
   /// Async person detection — call from camera stream handler.
-  Future<void> runPersonDetection(InputImage inputImage) async {
+  Future<void> runPersonDetection([InputImage? inputImage]) async {
     if (exerciseState == ExerciseState.completed) return;
     await _personDetector.detect(inputImage);
   }
@@ -317,8 +460,7 @@ abstract class ExerciseBase {
 
   void _syncPresenceState({required bool hasPose}) {
     final now = frameTimestamp;
-    final segmentationPresent = _personDetector.personDetected;
-    final presentNow = hasPose || segmentationPresent;
+    final presentNow = _personDetector.personDetected;
 
     if (exerciseState == ExerciseState.notActivated) {
       if (!_personConfirmed) {
@@ -347,6 +489,7 @@ abstract class ExerciseBase {
         if (now.difference(_resumePresenceSince!) >=
             _PERSON_RESUME_CONFIRM_DURATION) {
           _isPaused = false;
+          _resetPresenceDetectors();
         }
       } else {
         _resumePresenceSince = now;
@@ -356,8 +499,11 @@ abstract class ExerciseBase {
 
     _resumePresenceSince = null;
     _personLostSince ??= now;
-    if (!_isPaused && now.difference(_personLostSince!) >= _PERSON_LOST_GRACE) {
+    if (!_isPaused &&
+        now.difference(_personLostSince!) >= _PERSON_LOST_GRACE &&
+        !kDiagnosticMode) {
       _isPaused = true;
+      _resetPresenceDetectors();
     }
   }
 
@@ -426,6 +572,32 @@ abstract class ExerciseBase {
 
   // --- Helpers ---
 
+  double calScaleFacrtor(
+      Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
+    final ls = smoothedLandmarks[PoseLandmarkType.leftShoulder];
+    final rs = smoothedLandmarks[PoseLandmarkType.rightShoulder];
+    final lh = smoothedLandmarks[PoseLandmarkType.leftHip];
+    final rh = smoothedLandmarks[PoseLandmarkType.rightHip];
+    if (ls != null && rs != null && lh != null && rh != null) {
+      final shoulderMidX = (ls.x + rs.x) / 2;
+      final shoulderMidY = (ls.y + rs.y) / 2;
+      final hipMidX = (lh.x + rh.x) / 2;
+      final hipMidY = (lh.y + rh.y) / 2;
+      final dx = shoulderMidX - hipMidX;
+      final dy = shoulderMidY - hipMidY;
+      scaleFactor = math.sqrt(dx * dx + dy * dy);
+    }
+    return scaleFactor;
+  }
+
+  void _resetPresenceDetectors() {
+    _posePresenceDetector.reset();
+    _wasPoseAnomaly = false;
+    _wasPoseLowPresence = false;
+    _wasPoseFrameEdgeRisk = false;
+    _wasNoLandmarks = false;
+  }
+
   PoseLandmark? getSideLandmark({
     required Map<PoseLandmarkType, PoseLandmark> landmarks,
     required PoseLandmarkType rightType,
@@ -435,6 +607,56 @@ abstract class ExerciseBase {
       return landmarks[rightType];
     }
     return landmarks[leftType];
+  }
+
+  double _computeAvgPresence(
+      Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
+    if (smoothedLandmarks.isEmpty) return 0.0;
+    double totalPresence = 0.0;
+    for (final landmark in smoothedLandmarks.values) {
+      totalPresence += landmark.presence;
+    }
+    return totalPresence / smoothedLandmarks.length;
+  }
+
+  bool _isPoseFrameEdgeRisk(
+    Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks, {
+    required Size? imageSize,
+  }) {
+    if (imageSize == null || imageSize == Size.zero) return false;
+    if (imageSize.width <= 0 || imageSize.height <= 0) return false;
+
+    final marginX = imageSize.width * 0.04;
+    final marginY = imageSize.height * 0.04;
+    var visibleCount = 0;
+    var edgeCount = 0;
+    var outsideCount = 0;
+
+    for (final landmark in smoothedLandmarks.values) {
+      if (landmark.presence < 0.25 && landmark.visibility < 0.25) {
+        continue;
+      }
+      visibleCount += 1;
+
+      final outside = landmark.x < 0 ||
+          landmark.x > imageSize.width ||
+          landmark.y < 0 ||
+          landmark.y > imageSize.height;
+      if (outside) {
+        outsideCount += 1;
+        continue;
+      }
+
+      if (landmark.x <= marginX ||
+          landmark.x >= imageSize.width - marginX ||
+          landmark.y <= marginY ||
+          landmark.y >= imageSize.height - marginY) {
+        edgeCount += 1;
+      }
+    }
+
+    if (visibleCount < 8) return false;
+    return outsideCount >= 2 || edgeCount >= 5;
   }
 
   List<dynamic> getRepCountAndFeedback() => [repCount, resultIssues.feedback];
@@ -479,6 +701,8 @@ abstract class ExerciseBase {
           if (elapsed >= HOLD_STILL_REQUIRED_DURATION) {
             exerciseState = ExerciseState.activated;
             _holdStillStartedAt = null;
+            _resetPresenceDetectors();
+            unawaited(_personDetector.useActivatedCadence());
             onExerciseActivated();
           } else {
             resultIssues.feedback['System'] =
@@ -505,8 +729,8 @@ abstract class ExerciseBase {
   }
 
   /* -----------------------------------------------------------------------
-     ABSTRACT METHODS & LIFECYCLE HOOKS
-     ----------------------------------------------------------------------- */
+        ABSTRACT METHODS & LIFECYCLE HOOKS
+        ----------------------------------------------------------------------- */
 
   void onExerciseActivated() {}
 

@@ -45,7 +45,7 @@ android {
 
     defaultConfig {
         applicationId = "com.vikavn.app"
-        minSdk = flutter.minSdkVersion
+        minSdk = maxOf(flutter.minSdkVersion, 23)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -91,6 +91,7 @@ flutter {
 
 dependencies {
     implementation("com.google.mediapipe:tasks-vision:0.20230731")
+    implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta6")
     implementation("androidx.camera:camera-core:1.3.4")
     implementation("androidx.camera:camera-camera2:1.3.4")
     implementation("androidx.camera:camera-lifecycle:1.3.4")

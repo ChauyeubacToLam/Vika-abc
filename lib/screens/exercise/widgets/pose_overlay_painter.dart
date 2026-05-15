@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
 enum SkeletonStyle {
+  vikaCream,
   constellation,
   classic,
   tetGold,
@@ -26,6 +27,8 @@ class PoseOverlayPainter extends CustomPainter {
     required this.imageSize,
     required this.rotation,
     required this.lensDirection,
+    this.fit = BoxFit.cover,
+    this.mirrorHorizontally,
     this.debugData = const {},
     this.style = SkeletonStyle.constellation,
   });
@@ -37,6 +40,9 @@ class PoseOverlayPainter extends CustomPainter {
   static const Color goldLight = Color(0xFFFFE9A3);
   static const Color goldDark = Color(0xFF8C6D1F);
   static const Color tetGreen = Color(0xFF0F2E20);
+  static const Color cream = Color(0xFFFBF6EA);
+  static const Color creamWarm = Color(0xFFE8DFC8);
+  static const Color activeOrange = Color(0xFFD67B3E);
 
   static const double _minLikelihood = 0.5;
   static const double _coreDashLength = 3.0;
@@ -52,6 +58,8 @@ class PoseOverlayPainter extends CustomPainter {
   final Size imageSize;
   final InputImageRotation rotation;
   final CameraLensDirection lensDirection;
+  final BoxFit fit;
+  final bool? mirrorHorizontally;
   final Map<String, dynamic> debugData;
   final SkeletonStyle style;
 
@@ -151,6 +159,47 @@ class PoseOverlayPainter extends CustomPainter {
   final Paint _tetWristPaint = Paint()
     ..style = PaintingStyle.fill
     ..color = gold.withValues(alpha: 0.25);
+
+  final Paint _creamCoreLinePaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeCap = StrokeCap.round
+    ..strokeWidth = 1.6
+    ..color = creamWarm.withValues(alpha: 0.92);
+
+  final Paint _creamLimbLinePaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeCap = StrokeCap.round
+    ..strokeWidth = 1.2
+    ..color = cream.withValues(alpha: 0.88);
+
+  final Paint _creamHaloPaint = Paint()
+    ..style = PaintingStyle.fill
+    ..color = cream.withValues(alpha: 0.16)
+    ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
+
+  final Paint _creamWideHaloPaint = Paint()
+    ..style = PaintingStyle.fill
+    ..color = cream.withValues(alpha: 0.10)
+    ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18);
+
+  final Paint _creamMajorRingPaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1.0
+    ..color = cream.withValues(alpha: 0.92);
+
+  final Paint _creamMajorDotPaint = Paint()
+    ..style = PaintingStyle.fill
+    ..color = cream;
+
+  final Paint _creamMinorDotPaint = Paint()
+    ..style = PaintingStyle.fill
+    ..color = cream.withValues(alpha: 0.78);
+
+  final Paint _activeBracketPaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeCap = StrokeCap.round
+    ..strokeWidth = 1.4
+    ..color = activeOrange.withValues(alpha: 0.96);
 
   static const List<List<PoseLandmarkType>> _bodyConnections = [
     [PoseLandmarkType.leftShoulder, PoseLandmarkType.rightShoulder],
@@ -328,28 +377,13 @@ class PoseOverlayPainter extends CustomPainter {
     final canvasW = size.width;
     final canvasH = size.height;
 
-    final imageAspect = imageW / imageH;
-    final canvasAspect = canvasW / canvasH;
-
-    double previewW;
-    double previewH;
-    double offsetX;
-    double offsetY;
-
-    if (imageAspect > canvasAspect) {
-      previewW = canvasW;
-      previewH = canvasW / imageAspect;
-      offsetX = 0;
-      offsetY = (canvasH - previewH) / 2;
-    } else {
-      previewH = canvasH;
-      previewW = canvasH * imageAspect;
-      offsetX = (canvasW - previewW) / 2;
-      offsetY = 0;
-    }
-
-    final scaleX = previewW / imageW;
-    final scaleY = previewH / imageH;
+    final scale = fit == BoxFit.contain
+        ? math.min(canvasW / imageW, canvasH / imageH)
+        : math.max(canvasW / imageW, canvasH / imageH);
+    final previewW = imageW * scale;
+    final previewH = imageH * scale;
+    final offsetX = (canvasW - previewW) / 2;
+    final offsetY = (canvasH - previewH) / 2;
 
     Offset transformPoint(PoseLandmark landmark) {
       var x = landmark.x;
@@ -359,11 +393,13 @@ class PoseOverlayPainter extends CustomPainter {
       // the native MediaPipe path and the ML Kit fallback path, so applying an
       // extra Android-side rotation here can invert the skeleton on devices
       // that report rotation 270.
-      if (lensDirection == CameraLensDirection.front) {
+      final shouldMirror =
+          mirrorHorizontally ?? lensDirection == CameraLensDirection.front;
+      if (shouldMirror) {
         x = imageW - x;
       }
 
-      return Offset(x * scaleX + offsetX, y * scaleY + offsetY);
+      return Offset(x * scale + offsetX, y * scale + offsetY);
     }
 
     final projectedPoints = <PoseLandmarkType, Offset>{};
@@ -373,6 +409,9 @@ class PoseOverlayPainter extends CustomPainter {
     }
 
     switch (style) {
+      case SkeletonStyle.vikaCream:
+        _drawVikaCreamSkeleton(canvas, size, projectedPoints);
+        break;
       case SkeletonStyle.constellation:
         _drawConstellationSkeleton(canvas, projectedPoints);
         break;
@@ -384,7 +423,116 @@ class PoseOverlayPainter extends CustomPainter {
         break;
     }
 
-    _drawMetricLabels(canvas, projectedPoints);
+    if (style != SkeletonStyle.vikaCream) {
+      _drawMetricLabels(canvas, projectedPoints);
+    }
+  }
+
+  void _drawVikaCreamSkeleton(
+    Canvas canvas,
+    Size size,
+    Map<PoseLandmarkType, Offset> projectedPoints,
+  ) {
+    final head = _resolveHead(projectedPoints);
+    final spine = _resolveSpine(projectedPoints);
+    final visualScale = (size.shortestSide / 390).clamp(0.82, 1.22);
+    final majorHaloRadius = 14.0 * visualScale;
+    final headHaloRadius = 30.0 * visualScale;
+    final majorRingRadius = 5.0 * visualScale;
+    final minorRadius = 2.0 * visualScale;
+
+    final creamPoints = <String, Offset?>{
+      'head': head,
+      'spine': spine,
+      'leftShoulder': projectedPoints[PoseLandmarkType.leftShoulder],
+      'rightShoulder': projectedPoints[PoseLandmarkType.rightShoulder],
+      'leftElbow': projectedPoints[PoseLandmarkType.leftElbow],
+      'rightElbow': projectedPoints[PoseLandmarkType.rightElbow],
+      'leftWrist': projectedPoints[PoseLandmarkType.leftWrist],
+      'rightWrist': projectedPoints[PoseLandmarkType.rightWrist],
+      'leftHip': projectedPoints[PoseLandmarkType.leftHip],
+      'rightHip': projectedPoints[PoseLandmarkType.rightHip],
+      'leftKnee': projectedPoints[PoseLandmarkType.leftKnee],
+      'rightKnee': projectedPoints[PoseLandmarkType.rightKnee],
+      'leftAnkle': projectedPoints[PoseLandmarkType.leftAnkle],
+      'rightAnkle': projectedPoints[PoseLandmarkType.rightAnkle],
+    };
+
+    final majorKeys = <String>[
+      'leftShoulder',
+      'rightShoulder',
+      'spine',
+      'leftHip',
+      'rightHip',
+      'leftKnee',
+      'rightKnee',
+      'leftAnkle',
+      'rightAnkle',
+    ];
+
+    if (head != null) {
+      canvas.drawCircle(head, headHaloRadius, _creamWideHaloPaint);
+    }
+    for (final key in majorKeys) {
+      final point = creamPoints[key];
+      if (point == null) continue;
+      canvas.drawCircle(point, majorHaloRadius, _creamHaloPaint);
+    }
+
+    void drawSegment(String a, String b, {required bool core}) {
+      final start = creamPoints[a];
+      final end = creamPoints[b];
+      if (start == null || end == null) return;
+      canvas.drawLine(
+          start, end, core ? _creamCoreLinePaint : _creamLimbLinePaint);
+    }
+
+    drawSegment('head', 'spine', core: true);
+    drawSegment('leftShoulder', 'rightShoulder', core: true);
+    drawSegment('leftShoulder', 'leftElbow', core: false);
+    drawSegment('leftElbow', 'leftWrist', core: false);
+    drawSegment('rightShoulder', 'rightElbow', core: false);
+    drawSegment('rightElbow', 'rightWrist', core: false);
+    drawSegment('spine', 'leftHip', core: true);
+    drawSegment('spine', 'rightHip', core: true);
+    drawSegment('leftHip', 'rightHip', core: true);
+    drawSegment('leftHip', 'leftKnee', core: false);
+    drawSegment('leftKnee', 'leftAnkle', core: false);
+    drawSegment('rightHip', 'rightKnee', core: false);
+    drawSegment('rightKnee', 'rightAnkle', core: false);
+
+    if (head != null) {
+      canvas.drawCircle(head, 12.0 * visualScale, _creamMajorRingPaint);
+      canvas.drawCircle(head, 2.0 * visualScale, _creamMajorDotPaint);
+    }
+
+    for (final key in majorKeys) {
+      final point = creamPoints[key];
+      if (point == null) continue;
+      canvas.drawCircle(point, majorRingRadius, _creamMajorRingPaint);
+      canvas.drawCircle(point, 1.6 * visualScale, _creamMajorDotPaint);
+    }
+
+    for (final key in const [
+      'leftElbow',
+      'rightElbow',
+      'leftWrist',
+      'rightWrist'
+    ]) {
+      final point = creamPoints[key];
+      if (point == null) continue;
+      canvas.drawCircle(point, minorRadius, _creamMinorDotPaint);
+    }
+
+    final activeJoint = _resolveActiveJoint(projectedPoints);
+    if (activeJoint != null) {
+      _drawAutofocusBrackets(
+        canvas,
+        activeJoint,
+        distance: 12.0 * visualScale,
+        length: 4.5 * visualScale,
+      );
+    }
   }
 
   void _drawClassicSkeleton(
@@ -651,6 +799,33 @@ class PoseOverlayPainter extends CustomPainter {
     );
   }
 
+  Offset? _resolveSpine(Map<PoseLandmarkType, Offset> projectedPoints) {
+    final leftShoulder = projectedPoints[PoseLandmarkType.leftShoulder];
+    final rightShoulder = projectedPoints[PoseLandmarkType.rightShoulder];
+    final leftHip = projectedPoints[PoseLandmarkType.leftHip];
+    final rightHip = projectedPoints[PoseLandmarkType.rightHip];
+
+    if (leftShoulder == null ||
+        rightShoulder == null ||
+        leftHip == null ||
+        rightHip == null) {
+      return _resolveNeck(projectedPoints);
+    }
+
+    final shoulderCenter = Offset(
+      (leftShoulder.dx + rightShoulder.dx) / 2,
+      (leftShoulder.dy + rightShoulder.dy) / 2,
+    );
+    final hipCenter = Offset(
+      (leftHip.dx + rightHip.dx) / 2,
+      (leftHip.dy + rightHip.dy) / 2,
+    );
+    return Offset(
+      (shoulderCenter.dx + hipCenter.dx) / 2,
+      (shoulderCenter.dy + hipCenter.dy) / 2,
+    );
+  }
+
   Offset? _resolveHead(Map<PoseLandmarkType, Offset> projectedPoints) {
     final nose = projectedPoints[PoseLandmarkType.nose];
     if (nose != null) return nose;
@@ -674,6 +849,91 @@ class PoseOverlayPainter extends CustomPainter {
     }
 
     return null;
+  }
+
+  Offset? _resolveActiveJoint(Map<PoseLandmarkType, Offset> projectedPoints) {
+    final keys = debugData.keys.map((key) => key.toLowerCase()).join(' ');
+
+    if (keys.contains('elbow')) {
+      return _firstAvailable(projectedPoints, const [
+        PoseLandmarkType.leftElbow,
+        PoseLandmarkType.rightElbow,
+      ]);
+    }
+    if (keys.contains('neck') ||
+        keys.contains('ear') ||
+        keys.contains('head')) {
+      return _resolveHead(projectedPoints);
+    }
+    if (keys.contains('knee')) {
+      return _firstAvailable(projectedPoints, const [
+        PoseLandmarkType.leftKnee,
+        PoseLandmarkType.rightKnee,
+      ]);
+    }
+    if (keys.contains('heel') || keys.contains('ankle')) {
+      return _firstAvailable(projectedPoints, const [
+        PoseLandmarkType.leftAnkle,
+        PoseLandmarkType.rightAnkle,
+        PoseLandmarkType.leftHeel,
+        PoseLandmarkType.rightHeel,
+      ]);
+    }
+    if (keys.contains('hip') ||
+        keys.contains('trunk') ||
+        keys.contains('back') ||
+        keys.contains('sync')) {
+      return _firstAvailable(projectedPoints, const [
+        PoseLandmarkType.leftHip,
+        PoseLandmarkType.rightHip,
+      ]);
+    }
+    return _firstAvailable(projectedPoints, const [
+      PoseLandmarkType.leftKnee,
+      PoseLandmarkType.rightKnee,
+      PoseLandmarkType.leftHip,
+      PoseLandmarkType.rightHip,
+    ]);
+  }
+
+  Offset? _firstAvailable(
+    Map<PoseLandmarkType, Offset> projectedPoints,
+    List<PoseLandmarkType> candidates,
+  ) {
+    for (final candidate in candidates) {
+      final point = projectedPoints[candidate];
+      if (point != null) return point;
+    }
+    return null;
+  }
+
+  void _drawAutofocusBrackets(
+    Canvas canvas,
+    Offset center, {
+    required double distance,
+    required double length,
+  }) {
+    final left = center.dx - distance;
+    final right = center.dx + distance;
+    final top = center.dy - distance;
+    final bottom = center.dy + distance;
+
+    canvas.drawLine(
+        Offset(left + length, top), Offset(left, top), _activeBracketPaint);
+    canvas.drawLine(
+        Offset(left, top), Offset(left, top + length), _activeBracketPaint);
+    canvas.drawLine(
+        Offset(right - length, top), Offset(right, top), _activeBracketPaint);
+    canvas.drawLine(
+        Offset(right, top), Offset(right, top + length), _activeBracketPaint);
+    canvas.drawLine(Offset(left + length, bottom), Offset(left, bottom),
+        _activeBracketPaint);
+    canvas.drawLine(Offset(left, bottom), Offset(left, bottom - length),
+        _activeBracketPaint);
+    canvas.drawLine(Offset(right - length, bottom), Offset(right, bottom),
+        _activeBracketPaint);
+    canvas.drawLine(Offset(right, bottom), Offset(right, bottom - length),
+        _activeBracketPaint);
   }
 
   void _drawMetricLabels(
@@ -817,6 +1077,8 @@ class PoseOverlayPainter extends CustomPainter {
         oldDelegate.imageSize != imageSize ||
         oldDelegate.rotation != rotation ||
         oldDelegate.lensDirection != lensDirection ||
+        oldDelegate.fit != fit ||
+        oldDelegate.mirrorHorizontally != mirrorHorizontally ||
         oldDelegate.style != style ||
         !mapEquals(oldDelegate.debugData, debugData);
   }

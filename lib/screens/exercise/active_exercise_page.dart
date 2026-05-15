@@ -6,6 +6,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:native_device_orientation/native_device_orientation.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -16,8 +17,11 @@ import '../../debug/debug_types.dart';
 import '../../exercise/exercise_base.dart';
 import '../../pose/pose_landmarker_adapter.dart';
 import '../../pose/pose_landmarker_channel.dart';
+import '../../pose/vika_image_orientation.dart';
 import '../../models/exercise_definition.dart';
 import '../../utils/exercise_logger.dart';
+import '../../utils/orientation_lock.dart';
+import '../../utils/segmentation_channel.dart';
 import '../../theme/vf_theme.dart';
 import 'widgets/form_score_arc.dart';
 import 'widgets/ivory_chrome.dart';
@@ -49,8 +53,11 @@ class ActiveExercisePage extends StatefulWidget {
 }
 
 class _ActiveExercisePageState extends State<ActiveExercisePage>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   final PoseLandmarkerChannel _poseChannel = PoseLandmarkerChannel();
+  final SegmentationChannel _segmentationChannel = SegmentationChannel();
+  final NativeDeviceOrientationCommunicator _orientationCommunicator =
+      NativeDeviceOrientationCommunicator();
   final PoseDetector _poseDetector = PoseDetector(
     options: PoseDetectorOptions(
       model: PoseDetectionModel.accurate,
@@ -59,16 +66,19 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   );
 
   StreamSubscription<Map<String, dynamic>>? _landmarkSubscription;
+  StreamSubscription<NativeDeviceOrientation>? _orientationSubscription;
   CameraController? _cameraController;
   List<CameraDescription> _availableCameras = const [];
   int? _textureId;
   int _cameraIndex = -1;
-  CameraLensDirection _currentLens = CameraLensDirection.back;
+  CameraLensDirection _currentLens = CameraLensDirection.front;
   PermissionStatus? _permissionStatus;
   bool _isInitializing = false;
   bool _isProcessingFrame = false;
   bool _isCameraReady = false;
   bool _didComplete = false;
+  bool _isDisposed = false;
+  bool _isCompletingSet = false;
   String? _cameraErrorMessage;
   Map<String, String> _feedback = {};
   Pose? _detectedPose;
@@ -106,18 +116,33 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   int _debugBackTapCount = 0;
   DateTime? _debugFirstBackTap;
   Timer? _pendingStaffBackTimer;
+  Timer? _setCompleteTimer;
   DateTime? _lastPersonDetectionAt;
   bool _personDetectionInFlight = false;
+  bool _orientationPauseActive = false;
+  VikaImageOrientation _currentOrientation = VikaImageOrientation.portrait;
+  VikaImageOrientation? _lastSentOrientation;
+  bool? _lastSentOrientationFrontCamera;
+  Future<void>? _pipelineShutdownFuture;
   static const Duration _personDetectionInterval = Duration(milliseconds: 450);
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Restrict allowed orientations to those the exercise supports. For
+    // landscape-only exercises this forces iOS to rotate the Flutter surface
+    // into landscape, so the orientation gate can detect that the user is in
+    // a supported orientation and the rest of the UI lays out correctly.
+    unawaited(
+      OrientationLock.forSupported(widget.exercise.supportedOrientations),
+    );
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
     _voiceCoach = widget.exercise.createVoiceCoach();
+    _startOrientationListener();
     _loadDebugMode();
     _startSetTimer();
     _initCamera();
@@ -125,18 +150,89 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
   @override
   void dispose() {
+    _isDisposed = true;
+    _didComplete = true;
+    _isCompletingSet = true;
+    WidgetsBinding.instance.removeObserver(this);
     _setTimer?.cancel();
     _pendingStaffBackTimer?.cancel();
-    final landmarkSubscription = _landmarkSubscription;
-    _landmarkSubscription = null;
-    unawaited(landmarkSubscription?.cancel() ?? Future<void>.value());
-    unawaited(_disposeFallbackCamera());
-    unawaited(_poseChannel.dispose().catchError((_) {}));
+    _setCompleteTimer?.cancel();
+    unawaited(_orientationSubscription?.cancel() ?? Future<void>.value());
+    _orientationSubscription = null;
     _poseDetector.close();
-    unawaited(widget.exercise.disposeDetectors());
     _voiceCoach?.dispose();
+    _voiceCoach = null;
+    unawaited(OrientationLock.portraitOnly());
+    unawaited(_shutdownPipelines());
     _pulseController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    // Window dimensions just changed (typically a rotation). Re-evaluate the
+    // orientation gate so landscape-only exercises stop showing the
+    // "rotate phone" guidance once the surface is actually landscape, even on
+    // devices where the native_device_orientation sensor stream is slow or
+    // does not fire after rotation.
+    if (!ExerciseBase.kLandscapeRotationEnabled || _isDisposed) return;
+    unawaited(_handleMetricsChange());
+  }
+
+  Future<void> _handleMetricsChange() async {
+    if (_isDisposed) return;
+    // Re-read the native sensor so _currentOrientation tracks the device side
+    // (landscapeLeft vs landscapeRight) once it eventually reports — and so
+    // the camera receives the correct orientation. The gate inside
+    // _applyDeviceOrientation also falls back to the surface size when the
+    // sensor is still stuck on portrait.
+    try {
+      final nativeOrientation =
+          await _orientationCommunicator.orientation(useSensor: true);
+      if (_isDisposed) return;
+      await _applyDeviceOrientation(
+        VikaImageOrientation.fromNative(nativeOrientation),
+      );
+    } catch (_) {
+      if (_isDisposed) return;
+      await _applyDeviceOrientation(_currentOrientation);
+    }
+  }
+
+  Future<void> _stopAndDisposePoseChannel() async {
+    try {
+      await _poseChannel.stopDetection();
+    } catch (_) {}
+    try {
+      await _poseChannel.dispose();
+    } catch (_) {}
+  }
+
+  Future<void> _shutdownPipelines() {
+    return _pipelineShutdownFuture ??= _shutdownPipelinesOnce();
+  }
+
+  Future<void> _shutdownPipelinesOnce() async {
+    _setTimer?.cancel();
+    _pendingStaffBackTimer?.cancel();
+
+    final orientationSubscription = _orientationSubscription;
+    _orientationSubscription = null;
+    try {
+      await orientationSubscription?.cancel();
+    } catch (_) {}
+
+    final landmarkSubscription = _landmarkSubscription;
+    _landmarkSubscription = null;
+    try {
+      await landmarkSubscription?.cancel();
+    } catch (_) {}
+
+    try {
+      await widget.exercise.disposeDetectors();
+    } catch (_) {}
+    await _stopAndDisposePoseChannel();
+    await _disposeFallbackCamera();
   }
 
   Future<void> _loadDebugMode() async {
@@ -180,6 +276,178 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
     final metadataValue = user.appMetadata['is_staff'];
     return metadataValue == true || metadataValue == 'true';
+  }
+
+  bool get _isFrontCamera => _currentLens == CameraLensDirection.front;
+
+  void _startOrientationListener() {
+    if (!ExerciseBase.kLandscapeRotationEnabled) {
+      return;
+    }
+
+    // Use the sensor for left/right landscape side. The gate below resolves this
+    // against Flutter's actual surface size so logic cannot stay portrait after
+    // the UI has rotated.
+    _orientationSubscription = _orientationCommunicator
+        .onOrientationChanged(useSensor: true)
+        .listen(_handleNativeOrientation);
+  }
+
+  Future<void> _refreshCurrentOrientation() async {
+    if (!ExerciseBase.kLandscapeRotationEnabled) {
+      return;
+    }
+
+    // Hard-cap the sensor read at 1.5s. On iOS, asking
+    // NativeDeviceOrientationCommunicator with useSensor:true spins up
+    // CMMotionManager which (per system console) reads
+    // /private/var/Managed Preferences/mobile/com.apple.CoreMotion.plist.
+    // On some iPhones that read can stall (managed-prefs sandbox check)
+    // and never returns. Without the timeout, _initCamera() never
+    // proceeds and the user sits forever on "Đang chuẩn bị camera".
+    try {
+      final nativeOrientation = await _orientationCommunicator
+          .orientation(useSensor: true)
+          .timeout(const Duration(milliseconds: 1500));
+      _setCurrentOrientation(
+          VikaImageOrientation.fromNative(nativeOrientation));
+    } catch (_) {
+      // Sensor read failed or timed out — default to portrait. The
+      // orientation stream subscription (_orientationSubscription) will
+      // still fire async updates once CMMotionManager warms up.
+      _setCurrentOrientation(VikaImageOrientation.portrait);
+    }
+  }
+
+  void _handleNativeOrientation(NativeDeviceOrientation nativeOrientation) {
+    final newOrientation = VikaImageOrientation.fromNative(nativeOrientation);
+    unawaited(_applyDeviceOrientation(newOrientation));
+  }
+
+  Future<void> _applyDeviceOrientation(
+    VikaImageOrientation newOrientation,
+  ) async {
+    if (_isDisposed) return;
+
+    final wasGated = _orientationPauseActive;
+    final changed = newOrientation != _currentOrientation;
+    if (changed) {
+      _setCurrentOrientation(newOrientation);
+      if (_isCurrentOrientationSupported) {
+        await _sendOrientationToNative();
+      }
+    }
+
+    final blocked = _syncOrientationGate();
+    final gateChanged = wasGated != _orientationPauseActive;
+    if (!_isDisposed && mounted && (changed || blocked || gateChanged)) {
+      setState(() {});
+    }
+  }
+
+  void _setCurrentOrientation(VikaImageOrientation orientation) {
+    _currentOrientation = orientation;
+  }
+
+  // The Flutter window is locked to portraitUp; the page rotates manually via
+  // `RotatedBox`. So the session orientation is just the latest sensor
+  // reading — there's no surface-vs-sensor reconciliation to do.
+  VikaImageOrientation get _sessionOrientation => _currentOrientation;
+
+  bool get _isCurrentOrientationSupported {
+    if (!ExerciseBase.kLandscapeRotationEnabled) {
+      return true;
+    }
+    return widget.exercise.supportedOrientations.contains(_sessionOrientation);
+  }
+
+  bool get _orientationGateActive =>
+      ExerciseBase.kLandscapeRotationEnabled && !_isCurrentOrientationSupported;
+
+  String get _orientationFeedbackCode {
+    final wantsLandscape = !widget.exercise.supportedOrientations
+        .contains(VikaImageOrientation.portrait);
+    return wantsLandscape
+        ? 'wrong_orientation_landscape'
+        : 'wrong_orientation_portrait';
+  }
+
+  bool _isOrientationFeedback(String? value) {
+    return value == 'wrong_orientation_landscape' ||
+        value == 'wrong_orientation_portrait';
+  }
+
+  bool _syncOrientationGate() {
+    if (!ExerciseBase.kLandscapeRotationEnabled) {
+      return false;
+    }
+
+    if (!_isCurrentOrientationSupported) {
+      widget.exercise.resultIssues.feedback['System'] =
+          _orientationFeedbackCode;
+      _feedback =
+          Map<String, String>.from(widget.exercise.resultIssues.feedback);
+      if (!_orientationPauseActive) {
+        widget.exercise.manualPause();
+        _orientationPauseActive = true;
+      }
+      return true;
+    }
+
+    if (_isOrientationFeedback(
+        widget.exercise.resultIssues.feedback['System'])) {
+      widget.exercise.resultIssues.feedback.remove('System');
+    }
+    if (_isOrientationFeedback(_feedback['System'])) {
+      _feedback.remove('System');
+    }
+
+    if (_orientationPauseActive) {
+      _orientationPauseActive = false;
+      if (!_isManualPause) {
+        widget.exercise.manualResume();
+      }
+    }
+    unawaited(_sendOrientationToNative());
+    return false;
+  }
+
+  Future<void> _sendOrientationToNative() async {
+    if (!ExerciseBase.kLandscapeRotationEnabled ||
+        !_isCurrentOrientationSupported) {
+      return;
+    }
+
+    final orientation = _sessionOrientation;
+    if (_lastSentOrientation == orientation &&
+        _lastSentOrientationFrontCamera == _isFrontCamera) {
+      return;
+    }
+
+    _lastSentOrientation = orientation;
+    _lastSentOrientationFrontCamera = _isFrontCamera;
+
+    final updates = <Future<void>>[
+      _segmentationChannel
+          .setOrientation(
+            orientation: orientation,
+            isFrontCamera: _isFrontCamera,
+          )
+          .catchError((Object _) {}),
+    ];
+
+    if (_runtime == _PoseRuntime.nativeMediaPipe) {
+      updates.add(
+        _poseChannel
+            .setOrientation(
+              orientation: orientation,
+              isFrontCamera: _isFrontCamera,
+            )
+            .catchError((Object _) {}),
+      );
+    }
+
+    await Future.wait(updates);
   }
 
   Future<void> _applyDebugMode(DebugMode mode) async {
@@ -317,8 +585,12 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   Future<void> _initCamera() async {
+    if (_isDisposed) return;
+    await _refreshCurrentOrientation();
+    if (_isDisposed) return;
+    _syncOrientationGate();
     await _disposeFallbackCamera();
-    if (mounted) {
+    if (!_isDisposed && mounted) {
       setState(() {
         _isInitializing = true;
         _isCameraReady = false;
@@ -328,9 +600,10 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     }
 
     final status = await Permission.camera.request();
+    if (_isDisposed || !mounted) return;
     _permissionStatus = status;
     if (!status.isGranted) {
-      if (mounted) {
+      if (!_isDisposed && mounted) {
         setState(() {
           _isInitializing = false;
           _isCameraReady = false;
@@ -344,11 +617,35 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
     try {
       _ensureLandmarkSubscription();
-      final textureId = await _poseChannel.initialize(
-        useFrontCamera: _currentLens == CameraLensDirection.front,
-      );
-      await _poseChannel.startDetection();
-      if (!mounted) return;
+      // Hard-timeout the native init so a hung PoseLandmarkerService
+      // (completion handler never called, deadlocked Swift queue)
+      // doesn't strand the UI on "Đang chuẩn bị camera" forever. After
+      // 8 seconds we throw and surface a real error with a Retry button.
+      //
+      // ML Kit fallback intentionally NOT triggered here on real devices
+      // (iPhone/Android). It's for simulator/emulator only — see
+      // _shouldUseMlKitFallback() which gates on specific error strings
+      // ("x86_64", "native library", etc.) emitted by emulator builds.
+      final textureId = await _poseChannel
+          .initialize(
+            useFrontCamera: _isFrontCamera,
+            initialOrientation: _isCurrentOrientationSupported
+                ? _sessionOrientation
+                : VikaImageOrientation.portrait,
+            isFrontCamera: _isFrontCamera,
+          )
+          .timeout(const Duration(seconds: 8));
+      if (_isDisposed || !mounted) {
+        await _stopAndDisposePoseChannel();
+        return;
+      }
+      await _poseChannel
+          .startDetection()
+          .timeout(const Duration(seconds: 4));
+      if (_isDisposed || !mounted) {
+        await _stopAndDisposePoseChannel();
+        return;
+      }
 
       setState(() {
         _runtime = _PoseRuntime.nativeMediaPipe;
@@ -356,12 +653,33 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         _isCameraReady = true;
         _isInitializing = false;
       });
+    } on TimeoutException catch (_) {
+      // Native side never responded. Surface an error so the user can
+      // retry — don't auto-fallback to ML Kit on real device.
+      if (_isDisposed || !mounted) return;
+      debugPrint('[Vika] Native pose init timed out after 8s.');
+      try {
+        await _poseChannel.dispose();
+      } catch (_) {}
+      if (!_isDisposed && mounted) {
+        setState(() {
+          _isInitializing = false;
+          _isCameraReady = false;
+          _textureId = null;
+          _cameraErrorMessage =
+              'Camera khoi dong qua lau. Hay thu lai.';
+        });
+      }
     } on PlatformException catch (error) {
+      if (_isDisposed || !mounted) return;
       if (_shouldUseMlKitFallback(error)) {
+        // Emulator-only path. _shouldUseMlKitFallback gates on error
+        // strings emitted by simulator builds where the native MediaPipe
+        // dylib isn't shipped (x86_64, missing native library).
         await _startMlKitFallback(error.message);
         return;
       }
-      if (mounted) {
+      if (!_isDisposed && mounted) {
         setState(() {
           _isInitializing = false;
           _isCameraReady = false;
@@ -371,16 +689,32 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         });
       }
     } on MissingPluginException catch (_) {
-      // Native MediaPipe channel not implemented on this platform (e.g. iOS)
-      // → fallback to Flutter camera + ML Kit
-      await _startMlKitFallback('Native pose landmarker not available on iOS');
+      // Native MediaPipe channel not implemented for this build target
+      // (typically simulator without native pods). Use ML Kit fallback —
+      // emulator path only.
+      if (_isDisposed || !mounted) return;
+      await _startMlKitFallback('Native pose landmarker not registered');
     } catch (_) {
-      // Any other error → also try ML Kit fallback
-      await _startMlKitFallback('Unknown camera init error');
+      // Any other error — surface to the user with retry instead of
+      // silently swapping engines on a real device.
+      if (_isDisposed || !mounted) return;
+      try {
+        await _poseChannel.dispose();
+      } catch (_) {}
+      if (!_isDisposed && mounted) {
+        setState(() {
+          _isInitializing = false;
+          _isCameraReady = false;
+          _textureId = null;
+          _cameraErrorMessage =
+              'Loi khi khoi dong camera. Hay thu lai.';
+        });
+      }
     }
   }
 
   Future<void> _toggleCamera() async {
+    if (_isDisposed || _isCompletingSet) return;
     final nextLens = _currentLens == CameraLensDirection.back
         ? CameraLensDirection.front
         : CameraLensDirection.back;
@@ -394,6 +728,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     try {
       if (_runtime == _PoseRuntime.mlKitFallback) {
         await _switchMlKitCamera(nextLens);
+        await _sendOrientationToNative();
         if (!mounted) return;
         setState(() {
           _isInitializing = false;
@@ -408,6 +743,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         _currentLens = nextLens;
         _isInitializing = false;
       });
+      await _sendOrientationToNative();
     } catch (_) {
       if (mounted) {
         setState(() {
@@ -430,40 +766,69 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   Future<void> _handleLandmarkEvent(Map<String, dynamic> data) async {
-    if (_isProcessingFrame || _didComplete) {
+    if (_isDisposed ||
+        _isCompletingSet ||
+        _didComplete ||
+        (_isProcessingFrame && !ExerciseBase.kDiagnosticMode)) {
       return;
     }
 
-    _isProcessingFrame = true;
+    if (!ExerciseBase.kDiagnosticMode) {
+      _isProcessingFrame = true;
+    }
 
     try {
-      final inputImage = PoseLandmarkerAdapter.inputImageFromChannelData(data);
-      _schedulePersonDetection(inputImage);
+      if (_isDisposed) return;
+      _schedulePersonDetection();
 
       _currentLens = PoseLandmarkerAdapter.lensDirectionFromChannelData(data);
       _imageRotation =
           PoseLandmarkerAdapter.inputImageRotationFromChannelData(data);
       _imageSize =
           PoseLandmarkerAdapter.imageSizeFromChannelData(data) ?? Size.zero;
+      if (ExerciseBase.kDiagnosticMode) {
+        widget.exercise.debugData['nativeRotDeg'] =
+            data['rotationDegrees'] ?? '-';
+        widget.exercise.debugData['nativeRotMs'] =
+            data['rotationDurationMs'] ?? '-';
+        widget.exercise.debugData['nativeOrientation'] =
+            data['orientation'] ?? 'cameraX';
+      }
 
       final pose = PoseLandmarkerAdapter.fromChannelData(data);
+      if (_syncOrientationGate()) {
+        _detectedPose = pose;
+        _processVoiceFrame(hasPose: pose != null);
+        if (!_isDisposed && mounted) {
+          setState(() {});
+        }
+        return;
+      }
+
       if (pose != null) {
         _handlePose(pose);
       } else {
+        if (_isDisposed) return;
         _detectedPose = null;
         _feedback = widget.exercise.processNoPoseFrame();
         _processVoiceFrame(hasPose: false);
       }
 
-      if (mounted) {
+      if (!_isDisposed && mounted) {
         setState(() {});
       }
     } finally {
-      _isProcessingFrame = false;
+      if (!ExerciseBase.kDiagnosticMode) {
+        _isProcessingFrame = false;
+      }
     }
   }
 
   void _handlePoseResult(List<dynamic>? result) {
+    if (_isDisposed) {
+      return;
+    }
+
     if (result != null &&
         result.length == 2 &&
         result.first is int &&
@@ -477,18 +842,39 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
     if (widget.exercise.exerciseState == ExerciseState.completed &&
         !_didComplete) {
-      _didComplete = true;
-      unawaited(_poseChannel.stopDetection());
-      Future.delayed(const Duration(milliseconds: 700), () {
-        if (mounted) {
-          widget.onSetComplete(widget.exercise.logger);
-        }
-      });
+      _scheduleSetCompletion();
     }
   }
 
+  void _scheduleSetCompletion() {
+    if (_didComplete || _isCompletingSet || _isDisposed) {
+      return;
+    }
+
+    _didComplete = true;
+    _isCompletingSet = true;
+    _setCompleteTimer?.cancel();
+    unawaited(_poseChannel.stopDetection().catchError((Object _) {}));
+
+    // Give the completion cue a short breath, then make teardown deterministic
+    // before the parent swaps this active page out of the tree.
+    _setCompleteTimer = Timer(const Duration(milliseconds: 250), () {
+      unawaited(_finishSetAndNotifyParent());
+    });
+  }
+
+  Future<void> _finishSetAndNotifyParent() async {
+    if (_isDisposed) return;
+    await _shutdownPipelines();
+    _voiceCoach?.dispose();
+    _voiceCoach = null;
+
+    if (_isDisposed || !mounted) return;
+    widget.onSetComplete(widget.exercise.logger);
+  }
+
   void _handleLandmarkStreamError(Object error) {
-    if (!mounted) {
+    if (_isDisposed || !mounted) {
       return;
     }
 
@@ -500,30 +886,42 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   Future<void> _startMlKitFallback(String? nativeErrorMessage) async {
+    if (_isDisposed) return;
     debugPrint(
       '[Vika] Falling back to Flutter camera + ML Kit: ${nativeErrorMessage ?? "unknown native init error"}',
     );
     try {
       await _poseChannel.dispose();
     } catch (_) {}
+    if (_isDisposed || !mounted) return;
     await _initMlKitCamera();
   }
 
   bool _shouldUseMlKitFallback(PlatformException error) {
+    // ML Kit is for simulator/emulator only — real iPhones and Android phones
+    // must use the native MediaPipe Pose Landmarker. We only swap engines
+    // when the native error matches one of the emulator-specific signals
+    // emitted by:
+    //   • Android x86_64 emulator: ensureRuntimeSupport() throws
+    //     "is not available on x86_64 Android emulators"
+    //   • Android emulator missing native lib: "libmediapipe_tasks_vision_jni"
+    //   • iOS simulator: handled separately via MissingPluginException
+    // Any other PlatformException (model load failure, GPU init, etc.) on a
+    // real device surfaces a retry UI instead of silently falling back to a
+    // less accurate engine.
     final message = (error.message ?? '').toLowerCase();
-    return message.contains('mediapipe') ||
-        message.contains('x86_64') ||
-        message.contains('native library') ||
-        message.contains('pose landmarker') ||
-        message.contains('unsupported');
+    return message.contains('x86_64 android emulators') ||
+        message.contains('libmediapipe_tasks_vision_jni');
   }
 
   Future<void> _initMlKitCamera() async {
+    if (_isDisposed) return;
     await _disposeFallbackCamera();
+    if (_isDisposed || !mounted) return;
 
     final cameras = await availableCameras();
+    if (_isDisposed || !mounted) return;
     if (cameras.isEmpty) {
-      if (!mounted) return;
       setState(() {
         _runtime = _PoseRuntime.mlKitFallback;
         _isInitializing = false;
@@ -554,9 +952,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       );
       final controller = CameraController(
         camera,
-        // High = 1280x720, gives the widest 16:9 framing while staying within ML Kit's
-        // performance envelope on iOS (the fallback path).
-        ResolutionPreset.high,
+        // Keep the fallback path lighter; native MediaPipe remains the primary
+        // exercise pipeline on supported phones.
+        ResolutionPreset.medium,
         enableAudio: false,
         imageFormatGroup: Platform.isAndroid
             ? ImageFormatGroup.nv21
@@ -565,8 +963,12 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
       try {
         await controller.initialize().timeout(const Duration(seconds: 6));
+        if (_isDisposed || !mounted) {
+          await controller.dispose();
+          return;
+        }
         await controller.startImageStream(_processFallbackCameraImage);
-        if (!mounted) {
+        if (_isDisposed || !mounted) {
           await controller.dispose();
           return;
         }
@@ -581,6 +983,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
           _isInitializing = false;
           _cameraErrorMessage = null;
         });
+        await _sendOrientationToNative();
         return;
       } catch (error) {
         debugPrint('[Vika] Fallback camera ${camera.name} failed: $error');
@@ -590,7 +993,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       }
     }
 
-    if (!mounted) return;
+    if (_isDisposed || !mounted) return;
     setState(() {
       _runtime = _PoseRuntime.mlKitFallback;
       _isInitializing = false;
@@ -600,9 +1003,11 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   Future<void> _switchMlKitCamera(CameraLensDirection nextLens) async {
+    if (_isDisposed) return;
     if (_availableCameras.isEmpty) {
       _availableCameras = await availableCameras();
     }
+    if (_isDisposed || !mounted) return;
     final newIndex = _availableCameras.indexWhere(
       (camera) => camera.lensDirection == nextLens,
     );
@@ -615,15 +1020,19 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     final camera = _availableCameras[newIndex];
     final controller = CameraController(
       camera,
-      ResolutionPreset.high,
+      ResolutionPreset.medium,
       enableAudio: false,
       imageFormatGroup: Platform.isAndroid
           ? ImageFormatGroup.nv21
           : ImageFormatGroup.bgra8888,
     );
     await controller.initialize();
+    if (_isDisposed || !mounted) {
+      await controller.dispose();
+      return;
+    }
     await controller.startImageStream(_processFallbackCameraImage);
-    if (!mounted) {
+    if (_isDisposed || !mounted) {
       await controller.dispose();
       return;
     }
@@ -653,16 +1062,24 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   void _processFallbackCameraImage(CameraImage cameraImage) {
-    if (_isProcessingFrame || _didComplete) {
+    if (_isDisposed ||
+        _isCompletingSet ||
+        _didComplete ||
+        (_isProcessingFrame && !ExerciseBase.kDiagnosticMode)) {
       return;
     }
-    _isProcessingFrame = true;
+    if (!ExerciseBase.kDiagnosticMode) {
+      _isProcessingFrame = true;
+    }
     _detectPoseFromFallback(cameraImage).whenComplete(() {
-      _isProcessingFrame = false;
+      if (!ExerciseBase.kDiagnosticMode) {
+        _isProcessingFrame = false;
+      }
     });
   }
 
   Future<void> _detectPoseFromFallback(CameraImage cameraImage) async {
+    if (_isDisposed || _isCompletingSet) return;
     try {
       final inputImage = _buildInputImage(cameraImage);
       if (inputImage == null) {
@@ -671,20 +1088,31 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
       _schedulePersonDetection(inputImage);
       final poses = await _poseDetector.processImage(inputImage);
+      if (_isDisposed || _isCompletingSet || !mounted) return;
+
+      if (_syncOrientationGate()) {
+        _detectedPose = poses.isNotEmpty ? poses.first : null;
+        _processVoiceFrame(hasPose: poses.isNotEmpty);
+        if (!_isDisposed && mounted) {
+          setState(() {});
+        }
+        return;
+      }
 
       if (poses.isNotEmpty) {
         _handlePose(poses.first);
       } else {
+        if (_isDisposed) return;
         _detectedPose = null;
         _feedback = widget.exercise.processNoPoseFrame();
         _processVoiceFrame(hasPose: false);
       }
 
-      if (mounted) {
+      if (!_isDisposed && mounted) {
         setState(() {});
       }
     } catch (_) {
-      if (!mounted) return;
+      if (_isDisposed || !mounted) return;
       setState(() {
         _isCameraReady = false;
         _cameraErrorMessage = 'Khong the nhan du lieu pose. Hay thu lai.';
@@ -693,12 +1121,22 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   void _handlePose(Pose pose) {
+    if (_isDisposed) {
+      return;
+    }
+
     _detectedPose = pose;
-    _handlePoseResult(widget.exercise.processPose(pose.landmarks));
+    _handlePoseResult(
+      widget.exercise.processPose(
+        pose.landmarks,
+        imageSize: _imageSize == Size.zero ? null : _imageSize,
+      ),
+    );
   }
 
-  void _schedulePersonDetection(InputImage? inputImage) {
-    if (inputImage == null ||
+  void _schedulePersonDetection([InputImage? inputImage]) {
+    if (_isDisposed ||
+        _isCompletingSet ||
         _personDetectionInFlight ||
         widget.exercise.exerciseState == ExerciseState.completed) {
       return;
@@ -717,12 +1155,17 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
           .runPersonDetection(inputImage)
           .catchError((Object _) {})
           .whenComplete(() {
+        if (_isDisposed) return;
         _personDetectionInFlight = false;
       }),
     );
   }
 
   void _processVoiceFrame({required bool hasPose}) {
+    if (_isDisposed) {
+      return;
+    }
+
     final coach = _voiceCoach;
     if (coach == null) {
       return;
@@ -742,7 +1185,20 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     }
 
     final camera = _availableCameras[_cameraIndex];
-    final rotation = _rotationFromSensor(camera.sensorOrientation);
+    // The ML Kit fallback path only fires when native MediaPipe fails to
+    // initialize (e.g. x86_64 simulators). The Android formula combines
+    // sensor mount angle with device rotation; iOS ML Kit does not have
+    // first-class landscape support in this fallback and uses sensor
+    // orientation only — acceptable since iOS simulator cameras don't run
+    // a real preview and physical iPhones use the native MediaPipe path.
+    final rotation = ExerciseBase.kLandscapeRotationEnabled &&
+            Platform.isAndroid
+        ? _imageRotationFromVikaOrientation(
+            orientation: _sessionOrientation,
+            sensorOrientation: camera.sensorOrientation,
+            isFrontCamera: camera.lensDirection == CameraLensDirection.front,
+          )
+        : _rotationFromSensor(camera.sensorOrientation);
     _imageRotation = rotation;
 
     if (rotation == InputImageRotation.rotation90deg ||
@@ -772,7 +1228,25 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   InputImageRotation _rotationFromSensor(int sensorOrientation) {
-    switch (sensorOrientation) {
+    return _rotationFromDegrees(sensorOrientation);
+  }
+
+  InputImageRotation _imageRotationFromVikaOrientation({
+    required VikaImageOrientation orientation,
+    required int sensorOrientation,
+    required bool isFrontCamera,
+  }) {
+    // ML Kit's Android formula requires both device rotation and the camera
+    // sensor mount angle; device orientation alone is not enough on 90/270 sensors.
+    final deviceRotationDegrees = orientation.androidSurfaceRotationDegrees;
+    final rotationDegrees = isFrontCamera
+        ? (sensorOrientation + deviceRotationDegrees) % 360
+        : (sensorOrientation - deviceRotationDegrees + 360) % 360;
+    return _rotationFromDegrees(rotationDegrees);
+  }
+
+  InputImageRotation _rotationFromDegrees(int rotationDegrees) {
+    switch (rotationDegrees % 360) {
       case 0:
         return InputImageRotation.rotation0deg;
       case 90:
@@ -791,6 +1265,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     _setTimer?.cancel();
     _setTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
+      if (_isDisposed || _isCompletingSet) return;
       if (widget.exercise.isPaused) return;
       if (widget.exercise.exerciseState != ExerciseState.activated) return;
       setState(() => _setElapsedSeconds++);
@@ -800,8 +1275,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   @override
   Widget build(BuildContext context) {
     final permissionGranted = _permissionStatus?.isGranted ?? true;
+    final Widget inner;
     if (!permissionGranted) {
-      return _buildCameraFallback(
+      inner = _buildCameraFallback(
         icon: Icons.camera_alt_outlined,
         title: 'Cần quyền camera',
         subtitle: _cameraErrorMessage ??
@@ -813,9 +1289,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
             ? openAppSettings
             : _initCamera,
       );
-    }
-
-    if (!_isCameraReady || _textureId == null) {
+    } else if (!_isCameraReady || _textureId == null) {
       final waitingForFallback =
           _runtime == _PoseRuntime.mlKitFallback && _cameraController == null;
       final nativeReady =
@@ -823,25 +1297,41 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       final fallbackReady =
           _runtime == _PoseRuntime.mlKitFallback && _cameraController != null;
       if (nativeReady || fallbackReady) {
-        return _buildActiveLayout(context);
+        inner = _buildActiveLayout(context);
+      } else {
+        inner = _buildCameraFallback(
+          icon: _cameraErrorMessage == null
+              ? Icons.videocam_outlined
+              : Icons.videocam_off_outlined,
+          title: _cameraErrorMessage == null
+              ? 'Đang chuẩn bị camera'
+              : 'Camera chưa sẵn sàng',
+          subtitle: _cameraErrorMessage ??
+              (_isInitializing || waitingForFallback
+                  ? 'AI đang kết nối camera và chuẩn bị theo dõi form của bạn.'
+                  : 'Đang chờ camera sẵn sàng...'),
+          actionLabel: _cameraErrorMessage == null ? null : 'Thử lại',
+          onAction: _cameraErrorMessage == null ? null : _initCamera,
+        );
       }
-      return _buildCameraFallback(
-        icon: _cameraErrorMessage == null
-            ? Icons.videocam_outlined
-            : Icons.videocam_off_outlined,
-        title: _cameraErrorMessage == null
-            ? 'Đang chuẩn bị camera'
-            : 'Camera chưa sẵn sàng',
-        subtitle: _cameraErrorMessage ??
-            (_isInitializing || waitingForFallback
-                ? 'AI đang kết nối camera và chuẩn bị theo dõi form của bạn.'
-                : 'Đang chờ camera sẵn sàng...'),
-        actionLabel: _cameraErrorMessage == null ? null : 'Thử lại',
-        onAction: _cameraErrorMessage == null ? null : _initCamera,
-      );
+    } else {
+      inner = _buildActiveLayout(context);
     }
 
-    return _buildActiveLayout(context);
+    // Manually rotate the entire page to match the device sensor. The OS is
+    // locked to portraitUp (see OrientationLock); this RotatedBox is the
+    // single rotation point — it wraps the chrome, the camera Texture, and
+    // the skeleton overlay as one unit, so they always stay in sync. The
+    // native camera buffer is rotated server-side to match the same sensor
+    // reading (see PoseLandmarkerService.applyOrientation), so the image
+    // inside the rotated UI is already upright for the user's view.
+    if (!ExerciseBase.kLandscapeRotationEnabled) {
+      return inner;
+    }
+    return RotatedBox(
+      quarterTurns: _currentOrientation.uiQuarterTurns,
+      child: inner,
+    );
   }
 
   Widget _buildCameraFallback({
@@ -917,6 +1407,8 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     final overlayState = _overlayState;
     final bottomHoldCue = _bottomHoldCue;
     final guidanceCopy = _currentGuidanceCopy;
+    final orientationGuidanceActive =
+        _orientationPauseActive && guidanceCopy != null;
     final coachMessage = _coachMessage;
     final activeState =
         widget.exercise.exerciseState == ExerciseState.activated &&
@@ -929,6 +1421,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     final showDebugEntryBadge =
         trackedMetrics.isNotEmpty && (debugEnabled || _isStaffUser);
     final showDebugPanel = debugEnabled && _debugPanelOpen;
+    final previewFit = _previewFit;
 
     // Derive ivory phase verb from squat state machine phases.
     // Standing = default resting position (not a "ready" state).
@@ -969,16 +1462,12 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
               child: ClipRect(
                 child: SizedBox.expand(
                   child: FittedBox(
-                    fit: BoxFit.cover,
+                    fit: previewFit,
                     alignment: Alignment.center,
                     child: SizedBox(
                       width: _previewRenderSize.width,
                       height: _previewRenderSize.height,
-                      child: _runtime == _PoseRuntime.nativeMediaPipe
-                          ? Texture(textureId: _textureId!)
-                          : (_cameraController != null
-                              ? CameraPreview(_cameraController!)
-                              : const SizedBox.shrink()),
+                      child: _buildPreviewSurface(),
                     ),
                   ),
                 ),
@@ -1001,8 +1490,16 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                         imageSize: _imageSize,
                         rotation: _imageRotation,
                         lensDirection: _currentLens,
+                        fit: previewFit,
+                        // Native texture preview and native pose landmarks
+                        // are produced from the same oriented frame. The old
+                        // Flutter camera fallback still needs front-camera
+                        // mirroring to match CameraPreview.
+                        mirrorHorizontally:
+                            _runtime == _PoseRuntime.mlKitFallback &&
+                                _currentLens == CameraLensDirection.front,
                         debugData: widget.exercise.debugData,
-                        style: SkeletonStyle.constellation),
+                        style: SkeletonStyle.vikaCream),
                   );
                 },
               ),
@@ -1160,7 +1657,6 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                       guidanceCopy != null
                   ? const SizedBox.shrink()
                   : Center(
-                      key: ValueKey<_LiveOverlayState>(overlayState),
                       child: _CenterOverlay(
                         state: overlayState,
                         pulseController: _pulseController,
@@ -1196,11 +1692,26 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
               child: IvoryPauseOverlay(
                 isManualPause: _isManualPause,
                 onResume: () {
+                  if (_orientationGateActive) {
+                    _syncOrientationGate();
+                    setState(() {});
+                    return;
+                  }
                   _isManualPause = false;
                   widget.exercise.manualResume();
                   setState(() {});
                 },
                 onEnd: widget.onBack,
+              ),
+            ),
+
+          if (orientationGuidanceActive)
+            Positioned(
+              left: 20,
+              right: 20,
+              top: media.padding.top + 78,
+              child: IgnorePointer(
+                child: _SetupGuidancePanel(copy: guidanceCopy),
               ),
             ),
 
@@ -1319,6 +1830,22 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       return null;
     }
 
+    if (rawNormalized.contains('wrong_orientation_landscape')) {
+      return const _GuidanceCopy(
+        icon: Icons.screen_rotation_alt_rounded,
+        title: 'Quay điện thoại nằm ngang',
+        body: 'Bài tập này cần điện thoại nằm ngang để AI thấy rõ toàn thân.',
+        mode: SystemBannerMode.warn,
+      );
+    }
+    if (rawNormalized.contains('wrong_orientation_portrait')) {
+      return const _GuidanceCopy(
+        icon: Icons.screen_rotation_alt_rounded,
+        title: 'Quay điện thoại đứng',
+        body: 'Bài tập này cần điện thoại đứng dọc.',
+        mode: SystemBannerMode.warn,
+      );
+    }
     if (rawNormalized.contains('turn to the side') ||
         normalized.contains('quay ngang') ||
         normalized.contains('quay nghiêng') ||
@@ -1351,12 +1878,33 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         mode: SystemBannerMode.warn,
       );
     }
+    if (normalized.contains('đang tìm người')) {
+      return const _GuidanceCopy(
+        icon: Icons.person_search_rounded,
+        title: 'Đang tìm người',
+        body: 'Đứng trong khung hình để bắt đầu theo dõi.',
+        mode: SystemBannerMode.scan,
+      );
+    }
+    if (normalized.contains('tạm dừng') ||
+        normalized.contains('quay lại khung hình')) {
+      return const _GuidanceCopy(
+        icon: Icons.pause_circle_filled_rounded,
+        title: 'Tạm dừng',
+        body: 'Quay lại khung hình để AI tiếp tục theo dõi.',
+        mode: SystemBannerMode.pause,
+      );
+    }
+    if (normalized.contains('phần trên cơ thể')) {
+      return const _GuidanceCopy(
+        icon: Icons.fit_screen_rounded,
+        title: 'Đưa thân trên vào khung',
+        body: 'Lùi lại một chút để thấy rõ vai, khuỷu tay, cổ tay và hông.',
+        mode: SystemBannerMode.warn,
+      );
+    }
     if (rawNormalized.contains('body not fully visible') ||
-        normalized.contains('toàn thân') ||
-        normalized.contains('phần trên cơ thể') ||
-        normalized.contains('trong khung hình') ||
-        normalized.contains('vai, hông') ||
-        normalized.contains('vai, hông và gối')) {
+        normalized.contains('toàn thân')) {
       return const _GuidanceCopy(
         icon: Icons.fit_screen_rounded,
         title: 'Đưa toàn thân vào khung',
@@ -1365,12 +1913,14 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         mode: SystemBannerMode.warn,
       );
     }
-    if (normalized.contains('đang tìm người')) {
+    if (normalized.contains('trong khung hình') ||
+        normalized.contains('vai, hông') ||
+        normalized.contains('vai, hông và gối')) {
       return const _GuidanceCopy(
-        icon: Icons.person_search_rounded,
-        title: 'Đang tìm người',
-        body: 'Đứng trong khung hình và giữ toàn thân rõ để bắt đầu theo dõi.',
-        mode: SystemBannerMode.scan,
+        icon: Icons.fit_screen_rounded,
+        title: 'Đưa cơ thể vào khung',
+        body: 'Lùi lại hoặc chỉnh góc máy để các mốc cần theo dõi hiện rõ.',
+        mode: SystemBannerMode.warn,
       );
     }
     if (normalized.contains('vào tư thế') ||
@@ -1654,6 +2204,22 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     );
   }
 
+  Widget _buildPreviewSurface() {
+    if (_runtime == _PoseRuntime.nativeMediaPipe) {
+      // Native pipeline now rotates the AVCapture buffer to match the device
+      // orientation (see PoseLandmarkerService.captureVideoOrientation), so
+      // the texture is already correctly oriented. Displaying it directly
+      // avoids the double-rotation that previously made the preview appear
+      // 90° off in landscape.
+      return Texture(textureId: _textureId!);
+    }
+
+    if (_cameraController != null) {
+      return CameraPreview(_cameraController!);
+    }
+    return const SizedBox.shrink();
+  }
+
   Size get _previewRenderSize {
     if (_runtime == _PoseRuntime.mlKitFallback) {
       final previewSize = _cameraController?.value.previewSize;
@@ -1669,6 +2235,12 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       return _imageSize;
     }
 
+    if (_runtime == _PoseRuntime.nativeMediaPipe &&
+        ExerciseBase.kLandscapeRotationEnabled &&
+        _sessionOrientation.isLandscape) {
+      return const Size(640, 480);
+    }
+
     final previewSize = _cameraController?.value.previewSize;
     if (previewSize != null) {
       if (previewSize.width > previewSize.height) {
@@ -1679,6 +2251,8 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
     return const Size(480, 640);
   }
+
+  BoxFit get _previewFit => BoxFit.cover;
 }
 
 enum _PoseRuntime {

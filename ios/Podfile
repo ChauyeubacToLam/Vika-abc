@@ -38,8 +38,8 @@ target 'Runner' do
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 
-  pod 'MediaPipeTasksVision'
-
+  pod 'MediaPipeTasksVision', '~> 0.10.21'
+  pod 'GoogleMLKit/SegmentationSelfie', '~> 9.0.0'
   target 'RunnerTests' do
     inherit! :search_paths
   end

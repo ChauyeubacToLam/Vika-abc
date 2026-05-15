@@ -49,6 +49,10 @@ class _S05ForkState extends State<S05Fork> {
 
   @override
   Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).height < 720;
+    final heroTop = compact ? 126.0 : 144.0;
+    final heroHeight = compact ? 170.0 : 184.0;
+    final contentTop = compact ? 310.0 : 344.0;
     final recChoice = forkChoices[_recommendedId]!;
     final orderedIds =
         _recommendedId == 'home' ? ['home', 'yoga'] : ['yoga', 'home'];
@@ -58,10 +62,10 @@ class _S05ForkState extends State<S05Fork> {
       onBack: widget.onBack,
       children: [
         Positioned(
-          top: 144,
+          top: heroTop,
           left: 16,
           right: 16,
-          height: 184,
+          height: heroHeight,
           child: V5FadeIn(
             child: V5HeroCard(
               child: Stack(
@@ -134,7 +138,7 @@ class _S05ForkState extends State<S05Fork> {
           ),
         ),
         Positioned(
-          top: 344,
+          top: contentTop,
           left: 0,
           right: 0,
           bottom: 0,
@@ -154,7 +158,8 @@ class _S05ForkState extends State<S05Fork> {
                         choice: choice,
                         selected: widget.data.fork == choice.id,
                         recommended: choice.id == _recommendedId,
-                        onTap: () => setState(() => widget.data.fork = choice.id),
+                        onTap: () =>
+                            setState(() => widget.data.fork = choice.id),
                       ),
                     );
                   },
@@ -213,152 +218,156 @@ class _ForkCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        decoration: BoxDecoration(
-          color: selected ? V5.ink : V5.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected
-                ? V5.ink
-                : recommended
-                    ? V5.yellow.withValues(alpha: 0.5)
-                    : V5.border,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 92),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          decoration: BoxDecoration(
+            color: selected ? V5.ink : V5.surface,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: selected
+                  ? V5.ink
+                  : recommended
+                      ? V5.yellow.withValues(alpha: 0.5)
+                      : V5.border,
+            ),
+            boxShadow: [selected ? V5.cardShadow(0.18) : V5.cardShadow(0.08)],
           ),
-          boxShadow: [selected ? V5.cardShadow(0.18) : V5.cardShadow(0.08)],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? V5.yellow.withValues(alpha: 0.18)
-                          : V5.yellowSoft,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          choice.stat,
-                          style: V5.text(
-                            context,
-                            size: 16,
-                            weight: FontWeight.w800,
-                            color: V5.yellow,
-                            letterSpacing: -0.5,
-                            height: 1,
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? V5.yellow.withValues(alpha: 0.18)
+                            : V5.yellowSoft,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            choice.stat,
+                            style: V5.text(
+                              context,
+                              size: 17,
+                              weight: FontWeight.w800,
+                              color: V5.yellow,
+                              letterSpacing: -0.5,
+                              height: 1,
+                            ),
                           ),
-                        ),
-                        Text(
-                          choice.statLabel.toUpperCase(),
-                          style: V5.text(
-                            context,
-                            size: 8,
-                            weight: FontWeight.w700,
-                            color: selected ? V5.invInkSoft : V5.yellowDeep,
-                            letterSpacing: 0.5,
+                          Text(
+                            choice.statLabel.toUpperCase(),
+                            style: V5.text(
+                              context,
+                              size: 8,
+                              weight: FontWeight.w700,
+                              color: selected ? V5.invInkSoft : V5.yellowDeep,
+                              letterSpacing: 0.5,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Text(
+                                choice.title,
+                                style: V5.text(
+                                  context,
+                                  size: 17,
+                                  weight: FontWeight.w800,
+                                  color: selected ? V5.invInk : V5.ink,
+                                  letterSpacing: -0.3,
+                                ),
+                              ),
+                              if (recommended && !selected)
+                                _MiniTag(label: 'Gợi ý', dark: false),
+                              if (selected)
+                                _MiniTag(label: 'Đã chọn', dark: true),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            choice.sub,
+                            style: V5.text(
+                              context,
+                              size: 13,
+                              weight: FontWeight.w600,
+                              color: selected ? V5.invInkSoft : V5.inkSoft,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (selected)
+                V5FadeIn(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 4,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            Text(
-                              choice.title,
-                              style: V5.text(
-                                context,
-                                size: 16,
-                                weight: FontWeight.w800,
-                                color: selected ? V5.invInk : V5.ink,
-                                letterSpacing: -0.3,
-                              ),
-                            ),
-                            if (recommended && !selected)
-                              _MiniTag(label: 'Gợi ý', dark: false),
-                            if (selected) _MiniTag(label: 'Đã chọn', dark: true),
-                          ],
-                        ),
-                        const SizedBox(height: 2),
+                        Divider(color: Colors.white.withValues(alpha: 0.08)),
                         Text(
-                          choice.sub,
+                          choice.desc,
                           style: V5.text(
                             context,
                             size: 12,
                             weight: FontWeight.w500,
-                            color: selected ? V5.invInkSoft : V5.inkSoft,
-                            height: 1.3,
+                            color: V5.invInkSoft,
+                            height: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        ...choice.highlights.map(
+                          (h) => Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.check_rounded,
+                                    color: V5.yellow, size: 14),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    h,
+                                    style: V5.text(
+                                      context,
+                                      size: 12,
+                                      weight: FontWeight.w500,
+                                      color: V5.invInk,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                ],
-              ),
-            ),
-            if (selected)
-              V5FadeIn(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Divider(color: Colors.white.withValues(alpha: 0.08)),
-                      Text(
-                        choice.desc,
-                        style: V5.text(
-                          context,
-                          size: 12,
-                          weight: FontWeight.w500,
-                          color: V5.invInkSoft,
-                          height: 1.5,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      ...choice.highlights.map(
-                        (h) => Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.check_rounded,
-                                  color: V5.yellow, size: 14),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  h,
-                                  style: V5.text(
-                                    context,
-                                    size: 12,
-                                    weight: FontWeight.w500,
-                                    color: V5.invInk,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );

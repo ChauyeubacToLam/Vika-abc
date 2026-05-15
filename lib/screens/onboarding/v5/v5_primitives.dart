@@ -54,10 +54,21 @@ class _V5FadeInState extends State<V5FadeIn>
     return AnimatedBuilder(
       animation: _controller,
       child: widget.child,
-      builder: (context, child) => Opacity(
-        opacity: _opacity.value,
-        child: Transform.translate(offset: Offset(0, _dy.value), child: child),
-      ),
+      builder: (context, child) {
+        final translated = Transform.translate(
+          offset: Offset(0, _dy.value),
+          child: child,
+        );
+
+        if (widget.child is V5HeroCard) {
+          return translated;
+        }
+
+        return Opacity(
+          opacity: _opacity.value.clamp(0.0, 1.0),
+          child: translated,
+        );
+      },
     );
   }
 }
@@ -186,7 +197,8 @@ class V5TopChrome extends StatelessWidget {
   Widget build(BuildContext context) {
     final fg = inverted ? V5.invInk : V5.ink;
     final fgSoft = inverted ? V5.invInkSoft : V5.inkSoft;
-    final border = inverted ? Colors.white.withValues(alpha: 0.18) : V5.borderHi;
+    final border =
+        inverted ? Colors.white.withValues(alpha: 0.18) : V5.borderHi;
     // Position chrome 12px below the OS status bar / notch, regardless of
     // device. iPhone 14 Pro: ~59 + 12 = 71. Android Pixel: ~30 + 12 = 42.
     // Prototype's hardcoded `top: 60` looked good on iPhone but left an
@@ -253,8 +265,7 @@ class V5PhaseProgress extends StatelessWidget {
   Widget build(BuildContext context) {
     final fg = inverted ? V5.invInk : V5.ink;
     final fgFaint = inverted ? V5.invInkFaint : V5.inkFaint;
-    final track =
-        inverted ? Colors.white.withValues(alpha: 0.10) : V5.border;
+    final track = inverted ? Colors.white.withValues(alpha: 0.10) : V5.border;
     final current = _phases.indexWhere((p) => index >= p.$2 && index <= p.$3);
     return Row(
       children: _phases.asMap().entries.map((entry) {
@@ -374,72 +385,77 @@ class _V5PillCTAState extends State<V5PillCTA>
             onTap: enabled ? widget.onTap : null,
             onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
             onTapUp: enabled ? (_) => setState(() => _pressed = false) : null,
-            onTapCancel: enabled ? () => setState(() => _pressed = false) : null,
+            onTapCancel:
+                enabled ? () => setState(() => _pressed = false) : null,
             child: AnimatedScale(
               duration: const Duration(milliseconds: 120),
               curve: Curves.easeOut,
               scale: _pressed ? 0.985 : 1.0,
               child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              height: widget.yellow ? 64 : 60,
-              padding: EdgeInsets.fromLTRB(28, 0, enabled ? 8 : 28, 0),
-              decoration: BoxDecoration(
-                color: bg,
-                borderRadius: BorderRadius.circular(32),
-                border: enabled ? null : Border.all(color: V5.borderHi, width: 1.5),
-                boxShadow: enabled
-                    ? [
-                        BoxShadow(
-                          color: widget.yellow
-                              ? V5.yellow.withValues(alpha: 0.35)
-                              : V5.ink.withValues(alpha: glow),
-                          blurRadius: widget.yellow ? 32 : 28 + 8 * _controller.value,
-                          offset: Offset(0, widget.yellow ? 12 : 10),
+                duration: const Duration(milliseconds: 180),
+                height: widget.yellow ? 64 : 60,
+                padding: EdgeInsets.fromLTRB(28, 0, enabled ? 8 : 28, 0),
+                decoration: BoxDecoration(
+                  color: bg,
+                  borderRadius: BorderRadius.circular(32),
+                  border: enabled
+                      ? null
+                      : Border.all(color: V5.borderHi, width: 1.5),
+                  boxShadow: enabled
+                      ? [
+                          BoxShadow(
+                            color: widget.yellow
+                                ? V5.yellow.withValues(alpha: 0.35)
+                                : V5.ink.withValues(alpha: glow),
+                            blurRadius:
+                                widget.yellow ? 32 : 28 + 8 * _controller.value,
+                            offset: Offset(0, widget.yellow ? 12 : 10),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        enabled ? widget.label : widget.disabledLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: V5.text(
+                          context,
+                          size: 15,
+                          weight:
+                              widget.yellow ? FontWeight.w800 : FontWeight.w700,
+                          color: fg,
+                          letterSpacing: -0.2,
                         ),
-                      ]
-                    : null,
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      enabled ? widget.label : widget.disabledLabel,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: V5.text(
-                        context,
-                        size: 15,
-                        weight: widget.yellow ? FontWeight.w800 : FontWeight.w700,
-                        color: fg,
-                        letterSpacing: -0.2,
                       ),
                     ),
-                  ),
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    width: enabled ? (widget.yellow ? 48 : 44) : 24,
-                    height: enabled ? (widget.yellow ? 48 : 44) : 24,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: enabled
-                          ? widget.yellow
-                              ? V5.ink
-                              : V5.yellow
-                          : Colors.transparent,
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      width: enabled ? (widget.yellow ? 48 : 44) : 24,
+                      height: enabled ? (widget.yellow ? 48 : 44) : 24,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: enabled
+                            ? widget.yellow
+                                ? V5.ink
+                                : V5.yellow
+                            : Colors.transparent,
+                      ),
+                      child: Icon(
+                        Icons.arrow_forward_rounded,
+                        size: enabled ? 19 : 14,
+                        color: enabled
+                            ? widget.yellow
+                                ? V5.yellow
+                                : V5.yellowInk
+                            : V5.inkFaint,
+                      ),
                     ),
-                    child: Icon(
-                      Icons.arrow_forward_rounded,
-                      size: enabled ? 19 : 14,
-                      color: enabled
-                          ? widget.yellow
-                              ? V5.yellow
-                              : V5.yellowInk
-                          : V5.inkFaint,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
             ),
           );
         },
@@ -487,49 +503,8 @@ class V5HeroCard extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Positioned(
-              top: -70,
-              left: -70,
-              child: _GlowBlob(
-                width: 280,
-                height: 230,
-                color: V5.yellow.withValues(alpha: 0.16),
-              ),
-            ),
             child,
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _GlowBlob extends StatelessWidget {
-  const _GlowBlob({
-    required this.width,
-    required this.height,
-    required this.color,
-  });
-
-  final double width;
-  final double height;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    // RadialGradient instead of ImageFiltered+blur. End color is fully
-    // transparent BLACK (`Colors.transparent`) — interpolating to a low-alpha
-    // version of the SAME color leaves bright RGB with low alpha at the
-    // edge, which can show as a flash on first frame in unpremultiplied
-    // pipelines (Android emulator software renderer).
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: RadialGradient(
-          colors: [color, Colors.transparent],
-          stops: const [0.0, 1.0],
         ),
       ),
     );
@@ -592,7 +567,9 @@ class V5Eyebrow extends StatelessWidget {
             ? Colors.white.withValues(alpha: 0.08)
             : V5.ink.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(999),
-        border: sparkle ? Border.all(color: V5.yellow.withValues(alpha: 0.3)) : null,
+        border: sparkle
+            ? Border.all(color: V5.yellow.withValues(alpha: 0.3))
+            : null,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -750,7 +727,8 @@ class _HeroFigurePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     canvas.save();
     final scale = math.min(size.width / 320, size.height / 380);
-    canvas.translate((size.width - 320 * scale) / 2, (size.height - 380 * scale) / 2);
+    canvas.translate(
+        (size.width - 320 * scale) / 2, (size.height - 380 * scale) / 2);
     canvas.scale(scale);
 
     final bg = Paint()
@@ -800,7 +778,8 @@ class _HeroFigurePainter extends CustomPainter {
   }
 
   void _head(Canvas canvas, Paint p, Offset c, double rx, double ry) {
-    canvas.drawOval(Rect.fromCenter(center: c, width: rx * 2, height: ry * 2), p);
+    canvas.drawOval(
+        Rect.fromCenter(center: c, width: rx * 2, height: ry * 2), p);
   }
 
   Path _path(List<Offset> pts) {
@@ -814,93 +793,239 @@ class _HeroFigurePainter extends CustomPainter {
 
   void _squat(Canvas c, Paint body, Paint rim, Paint line) {
     _head(c, rim, const Offset(158, 84), 22, 25);
-    c.drawPath(_path([const Offset(137, 113), const Offset(144, 116), const Offset(138, 168), const Offset(142, 215), const Offset(138, 215), const Offset(132, 175)]), rim);
+    c.drawPath(
+        _path([
+          const Offset(137, 113),
+          const Offset(144, 116),
+          const Offset(138, 168),
+          const Offset(142, 215),
+          const Offset(138, 215),
+          const Offset(132, 175)
+        ]),
+        rim);
     _head(c, body, const Offset(162, 84), 22, 25);
-    c.drawPath(_path([const Offset(142, 110), const Offset(184, 110), const Offset(186, 130), const Offset(140, 130)]), body);
-    c.drawPath(Path()
-      ..moveTo(138, 130)
-      ..quadraticBezierTo(124, 175, 134, 220)
-      ..quadraticBezierTo(128, 250, 145, 268)
-      ..lineTo(195, 268)
-      ..quadraticBezierTo(218, 250, 214, 220)
-      ..quadraticBezierTo(224, 175, 210, 130)
-      ..close(), body);
-    c.drawPath(_path([const Offset(138, 145), const Offset(80, 200), const Offset(92, 215), const Offset(148, 175)]), body);
-    c.drawPath(_path([const Offset(210, 145), const Offset(268, 200), const Offset(256, 215), const Offset(200, 175)]), body);
-    c.drawPath(_path([const Offset(145, 268), const Offset(144, 350), const Offset(172, 354), const Offset(175, 268)]), body);
-    c.drawPath(_path([const Offset(195, 268), const Offset(196, 350), const Offset(168, 354), const Offset(165, 268)]), body);
-    c.drawPath(Path()
-      ..moveTo(184, 110)
-      ..lineTo(210, 130)
-      ..quadraticBezierTo(224, 175, 214, 220)
-      ..quadraticBezierTo(218, 250, 195, 268)
-      ..quadraticBezierTo(208, 305, 196, 350), line);
+    c.drawPath(
+        _path([
+          const Offset(142, 110),
+          const Offset(184, 110),
+          const Offset(186, 130),
+          const Offset(140, 130)
+        ]),
+        body);
+    c.drawPath(
+        Path()
+          ..moveTo(138, 130)
+          ..quadraticBezierTo(124, 175, 134, 220)
+          ..quadraticBezierTo(128, 250, 145, 268)
+          ..lineTo(195, 268)
+          ..quadraticBezierTo(218, 250, 214, 220)
+          ..quadraticBezierTo(224, 175, 210, 130)
+          ..close(),
+        body);
+    c.drawPath(
+        _path([
+          const Offset(138, 145),
+          const Offset(80, 200),
+          const Offset(92, 215),
+          const Offset(148, 175)
+        ]),
+        body);
+    c.drawPath(
+        _path([
+          const Offset(210, 145),
+          const Offset(268, 200),
+          const Offset(256, 215),
+          const Offset(200, 175)
+        ]),
+        body);
+    c.drawPath(
+        _path([
+          const Offset(145, 268),
+          const Offset(144, 350),
+          const Offset(172, 354),
+          const Offset(175, 268)
+        ]),
+        body);
+    c.drawPath(
+        _path([
+          const Offset(195, 268),
+          const Offset(196, 350),
+          const Offset(168, 354),
+          const Offset(165, 268)
+        ]),
+        body);
+    c.drawPath(
+        Path()
+          ..moveTo(184, 110)
+          ..lineTo(210, 130)
+          ..quadraticBezierTo(224, 175, 214, 220)
+          ..quadraticBezierTo(218, 250, 195, 268)
+          ..quadraticBezierTo(208, 305, 196, 350),
+        line);
   }
 
   void _reach(Canvas c, Paint body, Paint rim, Paint line) {
     _head(c, rim, const Offset(158, 68), 20, 23);
     _head(c, body, const Offset(160, 68), 20, 23);
-    c.drawPath(_path([const Offset(144, 92), const Offset(178, 92), const Offset(180, 110), const Offset(142, 110)]), body);
-    c.drawPath(Path()
-      ..moveTo(138, 110)
-      ..quadraticBezierTo(128, 180, 138, 250)
-      ..lineTo(184, 250)
-      ..quadraticBezierTo(194, 180, 184, 110)
-      ..close(), body);
-    c.drawPath(_path([const Offset(142, 116), const Offset(90, 18), const Offset(105, 14), const Offset(152, 110)]), body);
-    c.drawPath(_path([const Offset(180, 116), const Offset(232, 18), const Offset(217, 14), const Offset(170, 110)]), body);
-    c.drawPath(_path([const Offset(138, 250), const Offset(138, 380), const Offset(162, 380), const Offset(162, 250)]), body);
-    c.drawPath(_path([const Offset(158, 250), const Offset(158, 380), const Offset(184, 380), const Offset(184, 250)]), body);
-    c.drawPath(Path()
-      ..moveTo(178, 92)
-      ..lineTo(184, 110)
-      ..quadraticBezierTo(194, 180, 184, 250)
-      ..quadraticBezierTo(192, 320, 184, 380), line);
+    c.drawPath(
+        _path([
+          const Offset(144, 92),
+          const Offset(178, 92),
+          const Offset(180, 110),
+          const Offset(142, 110)
+        ]),
+        body);
+    c.drawPath(
+        Path()
+          ..moveTo(138, 110)
+          ..quadraticBezierTo(128, 180, 138, 250)
+          ..lineTo(184, 250)
+          ..quadraticBezierTo(194, 180, 184, 110)
+          ..close(),
+        body);
+    c.drawPath(
+        _path([
+          const Offset(142, 116),
+          const Offset(90, 18),
+          const Offset(105, 14),
+          const Offset(152, 110)
+        ]),
+        body);
+    c.drawPath(
+        _path([
+          const Offset(180, 116),
+          const Offset(232, 18),
+          const Offset(217, 14),
+          const Offset(170, 110)
+        ]),
+        body);
+    c.drawPath(
+        _path([
+          const Offset(138, 250),
+          const Offset(138, 380),
+          const Offset(162, 380),
+          const Offset(162, 250)
+        ]),
+        body);
+    c.drawPath(
+        _path([
+          const Offset(158, 250),
+          const Offset(158, 380),
+          const Offset(184, 380),
+          const Offset(184, 250)
+        ]),
+        body);
+    c.drawPath(
+        Path()
+          ..moveTo(178, 92)
+          ..lineTo(184, 110)
+          ..quadraticBezierTo(194, 180, 184, 250)
+          ..quadraticBezierTo(192, 320, 184, 380),
+        line);
   }
 
   void _lunge(Canvas c, Paint body, Paint rim, Paint line) {
     _head(c, rim, const Offset(170, 80), 21, 24);
     _head(c, body, const Offset(172, 80), 21, 24);
-    c.drawPath(_path([const Offset(156, 105), const Offset(188, 105), const Offset(190, 122), const Offset(154, 122)]), body);
-    c.drawPath(Path()
-      ..moveTo(148, 122)
-      ..quadraticBezierTo(138, 175, 148, 240)
-      ..lineTo(198, 240)
-      ..quadraticBezierTo(208, 175, 198, 122)
-      ..close(), body);
-    c.drawPath(_path([const Offset(152, 130), const Offset(102, 215), const Offset(116, 228), const Offset(158, 152)]), body);
-    c.drawPath(_path([const Offset(196, 130), const Offset(232, 180), const Offset(222, 192), const Offset(188, 152)]), body);
-    c.drawPath(_path([const Offset(152, 240), const Offset(200, 320), const Offset(222, 332), const Offset(178, 252)]), body);
-    c.drawPath(_path([const Offset(198, 240), const Offset(142, 365), const Offset(118, 372), const Offset(168, 252)]), body);
-    c.drawPath(Path()
-      ..moveTo(188, 105)
-      ..lineTo(190, 122)
-      ..quadraticBezierTo(208, 175, 198, 240)
-      ..quadraticBezierTo(200, 290, 222, 332), line);
+    c.drawPath(
+        _path([
+          const Offset(156, 105),
+          const Offset(188, 105),
+          const Offset(190, 122),
+          const Offset(154, 122)
+        ]),
+        body);
+    c.drawPath(
+        Path()
+          ..moveTo(148, 122)
+          ..quadraticBezierTo(138, 175, 148, 240)
+          ..lineTo(198, 240)
+          ..quadraticBezierTo(208, 175, 198, 122)
+          ..close(),
+        body);
+    c.drawPath(
+        _path([
+          const Offset(152, 130),
+          const Offset(102, 215),
+          const Offset(116, 228),
+          const Offset(158, 152)
+        ]),
+        body);
+    c.drawPath(
+        _path([
+          const Offset(196, 130),
+          const Offset(232, 180),
+          const Offset(222, 192),
+          const Offset(188, 152)
+        ]),
+        body);
+    c.drawPath(
+        _path([
+          const Offset(152, 240),
+          const Offset(200, 320),
+          const Offset(222, 332),
+          const Offset(178, 252)
+        ]),
+        body);
+    c.drawPath(
+        _path([
+          const Offset(198, 240),
+          const Offset(142, 365),
+          const Offset(118, 372),
+          const Offset(168, 252)
+        ]),
+        body);
+    c.drawPath(
+        Path()
+          ..moveTo(188, 105)
+          ..lineTo(190, 122)
+          ..quadraticBezierTo(208, 175, 198, 240)
+          ..quadraticBezierTo(200, 290, 222, 332),
+        line);
   }
 
   void _tree(Canvas c, Paint body, Paint rim, Paint line) {
     _head(c, rim, const Offset(158, 62), 18, 21);
     _head(c, body, const Offset(160, 62), 18, 21);
-    c.drawPath(_path([const Offset(146, 84), const Offset(174, 84), const Offset(176, 100), const Offset(144, 100)]), body);
-    c.drawPath(Path()
-      ..moveTo(140, 100)
-      ..quadraticBezierTo(130, 170, 140, 250)
-      ..lineTo(180, 250)
-      ..quadraticBezierTo(190, 170, 180, 100)
-      ..close(), body);
-    c.drawPath(_path([const Offset(142, 250), const Offset(142, 380), const Offset(162, 380), const Offset(162, 250)]), body);
-    c.drawPath(Path()
-      ..moveTo(178, 254)
-      ..quadraticBezierTo(215, 268, 232, 252)
-      ..lineTo(232, 268)
-      ..quadraticBezierTo(210, 285, 178, 272)
-      ..close(), body);
-    c.drawPath(Path()
-      ..moveTo(174, 84)
-      ..lineTo(176, 100)
-      ..quadraticBezierTo(190, 170, 180, 250)
-      ..quadraticBezierTo(192, 320, 184, 380), line);
+    c.drawPath(
+        _path([
+          const Offset(146, 84),
+          const Offset(174, 84),
+          const Offset(176, 100),
+          const Offset(144, 100)
+        ]),
+        body);
+    c.drawPath(
+        Path()
+          ..moveTo(140, 100)
+          ..quadraticBezierTo(130, 170, 140, 250)
+          ..lineTo(180, 250)
+          ..quadraticBezierTo(190, 170, 180, 100)
+          ..close(),
+        body);
+    c.drawPath(
+        _path([
+          const Offset(142, 250),
+          const Offset(142, 380),
+          const Offset(162, 380),
+          const Offset(162, 250)
+        ]),
+        body);
+    c.drawPath(
+        Path()
+          ..moveTo(178, 254)
+          ..quadraticBezierTo(215, 268, 232, 252)
+          ..lineTo(232, 268)
+          ..quadraticBezierTo(210, 285, 178, 272)
+          ..close(),
+        body);
+    c.drawPath(
+        Path()
+          ..moveTo(174, 84)
+          ..lineTo(176, 100)
+          ..quadraticBezierTo(190, 170, 180, 250)
+          ..quadraticBezierTo(192, 320, 184, 380),
+        line);
   }
 
   @override
@@ -996,7 +1121,8 @@ class _BodyDiagramPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     canvas.save();
     final scale = math.min(size.width / 200, size.height / 260);
-    canvas.translate((size.width - 200 * scale) / 2, (size.height - 260 * scale) / 2);
+    canvas.translate(
+        (size.width - 200 * scale) / 2, (size.height - 260 * scale) / 2);
     canvas.scale(scale);
     final body = Paint()
       ..color = Colors.white.withValues(alpha: 0.05)
@@ -1054,8 +1180,22 @@ class _BodyDiagramPainter extends CustomPainter {
       ..lineTo(126, 168)
       ..quadraticBezierTo(132, 152, 132, 130)
       ..close());
-    draw(_poly([const Offset(78, 168), const Offset(75, 215), const Offset(78, 250), const Offset(92, 250), const Offset(95, 215), const Offset(92, 168)]));
-    draw(_poly([const Offset(108, 168), const Offset(105, 215), const Offset(108, 250), const Offset(122, 250), const Offset(125, 215), const Offset(122, 168)]));
+    draw(_poly([
+      const Offset(78, 168),
+      const Offset(75, 215),
+      const Offset(78, 250),
+      const Offset(92, 250),
+      const Offset(95, 215),
+      const Offset(92, 168)
+    ]));
+    draw(_poly([
+      const Offset(108, 168),
+      const Offset(105, 215),
+      const Offset(108, 250),
+      const Offset(122, 250),
+      const Offset(125, 215),
+      const Offset(122, 168)
+    ]));
 
     marker(canvas, const Offset(100, 56), 'neck');
     marker(canvas, const Offset(100, 100), 'back');
@@ -1078,8 +1218,10 @@ class _BodyDiagramPainter extends CustomPainter {
   void marker(Canvas canvas, Offset center, String area, [double r = 5]) {
     final selected = !noPain && painAreas.contains(area);
     if (selected) {
-      canvas.drawCircle(center, r * 2.4, Paint()..color = V5.yellow.withValues(alpha: 0.28));
-      canvas.drawCircle(center, r * 1.6, Paint()..color = V5.yellow.withValues(alpha: 0.18));
+      canvas.drawCircle(
+          center, r * 2.4, Paint()..color = V5.yellow.withValues(alpha: 0.28));
+      canvas.drawCircle(
+          center, r * 1.6, Paint()..color = V5.yellow.withValues(alpha: 0.18));
     }
     canvas.drawCircle(
       center,

@@ -14,6 +14,7 @@ migrate_working_dir/
 claude/
 .claude/
 .claude/worktrees/
+.docs/
 
 # IntelliJ related
 *.iml

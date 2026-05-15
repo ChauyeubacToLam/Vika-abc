@@ -50,7 +50,7 @@ class SphinxStretch extends ExerciseBase {
     ];
 
     for (final type in req) {
-      if (landmarks[type] == null || landmarks[type]!.likelihood < ExerciseBase.MIN_CONFIDENCE) {
+      if (landmarks[type] == null || !ExerciseBase.isLandmarkConfident(landmarks[type]!)) {
         return "Cơ thể chưa nằm trọn trong khung hình hoặc ánh sáng yếu.";
       }
     }

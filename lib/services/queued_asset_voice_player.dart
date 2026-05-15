@@ -13,6 +13,9 @@ class QueuedAssetVoicePlayer {
   }) : _assetMap = Map.unmodifiable(assetMap) {
     _configFuture = _configurePlayer();
     _completionSubscription = _audioPlayer.onPlayerComplete.listen((_) {
+      if (_isDisposed) {
+        return;
+      }
       debugPrint('[$logTag] completed');
       _isPlaying = false;
       if (_isClearingQueue) {
@@ -120,6 +123,10 @@ class QueuedAssetVoicePlayer {
 
     if (!_isConfigured && _configFuture != null) {
       await _configFuture;
+      if (_isDisposed) {
+        _isPlaying = false;
+        return;
+      }
     }
 
     final text = _queue.removeAt(0);
@@ -137,6 +144,10 @@ class QueuedAssetVoicePlayer {
   }
 
   Future<bool> _playText(String text) async {
+    if (_isDisposed) {
+      return false;
+    }
+
     final filename = _assetMap[text];
     if (filename == null) {
       debugPrint('[$logTag] missing asset mapping for "$text"');
@@ -151,7 +162,13 @@ class QueuedAssetVoicePlayer {
       return false;
     }
 
+    if (_isDisposed) {
+      return false;
+    }
     await _audioPlayer.play(AssetSource('$assetSourcePrefix/$filename'));
+    if (_isDisposed) {
+      return false;
+    }
     debugPrint('[$logTag] asset played: $bundlePath');
     return true;
   }
@@ -161,8 +178,19 @@ class QueuedAssetVoicePlayer {
       return;
     }
     _isDisposed = true;
+    _isPlaying = false;
+    _isClearingQueue = false;
     _queue.clear();
     unawaited(_completionSubscription.cancel());
-    unawaited(_audioPlayer.dispose());
+    unawaited(_disposePlayer());
+  }
+
+  Future<void> _disposePlayer() async {
+    try {
+      await _audioPlayer.stop();
+    } catch (_) {}
+    try {
+      await _audioPlayer.dispose();
+    } catch (_) {}
   }
 }

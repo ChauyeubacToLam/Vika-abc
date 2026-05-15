@@ -1,8 +1,11 @@
 // ignore_for_file: curly_braces_in_flow_control_structures
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/exercise_definition.dart';
+import '../utils/orientation_lock.dart';
 
 /* =========================================================================
    HomeScreen — Exercise selection with modern card-based UI.
@@ -23,6 +26,7 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void initState() {
     super.initState();
+    unawaited(OrientationLock.portraitOnly());
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 900),
       vsync: this,
