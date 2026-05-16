@@ -118,12 +118,12 @@ void main() {
       );
       expect(
         VikaImageOrientation.landscapeLeft.androidNativeCameraSceneQuarterTurns,
-        2,
+        3,
       );
       expect(
         VikaImageOrientation
             .landscapeRight.androidNativeCameraSceneQuarterTurns,
-        2,
+        1,
       );
       expect(
         VikaImageOrientation

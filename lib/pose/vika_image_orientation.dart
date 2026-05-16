@@ -101,18 +101,20 @@ extension VikaImageOrientationCodes on VikaImageOrientation {
     }
   }
 
-  /// Extra presentation correction for Android's native CameraX texture when
-  /// the app manually rotates the full exercise UI while the OS stays portrait.
+  /// Pre-rotation for Android's native CameraX texture when the app manually
+  /// rotates the full exercise UI while the OS stays portrait.
   ///
-  /// iOS rotates the AVCapture buffer into the same landscape presentation the
-  /// page expects. Android's native SurfaceTexture arrives in the opposite
-  /// landscape presentation, so the camera scene needs a half-turn while the
-  /// controls continue to follow [uiQuarterTurns].
+  /// The full exercise page still applies [uiQuarterTurns] after this. Android
+  /// CameraX's native SurfaceTexture already carries a landscape transform, so
+  /// the camera scene must be pre-rotated by the opposite landscape side rather
+  /// than by a fixed half-turn. This keeps the camera preview and skeleton in
+  /// the same landscape frame as the controls.
   int get androidNativeCameraSceneQuarterTurns {
     switch (this) {
       case VikaImageOrientation.landscapeLeft:
+        return 3;
       case VikaImageOrientation.landscapeRight:
-        return 2;
+        return 1;
       case VikaImageOrientation.portrait:
       case VikaImageOrientation.portraitUpsideDown:
         return 0;
