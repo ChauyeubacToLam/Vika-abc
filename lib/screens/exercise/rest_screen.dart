@@ -267,7 +267,7 @@ class _RestScreenState extends State<RestScreen> with TickerProviderStateMixin {
                                   child: Text(
                                     widget.setReport.praiseSentence!,
                                     textAlign: TextAlign.center,
-                                    style: GoogleFonts.fraunces(
+                                    style: GoogleFonts.oswald(
                                       textStyle: VFTheme.textStyle(
                                         context,
                                         size: 14,

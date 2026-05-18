@@ -1,15 +1,33 @@
+// MainShell — top-level scaffold for the main app tabs (Trang chủ, Lộ
+// trình, Tiến bộ, Hồ sơ) plus the Library sheet that slides up from the
+// central FAB. Premium Ivory v1.
+//
+// Replaces the legacy jade-green VFTheme shell. The new shell:
+//   • Background = c.bg (#F4EEE2 cream)
+//   • Frosted-glass IvoryBottomNav with 4 tabs + central yellow FAB
+//   • IndexedStack so each tab keeps its scroll state
+//   • Library sheet animates up via AnimatedSlide / AnimatedOpacity
+//
+// UserProgramService is still loaded at startup and forwarded into Plan
+// (and Home, currently unused). When real wiring lands per the Wiring
+// Report, the screens will start consuming the program data.
+
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../services/user_program_service.dart';
-import '../theme/vf_theme.dart';
-import '../widgets/vf_primitives.dart';
 import '../models/exercise_definition.dart';
+import '../services/user_program_service.dart';
+import '../utils/orientation_lock.dart';
+import '../widgets/ivory/bottom_nav.dart';
 import 'dashboard_home_screen.dart';
 import 'exercise_browser.dart';
 import 'plan_screen.dart';
 import 'profile_screen.dart';
 import 'progress_screen.dart';
+import '../theme/app_colors.dart';
+import '../theme/responsive.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -26,6 +44,7 @@ class _MainShellState extends State<MainShell> {
   @override
   void initState() {
     super.initState();
+    unawaited(OrientationLock.portraitOnly());
     _loadProgram();
   }
 
@@ -35,13 +54,25 @@ class _MainShellState extends State<MainShell> {
     setState(() => _program = program);
   }
 
+  void _toggleBrowser() {
+    setState(() => _browserOpen = !_browserOpen);
+  }
+
+  void _openExerciseFromBrowser(ExerciseDefinition definition) {
+    setState(() => _browserOpen = false);
+    Navigator.of(context).pushNamed('/exercise', arguments: definition);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    final r = Responsive.of(context);
     final mediaQuery = MediaQuery.of(context);
     final bottomInset = mediaQuery.padding.bottom;
-    final s = VFTheme.scale(context);
-    final navBarHeight = VFTheme.navHeight + 8 * s;
-    final contentBottomPadding = navBarHeight + bottomInset + 20 * s;
+    final isDark = MediaQuery.platformBrightnessOf(context) == Brightness.dark;
+    // Capsule height (~76) + drop shadow + capsule top margin.
+    final navCapsule = r.w(100);
+    final contentBottomPadding = navCapsule + bottomInset + r.w(8);
 
     final screens = [
       DashboardHomeScreen(
@@ -58,14 +89,14 @@ class _MainShellState extends State<MainShell> {
     ];
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
+      value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
       ),
       child: Scaffold(
         extendBody: true,
-        backgroundColor: VFTheme.background,
+        backgroundColor: c.bg,
         body: Stack(
           fit: StackFit.expand,
           children: [
@@ -76,16 +107,17 @@ class _MainShellState extends State<MainShell> {
                 children: screens,
               ),
             ),
+            // Library sheet (slides up over content).
             Positioned.fill(
               child: IgnorePointer(
                 ignoring: !_browserOpen,
-                child: AnimatedSlide(
-                  duration: const Duration(milliseconds: 260),
-                  curve: Curves.easeOutCubic,
-                  offset: _browserOpen ? Offset.zero : const Offset(0, 1),
-                  child: AnimatedOpacity(
-                    duration: const Duration(milliseconds: 180),
-                    opacity: _browserOpen ? 1 : 0,
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 200),
+                  opacity: _browserOpen ? 1 : 0,
+                  child: AnimatedSlide(
+                    duration: const Duration(milliseconds: 280),
+                    curve: Curves.easeOutCubic,
+                    offset: _browserOpen ? Offset.zero : const Offset(0, 1),
                     child: ExerciseBrowser(
                       bottomPadding: contentBottomPadding,
                       onClose: _toggleBrowser,
@@ -97,251 +129,21 @@ class _MainShellState extends State<MainShell> {
             ),
           ],
         ),
-        bottomNavigationBar: _BottomNavBar(
-          currentIndex: _currentIndex,
-          browserOpen: _browserOpen,
-          bottomInset: bottomInset,
-          navBarHeight: navBarHeight,
-          onToggleBrowser: _toggleBrowser,
-          onTap: (index) {
-            setState(() {
-              _currentIndex = index;
-              _browserOpen = false;
-            });
-          },
-        ),
-      ),
-    );
-  }
-
-  void _toggleBrowser() {
-    setState(() => _browserOpen = !_browserOpen);
-  }
-
-  void _openExerciseFromBrowser(ExerciseDefinition definition) {
-    setState(() => _browserOpen = false);
-    Navigator.of(context).pushNamed('/exercise', arguments: definition);
-  }
-}
-
-class _BottomNavBar extends StatelessWidget {
-  const _BottomNavBar({
-    required this.currentIndex,
-    required this.browserOpen,
-    required this.bottomInset,
-    required this.navBarHeight,
-    required this.onToggleBrowser,
-    required this.onTap,
-  });
-
-  final int currentIndex;
-  final bool browserOpen;
-  final double bottomInset;
-  final double navBarHeight;
-  final VoidCallback onToggleBrowser;
-  final ValueChanged<int> onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = VFTheme.scale(context);
-    final navBarHeight = VFTheme.navHeight + 8 * s;
-
-    return FrostedGlass(
-      sigma: 28,
-      decoration: VFTheme.navDecoration(),
-      child: SizedBox(
-        height: navBarHeight + bottomInset,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(8 * s, 0, 8 * s, bottomInset),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: _NavItem(
-                  label: 'Trang chủ',
-                  glyph: VFNavGlyph.home,
-                  active: currentIndex == 0 && !browserOpen,
-                  onTap: () => onTap(0),
-                ),
-              ),
-              Expanded(
-                child: _NavItem(
-                  label: 'Kế hoạch',
-                  glyph: VFNavGlyph.plan,
-                  active: currentIndex == 1 && !browserOpen,
-                  onTap: () => onTap(1),
-                ),
-              ),
-              Expanded(
-                child: _CenterNavAction(
-                  active: browserOpen,
-                  onTap: onToggleBrowser,
-                ),
-              ),
-              Expanded(
-                child: _NavItem(
-                  label: 'Tiến bộ',
-                  glyph: VFNavGlyph.progress,
-                  active: currentIndex == 2 && !browserOpen,
-                  onTap: () => onTap(2),
-                ),
-              ),
-              Expanded(
-                child: _NavItem(
-                  label: 'Tôi',
-                  glyph: VFNavGlyph.profile,
-                  active: currentIndex == 3 && !browserOpen,
-                  onTap: () => onTap(3),
-                ),
-              ),
-            ],
+        bottomNavigationBar: AnimatedSlide(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          offset: _browserOpen ? const Offset(0, 1.1) : Offset.zero,
+          child: IvoryBottomNav(
+            currentIndex: _currentIndex,
+            bottomInset: bottomInset,
+            onTap: (idx) {
+              setState(() {
+                _currentIndex = idx;
+                _browserOpen = false;
+              });
+            },
+            onBrowse: _toggleBrowser,
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.label,
-    required this.glyph,
-    required this.active,
-    required this.onTap,
-  });
-
-  final String label;
-  final VFNavGlyph glyph;
-  final bool active;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = VFTheme.scale(context);
-    final opacity = active ? 1.0 : 0.3;
-    final color = active ? VFTheme.jade : VFTheme.textMuted;
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14 * s),
-      child: Padding(
-        padding: EdgeInsets.symmetric(vertical: 8 * s),
-        child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 160),
-          opacity: opacity,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              VFNavIcon(
-                glyph: glyph,
-                color: color,
-              ),
-              SizedBox(height: 4 * s),
-              Text(
-                label,
-                style: VFTheme.textStyle(
-                  context,
-                  size: 10,
-                  weight: active ? FontWeight.w700 : FontWeight.w500,
-                  color: color,
-                ),
-              ),
-              SizedBox(height: 2 * s),
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
-                width: 4 * s,
-                height: 4 * s,
-                decoration: BoxDecoration(
-                  color: active ? VFTheme.jade : Colors.transparent,
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _CenterNavAction extends StatelessWidget {
-  const _CenterNavAction({
-    required this.active,
-    required this.onTap,
-  });
-
-  final bool active;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = VFTheme.scale(context);
-    final iconColor = active ? VFTheme.white : VFTheme.jadeDark;
-    final labelColor = active ? VFTheme.jade : VFTheme.textMuted;
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(18 * s),
-      child: Padding(
-        padding: EdgeInsets.symmetric(vertical: 4 * s),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Transform.translate(
-              offset: Offset(0, active ? -4 * s : -2 * s),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOutCubic,
-                width: VFTheme.fabSize,
-                height: VFTheme.fabSize,
-                decoration: BoxDecoration(
-                  gradient: VFTheme.jadeGradient,
-                  borderRadius: BorderRadius.circular(17 * s),
-                  boxShadow: [
-                    BoxShadow(
-                      color: VFTheme.jade.withValues(
-                        alpha: active ? 0.30 : 0.24,
-                      ),
-                      blurRadius: active ? 22 * s : 18 * s,
-                      offset: Offset(0, active ? 8 * s : 4 * s),
-                    ),
-                  ],
-                ),
-                alignment: Alignment.center,
-                child: AnimatedRotation(
-                  duration: const Duration(milliseconds: 220),
-                  turns: active ? 0.125 : 0,
-                  curve: Curves.easeOutCubic,
-                  child: VFNavIcon(
-                    glyph: VFNavGlyph.plus,
-                    color: VFTheme.white,
-                    size: 22 * s,
-                    strokeWidth: 2.5,
-                  ),
-                ),
-              ),
-            ),
-            SizedBox(height: 2 * s),
-            Text(
-              'Khám phá',
-              style: VFTheme.textStyle(
-                context,
-                size: 10,
-                weight: active ? FontWeight.w800 : FontWeight.w600,
-                color: active ? VFTheme.jade : VFTheme.textMuted,
-              ),
-            ),
-            SizedBox(height: 2 * s),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              width: 4 * s,
-              height: 4 * s,
-              decoration: BoxDecoration(
-                color: active ? VFTheme.jade : Colors.transparent,
-                shape: BoxShape.circle,
-              ),
-            ),
-          ],
         ),
       ),
     );

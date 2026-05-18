@@ -2,12 +2,6 @@ package com.vikavn.app
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.ImageFormat
-import android.graphics.Matrix
-import android.graphics.Rect
-import android.graphics.YuvImage
-import androidx.camera.core.ImageProxy
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.framework.image.MPImage
 import com.google.mediapipe.tasks.components.containers.Landmark
@@ -17,7 +11,6 @@ import com.google.mediapipe.tasks.core.Delegate
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarker
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarkerResult
-import java.io.ByteArrayOutputStream
 import java.util.concurrent.ConcurrentHashMap
 
 class PoseLandmarkerHelper(
@@ -29,9 +22,16 @@ class PoseLandmarkerHelper(
     private var poseLandmarker: PoseLandmarker? = null
     private var lastSubmittedTimestampMs: Long = Long.MIN_VALUE
     private val pendingFrames = ConcurrentHashMap<Long, FramePayload>()
+    @Volatile private var currentOrientationCode: String? = null
+    @Volatile private var currentOrientationIsFrontCamera = true
 
     init {
         setupPoseLandmarker()
+    }
+
+    fun setOrientation(orientation: String?, isFrontCamera: Boolean) {
+        currentOrientationCode = orientation
+        currentOrientationIsFrontCamera = isFrontCamera
     }
 
     fun setupPoseLandmarker() {
@@ -59,49 +59,54 @@ class PoseLandmarkerHelper(
     fun clearPoseLandmarker() {
         poseLandmarker?.close()
         poseLandmarker = null
+        pendingFrames.values.forEach { it.onComplete() }
         pendingFrames.clear()
         lastSubmittedTimestampMs = Long.MIN_VALUE
     }
 
-    fun detectLiveStream(imageProxy: ImageProxy, isFrontCamera: Boolean) {
+    fun detectLiveStream(
+        bitmap: Bitmap,
+        timestampMs: Long,
+        frameWidth: Int,
+        frameHeight: Int,
+        rotationDegrees: Int,
+        rotationDurationMs: Double,
+        isFrontCamera: Boolean,
+        onComplete: () -> Unit,
+    ): Boolean {
         var pendingTimestampMs: Long? = null
 
         try {
-            val activeLandmarker = poseLandmarker ?: return
-            val nextTimestampMs = imageProxy.imageInfo.timestamp / 1_000_000L
-            if (nextTimestampMs <= lastSubmittedTimestampMs) {
-                return
+            val activeLandmarker = poseLandmarker ?: return false
+            if (timestampMs <= lastSubmittedTimestampMs) {
+                return false
             }
 
-            val nv21Bytes = imageProxyToNv21(imageProxy)
-            val rawBitmap = nv21ToBitmap(nv21Bytes, imageProxy.width, imageProxy.height)
-            val rotationDegrees = imageProxy.imageInfo.rotationDegrees
-            val rotatedBitmap = rotateBitmap(rawBitmap, rotationDegrees)
-            if (rotatedBitmap !== rawBitmap) {
-                rawBitmap.recycle()
-            }
-
-            val submittedTimestampMs = nextTimestampMs
+            val submittedTimestampMs = timestampMs
             pendingTimestampMs = submittedTimestampMs
             pendingFrames[submittedTimestampMs] = FramePayload(
-                frameBytes = nv21Bytes,
-                frameWidth = imageProxy.width,
-                frameHeight = imageProxy.height,
-                imageWidth = rotatedBitmap.width,
-                imageHeight = rotatedBitmap.height,
+                frameWidth = frameWidth,
+                frameHeight = frameHeight,
+                imageWidth = bitmap.width,
+                imageHeight = bitmap.height,
                 rotationDegrees = rotationDegrees,
+                rotationDurationMs = rotationDurationMs,
                 isFrontCamera = isFrontCamera,
+                orientation = currentOrientationCode,
+                onComplete = onComplete,
             )
             trimPendingFrames()
 
-            val mpImage = BitmapImageBuilder(rotatedBitmap).build()
+            val mpImage = BitmapImageBuilder(bitmap).build()
             lastSubmittedTimestampMs = submittedTimestampMs
             activeLandmarker.detectAsync(mpImage, submittedTimestampMs)
+            return true
         } catch (exception: Exception) {
-            pendingTimestampMs?.let { pendingFrames.remove(it) }
+            pendingTimestampMs?.let { timestamp ->
+                pendingFrames.remove(timestamp)?.onComplete()
+            }
             onError("pose_landmarker_detection", exception.message)
-        } finally {
-            imageProxy.close()
+            return false
         }
     }
 
@@ -134,6 +139,7 @@ class PoseLandmarkerHelper(
             onError("pose_landmarker_result", exception.message)
         } finally {
             input.close()
+            framePayload?.onComplete()
         }
     }
 
@@ -147,7 +153,12 @@ class PoseLandmarkerHelper(
             "x" to landmark.x(),
             "y" to landmark.y(),
             "z" to landmark.z(),
-            "likelihood" to (landmark.visibility().orElse(0.0f)),
+            "presence" to landmark.presence()
+                .orElse(landmark.visibility().orElse(0.0f)),
+            "visibility" to landmark.visibility()
+                .orElse(landmark.presence().orElse(0.0f)),
+            "likelihood" to landmark.visibility()
+                .orElse(landmark.presence().orElse(0.0f)),
         )
     }
 
@@ -157,7 +168,12 @@ class PoseLandmarkerHelper(
             "x" to landmark.x(),
             "y" to landmark.y(),
             "z" to landmark.z(),
-            "likelihood" to (landmark.visibility().orElse(0.0f)),
+            "presence" to landmark.presence()
+                .orElse(landmark.visibility().orElse(0.0f)),
+            "visibility" to landmark.visibility()
+                .orElse(landmark.presence().orElse(0.0f)),
+            "likelihood" to landmark.visibility()
+                .orElse(landmark.presence().orElse(0.0f)),
         )
     }
 
@@ -168,123 +184,20 @@ class PoseLandmarkerHelper(
 
         val keysToDrop = pendingFrames.keys.toList().sorted().take(pendingFrames.size - maxEntries)
         for (key in keysToDrop) {
-            pendingFrames.remove(key)
+            pendingFrames.remove(key)?.onComplete()
         }
-    }
-
-    private fun imageProxyToNv21(imageProxy: ImageProxy): ByteArray {
-        val width = imageProxy.width
-        val height = imageProxy.height
-        val ySize = width * height
-        val nv21 = ByteArray(ySize + (width * height / 2))
-
-        copyPlane(
-            plane = imageProxy.planes[0],
-            width = width,
-            height = height,
-            output = nv21,
-            outputOffset = 0,
-            outputStride = 1,
-        )
-        copyPlane(
-            plane = imageProxy.planes[2],
-            width = width / 2,
-            height = height / 2,
-            output = nv21,
-            outputOffset = ySize,
-            outputStride = 2,
-        )
-        copyPlane(
-            plane = imageProxy.planes[1],
-            width = width / 2,
-            height = height / 2,
-            output = nv21,
-            outputOffset = ySize + 1,
-            outputStride = 2,
-        )
-
-        return nv21
-    }
-
-    private fun copyPlane(
-        plane: ImageProxy.PlaneProxy,
-        width: Int,
-        height: Int,
-        output: ByteArray,
-        outputOffset: Int,
-        outputStride: Int,
-    ) {
-        val buffer = plane.buffer
-        buffer.rewind()
-
-        val rowStride = plane.rowStride
-        val pixelStride = plane.pixelStride
-        val rowData = ByteArray(rowStride)
-        var outputIndex = outputOffset
-
-        for (row in 0 until height) {
-            val length = if (pixelStride == 1 && outputStride == 1) {
-                width
-            } else {
-                ((width - 1) * pixelStride) + 1
-            }
-
-            buffer.get(rowData, 0, length)
-
-            if (pixelStride == 1 && outputStride == 1) {
-                System.arraycopy(rowData, 0, output, outputIndex, width)
-                outputIndex += width
-            } else {
-                for (column in 0 until width) {
-                    output[outputIndex] = rowData[column * pixelStride]
-                    outputIndex += outputStride
-                }
-            }
-
-            if (row < height - 1) {
-                buffer.position(buffer.position() + rowStride - length)
-            }
-        }
-    }
-
-    private fun nv21ToBitmap(nv21Bytes: ByteArray, width: Int, height: Int): Bitmap {
-        val yuvImage = YuvImage(nv21Bytes, ImageFormat.NV21, width, height, null)
-        val outputStream = ByteArrayOutputStream()
-        yuvImage.compressToJpeg(Rect(0, 0, width, height), 95, outputStream)
-        val jpegBytes = outputStream.toByteArray()
-
-        return BitmapFactory.decodeByteArray(jpegBytes, 0, jpegBytes.size)
-            ?: throw IllegalStateException("Failed to decode camera frame bitmap.")
-    }
-
-    private fun rotateBitmap(bitmap: Bitmap, rotationDegrees: Int): Bitmap {
-        if (rotationDegrees == 0) {
-            return bitmap
-        }
-
-        val matrix = Matrix().apply {
-            postRotate(rotationDegrees.toFloat())
-        }
-
-        return Bitmap.createBitmap(
-            bitmap,
-            0,
-            0,
-            bitmap.width,
-            bitmap.height,
-            matrix,
-            true,
-        )
     }
 
     private data class FramePayload(
-        val frameBytes: ByteArray,
         val frameWidth: Int,
         val frameHeight: Int,
         val imageWidth: Int,
         val imageHeight: Int,
         val rotationDegrees: Int,
+        val rotationDurationMs: Double,
         val isFrontCamera: Boolean,
+        val orientation: String?,
+        val onComplete: () -> Unit,
     ) {
         fun toEventPayload(
             timestampMs: Long,
@@ -298,9 +211,10 @@ class PoseLandmarkerHelper(
                 "imageHeight" to imageHeight,
                 "frameWidth" to frameWidth,
                 "frameHeight" to frameHeight,
-                "frameBytes" to frameBytes,
                 "rotationDegrees" to rotationDegrees,
+                "rotationDurationMs" to rotationDurationMs,
                 "isFrontCamera" to isFrontCamera,
+                "orientation" to orientation,
                 "timestampMs" to timestampMs,
             )
         }

@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:vika/pose/vika_pose_landmark.dart';
 
 /* AI-generated please verify logic before use.
    One Euro Filter implementation for smoothing pose landmarks over time.
@@ -44,12 +45,13 @@ class PoseSmoother {
       List<double> smoothedPos =
           _filters[type]!.filter(t, [landmark.x, landmark.y]);
 
-      smoothedLandmarks[type] = PoseLandmark(
+      smoothedLandmarks[type] = poseLandmarkWithVikaConfidence(
         type: type,
         x: smoothedPos[0],
         y: smoothedPos[1],
         z: landmark.z,
-        likelihood: landmark.likelihood,
+        presence: landmark.presence,
+        visibility: landmark.visibility,
       );
     });
 

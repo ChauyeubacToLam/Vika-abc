@@ -18,8 +18,10 @@ import 'exercise/exercise_base.dart';
 import 'models/exercise_definition.dart';
 import 'screens/exercise/exercise_experience_screen.dart';
 import 'screens/main_shell.dart';
-import 'screens/onboarding/onboarding_screen.dart';
+import 'screens/onboarding/v5/v5_onboarding_navigator.dart';
+import 'theme/typography.dart';
 import 'theme/vf_theme.dart';
+import 'utils/orientation_lock.dart';
 
 /* =========================================================================
    APP ENTRY POINT
@@ -37,7 +39,7 @@ Future<void> main() async {
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZyanRsZnpidmRnd2d6ZWdmenhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4Mjk2NjUsImV4cCI6MjA5MTQwNTY2NX0.Eprv5NtWbZqigYPZdOEeRIyvYVxp0l2hmbXXyEdh8nI',
   );
 
-  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  await OrientationLock.portraitOnly();
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -134,20 +136,21 @@ class VikaApp extends StatelessWidget {
       theme: VFTheme.lightTheme,
       builder: (context, child) => ScrollConfiguration(
         behavior: const VFScrollBehavior(),
-        child: child ?? const SizedBox.shrink(),
+        // Clamp the user's text scale to [0.9, 1.3]. Respects accessibility
+        // settings within reason; prevents 2× scales from breaking the
+        // tight Premium Ivory layouts. See lib/theme/typography.dart.
+        child: VikaType.clampTextScaler(context, child),
       ),
       initialRoute: '/',
       onGenerateRoute: (settings) {
         switch (settings.name) {
-          case '/':
-            return MaterialPageRoute(
-              builder: (_) => AppEntryGate(
-                initialOnboardingComplete: _hasCompletedOnboarding,
-              ),
-            );
+case '/':
+  return MaterialPageRoute(
+    builder: (_) => const MainShell(),
+  );
           case '/onboarding':
             return MaterialPageRoute(
-              builder: (_) => const OnboardingScreen(),
+              builder: (_) => const V5OnboardingNavigator(),
             );
           case '/exercise':
             final definition = settings.arguments as ExerciseDefinition;
@@ -185,6 +188,7 @@ class _AppEntryGateState extends State<AppEntryGate> {
   @override
   void initState() {
     super.initState();
+    unawaited(OrientationLock.portraitOnly());
     _entryState = _initialEntryState();
     _authSubscription = supabase.auth.onAuthStateChange.listen(
       _handleAuthStateChange,
@@ -199,27 +203,13 @@ class _AppEntryGateState extends State<AppEntryGate> {
   }
 
   _AppEntryState _initialEntryState() {
-    final session = supabase.auth.currentSession;
-    if (session == null) {
-      return _AppEntryState.onboarding;
-    }
-
     return widget.initialOnboardingComplete
         ? _AppEntryState.home
-        : _AppEntryState.onboarding;
+        : _AppEntryState.home;
   }
 
   Future<void> _resolveEntryState() async {
-    final session = supabase.auth.currentSession;
-    if (session == null) {
-      _setEntryState(_AppEntryState.onboarding);
-      return;
-    }
-
-    final complete = await isOnboardingComplete();
-    _setEntryState(
-      complete ? _AppEntryState.home : _AppEntryState.onboarding,
-    );
+    _setEntryState(_AppEntryState.home);
   }
 
   void _handleAuthStateChange(AuthState data) {
@@ -229,8 +219,12 @@ class _AppEntryGateState extends State<AppEntryGate> {
       case 'passwordRecovery':
       case 'userUpdated':
       case 'mfaChallengeVerified':
-        _setEntryState(_AppEntryState.loading);
-        _resolveEntryState();
+        // If the user is mid-onboarding, do NOT flash to loading and
+        // rebuild the navigator — that disposes its State and resets the
+        // PageController back to S01. The signup screen has its own auth
+        // listener that advances the page in place. Only swap to home
+        // if onboarding is actually complete.
+        _quietResolveEntryState();
         break;
       case 'signedOut':
       case 'userDeleted':
@@ -239,8 +233,27 @@ class _AppEntryGateState extends State<AppEntryGate> {
       case 'tokenRefreshed':
         break;
       default:
-        _setEntryState(_AppEntryState.loading);
-        _resolveEntryState();
+        _quietResolveEntryState();
+    }
+  }
+
+  /// Re-resolves the entry state without flashing through `loading`. Stays
+  /// in the current state if no transition is required — preserves the
+  /// V5OnboardingNavigator's State (PageController + OnboardingData) when
+  /// the signup screen completes auth mid-flow.
+  Future<void> _quietResolveEntryState() async {
+    final session = supabase.auth.currentSession;
+    if (session == null) {
+      if (_entryState != _AppEntryState.onboarding) {
+        _setEntryState(_AppEntryState.onboarding);
+      }
+      return;
+    }
+
+    final complete = await isOnboardingComplete();
+    final target = complete ? _AppEntryState.home : _AppEntryState.onboarding;
+    if (target != _entryState) {
+      _setEntryState(target);
     }
   }
 
@@ -256,7 +269,7 @@ class _AppEntryGateState extends State<AppEntryGate> {
   Widget build(BuildContext context) {
     switch (_entryState) {
       case _AppEntryState.onboarding:
-        return const OnboardingScreen();
+        return const MainShell();
       case _AppEntryState.home:
         return const MainShell();
       case _AppEntryState.loading:
@@ -331,7 +344,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
   CameraController? _cameraController;
   int _cameraIndex = -1;
   bool _isCameraReady = false;
-  CameraLensDirection _currentLensDirection = CameraLensDirection.back;
+  CameraLensDirection _currentLensDirection = CameraLensDirection.front;
 
   // ── ML Kit ──
   final PoseDetector _poseDetector = PoseDetector(
@@ -611,9 +624,10 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     }
   }
 
-  /* -----------------------------------------------------------------------
+ /* -----------------------------------------------------------------------
      POSE PIPELINE
      ----------------------------------------------------------------------- */
+
   void _processCameraImage(CameraImage cameraImage) {
     if (_isDetecting) return;
     _isDetecting = true;
@@ -624,15 +638,14 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     try {
       final inputImage = _buildInputImage(cameraImage);
       if (inputImage == null) return;
-
       await _exercise.runPersonDetection(inputImage);
       final poses = await _poseDetector.processImage(inputImage);
-
+      
       if (poses.isNotEmpty) {
         final pose = poses.first;
         _detectedPose = pose;
         _result = _exercise.processPose(pose.landmarks);
-
+        
         if (_result != null) {
           if (_exercise.exerciseState == ExerciseState.completed) {
             _repCount = _exercise.repCount;
@@ -648,12 +661,26 @@ class _ExerciseScreenState extends State<ExerciseScreen>
             }
           }
         }
-
         _logStateChanges();
       } else {
         _detectedPose = null;
         _feedback = _exercise.processNoPoseFrame();
       }
+
+      // ============================================================
+      // 👉 ĐOẠN CODE MỚI THÊM: BẮT LỖI HẾT GIỜ / YÊU CẦU DỪNG TỪ AI
+      // ============================================================
+      if (_exercise.requestStop() && !_didComplete) {
+        if (mounted) {
+          setState(() {
+            _feedback = {'Result': 'Kết thúc bài tập!'};
+          });
+        }
+        // Buộc lưu lại Rep hiện tại và pop màn hình về bảng Table (Report)
+        _logSetComplete();
+        _popWithLogger();
+      }
+      // ============================================================
 
       // FPS
       _frameCount++;
@@ -664,7 +691,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         _frameCount = 0;
         _lastFpsTime = now;
       }
-
+      
       final nowMs = DateTime.now().millisecondsSinceEpoch;
       if (mounted &&
           nowMs - _lastUiRefreshAtMs >= _MIN_UI_REFRESH_INTERVAL_MS) {
@@ -675,7 +702,6 @@ class _ExerciseScreenState extends State<ExerciseScreen>
       debugPrint('[Vika] Detection error: $e');
     }
   }
-
   /* -----------------------------------------------------------------------
      COMPLETION — Pop with logger after short delay
      ----------------------------------------------------------------------- */

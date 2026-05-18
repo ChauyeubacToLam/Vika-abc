@@ -344,3 +344,288 @@ class FrostedGlass extends StatelessWidget {
     );
   }
 }
+
+/// Primary jade-pill CTA. Ported from the deleted onboarding/vf_theme.dart so
+/// the rest of the codebase keeps working off a single theme module.
+class VFButton extends StatelessWidget {
+  const VFButton({
+    super.key,
+    required this.label,
+    this.onTap,
+    this.enabled = true,
+  });
+
+  final String label;
+  final VoidCallback? onTap;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = VFTheme.scale(context);
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: double.infinity,
+        height: 54 * s,
+        decoration: BoxDecoration(
+          color: enabled ? VFTheme.jade : VFTheme.bgDeep,
+          borderRadius: BorderRadius.circular(16 * s),
+          boxShadow: enabled ? VFTheme.jadeShadow : null,
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: VFTheme.textStyle(
+            context,
+            size: 15,
+            weight: FontWeight.w800,
+            color: enabled ? Colors.white : VFTheme.textMuted,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VikaIvory — Premium Ivory register for the active-exercise v8 screen.
+//
+// Added alongside VFTheme (not replacing it). All hex values come from the
+// locked JSX prototype (vika-active-exercise-ivory-v8.jsx) and the Canonical
+// Numbers doc. Pure black (#000000) is intentionally absent.
+//
+// Font: Plus Jakarta Sans, bundled as asset font in assets/fonts/.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class VikaIvory {
+  const VikaIvory._();
+
+  // ─── Page & scaffold ───
+
+  /// Page background (outside the camera view). JSX: pageBg '#EBE3D2'
+  static const Color bg = Color(0xFFEBE3D2);
+
+  /// Soft page bg variant.
+  static const Color bgSoft = Color(0xFFF5F0E5);
+
+  /// White surface for cards / pause overlay. JSX: surface '#FFFFFF'
+  static const Color surface = Color(0xFFFFFFFF);
+
+  /// Soft surface, cream. JSX: surfaceSoft '#FBF6EA'
+  static const Color surfaceSoft = Color(0xFFFBF6EA);
+
+  /// Dark scaffold behind camera. JSX: scaffoldBg '#15110D'
+  static const Color heroBg = Color(0xFF15110D);
+
+  /// Slightly lighter scaffold. JSX: scaffoldMid '#1F1812'
+  static const Color heroBgDeep = Color(0xFF1F1812);
+
+  // ─── Ink (light-on-dark) ───
+
+  /// Inverted ink, near-white cream. JSX: invInk '#FBF6EA'
+  static const Color ink = Color(0xFF2A1F12);
+
+  /// Dark ink at 0.62 opacity. JSX: inkSoft 'rgba(42, 31, 18, 0.62)'
+  static Color get inkSoft => ink.withValues(alpha: 0.62);
+
+  /// Dark ink at 0.38 opacity. JSX: inkFaint 'rgba(42, 31, 18, 0.38)'
+  static Color get inkFaint => ink.withValues(alpha: 0.38);
+
+  /// Inverted ink (cream white on dark). JSX: invInk '#FBF6EA'
+  static const Color invInk = Color(0xFFFBF6EA);
+
+  /// Inverted ink at 0.70 opacity.
+  static Color get invInkSoft => invInk.withValues(alpha: 0.70);
+
+  /// Inverted ink at 0.45 opacity.
+  static Color get invInkDim => invInk.withValues(alpha: 0.45);
+
+  /// Inverted ink at 0.30 opacity. JSX: invInkFaint 'rgba(251, 246, 234, 0.38)'
+  static Color get invInkFaint => invInk.withValues(alpha: 0.30);
+
+  // ─── Glass layers ───
+
+  /// JSX: glass06 'rgba(255, 255, 255, 0.06)'
+  static Color get glass06 => const Color(0xFFFFFFFF).withValues(alpha: 0.06);
+
+  /// JSX: glass08 'rgba(255, 255, 255, 0.08)'
+  static Color get glass08 => const Color(0xFFFFFFFF).withValues(alpha: 0.08);
+
+  /// JSX: glass12 'rgba(255, 255, 255, 0.12)'
+  static Color get glass12 => const Color(0xFFFFFFFF).withValues(alpha: 0.12);
+
+  /// JSX: glassBorderHi 'rgba(255, 255, 255, 0.16)'
+  static Color get glassBorderHi =>
+      const Color(0xFFFFFFFF).withValues(alpha: 0.16);
+
+  // ─── Yellow / Amber accent ───
+
+  /// Primary yellow. JSX: yellow '#FFB701'
+  static const Color yellow = Color(0xFFFFB701);
+
+  /// Deep yellow. JSX: yellowDeep '#C18800'
+  static const Color yellowDeep = Color(0xFFC18800);
+
+  /// Yellow at 0.18 opacity. JSX: yellowSoft
+  static Color get yellowSoft => yellow.withValues(alpha: 0.18);
+
+  /// Yellow glow at 0.60 opacity. JSX: yellowGlow 'rgba(255, 183, 1, 0.45)'
+  static Color get yellowGlow => yellow.withValues(alpha: 0.60);
+
+  /// Weak yellow glow at 0.18. JSX: yellowGlowWeak 'rgba(255, 183, 1, 0.22)'
+  static Color get yellowGlowWeak => yellow.withValues(alpha: 0.18);
+
+  /// Dark ink on yellow buttons. JSX: yellowInk '#1F1812'
+  static const Color yellowInk = Color(0xFF1F1812);
+
+  // ─── Semantic ───
+
+  /// Attention / fault color. JSX: attention '#D67B3E'
+  static const Color attention = Color(0xFFD67B3E);
+
+  /// Attention at 0.18 opacity.
+  static Color get attentionSoft => attention.withValues(alpha: 0.18);
+
+  /// Live / active color. JSX: live '#22C55E'
+  static const Color live = Color(0xFF22C55E);
+
+  /// Live at 0.22 opacity.
+  static Color get liveSoft => live.withValues(alpha: 0.22);
+
+  // ─── Typography ───
+
+  /// Plus Jakarta Sans, bundled as asset font.
+  static const String fontFamily = 'PlusJakartaSans';
+
+  // ─── Convenience shadows ───
+
+  static List<BoxShadow> get glassIconShadow => [
+        BoxShadow(
+          color: const Color(0xFF15110D).withValues(alpha: 0.30),
+          blurRadius: 8,
+          offset: const Offset(0, 2),
+        ),
+      ];
+
+  /// Warm vignette gradient for overlay on camera feed.
+  static LinearGradient get warmVignette => LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          heroBg.withValues(alpha: 0.55),
+          heroBg.withValues(alpha: 0.06),
+          heroBg.withValues(alpha: 0.04),
+          heroBg.withValues(alpha: 0.22),
+          heroBg.withValues(alpha: 0.78),
+        ],
+        stops: const [0.0, 0.18, 0.60, 0.80, 1.0],
+      );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VikaIvoryMain — Premium Ivory register for the main-app screens (Home, Plan,
+// Progress, Profile, Library). Sibling to VikaIvory; values come from the
+// vika-main-app-ivory-v1.jsx prototype. Calibrated separately because the
+// active-exercise-v8 prototype uses subtly different cream tones (#EBE3D2 vs
+// #F4EEE2) and a darker ink (#2A1F12 vs #1F1812).
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class VikaIvoryMain {
+  const VikaIvoryMain._();
+
+  // ─── Surfaces ───
+  static const Color bg = Color(0xFFF4EEE2);
+  static const Color bgRaised = Color(0xFFFBF7EE);
+  static const Color bgInverse = Color(0xFF1F1812);
+  static const Color bgInverseHi = Color(0xFF2A1F12);
+  static const Color powder = Color(0xFFEDE2CD);
+
+  // ─── Ink (always warm, never pure black) ───
+  static const Color ink = Color(0xFF1F1812);
+  static const Color inkSoft = Color(0xFF5A4A3A);
+  static const Color inkFaint = Color(0xFF8B7A66);
+  static const Color inkGhost = Color(0xFFC9BBA6);
+
+  // ─── Inverse ink (on warm-dark surfaces) ───
+  static const Color invInk = Color(0xFFF4EEE2);
+  static Color get invInkSoft => invInk.withValues(alpha: 0.72);
+  static Color get invInkFaint => invInk.withValues(alpha: 0.42);
+
+  // ─── Borders (warm, ivory-aware) ───
+  static const Color border = Color(0xFFE6DCC8);
+  static const Color borderHi = Color(0xFFD4C8B0);
+  static Color get borderDark => invInk.withValues(alpha: 0.10);
+
+  // ─── Yellow — RESERVED for 4 uses only (stat / dot / underline / CTA) ───
+  static const Color yellow = Color(0xFFFFB701);
+  static const Color yellowInk = Color(0xFF1F1812);
+  static Color get yellowGhost => yellow.withValues(alpha: 0.14);
+
+  // ─── Status (used outside Plan, but lives here for completeness) ───
+  static const Color attention = Color(0xFFD67B3E);
+  static const Color live = Color(0xFF22C55E);
+
+  // ─── Phase-distinct accents (used SPARINGLY, only for phase identity) ───
+  static const Color phase1 = Color(0xFFA8C5B1); // sage — Khởi đầu
+  static const Color phase2 = Color(0xFFE89A4B); // amber — Củng cố
+  static const Color phase3 = Color(0xFFD67B3E); // earth — Đẩy mạnh
+  static const Color phase4 = Color(0xFF7DA3D9); // dusk — Đỉnh cao
+
+  // ─── Typography ───
+  // Two-family pairing — see DESIGN.md § Typography.
+  //
+  //   serif  → Fraunces. Used in italic at display sizes (18–80pt).
+  //            The signature editorial-coaching tone.
+  //   sans   → BeVietnamPro. Workhorse for body, eyebrows, numerals.
+  //            Designed for Vietnamese diacritics.
+  //
+  // `fontFamily` aliases the sans family — most usages (body / eyebrow /
+  // labels) want the sans, so it stays the default.
+  static const String serifFamily = 'Fraunces';
+  static const String sansFamily = 'BeVietnamPro';
+  static const String fontFamily = sansFamily;
+
+  /// Tabular figures — stat numbers and dates need column-aligned digits.
+  static const List<FontFeature> tabularFigures = [
+    FontFeature.tabularFigures(),
+  ];
+
+  /// Phone-frame max width as referenced in the JSX (390pt iPhone). The plan
+  /// screen lays out at this width; SafeArea + scaling handles smaller phones.
+  static const double phoneWidth = 390;
+
+  // ─── Card decorations ───
+  static BoxDecoration creamCard({double radius = 22}) => BoxDecoration(
+        color: bgRaised,
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(color: border),
+      );
+
+  static BoxDecoration darkCard({double radius = 24}) => BoxDecoration(
+        gradient: LinearGradient(
+          begin: const Alignment(-0.4, -1),
+          end: const Alignment(0.4, 1),
+          colors: const [bgInverse, bgInverseHi],
+        ),
+        borderRadius: BorderRadius.circular(radius),
+      );
+
+  // ─── Yellow radial wash (top-right of warm-dark cards) ───
+  static Decoration yellowWashTopRight({
+    double topOffset = -50,
+    double rightOffset = -60,
+    double size = 200,
+    double opacity = 0.18,
+  }) {
+    return BoxDecoration(
+      gradient: RadialGradient(
+        colors: [
+          yellow.withValues(alpha: opacity),
+          yellow.withValues(alpha: 0),
+        ],
+        stops: const [0, 0.65],
+      ),
+    );
+  }
+}

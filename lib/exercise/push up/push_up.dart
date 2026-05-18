@@ -159,10 +159,10 @@ class PushUp extends ExerciseBase {
       return "⚠️ Đảm bảo phần trên cơ thể trong khung hình";
     }
 
-    if (shoulder.likelihood < ExerciseBase.MIN_CONFIDENCE ||
-        elbow.likelihood < ExerciseBase.MIN_CONFIDENCE ||
-        wrist.likelihood < ExerciseBase.MIN_CONFIDENCE ||
-        hip.likelihood < ExerciseBase.MIN_CONFIDENCE) {
+    if (!ExerciseBase.isLandmarkConfident(shoulder) ||
+        !ExerciseBase.isLandmarkConfident(elbow) ||
+        !ExerciseBase.isLandmarkConfident(wrist) ||
+        !ExerciseBase.isLandmarkConfident(hip)) {
       return "⚠️ Hình ảnh không rõ. Điều chỉnh ánh sáng hoặc vị trí";
     }
 

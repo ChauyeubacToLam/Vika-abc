@@ -40,7 +40,7 @@ class ViettelTTSService {
             audioFocus: AndroidAudioFocus.gain,
           ),
           iOS: AudioContextIOS(
-            category: AVAudioSessionCategory.playback,
+            category: AVAudioSessionCategory.playAndRecord,
             options: {AVAudioSessionOptions.defaultToSpeaker},
           ),
         ),
@@ -103,6 +103,7 @@ class ViettelTTSService {
     // New exercises feedback
     "Nâng hông cao hơn": "nang_hong_cao_hon.mp3",
     "Chậm lại": "cham_lai.mp3",
+    "tốt": "tot.mp3",
     "Cuộn lên thêm": "cuon_len_them.mp3",
     "Không kéo cổ": "khong_keo_co.mp3",
     "Giữ gối gập": "giu_goi_gap.mp3",
@@ -113,6 +114,9 @@ class ViettelTTSService {
     "Mở": "mo.mp3",
     "Đóng": "dong.mp3",
     "Xuống thấp hơn": "xuong_thap_hon.mp3",
+    "nhớ xuống thấp hơn": "nho_xuong_thap_hon.mp3",
+    "nhớ giữ gót chân": "nho_giu_got_chan.mp3",
+    "nhớ chậm lại": "nho_cham_lai.mp3",
     "Nhớ không nâng gót chân": "nho_khong_nang_got_chan.mp3",
     "Đừng nhấc hông lên trước": "dung_nhac_hong_len_truoc.mp3",
     "Giữ gót chân": "giu_got_chan.mp3",

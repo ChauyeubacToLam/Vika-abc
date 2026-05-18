@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -18,6 +19,7 @@ import '../../exercise/squat/squat.dart';
 import '../../models/exercise_definition.dart';
 import '../../models/post_exercise_data.dart';
 import '../../utils/exercise_logger.dart';
+import '../../utils/orientation_lock.dart';
 import 'active_exercise_page.dart';
 import 'exercise_intro_page.dart';
 import 'executive_summary_page.dart';
@@ -82,6 +84,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
   @override
   void initState() {
     super.initState();
+    unawaited(OrientationLock.portraitOnly());
     _spec = _ExerciseExperienceSpec.fromDefinition(widget.definition);
     _currentRepsTarget = _spec.repsPerSet;
     _loadCoachNote();
@@ -415,7 +418,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
   @override
   Widget build(BuildContext context) {
     final backgroundColor = switch (_phase) {
-      _WorkoutFlowPhase.active => const Color(0xFF080C1A),
+      _WorkoutFlowPhase.active => const Color(0xFF15110D),
       _ => const Color(0xFFF0EDE6),
     };
     final phaseBody = switch (_phase) {

@@ -1256,7 +1256,7 @@ class _CoachSection extends StatelessWidget {
           SizedBox(height: 8 * s),
           Text(
             text,
-            style: GoogleFonts.fraunces(
+            style: GoogleFonts.oswald(
               fontSize: VFTheme.sp(context, 14),
               fontWeight: FontWeight.w500,
               color: const Color(0xFF3D3D35),

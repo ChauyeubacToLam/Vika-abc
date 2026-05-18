@@ -1,38 +1,51 @@
 import '../exercise/exercise_base.dart';
 import '../exercise/squat/squat.dart';
-import 'viettel_tts_service.dart';
+import 'queued_asset_voice_player.dart';
+import 'squat_voice_assets.dart';
 
 abstract class SquatVoicePlayer {
   Future<void> speak(String text);
   void clearQueue();
   void clearPendingButKeepCurrent();
+  void dispose() {}
 }
 
-class _ViettelSquatVoicePlayer implements SquatVoicePlayer {
-  _ViettelSquatVoicePlayer({ViettelTTSService? ttsService})
-      : _ttsService = ttsService ?? ViettelTTSService();
+class _SquatAssetVoicePlayer implements SquatVoicePlayer {
+  _SquatAssetVoicePlayer({QueuedAssetVoicePlayer? player})
+      : _player = player ??
+            QueuedAssetVoicePlayer(
+              assetMap: SquatVoiceAssets.files,
+              assetSourcePrefix: SquatVoiceAssets.assetSourcePrefix,
+              assetBundlePrefix: SquatVoiceAssets.assetBundlePrefix,
+              logTag: 'SquatVoice',
+            );
 
-  final ViettelTTSService _ttsService;
+  final QueuedAssetVoicePlayer _player;
 
   @override
-  Future<void> speak(String text) => _ttsService.speak(text);
+  Future<void> speak(String text) => _player.speak(text);
 
   @override
-  void clearQueue() => _ttsService.clearQueue();
+  void clearQueue() => _player.clearQueue();
 
   @override
-  void clearPendingButKeepCurrent() => _ttsService.clearPendingButKeepCurrent();
+  void clearPendingButKeepCurrent() => _player.clearPendingButKeepCurrent();
+
+  @override
+  void dispose() => _player.dispose();
 }
 
-class SquatVoiceCoach {
+class SquatVoiceCoach implements ExerciseVoiceCoach {
   SquatVoiceCoach({SquatVoicePlayer? ttsService})
-      : _ttsService = ttsService ?? _ViettelSquatVoicePlayer();
+      : _ttsService = ttsService ?? _SquatAssetVoicePlayer();
 
   static const int _phaseCueMinGapMs = 250;
   static const int _faultCueCooldownMs = 3000;
-  static const int _postRepCueCooldownReps = 3;
+  static const int _postRepCueCooldownReps = 2;
   static const int _postRepRepeatSuppressMs = 1500;
 
+  static const List<String> _readyCountdown = ['3', '2', '1', 'Sẵn sàng'];
+  static const String _cleanRepCue = 'tốt';
   static const String _trunkPriorityCue = 'Ưỡn ngực lên';
 
   final SquatVoicePlayer _ttsService;
@@ -45,7 +58,9 @@ class SquatVoiceCoach {
   bool _wasTrunkFaultActive = false;
   final Map<String, int> _lastFaultVoiceAtMs = {};
   final Map<String, int> _lastPostRepVoiceRep = {};
+  final Set<String> _liveFaultVoicesSpokenThisRep = {};
 
+  @override
   void processFrame({
     required ExerciseBase exercise,
     required int repCount,
@@ -58,20 +73,23 @@ class SquatVoiceCoach {
     final repIncreased = repCount > _lastRepCount;
 
     if (currentExerciseState == ExerciseState.completed) {
-      if (repIncreased) {
-        _ttsService.clearPendingButKeepCurrent();
-        _ttsService.speak('$repCount');
-      } else if (!_didAnnounceSetComplete) {
-        _ttsService.clearPendingButKeepCurrent();
-      }
-
       if (!_didAnnounceSetComplete) {
+        _ttsService.clearPendingButKeepCurrent();
+        if (repIncreased) {
+          _speakRepOutcome(
+            exercise: exercise,
+            repCount: repCount,
+            nowMs: nowMs,
+            includeCount: false,
+          );
+        }
         _ttsService.speak('Hoàn thành bài tập');
         _didAnnounceSetComplete = true;
       }
 
       _lastPhasePhrase = null;
       _wasTrunkFaultActive = false;
+      _liveFaultVoicesSpokenThisRep.clear();
       _lastRepCount = repCount;
       return;
     }
@@ -81,6 +99,9 @@ class SquatVoiceCoach {
         !hasPose) {
       _lastPhasePhrase = null;
       _wasTrunkFaultActive = false;
+      if (currentExerciseState != ExerciseState.activated) {
+        _liveFaultVoicesSpokenThisRep.clear();
+      }
       _lastRepCount = repCount;
       return;
     }
@@ -91,12 +112,11 @@ class SquatVoiceCoach {
       statusText,
       exercise: exercise,
     );
-    var deferStandingCueUntilNextFrame = false;
-
     if (!_didAnnounceReady) {
       _ttsService.clearQueue();
-      // Keep the activation cue stable so Squat always opens with the same phrase.
-      _ttsService.speak('Sẵn sàng');
+      for (final phrase in _readyCountdown) {
+        _ttsService.speak(phrase);
+      }
       _didAnnounceReady = true;
       if (phasePhrase != null) {
         if (phasePhrase == 'Xuống') {
@@ -110,20 +130,24 @@ class SquatVoiceCoach {
     final liveFaultVoice = _highestPriorityLiveFaultVoice(feedback);
     final trunkFaultActive = liveFaultVoice == _trunkPriorityCue;
     final trunkFaultJustDetected = trunkFaultActive && !_wasTrunkFaultActive;
+    final liveFaultAlreadySpokenThisRep = liveFaultVoice != null &&
+        _liveFaultVoicesSpokenThisRep.contains(liveFaultVoice);
     final canSpeakLiveFault = liveFaultVoice != null &&
+        !liveFaultAlreadySpokenThisRep &&
         (trunkFaultJustDetected ||
             _canSpeakLiveFaultVoice(liveFaultVoice, nowMs));
 
     if (repIncreased) {
       _ttsService.clearPendingButKeepCurrent();
-      _ttsService.speak('$repCount');
-      _enqueuePostRepFeedbackIfAllowed(
+      _speakRepOutcome(
         exercise: exercise,
         repCount: repCount,
         nowMs: nowMs,
+        includeCount: true,
       );
       _lastPhasePhrase = phasePhrase == 'Xuống' ? null : phasePhrase;
-      _wasTrunkFaultActive = trunkFaultActive;
+      _wasTrunkFaultActive = false;
+      _liveFaultVoicesSpokenThisRep.clear();
       _lastRepCount = repCount;
       return;
     }
@@ -161,16 +185,19 @@ class SquatVoiceCoach {
         _ttsService.clearPendingButKeepCurrent();
       }
       _lastFaultVoiceAtMs[liveFaultVoice] = nowMs;
+      _liveFaultVoicesSpokenThisRep.add(liveFaultVoice);
       _ttsService.speak(liveFaultVoice);
     }
 
-    _lastPhasePhrase = deferStandingCueUntilNextFrame ? null : phasePhrase;
+    _lastPhasePhrase = phasePhrase;
     _wasTrunkFaultActive = trunkFaultActive;
     _lastRepCount = repCount;
   }
 
+  @override
   void dispose() {
     _ttsService.clearQueue();
+    _ttsService.dispose();
   }
 
   String? _effectivePhasePhrase(
@@ -246,12 +273,29 @@ class SquatVoiceCoach {
       return _trunkPriorityCue;
     }
 
-    final depth = (feedback['Depth'] ?? '').toLowerCase();
-    if (depth.contains('go lower')) {
-      return 'Thấp hơn nữa';
+    return null;
+  }
+
+  void _speakRepOutcome({
+    required ExerciseBase exercise,
+    required int repCount,
+    required int nowMs,
+    required bool includeCount,
+  }) {
+    if (includeCount) {
+      _ttsService.speak('$repCount');
     }
 
-    return null;
+    if (exercise is Squat && exercise.lastRepWasClean) {
+      _ttsService.speak(_cleanRepCue);
+      return;
+    }
+
+    _enqueuePostRepFeedbackIfAllowed(
+      exercise: exercise,
+      repCount: repCount,
+      nowMs: nowMs,
+    );
   }
 
   void _enqueuePostRepFeedbackIfAllowed({
@@ -263,8 +307,13 @@ class SquatVoiceCoach {
       return;
     }
 
-    final voice = exercise.lastRepTopVoiceMessage;
-    if (voice == null || voice.isEmpty) {
+    final rawVoice = exercise.lastRepTopVoiceMessage;
+    if (rawVoice == null || rawVoice.isEmpty) {
+      return;
+    }
+
+    final voice = _postRepVoice(rawVoice);
+    if (voice == null) {
       return;
     }
 
@@ -273,12 +322,26 @@ class SquatVoiceCoach {
       return;
     }
 
-    final lastLiveVoiceAt = _lastFaultVoiceAtMs[voice] ?? 0;
+    final lastLiveVoiceAt = _lastFaultVoiceAtMs[rawVoice] ?? 0;
     if (nowMs - lastLiveVoiceAt < _postRepRepeatSuppressMs) {
       return;
     }
 
     _lastPostRepVoiceRep[voice] = repCount;
     _ttsService.speak(voice);
+  }
+
+  String? _postRepVoice(String rawVoice) {
+    final voice = rawVoice.trim();
+    if (voice.isEmpty || voice == _trunkPriorityCue) {
+      return null;
+    }
+
+    final lowerVoice = voice.toLowerCase();
+    if (lowerVoice.startsWith('nhớ ')) {
+      return lowerVoice;
+    }
+
+    return 'nhớ ${voice[0].toLowerCase()}${voice.substring(1)}';
   }
 }

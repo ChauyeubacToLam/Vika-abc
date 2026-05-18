@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../onboarding/vf_theme.dart';
+import '../../../theme/vf_theme.dart';
 
 class MetricChip extends StatelessWidget {
   const MetricChip({
@@ -17,23 +17,23 @@ class MetricChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bgColor = switch (state) {
-      MetricChipState.good => VF.jadeGlow.withValues(alpha: 0.14),
-      MetricChipState.warning => VF.coral.withValues(alpha: 0.14),
+      MetricChipState.good => VFTheme.jadeGlow.withValues(alpha: 0.14),
+      MetricChipState.warning => VFTheme.coral.withValues(alpha: 0.14),
       MetricChipState.neutral => Colors.white.withValues(alpha: 0.06),
     };
     final borderColor = switch (state) {
-      MetricChipState.good => VF.jadeGlow.withValues(alpha: 0.20),
-      MetricChipState.warning => VF.coral.withValues(alpha: 0.24),
+      MetricChipState.good => VFTheme.jadeGlow.withValues(alpha: 0.20),
+      MetricChipState.warning => VFTheme.coral.withValues(alpha: 0.24),
       MetricChipState.neutral => Colors.white.withValues(alpha: 0.08),
     };
     final valueColor = switch (state) {
-      MetricChipState.good => VF.jadeGlow,
-      MetricChipState.warning => VF.coral,
+      MetricChipState.good => VFTheme.jadeGlow,
+      MetricChipState.warning => VFTheme.coral,
       MetricChipState.neutral => Colors.white.withValues(alpha: 0.82),
     };
     final labelColor = switch (state) {
-      MetricChipState.good => VF.jadeGlow.withValues(alpha: 0.85),
-      MetricChipState.warning => VF.coral.withValues(alpha: 0.88),
+      MetricChipState.good => VFTheme.jadeGlow.withValues(alpha: 0.85),
+      MetricChipState.warning => VFTheme.coral.withValues(alpha: 0.88),
       MetricChipState.neutral => Colors.white.withValues(alpha: 0.40),
     };
 

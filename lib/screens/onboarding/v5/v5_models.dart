@@ -1,0 +1,519 @@
+import 'dart:math' as math;
+
+import '../onboarding_assessment_thresholds.dart';
+import '../onboarding_data.dart';
+
+class V5WhyOption {
+  const V5WhyOption({
+    required this.id,
+    required this.label,
+    required this.sub,
+    required this.pose,
+    required this.stat,
+    required this.statLabel,
+  });
+
+  final String id;
+  final String label;
+  final String sub;
+  final String pose;
+  final String stat;
+  final String statLabel;
+}
+
+const whyOptions = [
+  V5WhyOption(
+    id: 'pain',
+    label: 'Hết đau mỏi',
+    sub: 'Lưng, cổ, vai, gáy',
+    pose: 'reach',
+    stat: '47%',
+    statLabel: 'Giảm đau lưng sau 4 tuần',
+  ),
+  V5WhyOption(
+    id: 'confidence',
+    label: 'Tự tin trong gương',
+    sub: 'Cơ thể bạn muốn',
+    pose: 'tree',
+    stat: '+12cm',
+    statLabel: 'Vai mở rộng & thẳng',
+  ),
+  V5WhyOption(
+    id: 'energy',
+    label: 'Năng lượng cả ngày',
+    sub: 'Hết kiệt sức buổi chiều',
+    pose: 'lunge',
+    stat: '+3.2h',
+    statLabel: 'Tỉnh táo mỗi ngày',
+  ),
+  V5WhyOption(
+    id: 'health',
+    label: 'Khỏe đến 60',
+    sub: 'Cho 10 năm tới',
+    pose: 'squat',
+    stat: '12yr+',
+    statLabel: 'Tuổi khớp tương đương',
+  ),
+];
+
+// TODO(LOGIC-REFINEMENT-#1): S02 Why — sentence builder follow-ups (`WHY_FOLLOWUPS`) are hardcoded 3 sub-options per primary why.
+// Currently using v1 placeholder from JSX prototype. Real logic deferred to Phase 2.
+// See Notion: Vika State > Onboarding Logic Refinement block for full context.
+const whyFollowups = {
+  'pain': ['Ngồi cả ngày không nhức', 'Ngủ ngon hơn', 'Cúi nhặt đồ không kêu'],
+  'confidence': ['Mặc đồ vừa hơn', 'Đứng thẳng vai', 'Chụp ảnh không né'],
+  'energy': ['Không kiệt sức buổi chiều', 'Tỉnh táo cả ngày', 'Về nhà vẫn vui'],
+  'health': ['Chơi với con sau này', 'Leo cầu thang không thở', 'Ít ốm vặt'],
+};
+
+class V5GoalOption {
+  const V5GoalOption({
+    required this.id,
+    required this.title,
+    required this.sub,
+    required this.stat,
+    required this.unit,
+    required this.pose,
+  });
+
+  final String id;
+  final String title;
+  final String sub;
+  final String stat;
+  final String unit;
+  final String pose;
+}
+
+const goalOptions = [
+  V5GoalOption(
+    id: 'health',
+    title: 'Sức khỏe',
+    sub: 'Dẻo dai, ít đau mỏi',
+    stat: '8h',
+    unit: 'Giấc ngủ sâu',
+    pose: 'reach',
+  ),
+  V5GoalOption(
+    id: 'body',
+    title: 'Vóc dáng',
+    sub: 'Săn chắc, gọn người',
+    stat: '-3.5kg',
+    unit: 'Mỡ thừa',
+    pose: 'tree',
+  ),
+  V5GoalOption(
+    id: 'strength',
+    title: 'Sức mạnh',
+    sub: 'Cơ bắp, sức bền',
+    stat: '+15kg',
+    unit: 'Tổng nâng',
+    pose: 'squat',
+  ),
+  V5GoalOption(
+    id: 'flexible',
+    title: 'Linh hoạt',
+    sub: 'Mềm dẻo, an toàn',
+    stat: '+10cm',
+    unit: 'Biên độ khớp',
+    pose: 'lunge',
+  ),
+];
+
+class V5DurationOption {
+  const V5DurationOption({
+    required this.id,
+    required this.label,
+    required this.sub,
+  });
+
+  final String id;
+  final String label;
+  final String sub;
+}
+
+const durationOptions = [
+  V5DurationOption(id: '<3m', label: '< 3 tháng', sub: 'Mới bắt đầu'),
+  V5DurationOption(id: '3-11m', label: '3–11 tháng', sub: 'Đang quen'),
+  V5DurationOption(id: '1y+', label: '1 năm+', sub: 'Đã lâu'),
+];
+
+class PainAreaOption {
+  const PainAreaOption({required this.id, required this.label});
+  final String id;
+  final String label;
+}
+
+const painAreaOptions = [
+  PainAreaOption(id: 'back', label: 'Lưng dưới'),
+  PainAreaOption(id: 'neck', label: 'Cổ · Vai · Gáy'),
+  PainAreaOption(id: 'knee', label: 'Đầu gối'),
+  PainAreaOption(id: 'hip', label: 'Hông'),
+  PainAreaOption(id: 'wrist', label: 'Cổ tay'),
+  PainAreaOption(id: 'other', label: 'Khác'),
+];
+
+class ForkChoice {
+  const ForkChoice({
+    required this.id,
+    required this.title,
+    required this.sub,
+    required this.stat,
+    required this.statLabel,
+    required this.pose,
+    required this.desc,
+    required this.highlights,
+  });
+
+  final String id;
+  final String title;
+  final String sub;
+  final String stat;
+  final String statLabel;
+  final String pose;
+  final String desc;
+  final List<String> highlights;
+}
+
+const forkChoices = {
+  'home': ForkChoice(
+    id: 'home',
+    title: 'Tập tại nhà',
+    sub: 'Sức mạnh & vóc dáng',
+    stat: '180+',
+    statLabel: 'bài tập',
+    pose: 'squat',
+    desc:
+        'Tập trung phát triển sức mạnh, săn chắc cơ và đốt mỡ. Phù hợp khi bạn muốn thấy thay đổi rõ rệt về vóc dáng.',
+    highlights: ['Squat, Push-up, Plank và 180+ bài', '5 nhóm cơ chính', '15–30 phút/ngày'],
+  ),
+  'yoga': ForkChoice(
+    id: 'yoga',
+    title: 'Yoga',
+    sub: 'Linh hoạt & cân bằng',
+    stat: '60+',
+    statLabel: 'asanas',
+    pose: 'tree',
+    desc:
+        'Giãn cơ, phục hồi và cải thiện linh hoạt. Tốt cho người ngồi nhiều, đau cổ vai gáy.',
+    highlights: ['Warrior, Tree, Forward Fold', 'Mọi cấp độ', '15–25 phút/ngày'],
+  ),
+};
+
+class ResultCandidate {
+  const ResultCandidate({required this.id, required this.label});
+  final String id;
+  final String label;
+}
+
+class AssessmentResultData {
+  const AssessmentResultData({
+    required this.id,
+    required this.name,
+    required this.score,
+    required this.scoreUnit,
+    required this.metric,
+    required this.metricLabel,
+    required this.chartTitle,
+    required this.chartData,
+    required this.chartTarget,
+    required this.chartUnit,
+    required this.coachTitle,
+    required this.coachBody,
+    required this.detectedPattern,
+    required this.questionTitle,
+    required this.questionSub,
+    required this.candidates,
+    this.lowerIsBetter = false,
+    this.chartFloor,
+  });
+
+  final String id;
+  final String name;
+  final int score;
+  final String scoreUnit;
+  final String metric;
+  final String metricLabel;
+  final String chartTitle;
+  final List<int> chartData;
+  final int chartTarget;
+  final String chartUnit;
+  final String coachTitle;
+  final String coachBody;
+  final String detectedPattern;
+  final String questionTitle;
+  final String questionSub;
+  final List<ResultCandidate> candidates;
+
+  /// When true, the chart inverts: lower values = taller bars, target line
+  /// is the *maximum acceptable* value. Squat depth measured as knee angle
+  /// uses this — 90° is the bare-minimum target, lower is deeper/better.
+  final bool lowerIsBetter;
+
+  /// Optional best-case value used as the chart's "tall bar" anchor when
+  /// `lowerIsBetter` is true. Defaults to ~10° below the smallest chart
+  /// data point if null.
+  final int? chartFloor;
+}
+
+// TODO(LOGIC-REFINEMENT-#3): S08 Phase1 — issue candidate generation is hardcoded NASM-mapped candidates per exercise.
+// Currently using v1 placeholder from JSX prototype. Real logic deferred to Phase 2.
+// See Notion: Vika State > Onboarding Logic Refinement block for full context.
+// TODO(LOGIC-REFINEMENT-#4): S08 Phase1 — coach text (`coachBody`) is hardcoded NASM references.
+// Currently using v1 placeholder from JSX prototype. Real logic deferred to Phase 2.
+// See Notion: Vika State > Onboarding Logic Refinement block for full context.
+const homeResultsMock = [
+  AssessmentResultData(
+    id: 'squat',
+    name: 'Squat',
+    score: 82,
+    scoreUnit: '°',
+    metric: 'Độ sâu trung bình',
+    metricLabel: 'Đủ sâu cho người mới',
+    chartTitle: 'Độ sâu qua 5 reps',
+    chartData: [95, 88, 82, 78, 72],
+    chartTarget: 90,
+    chartUnit: '°',
+    // Knee angle: lower = deeper squat = better. 90° is the bare-minimum
+    // target (parallel). Below that is good. Chart inverts so deeper reps
+    // get taller bars.
+    lowerIsBetter: true,
+    chartFloor: 60,
+    coachTitle: 'Vika thấy gì?',
+    coachBody:
+        'Độ sâu giảm dần qua 5 reps + đầu gối có xu hướng đi vào trong khi xuống. Theo NASM đây là dấu hiệu của một trong các nguyên nhân dưới.',
+    detectedPattern: 'Knee valgus + giảm độ sâu',
+    questionTitle: 'Cảm giác nào đúng với bạn?',
+    questionSub: 'Vika dùng để xác định nguyên nhân chính',
+    candidates: [
+      ResultCandidate(id: 'knee_pain', label: 'Đau gối khi xuống'),
+      ResultCandidate(id: 'ankle_tight', label: 'Cứng cổ chân'),
+      ResultCandidate(id: 'hip_tight', label: 'Cứng hông'),
+      ResultCandidate(id: 'thigh_fatigue', label: 'Đùi mỏi nhanh'),
+      ResultCandidate(id: 'none', label: 'Không, ổn cả'),
+    ],
+  ),
+  AssessmentResultData(
+    // TODO: wire to Wall Push-UpInterpreter when implemented
+    id: 'pushup',
+    name: 'Wall Push-Up',
+    score: 92,
+    scoreUnit: '%',
+    metric: 'Phạm vi chuyển động',
+    metricLabel: 'ROM tốt',
+    chartTitle: 'Phạm vi qua 5 reps',
+    chartData: [100, 100, 95, 88, 80],
+    chartTarget: 90,
+    chartUnit: '%',
+    coachTitle: 'Vika thấy gì?',
+    coachBody:
+        'ROM giảm 20% ở 2 reps cuối — vai có thể đang mỏi hoặc cứng cơ phía trước. Cần xác định nguyên nhân.',
+    detectedPattern: 'ROM giảm dần ở vai',
+    questionTitle: 'Bạn cảm thấy gì?',
+    questionSub: 'Vika dùng để xác định nguyên nhân chính',
+    candidates: [
+      ResultCandidate(id: 'shoulder_pain', label: 'Đau vai khi đẩy'),
+      ResultCandidate(id: 'wrist_discomfort', label: 'Cổ tay khó chịu'),
+      ResultCandidate(id: 'shoulder_fatigue', label: 'Vai mỏi nhanh'),
+      ResultCandidate(id: 'chest_tight', label: 'Cứng ngực/vai trước'),
+      ResultCandidate(id: 'none', label: 'Không, ổn cả'),
+    ],
+  ),
+];
+
+const yogaResultsMock = [
+  AssessmentResultData(
+    // TODO: wire to Warrior IInterpreter when implemented
+    id: 'warrior',
+    name: 'Warrior I',
+    score: 28,
+    scoreUnit: 's',
+    metric: 'Thời gian giữ',
+    metricLabel: 'Gần đạt mức 30s',
+    chartTitle: 'Độ ổn định theo thời gian',
+    chartData: [85, 92, 90, 88, 80, 72, 65],
+    chartTarget: 80,
+    chartUnit: '%',
+    coachTitle: 'Vika thấy gì?',
+    coachBody:
+        'Bạn giữ tư thế tốt 28s — chân vững. Vai hơi cao và lệch nhẹ về trước, độ ổn định giảm ở giây cuối. Cần xác định nguyên nhân.',
+    detectedPattern: 'Vai cao + ổn định giảm cuối bài',
+    questionTitle: 'Cảm giác nào đúng với bạn?',
+    questionSub: 'Vika dùng để xác định nguyên nhân chính',
+    candidates: [
+      ResultCandidate(id: 'hip_pain', label: 'Đau hông trước'),
+      ResultCandidate(id: 'shoulder_high', label: 'Vai bị cao/căng'),
+      ResultCandidate(id: 'leg_shake', label: 'Đùi run nhiều'),
+      ResultCandidate(id: 'breath', label: 'Hụt hơi'),
+      ResultCandidate(id: 'none', label: 'Không, ổn cả'),
+    ],
+  ),
+  AssessmentResultData(
+    // TODO: wire to Forward FoldInterpreter when implemented
+    id: 'fold',
+    name: 'Forward Fold',
+    score: 78,
+    scoreUnit: '°',
+    metric: 'Linh hoạt hông',
+    metricLabel: 'Tốt hơn 60% người mới',
+    chartTitle: 'Tiến độ giãn cơ',
+    chartData: [60, 65, 70, 73, 76, 78],
+    chartTarget: 90,
+    chartUnit: '°',
+    coachTitle: 'Vika thấy gì?',
+    coachBody:
+        'Bạn cúi tới 78° — lưng giữ thẳng (rất tốt). Tầm cúi bị giới hạn ở gân kheo hoặc hông. Cần xác định.',
+    detectedPattern: 'Tầm cúi giới hạn ở chuỗi sau',
+    questionTitle: 'Bạn cảm thấy căng ở đâu?',
+    questionSub: 'Vika dùng để xác định nguyên nhân chính',
+    candidates: [
+      ResultCandidate(id: 'hamstring_tight', label: 'Căng gân kheo (đùi sau)'),
+      ResultCandidate(id: 'low_back_pain', label: 'Đau lưng dưới'),
+      ResultCandidate(id: 'hip_tight', label: 'Cứng hông'),
+      ResultCandidate(id: 'calf_tight', label: 'Cứng bắp chân'),
+      ResultCandidate(id: 'none', label: 'Không, ổn cả'),
+    ],
+  ),
+];
+
+AssessmentResultData squatResultFromData(OnboardingData data) {
+  if (!data.hasSquatAssessment) return homeResultsMock.first;
+
+  final logger = data.squatLogger;
+  final totalReps = logger.repLogs.length;
+  final goodReps = (logger.setLogs['good_rep_count'] as int?) ?? 0;
+  final heelFails = (logger.setLogs['heel_fails_count'] as int?) ?? 0;
+  final depthFails = (logger.setLogs['depth_fails_count'] as int?) ?? 0;
+  final trunkFails = (logger.setLogs['trunk_lean_fails_count'] as int?) ?? 0;
+  final tempoFails = (logger.setLogs['tempo_fails_count'] as int?) ?? 0;
+  final syncFails =
+      (logger.setLogs['hip_shoulder_sync_fails_count'] as int?) ?? 0;
+  final repRatio = totalReps == 0 ? 0.0 : goodReps / totalReps;
+  final score = OnboardingAssessmentThresholds.computeFormScore(
+    repRatio: repRatio,
+    heelFails: heelFails,
+    depthFails: depthFails,
+    trunkFails: trunkFails,
+    tempoFails: tempoFails,
+    syncFails: syncFails,
+  );
+
+  final chart = logger.repLogs
+      .map((r) => (r.data['peak_knee_angle'] as num?)?.round())
+      .whereType<int>()
+      .toList();
+  final safeChart = chart.isEmpty ? homeResultsMock.first.chartData : chart;
+  final avgDepth =
+      safeChart.reduce((a, b) => a + b) / math.max(1, safeChart.length);
+
+  final interpreter = data.squatInterpreterOrNull;
+  final primary = interpreter?.getPrimaryIssueId();
+  final pattern = switch (primary) {
+    'ankle_mobility_restriction' => 'Nhấc gót + đổ người',
+    'hip_flexor_overactivity' => 'Thân trên nghiêng nhiều',
+    'limited_mobility' => 'Độ sâu chưa ổn định',
+    'ankle_mobility' => 'Gót chân chưa ổn định',
+    _ => homeResultsMock.first.detectedPattern,
+  };
+
+  final coachBody = switch (primary) {
+    'ankle_mobility_restriction' =>
+      'AI nhận thấy bạn vừa nhấc gót vừa đổ người về trước khi squat. Theo NASM đây là dấu hiệu cần kiểm tra cổ chân, hông hoặc kiểm soát thân trên.',
+    'hip_flexor_overactivity' =>
+      'AI nhận thấy thân trên phải nghiêng về trước khá nhiều để vào squat. Vika sẽ hỏi thêm để xác định cảm giác chính của bạn.',
+    'limited_mobility' =>
+      'Độ sâu squat chưa ổn định qua các rep. Vika dùng phản hồi của bạn để phân biệt giới hạn linh hoạt, mỏi cơ hay cảm giác đau.',
+    'ankle_mobility' =>
+      'Gót chân có xu hướng nâng lên ở một số rep. Đây có thể liên quan cổ chân, thói quen phân bổ lực hoặc độ sâu hiện tại.',
+    _ => homeResultsMock.first.coachBody,
+  };
+
+  return AssessmentResultData(
+    id: 'squat',
+    name: 'Squat',
+    score: avgDepth.round(),
+    scoreUnit: '°',
+    metric: 'Độ sâu trung bình',
+    metricLabel: OnboardingAssessmentThresholds.scoreCaption(score),
+    chartTitle: 'Độ sâu qua $totalReps reps',
+    chartData: safeChart,
+    chartTarget: 90,
+    chartUnit: '°',
+    coachTitle: 'Vika thấy gì?',
+    coachBody: coachBody,
+    detectedPattern: pattern,
+    questionTitle:
+        interpreter?.getQuestion()?.isNotEmpty == true ? 'Điểm này có đúng với bạn?' : 'Cảm giác nào đúng với bạn?',
+    questionSub: 'Vika dùng để xác định nguyên nhân chính',
+    candidates: homeResultsMock.first.candidates,
+    lowerIsBetter: true,
+    chartFloor: 60,
+  );
+}
+
+class PlanPersonalization {
+  const PlanPersonalization({
+    required this.level,
+    required this.levelLabel,
+    required this.goal,
+    required this.goalLabel,
+    required this.sessions,
+    required this.freq,
+    required this.painAreas,
+    required this.hasBackPain,
+    required this.isYoga,
+  });
+
+  final String level;
+  final String levelLabel;
+  final String goal;
+  final String goalLabel;
+  final List<String> sessions;
+  final int freq;
+  final List<String> painAreas;
+  final bool hasBackPain;
+  final bool isYoga;
+}
+
+// TODO(LOGIC-REFINEMENT-#8): S13 Outcomes — personalization logic is hand-coded if-else chains in `derivePlanPersonalization`.
+// Currently using v1 placeholder from JSX prototype. Real logic deferred to Phase 2.
+// See Notion: Vika State > Onboarding Logic Refinement block for full context.
+PlanPersonalization derivePlanPersonalization(OnboardingData data) {
+  final level = data.level ?? 'beginner';
+  final levelLabel = switch (level) {
+    'advanced' => 'Nâng cao',
+    'intermediate' => 'Trung cấp',
+    _ => 'Người mới',
+  };
+  final goal = data.goal ?? 'general';
+  final goalLabel = switch (goal) {
+    'weight_loss' || 'body' => 'Giảm cân',
+    'muscle' || 'strength' => 'Tăng cơ',
+    'flexibility' || 'flexible' => 'Linh hoạt',
+    'posture' => 'Tư thế',
+    _ => 'Khoẻ tổng thể',
+  };
+  final sessions = data.scheduleSessions;
+  final freq = sessions.isNotEmpty
+      ? sessions.length
+      : level == 'advanced'
+          ? 5
+          : level == 'intermediate'
+              ? 4
+              : 3;
+  final painAreas = data.painAreas;
+  final hasBackPain = painAreas.any(
+    (p) => p.toLowerCase().contains('lưng') || p == 'low_back' || p == 'back',
+  );
+  final isYoga = data.fork == 'yoga';
+  return PlanPersonalization(
+    level: level,
+    levelLabel: levelLabel,
+    goal: goal,
+    goalLabel: goalLabel,
+    sessions: sessions,
+    freq: freq,
+    painAreas: painAreas,
+    hasBackPain: hasBackPain,
+    isYoga: isYoga,
+  );
+}

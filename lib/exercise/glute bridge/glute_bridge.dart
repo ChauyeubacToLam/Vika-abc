@@ -1,6 +1,7 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, non_constant_identifier_names, constant_identifier_names
 
 import 'package:vika/utils/debouncer.dart';
+import 'package:vika/pose/vika_image_orientation.dart';
 
 import '../../utils/pose_math_helpers.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
@@ -113,6 +114,13 @@ class GluteBridge extends ExerciseBase {
      ----------------------------------------------------------------------- */
   @override
   String get exerciseName => 'Glute Bridge';
+
+  @override
+  Set<VikaImageOrientation> get supportedOrientations =>
+      const <VikaImageOrientation>{
+        VikaImageOrientation.landscapeLeft,
+        VikaImageOrientation.landscapeRight,
+      };
 
   @override
   String get currentPhaseKey => gluteState.toString().split('.').last;
@@ -240,9 +248,9 @@ class GluteBridge extends ExerciseBase {
       return "⚠️ Đảm bảo vai, hông và gối trong khung hình";
     }
 
-    if (shoulder.likelihood < ExerciseBase.MIN_CONFIDENCE ||
-        hip.likelihood < ExerciseBase.MIN_CONFIDENCE ||
-        knee.likelihood < ExerciseBase.MIN_CONFIDENCE) {
+    if (!ExerciseBase.isLandmarkConfident(shoulder) ||
+        !ExerciseBase.isLandmarkConfident(hip) ||
+        !ExerciseBase.isLandmarkConfident(knee)) {
       return "⚠️ Hình ảnh không rõ. Điều chỉnh ánh sáng hoặc vị trí";
     }
 
@@ -282,10 +290,9 @@ class GluteBridge extends ExerciseBase {
     final nose = smoothedLandmarks[PoseLandmarkType.nose];
 
     // Explicit null fallback hierarchy to prevent bypass when head goes out of frame
-    final double? headY = (ear != null &&
-            ear.likelihood >= ExerciseBase.MIN_CONFIDENCE)
+    final double? headY = (ear != null && ExerciseBase.isLandmarkConfident(ear))
         ? ear.y
-        : (nose != null && nose.likelihood >= ExerciseBase.MIN_CONFIDENCE)
+        : (nose != null && ExerciseBase.isLandmarkConfident(nose))
             ? nose.y
             : shoulder
                 ?.y; // Fallback to shoulder.y if head is totally lost to prevent metric crash
@@ -313,7 +320,7 @@ class GluteBridge extends ExerciseBase {
 
     // Knee angle (hip-knee-ankle) — null if ankle not visible.
     final double? kneeAngle =
-        (ankle != null && ankle.likelihood >= ExerciseBase.MIN_CONFIDENCE)
+        (ankle != null && ExerciseBase.isLandmarkConfident(ankle))
             ? calculateAngleNormalized(
                 firstPoint: hip, midPoint: knee, lastPoint: ankle)
             : null;

@@ -72,7 +72,6 @@ class AuthService {
         accessToken: accessToken,
       );
     } on AuthException catch (error) {
-      print('RAW GOOGLE ERROR: $error'); // ADD THIS
       throw Exception(
         _translateAuthException(
           error,

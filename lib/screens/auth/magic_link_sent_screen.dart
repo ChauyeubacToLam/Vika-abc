@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../theme/vf_theme.dart';
+import '../../utils/orientation_lock.dart';
 
 class MagicLinkSentScreen extends StatefulWidget {
   const MagicLinkSentScreen({
@@ -24,6 +25,7 @@ class _MagicLinkSentScreenState extends State<MagicLinkSentScreen> {
   @override
   void initState() {
     super.initState();
+    unawaited(OrientationLock.portraitOnly());
     _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen(
       _handleAuthState,
     );

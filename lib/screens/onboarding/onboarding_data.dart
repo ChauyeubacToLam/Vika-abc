@@ -5,33 +5,56 @@ import 'onboarding_assessment_thresholds.dart';
 
 class OnboardingData {
   // Step 1: Why
-  String? why; // 'pain', 'confidence', 'energy', 'health'
+  String? why; // Legacy alias retained for older unused onboarding pages.
+  String? whyStep1; // 'pain', 'confidence', 'energy', 'health'
+  String? whyStep2;
+  String whyCustomText = '';
+
+  // Step 4: Pain check
   List<String> painAreas =
       []; // 'none', 'lower_back', 'knee', 'shoulder_neck', 'hip', 'other'
+  bool noPain = false;
   String? painOtherText; // free text when 'other' selected (optional)
 
   // Step 2: Goal
   String? goal;
 
   // Step 3: Frequency
-  String? trainingDuration; // '<3m', '3-11m', '1y+'
+  String? duration; // '<3m', '3-11m', '1y+'
+
+  String? get trainingDuration => duration;
+  set trainingDuration(String? value) => duration = value;
+
+  // Step 5: Fork
+  String? fork; // 'yoga' | 'home'
 
   // Step 5-7: Assessment
   List<String> detectedIssues = [];
-  late ExerciseLogger squatLogger;
-  // ExerciseLogger? pushUpLogger;
-  late SquatInterpreter squatInterpreter;
+  ExerciseLogger? _squatLogger;
+  ExerciseLogger? pushUpLogger;
+  SquatInterpreter? _squatInterpreter;
+  Map<String, List<String>> feedbackByExercise = {};
+
+  bool get hasSquatAssessment => _squatLogger != null && _squatInterpreter != null;
+
+  // Non-null getters preserve analyzer compatibility for older unused pages.
+  ExerciseLogger get squatLogger => _squatLogger!;
+  SquatInterpreter get squatInterpreter => _squatInterpreter!;
+  SquatInterpreter? get squatInterpreterOrNull => _squatInterpreter;
 
   void onSquatComplete(ExerciseLogger logger) {
-    squatLogger = logger;
-    squatInterpreter = SquatInterpreter(logger: logger);
-    squatInterpreter.analyze();
+    _squatLogger = logger;
+    _squatInterpreter = SquatInterpreter(logger: logger);
+    _squatInterpreter!.analyze();
     detectedIssues
       ..clear()
-      ..addAll(squatInterpreter.detectedIssues);
+      ..addAll(_squatInterpreter!.detectedIssues);
   }
 
-  String? confirmedLevel;
+  String? level;
+  String? get confirmedLevel => level;
+  set confirmedLevel(String? value) => level = value;
+
   String? issueAnswer;
   bool medicalClear = false;
 
@@ -41,6 +64,9 @@ class OnboardingData {
   double? weightKg;
   List<int> workoutDays = [];
   String? preferredTime;
+  List<String> scheduleSessions = [];
+  int? age;
+  String? gender;
 
   String? timeCommitment;
   String? program;
