@@ -412,6 +412,29 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     return false;
   }
 
+  int get _cameraSceneQuarterTurns {
+    final orientation = _sessionOrientation;
+    if (!ExerciseBase.kLandscapeRotationEnabled ||
+        _runtime != _PoseRuntime.nativeMediaPipe ||
+        !Platform.isAndroid ||
+        !orientation.isLandscape) {
+      return 0;
+    }
+
+    return orientation.androidNativeCameraSceneQuarterTurns;
+  }
+
+  Widget _orientCameraScene(Widget child) {
+    final quarterTurns = _cameraSceneQuarterTurns;
+    if (quarterTurns == 0) {
+      return child;
+    }
+    return RotatedBox(
+      quarterTurns: quarterTurns,
+      child: child,
+    );
+  }
+
   Future<void> _sendOrientationToNative() async {
     if (!ExerciseBase.kLandscapeRotationEnabled ||
         !_isCurrentOrientationSupported) {
@@ -639,9 +662,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         await _stopAndDisposePoseChannel();
         return;
       }
-      await _poseChannel
-          .startDetection()
-          .timeout(const Duration(seconds: 4));
+      await _poseChannel.startDetection().timeout(const Duration(seconds: 4));
       if (_isDisposed || !mounted) {
         await _stopAndDisposePoseChannel();
         return;
@@ -666,8 +687,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
           _isInitializing = false;
           _isCameraReady = false;
           _textureId = null;
-          _cameraErrorMessage =
-              'Camera khoi dong qua lau. Hay thu lai.';
+          _cameraErrorMessage = 'Camera khoi dong qua lau. Hay thu lai.';
         });
       }
     } on PlatformException catch (error) {
@@ -706,8 +726,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
           _isInitializing = false;
           _isCameraReady = false;
           _textureId = null;
-          _cameraErrorMessage =
-              'Loi khi khoi dong camera. Hay thu lai.';
+          _cameraErrorMessage = 'Loi khi khoi dong camera. Hay thu lai.';
         });
       }
     }
@@ -1456,18 +1475,20 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         fit: StackFit.expand,
         children: [
           // ── Layer 1: Camera preview ──
-          RepaintBoundary(
-            child: ColoredBox(
-              color: Colors.black,
-              child: ClipRect(
-                child: SizedBox.expand(
-                  child: FittedBox(
-                    fit: previewFit,
-                    alignment: Alignment.center,
-                    child: SizedBox(
-                      width: _previewRenderSize.width,
-                      height: _previewRenderSize.height,
-                      child: _buildPreviewSurface(),
+          _orientCameraScene(
+            RepaintBoundary(
+              child: ColoredBox(
+                color: Colors.black,
+                child: ClipRect(
+                  child: SizedBox.expand(
+                    child: FittedBox(
+                      fit: previewFit,
+                      alignment: Alignment.center,
+                      child: SizedBox(
+                        width: _previewRenderSize.width,
+                        height: _previewRenderSize.height,
+                        child: _buildPreviewSurface(),
+                      ),
                     ),
                   ),
                 ),
@@ -1477,31 +1498,33 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
           // ── Layer 2: Skeleton overlay (unchanged — jade colors preserved) ──
           Positioned.fill(
-            child: IgnorePointer(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  if (_detectedPose == null || _imageSize == Size.zero) {
-                    return const SizedBox.shrink();
-                  }
-                  return CustomPaint(
-                    size: constraints.biggest,
-                    painter: PoseOverlayPainter(
-                        pose: _detectedPose!,
-                        imageSize: _imageSize,
-                        rotation: _imageRotation,
-                        lensDirection: _currentLens,
-                        fit: previewFit,
-                        // Native texture preview and native pose landmarks
-                        // are produced from the same oriented frame. The old
-                        // Flutter camera fallback still needs front-camera
-                        // mirroring to match CameraPreview.
-                        mirrorHorizontally:
-                            _runtime == _PoseRuntime.mlKitFallback &&
-                                _currentLens == CameraLensDirection.front,
-                        debugData: widget.exercise.debugData,
-                        style: SkeletonStyle.vikaCream),
-                  );
-                },
+            child: _orientCameraScene(
+              IgnorePointer(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    if (_detectedPose == null || _imageSize == Size.zero) {
+                      return const SizedBox.shrink();
+                    }
+                    return CustomPaint(
+                      size: constraints.biggest,
+                      painter: PoseOverlayPainter(
+                          pose: _detectedPose!,
+                          imageSize: _imageSize,
+                          rotation: _imageRotation,
+                          lensDirection: _currentLens,
+                          fit: previewFit,
+                          // Native texture preview and native pose landmarks
+                          // are produced from the same oriented frame. The old
+                          // Flutter camera fallback still needs front-camera
+                          // mirroring to match CameraPreview.
+                          mirrorHorizontally:
+                              _runtime == _PoseRuntime.mlKitFallback &&
+                                  _currentLens == CameraLensDirection.front,
+                          debugData: widget.exercise.debugData,
+                          style: SkeletonStyle.vikaCream),
+                    );
+                  },
+                ),
               ),
             ),
           ),

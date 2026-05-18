@@ -1,12 +1,12 @@
 import 'package:vika/interpreter/squat_interpreter.dart';
 import 'package:vika/utils/exercise_logger.dart';
-
+import 'package:vika/screens/onboarding/v5/fork_recommendation.dart';
 import 'onboarding_assessment_thresholds.dart';
 
 class OnboardingData {
   // Step 1: Why
   String? why; // Legacy alias retained for older unused onboarding pages.
-  String? whyStep1; // 'pain', 'confidence', 'energy', 'health'
+  String? whyStep1; // 'body', 'pain', 'energy', 'strength'
   String? whyStep2;
   String whyCustomText = '';
 
@@ -35,6 +35,7 @@ class OnboardingData {
   SquatInterpreter? _squatInterpreter;
   Map<String, List<String>> feedbackByExercise = {};
 
+  ForkRecommendation? forkRec;
   bool get hasSquatAssessment => _squatLogger != null && _squatInterpreter != null;
 
   // Non-null getters preserve analyzer compatibility for older unused pages.
