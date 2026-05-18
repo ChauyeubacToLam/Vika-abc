@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F688E414D6A9A6E97FD31478 /* PoseLandmarkerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC83E519973398FC25EDE409 /* PoseLandmarkerService.swift */; };
+		8C1DE7B02BFD4A2B9F5C7101 /* SegmentationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C1DE7AF2BFD4A2B9F5C7101 /* SegmentationService.swift */; };
+		A6F3D7CA2C00100100D8F001 /* pose_landmarker_lite.task in Resources */ = {isa = PBXBuildFile; fileRef = A6F3D7C92C00100100D8F001 /* pose_landmarker_lite.task */; };
 		1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = 1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */; };
 		331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C807B294A618700263BE5 /* RunnerTests.swift */; };
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
@@ -40,6 +43,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		DC83E519973398FC25EDE409 /* PoseLandmarkerService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PoseLandmarkerService.swift; sourceTree = "<group>"; };
+		8C1DE7AF2BFD4A2B9F5C7101 /* SegmentationService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SegmentationService.swift; sourceTree = "<group>"; };
+		A6F3D7C92C00100100D8F001 /* pose_landmarker_lite.task */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; path = pose_landmarker_lite.task; sourceTree = "<group>"; };
 		1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GeneratedPluginRegistrant.h; sourceTree = "<group>"; };
 		1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GeneratedPluginRegistrant.m; sourceTree = "<group>"; };
 		331C807B294A618700263BE5 /* RunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunnerTests.swift; sourceTree = "<group>"; };
@@ -109,6 +115,9 @@
 		97C146F01CF9000F007C117D /* Runner */ = {
 			isa = PBXGroup;
 			children = (
+				DC83E519973398FC25EDE409 /* PoseLandmarkerService.swift */,
+				8C1DE7AF2BFD4A2B9F5C7101 /* SegmentationService.swift */,
+				A6F3D7C92C00100100D8F001 /* pose_landmarker_lite.task */,
 				97C146FA1CF9000F007C117D /* Main.storyboard */,
 				97C146FD1CF9000F007C117D /* Assets.xcassets */,
 				97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */,
@@ -212,6 +221,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A6F3D7CA2C00100100D8F001 /* pose_landmarker_lite.task in Resources */,
 				97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */,
 				3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */,
 				97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */,
@@ -268,6 +278,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F688E414D6A9A6E97FD31478 /* PoseLandmarkerService.swift in Sources */,
+				8C1DE7B02BFD4A2B9F5C7101 /* SegmentationService.swift in Sources */,
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 			);
