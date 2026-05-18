@@ -148,10 +148,12 @@ class VikaApp extends StatelessWidget {
       initialRoute: '/',
       onGenerateRoute: (settings) {
         switch (settings.name) {
-case '/':
-  return MaterialPageRoute(
-    builder: (_) => const MainShell(),
-  );
+          case '/':
+            return MaterialPageRoute(
+              builder: (_) => AppEntryGate(
+                initialOnboardingComplete: _hasCompletedOnboarding,
+              ),
+            );
           case '/onboarding':
             return MaterialPageRoute(
               builder: (_) => const V5OnboardingNavigator(),
@@ -209,11 +211,11 @@ class _AppEntryGateState extends State<AppEntryGate> {
   _AppEntryState _initialEntryState() {
     return widget.initialOnboardingComplete
         ? _AppEntryState.home
-        : _AppEntryState.home;
+        : _AppEntryState.onboarding;
   }
 
   Future<void> _resolveEntryState() async {
-    _setEntryState(_AppEntryState.home);
+    await _quietResolveEntryState();
   }
 
   void _handleAuthStateChange(AuthState data) {

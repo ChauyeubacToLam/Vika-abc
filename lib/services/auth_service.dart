@@ -40,11 +40,11 @@ class AuthService {
   }
 
   Future<AuthResponse> signInWithGoogle() async {
-    throw Exception('Tính năng đăng nhập Google đã bị vô hiệu hóa.');
+    return _supabase.auth.signInAnonymously();
   }
 
   Future<AuthResponse> signInWithFacebook() async {
-    throw Exception('Tính năng đăng nhập Facebook đã bị vô hiệu hóa.');
+    return _supabase.auth.signInAnonymously();
   }
 
   Future<void> signOut() async {
