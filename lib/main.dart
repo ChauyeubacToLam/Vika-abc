@@ -150,9 +150,7 @@ class VikaApp extends StatelessWidget {
         switch (settings.name) {
           case '/':
             return MaterialPageRoute(
-              builder: (_) => AppEntryGate(
-                initialOnboardingComplete: _hasCompletedOnboarding,
-              ),
+              builder: (_) => const MainShell(),
             );
           case '/onboarding':
             return MaterialPageRoute(
@@ -165,9 +163,7 @@ class VikaApp extends StatelessWidget {
             );
           default:
             return MaterialPageRoute(
-              builder: (_) => AppEntryGate(
-                initialOnboardingComplete: _hasCompletedOnboarding,
-              ),
+              builder: (_) => const MainShell(),
             );
         }
       },
