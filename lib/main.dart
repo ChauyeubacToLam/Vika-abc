@@ -60,12 +60,8 @@ Future<bool> _readStoredOnboardingCompletion() async {
 }
 
 Future<bool> isOnboardingComplete() async {
-  final localValue = await _readStoredOnboardingCompletion();
   final user = supabase.auth.currentUser;
-
-  if (user == null) {
-    return false;
-  }
+  if (user == null) return false;
 
   try {
     final data = await supabase
@@ -74,9 +70,17 @@ Future<bool> isOnboardingComplete() async {
         .eq('id', user.id)
         .maybeSingle();
 
-    return data?['onboarding_complete'] as bool? ?? localValue;
+    if (data == null) {
+      // Profile row missing — user was deleted server-side. Clear stale
+      // local flag and sign out so onboarding starts fresh.
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('onboarding_complete');
+      await supabase.auth.signOut();
+      return false;
+    }
+    return data['onboarding_complete'] as bool? ?? false;
   } catch (_) {
-    return localValue;
+    return await _readStoredOnboardingCompletion();
   }
 }
 
@@ -269,7 +273,7 @@ class _AppEntryGateState extends State<AppEntryGate> {
   Widget build(BuildContext context) {
     switch (_entryState) {
       case _AppEntryState.onboarding:
-        return const MainShell();
+        return const V5OnboardingNavigator();
       case _AppEntryState.home:
         return const MainShell();
       case _AppEntryState.loading:

@@ -23,47 +23,66 @@ class V5WhyOption {
 
 const whyOptions = [
   V5WhyOption(
-    id: 'pain',
-    label: 'Hết đau mỏi',
-    sub: 'Lưng, cổ, vai, gáy',
-    pose: 'reach',
-    stat: '47%',
-    statLabel: 'Giảm đau lưng sau 4 tuần',
-  ),
-  V5WhyOption(
-    id: 'confidence',
-    label: 'Tự tin trong gương',
-    sub: 'Cơ thể bạn muốn',
-    pose: 'tree',
-    stat: '+12cm',
-    statLabel: 'Vai mở rộng & thẳng',
-  ),
-  V5WhyOption(
-    id: 'energy',
-    label: 'Năng lượng cả ngày',
-    sub: 'Hết kiệt sức buổi chiều',
-    pose: 'lunge',
-    stat: '+3.2h',
-    statLabel: 'Tỉnh táo mỗi ngày',
-  ),
-  V5WhyOption(
-    id: 'health',
-    label: 'Khỏe đến 60',
-    sub: 'Cho 10 năm tới',
-    pose: 'squat',
-    stat: '12yr+',
-    statLabel: 'Tuổi khớp tương đương',
-  ),
+  id: 'body',
+  label: 'Cải thiện vóc dáng',
+  sub: 'Cơ thể bạn mong muốn',
+  pose: 'squat',
+  stat: '-2kg',
+  statLabel: 'Trung bình sau 4 tuần',
+),
+V5WhyOption(
+  id: 'pain',
+  label: 'Giảm đau, tư thế tốt',
+  sub: 'Lưng, cổ, vai, gối',
+  pose: 'reach',
+  stat: '47%',
+  statLabel: 'Giảm đau lưng sau 4 tuần',
+),
+V5WhyOption(
+  id: 'energy',
+  label: 'Năng lượng cho cả ngày',
+  sub: 'Hết kiệt sức sau giờ làm',
+  pose: 'lunge',
+  stat: '+20%',
+  statLabel: 'Năng lượng & tinh thần',
+),
+V5WhyOption(
+  id: 'strength',
+  label: 'Khoẻ & tự tin hơn',
+  sub: 'Cho công việc và cuộc sống',
+  pose: 'tree',
+  stat: '+66%',
+  statLabel: 'Sức bền chống đẩy',
+),
 ];
 
-// TODO(LOGIC-REFINEMENT-#1): S02 Why — sentence builder follow-ups (`WHY_FOLLOWUPS`) are hardcoded 3 sub-options per primary why.
-// Currently using v1 placeholder from JSX prototype. Real logic deferred to Phase 2.
-// See Notion: Vika State > Onboarding Logic Refinement block for full context.
 const whyFollowups = {
-  'pain': ['Ngồi cả ngày không nhức', 'Ngủ ngon hơn', 'Cúi nhặt đồ không kêu'],
-  'confidence': ['Mặc đồ vừa hơn', 'Đứng thẳng vai', 'Chụp ảnh không né'],
-  'energy': ['Không kiệt sức buổi chiều', 'Tỉnh táo cả ngày', 'Về nhà vẫn vui'],
-  'health': ['Chơi với con sau này', 'Leo cầu thang không thở', 'Ít ốm vặt'],
+  'body': [
+    'Giảm cân, gọn người hơn',
+    'Săn chắc tay, chân, bụng',
+    'Tăng cơ, lên dáng',
+    'Tự tin mặc đồ mình thích',
+  ],
+  'pain': [
+    'Đau lưng do ngồi văn phòng cả ngày',
+    'Vai/cổ căng cứng sau giờ làm',
+    'Đầu gối khó chịu khi đứng lên xuống',
+    'Tư thế xấu, gù lưng / đầu cúi',
+    'Hồi phục sau chấn thương cũ',
+  ],
+  'energy': [
+    'Đi làm về vẫn còn năng lượng cho cuộc sống',
+    'Ngủ ngon hơn, dậy tỉnh táo hơn',
+    'Phòng bệnh, khoẻ lâu dài',
+    'Giảm căng thẳng, tinh thần ổn định',
+  ],
+  'strength': [
+    'Tăng sức bền cho công việc bận',
+    'Tăng cơ chắc, khoẻ hơn',
+    'Theo đuổi môn thể thao tôi thích (đá bóng, chạy bộ, ...)',
+    'Tự tin với cơ thể mình hơn',
+  ],
+
 };
 
 class V5GoalOption {
@@ -160,8 +179,9 @@ class ForkChoice {
     required this.stat,
     required this.statLabel,
     required this.pose,
-    required this.desc,
     required this.highlights,
+    required this.caveats,
+    required this.equipment,
   });
 
   final String id;
@@ -170,32 +190,53 @@ class ForkChoice {
   final String stat;
   final String statLabel;
   final String pose;
-  final String desc;
+
+  /// "Phù hợp khi bạn muốn" — positive-fit bullets.
   final List<String> highlights;
+
+  /// "Chưa lý tưởng nếu" — honest caveats so the user can self-select.
+  final List<String> caveats;
+
+  /// Equipment line shown in the footer chip strip (e.g. "Cần thảm").
+  final String equipment;
 }
 
 const forkChoices = {
   'home': ForkChoice(
     id: 'home',
-    title: 'Tập tại nhà',
-    sub: 'Sức mạnh & vóc dáng',
-    stat: '180+',
+    title: 'Home Workout',
+    sub: 'Khoẻ · Săn chắc · Năng lượng',
+    stat: '30+',
     statLabel: 'bài tập',
     pose: 'squat',
-    desc:
-        'Tập trung phát triển sức mạnh, săn chắc cơ và đốt mỡ. Phù hợp khi bạn muốn thấy thay đổi rõ rệt về vóc dáng.',
-    highlights: ['Squat, Push-up, Plank và 180+ bài', '5 nhóm cơ chính', '15–30 phút/ngày'],
+    highlights: [
+      'Săn cơ, tăng sức mạnh',
+      'Giảm mỡ, cải thiện vóc dáng',
+      'Tăng sức bền và năng lượng hàng ngày',
+    ],
+    caveats: [
+      'Mục tiêu là giảm đau lưng / cổ',
+      'Muốn tập trung vào sự dẻo dai, linh hoạt',
+    ],
+    equipment: 'Không cần thiết bị',
   ),
   'yoga': ForkChoice(
     id: 'yoga',
     title: 'Yoga',
-    sub: 'Linh hoạt & cân bằng',
-    stat: '60+',
-    statLabel: 'asanas',
+    sub: 'Linh hoạt · Cân bằng · Thư giãn',
+    stat: '30+',
+    statLabel: 'bài yoga',
     pose: 'tree',
-    desc:
-        'Giãn cơ, phục hồi và cải thiện linh hoạt. Tốt cho người ngồi nhiều, đau cổ vai gáy.',
-    highlights: ['Warrior, Tree, Forward Fold', 'Mọi cấp độ', '15–25 phút/ngày'],
+    highlights: [
+      'Tăng linh hoạt và biên độ chuyển động',
+      'Giảm đau lưng / cổ / vai do ngồi nhiều',
+      'Thư giãn, giảm stress, kiểm soát hơi thở',
+    ],
+    caveats: [
+      'Tăng cơ bắp rõ rệt',
+      'Đốt mỡ nhanh, tập cường độ cao',
+    ],
+    equipment: 'Cần thảm',
   ),
 };
 

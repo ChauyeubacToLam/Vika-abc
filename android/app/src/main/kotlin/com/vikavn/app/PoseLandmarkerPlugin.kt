@@ -536,18 +536,16 @@ class PoseLandmarkerPlugin(
         private const val TARGET_HEIGHT = 540
 
         private fun targetRotationForOrientation(orientation: String): Int {
-            // Convention swap on landscape only.
-            //
-            // The string comes from `native_device_orientation`, which uses
-            // UIDeviceOrientation-style naming where "landscapeLeft" = home
-            // button on RIGHT. Android's Surface.ROTATION_90 represents
-            // device 90° CW (= home button on LEFT) — i.e. the opposite
-            // physical orientation. Swap so CameraX's targetRotation
-            // matches the user's actual view.
+            // Match Flutter's camera_android_camerax orientation table:
+            // DeviceOrientation.landscapeLeft -> Surface.ROTATION_90 and
+            // DeviceOrientation.landscapeRight -> Surface.ROTATION_270.
+            // Reversing these two leaves CameraX's preview and analyzer
+            // upright in the wrong landscape side, which appears as a 180°
+            // flip when Dart rotates the exercise UI from the same sensor.
             return when (orientation) {
-                "landscapeLeft" -> Surface.ROTATION_270
+                "landscapeLeft" -> Surface.ROTATION_90
                 "portraitUpsideDown" -> Surface.ROTATION_180
-                "landscapeRight" -> Surface.ROTATION_90
+                "landscapeRight" -> Surface.ROTATION_270
                 else -> Surface.ROTATION_0
             }
         }

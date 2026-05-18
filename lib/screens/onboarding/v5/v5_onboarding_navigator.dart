@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vika/models/exercise_definition.dart';
 import 'package:vika/utils/exercise_logger.dart';
 import 'package:vika/utils/orientation_lock.dart';
+import 'package:vika/services/onboarding_persistence.dart';
 
 import '../onboarding_data.dart';
 import 'screens/s01_welcome.dart';
@@ -192,10 +193,8 @@ class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
           // Conservative upsert — only fields we're sure exist on `profiles`.
           // Everything else stays in SharedPreferences until columns ship.
           // See BACKEND-GAP list in the migration notes.
-          await Supabase.instance.client.from('profiles').upsert({
-            'id': user.id,
-            'onboarding_complete': true,
-          }, onConflict: 'id');
+          await OnboardingPersistence().persist(_data);
+
         } catch (_) {
           // Non-fatal — continue to home even if profile sync fails. The
           // SharedPreferences flag is enough for the entry gate.
