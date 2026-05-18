@@ -19,7 +19,6 @@ class HipRotationMetric extends PlankTapMetricBase {
   @override
   void onStateTransition(PlankTapState from, PlankTapState to, int timestampMs) {
     if (to == PlankTapState.base) {
-      // Cập nhật lại baseline mỗi khi về tư thế 4 chân
       _baselineHipY = null;
     }
   }
@@ -27,15 +26,14 @@ class HipRotationMetric extends PlankTapMetricBase {
   @override
   void update(RepContext ctx) {
     if (ctx.state == PlankTapState.base) {
-      // Học lại vị trí hông chuẩn khi ở tư thế 4 chân vững chãi
-      _baselineHipY = ctx.hipY;
+      // Sửa lỗi baseline drift: Chỉ học vị trí hông 1 lần đầu tiên ở tư thế base
+      _baselineHipY ??= ctx.hipY; 
       ctx.resultIssues.feedback['Anti-Rotation'] = 'Hông ổn định';
       return;
     }
 
     if (_baselineHipY == null) return;
 
-    // Tính độ lệch Y của Hông khi nhấc tay (Tương đương rớt hông hoặc nảy hông do xoay người)
     double hipVarianceNorm = (ctx.hipY - _baselineHipY!).abs() / (ctx.scaleFactor == 0 ? 1 : ctx.scaleFactor);
     _debugData['hipVarianceNorm'] = hipVarianceNorm.toStringAsFixed(2);
 

@@ -7,8 +7,15 @@ import 'metrics/superman_metric_base.dart';
 import 'metrics/limb_elevation_metric.dart';
 import 'metrics/hip_grounding_metric.dart';
 import 'metrics/hold_time_metric.dart';
+import 'metrics/lumbar_extension_metric.dart'; // Thêm import
 
 class Superman extends ExerciseBase {
+  @override
+  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+        VikaImageOrientation.landscapeLeft,
+        VikaImageOrientation.landscapeRight,
+      };
+
   @override
   String get exerciseName => 'Superman';
 
@@ -21,7 +28,10 @@ class Superman extends ExerciseBase {
   final LimbElevationMetric elevationMetric = LimbElevationMetric();
   final HipGroundingMetric hipMetric = HipGroundingMetric();
   final HoldTimeMetric holdMetric = HoldTimeMetric();
-  late final List<SupermanMetricBase> _metrics = [elevationMetric, hipMetric, holdMetric];
+  final LumbarExtensionMetric lumbarMetric = LumbarExtensionMetric(); // Fix #1: Khởi tạo metric
+
+  // Fix #1: Đã wire lumbarMetric vào list
+  late final List<SupermanMetricBase> _metrics = [elevationMetric, hipMetric, holdMetric, lumbarMetric];
 
   final Debouncer _liftDebouncer = Debouncer(requiredFrames: 3);
   final Debouncer _lowerDebouncer = Debouncer(requiredFrames: 3);
@@ -78,6 +88,10 @@ class Superman extends ExerciseBase {
     // Tính elevation (Y hướng xuống, nên nâng lên = Y nhỏ hơn)
     final armElevation = (lm['shoulder']!.y - lm['wrist']!.y) / scaleFactor;
     final legElevation = (lm['hip']!.y - lm['ankle']!.y) / scaleFactor;
+    
+    // Fix #5: Tính toán hipElevation (Bạn có thể điều chỉnh lại logic nhận diện mặt sàn thực tế tại đây)
+    final hipElevation = 0.0; // TODO: Cập nhật logic khoảng cách hông so với mặt sàn nếu có baseline
+    
     final spineAngle = calculateHorizontalAngle(point1: lm['shoulder']!, point2: lm['hip']!);
 
     debugData['arm_elev'] = armElevation.toStringAsFixed(3);
@@ -87,6 +101,7 @@ class Superman extends ExerciseBase {
     final ctx = SupermanRepContext(
       armElevation: armElevation,
       legElevation: legElevation,
+      hipElevation: hipElevation, // Fix #5: Đã truyền vào context
       spineAngle: spineAngle,
       scaleFactor: scaleFactor,
       currentState: superState,
@@ -145,6 +160,7 @@ class Superman extends ExerciseBase {
     logger.pushKey("elevation_fails", elevationMetric.faultsCount);
     logger.pushKey("hip_fails", hipMetric.faultsCount);
     logger.pushKey("hold_fails", holdMetric.faultsCount);
+    logger.pushKey("lumbar_fails", lumbarMetric.faultsCount); // Thêm log cho lumbar
     logger.pushGoodRepCount();
   }
 

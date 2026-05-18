@@ -1,4 +1,5 @@
 // ignore_for_file: non_constant_identifier_names, curly_braces_in_flow_control_structures
+import 'dart:math';
 import 'package:vika/utils/debouncer.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
@@ -15,13 +16,17 @@ class SitUpConfig {
   static const int MAX_REP = 15;
   static const int TIMEOUT_MS = 90000; // 90s
 
-  static const double START_TRUNK_HORIZ_MAX = 15.0; 
+  // FIX: Spec yêu cầu < 10° (code cũ là 15°)
+  static const double START_TRUNK_HORIZ_MAX = 10.0;
   static const double START_KNEE_MIN = 70.0;
-  static const double START_KNEE_MAX = 110.0; 
+  // FIX: Spec yêu cầu 100° (code cũ là 110°)
+  static const double START_KNEE_MAX = 100.0;
 
   static const double RISING_TRUNK_START = 15.0;
-  static const double UPRIGHT_KHS_THRESHOLD = 95.0; 
-  static const double LOWERING_KHS_THRESHOLD = 100.0;
+  // FIX: Spec yêu cầu ≤ 90° (code cũ là 95°)
+  static const double UPRIGHT_KHS_THRESHOLD = 90.0;
+  // FIX: Spec yêu cầu > 95° (code cũ là 100°)
+  static const double LOWERING_KHS_THRESHOLD = 95.0;
   static const double LYING_TRUNK_THRESHOLD = 15.0;
 }
 
@@ -53,6 +58,12 @@ class SitUp extends ExerciseBase {
   SitUp({this.maxRep = SitUpConfig.MAX_REP});
 
   @override
+  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+        VikaImageOrientation.landscapeLeft,
+        VikaImageOrientation.landscapeRight,
+      };
+
+  @override
   String get exerciseName => 'Sit Up';
 
   @override
@@ -68,10 +79,11 @@ class SitUp extends ExerciseBase {
     }
   }
 
-  // FIXED: Sửa kiểu trả về từ void thành String? để đúng với ExerciseBase
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    return null; 
+    // Pain screening gate (thoát vị / đau thắt lưng) được xử lý ở UI layer
+    // trước khi exercise này được khởi tạo. Xem: SitUpSafetyGateScreen.
+    return null;
   }
 
   @override
@@ -80,15 +92,15 @@ class SitUp extends ExerciseBase {
     final hip = landmarks[PoseLandmarkType.leftHip];
     final knee = landmarks[PoseLandmarkType.leftKnee];
     final ankle = landmarks[PoseLandmarkType.leftAnkle];
-         
+
     if (shoulder == null || hip == null || knee == null || ankle == null) return false;
-    
+
     double trunkHoriz = _calcHorizontalAngle(shoulder, hip);
     double kneeAngle = calculateAngleNormalized(firstPoint: hip, midPoint: knee, lastPoint: ankle);
-    
+
     if (trunkHoriz > SitUpConfig.START_TRUNK_HORIZ_MAX) return false;
     if (kneeAngle < SitUpConfig.START_KNEE_MIN || kneeAngle > SitUpConfig.START_KNEE_MAX) return false;
-    
+
     return true;
   }
 
@@ -102,11 +114,11 @@ class SitUp extends ExerciseBase {
     logger.pushKey("stability_fails_count", stabilityMetric.faultsCount);
     logger.pushKey("tempo_fails_count", tempoMetric.faultsCount);
     logger.pushGoodRepCount();
-         
+
     StringBuffer dump = StringBuffer();
     dump.writeln("=== DIAGNOSTIC LOG (SIT-UP) ===");
     for (var log in _diagnosticLog) {
-       dump.writeln("${log['time']} | ${log['state']} | ${log['trunk'].toStringAsFixed(1)} | ${log['khs'].toStringAsFixed(1)} | ${log['ankleY'].toStringAsFixed(1)}");
+      dump.writeln("${log['time']} | ${log['state']} | ${log['trunk'].toStringAsFixed(1)} | ${log['khs'].toStringAsFixed(1)} | ${log['ankleY'].toStringAsFixed(1)}");
     }
     logger.pushKey("diagnostic_dump", dump.toString());
   }
@@ -115,7 +127,7 @@ class SitUp extends ExerciseBase {
   void checkingPose(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     final now = frameTimestampMs;
     _exerciseStartTimeMs ??= now;
-         
+
     if (now - _exerciseStartTimeMs! >= SitUpConfig.TIMEOUT_MS) {
       _timeoutReached = true;
       return;
@@ -125,12 +137,12 @@ class SitUp extends ExerciseBase {
     final hip = landmarks[PoseLandmarkType.leftHip]!;
     final knee = landmarks[PoseLandmarkType.leftKnee]!;
     final ankle = landmarks[PoseLandmarkType.leftAnkle]!;
-    
+
     scaleFactor = calculateDistance(shoulder, hip);
     double trunkHoriz = _calcHorizontalAngle(shoulder, hip);
     double kneeAngle = calculateAngleNormalized(firstPoint: hip, midPoint: knee, lastPoint: ankle);
     double khsAngle = calculateAngleNormalized(firstPoint: knee, midPoint: hip, lastPoint: shoulder);
-    
+
     final ctx = SitUpRepContext(
       trunkHorizontalAngle: trunkHoriz,
       hipKneeAnkleAngle: kneeAngle,
@@ -164,7 +176,7 @@ class SitUp extends ExerciseBase {
     if (state != SitUpState.lying) {
       for (final metric in _metrics) metric.update(ctx);
     }
-         
+
     resultIssues.addInstruction(state.name, 'Status', currentPhaseLabel);
   }
 
@@ -189,34 +201,34 @@ class SitUp extends ExerciseBase {
 
   void _completeRep(SitUpRepContext ctx) {
     repCount++;
-    romMetric.evaluateRep(ctx);
-    tempoMetric.evaluateRep(ctx);
-    
+    romMetric.evaluateRep();
+    tempoMetric.evaluateRep();
+
     final allFaults = <FaultRecord>[];
     for (var metric in _metrics) allFaults.addAll(metric.faults);
-    
+
     correctForm = !allFaults.any((f) => f.affectsForm);
-         
+
     if (!correctForm) resultIssues.feedback['Result'] = 'Fix Form';
-    
+
     logger.addRepLog(RepLog(
-      correctForm: correctForm, 
-      repNumber: repCount, 
+      correctForm: correctForm,
+      repNumber: repCount,
       data: {
-       "min_khs_angle": romMetric.minKneeHipShoulder ?? 180.0,
-       "lowering_time": tempoMetric.loweringDuration ?? 0.0,
-       "fault_types": allFaults.map((e) => e.type).toSet().toList()
+        "min_khs_angle": romMetric.minKneeHipShoulder ?? 180.0,
+        "lowering_time": tempoMetric.loweringDuration ?? 0.0,
+        "fault_types": allFaults.map((e) => e.type).toSet().toList()
       }
     ));
-    
+
     correctForm = true;
     for (var metric in _metrics) metric.resetAndCountFault();
   }
 
+  // FIX: Dùng atan2 thay vì (dy/dx * 180/π) — công thức cũ trả về tan(θ)×(180/π), không phải góc thật
   double _calcHorizontalAngle(PoseLandmark p1, PoseLandmark p2) {
     double dy = (p2.y - p1.y).abs();
     double dx = (p2.x - p1.x).abs();
-    if (dx == 0) return 90.0;
-    return (dy / dx) * (180 / 3.14159);
+    return atan2(dy, dx) * (180 / pi);
   }
 }

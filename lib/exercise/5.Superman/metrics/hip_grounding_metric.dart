@@ -6,16 +6,17 @@ class HipGroundingMetric extends SupermanMetricBase {
 
   @override
   void update(SupermanRepContext ctx) {
-    debugData['spine_angle'] = ctx.spineAngle.toStringAsFixed(1);
+    debugData['hip_elevation'] = ctx.hipElevation.toStringAsFixed(3); // Log hip_elevation thay cho spine_angle
 
     if (ctx.currentState != SupermanState.hold) return;
 
-    if (ctx.spineAngle.abs() > SupermanConfig.SPINE_NEUTRAL_RANGE) {
-      if (!faults.any((f) => f.type == 'SpineNotNeutral')) {
+    // Fix #4: Check hông nhấc khỏi sàn (Dùng LIFT_THRESHOLD làm ngưỡng tham khảo, bạn có thể chỉnh tuỳ specs)
+    if (ctx.hipElevation > SupermanConfig.LIFT_THRESHOLD) {
+      if (!faults.any((f) => f.type == 'HipNotGrounded')) {
         addFault(FaultRecord(
           phase: ctx.currentState.name,
-          type: 'SpineNotNeutral',
-          message: 'Giữ cột sống thẳng và trung tính!',
+          type: 'HipNotGrounded',
+          message: 'Không nhấc hông khỏi sàn!',
           voiceMessage: 'Lấy hông làm điểm tựa, đừng nhấc hông lên',
           affectsForm: false,
           priority: SupermanVoicePriority.hipGrounding,

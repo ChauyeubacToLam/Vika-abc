@@ -9,8 +9,6 @@ class TrunkAlignmentMetric extends PlankTapMetricBase {
   final Map<String, dynamic> _debugData = {};
   final Debouncer _sagDebouncer = Debouncer(requiredFrames: 4);
 
-  double? _minTrunkAngle;
-
   @override
   List<FaultRecord> get faults => _faults;
   @override
@@ -18,10 +16,6 @@ class TrunkAlignmentMetric extends PlankTapMetricBase {
 
   @override
   void update(RepContext ctx) {
-    if (_minTrunkAngle == null || ctx.trunkAngle < _minTrunkAngle!) {
-      _minTrunkAngle = ctx.trunkAngle;
-    }
-
     _debugData['trunkAngle'] = ctx.trunkAngle.toStringAsFixed(1);
 
     bool isSagging = ctx.trunkAngle < PlankTapConfig.TRUNK_SAG_THRESHOLD;
@@ -44,6 +38,5 @@ class TrunkAlignmentMetric extends PlankTapMetricBase {
     _faults.clear();
     _debugData.clear();
     _sagDebouncer.reset();
-    _minTrunkAngle = null;
   }
 }

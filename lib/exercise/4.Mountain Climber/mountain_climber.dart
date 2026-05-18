@@ -10,6 +10,12 @@ import 'metrics/knee_drive_rom_metric.dart';
 
 class MountainClimber extends ExerciseBase {
   @override
+  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+        VikaImageOrientation.landscapeLeft,
+        VikaImageOrientation.landscapeRight,
+      };
+
+  @override
   String get exerciseName => 'Mountain Climber';
 
   @override

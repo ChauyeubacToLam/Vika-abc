@@ -3,6 +3,7 @@ import 'sit_up_metric_base.dart';
 class TempoMetric extends SitUpMetricBase {
   @override
   String get name => 'Tempo';
+
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
 
@@ -11,6 +12,7 @@ class TempoMetric extends SitUpMetricBase {
 
   @override
   List<FaultRecord> get faults => _faults;
+
   @override
   Map<String, dynamic> get debugData => _debugData;
 
@@ -26,16 +28,17 @@ class TempoMetric extends SitUpMetricBase {
   @override
   void update(SitUpRepContext ctx) {}
 
-  void evaluateRep(SitUpRepContext ctx) {
+  // FIX: Bỏ param ctx — hàm chỉ dùng loweringDuration đã được tính qua onStateTransition()
+  void evaluateRep() {
     if (loweringDuration != null && loweringDuration! < 1.5) {
-       _faults.add(FaultRecord(
-          phase: 'REP_COMPLETE',
-          type: 'Tempo',
-          message: 'Hạ người quá nhanh (${loweringDuration!.toStringAsFixed(1)}s)',
-          voiceMessage: 'Hạ lưng xuống chậm lại, cảm nhận cơ bụng căng ra',
-          affectsForm: true,
-          priority: SitUpFaultPriority.tempo,
-        ));
+      _faults.add(FaultRecord(
+        phase: 'REP_COMPLETE',
+        type: 'Tempo',
+        message: 'Hạ người quá nhanh (${loweringDuration!.toStringAsFixed(1)}s)',
+        voiceMessage: 'Hạ lưng xuống chậm lại, cảm nhận cơ bụng căng ra',
+        affectsForm: true,
+        priority: SitUpFaultPriority.tempo,
+      ));
     }
   }
 

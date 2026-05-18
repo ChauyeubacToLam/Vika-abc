@@ -16,7 +16,13 @@ class PikedHipMetric extends HighPlankMetricBase {
 
   @override
   void update(HighPlankRepContext ctx) {
-    // Góc cơ thể giảm (<155) VÀ hông nằm trên đường chuẩn (Âm trong ML Kit Y)
+    // FIX Bug 4: Chỉ ghi fault khi đang HOLDING.
+    // Trong SETUP user đang chổng mông để lên vị trí plank là hoàn toàn bình thường.
+    if (ctx.state != HighPlankState.holding) {
+      _isFaulting = false;
+      return;
+    }
+
     if (ctx.shoulderHipAnkleAngle < HighPlankConfig.DROPPING_PIKE_ANGLE && ctx.hipDeviation < -0.05) {
       if (!_isFaulting) {
         _faults.add(FaultRecord(

@@ -11,6 +11,12 @@ import 'metrics/tap_tempo_metric.dart';
 
 class PlankShoulderTap extends ExerciseBase {
   @override
+  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+        VikaImageOrientation.landscapeLeft,
+        VikaImageOrientation.landscapeRight,
+      };
+
+  @override
   String get exerciseName => 'Plank Shoulder Tap';
 
   @override
@@ -28,7 +34,7 @@ class PlankShoulderTap extends ExerciseBase {
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
-    return null; // No specific safety check for this exercise yet.
+    return null;
   }
 
   PlankTapState tapState = PlankTapState.base;
@@ -80,12 +86,19 @@ class PlankShoulderTap extends ExerciseBase {
     final lm = _getLandmarks(landmarks);
     if (lm == null) return;
 
+    // Sửa lỗi Null crash: Đảm bảo tồn tại đủ các điểm khớp cổ tay và vai trước khi tính toán
+    if (!landmarks.containsKey(PoseLandmarkType.leftWrist) ||
+        !landmarks.containsKey(PoseLandmarkType.rightShoulder) ||
+        !landmarks.containsKey(PoseLandmarkType.rightWrist) ||
+        !landmarks.containsKey(PoseLandmarkType.leftShoulder)) {
+      return; 
+    }
+
     scaleFactor = calculateDistance(lm['shoulder']!, lm['hip']!);
     if (scaleFactor == 0) scaleFactor = 1;
 
     double trunkAngle = calculateAngleNormalized(firstPoint: lm['shoulder']!, midPoint: lm['hip']!, lastPoint: lm['ankle']!);
     
-    // Tìm khoảng cách nhỏ nhất giữa Cổ tay L - Vai R và Cổ tay R - Vai L để biết tay nào đang nhấc
     double distLtoR = calculateDistance(landmarks[PoseLandmarkType.leftWrist]!, landmarks[PoseLandmarkType.rightShoulder]!) / scaleFactor;
     double distRtoL = calculateDistance(landmarks[PoseLandmarkType.rightWrist]!, landmarks[PoseLandmarkType.leftShoulder]!) / scaleFactor;
     
@@ -123,11 +136,16 @@ class PlankShoulderTap extends ExerciseBase {
     else if (tapState == PlankTapState.lifting && dist <= PlankTapConfig.TAP_DISTANCE_THRESHOLD) {
       _transitionState(PlankTapState.tap, ctx.frameTimestamp);
     }
-    // Chuyển sang lowering (returning) khi khoảng cách bắt đầu xa ra
-    else if ((tapState == PlankTapState.tap || tapState == PlankTapState.lifting) && dist > PlankTapConfig.TAP_DISTANCE_THRESHOLD + 0.1) {
+    // Sửa lỗi Rep bị tính dù bỏ qua state TAP: Chỉ sang lowering khi đang ở tap
+    else if (tapState == PlankTapState.tap && dist > PlankTapConfig.TAP_DISTANCE_THRESHOLD + 0.1) {
       _transitionState(PlankTapState.returning, ctx.frameTimestamp);
     }
-    else if (tapState == PlankTapState.returning && dist >= PlankTapConfig.LIFT_START_THRESHOLD) {
+    // Cập nhật lại logic hoàn thành rep
+    else if ((tapState == PlankTapState.returning || tapState == PlankTapState.lifting) && dist >= PlankTapConfig.LIFT_START_THRESHOLD) {
+      if (tapState == PlankTapState.lifting) {
+        // Nâng tay nhưng hạ ngay mà chưa chạm tới vai (Lỗi Missed Tap)
+        _transitionState(PlankTapState.returning, ctx.frameTimestamp);
+      }
       _completeRep(ctx);
     }
   }
@@ -152,11 +170,16 @@ class PlankShoulderTap extends ExerciseBase {
   }
 
   Map<String, PoseLandmark>? _getLandmarks(Map<PoseLandmarkType, PoseLandmark> lm) {
+    // Sửa lỗi Null crash: Validate trước các điểm
+    if (!lm.containsKey(PoseLandmarkType.leftShoulder) ||
+        !lm.containsKey(PoseLandmarkType.leftHip) ||
+        !lm.containsKey(PoseLandmarkType.leftAnkle)) {
+      return null;
+    }
     return {
       'shoulder': lm[PoseLandmarkType.leftShoulder]!,
       'hip': lm[PoseLandmarkType.leftHip]!,
       'ankle': lm[PoseLandmarkType.leftAnkle]!,
-      // Mặc định lấy side chuẩn, cổ tay tính chéo ở trên
     };
   }
 
@@ -166,6 +189,7 @@ class PlankShoulderTap extends ExerciseBase {
     logger.pushKey("rotation_fails", rotationMetric.faultsCount);
     logger.pushKey("alignment_fails", trunkMetric.faultsCount);
     logger.pushKey("tap_fails", tapMetric.faultsCount);
+    logger.pushKey("tempo_fails", tempoMetric.faultsCount); // Sửa lỗi thiếu log tempo_fails
     logger.pushGoodRepCount();
   }
 }

@@ -5,16 +5,11 @@ class LumbarExtensionMetric extends SupermanMetricBase {
   @override
   String get name => 'LumbarExtension';
   
-  final List<FaultRecord> _faults = [];
-  final Map<String, dynamic> _debugData = {};
+  // Fix #2: Bỏ ghi đè _faults, _debugData và get faults, get debugData
+  
   final Debouncer _dangerDebouncer = Debouncer(requiredFrames: 3);
 
   double? _minTrunkAngle;
-
-  @override
-  List<FaultRecord> get faults => _faults;
-  @override
-  Map<String, dynamic> get debugData => _debugData;
 
   @override
   void update(SupermanRepContext ctx) {
@@ -22,10 +17,11 @@ class LumbarExtensionMetric extends SupermanMetricBase {
       _minTrunkAngle = ctx.trunkAngle;
     }
 
-    _debugData['trunkAngle'] = ctx.trunkAngle.toStringAsFixed(1);
-    _debugData['minTrunkAngle'] = _minTrunkAngle?.toStringAsFixed(1) ?? '-';
+    debugData['trunkAngle'] = ctx.trunkAngle.toStringAsFixed(1);
+    debugData['minTrunkAngle'] = _minTrunkAngle?.toStringAsFixed(1) ?? '-';
 
-    bool isDangerousExtension = ctx.trunkAngle < SupermanConfig.LUMBAR_EXTENSION_DANGER;
+    // Fix #3: Đổi điều kiện uốn cong lưng âm dần thành < -LUMBAR_EXTENSION_DANGER
+    bool isDangerousExtension = ctx.trunkAngle < -SupermanConfig.LUMBAR_EXTENSION_DANGER;
 
     if (_dangerDebouncer.update(isDangerousExtension)) {
       ctx.resultIssues.feedback['Spine'] = 'Uốn lưng quá gắt! Hạ thấp tay chân';
@@ -36,8 +32,9 @@ class LumbarExtensionMetric extends SupermanMetricBase {
   }
 
   void _logFault(String phase, String type, String msg, int priority) {
-    if (!_faults.any((f) => f.type == type)) {
-      _faults.add(FaultRecord(
+    if (!faults.any((f) => f.type == type)) {
+      // Fix #2: Sử dụng addFault() của base class
+      addFault(FaultRecord(
         phase: phase, type: type, message: msg, affectsForm: true, priority: priority, voiceMessage: msg
       ));
     }
@@ -45,8 +42,7 @@ class LumbarExtensionMetric extends SupermanMetricBase {
 
   @override
   void reset() {
-    _faults.clear();
-    _debugData.clear();
+    super.reset(); // Gọi reset của base class để xoá faults
     _dangerDebouncer.reset();
     _minTrunkAngle = null;
   }

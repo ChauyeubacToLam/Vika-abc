@@ -59,6 +59,12 @@ class BirdDog extends ExerciseBase {
   BirdDog({this.maxRep = BirdDogConfig.MAX_REP});
 
   @override
+  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+        VikaImageOrientation.landscapeLeft,
+        VikaImageOrientation.landscapeRight,
+      };
+
+  @override
   String get exerciseName => 'Bird Dog';
 
   @override

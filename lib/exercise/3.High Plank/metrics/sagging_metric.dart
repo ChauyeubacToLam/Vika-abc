@@ -18,10 +18,14 @@ class SaggingMetric extends HighPlankMetricBase {
   void update(HighPlankRepContext ctx) {
     _debugData['hipDev'] = ctx.hipDeviation.toStringAsFixed(3);
 
-    // Hông sụt xuống (Dương trong ML Kit Y)
     if (ctx.hipDeviation > HighPlankConfig.DROPPING_SAG_DEVIATION) {
+      // UI feedback hiển thị mọi lúc để hướng dẫn user
       ctx.resultIssues.feedback['Core'] = 'Võng lưng!';
-      if (!_isFaulting) {
+
+      // FIX Bug 4: Chỉ ghi fault record khi đang HOLDING.
+      // Khi SETUP: user chưa vào vị trí, không nên tính lỗi.
+      // Khi DROPPING: state đã phản ánh mất form rồi, fault mới không có thêm giá trị.
+      if (ctx.state == HighPlankState.holding && !_isFaulting) {
         _faults.add(FaultRecord(
           phase: ctx.state.name,
           type: 'Sagging',
@@ -39,5 +43,5 @@ class SaggingMetric extends HighPlankMetricBase {
   }
 
   @override
-  void reset() {} // Metric tĩnh không xóa faults mỗi rep
+  void reset() {}
 }

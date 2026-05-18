@@ -10,6 +10,7 @@
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:vika/pose/vika_pose_landmark.dart';
 import 'package:vika/pose/vika_image_orientation.dart';
+export 'package:vika/pose/vika_image_orientation.dart';
 import 'package:vika/utils/debouncer.dart';
 import 'package:vika/utils/person_detector.dart';
 import '../utils/pose_smoother.dart';

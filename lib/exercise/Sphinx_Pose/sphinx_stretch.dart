@@ -27,6 +27,12 @@ class SphinxStretch extends ExerciseBase {
   ];
 
   @override
+  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+        VikaImageOrientation.landscapeLeft,
+        VikaImageOrientation.landscapeRight,
+      };
+
+  @override
   String get exerciseName => 'Sphinx Pose';
 
   @override

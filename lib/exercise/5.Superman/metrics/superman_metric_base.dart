@@ -19,12 +19,14 @@ class SupermanVoicePriority {
   static const int lumbarExtension = 1;
   static const int hipGrounding = 2;
   static const int holdTime = 3;
+  static const int limbElevation = 4; // Fix #8: Đã thêm constant
 }
 
 // ─── Context ─────────────────────────────────────────────────────────────────
 class SupermanRepContext {
   final double armElevation;
   final double legElevation;
+  final double hipElevation; // Fix #5: Đã thêm field hipElevation
   final double spineAngle;
   final double? scaleFactor;
   final SupermanState currentState;
@@ -37,6 +39,7 @@ class SupermanRepContext {
   const SupermanRepContext({
     required this.armElevation,
     required this.legElevation,
+    required this.hipElevation,
     required this.spineAngle,
     required this.scaleFactor,
     required this.currentState,

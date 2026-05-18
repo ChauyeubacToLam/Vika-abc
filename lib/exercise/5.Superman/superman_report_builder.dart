@@ -2,6 +2,7 @@ import 'package:vika/utils/exercise_logger.dart';
 import 'metrics/limb_elevation_metric.dart';
 import 'metrics/hip_grounding_metric.dart';
 import 'metrics/hold_time_metric.dart';
+import 'metrics/lumbar_extension_metric.dart'; // Thêm import
 
 class SupermanReportBuilder {
   static Map<String, dynamic> build({
@@ -10,6 +11,7 @@ class SupermanReportBuilder {
     required LimbElevationMetric elevationMetric,
     required HipGroundingMetric hipMetric,
     required HoldTimeMetric holdMetric,
+    required LumbarExtensionMetric lumbarMetric, // Fix #7: Thêm tham số
   }) {
     final totalReps = repLogs.length;
     final goodReps = repLogs.where((r) => r.correctForm).length;
@@ -21,6 +23,7 @@ class SupermanReportBuilder {
       'elevation_fails': elevationMetric.faultsCount,
       'hip_fails': hipMetric.faultsCount,
       'hold_fails': holdMetric.faultsCount,
+      'lumbar_fails': lumbarMetric.faultsCount, // Fix #7: Thêm stat
     };
   }
 }
