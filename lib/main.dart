@@ -246,16 +246,7 @@ class _AppEntryGateState extends State<AppEntryGate> {
   /// Re-resolves the entry state without flashing through `loading`. Stays
   /// in the current state if no transition is required — preserves the
   /// V5OnboardingNavigator's State (PageController + OnboardingData) when
-  /// the signup screen completes auth mid-flow.
   Future<void> _quietResolveEntryState() async {
-    final session = supabase.auth.currentSession;
-    if (session == null) {
-      if (_entryState != _AppEntryState.onboarding) {
-        _setEntryState(_AppEntryState.onboarding);
-      }
-      return;
-    }
-
     final complete = await isOnboardingComplete();
     final target = complete ? _AppEntryState.home : _AppEntryState.onboarding;
     if (target != _entryState) {
