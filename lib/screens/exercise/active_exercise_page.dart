@@ -26,15 +26,7 @@ import 'widgets/form_score_arc.dart';
 import 'widgets/ivory_chrome.dart';
 import 'widgets/pose_overlay_painter.dart';
 import 'widgets/system_banner.dart';
-
-class NativeDeviceOrientationCommunicator {
-  Future<NativeDeviceOrientation> orientation({bool useSensor = false}) async {
-    return NativeDeviceOrientation.portraitUp;
-  }
-  Stream<NativeDeviceOrientation> onOrientationChanged({bool useSensor = false}) {
-    return Stream.empty();
-  }
-}
+import 'package:native_device_orientation/native_device_orientation.dart';
 
 class ActiveExercisePage extends StatefulWidget {
   const ActiveExercisePage({
