@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'recommendation/progression_service.dart';
+
 /// Summary of a completed exercise session, loaded from Supabase.
 class PreviousSessionSummary {
   final int formScore;
@@ -75,6 +77,8 @@ class SessionPersistence {
   /// [overallDifficulty] is captured later via updateSessionDifficulty().
   Future<String?> saveSession({
     required String exerciseId,
+    String? recommendationId,
+    String? slotName,
     required DateTime startedAt,
     required int formScore,
     required int totalReps,
@@ -106,11 +110,22 @@ class SessionPersistence {
             'fault_counts': faultCounts,
             'difficulty_ratings': difficultyRatings,
             'set_data': setData,
+            'recommendation_id': recommendationId,
+            'slot_name': slotName,
           })
           .select('id')
           .single();
 
-      return response['id'] as String;
+      final sessionId = response['id'] as String;
+      await RecommendationProgressionService().recordCompletedSession(
+        userId: userId,
+        sessionId: sessionId,
+        exerciseId: exerciseId,
+        difficultyRatings: difficultyRatings,
+        setData: setData,
+      );
+
+      return sessionId;
     } catch (e) {
       debugPrint('[Vika] Failed to save session: $e');
       return null;

@@ -1,3 +1,5 @@
+import '../../services/recommendation/fitness_test_scoring.dart';
+
 class OnboardingAssessmentThresholds {
   const OnboardingAssessmentThresholds._();
 
@@ -32,16 +34,7 @@ class OnboardingAssessmentThresholds {
   static const int decentScoreMin = 64;
 
   static int trainingDurationScore(String? trainingDuration) {
-    switch (trainingDuration) {
-      case '1y+':
-        return 3;
-      case '3-11m':
-        return 2;
-      case '<3m':
-        return 1;
-      default:
-        return 0;
-    }
+    return FitnessTestScorer.trainingDurationScore(trainingDuration);
   }
 
   static int computeFormScore({
@@ -68,26 +61,12 @@ class OnboardingAssessmentThresholds {
     required String? trainingDuration,
     required double kneeAngleCv,
   }) {
-    final depthScore = _depthScore(avgDepth ?? 130);
-    final compScore = _compensationScore(goodRatio);
-
-    final histScore = trainingDurationScore(trainingDuration).clamp(1, 3);
-
-    var weighted = (depthWeight * depthScore) +
-        (compensationWeight * compScore) +
-        (historyWeight * histScore);
-
-    if (compScore <= 1.0) {
-      // < 40% clean reps — cap at beginner regardless of depth
-      weighted = weighted.clamp(0.0, intermediateLevelMin - 0.01);
-    }
-    if (kneeAngleCv > 0 && kneeAngleCv > cvErraticThreshold) {
-      weighted = weighted.clamp(0.0, advancedLevelMin);
-    }
-
-    if (weighted > advancedLevelMin) return 'advanced';
-    if (weighted >= intermediateLevelMin) return 'intermediate';
-    return 'beginner';
+    return FitnessTestScorer.scoreHomeFiveRepAssessment(
+      avgDepth: avgDepth,
+      goodRatio: goodRatio,
+      trainingDuration: trainingDuration,
+      kneeAngleCv: kneeAngleCv,
+    );
   }
 
   static String scoreCaption(int score) {
@@ -105,17 +84,5 @@ class OnboardingAssessmentThresholds {
     if (avgDepth <= goodDepthMaxAngle) return 'Độ sâu tốt';
     if (avgDepth <= okayDepthMaxAngle) return 'Độ sâu ổn';
     return 'Độ sâu còn hạn chế';
-  }
-
-  static double _depthScore(double avgAngle) {
-    if (avgAngle > beginnerDepthMaxAngle) return 1.0;
-    if (avgAngle > intermediateDepthMaxAngle) return 2.0;
-    return 3.0;
-  }
-
-  static double _compensationScore(double goodRatio) {
-    if (goodRatio < beginnerCompMaxRatio) return 1.0;
-    if (goodRatio < intermediateCompMaxRatio) return 2.0;
-    return 3.0;
   }
 }

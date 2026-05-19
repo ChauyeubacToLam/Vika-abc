@@ -54,19 +54,18 @@ const String _defaultGoal = 'health';
 /// Returns score in [0.0, 1.0]. Higher = better fit for this user.
 double score({
   required ExerciseCatalogEntry exercise,
-  required String fitnessLevel,              // 'beginner'|'intermediate'|'advanced'
-  required String goalKey,                   // 'health'|'body'|'strength'|'flexible'
+  required String fitnessLevel, // 'beginner'|'intermediate'|'advanced'
+  required String goalKey, // 'health'|'body'|'strength'|'flexible'
   required List<String> activePainAreas,
-  required List<String> recentExerciseIds,   // most-recent-first
+  required List<String> recentExerciseIds, // most-recent-first
 }) {
-    final g = _goalComponent(exercise, goalKey);
-    final l = _levelComponent(exercise.difficultyTier, fitnessLevel);
-    final p = _painComponent(exercise.painSafe, activePainAreas);
-    final c = _cooldownComponent(exercise.id, recentExerciseIds);
-  
+  final g = _goalComponent(exercise, goalKey);
+  final l = _levelComponent(exercise.difficultyTier, fitnessLevel);
+  final p = _painComponent(exercise.painSafe, activePainAreas);
+  final c = _cooldownComponent(exercise.id, recentExerciseIds);
+
   // Step 2: Weighted sum.
   return _wGoal * g + _wLevel * l + _wPain * p + _wCooldown * c;
-
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -82,9 +81,9 @@ double score({
 ///   2. If 'health' is also missing (catastrophic data error), return
 ///      a neutral 0.5 so scoring NEVER throws.
 double _goalComponent(ExerciseCatalogEntry exercise, String goalKey) {
-    final value = exercise.goalFit[goalKey];
-    if (value != null) return value;
-    return exercise.goalFit[_defaultGoal] ?? 0.5;
+  final value = exercise.goalFit[goalKey];
+  if (value != null) return value;
+  return exercise.goalFit[_defaultGoal] ?? 0.5;
 }
 
 /// Level-match curve. Exact tier match = 1.0, off by 1 tier = 0.7,
@@ -94,11 +93,11 @@ double _goalComponent(ExerciseCatalogEntry exercise, String goalKey) {
 /// pool doesn't collapse when library is sparse at a level. Blocks
 /// gross mismatches (beginner facing advanced) from scoring at all.
 double _levelComponent(int exerciseTier, String fitnessLevel) {
-    final userTier = _levelToTier(fitnessLevel);
-    final diff = (exerciseTier - userTier).abs();
-    if (diff == 0) return 1.0;
-    if (diff == 1) return 0.7;
-    return 0.0;
+  final userTier = _levelToTier(fitnessLevel);
+  final diff = (exerciseTier - userTier).abs();
+  if (diff == 0) return 1.0;
+  if (diff == 1) return 0.7;
+  return 0.0;
 }
 
 /// Pain-safety BONUS — rewards exercises that ACTIVELY benefit the
@@ -121,9 +120,9 @@ double _levelComponent(int exerciseTier, String fitnessLevel) {
 /// v1; v2 could dynamically re-normalize weights when N=0.
 double _painComponent(
     List<String> exercisePainSafe, List<String> activePainAreas) {
-    if (activePainAreas.isEmpty) return 0.5;
-    final overlap = activePainAreas.where(exercisePainSafe.contains).length;
-    return overlap / activePainAreas.length;
+  if (activePainAreas.isEmpty) return 0.5;
+  final overlap = activePainAreas.where(exercisePainSafe.contains).length;
+  return overlap / activePainAreas.length;
 }
 
 /// Cooldown FRESHNESS (note: NOT penalty; we invert here so that
@@ -141,9 +140,9 @@ double _painComponent(
 ///         i=1:               0.2
 ///         i=5 (edge of window): 1.0
 double _cooldownComponent(String exerciseId, List<String> recentExerciseIds) {
-    final i = recentExerciseIds.indexOf(exerciseId);
-    if (i == -1) return 1.0;
-    return (i / (_cooldownWindow - 1)).clamp(0.0, 1.0);
+  final i = recentExerciseIds.indexOf(exerciseId);
+  if (i == -1) return 1.0;
+  return (i / (_cooldownWindow - 1)).clamp(0.0, 1.0);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -157,10 +156,14 @@ double _cooldownComponent(String exerciseId, List<String> recentExerciseIds) {
 /// because tier-1 AND tier-3 exercises are reachable via the 0.7
 /// off-by-1 path; a 1-default would zero out all tier-3 exercises.
 int _levelToTier(String fitnessLevel) {
-    switch (fitnessLevel) {
-      case 'beginner':     return 1;
-      case 'intermediate': return 2;
-      case 'advanced':     return 3;
-      default:             return 2;
-    }
+  switch (fitnessLevel) {
+    case 'beginner':
+      return 1;
+    case 'intermediate':
+      return 2;
+    case 'advanced':
+      return 3;
+    default:
+      return 2;
+  }
 }

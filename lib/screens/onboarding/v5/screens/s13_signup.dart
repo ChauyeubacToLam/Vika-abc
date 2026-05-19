@@ -16,11 +16,13 @@ class S13Signup extends StatefulWidget {
     required this.data,
     required this.onNext,
     required this.onBack,
+    this.onAuthenticated,
   });
 
   final OnboardingData data;
   final VoidCallback onNext;
   final VoidCallback onBack;
+  final Future<void> Function()? onAuthenticated;
 
   @override
   State<S13Signup> createState() => _S13SignupState();
@@ -32,6 +34,7 @@ class _S13SignupState extends State<S13Signup> {
   StreamSubscription<AuthState>? _authSubscription;
   bool _busy = false;
   String? _notice;
+  bool _advancing = false;
 
   bool get _validEmail {
     final email = _emailController.text.trim();
@@ -45,9 +48,11 @@ class _S13SignupState extends State<S13Signup> {
     _authService = AuthService();
     _authSubscription =
         Supabase.instance.client.auth.onAuthStateChange.listen((_) {
-      _advanceIfAuthenticated();
+      unawaited(_advanceIfAuthenticated());
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) => _advanceIfAuthenticated());
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => unawaited(_advanceIfAuthenticated()),
+    );
   }
 
   @override
@@ -57,11 +62,23 @@ class _S13SignupState extends State<S13Signup> {
     super.dispose();
   }
 
-  void _advanceIfAuthenticated() {
-    if (!mounted) return;
+  Future<void> _advanceIfAuthenticated() async {
+    if (!mounted || _advancing) return;
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return;
+    _advancing = true;
+    setState(() {
+      _busy = true;
+      _notice = 'Đang tạo lộ trình cá nhân của bạn...';
+    });
     widget.data.email = user.email ?? widget.data.email;
+    try {
+      await widget.onAuthenticated?.call();
+    } catch (_) {
+      // Plan bootstrap is best-effort here; S15 has its own retry state.
+    }
+    if (!mounted) return;
+    setState(() => _busy = false);
     widget.onNext();
   }
 
@@ -72,10 +89,11 @@ class _S13SignupState extends State<S13Signup> {
       // Native GoogleSignIn → signInWithIdToken. No browser hop, so no
       // Supabase callback page or chrome redirect.
       await _authService.signInWithGoogle();
-      _advanceIfAuthenticated();
+      await _advanceIfAuthenticated();
     } catch (e) {
       _showError(_friendlyError(e,
-          fallback: 'Không thể đăng nhập bằng Google lúc này. Vui lòng thử lại.'));
+          fallback:
+              'Không thể đăng nhập bằng Google lúc này. Vui lòng thử lại.'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -86,7 +104,7 @@ class _S13SignupState extends State<S13Signup> {
     setState(() => _busy = true);
     try {
       await _authService.signInWithFacebook();
-      _advanceIfAuthenticated();
+      await _advanceIfAuthenticated();
     } catch (e) {
       _showError(_friendlyError(e,
           fallback:
@@ -475,7 +493,9 @@ class _SocialButton extends StatelessWidget {
           color: background,
           borderRadius: BorderRadius.circular(14),
           border: border == null ? null : Border.all(color: border!),
-          boxShadow: [V5.cardShadow(background == const Color(0xFF1877F2) ? .10 : .18)],
+          boxShadow: [
+            V5.cardShadow(background == const Color(0xFF1877F2) ? .10 : .18)
+          ],
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,

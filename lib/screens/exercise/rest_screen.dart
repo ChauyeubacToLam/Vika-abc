@@ -18,6 +18,7 @@ class RestScreen extends StatefulWidget {
     required this.setIndex,
     required this.totalSets,
     required this.currentReps,
+    required this.baseRestSeconds,
     required this.isLastSet,
     required this.onNext,
     this.onDifficultyAnswer,
@@ -29,6 +30,7 @@ class RestScreen extends StatefulWidget {
   final int setIndex;
   final int totalSets;
   final int currentReps;
+  final int baseRestSeconds;
   final bool isLastSet;
   final VoidCallback onNext;
   final Function(String difficulty)? onDifficultyAnswer;
@@ -81,7 +83,7 @@ class _RestScreenState extends State<RestScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    _restDuration = widget.isLastSet ? 10 : 45;
+    _restDuration = widget.isLastSet ? 10 : widget.baseRestSeconds;
     _remaining = _restDuration;
     _dotController = AnimationController(
       vsync: this,
@@ -164,7 +166,6 @@ class _RestScreenState extends State<RestScreen> with TickerProviderStateMixin {
       _ => null,
     };
   }
-
 
   @override
   Widget build(BuildContext context) {
