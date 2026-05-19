@@ -16,9 +16,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'exercise/exercise_base.dart';
 import 'models/exercise_definition.dart';
+import 'screens/exercise/exercise_launch_args.dart';
 import 'screens/exercise/exercise_experience_screen.dart';
 import 'screens/main_shell.dart';
 import 'screens/onboarding/v5/v5_onboarding_navigator.dart';
+import 'screens/plan_retest_screen.dart';
+import 'screens/weekly_check_in_screen.dart';
+import 'services/recommendation/recommendation_service.dart';
 import 'theme/typography.dart';
 import 'theme/vf_theme.dart';
 import 'utils/orientation_lock.dart';
@@ -157,9 +161,32 @@ class VikaApp extends StatelessWidget {
               builder: (_) => const V5OnboardingNavigator(),
             );
           case '/exercise':
-            final definition = settings.arguments as ExerciseDefinition;
+            final args = settings.arguments;
+            final launchArgs = args is ExerciseLaunchArgs
+                ? args
+                : ExerciseLaunchArgs(
+                    definition: args as ExerciseDefinition,
+                  );
             return MaterialPageRoute(
-              builder: (_) => ExerciseExperienceScreen(definition: definition),
+              builder: (_) => ExerciseExperienceScreen(
+                definition: launchArgs.definition,
+                catalogExerciseId: launchArgs.catalogExerciseId,
+                prescription: launchArgs.prescription,
+                recommendationId: launchArgs.recommendationId,
+                weekNumber: launchArgs.weekNumber,
+                slotName: launchArgs.slotName,
+              ),
+            );
+          case '/weekly-check-in':
+            final args = settings.arguments as WeeklyCheckInLaunchArgs;
+            return MaterialPageRoute(
+              builder: (_) => WeeklyCheckInScreen(args: args),
+            );
+          case '/plan-retest':
+            final args = settings.arguments as PlanRetestLaunchArgs;
+            return MaterialPageRoute(
+              fullscreenDialog: true,
+              builder: (_) => PlanRetestScreen(args: args),
             );
           default:
             return MaterialPageRoute(
@@ -186,6 +213,7 @@ class AppEntryGate extends StatefulWidget {
 class _AppEntryGateState extends State<AppEntryGate> {
   StreamSubscription<AuthState>? _authSubscription;
   late _AppEntryState _entryState;
+  bool _ensuredPlanForSession = false;
 
   @override
   void initState() {
@@ -244,6 +272,9 @@ class _AppEntryGateState extends State<AppEntryGate> {
   /// V5OnboardingNavigator's State (PageController + OnboardingData) when
   Future<void> _quietResolveEntryState() async {
     final complete = await isOnboardingComplete();
+    if (complete) {
+      _ensurePlanForSignedInUser();
+    }
     final target = complete ? _AppEntryState.home : _AppEntryState.onboarding;
     if (target != _entryState) {
       _setEntryState(target);
@@ -256,6 +287,14 @@ class _AppEntryGateState extends State<AppEntryGate> {
     }
 
     setState(() => _entryState = state);
+  }
+
+  void _ensurePlanForSignedInUser() {
+    if (_ensuredPlanForSession) return;
+    _ensuredPlanForSession = true;
+    unawaited(
+      RecommendationService().ensurePlanForCurrentUser(trigger: 'onboarding'),
+    );
   }
 
   @override

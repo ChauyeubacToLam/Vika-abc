@@ -979,9 +979,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       );
       final controller = CameraController(
         camera,
-        // Keep the fallback path lighter; native MediaPipe remains the primary
-        // exercise pipeline on supported phones.
-        ResolutionPreset.medium,
+        // Match the native path's 720p-class preview quality when fallback is
+        // needed on simulator/emulator builds.
+        ResolutionPreset.high,
         enableAudio: false,
         imageFormatGroup: Platform.isAndroid
             ? ImageFormatGroup.nv21
@@ -1047,7 +1047,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     final camera = _availableCameras[newIndex];
     final controller = CameraController(
       camera,
-      ResolutionPreset.medium,
+      ResolutionPreset.high,
       enableAudio: false,
       imageFormatGroup: Platform.isAndroid
           ? ImageFormatGroup.nv21
@@ -2269,7 +2269,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     if (_runtime == _PoseRuntime.nativeMediaPipe &&
         ExerciseBase.kLandscapeRotationEnabled &&
         _sessionOrientation.isLandscape) {
-      return const Size(640, 480);
+      return const Size(1280, 720);
     }
 
     final previewSize = _cameraController?.value.previewSize;
@@ -2280,9 +2280,12 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       return previewSize;
     }
 
-    return const Size(480, 640);
+    return const Size(720, 1280);
   }
 
+  // Setup hard constraint: the live camera must fill the whole exercise
+  // surface. Native min-zoom plus 720p capture keep the visible scene as wide
+  // and sharp as possible within this no-letterbox presentation.
   BoxFit get _previewFit => BoxFit.cover;
 }
 

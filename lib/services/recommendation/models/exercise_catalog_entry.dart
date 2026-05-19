@@ -27,6 +27,12 @@ class ExerciseCatalogEntry {
     this.videoUrl,
     this.baseReps,
     this.baseSeconds,
+    this.maxRepsBeginner,
+    this.maxRepsIntermediate,
+    this.maxRepsAdvanced,
+    this.maxSecondsBeginner,
+    this.maxSecondsIntermediate,
+    this.maxSecondsAdvanced,
     this.progressionFrom,
     this.progressionTo,
     this.metadata = const {},
@@ -107,6 +113,17 @@ class ExerciseCatalogEntry {
   /// Null for rep-based.
   final int? baseSeconds;
 
+  /// Tier-specific rep ceilings. Null = no cap.
+  /// When hit, signals "ready for harder variant" via progression_to walk.
+  final int? maxRepsBeginner;
+  final int? maxRepsIntermediate;
+  final int? maxRepsAdvanced;
+
+  /// Tier-specific hold ceilings. Same semantic.
+  final int? maxSecondsBeginner;
+  final int? maxSecondsIntermediate;
+  final int? maxSecondsAdvanced;
+
   // ── Progression links (v1.5+ feature, populated for reference) ──
   /// Easier variant this exercise progresses FROM.
   /// e.g. cobra.progressionFrom = 'sphinx'. Null in v1 seed,
@@ -119,7 +136,7 @@ class ExerciseCatalogEntry {
   // ── Forward compatibility ──
   /// Catch-all JSONB. v1 seed rows have:
   ///   {seed_version: '1.0-provisional', source: 'claude-2026-05-14',
-  ///    evidence_anchor: <study_id_or_null>}
+  ///    evidence_anchor: study_id_or_null}
   /// Refresh provisional rows via:
   ///   WHERE metadata->>'seed_version' = '1.0-provisional'
   final Map<String, dynamic> metadata;
@@ -133,7 +150,7 @@ class ExerciseCatalogEntry {
       fork: row['fork'] as String,
       bodyRegions: _stringList(row['body_regions']),
       muscleGroups: _stringList(row['muscle_groups']),
-      difficultyTier: row['difficulty_tier'] as int,
+      difficultyTier: (row['difficulty_tier'] as num).toInt(),
       goalFit: _doubleMap(row['goal_fit']),
       painSafe: _stringList(row['pain_safe']),
       painContraindicated: _stringList(row['pain_contraindicated']),
@@ -142,18 +159,24 @@ class ExerciseCatalogEntry {
       correctiveFor: _stringList(row['corrective_for']),
       classKey: row['class_key'] as String?,
       videoUrl: row['video_url'] as String?,
-      baseReps: row['base_reps'] as int?,
-      baseSeconds: row['base_seconds'] as int?,
+      baseReps: (row['base_reps'] as num?)?.toInt(),
+      baseSeconds: (row['base_seconds'] as num?)?.toInt(),
+      maxRepsBeginner: (row['max_reps_beginner'] as num?)?.toInt(),
+      maxRepsIntermediate: (row['max_reps_intermediate'] as num?)?.toInt(),
+      maxRepsAdvanced: (row['max_reps_advanced'] as num?)?.toInt(),
+      maxSecondsBeginner: (row['max_seconds_beginner'] as num?)?.toInt(),
+      maxSecondsIntermediate:
+          (row['max_seconds_intermediate'] as num?)?.toInt(),
+      maxSecondsAdvanced: (row['max_seconds_advanced'] as num?)?.toInt(),
       progressionFrom: row['progression_from'] as String?,
       progressionTo: row['progression_to'] as String?,
-      metadata:
-          (row['metadata'] as Map?)?.cast<String, dynamic>() ?? const {},
+      metadata: (row['metadata'] as Map?)?.cast<String, dynamic>() ?? const {},
     );
   }
 }
 
-/// Supabase returns TEXT[] columns as List<dynamic>. Plain
-/// `as List<String>` throws because the runtime type is List<dynamic>;
+/// Supabase returns TEXT[] columns as dynamic lists. Plain string-list casts
+/// throw because the runtime type is dynamic-list;
 /// you need element-by-element cast via `.cast<String>()`.
 List<String> _stringList(dynamic value) {
   if (value == null) return const [];

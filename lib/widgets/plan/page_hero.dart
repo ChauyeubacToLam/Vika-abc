@@ -15,6 +15,7 @@ import '../../theme/vf_theme.dart';
 import 'plan_typography.dart';
 import 'status_swipe_dots.dart';
 import '../../theme/app_colors.dart';
+
 class PageHero extends StatelessWidget {
   const PageHero({
     super.key,
@@ -68,7 +69,7 @@ class PageHero extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '$totalDone / $totalSessions buổi · Phase 1 đang chạy',
+                  '$totalDone / $totalSessions buổi · ${week.name}',
                   style: TextStyle(
                     fontFamily: 'BeVietnamPro',
                     fontSize: 11,

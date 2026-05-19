@@ -18,15 +18,16 @@ class SamplerOutput {
 
 SamplerOutput sample(List<ScoredCandidate> ranked, String seed) {
   if (ranked.isEmpty) {
-  throw ArgumentError('Cannot sample from empty candidate list');
+    throw ArgumentError('Cannot sample from empty candidate list');
   }
-  
+
   List<ScoredCandidate> topKList = ranked.sublist(0, min(_logN, ranked.length));
-  List<ScoredCandidate> poolForRandom = ranked.sublist(0, min(_topN, ranked.length)); // sample from 3
+  List<ScoredCandidate> poolForRandom =
+      ranked.sublist(0, min(_topN, ranked.length)); // sample from 3
 
   int rngSeed = stableHash(seed);
   Random rng = Random(rngSeed);
-  
+
   if (ranked.length == 1) {
     return SamplerOutput(winner: ranked[0], topK: topKList);
   }
@@ -36,7 +37,7 @@ SamplerOutput sample(List<ScoredCandidate> ranked, String seed) {
     int idx = rng.nextInt(poolForRandom.length);
     return SamplerOutput(winner: poolForRandom[idx], topK: topKList);
   }
-  
+
   return SamplerOutput(winner: ranked[0], topK: topKList);
 }
 

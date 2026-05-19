@@ -18,6 +18,8 @@ import '../../exercise/squat/metrics/trunk_lean_metric.dart';
 import '../../exercise/squat/squat.dart';
 import '../../models/exercise_definition.dart';
 import '../../models/post_exercise_data.dart';
+import '../../services/recommendation/models/plan.dart';
+import '../../services/recommendation/progression_service.dart';
 import '../../utils/exercise_logger.dart';
 import '../../utils/orientation_lock.dart';
 import 'active_exercise_page.dart';
@@ -32,9 +34,19 @@ class ExerciseExperienceScreen extends StatefulWidget {
   const ExerciseExperienceScreen({
     super.key,
     required this.definition,
+    this.catalogExerciseId,
+    this.prescription,
+    this.recommendationId,
+    this.weekNumber,
+    this.slotName,
   });
 
   final ExerciseDefinition definition;
+  final String? catalogExerciseId;
+  final VolumePrescription? prescription;
+  final String? recommendationId;
+  final int? weekNumber;
+  final String? slotName;
 
   @override
   State<ExerciseExperienceScreen> createState() =>
@@ -46,6 +58,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
   _WorkoutFlowPhase _phase = _WorkoutFlowPhase.intro;
   final List<ExerciseLogger> _setLoggers = [];
   final Map<int, Map<String, dynamic>> _difficultyLogs = {};
+  final Map<int, int> _prescribedRepsBySet = {};
 
   ExerciseBase? _activeExercise;
   PostExerciseData? _fullReport;
@@ -72,6 +85,8 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
   List<PreviousSessionSummary> _sessionHistory = [];
 
   bool get _isAssessment => widget.definition.id.endsWith('_assessment');
+  String get _sessionExerciseId =>
+      widget.catalogExerciseId ?? widget.definition.id;
 
   void _setFlowState(VoidCallback mutation) {
     if (!mounted) return;
@@ -85,7 +100,10 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
   void initState() {
     super.initState();
     unawaited(OrientationLock.portraitOnly());
-    _spec = _ExerciseExperienceSpec.fromDefinition(widget.definition);
+    _spec = _ExerciseExperienceSpec.fromDefinition(
+      widget.definition,
+      prescription: widget.prescription,
+    );
     _currentRepsTarget = _spec.repsPerSet;
     _loadCoachNote();
     _loadUserWeight();
@@ -116,7 +134,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
   Future<void> _loadSessionHistory() async {
     if (_isAssessment) return;
     final history =
-        await SessionPersistence().getSessionHistory(widget.definition.id);
+        await SessionPersistence().getSessionHistory(_sessionExerciseId);
     if (!mounted) return;
     setState(() {
       _sessionHistory = history;
@@ -170,6 +188,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     setState(() {
       _setLoggers.clear();
       _difficultyLogs.clear();
+      _prescribedRepsBySet.clear();
       _fullReport = null;
       _currentSetReport = null;
       _currentSetLogger = null;
@@ -189,6 +208,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
   void _prepareActiveSet() {
     _currentSetReport = null;
     _currentSetLogger = null;
+    _prescribedRepsBySet[_currentSet - 1] = _currentRepsTarget;
     _activeExercise = _spec.createExercise(_currentRepsTarget);
     _phase = _WorkoutFlowPhase.active;
   }
@@ -247,15 +267,15 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     final orderedLogs = _difficultyLogs.entries.toList()
       ..sort((a, b) => a.key.compareTo(b.key));
     await prefs.setStringList(
-      'exercise_difficulty_${widget.definition.id}',
+      'exercise_difficulty_$_sessionExerciseId',
       orderedLogs.map((entry) => jsonEncode(entry.value)).toList(),
     );
   }
 
   void _handleDifficultyAnswer(String difficulty) {
     final isLastSet = _currentSet >= _spec.sets;
-    final restSeconds =
-        (isLastSet ? 10 : 45) + (difficulty == 'heavy' ? 15 : 0);
+    final prescribedRest = isLastSet ? 10 : _spec.restSeconds;
+    final restSeconds = prescribedRest + (difficulty == 'heavy' ? 15 : 0);
     final nextReps = switch (difficulty) {
       'light' => _currentRepsTarget + 2,
       'heavy' => _currentRepsTarget > 1 ? _currentRepsTarget - 1 : 1,
@@ -267,7 +287,11 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       'set_index': _currentSetReport?.setIndex ?? (_currentSet - 1),
       'set_score': _currentSetReport?.score ?? 0,
       'difficulty': difficulty,
+      'recommendation_difficulty':
+          normalizeSetDifficultyForRecommendation(difficulty),
       'reps_completed': _currentSetReport?.totalReps ?? 0,
+      'prescribed_reps': _currentRepsTarget,
+      'prescribed_rest': prescribedRest,
       'rest_time_seconds': restSeconds,
     });
   }
@@ -291,8 +315,21 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     return setLogs.asMap().entries.map((entry) {
       final i = entry.key;
       final logger = entry.value;
+      final difficultyLog = _difficultyLogs[i];
+      final prescribedReps = _prescribedRepsBySet[i] ?? _spec.repsPerSet;
+      final appliedRest = difficultyLog?['rest_time_seconds'] as int? ??
+          (i == setLogs.length - 1 ? 10 : _spec.restSeconds);
       return {
         'set_index': i,
+        'set_number': i + 1,
+        'recommendation_id': widget.recommendationId,
+        'week_number': widget.weekNumber,
+        'is_deload_week': widget.prescription?.isDeloadWeek ?? false,
+        'prescribed_reps': prescribedReps,
+        'actual_reps': logger.repLogs.length,
+        'prescribed_rest':
+            difficultyLog?['prescribed_rest'] ?? _spec.restSeconds,
+        'applied_rest': appliedRest,
         'good_reps': logger.setLogs['good_rep_count'] ?? 0,
         'total_reps': logger.repLogs.length,
         'rep_data': logger.repLogs
@@ -314,11 +351,13 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     // Preserves set ordering so set 2's rating is always at index 1.
     final ratings = List<String?>.generate(
       report.sets.length,
-      (i) => _difficultyLogs[i]?['difficulty'] as String?,
+      (i) => _difficultyLogs[i]?['recommendation_difficulty'] as String?,
     );
 
     final sessionId = await SessionPersistence().saveSession(
-      exerciseId: widget.definition.id,
+      exerciseId: _sessionExerciseId,
+      recommendationId: widget.recommendationId,
+      slotName: widget.slotName,
       startedAt: _startedAt ?? DateTime.now(),
       formScore: report.formScore,
       totalReps: report.sets.fold(0, (sum, s) => sum + s.totalReps),
@@ -450,6 +489,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
           setIndex: _currentSet - 1,
           totalSets: _spec.sets,
           currentReps: _currentRepsTarget,
+          baseRestSeconds: _spec.restSeconds,
           isLastSet: _currentSet >= _spec.sets,
           setLogger: _currentSetLogger,
           onNext: _handleSummaryNext,
@@ -486,6 +526,7 @@ class _ExerciseExperienceSpec {
     required this.sets,
     required this.repsPerSet,
     required this.videoDuration,
+    required this.restSeconds,
     required this.muscles,
     required this.tips,
     required this.badges,
@@ -496,6 +537,7 @@ class _ExerciseExperienceSpec {
   final int sets;
   final int repsPerSet;
   final String videoDuration;
+  final int restSeconds;
   final List<String> muscles;
   final List<String> tips;
   final List<ExerciseIntroBadge> badges;
@@ -503,14 +545,20 @@ class _ExerciseExperienceSpec {
   final ExerciseBase Function(int repsPerSet) createExercise;
 
   factory _ExerciseExperienceSpec.fromDefinition(
-    ExerciseDefinition definition,
-  ) {
+    ExerciseDefinition definition, {
+    VolumePrescription? prescription,
+  }) {
+    final overrideSets = prescription?.sets;
+    final overrideReps = prescription?.reps;
+    final overrideRest = prescription?.restSeconds;
+
     switch (definition.id) {
       case 'squat_assessment':
         return _ExerciseExperienceSpec(
           sets: 1,
           repsPerSet: 5,
           videoDuration: '1:18',
+          restSeconds: overrideRest ?? 45,
           muscles: definition.targetMuscles,
           tips: definition.setupTips,
           badges: [
@@ -558,14 +606,16 @@ class _ExerciseExperienceSpec {
           definition: definition,
           sets: 1,
           repsPerSet: 5,
+          restSeconds: overrideRest,
           videoDuration: '1:12',
           createExercise: (repsPerSet) => PushUp(maxRep: repsPerSet),
         );
       case 'squat':
         return _ExerciseExperienceSpec(
-          sets: 3,
-          repsPerSet: 8,
+          sets: overrideSets ?? 3,
+          repsPerSet: overrideReps ?? 8,
           videoDuration: '2:15',
+          restSeconds: overrideRest ?? 45,
           muscles: definition.targetMuscles,
           tips: definition.setupTips,
           badges: [
@@ -611,42 +661,54 @@ class _ExerciseExperienceSpec {
       case 'lunge':
         return _generic(
           definition: definition,
-          repsPerSet: 8,
+          sets: overrideSets ?? 3,
+          repsPerSet: overrideReps ?? 8,
+          restSeconds: overrideRest,
           videoDuration: '1:58',
           createExercise: (repsPerSet) => Lunge(maxRep: repsPerSet),
         );
       case 'push_up':
         return _generic(
           definition: definition,
-          repsPerSet: 6,
+          sets: overrideSets ?? 3,
+          repsPerSet: overrideReps ?? 6,
+          restSeconds: overrideRest,
           videoDuration: '1:42',
           createExercise: (repsPerSet) => PushUp(maxRep: repsPerSet),
         );
       case 'plank':
         return _generic(
           definition: definition,
-          repsPerSet: 3,
+          sets: overrideSets ?? 3,
+          repsPerSet: overrideReps ?? 3,
+          restSeconds: overrideRest,
           videoDuration: '1:28',
           createExercise: (repsPerSet) => Plank(maxRep: repsPerSet),
         );
       case 'jumping_jack':
         return _generic(
           definition: definition,
-          repsPerSet: 15,
+          sets: overrideSets ?? 3,
+          repsPerSet: overrideReps ?? 15,
+          restSeconds: overrideRest,
           videoDuration: '1:10',
           createExercise: (repsPerSet) => JumpingJack(maxRep: repsPerSet),
         );
       case 'glute_bridge':
         return _generic(
           definition: definition,
-          repsPerSet: 15,
+          sets: overrideSets ?? 3,
+          repsPerSet: overrideReps ?? 15,
+          restSeconds: overrideRest,
           videoDuration: '1:36',
-          createExercise: (_) => GluteBridge(),
+          createExercise: (repsPerSet) => GluteBridge(maxRep: repsPerSet),
         );
       default:
         return _generic(
           definition: definition,
-          repsPerSet: 8,
+          sets: overrideSets ?? 3,
+          repsPerSet: overrideReps ?? 8,
+          restSeconds: overrideRest,
           videoDuration: '1:30',
           createExercise: (_) => definition.createExercise(),
         );
@@ -657,6 +719,7 @@ class _ExerciseExperienceSpec {
     required ExerciseDefinition definition,
     int sets = 3,
     required int repsPerSet,
+    int? restSeconds,
     required String videoDuration,
     required ExerciseBase Function(int repsPerSet) createExercise,
   }) {
@@ -664,6 +727,7 @@ class _ExerciseExperienceSpec {
       sets: sets,
       repsPerSet: repsPerSet,
       videoDuration: videoDuration,
+      restSeconds: restSeconds ?? 45,
       muscles: definition.targetMuscles,
       tips: definition.setupTips,
       badges: [

@@ -27,11 +27,15 @@ class WeekPage extends StatelessWidget {
     required this.week,
     required this.isActive,
     required this.nextWeek,
+    this.onStartToday,
+    this.onStartRecheck,
   });
 
   final PlanWeek week;
   final bool isActive;
   final PlanWeek? nextWeek;
+  final VoidCallback? onStartToday;
+  final VoidCallback? onStartRecheck;
 
   @override
   Widget build(BuildContext context) {
@@ -55,9 +59,8 @@ class WeekPage extends StatelessWidget {
           (d) => d.status == DayStatus.today,
           orElse: () => week.days.first,
         );
-        final recheck = week.days
-            .where((d) => d.status == DayStatus.recheck)
-            .toList();
+        final recheck =
+            week.days.where((d) => d.status == DayStatus.recheck).toList();
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -82,8 +85,16 @@ class WeekPage extends StatelessWidget {
               sessions: week.sessions,
             ),
             if (today.status == DayStatus.today)
-              TodayCard(day: today, weekNum: week.num),
-            if (recheck.isNotEmpty) RecheckCard(day: recheck.first),
+              TodayCard(
+                day: today,
+                weekNum: week.num,
+                onStart: onStartToday,
+              ),
+            if (recheck.isNotEmpty)
+              RecheckCard(
+                day: recheck.first,
+                onStart: onStartRecheck,
+              ),
           ],
         );
 
