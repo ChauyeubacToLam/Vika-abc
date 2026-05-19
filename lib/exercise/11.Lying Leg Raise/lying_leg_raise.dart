@@ -11,6 +11,12 @@ import 'metrics/knee_straight_metric.dart';
 
 class LyingLegRaise extends ExerciseBase {
   @override
+  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+        VikaImageOrientation.landscapeLeft,
+        VikaImageOrientation.landscapeRight,
+      };
+
+  @override
   String get exerciseName => 'Lying Leg Raise';
 
   @override

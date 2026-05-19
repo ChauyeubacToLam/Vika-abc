@@ -27,6 +27,12 @@ class LegRaiseConfig {
 }
 
 class LegRaise extends ExerciseBase {
+  @override
+  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+        VikaImageOrientation.landscapeLeft,
+        VikaImageOrientation.landscapeRight,
+      };
+
   final int maxRep;
   LegRaiseState state = LegRaiseState.lying;
   LegRaiseState previousState = LegRaiseState.lying;

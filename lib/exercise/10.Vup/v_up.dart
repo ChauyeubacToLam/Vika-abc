@@ -27,6 +27,12 @@ class VUpConfig {
 }
 
 class VUp extends ExerciseBase {
+  @override
+  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+        VikaImageOrientation.landscapeLeft,
+        VikaImageOrientation.landscapeRight,
+      };
+
   final int maxRep;
   VUpState state = VUpState.lying;
   VUpState previousState = VUpState.lying;

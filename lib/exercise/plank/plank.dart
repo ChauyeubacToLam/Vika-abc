@@ -39,6 +39,12 @@ enum PlankState { setup, holding, resting }
 // --- Plank ---
 
 class Plank extends ExerciseBase {
+  @override
+  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+        VikaImageOrientation.landscapeLeft,
+        VikaImageOrientation.landscapeRight,
+      };
+
   final int maxRep;
 
   Plank({this.maxRep = PlankConfig.MAX_REP});

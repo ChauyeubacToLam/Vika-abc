@@ -9,6 +9,12 @@ import 'metrics/hold_tempo_metric.dart';
 import 'metrics/ankle_dorsiflexion_metric.dart';
 
 class SeatedForwardFold extends ExerciseBase {
+  @override
+  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+        VikaImageOrientation.landscapeLeft,
+        VikaImageOrientation.landscapeRight,
+      };
+
   SeatedForwardState state = SeatedForwardState.setup;
   SeatedForwardState prevState = SeatedForwardState.setup;
   bool isLeftTracked = true;

@@ -10,11 +10,13 @@ class S13Signup extends StatefulWidget {
     required this.data,
     required this.onNext,
     required this.onBack,
+    this.onAuthenticated,
   });
 
   final OnboardingData data;
   final VoidCallback onNext;
   final VoidCallback onBack;
+  final Future<void> Function()? onAuthenticated;
 
   @override
   State<S13Signup> createState() => _S13SignupState();

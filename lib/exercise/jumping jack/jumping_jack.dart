@@ -30,6 +30,12 @@ enum JJState { closed, open }
 // --- Jumping Jack (front-view exercise) ---
 
 class JumpingJack extends ExerciseBase {
+  @override
+  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+        VikaImageOrientation.landscapeLeft,
+        VikaImageOrientation.landscapeRight,
+      };
+
   final int maxRep;
 
   JumpingJack({this.maxRep = JumpingJackConfig.MAX_REP});

@@ -25,6 +25,12 @@ enum LungeState { standing, descending, bottom, ascending }
 // --- Lunge ---
 
 class Lunge extends ExerciseBase {
+  @override
+  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+        VikaImageOrientation.landscapeLeft,
+        VikaImageOrientation.landscapeRight,
+      };
+
   final int maxRep;
 
   Lunge({this.maxRep = LungeConfig.MAX_REP});

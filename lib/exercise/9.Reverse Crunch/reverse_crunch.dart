@@ -10,6 +10,12 @@ import 'metrics/eccentric_tempo_metric.dart';
 
 class ReverseCrunch extends ExerciseBase {
   @override
+  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+        VikaImageOrientation.landscapeLeft,
+        VikaImageOrientation.landscapeRight,
+      };
+
+  @override
   String get exerciseName => 'Reverse Crunch';
 
   ReverseCrunchState crunchState = ReverseCrunchState.lying;

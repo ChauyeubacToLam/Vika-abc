@@ -10,6 +10,12 @@ import 'metrics/hip_rotation_metric.dart';
 import 'metrics/arm_extension_metric.dart';
 
 class PlankUpDown extends ExerciseBase {
+  @override
+  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+        VikaImageOrientation.landscapeLeft,
+        VikaImageOrientation.landscapeRight,
+      };
+
   final int maxRep;
   PlankState plankState = PlankState.forearm_plank;
   PlankState previousPlankState = PlankState.forearm_plank;

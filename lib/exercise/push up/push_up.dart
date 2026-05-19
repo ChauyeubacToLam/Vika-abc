@@ -31,6 +31,12 @@ enum PushUpState { plank, descending, bottom, ascending }
 // --- Push Up ---
 
 class PushUp extends ExerciseBase {
+  @override
+  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+        VikaImageOrientation.landscapeLeft,
+        VikaImageOrientation.landscapeRight,
+      };
+
   final int maxRep;
   PushUp({this.maxRep = PushUpConfig.MAX_REP});
 

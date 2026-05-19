@@ -10,6 +10,12 @@ import 'metrics/flat_back_metric.dart';
 import 'metrics/weight_distribution_metric.dart';
 
 class BearPlank extends ExerciseBase {
+  @override
+  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+        VikaImageOrientation.landscapeLeft,
+        VikaImageOrientation.landscapeRight,
+      };
+
   BearState bearState = BearState.setup;
   BearState previousBearState = BearState.setup;
   

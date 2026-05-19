@@ -19,6 +19,12 @@ class BowPoseConfig {
 }
 
 class BowPose extends ExerciseBase {
+  @override
+  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+        VikaImageOrientation.landscapeLeft,
+        VikaImageOrientation.landscapeRight,
+      };
+
   final int maxRep;
   BowPose({this.maxRep = BowPoseConfig.MAX_REP});
 

@@ -27,6 +27,12 @@ class DeadBugConfig {
 }
 
 class DeadBug extends ExerciseBase {
+  @override
+  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+        VikaImageOrientation.landscapeLeft,
+        VikaImageOrientation.landscapeRight,
+      };
+
   final int maxRep;
   DeadBugState state = DeadBugState.setup;
   DeadBugState previousState = DeadBugState.setup;
