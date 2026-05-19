@@ -37,6 +37,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.13.1
 
 
 flutter:
@@ -95,3 +96,9 @@ flutter:
         - asset: assets/fonts/be_vietnam_pro/BeVietnamPro-ExtraBoldItalic.ttf
           weight: 800
           style: italic
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  remove_alpha_ios: true
+  image_path: "assets/images/app_icon.png"
