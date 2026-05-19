@@ -313,7 +313,13 @@ class PoseLandmarkerPlugin(
         preview = previewUseCase
         imageAnalysis = analysisUseCase
 
-        provider.bindToLifecycle(activity, cameraSelector, previewUseCase, analysisUseCase)
+        val boundCamera = provider.bindToLifecycle(
+            activity,
+            cameraSelector,
+            previewUseCase,
+            analysisUseCase,
+        )
+        boundCamera.cameraControl.setLinearZoom(0.0f)
     }
 
     private fun analyzeFrame(
@@ -529,11 +535,11 @@ class PoseLandmarkerPlugin(
         private const val EVENT_CHANNEL_NAME = "com.vikavn.app/pose_landmarker_stream"
         private const val ROTATION_LOG_SAMPLE_RATE = 30
         private const val ROTATION_SLOW_FRAME_MS = 12.0
-        // 16:9 keeps the wide exercise framing while avoiding the per-frame 720p
-        // bitmap allocation/rotation cost on mid and low-range Android phones.
-        // CameraX picks the closest supported size when 960x540 is unavailable.
-        private const val TARGET_WIDTH = 960
-        private const val TARGET_HEIGHT = 540
+        // 720p keeps a sharper, wider preview while staying light enough for
+        // live pose analysis on mainstream phones. CameraX picks the closest
+        // supported size when 1280x720 is unavailable.
+        private const val TARGET_WIDTH = 1280
+        private const val TARGET_HEIGHT = 720
 
         private fun targetRotationForOrientation(orientation: String): Int {
             // Match Flutter's camera_android_camerax orientation table:

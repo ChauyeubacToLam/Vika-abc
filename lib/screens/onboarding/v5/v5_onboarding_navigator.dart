@@ -9,6 +9,7 @@ import 'package:vika/models/exercise_definition.dart';
 import 'package:vika/utils/exercise_logger.dart';
 import 'package:vika/utils/orientation_lock.dart';
 import 'package:vika/services/onboarding_persistence.dart';
+import 'package:vika/services/recommendation/recommendation_service.dart';
 
 import '../onboarding_data.dart';
 import 'screens/s01_welcome.dart';
@@ -44,6 +45,8 @@ class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
   final OnboardingData _data = OnboardingData();
   int _page = 0;
   bool _completing = false;
+  bool _onboardingSignalsPersisted = false;
+  Future<PlanSnapshot?>? _onboardingPlanFuture;
 
   // Page indices used for special-case logic.
   static const _idxAssessmentIntro = 6; // S07
@@ -72,6 +75,41 @@ class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
         curve: Curves.easeOutCubic,
       );
     }
+  }
+
+  Future<PlanSnapshot?> _ensureOnboardingPlan({bool markComplete = false}) {
+    final existing = _onboardingPlanFuture;
+    if (existing != null) return existing;
+
+    final future = _persistAndGenerateOnboardingPlan(
+      markComplete: markComplete,
+    ).then((snapshot) {
+      if (snapshot == null) {
+        _onboardingPlanFuture = null;
+      }
+      return snapshot;
+    });
+    _onboardingPlanFuture = future;
+    return future;
+  }
+
+  Future<PlanSnapshot?> _persistAndGenerateOnboardingPlan({
+    required bool markComplete,
+  }) async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return null;
+
+    final persisted = await OnboardingPersistence().persist(
+      _data,
+      markComplete: markComplete,
+      writeSignals: !_onboardingSignalsPersisted,
+    );
+    if (!persisted) return null;
+    _onboardingSignalsPersisted = true;
+
+    return RecommendationService().ensurePlanForCurrentUser(
+      trigger: 'onboarding',
+    );
   }
 
   void _back() {
@@ -193,8 +231,12 @@ class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
           // Conservative upsert — only fields we're sure exist on `profiles`.
           // Everything else stays in SharedPreferences until columns ship.
           // See BACKEND-GAP list in the migration notes.
-          await OnboardingPersistence().persist(_data);
-
+          final persisted = await OnboardingPersistence().persist(
+            _data,
+            writeSignals: !_onboardingSignalsPersisted,
+          );
+          if (persisted) _onboardingSignalsPersisted = true;
+          await _ensureOnboardingPlan(markComplete: true);
         } catch (_) {
           // Non-fatal — continue to home even if profile sync fails. The
           // SharedPreferences flag is enough for the entry gate.
@@ -239,9 +281,21 @@ class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
         S10LevelIssue(data: _data, onNext: _next, onBack: _back),
         S11BodyInfo(data: _data, onNext: _next, onBack: _back),
         S12Schedule(data: _data, onNext: _next, onBack: _back),
-        S13Signup(data: _data, onNext: _next, onBack: _back),
+        S13Signup(
+          data: _data,
+          onNext: _next,
+          onBack: _back,
+          onAuthenticated: () async {
+            await _ensureOnboardingPlan();
+          },
+        ),
         S14Outcomes(data: _data, onNext: _next, onBack: _back),
-        S15Journey(data: _data, onNext: _next, onBack: _back),
+        S15Journey(
+          data: _data,
+          onNext: _next,
+          onBack: _back,
+          loadPlan: _ensureOnboardingPlan,
+        ),
         S16Closer(
           data: _data,
           onComplete: _complete,

@@ -1,207 +1,310 @@
 import 'package:flutter/material.dart';
 
+import 'package:vika/models/exercise_lookup.dart';
 import '../../onboarding_data.dart';
+import '../../../../services/recommendation/models/plan.dart';
+import '../../../../services/recommendation/recommendation_service.dart';
 import '../v5_models.dart';
 import '../v5_primitives.dart';
 import '../v5_theme.dart';
 
-class S15Journey extends StatelessWidget {
+class S15Journey extends StatefulWidget {
   const S15Journey({
     super.key,
     required this.data,
     required this.onNext,
     required this.onBack,
+    this.loadPlan,
   });
 
   final OnboardingData data;
   final VoidCallback onNext;
   final VoidCallback onBack;
+  final Future<PlanSnapshot?> Function()? loadPlan;
+
+  @override
+  State<S15Journey> createState() => _S15JourneyState();
+}
+
+class _S15JourneyState extends State<S15Journey> {
+  late Future<PlanSnapshot?> _planFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _planFuture = _loadPlan();
+  }
+
+  Future<PlanSnapshot?> _loadPlan() {
+    final loader = widget.loadPlan;
+    if (loader == null) return Future<PlanSnapshot?>.value(null);
+    return loader();
+  }
+
+  void _retry() {
+    setState(() => _planFuture = _loadPlan());
+  }
 
   @override
   Widget build(BuildContext context) {
-    final p = derivePlanPersonalization(data);
-    final weeks = _weeks(p);
+    final p = derivePlanPersonalization(widget.data);
     return V5Screen(
       index: 15,
-      onBack: onBack,
+      onBack: widget.onBack,
       children: [
-        Positioned(
-          top: 144,
-          left: 24,
-          right: 24,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const V5Eyebrow(label: 'Hành trình'),
-              const SizedBox(height: 10),
-              Text(
-                '4 chặng đường phía trước',
-                style: V5.text(
-                  context,
-                  size: 24,
-                  weight: FontWeight.w800,
-                  color: V5.ink,
-                  letterSpacing: -.8,
-                  height: 1.05,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Vuốt sang để xem từng tuần. Mỗi tuần đều khác — Vika điều chỉnh theo cơ thể bạn.',
-                style: V5.text(
-                  context,
-                  size: 12,
-                  weight: FontWeight.w500,
-                  color: V5.inkSoft,
-                  height: 1.4,
-                ),
-              ),
-            ],
-          ),
-        ),
-        Positioned(
-          top: 262,
-          left: 20,
-          right: 20,
-          child: Row(
-            children: weeks.asMap().entries.map((entry) {
-              final i = entry.key;
-              final first = i == 0;
-              return Expanded(
-                child: Container(
-                  height: 5,
-                  margin: EdgeInsets.only(right: i == weeks.length - 1 ? 0 : 6),
-                  decoration: BoxDecoration(
-                    color: first
-                        ? V5.yellow
-                        : V5.yellow.withValues(alpha: 0.18 + (i + 1) / 4 * 0.15),
-                    borderRadius: BorderRadius.circular(3),
+        FutureBuilder<PlanSnapshot?>(
+          future: _planFuture,
+          builder: (context, snapshot) {
+            final plan = snapshot.data?.plan;
+            final loading = snapshot.connectionState == ConnectionState.waiting;
+            final weeks =
+                plan == null ? _loadingWeeks(p) : _weeksFromPlan(plan);
+            final hasPlan = plan != null;
+
+            return Stack(
+              children: [
+                Positioned(
+                  top: 144,
+                  left: 24,
+                  right: 24,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const V5Eyebrow(label: 'Hành trình'),
+                      const SizedBox(height: 10),
+                      Text(
+                        loading
+                            ? 'Đang tạo lộ trình của bạn'
+                            : hasPlan
+                                ? '${weeks.length} tuần phía trước'
+                                : 'Chưa tải được lộ trình',
+                        style: V5.text(
+                          context,
+                          size: 24,
+                          weight: FontWeight.w800,
+                          color: V5.ink,
+                          letterSpacing: -.8,
+                          height: 1.05,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        loading
+                            ? 'Vika đang lưu hồ sơ và tạo kế hoạch thật từ thuật toán mới.'
+                            : hasPlan
+                                ? 'Đây là lộ trình thật đã được lưu cho tài khoản của bạn.'
+                                : 'Mạng có thể chưa ổn. Bạn có thể thử lại trước khi bắt đầu.',
+                        style: V5.text(
+                          context,
+                          size: 12,
+                          weight: FontWeight.w500,
+                          color: V5.inkSoft,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
                   ),
-                  child: first
-                      ? Align(
-                          alignment: Alignment.centerRight,
-                          child: Transform.translate(
-                            offset: const Offset(5, 0),
-                            child: Container(
-                              width: 11,
-                              height: 11,
-                              decoration: BoxDecoration(
-                                color: V5.yellow,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: V5.bg, width: 2),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: V5.yellow.withValues(alpha: .6),
-                                    blurRadius: 6,
-                                  ),
-                                ],
-                              ),
-                            ),
+                ),
+                Positioned(
+                  top: 262,
+                  left: 20,
+                  right: 20,
+                  child: Row(
+                    children: weeks.asMap().entries.map((entry) {
+                      final i = entry.key;
+                      final first = i == 0;
+                      return Expanded(
+                        child: Container(
+                          height: 5,
+                          margin: EdgeInsets.only(
+                            right: i == weeks.length - 1 ? 0 : 6,
                           ),
-                        )
-                      : null,
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-        Positioned(
-          top: 286,
-          left: 0,
-          right: 0,
-          bottom: 108,
-          child: PageView.builder(
-            controller: PageController(viewportFraction: .75),
-            padEnds: false,
-            itemCount: weeks.length,
-            itemBuilder: (context, index) {
-              return Padding(
-                padding: EdgeInsets.fromLTRB(index == 0 ? 16 : 6, 8, 6, 8),
-                child: V5FadeIn(
-                  delay: Duration(milliseconds: index * 70),
-                  slideY: 8,
-                  child: _WeekCard(
-                    week: weeks[index],
-                    level: p.level,
-                    first: index == 0,
+                          decoration: BoxDecoration(
+                            color: first
+                                ? V5.yellow
+                                : V5.yellow.withValues(
+                                    alpha: 0.18 + (i + 1) / weeks.length * 0.15,
+                                  ),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: first
+                              ? Align(
+                                  alignment: Alignment.centerRight,
+                                  child: Transform.translate(
+                                    offset: const Offset(5, 0),
+                                    child: Container(
+                                      width: 11,
+                                      height: 11,
+                                      decoration: BoxDecoration(
+                                        color: V5.yellow,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: V5.bg,
+                                          width: 2,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: V5.yellow.withValues(
+                                              alpha: .6,
+                                            ),
+                                            blurRadius: 6,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : null,
+                        ),
+                      );
+                    }).toList(),
                   ),
                 ),
-              );
-            },
-          ),
+                Positioned(
+                  top: 286,
+                  left: 0,
+                  right: 0,
+                  bottom: 108,
+                  child: PageView.builder(
+                    controller: PageController(viewportFraction: .75),
+                    padEnds: false,
+                    itemCount: weeks.length,
+                    itemBuilder: (context, index) {
+                      return Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          index == 0 ? 16 : 6,
+                          8,
+                          6,
+                          8,
+                        ),
+                        child: V5FadeIn(
+                          delay: Duration(milliseconds: index * 70),
+                          slideY: 8,
+                          child: _WeekCard(
+                            week: weeks[index],
+                            level: p.level,
+                            first: index == 0,
+                            loading: loading,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                if (!loading && !hasPlan)
+                  Positioned(
+                    left: 24,
+                    right: 24,
+                    bottom: 108,
+                    child: _RetryPanel(onRetry: _retry),
+                  ),
+              ],
+            );
+          },
         ),
-        V5PillCTA(label: 'Sẵn sàng bắt đầu', onTap: onNext),
+        V5PillCTA(
+          label: 'Sẵn sàng bắt đầu',
+          enabled: true,
+          onTap: widget.onNext,
+        ),
       ],
     );
   }
 
-  List<_Week> _weeks(PlanPersonalization p) {
-    // TODO(LOGIC-REFINEMENT-#9): S14 Journey — week-by-week exercise assignment is a placeholder mix from 8-exercise libraries.
-    // Currently using v1 placeholder from JSX prototype. Real logic deferred to Phase 2.
-    // See Notion: Vika State > Onboarding Logic Refinement block for full context.
-    const homeLib = [
-      'Squat',
-      'Wall Push-Up',
-      'Glute Bridge',
-      'Bird Dog',
-      'Lunge',
-      'Plank',
-      'Dead Bug',
-      'Calf Raise',
-    ];
-    const yogaLib = [
-      'Warrior I',
-      'Forward Fold',
-      'Cat-Cow',
-      'Child Pose',
-      'Down Dog',
-      'Triangle',
-      'Bridge',
-      'Tree Pose',
-    ];
-    final lib = p.isYoga ? yogaLib : homeLib;
+  List<_Week> _weeksFromPlan(Plan plan) {
+    return plan.weeks.map((week) {
+      final firstSession = week.sessions.isEmpty ? null : week.sessions.first;
+      final slots = firstSession?.slots ?? const <SlotAssignment>[];
+      final exercises = slots.take(4).map((slot) {
+        return '${_exerciseLabel(slot.exerciseId)} · ${_formatVolume(slot.volume)}';
+      }).toList();
+      return _Week(
+        number: week.weekNumber,
+        theme: week.phaseName,
+        headline: week.isDeloadWeek
+            ? 'Giảm tải để cơ thể hồi phục'
+            : week.weekNumber == 1
+                ? 'Bắt đầu chắc và đúng form'
+                : 'Tăng dần mục tiêu trong tuần này',
+        feeling: week.isDeloadWeek
+            ? 'Tuần này nhẹ hơn có chủ đích. Cơ thể được hồi lại trước khi kiểm tra tiến độ.'
+            : 'Bài tập giữ ổn định, chỉ tăng lượng vừa đủ để bạn thấy tiến bộ mà không bị quá sức.',
+        sessionCount: week.sessions.length,
+        exercises:
+            exercises.isEmpty ? ['Vika đang chuẩn bị bài tập'] : exercises,
+        tag: week.isDeloadWeek ? 'Phục hồi' : 'Tuần ${week.weekNumber}',
+      );
+    }).toList();
+  }
+
+  List<_Week> _loadingWeeks(PlanPersonalization p) {
     return [
-      _Week(
-        number: 1,
-        theme: 'Khởi động',
-        headline: 'Làm quen với chuyển động',
-        feeling:
-            'Cơ thể bắt đầu nhớ form chuẩn. Có thể vẫn lúng túng, nhưng đó là dấu hiệu bạn đang học.',
-        sessionCount: p.freq,
-        exercises: [lib[0], lib[1], lib[2]],
-        tag: 'Form chuẩn',
-      ),
-      _Week(
-        number: 2,
-        theme: 'Củng cố',
-        headline: 'Form quen, sức bền tăng',
-        feeling:
-            'Tập xong không còn mệt như tuần 1. Cơ thể đã thích nghi — bạn sẽ thấy rõ điều này.',
-        sessionCount: p.freq,
-        exercises: [lib[0], lib[3], lib[4]],
-        tag: 'Tăng reps',
-      ),
-      _Week(
-        number: 3,
-        theme: 'Đẩy mạnh',
-        headline: 'Vượt giới hạn cũ',
-        feeling:
-            'Có thể tập sâu hơn, lâu hơn. Cảm giác kiểm soát body tốt hơn nhiều so với tuần 1.',
-        sessionCount: p.freq,
-        exercises: [lib[3], lib[5], lib[6]],
-        tag: 'Sâu hơn',
-      ),
-      _Week(
-        number: 4,
-        theme: 'Đỉnh cao',
-        headline: 'Đo kết quả & ăn mừng',
-        feeling:
-            'So sánh với tuần 1 — tiến bộ rõ rệt. Đủ tự tin để tiếp tục lộ trình tiếp theo.',
-        sessionCount: p.freq,
-        exercises: [lib[0], lib[1], lib[7]],
-        tag: 'Đo tiến bộ',
-      ),
+      for (var week = 1; week <= 7; week++)
+        _Week(
+          number: week,
+          theme: week == 7
+              ? 'Phục hồi'
+              : week <= 3
+                  ? 'Nền tảng'
+                  : 'Phát triển',
+          headline: 'Đang ghép bài tập phù hợp',
+          feeling: 'Vika đang đọc hồ sơ, vùng đau và lịch tập của bạn.',
+          sessionCount: p.freq,
+          exercises: const [
+            'Đang tạo bài tập',
+            'Đang đặt mục tiêu',
+            'Đang lưu kế hoạch'
+          ],
+          tag: week == 7 ? 'Giảm tải' : 'Đang tạo',
+        ),
     ];
+  }
+}
+
+class _RetryPanel extends StatelessWidget {
+  const _RetryPanel({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: V5.surface,
+        border: Border.all(color: V5.border),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [V5.cardShadow(0.08)],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'Lộ trình chưa được lưu. Thử lại để Vika tạo kế hoạch thật.',
+              style: V5.text(
+                context,
+                size: 12,
+                weight: FontWeight.w600,
+                color: V5.inkSoft,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          TextButton(
+            onPressed: onRetry,
+            child: Text(
+              'Thử lại',
+              style: V5.text(
+                context,
+                size: 12,
+                weight: FontWeight.w800,
+                color: V5.yellowDeep,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -230,11 +333,13 @@ class _WeekCard extends StatelessWidget {
     required this.week,
     required this.level,
     required this.first,
+    required this.loading,
   });
 
   final _Week week;
   final String level;
   final bool first;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
@@ -323,13 +428,16 @@ class _WeekCard extends StatelessWidget {
                   ),
                   if (first)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: V5.yellow,
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
-                        'BẮT ĐẦU ĐÂY',
+                        loading ? 'ĐANG TẠO' : 'BẮT ĐẦU ĐÂY',
                         style: V5.text(
                           context,
                           size: 8,
@@ -397,9 +505,13 @@ class _WeekCard extends StatelessWidget {
               ...week.exercises.map(
                 (ex) => Container(
                   margin: const EdgeInsets.only(bottom: 5),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 7,
+                  ),
                   decoration: BoxDecoration(
-                    color: first ? Colors.white.withValues(alpha: .05) : V5.bgSoft,
+                    color:
+                        first ? Colors.white.withValues(alpha: .05) : V5.bgSoft,
                     borderRadius: BorderRadius.circular(10),
                     border: first
                         ? Border.all(color: Colors.white.withValues(alpha: .08))
@@ -426,14 +538,18 @@ class _WeekCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        ex,
-                        style: V5.text(
-                          context,
-                          size: 12,
-                          weight: FontWeight.w700,
-                          color: first ? V5.invInk : V5.ink,
-                          letterSpacing: -.2,
+                      Expanded(
+                        child: Text(
+                          ex,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: V5.text(
+                            context,
+                            size: 12,
+                            weight: FontWeight.w700,
+                            color: first ? V5.invInk : V5.ink,
+                            letterSpacing: -.2,
+                          ),
                         ),
                       ),
                     ],
@@ -441,7 +557,9 @@ class _WeekCard extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              Divider(color: first ? Colors.white.withValues(alpha: .08) : V5.border),
+              Divider(
+                color: first ? Colors.white.withValues(alpha: .08) : V5.border,
+              ),
               Row(
                 children: [
                   Icon(Icons.schedule_rounded,
@@ -474,4 +592,31 @@ class _WeekCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String _formatVolume(VolumePrescription volume) {
+  final target = volume.reps != null
+      ? '${volume.reps} rep'
+      : volume.seconds != null
+          ? '${volume.seconds}s'
+          : '';
+  return '${volume.sets} hiệp${target.isEmpty ? '' : ' x $target'}';
+}
+
+String _exerciseLabel(String id) {
+  final definition = lookupExerciseDefinition(id);
+  if (definition != null) return definition.name;
+  return switch (id) {
+    'squat_bw' => 'Squat',
+    'wall_pushup' || 'wall_pushup_assessment' => 'Wall Push-Up',
+    'glute_bridge_bw' => 'Glute Bridge',
+    'warrior_i' => 'Warrior I',
+    'standing_forward_fold' => 'Standing Forward Fold',
+    'cobra' => 'Cobra',
+    _ => id
+        .split('_')
+        .where((part) => part.isNotEmpty)
+        .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+        .join(' '),
+  };
 }

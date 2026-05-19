@@ -19,9 +19,12 @@ import 'package:flutter/services.dart';
 
 import '../data/home_mock.dart';
 import '../models/exercise_lookup.dart';
+import '../services/recommendation/recommendation_service.dart';
+import '../services/recommendation/weekly_check_in_service.dart';
 import '../services/user_program_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/orientation_lock.dart';
+import 'weekly_check_in_screen.dart';
 import '../widgets/home/browse_shortcut.dart';
 import '../widgets/home/form_week_chart.dart';
 import '../widgets/home/greeting_block.dart';
@@ -31,6 +34,7 @@ import '../widgets/home/streak_ring.dart';
 import '../widgets/plan/editorial_closer.dart';
 import '../widgets/plan/section_mark.dart';
 import '../widgets/plan/wordmark_header.dart';
+
 class DashboardHomeScreen extends StatefulWidget {
   const DashboardHomeScreen({
     super.key,
@@ -51,10 +55,51 @@ class DashboardHomeScreen extends StatefulWidget {
 }
 
 class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
+  final _recommendations = RecommendationService();
+  final _checkIns = WeeklyCheckInService();
+  _CheckInPrompt? _checkInPrompt;
+
   @override
   void initState() {
     super.initState();
     unawaited(OrientationLock.portraitOnly());
+    unawaited(_loadCheckInPrompt());
+  }
+
+  Future<void> _loadCheckInPrompt() async {
+    final snapshot =
+        await _recommendations.fetchLatestPlanSnapshotForCurrentUser();
+    final plan = snapshot?.plan;
+    if (snapshot == null || plan == null) return;
+    final weekNumber = snapshot.currentWeekNumber;
+    if (!plan.weeklyCheckInWeeks.contains(weekNumber)) return;
+    final due = await _checkIns.isDue(
+      recommendationId: plan.recommendationId,
+      weekNumber: weekNumber,
+    );
+    if (!mounted || !due) return;
+    setState(() {
+      _checkInPrompt = _CheckInPrompt(
+        recommendationId: plan.recommendationId,
+        weekNumber: weekNumber,
+      );
+    });
+  }
+
+  Future<void> _openCheckIn() async {
+    final prompt = _checkInPrompt;
+    if (prompt == null) return;
+    final completed = await Navigator.of(context).pushNamed(
+      '/weekly-check-in',
+      arguments: WeeklyCheckInLaunchArgs(
+        recommendationId: prompt.recommendationId,
+        weekNumber: prompt.weekNumber,
+      ),
+    );
+    if (!mounted) return;
+    if (completed == true) {
+      setState(() => _checkInPrompt = null);
+    }
   }
 
   @override
@@ -87,6 +132,11 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
                 dayLabel: homeMockUser.dayLabel,
                 sessionLabel: homeMockUser.sessionLabel,
               ),
+              if (_checkInPrompt != null)
+                _WeeklyCheckInBanner(
+                  weekNumber: _checkInPrompt!.weekNumber,
+                  onTap: _openCheckIn,
+                ),
               const SectionMark(num: '01', label: 'Hôm nay', total: '02'),
               const SizedBox(height: 18),
               _HeroDayRail(onCta: () => _startTodayWorkout(context)),
@@ -121,6 +171,94 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
     } else {
       debugPrint('[Home] No ExerciseDefinition for Squat — stubbed.');
     }
+  }
+}
+
+class _CheckInPrompt {
+  const _CheckInPrompt({
+    required this.recommendationId,
+    required this.weekNumber,
+  });
+
+  final String recommendationId;
+  final int weekNumber;
+}
+
+class _WeeklyCheckInBanner extends StatelessWidget {
+  const _WeeklyCheckInBanner({
+    required this.weekNumber,
+    required this.onTap,
+  });
+
+  final int weekNumber;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
+      child: Material(
+        color: c.bgRaised,
+        borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: c.border),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: c.yellow,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.tune_rounded,
+                    size: 17,
+                    color: c.yellowInk,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Check-in tuần $weekNumber',
+                        style: TextStyle(
+                          fontFamily: 'BeVietnamPro',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: c.ink,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '30 giây để Vika hiểu cơ thể bạn hơn.',
+                        style: TextStyle(
+                          fontFamily: 'BeVietnamPro',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: c.inkSoft,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: c.inkSoft),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -230,9 +368,7 @@ class _RailDots extends StatelessWidget {
             width: i == activeIndex ? 22 : 4,
             height: 4,
             decoration: BoxDecoration(
-              color: i == activeIndex
-                  ? c.ink
-                  : c.inkGhost,
+              color: i == activeIndex ? c.ink : c.inkGhost,
               borderRadius: BorderRadius.circular(2),
             ),
           ),

@@ -70,6 +70,10 @@ enum GluteBridgeState {
    GLUTE BRIDGE LOGIC
    ========================================================================= */
 class GluteBridge extends ExerciseBase {
+  final int maxRep;
+
+  GluteBridge({this.maxRep = GluteBridgeConfig.MAX_REP});
+
   GluteBridgeState gluteState = GluteBridgeState.bottom;
   GluteBridgeState previousGluteState = GluteBridgeState.bottom;
 
@@ -214,7 +218,7 @@ class GluteBridge extends ExerciseBase {
      ----------------------------------------------------------------------- */
   @override
   bool requestStop() {
-    return repCount >= GluteBridgeConfig.MAX_REP;
+    return repCount >= maxRep;
   }
 
   @override

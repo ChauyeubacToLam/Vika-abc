@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../../onboarding_assessment_thresholds.dart';
+import '../../../../services/recommendation/fitness_test_scoring.dart';
 import '../../onboarding_data.dart';
 import '../v5_models.dart';
 import '../v5_primitives.dart';
@@ -35,7 +35,8 @@ class _S10LevelIssueState extends State<S10LevelIssue>
       title: 'Người mới',
       stat: '15-25 phút',
       sub: 'Đang xây nền tảng',
-      desc: 'Tập trung vào nền tảng & form chuẩn. Ít reps, nhiều thời gian học.',
+      desc:
+          'Tập trung vào nền tảng & form chuẩn. Ít reps, nhiều thời gian học.',
       pose: 'reach',
     ),
     (
@@ -75,71 +76,36 @@ class _S10LevelIssueState extends State<S10LevelIssue>
 
   String _recommendedLevel() {
     if (widget.data.fork == 'yoga') {
-      return _mockYogaLevel();
+      final results = yogaResultsMock;
+      final allValues = results.expand((r) => r.chartData).toList();
+      final totalCandidates = results.fold<int>(
+        0,
+        (sum, r) => sum + r.candidates.where((c) => c.id != 'none').length,
+      );
+      final confirmedIssues = widget.data.feedbackByExercise.values.fold<int>(
+        0,
+        (sum, items) => sum + items.where((id) => id != 'none').length,
+      );
+      return FitnessTestScorer.score(
+        FitnessTestScoringInput(
+          fork: widget.data.fork,
+          trainingDuration: widget.data.duration,
+          yogaAssessment: YogaMobilityAssessment(
+            chartValues: allValues,
+            chartTarget: results.first.chartTarget,
+            totalIssueCandidates: totalCandidates,
+            confirmedIssueCount: confirmedIssues,
+          ),
+        ),
+      ).suggestedLevel;
     }
-    if (!widget.data.hasSquatAssessment) return 'beginner';
-    final logger = widget.data.squatLogger;
-    final totalReps = logger.repLogs.length;
-    final goodReps = (logger.setLogs['good_rep_count'] as int?) ?? 0;
-    final goodRatio = totalReps == 0 ? 0.0 : goodReps / totalReps;
-    final depths = logger.repLogs
-        .map((r) => r.data['peak_knee_angle'] as num?)
-        .whereType<num>()
-        .map((v) => v.toDouble())
-        .toList();
-    final avgDepth =
-        depths.isEmpty ? null : depths.reduce((a, b) => a + b) / depths.length;
-    final cv = _kneeAngleCv(depths);
-    return OnboardingAssessmentThresholds.computeLevel(
-      avgDepth: avgDepth,
-      goodRatio: goodRatio,
-      trainingDuration: widget.data.duration,
-      kneeAngleCv: cv,
-    );
-  }
 
-  String _mockYogaLevel() {
-    // TODO(LOGIC-REFINEMENT-#5): S09 LevelIssue — yoga branch level prediction formula needs ROM-based scoring + comp gate translation.
-    // Currently using v1 placeholder from JSX prototype. Real logic deferred to Phase 2.
-    // See Notion: Vika State > Onboarding Logic Refinement block for full context.
-    final results = yogaResultsMock;
-    final feedbackByEx = widget.data.feedbackByExercise;
-    final allValues = results.expand((r) => r.chartData).toList();
-    final target = results.first.chartTarget;
-    final avg = allValues.reduce((a, b) => a + b) / allValues.length;
-    final depthScore = math.min(avg / target, 1.2);
-    final totalCandidates = results.fold<int>(
-      0,
-      (sum, r) => sum + r.candidates.where((c) => c.id != 'none').length,
-    );
-    final confirmedIssues = feedbackByEx.values.fold<int>(
-      0,
-      (sum, items) => sum + items.where((id) => id != 'none').length,
-    );
-    final compScore = 1 - (confirmedIssues / math.max(totalCandidates, 1));
-    final historyScore = widget.data.duration == '1y+'
-        ? 0.85
-        : widget.data.duration == '3-11m'
-            ? 0.5
-            : 0.2;
-    final weighted = 0.40 * depthScore + 0.35 * compScore + 0.25 * historyScore;
-    final cappedScore = compScore < 0.5 ? math.min(weighted, 0.49) : weighted;
-    final isNewToTraining =
-        widget.data.duration == null || widget.data.duration == '<3m';
-    if (isNewToTraining) return 'beginner';
-    if (cappedScore >= 0.75) return 'advanced';
-    if (cappedScore >= 0.55) return 'intermediate';
-    return 'beginner';
-  }
-
-  double _kneeAngleCv(List<double> angles) {
-    if (angles.length < 3) return -1;
-    final mean = angles.reduce((a, b) => a + b) / angles.length;
-    if (mean == 0) return -1;
-    final variance =
-        angles.map((a) => (a - mean) * (a - mean)).reduce((a, b) => a + b) /
-            angles.length;
-    return (math.sqrt(variance) / mean) * 100;
+    return FitnessTestScorer.score(
+      FitnessTestScoringInput.fromSquatLogger(
+        logger: widget.data.hasSquatAssessment ? widget.data.squatLogger : null,
+        trainingDuration: widget.data.duration,
+      ),
+    ).suggestedLevel;
   }
 
   String _reasoning() {
@@ -277,7 +243,8 @@ class _S10LevelIssueState extends State<S10LevelIssue>
                   padding: const EdgeInsets.fromLTRB(16, 10, 16, 112),
                   children: ordered.asMap().entries.map((entry) {
                     final i = entry.key;
-                    final level = _levels.firstWhere((l) => l.id == entry.value);
+                    final level =
+                        _levels.firstWhere((l) => l.id == entry.value);
                     final selected = widget.data.level == level.id;
                     final recommended = level.id == _recommendedId;
                     return Padding(
@@ -423,7 +390,8 @@ class _LevelCard extends StatelessWidget {
                               letterSpacing: -0.3,
                             ),
                           ),
-                          if (recommended && !selected) _tag('Gợi ý', false, context),
+                          if (recommended && !selected)
+                            _tag('Gợi ý', false, context),
                           if (selected) _tag('Đã chọn', true, context),
                         ],
                       ),
@@ -440,7 +408,9 @@ class _LevelCard extends StatelessWidget {
                       ),
                       if (selected) ...[
                         const SizedBox(height: 6),
-                        Divider(color: Colors.white.withValues(alpha: 0.10), height: 1),
+                        Divider(
+                            color: Colors.white.withValues(alpha: 0.10),
+                            height: 1),
                         const SizedBox(height: 6),
                         Text(
                           level.desc,

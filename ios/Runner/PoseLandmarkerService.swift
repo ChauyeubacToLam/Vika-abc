@@ -290,7 +290,13 @@ final class PoseLandmarkerService: NSObject,
         defer {
             captureSession.commitConfiguration()
         }
-        captureSession.sessionPreset = .vga640x480
+        if captureSession.canSetSessionPreset(.hd1280x720) {
+            captureSession.sessionPreset = .hd1280x720
+        } else if captureSession.canSetSessionPreset(.high) {
+            captureSession.sessionPreset = .high
+        } else {
+            captureSession.sessionPreset = .vga640x480
+        }
 
         for input in captureSession.inputs {
             captureSession.removeInput(input)
@@ -308,6 +314,7 @@ final class PoseLandmarkerService: NSObject,
                 userInfo: [NSLocalizedDescriptionKey: "Khong tim thay camera"]
             )
         }
+        configureCameraDevice(camera)
 
         let input = try AVCaptureDeviceInput(device: camera)
         guard captureSession.canAddInput(input) else {
@@ -350,6 +357,40 @@ final class PoseLandmarkerService: NSObject,
             }
         }
 
+    }
+
+    private func configureCameraDevice(_ camera: AVCaptureDevice) {
+        let targetFps: Double = 30
+        let supportsTargetFps = camera.activeFormat.videoSupportedFrameRateRanges.contains { range in
+            range.minFrameRate <= targetFps && targetFps <= range.maxFrameRate
+        }
+
+        do {
+            try camera.lockForConfiguration()
+            defer {
+                camera.unlockForConfiguration()
+            }
+            if camera.isFocusModeSupported(.continuousAutoFocus) {
+                camera.focusMode = .continuousAutoFocus
+            }
+            if camera.isSmoothAutoFocusSupported {
+                camera.isSmoothAutoFocusEnabled = true
+            }
+            if camera.isExposureModeSupported(.continuousAutoExposure) {
+                camera.exposureMode = .continuousAutoExposure
+            }
+            if camera.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
+                camera.whiteBalanceMode = .continuousAutoWhiteBalance
+            }
+            camera.videoZoomFactor = camera.minAvailableVideoZoomFactor
+            if supportsTargetFps {
+                let frameDuration = CMTime(value: 1, timescale: 30)
+                camera.activeVideoMinFrameDuration = frameDuration
+                camera.activeVideoMaxFrameDuration = frameDuration
+            }
+        } catch {
+            print("[PoseLandmarker] Could not configure camera device: \(error.localizedDescription)")
+        }
     }
 
     // MARK: - AVCaptureVideoDataOutputSampleBufferDelegate
