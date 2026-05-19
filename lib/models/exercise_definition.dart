@@ -25,6 +25,7 @@ import '../exercise/11.Lying Leg Raise/lying_leg_raise.dart';
 import '../exercise/12.Dead Bug/dead_bug.dart';
 import '../exercise/13.Plank Up-Down/plank_up_down.dart';
 import '../exercise/14.Bear Plank/bear_plank.dart';
+import '../exercise/suryanamaskar/suryanamaskar.dart';
 /* =========================================================================
    ExerciseDefinition — Metadata + factory for each exercise type.
 
@@ -622,5 +623,40 @@ ExerciseDefinition(
     setupTips: const ['Tư thế cái bàn', 'Nâng gối cách sàn 5-10cm'],
     createExercise: () => BearPlank(),
     phaseColors: const { 'setup': Colors.grey, 'hovering': Colors.green, 'fatiguing': Colors.red },
+  ),
+  ExerciseDefinition(
+    id: 'suryanamaskar',
+    name: 'Suryanamaskar',
+    subtitle: 'Chuỗi Chào Mặt Trời 12 bước',
+    description: 'Chuỗi 12 tư thế Yoga liên hoàn giúp kích hoạt toàn thân, tăng độ dẻo dai cột sống và cải thiện nhịp thở.\nMỗi vòng đi qua 12 trạm từ Cầu nguyện → Rắn hổ mang → trở về.',
+    icon: Icons.self_improvement,
+    primaryColor: const Color(0xFFFF8A65),
+    secondaryColor: const Color(0xFFFF5722),
+    difficulty: 'Trung bình',
+    targetMuscles: const ['Toàn thân', 'Cột sống', 'Core', 'Chân'],
+    duration: '5 vòng',
+    cameraHint: 'Quay ngang người 100% (Side View).',
+    framingHint: 'Đảm bảo thấy toàn thân từ đầu đến chân, chừa khoảng trống khi nằm sấp.',
+    setupTips: const [
+      'Đặt camera quay ngang, cách bạn 3–4 mét để thấy toàn thân khi nằm.',
+      'Trải thảm yoga theo chiều dài hướng camera.',
+      'Hít thở sâu, bắt đầu ở tư thế đứng thẳng tay chắp trước ngực.',
+    ],
+    safetyWarning: 'Không gượng ép nếu đau lưng. Dừng lại ngay nếu chóng mặt.',
+    createExercise: () => Suryanamaskar(),
+    phaseColors: const {
+      'p1_pranamasana': Color(0xFF00E676),
+      'p2_hasta_uttanasana': Color(0xFFFFD600),
+      'p3_hastapaadasana': Color(0xFFFF9800),
+      'p4_ashwa_sanchalanasana': Color(0xFFFF6D00),
+      'p5_parvatasana': Color(0xFF2196F3),
+      'p6_ashtanga_namaskara': Color(0xFFE91E63),
+      'p7_bhujangasana': Color(0xFF9C27B0),
+      'p8_parvatasana_return': Color(0xFF2196F3),
+      'p9_ashwa_return': Color(0xFFFF6D00),
+      'p10_hastapaadasana_return': Color(0xFFFF9800),
+      'p11_hasta_uttanasana_return': Color(0xFFFFD600),
+      'p12_pranamasana_return': Color(0xFF00E676),
+    },
   ),
 ];
