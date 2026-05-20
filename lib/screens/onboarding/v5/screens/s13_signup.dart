@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -35,6 +36,8 @@ class _S13SignupState extends State<S13Signup> {
   bool _busy = false;
   String? _notice;
   bool _advancing = false;
+  bool _acceptAuthEvents = false;
+  String? _pendingProvider;
 
   bool get _validEmail {
     final email = _emailController.text.trim();
@@ -46,13 +49,40 @@ class _S13SignupState extends State<S13Signup> {
     super.initState();
     _emailController = TextEditingController(text: widget.data.email ?? '');
     _authService = AuthService();
-    _authSubscription =
-        Supabase.instance.client.auth.onAuthStateChange.listen((_) {
-      unawaited(_advanceIfAuthenticated());
-    });
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => unawaited(_advanceIfAuthenticated()),
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen(
+      _handleAuthStateChange,
     );
+  }
+
+  void _handleAuthStateChange(AuthState data) {
+    if (!_acceptAuthEvents || data.event != AuthChangeEvent.signedIn) {
+      return;
+    }
+
+    unawaited(_advanceIfAuthenticated(expectedProvider: _pendingProvider)
+        .catchError((error) {
+      _showError(_friendlyError(
+        error,
+        fallback: 'Không thể hoàn tất đăng nhập lúc này. Vui lòng thử lại.',
+      ));
+    }));
+  }
+
+  void _beginAuthAttempt(String provider) {
+    _acceptAuthEvents = true;
+    _pendingProvider = provider;
+    setState(() {
+      _busy = true;
+      _notice = null;
+    });
+  }
+
+  void _endAuthAttempt() {
+    _acceptAuthEvents = false;
+    _pendingProvider = null;
+    if (mounted && !_advancing) {
+      setState(() => _busy = false);
+    }
   }
 
   @override
@@ -62,11 +92,21 @@ class _S13SignupState extends State<S13Signup> {
     super.dispose();
   }
 
-  Future<void> _advanceIfAuthenticated() async {
+  Future<void> _advanceIfAuthenticated({String? expectedProvider}) async {
     if (!mounted || _advancing) return;
-    final user = Supabase.instance.client.auth.currentUser;
+    final session = Supabase.instance.client.auth.currentSession;
+    final user = session?.user;
     if (user == null) return;
+
+    if (expectedProvider != null &&
+        !_sessionIncludesProvider(session!, expectedProvider)) {
+      throw Exception(
+        'Phiên đăng nhập hiện tại không phải $expectedProvider. Vui lòng thử lại.',
+      );
+    }
+
     _advancing = true;
+    _acceptAuthEvents = false;
     setState(() {
       _busy = true;
       _notice = 'Đang tạo lộ trình cá nhân của bạn...';
@@ -82,49 +122,81 @@ class _S13SignupState extends State<S13Signup> {
     widget.onNext();
   }
 
+  bool _sessionIncludesProvider(Session session, String provider) {
+    final appMetadata = session.user.appMetadata;
+    final primaryProvider = appMetadata['provider']?.toString();
+    final providers = appMetadata['providers'];
+
+    if (primaryProvider == provider) {
+      return true;
+    }
+
+    return providers is List &&
+        providers.map((value) => '$value').contains(provider);
+  }
+
   Future<void> _signInWithGoogle() async {
     if (_busy) return;
-    setState(() => _busy = true);
+    _beginAuthAttempt('google');
     try {
       // Native GoogleSignIn → signInWithIdToken. No browser hop, so no
       // Supabase callback page or chrome redirect.
       await _authService.signInWithGoogle();
-      await _advanceIfAuthenticated();
+      await _advanceIfAuthenticated(expectedProvider: 'google');
+    } on AuthFlowCancelledException {
+      // User intent: close the provider sheet and stay on signup.
     } catch (e) {
       _showError(_friendlyError(e,
           fallback:
               'Không thể đăng nhập bằng Google lúc này. Vui lòng thử lại.'));
     } finally {
-      if (mounted) setState(() => _busy = false);
+      _endAuthAttempt();
     }
   }
 
   Future<void> _signInWithFacebook() async {
     if (_busy) return;
-    setState(() => _busy = true);
+    _beginAuthAttempt('facebook');
     try {
       await _authService.signInWithFacebook();
-      await _advanceIfAuthenticated();
+      await _advanceIfAuthenticated(expectedProvider: 'facebook');
+    } on AuthFlowCancelledException {
+      // User intent: close the provider sheet and stay on signup.
     } catch (e) {
       _showError(_friendlyError(e,
           fallback:
               'Không thể đăng nhập bằng Facebook lúc này. Vui lòng thử lại.'));
     } finally {
-      if (mounted) setState(() => _busy = false);
+      _endAuthAttempt();
     }
   }
 
   Future<void> _signInWithApple() async {
-    // Apple Sign-In requires a separate package on Android (sign_in_with_apple)
-    // and iOS-side entitlements. Until that lands, surface a clear notice
-    // rather than silently failing.
-    _showError('Đăng nhập Apple sắp ra mắt — hãy dùng Google hoặc email.');
+    if (_busy) return;
+    if (!Platform.isIOS) {
+      _showError('Đăng nhập Apple chỉ hỗ trợ trên iPhone.');
+      return;
+    }
+
+    _beginAuthAttempt('apple');
+    try {
+      await _authService.signInWithApple();
+      await _advanceIfAuthenticated(expectedProvider: 'apple');
+    } on AuthFlowCancelledException {
+      // User intent: close the provider sheet and stay on signup.
+    } catch (e) {
+      _showError(_friendlyError(e,
+          fallback:
+              'Không thể đăng nhập bằng Apple lúc này. Vui lòng thử lại.'));
+    } finally {
+      _endAuthAttempt();
+    }
   }
 
   Future<void> _magicLink() async {
     if (!_validEmail || _busy) return;
     final email = _emailController.text.trim();
-    setState(() => _busy = true);
+    _beginAuthAttempt('email');
     try {
       widget.data.email = email;
       await _authService.signInWithMagicLink(email);
@@ -134,6 +206,8 @@ class _S13SignupState extends State<S13Signup> {
     } catch (e) {
       _showError(_friendlyError(e,
           fallback: 'Không thể gửi link đăng nhập lúc này. Vui lòng thử lại.'));
+      _acceptAuthEvents = false;
+      _pendingProvider = null;
     } finally {
       if (mounted) setState(() => _busy = false);
     }

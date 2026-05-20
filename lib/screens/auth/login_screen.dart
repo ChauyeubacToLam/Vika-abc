@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,7 +8,7 @@ import '../../services/auth_service.dart';
 import '../../theme/vf_theme.dart';
 import 'magic_link_sent_screen.dart';
 
-enum _LoginAction { google, facebook, email }
+enum _LoginAction { google, facebook, email, apple }
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({
@@ -90,6 +91,16 @@ class _VikaLoginPanelState extends State<VikaLoginPanel> {
     );
   }
 
+  Future<void> _handleAppleSignIn() async {
+    await _runAction(
+      _LoginAction.apple,
+      () async {
+        await _authService.signInWithApple();
+        widget.onAuthenticated?.call();
+      },
+    );
+  }
+
   Future<void> _handleMagicLink() async {
     if (!_hasValidEmail || _isBusy) {
       return;
@@ -129,6 +140,8 @@ class _VikaLoginPanelState extends State<VikaLoginPanel> {
     setState(() => _activeAction = action);
     try {
       await task();
+    } on AuthFlowCancelledException {
+      // User intent: close the provider sheet and return to the buttons.
     } catch (error) {
       _showErrorSnackBar(error);
     } finally {
@@ -159,21 +172,6 @@ class _VikaLoginPanelState extends State<VikaLoginPanel> {
         SnackBar(
           content: Text(message),
           backgroundColor: VFTheme.text,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-  }
-
-  void _showAppleComingSoon() {
-    if (_isBusy) {
-      return;
-    }
-
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(
-          content: Text('Sắp ra mắt trên iOS'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -255,16 +253,20 @@ class _VikaLoginPanelState extends State<VikaLoginPanel> {
                           onTap: _handleFacebookSignIn,
                         ),
                         SizedBox(height: 10 * s),
-                        _AuthButton(
-                          label: 'Tiếp tục với Apple',
-                          icon: Icon(
-                            Icons.apple_rounded,
-                            color: VFTheme.text,
-                            size: 18 * s,
+                        if (Platform.isIOS) ...[
+                          _AuthButton(
+                            label: 'Tiếp tục với Apple',
+                            icon: Icon(
+                              Icons.apple_rounded,
+                              color: VFTheme.text,
+                              size: 18 * s,
+                            ),
+                            enabled: !_isBusy,
+                            isLoading: _activeAction == _LoginAction.apple,
+                            onTap: _handleAppleSignIn,
                           ),
-                          enabled: !_isBusy,
-                          onTap: _showAppleComingSoon,
-                        ),
+                          SizedBox(height: 10 * s),
+                        ],
                         SizedBox(height: 22 * s),
                         const _SectionDivider(),
                         SizedBox(height: 22 * s),
