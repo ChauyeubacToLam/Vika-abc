@@ -41,11 +41,11 @@ class DeadBugReportBuilder extends ExerciseReportBuilder {
     if (totalReps == 0) return [];
 
     // Điểm Anti-Extension Score (% không bị võng lưng)
-    int antiExtFails = setLoggers.map((l) => l.setLogs['anti_extension_fails_count'] as int? ?? 0).reduce((a, b) => a + b);
+    int antiExtFails = setLoggers.map((l) => l.setLogs['anti_extension_fails_count'] as int? ?? 0).fold(0, (a, b) => a + b);
     double antiExtScore = totalReps > 0 ? ((totalReps - antiExtFails) / totalReps) * 100 : 0;
 
     // Coordination Accuracy (% đi đúng chéo chi)
-    int coordFails = setLoggers.map((l) => l.setLogs['coordination_fails_count'] as int? ?? 0).reduce((a, b) => a + b);
+    int coordFails = setLoggers.map((l) => l.setLogs['coordination_fails_count'] as int? ?? 0).fold(0, (a, b) => a + b);
     double coordScore = totalReps > 0 ? ((totalReps - coordFails) / totalReps) * 100 : 0;
 
     // Tempo Control

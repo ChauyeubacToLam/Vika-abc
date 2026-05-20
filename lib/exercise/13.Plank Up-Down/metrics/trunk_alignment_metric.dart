@@ -19,14 +19,14 @@ class TrunkAlignmentMetric extends PlankMetricBase {
     bool isSagging = ctx.bodyAngle < PlankConfig.BODY_ALIGNMENT_SAG_THRESHOLD;
     
     if (_sagDebouncer.update(isSagging)) {
-      ctx.resultIssues.feedback['Trunk'] = 'Sụt hông! Gồng core';
+      ctx.resultIssues.feedback['Trunk'] = 'Sụt hông! Gồng chặt cơ bụng';
       if (!_faults.any((f) => f.type == 'Sagging')) {
         _faults.add(FaultRecord(
           phase: ctx.currentState.name,
           type: 'Sagging',
           message: 'Sụt hông, mất liên kết Core',
           affectsForm: true,
-          voiceMessage: 'Nâng hông lên, gồng chặt bụng!',
+          voiceMessage: 'Sụt hông! Gồng chặt cơ bụng, đừng để lưng bị võng!',
           priority: PlankFaultVoicePriority.trunkSagging,
         ));
       }

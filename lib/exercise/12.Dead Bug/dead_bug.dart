@@ -85,18 +85,27 @@ class DeadBug extends ExerciseBase {
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     final lShoulder = landmarks[PoseLandmarkType.leftShoulder];
+    final rShoulder = landmarks[PoseLandmarkType.rightShoulder];
     final lHip = landmarks[PoseLandmarkType.leftHip];
+    final rHip = landmarks[PoseLandmarkType.rightHip];
     final lWrist = landmarks[PoseLandmarkType.leftWrist];
+    final rWrist = landmarks[PoseLandmarkType.rightWrist];
     final lKnee = landmarks[PoseLandmarkType.leftKnee];
+    final rKnee = landmarks[PoseLandmarkType.rightKnee];
     
-    if (lShoulder == null || lHip == null || lWrist == null || lKnee == null) return false;
+    if (lShoulder == null || rShoulder == null || lHip == null || rHip == null ||
+        lWrist == null || rWrist == null || lKnee == null || rKnee == null) return false;
 
-    // Check nhánh bên trái làm chuẩn đại diện cho Start Position
     double lArm = calculateAngleNormalized(firstPoint: lHip, midPoint: lShoulder, lastPoint: lWrist);
+    double rArm = calculateAngleNormalized(firstPoint: rHip, midPoint: rShoulder, lastPoint: rWrist);
     double lLeg = calculateAngleNormalized(firstPoint: lShoulder, midPoint: lHip, lastPoint: lKnee);
+    double rLeg = calculateAngleNormalized(firstPoint: rShoulder, midPoint: rHip, lastPoint: rKnee);
 
-    if (lArm < DeadBugConfig.START_ANGLE_MIN || lArm > DeadBugConfig.START_ANGLE_MAX) return false;
-    if (lLeg < DeadBugConfig.START_ANGLE_MIN || lLeg > DeadBugConfig.START_ANGLE_MAX) return false;
+    double avgArm = (lArm + rArm) / 2;
+    double avgLeg = (lLeg + rLeg) / 2;
+
+    if (avgArm < DeadBugConfig.START_ANGLE_MIN || avgArm > DeadBugConfig.START_ANGLE_MAX) return false;
+    if (avgLeg < DeadBugConfig.START_ANGLE_MIN || avgLeg > DeadBugConfig.START_ANGLE_MAX) return false;
 
     return true; 
   }
@@ -131,15 +140,18 @@ class DeadBug extends ExerciseBase {
       return; 
     }
 
-    final lShoulder = landmarks[PoseLandmarkType.leftShoulder]!;
-    final rShoulder = landmarks[PoseLandmarkType.rightShoulder]!;
-    final lHip = landmarks[PoseLandmarkType.leftHip]!;
-    final rHip = landmarks[PoseLandmarkType.rightHip]!;
+    final lShoulder = landmarks[PoseLandmarkType.leftShoulder];
+    final rShoulder = landmarks[PoseLandmarkType.rightShoulder];
+    final lHip = landmarks[PoseLandmarkType.leftHip];
+    final rHip = landmarks[PoseLandmarkType.rightHip];
     
-    final lWrist = landmarks[PoseLandmarkType.leftWrist]!;
-    final rWrist = landmarks[PoseLandmarkType.rightWrist]!;
-    final lKnee = landmarks[PoseLandmarkType.leftKnee]!;
-    final rKnee = landmarks[PoseLandmarkType.rightKnee]!;
+    final lWrist = landmarks[PoseLandmarkType.leftWrist];
+    final rWrist = landmarks[PoseLandmarkType.rightWrist];
+    final lKnee = landmarks[PoseLandmarkType.leftKnee];
+    final rKnee = landmarks[PoseLandmarkType.rightKnee];
+
+    if (lShoulder == null || rShoulder == null || lHip == null || rHip == null ||
+        lWrist == null || rWrist == null || lKnee == null || rKnee == null) return;
 
     // Chuẩn hóa chiều dài lưng
     scaleFactor = calculateDistance(lShoulder, lHip);
@@ -149,6 +161,22 @@ class DeadBug extends ExerciseBase {
     double rArmAng = calculateAngleNormalized(firstPoint: rHip, midPoint: rShoulder, lastPoint: rWrist);
     double lHipAng = calculateAngleNormalized(firstPoint: lShoulder, midPoint: lHip, lastPoint: lKnee);
     double rHipAng = calculateAngleNormalized(firstPoint: rShoulder, midPoint: rHip, lastPoint: rKnee);
+
+    double maxExt = [lArmAng, rArmAng, lHipAng, rHipAng].reduce((a, b) => a > b ? a : b);
+
+    if (now - _lastDiagnosticTime > 500 || state != previousState) {
+      _diagnosticLog.add({
+        'time': ((now - _exerciseStartTimeMs!) / 1000).toStringAsFixed(1),
+        'state': state.name,
+        'max': maxExt,
+        'la': lArmAng, 'ra': rArmAng,
+        'lh': lHipAng, 'rh': rHipAng,
+        'hipY': lHip.y
+      });
+      _lastDiagnosticTime = now;
+    }
+
+    _updateStateMachine(maxExt, now);
 
     final ctx = DeadBugRepContext(
       leftArmAngle: lArmAng,
@@ -162,20 +190,6 @@ class DeadBug extends ExerciseBase {
       frameTimestampMs: now,
       resultIssues: resultIssues,
     );
-
-    if (now - _lastDiagnosticTime > 500 || state != previousState) {
-      _diagnosticLog.add({
-        'time': ((now - _exerciseStartTimeMs!) / 1000).toStringAsFixed(1),
-        'state': state.name,
-        'max': ctx.maxExtensionAngle,
-        'la': lArmAng, 'ra': rArmAng,
-        'lh': lHipAng, 'rh': rHipAng,
-        'hipY': lHip.y
-      });
-      _lastDiagnosticTime = now;
-    }
-
-    _updateStateMachine(ctx.maxExtensionAngle, now);
 
     if (state == DeadBugState.setup && previousState == DeadBugState.returning) {
       _completeRep(ctx);
@@ -212,6 +226,7 @@ class DeadBug extends ExerciseBase {
   }
 
   void _completeRep(DeadBugRepContext ctx) {
+    previousState = DeadBugState.setup;
     repCount++;
     tempoMetric.evaluateRep(ctx);
 

@@ -20,17 +20,17 @@ class BearConfig {
 }
 
 class BearVoicePriority {
-  static const int kneeHover = 1;
-  static const int backFlat = 2;
-  static const int weightShift = 3;
+  static const int backFlat = 0;      // Critical — rủi ro cột sống
+  static const int kneeHover = 1;     // High — bù trừ cơ
+  static const int weightShift = 2;   // Medium — áp lực cổ tay
 }
 
 // ─── Context ─────────────────────────────────────────────────────────────────
 class BearRepContext {
   final double kneeHeightOffset;
   final double kneeAngle;
-  final double backYDifference;
-  final double wristXDifference;
+  final double backYOffset;         // Signed: positive = shoulder below hip (sagging)
+  final double shoulderWristXOffset; // Abs distance, vai chúi trước cổ tay
   final double? scaleFactor;
   final BearState currentState;
   final int frameTimestampMs;
@@ -39,8 +39,8 @@ class BearRepContext {
   const BearRepContext({
     required this.kneeHeightOffset,
     required this.kneeAngle,
-    required this.backYDifference,
-    required this.wristXDifference,
+    required this.backYOffset,
+    required this.shoulderWristXOffset,
     required this.scaleFactor,
     required this.currentState,
     required this.frameTimestampMs,

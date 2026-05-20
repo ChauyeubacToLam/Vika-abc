@@ -24,37 +24,62 @@ class PlankUpDownReportBuilder extends ExerciseReportBuilder {
   List<DetailCard> buildDetailCards(List<ExerciseLogger> setLoggers) {
     final allReps = setLoggers.expand((l) => l.repLogs).toList();
     final totalReps = allReps.length;
-    final totalGood = allReps.where((r) => r.correctForm).length;
-    
+
     if (totalReps == 0) return [];
 
-    // Tính Core Alignment Score (Ví dụ: % số rep không bị lỗi võng lưng)
+    // ── Card 1: Điểm ổn định cốt lõi ──────────────────────────────────────
+    // % số rep KHÔNG bị sụt hông (trunk_sagging_fails)
     final saggingFails = setLoggers.fold(0, (sum, l) => sum + (l.setLogs['trunk_sagging_fails'] as int? ?? 0));
-    final coreScore = totalReps > 0 ? ((totalReps - saggingFails) / totalReps * 100).roundToDouble() : 0.0;
+    final coreScore = ((totalReps - saggingFails.clamp(0, totalReps)) / totalReps * 100).roundToDouble();
 
-    // Check Timeout
-    final isTimeout = setLoggers.any((l) => l.setLogs['timeout_triggered'] == true);
+    // ── Card 2: Độ cố định khung chậu ──────────────────────────────────────
+    // Anti-Rotation Index: % số rep KHÔNG bị lắc hông (hip_rotation_fails)
+    final hipFails = setLoggers.fold(0, (sum, l) => sum + (l.setLogs['hip_rotation_fails'] as int? ?? 0));
+    final stabilityScore = ((totalReps - hipFails.clamp(0, totalReps)) / totalReps * 100).roundToDouble();
+
+    // ── Card 3: Tính đối xứng ────────────────────────────────────────────
+    // Left/Right lead arm balance across all sets
+    final totalLeftLead = setLoggers.fold(0, (sum, l) => sum + (l.setLogs['left_lead_count'] as int? ?? 0));
+    final totalRightLead = setLoggers.fold(0, (sum, l) => sum + (l.setLogs['right_lead_count'] as int? ?? 0));
+    final totalLeads = totalLeftLead + totalRightLead;
+    final symmetryScore = totalLeads > 0
+        ? (1.0 - (totalLeftLead - totalRightLead).abs() / totalLeads) * 100
+        : 100.0;
+
+    String symmetryLabel;
+    if (totalLeads == 0) {
+      symmetryLabel = 'Không có dữ liệu';
+    } else {
+      symmetryLabel = 'T: $totalLeftLead — P: $totalRightLead rep';
+    }
 
     return [
+      // Card 1 — Điểm ổn định cốt lõi
       DetailCard(
-        label: 'Tính Ổn Định Lõi (Core)',
+        label: 'Điểm ổn định cốt lõi',
         value: '${coreScore.toStringAsFixed(0)}%',
-        subLabel: 'Không bị võng lưng',
+        subLabel: 'Rep không bị võng lưng',
         useRadial: true,
         radialValue: coreScore,
-        color: coreScore > 80 ? 'jade' : 'amber',
+        color: coreScore >= 80 ? 'jade' : (coreScore >= 60 ? 'amber' : 'rose'),
       ),
+      // Card 2 — Độ cố định khung chậu
       DetailCard(
-        label: 'Thời gian tập',
-        value: isTimeout ? '90s (Timeout)' : 'Hoàn thành',
-        subLabel: 'Giới hạn 90s',
-        color: isTimeout ? 'rose' : 'jade',
+        label: 'Độ cố định khung chậu',
+        value: '${stabilityScore.toStringAsFixed(0)}%',
+        subLabel: 'Rep không lắc hông',
+        useRadial: true,
+        radialValue: stabilityScore,
+        color: stabilityScore >= 80 ? 'jade' : (stabilityScore >= 60 ? 'amber' : 'rose'),
       ),
+      // Card 3 — Tính đối xứng
       DetailCard(
-        label: 'Độ chính xác (Form)',
-        value: '${((totalGood / totalReps) * 100).round()}%',
-        subLabel: '$totalGood/$totalReps reps',
-        color: 'blue',
+        label: 'Tính đối xứng',
+        value: '${symmetryScore.toStringAsFixed(0)}%',
+        subLabel: symmetryLabel,
+        useRadial: true,
+        radialValue: symmetryScore,
+        color: symmetryScore >= 80 ? 'jade' : 'amber',
       ),
     ];
   }

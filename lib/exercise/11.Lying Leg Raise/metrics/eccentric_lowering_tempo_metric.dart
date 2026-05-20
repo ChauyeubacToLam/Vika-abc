@@ -32,6 +32,8 @@ class EccentricLoweringTempoMetric extends LyingLegRaiseMetricBase {
       double currentTempo = (ctx.frameTimestamp - _loweringStartMs!) / 1000.0;
       _debugData['loweringTime'] = currentTempo.toStringAsFixed(2);
       ctx.resultIssues.feedback['Tempo'] = 'Kiểm soát, hạ từ từ...';
+    } else {
+      ctx.resultIssues.feedback.remove('Tempo');
     }
   }
 

@@ -29,10 +29,10 @@ class PelvicStabilityMetric extends LegRaiseMetricBase {
     _baselineHipY ??= ctx.hipY;
 
     // Chỉ check gắt nhất ở pha Lowering (Đặc biệt lúc chân sắp chạm đất)
-    if (ctx.state == LegRaiseState.lowering && ctx.scaleFactor != null) {
+    if (ctx.state == LegRaiseState.lowering) {
       // Trong ML Kit, Y hướng xuống đất. Nếu hông nhấc lên tức là Y giảm (baselineHipY - hipY > 0)
       double upwardShift = _baselineHipY! - ctx.hipY;
-      double normalizedShift = upwardShift / ctx.scaleFactor!;
+      double normalizedShift = upwardShift / ctx.scaleFactor;
 
       _debugData['hipUpwardShift'] = normalizedShift.toStringAsFixed(3);
 
@@ -56,5 +56,6 @@ class PelvicStabilityMetric extends LegRaiseMetricBase {
   void reset() {
     _faults.clear();
     _faultDebouncer.reset();
+    _baselineHipY = null; // Clear baseline on reset/new set
   }
 }

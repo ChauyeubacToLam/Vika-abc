@@ -7,6 +7,7 @@ import 'metrics/reverse_crunch_metric_base.dart';
 import 'metrics/swinging_momentum_metric.dart';
 import 'metrics/pelvic_curl_metric.dart';
 import 'metrics/eccentric_tempo_metric.dart';
+import '../../utils/exercise_logger.dart';
 
 class ReverseCrunch extends ExerciseBase {
   @override
@@ -140,15 +141,13 @@ class ReverseCrunch extends ExerciseBase {
         ctx.trunkKneeVelocity < -15.0) {
       _transitionState(ReverseCrunchState.curling, ctx.frameTimestamp);
     } 
-    // Top: Dừng góc, góc bắt đầu có chiều hướng mở ra (velocity đảo chiều sang dương)
-    else if (crunchState == ReverseCrunchState.curling && ctx.trunkKneeVelocity > 5.0) {
+    // Top: Dừng góc cuộn (vận tốc đạt ~0 hoặc đổi chiều), góc đạt nhỏ nhất và hông đạt đỉnh
+    else if (crunchState == ReverseCrunchState.curling && ctx.trunkKneeVelocity >= -2.0) {
       _transitionState(ReverseCrunchState.top, ctx.frameTimestamp);
-      // Tự động nhảy sang lowering ngay sau điểm TOP thường chỉ là 1 khoảnh khắc
-      Future.delayed(Duration(milliseconds: 100), () {
-        if (crunchState == ReverseCrunchState.top) {
-          _transitionState(ReverseCrunchState.lowering, ctx.frameTimestamp);
-        }
-      });
+    }
+    // Lowering: Bắt đầu duỗi hông/hạ chân với vận tốc dương ổn định
+    else if (crunchState == ReverseCrunchState.top && ctx.trunkKneeVelocity > 5.0) {
+      _transitionState(ReverseCrunchState.lowering, ctx.frameTimestamp);
     }
     // Lying: Đã trở về setup
     else if (crunchState == ReverseCrunchState.lowering && 
@@ -172,6 +171,15 @@ class ReverseCrunch extends ExerciseBase {
     for (final metric in _metrics) allFaults.addAll(metric.faults);
     
     correctForm = !allFaults.any((f) => f.affectsForm);
+    
+    logger.addRepLog(RepLog(
+      correctForm: correctForm,
+      repNumber: repCount,
+      data: {
+        "fault_types": allFaults.map((e) => e.type).toSet().toList()
+      },
+    ));
+
     _transitionState(ReverseCrunchState.lying, ctx.frameTimestamp);
     for (final metric in _metrics) metric.resetAndCountFault();
   }
@@ -186,11 +194,20 @@ class ReverseCrunch extends ExerciseBase {
   }
 
   Map<String, PoseLandmark>? _getLandmarks(Map<PoseLandmarkType, PoseLandmark> lm) {
+    final shoulder = lm[PoseLandmarkType.leftShoulder];
+    final hip = lm[PoseLandmarkType.leftHip];
+    final knee = lm[PoseLandmarkType.leftKnee];
+    final ankle = lm[PoseLandmarkType.leftAnkle];
+
+    if (shoulder == null || hip == null || knee == null || ankle == null) {
+      return null;
+    }
+
     return {
-      'shoulder': lm[PoseLandmarkType.leftShoulder]!,
-      'hip': lm[PoseLandmarkType.leftHip]!,
-      'knee': lm[PoseLandmarkType.leftKnee]!,
-      'ankle': lm[PoseLandmarkType.leftAnkle]!,
+      'shoulder': shoulder,
+      'hip': hip,
+      'knee': knee,
+      'ankle': ankle,
     };
   }
 

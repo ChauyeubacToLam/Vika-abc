@@ -11,14 +11,14 @@ class PlankConfig {
   static const int MAX_DURATION_MS = 90000; // 90 giây timeout
   
   // Góc cơ thể (Shoulder-Hip-Ankle)
-  static const double BODY_ALIGNMENT_START_MIN = 165.0; // Setup (nới lỏng một chút so với 170 để dễ nhận diện)
-  static const double BODY_ALIGNMENT_SAG_THRESHOLD = 155.0; // Sụt hông
+  static const double BODY_ALIGNMENT_START_MIN = 170.0;
+  static const double BODY_ALIGNMENT_SAG_THRESHOLD = 160.0; // Sụt hông
   
   // Góc tay (Shoulder-Elbow-Wrist)
   static const double ELBOW_FOREARM_MAX = 110.0; // ~90 độ
-  static const double ELBOW_PUSHING_THRESHOLD = 105.0;
-  static const double ELBOW_HIGH_PLANK_MIN = 155.0; // ~180 độ
-  static const double ELBOW_LOWERING_THRESHOLD = 145.0;
+  static const double ELBOW_PUSHING_THRESHOLD = 100.0;
+  static const double ELBOW_HIGH_PLANK_MIN = 160.0; // ~180 độ
+  static const double ELBOW_LOWERING_THRESHOLD = 150.0;
   
   // Cố định hông (pixel, sẽ chuẩn hóa theo chiều dài lưng)
   static const double HIP_Y_ROTATION_TOLERANCE = 0.15; // 15% chiều dài lưng
@@ -32,7 +32,8 @@ class PlankFaultVoicePriority {
 
 class PlankRepContext {
   final double bodyAngle;
-  final double elbowAngle;
+  final double leftElbowAngle;
+  final double rightElbowAngle;
   final double hipY;
   final double shoulderY;
   final double? scaleFactor; // Chiều dài vai-hông để chuẩn hóa khoảng cách
@@ -42,7 +43,8 @@ class PlankRepContext {
 
   PlankRepContext({
     required this.bodyAngle,
-    required this.elbowAngle,
+    required this.leftElbowAngle,
+    required this.rightElbowAngle,
     required this.hipY,
     required this.shoulderY,
     required this.scaleFactor,

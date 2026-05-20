@@ -2,6 +2,25 @@ import '../../exercise_base.dart';
 import '../../fault_record.dart';
 export '../../fault_record.dart';
 
+class LegRaiseConfig {
+  static const int MAX_REP = 12; // Beginner/Conservative
+  static const int TIMEOUT_MS = 90000; // 90s
+  
+  // Start Position Limits
+  static const double START_HIP_FLEXION_MIN = 165.0; // Gần 180 độ
+  static const double START_KNEE_STRAIGHT_MIN = 160.0; // Phải duỗi gối
+
+  // State Transition Thresholds
+  static const double RAISING_ANGLE = 170.0;
+  static const double TOP_ANGLE = 100.0; // Vai-Hông-Gối <= 100 độ
+  static const double LOWERING_ANGLE = 105.0;
+  static const double LYING_ANGLE = 165.0;
+
+  // Tempo Thresholds (Unified: fault if < 2.0s, target if >= 2.0s)
+  static const double TEMPO_FAULT_THRESHOLD = 2.0;
+  static const double TEMPO_TARGET_THRESHOLD = 2.0;
+}
+
 enum LegRaiseState { lying, raising, top, lowering }
 
 class LegRaiseRepContext {
@@ -10,7 +29,7 @@ class LegRaiseRepContext {
   
   final double hipY; // Tọa độ Y của hông để đo độ võng lưng (Pelvic tilt)
   final double ankleY; // Dùng để đo vận tốc khi ở pha TOP
-  final double? scaleFactor; // Khoảng cách Shoulder-Hip (chuẩn hóa kích thước)
+  final double scaleFactor; // Khoảng cách Shoulder-Hip (chuẩn hóa kích thước)
   
   final LegRaiseState state;
   final int frameTimestampMs;

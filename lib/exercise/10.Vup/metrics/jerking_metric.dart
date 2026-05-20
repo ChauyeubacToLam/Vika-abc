@@ -30,6 +30,7 @@ class JerkingMetric extends VUpMetricBase {
         double vel = (dShld > dAnkle ? dShld : dAnkle) / dt;
         
         if (vel > _maxVelocity) _maxVelocity = vel;
+        _debugData['maxVelocity'] = _maxVelocity.toStringAsFixed(2);
         
         // Ngưỡng vận tốc gia tốc cục bộ (Spike) - Tinh chỉnh bằng Diagnostic Log nếu cần
         if (vel > 2.5 && !_faults.any((f) => f.type == 'Jerking')) {

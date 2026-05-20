@@ -2,6 +2,7 @@
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/frame_snapshot.dart';
+import '../../utils/exercise_logger.dart';
 import '../exercise_base.dart';
 import 'metrics/lying_leg_raise_metric_base.dart';
 import 'metrics/lumbar_arching_metric.dart';
@@ -116,6 +117,9 @@ class LyingLegRaise extends ExerciseBase {
       'Hip_Y': lm['hip']!.y.toStringAsFixed(1),
     };
 
+    // State machine runs first, updating raiseState/previousState
+    _updateStateMachine(legHorizontalAngle, legVelocity, now);
+
     final ctx = RepContext(
       state: raiseState, frameTimestamp: now, scaleFactor: scaleFactor,
       trunkHorizontalAngle: trunkHorizontalAngle, legHorizontalAngle: legHorizontalAngle, 
@@ -123,7 +127,10 @@ class LyingLegRaise extends ExerciseBase {
       resultIssues: resultIssues,
     );
 
-    _updateStateMachine(ctx);
+    if (raiseState == LyingLegRaiseState.lying && previousState == LyingLegRaiseState.lowering) {
+      _completeRep(ctx);
+      return;
+    }
 
     for (final metric in _metrics) {
       metric.update(ctx);
@@ -131,22 +138,22 @@ class LyingLegRaise extends ExerciseBase {
     }
   }
 
-  void _updateStateMachine(RepContext ctx) {
+  void _updateStateMachine(double legHorizontalAngle, double legAngularVelocity, int now) {
     // Lý thuyết: Góc tăng dần khi Lifting, đạt đỉnh (vel ~ 0), giảm dần khi Lowering
     
-    if (raiseState == LyingLegRaiseState.lying && ctx.legHorizontalAngle > LegRaiseConfig.LIFT_START_ANGLE && ctx.legAngularVelocity > 5.0) {
-      _transitionState(LyingLegRaiseState.raising, ctx.frameTimestamp);
+    if (raiseState == LyingLegRaiseState.lying && legHorizontalAngle > LegRaiseConfig.LIFT_START_ANGLE && legAngularVelocity > 5.0) {
+      _transitionState(LyingLegRaiseState.raising, now);
     } 
-    else if (raiseState == LyingLegRaiseState.raising && ctx.legAngularVelocity.abs() <= LegRaiseConfig.VELOCITY_ZERO_TOLERANCE && ctx.legHorizontalAngle > 50.0) {
-      _transitionState(LyingLegRaiseState.top, ctx.frameTimestamp);
+    else if (raiseState == LyingLegRaiseState.raising && legAngularVelocity.abs() <= LegRaiseConfig.VELOCITY_ZERO_TOLERANCE && legHorizontalAngle >= LegRaiseConfig.TOP_ANGLE_ERROR) {
+      _transitionState(LyingLegRaiseState.top, now);
     }
     // Góc bắt đầu giảm (velocity âm)
-    else if (raiseState == LyingLegRaiseState.top && ctx.legAngularVelocity < -2.0) {
-      _transitionState(LyingLegRaiseState.lowering, ctx.frameTimestamp);
+    else if (raiseState == LyingLegRaiseState.top && legAngularVelocity < -2.0) {
+      _transitionState(LyingLegRaiseState.lowering, now);
     }
     // Trở về sát mặt đất
-    else if (raiseState == LyingLegRaiseState.lowering && ctx.legHorizontalAngle < LegRaiseConfig.LIFT_START_ANGLE) {
-      _completeRep(ctx);
+    else if (raiseState == LyingLegRaiseState.lowering && legHorizontalAngle < LegRaiseConfig.LIFT_START_ANGLE) {
+      _transitionState(LyingLegRaiseState.lying, now);
     }
   }
 
@@ -158,14 +165,27 @@ class LyingLegRaise extends ExerciseBase {
   }
 
   void _completeRep(RepContext ctx) {
-    repCount++;
+    previousState = LyingLegRaiseState.lying; // Chặn lặp vô hạn
+
     for (final metric in _metrics) metric.evaluateRepEnd(ctx);
 
     final allFaults = <FaultRecord>[];
     for (final metric in _metrics) allFaults.addAll(metric.faults);
     correctForm = !allFaults.any((f) => f.affectsForm);
 
-    _transitionState(LyingLegRaiseState.lying, ctx.frameTimestamp);
+    if (!correctForm) resultIssues.feedback['Result'] = 'Fix Form';
+
+    logger.addRepLog(RepLog(
+      correctForm: correctForm,
+      repNumber: repCount + 1,
+      data: {
+        "eccentric_time": tempoMetric.lastLoweringTime ?? 0.0,
+        "fault_types": allFaults.map((e) => e.type).toSet().toList()
+      }
+    ));
+
+    repCount++;
+    correctForm = true;
     for (final metric in _metrics) metric.resetAndCountFault();
   }
 
@@ -179,13 +199,58 @@ class LyingLegRaise extends ExerciseBase {
   }
 
   Map<String, PoseLandmark>? _getLandmarks(Map<PoseLandmarkType, PoseLandmark> lm) {
-    // Trích xuất ưu tiên side chuẩn
-    return {
-      'shoulder': lm[PoseLandmarkType.leftShoulder]!,
-      'hip': lm[PoseLandmarkType.leftHip]!,
-      'knee': lm[PoseLandmarkType.leftKnee]!,
-      'ankle': lm[PoseLandmarkType.leftAnkle]!,
-    };
+    final lShoulder = lm[PoseLandmarkType.leftShoulder];
+    final lHip = lm[PoseLandmarkType.leftHip];
+    final lKnee = lm[PoseLandmarkType.leftKnee];
+    final lAnkle = lm[PoseLandmarkType.leftAnkle];
+
+    final rShoulder = lm[PoseLandmarkType.rightShoulder];
+    final rHip = lm[PoseLandmarkType.rightHip];
+    final rKnee = lm[PoseLandmarkType.rightKnee];
+    final rAnkle = lm[PoseLandmarkType.rightAnkle];
+
+    // Lựa chọn bên có độ tin cậy (likelihood) cao hơn ở khớp hông
+    bool useLeft = (lHip?.likelihood ?? 0.0) >= (rHip?.likelihood ?? 0.0);
+
+    if (useLeft) {
+      if (lShoulder != null && lHip != null && lKnee != null && lAnkle != null) {
+        return {
+          'shoulder': lShoulder,
+          'hip': lHip,
+          'knee': lKnee,
+          'ankle': lAnkle,
+        };
+      }
+    } else {
+      if (rShoulder != null && rHip != null && rKnee != null && rAnkle != null) {
+        return {
+          'shoulder': rShoulder,
+          'hip': rHip,
+          'knee': rKnee,
+          'ankle': rAnkle,
+        };
+      }
+    }
+
+    // Fallback nếu bên được chọn bị thiếu landmark nhưng bên kia có đủ
+    if (lShoulder != null && lHip != null && lKnee != null && lAnkle != null) {
+      return {
+        'shoulder': lShoulder,
+        'hip': lHip,
+        'knee': lKnee,
+        'ankle': lAnkle,
+      };
+    }
+    if (rShoulder != null && rHip != null && rKnee != null && rAnkle != null) {
+      return {
+        'shoulder': rShoulder,
+        'hip': rHip,
+        'knee': rKnee,
+        'ankle': rAnkle,
+      };
+    }
+
+    return null;
   }
 
   @override

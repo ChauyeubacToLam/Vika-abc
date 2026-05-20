@@ -11,20 +11,7 @@ import 'metrics/rom_metric.dart';
 import 'metrics/knee_straightness_metric.dart';
 import 'metrics/tempo_metric.dart';
 
-class LegRaiseConfig {
-  static const int MAX_REP = 12; // Beginner/Conservative
-  static const int TIMEOUT_MS = 90000; // 90s
-  
-  // Start Position Limits
-  static const double START_HIP_FLEXION_MIN = 165.0; // Gần 180 độ
-  static const double START_KNEE_STRAIGHT_MIN = 160.0; // Phải duỗi gối
 
-  // State Transition Thresholds
-  static const double RAISING_ANGLE = 170.0;
-  static const double TOP_ANGLE = 100.0; // Vai-Hông-Gối <= 100 độ
-  static const double LOWERING_ANGLE = 105.0;
-  static const double LYING_ANGLE = 165.0;
-}
 
 class LegRaise extends ExerciseBase {
   @override
@@ -78,6 +65,7 @@ class LegRaise extends ExerciseBase {
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
+    // TODO: Implement safety check for Leg Raises (e.g. check if user has pre-existing lower back pain history before starting).
     return null; // No specific safety check for this exercise yet.
   }
 
@@ -131,10 +119,14 @@ class LegRaise extends ExerciseBase {
       return; 
     }
 
-    final shoulder = landmarks[PoseLandmarkType.leftShoulder]!;
-    final hip = landmarks[PoseLandmarkType.leftHip]!;
-    final knee = landmarks[PoseLandmarkType.leftKnee]!;
-    final ankle = landmarks[PoseLandmarkType.leftAnkle]!;
+    final shoulder = landmarks[PoseLandmarkType.leftShoulder];
+    final hip = landmarks[PoseLandmarkType.leftHip];
+    final knee = landmarks[PoseLandmarkType.leftKnee];
+    final ankle = landmarks[PoseLandmarkType.leftAnkle];
+
+    if (shoulder == null || hip == null || knee == null || ankle == null) {
+      return; // Safe guard: prevent null crash when user goes out of frame
+    }
 
     scaleFactor = calculateDistance(shoulder, hip);
 

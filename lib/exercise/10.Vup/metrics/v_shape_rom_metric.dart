@@ -23,12 +23,14 @@ class VShapeRomMetric extends VUpMetricBase {
       if (minWristAnkleDist == null || ctx.wristAnkleDistance < minWristAnkleDist!) {
         minWristAnkleDist = ctx.wristAnkleDistance;
       }
+      _debugData['minVAngle'] = minVAngle?.toStringAsFixed(1);
+      _debugData['minWristAnkleDist'] = minWristAnkleDist?.toStringAsFixed(2);
     }
   }
 
   void evaluateRep(VUpRepContext ctx) {
-    // Góc phải khép lại <= 80 độ mới tính là đạt
-    if (minVAngle != null && minVAngle! > 80.0) {
+    // Góc phải khép lại <= ROM_TARGET_ANGLE mới tính là đạt
+    if (minVAngle != null && minVAngle! > VUpConfig.ROM_TARGET_ANGLE) {
        _faults.add(FaultRecord(
           phase: 'REP_COMPLETE',
           type: 'ROM',

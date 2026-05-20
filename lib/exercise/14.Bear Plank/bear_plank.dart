@@ -24,6 +24,12 @@ class BearPlank extends ExerciseBase {
   int? _lastFrameTimeMs;
   bool _isTimeout = false;
 
+  // Fault frame counters — đếm số frame bị lỗi trong khi hovering
+  int _totalHoverFrames = 0;
+  int _kneeFaultFrames = 0;
+  int _backFaultFrames = 0;
+  int _weightFaultFrames = 0;
+
   // Telemetry Log
   final List<Map<String, dynamic>> _telemetryLog = [];
 
@@ -67,7 +73,7 @@ class BearPlank extends ExerciseBase {
     if (lm == null) return false;
 
     final kneeAngle = calculateAngleNormalized(firstPoint: lm['hip']!, midPoint: lm['knee']!, lastPoint: lm['ankle']!);
-    // Đầu gối vuông góc 70-110 độ. Nếu lưng thẳng nữa thì mới cho bắt đầu.
+    // Đầu gối vuông góc 60-120 độ. Nếu lưng thẳng nữa thì mới cho bắt đầu.
     return kneeAngle >= BearConfig.KNEE_ANGLE_SETUP_MIN && kneeAngle <= BearConfig.KNEE_ANGLE_SETUP_MAX;
   }
 
@@ -87,19 +93,28 @@ class BearPlank extends ExerciseBase {
     final lm = _getLandmarks(smoothedLandmarks);
     if (lm == null) return;
 
-    scaleFactor = calculateDistance(lm['shoulder']!, lm['hip']!);
+    final shoulder = lm['shoulder']!;
+    final hip = lm['hip']!;
+    final knee = lm['knee']!;
+    final wrist = lm['wrist']!;
+
+    scaleFactor = calculateDistance(shoulder, hip);
     if (scaleFactor == 0) scaleFactor = 1;
 
     // Tính toán hình học
-    final kneeHeightOffset = lm['ankle']!.y - lm['knee']!.y; // Y hướng xuống
-    final kneeAngle = calculateAngleNormalized(firstPoint: lm['hip']!, midPoint: lm['knee']!, lastPoint: lm['ankle']!);
-    final backYDifference = (lm['shoulder']!.y - lm['hip']!.y).abs();
-    final wristXDifference = (lm['shoulder']!.x - lm['wrist']!.x).abs();
+    // Dùng wrist.y làm mốc sàn (tay luôn chống sàn trong Bear Plank)
+    final floorY = wrist.y;
+    final kneeHeightOffset = floorY - knee.y; // Dương khi gối nhấc lên khỏi sàn
+    final kneeAngle = calculateAngleNormalized(firstPoint: hip, midPoint: knee, lastPoint: lm['ankle']!);
+    
+    // Signed: dương = shoulder thấp hơn hip (Y hướng xuống) → võng lưng
+    final backYOffset = (shoulder.y - hip.y) / scaleFactor;
+    
+    // Abs distance: vai chúi trước cổ tay
+    final shoulderWristXOffset = (shoulder.x - wrist.x).abs() / scaleFactor;
 
-    // Chuẩn hóa
+    // Chuẩn hóa knee height
     final normKneeHeight = kneeHeightOffset / scaleFactor;
-    final normBackY = backYDifference / scaleFactor;
-    final normWristX = wristXDifference / scaleFactor;
 
     // GHI LOG TELEMETRY
     _telemetryLog.add({
@@ -107,15 +122,15 @@ class BearPlank extends ExerciseBase {
       'state': bearState.name,
       'normKneeHeight': double.parse(normKneeHeight.toStringAsFixed(3)),
       'kneeAngle': double.parse(kneeAngle.toStringAsFixed(1)),
-      'normBackY': double.parse(normBackY.toStringAsFixed(3)),
-      'normWristX': double.parse(normWristX.toStringAsFixed(3)),
+      'backYOffset': double.parse(backYOffset.toStringAsFixed(3)),
+      'shoulderWristXOffset': double.parse(shoulderWristXOffset.toStringAsFixed(3)),
     });
 
     final ctx = BearRepContext(
       kneeHeightOffset: normKneeHeight,
       kneeAngle: kneeAngle,
-      backYDifference: normBackY,
-      wristXDifference: normWristX,
+      backYOffset: backYOffset,
+      shoulderWristXOffset: shoulderWristXOffset,
       scaleFactor: scaleFactor,
       currentState: bearState,
       frameTimestampMs: now,
@@ -125,10 +140,18 @@ class BearPlank extends ExerciseBase {
     // Cập nhật State Machine
     _updateStateMachine(ctx, now, dt);
 
-    // Cập nhật Metrics
+    // Cập nhật Metrics (chỉ khi đang hovering)
     for (var metric in _metrics) {
       metric.update(ctx);
       debugData.addAll(metric.debugData);
+    }
+
+    // Đếm fault frames khi đang hovering
+    if (bearState == BearState.hovering) {
+      _totalHoverFrames++;
+      if (kneeMetric.faults.isNotEmpty) _kneeFaultFrames++;
+      if (backMetric.faults.isNotEmpty) _backFaultFrames++;
+      if (weightMetric.faults.isNotEmpty) _weightFaultFrames++;
     }
     
     // UI Data
@@ -150,9 +173,16 @@ class BearPlank extends ExerciseBase {
         }
         break;
       case BearState.hovering:
-        _totalHoverTimeMs += dt; // Cộng dồn thời gian giữ đúng form
+        // Chỉ cộng thời gian khi form thực sự chuẩn (chưa bị fatigue)
+        if (isHoveringForm && !isFatiguedForm) {
+          _totalHoverTimeMs += dt;
+        }
         
         if (_fatigueDebouncer.update(isFatiguedForm)) {
+          // Reset metrics khi kết thúc hold cycle
+          for (var metric in _metrics) {
+            metric.resetAndCountFault();
+          }
           _transitionState(BearState.fatiguing, now);
         }
         break;
@@ -183,6 +213,13 @@ class BearPlank extends ExerciseBase {
     logger.pushKey("knee_fails", kneeMetric.faultsCount);
     logger.pushKey("back_fails", backMetric.faultsCount);
     logger.pushKey("weight_fails", weightMetric.faultsCount);
+    
+    // Fault frame counts — cho report builder tính % chính xác
+    logger.pushKey("total_hover_frames", _totalHoverFrames);
+    logger.pushKey("knee_fault_frames", _kneeFaultFrames);
+    logger.pushKey("back_fault_frames", _backFaultFrames);
+    logger.pushKey("weight_fault_frames", _weightFaultFrames);
+    
     logger.pushKey("telemetry_data", _telemetryLog); // Chìa khóa debug
     
     // Set kết quả (Form tốt nếu giữ trên 80% thời gian mục tiêu)
@@ -191,13 +228,31 @@ class BearPlank extends ExerciseBase {
   }
 
   Map<String, PoseLandmark>? _getLandmarks(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    final shoulder = landmarks[PoseLandmarkType.leftShoulder] ?? landmarks[PoseLandmarkType.rightShoulder];
-    final hip = landmarks[PoseLandmarkType.leftHip] ?? landmarks[PoseLandmarkType.rightHip];
-    final knee = landmarks[PoseLandmarkType.leftKnee] ?? landmarks[PoseLandmarkType.rightKnee];
-    final ankle = landmarks[PoseLandmarkType.leftAnkle] ?? landmarks[PoseLandmarkType.rightAnkle];
-    final wrist = landmarks[PoseLandmarkType.leftWrist] ?? landmarks[PoseLandmarkType.rightWrist];
+    final lShoulder = landmarks[PoseLandmarkType.leftShoulder];
+    final lHip = landmarks[PoseLandmarkType.leftHip];
+    final lKnee = landmarks[PoseLandmarkType.leftKnee];
+    final lAnkle = landmarks[PoseLandmarkType.leftAnkle];
+    final lWrist = landmarks[PoseLandmarkType.leftWrist];
 
-    if (shoulder == null || hip == null || knee == null || ankle == null || wrist == null) return null;
-    return {'shoulder': shoulder, 'hip': hip, 'knee': knee, 'ankle': ankle, 'wrist': wrist};
+    final rShoulder = landmarks[PoseLandmarkType.rightShoulder];
+    final rHip = landmarks[PoseLandmarkType.rightHip];
+    final rKnee = landmarks[PoseLandmarkType.rightKnee];
+    final rAnkle = landmarks[PoseLandmarkType.rightAnkle];
+    final rWrist = landmarks[PoseLandmarkType.rightWrist];
+
+    // Chọn bên có likelihood hông cao hơn, fallback nếu 1 bên null
+    if (lShoulder != null && lHip != null && lKnee != null && lAnkle != null && lWrist != null) {
+      if (rHip == null || lHip.likelihood >= rHip.likelihood) {
+        return {'shoulder': lShoulder, 'hip': lHip, 'knee': lKnee, 'ankle': lAnkle, 'wrist': lWrist};
+      }
+    }
+    if (rShoulder != null && rHip != null && rKnee != null && rAnkle != null && rWrist != null) {
+      return {'shoulder': rShoulder, 'hip': rHip, 'knee': rKnee, 'ankle': rAnkle, 'wrist': rWrist};
+    }
+    // Fallback to left if right failed but left was available
+    if (lShoulder != null && lHip != null && lKnee != null && lAnkle != null && lWrist != null) {
+      return {'shoulder': lShoulder, 'hip': lHip, 'knee': lKnee, 'ankle': lAnkle, 'wrist': lWrist};
+    }
+    return null;
   }
 }

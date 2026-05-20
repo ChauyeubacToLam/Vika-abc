@@ -8,6 +8,7 @@ class EccentricTempoMetric extends ReverseCrunchMetricBase {
   final Map<String, dynamic> _debugData = {};
 
   int? _loweringStartMs;
+  double? loweringDuration;
 
   @override
   List<FaultRecord> get faults => _faults;
@@ -24,8 +25,8 @@ class EccentricTempoMetric extends ReverseCrunchMetricBase {
   @override
   void update(RepContext ctx) {
     if (_loweringStartMs != null && ctx.state == ReverseCrunchState.lowering) {
-      double loweringTime = (ctx.frameTimestamp - _loweringStartMs!) / 1000.0;
-      _debugData['loweringTime'] = loweringTime.toStringAsFixed(2);
+      double currentLoweringTime = (ctx.frameTimestamp - _loweringStartMs!) / 1000.0;
+      _debugData['loweringTime'] = currentLoweringTime.toStringAsFixed(2);
       ctx.resultIssues.feedback['Tempo'] = 'Từ từ hạ xuống...';
     }
   }
@@ -33,8 +34,8 @@ class EccentricTempoMetric extends ReverseCrunchMetricBase {
   @override
   void evaluateRepEnd(RepContext ctx) {
     if (_loweringStartMs != null) {
-      double totalLoweringTime = (ctx.frameTimestamp - _loweringStartMs!) / 1000.0;
-      if (totalLoweringTime < ReverseCrunchConfig.ECCENTRIC_MIN_TIME) {
+      loweringDuration = (ctx.frameTimestamp - _loweringStartMs!) / 1000.0;
+      if (loweringDuration! < ReverseCrunchConfig.ECCENTRIC_MIN_TIME) {
         _faults.add(FaultRecord(
           phase: 'LOWERING', type: 'FastEccentric', message: 'Hạ hông quá nhanh',
           affectsForm: false, // Lỗi nhịp độ, không đánh hỏng form cứng
@@ -50,5 +51,6 @@ class EccentricTempoMetric extends ReverseCrunchMetricBase {
     _faults.clear();
     _debugData.clear();
     _loweringStartMs = null;
+    loweringDuration = null;
   }
 }

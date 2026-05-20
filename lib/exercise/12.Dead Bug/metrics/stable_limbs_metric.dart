@@ -18,11 +18,14 @@ class StableLimbsMetric extends DeadBugMetricBase {
   void update(DeadBugRepContext ctx) {
     if (ctx.state == DeadBugState.extending || ctx.state == DeadBugState.hold) {
       
-      // Tìm chi ĐANG DUỖI (>135)
-      bool lArmExt = ctx.leftArmAngle > 135.0;
-      bool rArmExt = ctx.rightArmAngle > 135.0;
-      bool lHipExt = ctx.leftHipAngle > 135.0;
-      bool rHipExt = ctx.rightHipAngle > 135.0;
+      // Tìm chi ĐANG DUỖI (>125)
+      bool lArmExt = ctx.leftArmAngle > 125.0;
+      bool rArmExt = ctx.rightArmAngle > 125.0;
+      bool lHipExt = ctx.leftHipAngle > 125.0;
+      bool rHipExt = ctx.rightHipAngle > 125.0;
+
+      bool anyExtending = lArmExt || rArmExt || lHipExt || rHipExt;
+      if (!anyExtending) return;
 
       // Chi TRỤ (không duỗi) phải giữ ở mức < 115 độ
       bool lArmUnstable = !lArmExt && ctx.leftArmAngle > 115.0;

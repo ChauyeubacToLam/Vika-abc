@@ -15,7 +15,9 @@ class ArmExtensionMetric extends PlankMetricBase {
 
   @override
   void update(PlankRepContext ctx) {
-    if (ctx.currentState == PlankState.high_plank && ctx.elbowAngle >= PlankConfig.ELBOW_HIGH_PLANK_MIN) {
+    if (ctx.currentState == PlankState.high_plank &&
+        ctx.leftElbowAngle >= PlankConfig.ELBOW_HIGH_PLANK_MIN &&
+        ctx.rightElbowAngle >= PlankConfig.ELBOW_HIGH_PLANK_MIN) {
       _reachedFullExtension = true;
     }
   }

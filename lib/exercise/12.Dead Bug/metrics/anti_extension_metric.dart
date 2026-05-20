@@ -53,5 +53,6 @@ class AntiExtensionMetric extends DeadBugMetricBase {
   void reset() {
     _faults.clear();
     _faultDebouncer.reset();
+    _baselineHipY = null;
   }
 }

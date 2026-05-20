@@ -19,7 +19,9 @@ class LumbarArchingMetric extends LyingLegRaiseMetricBase {
   @override
   void update(RepContext ctx) {
     if (ctx.state == LyingLegRaiseState.lying) {
-      _baselineHipY = ctx.hipY; // Học vị trí hông phẳng sát sàn
+      if (_baselineHipY == null || ctx.hipY > _baselineHipY!) {
+        _baselineHipY = ctx.hipY; // Học vị trí hông phẳng sát sàn (thấp nhất vật lý, Y lớn nhất)
+      }
       ctx.resultIssues.feedback['Lumbar'] = 'Lưng ép sàn';
       return;
     }
@@ -54,5 +56,6 @@ class LumbarArchingMetric extends LyingLegRaiseMetricBase {
     _faults.clear();
     _debugData.clear();
     _archDebouncer.reset();
+    _baselineHipY = null;
   }
 }

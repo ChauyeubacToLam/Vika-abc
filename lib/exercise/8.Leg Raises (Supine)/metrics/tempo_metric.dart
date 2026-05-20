@@ -27,8 +27,8 @@ class TempoMetric extends LegRaiseMetricBase {
   void update(LegRaiseRepContext ctx) {}
 
   void evaluateRep(LegRaiseRepContext ctx) {
-    // Nếu rớt tự do < 1.5s (Hạ rầm xuống đất)
-    if (loweringDuration != null && loweringDuration! < 1.5) {
+    // Nếu rớt tự do < TEMPO_FAULT_THRESHOLD (ví dụ < 2.0s)
+    if (loweringDuration != null && loweringDuration! < LegRaiseConfig.TEMPO_FAULT_THRESHOLD) {
        _faults.add(FaultRecord(
           phase: 'REP_COMPLETE',
           type: 'Tempo',

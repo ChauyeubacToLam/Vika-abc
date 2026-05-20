@@ -16,10 +16,17 @@ class SwingingMomentumMetric extends ReverseCrunchMetricBase {
   Map<String, dynamic> get debugData => _debugData;
 
   @override
+  void onStateTransition(ReverseCrunchState from, ReverseCrunchState to, int timestampMs) {
+    if (to == ReverseCrunchState.lying) {
+      _setupKneeAngle = null; // Sẽ lấy mẫu frame đầu tiên khi bắt đầu pha LYING để tránh nhiễu và drift
+    }
+  }
+
+  @override
   void update(RepContext ctx) {
     if (ctx.state == ReverseCrunchState.lying) {
-      // Học góc gối lúc setup (khoảng 90 độ)
-      _setupKneeAngle = ctx.kneeAngle;
+      // Học góc gối lúc setup (khoảng 90 độ) - chỉ lấy mẫu 1 lần để tránh nhiễu
+      _setupKneeAngle ??= ctx.kneeAngle;
       ctx.resultIssues.feedback['KneeLock'] = 'Khóa chặt gối';
       return;
     }

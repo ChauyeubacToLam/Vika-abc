@@ -71,5 +71,7 @@ class PelvicCurlMetric extends ReverseCrunchMetricBase {
     _debugData.clear();
     _minTrunkKneeAngle = 180.0;
     _minHipY = 9999.0;
+    _baselineHipY = null;
+    _baselineTrunkKneeAngle = null;
   }
 }

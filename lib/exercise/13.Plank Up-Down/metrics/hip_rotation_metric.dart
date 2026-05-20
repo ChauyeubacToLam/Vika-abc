@@ -31,7 +31,7 @@ class HipRotationMetric extends PlankMetricBase {
           type: 'Rotation',
           message: 'Hông mất ổn định khi đổi tay',
           affectsForm: true,
-          voiceMessage: 'Giữ hông cố định, không lắc lư!',
+          voiceMessage: 'Giữ hông cố định, không lắc lư khi đẩy người!',
           priority: PlankFaultVoicePriority.hipRotation,
         ));
       }

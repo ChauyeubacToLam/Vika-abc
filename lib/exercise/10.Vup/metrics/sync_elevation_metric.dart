@@ -65,5 +65,7 @@ class SyncElevationMetric extends VUpMetricBase {
   void reset() {
     _faults.clear();
     _evaluatedThisRep = false;
+    _baselineShoulderY = null;
+    _baselineAnkleY = null;
   }
 }

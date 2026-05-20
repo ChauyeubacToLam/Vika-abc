@@ -17,11 +17,11 @@ class CoordinationMetric extends DeadBugMetricBase {
   void update(DeadBugRepContext ctx) {
     if ((ctx.state == DeadBugState.extending || ctx.state == DeadBugState.hold) && !_evaluatedThisRep) {
       
-      // Ngưỡng 135 độ để xác định chi đó đang được duỗi ra
-      bool lArmExt = ctx.leftArmAngle > 135.0;
-      bool rArmExt = ctx.rightArmAngle > 135.0;
-      bool lHipExt = ctx.leftHipAngle > 135.0;
-      bool rHipExt = ctx.rightHipAngle > 135.0;
+      // Ngưỡng 125 độ để xác định chi đó đang được duỗi ra
+      bool lArmExt = ctx.leftArmAngle > 125.0;
+      bool rArmExt = ctx.rightArmAngle > 125.0;
+      bool lHipExt = ctx.leftHipAngle > 125.0;
+      bool rHipExt = ctx.rightHipAngle > 125.0;
 
       // Lỗi đi cùng bên (Left-Left hoặc Right-Right)
       bool sameSideLeft = lArmExt && lHipExt;

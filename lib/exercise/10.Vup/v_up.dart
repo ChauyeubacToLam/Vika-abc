@@ -12,19 +12,6 @@ import 'metrics/jerking_metric.dart';
 import 'metrics/knee_extension_metric.dart';
 import 'metrics/tempo_metric.dart';
 
-class VUpConfig {
-  static const int MAX_REP = 12; // Cường độ cao, dừng ở 12
-  static const int TIMEOUT_MS = 90000; // 90s
-  
-  // Start Position Limits
-  static const double START_BODY_MIN = 165.0; // Duỗi thẳng người
-
-  // State Transition Thresholds
-  static const double RISING_ANGLE = 160.0;
-  static const double V_POSITION_ANGLE = 80.0; // Ngưỡng an toàn để nhận diện pha đỉnh
-  static const double LOWERING_THRESHOLD_DIFF = 5.0; // Góc mở ra 5 độ so với đỉnh
-  static const double LYING_ANGLE = 160.0;
-}
 
 class VUp extends ExerciseBase {
   @override
@@ -138,30 +125,19 @@ class VUp extends ExerciseBase {
       return; 
     }
 
-    final shoulder = landmarks[PoseLandmarkType.leftShoulder]!;
-    final wrist = landmarks[PoseLandmarkType.leftWrist]!;
-    final hip = landmarks[PoseLandmarkType.leftHip]!;
-    final knee = landmarks[PoseLandmarkType.leftKnee]!;
-    final ankle = landmarks[PoseLandmarkType.leftAnkle]!;
+    final shoulder = landmarks[PoseLandmarkType.leftShoulder];
+    final wrist = landmarks[PoseLandmarkType.leftWrist];
+    final hip = landmarks[PoseLandmarkType.leftHip];
+    final knee = landmarks[PoseLandmarkType.leftKnee];
+    final ankle = landmarks[PoseLandmarkType.leftAnkle];
+
+    if (shoulder == null || wrist == null || hip == null || knee == null || ankle == null) return;
 
     scaleFactor = calculateDistance(shoulder, hip);
 
     double vAngle = calculateAngleNormalized(firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
     double kneeStraight = calculateAngleNormalized(firstPoint: hip, midPoint: knee, lastPoint: ankle);
     double wristAnkleDist = scaleFactor > 0 ? calculateDistance(wrist, ankle) / scaleFactor : 0;
-
-    final ctx = VUpRepContext(
-      shoulderHipAnkleAngle: vAngle,
-      hipKneeAnkleAngle: kneeStraight,
-      wristAnkleDistance: wristAnkleDist,
-      shoulderY: shoulder.y,
-      ankleY: ankle.y,
-      hipY: hip.y,
-      scaleFactor: scaleFactor,
-      state: state,
-      frameTimestampMs: now,
-      resultIssues: resultIssues,
-    );
 
     if (now - _lastDiagnosticTime > 500 || state != previousState) {
       _diagnosticLog.add({
@@ -176,6 +152,19 @@ class VUp extends ExerciseBase {
     }
 
     _updateStateMachine(vAngle, now);
+
+    final ctx = VUpRepContext(
+      shoulderHipAnkleAngle: vAngle,
+      hipKneeAnkleAngle: kneeStraight,
+      wristAnkleDistance: wristAnkleDist,
+      shoulderY: shoulder.y,
+      ankleY: ankle.y,
+      hipY: hip.y,
+      scaleFactor: scaleFactor,
+      state: state,
+      frameTimestampMs: now,
+      resultIssues: resultIssues,
+    );
 
     if (state == VUpState.lying && previousState == VUpState.lowering) {
       _completeRep(ctx);
@@ -200,7 +189,7 @@ class VUp extends ExerciseBase {
       _transitionState(VUpState.rising, now);
       _minAngleThisRep = vAngle;
     } 
-    else if (_vPositionDebouncer.update(state == VUpState.rising && vAngle <= VUpConfig.V_POSITION_ANGLE)) {
+    else if (_vPositionDebouncer.update(state == VUpState.rising && vAngle <= VUpConfig.V_POSITION_THRESHOLD)) {
       _transitionState(VUpState.v_position, now);
     }
     else if (_loweringDebouncer.update((state == VUpState.v_position || state == VUpState.rising) && 
@@ -221,9 +210,9 @@ class VUp extends ExerciseBase {
   }
 
   void _completeRep(VUpRepContext ctx) {
-    repCount++;
     romMetric.evaluateRep(ctx);
     tempoMetric.evaluateRep(ctx);
+    repCount++;
 
     final allFaults = <FaultRecord>[];
     for (var metric in _metrics) allFaults.addAll(metric.faults);
