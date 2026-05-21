@@ -26,6 +26,11 @@ import '../exercise/12.Dead Bug/dead_bug.dart';
 import '../exercise/13.Plank Up-Down/plank_up_down.dart';
 import '../exercise/14.Bear Plank/bear_plank.dart';
 import '../exercise/suryanamaskar/suryanamaskar.dart';
+import '../exercise/cossack_squat/cossack_squat.dart';
+import '../exercise/walking_lunge/walking_lunge.dart';
+import '../exercise/tricep_dip/tricep_dip.dart';
+import '../exercise/russian_twist/russian_twist.dart';
+import '../exercise/standing_knee_to_elbow/standing_knee_to_elbow.dart';
 /* =========================================================================
    ExerciseDefinition — Metadata + factory for each exercise type.
 
@@ -658,5 +663,105 @@ ExerciseDefinition(
       'p11_hasta_uttanasana_return': Color(0xFFFFD600),
       'p12_pranamasana_return': Color(0xFF00E676),
     },
+  ),
+  ExerciseDefinition(
+    id: 'cossack_squat',
+    name: 'Cossack Squat',
+    subtitle: 'Tăng cường sức mạnh và độ linh hoạt cho hông/đùi',
+    description: 'Squat sang một bên luân phiên. Cải thiện độ dẻo dai cơ đùi trong và sức mạnh chân trụ.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFFE91E63),
+    secondaryColor: const Color(0xFFC2185B),
+    difficulty: 'Khó',
+    targetMuscles: const ['Đùi', 'Mông', 'Hông'],
+    duration: '16 reps',
+    cameraHint: 'Quay chính diện (Front View).',
+    framingHint: 'Đảm bảo thấy toàn bộ cơ thể từ đầu đến chân.',
+    setupTips: const [
+      'Đứng dang chân rộng gấp 1.5 - 2 lần vai.',
+      'Giữ lưng thẳng, mũi chân hơi hướng ra ngoài.',
+    ],
+    createExercise: () => CossackSquat(),
+    phaseColors: const { 'standing': Colors.green, 'descending': Colors.orange, 'bottom': Colors.red, 'ascending': Colors.blue },
+  ),
+  ExerciseDefinition(
+    id: 'walking_lunge',
+    name: 'Walking Lunge',
+    subtitle: 'Lunge di chuyển liên tục',
+    description: 'Phát triển sức mạnh đùi và mông đồng thời cải thiện thăng bằng.',
+    icon: Icons.directions_walk,
+    primaryColor: const Color(0xFF9C27B0),
+    secondaryColor: const Color(0xFF7B1FA2),
+    difficulty: 'Trung bình',
+    targetMuscles: const ['Đùi trước', 'Đùi sau', 'Mông'],
+    duration: '20 reps',
+    cameraHint: 'Quay ngang hông (Side View).',
+    framingHint: 'Không gian cần rộng ít nhất 3m theo chiều ngang.',
+    setupTips: const [
+      'Đứng thẳng ở mép khung hình.',
+      'Bước dài về phía trước, giữ thân người thẳng.',
+    ],
+    createExercise: () => WalkingLunge(),
+    phaseColors: const { 'standing': Colors.grey, 'stepping': Colors.blue, 'descending': Colors.orange, 'bottom': Colors.green, 'pulling_through': Colors.purple },
+  ),
+  ExerciseDefinition(
+    id: 'tricep_dip',
+    name: 'Tricep Dip (Floor)',
+    subtitle: 'Đẩy bắp tay sau trên sàn',
+    description: 'Làm săn chắc bắp tay sau mà không cần dụng cụ.',
+    icon: Icons.accessibility,
+    primaryColor: const Color(0xFF00BCD4),
+    secondaryColor: const Color(0xFF0097A7),
+    difficulty: 'Cơ bản',
+    targetMuscles: const ['Bắp tay sau', 'Vai', 'Ngực'],
+    duration: '15 reps',
+    cameraHint: 'Quay ngang người (Side View).',
+    framingHint: 'Thấy rõ phần thân trên và góc khuỷu tay.',
+    setupTips: const [
+      'Ngồi trên sàn, tay chống phía sau lưng.',
+      'Dùng tay đẩy hông lên, cánh tay thẳng.',
+    ],
+    createExercise: () => TricepDip(),
+    phaseColors: const { 'setup_top': Colors.green, 'descending': Colors.orange, 'bottom': Colors.red, 'ascending': Colors.blue },
+  ),
+  ExerciseDefinition(
+    id: 'russian_twist',
+    name: 'Russian Twist',
+    subtitle: 'Vặn mình kiểu Nga',
+    description: 'Đánh tan mỡ eo và làm săn chắc cơ liên sườn.',
+    icon: Icons.sync,
+    primaryColor: const Color(0xFFFF5722),
+    secondaryColor: const Color(0xFFE64A19),
+    difficulty: 'Trung bình',
+    targetMuscles: const ['Cơ liên sườn', 'Core', 'Bụng'],
+    duration: '20 reps',
+    cameraHint: 'Chính diện (Front View).',
+    framingHint: 'Thấy rõ chuyển động của hai tay và hông.',
+    setupTips: const [
+      'Ngồi ngả người ra sau hình chữ V.',
+      'Hai tay chụm lại trước ngực và vặn sang hai bên.',
+    ],
+    createExercise: () => RussianTwist(),
+    phaseColors: const { 'center_setup': Colors.green, 'twisting': Colors.blue, 'max_point': Colors.orange, 'returning': Colors.purple },
+  ),
+  ExerciseDefinition(
+    id: 'standing_knee_to_elbow',
+    name: 'Standing Knee-to-Elbow',
+    subtitle: 'Gối chạm khuỷu chéo góc',
+    description: 'Cardio đứng vặn người, cải thiện sức bền và cơ chéo bụng.',
+    icon: Icons.transfer_within_a_station,
+    primaryColor: const Color(0xFF4CAF50),
+    secondaryColor: const Color(0xFF388E3C),
+    difficulty: 'Cơ bản',
+    targetMuscles: const ['Core', 'Cơ liên sườn', 'Cardio'],
+    duration: '30 reps',
+    cameraHint: 'Quay chính diện (Front View).',
+    framingHint: 'Thấy toàn bộ thân hình từ tay đến gót chân.',
+    setupTips: const [
+      'Đứng thẳng, hai tay sau gáy hoặc giơ cao.',
+      'Kéo chéo đầu gối lên chạm khuỷu tay đối diện.',
+    ],
+    createExercise: () => StandingKneeToElbow(),
+    phaseColors: const { 'standing_base': Colors.grey, 'approaching': Colors.blue, 'touch': Colors.green, 'returning': Colors.orange },
   ),
 ];
