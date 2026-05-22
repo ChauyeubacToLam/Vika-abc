@@ -1,55 +1,106 @@
 import 'mountain_climber_metric_base.dart';
 
+/// Đánh giá biên độ co gối (Knee Drive ROM).
+/// Không cần state MAX_FLEXION nữa — KneePeakRepCounter đã xác định
+/// thời điểm gối gần ngực nhất, metric chỉ cần nhận khoảng cách tối thiểu đó.
 class KneeDriveRomMetric extends ClimberMetricBase {
   @override
   String get name => 'KneeDriveROM';
-  
+
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
-  
-  double? _minKneeToShoulderDist; // Tìm khoảng cách X ngắn nhất (gần ngực nhất)
+
+  // Track dist nhỏ nhất trong lần co hiện tại cho từng chân
+  double? _minDistLeft;
+  double? _minDistRight;
+
+  // Thống kê theo rep
+  int _goodRomCount = 0;
+  int _shortRomCount = 0;
+
+  int get goodRomCount => _goodRomCount;
+  int get shortRomCount => _shortRomCount;
 
   @override
   List<FaultRecord> get faults => _faults;
+
   @override
   Map<String, dynamic> get debugData => _debugData;
 
   @override
   void update(RepContext ctx) {
-    // Tính khoảng cách X tương đối
-    double dist = (ctx.activeKneeX - ctx.shoulderX).abs() / (ctx.scaleFactor == 0 ? 1 : ctx.scaleFactor);
-    
-    if (_minKneeToShoulderDist == null || dist < _minKneeToShoulderDist!) {
-      _minKneeToShoulderDist = dist;
-    }
-    
-    _debugData['kneeDistanceNorm'] = dist.toStringAsFixed(2);
-    _debugData['minKneeDistance'] = _minKneeToShoulderDist?.toStringAsFixed(2) ?? '-';
+    final double scale = ctx.scaleFactor == 0 ? 1.0 : ctx.scaleFactor;
 
-    if (ctx.state == ClimberState.max_flexion) {
-      // Giả sử khoảng cách lý tưởng là < 0.6 thân người (vượt qua hông)
-      if (dist > 0.6) {
-        ctx.resultIssues.feedback['ROM'] = 'Kéo gối cao lên!';
-      } else {
-        ctx.resultIssues.feedback['ROM'] = 'Biên độ tốt';
-      }
+    final double distLeft =
+        (ctx.leftKneeX - ctx.shoulderX).abs() / scale;
+    final double distRight =
+        (ctx.rightKneeX - ctx.shoulderX).abs() / scale;
+
+    // Cập nhật min cho từng chân
+    if (_minDistLeft == null || distLeft < _minDistLeft!) {
+      _minDistLeft = distLeft;
     }
+    if (_minDistRight == null || distRight < _minDistRight!) {
+      _minDistRight = distRight;
+    }
+
+    _debugData['ROM_distLeftNorm'] = distLeft.toStringAsFixed(2);
+    _debugData['ROM_distRightNorm'] = distRight.toStringAsFixed(2);
+    _debugData['ROM_minLeft'] = _minDistLeft?.toStringAsFixed(2) ?? '-';
+    _debugData['ROM_minRight'] = _minDistRight?.toStringAsFixed(2) ?? '-';
+    _debugData['ROM_goodCount'] = _goodRomCount;
+    _debugData['ROM_shortCount'] = _shortRomCount;
   }
 
-  void evaluateRepEnd(RepContext ctx) {
-    if (_minKneeToShoulderDist != null && _minKneeToShoulderDist! > 0.6) {
+  /// Gọi ngay khi KneePeakRepCounter xác nhận +1 rep cho 1 bên chân.
+  /// [peakDist] = minDistInZone được lấy từ counter tại thời điểm đó.
+  /// [zoneThreshold] = ngưỡng đã calibrate của counter, dùng để tham chiếu.
+  void evaluateRepEnd(
+    RepContext ctx,
+    KneeSide side,
+    double peakDist,
+    double zoneThreshold,
+  ) {
+    // Tiêu chuẩn: gối phải vượt qua ~60% khoảng shoulder-hip.
+    // Dùng chính zoneThreshold đã calibrate làm baseline "đạt chuẩn".
+    final bool isShort = peakDist > zoneThreshold;
+
+    if (isShort) {
+      _shortRomCount++;
       _faults.add(FaultRecord(
-        phase: 'MAX_FLEXION', type: 'ShortROM', message: 'Co gối quá ngắn',
-        affectsForm: true, priority: ClimberVoicePriority.kneeRom, voiceMessage: 'Co gối sâu hơn về phía ngực'
+        phase: 'MAX_FLEXION',
+        type: 'ShortROM_${side.name}',
+        message: 'Co gối ${side == KneeSide.left ? "trái" : "phải"} quá ngắn',
+        affectsForm: true,
+        priority: ClimberVoicePriority.kneeRom,
+        voiceMessage: 'Co gối sâu hơn về phía ngực',
       ));
-      ctx.resultIssues.addInstruction('high_plank_base', 'ROM', 'Co gối sâu hơn ở nhịp sau');
+      ctx.resultIssues.feedback['ROM'] =
+          'Co gối ${side == KneeSide.left ? "trái" : "phải"} sâu hơn!';
+      ctx.resultIssues.addInstruction(
+          'high_plank_base', 'ROM', 'Co gối sâu hơn ở nhịp sau');
+    } else {
+      _goodRomCount++;
+      ctx.resultIssues.feedback['ROM'] = 'Biên độ tốt';
     }
+
+    // Reset min dist cho chân vừa hoàn thành
+    if (side == KneeSide.left) _minDistLeft = null;
+    if (side == KneeSide.right) _minDistRight = null;
   }
 
   @override
   void reset() {
     _faults.clear();
     _debugData.clear();
-    _minKneeToShoulderDist = null;
+    _minDistLeft = null;
+    _minDistRight = null;
+  }
+
+  /// Full reset khi kết thúc set
+  void fullReset() {
+    reset();
+    _goodRomCount = 0;
+    _shortRomCount = 0;
   }
 }

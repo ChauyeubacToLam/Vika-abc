@@ -11,6 +11,10 @@ class TempoMetric extends BirdDogMetricBase {
   double? holdDuration;
   bool? _lastLegWasLeft;
 
+  // Mở getter để truy cập tính vòng quay 5s
+  int? get holdStartMs => _holdStartMs;
+  bool? get lastLegWasLeft => _lastLegWasLeft;
+
   @override
   List<FaultRecord> get faults => _faults;
 
@@ -30,29 +34,22 @@ class TempoMetric extends BirdDogMetricBase {
   void update(BirdDogRepContext ctx) {}
 
   void evaluateRep(BirdDogRepContext ctx) {
-    if (holdDuration != null && holdDuration! < 1.5) {
+    // Đổi logic thành check 5.0 giây
+    if (holdDuration != null && holdDuration! < 5.0) {
        _faults.add(FaultRecord(
           phase: 'REP_COMPLETE',
           type: 'Tempo',
-          message: 'Giữ quá ngắn (${holdDuration!.toStringAsFixed(1)}s)',
-          voiceMessage: 'Giữ lại 2 giây ở điểm cao nhất nhé',
+          message: 'Giữ chưa đủ 5s (${holdDuration!.toStringAsFixed(1)}s)',
+          voiceMessage: 'Giữ lại 5 giây ở điểm cao nhất nhé',
           affectsForm: true,
           priority: BirdDogFaultPriority.tempo,
         ));
     }
+  }
 
-    if (_lastLegWasLeft != null && _lastLegWasLeft == ctx.isLeftLegActive) {
-      _faults.add(FaultRecord(
-          phase: 'REP_COMPLETE',
-          type: 'Alternating',
-          message: 'Không luân phiên đổi bên',
-          voiceMessage: 'Nhớ đổi bên tay và chân liên tục nhé',
-          affectsForm: true, 
-          priority: BirdDogFaultPriority.tempo, 
-        ));
-    }
-    
-    _lastLegWasLeft = ctx.isLeftLegActive;
+  // Được gọi khi rep hợp lệ hoàn thành để lưu bên
+  void markLegUsed(bool isLeft) {
+    _lastLegWasLeft = isLeft;
   }
 
   @override

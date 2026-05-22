@@ -7,28 +7,36 @@ enum BirdDogState { neutral, extending, hold_extended, returning }
 
 class BirdDogRepContext {
   final double activeKneeAngle;       
+  final double nonActiveKneeAngle; // Thêm để chặn lỗi Push-up
   final double activeArmAngle;        
   final double shoulderHipAnkleAngle; 
   final double trunkHorizontalAngle;  
   final double activeArmHorizontalAngle; 
   final double activeLegHorizontalAngle; 
   final double hipY; 
+  final double earY; // Thêm để check cúi đầu
+  final double shoulderY; // Thêm để check cúi đầu
   final double? scaleFactor; 
   final bool isLeftLegActive; 
+  final bool isSameSide; // Thêm để check lỗi cùng tay cùng chân
   final BirdDogState state;
   final int frameTimestamp;
   final ResultIssues resultIssues;
 
   BirdDogRepContext({
     required this.activeKneeAngle,
+    required this.nonActiveKneeAngle,
     required this.activeArmAngle,
     required this.shoulderHipAnkleAngle,
     required this.trunkHorizontalAngle,
     required this.activeArmHorizontalAngle,
     required this.activeLegHorizontalAngle,
     required this.hipY,
+    required this.earY,
+    required this.shoulderY,
     required this.scaleFactor,
     required this.isLeftLegActive,
+    required this.isSameSide,
     required this.state,
     required this.frameTimestamp,
     required this.resultIssues,

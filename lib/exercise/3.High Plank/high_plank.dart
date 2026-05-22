@@ -15,20 +15,21 @@ class HighPlankConfig {
   static const int TARGET_TIME_MS = 30000; // 30s form chuẩn
   static const int TIMEOUT_MS = 90000; // 90s timeout
 
-  // Start Position (Tay duỗi, lưng thẳng)
+  // Start Position (Tay duỗi, lưng thẳng, gối thẳng)
   static const double START_ARM_MIN = 160.0;
   static const double START_BODY_MIN = 165.0;
+  static const double START_KNEE_MIN = 150.0;
 
   // State Transition Thresholds — SETUP/DROPPING -> HOLDING (ngưỡng vào, chặt hơn)
   static const double HOLDING_BODY_THRESHOLD = 165.0;
   static const double HOLDING_ARM_THRESHOLD = 160.0;
-  // FIX Bug 2: Ngưỡng vào HOLDING cho sagging phải chặt hơn ngưỡng ra (0.05 < 0.08)
-  // để tạo hysteresis band giống arm/body angle, tránh rung state.
+  static const double HOLDING_KNEE_THRESHOLD = 150.0;
   static const double HOLDING_SAG_DEVIATION = 0.05;
 
   // State Transition Thresholds — HOLDING -> DROPPING (ngưỡng ra, lỏng hơn = tạo hysteresis band)
   static const double DROPPING_PIKE_ANGLE = 155.0;
   static const double DROPPING_ARM_ANGLE = 150.0;
+  static const double DROPPING_KNEE_ANGLE = 140.0; // Gập gối dưới 140 độ coi như rớt form
   static const double DROPPING_SAG_DEVIATION = 0.08; // Sụt hông > 8% chiều dài lưng
 }
 
@@ -87,15 +88,18 @@ class HighPlank extends ExerciseBase {
     final elbow = landmarks[PoseLandmarkType.leftElbow];
     final wrist = landmarks[PoseLandmarkType.leftWrist];
     final hip = landmarks[PoseLandmarkType.leftHip];
+    final knee = landmarks[PoseLandmarkType.leftKnee];
     final ankle = landmarks[PoseLandmarkType.leftAnkle];
 
-    if (shoulder == null || elbow == null || wrist == null || hip == null || ankle == null) return false;
+    if (shoulder == null || elbow == null || wrist == null || hip == null || knee == null || ankle == null) return false;
 
     double armAngle = calculateAngleNormalized(firstPoint: shoulder, midPoint: elbow, lastPoint: wrist);
     double bodyAngle = calculateAngleNormalized(firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
+    double kneeAngle = calculateAngleNormalized(firstPoint: hip, midPoint: knee, lastPoint: ankle);
 
     if (armAngle < HighPlankConfig.START_ARM_MIN) return false;
     if (bodyAngle < HighPlankConfig.START_BODY_MIN) return false;
+    if (kneeAngle < HighPlankConfig.START_KNEE_MIN) return false;
 
     return true;
   }
@@ -135,20 +139,20 @@ class HighPlank extends ExerciseBase {
       return;
     }
 
-    // FIX Bug 1: Null-check trước khi force-unwrap.
-    // ML Kit có thể mất điểm neo bất kỳ lúc nào → không check = crash.
     final shoulder = landmarks[PoseLandmarkType.leftShoulder];
     final elbow = landmarks[PoseLandmarkType.leftElbow];
     final wrist = landmarks[PoseLandmarkType.leftWrist];
     final hip = landmarks[PoseLandmarkType.leftHip];
+    final knee = landmarks[PoseLandmarkType.leftKnee];
     final ankle = landmarks[PoseLandmarkType.leftAnkle];
 
-    if (shoulder == null || elbow == null || wrist == null || hip == null || ankle == null) return;
+    if (shoulder == null || elbow == null || wrist == null || hip == null || knee == null || ankle == null) return;
 
     scaleFactor = calculateDistance(shoulder, hip);
 
     double bodyAngle = calculateAngleNormalized(firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
     double armAngle = calculateAngleNormalized(firstPoint: shoulder, midPoint: elbow, lastPoint: wrist);
+    double kneeAngle = calculateAngleNormalized(firstPoint: hip, midPoint: knee, lastPoint: ankle);
 
     double expectedHipY = _interpolateY(shoulder, ankle, hip.x);
     double rawDeviation = hip.y - expectedHipY;
@@ -165,7 +169,7 @@ class HighPlank extends ExerciseBase {
       _lastDiagnosticTime = now;
     }
 
-    _updateStateMachine(bodyAngle, armAngle, hipDeviation, now);
+    _updateStateMachine(bodyAngle, armAngle, hipDeviation, kneeAngle, now);
 
     final ctx = HighPlankRepContext(
       shoulderHipAnkleAngle: bodyAngle,
@@ -182,15 +186,15 @@ class HighPlank extends ExerciseBase {
     resultIssues.addInstruction(state.name, 'Status', currentPhaseLabel);
   }
 
-  void _updateStateMachine(double bodyAngle, double armAngle, double hipDev, int now) {
-    // FIX Bug 2: Dùng HOLDING_SAG_DEVIATION (0.05) cho ngưỡng vào — chặt hơn ngưỡng ra (0.08).
-    // Trước đây cả hai đều dùng 0.08 → không có hysteresis → rung state khi hipDev dao động gần 0.08.
+  void _updateStateMachine(double bodyAngle, double armAngle, double hipDev, double kneeAngle, int now) {
     bool isFormGoodToHold = bodyAngle >= HighPlankConfig.HOLDING_BODY_THRESHOLD &&
                             armAngle >= HighPlankConfig.HOLDING_ARM_THRESHOLD &&
+                            kneeAngle >= HighPlankConfig.HOLDING_KNEE_THRESHOLD &&
                             hipDev < HighPlankConfig.HOLDING_SAG_DEVIATION;
 
     bool isFormBadToDrop = bodyAngle < HighPlankConfig.DROPPING_PIKE_ANGLE ||
                            armAngle < HighPlankConfig.DROPPING_ARM_ANGLE ||
+                           kneeAngle < HighPlankConfig.DROPPING_KNEE_ANGLE ||
                            hipDev >= HighPlankConfig.DROPPING_SAG_DEVIATION;
 
     if (state == HighPlankState.setup || state == HighPlankState.dropping) {

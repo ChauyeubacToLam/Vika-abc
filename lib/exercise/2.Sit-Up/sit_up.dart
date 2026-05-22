@@ -168,11 +168,11 @@ class SitUp extends ExerciseBase {
 
     _updateStateMachine(trunkHoriz, khsAngle, now);
 
-    if (state == SitUpState.lying && previousState == SitUpState.lowering) {
+if (state == SitUpState.lying && previousState == SitUpState.lowering) {
       _completeRep(ctx);
+      previousState = SitUpState.lying; // Thêm dòng này để reset trạng thái
       return;
     }
-
     if (state != SitUpState.lying) {
       for (final metric in _metrics) metric.update(ctx);
     }

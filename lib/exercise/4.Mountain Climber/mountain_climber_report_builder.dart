@@ -3,44 +3,93 @@ import 'package:vika/interpreter/interpreter_base.dart';
 import 'package:vika/utils/exercise_logger.dart';
 
 class MountainClimberReportBuilder extends ExerciseReportBuilder {
+  // ---------------------------------------------------------------------------
+  // Pain → Fault mapping
+  // ---------------------------------------------------------------------------
+
   @override
   Map<String, List<String>> painToFaultMap() => {
-        'lower_back': ['trunk_fails_count'], // Đau lưng dưới do võng lưng
-        'shoulder': ['trunk_fails_count'], // Setup tay sai
-        'wrist': ['trunk_fails_count'],
+        'lower_back': ['trunk_fails_count'], // Võng lưng dồn lực lên cột sống
+        'shoulder':   ['trunk_fails_count'], // Mất ổn định trục thân
+        'wrist':      ['trunk_fails_count'],
       };
+
+  // ---------------------------------------------------------------------------
+  // Fault → Tip
+  // ---------------------------------------------------------------------------
 
   @override
   Map<String, String> faultToTipMap() => {
-        'trunk_fails_count': 'Siết chặt cơ bụng, cuộn xương cụt nhẹ xuống để khóa form lưng thẳng.',
-        'rom_fails_count': 'Cố gắng kéo gối cao ngang rốn hoặc sát khuỷu tay để đốt mỡ hiệu quả hơn.',
+        'trunk_fails_count':
+            'Siết chặt cơ bụng, cuộn xương cụt nhẹ xuống để khóa form lưng thẳng.',
+        'rom_fails_count':
+            'Cố gắng kéo gối cao ngang rốn hoặc sát khuỷu tay để đốt mỡ hiệu quả hơn.',
       };
+
+  // ---------------------------------------------------------------------------
+  // Praise
+  // ---------------------------------------------------------------------------
 
   @override
   Map<String, String Function(int count, int total)> praiseSentenceMap() => {
         'Core': (c, t) => 'Giữ form cực đỉnh $c/$t rep!',
-        'ROM': (c, t) => 'Biên độ sâu $c/$t rep, rất ăn bụng!',
+        'ROM':  (c, t) => 'Biên độ sâu $c/$t rep, rất ăn bụng!',
       };
 
   @override
   Map<String, String> praiseMetricNames() => {
         'trunk_fails_count': 'Core',
-        'rom_fails_count': 'ROM',
+        'rom_fails_count':   'ROM',
       };
+
+  // ---------------------------------------------------------------------------
+  // Detail Cards
+  // ---------------------------------------------------------------------------
 
   @override
   List<DetailCard> buildDetailCards(List<ExerciseLogger> setLoggers) {
-    final allReps = setLoggers.expand((l) => l.repLogs).toList();
+    final allReps   = setLoggers.expand((l) => l.repLogs).toList();
     final totalReps = allReps.length;
-    final totalGood = allReps.where((r) => r.correctForm).length;
-    
+
     if (totalReps == 0) return [];
 
-    final accuracy = (totalGood / totalReps * 100).roundToDouble();
-    
-    // Core Stability Score giả lập dựa trên tỷ lệ lỗi trunk (càng ít lỗi điểm càng cao)
-    int totalTrunkFails = setLoggers.fold(0, (sum, log) => sum + (log.setLogs['trunk_fails_count'] as int? ?? 0));
-    double coreScore = ((totalReps - totalTrunkFails) / totalReps * 100).clamp(0, 100).roundToDouble();
+    final totalGood = allReps.where((r) => r.correctForm).length;
+    final accuracy  = (totalGood / totalReps * 100).roundToDouble();
+
+    // --- Core Stability Score ---
+    // Lấy từ core_stability_ratio thực tế (% frame hông ổn định), đã được
+    // TrunkStabilityMetric track chính xác hơn so với cách tính gián tiếp cũ.
+    final double avgCoreRatio = setLoggers.fold<double>(
+          0.0,
+          (sum, log) =>
+              sum +
+              double.tryParse(
+                      log.setLogs['core_stability_ratio']?.toString() ?? '1.0') ??
+                  1.0,
+        ) /
+        setLoggers.length;
+    final double coreScore = (avgCoreRatio * 100).clamp(0.0, 100.0);
+
+    // --- ROM Score ---
+    final int totalGoodRom = setLoggers.fold(
+        0, (s, l) => s + (l.setLogs['rom_good_count'] as int? ?? 0));
+    final int totalShortRom = setLoggers.fold(
+        0, (s, l) => s + (l.setLogs['rom_short_count'] as int? ?? 0));
+    final int totalRomReps = totalGoodRom + totalShortRom;
+    final double romScore = totalRomReps == 0
+        ? 100.0
+        : (totalGoodRom / totalRomReps * 100).clamp(0.0, 100.0);
+
+    // --- Pace: reps/phút ---
+    // Tính từ thời gian logger nếu có, fallback = 0
+    final double totalMinutes = setLoggers.fold<double>(
+          0.0,
+          (sum, log) =>
+              sum + (log.setLogs['duration_ms'] as int? ?? 0) / 60000.0,
+        );
+    final String paceLabel = totalMinutes > 0
+        ? '${(totalReps / totalMinutes).round()} rep/phút'
+        : '-';
 
     return [
       DetailCard(
@@ -52,24 +101,54 @@ class MountainClimberReportBuilder extends ExerciseReportBuilder {
         color: 'amber',
       ),
       DetailCard(
-        label: 'Tỷ lệ chính xác',
+        label: 'Biên Độ Co Gối',
+        value: '${romScore.round()}%',
+        subLabel: '$totalGoodRom/$totalRomReps rep đạt chuẩn',
+        useRadial: true,
+        radialValue: romScore,
+        color: 'jade',
+      ),
+      DetailCard(
+        label: 'Tỷ Lệ Chính Xác',
         value: '${accuracy.round()}%',
         subLabel: '$totalGood/$totalReps rep',
         useRadial: true,
         radialValue: accuracy,
-        color: 'jade',
+        color: 'blue',
       ),
       DetailCard(
-        label: 'Reps đạt chuẩn',
-        value: '$totalGood',
-        subLabel: 'ROM tốt',
-        color: 'blue',
+        label: 'Nhịp Độ',
+        value: paceLabel,
+        subLabel: 'Tốc độ trung bình',
+        color: 'purple',
       ),
     ];
   }
-  
+
+  // ---------------------------------------------------------------------------
+  // Interpreter
+  // ---------------------------------------------------------------------------
+
   @override
   DetectedEvidence? detectIssue(List<ExerciseLogger> setLoggers) {
-    return null; // Có thể mở rộng Interpreter ở đây
+    // Kiểm tra nếu trunk_fails_count cao (>50% số set) → gợi ý tập Plank trước
+    final int totalSets = setLoggers.length;
+    if (totalSets == 0) return null;
+
+    final int failingSets = setLoggers
+        .where((l) => (l.setLogs['trunk_fails_count'] as int? ?? 0) > 0)
+        .length;
+
+    if (failingSets / totalSets >= 0.5) {
+      return DetectedEvidence(
+        issueKey: 'core_weakness',
+        title: 'Core chưa đủ mạnh',
+        description:
+            'Lưng bị võng ở hơn nửa số set. Hãy tập Plank tĩnh 30–60 giây để tăng sức bền core trước khi tăng tốc Mountain Climber.',
+        recommendedExercises: ['plank', 'dead_bug'],
+      );
+    }
+
+    return null;
   }
 }

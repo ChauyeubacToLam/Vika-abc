@@ -13,15 +13,15 @@ class BirdDogReportBuilder extends ExerciseReportBuilder {
   Map<String, String> faultToTipMap() => {
         'lumbar_fails_count': 'Đưa chân quá cao, chú ý chỉnh.',
         'trunk_fails_count': 'Hông cứng cáp như chuông không lắc.',
-        'alignment_fails_count': 'Cong vẹo tay vươn ra xa nhau.',
-        'tempo_fails_count': 'Kiểm soát: Giữ 2s đỉnh.',
+        'alignment_fails_count': 'Đừng gập cổ, vươn dài tay chân.',
+        'tempo_fails_count': 'Kiểm soát: Giữ đủ 5s trên đỉnh.',
       };
 
   @override
   Map<String, String Function(int count, int total)> praiseSentenceMap() => {
         'Lưng thẳng': (c, t) => 'Lưng giữ thẳng $c/$t rep - Cực an toàn!',
         'Ổn định': (c, t) => 'Cứng cáp $c/$t rep!',
-        'Nhịp nhàng': (c, t) => 'Giữ form kiểm soát $c/$t rep!',
+        'Nhịp nhàng': (c, t) => 'Giữ form đủ 5s trong $c/$t rep!',
       };
 
   @override
@@ -62,7 +62,7 @@ class BirdDogReportBuilder extends ExerciseReportBuilder {
       DetailCard(
         label: 'Thời gian Hold TB',
         value: '${avgTempo.toStringAsFixed(1)}s',
-        subLabel: 'Mục tiêu: >1.5s',
+        subLabel: 'Mục tiêu: >5.0s', // Cập nhật text hiển thị
         color: 'amber',
       ),
       DetailCard(

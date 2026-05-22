@@ -15,20 +15,37 @@ class AlignmentMetric extends BirdDogMetricBase {
   void update(BirdDogRepContext ctx) {
     if (ctx.state != BirdDogState.hold_extended) return;
 
-    // Góc lệch so với phương ngang > 20 độ
+    // 1. Lỗi căn chỉnh tay chân
     bool armBad = ctx.activeArmHorizontalAngle > 20.0;
     bool legBad = ctx.activeLegHorizontalAngle > 20.0;
 
     if (armBad || legBad) {
-      if (!_faults.any((f) => f.type == 'Alignment')) {
+      if (!_faults.any((f) => f.type == 'Alignment_Limb')) {
         _faults.add(FaultRecord(
           phase: ctx.state.name,
-          type: 'Alignment',
+          type: 'Alignment_Limb',
           message: 'Tay/Chân duỗi chưa thẳng với mặt đất',
           voiceMessage: 'Vươn dài tay và chân ra',
           affectsForm: true,
           priority: BirdDogFaultPriority.alignment,
         ));
+      }
+    }
+
+    // 2. Lỗi CÚI ĐẦU: So sánh trục Y của Tai và Vai. Y trong màn hình hướng xuống dưới.
+    // Nếu Tai nằm thấp hơn Vai nhiều (tọa độ Y lớn hơn) -> Cúi gập cổ.
+    if (ctx.scaleFactor != null) {
+      if (ctx.earY > ctx.shoulderY + (ctx.scaleFactor! * 0.15)) {
+        if (!_faults.any((f) => f.type == 'Alignment_Head')) {
+          _faults.add(FaultRecord(
+            phase: ctx.state.name,
+            type: 'Alignment_Head',
+            message: 'Đầu cúi quá thấp',
+            voiceMessage: 'Nâng đầu lên, mắt nhìn xuống thảm',
+            affectsForm: true,
+            priority: BirdDogFaultPriority.alignment,
+          ));
+        }
       }
     }
   }
