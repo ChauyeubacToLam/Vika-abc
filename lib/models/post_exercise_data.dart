@@ -1,7 +1,7 @@
 /// Generic data contract for all post-exercise UI screens.
 ///
-/// UI screens (RestScreen, SplashScreen, ExecutiveSummaryPage) consume
-/// ONLY this data. They never import exercise-specific classes.
+/// UI screens (RestScreen, ExecutiveSummaryPage) consume ONLY this data.
+/// They never import exercise-specific classes.
 library;
 
 import '../utils/exercise_logger.dart';

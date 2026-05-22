@@ -1,4 +1,4 @@
-// Mock data for the Home tab. Mirrors the inline values in HomeScreen of
+// Mock data for the Home tab. Mirrors the inline values in the
 // vika-main-app-ivory-v1.jsx. Single source of truth so the screen stays
 // declarative and easy to tweak.
 //
@@ -53,8 +53,7 @@ const List<HomeHeroDayMock> homeMockHeroDays = [
     titleLine1: 'Toàn',
     titleLine2: 'thân nhẹ',
     stats: [
-      HeroDayStat(
-          icon: Icons.access_time_rounded, value: '15', label: 'phút'),
+      HeroDayStat(icon: Icons.access_time_rounded, value: '15', label: 'phút'),
       HeroDayStat(
           icon: Icons.bar_chart_rounded, value: 'Beginner', label: 'Cấp độ'),
       HeroDayStat(
@@ -72,10 +71,8 @@ const List<HomeHeroDayMock> homeMockHeroDays = [
     titleLine1: 'Đánh',
     titleLine2: 'giá lại',
     stats: [
-      HeroDayStat(
-          icon: Icons.access_time_rounded, value: '8', label: 'phút'),
-      HeroDayStat(
-          icon: Icons.bar_chart_rounded, value: 'Test', label: 'Loại'),
+      HeroDayStat(icon: Icons.access_time_rounded, value: '8', label: 'phút'),
+      HeroDayStat(icon: Icons.bar_chart_rounded, value: 'Test', label: 'Loại'),
       HeroDayStat(
           icon: Icons.gps_fixed_rounded, value: 'Form', label: 'Đo lại'),
       HeroDayStat(
@@ -89,7 +86,15 @@ const List<HomeHeroDayMock> homeMockHeroDays = [
 ];
 
 const int homeMockStreakDays = 12;
-const List<bool> homeMockWeekDots = [true, true, false, true, true, false, true];
+const List<bool> homeMockWeekDots = [
+  true,
+  true,
+  false,
+  true,
+  true,
+  false,
+  true
+];
 
 const int homeMockFormToday = 78;
 const int homeMockFormDelta = 6;

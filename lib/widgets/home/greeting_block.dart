@@ -1,12 +1,13 @@
 // GreetingBlock — small two-line greeting under the wordmark header on Home.
 // First line: "Xin chào, Nam." Second line: weekday · date · session number.
 //
-// Mirrors the inline greeting block at the top of HomeScreen in
+// Mirrors the inline greeting block at the top of the Home tab in
 // vika-main-app-ivory-v1.jsx.
 
 import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
+
 class GreetingBlock extends StatelessWidget {
   const GreetingBlock({
     super.key,

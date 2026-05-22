@@ -89,21 +89,26 @@ class PersonDetector {
     if (_isClosed || _isStarted) return;
     _isStarted = true;
 
-    _subscription = _channel.eventStream.listen(
-      _handleSegmentationEvent,
-      onError: (_) {
-        // If segmentation fails, do not hard-block the workout.
-      },
-    );
+    try {
+      _subscription = _channel.eventStream.listen(
+        _handleSegmentationEvent,
+        onError: (_) {
+          // If segmentation fails, do not hard-block the workout.
+        },
+      );
 
-    await _configureMinProcessInterval(
-      PersonDetectorConfig.SEARCH_PROCESS_INTERVAL,
-    );
-    if (_isClosed) {
-      await _channel.dispose();
-      return;
+      await _configureMinProcessInterval(
+        PersonDetectorConfig.SEARCH_PROCESS_INTERVAL,
+      );
+      if (_isClosed) {
+        await _disposeChannelQuietly();
+        return;
+      }
+      await _channel.start();
+    } catch (_) {
+      await _subscription?.cancel();
+      _subscription = null;
     }
-    await _channel.start();
   }
 
   /// Returns the cached native segmentation state.
@@ -136,13 +141,18 @@ class PersonDetector {
   Future<void> _configureMinProcessInterval(Duration interval) async {
     if (_isClosed || _configuredMinProcessInterval == interval) return;
 
-    await _channel.initialize(
-      pixelConfidenceThreshold: PersonDetectorConfig.PIXEL_CONFIDENCE_THRESHOLD,
-      softPixelConfidenceThreshold:
-          PersonDetectorConfig.SOFT_PIXEL_CONFIDENCE_THRESHOLD,
-      minProcessIntervalMs: interval.inMilliseconds,
-    );
-    _configuredMinProcessInterval = interval;
+    try {
+      await _channel.initialize(
+        pixelConfidenceThreshold:
+            PersonDetectorConfig.PIXEL_CONFIDENCE_THRESHOLD,
+        softPixelConfidenceThreshold:
+            PersonDetectorConfig.SOFT_PIXEL_CONFIDENCE_THRESHOLD,
+        minProcessIntervalMs: interval.inMilliseconds,
+      );
+      _configuredMinProcessInterval = interval;
+    } catch (_) {
+      // Native segmentation is an optional signal; pose logic can continue.
+    }
   }
 
   /// Counters for trigger frequency, keyed by reason.
@@ -238,10 +248,19 @@ class PersonDetector {
     _isClosed = true;
     await _subscription?.cancel();
     _subscription = null;
+    await _disposeChannelQuietly();
+  }
+
+  Future<void> _disposeChannelQuietly() async {
     try {
       await _channel.stop();
-    } finally {
+    } catch (_) {
+      // Native segmentation may be unavailable in tests or unsupported builds.
+    }
+    try {
       await _channel.dispose();
+    } catch (_) {
+      // Best effort only.
     }
   }
 }

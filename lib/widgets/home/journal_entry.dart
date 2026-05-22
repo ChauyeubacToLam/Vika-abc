@@ -1,7 +1,7 @@
 // JournalEntry — italic quote with a yellow left-border accent. Displays
 // what the user wrote about their goal during onboarding.
 //
-// Mirrors the journal entry block on HomeScreen in
+// Mirrors the journal entry block on the Home tab in
 // vika-main-app-ivory-v1.jsx.
 
 import 'package:flutter/material.dart';

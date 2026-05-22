@@ -3,14 +3,14 @@
 // "+6" delta pill, 7 vertical bars (today is yellow, others are
 // borderHi), Mon→TODAY axis labels.
 //
-// Mirrors the inline 7-day chart inside HomeScreen in
-// vika-main-app-ivory-v1.jsx.
+// Mirrors the inline 7-day chart in vika-main-app-ivory-v1.jsx.
 
 import 'package:flutter/material.dart';
 
 import '../../theme/vf_theme.dart';
 import '../plan/plan_typography.dart';
 import '../../theme/app_colors.dart';
+
 class FormWeekChart extends StatelessWidget {
   const FormWeekChart({
     super.key,
@@ -65,7 +65,8 @@ class FormWeekChart extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                   decoration: BoxDecoration(
                     color: c.yellowGhost,
                     borderRadius: BorderRadius.circular(5),
@@ -97,9 +98,8 @@ class FormWeekChart extends StatelessWidget {
                     child: Container(
                       height: (weekValues[i].clamp(0, 100) / 100) * 28,
                       decoration: BoxDecoration(
-                        color: i == weekValues.length - 1
-                            ? c.yellow
-                            : c.borderHi,
+                        color:
+                            i == weekValues.length - 1 ? c.yellow : c.borderHi,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),

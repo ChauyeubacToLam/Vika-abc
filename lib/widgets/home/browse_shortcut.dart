@@ -2,12 +2,13 @@
 // inviting the user to open the Library. Yellow icon tile + italic
 // "Khám phá thêm" + meta + chevron.
 //
-// Mirrors the "Khám phá thêm" CTA card at the bottom of HomeScreen in
+// Mirrors the "Khám phá thêm" CTA card at the bottom of the Home tab in
 // vika-main-app-ivory-v1.jsx.
 
 import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
+
 class BrowseShortcut extends StatelessWidget {
   const BrowseShortcut({
     super.key,
@@ -116,6 +117,7 @@ class _MiniGridPainter extends CustomPainter {
         stroke,
       );
     }
+
     box(2, 2);
     box(10, 2);
     box(2, 10);

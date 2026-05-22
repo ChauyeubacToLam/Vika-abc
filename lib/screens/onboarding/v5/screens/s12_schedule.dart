@@ -23,23 +23,24 @@ class S12Schedule extends StatefulWidget {
 class _S12ScheduleState extends State<S12Schedule> {
   static const _days = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
   static const _slots = [
-    ('morning', '5 - 8h', 'Sáng'),
-    ('afternoon', '16 - 18h', 'Chiều'),
-    ('evening', '19 - 22h', 'Tối'),
+    ('morning', '5–8h', 'Sáng', Icons.wb_sunny_outlined),
+    ('afternoon', '16–18h', 'Chiều', Icons.wb_twilight_rounded),
+    ('evening', '19–22h', 'Tối', Icons.nightlight_round),
   ];
 
   @override
   void initState() {
     super.initState();
     if (widget.data.scheduleSessions.isEmpty) {
-      widget.data.scheduleSessions = ['T2_afternoon', 'T4_afternoon', 'T6_afternoon'];
+      widget.data.scheduleSessions = [
+        'T2_afternoon',
+        'T4_afternoon',
+        'T6_afternoon'
+      ];
     }
   }
 
   int get _recommendedFreq {
-    // TODO(LOGIC-REFINEMENT-#7): S11 Schedule — frequency recommendation uses 3/4/5 by level only.
-    // Currently using v1 placeholder from JSX prototype. Real logic deferred to Phase 2.
-    // See Notion: Vika State > Onboarding Logic Refinement block for full context.
     final level = widget.data.level ?? 'beginner';
     return level == 'advanced'
         ? 5
@@ -79,295 +80,106 @@ class _S12ScheduleState extends State<S12Schedule> {
   @override
   Widget build(BuildContext context) {
     final sessions = widget.data.scheduleSessions;
-    final totalHr = (sessions.length * _minutesPerSession / 60).toStringAsFixed(1);
+    final totalHr =
+        (sessions.length * _minutesPerSession / 60).toStringAsFixed(1);
+    final r = V5Responsive.of(context);
     return V5Screen(
-      index: 12,
+      index: 14,
       onBack: widget.onBack,
       children: [
-        Positioned(
-          top: 144,
-          left: 16,
-          right: 16,
-          height: 124,
-          child: V5FadeIn(
-            child: V5HeroCard(
-              borderRadius: 22,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                child: Row(
-                  children: [
-                    Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Row(
-                          children: _days.map((d) {
-                            final lit = sessions.any((s) => s.startsWith('${d}_'));
-                            return AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              width: 8,
-                              height: 8,
-                              margin: const EdgeInsets.only(right: 4),
-                              decoration: BoxDecoration(
-                                color: lit ? V5.yellow : Colors.white.withValues(alpha: .12),
-                                borderRadius: BorderRadius.circular(2),
-                                boxShadow: lit
-                                    ? [
-                                        BoxShadow(
-                                          color: V5.yellow.withValues(alpha: .5),
-                                          blurRadius: 5,
-                                        ),
-                                      ]
-                                    : null,
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                        const SizedBox(height: 3),
-                        Row(
-                          children: _days.map((d) {
-                            return SizedBox(
-                              width: 12,
-                              child: Text(
-                                d.replaceAll('T', '').replaceAll('CN', 'C'),
-                                textAlign: TextAlign.center,
-                                style: V5.text(
-                                  context,
-                                  size: 7,
-                                  weight: FontWeight.w700,
-                                  color: Colors.white.withValues(alpha: .4),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(width: 18),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const V5Eyebrow(
-                            label: 'Vika gợi ý',
-                            dark: true,
-                            sparkle: true,
-                          ),
-                          const SizedBox(height: 6),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.baseline,
-                            textBaseline: TextBaseline.alphabetic,
-                            children: [
-                              Text(
-                                '$_recommendedFreq',
-                                style: V5.text(
-                                  context,
-                                  size: 32,
-                                  weight: FontWeight.w800,
-                                  color: V5.invInk,
-                                  letterSpacing: -1.2,
-                                  height: .95,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                'buổi/tuần',
-                                style: V5.text(
-                                  context,
-                                  size: 13,
-                                  weight: FontWeight.w700,
-                                  color: V5.invInk,
-                                  letterSpacing: -.3,
-                                ),
-                              ),
-                            ],
-                          ),
-                          Text(
-                            _reason,
-                            style: V5.text(
-                              context,
-                              size: 11,
-                              weight: FontWeight.w500,
-                              color: V5.invInkSoft,
-                              height: 1.35,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          top: 284,
-          left: 0,
-          right: 0,
-          bottom: 108,
+        Positioned.fill(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: EdgeInsets.fromLTRB(
+              V5.gutter,
+              r.chromeTopPadding,
+              V5.gutter,
+              r.ctaBottomPadding,
+            ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                V5ScreenHeader(
+                  eyebrow: 'Lịch tập',
+                  title: 'Bạn rảnh\nlúc nào?',
+                  size: r.isShort ? V5HeaderSize.medium : V5HeaderSize.large,
+                ),
+                SizedBox(height: r.pick(cozy: V5.space16, short: V5.space10)),
+                V5FadeIn(
+                  delay: const Duration(milliseconds: 140),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: _RecommendationStrip(
+                      freq: _recommendedFreq,
+                      reason: _reason,
+                      days: _days,
+                      sessions: sessions,
+                    ),
+                  ),
+                ),
+                SizedBox(height: r.pick(cozy: V5.space16, short: V5.space10)),
                 Row(
                   children: [
-                    Text(
-                      'Lịch tập trong tuần',
-                      style: V5.text(
-                        context,
-                        size: 14,
-                        weight: FontWeight.w700,
-                        color: V5.ink,
-                        letterSpacing: -.2,
+                    Expanded(
+                      child: Text(
+                        'CHỌN BUỔI TẬP',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: V5.eyebrow(context, color: V5.inkSoft),
                       ),
                     ),
-                    const Spacer(),
-                    Text(
-                      sessions.isEmpty ? 'Chạm để chọn' : '${sessions.length} buổi · ~$totalHr h',
-                      style: V5.text(
-                        context,
-                        size: 11,
-                        weight: FontWeight.w700,
-                        color: sessions.isEmpty ? V5.inkFaint : V5.yellowDeep,
+                    const SizedBox(width: V5.space10),
+                    Flexible(
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 220),
+                          child: Container(
+                            key: ValueKey(sessions.length),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: sessions.isEmpty
+                                  ? V5.inkHair
+                                  : V5.yellow.withValues(alpha: 0.16),
+                              borderRadius:
+                                  BorderRadius.circular(V5.radiusFull),
+                              border: Border.all(
+                                color: sessions.isEmpty
+                                    ? V5.border
+                                    : V5.yellow.withValues(alpha: 0.4),
+                              ),
+                            ),
+                            child: Text(
+                              sessions.isEmpty
+                                  ? 'Chạm để chọn'
+                                  : '${sessions.length} buổi · ~$totalHr h',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: V5
+                                  .bodyXs(
+                                    context,
+                                    color: sessions.isEmpty
+                                        ? V5.inkFaint
+                                        : V5.yellowDeep,
+                                  )
+                                  .copyWith(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: V5.space10),
                 Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.fromLTRB(8, 10, 8, 8),
-                    decoration: BoxDecoration(
-                      color: V5.surface,
-                      border: Border.all(color: V5.border),
-                      borderRadius: BorderRadius.circular(18),
-                      boxShadow: [V5.cardShadow(0.08)],
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            const SizedBox(width: 40),
-                            ..._days.map(
-                              (d) => Expanded(
-                                child: Text(
-                                  d,
-                                  textAlign: TextAlign.center,
-                                  style: V5.text(
-                                    context,
-                                    size: 10,
-                                    weight: FontWeight.w800,
-                                    color: V5.inkSoft,
-                                    letterSpacing: .3,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Expanded(
-                          child: Column(
-                            children: _slots.map((slot) {
-                              return Expanded(
-                                child: Padding(
-                                  padding: const EdgeInsets.only(bottom: 6),
-                                  child: Row(
-                                    children: [
-                                      SizedBox(
-                                        width: 40,
-                                        child: Column(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              slot.$2,
-                                              maxLines: 1,
-                                              style: V5.text(
-                                                context,
-                                                size: 9,
-                                                weight: FontWeight.w800,
-                                                color: V5.ink,
-                                                letterSpacing: -.1,
-                                                height: 1,
-                                              ),
-                                            ),
-                                            Text(
-                                              slot.$3,
-                                              style: V5.text(
-                                                context,
-                                                size: 8,
-                                                weight: FontWeight.w600,
-                                                color: V5.inkFaint,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      ..._days.map((d) {
-                                        final key = '${d}_${slot.$1}';
-                                        final selected = sessions.contains(key);
-                                        return Expanded(
-                                          child: Padding(
-                                            padding: const EdgeInsets.symmetric(horizontal: 2),
-                                            child: GestureDetector(
-                                              onTap: () => _toggle(key),
-                                              child: AnimatedContainer(
-                                                duration: const Duration(milliseconds: 180),
-                                                decoration: BoxDecoration(
-                                                  color: selected
-                                                      ? V5.ink
-                                                      : V5.ink.withValues(alpha: .04),
-                                                  border: Border.all(
-                                                    color: selected
-                                                        ? V5.ink
-                                                        : V5.ink.withValues(alpha: .06),
-                                                  ),
-                                                  borderRadius: BorderRadius.circular(8),
-                                                  boxShadow:
-                                                      selected ? [V5.cardShadow(0.18)] : null,
-                                                ),
-                                                child: Center(
-                                                  child: AnimatedContainer(
-                                                    duration: const Duration(milliseconds: 180),
-                                                    width: selected ? 8 : 3,
-                                                    height: selected ? 8 : 3,
-                                                    decoration: BoxDecoration(
-                                                      color: selected
-                                                          ? V5.yellow
-                                                          : V5.ink.withValues(alpha: .15),
-                                                      shape: BoxShape.circle,
-                                                      boxShadow: selected
-                                                          ? [
-                                                              BoxShadow(
-                                                                color: V5.yellow
-                                                                    .withValues(alpha: .7),
-                                                                blurRadius: 8,
-                                                              ),
-                                                              BoxShadow(
-                                                                color: V5.yellow
-                                                                    .withValues(alpha: .15),
-                                                                spreadRadius: 3,
-                                                              ),
-                                                            ]
-                                                          : null,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        );
-                                      }),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                      ],
+                  child: V5FadeIn(
+                    delay: const Duration(milliseconds: 220),
+                    slideY: 8,
+                    child: _ScheduleGrid(
+                      days: _days,
+                      slots: _slots,
+                      sessions: sessions,
+                      onToggle: _toggle,
                     ),
                   ),
                 ),
@@ -380,8 +192,320 @@ class _S12ScheduleState extends State<S12Schedule> {
           disabledLabel: 'Chạm để chọn buổi tập',
           enabled: sessions.length >= 2,
           onTap: widget.onNext,
+          bottom: 32 + r.viewPadding.bottom,
         ),
       ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Recommendation strip — frequency stat + week dot indicator
+// ─────────────────────────────────────────────────────────────
+
+class _RecommendationStrip extends StatelessWidget {
+  const _RecommendationStrip({
+    required this.freq,
+    required this.reason,
+    required this.days,
+    required this.sessions,
+  });
+
+  final int freq;
+  final String reason;
+  final List<String> days;
+  final List<String> sessions;
+
+  @override
+  Widget build(BuildContext context) {
+    return V5HeroCard(
+      borderRadius: V5.radiusLg,
+      elevation: 2,
+      child: Stack(
+        children: [
+          Positioned(
+            right: -40,
+            top: -40,
+            child: V5AmbientGlow(
+              size: const Size(200, 200),
+              opacity: 0.18,
+              color: V5.yellow,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+            child: Row(
+              children: [
+                // Left — frequency stat.
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          const V5Sparkle(size: 11),
+                          const SizedBox(width: 7),
+                          Flexible(
+                            child: Text(
+                              'VIKA GỢI Ý',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: V5.eyebrow(context, color: V5.invInkSoft),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: V5.space10),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            '$freq',
+                            style: V5.displaySm(context, color: V5.yellow),
+                          ),
+                          const SizedBox(width: V5.space6),
+                          Flexible(
+                            child: Text(
+                              'buổi/tuần',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: V5.titleSm(context, color: V5.invInk),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: V5.space4),
+                      Text(
+                        reason,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: V5.bodySm(context, color: V5.invInkSoft),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: V5.space12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'TUẦN CỦA BẠN',
+                      style: V5.eyebrow(context, color: V5.invInkFaint),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: days.map((d) {
+                        final lit = sessions.any((s) => s.startsWith('${d}_'));
+                        return AnimatedContainer(
+                          duration: const Duration(milliseconds: 220),
+                          width: 10,
+                          height: 10,
+                          margin: const EdgeInsets.only(left: 5),
+                          decoration: BoxDecoration(
+                            color: lit
+                                ? V5.yellow
+                                : Colors.white.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(V5.radiusXs),
+                            boxShadow: lit
+                                ? [
+                                    BoxShadow(
+                                      color: V5.yellow.withValues(alpha: 0.6),
+                                      blurRadius: 7,
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: days.map((d) {
+                        return SizedBox(
+                          width: 15,
+                          child: Text(
+                            d.replaceAll('T', '').replaceAll('CN', 'C'),
+                            textAlign: TextAlign.center,
+                            style: V5.text(
+                              context,
+                              size: 8,
+                              weight: FontWeight.w700,
+                              color: V5.invInkFaint,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Schedule grid — 7 days × 3 slots, toggleable cells
+// ─────────────────────────────────────────────────────────────
+
+class _ScheduleGrid extends StatelessWidget {
+  const _ScheduleGrid({
+    required this.days,
+    required this.slots,
+    required this.sessions,
+    required this.onToggle,
+  });
+
+  final List<String> days;
+  final List<(String, String, String, IconData)> slots;
+  final List<String> sessions;
+  final ValueChanged<String> onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
+      decoration: BoxDecoration(
+        color: V5.surface,
+        border: Border.all(color: V5.border),
+        borderRadius: BorderRadius.circular(V5.radiusLg),
+        boxShadow: V5.elevation1,
+      ),
+      child: Column(
+        children: [
+          // Day headers.
+          Row(
+            children: [
+              const SizedBox(width: 48),
+              ...days.map(
+                (d) => Expanded(
+                  child: Text(
+                    d,
+                    textAlign: TextAlign.center,
+                    style: V5.eyebrow(context, color: V5.inkSoft),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: Column(
+              children: slots.map((slot) {
+                return Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        // Time slot label.
+                        SizedBox(
+                          width: 48,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(slot.$4, size: 11, color: V5.inkSoft),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      slot.$3,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: V5
+                                          .eyebrow(context, color: V5.ink)
+                                          .copyWith(
+                                            letterSpacing: 0.2,
+                                            height: 1,
+                                          ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: V5.space2),
+                              Text(
+                                slot.$2,
+                                style: V5
+                                    .caption(context, color: V5.inkFaint)
+                                    .copyWith(height: 1.1),
+                              ),
+                            ],
+                          ),
+                        ),
+                        ...days.map((d) {
+                          final key = '${d}_${slot.$1}';
+                          final selected = sessions.contains(key);
+                          return Expanded(
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 2),
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () => onToggle(key),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 220),
+                                  curve: V5.curveSharp,
+                                  decoration: BoxDecoration(
+                                    color: selected
+                                        ? V5.ink
+                                        : V5.ink.withValues(alpha: 0.04),
+                                    border: Border.all(
+                                      color: selected
+                                          ? V5.ink
+                                          : V5.ink.withValues(alpha: 0.06),
+                                    ),
+                                    borderRadius:
+                                        BorderRadius.circular(V5.radiusXs),
+                                    boxShadow: selected
+                                        ? V5.elevation2
+                                        : const <BoxShadow>[],
+                                  ),
+                                  child: Center(
+                                    child: AnimatedContainer(
+                                      duration:
+                                          const Duration(milliseconds: 220),
+                                      curve: V5.curveSharp,
+                                      width: selected ? 8 : 3,
+                                      height: selected ? 8 : 3,
+                                      decoration: BoxDecoration(
+                                        color: selected
+                                            ? V5.yellow
+                                            : V5.ink.withValues(alpha: 0.18),
+                                        shape: BoxShape.circle,
+                                        boxShadow: selected
+                                            ? [
+                                                BoxShadow(
+                                                  color: V5.yellow
+                                                      .withValues(alpha: 0.7),
+                                                  blurRadius: 8,
+                                                ),
+                                              ]
+                                            : null,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -8,6 +8,9 @@ import '../v5_models.dart';
 import '../v5_primitives.dart';
 import '../v5_theme.dart';
 
+/// S10 — Level. Featured recommendation: one prominent hero card for the
+/// suggested level, plus two compact alternates the user can override to.
+/// Replaces the old "three equal stacked options" layout.
 class S10LevelIssue extends StatefulWidget {
   const S10LevelIssue({
     super.key,
@@ -29,31 +32,46 @@ class _S10LevelIssueState extends State<S10LevelIssue>
   late final String _recommendedId;
   late final AnimationController _glowController;
 
-  static const _levels = [
-    (
+  static const _levels = <_LevelSpec>[
+    _LevelSpec(
       id: 'beginner',
       title: 'Người mới',
-      stat: '15-25 phút',
+      stat: '15–25',
       sub: 'Đang xây nền tảng',
       desc:
-          'Tập trung vào nền tảng & form chuẩn. Ít reps, nhiều thời gian học.',
-      pose: 'reach',
+          'Tập trung vào nền tảng & form chuẩn. Ít reps, nhiều thời gian học cơ.',
+      bullets: [
+        'Bài tập cơ bản, lặp lại',
+        'Form chuẩn ưu tiên hơn tốc độ',
+        'Tăng nhẹ mỗi tuần',
+      ],
+      intensity: 0.35,
     ),
-    (
+    _LevelSpec(
       id: 'intermediate',
       title: 'Trung cấp',
-      stat: '25-40 phút',
+      stat: '25–40',
       sub: 'Đã có kinh nghiệm',
       desc: 'Cường độ vừa phải. Bài tập đa dạng & thử thách hơn.',
-      pose: 'lunge',
+      bullets: [
+        'Tổ hợp đa dạng, ít lặp lại',
+        'Thử thách form ở các góc khó',
+        'Phục hồi & tiến độ song hành',
+      ],
+      intensity: 0.65,
     ),
-    (
+    _LevelSpec(
       id: 'advanced',
       title: 'Nâng cao',
-      stat: '40+ phút',
+      stat: '40+',
       sub: 'Tập đều 1+ năm',
-      desc: 'Cường độ cao + tổ hợp bài. Yêu cầu thực hiện chuẩn.',
-      pose: 'tree',
+      desc: 'Cường độ cao + tổ hợp bài. Yêu cầu thực hiện chuẩn xác.',
+      bullets: [
+        'Tổ hợp dài, cường độ cao',
+        'Yêu cầu form chuẩn xác',
+        'Tối ưu hiệu suất theo từng tuần',
+      ],
+      intensity: 0.95,
     ),
   ];
 
@@ -63,9 +81,9 @@ class _S10LevelIssueState extends State<S10LevelIssue>
     _recommendedId = _recommendedLevel();
     widget.data.level ??= _recommendedId;
     _glowController = AnimationController(
-      duration: const Duration(milliseconds: 1400),
+      duration: const Duration(milliseconds: 1600),
       vsync: this,
-    );
+    )..repeat(reverse: true);
   }
 
   @override
@@ -108,198 +126,158 @@ class _S10LevelIssueState extends State<S10LevelIssue>
     ).suggestedLevel;
   }
 
-  String _reasoning() {
-    final issueCount = widget.data.feedbackByExercise.values
-        .expand((items) => items)
-        .where((id) => id != 'none')
-        .length;
-    if (_recommendedId == 'beginner') {
-      if (issueCount > 0) {
-        return 'Có $issueCount điểm cần luyện — Vika sẽ giúp xây nền tảng vững';
-      }
-      if (widget.data.duration == null || widget.data.duration == '<3m') {
-        return 'Còn mới với tập luyện — bắt đầu chậm để form chuẩn';
-      }
-      return 'Form ổn nhưng nên luyện từ nền tảng để tránh chấn thương';
-    }
-    if (_recommendedId == 'intermediate') {
-      return 'Form tốt + có kinh nghiệm — sẵn sàng cho cường độ vừa';
-    }
-    return 'Form xuất sắc + nền tảng vững — sẵn sàng cường độ cao';
-  }
+  void _pick(String id) => setState(() => widget.data.level = id);
 
-  void _pick(String id) {
-    setState(() => widget.data.level = id);
-    if (id != _recommendedId) _glowController.forward(from: 0);
-  }
+  int get _issueCount => widget.data.feedbackByExercise.values
+      .expand((items) => items)
+      .where((id) => id != 'none')
+      .length;
 
   @override
   Widget build(BuildContext context) {
+    final r = V5Responsive.of(context);
     final rec = _levels.firstWhere((l) => l.id == _recommendedId);
-    final ordered = _recommendedId == 'beginner'
-        ? ['beginner', 'intermediate', 'advanced']
-        : _recommendedId == 'intermediate'
-            ? ['intermediate', 'beginner', 'advanced']
-            : ['advanced', 'intermediate', 'beginner'];
-    return V5Screen(
-      index: 10,
+    // Alternates: the two non-recommended levels, in their natural order.
+    final alternates =
+        _levels.where((l) => l.id != _recommendedId).toList(growable: false);
+    final selected = widget.data.level ?? _recommendedId;
+
+    return V5Page(
+      index: 12,
       onBack: widget.onBack,
-      children: [
-        Positioned(
-          top: 144,
-          left: 16,
-          right: 16,
-          height: 184,
-          child: V5FadeIn(
-            child: V5HeroCard(
-              child: Stack(
+      scroll: true,
+      cta: V5PillCTA(
+        label: 'Tiếp tục',
+        enabled: widget.data.level != null,
+        onTap: widget.onNext,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          V5FadeIn(
+            slideY: 6,
+            child: Text(
+              'MỨC TẬP',
+              style: V5.eyebrow(context, color: V5.inkSoft),
+            ),
+          ),
+          SizedBox(height: r.pick(cozy: V5.space12, short: V5.space8)),
+          V5FadeIn(
+            delay: const Duration(milliseconds: 60),
+            slideY: 10,
+            child: RichText(
+              text: TextSpan(
+                style: r.isShort ? V5.titleLg(context) : V5.headline(context),
                 children: [
-                  const Positioned(
-                    top: 18,
-                    left: 18,
-                    child: V5Eyebrow(
-                      label: 'Vika gợi ý',
-                      dark: true,
-                      sparkle: true,
-                    ),
+                  const TextSpan(text: 'Vika gợi ý mức\n'),
+                  TextSpan(
+                    text: rec.title,
+                    style: TextStyle(color: V5.yellowDeep),
                   ),
-                  Positioned(
-                    top: 0,
-                    right: -30,
-                    bottom: 0,
-                    width: 220,
-                    child: V5HeroFigure(pose: rec.pose),
-                  ),
-                  Positioned(
-                    left: 24,
-                    bottom: 20,
-                    width: 210,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'VIKA NGHĨ',
-                          style: V5.text(
-                            context,
-                            size: 11,
-                            weight: FontWeight.w600,
-                            color: V5.invInkSoft,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        Text(
-                          rec.title,
-                          style: V5.text(
-                            context,
-                            size: 30,
-                            weight: FontWeight.w800,
-                            color: V5.invInk,
-                            letterSpacing: -1,
-                            height: 0.95,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          _reasoning(),
-                          style: V5.text(
-                            context,
-                            size: 11,
-                            weight: FontWeight.w500,
-                            color: V5.invInkSoft,
-                            height: 1.4,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  const TextSpan(text: '.'),
                 ],
               ),
             ),
           ),
-        ),
-        Positioned(
-          top: 344,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-                child: Text(
-                  'CHỌN MỨC TẬP CỦA BẠN',
-                  style: V5.text(
-                    context,
-                    size: 10,
-                    weight: FontWeight.w700,
-                    color: V5.inkSoft,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-              ),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 112),
-                  children: ordered.asMap().entries.map((entry) {
-                    final i = entry.key;
-                    final level =
-                        _levels.firstWhere((l) => l.id == entry.value);
-                    final selected = widget.data.level == level.id;
-                    final recommended = level.id == _recommendedId;
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: V5FadeIn(
-                        delay: Duration(milliseconds: i * 60),
-                        slideY: 8,
-                        child: _LevelCard(
-                          level: level,
-                          selected: selected,
-                          recommended: recommended,
-                          pulse: recommended && !selected,
-                          glow: _glowController,
-                          onTap: () => _pick(level.id),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-            ],
+          SizedBox(height: r.pick(cozy: V5.space10, short: V5.space6)),
+          V5FadeIn(
+            delay: const Duration(milliseconds: 120),
+            slideY: 8,
+            child: Text(
+              _issueCount == 0
+                  ? 'Plan sẽ tăng nhịp từ từ dựa trên bài đánh giá.'
+                  : 'Plan sẽ ưu tiên $_issueCount điểm cần luyện từ bài đánh giá.',
+              style: V5.body(context, color: V5.inkSoft),
+              maxLines: 2,
+            ),
           ),
-        ),
-        V5PillCTA(
-          label: 'Tiếp tục',
-          enabled: widget.data.level != null,
-          onTap: widget.onNext,
-        ),
-      ],
+          SizedBox(height: r.pick(cozy: V5.space24, short: V5.space16)),
+          V5FadeIn(
+            delay: const Duration(milliseconds: 200),
+            slideY: 12,
+            child: _FeaturedLevelCard(
+              level: rec,
+              selected: selected == rec.id,
+              glow: _glowController,
+              dense: r.isShort,
+              onTap: () => _pick(rec.id),
+            ),
+          ),
+          SizedBox(height: r.pick(cozy: V5.space20, short: V5.space14)),
+          V5FadeIn(
+            delay: const Duration(milliseconds: 280),
+            slideY: 6,
+            child: Text(
+              'HOẶC CHỌN MỨC KHÁC',
+              style: V5.eyebrow(context, color: V5.inkSoft),
+            ),
+          ),
+          SizedBox(height: r.pick(cozy: V5.space12, short: V5.space8)),
+          V5FadeIn(
+            delay: const Duration(milliseconds: 320),
+            slideY: 10,
+            child: Row(
+              children: [
+                for (var i = 0; i < alternates.length; i++) ...[
+                  if (i > 0) const SizedBox(width: V5.space12),
+                  Expanded(
+                    child: _AlternateLevelTile(
+                      level: alternates[i],
+                      selected: selected == alternates[i].id,
+                      onTap: () => _pick(alternates[i].id),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _LevelCard extends StatelessWidget {
-  const _LevelCard({
+// ─────────────────────────────────────────────────────────────
+// Level spec
+// ─────────────────────────────────────────────────────────────
+
+class _LevelSpec {
+  const _LevelSpec({
+    required this.id,
+    required this.title,
+    required this.stat,
+    required this.sub,
+    required this.desc,
+    required this.bullets,
+    required this.intensity,
+  });
+
+  final String id;
+  final String title;
+  final String stat;
+  final String sub;
+  final String desc;
+  final List<String> bullets;
+  final double intensity;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Featured recommendation hero — large, dark, premium
+// ─────────────────────────────────────────────────────────────
+
+class _FeaturedLevelCard extends StatelessWidget {
+  const _FeaturedLevelCard({
     required this.level,
     required this.selected,
-    required this.recommended,
-    required this.pulse,
     required this.glow,
+    required this.dense,
     required this.onTap,
   });
 
-  final ({
-    String id,
-    String title,
-    String stat,
-    String sub,
-    String desc,
-    String pose,
-  }) level;
+  final _LevelSpec level;
   final bool selected;
-  final bool recommended;
-  final bool pulse;
   final Animation<double> glow;
+  final bool dense;
   final VoidCallback onTap;
 
   @override
@@ -307,153 +285,425 @@ class _LevelCard extends StatelessWidget {
     return AnimatedBuilder(
       animation: glow,
       builder: (context, _) {
-        final ring = pulse ? math.sin(glow.value * math.pi) : 0.0;
+        final ringT = (math.sin(glow.value * math.pi) * 0.5 + 0.5);
         return GestureDetector(
           onTap: onTap,
+          behavior: HitTestBehavior.opaque,
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.all(12),
+            duration: const Duration(milliseconds: 220),
+            curve: V5.curveSharp,
             decoration: BoxDecoration(
-              color: selected ? V5.ink : V5.surface,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: selected
-                    ? V5.ink
-                    : recommended
-                        ? V5.yellow.withValues(alpha: 0.55)
-                        : V5.border,
-              ),
+              borderRadius: BorderRadius.circular(V5.radiusXl),
               boxShadow: [
-                selected ? V5.cardShadow(0.18) : V5.cardShadow(0.08),
-                if (ring > 0)
+                ...V5.elevation3,
+                if (selected)
                   BoxShadow(
-                    color: V5.yellow.withValues(alpha: 0.35 * ring),
-                    spreadRadius: 8 * ring,
-                    blurRadius: 1,
+                    color: V5.yellow.withValues(alpha: 0.10 + 0.10 * ringT),
+                    blurRadius: 32 + 12 * ringT,
+                    spreadRadius: 2,
                   ),
               ],
             ),
-            child: Row(
-              children: [
-                Container(
-                  width: 54,
-                  height: 54,
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? V5.yellow.withValues(alpha: 0.18)
-                        : V5.yellowSoft,
-                    borderRadius: BorderRadius.circular(14),
+            child: V5HeroCard(
+              borderRadius: V5.radiusXl,
+              elevation: 1,
+              child: Stack(
+                fit: StackFit.passthrough,
+                children: [
+                  Positioned(
+                    right: -90,
+                    top: -90,
+                    child: V5AmbientGlow(
+                      size: const Size(260, 260),
+                      opacity: 0.20,
+                      color: V5.yellow,
+                    ),
                   ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        level.stat.split(' ').first,
-                        style: V5.text(
-                          context,
-                          size: 13,
-                          weight: FontWeight.w800,
-                          color: V5.yellowDeep,
-                          letterSpacing: -0.4,
-                          height: 1,
-                        ),
-                      ),
-                      Text(
-                        'PHÚT',
-                        style: V5.text(
-                          context,
-                          size: 8,
-                          weight: FontWeight.w700,
-                          color: V5.yellowDeep,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ],
+                  const Positioned.fill(
+                    child: V5Texture(opacity: 0.05, density: 1.2),
                   ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: [
-                          Text(
-                            level.title,
-                            style: V5.text(
-                              context,
-                              size: 15,
-                              weight: FontWeight.w800,
-                              color: selected ? V5.invInk : V5.ink,
-                              letterSpacing: -0.3,
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      dense ? 18 : 22,
+                      dense ? 16 : 20,
+                      dense ? 18 : 22,
+                      dense ? 16 : 20,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const V5Sparkle(size: 13),
+                            const SizedBox(width: V5.space8),
+                            Text(
+                              'VIKA GỢI Ý',
+                              style: V5
+                                  .eyebrow(context, color: V5.yellow)
+                                  .copyWith(letterSpacing: 1.6),
                             ),
-                          ),
-                          if (recommended && !selected)
-                            _tag('Gợi ý', false, context),
-                          if (selected) _tag('Đã chọn', true, context),
+                            const Spacer(),
+                            if (selected)
+                              const _SelectedBadge()
+                            else
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.08),
+                                  borderRadius:
+                                      BorderRadius.circular(V5.radiusFull),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.16),
+                                  ),
+                                ),
+                                child: Text(
+                                  'CHẠM ĐỂ CHỌN',
+                                  style: V5.eyebrow(
+                                    context,
+                                    color: V5.invInkSoft,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        SizedBox(height: dense ? V5.space12 : V5.space16),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    level.title.toUpperCase(),
+                                    style: V5
+                                        .displaySm(context, color: V5.invInk)
+                                        .copyWith(letterSpacing: -1.1),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: V5.space6),
+                                  Text(
+                                    level.sub,
+                                    style: V5.bodyLg(
+                                      context,
+                                      color: V5.invInkSoft,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: V5.space12),
+                            _MinutesBlock(stat: level.stat),
+                          ],
+                        ),
+                        SizedBox(height: dense ? V5.space14 : V5.space16),
+                        _IntensityBar(value: level.intensity),
+                        SizedBox(height: dense ? V5.space14 : V5.space16),
+                        for (var i = 0; i < level.bullets.length; i++) ...[
+                          if (i > 0) const SizedBox(height: V5.space6),
+                          _BulletRow(text: level.bullets[i]),
                         ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        level.sub,
-                        style: V5.text(
-                          context,
-                          size: 11,
-                          weight: FontWeight.w500,
-                          color: selected ? V5.invInkSoft : V5.inkSoft,
-                          height: 1.3,
-                        ),
-                      ),
-                      if (selected) ...[
-                        const SizedBox(height: 6),
-                        Divider(
-                            color: Colors.white.withValues(alpha: 0.10),
-                            height: 1),
-                        const SizedBox(height: 6),
-                        Text(
-                          level.desc,
-                          style: V5.text(
-                            context,
-                            size: 11,
-                            weight: FontWeight.w500,
-                            color: V5.invInkSoft,
-                            height: 1.4,
-                          ),
-                        ),
                       ],
-                    ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );
       },
     );
   }
+}
 
-  Widget _tag(String label, bool selected, BuildContext context) {
+class _SelectedBadge extends StatelessWidget {
+  const _SelectedBadge();
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: selected ? V5.yellow : V5.yellow.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(999),
-        border: selected
-            ? null
-            : Border.all(color: V5.yellow.withValues(alpha: 0.40)),
+        color: V5.yellow,
+        borderRadius: BorderRadius.circular(V5.radiusFull),
+        boxShadow: V5.yellowGlow(0.18),
       ),
-      child: Text(
-        label.toUpperCase(),
-        style: V5.text(
-          context,
-          size: 8,
-          weight: FontWeight.w800,
-          color: selected ? V5.yellowInk : V5.yellowDeep,
-          letterSpacing: 0.4,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.check_rounded, size: 14, color: V5.yellowInk),
+          const SizedBox(width: 4),
+          Text(
+            'ĐÃ CHỌN',
+            style: V5.eyebrow(context, color: V5.yellowInk),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MinutesBlock extends StatelessWidget {
+  const _MinutesBlock({required this.stat});
+  final String stat;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(
+          stat,
+          style: V5.text(
+            context,
+            size: 30,
+            weight: FontWeight.w800,
+            letterSpacing: -1.4,
+            height: 1,
+            color: V5.invInk,
+          ),
+        ),
+        const SizedBox(height: V5.space4),
+        Text(
+          'PHÚT / BUỔI',
+          style: V5
+              .eyebrow(context, color: V5.invInkSoft)
+              .copyWith(letterSpacing: 1.4),
+        ),
+      ],
+    );
+  }
+}
+
+class _IntensityBar extends StatelessWidget {
+  const _IntensityBar({required this.value});
+  final double value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text(
+          'CƯỜNG ĐỘ',
+          style: V5.eyebrow(context, color: V5.invInkSoft),
+        ),
+        const SizedBox(width: V5.space10),
+        Expanded(
+          child: SizedBox(
+            height: 6,
+            child: Stack(
+              children: [
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(V5.radiusFull),
+                  ),
+                ),
+                FractionallySizedBox(
+                  widthFactor: value.clamp(0.0, 1.0),
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0, end: 1),
+                    duration: const Duration(milliseconds: 700),
+                    curve: V5.curve,
+                    builder: (_, t, __) => Opacity(
+                      opacity: t,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [V5.yellowDeep, V5.yellow, V5.yellowSpark],
+                          ),
+                          borderRadius: BorderRadius.circular(V5.radiusFull),
+                          boxShadow: V5.yellowGlow(0.18),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BulletRow extends StatelessWidget {
+  const _BulletRow({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 5,
+          height: 5,
+          margin: const EdgeInsets.only(top: 7),
+          decoration: const BoxDecoration(
+            color: V5.yellow,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: V5.space10),
+        Expanded(
+          child: Text(
+            text,
+            style: V5.bodySm(context, color: V5.invInkSoft),
+            maxLines: 2,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Alternate level tile — compact, light surface, equal-width row
+// ─────────────────────────────────────────────────────────────
+
+class _AlternateLevelTile extends StatelessWidget {
+  const _AlternateLevelTile({
+    required this.level,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _LevelSpec level;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: V5.curveSharp,
+        padding: const EdgeInsets.fromLTRB(
+          V5.space14,
+          V5.space14,
+          V5.space14,
+          V5.space16,
+        ),
+        decoration: BoxDecoration(
+          color: selected ? V5.ink : V5.surface,
+          borderRadius: BorderRadius.circular(V5.radiusLg),
+          border: Border.all(
+            color: selected ? V5.ink : V5.border,
+            width: selected ? 1.4 : 1,
+          ),
+          boxShadow: selected ? V5.elevation2 : V5.elevation1,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  level.stat,
+                  style: V5.text(
+                    context,
+                    size: 22,
+                    weight: FontWeight.w800,
+                    letterSpacing: -0.8,
+                    height: 1,
+                    color: selected ? V5.invInk : V5.ink,
+                  ),
+                ),
+                const SizedBox(width: V5.space6),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: Text(
+                    'PHÚT',
+                    style: V5.eyebrow(
+                      context,
+                      color: selected ? V5.invInkSoft : V5.inkSoft,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                if (selected)
+                  Container(
+                    width: 20,
+                    height: 20,
+                    decoration: const BoxDecoration(
+                      color: V5.yellow,
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: const Icon(
+                      Icons.check_rounded,
+                      size: 13,
+                      color: V5.yellowInk,
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: V5.space10),
+            Text(
+              level.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: V5.titleSm(
+                context,
+                color: selected ? V5.invInk : V5.ink,
+              ),
+            ),
+            const SizedBox(height: V5.space2),
+            Text(
+              level.sub,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: V5.bodyXs(
+                context,
+                color: selected ? V5.invInkSoft : V5.inkSoft,
+              ),
+            ),
+            const SizedBox(height: V5.space10),
+            _MiniIntensityDots(
+              value: level.intensity,
+              dark: selected,
+            ),
+          ],
         ),
       ),
+    );
+  }
+}
+
+class _MiniIntensityDots extends StatelessWidget {
+  const _MiniIntensityDots({required this.value, required this.dark});
+
+  final double value;
+  final bool dark;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = (value * 3).ceil();
+    return Row(
+      children: [
+        for (var i = 0; i < 3; i++)
+          Expanded(
+            child: Container(
+              height: 4,
+              margin: EdgeInsets.only(right: i == 2 ? 0 : 4),
+              decoration: BoxDecoration(
+                color: i < active
+                    ? V5.yellow
+                    : (dark ? V5.heroBorderHi : V5.ink.withValues(alpha: 0.08)),
+                borderRadius: BorderRadius.circular(V5.radiusFull),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

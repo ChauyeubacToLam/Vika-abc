@@ -33,11 +33,8 @@ class _S16CloserState extends State<S16Closer>
   @override
   void initState() {
     super.initState();
-    // Animation 6 — sequential commitment check-in.
-    // Items reveal at 400ms / 620ms / 840ms (each 380ms long).
-    // Single controller drives all three via Interval curves.
     _stagger = AnimationController(
-      duration: const Duration(milliseconds: 1220),
+      duration: const Duration(milliseconds: 1400),
       vsync: this,
     )..forward();
   }
@@ -62,98 +59,140 @@ class _S16CloserState extends State<S16Closer>
     final now = DateTime.now();
     final dd = now.day.toString().padLeft(2, '0');
     final mm = now.month.toString().padLeft(2, '0');
-    return '$dd/$mm/${now.year}';
+    return '$dd / $mm / ${now.year}';
   }
 
   @override
   Widget build(BuildContext context) {
     final p = derivePlanPersonalization(widget.data);
+    final r = V5Responsive.of(context);
+    final bottomInset = r.viewPadding.bottom;
     return V5Screen(
-      index: 16,
+      index: 17,
       onBack: widget.onBack,
       inverted: true,
       background: V5.heroBg,
       showChrome: false,
       children: [
-        // Atmospheric glow layers — radial gradients (no MaskFilter / blur
-        // pass) so there's no first-frame unblurred-disk flash.
-        Positioned(
-          top: -160,
-          left: -120,
-          child: Container(
-            width: 360,
-            height: 360,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: [
-                  V5.yellow.withValues(alpha: 0.30),
-                  Colors.transparent,
-                ],
-              ),
-            ),
+        // Atmospheric layers — warm key + cool fill + texture.
+        const Positioned(
+          top: -180,
+          left: -140,
+          child: V5AmbientGlow(
+            size: Size(440, 460),
+            opacity: 0.28,
+            color: V5.yellow,
           ),
         ),
         Positioned(
-          right: -120,
-          bottom: -100,
-          child: Container(
-            width: 320,
-            height: 280,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: [
-                  V5.yellow.withValues(alpha: 0.15),
-                  Colors.transparent,
-                ],
-              ),
-            ),
+          right: -160,
+          bottom: -120,
+          child: V5AmbientGlow(
+            size: const Size(360, 340),
+            opacity: 0.16,
+            color: const Color(0xFFCD7C45),
           ),
         ),
+        const Positioned.fill(child: V5Texture(opacity: 0.06, density: 1.2)),
+
+        // Decorative sparkles.
         const Positioned(
-          top: 160,
-          left: 32,
-          child: Opacity(opacity: 0.50, child: V5Sparkle(size: 14)),
+          top: 170,
+          left: 36,
+          child: Opacity(opacity: 0.55, child: V5Sparkle(size: 14)),
         ),
         const Positioned(
-          top: 200,
-          right: 48,
-          child: Opacity(opacity: 0.35, child: V5Sparkle(size: 10)),
+          top: 220,
+          right: 52,
+          child: Opacity(opacity: 0.40, child: V5Sparkle(size: 10)),
         ),
         const Positioned(
           top: 540,
-          left: 60,
-          child: Opacity(opacity: 0.40, child: V5Sparkle(size: 9)),
+          left: 64,
+          child: Opacity(opacity: 0.42, child: V5Sparkle(size: 9)),
         ),
 
-        // Eyebrow pill
-        Positioned(
-          top: 140,
-          left: 0,
-          right: 0,
-          child: Center(
-            child: V5FadeIn(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                decoration: BoxDecoration(
-                  color: V5.yellow.withValues(alpha: 0.15),
-                  border: Border.all(color: V5.yellow.withValues(alpha: 0.35)),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+        // Main column — keeps everything in a flow that adapts to height,
+        // instead of magic top:140 / 198 / 386 positions that overflow on
+        // short phones.
+        Positioned.fill(
+          child: SafeArea(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                V5.gutter,
+                r.viewPadding.top +
+                    r.pick(cozy: 64.0, short: 40.0, veryShort: 24.0),
+                V5.gutter,
+                bottomInset + r.pick(cozy: 120.0, short: 104.0),
+              ),
+              child: SingleChildScrollView(
+                physics: const ClampingScrollPhysics(),
+                child: Column(
                   children: [
-                    const V5Sparkle(size: 11),
-                    const SizedBox(width: 6),
-                    Text(
-                      'NGÀY 1 · HÀNH TRÌNH BẮT ĐẦU',
-                      style: V5.text(
-                        context,
-                        size: 10,
-                        weight: FontWeight.w800,
-                        color: V5.yellow,
-                        letterSpacing: 1.4,
+                    V5FadeIn(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: V5.yellow.withValues(alpha: 0.14),
+                          border: Border.all(
+                              color: V5.yellow.withValues(alpha: 0.36)),
+                          borderRadius: BorderRadius.circular(V5.radiusFull),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const V5Sparkle(size: 12),
+                            const SizedBox(width: V5.space8),
+                            Text(
+                              'NGÀY 1 · HÀNH TRÌNH BẮT ĐẦU',
+                              style: V5
+                                  .eyebrow(context, color: V5.yellow)
+                                  .copyWith(letterSpacing: 1.6),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                        height: r.pick(cozy: V5.space24, short: V5.space16)),
+                    V5FadeIn(
+                      delay: const Duration(milliseconds: 120),
+                      slideY: 12,
+                      child: Column(
+                        children: [
+                          Text(
+                            'Hôm nay,\nbạn bắt đầu.',
+                            textAlign: TextAlign.center,
+                            style: r.isShort
+                                ? V5.displaySm(context, color: V5.invInk)
+                                : V5.display(context, color: V5.invInk),
+                          ),
+                          SizedBox(
+                              height:
+                                  r.pick(cozy: V5.space14, short: V5.space10)),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: Text(
+                              'Mỗi buổi tập là một lá phiếu cho con người bạn muốn trở thành.',
+                              textAlign: TextAlign.center,
+                              maxLines: 3,
+                              style: V5.body(context, color: V5.invInkSoft),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(
+                        height: r.pick(cozy: V5.space28, short: V5.space20)),
+                    V5FadeIn(
+                      delay: const Duration(milliseconds: 240),
+                      slideY: 16,
+                      child: _CommitmentCard(
+                        stagger: _stagger,
+                        todayLabel: _todayLabel(),
+                        freq: p.freq,
+                        levelLabel: p.levelLabel,
                       ),
                     ),
                   ],
@@ -163,242 +202,188 @@ class _S16CloserState extends State<S16Closer>
           ),
         ),
 
-        // Big title block
-        Positioned(
-          top: 200,
-          left: 24,
-          right: 24,
-          child: V5FadeIn(
-            delay: const Duration(milliseconds: 80),
-            child: Column(
-              children: [
-                Text(
-                  'Hôm nay,\nbạn bắt đầu.',
-                  textAlign: TextAlign.center,
-                  style: V5.text(
-                    context,
-                    size: 36,
-                    weight: FontWeight.w800,
-                    color: V5.invInk,
-                    letterSpacing: -1.4,
-                    height: 1.0,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Text(
-                    'Mỗi buổi tập là một lá phiếu cho con người bạn muốn trở thành.',
-                    textAlign: TextAlign.center,
-                    style: V5.text(
-                      context,
-                      size: 13,
-                      weight: FontWeight.w500,
-                      color: V5.invInkSoft,
-                      height: 1.5,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        // Commitment card
-        Positioned(
-          top: 368,
-          left: 20,
-          right: 20,
-          child: V5FadeIn(
-            delay: const Duration(milliseconds: 200),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(22),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.04),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.10),
-                    ),
-                    borderRadius: BorderRadius.circular(22),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Card header
-                      Row(
-                        children: [
-                          Text(
-                            'CAM KẾT CỦA BẠN',
-                            style: V5.text(
-                              context,
-                              size: 9,
-                              weight: FontWeight.w800,
-                              color: V5.yellow,
-                              letterSpacing: 1.4,
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            _todayLabel(),
-                            style: V5.text(
-                              context,
-                              size: 9,
-                              weight: FontWeight.w600,
-                              color: V5.invInkSoft,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-
-                      // 3 commitment lines — Animation 6 (sequential check-in)
-                      _CommitmentRow(
-                        animation: _stagger,
-                        // 400ms delay / 380ms duration in a 1220ms total
-                        intervalStart: 400 / 1220,
-                        intervalEnd: 780 / 1220,
-                        spans: [
-                          const TextSpan(text: 'Tập '),
-                          TextSpan(
-                            text: '${p.freq} buổi/tuần',
-                            style: const TextStyle(color: V5.yellow),
-                          ),
-                          const TextSpan(text: ' theo lịch của tôi'),
-                        ],
-                      ),
-                      const SizedBox(height: 11),
-                      _CommitmentRow(
-                        animation: _stagger,
-                        intervalStart: 620 / 1220,
-                        intervalEnd: 1000 / 1220,
-                        spans: [
-                          const TextSpan(text: 'Đi qua '),
-                          const TextSpan(
-                            text: '4 tuần',
-                            style: TextStyle(color: V5.yellow),
-                          ),
-                          const TextSpan(text: ' với mức '),
-                          TextSpan(
-                            text: p.levelLabel,
-                            style: const TextStyle(color: V5.yellow),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 11),
-                      _CommitmentRow(
-                        animation: _stagger,
-                        intervalStart: 840 / 1220,
-                        intervalEnd: 1220 / 1220,
-                        spans: const [
-                          TextSpan(text: 'Tin vào '),
-                          TextSpan(
-                            text: 'quá trình',
-                            style: TextStyle(color: V5.yellow),
-                          ),
-                          TextSpan(text: ', không bỏ giữa chừng'),
-                        ],
-                      ),
-
-                      // Vika signature
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.only(top: 12),
-                        decoration: BoxDecoration(
-                          border: Border(
-                            top: BorderSide(
-                              color: Colors.white.withValues(alpha: 0.08),
-                            ),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 22,
-                              height: 22,
-                              decoration: BoxDecoration(
-                                color: V5.yellow,
-                                borderRadius: BorderRadius.circular(7),
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                'V',
-                                style: V5.text(
-                                  context,
-                                  size: 12,
-                                  weight: FontWeight.w900,
-                                  color: V5.yellowInk,
-                                  letterSpacing: -0.5,
-                                  height: 1,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'ĐỒNG HÀNH CÙNG',
-                                  style: V5.text(
-                                    context,
-                                    size: 9,
-                                    weight: FontWeight.w700,
-                                    color: V5.invInkSoft,
-                                    letterSpacing: 0.4,
-                                    height: 1,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Vika · HLV cá nhân hoá',
-                                  style: V5.text(
-                                    context,
-                                    size: 11,
-                                    weight: FontWeight.w800,
-                                    color: V5.invInk,
-                                    letterSpacing: -0.2,
-                                    height: 1.2,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const Spacer(),
-                            Icon(
-                              Icons.check_rounded,
-                              color: V5.yellow,
-                              size: 16,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-
-        // CTA — yellow background, dark inner button (color reversal)
         V5PillCTA(
-          label: (_busy || widget.busy)
-              ? 'Đang lưu...'
-              : 'Vào buổi tập đầu tiên',
+          label:
+              (_busy || widget.busy) ? 'Đang lưu...' : 'Vào buổi tập đầu tiên',
           enabled: !_busy && !widget.busy,
           onTap: _handleComplete,
           yellow: true,
-          bottom: 32,
+          bottom: 32 + bottomInset,
         ),
       ],
     );
   }
 }
 
-/// One commitment line. Slides in from the left + fades, driven by an
-/// `Interval` slice of the parent stagger controller.
+// ─────────────────────────────────────────────────────────────
+// Commitment card — frosted glass with three animated lines
+// ─────────────────────────────────────────────────────────────
+
+class _CommitmentCard extends StatelessWidget {
+  const _CommitmentCard({
+    required this.stagger,
+    required this.todayLabel,
+    required this.freq,
+    required this.levelLabel,
+  });
+
+  final AnimationController stagger;
+  final String todayLabel;
+  final int freq;
+  final String levelLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(V5.radiusLg),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(22, 20, 22, 18),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.05),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+            borderRadius: BorderRadius.circular(V5.radiusLg),
+            boxShadow: V5.elevation3,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header.
+              Row(
+                children: [
+                  Text(
+                    'CAM KẾT CỦA BẠN',
+                    style: V5
+                        .eyebrow(context, color: V5.yellow)
+                        .copyWith(letterSpacing: 1.6),
+                  ),
+                  const Spacer(),
+                  Text(
+                    todayLabel,
+                    style: V5
+                        .eyebrow(context, color: V5.invInkSoft)
+                        .copyWith(letterSpacing: 0.8),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+
+              _CommitmentRow(
+                animation: stagger,
+                intervalStart: 0.28,
+                intervalEnd: 0.56,
+                spans: [
+                  const TextSpan(text: 'Tập '),
+                  TextSpan(
+                    text: '$freq buổi/tuần',
+                    style: const TextStyle(color: V5.yellow),
+                  ),
+                  const TextSpan(text: ' theo lịch của tôi.'),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _CommitmentRow(
+                animation: stagger,
+                intervalStart: 0.44,
+                intervalEnd: 0.72,
+                spans: [
+                  const TextSpan(text: 'Đi qua '),
+                  const TextSpan(
+                    text: '4 tuần',
+                    style: TextStyle(color: V5.yellow),
+                  ),
+                  const TextSpan(text: ' với mức '),
+                  TextSpan(
+                    text: levelLabel,
+                    style: const TextStyle(color: V5.yellow),
+                  ),
+                  const TextSpan(text: '.'),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _CommitmentRow(
+                animation: stagger,
+                intervalStart: 0.60,
+                intervalEnd: 0.88,
+                spans: const [
+                  TextSpan(text: 'Tin vào '),
+                  TextSpan(
+                    text: 'quá trình',
+                    style: TextStyle(color: V5.yellow),
+                  ),
+                  TextSpan(text: ', không bỏ giữa chừng.'),
+                ],
+              ),
+
+              const SizedBox(height: 18),
+
+              // Vika signature.
+              Container(
+                padding: const EdgeInsets.only(top: 14),
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(color: V5.heroBorderHi),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        gradient: V5.accentGradient,
+                        borderRadius: BorderRadius.circular(V5.radiusXs),
+                        boxShadow: V5.yellowGlow(0.32),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        'V',
+                        style: V5.text(
+                          context,
+                          size: 14,
+                          weight: FontWeight.w900,
+                          color: V5.yellowInk,
+                          letterSpacing: -0.5,
+                          height: 1,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'ĐỒNG HÀNH CÙNG',
+                          style: V5
+                              .eyebrow(context, color: V5.invInkSoft)
+                              .copyWith(letterSpacing: 1.0),
+                        ),
+                        const SizedBox(height: V5.space2),
+                        Text(
+                          'Vika · HLV cá nhân hoá',
+                          style: V5.titleSm(context, color: V5.invInk),
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
+                    const Icon(
+                      Icons.check_rounded,
+                      color: V5.yellow,
+                      size: 18,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _CommitmentRow extends StatelessWidget {
   const _CommitmentRow({
     required this.animation,
@@ -419,8 +404,7 @@ class _CommitmentRow extends StatelessWidget {
       curve: Interval(
         intervalStart,
         intervalEnd,
-        // cubic-bezier(0.34, 1.3, 0.64, 1) — slight overshoot.
-        curve: Curves.easeOutBack,
+        curve: V5.curve,
       ),
     );
     return AnimatedBuilder(
@@ -430,34 +414,32 @@ class _CommitmentRow extends StatelessWidget {
         return Opacity(
           opacity: t,
           child: Transform.translate(
-            offset: Offset(-12 * (1 - t), 0),
+            offset: Offset(-14 * (1 - t), 0),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Container(
-                  width: 22,
-                  height: 22,
-                  decoration: const BoxDecoration(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
                     color: V5.yellow,
                     shape: BoxShape.circle,
+                    boxShadow: V5.yellowGlow(0.24),
                   ),
                   alignment: Alignment.center,
                   child: const Icon(
                     Icons.check_rounded,
                     color: V5.yellowInk,
-                    size: 13,
+                    size: 14,
                   ),
                 ),
-                const SizedBox(width: 11),
+                const SizedBox(width: 12),
                 Expanded(
                   child: RichText(
                     text: TextSpan(
-                      style: V5.text(
-                        context,
-                        size: 13,
-                        weight: FontWeight.w700,
-                        color: V5.invInk,
-                        letterSpacing: -0.2,
-                      ),
+                      style: V5
+                          .titleSm(context, color: V5.invInk)
+                          .copyWith(height: 1.4),
                       children: spans,
                     ),
                   ),

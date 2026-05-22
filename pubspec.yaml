@@ -33,6 +33,7 @@ dependencies:
   flutter_facebook_auth: ^7.0.0
   sign_in_with_apple: ^6.0.0
   crypto: ^3.0.7
+  url_launcher: ^6.3.0
 
 dev_dependencies:
   flutter_test:
@@ -46,6 +47,7 @@ flutter:
     - assets/audio/
     - assets/audio/squat/
     - assets/images/
+    - assets/images/onboarding/
 
   # ─── Fonts ───
   # Vika uses Be Vietnam Pro as a single family for the whole main app

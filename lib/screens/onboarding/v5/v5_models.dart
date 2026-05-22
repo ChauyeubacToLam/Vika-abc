@@ -8,7 +8,6 @@ class V5WhyOption {
     required this.id,
     required this.label,
     required this.sub,
-    required this.pose,
     required this.stat,
     required this.statLabel,
   });
@@ -16,44 +15,39 @@ class V5WhyOption {
   final String id;
   final String label;
   final String sub;
-  final String pose;
   final String stat;
   final String statLabel;
 }
 
 const whyOptions = [
   V5WhyOption(
-  id: 'body',
-  label: 'Cải thiện vóc dáng',
-  sub: 'Cơ thể bạn mong muốn',
-  pose: 'squat',
-  stat: '-2kg',
-  statLabel: 'Trung bình sau 4 tuần',
-),
-V5WhyOption(
-  id: 'pain',
-  label: 'Giảm đau, tư thế tốt',
-  sub: 'Lưng, cổ, vai, gối',
-  pose: 'reach',
-  stat: '47%',
-  statLabel: 'Giảm đau lưng sau 4 tuần',
-),
-V5WhyOption(
-  id: 'energy',
-  label: 'Năng lượng cho cả ngày',
-  sub: 'Hết kiệt sức sau giờ làm',
-  pose: 'lunge',
-  stat: '+20%',
-  statLabel: 'Năng lượng & tinh thần',
-),
-V5WhyOption(
-  id: 'strength',
-  label: 'Khoẻ & tự tin hơn',
-  sub: 'Cho công việc và cuộc sống',
-  pose: 'tree',
-  stat: '+66%',
-  statLabel: 'Sức bền chống đẩy',
-),
+    id: 'body',
+    label: 'Cải thiện vóc dáng',
+    sub: 'Cơ thể bạn mong muốn',
+    stat: '-2kg',
+    statLabel: 'Trung bình sau 4 tuần',
+  ),
+  V5WhyOption(
+    id: 'pain',
+    label: 'Giảm đau, tư thế tốt',
+    sub: 'Lưng, cổ, vai, gối',
+    stat: '47%',
+    statLabel: 'Giảm đau lưng sau 4 tuần',
+  ),
+  V5WhyOption(
+    id: 'energy',
+    label: 'Năng lượng cho cả ngày',
+    sub: 'Hết kiệt sức sau giờ làm',
+    stat: '+20%',
+    statLabel: 'Năng lượng & tinh thần',
+  ),
+  V5WhyOption(
+    id: 'strength',
+    label: 'Khoẻ & tự tin hơn',
+    sub: 'Cho công việc và cuộc sống',
+    stat: '+66%',
+    statLabel: 'Sức bền chống đẩy',
+  ),
 ];
 
 const whyFollowups = {
@@ -82,7 +76,6 @@ const whyFollowups = {
     'Theo đuổi môn thể thao tôi thích (đá bóng, chạy bộ, ...)',
     'Tự tin với cơ thể mình hơn',
   ],
-
 };
 
 class V5GoalOption {
@@ -92,7 +85,6 @@ class V5GoalOption {
     required this.sub,
     required this.stat,
     required this.unit,
-    required this.pose,
   });
 
   final String id;
@@ -100,7 +92,6 @@ class V5GoalOption {
   final String sub;
   final String stat;
   final String unit;
-  final String pose;
 }
 
 const goalOptions = [
@@ -110,7 +101,6 @@ const goalOptions = [
     sub: 'Dẻo dai, ít đau mỏi',
     stat: '8h',
     unit: 'Giấc ngủ sâu',
-    pose: 'reach',
   ),
   V5GoalOption(
     id: 'body',
@@ -118,7 +108,6 @@ const goalOptions = [
     sub: 'Săn chắc, gọn người',
     stat: '-3.5kg',
     unit: 'Mỡ thừa',
-    pose: 'tree',
   ),
   V5GoalOption(
     id: 'strength',
@@ -126,7 +115,6 @@ const goalOptions = [
     sub: 'Cơ bắp, sức bền',
     stat: '+15kg',
     unit: 'Tổng nâng',
-    pose: 'squat',
   ),
   V5GoalOption(
     id: 'flexible',
@@ -134,7 +122,6 @@ const goalOptions = [
     sub: 'Mềm dẻo, an toàn',
     stat: '+10cm',
     unit: 'Biên độ khớp',
-    pose: 'lunge',
   ),
 ];
 
@@ -178,7 +165,6 @@ class ForkChoice {
     required this.sub,
     required this.stat,
     required this.statLabel,
-    required this.pose,
     required this.highlights,
     required this.caveats,
     required this.equipment,
@@ -189,7 +175,6 @@ class ForkChoice {
   final String sub;
   final String stat;
   final String statLabel;
-  final String pose;
 
   /// "Phù hợp khi bạn muốn" — positive-fit bullets.
   final List<String> highlights;
@@ -205,14 +190,13 @@ const forkChoices = {
   'home': ForkChoice(
     id: 'home',
     title: 'Home Workout',
-    sub: 'Khoẻ · Săn chắc · Năng lượng',
+    sub: 'Sức mạnh · săn chắc',
     stat: '30+',
     statLabel: 'bài tập',
-    pose: 'squat',
     highlights: [
-      'Săn cơ, tăng sức mạnh',
-      'Giảm mỡ, cải thiện vóc dáng',
-      'Tăng sức bền và năng lượng hàng ngày',
+      'Tăng sức mạnh và săn chắc',
+      'Giữ nhịp tim, đốt năng lượng',
+      'Không cần thiết bị phức tạp',
     ],
     caveats: [
       'Mục tiêu là giảm đau lưng / cổ',
@@ -223,14 +207,13 @@ const forkChoices = {
   'yoga': ForkChoice(
     id: 'yoga',
     title: 'Yoga',
-    sub: 'Linh hoạt · Cân bằng · Thư giãn',
+    sub: 'Linh hoạt · thả lỏng',
     stat: '30+',
     statLabel: 'bài yoga',
-    pose: 'tree',
     highlights: [
-      'Tăng linh hoạt và biên độ chuyển động',
-      'Giảm đau lưng / cổ / vai do ngồi nhiều',
-      'Thư giãn, giảm stress, kiểm soát hơi thở',
+      'Mở khớp, tăng biên độ chuyển động',
+      'Giảm căng lưng, vai và cổ',
+      'Thở chậm, thả lỏng sau ngày dài',
     ],
     caveats: [
       'Tăng cơ bắp rõ rệt',
@@ -482,8 +465,9 @@ AssessmentResultData squatResultFromData(OnboardingData data) {
     coachTitle: 'Vika thấy gì?',
     coachBody: coachBody,
     detectedPattern: pattern,
-    questionTitle:
-        interpreter?.getQuestion()?.isNotEmpty == true ? 'Điểm này có đúng với bạn?' : 'Cảm giác nào đúng với bạn?',
+    questionTitle: interpreter?.getQuestion()?.isNotEmpty == true
+        ? 'Điểm này có đúng với bạn?'
+        : 'Cảm giác nào đúng với bạn?',
     questionSub: 'Vika dùng để xác định nguyên nhân chính',
     candidates: homeResultsMock.first.candidates,
     lowerIsBetter: true,
