@@ -5,6 +5,10 @@ import 'package:flutter/material.dart';
 import '../v5_primitives.dart';
 import '../v5_theme.dart';
 
+/// S01 — Welcome. The first frame. Designed to feel like the opening of a
+/// premium athletic app (Future, Caliber, Whoop): big confident brand mark,
+/// a living visualization that hints at the AI-camera differentiator, and a
+/// headline that lands without explaining itself.
 class S01Welcome extends StatelessWidget {
   const S01Welcome({super.key, required this.onNext});
 
@@ -12,189 +16,199 @@ class S01Welcome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: V5.heroBg,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          const Positioned(
-            top: -120,
-            left: -120,
-            child: _AtmosphericGlow(width: 360, height: 480, opacity: 0.28),
+    final r = V5Responsive.of(context);
+    final bottomInset = r.viewPadding.bottom;
+    return V5Screen(
+      index: 1,
+      inverted: true,
+      background: V5.heroBg,
+      showChrome: false,
+      children: [
+        // Background layers
+        const Positioned(
+          top: -160,
+          left: -140,
+          child: V5AmbientGlow(
+            size: Size(420, 480),
+            opacity: 0.28,
+            color: V5.yellow,
           ),
-          const Positioned(
-            right: -120,
-            bottom: -120,
-            child: _AtmosphericGlow(width: 340, height: 360, opacity: 0.14),
+        ),
+        const Positioned(
+          right: -170,
+          bottom: -180,
+          child: V5AmbientGlow(
+            size: Size(380, 380),
+            opacity: 0.14,
+            color: Color(0xFFCD7C45),
           ),
-          const Positioned(top: 120, right: 36, child: Opacity(opacity: 0.55, child: V5Sparkle(size: 11))),
-          const Positioned(top: 200, left: 42, child: Opacity(opacity: 0.40, child: V5Sparkle(size: 8))),
-          const Positioned(top: 520, right: 60, child: Opacity(opacity: 0.45, child: V5Sparkle(size: 9))),
-          const V5StatusBar(inverted: true),
-          Positioned(
-            top: 80,
-            left: 0,
-            right: 0,
-            child: V5FadeIn(
+        ),
+        const Positioned.fill(child: V5Texture(opacity: 0.06, density: 1.2)),
+
+        // Main body
+        Positioned.fill(
+          child: SafeArea(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                V5.gutter,
+                r.viewPadding.top + r.pick(cozy: 28.0, short: 18.0, veryShort: 10.0),
+                V5.gutter,
+                bottomInset + r.pick(cozy: 132.0, short: 116.0, veryShort: 102.0),
+              ),
               child: Column(
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: V5.yellow,
-                          borderRadius: BorderRadius.circular(9),
-                          boxShadow: [
-                            BoxShadow(
-                              color: V5.yellow.withValues(alpha: 0.45),
-                              blurRadius: 14,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          'V',
-                          style: V5.text(
-                            context,
-                            size: 16,
-                            weight: FontWeight.w900,
-                            color: V5.yellowInk,
-                            letterSpacing: -0.6,
-                            height: 1,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        'vika',
-                        style: V5.text(
-                          context,
-                          size: 24,
-                          weight: FontWeight.w800,
-                          color: V5.invInk,
-                          letterSpacing: -1,
-                          height: 1,
-                        ),
-                      ),
-                    ],
+                  V5FadeIn(child: const _WelcomeBrand()),
+                  SizedBox(height: r.pick(cozy: V5.space20, short: V5.space12)),
+                  Expanded(
+                    child: V5FadeIn(
+                      delay: const Duration(milliseconds: 140),
+                      slideY: 12,
+                      child: const _WelcomeStage(),
+                    ),
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'HLV CÁ NHÂN HOÁ BẰNG AI',
-                    style: V5.text(
-                      context,
-                      size: 9,
-                      weight: FontWeight.w700,
-                      color: V5.invInkSoft,
-                      letterSpacing: 1.6,
+                  SizedBox(height: r.pick(cozy: V5.space20, short: V5.space14)),
+                  V5FadeIn(
+                    delay: const Duration(milliseconds: 260),
+                    slideY: 8,
+                    child: const _CameraAiPill(),
+                  ),
+                  SizedBox(height: r.pick(cozy: V5.space24, short: V5.space16)),
+                  V5FadeIn(
+                    delay: const Duration(milliseconds: 340),
+                    slideY: 14,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: _WelcomeHeadline(responsive: r),
+                    ),
+                  ),
+                  SizedBox(height: r.pick(cozy: V5.space12, short: V5.space8)),
+                  V5FadeIn(
+                    delay: const Duration(milliseconds: 420),
+                    slideY: 8,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Camera AI quan sát từng chuyển động và đưa ra hướng dẫn cá nhân hoá cho cơ thể bạn.',
+                        maxLines: r.isVeryShort ? 2 : 3,
+                        style: V5.bodyLg(context, color: V5.invInkSoft),
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
           ),
-          const Positioned(
-            top: 160,
+        ),
+
+        // Primary CTA
+        V5PillCTA(
+          label: 'Bắt đầu hành trình',
+          onTap: onNext,
+          yellow: true,
+          bottom: 32 + bottomInset,
+        ),
+
+        // Footer signature
+        if (!r.isVeryShort)
+          Positioned(
             left: 0,
             right: 0,
-            bottom: 386,
-            child: Center(
-              // TODO(WELCOME-HERO-SWAP): Replace with looping video when asset is provided.
-              // Final asset will be a 9:16 looping video (~3-5s) of a PT doing a squat
-              // with MediaPipe skeleton overlay rendered on top. Use video_player package.
-              // Video should: autoplay, loop, mute, no controls, no fullscreen.
-              // Keep all surrounding chrome (wordmark, sparkles, glow, indicator pill, headline, CTA).
-              child: WelcomeHero(),
+            bottom: 12 + bottomInset,
+            child: Text(
+              'Phát triển tại Việt Nam  ·  16 bước trong 3 phút',
+              textAlign: TextAlign.center,
+              style: V5
+                  .caption(context, color: V5.invInkFaint)
+                  .copyWith(letterSpacing: 0.4),
             ),
           ),
-          Positioned(
-            bottom: 340,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: V5FadeIn(
-                child: V5Glass(
-                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const V5PulseDot(),
-                      const SizedBox(width: 6),
-                      Text(
-                        'CAMERA AI · PHÂN TÍCH FORM',
-                        style: V5.text(
-                          context,
-                          size: 9,
-                          weight: FontWeight.w700,
-                          color: V5.invInk,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                    ],
-                  ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Brand mark
+// ─────────────────────────────────────────────────────────────
+
+class _WelcomeBrand extends StatelessWidget {
+  const _WelcomeBrand();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                gradient: V5.accentGradient,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: V5.yellowGlow(0.28),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                'V',
+                style: V5.text(
+                  context,
+                  size: 18,
+                  weight: FontWeight.w900,
+                  color: V5.yellowInk,
+                  letterSpacing: -0.6,
+                  height: 1,
                 ),
               ),
             ),
-          ),
-          Positioned(
-            left: 24,
-            right: 24,
-            bottom: 170,
-            child: V5FadeIn(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Tập đúng.\nTiến bộ thật.',
-                    style: V5.text(
-                      context,
-                      size: 42,
-                      weight: FontWeight.w800,
-                      color: V5.invInk,
-                      letterSpacing: -1.8,
-                      height: 0.95,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Camera AI quan sát từng chuyển động & đưa ra hướng dẫn cá nhân hoá cho cơ thể bạn.',
-                    style: V5.text(
-                      context,
-                      size: 13,
-                      weight: FontWeight.w500,
-                      color: V5.invInkSoft,
-                      height: 1.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          V5PillCTA(
-            label: 'Bắt đầu hành trình',
-            onTap: onNext,
-            yellow: true,
-            bottom: 64,
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 30,
-            child: Text(
-              'Phát triển tại Việt Nam · 16 bước trong 3 phút',
-              textAlign: TextAlign.center,
+            const SizedBox(width: V5.space10),
+            Text(
+              'vika',
               style: V5.text(
                 context,
-                size: 10,
-                weight: FontWeight.w600,
-                color: V5.invInkSoft,
-                letterSpacing: 0.3,
+                size: 26,
+                weight: FontWeight.w800,
+                color: V5.invInk,
+                letterSpacing: -1.1,
+                height: 1,
               ),
             ),
+          ],
+        ),
+        const SizedBox(height: V5.space8),
+        Text(
+          'HUẤN LUYỆN VIÊN AI CỦA BẠN',
+          style: V5
+              .eyebrow(context, color: V5.invInkSoft)
+              .copyWith(letterSpacing: 1.4),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Camera AI pill (glass)
+// ─────────────────────────────────────────────────────────────
+
+class _CameraAiPill extends StatelessWidget {
+  const _CameraAiPill();
+
+  @override
+  Widget build(BuildContext context) {
+    return V5Glass(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const V5PulseDot(color: V5.yellow),
+          const SizedBox(width: V5.space8),
+          Text(
+            'CAMERA AI  ·  PHÂN TÍCH FORM THỜI GIAN THỰC',
+            style: V5
+                .eyebrow(context, color: V5.invInk)
+                .copyWith(letterSpacing: 1.0),
           ),
         ],
       ),
@@ -202,162 +216,237 @@ class S01Welcome extends StatelessWidget {
   }
 }
 
-class _AtmosphericGlow extends StatelessWidget {
-  const _AtmosphericGlow({
-    required this.width,
-    required this.height,
-    required this.opacity,
-  });
+// ─────────────────────────────────────────────────────────────
+// Headline — two lines that wrap naturally
+// ─────────────────────────────────────────────────────────────
 
-  final double width;
-  final double height;
-  final double opacity;
+class _WelcomeHeadline extends StatelessWidget {
+  const _WelcomeHeadline({required this.responsive});
+
+  final V5Responsive responsive;
 
   @override
   Widget build(BuildContext context) {
-    // RadialGradient instead of ImageFiltered+blur — same soft halo, no
-    // filter pass that flashes the unblurred yellow disk on first frame.
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: RadialGradient(
-          colors: [
-            V5.yellow.withValues(alpha: opacity),
-            Colors.transparent,
-          ],
-        ),
+    final size = responsive.pick(
+      cozy: 44.0,
+      short: 40.0,
+      veryShort: 34.0,
+      tall: 48.0,
+    );
+    final style = V5.text(
+      context,
+      size: size,
+      weight: FontWeight.w800,
+      color: V5.invInk,
+      letterSpacing: -2.0,
+      height: 0.95,
+    );
+    return RichText(
+      text: TextSpan(
+        style: style,
+        children: [
+          const TextSpan(text: 'Tập đúng.\n'),
+          TextSpan(
+            text: 'Tiến bộ thật.',
+            style: TextStyle(color: V5.yellow),
+          ),
+        ],
       ),
     );
   }
 }
 
-class WelcomeHero extends StatefulWidget {
-  const WelcomeHero({super.key});
+// ─────────────────────────────────────────────────────────────
+// Welcome stage — the animated hero (pose detection visualization)
+// ─────────────────────────────────────────────────────────────
+
+class _WelcomeStage extends StatefulWidget {
+  const _WelcomeStage();
 
   @override
-  State<WelcomeHero> createState() => _WelcomeHeroState();
+  State<_WelcomeStage> createState() => _WelcomeStageState();
 }
 
-class _WelcomeHeroState extends State<WelcomeHero>
-    with TickerProviderStateMixin {
-  late final AnimationController _trace;
-  late final AnimationController _halo;
+class _WelcomeStageState extends State<_WelcomeStage>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _loop;
 
   @override
   void initState() {
     super.initState();
-    _trace = AnimationController(
-      duration: const Duration(milliseconds: 1360),
+    _loop = AnimationController(
+      duration: const Duration(milliseconds: 6800),
       vsync: this,
-    )..forward();
-    _halo = AnimationController(
-      duration: const Duration(milliseconds: 2400),
-      vsync: this,
-    );
-    Future<void>.delayed(const Duration(milliseconds: 1000), () {
-      if (mounted) _halo.repeat(reverse: true);
-    });
+    )..repeat();
   }
 
   @override
   void dispose() {
-    _trace.dispose();
-    _halo.dispose();
+    _loop.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return V5FadeIn(
-      child: SizedBox(
-        width: 280,
-        height: 300,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            const Opacity(opacity: 0.85, child: V5HeroFigure(pose: 'squat')),
-            AnimatedBuilder(
-              animation: Listenable.merge([_trace, _halo]),
-              builder: (context, _) => CustomPaint(
-                painter: _SkeletonPainter(
-                  trace: _trace.value,
-                  halo: _halo.value,
-                ),
-              ),
-            ),
-          ],
+    return Center(
+      child: AspectRatio(
+        aspectRatio: 0.94,
+        child: AnimatedBuilder(
+          animation: _loop,
+          builder: (context, _) => CustomPaint(
+            painter: _WelcomeStagePainter(progress: _loop.value),
+          ),
         ),
       ),
     );
   }
 }
 
-class _SkeletonPainter extends CustomPainter {
-  _SkeletonPainter({required this.trace, required this.halo});
+class _WelcomeStagePainter extends CustomPainter {
+  const _WelcomeStagePainter({required this.progress});
 
-  final double trace;
-  final double halo;
-
-  static final _segments = <({Path path, double start})>[
-    (path: Path()..moveTo(162, 85)..lineTo(162, 110), start: .15),
-    (path: Path()..moveTo(142, 113)..lineTo(184, 113), start: .21),
-    (path: Path()..moveTo(162, 113)..lineTo(168, 200)..lineTo(175, 268), start: .26),
-    (path: Path()..moveTo(142, 113)..quadraticBezierTo(100, 165, 92, 200), start: .32),
-    (path: Path()..moveTo(184, 113)..quadraticBezierTo(226, 165, 234, 200), start: .32),
-    (path: Path()..moveTo(175, 268)..lineTo(156, 308)..lineTo(165, 350), start: .41),
-    (path: Path()..moveTo(175, 268)..lineTo(196, 308)..lineTo(187, 350), start: .41),
-  ];
-
-  static const _points = <({Offset p, double start, double r})>[
-    (p: Offset(162, 85), start: .15, r: 3),
-    (p: Offset(142, 113), start: .24, r: 3),
-    (p: Offset(184, 113), start: .24, r: 3),
-    (p: Offset(92, 200), start: .35, r: 2.5),
-    (p: Offset(234, 200), start: .35, r: 2.5),
-    (p: Offset(175, 268), start: .30, r: 3),
-    (p: Offset(156, 308), start: .44, r: 2.5),
-    (p: Offset(196, 308), start: .44, r: 2.5),
-    (p: Offset(165, 350), start: .51, r: 2.5),
-    (p: Offset(187, 350), start: .51, r: 2.5),
-  ];
+  final double progress;
 
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.save();
-    final scale = math.min(size.width / 320, size.height / 380);
-    canvas.translate((size.width - 320 * scale) / 2, (size.height - 380 * scale) / 2);
-    canvas.scale(scale);
+    final center = size.center(Offset.zero);
+    final r = math.min(size.width, size.height) * 0.46;
 
-    final stroke = Paint()
-      ..color = V5.yellow.withValues(alpha: 0.55)
+    // Soft halo
+    final breathe = 0.5 + math.sin(progress * math.pi * 2) * 0.5;
+    canvas.drawCircle(
+      center,
+      r,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            V5.yellow.withValues(alpha: 0.18 + breathe * 0.06),
+            Colors.white.withValues(alpha: 0.04),
+            Colors.transparent,
+          ],
+          stops: const [0, 0.55, 1],
+        ).createShader(Rect.fromCircle(center: center, radius: r)),
+    );
+
+    // Concentric rings
+    for (var i = 0; i < 5; i++) {
+      canvas.drawCircle(
+        center,
+        r * (0.36 + i * 0.14),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = i == 4 ? 1.4 : 1
+          ..color = (i == 4 ? V5.yellow : V5.invInk)
+              .withValues(alpha: i == 4 ? 0.38 : 0.10),
+      );
+    }
+
+    // Rotating accent arcs
+    final arcPaint = Paint()
+      ..color = V5.yellow.withValues(alpha: 0.58)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2
+      ..strokeWidth = 1.8
       ..strokeCap = StrokeCap.round;
-    for (final segment in _segments) {
-      final t = ((trace - segment.start) / 0.58).clamp(0.0, 1.0);
-      final eased = 1 - math.pow(1 - t, 3);
-      for (final metric in segment.path.computeMetrics()) {
-        canvas.drawPath(metric.extractPath(0, metric.length * eased), stroke);
+    final outer = Rect.fromCircle(center: center, radius: r * 0.93);
+    for (var i = 0; i < 3; i++) {
+      canvas.drawArc(
+        outer,
+        progress * math.pi * 2 + i * math.pi * 2 / 3,
+        math.pi / 8,
+        false,
+        arcPaint,
+      );
+    }
+
+    // Pose skeleton — abstract figure that "breathes"
+    final skeletonProgress = progress * 2 * math.pi;
+    final flex = math.sin(skeletonProgress) * 0.06;
+
+    final figureScale = r * 0.78;
+    final fx = center.dx;
+    final fy = center.dy;
+    final head = Offset(fx, fy - figureScale * 0.42);
+    final neck = head + Offset(0, figureScale * 0.10);
+    final hip = Offset(fx, fy + figureScale * 0.06);
+    final shoulderL = neck + Offset(-figureScale * 0.16, figureScale * 0.02);
+    final shoulderR = neck + Offset(figureScale * 0.16, figureScale * 0.02);
+    final elbowL = shoulderL +
+        Offset(-figureScale * 0.10, figureScale * (0.16 - flex));
+    final elbowR = shoulderR +
+        Offset(figureScale * 0.10, figureScale * (0.16 - flex));
+    final handL = elbowL + Offset(-figureScale * 0.04, figureScale * 0.14);
+    final handR = elbowR + Offset(figureScale * 0.04, figureScale * 0.14);
+    final kneeL = hip +
+        Offset(-figureScale * 0.10, figureScale * (0.22 + flex * 1.4));
+    final kneeR = hip +
+        Offset(figureScale * 0.10, figureScale * (0.22 + flex * 1.4));
+    final footL = Offset(kneeL.dx, fy + figureScale * 0.46);
+    final footR = Offset(kneeR.dx, fy + figureScale * 0.46);
+
+    final bonePaint = Paint()
+      ..color = V5.invInk.withValues(alpha: 0.78)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    // Bones
+    canvas.drawLine(neck, hip, bonePaint);
+    canvas.drawLine(shoulderL, shoulderR, bonePaint);
+    canvas.drawLine(shoulderL, elbowL, bonePaint);
+    canvas.drawLine(elbowL, handL, bonePaint);
+    canvas.drawLine(shoulderR, elbowR, bonePaint);
+    canvas.drawLine(elbowR, handR, bonePaint);
+    canvas.drawLine(hip, kneeL, bonePaint);
+    canvas.drawLine(kneeL, footL, bonePaint);
+    canvas.drawLine(hip, kneeR, bonePaint);
+    canvas.drawLine(kneeR, footR, bonePaint);
+
+    // Head
+    canvas.drawCircle(
+      head,
+      figureScale * 0.06,
+      Paint()..color = V5.invInk.withValues(alpha: 0.86),
+    );
+
+    // Joint highlights — yellow accent dots that scan around the body
+    final joints = [
+      neck,
+      hip,
+      shoulderL,
+      shoulderR,
+      elbowL,
+      elbowR,
+      handL,
+      handR,
+      kneeL,
+      kneeR,
+      footL,
+      footR,
+    ];
+    final activeIndex = (progress * joints.length * 1.6).floor() % joints.length;
+    for (var i = 0; i < joints.length; i++) {
+      final j = joints[i];
+      final isActive = i == activeIndex;
+      final ringR = isActive ? 5.5 : 3.2;
+      canvas.drawCircle(
+        j,
+        ringR,
+        Paint()..color = V5.yellow.withValues(alpha: isActive ? 0.95 : 0.42),
+      );
+      if (isActive) {
+        canvas.drawCircle(
+          j,
+          ringR + 4,
+          Paint()
+            ..color = V5.yellow.withValues(alpha: 0.20)
+            ..style = PaintingStyle.fill,
+        );
       }
     }
-
-    final dotPaint = Paint()..color = V5.yellow;
-    for (final point in _points) {
-      final t = ((trace - point.start) / 0.24).clamp(0.0, 1.0);
-      final pop = t < .6 ? t / .6 * 1.3 : 1.3 - ((t - .6) / .4) * .3;
-      if (t > 0) canvas.drawCircle(point.p, point.r * pop, dotPaint);
-    }
-
-    final haloPaint = Paint()
-      ..color = V5.yellow.withValues(alpha: 0.20 + halo * 0.20);
-    canvas.drawCircle(const Offset(162, 85), 6 + 4 * halo, haloPaint);
-    canvas.drawCircle(const Offset(175, 268), 6 + 4 * halo, haloPaint);
-    canvas.restore();
   }
 
   @override
-  bool shouldRepaint(covariant _SkeletonPainter oldDelegate) =>
-      oldDelegate.trace != trace || oldDelegate.halo != halo;
+  bool shouldRepaint(covariant _WelcomeStagePainter old) =>
+      old.progress != progress;
 }

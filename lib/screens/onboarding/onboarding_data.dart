@@ -10,6 +10,9 @@ class OnboardingData {
   String? whyStep2;
   String whyCustomText = '';
 
+  // Phase 1 resonance. IDs are locked for downstream profile queries.
+  List<String> problemResonance = [];
+
   // Step 4: Pain check
   List<String> painAreas =
       []; // 'none', 'lower_back', 'knee', 'shoulder_neck', 'hip', 'other'
@@ -36,7 +39,8 @@ class OnboardingData {
   Map<String, List<String>> feedbackByExercise = {};
 
   ForkRecommendation? forkRec;
-  bool get hasSquatAssessment => _squatLogger != null && _squatInterpreter != null;
+  bool get hasSquatAssessment =>
+      _squatLogger != null && _squatInterpreter != null;
 
   // Non-null getters preserve analyzer compatibility for older unused pages.
   ExerciseLogger get squatLogger => _squatLogger!;

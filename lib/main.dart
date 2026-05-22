@@ -31,8 +31,8 @@ import 'utils/orientation_lock.dart';
    APP ENTRY POINT
    ========================================================================= */
 
-late List<CameraDescription> _cameras;
-late bool _hasCompletedOnboarding;
+List<CameraDescription> _cameras = const <CameraDescription>[];
+bool _hasCompletedOnboarding = false;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -153,9 +153,14 @@ class VikaApp extends StatelessWidget {
       onGenerateRoute: (settings) {
         switch (settings.name) {
           case '/':
+            final args = settings.arguments;
+            final overrideComplete = args is Map<String, dynamic>
+                ? args['onboardingComplete'] as bool?
+                : null;
             return MaterialPageRoute(
               builder: (_) => AppEntryGate(
-                initialOnboardingComplete: _hasCompletedOnboarding,
+                initialOnboardingComplete:
+                    overrideComplete ?? _hasCompletedOnboarding,
               ),
             );
           case '/onboarding':

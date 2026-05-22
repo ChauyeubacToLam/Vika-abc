@@ -8,23 +8,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:vika/main.dart';
+import 'package:vika/screens/onboarding/v5/screens/s01_welcome.dart';
 
 void main() {
-  testWidgets('Vika home screen renders exercise cards',
+  testWidgets('Vika onboarding entry renders core CTA and copy',
       (WidgetTester tester) async {
-    await tester.pumpWidget(const VikaApp());
-    await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      MaterialApp(home: S01Welcome(onNext: () {})),
+    );
+    await tester.pump(const Duration(milliseconds: 600));
 
-    expect(find.text('VIKA'), findsOneWidget);
-    expect(find.text('Chọn bài tập'), findsOneWidget);
-    expect(find.text('Squat'), findsOneWidget);
-    expect(find.text('Plank'), findsOneWidget);
-
-    await tester.drag(find.byType(CustomScrollView), const Offset(0, -300));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Nhảy Dạng'), findsOneWidget);
-    expect(find.text('Push Up'), findsOneWidget);
+    expect(find.text('vika'), findsOneWidget);
+    expect(find.text('Bắt đầu hành trình'), findsOneWidget);
+    expect(
+      find.text('CAMERA AI  ·  PHÂN TÍCH FORM THỜI GIAN THỰC'),
+      findsOneWidget,
+    );
   });
 }

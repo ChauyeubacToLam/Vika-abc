@@ -28,6 +28,7 @@ class _S09Phase1State extends State<S09Phase1>
     with SingleTickerProviderStateMixin {
   int _tab = 0;
   late final AnimationController _scoreController;
+  late final PageController _pageController;
   Timer? _barTimer;
   bool _showBars = false;
 
@@ -39,29 +40,36 @@ class _S09Phase1State extends State<S09Phase1>
     ];
   }
 
-  AssessmentResultData get _ex => _results[_tab];
-
   @override
   void initState() {
     super.initState();
     _scoreController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 1100),
       vsync: this,
     );
+    _pageController = PageController();
     _replayAnimations();
   }
 
   @override
   void dispose() {
     _barTimer?.cancel();
+    _pageController.dispose();
     _scoreController.dispose();
     super.dispose();
   }
 
-  void _setTab(int index) {
+  void _setTab(int index, {bool animatePage = true}) {
     if (_tab == index) return;
     setState(() => _tab = index);
     _replayAnimations();
+    if (animatePage && _pageController.hasClients) {
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 260),
+        curve: V5.curveSharp,
+      );
+    }
   }
 
   void _replayAnimations() {
@@ -73,165 +81,213 @@ class _S09Phase1State extends State<S09Phase1>
     });
   }
 
-  void _toggleFeedback(String id) {
+  void _toggleFeedbackFor(AssessmentResultData ex, String id) {
     setState(() {
-      final feedback = widget.data.feedbackByExercise[_ex.id] ?? <String>[];
+      final feedback = widget.data.feedbackByExercise[ex.id] ?? <String>[];
       final next = List<String>.from(feedback);
       if (next.contains(id)) {
         next.remove(id);
       } else {
         next.add(id);
       }
-      widget.data.feedbackByExercise[_ex.id] = next;
+      widget.data.feedbackByExercise[ex.id] = next;
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final results = _results;
-    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
-    return V5Screen(
-      index: 9,
+    final r = V5Responsive.of(context);
+    return V5Page(
+      index: 11,
       onBack: widget.onBack,
-      children: [
-        // Flow layout: header → tabs → expanded scroll content. Replaces
-        // the previous trio of fixed-y Positioned blocks that overflowed
-        // on screens shorter than 844px.
-        Positioned(
-          top: 144,
-          left: 0,
-          right: 0,
-          bottom: 32 + 60 + bottomInset + 12, // CTA region + safe gap
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const V5Eyebrow(label: 'Kết quả đánh giá'),
-                    const SizedBox(height: 10),
-                    Text(
-                      'Đánh giá hoàn tất',
-                      style: V5.text(
-                        context,
-                        size: 24,
-                        weight: FontWeight.w800,
-                        color: V5.ink,
-                        letterSpacing: -0.8,
-                        height: 1.05,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 14),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: V5.surface,
-                    border: Border.all(color: V5.border),
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [V5.cardShadow(0.08)],
-                  ),
-                  child: Row(
-                    children: results.asMap().entries.map((entry) {
-                      final i = entry.key;
-                      final active = _tab == i;
-                      return Expanded(
-                        child: GestureDetector(
-                          onTap: () => _setTab(i),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: active ? V5.ink : Colors.transparent,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              entry.value.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: V5.text(
-                                context,
-                                size: 12,
-                                weight: FontWeight.w700,
-                                color: active ? V5.invInk : V5.inkSoft,
-                                letterSpacing: -0.2,
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  child: V5FadeIn(
-                    key: ValueKey(_ex.id),
-                    child: Column(
-                      children: [
-                        _DataCard(
-                          ex: _ex,
-                          isYoga: widget.data.fork == 'yoga',
-                          tab: _tab,
-                          scoreAnimation: _scoreController,
-                          showBars: _showBars,
-                        ),
-                        const SizedBox(height: 10),
-                        _AnalysisCard(
-                          ex: _ex,
-                          selected: widget.data.feedbackByExercise[_ex.id] ??
-                              const <String>[],
-                          onToggle: _toggleFeedback,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
+      cta: V5PillCTA(label: 'Tiếp tục', onTap: widget.onNext),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          V5ScreenHeader(
+            eyebrow: 'Kết quả đánh giá',
+            title: 'Đây là\nkết quả của bạn.',
+            size: r.isShort ? V5HeaderSize.medium : V5HeaderSize.large,
           ),
-        ),
-        V5PillCTA(
-          label: 'Tiếp tục',
-          onTap: widget.onNext,
-          bottom: 32 + bottomInset,
-        ),
-      ],
+          SizedBox(height: r.pick(cozy: V5.space20, short: V5.space14)),
+          _ExerciseTabs(
+            results: results,
+            currentTab: _tab,
+            onTap: (index) => _setTab(index),
+          ),
+          SizedBox(height: r.pick(cozy: V5.space14, short: V5.space10)),
+          Expanded(
+            child: PageView.builder(
+              controller: _pageController,
+              physics: const BouncingScrollPhysics(),
+              itemCount: results.length,
+              onPageChanged: (index) => _setTab(index, animatePage: false),
+              itemBuilder: (context, index) {
+                final ex = results[index];
+                return SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _DataCard(
+                        ex: ex,
+                        scoreAnimation: _scoreController,
+                        showBars: _showBars,
+                      ),
+                      const SizedBox(height: V5.space12),
+                      _AnalysisCard(
+                        ex: ex,
+                        selected:
+                            widget.data.feedbackByExercise[ex.id] ??
+                                const <String>[],
+                        onToggle: (id) => _toggleFeedbackFor(ex, id),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          if (!r.isShort) ...[
+            const SizedBox(height: V5.space8),
+            Center(
+              child: _SwipeHint(current: _tab, total: results.length),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
 
+// ─────────────────────────────────────────────────────────────
+// Exercise segment control
+// ─────────────────────────────────────────────────────────────
+
+class _ExerciseTabs extends StatelessWidget {
+  const _ExerciseTabs({
+    required this.results,
+    required this.currentTab,
+    required this.onTap,
+  });
+
+  final List<AssessmentResultData> results;
+  final int currentTab;
+  final ValueChanged<int> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: V5.surface,
+        borderRadius: BorderRadius.circular(V5.radiusMd),
+        border: Border.all(color: V5.border),
+        boxShadow: V5.elevation1,
+      ),
+      child: Row(
+        children: results.asMap().entries.map((entry) {
+          final i = entry.key;
+          final active = currentTab == i;
+          return Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => onTap(i),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                curve: V5.curveSharp,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                decoration: BoxDecoration(
+                  color: active ? V5.ink : Colors.transparent,
+                  borderRadius: BorderRadius.circular(V5.radiusSm),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  entry.value.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: V5.titleSm(
+                    context,
+                    color: active ? V5.invInk : V5.inkSoft,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _SwipeHint extends StatelessWidget {
+  const _SwipeHint({required this.current, required this.total});
+
+  final int current;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    final width = math.min(300.0, MediaQuery.sizeOf(context).width - 44);
+    return SizedBox(
+      width: width,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: V5.ink.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(V5.radiusFull),
+          border: Border.all(color: V5.border),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.swipe_rounded, size: 14, color: V5.inkSoft),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Text(
+                'Vuốt ngang để xem bài khác',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: V5.caption(context, color: V5.inkSoft),
+              ),
+            ),
+            const SizedBox(width: 10),
+            for (var i = 0; i < total; i++)
+              Container(
+                width: i == current ? 14 : 5,
+                height: 5,
+                margin: EdgeInsets.only(right: i == total - 1 ? 0 : 4),
+                decoration: BoxDecoration(
+                  color: i == current ? V5.ink : V5.inkDim,
+                  borderRadius: BorderRadius.circular(V5.radiusFull),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Data card — premium dark editorial with score + bar chart
+// ─────────────────────────────────────────────────────────────
+
 class _DataCard extends StatelessWidget {
   const _DataCard({
     required this.ex,
-    required this.isYoga,
-    required this.tab,
     required this.scoreAnimation,
     required this.showBars,
   });
 
   final AssessmentResultData ex;
-  final bool isYoga;
-  final int tab;
   final Animation<double> scoreAnimation;
   final bool showBars;
 
   @override
   Widget build(BuildContext context) {
-    // Chart range — for `lowerIsBetter` (squat depth), tall bars represent
-    // *low* values, so we anchor the chart's "top" at chartFloor (best case)
-    // and "bottom" at chartMax (worst case). For normal metrics, bottom = 0.
+    final narrow = MediaQuery.sizeOf(context).width < 360;
     final dataMax = ex.chartData.reduce(math.max);
     final dataMin = ex.chartData.reduce(math.min);
     final chartMax = ex.lowerIsBetter
@@ -246,35 +302,35 @@ class _DataCard extends StatelessWidget {
           ? ((chartMax - value) / (chartMax - chartFloor)).clamp(0.0, 1.0)
           : ((value - chartFloor) / (chartMax - chartFloor)).clamp(0.0, 1.0);
     }
+
+    final targetFraction = barFraction(ex.chartTarget);
     bool isOk(int value) =>
         ex.lowerIsBetter ? value <= ex.chartTarget : value >= ex.chartTarget;
-    final pose = isYoga ? (tab == 0 ? 'lunge' : 'reach') : (tab == 0 ? 'squat' : 'reach');
-    return Container(
-      decoration: BoxDecoration(
-        gradient: V5.heroGradient,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: V5.heroBorder),
-        boxShadow: [V5.cardShadow(0.08)],
-      ),
-      clipBehavior: Clip.antiAlias,
+
+    return V5HeroCard(
+      borderRadius: V5.radiusLg,
+      elevation: 2,
       child: Stack(
         children: [
           Positioned(
             top: -60,
-            right: -30,
-            width: 220,
-            height: 220,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: V5.yellow.withValues(alpha: 0.10),
-                shape: BoxShape.circle,
-              ),
+            right: -40,
+            child: V5AmbientGlow(
+              size: const Size(240, 240),
+              opacity: 0.18,
+              color: V5.yellow,
             ),
           ),
           Column(
             children: [
+              // Top — score region.
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+                padding: EdgeInsets.fromLTRB(
+                  narrow ? 16 : 22,
+                  narrow ? 18 : 22,
+                  narrow ? 16 : 22,
+                  narrow ? 14 : 18,
+                ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -284,193 +340,116 @@ class _DataCard extends StatelessWidget {
                         children: [
                           Text(
                             ex.metric.toUpperCase(),
-                            style: V5.text(
-                              context,
-                              size: 10,
-                              weight: FontWeight.w700,
-                              color: V5.invInkSoft,
-                              letterSpacing: 1,
-                            ),
+                            style: V5.eyebrow(context, color: V5.invInkSoft),
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 10),
                           AnimatedBuilder(
                             animation: scoreAnimation,
                             builder: (context, _) {
                               final eased =
                                   1 - math.pow(1 - scoreAnimation.value, 3);
                               final score = (ex.score * eased).round();
-                              return Row(
-                                crossAxisAlignment: CrossAxisAlignment.baseline,
-                                textBaseline: TextBaseline.alphabetic,
-                                children: [
-                                  Text(
-                                    '$score',
-                                    style: V5.text(
-                                      context,
-                                      size: 48,
-                                      weight: FontWeight.w800,
-                                      color: V5.yellow,
-                                      letterSpacing: -2,
-                                      height: .92,
+                              return FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.baseline,
+                                  textBaseline: TextBaseline.alphabetic,
+                                  children: [
+                                    Text(
+                                      '$score',
+                                      style: V5
+                                          .stat(context, color: V5.yellow)
+                                          .copyWith(fontSize: narrow ? 42 : 58),
                                     ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    ex.scoreUnit,
-                                    style: V5.text(
-                                      context,
-                                      size: 20,
-                                      weight: FontWeight.w700,
-                                      color: V5.yellow,
-                                      letterSpacing: -0.5,
+                                    const SizedBox(width: 6),
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 6),
+                                      child: Text(
+                                        ex.scoreUnit,
+                                        style: V5
+                                            .titleLg(
+                                              context,
+                                              color: V5.yellow,
+                                            )
+                                            .copyWith(
+                                                fontSize: narrow ? 14 : 18),
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               );
                             },
                           ),
                           const SizedBox(height: 6),
                           Text(
                             ex.metricLabel,
-                            style: V5.text(
-                              context,
-                              size: 12,
-                              weight: FontWeight.w600,
-                              color: V5.invInk,
-                            ),
+                            style: V5.bodySm(context, color: V5.invInkSoft),
                           ),
                         ],
                       ),
                     ),
-                    SizedBox(
-                      width: 80,
-                      height: 80,
-                      child: Opacity(
-                        opacity: .70,
-                        child: V5HeroFigure(pose: pose),
-                      ),
-                    ),
+                    // Numeric quality badge — refined "verdict" pill.
+                    Flexible(
+                        child: Align(
+                      alignment: Alignment.centerRight,
+                      child: _ScoreVerdict(ex: ex),
+                    )),
                   ],
                 ),
               ),
-              Divider(color: Colors.white.withValues(alpha: 0.08), height: 1),
+              const V5Divider(dark: true),
+              // Bottom — chart.
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
+                padding: const EdgeInsets.fromLTRB(22, 16, 22, 20),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      ex.chartTitle,
-                      style: V5.text(
-                        context,
-                        size: 11,
-                        weight: FontWeight.w700,
-                        color: V5.invInk,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    // Chart layout — three explicit zones in the same Stack so
-                    // the dashed target line sits in the SAME coordinate space
-                    // as the bar tops. (Codex's previous version put labels
-                    // above/below each bar, which shifted the bar baseline by
-                    // ~28px and made the line render visually-detached from
-                    // the bar tops.)
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        const valueLabelHeight = 14.0;
-                        const repLabelHeight = 14.0;
-                        const valueGap = 4.0;
-                        const repGap = 4.0;
-                        const barAreaHeight = 78.0;
-                        final totalHeight = valueLabelHeight +
-                            valueGap +
-                            barAreaHeight +
-                            repGap +
-                            repLabelHeight;
-                        return SizedBox(
-                          height: totalHeight,
-                          child: Stack(
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            ex.chartTitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: V5.eyebrow(context, color: V5.invInk),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Flexible(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              // Bar columns. Each column draws its own value
-                              // label just above the bar via a Stack with
-                              // bottom-aligned bar + Positioned label.
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children:
-                                    ex.chartData.asMap().entries.map((entry) {
-                                  final i = entry.key;
-                                  final value = entry.value;
-                                  final ok = isOk(value);
-                                  final barH =
-                                      barFraction(value) * barAreaHeight;
-                                  return Expanded(
-                                    child: Padding(
-                                      padding:
-                                          const EdgeInsets.symmetric(horizontal: 3),
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.end,
-                                        children: [
-                                          // Bar drawing zone — fixed height,
-                                          // bar bottom-aligned, value label
-                                          // sits above bar top.
-                                          SizedBox(
-                                            height: valueLabelHeight +
-                                                valueGap +
-                                                barAreaHeight,
-                                            child: Stack(
-                                              alignment: Alignment.bottomCenter,
-                                              clipBehavior: Clip.none,
-                                              children: [
-                                                _GrowingBar(
-                                                  visible: showBars,
-                                                  delayMs: i * 90,
-                                                  height: barH,
-                                                  color: ok
-                                                      ? V5.yellow
-                                                      : V5.yellow
-                                                          .withValues(alpha: 0.4),
-                                                ),
-                                                Positioned(
-                                                  bottom: barH + 1,
-                                                  child: Text(
-                                                    '$value',
-                                                    style: V5.text(
-                                                      context,
-                                                      size: 9,
-                                                      weight: FontWeight.w700,
-                                                      color: ok
-                                                          ? V5.yellow
-                                                          : V5.invInkSoft,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          const SizedBox(height: repGap),
-                                          SizedBox(
-                                            height: repLabelHeight,
-                                            child: Text(
-                                              '${i + 1}',
-                                              style: V5.text(
-                                                context,
-                                                size: 9,
-                                                weight: FontWeight.w600,
-                                                color: V5.invInkSoft,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                }).toList(),
+                              Container(
+                                width: 14,
+                                height: 1.5,
+                                color: V5.yellow.withValues(alpha: 0.5),
                               ),
-
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  'Mục tiêu ${ex.chartTarget}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: V5.caption(
+                                    context,
+                                    color: V5.invInkSoft,
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
-                        );
-                      },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    _BarChart(
+                      values: ex.chartData,
+                      barFraction: barFraction,
+                      targetFraction: targetFraction,
+                      isOk: isOk,
+                      showBars: showBars,
                     ),
                   ],
                 ),
@@ -483,18 +462,204 @@ class _DataCard extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────
+// Score verdict — pill that says "Tốt" / "Cần cải thiện"
+// ─────────────────────────────────────────────────────────────
+
+class _ScoreVerdict extends StatelessWidget {
+  const _ScoreVerdict({required this.ex});
+
+  final AssessmentResultData ex;
+
+  @override
+  Widget build(BuildContext context) {
+    final passed = ex.lowerIsBetter
+        ? ex.score <= ex.chartTarget
+        : ex.score >= ex.chartTarget;
+    final label = passed ? 'TRÊN MỤC TIÊU' : 'CẦN ĐỘ SÂU';
+    final color = passed ? V5.success : V5.yellow;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(V5.radiusFull),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(passed ? Icons.check_rounded : Icons.trending_up_rounded,
+                color: color, size: 12),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: V5.eyebrow(context, color: color),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Bar chart — with dashed target line + per-rep bars
+// ─────────────────────────────────────────────────────────────
+
+class _BarChart extends StatelessWidget {
+  const _BarChart({
+    required this.values,
+    required this.barFraction,
+    required this.targetFraction,
+    required this.isOk,
+    required this.showBars,
+  });
+
+  final List<int> values;
+  final double Function(num value) barFraction;
+  final double targetFraction;
+  final bool Function(int value) isOk;
+  final bool showBars;
+
+  @override
+  Widget build(BuildContext context) {
+    const valueLabelHeight = 14.0;
+    const repLabelHeight = 14.0;
+    const valueGap = 4.0;
+    const repGap = 8.0;
+    const barAreaHeight = 88.0;
+    final totalHeight =
+        valueLabelHeight + valueGap + barAreaHeight + repGap + repLabelHeight;
+
+    return SizedBox(
+      height: totalHeight,
+      child: Stack(
+        children: [
+          // Dashed target line — overlays the bar area at the
+          // appropriate fraction.
+          Positioned(
+            left: 0,
+            right: 0,
+            top: valueLabelHeight +
+                valueGap +
+                (1 - targetFraction) * barAreaHeight,
+            child: CustomPaint(
+              size: const Size.fromHeight(1),
+              painter: _DashedLine(color: V5.yellow.withValues(alpha: 0.45)),
+            ),
+          ),
+
+          // Bars.
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: values.asMap().entries.map((entry) {
+              final i = entry.key;
+              final value = entry.value;
+              final ok = isOk(value);
+              final barH = barFraction(value) * barAreaHeight;
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      SizedBox(
+                        height: valueLabelHeight + valueGap + barAreaHeight,
+                        child: Stack(
+                          alignment: Alignment.bottomCenter,
+                          clipBehavior: Clip.none,
+                          children: [
+                            _GrowingBar(
+                              visible: showBars,
+                              delayMs: i * 110,
+                              height: barH,
+                              color: ok
+                                  ? V5.yellow
+                                  : V5.yellow.withValues(alpha: 0.32),
+                              border: ok
+                                  ? V5.yellowDeep.withValues(alpha: 0.4)
+                                  : V5.invInkFaint,
+                            ),
+                            Positioned(
+                              bottom: barH + 2,
+                              child: Text(
+                                '$value',
+                                style: V5.text(
+                                  context,
+                                  size: 9.5,
+                                  weight: FontWeight.w700,
+                                  color: ok ? V5.yellow : V5.invInkSoft,
+                                  letterSpacing: -0.1,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: repGap),
+                      SizedBox(
+                        height: repLabelHeight,
+                        child: Text(
+                          '${i + 1}',
+                          style: V5.text(
+                            context,
+                            size: 9.5,
+                            weight: FontWeight.w600,
+                            color: V5.invInkSoft,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DashedLine extends CustomPainter {
+  _DashedLine({required this.color});
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.2;
+    const dashWidth = 5.0;
+    const dashGap = 4.0;
+    var x = 0.0;
+    while (x < size.width) {
+      canvas.drawLine(Offset(x, 0), Offset(x + dashWidth, 0), paint);
+      x += dashWidth + dashGap;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedLine old) => old.color != color;
+}
+
 class _GrowingBar extends StatefulWidget {
   const _GrowingBar({
     required this.visible,
     required this.delayMs,
     required this.height,
     required this.color,
+    required this.border,
   });
 
   final bool visible;
   final int delayMs;
   final double height;
   final Color color;
+  final Color border;
 
   @override
   State<_GrowingBar> createState() => _GrowingBarState();
@@ -538,17 +703,22 @@ class _GrowingBarState extends State<_GrowingBar> {
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 320),
-      curve: Curves.easeOutCubic,
+      duration: const Duration(milliseconds: 420),
+      curve: V5.curve,
       height: _grow ? widget.height : 0,
       width: double.infinity,
       decoration: BoxDecoration(
         color: widget.color,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(5)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+        border: Border.all(color: widget.border, width: 0.5),
       ),
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────
+// Analysis card — Vika coaching feedback + self-report chips
+// ─────────────────────────────────────────────────────────────
 
 class _AnalysisCard extends StatelessWidget {
   const _AnalysisCard({
@@ -564,7 +734,7 @@ class _AnalysisCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -572,105 +742,101 @@ class _AnalysisCard extends StatelessWidget {
             V5.yellow.withValues(alpha: 0.03),
           ],
         ),
-        border: Border.all(color: V5.yellow.withValues(alpha: 0.22)),
-        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: V5.yellow.withValues(alpha: 0.24)),
+        borderRadius: BorderRadius.circular(V5.radiusLg),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
               color: V5.yellow,
-              borderRadius: BorderRadius.circular(999),
+              borderRadius: BorderRadius.circular(V5.radiusFull),
             ),
             child: Row(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                const V5Sparkle(size: 10, color: V5.yellowInk),
-                const SizedBox(width: 6),
-                Text(
-                  'VIKA PHÁT HIỆN · ${ex.detectedPattern}'.toUpperCase(),
-                  style: V5.text(
-                    context,
-                    size: 9,
-                    weight: FontWeight.w800,
-                    color: V5.yellowInk,
-                    letterSpacing: 0.4,
+                const V5Sparkle(size: 11, color: V5.yellowInk),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    'VIKA PHÁT HIỆN · ${ex.detectedPattern}'.toUpperCase(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: V5
+                        .eyebrow(context, color: V5.yellowInk)
+                        .copyWith(letterSpacing: 1.0),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: V5.space12),
           Text(
             ex.coachBody,
-            style: V5.text(
-              context,
-              size: 13,
-              weight: FontWeight.w500,
-              color: V5.ink,
-              height: 1.5,
-            ),
+            style: V5.body(context),
           ),
-          const SizedBox(height: 12),
-          Divider(color: V5.ink.withValues(alpha: 0.08), height: 1),
-          const SizedBox(height: 12),
+          const SizedBox(height: V5.space12),
+          const V5Divider(),
+          const SizedBox(height: V5.space12),
           Text(
             ex.questionTitle,
-            style: V5.text(
-              context,
-              size: 13,
-              weight: FontWeight.w800,
-              color: V5.ink,
-              letterSpacing: -0.2,
-            ),
+            style: V5.titleSm(context),
           ),
-          const SizedBox(height: 3),
+          const SizedBox(height: 4),
           Text(
             ex.questionSub,
-            style: V5.text(
-              context,
-              size: 11,
-              weight: FontWeight.w500,
-              color: V5.inkSoft,
-              height: 1.4,
-            ),
+            style: V5.bodySm(context, color: V5.inkSoft),
           ),
-          const SizedBox(height: 11),
+          const SizedBox(height: 12),
           Wrap(
-            spacing: 6,
-            runSpacing: 6,
+            spacing: 7,
+            runSpacing: 7,
             children: ex.candidates.map((c) {
               final isSel = selected.contains(c.id);
               return GestureDetector(
+                behavior: HitTestBehavior.opaque,
                 onTap: () => onToggle(c.id),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: isSel ? V5.ink : V5.surface,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: isSel ? V5.ink : V5.borderHi),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (isSel) ...[
-                        const Icon(Icons.check_rounded, color: V5.yellow, size: 12),
-                        const SizedBox(width: 5),
-                      ],
-                      Text(
-                        c.label,
-                        style: V5.text(
-                          context,
-                          size: 11,
-                          weight: FontWeight.w700,
-                          color: isSel ? V5.invInk : V5.ink,
-                          letterSpacing: -0.1,
-                        ),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 190),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    curve: V5.curveSharp,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isSel ? V5.ink : V5.surface,
+                      borderRadius: BorderRadius.circular(V5.radiusFull),
+                      border: Border.all(
+                        color: isSel ? V5.ink : V5.borderHi,
+                        width: isSel ? 1.2 : 1,
                       ),
-                    ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isSel) ...[
+                          const Icon(Icons.check_rounded,
+                              color: V5.yellow, size: 13),
+                          const SizedBox(width: 6),
+                        ],
+                        Flexible(
+                          child: Text(
+                            c.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: V5.text(
+                              context,
+                              size: 11.5,
+                              weight: FontWeight.w700,
+                              color: isSel ? V5.invInk : V5.ink,
+                              letterSpacing: -0.1,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               );

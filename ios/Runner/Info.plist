@@ -29,14 +29,22 @@
 				<string>Editor</string>
 				<key>CFBundleURLSchemes</key>
 				<array>
-    <string>com.googleusercontent.apps.842720056940-6de5r778b6gqjspmhrn5u347od5oqhmc</string>
+					<string>com.googleusercontent.apps.842720056940-6de5r778b6gqjspmhrn5u347od5oqhmc</string>
+				</array>
+			</dict>
+			<dict>
+				<key>CFBundleTypeRole</key>
+				<string>Editor</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>fb1001712105563084</string>
 				</array>
 			</dict>
 		</array>
 		<key>CFBundleVersion</key>
 		<string>4</string>
 		<key>GIDClientID</key>
-    <string>842720056940-6de5r778b6gqjspmhrn5u347od5oqhmc.apps.googleusercontent.com</string>
+		<string>842720056940-6de5r778b6gqjspmhrn5u347od5oqhmc.apps.googleusercontent.com</string>
 		<key>ITSAppUsesNonExemptEncryption</key>
 		<false/>
 		<key>LSRequiresIPhoneOS</key>
@@ -61,6 +69,19 @@
 			<string>UIInterfaceOrientationPortraitUpsideDown</string>
 			<string>UIInterfaceOrientationLandscapeLeft</string>
 			<string>UIInterfaceOrientationLandscapeRight</string>
+		</array>
+		<key>FacebookAppID</key>
+		<string>1001712105563084</string>
+		<key>FacebookClientToken</key>
+		<string>05306004cb669f611b1d57316fcacba9</string>
+		<key>FacebookDisplayName</key>
+		<string>Vika</string>
+		<key>LSApplicationQueriesSchemes</key>
+		<array>
+			<string>fbapi</string>
+			<string>fb-messenger-share-api</string>
+			<string>fbauth2</string>
+			<string>fbshareextension</string>
 		</array>
 	</dict>
 	</plist>

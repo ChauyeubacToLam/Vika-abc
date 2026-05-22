@@ -77,11 +77,8 @@ class OnboardingPersistence {
       'height_cm': data.heightCm,
       'weight_kg': data.weightKg,
       'age': data.age,
-      'why_primary': data.whyStep1,
-      'why_secondary': data.whyStep2,
-      'intent_quote': data.whyCustomText.trim().isNotEmpty
-          ? data.whyCustomText.trim()
-          : null,
+      'problem_resonance':
+          data.problemResonance.isNotEmpty ? data.problemResonance : null,
       'goals': data.goal != null ? [data.goal] : null,
       'training_duration': data.trainingDuration,
       'fork': data.fork,
@@ -193,7 +190,7 @@ class OnboardingPersistence {
         'fork_recommended': rec.fork,
         'fork_chosen': data.fork,
         'raw_score': rec.rawScore,
-        'confidence': rec.confidence,
+        'confidence': rec.confidence, 
         'dominant_signal': rec.dominantSignal,
         'reason_text': rec.reason,
         'contribution_goal': rec.signalContributions['goal'],

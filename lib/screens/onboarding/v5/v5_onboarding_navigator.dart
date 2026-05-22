@@ -13,8 +13,10 @@ import 'package:vika/services/recommendation/recommendation_service.dart';
 
 import '../onboarding_data.dart';
 import 'screens/s01_welcome.dart';
-import 'screens/s02_why.dart';
+import 'screens/s02_mirror.dart';
+import 'screens/s03_barrier.dart';
 import 'screens/s03_goal.dart';
+import 'screens/s04_resolution.dart';
 import 'screens/s04_pain_check.dart';
 import 'screens/s05_fork.dart';
 import 'screens/s06_trust.dart';
@@ -25,12 +27,11 @@ import 'screens/s10_level_issue.dart';
 import 'screens/s11_body_info.dart';
 import 'screens/s12_schedule.dart';
 import 'screens/s13_signup.dart';
-import 'screens/s14_outcomes.dart';
 import 'screens/s15_journey.dart';
 import 'screens/s16_closer.dart';
 import 'v5_theme.dart';
 
-/// 16-screen v5 onboarding host. Owns [OnboardingData], threads next/back,
+/// 17-screen v5 onboarding host. Owns [OnboardingData], threads next/back,
 /// launches the live squat assessment between S07 and S08, and persists the
 /// collected profile on the S16 CTA.
 class V5OnboardingNavigator extends StatefulWidget {
@@ -49,11 +50,11 @@ class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
   Future<PlanSnapshot?>? _onboardingPlanFuture;
 
   // Page indices used for special-case logic.
-  static const _idxAssessmentIntro = 6; // S07
-  static const _idxAnalyzing = 7; // S08
+  static const _idxAssessmentIntro = 8; // S07
+  static const _idxAnalyzing = 9; // S08
 
   // Screens with dark/inverted backgrounds — drives the status bar overlay.
-  static const _darkPages = <int>{0, 7, 15}; // S01, S08, S16
+  static const _darkPages = <int>{0, 9, 16}; // S01, S08, S16
 
   @override
   void initState() {
@@ -69,7 +70,7 @@ class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
 
   void _next() {
     if (!_pc.hasClients) return;
-    if (_page < 15) {
+    if (_page < 16) {
       _pc.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOutCubic,
@@ -163,6 +164,10 @@ class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
       await prefs.setBool('onboarding_complete', true);
 
       // Why
+      await prefs.setStringList(
+        'user_problem_resonance',
+        _data.problemResonance,
+      );
       if (_data.whyStep1 != null) {
         await prefs.setString('user_why_primary', _data.whyStep1!);
       }
@@ -244,7 +249,10 @@ class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
       }
 
       if (!mounted) return;
-      Navigator.of(context).pushReplacementNamed('/');
+      Navigator.of(context).pushReplacementNamed(
+        '/',
+        arguments: const {'onboardingComplete': true},
+      );
     } finally {
       _completing = false;
     }
@@ -261,7 +269,9 @@ class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
 
   List<Widget> get _pages => [
         S01Welcome(onNext: _next),
-        S02Why(data: _data, onNext: _next, onBack: _back),
+        S02Mirror(data: _data, onNext: _next, onBack: _back),
+        S03Barrier(onNext: _next, onBack: _back),
+        S04Resolution(onNext: _next, onBack: _back),
         S03Goal(data: _data, onNext: _next, onBack: _back),
         S04PainCheck(data: _data, onNext: _next, onBack: _back),
         S05Fork(data: _data, onNext: _next, onBack: _back),
@@ -289,7 +299,6 @@ class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
             await _ensureOnboardingPlan();
           },
         ),
-        S14Outcomes(data: _data, onNext: _next, onBack: _back),
         S15Journey(
           data: _data,
           onNext: _next,
@@ -306,18 +315,25 @@ class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
 
   @override
   Widget build(BuildContext context) {
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: _overlayStyle,
-      child: Scaffold(
-        backgroundColor: V5.bg,
-        // S13 has a TextField — let the keyboard resize the body so the field
-        // stays visible above it.
-        resizeToAvoidBottomInset: true,
-        body: PageView(
-          controller: _pc,
-          physics: const NeverScrollableScrollPhysics(),
-          onPageChanged: (i) => setState(() => _page = i),
-          children: _pages,
+    final mq = MediaQuery.of(context);
+    // Clamp text scaling for the whole onboarding flow. Respects user's
+    // accessibility preference but prevents 1.5×+ scales from blowing
+    // apart hand-tuned editorial layouts.
+    return MediaQuery(
+      data: mq.copyWith(textScaler: V5.clampedTextScaler(context)),
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: _overlayStyle,
+        child: Scaffold(
+          backgroundColor: V5.bg,
+          // S13 has a TextField — let the keyboard resize the body so the field
+          // stays visible above it.
+          resizeToAvoidBottomInset: true,
+          body: PageView(
+            controller: _pc,
+            physics: const NeverScrollableScrollPhysics(),
+            onPageChanged: (i) => setState(() => _page = i),
+            children: _pages,
+          ),
         ),
       ),
     );

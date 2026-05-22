@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Vika</string>
+    <string name="facebook_app_id">1001712105563084</string>
+    <string name="facebook_client_token">05306004cb669f611b1d57316fcacba9</string>
+    <string name="fb_login_protocol_scheme">fb1001712105563084</string>
+</resources>

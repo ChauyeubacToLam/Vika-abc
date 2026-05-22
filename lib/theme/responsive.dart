@@ -10,7 +10,7 @@
 // Usage:
 // ```dart
 // final r = Responsive.of(context);
-// padding: EdgeInsets.all(r.w(VikaSpace.s24)),
+// padding: EdgeInsets.all(r.w(24)),
 // fontSize: r.sp(46),
 // child: SizedBox(height: r.gap(18)),
 // ```
@@ -116,8 +116,8 @@ class Responsive {
   /// inset directly. Most main-app screens get this via
   /// `IvoryBottomNav` reading `MediaQuery.viewPadding.bottom`.
   double get bottomInset {
-    return WidgetsBinding.instance.platformDispatcher.views.first.padding
-            .bottom /
+    return WidgetsBinding
+            .instance.platformDispatcher.views.first.padding.bottom /
         WidgetsBinding.instance.platformDispatcher.views.first.devicePixelRatio;
   }
 }

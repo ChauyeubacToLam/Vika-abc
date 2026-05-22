@@ -15,7 +15,7 @@ import '../exercise/squat/squat.dart';
    To add a new exercise:
    1. Create the exercise class extending ExerciseBase
    2. Add a new ExerciseDefinition entry to [exerciseDefinitions]
-   3. Done — the HomeScreen and exercise flow will pick it up
+   3. Done — the Home tab and exercise flow will pick it up
    ========================================================================= */
 
 class ExerciseDefinition {

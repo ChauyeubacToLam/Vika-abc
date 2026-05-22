@@ -495,8 +495,8 @@ class VikaIvory {
 
   // ─── Typography ───
 
-  /// Plus Jakarta Sans, bundled as asset font.
-  static const String fontFamily = 'PlusJakartaSans';
+  /// Bundled app font with full Vietnamese diacritic coverage.
+  static const String fontFamily = 'BeVietnamPro';
 
   // ─── Convenience shadows ───
 

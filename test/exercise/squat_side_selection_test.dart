@@ -299,6 +299,8 @@ Map<PoseLandmarkType, PoseLandmark> _buildDepthFacingLandmarks({
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test(
       'squat stays valid when the right side is visible but orientation is only angled',
       () {

@@ -20,8 +20,8 @@
 //   goalKey is the S03 onboarding selection (OnboardingData.goal),
 //   one of {'health', 'body', 'strength', 'flexible'}. These map
 //   directly to ExerciseCatalogEntry.goalFit keys — no translation.
-//   `why_primary` (S02) is consumed elsewhere (S14 copy, S05 fork)
-//   and does NOT flow into scoring.
+//   `why_primary` is a legacy onboarding signal and does NOT flow into
+//   scoring.
 
 import 'models/exercise_catalog_entry.dart';
 
