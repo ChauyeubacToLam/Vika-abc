@@ -25,10 +25,10 @@ class PlankShoulderTap extends ExerciseBase {
   @override
   String get currentPhaseLabel {
     switch (tapState) {
-      case PlankTapState.base: return 'Chuẩn bị';
-      case PlankTapState.lifting: return 'Đang nâng tay';
-      case PlankTapState.tap: return 'Chạm vai';
-      case PlankTapState.returning: return 'Hạ tay';
+      case PlankTapState.base: return 'Chu';
+      case PlankTapState.lifting: return ' ang n ng tay';
+      case PlankTapState.tap: return 'Ch m vai';
+      case PlankTapState.returning: return 'H  tay';
     }
   }
 
@@ -39,7 +39,6 @@ class PlankShoulderTap extends ExerciseBase {
 
   PlankTapState tapState = PlankTapState.base;
   PlankTapState previousState = PlankTapState.base;
-
   int? _exerciseStartTimeMs;
   bool _isTimeout = false;
 
@@ -58,11 +57,11 @@ class PlankShoulderTap extends ExerciseBase {
     if (lm == null) return false;
 
     double trunkAngle = calculateAngleNormalized(firstPoint: lm['shoulder']!, midPoint: lm['hip']!, lastPoint: lm['ankle']!);
-    
-    // 1. Chống lỗi quỳ gối / co gối (Kiểm tra cả 2 chân nếu có hiển thị)
+         
+    // 1. Ch ng l i qu i / co g i (Ki m tra c  2 ch n th
     double leftKneeAngle = 180.0;
     double rightKneeAngle = 180.0;
-    
+         
     if (landmarks.containsKey(PoseLandmarkType.leftHip) && landmarks.containsKey(PoseLandmarkType.leftKnee) && landmarks.containsKey(PoseLandmarkType.leftAnkle)) {
       leftKneeAngle = calculateAngleNormalized(firstPoint: landmarks[PoseLandmarkType.leftHip]!, midPoint: landmarks[PoseLandmarkType.leftKnee]!, lastPoint: landmarks[PoseLandmarkType.leftAnkle]!);
     }
@@ -70,7 +69,7 @@ class PlankShoulderTap extends ExerciseBase {
       rightKneeAngle = calculateAngleNormalized(firstPoint: landmarks[PoseLandmarkType.rightHip]!, midPoint: landmarks[PoseLandmarkType.rightKnee]!, lastPoint: landmarks[PoseLandmarkType.rightAnkle]!);
     }
 
-    // 2. Chống lỗi Wall Push-up (Đứng đẩy tường) - Cơ thể phải nằm ngang
+    // 2. Ch ng l i Wall Push-up ( ng) - C m ngang
     double dx = (lm['shoulder']!.x - lm['ankle']!.x).abs();
     double dy = (lm['shoulder']!.y - lm['ankle']!.y).abs();
     bool isHorizontal = dx > dy * 1.2;
@@ -84,9 +83,8 @@ class PlankShoulderTap extends ExerciseBase {
     };
 
     if (trunkAngle < PlankTapConfig.TRUNK_STRAIGHT_RANGE[0] || trunkAngle > PlankTapConfig.TRUNK_STRAIGHT_RANGE[1]) return false;
-    if (leftKneeAngle < 150.0 || rightKneeAngle < 150.0) return false; // Chặn gập/quỳ gối
-    if (!isHorizontal) return false; // Chặn đứng đẩy tường
-
+    if (leftKneeAngle < 150.0 || rightKneeAngle < 150.0) return false; // Ch p/qu
+    if (!isHorizontal) return false; // Ch
     return true;
   }
 
@@ -103,37 +101,34 @@ class PlankShoulderTap extends ExerciseBase {
   void checkingPose(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     _exerciseStartTimeMs ??= frameTimestampMs;
     final now = frameTimestampMs;
-
     final lm = _getLandmarks(landmarks);
     
-    // 3. XỬ LÝ LỖI CHE CAMERA: Ép reset State về Base nếu mất các khớp nối trọng yếu
-    if (lm == null ||
-        !landmarks.containsKey(PoseLandmarkType.leftWrist) ||
-        !landmarks.containsKey(PoseLandmarkType.rightShoulder) ||
-        !landmarks.containsKey(PoseLandmarkType.rightWrist) ||
-        !landmarks.containsKey(PoseLandmarkType.leftShoulder)) {
-      
-      if (tapState != PlankTapState.base) {
-        _transitionState(PlankTapState.base, now);
-        for (final metric in _metrics) metric.reset();
-      }
-      return; 
-    }
+    // Nếu mất hẳn thân người thì bỏ qua frame, KHÔNG reset state đang tập
+    if (lm == null) return;
 
     scaleFactor = calculateDistance(lm['shoulder']!, lm['hip']!);
     if (scaleFactor == 0) scaleFactor = 1;
-
     double trunkAngle = calculateAngleNormalized(firstPoint: lm['shoulder']!, midPoint: lm['hip']!, lastPoint: lm['ankle']!);
     
-    // Quãng đường cổ tay -> vai ĐỐI DIỆN
-    double distLtoR = calculateDistance(landmarks[PoseLandmarkType.leftWrist]!, landmarks[PoseLandmarkType.rightShoulder]!) / scaleFactor;
-    double distRtoL = calculateDistance(landmarks[PoseLandmarkType.rightWrist]!, landmarks[PoseLandmarkType.leftShoulder]!) / scaleFactor;
+    // TÍNH KHOẢNG CÁCH LUÂN PHIÊN ĐỘC LẬP
+    double distLtoR = double.infinity;
+    double distRtoL = double.infinity;
+
+    if (landmarks.containsKey(PoseLandmarkType.leftWrist) && landmarks.containsKey(PoseLandmarkType.rightShoulder)) {
+      distLtoR = calculateDistance(landmarks[PoseLandmarkType.leftWrist]!, landmarks[PoseLandmarkType.rightShoulder]!) / scaleFactor;
+    }
+    if (landmarks.containsKey(PoseLandmarkType.rightWrist) && landmarks.containsKey(PoseLandmarkType.leftShoulder)) {
+      distRtoL = calculateDistance(landmarks[PoseLandmarkType.rightWrist]!, landmarks[PoseLandmarkType.leftShoulder]!) / scaleFactor;
+    }
     
     double activeWristShoulderDistNorm = min(distLtoR, distRtoL);
 
-    // Tính trung bình hông hai bên để Anti-Rotation quét nhạy hơn
+    // Nếu MediaPipe tạm thời mất điểm nhận diện cổ tay (do bị vắt chéo che khuất),
+    // ta bỏ qua frame này và giữ nguyên State Machine chờ nó xuất hiện lại.
+    if (activeWristShoulderDistNorm == double.infinity) return;
+
     double hipY = lm['hip']!.y;
-    if (landmarks.containsKey(PoseLandmarkType.rightHip)) {
+    if (landmarks.containsKey(PoseLandmarkType.rightHip) && landmarks.containsKey(PoseLandmarkType.leftHip)) {
       hipY = (landmarks[PoseLandmarkType.leftHip]!.y + landmarks[PoseLandmarkType.rightHip]!.y) / 2;
     }
 
@@ -146,14 +141,16 @@ class PlankShoulderTap extends ExerciseBase {
     };
 
     final ctx = RepContext(
-      state: tapState, frameTimestamp: now, scaleFactor: scaleFactor,
-      trunkAngle: trunkAngle, hipY: hipY, 
+      state: tapState, 
+      frameTimestamp: now, 
+      scaleFactor: scaleFactor,
+      trunkAngle: trunkAngle, 
+      hipY: hipY, 
       activeWristShoulderDistNorm: activeWristShoulderDistNorm,
       resultIssues: resultIssues,
     );
-
+    
     _updateStateMachine(ctx);
-
     for (final metric in _metrics) {
       metric.update(ctx);
       debugData.addAll(metric.debugData);
@@ -170,8 +167,8 @@ class PlankShoulderTap extends ExerciseBase {
       if (dist <= PlankTapConfig.TAP_DISTANCE_THRESHOLD) {
         _transitionState(PlankTapState.tap, ctx.frameTimestamp);
       } 
-      // 4. XỬ LÝ CHẠM CÙNG TAY HOẶC HẠ TAY SỚM:
-      // Tay đã nhấc, nhưng không thể chạm tới vai chéo mà vội hạ xuống lại mặt đất -> HỦY REP
+      // 4. X NG TAY HO  TAY S
+      // Tay  c, nh ng kh ng th i vai ch ng l t -> H Y REP
       else if (dist >= PlankTapConfig.LIFT_START_THRESHOLD) {
         _transitionState(PlankTapState.base, ctx.frameTimestamp);
         for (final metric in _metrics) metric.reset();
@@ -198,6 +195,7 @@ class PlankShoulderTap extends ExerciseBase {
 
     final allFaults = <FaultRecord>[];
     for (final metric in _metrics) allFaults.addAll(metric.faults);
+
     correctForm = !allFaults.any((f) => f.affectsForm);
 
     _transitionState(PlankTapState.base, ctx.frameTimestamp);
@@ -205,16 +203,30 @@ class PlankShoulderTap extends ExerciseBase {
   }
 
   Map<String, PoseLandmark>? _getLandmarks(Map<PoseLandmarkType, PoseLandmark> lm) {
-    if (!lm.containsKey(PoseLandmarkType.leftShoulder) ||
-        !lm.containsKey(PoseLandmarkType.leftHip) ||
-        !lm.containsKey(PoseLandmarkType.leftAnkle)) {
-      return null;
+    bool hasLeft = lm.containsKey(PoseLandmarkType.leftShoulder) && 
+                   lm.containsKey(PoseLandmarkType.leftHip) && 
+                   lm.containsKey(PoseLandmarkType.leftAnkle);
+                   
+    bool hasRight = lm.containsKey(PoseLandmarkType.rightShoulder) && 
+                    lm.containsKey(PoseLandmarkType.rightHip) && 
+                    lm.containsKey(PoseLandmarkType.rightAnkle);
+
+    if (!hasLeft && !hasRight) return null;
+
+    // Ưu tiên bên trái, nếu mất bên trái thì dùng tạm bên phải làm mốc đo cơ thể
+    if (hasLeft) {
+      return {
+        'shoulder': lm[PoseLandmarkType.leftShoulder]!,
+        'hip': lm[PoseLandmarkType.leftHip]!,
+        'ankle': lm[PoseLandmarkType.leftAnkle]!,
+      };
+    } else {
+      return {
+        'shoulder': lm[PoseLandmarkType.rightShoulder]!,
+        'hip': lm[PoseLandmarkType.rightHip]!,
+        'ankle': lm[PoseLandmarkType.rightAnkle]!,
+      };
     }
-    return {
-      'shoulder': lm[PoseLandmarkType.leftShoulder]!,
-      'hip': lm[PoseLandmarkType.leftHip]!,
-      'ankle': lm[PoseLandmarkType.leftAnkle]!,
-    };
   }
 
   @override

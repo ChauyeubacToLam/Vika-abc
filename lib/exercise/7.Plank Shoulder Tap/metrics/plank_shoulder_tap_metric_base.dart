@@ -6,41 +6,37 @@ export '../../fault_record.dart';
 enum PlankTapState { base, lifting, tap, returning }
 
 class PlankTapConfig {
-  static const int MAX_REP = 20; // 10 rep mỗi bên
+  static const int MAX_REP = 20; // 10 rep m
   static const int MAX_DURATION_MS = 90000; // 90s timeout
-
-  // Cấu hình tư thế chuẩn bị
+  // C nh t  chu
   static const List<double> TRUNK_STRAIGHT_RANGE = [170.0, 180.0];
   
-  // Cấu hình State Machine (Normalized Distance: Khoảng cách Cổ tay - Vai chéo / Khoảng cách Vai - Hông)
-  static const double LIFT_START_THRESHOLD = 0.8; // Cổ tay rời đất, khoảng cách bắt đầu giảm
-  static const double TAP_DISTANCE_THRESHOLD = 0.35; // Cổ tay chạm sát vai đối diện
+  // C nh State Machine (Normalized Distance: Kho ng c ch C  tay - Vai ch o / Kho ng c ch Vai - H
+  static const double LIFT_START_THRESHOLD = 0.65; // Đã sửa: Giảm để dễ hạ tay xuống sàn
+  static const double TAP_DISTANCE_THRESHOLD = 0.50; // Đã sửa: Tăng để dễ ghi nhận lúc chạm vai
   
-  // Các ngưỡng Metric Y khoa
-  static const double HIP_ROTATION_TOLERANCE = 0.15; // Hông không rớt/nhấp nhô quá ~5-7cm (normalized)
-  static const double TRUNK_SAG_THRESHOLD = 160.0; // Võng lưng
-  static const double MIN_TAP_TIME = 0.5; // Ít nhất 0.5s cho một nhịp nhấc tay để kích hoạt cơ lõi
+  // C c ng ng Metric Y khoa
+  static const double HIP_ROTATION_TOLERANCE = 0.15; // H ng kh ng r t/nh p nh  ~5-7cm (normalized)
+  static const double TRUNK_SAG_THRESHOLD = 160.0; // V ng l
+  static const double MIN_TAP_TIME = 0.5; //  t nh t 0.5s cho m t nh p nh c tay  ch ho
 }
 
 class PlankTapVoicePriority {
-  static const int hipRotation = 0; // Critical (Lực xoắn cột sống)
-  static const int trunkAlignment = 1; // High (Võng lưng)
-  static const int clearTap = 2; // Medium (Ăn gian biên độ)
-  static const int tempo = 3; // Medium (Tập giật cục)
+  static const int hipRotation = 0; // Critical (L c xo
+  static const int trunkAlignment = 1; // High (V ng l
+  static const int clearTap = 2; // Medium ( n gian bi
+  static const int tempo = 3; // Medium (T p gi
 }
 
 class RepContext {
   final PlankTapState state;
   final int frameTimestamp;
   final double scaleFactor;
-
   // Angles
-  final double trunkAngle; // Vai - Hông - Gót (chân trụ)
-  
+  final double trunkAngle; // Vai - H ng - G t (ch n tr
   // Coordinates & Distances
   final double hipY; 
-  final double activeWristShoulderDistNorm; // Khoảng cách Cổ tay đang nhấc tới Vai đối diện (đã chuẩn hóa)
-
+  final double activeWristShoulderDistNorm; // Kho ng c ch C  tay  ang nh i Vai  i di  chu
   final ResultIssues resultIssues;
 
   RepContext({
@@ -57,14 +53,17 @@ class RepContext {
 abstract class PlankTapMetricBase {
   String get name;
   int faultsCount = 0;
+
   void update(RepContext ctx);
   List<FaultRecord> get faults;
   Map<String, dynamic> get debugData;
   void reset();
+
   void resetAndCountFault() {
     if (faults.isNotEmpty) faultsCount++;
     reset();
   }
+
   void onStateTransition(PlankTapState from, PlankTapState to, int timestampMs) {}
   void evaluateRepEnd(RepContext ctx) {}
 }
