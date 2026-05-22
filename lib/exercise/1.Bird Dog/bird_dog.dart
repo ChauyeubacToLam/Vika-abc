@@ -263,19 +263,9 @@ class BirdDog extends ExerciseBase {
   }
 
   void _completeRep(BirdDogRepContext ctx) {
-    if (ctx.isSameSide) {
-      resultIssues.feedback['Result'] = 'Cùng tay chân (Ko đếm)';
-      resultIssues.addInstruction('REJECTED', 'Error', 'Hãy đưa tay nọ chân kia!');
-      _resetRepState();
-      return;
-    }
-
-    if (tempoMetric.lastLegWasLeft == ctx.isLeftLegActive) {
-      resultIssues.feedback['Result'] = 'Chưa đổi bên (Ko đếm)';
-      resultIssues.addInstruction('REJECTED', 'Error', 'Hãy luân phiên đổi bên!');
-      _resetRepState();
-      return;
-    }
+    // Bỏ check isSameSide và lastLegWasLeft do ML Kit 2D từ góc ngang 
+    // không thể phân biệt chính xác trái/phải khi chi bị che khuất,
+    // dẫn đến bắt lỗi sai (falsely rejected) khi người dùng đã tập đúng.
 
     repCount++;
     tempoMetric.markLegUsed(ctx.isLeftLegActive);

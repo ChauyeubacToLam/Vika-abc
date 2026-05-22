@@ -27,6 +27,9 @@ class CoordinationMetric extends DeadBugMetricBase {
       bool sameSideLeft = lArmExt && lHipExt;
       bool sameSideRight = rArmExt && rHipExt;
 
+      // Do hạn chế của nhận diện 2D góc ngang (ML Kit thường gán 2 chi đang duỗi về cùng 1 bên Left hoặc Right),
+      // nên việc check cùng bên sẽ bị sai (False Positive). Đã bỏ block kiểm tra này để rep được tính.
+      /*
       if (sameSideLeft || sameSideRight) {
         _faults.add(FaultRecord(
           phase: ctx.state.name,
@@ -38,13 +41,14 @@ class CoordinationMetric extends DeadBugMetricBase {
         ));
         _evaluatedThisRep = true;
       }
+      */
       
-      // Chuyển động chéo chính xác
+      // Chuyển động chéo chính xác HOẶC bị gán cùng bên do 2D đều được tính là hợp lệ để chốt
       bool crossLeftRight = lArmExt && rHipExt;
       bool crossRightLeft = rArmExt && lHipExt;
       
-      if (crossLeftRight || crossRightLeft) {
-        _evaluatedThisRep = true; // Đúng form, chốt sổ rep này
+      if (sameSideLeft || sameSideRight || crossLeftRight || crossRightLeft) {
+        _evaluatedThisRep = true; // Chốt sổ rep này, hoàn thành kiểm tra
       }
     }
   }

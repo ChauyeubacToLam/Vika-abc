@@ -70,21 +70,51 @@ class LegRaise extends ExerciseBase {
   }
 
   // NOTE UI: Cần hiển thị Pop-up Safety Gate "Có tiền sử đau thắt lưng không?" trước.
+  ({double hipFlexion, double kneeStraight}) _calculateStrictAngles(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+    double leftHipFlexion = 180.0, rightHipFlexion = 180.0;
+    double leftKneeStraight = 180.0, rightKneeStraight = 180.0;
+    bool hasLeft = false, hasRight = false;
+
+    if (landmarks.containsKey(PoseLandmarkType.leftShoulder) && landmarks.containsKey(PoseLandmarkType.leftHip) && 
+        landmarks.containsKey(PoseLandmarkType.leftKnee) && landmarks.containsKey(PoseLandmarkType.leftAnkle) &&
+        landmarks[PoseLandmarkType.leftKnee]!.likelihood > 0.4) {
+      leftHipFlexion = calculateAngleNormalized(firstPoint: landmarks[PoseLandmarkType.leftShoulder]!, midPoint: landmarks[PoseLandmarkType.leftHip]!, lastPoint: landmarks[PoseLandmarkType.leftKnee]!);
+      leftKneeStraight = calculateAngleNormalized(firstPoint: landmarks[PoseLandmarkType.leftHip]!, midPoint: landmarks[PoseLandmarkType.leftKnee]!, lastPoint: landmarks[PoseLandmarkType.leftAnkle]!);
+      hasLeft = true;
+    }
+
+    if (landmarks.containsKey(PoseLandmarkType.rightShoulder) && landmarks.containsKey(PoseLandmarkType.rightHip) && 
+        landmarks.containsKey(PoseLandmarkType.rightKnee) && landmarks.containsKey(PoseLandmarkType.rightAnkle) &&
+        landmarks[PoseLandmarkType.rightKnee]!.likelihood > 0.4) {
+      rightHipFlexion = calculateAngleNormalized(firstPoint: landmarks[PoseLandmarkType.rightShoulder]!, midPoint: landmarks[PoseLandmarkType.rightHip]!, lastPoint: landmarks[PoseLandmarkType.rightKnee]!);
+      rightKneeStraight = calculateAngleNormalized(firstPoint: landmarks[PoseLandmarkType.rightHip]!, midPoint: landmarks[PoseLandmarkType.rightKnee]!, lastPoint: landmarks[PoseLandmarkType.rightAnkle]!);
+      hasRight = true;
+    }
+
+    double hipFlexion = 180.0;
+    double kneeStraight = 180.0;
+    
+    if (hasLeft && hasRight) {
+      hipFlexion = leftHipFlexion > rightHipFlexion ? leftHipFlexion : rightHipFlexion;
+      kneeStraight = leftKneeStraight < rightKneeStraight ? leftKneeStraight : rightKneeStraight;
+    } else if (hasLeft) {
+      hipFlexion = leftHipFlexion;
+      kneeStraight = leftKneeStraight;
+    } else if (hasRight) {
+      hipFlexion = rightHipFlexion;
+      kneeStraight = rightKneeStraight;
+    }
+
+    return (hipFlexion: hipFlexion, kneeStraight: kneeStraight);
+  }
+
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    final shoulder = landmarks[PoseLandmarkType.leftShoulder];
-    final hip = landmarks[PoseLandmarkType.leftHip];
-    final knee = landmarks[PoseLandmarkType.leftKnee];
-    final ankle = landmarks[PoseLandmarkType.leftAnkle];
-    
-    if (shoulder == null || hip == null || knee == null || ankle == null) return false;
-
-    double hipFlexion = calculateAngleNormalized(firstPoint: shoulder, midPoint: hip, lastPoint: knee);
-    double kneeStraight = calculateAngleNormalized(firstPoint: hip, midPoint: knee, lastPoint: ankle);
+    final angles = _calculateStrictAngles(landmarks);
 
     // Người phải duỗi thẳng trên mặt đất
-    if (hipFlexion < LegRaiseConfig.START_HIP_FLEXION_MIN) return false;
-    if (kneeStraight < LegRaiseConfig.START_KNEE_STRAIGHT_MIN) return false;
+    if (angles.hipFlexion < LegRaiseConfig.START_HIP_FLEXION_MIN) return false;
+    if (angles.kneeStraight < LegRaiseConfig.START_KNEE_STRAIGHT_MIN) return false;
 
     return true; 
   }
@@ -119,10 +149,10 @@ class LegRaise extends ExerciseBase {
       return; 
     }
 
-    final shoulder = landmarks[PoseLandmarkType.leftShoulder];
-    final hip = landmarks[PoseLandmarkType.leftHip];
-    final knee = landmarks[PoseLandmarkType.leftKnee];
-    final ankle = landmarks[PoseLandmarkType.leftAnkle];
+    final shoulder = landmarks[PoseLandmarkType.leftShoulder] ?? landmarks[PoseLandmarkType.rightShoulder];
+    final hip = landmarks[PoseLandmarkType.leftHip] ?? landmarks[PoseLandmarkType.rightHip];
+    final knee = landmarks[PoseLandmarkType.leftKnee] ?? landmarks[PoseLandmarkType.rightKnee];
+    final ankle = landmarks[PoseLandmarkType.leftAnkle] ?? landmarks[PoseLandmarkType.rightAnkle];
 
     if (shoulder == null || hip == null || knee == null || ankle == null) {
       return; // Safe guard: prevent null crash when user goes out of frame
@@ -130,8 +160,9 @@ class LegRaise extends ExerciseBase {
 
     scaleFactor = calculateDistance(shoulder, hip);
 
-    double hipFlexion = calculateAngleNormalized(firstPoint: shoulder, midPoint: hip, lastPoint: knee);
-    double kneeStraight = calculateAngleNormalized(firstPoint: hip, midPoint: knee, lastPoint: ankle);
+    final angles = _calculateStrictAngles(landmarks);
+    double hipFlexion = angles.hipFlexion;
+    double kneeStraight = angles.kneeStraight;
 
     final ctx = LegRaiseRepContext(
       hipFlexionAngle: hipFlexion,
@@ -155,12 +186,7 @@ class LegRaise extends ExerciseBase {
       _lastDiagnosticTime = now;
     }
 
-    _updateStateMachine(hipFlexion, now);
-
-    if (state == LegRaiseState.lying && previousState == LegRaiseState.lowering) {
-      _completeRep(ctx);
-      return;
-    }
+    _updateStateMachine(ctx);
 
     if (state != LegRaiseState.lying) {
       for (final metric in _metrics) metric.update(ctx);
@@ -169,7 +195,10 @@ class LegRaise extends ExerciseBase {
     resultIssues.addInstruction(state.name, 'Status', currentPhaseLabel);
   }
 
-  void _updateStateMachine(double hipFlexion, int now) {
+  void _updateStateMachine(LegRaiseRepContext ctx) {
+    double hipFlexion = ctx.hipFlexionAngle;
+    int now = ctx.frameTimestampMs;
+
     if (_raisingDebouncer.update(state == LegRaiseState.lying && hipFlexion < LegRaiseConfig.RAISING_ANGLE)) {
       _transitionState(LegRaiseState.raising, now);
     } 
@@ -181,6 +210,7 @@ class LegRaise extends ExerciseBase {
     }
     else if (_lyingDebouncer.update(state == LegRaiseState.lowering && hipFlexion > LegRaiseConfig.LYING_ANGLE)) {
       _transitionState(LegRaiseState.lying, now);
+      _completeRep(ctx);
     }
   }
 

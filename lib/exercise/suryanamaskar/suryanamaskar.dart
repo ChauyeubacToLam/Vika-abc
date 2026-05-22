@@ -81,6 +81,9 @@ class Suryanamaskar extends ExerciseBase with SideTrackedExerciseMixin {
   int? _exerciseStartTimeMs;
   bool _isTimeout = false;
 
+  int _lastTransitionTimeMs = 0;
+  String _transitionMessage = "";
+
   // ── Metrics ──
   final LumbarBreakMetric lumbarMetric = LumbarBreakMetric();
   final KneeBendMetric kneeBendMetric = KneeBendMetric();
@@ -262,6 +265,12 @@ class Suryanamaskar extends ExerciseBase with SideTrackedExerciseMixin {
     // --- State Machine ---
     _updateStateMachine(ctx);
 
+    if (frameTimestampMs - _lastTransitionTimeMs < 3000 && _transitionMessage.isNotEmpty) {
+      resultIssues.feedback['Chuyển bước'] = _transitionMessage;
+    } else {
+      resultIssues.feedback['Bước hiện tại'] = currentPhaseLabel;
+    }
+
     // --- Run Metrics ---
     for (final metric in _metrics) {
       metric.update(ctx);
@@ -387,6 +396,10 @@ class Suryanamaskar extends ExerciseBase with SideTrackedExerciseMixin {
     if (newState == _state) return;
     _prevState = _state;
     _state = newState;
+
+    _lastTransitionTimeMs = timestampMs;
+    _transitionMessage = "Sang $currentPhaseLabel";
+    ttsService.speak(_transitionMessage);
 
     for (final metric in _metrics) {
       metric.onStateTransition(_prevState, newState, timestampMs);

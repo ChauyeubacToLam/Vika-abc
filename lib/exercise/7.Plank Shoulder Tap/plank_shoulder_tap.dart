@@ -9,6 +9,8 @@ import 'metrics/trunk_alignment_metric.dart';
 import 'metrics/clear_tap_metric.dart';
 import 'metrics/tap_tempo_metric.dart';
 
+enum TappingSide { none, leftHandToRight, rightHandToLeft }
+
 class PlankShoulderTap extends ExerciseBase {
   @override
   Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
@@ -39,6 +41,8 @@ class PlankShoulderTap extends ExerciseBase {
 
   PlankTapState tapState = PlankTapState.base;
   PlankTapState previousState = PlankTapState.base;
+  TappingSide lastTappedSide = TappingSide.none;
+  TappingSide currentTappingSide = TappingSide.none;
   int? _exerciseStartTimeMs;
   bool _isTimeout = false;
 
@@ -121,11 +125,30 @@ class PlankShoulderTap extends ExerciseBase {
       distRtoL = calculateDistance(landmarks[PoseLandmarkType.rightWrist]!, landmarks[PoseLandmarkType.leftShoulder]!) / scaleFactor;
     }
     
-    double activeWristShoulderDistNorm = min(distLtoR, distRtoL);
+    // Nếu cả 2 tay đều bị mất tín hiệu thì bỏ qua frame
+    if (distLtoR == double.infinity && distRtoL == double.infinity) return;
 
-    // Nếu MediaPipe tạm thời mất điểm nhận diện cổ tay (do bị vắt chéo che khuất),
-    // ta bỏ qua frame này và giữ nguyên State Machine chờ nó xuất hiện lại.
-    if (activeWristShoulderDistNorm == double.infinity) return;
+    double activeWristShoulderDistNorm = double.infinity;
+
+    if (tapState == PlankTapState.base) {
+      // Trong trạng thái chuẩn bị, ta xem tay nào đang được nhấc lên (tiến gần vai đối diện)
+      if (distLtoR < PlankTapConfig.LIFT_START_THRESHOLD) {
+         currentTappingSide = TappingSide.leftHandToRight;
+         activeWristShoulderDistNorm = distLtoR;
+      } else if (distRtoL < PlankTapConfig.LIFT_START_THRESHOLD) {
+         currentTappingSide = TappingSide.rightHandToLeft;
+         activeWristShoulderDistNorm = distRtoL;
+      } else {
+         // Cả 2 tay đang ở dưới đất, lấy khoảng cách nhỏ hơn làm chuẩn tạm thời
+         activeWristShoulderDistNorm = min(distLtoR, distRtoL);
+         currentTappingSide = TappingSide.none;
+      }
+    } else {
+      // Đang trong chu trình tập, chỉ theo dõi tay đang thực hiện
+      activeWristShoulderDistNorm = currentTappingSide == TappingSide.leftHandToRight ? distLtoR : distRtoL;
+      // Nếu tay đang thực hiện bị mất tín hiệu tạm thời, bỏ qua frame
+      if (activeWristShoulderDistNorm == double.infinity) return;
+    }
 
     double hipY = lm['hip']!.y;
     if (landmarks.containsKey(PoseLandmarkType.rightHip) && landmarks.containsKey(PoseLandmarkType.leftHip)) {
@@ -138,6 +161,7 @@ class PlankShoulderTap extends ExerciseBase {
       'TrunkAngle': trunkAngle.toStringAsFixed(1),
       'Hip_Y': hipY.toStringAsFixed(1),
       'ActiveDistNorm': activeWristShoulderDistNorm.toStringAsFixed(2),
+      'Side': currentTappingSide.name,
     };
 
     final ctx = RepContext(
@@ -161,16 +185,20 @@ class PlankShoulderTap extends ExerciseBase {
     double dist = ctx.activeWristShoulderDistNorm;
 
     if (tapState == PlankTapState.base && dist < PlankTapConfig.LIFT_START_THRESHOLD) {
-      _transitionState(PlankTapState.lifting, ctx.frameTimestamp);
+      if (lastTappedSide == TappingSide.none || currentTappingSide != lastTappedSide) {
+        _transitionState(PlankTapState.lifting, ctx.frameTimestamp);
+      } else {
+        ctx.resultIssues.addInstruction('Base', 'WrongSide', 'Hãy đổi tay cho rep này!');
+      }
     } 
     else if (tapState == PlankTapState.lifting) {
       if (dist <= PlankTapConfig.TAP_DISTANCE_THRESHOLD) {
         _transitionState(PlankTapState.tap, ctx.frameTimestamp);
       } 
-      // 4. X NG TAY HO  TAY S
-      // Tay  c, nh ng kh ng th i vai ch ng l t -> H Y REP
+      // Tay nhấc nhưng vội hạ xuống lại mặt đất -> HỦY REP
       else if (dist >= PlankTapConfig.LIFT_START_THRESHOLD) {
         _transitionState(PlankTapState.base, ctx.frameTimestamp);
+        currentTappingSide = TappingSide.none;
         for (final metric in _metrics) metric.reset();
       }
     }
@@ -197,6 +225,9 @@ class PlankShoulderTap extends ExerciseBase {
     for (final metric in _metrics) allFaults.addAll(metric.faults);
 
     correctForm = !allFaults.any((f) => f.affectsForm);
+
+    // Lưu lại tay vừa chạm để bắt buộc đổi tay ở rep sau
+    lastTappedSide = currentTappingSide;
 
     _transitionState(PlankTapState.base, ctx.frameTimestamp);
     for (final metric in _metrics) metric.resetAndCountFault();

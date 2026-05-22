@@ -83,20 +83,90 @@ class HighPlank extends ExerciseBase {
     return null;
   }
 
+  Map<String, PoseLandmark>? _getLandmarks(Map<PoseLandmarkType, PoseLandmark> lm) {
+    bool hasLeft = lm.containsKey(PoseLandmarkType.leftShoulder) && 
+                   lm.containsKey(PoseLandmarkType.leftHip) && 
+                   lm.containsKey(PoseLandmarkType.leftAnkle) &&
+                   lm.containsKey(PoseLandmarkType.leftElbow) &&
+                   lm.containsKey(PoseLandmarkType.leftWrist) &&
+                   lm.containsKey(PoseLandmarkType.leftKnee);
+                   
+    bool hasRight = lm.containsKey(PoseLandmarkType.rightShoulder) && 
+                    lm.containsKey(PoseLandmarkType.rightHip) && 
+                    lm.containsKey(PoseLandmarkType.rightAnkle) &&
+                    lm.containsKey(PoseLandmarkType.rightElbow) &&
+                    lm.containsKey(PoseLandmarkType.rightWrist) &&
+                    lm.containsKey(PoseLandmarkType.rightKnee);
+
+    if (!hasLeft && !hasRight) return null;
+
+    double leftScore = 0;
+    if (hasLeft) {
+      leftScore = lm[PoseLandmarkType.leftShoulder]!.likelihood + 
+                  lm[PoseLandmarkType.leftHip]!.likelihood + 
+                  lm[PoseLandmarkType.leftAnkle]!.likelihood;
+    }
+    double rightScore = 0;
+    if (hasRight) {
+      rightScore = lm[PoseLandmarkType.rightShoulder]!.likelihood + 
+                   lm[PoseLandmarkType.rightHip]!.likelihood + 
+                   lm[PoseLandmarkType.rightAnkle]!.likelihood;
+    }
+
+    if (hasLeft && leftScore >= rightScore) {
+      return {
+        'shoulder': lm[PoseLandmarkType.leftShoulder]!,
+        'elbow': lm[PoseLandmarkType.leftElbow]!,
+        'wrist': lm[PoseLandmarkType.leftWrist]!,
+        'hip': lm[PoseLandmarkType.leftHip]!,
+        'knee': lm[PoseLandmarkType.leftKnee]!,
+        'ankle': lm[PoseLandmarkType.leftAnkle]!,
+      };
+    } else {
+      return {
+        'shoulder': lm[PoseLandmarkType.rightShoulder]!,
+        'elbow': lm[PoseLandmarkType.rightElbow]!,
+        'wrist': lm[PoseLandmarkType.rightWrist]!,
+        'hip': lm[PoseLandmarkType.rightHip]!,
+        'knee': lm[PoseLandmarkType.rightKnee]!,
+        'ankle': lm[PoseLandmarkType.rightAnkle]!,
+      };
+    }
+  }
+
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    final shoulder = landmarks[PoseLandmarkType.leftShoulder];
-    final elbow = landmarks[PoseLandmarkType.leftElbow];
-    final wrist = landmarks[PoseLandmarkType.leftWrist];
-    final hip = landmarks[PoseLandmarkType.leftHip];
-    final knee = landmarks[PoseLandmarkType.leftKnee];
-    final ankle = landmarks[PoseLandmarkType.leftAnkle];
+    final lm = _getLandmarks(landmarks);
+    if (lm == null) return false;
 
-    if (shoulder == null || elbow == null || wrist == null || hip == null || knee == null || ankle == null) return false;
+    final shoulder = lm['shoulder']!;
+    final elbow = lm['elbow']!;
+    final wrist = lm['wrist']!;
+    final hip = lm['hip']!;
+    final knee = lm['knee']!;
+    final ankle = lm['ankle']!;
 
     // FIX 1: Đảm bảo camera đã nhận diện rõ ràng toàn bộ cơ thể (không bị che lấp chân/hông dẫn đến nội suy sai)
     if (shoulder.likelihood < 0.6 || elbow.likelihood < 0.6 || wrist.likelihood < 0.6 ||
         hip.likelihood < 0.6 || knee.likelihood < 0.6 || ankle.likelihood < 0.6) {
+      return false;
+    }
+
+    // Cơ thể nằm ngang (khoảng cách X lớn hơn Y)
+    double dx = (shoulder.x - ankle.x).abs();
+    double dy = (shoulder.y - ankle.y).abs();
+    bool isHorizontal = dx > dy * 1.2;
+    if (!isHorizontal) return false;
+
+    // Khoảng cách thân
+    double torso = calculateDistance(shoulder, hip);
+    if (torso == 0) torso = 1;
+
+    // CHỐNG NGOẠI SUY VÀ NẰM BẸP TRÊN SÀN:
+    // Cổ tay phải nằm DƯỚI vai một khoảng đáng kể (trục Y hướng xuống nên Y cổ tay > Y vai)
+    // Chứng tỏ tay đang chống đẩy thân người lên khỏi mặt đất
+    double armVerticalLift = wrist.y - shoulder.y;
+    if (armVerticalLift < torso * 0.45) {
       return false;
     }
 
@@ -152,14 +222,15 @@ class HighPlank extends ExerciseBase {
       return;
     }
 
-    final shoulder = landmarks[PoseLandmarkType.leftShoulder];
-    final elbow = landmarks[PoseLandmarkType.leftElbow];
-    final wrist = landmarks[PoseLandmarkType.leftWrist];
-    final hip = landmarks[PoseLandmarkType.leftHip];
-    final knee = landmarks[PoseLandmarkType.leftKnee];
-    final ankle = landmarks[PoseLandmarkType.leftAnkle];
+    final lm = _getLandmarks(landmarks);
+    if (lm == null) return;
 
-    if (shoulder == null || elbow == null || wrist == null || hip == null || knee == null || ankle == null) return;
+    final shoulder = lm['shoulder']!;
+    final elbow = lm['elbow']!;
+    final wrist = lm['wrist']!;
+    final hip = lm['hip']!;
+    final knee = lm['knee']!;
+    final ankle = lm['ankle']!;
 
     // Bổ sung chặn rác dữ liệu: Nếu đang tập mà có vật cản che khuất tay/chân/hông thì tạm bỏ qua frame này
     if (shoulder.likelihood < 0.5 || elbow.likelihood < 0.5 || wrist.likelihood < 0.5 ||

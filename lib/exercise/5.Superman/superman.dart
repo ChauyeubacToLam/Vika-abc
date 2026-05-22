@@ -61,16 +61,41 @@ class Superman extends ExerciseBase {
   }
 
   // Ràng buộc BẮT BUỘC nằm sấp (Prone)
-  bool _isProne(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  bool _isProne(Map<PoseLandmarkType, PoseLandmark> landmarks, double scaleFactor) {
     final nose = landmarks[PoseLandmarkType.nose];
-    final ear = landmarks[PoseLandmarkType.leftEar] ?? landmarks[PoseLandmarkType.rightEar];
+    final leftEar = landmarks[PoseLandmarkType.leftEar];
+    final rightEar = landmarks[PoseLandmarkType.rightEar];
     
-    if (nose != null && ear != null) {
-      // Trục Y hướng xuống. Nằm sấp thì mũi thường hướng xuống đất hoặc ngang bằng -> (nose.y >= ear.y).
-      // Biên độ bù trừ góc camera 0.05
-      return nose.y > (ear.y - 0.05); 
+    PoseLandmark? ear;
+    if (leftEar != null && rightEar != null) {
+      ear = leftEar.likelihood > rightEar.likelihood ? leftEar : rightEar;
+    } else {
+      ear = leftEar ?? rightEar;
+    }
+    
+    if (nose != null && ear != null && scaleFactor > 0) {
+      // Trục Y hướng xuống. 
+      // Nằm sấp: Mũi úp xuống đất (Y lớn) hoặc ngang tai (nếu ngẩng đầu nhìn tới).
+      // Nằm ngửa: Mũi chỉ lên trần (Y nhỏ), tai gần đất (Y lớn).
+      double faceVerticalDiff = (nose.y - ear.y) / scaleFactor;
+      // Nằm ngửa thì mũi cao hơn tai rất nhiều (faceVerticalDiff âm lớn)
+      if (faceVerticalDiff < -0.15) return false; 
     }
     return true; 
+  }
+
+  // Chống gian lận: Nằm nghiêng
+  bool _isNotOnSide(Map<PoseLandmarkType, PoseLandmark> landmarks, double scaleFactor) {
+    final leftShoulder = landmarks[PoseLandmarkType.leftShoulder];
+    final rightShoulder = landmarks[PoseLandmarkType.rightShoulder];
+    
+    if (leftShoulder != null && rightShoulder != null && scaleFactor > 0) {
+      double shoulderDiffY = (leftShoulder.y - rightShoulder.y).abs() / scaleFactor;
+      // Nằm nghiêng thì 1 vai ở trên trần, 1 vai dưới đất -> chênh lệch Y rất lớn
+      // Nằm sấp/ngửa thì 2 vai gần bằng nhau về trục Y.
+      if (shoulderDiffY > 0.35) return false;
+    }
+    return true;
   }
 
   // Lấy độ cao THẤP NHẤT giữa bên trái và bên phải (Bắt buộc nhấc cả 2 bên)
@@ -98,11 +123,13 @@ class Superman extends ExerciseBase {
     final lm = _getLandmarks(landmarks);
     if (lm == null) return false;
 
-    // Chặn trường hợp nằm ngửa gập bụng
-    if (!_isProne(landmarks)) return false;
+    final torso = calculateDistance(lm['shoulder']!, lm['hip']!);
+    if (torso == 0) return false;
+
+    // Chặn trường hợp nằm ngửa gập bụng hoặc nằm nghiêng
+    if (!_isProne(landmarks, torso) || !_isNotOnSide(landmarks, torso)) return false;
 
     final shoulderHipDiff = (lm['shoulder']!.y - lm['hip']!.y).abs();
-    final torso = calculateDistance(lm['shoulder']!, lm['hip']!);
     
     bool isHorizontal = torso > 0 && shoulderHipDiff / torso < 0.25;
     
@@ -133,6 +160,15 @@ class Superman extends ExerciseBase {
 
     scaleFactor = calculateDistance(lm['shoulder']!, lm['hip']!);
     if (scaleFactor == 0) scaleFactor = 1;
+
+    // CHỐNG GIAN LẬN: Xử lý ngay trong lúc tập nếu người dùng lật ngửa hoặc nằm nghiêng
+    if (!_isProne(landmarks, scaleFactor) || !_isNotOnSide(landmarks, scaleFactor)) {
+      if (superState != SupermanState.setup) {
+        _transition(SupermanState.setup, now);
+        for (final m in _metrics) m.reset(); // Reset số liệu của rep lỗi này
+      }
+      return; 
+    }
 
     // Tính toán khắt khe: Bắt buộc nhấc cả 2 tay và 2 chân
     final armElevation = _getStrictLimbElevation(
