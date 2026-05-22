@@ -59,13 +59,15 @@ class MountainClimberReportBuilder extends ExerciseReportBuilder {
     // --- Core Stability Score ---
     // Lấy từ core_stability_ratio thực tế (% frame hông ổn định), đã được
     // TrunkStabilityMetric track chính xác hơn so với cách tính gián tiếp cũ.
+    // Fix: wrap (double.tryParse(...) ?? 1.0) để ?? chỉ áp dụng cho tryParse,
+    // không phải cho toàn bộ biểu thức sum + ...
     final double avgCoreRatio = setLoggers.fold<double>(
           0.0,
           (sum, log) =>
               sum +
-              double.tryParse(
+              (double.tryParse(
                       log.setLogs['core_stability_ratio']?.toString() ?? '1.0') ??
-                  1.0,
+                  1.0),
         ) /
         setLoggers.length;
     final double coreScore = (avgCoreRatio * 100).clamp(0.0, 100.0);
@@ -81,7 +83,6 @@ class MountainClimberReportBuilder extends ExerciseReportBuilder {
         : (totalGoodRom / totalRomReps * 100).clamp(0.0, 100.0);
 
     // --- Pace: reps/phút ---
-    // Tính từ thời gian logger nếu có, fallback = 0
     final double totalMinutes = setLoggers.fold<double>(
           0.0,
           (sum, log) =>
@@ -131,24 +132,23 @@ class MountainClimberReportBuilder extends ExerciseReportBuilder {
 
   @override
   DetectedEvidence? detectIssue(List<ExerciseLogger> setLoggers) {
-    // Kiểm tra nếu trunk_fails_count cao (>50% số set) → gợi ý tập Plank trước
-    final int totalSets = setLoggers.length;
-    if (totalSets == 0) return null;
-
-    final int failingSets = setLoggers
-        .where((l) => (l.setLogs['trunk_fails_count'] as int? ?? 0) > 0)
-        .length;
-
-    if (failingSets / totalSets >= 0.5) {
-      return DetectedEvidence(
-        issueKey: 'core_weakness',
-        title: 'Core chưa đủ mạnh',
-        description:
-            'Lưng bị võng ở hơn nửa số set. Hãy tập Plank tĩnh 30–60 giây để tăng sức bền core trước khi tăng tốc Mountain Climber.',
-        recommendedExercises: ['plank', 'dead_bug'],
-      );
-    }
-
+    // TODO: Điền đúng các field theo constructor DetectedEvidence của project:
+    //   issueId, confidence, exerciseSource, rawSignal, question
+    //
+    // Logic muốn implement: nếu trunk_fails > 50% số set → gợi ý tập Plank
+    //
+    //   final int failingSets = setLoggers
+    //       .where((l) => (l.setLogs['trunk_fails_count'] as int? ?? 0) > 0)
+    //       .length;
+    //   if (setLoggers.isNotEmpty && failingSets / setLoggers.length >= 0.5) {
+    //     return DetectedEvidence(
+    //       issueId: 'core_weakness',
+    //       confidence: failingSets / setLoggers.length,
+    //       exerciseSource: exerciseName,
+    //       rawSignal: 'trunk_fails_count',
+    //       question: 'Bạn có thường bị đau lưng sau khi tập không?',
+    //     );
+    //   }
     return null;
   }
 }

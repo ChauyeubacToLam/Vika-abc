@@ -4,7 +4,6 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/exercise_logger.dart';
 import '../exercise_base.dart';
-
 import 'metrics/high_plank_metric_base.dart';
 import 'metrics/sagging_metric.dart';
 import 'metrics/piked_hip_metric.dart';
@@ -20,17 +19,19 @@ class HighPlankConfig {
   static const double START_BODY_MIN = 165.0;
   static const double START_KNEE_MIN = 150.0;
 
-  // State Transition Thresholds — SETUP/DROPPING -> HOLDING (ngưỡng vào, chặt hơn)
+  // State Transition Thresholds
+  // SETUP/DROPPING -> HOLDING (ngưỡng vào, chuẩn)
   static const double HOLDING_BODY_THRESHOLD = 165.0;
   static const double HOLDING_ARM_THRESHOLD = 160.0;
   static const double HOLDING_KNEE_THRESHOLD = 150.0;
   static const double HOLDING_SAG_DEVIATION = 0.05;
 
-  // State Transition Thresholds — HOLDING -> DROPPING (ngưỡng ra, lỏng hơn = tạo hysteresis band)
+  // State Transition Thresholds
+  // HOLDING -> DROPPING (ngưỡng ra, lỏng hơn = tạo hysteresis band)
   static const double DROPPING_PIKE_ANGLE = 155.0;
   static const double DROPPING_ARM_ANGLE = 150.0;
-  static const double DROPPING_KNEE_ANGLE = 140.0; // Gập gối dưới 140 độ coi như rớt form
-  static const double DROPPING_SAG_DEVIATION = 0.08; // Sụt hông > 8% chiều dài lưng
+  static const double DROPPING_KNEE_ANGLE = 140.0; // Gối 140 độ coi như mất form
+  static const double DROPPING_SAG_DEVIATION = 0.08; // Sụp hông > 8% chiều dài
 }
 
 class HighPlank extends ExerciseBase {
@@ -93,13 +94,25 @@ class HighPlank extends ExerciseBase {
 
     if (shoulder == null || elbow == null || wrist == null || hip == null || knee == null || ankle == null) return false;
 
+    // FIX 1: Đảm bảo camera đã nhận diện rõ ràng toàn bộ cơ thể (không bị che lấp chân/hông dẫn đến nội suy sai)
+    if (shoulder.likelihood < 0.6 || elbow.likelihood < 0.6 || wrist.likelihood < 0.6 ||
+        hip.likelihood < 0.6 || knee.likelihood < 0.6 || ankle.likelihood < 0.6) {
+      return false;
+    }
+
     double armAngle = calculateAngleNormalized(firstPoint: shoulder, midPoint: elbow, lastPoint: wrist);
     double bodyAngle = calculateAngleNormalized(firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
     double kneeAngle = calculateAngleNormalized(firstPoint: hip, midPoint: knee, lastPoint: ankle);
+    
+    // FIX 2: Đo góc giữa cánh tay và thân người để tránh trường hợp nằm duỗi thẳng trên sàn (Superman pose)
+    double armBodyAngle = calculateAngleNormalized(firstPoint: hip, midPoint: shoulder, lastPoint: wrist);
 
     if (armAngle < HighPlankConfig.START_ARM_MIN) return false;
     if (bodyAngle < HighPlankConfig.START_BODY_MIN) return false;
     if (kneeAngle < HighPlankConfig.START_KNEE_MIN) return false;
+
+    // Trong Plank, cánh tay chống đẩy cơ thể lên nên sẽ tạo góc với lưng, không được duỗi song song với cơ thể
+    if (armBodyAngle < 40.0 || armBodyAngle > 140.0) return false;
 
     return true;
   }
@@ -148,8 +161,13 @@ class HighPlank extends ExerciseBase {
 
     if (shoulder == null || elbow == null || wrist == null || hip == null || knee == null || ankle == null) return;
 
-    scaleFactor = calculateDistance(shoulder, hip);
+    // Bổ sung chặn rác dữ liệu: Nếu đang tập mà có vật cản che khuất tay/chân/hông thì tạm bỏ qua frame này
+    if (shoulder.likelihood < 0.5 || elbow.likelihood < 0.5 || wrist.likelihood < 0.5 ||
+        hip.likelihood < 0.5 || knee.likelihood < 0.5 || ankle.likelihood < 0.5) {
+      return;
+    }
 
+    scaleFactor = calculateDistance(shoulder, hip);
     double bodyAngle = calculateAngleNormalized(firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
     double armAngle = calculateAngleNormalized(firstPoint: shoulder, midPoint: elbow, lastPoint: wrist);
     double kneeAngle = calculateAngleNormalized(firstPoint: hip, midPoint: knee, lastPoint: ankle);
