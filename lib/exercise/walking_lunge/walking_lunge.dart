@@ -32,7 +32,6 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
   WalkingState previousWalkingState = WalkingState.standing;
 
   int? _bottomStartTime;
-  bool _holdSuccess = false;
   final List<FaultRecord> _localFaults = [];
 
   // Which leg is currently in front
@@ -190,9 +189,6 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
 
     // Determine Front Leg vs Rear Leg based on X coordinate
     // Note: direction depends on camera facing.
-    final leftAnkle = smoothedLandmarks[PoseLandmarkType.leftAnkle];
-    final rightAnkle = smoothedLandmarks[PoseLandmarkType.rightAnkle];
-    if (leftAnkle == null || rightAnkle == null) return;
 
     // Determine which leg is in front
     if (cameraFacing == CameraFacing.left) {
@@ -335,13 +331,12 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
         } else {
           _transitionState(WalkingState.bottom, now);
           _bottomStartTime = now;
-          _holdSuccess = false;
           // evaluate step length here using the real context
           stepLengthMetric.evaluateRep(ctx);
         }
       }
     } else if (walkingState == WalkingState.bottom) {
-      if (_bottomStartTime == null) _bottomStartTime = now;
+      _bottomStartTime ??= now;
       
       // Pulling through when hip moves up
       if (hipYChange == AngleChangeState.decreasing || ctx.frontKneeAngle > 120) {
@@ -371,7 +366,6 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
       if (_bottomStartTime != null) {
         int elapsed = timestampMs - _bottomStartTime!;
         if (elapsed < 2000) {
-          _holdSuccess = false;
           if (!_localFaults.any((f) => f.type == 'not_enough_hold')) {
             _localFaults.add(FaultRecord(
               type: 'not_enough_hold',
@@ -382,8 +376,6 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
               voiceMessage: 'Phải giữ đủ 2 giây!',
             ));
           }
-        } else {
-          _holdSuccess = true;
         }
       }
     }
