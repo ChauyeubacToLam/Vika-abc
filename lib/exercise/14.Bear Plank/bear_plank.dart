@@ -98,14 +98,23 @@ class BearPlank extends ExerciseBase {
     final knee = lm['knee']!;
     final wrist = lm['wrist']!;
 
+    final ankle = lm['ankle']!;
+
     scaleFactor = calculateDistance(shoulder, hip);
     if (scaleFactor == 0) scaleFactor = 1;
 
     // Tính toán hình học
-    // Dùng wrist.y làm mốc sàn (tay luôn chống sàn trong Bear Plank)
-    final floorY = wrist.y;
+    // Sàn là đường thẳng nối cổ tay (wrist) và cổ chân (ankle)
+    double floorY;
+    if ((ankle.x - wrist.x).abs() > 0.001) {
+      double t = (knee.x - wrist.x) / (ankle.x - wrist.x);
+      floorY = wrist.y + t * (ankle.y - wrist.y);
+    } else {
+      floorY = wrist.y > ankle.y ? wrist.y : ankle.y;
+    }
+    
     final kneeHeightOffset = floorY - knee.y; // Dương khi gối nhấc lên khỏi sàn
-    final kneeAngle = calculateAngleNormalized(firstPoint: hip, midPoint: knee, lastPoint: lm['ankle']!);
+    final kneeAngle = calculateAngleNormalized(firstPoint: hip, midPoint: knee, lastPoint: ankle);
     
     // Signed: dương = shoulder thấp hơn hip (Y hướng xuống) → võng lưng
     final backYOffset = (shoulder.y - hip.y) / scaleFactor;
@@ -166,7 +175,7 @@ class BearPlank extends ExerciseBase {
                           ctx.kneeHeightOffset <= BearConfig.KNEE_HOVER_MAX &&
                           ctx.kneeAngle < BearConfig.KNEE_ANGLE_BUTT_UP;
                           
-    bool isFatiguedForm = ctx.kneeHeightOffset <= 0 || ctx.kneeAngle >= BearConfig.KNEE_ANGLE_BUTT_UP;
+    bool isFatiguedForm = ctx.kneeHeightOffset <= BearConfig.KNEE_HOVER_MIN || ctx.kneeAngle >= BearConfig.KNEE_ANGLE_BUTT_UP;
 
     switch (bearState) {
       case BearState.setup:
