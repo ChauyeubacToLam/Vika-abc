@@ -119,6 +119,7 @@ class StandingKneeToElbow extends ExerciseBase {
 
     double shoulderTilt = (leftShoulder.y - rightShoulder.y).abs();
     double shoulderWidth = (leftShoulder.x - rightShoulder.x).abs();
+    double torsoLength = (leftShoulder.y - leftHip.y).abs();
     
     // Check if shoulders are roughly level (tilt < 10% of width)
     if (shoulderWidth > 0 && shoulderTilt / shoulderWidth > 0.15) {
@@ -126,7 +127,7 @@ class StandingKneeToElbow extends ExerciseBase {
       return false;
     }
 
-    if (leftWrist.y > leftShoulder.y || rightWrist.y > rightShoulder.y) {
+    if (leftWrist.y > leftShoulder.y + torsoLength * 0.1 || rightWrist.y > rightShoulder.y + torsoLength * 0.1) {
       resultIssues.feedback['System'] = 'Hãy đặt 2 tay sau đầu.';
       return false;
     }
@@ -243,14 +244,16 @@ class StandingKneeToElbow extends ExerciseBase {
         _transitionState(KteState.approaching, now);
       }
     } else if (kteState == KteState.approaching) {
-      if (distanceD < torsoLength * 0.6) {
+      // Relaxed entry threshold from 0.6 to 0.85
+      if (distanceD < torsoLength * 0.85) {
         _transitionState(KteState.touch, now);
       } else if (liftingKneeY > standingKneeY - torsoLength * 0.1) {
         // Returned early without reaching touch distance
         _transitionState(KteState.standing_base, now);
       }
     } else if (kteState == KteState.touch) {
-      if (distanceD > torsoLength * 0.8 || liftingKneeY > standingKneeY - torsoLength * 0.2) {
+      // Relaxed exit threshold from 0.8 to 1.0 to give time to reach peak
+      if (distanceD > torsoLength * 1.0 || liftingKneeY > standingKneeY - torsoLength * 0.2) {
         _transitionState(KteState.returning, now);
       }
     } else if (kteState == KteState.returning) {

@@ -31,6 +31,10 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
   WalkingState walkingState = WalkingState.standing;
   WalkingState previousWalkingState = WalkingState.standing;
 
+  int? _bottomStartTime;
+  bool _holdSuccess = false;
+  final List<FaultRecord> _localFaults = [];
+
   // Which leg is currently in front
   TrackedSide _frontLegSide = TrackedSide.left;
 
@@ -142,7 +146,28 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
   void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
     // 1. Resolve Side Tracked Landmarks to get visible side
     final req = getSideTrackedLandmarks(smoothedLandmarks);
-    if (req == null) return;
+    if (req == null) {
+      if (walkingState != WalkingState.standing) {
+        _transitionState(WalkingState.standing, frameTimestampMs);
+      }
+      resultIssues.feedback['System'] = "Không thấy rõ người! Vui lòng giữ toàn thân trong khung hình.";
+      return;
+    }
+
+    final leftKnee = smoothedLandmarks[PoseLandmarkType.leftKnee];
+    final rightKnee = smoothedLandmarks[PoseLandmarkType.rightKnee];
+    final leftAnkle = smoothedLandmarks[PoseLandmarkType.leftAnkle];
+    final rightAnkle = smoothedLandmarks[PoseLandmarkType.rightAnkle];
+
+    if (leftKnee == null || rightKnee == null || leftAnkle == null || rightAnkle == null ||
+        leftKnee.likelihood < 0.5 || rightKnee.likelihood < 0.5 || 
+        leftAnkle.likelihood < 0.5 || rightAnkle.likelihood < 0.5) {
+      if (walkingState != WalkingState.standing) {
+        _transitionState(WalkingState.standing, frameTimestampMs);
+      }
+      resultIssues.feedback['System'] = "Chưa nhìn thấy hết toàn bộ 2 chân! Hãy lùi lại.";
+      return;
+    }
 
     final hip = req['hip']!;
     final shoulder = req['shoulder']!;
@@ -268,7 +293,18 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
     } else if (walkingState == WalkingState.descending) {
       resultIssues.addInstruction('descending', 'Status', 'Hạ hông xuống...');
     } else if (walkingState == WalkingState.bottom) {
-      resultIssues.addInstruction('bottom', 'Status', 'Đạp lên!');
+      if (_bottomStartTime != null) {
+        int elapsed = now - _bottomStartTime!;
+        int remaining = 2000 - elapsed;
+        if (remaining > 0) {
+          int seconds = (remaining / 1000).ceil();
+          resultIssues.addInstruction('bottom', 'Timer', 'Giữ $seconds giây!');
+        } else {
+          resultIssues.addInstruction('bottom', 'Timer', 'Tốt! Đứng lên!');
+        }
+      } else {
+        resultIssues.addInstruction('bottom', 'Status', 'Giữ 2 giây!');
+      }
     } else if (walkingState == WalkingState.pulling_through) {
       resultIssues.addInstruction('pulling', 'Status', 'Rút chân sau lên!');
     }
@@ -298,11 +334,15 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
           _transitionState(WalkingState.stepping, now);
         } else {
           _transitionState(WalkingState.bottom, now);
+          _bottomStartTime = now;
+          _holdSuccess = false;
           // evaluate step length here using the real context
           stepLengthMetric.evaluateRep(ctx);
         }
       }
     } else if (walkingState == WalkingState.bottom) {
+      if (_bottomStartTime == null) _bottomStartTime = now;
+      
       // Pulling through when hip moves up
       if (hipYChange == AngleChangeState.decreasing || ctx.frontKneeAngle > 120) {
         _transitionState(WalkingState.pulling_through, now);
@@ -327,6 +367,27 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
   void _transitionState(WalkingState newState, int timestampMs) {
     if (newState == walkingState) return;
     
+    if (walkingState == WalkingState.bottom && newState == WalkingState.pulling_through) {
+      if (_bottomStartTime != null) {
+        int elapsed = timestampMs - _bottomStartTime!;
+        if (elapsed < 2000) {
+          _holdSuccess = false;
+          if (!_localFaults.any((f) => f.type == 'not_enough_hold')) {
+            _localFaults.add(FaultRecord(
+              type: 'not_enough_hold',
+              message: 'Chưa giữ đủ 2 giây!',
+              affectsForm: true,
+              phase: 'bottom',
+              priority: 1,
+              voiceMessage: 'Phải giữ đủ 2 giây!',
+            ));
+          }
+        } else {
+          _holdSuccess = true;
+        }
+      }
+    }
+
     previousWalkingState = walkingState;
     walkingState = newState;
 
@@ -343,6 +404,7 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
     repCount++;
 
     final allFaults = <FaultRecord>[];
+    allFaults.addAll(_localFaults);
     for (final metric in _metrics) {
       allFaults.addAll(metric.faults);
     }
@@ -363,6 +425,7 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
     }));
 
     correctForm = true;
+    _localFaults.clear();
     for (final metric in _metrics) {
       metric.resetAndCountFault();
     }
