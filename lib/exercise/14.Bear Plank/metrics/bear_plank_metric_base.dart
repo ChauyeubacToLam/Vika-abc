@@ -7,11 +7,11 @@ enum BearState { setup, hovering, fatiguing }
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 class BearConfig {
-  static const double KNEE_HOVER_MIN = 0.04;
-  static const double KNEE_HOVER_MAX = 0.30;
+  static const double KNEE_HOVER_MIN = 0.02;
+  static const double KNEE_HOVER_MAX = 0.40;
   static const double KNEE_ANGLE_SETUP_MIN = 60.0;
   static const double KNEE_ANGLE_SETUP_MAX = 120.0;
-  static const double KNEE_ANGLE_BUTT_UP = 140.0;
+  static const double KNEE_ANGLE_BUTT_UP = 145.0;
   static const double BACK_SAG_THRESHOLD = 0.15;
   static const double BACK_ARCH_THRESHOLD = 0.20;
   static const double WEIGHT_SHIFT_THRESHOLD = 0.25;

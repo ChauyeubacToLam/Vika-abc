@@ -12,8 +12,8 @@ class PlankTapConfig {
   static const List<double> TRUNK_STRAIGHT_RANGE = [170.0, 180.0];
   
   // C nh State Machine (Normalized Distance: Kho ng c ch C  tay - Vai ch o / Kho ng c ch Vai - H
-  static const double LIFT_START_THRESHOLD = 0.65; // Đã sửa: Giảm để dễ hạ tay xuống sàn
-  static const double TAP_DISTANCE_THRESHOLD = 0.50; // Đã sửa: Tăng để dễ ghi nhận lúc chạm vai
+  static const double LIFT_START_THRESHOLD = 0.85; // Đã sửa: Nới lỏng để dễ bắt đầu nhấc tay
+  static const double TAP_DISTANCE_THRESHOLD = 0.70; // Đã sửa: Nới lỏng để dễ ghi nhận lúc chạm vai (tránh khuất camera)
   
   // C c ng ng Metric Y khoa
   static const double HIP_ROTATION_TOLERANCE = 0.15; // H ng kh ng r t/nh p nh  ~5-7cm (normalized)

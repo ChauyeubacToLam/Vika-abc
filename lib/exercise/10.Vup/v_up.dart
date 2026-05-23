@@ -151,8 +151,6 @@ class VUp extends ExerciseBase {
       _lastDiagnosticTime = now;
     }
 
-    _updateStateMachine(vAngle, now);
-
     final ctx = VUpRepContext(
       shoulderHipAnkleAngle: vAngle,
       hipKneeAnkleAngle: kneeStraight,
@@ -165,6 +163,8 @@ class VUp extends ExerciseBase {
       frameTimestampMs: now,
       resultIssues: resultIssues,
     );
+
+    _updateStateMachine(ctx);
 
     if (state == VUpState.lying && previousState == VUpState.lowering) {
       _completeRep(ctx);
@@ -179,7 +179,10 @@ class VUp extends ExerciseBase {
     resultIssues.addInstruction(state.name, 'Status', currentPhaseLabel);
   }
 
-  void _updateStateMachine(double vAngle, int now) {
+  void _updateStateMachine(VUpRepContext ctx) {
+    double vAngle = ctx.shoulderHipAnkleAngle;
+    int now = ctx.frameTimestampMs;
+
     if (state == VUpState.rising || state == VUpState.v_position) {
       if (_minAngleThisRep == null || vAngle < _minAngleThisRep!) {
         _minAngleThisRep = vAngle;
@@ -191,7 +194,15 @@ class VUp extends ExerciseBase {
       _minAngleThisRep = vAngle;
     } 
     else if (_vPositionDebouncer.update(state == VUpState.rising && vAngle <= VUpConfig.V_POSITION_THRESHOLD)) {
-      _transitionState(VUpState.v_position, now);
+      double scale = ctx.scaleFactor > 0 ? ctx.scaleFactor : 1.0;
+      double shoulderLift = (ctx.hipY - ctx.shoulderY) / scale;
+      double ankleLift = (ctx.hipY - ctx.ankleY) / scale;
+      
+      if (shoulderLift > 0.1 && ankleLift > 0.1) {
+        _transitionState(VUpState.v_position, now);
+      } else {
+        ctx.resultIssues.addInstruction('STRICT', 'Error', 'Nâng cao cả vai và chân!');
+      }
     }
     else if (_loweringDebouncer.update((state == VUpState.v_position || state == VUpState.rising) && 
             _minAngleThisRep != null && vAngle > _minAngleThisRep! + VUpConfig.LOWERING_THRESHOLD_DIFF)) {

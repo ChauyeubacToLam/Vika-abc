@@ -54,6 +54,7 @@ class BirdDog extends ExerciseBase {
   // Biến Snapshot: Chỉ lưu tay/chân đang thao tác ở đúng đỉnh của rep
   bool? _peakLeftLeg;
   bool? _peakLeftArm;
+  bool? _lastPeakLeftLeg;
 
   BirdDog({this.maxRep = BirdDogConfig.MAX_REP});
 
@@ -268,16 +269,20 @@ class BirdDog extends ExerciseBase {
   }
 
   void _completeRep(BirdDogRepContext ctx) {
-    // Bỏ check isSameSide và lastLegWasLeft do ML Kit 2D từ góc ngang 
-    // không thể phân biệt chính xác trái/phải khi chi bị che khuất,
-    // dẫn đến bắt lỗi sai (falsely rejected) khi người dùng đã tập đúng.
-
     repCount++;
     tempoMetric.markLegUsed(ctx.isLeftLegActive);
     tempoMetric.evaluateRep(ctx);
     
     final allFaults = <FaultRecord>[];
     for (var metric in _metrics) allFaults.addAll(metric.faults);
+
+    if (ctx.isSameSide) {
+      allFaults.add(FaultRecord(phase: ctx.state.name, type: 'SameSide', message: 'Cùng tay cùng chân', voiceMessage: 'Nhớ đổi tay đổi chân nhé', affectsForm: true, priority: 0));
+    } else if (_lastPeakLeftLeg != null && _lastPeakLeftLeg == ctx.isLeftLegActive) {
+      allFaults.add(FaultRecord(phase: ctx.state.name, type: 'NotAlternating', message: 'Chưa đổi bên', voiceMessage: 'Hãy luân phiên đổi bên', affectsForm: true, priority: 0));
+    }
+    
+    _lastPeakLeftLeg = ctx.isLeftLegActive;
 
     correctForm = !allFaults.any((f) => f.affectsForm);
     if (!correctForm) resultIssues.feedback['Result'] = 'Sai Form';

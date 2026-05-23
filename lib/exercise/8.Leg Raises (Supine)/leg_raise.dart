@@ -78,7 +78,7 @@ class LegRaise extends ExerciseBase {
 
     if (landmarks.containsKey(PoseLandmarkType.leftShoulder) && landmarks.containsKey(PoseLandmarkType.leftHip) && 
         landmarks.containsKey(PoseLandmarkType.leftKnee) && landmarks.containsKey(PoseLandmarkType.leftAnkle) &&
-        landmarks[PoseLandmarkType.leftKnee]!.likelihood > 0.4) {
+        landmarks[PoseLandmarkType.leftKnee]!.likelihood > 0.4 && landmarks[PoseLandmarkType.leftAnkle]!.likelihood > 0.4) {
       leftHipFlexion = calculateAngleNormalized(firstPoint: landmarks[PoseLandmarkType.leftShoulder]!, midPoint: landmarks[PoseLandmarkType.leftHip]!, lastPoint: landmarks[PoseLandmarkType.leftKnee]!);
       leftKneeStraight = calculateAngleNormalized(firstPoint: landmarks[PoseLandmarkType.leftHip]!, midPoint: landmarks[PoseLandmarkType.leftKnee]!, lastPoint: landmarks[PoseLandmarkType.leftAnkle]!);
       leftTrunk = calculateHorizontalAngle(point1: landmarks[PoseLandmarkType.leftShoulder]!, point2: landmarks[PoseLandmarkType.leftHip]!);
@@ -87,7 +87,7 @@ class LegRaise extends ExerciseBase {
 
     if (landmarks.containsKey(PoseLandmarkType.rightShoulder) && landmarks.containsKey(PoseLandmarkType.rightHip) && 
         landmarks.containsKey(PoseLandmarkType.rightKnee) && landmarks.containsKey(PoseLandmarkType.rightAnkle) &&
-        landmarks[PoseLandmarkType.rightKnee]!.likelihood > 0.4) {
+        landmarks[PoseLandmarkType.rightKnee]!.likelihood > 0.4 && landmarks[PoseLandmarkType.rightAnkle]!.likelihood > 0.4) {
       rightHipFlexion = calculateAngleNormalized(firstPoint: landmarks[PoseLandmarkType.rightShoulder]!, midPoint: landmarks[PoseLandmarkType.rightHip]!, lastPoint: landmarks[PoseLandmarkType.rightKnee]!);
       rightKneeStraight = calculateAngleNormalized(firstPoint: landmarks[PoseLandmarkType.rightHip]!, midPoint: landmarks[PoseLandmarkType.rightKnee]!, lastPoint: landmarks[PoseLandmarkType.rightAnkle]!);
       rightTrunk = calculateHorizontalAngle(point1: landmarks[PoseLandmarkType.rightShoulder]!, point2: landmarks[PoseLandmarkType.rightHip]!);
@@ -122,6 +122,7 @@ class LegRaise extends ExerciseBase {
     // Người phải duỗi thẳng trên mặt đất
     if (angles.hipFlexion < LegRaiseConfig.START_HIP_FLEXION_MIN) return false;
     if (angles.kneeStraight < LegRaiseConfig.START_KNEE_STRAIGHT_MIN) return false;
+    if (angles.trunkHorizontal > LegRaiseConfig.MAX_TRUNK_ANGLE) return false;
 
     return true; 
   }
@@ -210,6 +211,13 @@ class LegRaise extends ExerciseBase {
     int now = ctx.frameTimestampMs;
 
     bool isTrunkLying = trunkHorizontal <= LegRaiseConfig.MAX_TRUNK_ANGLE;
+
+    if (!isTrunkLying && state != LegRaiseState.lying) {
+      _transitionState(LegRaiseState.lying, now);
+      ctx.resultIssues.feedback['Error'] = 'Lưng không chạm sàn';
+      ctx.resultIssues.addInstruction('BLOCK', 'Error', 'Hãy nằm sát lưng xuống sàn!');
+      return;
+    }
 
     if (_raisingDebouncer.update(isTrunkLying && state == LegRaiseState.lying && hipFlexion < LegRaiseConfig.RAISING_ANGLE)) {
       _transitionState(LegRaiseState.raising, now);

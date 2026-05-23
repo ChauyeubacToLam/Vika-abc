@@ -24,6 +24,12 @@ class ReverseCrunch extends ExerciseBase {
   int? _exerciseStartTimeMs;
   bool _isTimeout = false;
   double? _baselineTrunkKneeAngle;
+  double? _minTrunkKneeAngleThisRep;
+
+  final Debouncer _curlingDebouncer = Debouncer(requiredFrames: 2);
+  final Debouncer _topDebouncer = Debouncer(requiredFrames: 2);
+  final Debouncer _loweringDebouncer = Debouncer(requiredFrames: 2);
+  final Debouncer _lyingDebouncer = Debouncer(requiredFrames: 2);
 
   final SwingingMomentumMetric momentumMetric = SwingingMomentumMetric();
   final PelvicCurlMetric curlMetric = PelvicCurlMetric();
@@ -135,24 +141,29 @@ class ReverseCrunch extends ExerciseBase {
   void _updateStateMachine(RepContext ctx) {
     if (_baselineTrunkKneeAngle == null) return;
 
-    // Curling: Góc bắt đầu giảm đi đang cuộn vào (velocity âm)
-    if (crunchState == ReverseCrunchState.lying && 
-        ctx.trunkKneeAngle < _baselineTrunkKneeAngle! - ReverseCrunchConfig.LIFT_START_ANGLE_DROP && 
-        ctx.trunkKneeVelocity < -15.0) {
+    if (crunchState == ReverseCrunchState.curling || crunchState == ReverseCrunchState.top) {
+      if (_minTrunkKneeAngleThisRep == null || ctx.trunkKneeAngle < _minTrunkKneeAngleThisRep!) {
+        _minTrunkKneeAngleThisRep = ctx.trunkKneeAngle;
+      }
+    }
+
+    if (_curlingDebouncer.update(crunchState == ReverseCrunchState.lying && 
+        ctx.trunkKneeAngle < _baselineTrunkKneeAngle! - ReverseCrunchConfig.LIFT_START_ANGLE_DROP)) {
       _transitionState(ReverseCrunchState.curling, ctx.frameTimestamp);
+      _minTrunkKneeAngleThisRep = ctx.trunkKneeAngle;
     } 
-    // Top: Dừng góc cuộn (vận tốc đạt ~0 hoặc đổi chiều), góc đạt nhỏ nhất và hông đạt đỉnh
-    else if (crunchState == ReverseCrunchState.curling && ctx.trunkKneeVelocity >= -2.0) {
+    else if (_topDebouncer.update(crunchState == ReverseCrunchState.curling && 
+             ctx.trunkKneeAngle <= _baselineTrunkKneeAngle! - ReverseCrunchConfig.PELVIC_CURL_ANGLE_MIN_DROP)) {
       _transitionState(ReverseCrunchState.top, ctx.frameTimestamp);
     }
-    // Lowering: Bắt đầu duỗi hông/hạ chân với vận tốc dương ổn định
-    else if (crunchState == ReverseCrunchState.top && ctx.trunkKneeVelocity > 5.0) {
+    else if (_loweringDebouncer.update((crunchState == ReverseCrunchState.top || crunchState == ReverseCrunchState.curling) && 
+             _minTrunkKneeAngleThisRep != null && ctx.trunkKneeAngle > _minTrunkKneeAngleThisRep! + 5.0)) {
       _transitionState(ReverseCrunchState.lowering, ctx.frameTimestamp);
     }
-    // Lying: Đã trở về setup
-    else if (crunchState == ReverseCrunchState.lowering && 
-             ctx.trunkKneeAngle >= _baselineTrunkKneeAngle! - 5.0) {
+    else if (_lyingDebouncer.update(crunchState == ReverseCrunchState.lowering && 
+             ctx.trunkKneeAngle >= _baselineTrunkKneeAngle! - 5.0)) {
       _completeRep(ctx);
+      _minTrunkKneeAngleThisRep = null;
     }
   }
 
