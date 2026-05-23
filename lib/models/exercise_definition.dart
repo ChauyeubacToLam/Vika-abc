@@ -31,6 +31,10 @@ import '../exercise/walking_lunge/walking_lunge.dart';
 import '../exercise/tricep_dip/tricep_dip.dart';
 import '../exercise/russian_twist/russian_twist.dart';
 import '../exercise/standing_knee_to_elbow/standing_knee_to_elbow.dart';
+import '../exercise/Jump_Squat/jump_squat.dart';
+import '../exercise/bow_pose/bow_pose.dart';
+import '../exercise/side_plank_dip/side_plank_dip.dart';
+import '../exercise/step_back_burpee/step_back_burpee.dart';
 /* =========================================================================
    ExerciseDefinition — Metadata + factory for each exercise type.
 
@@ -763,5 +767,87 @@ ExerciseDefinition(
     ],
     createExercise: () => StandingKneeToElbow(),
     phaseColors: const { 'standing_base': Colors.grey, 'approaching': Colors.blue, 'touch': Colors.green, 'returning': Colors.orange },
+  ),
+  ExerciseDefinition(
+    id: 'jump_squat',
+    name: 'Jump Squat',
+    subtitle: 'Bật nhảy squat',
+    description: 'Bài tập plyometric giúp tăng cường sức mạnh bùng nổ của cơ chân.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFFF44336),
+    secondaryColor: const Color(0xFFD32F2F),
+    difficulty: 'Khó',
+    targetMuscles: const ['Đùi trước', 'Mông', 'Bắp chân'],
+    duration: '12 reps',
+    cameraHint: 'Quay ngang người (Side View).',
+    framingHint: 'Đảm bảo thấy toàn bộ cơ thể từ đầu đến chân khi bật cao.',
+    setupTips: const [
+      'Đứng thẳng, chân rộng bằng vai.',
+      'Lấy đà và bật cao hết mức có thể.',
+      'Tiếp đất mềm mại bằng mũi chân.'
+    ],
+    createExercise: () => JumpSquat(),
+    phaseColors: const { 'standing': Colors.green, 'squatting': Colors.orange, 'launching': Colors.red, 'airborne': Colors.blue, 'landing': Colors.purple },
+  ),
+  ExerciseDefinition(
+    id: 'bow_pose',
+    name: 'Bow Pose',
+    subtitle: 'Tư thế cánh cung',
+    description: 'Mở rộng lồng ngực và kéo giãn mặt trước cơ thể.',
+    icon: Icons.self_improvement,
+    primaryColor: const Color(0xFF9C27B0),
+    secondaryColor: const Color(0xFF7B1FA2),
+    difficulty: 'Trung bình',
+    targetMuscles: const ['Lưng', 'Ngực', 'Cột sống'],
+    duration: '3 reps',
+    cameraHint: 'Quay ngang người (Side View).',
+    framingHint: 'Đảm bảo thấy toàn bộ cơ thể khi nằm.',
+    setupTips: const [
+      'Nằm sấp trên thảm.',
+      'Gập hai gối, đưa tay ra sau nắm lấy cổ chân.',
+      'Kéo lồng ngực và đùi lên khỏi mặt sàn.'
+    ],
+    createExercise: () => BowPose(),
+    phaseColors: const { 'prone': Colors.grey, 'setup': Colors.blue, 'ascending': Colors.orange, 'hold': Colors.green, 'descending': Colors.red },
+  ),
+  ExerciseDefinition(
+    id: 'side_plank_dip',
+    name: 'Side Plank Dip',
+    subtitle: 'Nâng hạ hông plank nghiêng',
+    description: 'Làm săn chắc cơ liên sườn và tăng cường sức mạnh core.',
+    icon: Icons.horizontal_rule,
+    primaryColor: const Color(0xFF00BCD4),
+    secondaryColor: const Color(0xFF0097A7),
+    difficulty: 'Trung bình',
+    targetMuscles: const ['Cơ liên sườn', 'Core', 'Vai'],
+    duration: '12 reps',
+    cameraHint: 'Quay chính diện (Front View) hoặc nghiêng nhẹ.',
+    framingHint: 'Thấy rõ phần vai và hông.',
+    setupTips: const [
+      'Vào tư thế Side Plank trên khuỷu tay.',
+      'Hạ hông xuống gần chạm sàn rồi nâng lên vị trí ban đầu.'
+    ],
+    createExercise: () => SidePlankDip(),
+    phaseColors: const { 'basePlank': Colors.green, 'descending': Colors.orange, 'bottom': Colors.red, 'ascending': Colors.blue, 'top': Colors.purple },
+  ),
+  ExerciseDefinition(
+    id: 'step_back_burpee',
+    name: 'Step-Back Burpee',
+    subtitle: 'Burpee bước lùi không nhảy',
+    description: 'Bài tập toàn thân cardio thân thiện với khớp, không cần nhảy.',
+    icon: Icons.directions_run,
+    primaryColor: const Color(0xFFFF9800),
+    secondaryColor: const Color(0xFFF57C00),
+    difficulty: 'Trung bình',
+    targetMuscles: const ['Toàn thân', 'Cardio', 'Core'],
+    duration: '15 reps',
+    cameraHint: 'Quay ngang người (Side View).',
+    framingHint: 'Đảm bảo thấy toàn bộ cơ thể từ đầu đến chân.',
+    setupTips: const [
+      'Đứng thẳng, hạ người chống tay xuống thảm.',
+      'Bước từng chân lùi về tư thế Plank, sau đó bước lên và đứng thẳng.'
+    ],
+    createExercise: () => StepBackBurpee(),
+    phaseColors: const { 'standing': Colors.green, 'squattingDown': Colors.orange, 'steppingBack': Colors.blue, 'highPlank': Colors.red, 'steppingForward': Colors.purple, 'standingUp': Colors.cyan },
   ),
 ];
