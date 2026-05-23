@@ -19,6 +19,9 @@ class LegRaiseConfig {
   // Tempo Thresholds (Unified: fault if < 2.0s, target if >= 2.0s)
   static const double TEMPO_FAULT_THRESHOLD = 2.0;
   static const double TEMPO_TARGET_THRESHOLD = 2.0;
+  
+  // Trunk Angle Limit
+  static const double MAX_TRUNK_ANGLE = 45.0;
 }
 
 enum LegRaiseState { lying, raising, top, lowering }
@@ -26,6 +29,7 @@ enum LegRaiseState { lying, raising, top, lowering }
 class LegRaiseRepContext {
   final double hipFlexionAngle;     // Góc Vai-Hông-Đầu gối (ROM)
   final double kneeStraightnessAngle; // Góc Hông-Đầu gối-Mắt cá (Độ thẳng chân)
+  final double trunkHorizontalAngle; // Góc ngang của thân người (chống gian lận bằng cách ngồi dậy)
   
   final double hipY; // Tọa độ Y của hông để đo độ võng lưng (Pelvic tilt)
   final double ankleY; // Dùng để đo vận tốc khi ở pha TOP
@@ -38,6 +42,7 @@ class LegRaiseRepContext {
   LegRaiseRepContext({
     required this.hipFlexionAngle,
     required this.kneeStraightnessAngle,
+    required this.trunkHorizontalAngle,
     required this.hipY,
     required this.ankleY,
     required this.scaleFactor,

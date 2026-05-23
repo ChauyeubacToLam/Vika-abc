@@ -14,6 +14,9 @@ class PlankConfig {
   static const double BODY_ALIGNMENT_START_MIN = 170.0;
   static const double BODY_ALIGNMENT_SAG_THRESHOLD = 160.0; // Sụt hông
   
+  // Góc gối (Hip-Knee-Ankle)
+  static const double KNEE_EXTENSION_MIN = 150.0; // Yêu cầu thẳng chân, dưới mức này coi như co gối
+  
   // Góc tay (Shoulder-Elbow-Wrist)
   static const double ELBOW_FOREARM_MAX = 110.0; // ~90 độ
   static const double ELBOW_PUSHING_THRESHOLD = 100.0;
@@ -32,6 +35,7 @@ class PlankFaultVoicePriority {
 
 class PlankRepContext {
   final double bodyAngle;
+  final double kneeAngle;
   final double leftElbowAngle;
   final double rightElbowAngle;
   final double hipY;
@@ -43,6 +47,7 @@ class PlankRepContext {
 
   PlankRepContext({
     required this.bodyAngle,
+    required this.kneeAngle,
     required this.leftElbowAngle,
     required this.rightElbowAngle,
     required this.hipY,

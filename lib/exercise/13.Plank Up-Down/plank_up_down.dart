@@ -78,18 +78,20 @@ class PlankUpDown extends ExerciseBase {
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     final lShoulder = landmarks[PoseLandmarkType.leftShoulder];
     final lHip = landmarks[PoseLandmarkType.leftHip];
+    final lKnee = landmarks[PoseLandmarkType.leftKnee];
     final lAnkle = landmarks[PoseLandmarkType.leftAnkle];
     final lElbow = landmarks[PoseLandmarkType.leftElbow];
     final lWrist = landmarks[PoseLandmarkType.leftWrist];
 
     final rShoulder = landmarks[PoseLandmarkType.rightShoulder];
     final rHip = landmarks[PoseLandmarkType.rightHip];
+    final rKnee = landmarks[PoseLandmarkType.rightKnee];
     final rAnkle = landmarks[PoseLandmarkType.rightAnkle];
     final rElbow = landmarks[PoseLandmarkType.rightElbow];
     final rWrist = landmarks[PoseLandmarkType.rightWrist];
 
-    bool leftValid = lShoulder != null && lHip != null && lAnkle != null && lElbow != null && lWrist != null;
-    bool rightValid = rShoulder != null && rHip != null && rAnkle != null && rElbow != null && rWrist != null;
+    bool leftValid = lShoulder != null && lHip != null && lKnee != null && lAnkle != null && lElbow != null && lWrist != null;
+    bool rightValid = rShoulder != null && rHip != null && rKnee != null && rAnkle != null && rElbow != null && rWrist != null;
 
     if (!leftValid && !rightValid) return false;
 
@@ -129,18 +131,20 @@ class PlankUpDown extends ExerciseBase {
 
     final lShoulder = smoothedLandmarks[PoseLandmarkType.leftShoulder];
     final lHip = smoothedLandmarks[PoseLandmarkType.leftHip];
+    final lKnee = smoothedLandmarks[PoseLandmarkType.leftKnee];
     final lAnkle = smoothedLandmarks[PoseLandmarkType.leftAnkle];
     final lElbow = smoothedLandmarks[PoseLandmarkType.leftElbow];
     final lWrist = smoothedLandmarks[PoseLandmarkType.leftWrist];
 
     final rShoulder = smoothedLandmarks[PoseLandmarkType.rightShoulder];
     final rHip = smoothedLandmarks[PoseLandmarkType.rightHip];
+    final rKnee = smoothedLandmarks[PoseLandmarkType.rightKnee];
     final rAnkle = smoothedLandmarks[PoseLandmarkType.rightAnkle];
     final rElbow = smoothedLandmarks[PoseLandmarkType.rightElbow];
     final rWrist = smoothedLandmarks[PoseLandmarkType.rightWrist];
 
-    bool leftValid = lShoulder != null && lHip != null && lAnkle != null && lElbow != null && lWrist != null;
-    bool rightValid = rShoulder != null && rHip != null && rAnkle != null && rElbow != null && rWrist != null;
+    bool leftValid = lShoulder != null && lHip != null && lKnee != null && lAnkle != null && lElbow != null && lWrist != null;
+    bool rightValid = rShoulder != null && rHip != null && rKnee != null && rAnkle != null && rElbow != null && rWrist != null;
 
     if (!leftValid && !rightValid) return; // early return to prevent null crash
 
@@ -149,10 +153,12 @@ class PlankUpDown extends ExerciseBase {
 
     final shoulder = useLeft ? lShoulder! : rShoulder!;
     final hip = useLeft ? lHip! : rHip!;
+    final knee = useLeft ? lKnee! : rKnee!;
     final ankle = useLeft ? lAnkle! : rAnkle!;
 
     scaleFactor = calculateDistance(shoulder, hip);
     final bodyAngle = calculateAngleNormalized(firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
+    final kneeAngle = calculateAngleNormalized(firstPoint: hip, midPoint: knee, lastPoint: ankle);
 
     final leftElbowAngle = leftValid
         ? calculateAngleNormalized(firstPoint: lShoulder!, midPoint: lElbow!, lastPoint: lWrist!)
@@ -170,14 +176,16 @@ class PlankUpDown extends ExerciseBase {
       'bodyAngle': double.parse(bodyAngle.toStringAsFixed(1)),
       'leftElbowAngle': double.parse(leftElbowAngle.toStringAsFixed(1)),
       'rightElbowAngle': double.parse(rightElbowAngle.toStringAsFixed(1)),
+      'kneeAngle': double.parse(kneeAngle.toStringAsFixed(1)),
       'hipY': double.parse(hip.y.toStringAsFixed(1)),
-      'visibility': (useLeft ? [lShoulder, lHip, lAnkle, lElbow, lWrist] : [rShoulder, rHip, rAnkle, rElbow, rWrist])
+      'visibility': (useLeft ? [lShoulder, lHip, lKnee, lAnkle, lElbow, lWrist] : [rShoulder, rHip, rKnee, rAnkle, rElbow, rWrist])
           .map((l) => l!.likelihood)
-          .reduce((a, b) => a + b) / 5, // Avg confidence
+          .reduce((a, b) => a + b) / 6, // Avg confidence
     });
 
     final ctx = PlankRepContext(
       bodyAngle: bodyAngle,
+      kneeAngle: kneeAngle,
       leftElbowAngle: leftElbowAngle,
       rightElbowAngle: rightElbowAngle,
       hipY: hip.y,
@@ -191,11 +199,12 @@ class PlankUpDown extends ExerciseBase {
     // Update UI Debug Data
     debugData['State'] = plankState.name;
     debugData['Body_Angle'] = bodyAngle.toStringAsFixed(1);
+    debugData['Knee_Angle'] = kneeAngle.toStringAsFixed(1);
     debugData['Left_Elbow'] = leftElbowAngle.toStringAsFixed(1);
     debugData['Right_Elbow'] = rightElbowAngle.toStringAsFixed(1);
     debugData['Time_Left'] = ((PlankConfig.MAX_DURATION_MS - (now - _exerciseStartTimeMs!)) / 1000).toStringAsFixed(1);
 
-    _updateStateMachine(leftElbowAngle, rightElbowAngle, now);
+    _updateStateMachine(leftElbowAngle, rightElbowAngle, kneeAngle, now);
 
     // Chạy Metrics
     for (var metric in _metrics) {
@@ -204,7 +213,14 @@ class PlankUpDown extends ExerciseBase {
     }
   }
 
-  void _updateStateMachine(double leftElbowAngle, double rightElbowAngle, int now) {
+  void _updateStateMachine(double leftElbowAngle, double rightElbowAngle, double kneeAngle, int now) {
+    if (kneeAngle < PlankConfig.KNEE_EXTENSION_MIN) {
+      resultIssues.feedback['Knee'] = 'Thẳng đầu gối ra!';
+      return; // Dừng State Machine, không đếm rep nếu gối bị co
+    } else {
+      resultIssues.feedback.remove('Knee');
+    }
+
     switch (plankState) {
       case PlankState.forearm_plank:
         if (_pushingDebouncer.update(leftElbowAngle > PlankConfig.ELBOW_PUSHING_THRESHOLD || rightElbowAngle > PlankConfig.ELBOW_PUSHING_THRESHOLD)) {

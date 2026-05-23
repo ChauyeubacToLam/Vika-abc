@@ -71,11 +71,11 @@ class ReverseCrunch extends ExerciseBase {
       'kneeAngle': kneeAngle.toStringAsFixed(1),
       'trunkHorizontal': trunkHorizontalAngle.toStringAsFixed(1),
       'isKneeLocked': kneeAngle >= ReverseCrunchConfig.SETUP_KNEE_ANGLE_RANGE[0] && kneeAngle <= ReverseCrunchConfig.SETUP_KNEE_ANGLE_RANGE[1],
-      'isLyingFlat': trunkHorizontalAngle < 15.0,
+      'isLyingFlat': trunkHorizontalAngle < 35.0,
     };
 
     if (kneeAngle < ReverseCrunchConfig.SETUP_KNEE_ANGLE_RANGE[0] || kneeAngle > ReverseCrunchConfig.SETUP_KNEE_ANGLE_RANGE[1]) return false;
-    if (trunkHorizontalAngle > 15.0) return false;
+    if (trunkHorizontalAngle > 35.0) return false;
     return true;
   }
 

@@ -10,7 +10,7 @@ class ReverseCrunchConfig {
   static const int MAX_DURATION_MS = 90000; // 90s timeout
 
   // Setup thresholds
-  static const List<double> SETUP_KNEE_ANGLE_RANGE = [80.0, 110.0]; // Khóa gối vuông góc
+  static const List<double> SETUP_KNEE_ANGLE_RANGE = [60.0, 140.0]; // Mở rộng góc gối để dễ setup
   static const double LIFT_START_ANGLE_DROP = 5.0; // Góc Vai-Hông-Gối giảm 5 độ -> Bắt đầu cuộn
   
   // Y Khoa (McGill & Sarti) thresholds

@@ -140,6 +140,8 @@ class BearPlank extends ExerciseBase {
     // Cập nhật State Machine
     _updateStateMachine(ctx, now, dt);
 
+    repCount = _totalHoverTimeMs ~/ 1000;
+
     // Cập nhật Metrics (chỉ khi đang hovering)
     for (var metric in _metrics) {
       metric.update(ctx);

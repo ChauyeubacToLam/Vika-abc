@@ -86,6 +86,11 @@ class BirdDog extends ExerciseBase {
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     bool checkSide(PoseLandmark? shoulder, PoseLandmark? hip, PoseLandmark? knee, PoseLandmark? ankle, PoseLandmark? wrist) {
       if (shoulder == null || hip == null || knee == null || ankle == null || wrist == null) return false;
+      
+      // Ensure the user is facing down (wrist below shoulder, knee below hip)
+      if (wrist.y < shoulder.y) return false;
+      if (knee.y < hip.y) return false;
+
       double kneeAngle = calculateAngleNormalized(firstPoint: hip, midPoint: knee, lastPoint: ankle);
       double armAngle = calculateAngleNormalized(firstPoint: hip, midPoint: shoulder, lastPoint: wrist);
       double trunkHoriz = _calcHorizontalAngle(shoulder, hip);

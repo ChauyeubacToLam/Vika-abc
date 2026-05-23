@@ -114,15 +114,17 @@ class PlankShoulderTap extends ExerciseBase {
     if (scaleFactor == 0) scaleFactor = 1;
     double trunkAngle = calculateAngleNormalized(firstPoint: lm['shoulder']!, midPoint: lm['hip']!, lastPoint: lm['ankle']!);
     
-    // TÍNH KHOẢNG CÁCH LUÂN PHIÊN ĐỘC LẬP
+    // TÍNH KHOẢNG CÁCH LUÂN PHIÊN ĐỘC LẬP (Sử dụng vai chính để tránh mất điểm mốc ở góc nghiêng)
     double distLtoR = double.infinity;
     double distRtoL = double.infinity;
+    
+    PoseLandmark targetShoulder = lm['shoulder']!;
 
-    if (landmarks.containsKey(PoseLandmarkType.leftWrist) && landmarks.containsKey(PoseLandmarkType.rightShoulder)) {
-      distLtoR = calculateDistance(landmarks[PoseLandmarkType.leftWrist]!, landmarks[PoseLandmarkType.rightShoulder]!) / scaleFactor;
+    if (landmarks.containsKey(PoseLandmarkType.leftWrist)) {
+      distLtoR = calculateDistance(landmarks[PoseLandmarkType.leftWrist]!, targetShoulder) / scaleFactor;
     }
-    if (landmarks.containsKey(PoseLandmarkType.rightWrist) && landmarks.containsKey(PoseLandmarkType.leftShoulder)) {
-      distRtoL = calculateDistance(landmarks[PoseLandmarkType.rightWrist]!, landmarks[PoseLandmarkType.leftShoulder]!) / scaleFactor;
+    if (landmarks.containsKey(PoseLandmarkType.rightWrist)) {
+      distRtoL = calculateDistance(landmarks[PoseLandmarkType.rightWrist]!, targetShoulder) / scaleFactor;
     }
     
     // Nếu cả 2 tay đều bị mất tín hiệu thì bỏ qua frame

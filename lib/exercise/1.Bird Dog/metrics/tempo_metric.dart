@@ -45,6 +45,30 @@ class TempoMetric extends BirdDogMetricBase {
           priority: BirdDogFaultPriority.tempo,
         ));
     }
+
+    // Lỗi cùng tay cùng chân
+    if (ctx.isSameSide) {
+      _faults.add(FaultRecord(
+        phase: 'REP_COMPLETE',
+        type: 'SameSide',
+        message: 'Giơ cùng lúc tay và chân một bên',
+        voiceMessage: 'Chú ý giơ tay và chân khác bên nhé',
+        affectsForm: true,
+        priority: BirdDogFaultPriority.alignment,
+      ));
+    }
+
+    // Lỗi không luân phiên đổi bên
+    if (_lastLegWasLeft != null && _lastLegWasLeft == ctx.isLeftLegActive) {
+      _faults.add(FaultRecord(
+        phase: 'REP_COMPLETE',
+        type: 'NotAlternating',
+        message: 'Không luân phiên đổi bên',
+        voiceMessage: 'Nhớ đổi bên sau mỗi lần nhé',
+        affectsForm: true,
+        priority: BirdDogFaultPriority.alignment,
+      ));
+    }
   }
 
   // Được gọi khi rep hợp lệ hoàn thành để lưu bên

@@ -96,6 +96,11 @@ class DeadBug extends ExerciseBase {
     if (lShoulder == null || rShoulder == null || lHip == null || rHip == null ||
         lWrist == null || rWrist == null || lKnee == null || rKnee == null) return false;
 
+    // Ensure the user is facing up (Dead Bug) and not down (Bird Dog)
+    // For Dead Bug, both wrists and knees should be above the shoulders and hips (smaller Y)
+    if (lWrist.y > lShoulder.y || rWrist.y > rShoulder.y) return false;
+    if (lKnee.y > lHip.y || rKnee.y > rHip.y) return false;
+
     double lArm = calculateAngleNormalized(firstPoint: lHip, midPoint: lShoulder, lastPoint: lWrist);
     double rArm = calculateAngleNormalized(firstPoint: rHip, midPoint: rShoulder, lastPoint: rWrist);
     double lLeg = calculateAngleNormalized(firstPoint: lShoulder, midPoint: lHip, lastPoint: lKnee);

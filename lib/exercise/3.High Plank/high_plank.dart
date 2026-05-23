@@ -272,6 +272,8 @@ class HighPlank extends ExerciseBase {
 
     for (final metric in _metrics) metric.update(ctx);
 
+    repCount = timerMetric.totalHoldingTimeMs ~/ 1000;
+
     resultIssues.addInstruction(state.name, 'Status', currentPhaseLabel);
   }
 

@@ -70,9 +70,10 @@ class LegRaise extends ExerciseBase {
   }
 
   // NOTE UI: Cần hiển thị Pop-up Safety Gate "Có tiền sử đau thắt lưng không?" trước.
-  ({double hipFlexion, double kneeStraight}) _calculateStrictAngles(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  ({double hipFlexion, double kneeStraight, double trunkHorizontal}) _calculateStrictAngles(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     double leftHipFlexion = 180.0, rightHipFlexion = 180.0;
     double leftKneeStraight = 180.0, rightKneeStraight = 180.0;
+    double leftTrunk = 0.0, rightTrunk = 0.0;
     bool hasLeft = false, hasRight = false;
 
     if (landmarks.containsKey(PoseLandmarkType.leftShoulder) && landmarks.containsKey(PoseLandmarkType.leftHip) && 
@@ -80,6 +81,7 @@ class LegRaise extends ExerciseBase {
         landmarks[PoseLandmarkType.leftKnee]!.likelihood > 0.4) {
       leftHipFlexion = calculateAngleNormalized(firstPoint: landmarks[PoseLandmarkType.leftShoulder]!, midPoint: landmarks[PoseLandmarkType.leftHip]!, lastPoint: landmarks[PoseLandmarkType.leftKnee]!);
       leftKneeStraight = calculateAngleNormalized(firstPoint: landmarks[PoseLandmarkType.leftHip]!, midPoint: landmarks[PoseLandmarkType.leftKnee]!, lastPoint: landmarks[PoseLandmarkType.leftAnkle]!);
+      leftTrunk = calculateHorizontalAngle(point1: landmarks[PoseLandmarkType.leftShoulder]!, point2: landmarks[PoseLandmarkType.leftHip]!);
       hasLeft = true;
     }
 
@@ -88,24 +90,29 @@ class LegRaise extends ExerciseBase {
         landmarks[PoseLandmarkType.rightKnee]!.likelihood > 0.4) {
       rightHipFlexion = calculateAngleNormalized(firstPoint: landmarks[PoseLandmarkType.rightShoulder]!, midPoint: landmarks[PoseLandmarkType.rightHip]!, lastPoint: landmarks[PoseLandmarkType.rightKnee]!);
       rightKneeStraight = calculateAngleNormalized(firstPoint: landmarks[PoseLandmarkType.rightHip]!, midPoint: landmarks[PoseLandmarkType.rightKnee]!, lastPoint: landmarks[PoseLandmarkType.rightAnkle]!);
+      rightTrunk = calculateHorizontalAngle(point1: landmarks[PoseLandmarkType.rightShoulder]!, point2: landmarks[PoseLandmarkType.rightHip]!);
       hasRight = true;
     }
 
     double hipFlexion = 180.0;
     double kneeStraight = 180.0;
+    double trunkHorizontal = 0.0;
     
     if (hasLeft && hasRight) {
       hipFlexion = leftHipFlexion > rightHipFlexion ? leftHipFlexion : rightHipFlexion;
       kneeStraight = leftKneeStraight < rightKneeStraight ? leftKneeStraight : rightKneeStraight;
+      trunkHorizontal = leftTrunk < rightTrunk ? leftTrunk : rightTrunk;
     } else if (hasLeft) {
       hipFlexion = leftHipFlexion;
       kneeStraight = leftKneeStraight;
+      trunkHorizontal = leftTrunk;
     } else if (hasRight) {
       hipFlexion = rightHipFlexion;
       kneeStraight = rightKneeStraight;
+      trunkHorizontal = rightTrunk;
     }
 
-    return (hipFlexion: hipFlexion, kneeStraight: kneeStraight);
+    return (hipFlexion: hipFlexion, kneeStraight: kneeStraight, trunkHorizontal: trunkHorizontal);
   }
 
   @override
@@ -163,10 +170,12 @@ class LegRaise extends ExerciseBase {
     final angles = _calculateStrictAngles(landmarks);
     double hipFlexion = angles.hipFlexion;
     double kneeStraight = angles.kneeStraight;
+    double trunkHorizontal = angles.trunkHorizontal;
 
     final ctx = LegRaiseRepContext(
       hipFlexionAngle: hipFlexion,
       kneeStraightnessAngle: kneeStraight,
+      trunkHorizontalAngle: trunkHorizontal,
       hipY: hip.y,
       ankleY: ankle.y,
       scaleFactor: scaleFactor,
@@ -197,12 +206,15 @@ class LegRaise extends ExerciseBase {
 
   void _updateStateMachine(LegRaiseRepContext ctx) {
     double hipFlexion = ctx.hipFlexionAngle;
+    double trunkHorizontal = ctx.trunkHorizontalAngle;
     int now = ctx.frameTimestampMs;
 
-    if (_raisingDebouncer.update(state == LegRaiseState.lying && hipFlexion < LegRaiseConfig.RAISING_ANGLE)) {
+    bool isTrunkLying = trunkHorizontal <= LegRaiseConfig.MAX_TRUNK_ANGLE;
+
+    if (_raisingDebouncer.update(isTrunkLying && state == LegRaiseState.lying && hipFlexion < LegRaiseConfig.RAISING_ANGLE)) {
       _transitionState(LegRaiseState.raising, now);
     } 
-    else if (_topDebouncer.update(state == LegRaiseState.raising && hipFlexion <= LegRaiseConfig.TOP_ANGLE)) {
+    else if (_topDebouncer.update(isTrunkLying && state == LegRaiseState.raising && hipFlexion <= LegRaiseConfig.TOP_ANGLE)) {
       _transitionState(LegRaiseState.top, now);
     }
     else if (_loweringDebouncer.update(state == LegRaiseState.top && hipFlexion > LegRaiseConfig.LOWERING_ANGLE)) {

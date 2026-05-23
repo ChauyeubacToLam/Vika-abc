@@ -168,6 +168,7 @@ class VUp extends ExerciseBase {
 
     if (state == VUpState.lying && previousState == VUpState.lowering) {
       _completeRep(ctx);
+      previousState = state;
       return;
     }
 
