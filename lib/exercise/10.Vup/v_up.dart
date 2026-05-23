@@ -194,7 +194,7 @@ class VUp extends ExerciseBase {
       _minAngleThisRep = vAngle;
     } 
     else if (_vPositionDebouncer.update(state == VUpState.rising && vAngle <= VUpConfig.V_POSITION_THRESHOLD)) {
-      double scale = ctx.scaleFactor > 0 ? ctx.scaleFactor : 1.0;
+      double scale = (ctx.scaleFactor ?? 0) > 0 ? ctx.scaleFactor! : 1.0;
       double shoulderLift = (ctx.hipY - ctx.shoulderY) / scale;
       double ankleLift = (ctx.hipY - ctx.ankleY) / scale;
       

@@ -8,6 +8,7 @@ import 'metrics/swinging_momentum_metric.dart';
 import 'metrics/pelvic_curl_metric.dart';
 import 'metrics/eccentric_tempo_metric.dart';
 import '../../utils/exercise_logger.dart';
+import '../../utils/debouncer.dart';
 
 class ReverseCrunch extends ExerciseBase {
   @override
