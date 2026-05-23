@@ -362,3 +362,28 @@ double clockAngleDeviation(double clockAngle, double target) {
   if (diff < -180) diff += 360;
   return diff;
 }
+
+/* =========================================================================
+   Determine physical left/right side bypass ML Kit Labels
+   ========================================================================= */
+/// Xác định xem một mốc (target) có nằm ở nửa bên trái cơ thể (về mặt vật lý) hay không,
+/// bất chấp nhãn Trái/Phải do ML Kit cấp có thể bị sai.
+/// Sử dụng Dot Product của vector từ tâm thân người tới target chiếu lên trục ngang của cơ thể (leftRef -> rightRef).
+bool isPhysicalLeftSide(PoseLandmark target, PoseLandmark leftReference, PoseLandmark rightReference) {
+  // Vector Trục ngang cơ thể (từ Phải sang Trái)
+  double wX = leftReference.x - rightReference.x;
+  double wY = leftReference.y - rightReference.y;
+  
+  // Tâm điểm của cơ thể (giữa 2 vai hoặc 2 hông)
+  double midX = (leftReference.x + rightReference.x) / 2;
+  double midY = (leftReference.y + rightReference.y) / 2;
+  
+  // Vector từ tâm đến điểm mục tiêu (ví dụ: cổ tay)
+  double vX = target.x - midX;
+  double vY = target.y - midY;
+  
+  // Tích vô hướng (Dot Product). Nếu > 0, mục tiêu nằm cùng hướng với leftReference (Bên trái)
+  double dotProduct = vX * wX + vY * wY;
+  
+  return dotProduct > 0;
+}

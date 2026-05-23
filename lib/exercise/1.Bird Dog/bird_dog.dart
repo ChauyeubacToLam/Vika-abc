@@ -14,11 +14,11 @@ class BirdDogConfig {
   static const int MAX_REP = 24;
   static const int TIMEOUT_MS = 90000;
 
-  static const double START_KNEE_MIN = 60;
-  static const double START_KNEE_MAX = 120;
-  static const double START_ARM_MIN = 60;
-  static const double START_ARM_MAX = 120;
-  static const double START_TRUNK_HORIZ_MAX = 15;
+  static const double START_KNEE_MIN = 40;
+  static const double START_KNEE_MAX = 140;
+  static const double START_ARM_MIN = 40;
+  static const double START_ARM_MAX = 140;
+  static const double START_TRUNK_HORIZ_MAX = 20;
 
   static const double EXTENDING_KNEE_START = 120;
   static const double HOLD_KNEE_THRESHOLD = 160;
@@ -149,37 +149,45 @@ class BirdDog extends ExerciseBase {
     final leftKneeAngle = calculateAngleNormalized(firstPoint: landmarks[PoseLandmarkType.leftHip]!, midPoint: landmarks[PoseLandmarkType.leftKnee]!, lastPoint: landmarks[PoseLandmarkType.leftAnkle]!);
     final rightKneeAngle = calculateAngleNormalized(firstPoint: landmarks[PoseLandmarkType.rightHip]!, midPoint: landmarks[PoseLandmarkType.rightKnee]!, lastPoint: landmarks[PoseLandmarkType.rightAnkle]!);
 
-    // --- XÁC ĐỊNH TAY (Live Data - Tính từ Hông lên Cổ tay để phân biệt rõ rệt) ---
+    // --- XÁC ĐỊNH TAY (Live Data) ---
     final leftArmAngle = calculateAngleNormalized(firstPoint: landmarks[PoseLandmarkType.leftHip]!, midPoint: landmarks[PoseLandmarkType.leftShoulder]!, lastPoint: landmarks[PoseLandmarkType.leftWrist]!);
     final rightArmAngle = calculateAngleNormalized(firstPoint: landmarks[PoseLandmarkType.rightHip]!, midPoint: landmarks[PoseLandmarkType.rightShoulder]!, lastPoint: landmarks[PoseLandmarkType.rightWrist]!);
 
-    bool currentLeftLeg = leftKneeAngle > rightKneeAngle;
-    bool currentLeftArm = leftArmAngle > rightArmAngle;
+    // ML Kit Label có thể bị sai. Tạm thời xác định "cái nào đang giơ lên" dựa vào nhãn hiện tại
+    bool mlKitActiveLegIsLeft = leftKneeAngle > rightKneeAngle;
+    bool mlKitActiveArmIsLeft = leftArmAngle > rightArmAngle;
 
-    double activeKneeAngle = currentLeftLeg ? leftKneeAngle : rightKneeAngle;
-    double activeArmAngle = currentLeftArm ? leftArmAngle : rightArmAngle;
-    double nonActiveKneeAngle = currentLeftLeg ? rightKneeAngle : leftKneeAngle;
+    double activeKneeAngle = mlKitActiveLegIsLeft ? leftKneeAngle : rightKneeAngle;
+    double activeArmAngle = mlKitActiveArmIsLeft ? leftArmAngle : rightArmAngle;
+    double nonActiveKneeAngle = mlKitActiveLegIsLeft ? rightKneeAngle : leftKneeAngle;
+
+    // Tính toán Tọa độ vật lý (Physical Side) bằng Toán Hình học để chống lỗi nhảy nhãn của ML Kit
+    PoseLandmark activeAnkle = mlKitActiveLegIsLeft ? landmarks[PoseLandmarkType.leftAnkle]! : landmarks[PoseLandmarkType.rightAnkle]!;
+    PoseLandmark activeWrist = mlKitActiveArmIsLeft ? landmarks[PoseLandmarkType.leftWrist]! : landmarks[PoseLandmarkType.rightWrist]!;
+    
+    bool physicalLeftLeg = isPhysicalLeftSide(activeAnkle, landmarks[PoseLandmarkType.leftHip]!, landmarks[PoseLandmarkType.rightHip]!);
+    bool physicalLeftArm = isPhysicalLeftSide(activeWrist, landmarks[PoseLandmarkType.leftShoulder]!, landmarks[PoseLandmarkType.rightShoulder]!);
 
     // --- SNAPSHOT DATA (Chỉ chốt số liệu tay chân khi đang ở đỉnh rep) ---
     if (state == BirdDogState.hold_extended) {
-      _peakLeftLeg = currentLeftLeg;
-      _peakLeftArm = currentLeftArm;
+      _peakLeftLeg = physicalLeftLeg;
+      _peakLeftArm = physicalLeftArm;
     }
 
     // --- EVALUATION DATA (Dữ liệu chống nhiễu dùng để chấm điểm) ---
-    // Nếu đang thu về hoặc chốt rep, BẮT BUỘC dùng data snapshot ở đỉnh để đánh giá
     bool evalLeftLeg = (state == BirdDogState.returning || state == BirdDogState.neutral) && _peakLeftLeg != null 
         ? _peakLeftLeg! 
-        : currentLeftLeg;
+        : physicalLeftLeg;
         
     bool evalLeftArm = (state == BirdDogState.returning || state == BirdDogState.neutral) && _peakLeftArm != null 
         ? _peakLeftArm! 
-        : currentLeftArm;
+        : physicalLeftArm;
 
-    // --- FIX LỖI CHỐNG ĐẨY (PUSH-UP BLOCKER) ---
-    if (nonActiveKneeAngle > 130 && state != BirdDogState.neutral) {
+    // Không còn bắt lỗi Push-up (Plank) quá gắt vì góc chéo 45 độ làm biến dạng hình chiếu 2D của chân trụ
+    // Vẫn giữ lại safety catch nếu cần nhưng nới lỏng
+    if (nonActiveKneeAngle > 150 && state != BirdDogState.neutral) {
       _transitionState(BirdDogState.neutral, now);
-      _peakLeftLeg = null; // Xóa snapshot
+      _peakLeftLeg = null; 
       _peakLeftArm = null;
       resultIssues.feedback['Error'] = 'Sai tư thế (Đang Plank)';
       resultIssues.addInstruction('BLOCK', 'Error', 'Hạ hai gối xuống sàn!');
@@ -188,11 +196,12 @@ class BirdDog extends ExerciseBase {
 
     bool isSameSide = (evalLeftLeg == evalLeftArm);
 
-    final hip = landmarks[evalLeftLeg ? PoseLandmarkType.leftHip : PoseLandmarkType.rightHip]!;
-    final ankle = landmarks[evalLeftLeg ? PoseLandmarkType.leftAnkle : PoseLandmarkType.rightAnkle]!;
-    final shoulder = landmarks[evalLeftArm ? PoseLandmarkType.leftShoulder : PoseLandmarkType.rightShoulder]!;
-    final wrist = landmarks[evalLeftArm ? PoseLandmarkType.leftWrist : PoseLandmarkType.rightWrist]!;
-    final ear = landmarks[evalLeftArm ? PoseLandmarkType.leftEar : PoseLandmarkType.rightEar] ?? landmarks[PoseLandmarkType.leftEar]!;
+    // Vẫn lấy dữ liệu bằng ML Kit labels cho việc render (nếu có)
+    final hip = landmarks[mlKitActiveLegIsLeft ? PoseLandmarkType.leftHip : PoseLandmarkType.rightHip]!;
+    final ankle = activeAnkle;
+    final shoulder = landmarks[mlKitActiveArmIsLeft ? PoseLandmarkType.leftShoulder : PoseLandmarkType.rightShoulder]!;
+    final wrist = activeWrist;
+    final ear = landmarks[mlKitActiveArmIsLeft ? PoseLandmarkType.leftEar : PoseLandmarkType.rightEar] ?? landmarks[PoseLandmarkType.leftEar]!;
 
     scaleFactor = calculateDistance(shoulder, hip);
 

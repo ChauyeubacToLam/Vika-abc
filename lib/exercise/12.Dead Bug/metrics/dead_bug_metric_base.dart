@@ -13,6 +13,9 @@ class DeadBugRepContext {
   final double hipY; // Tọa độ Y hông (để tính võng lưng)
   final double shoulderY; // Tọa độ Y vai
   final double? scaleFactor; // Khoảng cách Shoulder-Hip để chuẩn hóa
+
+  final bool physicalLeftArmExtending; // Tay đang duỗi có phải tay trái vật lý?
+  final bool physicalLeftLegExtending; // Chân đang duỗi có phải chân trái vật lý?
   
   final DeadBugState state;
   final int frameTimestampMs;
@@ -26,6 +29,8 @@ class DeadBugRepContext {
     required this.hipY,
     required this.shoulderY,
     required this.scaleFactor,
+    required this.physicalLeftArmExtending,
+    required this.physicalLeftLegExtending,
     required this.state,
     required this.frameTimestampMs,
     required this.resultIssues,

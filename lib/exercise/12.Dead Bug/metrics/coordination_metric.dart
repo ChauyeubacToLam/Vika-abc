@@ -18,18 +18,9 @@ class CoordinationMetric extends DeadBugMetricBase {
   void update(DeadBugRepContext ctx) {
     if ((ctx.state == DeadBugState.extending || ctx.state == DeadBugState.hold) && !_evaluatedThisRep) {
       
-      // Ngưỡng 125 độ để xác định chi đó đang được duỗi ra
-      bool lArmExt = ctx.leftArmAngle > 125.0;
-      bool rArmExt = ctx.rightArmAngle > 125.0;
-      bool lHipExt = ctx.leftHipAngle > 125.0;
-      bool rHipExt = ctx.rightHipAngle > 125.0;
+      bool sameSide = ctx.physicalLeftArmExtending == ctx.physicalLeftLegExtending;
 
-      // Lỗi đi cùng bên (Left-Left hoặc Right-Right)
-      bool sameSideLeft = lArmExt && lHipExt;
-      bool sameSideRight = rArmExt && rHipExt;
-
-      // Kiểm tra lỗi đi cùng bên (Left-Left hoặc Right-Right)
-      if (sameSideLeft || sameSideRight) {
+      if (sameSide) {
         _faults.add(FaultRecord(
           phase: ctx.state.name,
           type: 'Coordination',
@@ -40,13 +31,9 @@ class CoordinationMetric extends DeadBugMetricBase {
         ));
         _evaluatedThisRep = true;
       }
-      
-      // Chuyển động chéo chính xác
-      bool crossLeftRight = lArmExt && rHipExt;
-      bool crossRightLeft = rArmExt && lHipExt;
-      
-      if (crossLeftRight || crossRightLeft) {
-         bool currentIsLeftArm = crossLeftRight;
+      else {
+         // Chuyển động chéo chính xác (Khác bên)
+         bool currentIsLeftArm = ctx.physicalLeftArmExtending;
          if (_lastWasLeftArm != null && _lastWasLeftArm == currentIsLeftArm) {
              _faults.add(FaultRecord(
                phase: ctx.state.name,
@@ -59,10 +46,6 @@ class CoordinationMetric extends DeadBugMetricBase {
          }
          _lastWasLeftArm = currentIsLeftArm;
          _evaluatedThisRep = true;
-      }
-
-      if (sameSideLeft || sameSideRight || crossLeftRight || crossRightLeft) {
-        _evaluatedThisRep = true; // Chốt sổ rep này, hoàn thành kiểm tra
       }
     }
   }

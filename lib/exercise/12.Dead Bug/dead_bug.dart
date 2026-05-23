@@ -16,8 +16,8 @@ class DeadBugConfig {
   static const int TIMEOUT_MS = 90000; // 90s timeout
   
   // Start Position (Tay chân dựng thẳng vuông góc sàn)
-  static const double START_ANGLE_MIN = 70.0;
-  static const double START_ANGLE_MAX = 110.0;
+  static const double START_ANGLE_MIN = 50.0;
+  static const double START_ANGLE_MAX = 130.0;
 
   // State Transition Thresholds (Dựa vào góc mở của chi đang hạ xuống)
   static const double EXTENDING_THRESHOLD = 120.0;
@@ -175,6 +175,15 @@ class DeadBug extends ExerciseBase {
 
     double maxExt = [lArmAng, rArmAng, lHipAng, rHipAng].reduce((a, b) => a > b ? a : b);
 
+    // Tính toán Physical Side bằng Dot Product
+    bool mlKitActiveLegIsLeft = lHipAng > rHipAng;
+    bool mlKitActiveArmIsLeft = lArmAng > rArmAng;
+    PoseLandmark activeAnkle = mlKitActiveLegIsLeft ? landmarks[PoseLandmarkType.leftAnkle]! : landmarks[PoseLandmarkType.rightAnkle]!;
+    PoseLandmark activeWrist = mlKitActiveArmIsLeft ? landmarks[PoseLandmarkType.leftWrist]! : landmarks[PoseLandmarkType.rightWrist]!;
+    
+    bool physicalLeftLeg = isPhysicalLeftSide(activeAnkle, lHip, rHip);
+    bool physicalLeftArm = isPhysicalLeftSide(activeWrist, lShoulder, rShoulder);
+
     if (now - _lastDiagnosticTime > 500 || state != previousState) {
       _diagnosticLog.add({
         'time': ((now - _exerciseStartTimeMs!) / 1000).toStringAsFixed(1),
@@ -197,6 +206,8 @@ class DeadBug extends ExerciseBase {
       hipY: lHip.y,
       shoulderY: lShoulder.y,
       scaleFactor: scaleFactor,
+      physicalLeftArmExtending: physicalLeftArm,
+      physicalLeftLegExtending: physicalLeftLeg,
       state: state,
       frameTimestampMs: now,
       resultIssues: resultIssues,
