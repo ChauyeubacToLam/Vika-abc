@@ -1,18 +1,21 @@
+import 'dart:math';
 import 'russian_metric_base.dart';
 import '../russian_twist.dart';
 
 class SpinalFlexionMetric extends RussianMetricBase {
   static const double HUNCH_RATIO_LIMIT = 0.8; // If shoulder-hip distance drops below 80% of setup
 
-  double? _setupShoulderToHipY;
+  double? _setupShoulderToHipDist;
 
   @override
   void update(RussianRepContext ctx) {
+    double currentDist = sqrt(pow(ctx.shoulderX - ctx.hipX, 2) + pow(ctx.shoulderY - ctx.hipY, 2));
+
     if (ctx.state == RussianTwistState.center_setup) {
-      _setupShoulderToHipY = ctx.shoulderToHipY;
+      _setupShoulderToHipDist = currentDist;
     } else {
-      if (_setupShoulderToHipY != null && _setupShoulderToHipY! > 0) {
-        double currentRatio = ctx.shoulderToHipY / _setupShoulderToHipY!;
+      if (_setupShoulderToHipDist != null && _setupShoulderToHipDist! > 0) {
+        double currentRatio = currentDist / _setupShoulderToHipDist!;
         
         debugData['torsoHeightRatio'] = currentRatio;
 

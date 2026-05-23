@@ -6,13 +6,18 @@ export '../../fault_record.dart';
 
 
 class RussianRepContext {
-  final double midWristX;
-  final double midKneeX;
-  final double shoulderWidth;
-  final double hipWidth;
-  final double shoulderToHipY;
-  final double leftHipX;
-  final double rightHipX;
+  final double wristX;
+  final double wristY;
+  final double kneeX;
+  final double kneeY;
+  final double hipX;
+  final double hipY;
+  final double shoulderX;
+  final double shoulderY;
+  
+  final double wristHipDx;
+  final double kneeHipDx;
+  final double directionMultiplier;
   
   final RussianTwistState state;
   final TwistDirection direction;
@@ -20,13 +25,17 @@ class RussianRepContext {
   final ResultIssues resultIssues;
 
   RussianRepContext({
-    required this.midWristX,
-    required this.midKneeX,
-    required this.shoulderWidth,
-    required this.hipWidth,
-    required this.shoulderToHipY,
-    required this.leftHipX,
-    required this.rightHipX,
+    required this.wristX,
+    required this.wristY,
+    required this.kneeX,
+    required this.kneeY,
+    required this.hipX,
+    required this.hipY,
+    required this.shoulderX,
+    required this.shoulderY,
+    required this.wristHipDx,
+    required this.kneeHipDx,
+    required this.directionMultiplier,
     required this.state,
     required this.direction,
     required this.frameTimestamp,

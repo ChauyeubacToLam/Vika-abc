@@ -1,8 +1,8 @@
 import 'package:vika/exercise/exercise_base.dart';
+import 'package:vika/exercise/side_tracked_exercise_mixin.dart';
 
 import '../../utils/frame_buffer.dart';
 import 'package:vika/utils/exercise_logger.dart';
-
 import '../../utils/frame_snapshot.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'metrics/russian_metric_base.dart';
@@ -12,17 +12,26 @@ import 'metrics/twist_rom_metric.dart';
 import 'metrics/spinal_flexion_metric.dart';
 
 enum RussianTwistState { center_setup, twisting, max_point, returning }
-enum TwistDirection { none, left, right }
+enum TwistDirection { none, forward, backward }
 
 class RussianTwistConfig {
   static const int MAX_REP = 20; // 10 per side
-  static const double WRIST_VELOCITY_THRESHOLD = 0.5; 
 }
 
-class RussianTwist extends ExerciseBase {
+class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
   @override
-  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+  Set<VikaImageOrientation> get supportedOrientations => <VikaImageOrientation>{
+        VikaImageOrientation.landscapeLeft,
+        VikaImageOrientation.landscapeRight,
         VikaImageOrientation.portrait,
+      };
+
+  @override
+  Map<String, SideLandmarkPair> get requiredSideLandmarks => const {
+        'shoulder': (right: PoseLandmarkType.rightShoulder, left: PoseLandmarkType.leftShoulder),
+        'hip': (right: PoseLandmarkType.rightHip, left: PoseLandmarkType.leftHip),
+        'knee': (right: PoseLandmarkType.rightKnee, left: PoseLandmarkType.leftKnee),
+        'wrist': (right: PoseLandmarkType.rightWrist, left: PoseLandmarkType.leftWrist),
       };
 
   final int maxRep;
@@ -31,6 +40,8 @@ class RussianTwist extends ExerciseBase {
   RussianTwistState russianState = RussianTwistState.center_setup;
   RussianTwistState previousRussianState = RussianTwistState.center_setup;
   TwistDirection currentDirection = TwistDirection.none;
+  TwistDirection lastCompletedTwistDirection = TwistDirection.none;
+
   int _halfRepCount = 0; // count twists, 2 twists = 1 rep
 
   // Metrics
@@ -56,7 +67,7 @@ class RussianTwist extends ExerciseBase {
   String get currentPhaseLabel {
     switch (russianState) {
       case RussianTwistState.center_setup:
-        return 'Vị trí giữa';
+        return 'Sẵn sàng';
       case RussianTwistState.twisting:
         return 'Vặn mình';
       case RussianTwistState.max_point:
@@ -80,29 +91,26 @@ class RussianTwist extends ExerciseBase {
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    if (cameraFacing != CameraFacing.front) {
-      return "⚠️ Bài tập này yêu cầu góc máy chính diện (Front Camera).";
+    if (cameraFacing == CameraFacing.front || cameraFacing == CameraFacing.undefined) {
+      return "⚠️ Vui lòng đặt camera ở góc ngang hoặc ngang lệch để hệ thống thấy rõ lưng và chân của bạn.";
+    }
+    final sideLandmarks = getSideTrackedLandmarks(landmarks);
+    if (sideLandmarks == null) {
+      return "⚠️ Không nhìn thấy đủ các điểm khớp (Vai, Hông, Đầu gối, Cổ tay).";
     }
     return null;
   }
 
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    if (cameraFacing != CameraFacing.front) return false;
-    
-    final leftShoulder = landmarks[PoseLandmarkType.leftShoulder];
-    final rightShoulder = landmarks[PoseLandmarkType.rightShoulder];
-    final leftHip = landmarks[PoseLandmarkType.leftHip];
-    final rightHip = landmarks[PoseLandmarkType.rightHip];
+    final sideLandmarks = getSideTrackedLandmarks(landmarks);
+    if (sideLandmarks == null) return false;
 
-    if (leftShoulder == null || rightShoulder == null || leftHip == null || rightHip == null) return false;
-
-    double midShoulderY = (leftShoulder.y + rightShoulder.y) / 2;
-    double midHipY = (leftHip.y + rightHip.y) / 2;
+    final shoulder = sideLandmarks['shoulder']!;
+    final hip = sideLandmarks['hip']!;
 
     // Y increases downwards. Shoulder must be higher (smaller Y) than Hip
-    // Add a margin to ensure they are upright or sitting
-    if (midShoulderY > midHipY - 10) {
+    if (shoulder.y > hip.y - 10) {
       resultIssues.feedback['System'] = 'Ngồi dậy, nâng vai cao hơn hông.';
       return false;
     }
@@ -112,47 +120,44 @@ class RussianTwist extends ExerciseBase {
 
   @override
   void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
-    final leftShoulder = smoothedLandmarks[PoseLandmarkType.leftShoulder];
-    final rightShoulder = smoothedLandmarks[PoseLandmarkType.rightShoulder];
-    final leftHip = smoothedLandmarks[PoseLandmarkType.leftHip];
-    final rightHip = smoothedLandmarks[PoseLandmarkType.rightHip];
-    final leftKnee = smoothedLandmarks[PoseLandmarkType.leftKnee];
-    final rightKnee = smoothedLandmarks[PoseLandmarkType.rightKnee];
-    final leftWrist = smoothedLandmarks[PoseLandmarkType.leftWrist];
-    final rightWrist = smoothedLandmarks[PoseLandmarkType.rightWrist];
+    final sideLandmarks = getSideTrackedLandmarks(smoothedLandmarks);
+    if (sideLandmarks == null) return;
 
-    if (leftShoulder == null || rightShoulder == null || 
-        leftHip == null || rightHip == null || 
-        leftKnee == null || rightKnee == null || 
-        leftWrist == null || rightWrist == null) {
-      return;
-    }
+    final shoulder = sideLandmarks['shoulder']!;
+    final hip = sideLandmarks['hip']!;
+    final knee = sideLandmarks['knee']!;
+    final wrist = sideLandmarks['wrist']!;
 
-    double midWristX = (leftWrist.x + rightWrist.x) / 2;
-    double midKneeX = (leftKnee.x + rightKnee.x) / 2;
-    double midShoulderY = (leftShoulder.y + rightShoulder.y) / 2;
-    double midHipY = (leftHip.y + rightHip.y) / 2;
+    // Determine facing direction. If knee is to the right of hip, they face right.
+    double directionMultiplier = (knee.x > hip.x) ? 1.0 : -1.0;
 
-    double shoulderWidth = (leftShoulder.x - rightShoulder.x).abs();
-    double hipWidth = (leftHip.x - rightHip.x).abs();
-    double shoulderToHipY = (midHipY - midShoulderY).abs();
+    // Calculate relative positions
+    double wristHipDx = (wrist.x - hip.x) * directionMultiplier;
+    double kneeHipDx = (knee.x - hip.x) * directionMultiplier;
+    
+    // Fallback if knee is directly under hip (shouldn't happen sitting)
+    if (kneeHipDx <= 0) kneeHipDx = 1.0;
 
     int now = frameTimestampMs;
 
     frameBuffer.addFrame(FrameSnapshot(log: {
-      "midWristX": midWristX,
+      "wristHipDx": wristHipDx,
     }, timeStamp: now));
 
-    _updateStateMachine(midWristX, leftHip.x, rightHip.x, now);
+    _updateStateMachine(wristHipDx, kneeHipDx, now);
 
     final ctx = RussianRepContext(
-      midWristX: midWristX,
-      midKneeX: midKneeX,
-      shoulderWidth: shoulderWidth,
-      hipWidth: hipWidth,
-      shoulderToHipY: shoulderToHipY,
-      leftHipX: leftHip.x,
-      rightHipX: rightHip.x,
+      wristX: wrist.x,
+      wristY: wrist.y,
+      kneeX: knee.x,
+      kneeY: knee.y,
+      hipX: hip.x,
+      hipY: hip.y,
+      shoulderX: shoulder.x,
+      shoulderY: shoulder.y,
+      wristHipDx: wristHipDx,
+      kneeHipDx: kneeHipDx,
+      directionMultiplier: directionMultiplier,
       state: russianState,
       direction: currentDirection,
       frameTimestamp: now,
@@ -165,6 +170,7 @@ class RussianTwist extends ExerciseBase {
 
     debugData['russianState'] = russianState.name;
     debugData['direction'] = currentDirection.name;
+    debugData['halfRepCount'] = _halfRepCount;
     
     for (final metric in _metrics) {
       debugData.addAll(metric.debugData);
@@ -179,39 +185,44 @@ class RussianTwist extends ExerciseBase {
     }
   }
 
-  void _updateStateMachine(double midWristX, double leftHipX, double rightHipX, int now) {
-    final wristXChange = frameBuffer.getAngleChange("midWristX");
-    double minHip = leftHipX < rightHipX ? leftHipX : rightHipX;
-    double maxHip = leftHipX > rightHipX ? leftHipX : rightHipX;
+  void _updateStateMachine(double wristHipDx, double kneeHipDx, int now) {
+    final wristChange = frameBuffer.getAngleChange("wristHipDx");
 
     if (russianState == RussianTwistState.center_setup) {
-      // If moving right (X increasing strongly) or left (X decreasing strongly)
-      if (wristXChange == AngleChangeState.increasing) {
-        currentDirection = TwistDirection.right;
+      // If moving forward (towards knees) or backward (towards hips)
+      if (wristChange == AngleChangeState.increasing) {
+        currentDirection = TwistDirection.forward;
         _transitionState(RussianTwistState.twisting, now);
-      } else if (wristXChange == AngleChangeState.decreasing) {
-        currentDirection = TwistDirection.left;
+      } else if (wristChange == AngleChangeState.decreasing) {
+        currentDirection = TwistDirection.backward;
         _transitionState(RussianTwistState.twisting, now);
       }
     } else if (russianState == RussianTwistState.twisting) {
-      // Reached max when velocity stops and we crossed the hip boundary (or at least moved significantly)
-      if (currentDirection == TwistDirection.right && wristXChange != AngleChangeState.increasing && midWristX > minHip + (maxHip - minHip)/2) {
+      // Reached max point when velocity stops
+      if (currentDirection == TwistDirection.forward && wristChange != AngleChangeState.increasing) {
          _transitionState(RussianTwistState.max_point, now);
-      } else if (currentDirection == TwistDirection.left && wristXChange != AngleChangeState.decreasing && midWristX < minHip + (maxHip - minHip)/2) {
+      } else if (currentDirection == TwistDirection.backward && wristChange != AngleChangeState.decreasing) {
          _transitionState(RussianTwistState.max_point, now);
       }
     } else if (russianState == RussianTwistState.max_point) {
       // Started returning
-      if (currentDirection == TwistDirection.right && wristXChange == AngleChangeState.decreasing) {
+      if (currentDirection == TwistDirection.forward && wristChange == AngleChangeState.decreasing) {
         _transitionState(RussianTwistState.returning, now);
-      } else if (currentDirection == TwistDirection.left && wristXChange == AngleChangeState.increasing) {
+      } else if (currentDirection == TwistDirection.backward && wristChange == AngleChangeState.increasing) {
         _transitionState(RussianTwistState.returning, now);
       }
     } else if (russianState == RussianTwistState.returning) {
-      // Reached center setup again (midWrist is within the inner 50% of the hips)
-      double centerMin = minHip + (maxHip - minHip) * 0.25;
-      double centerMax = maxHip - (maxHip - minHip) * 0.25;
-      if (midWristX > centerMin && midWristX < centerMax) {
+      // We consider returning to center when velocity stops again, OR when it crosses the middle.
+      // A common pattern is sweeping from forward to backward directly.
+      // So if velocity changes direction, or we cross the center zone, we reset.
+      
+      // Center zone is around 30% to 50% of kneeHipDx.
+      double centerMin = kneeHipDx * 0.25;
+      double centerMax = kneeHipDx * 0.55;
+
+      bool inCenterZone = wristHipDx > centerMin && wristHipDx < centerMax;
+      
+      if (inCenterZone || (currentDirection == TwistDirection.forward && wristChange == AngleChangeState.increasing) || (currentDirection == TwistDirection.backward && wristChange == AngleChangeState.decreasing)) {
         _transitionState(RussianTwistState.center_setup, now);
         _completeHalfRep();
       }
@@ -234,44 +245,61 @@ class RussianTwist extends ExerciseBase {
   }
 
   void _completeHalfRep() {
-    _halfRepCount++;
-    
-    // Evaluate faults for this side
+    // Collect faults early to see if rom failed
     final allFaults = <FaultRecord>[];
     for (final metric in _metrics) {
       allFaults.addAll(metric.faults);
     }
+    
+    bool hasRomFault = allFaults.any((f) => f.type == 'shallow_twist');
 
-    bool isGoodHalf = !allFaults.any((f) => f.affectsForm);
+    // Only process valid alternating reps if ROM was good enough.
+    // If ROM failed, we don't count it as a valid twist side.
+    if (!hasRomFault) {
+      if (currentDirection == lastCompletedTwistDirection) {
+        // Repeated the same side!
+        resultIssues.feedback['Result'] = 'Lỗi!';
+        setFeedback.add({false: {'General': {'duplicate_side': 'Vui lòng vặn luân phiên 2 bên!'}}});
+        logger.addRepLog(RepLog(correctForm: false, repNumber: repCount, data: {
+          "fault_types": ['duplicate_side'],
+        }));
+      } else {
+        // Valid alternate twist
+        _halfRepCount++;
+        lastCompletedTwistDirection = currentDirection;
 
-    final faultMap = <String, Map<String, String>>{};
-    for (final fault in allFaults) {
-      faultMap.putIfAbsent(fault.phase, () => {});
-      faultMap[fault.phase]![fault.type] = fault.message;
-    }
+        bool isGoodHalf = !allFaults.any((f) => f.affectsForm);
 
-    // Every 2 half reps = 1 full rep count
-    if (_halfRepCount % 2 == 0) {
-      repCount++;
-      correctForm = isGoodHalf; // simplify, if second half is good, rep is good (ideally both are good)
-      resultIssues.feedback['Result'] = correctForm ? 'Good Rep!' : 'Fix Form';
-      
-      setFeedback.add({correctForm: faultMap});
-      logger.addRepLog(RepLog(correctForm: correctForm, repNumber: repCount, data: {
-        "fault_types": allFaults.map((f) => f.type).toSet().toList(),
-      }));
+        final faultMap = <String, Map<String, String>>{};
+        for (final fault in allFaults) {
+          faultMap.putIfAbsent(fault.phase, () => {});
+          faultMap[fault.phase]![fault.type] = fault.message;
+        }
 
-      for (final metric in _metrics) {
-        metric.resetAndCountFault();
+        // Every 2 valid half reps = 1 full rep count
+        if (_halfRepCount % 2 == 0) {
+          repCount++;
+          correctForm = isGoodHalf;
+          resultIssues.feedback['Result'] = correctForm ? 'Good Rep!' : 'Fix Form';
+          
+          setFeedback.add({correctForm: faultMap});
+          logger.addRepLog(RepLog(correctForm: correctForm, repNumber: repCount, data: {
+            "fault_types": allFaults.map((f) => f.type).toSet().toList(),
+          }));
+        }
       }
     } else {
-      // Clear faults for next half
-      // Actually we should wait until full rep to reset and count fault.
-      // But user might only be bad on one side.
-      // Let's count fault per half rep for fine-grained analytics.
-      for (final metric in _metrics) {
-        metric.resetAndCountFault();
+      // Shallow twist, don't count it, just log the fault.
+      final faultMap = <String, Map<String, String>>{};
+      for (final fault in allFaults) {
+        faultMap.putIfAbsent(fault.phase, () => {});
+        faultMap[fault.phase]![fault.type] = fault.message;
       }
+      setFeedback.add({false: faultMap});
+    }
+
+    for (final metric in _metrics) {
+      metric.resetAndCountFault();
     }
     
     currentDirection = TwistDirection.none;

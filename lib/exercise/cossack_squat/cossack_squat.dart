@@ -214,6 +214,7 @@ class CossackSquat extends ExerciseBase {
     if (cossackState == CossackState.standing && previousCossackState != CossackState.standing) {
       // Rep completed
       _completeRep();
+      previousCossackState = cossackState;
       return;
     }
 

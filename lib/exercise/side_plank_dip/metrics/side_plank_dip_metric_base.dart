@@ -6,6 +6,7 @@ import '../../fault_record.dart';
 export '../../fault_record.dart';
 
 enum SidePlankState {
+  setupPlank,  // Tư thế plank cơ bản
   basePlank,   // Chuẩn bị, hông cao
   descending,  // Đang hạ hông
   bottom,      // Đáy
@@ -32,6 +33,9 @@ class RepContext {
   /// Tọa độ Y của Hông trụ (Hông dưới sàn) - Dùng cho State Machine
   final double lowerHipY;
 
+  /// Khoảng cách dọc (trục Y) giữa 2 vai - Dùng để đo vặn mình
+  final double shoulderWidthY;
+
   final SidePlankState plankState;
   final int frameTimestamp;
   final ResultIssues resultIssues;
@@ -42,6 +46,7 @@ class RepContext {
     required this.shoulderWidthX,
     required this.hipWidthX,
     required this.lowerHipY,
+    required this.shoulderWidthY,
     required this.plankState,
     required this.frameTimestamp,
     required this.resultIssues,

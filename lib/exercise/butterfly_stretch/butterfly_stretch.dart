@@ -25,11 +25,7 @@ class ButterflyStretch extends ExerciseBase {
   ButterflyState stretchState = ButterflyState.setup;
   ButterflyState previousState = ButterflyState.setup;
 
-  // Tổng thời gian hold hợp lệ đã flush (giây)
-  double totalValidHoldTime = 0.0;
-
-  // Timestamp lúc bắt đầu vào trạng thái hold (ms)
-  int? _holdStartMs;
+  int? _exerciseStartTimeMs;
 
   final KneeSeparationMetric kneeMetric = KneeSeparationMetric();
   final PostureMetric postureMetric = PostureMetric();
@@ -90,16 +86,17 @@ class ButterflyStretch extends ExerciseBase {
     return true;
   }
 
+  double get _elapsedSeconds {
+    if (_exerciseStartTimeMs == null) return 0.0;
+    return (frameTimestampMs - _exerciseStartTimeMs!) / 1000.0;
+  }
+
   @override
-  bool requestStop() => totalValidHoldTime >= ButterflyConfig.TARGET_HOLD_SECONDS;
+  bool requestStop() => _elapsedSeconds >= ButterflyConfig.TARGET_HOLD_SECONDS;
 
   @override
   void onSetComplete() {
-    // Dùng DateTime.now() thay vì frameTimestampMs để tránh thiếu thời gian
-    // do delay giữa frame cuối cùng và thời điểm set thực sự kết thúc.
-    _flushHoldTime(DateTime.now().millisecondsSinceEpoch);
-
-    logger.pushKey("total_hold_time", totalValidHoldTime);
+    logger.pushKey("total_hold_time", _elapsedSeconds);
     logger.pushKey("max_knee_separation", kneeMetric.maxSeparation);
     logger.pushKey("posture_fails_count", postureMetric.faultsCount);
   }
@@ -130,10 +127,10 @@ class ButterflyStretch extends ExerciseBase {
     double torsoHeight = (avgShoulderY - lHip.y).abs();
 
     final now = frameTimestampMs;
+    _exerciseStartTimeMs ??= now;
 
     // ButterflyStretch là nguồn sự thật cho hold time.
-    // Tính _currentSessionHoldSeconds rồi truyền vào ctx để các metric đọc,
-    // không để metric tự tính lại từ timestamp riêng của chúng.
+    // Dùng thời gian trôi qua liên tục từ lúc bắt đầu
     final ctx = StretchContext(
       kneeSeparation: kneeSep,
       leftKneeY: lKnee.y,
@@ -144,7 +141,7 @@ class ButterflyStretch extends ExerciseBase {
       currentState: stretchState,
       frameTimestamp: now,
       resultIssues: resultIssues,
-      currentHoldSeconds: _currentSessionHoldSeconds, // <-- truyền vào ctx
+      currentHoldSeconds: _elapsedSeconds, // <-- truyền vào ctx
     );
 
     frameBuffer.addFrame(FrameSnapshot(log: {"avgKneeY": avgKneeY, "kneeSep": kneeSep}, timeStamp: now));
@@ -156,6 +153,8 @@ class ButterflyStretch extends ExerciseBase {
         debugData.addAll(metric.debugData);
       }
     }
+
+    repCount = _elapsedSeconds.toInt(); // Cập nhật repCount để UI quay vòng liên tục
 
     _updateHoldDisplay(now);
     _updatePhaseInstructions();
@@ -185,14 +184,6 @@ class ButterflyStretch extends ExerciseBase {
   void _transitionState(ButterflyState newState, int timestampMs) {
     if (newState == stretchState) return;
 
-    if (stretchState == ButterflyState.isometric_hold) {
-      _flushHoldTime(timestampMs);
-    }
-
-    if (newState == ButterflyState.isometric_hold) {
-      _holdStartMs = timestampMs;
-    }
-
     previousState = stretchState;
     stretchState = newState;
 
@@ -201,26 +192,9 @@ class ButterflyStretch extends ExerciseBase {
     }
   }
 
-  /// Cộng dồn thời gian hold hiện tại vào totalValidHoldTime rồi reset con trỏ.
-  void _flushHoldTime(int nowMs) {
-    if (_holdStartMs != null) {
-      final elapsed = (nowMs - _holdStartMs!) / 1000.0;
-      if (elapsed > 0) totalValidHoldTime += elapsed;
-      _holdStartMs = null;
-    }
-  }
-
-  /// Thời gian hold đang chạy (chưa flush) — dùng để hiển thị realtime và truyền vào ctx.
-  double get _currentSessionHoldSeconds {
-    if (stretchState == ButterflyState.isometric_hold && _holdStartMs != null) {
-      return (frameTimestampMs - _holdStartMs!) / 1000.0;
-    }
-    return 0.0;
-  }
-
   /// Duy nhất nơi ghi feedback['Thời gian'] — không còn HoldDurationMetric ghi đè.
   void _updateHoldDisplay(int now) {
-    final displayed = totalValidHoldTime + _currentSessionHoldSeconds;
+    final displayed = _elapsedSeconds;
     resultIssues.feedback['Thời gian'] =
         '${displayed.toStringAsFixed(1)}s / ${ButterflyConfig.TARGET_HOLD_SECONDS}s';
     debugData['total_hold'] = displayed.toStringAsFixed(1);

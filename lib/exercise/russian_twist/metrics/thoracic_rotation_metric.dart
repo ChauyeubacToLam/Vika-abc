@@ -2,24 +2,28 @@ import 'russian_metric_base.dart';
 import '../russian_twist.dart';
 
 class ThoracicRotationMetric extends RussianMetricBase {
-  static const double SHOULDER_WIDTH_DROP_RATIO = 0.8; // Shoulder width must drop to at least 80% of original to count as a twist.
+  static const double SHOULDER_MOVEMENT_MIN = 0.15; // Shoulder must move at least 15% of hip-to-knee distance to count as torso twist
 
-  double? _setupShoulderWidth;
+  double? _setupShoulderHipDx;
 
   @override
   void update(RussianRepContext ctx) {
     if (ctx.state == RussianTwistState.center_setup) {
-      // Record the baseline shoulder width when facing forward
-      _setupShoulderWidth = ctx.shoulderWidth;
+      // Record the baseline shoulder-to-hip X distance
+      _setupShoulderHipDx = ctx.shoulderX - ctx.hipX;
     }
 
     if (ctx.state == RussianTwistState.max_point) {
-      if (_setupShoulderWidth != null && _setupShoulderWidth! > 0) {
-        double currentRatio = ctx.shoulderWidth / _setupShoulderWidth!;
-        debugData['shoulderWidthRatio'] = currentRatio;
+      if (_setupShoulderHipDx != null) {
+        double currentShoulderHipDx = ctx.shoulderX - ctx.hipX;
+        double shoulderMovement = (currentShoulderHipDx - _setupShoulderHipDx!).abs();
+        
+        // Normalize by kneeHipDx to be scale invariant
+        double movementRatio = shoulderMovement / ctx.kneeHipDx;
+        debugData['shoulderMovementRatio'] = movementRatio;
 
-        // If ratio is still near 1.0 (e.g. > 0.85), they are just swinging arms
-        if (currentRatio > SHOULDER_WIDTH_DROP_RATIO) {
+        // If shoulder didn't move much, they are just swinging arms
+        if (movementRatio < SHOULDER_MOVEMENT_MIN) {
           addFault(
             FaultRecord(
               type: 'arm_swinging',

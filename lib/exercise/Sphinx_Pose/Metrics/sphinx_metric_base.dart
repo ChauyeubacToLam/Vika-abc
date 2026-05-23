@@ -17,6 +17,8 @@ class SphinxConfig {
   // neckAngle = góc Tai - Vai - Hông. Khi nằm trung tính ~160-170
   // Nếu < 140 là ngửa ra sau quá nhiều so với ngực
   static const double Ai_Neck_Hyper_Tol = 140.0;
+  static const double Aj_Forearm_Horiz_Tol = 30.0;
+  static const double Ak_UpperArm_Vert_Tol = 60.0;
 }
 
 enum SphinxState { proneSetup, ascending, isometricHold, descending }
@@ -25,6 +27,8 @@ class SphinxContext {
   final double bodyAngle;
   final double elbowAngle;
   final double spineAngle;
+  final double forearmAngle;
+  final double upperArmAngle;
   final double hipY;
   final double ankleY;
   final double earShoulderDist;
@@ -38,6 +42,8 @@ class SphinxContext {
     required this.bodyAngle,
     required this.elbowAngle,
     required this.spineAngle,
+    required this.forearmAngle,
+    required this.upperArmAngle,
     required this.hipY,
     required this.ankleY,
     required this.earShoulderDist,

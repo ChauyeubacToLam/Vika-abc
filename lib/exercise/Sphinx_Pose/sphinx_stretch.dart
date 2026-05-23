@@ -2,11 +2,11 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/exercise_logger.dart';
 import '../exercise_base.dart';
-import 'metrics/sphinx_metric_base.dart';
-import 'metrics/hip_ground_metric.dart';
-import 'metrics/hold_tempo_metric.dart';
-import 'metrics/elbow_angle_metric.dart';
-import 'metrics/neck_shoulder_metric.dart';
+import 'Metrics/sphinx_metric_base.dart';
+import 'Metrics/hip_ground_metric.dart';
+import 'Metrics/hold_tempo_metric.dart';
+import 'Metrics/elbow_angle_metric.dart';
+import 'Metrics/neck_shoulder_metric.dart';
 
 class SphinxStretch extends ExerciseBase {
   SphinxState state = SphinxState.proneSetup;
@@ -96,6 +96,8 @@ class SphinxStretch extends ExerciseBase {
       bodyAngle:      calculateAngleNormalized(firstPoint: shoulder, midPoint: hip,    lastPoint: ankle),
       elbowAngle:     calculateAngleNormalized(firstPoint: shoulder, midPoint: elbow,  lastPoint: wrist),
       spineAngle:     calculateAngleNormalized(firstPoint: shoulder, midPoint: hip,    lastPoint: knee),
+      forearmAngle:   calculateHorizontalAngle(point1: elbow, point2: wrist),
+      upperArmAngle:  calculateHorizontalAngle(point1: shoulder, point2: elbow),
       neckAngle:      calculateAngleNormalized(firstPoint: ear,      midPoint: shoulder, lastPoint: hip),
       hipY:           hip.y,
       ankleY:         ankle.y,
@@ -155,10 +157,6 @@ class SphinxStretch extends ExerciseBase {
       }
       prevState = state;
       state = newState;
-
-      if (state == SphinxState.proneSetup && prevState == SphinxState.descending) {
-        _completeRep(ctx);
-      }
     }
 
     // --- LOGIC MỚI: ĐẾM REP THEO GIÂY TRONG LÚC HOLD ---

@@ -30,7 +30,7 @@ class KneeExtensionMetric extends SeatedForwardMetricBase {
         ctx.resultIssues.addInstruction(
           ctx.state.name,
           'Knee',
-          'Gối bạn đang bị co lại. Ép chặt nhượng chân xuống thảm để dãn cơ gân kheo.',
+          'Gối co quá nhiều. Hãy gập người từ hông, giữ lưng thẳng và ép nhẹ gối xuống.',
         );
         _instructionSet = true;
       }

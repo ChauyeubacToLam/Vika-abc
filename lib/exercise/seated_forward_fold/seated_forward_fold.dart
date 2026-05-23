@@ -21,6 +21,7 @@ class SeatedForwardFold extends ExerciseBase {
 
   double _minHipAngleThisRep = 999.0;
   double _lastMaxDepth = 0.0;
+  double? _userMaxRom;
 
   double _lastHipAngle = -1.0;
   int _lastTimestampMs = -1;
@@ -138,7 +139,9 @@ class SeatedForwardFold extends ExerciseBase {
           _minHipAngleThisRep = ctx.hipAngle;
         }
         
-        if (ctx.hipAngle < SeatedForwardConfig.Ah_Hold_Safety_Floor && 
+        double targetDepth = _userMaxRom != null ? _userMaxRom! * 1.15 : 120.0;
+        
+        if (ctx.hipAngle < targetDepth && 
             ctx.hipVelocity.abs() < SeatedForwardConfig.Av_Stable_Velocity) {
               
           if (_stableStartTimeMs == null) {
@@ -184,13 +187,18 @@ class SeatedForwardFold extends ExerciseBase {
   void _completeRep(SeatedForwardContext ctx) {
     repCount += 1;
     _lastMaxDepth = _minHipAngleThisRep;
+    if (_userMaxRom == null || _lastMaxDepth < _userMaxRom!) {
+      _userMaxRom = _lastMaxDepth;
+    }
 
     final allFaults = <FaultRecord>[
       ...kneeMetric.faults, ...spineMetric.faults, 
       ...tempoMetric.faults, ...ankleMetric.faults,
     ];
     
-    correctForm = !allFaults.any((f) => f.priority == SeatedForwardFaultVoicePriority.kneeBent);
+    correctForm = !allFaults.any((f) => 
+      f.priority == SeatedForwardFaultVoicePriority.kneeBent || 
+      f.priority == SeatedForwardFaultVoicePriority.spineRound);
 
     logger.addRepLog(RepLog(
       repNumber: repCount,

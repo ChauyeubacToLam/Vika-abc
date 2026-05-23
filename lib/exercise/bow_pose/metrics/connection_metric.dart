@@ -2,8 +2,8 @@ import 'bow_pose_metric_base.dart';
 import '../../../../utils/debouncer.dart';
 
 class ConnectionConfig {
-  static const double GRAB_THRESHOLD = 0.10; 
-  static const double DROP_THRESHOLD = 0.20; 
+  static const double GRAB_THRESHOLD = 0.15; 
+  static const double DROP_THRESHOLD = 0.30; 
 }
 
 class ConnectionMetric extends BowPoseMetricBase {

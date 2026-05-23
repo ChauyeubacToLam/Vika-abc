@@ -5,7 +5,7 @@ export '../../fault_record.dart';
 class SeatedForwardConfig {
   static const List<double> Ah_Start_Hip_Angle = [80.0, 110.0];
   static const double Ak_Start_Knee_Angle = 170.0;
-  static const double Ak_Fault_Knee_Angle = 160.0;
+  static const double Ak_Fault_Knee_Angle = 165.0;
   static const double As_Fault_Spine_Angle = 140.0;
   
   static const double Av_Stable_Velocity = 5.0; 

@@ -30,7 +30,7 @@ class SpinalAlignmentMetric extends SeatedForwardMetricBase {
         ctx.resultIssues.addInstruction(
           ctx.state.name,
           'Spine',
-          'Bạn đang gù lưng. Hãy gập người từ khớp hông và đẩy ngực về phía trước.',
+          'Lưng đang bị gù. Hãy kê cao mông (ngồi lên đệm), ưu tiên co nhẹ gối để bụng chạm đùi thay vì cố vươn tay chạm chân.',
         );
         _instructionSet = true;
       }
@@ -47,7 +47,7 @@ class SpinalAlignmentMetric extends SeatedForwardMetricBase {
         type: 'SpineRound',
         message: 'Lỗi gù lưng',
         voiceMessage: voiceMessage,
-        affectsForm: false, 
+        affectsForm: true, 
         priority: SeatedForwardFaultVoicePriority.spineRound,
       ));
     }

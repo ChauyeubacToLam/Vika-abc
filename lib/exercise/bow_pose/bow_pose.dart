@@ -12,10 +12,10 @@ import 'metrics/stability_metric.dart';
 class BowPoseConfig {
   static const int MAX_REP = 3; 
 
-  static const double KNEE_SETUP_ANGLE = 120.0; 
-  static const double CHEST_LIFT_THRESHOLD = 0.12;
-  static const double THIGH_LIFT_THRESHOLD = 0.03;
-  static const double RELEASE_DIST_THRESHOLD = 0.40;
+  static const double KNEE_SETUP_ANGLE = 135.0; 
+  static const double CHEST_LIFT_THRESHOLD = 0.08;
+  static const double THIGH_LIFT_THRESHOLD = 0.01;
+  static const double RELEASE_DIST_THRESHOLD = 0.50;
 }
 
 class BowPose extends ExerciseBase {
@@ -173,9 +173,10 @@ class BowPose extends ExerciseBase {
     for (final metric in _metrics) debugData.addAll(metric.debugData);
 
     // UI Coaching State
-    if (bowPoseState == BowPoseState.setup) resultIssues.addInstruction('setup', 'Status', 'Gập gối, với tay...');
-    else if (bowPoseState == BowPoseState.ascending) resultIssues.addInstruction('ascending', 'Status', 'Kéo lồng ngực lên!');
-    else if (bowPoseState == BowPoseState.hold) resultIssues.addInstruction('hold', 'Status', 'Giữ yên!');
+    if (bowPoseState == BowPoseState.setup) resultIssues.addInstruction('setup', 'Status', 'Gập gối');
+    else if (bowPoseState == BowPoseState.ascending) resultIssues.addInstruction('ascending', 'Status', 'Lên cung');
+    else if (bowPoseState == BowPoseState.hold) resultIssues.addInstruction('hold', 'Status', 'Giữ tĩnh');
+    else if (bowPoseState == BowPoseState.descending) resultIssues.addInstruction('descending', 'Status', 'Hạ xuống');
   }
 
   void _updateStateMachine(RepContext ctx, int now) {

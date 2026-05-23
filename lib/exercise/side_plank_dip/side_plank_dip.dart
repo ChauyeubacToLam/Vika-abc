@@ -13,8 +13,11 @@ import 'report/side_plank_dip_report_builder.dart';
 
 class SidePlankConfig {
   static const int MAX_REP = 12;
-  static const double STRAIGHT_BODY_ANGLE = 165.0; 
+  static const double STRAIGHT_BODY_ANGLE = 175.0; 
+  static const double BOTTOM_BODY_ANGLE = 160.0;
   static const double MOVEMENT_THRESHOLD = 3.0; // Y-axis delta (pixels/cm)
+  static const int REP_COOLDOWN_MS = 500; // 0.5s
+  static const int REP_TIMEOUT_MS = 4000; // 4s
 }
 
 class SidePlankDip extends ExerciseBase {
@@ -28,11 +31,13 @@ class SidePlankDip extends ExerciseBase {
   final int maxRep;
   SidePlankDip({this.maxRep = SidePlankConfig.MAX_REP});
 
-  SidePlankState plankState = SidePlankState.basePlank;
-  SidePlankState previousPlankState = SidePlankState.basePlank;
+  SidePlankState plankState = SidePlankState.setupPlank;
+  SidePlankState previousPlankState = SidePlankState.setupPlank;
   
   int? _setStartTime;
   double? _previousHipY;
+  int? _lastRepTime;
+  int? _stateEnterTime;
   
   final Debouncer _bottomDebouncer = Debouncer(requiredFrames: 3);
 
@@ -57,6 +62,7 @@ class SidePlankDip extends ExerciseBase {
   @override
   String get currentPhaseLabel {
     switch (plankState) {
+      case SidePlankState.setupPlank: return 'Tư thế Plank';
       case SidePlankState.basePlank: return 'Chuẩn bị';
       case SidePlankState.descending: return 'Hạ hông';
       case SidePlankState.bottom: return 'Giữ đáy';
@@ -73,27 +79,17 @@ class SidePlankDip extends ExerciseBase {
 
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    // Tự động tìm bên trụ: Khuỷu tay nào gần đất (Y lớn hơn) là bên trụ
-    final leftElbow = landmarks[PoseLandmarkType.leftElbow];
-    final rightElbow = landmarks[PoseLandmarkType.rightElbow];
-    if (leftElbow == null || rightElbow == null) return false;
+    final leftShoulder = landmarks[PoseLandmarkType.leftShoulder];
+    final rightShoulder = landmarks[PoseLandmarkType.rightShoulder];
+    final leftHip = landmarks[PoseLandmarkType.leftHip];
+    final rightHip = landmarks[PoseLandmarkType.rightHip];
 
-    bool isLeftSupport = leftElbow.y > rightElbow.y;
-    
-    final shoulder = landmarks[isLeftSupport ? PoseLandmarkType.leftShoulder : PoseLandmarkType.rightShoulder];
-    final hip = landmarks[isLeftSupport ? PoseLandmarkType.leftHip : PoseLandmarkType.rightHip];
-    final ankle = landmarks[isLeftSupport ? PoseLandmarkType.leftAnkle : PoseLandmarkType.rightAnkle];
-    final elbow = isLeftSupport ? leftElbow : rightElbow;
+    if (leftShoulder == null || rightShoulder == null || leftHip == null || rightHip == null) return false;
 
-    if (shoulder == null || hip == null || ankle == null) return false;
-
-    // Cơ thể phải thẳng
-    double bodyAngle = calculateAngle(firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
-    if (bodyAngle < SidePlankConfig.STRAIGHT_BODY_ANGLE) return false;
-    
-    // Khuỷu tay vuông góc trục vai (X gần nhau)
-    double offsetX = (shoulder.x - elbow.x).abs() / (scaleFactor ?? 1.0);
-    if (offsetX > 20.0) return false; // Cần canh thẳng trước khi bắt đầu
+    // Tư thế chuẩn bị giống hệt bài plank (thân người nằm ngang)
+    double trunkClockAngle = calculateVerticalAngle(pivot: leftHip, point: leftShoulder);
+    double horizontalDiff = (trunkClockAngle % 180) - 90;
+    if (horizontalDiff.abs() > 30.0) return false;
 
     antiRotationMetric.captureBaseline(landmarks); // Chụp baseline 2D
     return true;
@@ -137,6 +133,7 @@ class SidePlankDip extends ExerciseBase {
     double shoulderElbowOffsetX = (supportShoulder.x - supportElbow.x).abs() / (scaleFactor ?? 1.0);
     
     double shoulderWidthX = (lShoulder.x - rShoulder.x).abs();
+    double shoulderWidthY = (lShoulder.y - rShoulder.y).abs();
     double hipWidthX = (lHip.x - rHip.x).abs();
     double lowerHipY = supportHip.y;
     int now = frameTimestampMs;
@@ -147,6 +144,7 @@ class SidePlankDip extends ExerciseBase {
       shoulderWidthX: shoulderWidthX,
       hipWidthX: hipWidthX,
       lowerHipY: lowerHipY,
+      shoulderWidthY: shoulderWidthY,
       plankState: plankState,
       frameTimestamp: now,
       resultIssues: resultIssues,
@@ -157,7 +155,7 @@ class SidePlankDip extends ExerciseBase {
     debugData['Offset'] = shoulderElbowOffsetX.toStringAsFixed(1);
 
     // 2. State Machine Update
-    _updateState(lowerHipY, bodyAngle, now);
+    _updateState(lowerHipY, bodyAngle, shoulderWidthY, shoulderWidthX, now);
     _previousHipY = lowerHipY;
 
     // 3. Update Metrics
@@ -169,6 +167,7 @@ class SidePlankDip extends ExerciseBase {
     // 4. Hoàn thành 1 Rep
     if (plankState == SidePlankState.top && previousPlankState == SidePlankState.ascending) {
       repCount += 1;
+      _lastRepTime = now;
       
       final allFaults = <FaultRecord>[];
       for (final metric in _metrics) allFaults.addAll(metric.faults);
@@ -192,28 +191,62 @@ class SidePlankDip extends ExerciseBase {
     }
   }
 
-  void _updateState(double currentHipY, double bodyAngle, int timestampMs) {
+  void _updateState(double currentHipY, double bodyAngle, double shoulderWidthY, double shoulderWidthX, int timestampMs) {
     if (_previousHipY == null) return;
     
+    _stateEnterTime ??= timestampMs;
+
+    // Timeout logic: reset to basePlank or setupPlank if stuck for 4 seconds
+    if (plankState != SidePlankState.setupPlank && plankState != SidePlankState.basePlank) {
+      if (timestampMs - _stateEnterTime! > SidePlankConfig.REP_TIMEOUT_MS) {
+        _transitionState(SidePlankState.basePlank, timestampMs);
+      }
+    }
+
     double deltaY = currentHipY - _previousHipY!; // Y tăng -> đi xuống, Y giảm -> đi lên
+    bool isTwisting = shoulderWidthX > shoulderWidthY; // Xoay người (ngực úp xuống sàn)
     
-    if (plankState == SidePlankState.basePlank && deltaY > SidePlankConfig.MOVEMENT_THRESHOLD) {
-      _transitionState(SidePlankState.descending, timestampMs);
+    if (plankState == SidePlankState.setupPlank) {
+      // Rotate into side plank
+      if (!isTwisting && bodyAngle > SidePlankConfig.BOTTOM_BODY_ANGLE) {
+        _transitionState(SidePlankState.basePlank, timestampMs);
+      }
     } 
-    else if (plankState == SidePlankState.descending && _bottomDebouncer.update(deltaY.abs() < 2.0)) {
-      _transitionState(SidePlankState.bottom, timestampMs);
+    else if (plankState == SidePlankState.basePlank) {
+      bool cooldownOk = _lastRepTime == null || (timestampMs - _lastRepTime! > SidePlankConfig.REP_COOLDOWN_MS);
+      if (cooldownOk && deltaY > SidePlankConfig.MOVEMENT_THRESHOLD && !isTwisting) {
+        _transitionState(SidePlankState.descending, timestampMs);
+      } else if (isTwisting) {
+        _transitionState(SidePlankState.setupPlank, timestampMs);
+      }
     } 
-    else if (plankState == SidePlankState.bottom && deltaY < -SidePlankConfig.MOVEMENT_THRESHOLD) {
-      _transitionState(SidePlankState.ascending, timestampMs);
+    else if (plankState == SidePlankState.descending) {
+      if (bodyAngle < SidePlankConfig.BOTTOM_BODY_ANGLE && _bottomDebouncer.update(deltaY.abs() < 2.0)) {
+        _transitionState(SidePlankState.bottom, timestampMs);
+      } else if (isTwisting) {
+        _transitionState(SidePlankState.setupPlank, timestampMs);
+      }
     } 
-    else if (plankState == SidePlankState.ascending && bodyAngle > SidePlankConfig.STRAIGHT_BODY_ANGLE) {
-      _transitionState(SidePlankState.top, timestampMs);
+    else if (plankState == SidePlankState.bottom) {
+      if (deltaY < -SidePlankConfig.MOVEMENT_THRESHOLD && !isTwisting) {
+        _transitionState(SidePlankState.ascending, timestampMs);
+      } else if (isTwisting) {
+        _transitionState(SidePlankState.setupPlank, timestampMs);
+      }
+    } 
+    else if (plankState == SidePlankState.ascending) {
+      if (bodyAngle > SidePlankConfig.STRAIGHT_BODY_ANGLE && !isTwisting) {
+        _transitionState(SidePlankState.top, timestampMs);
+      } else if (isTwisting) {
+        _transitionState(SidePlankState.setupPlank, timestampMs);
+      }
     }
   }
 
   void _transitionState(SidePlankState newState, int timestampMs) {
     previousPlankState = plankState;
     plankState = newState;
+    _stateEnterTime = timestampMs;
     for (final metric in _metrics) {
       metric.onStateTransition(previousPlankState, newState, timestampMs);
     }

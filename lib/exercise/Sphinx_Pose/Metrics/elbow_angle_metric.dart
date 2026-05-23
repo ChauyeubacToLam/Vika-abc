@@ -9,6 +9,8 @@ class ElbowAngleMetric extends SphinxMetricBase {
   final Map<String, dynamic> _debugData = {};
   
   final Debouncer _straightArmDebouncer = Debouncer(requiredFrames: 4);
+  final Debouncer _forearmDebouncer = Debouncer(requiredFrames: 4);
+  final Debouncer _upperArmDebouncer = Debouncer(requiredFrames: 4);
   bool _instructionSet = false;
 
   @override
@@ -36,7 +38,13 @@ class ElbowAngleMetric extends SphinxMetricBase {
         ctx.resultIssues.addInstruction('isometricHold', 'Arm', 'Đang bị sai thành Rắn hổ mang. Hạ cẳng tay chạm sàn.');
         _instructionSet = true;
       }
-      _logFault(ctx.state.name, 'Lỗi đẩy thẳng tay');
+      _logFault(ctx.state.name, 'Lỗi đẩy thẳng tay', 'Gập cùi chỏ lại');
+    } else if (_forearmDebouncer.update(ctx.forearmAngle > SphinxConfig.Aj_Forearm_Horiz_Tol)) {
+      ctx.resultIssues.feedback['Arm'] = 'Hạ cẳng tay xuống sàn!';
+      _logFault(ctx.state.name, 'Cẳng tay không song song sàn', 'Hạ cẳng tay xuống sàn');
+    } else if (_upperArmDebouncer.update(ctx.upperArmAngle < SphinxConfig.Ak_UpperArm_Vert_Tol)) {
+      ctx.resultIssues.feedback['Arm'] = 'Cánh tay phải vuông góc!';
+      _logFault(ctx.state.name, 'Cánh tay không vuông góc sàn', 'Chống tay vuông góc với sàn');
     } else if (ctx.elbowAngle < SphinxConfig.Ab_Elbow_Hold_Angle[0]) {
       ctx.resultIssues.feedback['Arm'] = 'Đẩy ngực lên!';
     } else {
@@ -44,13 +52,13 @@ class ElbowAngleMetric extends SphinxMetricBase {
     }
   }
 
-  void _logFault(String phase, String message) {
+  void _logFault(String phase, String message, String voiceMsg) {
     if (!_faults.any((f) => f.phase == phase && f.type == 'Arm')) {
       _faults.add(FaultRecord(
         phase: phase,
         type: 'Arm',
         message: message,
-        voiceMessage: 'Gập cùi chỏ lại',
+        voiceMessage: voiceMsg,
         affectsForm: true,
         priority: SphinxFaultVoicePriority.straightArm,
       ));
@@ -63,5 +71,7 @@ class ElbowAngleMetric extends SphinxMetricBase {
     super.reset();
     _instructionSet = false;
     _straightArmDebouncer.reset();
+    _forearmDebouncer.reset();
+    _upperArmDebouncer.reset();
   }
 }
