@@ -293,9 +293,14 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
     } else if (walkingState == WalkingState.descending) {
       // Bottom when hip stops moving down or knee hits 100
       if (ctx.frontKneeAngle <= 100 || hipYChange == AngleChangeState.decreasing) {
-        _transitionState(WalkingState.bottom, now);
-        // evaluate step length here using the real context
-        stepLengthMetric.evaluateRep(ctx);
+        if (ctx.frontKneeAngle > 135) {
+          // Knee didn't bend enough. This is just normal walking, not a lunge attempt.
+          _transitionState(WalkingState.stepping, now);
+        } else {
+          _transitionState(WalkingState.bottom, now);
+          // evaluate step length here using the real context
+          stepLengthMetric.evaluateRep(ctx);
+        }
       }
     } else if (walkingState == WalkingState.bottom) {
       // Pulling through when hip moves up
