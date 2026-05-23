@@ -100,9 +100,12 @@ class StandingKneeToElbow extends ExerciseBase {
     final rightAnkle = landmarks[PoseLandmarkType.rightAnkle];
     final leftShoulder = landmarks[PoseLandmarkType.leftShoulder];
     final rightShoulder = landmarks[PoseLandmarkType.rightShoulder];
+    final leftWrist = landmarks[PoseLandmarkType.leftWrist];
+    final rightWrist = landmarks[PoseLandmarkType.rightWrist];
 
     if (leftHip == null || rightHip == null || leftKnee == null || rightKnee == null || 
-        leftAnkle == null || rightAnkle == null || leftShoulder == null || rightShoulder == null) {
+        leftAnkle == null || rightAnkle == null || leftShoulder == null || rightShoulder == null ||
+        leftWrist == null || rightWrist == null) {
       return false;
     }
 
@@ -120,6 +123,11 @@ class StandingKneeToElbow extends ExerciseBase {
     // Check if shoulders are roughly level (tilt < 10% of width)
     if (shoulderWidth > 0 && shoulderTilt / shoulderWidth > 0.15) {
       resultIssues.feedback['System'] = 'Giữ 2 vai thăng bằng.';
+      return false;
+    }
+
+    if (leftWrist.y > leftShoulder.y || rightWrist.y > rightShoulder.y) {
+      resultIssues.feedback['System'] = 'Hãy đặt 2 tay sau đầu.';
       return false;
     }
 
@@ -157,14 +165,12 @@ class StandingKneeToElbow extends ExerciseBase {
     }, timeStamp: now));
 
     if (kteState == KteState.standing_base) {
-      final leftYChange = frameBuffer.getAngleChange("leftKneeY");
-      final rightYChange = frameBuffer.getAngleChange("rightKneeY");
-      
-      // Y decreases as knee goes up
-      if (leftYChange == AngleChangeState.decreasing && rightYChange != AngleChangeState.decreasing) {
+      // Fast movement: check if knee is significantly lifted relative to torso length
+      double torsoLength = (leftShoulder.y - leftHip.y).abs();
+      if (leftKneeY < rightKneeY - torsoLength * 0.15) {
         _liftingLegSide = TrackedSide.left;
         _standingLegSide = TrackedSide.right;
-      } else if (rightYChange == AngleChangeState.decreasing && leftYChange != AngleChangeState.decreasing) {
+      } else if (rightKneeY < leftKneeY - torsoLength * 0.15) {
         _liftingLegSide = TrackedSide.right;
         _standingLegSide = TrackedSide.left;
       }
@@ -189,7 +195,7 @@ class StandingKneeToElbow extends ExerciseBase {
       "distanceD": distanceD,
     }, timeStamp: now));
 
-    _updateStateMachine(distanceD, liftingKnee.y, standingKnee.y, now);
+    _updateStateMachine(distanceD, liftingKnee.y, standingKnee.y, torsoLength, now);
 
     if (kteState == KteState.standing_base && previousKteState != KteState.standing_base) {
       _completeRep();
@@ -236,27 +242,25 @@ class StandingKneeToElbow extends ExerciseBase {
     }
   }
 
-  void _updateStateMachine(double distanceD, double liftingKneeY, double standingKneeY, int now) {
-    final distChange = frameBuffer.getAngleChange("distanceD");
-
+  void _updateStateMachine(double distanceD, double liftingKneeY, double standingKneeY, double torsoLength, int now) {
     if (kteState == KteState.standing_base) {
-      // If distance starts dropping fast, we are approaching
-      if (distChange == AngleChangeState.decreasing) {
+      if (liftingKneeY < standingKneeY - torsoLength * 0.15) {
         _transitionState(KteState.approaching, now);
       }
     } else if (kteState == KteState.approaching) {
-      // If distance reaches minimum (stops decreasing)
-      if (distChange == AngleChangeState.increasing || distChange == AngleChangeState.stable) {
+      if (distanceD < torsoLength * 0.6) {
         _transitionState(KteState.touch, now);
+      } else if (liftingKneeY > standingKneeY - torsoLength * 0.1) {
+        // Returned early without reaching touch distance
+        _transitionState(KteState.standing_base, now);
       }
     } else if (kteState == KteState.touch) {
-      // Started moving away
-      if (distChange == AngleChangeState.increasing && distanceD > 100) { // Arbitrary small threshold
+      if (distanceD > torsoLength * 0.8 || liftingKneeY > standingKneeY - torsoLength * 0.2) {
         _transitionState(KteState.returning, now);
       }
     } else if (kteState == KteState.returning) {
-      // Check if lifting knee returned back to normal level (close to standing knee)
-      if (liftingKneeY > standingKneeY - 10) { // Y increases downwards, so returning to floor
+      // Check if lifting knee returned back to normal level
+      if (liftingKneeY > standingKneeY - torsoLength * 0.1) {
         _transitionState(KteState.standing_base, now);
       }
     }

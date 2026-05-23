@@ -70,8 +70,13 @@ class StepBackBurpee extends ExerciseBase {
     final shoulder = getSideLandmark(landmarks: landmarks, rightType: PoseLandmarkType.rightShoulder, leftType: PoseLandmarkType.leftShoulder);
     final hip = getSideLandmark(landmarks: landmarks, rightType: PoseLandmarkType.rightHip, leftType: PoseLandmarkType.leftHip);
     final ankle = getSideLandmark(landmarks: landmarks, rightType: PoseLandmarkType.rightAnkle, leftType: PoseLandmarkType.leftAnkle);
+    final wrist = getSideLandmark(landmarks: landmarks, rightType: PoseLandmarkType.rightWrist, leftType: PoseLandmarkType.leftWrist);
+    final knee = getSideLandmark(landmarks: landmarks, rightType: PoseLandmarkType.rightKnee, leftType: PoseLandmarkType.leftKnee);
 
-    if (shoulder == null || hip == null || ankle == null) return false;
+    if (shoulder == null || hip == null || ankle == null || wrist == null || knee == null) return false;
+
+    // Yêu cầu nhìn rõ toàn thân, tránh việc bị ngoại suy khi mới thấy nửa người
+    if (shoulder.likelihood < 0.5 || hip.likelihood < 0.5 || ankle.likelihood < 0.5 || wrist.likelihood < 0.5 || knee.likelihood < 0.5) return false;
 
     double bodyAngle = calculateAngle(firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
     
@@ -118,9 +123,11 @@ class StepBackBurpee extends ExerciseBase {
     double bodyAlignmentAngle = calculateAngle(firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
     double hipAngle = calculateAngle(firstPoint: shoulder, midPoint: hip, lastPoint: knee);
     double elbowAngle = calculateAngle(firstPoint: shoulder, midPoint: elbow, lastPoint: wrist);
+    double shoulderToArmAngle = calculateAngle(firstPoint: hip, midPoint: shoulder, lastPoint: wrist);
     
     double wristAnkleDistX = (wrist.x - ankle.x).abs() / scaleFactor!; // Chuẩn hóa theo tỷ lệ cơ thể
     double wristY = wrist.y;
+    double kneeY = knee.y;
     int now = frameTimestampMs;
 
     final ctx = RepContext(
@@ -139,9 +146,10 @@ class StepBackBurpee extends ExerciseBase {
     debugData['Knee'] = kneeAngle.toStringAsFixed(0);
     debugData['Body'] = bodyAlignmentAngle.toStringAsFixed(0);
     debugData['DistX'] = wristAnkleDistX.toStringAsFixed(2);
+    debugData['ShToArm'] = shoulderToArmAngle.toStringAsFixed(0);
 
     // 2. State Machine Update
-    _updateState(kneeAngle, bodyAlignmentAngle, wristAnkleDistX, wristY, now);
+    _updateState(kneeAngle, bodyAlignmentAngle, wristAnkleDistX, wristY, kneeY, shoulderToArmAngle, now);
 
     // 3. Update Metrics
     for (final metric in _metrics) {
@@ -174,10 +182,15 @@ class StepBackBurpee extends ExerciseBase {
     }
   }
 
-  void _updateState(double kneeAngle, double bodyAngle, double distX, double wristY, int timestampMs) {
+  void _updateState(double kneeAngle, double bodyAngle, double distX, double wristY, double kneeY, double shoulderToArmAngle, int timestampMs) {
     // Logic nhận diện trạng thái qua khoảng cách ngang (DistX) và tư thế
     bool isCrouching = kneeAngle < 120 && bodyAngle < 120; // Đang co người
-    bool isExtendedPlank = _plankDebouncer.update(distX > BurpeeConfig.PLANK_MIN_DIST_X && bodyAngle > 140);
+    bool isExtendedPlank = _plankDebouncer.update(
+      distX > BurpeeConfig.PLANK_MIN_DIST_X && 
+      bodyAngle > 140 &&
+      wristY > kneeY && // Tay phải chống dưới sàn (thấp hơn đầu gối)
+      shoulderToArmAngle > 60 && shoulderToArmAngle < 120 // Tay tạo thành góc vuông với vai
+    );
     bool isStandingStraight = _standingDebouncer.update(bodyAngle > BurpeeConfig.STANDING_BODY_ANGLE);
 
     if (burpeeState == BurpeeState.standing && !isStandingStraight) {
@@ -196,6 +209,10 @@ class StepBackBurpee extends ExerciseBase {
       _transitionState(BurpeeState.standingUp, timestampMs);
     } 
     else if (burpeeState == BurpeeState.standingUp && isStandingStraight) {
+      _transitionState(BurpeeState.standing, timestampMs);
+    }
+    else if (isStandingStraight && burpeeState != BurpeeState.standing) {
+      // Reset state if user stands up without completing the full sequence
       _transitionState(BurpeeState.standing, timestampMs);
     }
   }

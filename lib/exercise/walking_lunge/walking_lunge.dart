@@ -207,15 +207,7 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
       "stepLengthX": stepLengthX,
     }, timeStamp: now));
 
-    // State Machine
-    _updateStateMachine(frontKneeAngle, rearKneeAngle, stepLengthX, now);
-
-    if (walkingState == WalkingState.standing && previousWalkingState != WalkingState.standing) {
-      _completeRep();
-      return;
-    }
-
-    final ctx = WalkingRepContext(
+    var ctx = WalkingRepContext(
       thighLength: thighLength,
       frontKnee: frontKnee,
       frontAnkle: frontAnkle,
@@ -232,6 +224,29 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
       frameTimestamp: now,
       resultIssues: resultIssues,
     );
+
+    // State Machine
+    _updateStateMachine(ctx);
+
+    if (ctx.state != walkingState) {
+      ctx = WalkingRepContext(
+        thighLength: thighLength,
+        frontKnee: frontKnee,
+        frontAnkle: frontAnkle,
+        frontFoot: frontFoot,
+        rearKnee: rearKnee,
+        rearAnkle: rearAnkle,
+        hip: hip,
+        shoulder: shoulder,
+        frontKneeAngle: frontKneeAngle,
+        rearKneeAngle: rearKneeAngle,
+        torsoAngle: torsoAngle,
+        stepLengthX: stepLengthX,
+        state: walkingState,
+        frameTimestamp: now,
+        resultIssues: resultIssues,
+      );
+    }
 
     if (walkingState != WalkingState.standing) {
       for (final metric in _metrics) {
@@ -259,56 +274,47 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
     }
   }
 
-  void _updateStateMachine(double frontKneeAngle, double rearKneeAngle, double stepLengthX, int now) {
+  void _updateStateMachine(WalkingRepContext ctx) {
+    int now = ctx.frameTimestamp;
     final hipYChange = frameBuffer.getAngleChange("hipY");
     final stepXChange = frameBuffer.getAngleChange("stepLengthX");
 
     if (walkingState == WalkingState.standing) {
-      // If step length is increasing strongly, we are stepping
-      if (stepXChange == AngleChangeState.increasing && stepLengthX > 50) {
+      if (ctx.stepLengthX > 80 || ctx.frontKneeAngle < 160) {
         _transitionState(WalkingState.stepping, now);
       }
     } else if (walkingState == WalkingState.stepping) {
-      // If hip starts moving down, descending
       if (hipYChange == AngleChangeState.increasing) {
         _transitionState(WalkingState.descending, now);
+      } else if (ctx.stepLengthX < 50 && ctx.frontKneeAngle > 160 && ctx.rearKneeAngle > 160) {
+        // False start, returned to standing
+        _transitionState(WalkingState.standing, now);
       }
     } else if (walkingState == WalkingState.descending) {
-      // Bottom when hip stops moving down or knee hits 90
-      if (frontKneeAngle <= 100 || hipYChange == AngleChangeState.decreasing) {
+      // Bottom when hip stops moving down or knee hits 100
+      if (ctx.frontKneeAngle <= 100 || hipYChange == AngleChangeState.decreasing) {
         _transitionState(WalkingState.bottom, now);
-        // evaluate step length here
-        final ctx = WalkingRepContext(
-          thighLength: calculateDistance(getSideTrackedLandmarks(smoothedLandmarks!)!['hip']!, getSideTrackedLandmarks(smoothedLandmarks!)!['knee']!),
-          frontKnee: getSideTrackedLandmarks(smoothedLandmarks!)!['knee']!, // mock just for eval
-          frontAnkle: getSideTrackedLandmarks(smoothedLandmarks!)!['ankle']!, // mock
-          frontFoot: getSideTrackedLandmarks(smoothedLandmarks!)!['foot']!, // mock
-          rearKnee: getSideTrackedLandmarks(smoothedLandmarks!)!['knee']!, // mock
-          rearAnkle: getSideTrackedLandmarks(smoothedLandmarks!)!['ankle']!, // mock
-          hip: getSideTrackedLandmarks(smoothedLandmarks!)!['hip']!,
-          shoulder: getSideTrackedLandmarks(smoothedLandmarks!)!['shoulder']!,
-          frontKneeAngle: frontKneeAngle,
-          rearKneeAngle: rearKneeAngle,
-          torsoAngle: 0,
-          stepLengthX: stepLengthX,
-          state: walkingState,
-          frameTimestamp: now,
-          resultIssues: resultIssues,
-        );
+        // evaluate step length here using the real context
         stepLengthMetric.evaluateRep(ctx);
       }
     } else if (walkingState == WalkingState.bottom) {
-      // Pulling through when hip moves up and step length decreases
-      if (hipYChange == AngleChangeState.decreasing || stepXChange == AngleChangeState.decreasing) {
+      // Pulling through when hip moves up
+      if (hipYChange == AngleChangeState.decreasing || ctx.frontKneeAngle > 120) {
         _transitionState(WalkingState.pulling_through, now);
-        _completeRep(); // Complete rep here since it's continuous
-        // we can go straight to stepping
-        _transitionState(WalkingState.stepping, now);
       }
     } else if (walkingState == WalkingState.pulling_through) {
-      // Fallback
-      if (frontKneeAngle > 160 && rearKneeAngle > 160) {
+      // Rep is completed when both knees are mostly straight
+      if (ctx.frontKneeAngle > 150 && ctx.rearKneeAngle > 150 && ctx.stepLengthX < 80) {
+         _completeRep();
          _transitionState(WalkingState.standing, now);
+      } else if (ctx.stepLengthX > 80 && ctx.frontKneeAngle > 140 && ctx.rearKneeAngle > 140) {
+         // Continuous walking: stepped out for next rep
+         _completeRep();
+         _transitionState(WalkingState.stepping, now);
+      } else if (hipYChange == AngleChangeState.increasing && ctx.stepLengthX > 80 && stepXChange == AngleChangeState.increasing) {
+         // Continuous walking: immediately started descending
+         _completeRep();
+         _transitionState(WalkingState.descending, now);
       }
     }
   }
