@@ -197,11 +197,6 @@ class StandingKneeToElbow extends ExerciseBase {
 
     _updateStateMachine(distanceD, liftingKnee.y, standingKnee.y, torsoLength, now);
 
-    if (kteState == KteState.standing_base && previousKteState != KteState.standing_base) {
-      _completeRep();
-      return;
-    }
-
     final ctx = StandingKteRepContext(
       standingLegSide: _standingLegSide,
       standingKnee: standingKnee,
@@ -261,6 +256,7 @@ class StandingKneeToElbow extends ExerciseBase {
     } else if (kteState == KteState.returning) {
       // Check if lifting knee returned back to normal level
       if (liftingKneeY > standingKneeY - torsoLength * 0.1) {
+        _completeRep();
         _transitionState(KteState.standing_base, now);
       }
     }
