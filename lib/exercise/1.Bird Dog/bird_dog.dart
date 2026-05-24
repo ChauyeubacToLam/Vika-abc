@@ -82,11 +82,8 @@ class BirdDog extends ExerciseBase {
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    if (cameraFacing == CameraFacing.left || cameraFacing == CameraFacing.right) {
-      return 'Góc ngang bị che khuất tay/chân. Hãy đặt máy góc chéo 45 độ!';
-    }
-    if (cameraFacing == CameraFacing.front) {
-      return 'Không đặt máy chính diện. Hãy đặt góc chéo 45 độ!';
+    if (cameraFacing != CameraFacing.left && cameraFacing != CameraFacing.right) {
+      return 'Vui lòng quay ngang người 100% với camera!';
     }
     return null;
   }

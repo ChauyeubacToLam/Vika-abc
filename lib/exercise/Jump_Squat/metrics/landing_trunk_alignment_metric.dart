@@ -51,6 +51,7 @@ class LandingTrunkAlignmentMetric extends JumpSquatMetricBase {
           phase: 'REP_COMPLETE',
           type: 'Back',
           message: 'Lưng rạp úp quá mức khi tiếp đất (${_maxLeanAngle!.toStringAsFixed(0)}°)! Giữ ngực cao.',
+          voiceMessage: 'Giữ thẳng lưng',
           affectsForm: true,
         ));
       }

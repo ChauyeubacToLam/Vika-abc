@@ -201,16 +201,27 @@ class SitUp extends ExerciseBase {
   }
 
   void _completeRep(SitUpRepContext ctx) {
-    repCount++;
     romMetric.evaluateRep();
     tempoMetric.evaluateRep();
 
     final allFaults = <FaultRecord>[];
     for (var metric in _metrics) allFaults.addAll(metric.faults);
 
+    final legLifts = allFaults.where((f) => f.type == 'Stability').toList();
+    bool isLegLifted = legLifts.isNotEmpty;
+
+    if (!isLegLifted) {
+      repCount++;
+    } else {
+      final voiceMsg = legLifts.first.voiceMessage;
+      if (voiceMsg != null && voiceMsg.isNotEmpty) {
+        ttsService.speak(voiceMsg);
+      }
+    }
+
     correctForm = !allFaults.any((f) => f.affectsForm);
 
-    if (!correctForm) resultIssues.feedback['Result'] = 'Fix Form';
+    if (!correctForm) resultIssues.feedback['Result'] = isLegLifted ? 'Không tính rep' : 'Fix Form';
 
     logger.addRepLog(RepLog(
       correctForm: correctForm,

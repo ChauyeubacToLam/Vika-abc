@@ -59,7 +59,7 @@ class StepBackBurpee extends ExerciseBase {
       case BurpeeState.standing: return 'Đứng thẳng';
       case BurpeeState.squattingDown: return 'Hạ người';
       case BurpeeState.steppingBack: return 'Bước lùi';
-      case BurpeeState.highPlank: return 'Plank';
+      case BurpeeState.highPlank: return 'Nằm xuống'; // Thay vì Plank
       case BurpeeState.steppingForward: return 'Bước lên';
       case BurpeeState.standingUp: return 'Đứng lên';
     }
@@ -126,6 +126,7 @@ class StepBackBurpee extends ExerciseBase {
     double shoulderToArmAngle = calculateAngle(firstPoint: hip, midPoint: shoulder, lastPoint: wrist);
     
     double wristAnkleDistX = (wrist.x - ankle.x).abs() / scaleFactor!; // Chuẩn hóa theo tỷ lệ cơ thể
+    double shoulderWristDistY = (wrist.y - shoulder.y).abs() / scaleFactor!; // Khoảng cách Y giữa vai và tay
     double wristY = wrist.y;
     double kneeY = knee.y;
     int now = frameTimestampMs;
@@ -147,9 +148,10 @@ class StepBackBurpee extends ExerciseBase {
     debugData['Body'] = bodyAlignmentAngle.toStringAsFixed(0);
     debugData['DistX'] = wristAnkleDistX.toStringAsFixed(2);
     debugData['ShToArm'] = shoulderToArmAngle.toStringAsFixed(0);
+    debugData['ShWrDistY'] = shoulderWristDistY.toStringAsFixed(2);
 
     // 2. State Machine Update
-    _updateState(kneeAngle, bodyAlignmentAngle, wristAnkleDistX, wristY, kneeY, shoulderToArmAngle, now);
+    _updateState(kneeAngle, bodyAlignmentAngle, wristAnkleDistX, wristY, kneeY, shoulderToArmAngle, shoulderWristDistY, now);
 
     // 3. Update Metrics
     for (final metric in _metrics) {
@@ -182,15 +184,18 @@ class StepBackBurpee extends ExerciseBase {
     }
   }
 
-  void _updateState(double kneeAngle, double bodyAngle, double distX, double wristY, double kneeY, double shoulderToArmAngle, int timestampMs) {
+  void _updateState(double kneeAngle, double bodyAngle, double distX, double wristY, double kneeY, double shoulderToArmAngle, double shoulderWristDistY, int timestampMs) {
     // Logic nhận diện trạng thái qua khoảng cách ngang (DistX) và tư thế
     bool isCrouching = kneeAngle < 120 && bodyAngle < 120; // Đang co người
-    bool isExtendedPlank = _plankDebouncer.update(
+    
+    // Yêu cầu nằm hoàn toàn xuống sàn: vai phải hạ thấp gần bằng cổ tay (khoảng cách Y nhỏ)
+    bool isLyingOnFloor = _plankDebouncer.update(
       distX > BurpeeConfig.PLANK_MIN_DIST_X && 
       bodyAngle > 140 &&
-      wristY > kneeY && // Tay phải chống dưới sàn (thấp hơn đầu gối)
-      shoulderToArmAngle > 60 && shoulderToArmAngle < 120 // Tay tạo thành góc vuông với vai
+      shoulderWristDistY < 0.6 && // Nằm hoàn toàn xuống sàn (vai hạ thấp)
+      shoulderToArmAngle > 45 && shoulderToArmAngle < 135 // Tay tạo thành góc vuông với vai
     );
+    
     bool isStandingStraight = _standingDebouncer.update(bodyAngle > BurpeeConfig.STANDING_BODY_ANGLE);
 
     if (burpeeState == BurpeeState.standing && !isStandingStraight) {
@@ -199,10 +204,10 @@ class StepBackBurpee extends ExerciseBase {
     else if (burpeeState == BurpeeState.squattingDown && isCrouching && distX > 0.2) {
       _transitionState(BurpeeState.steppingBack, timestampMs);
     } 
-    else if ((burpeeState == BurpeeState.steppingBack || burpeeState == BurpeeState.squattingDown) && isExtendedPlank) {
-      _transitionState(BurpeeState.highPlank, timestampMs);
+    else if ((burpeeState == BurpeeState.steppingBack || burpeeState == BurpeeState.squattingDown) && isLyingOnFloor) {
+      _transitionState(BurpeeState.highPlank, timestampMs); // Sử dụng highPlank state làm trạng thái nằm
     } 
-    else if (burpeeState == BurpeeState.highPlank && !isExtendedPlank && distX < BurpeeConfig.PLANK_MIN_DIST_X) {
+    else if (burpeeState == BurpeeState.highPlank && !isLyingOnFloor && distX < BurpeeConfig.PLANK_MIN_DIST_X) {
       _transitionState(BurpeeState.steppingForward, timestampMs);
     } 
     else if (burpeeState == BurpeeState.steppingForward && bodyAngle > 100) {

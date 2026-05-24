@@ -21,7 +21,6 @@ import '../exercise/7.Plank Shoulder Tap/plank_shoulder_tap.dart';
 import '../exercise/8.Leg Raises (Supine)/leg_raise.dart';
 import '../exercise/9.Reverse Crunch/reverse_crunch.dart';
 import '../exercise/10.Vup/v_up.dart';
-import '../exercise/11.Lying Leg Raise/lying_leg_raise.dart';
 import '../exercise/12.Dead Bug/dead_bug.dart';
 import '../exercise/13.Plank Up-Down/plank_up_down.dart';
 import '../exercise/14.Bear Plank/bear_plank.dart';
@@ -565,23 +564,7 @@ ExerciseDefinition(
     createExercise: () => VUp(),
     phaseColors: const { 'lying': Colors.grey, 'folding': Colors.orange, 'vShape': Colors.green, 'unfolding': Colors.blue },
   ),
-  ExerciseDefinition(
-    id: 'lying_leg_raise',
-    name: 'Lying Leg Raise',
-    subtitle: 'Nâng chân nằm ngửa',
-    description: 'Biến thể nâng chân tăng cường cơ bụng.',
-    icon: Icons.airline_seat_flat_angled,
-    primaryColor: const Color(0xFF009688),
-    secondaryColor: const Color(0xFF00796B),
-    difficulty: 'Trung bình',
-    targetMuscles: const ['Bụng dưới'],
-    duration: '15 reps',
-    cameraHint: 'Quay ngang người (Side View).',
-    framingHint: 'Giữ vai, hông, đầu gối trong khung hình.',
-    setupTips: const ['Ép chặt thắt lưng xuống sàn', 'Hạ chân chậm rãi'],
-    createExercise: () => LyingLegRaise(),
-    phaseColors: const { 'lying': Colors.grey, 'raising': Colors.orange, 'top': Colors.green, 'lowering': Colors.blue },
-  ),
+
   ExerciseDefinition(
     id: 'dead_bug',
     name: 'Dead Bug',

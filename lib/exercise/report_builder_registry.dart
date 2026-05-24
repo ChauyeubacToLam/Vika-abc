@@ -5,7 +5,6 @@ import 'squat/squat_report_builder.dart';
 import '8.Leg Raises (Supine)/leg_raise_report_builder.dart';
 import '9.Reverse Crunch/reverse_crunch_report_builder.dart';
 import '10.Vup/v_up_report_builder.dart';
-import '11.Lying Leg Raise/lying_leg_raise_report_builder.dart';
 import '12.Dead Bug/dead_bug_report_builder.dart';
 import '13.Plank Up-Down/plank_up_down_report_builder.dart';
 import '14.Bear Plank/bear_plank_report_builder.dart';
@@ -31,7 +30,6 @@ final Map<String, ({ExerciseReportBuilder builder, double met})>
   'leg_raise': (builder: LegRaiseReportBuilder(), met: 3.5),
   'reverse_crunch': (builder: ReverseCrunchReportBuilder(), met: 3.5),
   'v_up': (builder: VUpReportBuilder(), met: 4.0),
-  'lying_leg_raise': (builder: LyingLegRaiseReportBuilder(), met: 3.5),
   'dead_bug': (builder: DeadBugReportBuilder(), met: 3.0),
   'plank_up_down': (builder: PlankUpDownReportBuilder(), met: 4.5),
   'bear_plank': (builder: BearPlankReportBuilder(), met: 3.5),

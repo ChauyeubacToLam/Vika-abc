@@ -29,6 +29,10 @@ class VUpRepContext {
   final double hipY;
   final double? scaleFactor; // Khoảng cách Shoulder-Hip (chuẩn hóa kích thước)
   
+  final bool isHorizontal;
+  final bool bothArmsLifted;
+  final bool bothLegsLifted;
+  
   final VUpState state;
   final int frameTimestampMs;
   final ResultIssues resultIssues;
@@ -41,6 +45,9 @@ class VUpRepContext {
     required this.ankleY,
     required this.hipY,
     required this.scaleFactor,
+    required this.isHorizontal,
+    required this.bothArmsLifted,
+    required this.bothLegsLifted,
     required this.state,
     required this.frameTimestampMs,
     required this.resultIssues,

@@ -4,6 +4,7 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/exercise_logger.dart';
 import '../exercise_base.dart';
+import '../side_tracked_exercise_mixin.dart';
 
 import 'metrics/v_up_metric_base.dart';
 import 'metrics/sync_elevation_metric.dart';
@@ -13,11 +14,20 @@ import 'metrics/knee_extension_metric.dart';
 import 'metrics/tempo_metric.dart';
 
 
-class VUp extends ExerciseBase {
+class VUp extends ExerciseBase with SideTrackedExerciseMixin {
   @override
   Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
         VikaImageOrientation.landscapeLeft,
         VikaImageOrientation.landscapeRight,
+      };
+
+  @override
+  Map<String, SideLandmarkPair> get requiredSideLandmarks => {
+        'shoulder': (right: PoseLandmarkType.rightShoulder, left: PoseLandmarkType.leftShoulder),
+        'wrist': (right: PoseLandmarkType.rightWrist, left: PoseLandmarkType.leftWrist),
+        'hip': (right: PoseLandmarkType.rightHip, left: PoseLandmarkType.leftHip),
+        'knee': (right: PoseLandmarkType.rightKnee, left: PoseLandmarkType.leftKnee),
+        'ankle': (right: PoseLandmarkType.rightAnkle, left: PoseLandmarkType.leftAnkle),
       };
 
   final int maxRep;
@@ -73,23 +83,37 @@ class VUp extends ExerciseBase {
   // NOTE UI: Cần hiển thị Pop-up Safety Gate "Có tiền sử đau thắt lưng không?" trước.
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    final shoulder = landmarks[PoseLandmarkType.leftShoulder];
-    final hip = landmarks[PoseLandmarkType.leftHip];
-    final ankle = landmarks[PoseLandmarkType.leftAnkle];
+    final tracked = getSideTrackedLandmarks(landmarks);
+    if (tracked == null) return false;
     
-    if (shoulder == null || hip == null || ankle == null) return false;
+    final shoulder = tracked['shoulder']!;
+    final hip = tracked['hip']!;
+    final ankle = tracked['ankle']!;
 
     double bodyAngle = calculateAngleNormalized(firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
 
     // Người phải nằm thẳng
     if (bodyAngle < VUpConfig.START_BODY_MIN) return false;
 
-    // Check tọa độ Y xấp xỉ nhau (Sát sàn)
-    double dyShoulderHip = (shoulder.y - hip.y).abs();
-    double dyAnkleHip = (ankle.y - hip.y).abs();
+    // Check tọa độ Y xấp xỉ nhau (Sát sàn) của CẢ HAI BÊN
+    final leftShoulder = landmarks[PoseLandmarkType.leftShoulder];
+    final rightShoulder = landmarks[PoseLandmarkType.rightShoulder];
+    final leftHip = landmarks[PoseLandmarkType.leftHip];
+    final rightHip = landmarks[PoseLandmarkType.rightHip];
+    final leftAnkle = landmarks[PoseLandmarkType.leftAnkle];
+    final rightAnkle = landmarks[PoseLandmarkType.rightAnkle];
+
+    if (leftShoulder == null || rightShoulder == null || leftHip == null || rightHip == null || leftAnkle == null || rightAnkle == null) return false;
+
     double scale = calculateDistance(shoulder, hip);
-    
-    if (scale > 0 && (dyShoulderHip / scale > 0.2 || dyAnkleHip / scale > 0.2)) return false;
+    if (scale <= 0) return false;
+
+    double dyLShoulderHip = (leftShoulder.y - leftHip.y).abs() / scale;
+    double dyRShoulderHip = (rightShoulder.y - rightHip.y).abs() / scale;
+    double dyLAnkleHip = (leftAnkle.y - leftHip.y).abs() / scale;
+    double dyRAnkleHip = (rightAnkle.y - rightHip.y).abs() / scale;
+
+    if (dyLShoulderHip > 0.3 || dyRShoulderHip > 0.3 || dyLAnkleHip > 0.3 || dyRAnkleHip > 0.3) return false;
 
     return true; 
   }
@@ -125,19 +149,51 @@ class VUp extends ExerciseBase {
       return; 
     }
 
-    final shoulder = landmarks[PoseLandmarkType.leftShoulder];
-    final wrist = landmarks[PoseLandmarkType.leftWrist];
-    final hip = landmarks[PoseLandmarkType.leftHip];
-    final knee = landmarks[PoseLandmarkType.leftKnee];
-    final ankle = landmarks[PoseLandmarkType.leftAnkle];
+    final tracked = getSideTrackedLandmarks(landmarks);
+    if (tracked == null) return;
 
-    if (shoulder == null || wrist == null || hip == null || knee == null || ankle == null) return;
+    final shoulder = tracked['shoulder']!;
+    final wrist = tracked['wrist']!;
+    final hip = tracked['hip']!;
+    final knee = tracked['knee']!;
+    final ankle = tracked['ankle']!;
 
     scaleFactor = calculateDistance(shoulder, hip);
 
     double vAngle = calculateAngleNormalized(firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
     double kneeStraight = calculateAngleNormalized(firstPoint: hip, midPoint: knee, lastPoint: ankle);
     double wristAnkleDist = scaleFactor > 0 ? calculateDistance(wrist, ankle) / scaleFactor : 0;
+
+    // Tính isHorizontal, bothArmsLifted, bothLegsLifted cho cả 2 bên
+    bool isHorizontal = false;
+    bool bothArmsLifted = false;
+    bool bothLegsLifted = false;
+
+    final leftShoulder = landmarks[PoseLandmarkType.leftShoulder];
+    final rightShoulder = landmarks[PoseLandmarkType.rightShoulder];
+    final leftHip = landmarks[PoseLandmarkType.leftHip];
+    final rightHip = landmarks[PoseLandmarkType.rightHip];
+    final leftAnkle = landmarks[PoseLandmarkType.leftAnkle];
+    final rightAnkle = landmarks[PoseLandmarkType.rightAnkle];
+
+    if (leftShoulder != null && rightShoulder != null && leftHip != null && rightHip != null && leftAnkle != null && rightAnkle != null && scaleFactor > 0) {
+      double dyLShoulderHip = (leftShoulder.y - leftHip.y).abs() / scaleFactor;
+      double dyRShoulderHip = (rightShoulder.y - rightHip.y).abs() / scaleFactor;
+      double dyLAnkleHip = (leftAnkle.y - leftHip.y).abs() / scaleFactor;
+      double dyRAnkleHip = (rightAnkle.y - rightHip.y).abs() / scaleFactor;
+
+      if (dyLShoulderHip <= 0.35 && dyRShoulderHip <= 0.35 && dyLAnkleHip <= 0.35 && dyRAnkleHip <= 0.35) {
+        isHorizontal = true;
+      }
+
+      double lAnkleLift = (leftHip.y - leftAnkle.y) / scaleFactor;
+      double rAnkleLift = (rightHip.y - rightAnkle.y) / scaleFactor;
+      double lShoulderLift = (leftHip.y - leftShoulder.y) / scaleFactor;
+      double rShoulderLift = (rightHip.y - rightShoulder.y) / scaleFactor;
+
+      if (lAnkleLift > 0.1 && rAnkleLift > 0.1) bothLegsLifted = true;
+      if (lShoulderLift > 0.1 && rShoulderLift > 0.1) bothArmsLifted = true;
+    }
 
     if (now - _lastDiagnosticTime > 500 || state != previousState) {
       _diagnosticLog.add({
@@ -159,6 +215,9 @@ class VUp extends ExerciseBase {
       ankleY: ankle.y,
       hipY: hip.y,
       scaleFactor: scaleFactor,
+      isHorizontal: isHorizontal,
+      bothArmsLifted: bothArmsLifted,
+      bothLegsLifted: bothLegsLifted,
       state: state,
       frameTimestampMs: now,
       resultIssues: resultIssues,
@@ -199,7 +258,11 @@ class VUp extends ExerciseBase {
       double ankleLift = (ctx.hipY - ctx.ankleY) / scale;
       
       if (shoulderLift > 0.1 && ankleLift > 0.1) {
-        _transitionState(VUpState.v_position, now);
+        if (ctx.bothArmsLifted && ctx.bothLegsLifted) {
+          _transitionState(VUpState.v_position, now);
+        } else {
+          ctx.resultIssues.addInstruction('STRICT', 'Error', 'Hãy nâng ĐỒNG THỜI cả hai tay và hai chân!');
+        }
       } else {
         ctx.resultIssues.addInstruction('STRICT', 'Error', 'Nâng cao cả vai và chân!');
       }
@@ -209,8 +272,12 @@ class VUp extends ExerciseBase {
       _transitionState(VUpState.lowering, now);
     }
     else if (_lyingDebouncer.update(state == VUpState.lowering && vAngle > VUpConfig.LYING_ANGLE)) {
-      _transitionState(VUpState.lying, now);
-      _minAngleThisRep = null;
+      if (ctx.isHorizontal) {
+        _transitionState(VUpState.lying, now);
+        _minAngleThisRep = null;
+      } else {
+        ctx.resultIssues.addInstruction('STRICT', 'Error', 'Hạ hẳn người xuống sàn!');
+      }
     }
   }
 

@@ -1,4 +1,5 @@
 // ignore_for_file: non_constant_identifier_names, curly_braces_in_flow_control_structures
+import 'dart:math' as math;
 import 'package:vika/utils/debouncer.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
@@ -70,7 +71,7 @@ class LegRaise extends ExerciseBase {
   }
 
   // NOTE UI: Cần hiển thị Pop-up Safety Gate "Có tiền sử đau thắt lưng không?" trước.
-  ({double hipFlexion, double kneeStraight, double trunkHorizontal}) _calculateStrictAngles(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  ({double hipFlexion, double kneeStraight, double trunkHorizontal, bool isValid}) _calculateStrictAngles(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     double leftHipFlexion = 180.0, rightHipFlexion = 180.0;
     double leftKneeStraight = 180.0, rightKneeStraight = 180.0;
     double leftTrunk = 0.0, rightTrunk = 0.0;
@@ -81,7 +82,11 @@ class LegRaise extends ExerciseBase {
         landmarks[PoseLandmarkType.leftKnee]!.likelihood > 0.4 && landmarks[PoseLandmarkType.leftAnkle]!.likelihood > 0.4) {
       leftHipFlexion = calculateAngleNormalized(firstPoint: landmarks[PoseLandmarkType.leftShoulder]!, midPoint: landmarks[PoseLandmarkType.leftHip]!, lastPoint: landmarks[PoseLandmarkType.leftKnee]!);
       leftKneeStraight = calculateAngleNormalized(firstPoint: landmarks[PoseLandmarkType.leftHip]!, midPoint: landmarks[PoseLandmarkType.leftKnee]!, lastPoint: landmarks[PoseLandmarkType.leftAnkle]!);
-      leftTrunk = calculateHorizontalAngle(point1: landmarks[PoseLandmarkType.leftShoulder]!, point2: landmarks[PoseLandmarkType.leftHip]!);
+      
+      double dx = (landmarks[PoseLandmarkType.leftShoulder]!.x - landmarks[PoseLandmarkType.leftHip]!.x).abs();
+      double dy = (landmarks[PoseLandmarkType.leftShoulder]!.y - landmarks[PoseLandmarkType.leftHip]!.y).abs();
+      leftTrunk = math.atan2(dy, dx) * (180.0 / math.pi);
+      
       hasLeft = true;
     }
 
@@ -90,7 +95,11 @@ class LegRaise extends ExerciseBase {
         landmarks[PoseLandmarkType.rightKnee]!.likelihood > 0.4 && landmarks[PoseLandmarkType.rightAnkle]!.likelihood > 0.4) {
       rightHipFlexion = calculateAngleNormalized(firstPoint: landmarks[PoseLandmarkType.rightShoulder]!, midPoint: landmarks[PoseLandmarkType.rightHip]!, lastPoint: landmarks[PoseLandmarkType.rightKnee]!);
       rightKneeStraight = calculateAngleNormalized(firstPoint: landmarks[PoseLandmarkType.rightHip]!, midPoint: landmarks[PoseLandmarkType.rightKnee]!, lastPoint: landmarks[PoseLandmarkType.rightAnkle]!);
-      rightTrunk = calculateHorizontalAngle(point1: landmarks[PoseLandmarkType.rightShoulder]!, point2: landmarks[PoseLandmarkType.rightHip]!);
+      
+      double dx = (landmarks[PoseLandmarkType.rightShoulder]!.x - landmarks[PoseLandmarkType.rightHip]!.x).abs();
+      double dy = (landmarks[PoseLandmarkType.rightShoulder]!.y - landmarks[PoseLandmarkType.rightHip]!.y).abs();
+      rightTrunk = math.atan2(dy, dx) * (180.0 / math.pi);
+      
       hasRight = true;
     }
 
@@ -112,12 +121,14 @@ class LegRaise extends ExerciseBase {
       trunkHorizontal = rightTrunk;
     }
 
-    return (hipFlexion: hipFlexion, kneeStraight: kneeStraight, trunkHorizontal: trunkHorizontal);
+    return (hipFlexion: hipFlexion, kneeStraight: kneeStraight, trunkHorizontal: trunkHorizontal, isValid: hasLeft || hasRight);
   }
 
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     final angles = _calculateStrictAngles(landmarks);
+
+    if (!angles.isValid) return false;
 
     // Người phải duỗi thẳng trên mặt đất
     if (angles.hipFlexion < LegRaiseConfig.START_HIP_FLEXION_MIN) return false;
@@ -169,6 +180,12 @@ class LegRaise extends ExerciseBase {
     scaleFactor = calculateDistance(shoulder, hip);
 
     final angles = _calculateStrictAngles(landmarks);
+    if (!angles.isValid) {
+      resultIssues.feedback['Error'] = 'Không nhìn rõ người';
+      resultIssues.addInstruction('BLOCK', 'Error', 'Hãy nằm vào giữa khung hình!');
+      return;
+    }
+
     double hipFlexion = angles.hipFlexion;
     double kneeStraight = angles.kneeStraight;
     double trunkHorizontal = angles.trunkHorizontal;
@@ -212,17 +229,20 @@ class LegRaise extends ExerciseBase {
 
     bool isTrunkLying = trunkHorizontal <= LegRaiseConfig.MAX_TRUNK_ANGLE;
 
-    if (!isTrunkLying && state != LegRaiseState.lying) {
-      _transitionState(LegRaiseState.lying, now);
+    if (!isTrunkLying) {
+      if (state != LegRaiseState.lying) {
+        _transitionState(LegRaiseState.lying, now);
+      }
       ctx.resultIssues.feedback['Error'] = 'Lưng không chạm sàn';
       ctx.resultIssues.addInstruction('BLOCK', 'Error', 'Hãy nằm sát lưng xuống sàn!');
+      _raisingDebouncer.update(false); // Reset debouncer
       return;
     }
 
-    if (_raisingDebouncer.update(isTrunkLying && state == LegRaiseState.lying && hipFlexion < LegRaiseConfig.RAISING_ANGLE)) {
+    if (_raisingDebouncer.update(state == LegRaiseState.lying && hipFlexion < LegRaiseConfig.RAISING_ANGLE)) {
       _transitionState(LegRaiseState.raising, now);
     } 
-    else if (_topDebouncer.update(isTrunkLying && state == LegRaiseState.raising && hipFlexion <= LegRaiseConfig.TOP_ANGLE)) {
+    else if (_topDebouncer.update(state == LegRaiseState.raising && hipFlexion <= LegRaiseConfig.TOP_ANGLE)) {
       _transitionState(LegRaiseState.top, now);
     }
     else if (_loweringDebouncer.update(state == LegRaiseState.top && hipFlexion > LegRaiseConfig.LOWERING_ANGLE)) {

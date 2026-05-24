@@ -27,8 +27,7 @@ class JumpSquatConfig {
 class JumpSquat extends ExerciseBase {
   @override
   Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
-        VikaImageOrientation.landscapeLeft,
-        VikaImageOrientation.landscapeRight,
+        VikaImageOrientation.portrait,
       };
 
   final int maxRep;
@@ -74,12 +73,25 @@ class JumpSquat extends ExerciseBase {
   // --- Start Position & Setup ---
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+    final nose = landmarks[PoseLandmarkType.nose];
+    final shoulder = getSideLandmark(landmarks: landmarks, rightType: PoseLandmarkType.rightShoulder, leftType: PoseLandmarkType.leftShoulder);
     final hip = getSideLandmark(landmarks: landmarks, rightType: PoseLandmarkType.rightHip, leftType: PoseLandmarkType.leftHip);
     final knee = getSideLandmark(landmarks: landmarks, rightType: PoseLandmarkType.rightKnee, leftType: PoseLandmarkType.leftKnee);
     final ankle = getSideLandmark(landmarks: landmarks, rightType: PoseLandmarkType.rightAnkle, leftType: PoseLandmarkType.leftAnkle);
     final footIndex = getSideLandmark(landmarks: landmarks, rightType: PoseLandmarkType.rightFootIndex, leftType: PoseLandmarkType.leftFootIndex);
 
-    if (hip == null || knee == null || ankle == null || footIndex == null) return false;
+    if (nose == null || shoulder == null || hip == null || knee == null || ankle == null || footIndex == null) return false;
+
+    // Phải nhìn thấy đủ các bộ phận trên cơ thể mới vào tư thế sẵn sàng
+    if (!ExerciseBase.isLandmarkConfident(nose) ||
+        !ExerciseBase.isLandmarkConfident(shoulder) ||
+        !ExerciseBase.isLandmarkConfident(hip) ||
+        !ExerciseBase.isLandmarkConfident(knee) ||
+        !ExerciseBase.isLandmarkConfident(ankle) ||
+        !ExerciseBase.isLandmarkConfident(footIndex)) {
+      resultIssues.feedback['System'] = 'Hãy đứng xa ra để AI nhìn thấy toàn thân (từ đầu đến chân)';
+      return false;
+    }
 
     double kneeAngle = calculateAngle(firstPoint: hip, midPoint: knee, lastPoint: ankle);
     
@@ -100,9 +112,8 @@ class JumpSquat extends ExerciseBase {
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing == CameraFacing.front) {
-      return "⚠️ Góc quay ngang là BẮT BUỘC để theo dõi độ gập gối tiếp đất!";
+      return "⚠️ Hãy quay ngang người để AI đánh giá độ cong của lưng!";
     }
-    // Ghi chú: Gate y khoa đau lưng/béo phì (BMI > 30) cần được filter ở UI trước khi vào màn hình này.
     return null;
   }
 
@@ -155,16 +166,30 @@ class JumpSquat extends ExerciseBase {
 
     // 4. Hoàn thành 1 Rep (từ landing -> standing)
     if (jumpSquatState == JumpSquatState.standing && previousJumpSquatState == JumpSquatState.landing) {
-      repCount += 1;
-      
       // Xử lý Report và Faults
       final allFaults = <FaultRecord>[];
       for (final metric in _metrics) {
         allFaults.addAll(metric.faults);
       }
 
+      final backFaults = allFaults.where((f) => f.type == 'Back').toList();
+      bool hasBackFault = backFaults.isNotEmpty;
+
+      if (!hasBackFault) {
+        repCount += 1;
+      } else {
+        final voiceMsg = backFaults.first.voiceMessage;
+        if (voiceMsg != null && voiceMsg.isNotEmpty) {
+          ttsService.speak(voiceMsg);
+        }
+      }
+
       correctForm = !allFaults.any((f) => f.affectsForm);
-      resultIssues.feedback['Result'] = correctForm ? 'Hoàn hảo! 🔥' : 'Cần chú ý an toàn!';
+      if (hasBackFault) {
+        resultIssues.feedback['Result'] = 'Không tính rep (Cong lưng)';
+      } else {
+        resultIssues.feedback['Result'] = correctForm ? 'Hoàn hảo! 🔥' : 'Cần chú ý an toàn!';
+      }
 
       final faultMap = <String, Map<String, String>>{};
       for (final fault in allFaults) {

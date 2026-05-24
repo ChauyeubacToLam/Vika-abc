@@ -69,30 +69,22 @@ class PlankFormMetric extends StepBackBurpeeMetricBase {
         _faults.add(FaultRecord(
           phase: 'REP_COMPLETE',
           type: 'Spine',
-          message: 'Võng lưng khi Plank! Nguy cơ đau thắt lưng.',
+          message: 'Lưng bị gập quá mức khi nằm!',
           affectsForm: true,
         ));
       }
       
-      // Lỗi bước ngắn
+      // Lỗi bước ngắn (bear plank / co gập khi nằm)
       if (_maxHipAngle != null && _maxHipAngle! < PlankConfig.SHORT_STEP_WARNING) {
         _faults.add(FaultRecord(
           phase: 'REP_COMPLETE',
           type: 'Amplitude',
-          message: 'Bước chân quá ngắn, cơ thể bị gập gót.',
+          message: 'Chân chưa duỗi thẳng hết cỡ khi nằm xuống.',
           affectsForm: false,
         ));
       }
 
-      // Lỗi cong tay
-      if (_minElbowAngle != null && _minElbowAngle! < PlankConfig.ARM_BENT_WARNING) {
-         _faults.add(FaultRecord(
-          phase: 'REP_COMPLETE',
-          type: 'Arm',
-          message: 'Tay chống không thẳng, gây mỏi vai.',
-          affectsForm: false,
-        ));
-      }
+      // Đã bỏ kiểm tra lỗi cong tay vì nằm hoàn toàn xuống sàn thì tay bắt buộc phải cong.
     }
   }
 

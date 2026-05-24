@@ -31,8 +31,8 @@ class StabilityMetric extends SitUpMetricBase {
         _faults.add(FaultRecord(
           phase: ctx.state.name,
           type: 'Stability',
-          message: 'Bàn chân không giữ chặt',
-          voiceMessage: 'Ép chặt chân xuống sàn nhà',
+          message: 'Nhấc chân khỏi sàn',
+          voiceMessage: 'Hạ chân xuống',
           affectsForm: true,
           priority: SitUpFaultPriority.heelLift,
         ));

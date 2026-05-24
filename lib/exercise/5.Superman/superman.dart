@@ -79,8 +79,39 @@ class Superman extends ExerciseBase {
       // Nằm ngửa: Mũi chỉ lên trần (Y nhỏ), tai gần đất (Y lớn).
       double faceVerticalDiff = (nose.y - ear.y) / scaleFactor;
       // Nằm ngửa thì mũi cao hơn tai rất nhiều (faceVerticalDiff âm lớn)
-      if (faceVerticalDiff < -0.15) return false; 
+      if (faceVerticalDiff < -0.2) return false; 
     }
+
+    // Kiểm tra bằng hướng của bàn chân (nếu nhìn thấy)
+    final leftHeel = landmarks[PoseLandmarkType.leftHeel];
+    final leftFootIndex = landmarks[PoseLandmarkType.leftFootIndex];
+    final rightHeel = landmarks[PoseLandmarkType.rightHeel];
+    final rightFootIndex = landmarks[PoseLandmarkType.rightFootIndex];
+
+    PoseLandmark? heel;
+    PoseLandmark? footIndex;
+
+    if (leftHeel != null && leftFootIndex != null && rightHeel != null && rightFootIndex != null) {
+      if (leftHeel.likelihood + leftFootIndex.likelihood > rightHeel.likelihood + rightFootIndex.likelihood) {
+        heel = leftHeel;
+        footIndex = leftFootIndex;
+      } else {
+        heel = rightHeel;
+        footIndex = rightFootIndex;
+      }
+    } else {
+      heel = leftHeel ?? rightHeel;
+      footIndex = leftFootIndex ?? rightFootIndex;
+    }
+
+    if (heel != null && footIndex != null && scaleFactor > 0 && heel.likelihood > 0.3 && footIndex.likelihood > 0.3) {
+      // Nằm ngửa (supine): ngón chân (footIndex) hướng lên trần nhà (Y nhỏ hơn gót chân)
+      // Nằm sấp (prone): ngón chân úp xuống sàn (Y lớn hơn hoặc bằng gót chân)
+      double footVerticalDiff = (heel.y - footIndex.y) / scaleFactor;
+      // Nếu ngón chân cao hơn gót chân một khoảng rõ rệt (footVerticalDiff dương), chắc chắn đang nằm ngửa
+      if (footVerticalDiff > 0.15) return false;
+    }
+
     return true; 
   }
 
