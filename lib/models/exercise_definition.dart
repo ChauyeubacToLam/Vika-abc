@@ -41,6 +41,7 @@ import '../exercise/hastapaadasana/hastapaadasana.dart';
 import '../exercise/ashwa_sanchalanasana/ashwa_sanchalanasana.dart';
 import '../exercise/parvatasana/parvatasana.dart';
 import '../exercise/ashtanga_namaskara/ashtanga_namaskara.dart';
+import '../exercise/Cobra/cobra.dart';
 
 /* =========================================================================
    ExerciseDefinition — Metadata + factory for each exercise type.
@@ -966,5 +967,25 @@ ExerciseDefinition(
     ],
     createExercise: () => StepBackBurpee(),
     phaseColors: const { 'standing': Colors.green, 'squattingDown': Colors.orange, 'steppingBack': Colors.blue, 'highPlank': Colors.red, 'steppingForward': Colors.purple, 'standingUp': Colors.cyan },
+  ),
+  ExerciseDefinition(
+    id: 'cobra',
+    name: 'Cobra',
+    subtitle: 'Rắn hổ mang',
+    description: 'Tư thế yoga giúp giảm căng thẳng lưng dưới và kéo giãn lồng ngực.',
+    icon: Icons.accessibility_new,
+    primaryColor: const Color(0xFF9C27B0),
+    secondaryColor: const Color(0xFF7B1FA2),
+    difficulty: 'Cơ bản',
+    targetMuscles: const ['Lưng dưới', 'Ngực', 'Vai'],
+    duration: '3 reps',
+    cameraHint: 'Quay ngang người (Side View).',
+    framingHint: 'Đảm bảo thấy rõ từ vai đến hông khi nâng người.',
+    setupTips: const [
+      'Nằm sấp trên thảm.',
+      'Hai tay đặt cạnh ngực, dùng sức lưng nâng vai lên.',
+    ],
+    createExercise: () => Cobra(),
+    phaseColors: const { 'setup': Colors.grey, 'holding': Colors.orange, 'resting': Colors.blue },
   ),
 ];
