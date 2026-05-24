@@ -34,36 +34,9 @@ import '../exercise/Jump_Squat/jump_squat.dart';
 import '../exercise/bow_pose/bow_pose.dart';
 import '../exercise/side_plank_dip/side_plank_dip.dart';
 import '../exercise/step_back_burpee/step_back_burpee.dart';
-import '../exercise/cmt_1/cmt_1.dart';
-import '../exercise/cmt_2/cmt_2.dart';
-import '../exercise/cmt_3/cmt_3.dart';
-import '../exercise/cmt_4/cmt_4.dart';
-import '../exercise/cmt_5/cmt_5.dart';
-import '../exercise/cmt_6/cmt_6.dart';
-import '../exercise/cmt_7/cmt_7.dart';
-import '../exercise/cmt_8/cmt_8.dart';
-import '../exercise/cmt_9/cmt_9.dart';
-import '../exercise/cmt_10/cmt_10.dart';
-import '../exercise/cmt_11/cmt_11.dart';
-import '../exercise/cmt_12/cmt_12.dart';
-
-ExerciseBase _createCmtExercise(int index) {
-  switch (index) {
-    case 1: return Cmt1();
-    case 2: return Cmt2();
-    case 3: return Cmt3();
-    case 4: return Cmt4();
-    case 5: return Cmt5();
-    case 6: return Cmt6();
-    case 7: return Cmt7();
-    case 8: return Cmt8();
-    case 9: return Cmt9();
-    case 10: return Cmt10();
-    case 11: return Cmt11();
-    case 12: return Cmt12();
-    default: return Cmt1();
-  }
-}
+// import '../exercise/suryanamaskar/suryanamaskar.dart';
+import '../exercise/pranamasana/pranamasana.dart';
+import '../exercise/hasta_uttanasana/hasta_uttanasana.dart';
 
 /* =========================================================================
    ExerciseDefinition — Metadata + factory for each exercise type.
@@ -647,41 +620,41 @@ ExerciseDefinition(
     createExercise: () => BearPlank(),
     phaseColors: const { 'setup': Colors.grey, 'hovering': Colors.green, 'fatiguing': Colors.red },
   ),
-  ...List.generate(12, (index) => ExerciseDefinition(
-    id: 'cmt_${index + 1}',
-    name: 'Chào mặt trời ${index + 1}',
-    subtitle: 'Chuỗi Chào Mặt Trời 12 bước',
-    description: 'Chuỗi 12 tư thế Yoga liên hoàn giúp kích hoạt toàn thân, tăng độ dẻo dai cột sống và cải thiện nhịp thở.\nMỗi vòng đi qua 12 trạm từ Cầu nguyện → Rắn hổ mang → trở về.',
-    icon: Icons.self_improvement,
-    primaryColor: const Color(0xFFFF8A65),
-    secondaryColor: const Color(0xFFFF5722),
-    difficulty: 'Trung bình',
-    targetMuscles: const ['Toàn thân', 'Cột sống', 'Core', 'Chân'],
-    duration: '5 vòng',
-    cameraHint: 'Quay ngang người 100% (Side View).',
-    framingHint: 'Đảm bảo thấy toàn thân từ đầu đến chân, chừa khoảng trống khi nằm sấp.',
-    setupTips: const [
-      'Đặt camera quay ngang, cách bạn 3–4 mét để thấy toàn thân khi nằm.',
-      'Trải thảm yoga theo chiều dài hướng camera.',
-      'Hít thở sâu, bắt đầu ở tư thế đứng thẳng tay chắp trước ngực.',
-    ],
-    safetyWarning: 'Không gượng ép nếu đau lưng. Dừng lại ngay nếu chóng mặt.',
-    createExercise: () => _createCmtExercise(index + 1),
-    phaseColors: const {
-      'p1_pranamasana': Color(0xFF00E676),
-      'p2_hasta_uttanasana': Color(0xFFFFD600),
-      'p3_hastapaadasana': Color(0xFFFF9800),
-      'p4_ashwa_sanchalanasana': Color(0xFFFF6D00),
-      'p5_parvatasana': Color(0xFF2196F3),
-      'p6_ashtanga_namaskara': Color(0xFFE91E63),
-      'p7_bhujangasana': Color(0xFF9C27B0),
-      'p8_parvatasana_return': Color(0xFF2196F3),
-      'p9_ashwa_return': Color(0xFFFF6D00),
-      'p10_hastapaadasana_return': Color(0xFFFF9800),
-      'p11_hasta_uttanasana_return': Color(0xFFFFD600),
-      'p12_pranamasana_return': Color(0xFF00E676),
-    },
-  )),
+  // ExerciseDefinition(
+  //   id: 'suryanamaskar',
+  //   name: 'Chào mặt trời',
+  //   subtitle: 'Chuỗi Chào Mặt Trời 12 bước',
+  //   description: 'Chuỗi 12 tư thế Yoga liên hoàn giúp kích hoạt toàn thân, tăng độ dẻo dai cột sống và cải thiện nhịp thở.\nMỗi vòng đi qua 12 trạm từ Cầu nguyện → Rắn hổ mang → trở về.',
+  //   icon: Icons.self_improvement,
+  //   primaryColor: const Color(0xFFFF8A65),
+  //   secondaryColor: const Color(0xFFFF5722),
+  //   difficulty: 'Trung bình',
+  //   targetMuscles: const ['Toàn thân', 'Cột sống', 'Core', 'Chân'],
+  //   duration: '5 vòng',
+  //   cameraHint: 'Quay ngang người 100% (Side View).',
+  //   framingHint: 'Đảm bảo thấy toàn thân từ đầu đến chân, chừa khoảng trống khi nằm sấp.',
+  //   setupTips: const [
+  //     'Đặt camera quay ngang, cách bạn 3–4 mét để thấy toàn thân khi nằm.',
+  //     'Trải thảm yoga theo chiều dài hướng camera.',
+  //     'Hít thở sâu, bắt đầu ở tư thế đứng thẳng tay chắp trước ngực.',
+  //   ],
+  //   safetyWarning: 'Không gượng ép nếu đau lưng. Dừng lại ngay nếu chóng mặt.',
+  //   // createExercise: () => Suryanamaskar(),
+  //   phaseColors: const {
+  //     'p1_pranamasana': Color(0xFF00E676),
+  //     'p2_hasta_uttanasana': Color(0xFFFFD600),
+  //     'p3_hastapaadasana': Color(0xFFFF9800),
+  //     'p4_ashwa_sanchalanasana': Color(0xFFFF6D00),
+  //     'p5_parvatasana': Color(0xFF2196F3),
+  //     'p6_ashtanga_namaskara': Color(0xFFE91E63),
+  //     'p7_bhujangasana': Color(0xFF9C27B0),
+  //     'p8_parvatasana_return': Color(0xFF2196F3),
+  //     'p9_ashwa_return': Color(0xFFFF6D00),
+  //     'p10_hastapaadasana_return': Color(0xFFFF9800),
+  //     'p11_hasta_uttanasana_return': Color(0xFFFFD600),
+  //     'p12_pranamasana_return': Color(0xFF00E676),
+  //   },
+  // ),
   ExerciseDefinition(
     id: 'cossack_squat',
     name: 'Cossack Squat',
@@ -741,6 +714,48 @@ ExerciseDefinition(
     ],
     createExercise: () => TricepDip(),
     phaseColors: const { 'setup_top': Colors.green, 'descending': Colors.orange, 'bottom': Colors.red, 'ascending': Colors.blue },
+  ),
+  ExerciseDefinition(
+    id: 'pranamasana',
+    name: 'Pranamasana',
+    subtitle: 'Đứng cầu nguyện',
+    description: 'Tư thế đứng cầu nguyện đầu tiên trong chuỗi Chào mặt trời.',
+    icon: Icons.self_improvement,
+    primaryColor: const Color(0xFF00E676),
+    secondaryColor: const Color(0xFF00C853),
+    difficulty: 'Cơ bản',
+    targetMuscles: const ['Toàn thân'],
+    duration: '5s hold',
+    cameraHint: 'Quay ngang người hoặc chính diện.',
+    framingHint: 'Đảm bảo thấy rõ thân trên đến đầu gối.',
+    setupTips: const [
+      'Đứng thẳng, chân chụm lại.',
+      'Chắp hai tay trước ngực.',
+      'Giữ yên trong 5 giây.',
+    ],
+    createExercise: () => Pranamasana(),
+    phaseColors: const { 'setup': Colors.grey, 'holding': Colors.green },
+  ),
+  ExerciseDefinition(
+    id: 'hasta_uttanasana',
+    name: 'Hasta Uttanasana',
+    subtitle: 'Vươn tay lên cao',
+    description: 'Tư thế vươn người thứ hai trong chuỗi Chào mặt trời, kéo giãn cơ bụng và mở rộng lồng ngực.',
+    icon: Icons.accessibility_new,
+    primaryColor: const Color(0xFFFFD600),
+    secondaryColor: const Color(0xFFFBC02D),
+    difficulty: 'Cơ bản',
+    targetMuscles: const ['Toàn thân', 'Cơ bụng', 'Lưng trên'],
+    duration: '3s hold',
+    cameraHint: 'Quay ngang người (Side View).',
+    framingHint: 'Đảm bảo thấy toàn bộ cơ thể từ đầu đến gót chân.',
+    setupTips: const [
+      'Hít vào, vươn hai tay lên cao qua đầu.',
+      'Đẩy nhẹ hông về trước và ngả thân trên ra sau.',
+      'Giữ yên trong 3 giây.',
+    ],
+    createExercise: () => HastaUttanasana(),
+    phaseColors: const { 'setup': Colors.grey, 'holding': Colors.orange },
   ),
   ExerciseDefinition(
     id: 'russian_twist',
