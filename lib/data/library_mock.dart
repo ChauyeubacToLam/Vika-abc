@@ -616,6 +616,16 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
     glyph: PoseGlyphType.plank,
     definitionName: 'Cobra',
   ),
+  AllExerciseRowMock(
+    idx: 45,
+    name: 'Ashtanga to Cobra',
+    cat: 'Yoga · Toàn thân · Nối tiếp',
+    diff: 'Trung bình',
+    ai: true,
+    yoga: true,
+    glyph: PoseGlyphType.plank,
+    definitionName: 'Ashtanga to Cobra',
+  ),
 ];
 
 const List<({String id, String label, int count})> libraryMockFilters = [

@@ -42,6 +42,7 @@ import '../exercise/ashwa_sanchalanasana/ashwa_sanchalanasana.dart';
 import '../exercise/parvatasana/parvatasana.dart';
 import '../exercise/ashtanga_namaskara/ashtanga_namaskara.dart';
 import '../exercise/Cobra/cobra.dart';
+import '../exercise/ashtanga_to_cobra/ashtanga_to_cobra.dart';
 
 /* =========================================================================
    ExerciseDefinition — Metadata + factory for each exercise type.
@@ -987,5 +988,30 @@ ExerciseDefinition(
     ],
     createExercise: () => Cobra(),
     phaseColors: const { 'setup': Colors.grey, 'holding': Colors.orange, 'resting': Colors.blue },
+  ),
+  ExerciseDefinition(
+    id: 'ashtanga_to_cobra',
+    name: 'Ashtanga to Cobra',
+    subtitle: 'Nối tiếp Cá sấu và Rắn hổ mang',
+    description: 'Bài tập nối tiếp từ tư thế Cá sấu (8 điểm chạm sàn) trườn lên tư thế Rắn hổ mang.',
+    icon: Icons.sync_alt,
+    primaryColor: const Color(0xFFE91E63),
+    secondaryColor: const Color(0xFF9C27B0),
+    difficulty: 'Trung bình',
+    targetMuscles: const ['Ngực', 'Vai', 'Lưng dưới', 'Core'],
+    duration: '2 tư thế',
+    cameraHint: 'Quay ngang người (Side View).',
+    framingHint: 'Đảm bảo thấy toàn bộ cơ thể trên thảm.',
+    setupTips: const [
+      'Bắt đầu từ tư thế 8 điểm chạm sàn (Ashtanga Namaskara).',
+      'Hạ hông và trườn ngực lên tư thế Rắn hổ mang (Cobra).',
+    ],
+    createExercise: () => AshtangaToCobra(),
+    phaseColors: const {
+      'ashtangaSetup': Colors.grey,
+      'ashtangaHolding': Colors.pink,
+      'cobraTransition': Colors.orange,
+      'cobraHolding': Colors.purple,
+    },
   ),
 ];
