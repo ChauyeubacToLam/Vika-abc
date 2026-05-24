@@ -51,6 +51,8 @@
 		<true/>
 		<key>NSCameraUsageDescription</key>
 		<string>Vika cần camera để theo dõi và phân tích tư thế tập luyện của bạn bằng AI.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>Vika cần quyền chọn ảnh để cập nhật ảnh đại diện của bạn.</string>
 		<key>UIApplicationSupportsIndirectInputEvents</key>
 		<true/>
 		<key>UILaunchStoryboardName</key>

@@ -1,14 +1,13 @@
-// SettingsGroup + SettingRow — categorical settings list on the Profile
-// screen. Group label uppercase tracked, then a cream card containing rows
-// with an icon tile, label, optional sub-label, and a chevron.
-//
-// Mirrors `SettingsGroup`, `SettingRow`, and `SettingsIcon` in
-// vika-main-app-ivory-v1.jsx.
+// SettingsGroup + SettingRow — categorical settings list on the
+// Profile screen. v2 polish: group label uses the 13pt section-header
+// grammar (yellow accent bar + uppercase eyebrow), rows are slightly
+// taller with refined icon medallions and a more visible chevron.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
-import '../plan/plan_typography.dart';
 import '../../theme/app_colors.dart';
+
 class SettingsGroup extends StatelessWidget {
   const SettingsGroup({
     super.key,
@@ -23,23 +22,53 @@ class SettingsGroup extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
+      padding: const EdgeInsets.only(bottom: 22),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: PlanEyebrow(label, size: 9, letterSpacing: 1.6),
+            padding: const EdgeInsets.fromLTRB(2, 0, 2, 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 4,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: c.yellow,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontFamily: 'BeVietnamPro',
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.6,
+                    color: c.ink,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(child: Container(height: 1, color: c.border)),
+              ],
+            ),
           ),
-          const SizedBox(height: 8),
           Container(
             decoration: BoxDecoration(
               color: c.bgRaised,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(18),
               border: Border.all(color: c.border),
+              boxShadow: [
+                BoxShadow(
+                  color: c.ink.withValues(alpha: 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(18),
               child: Column(
                 children: [
                   for (var i = 0; i < rows.length; i++) ...[
@@ -49,6 +78,7 @@ class SettingsGroup extends StatelessWidget {
                         height: 1,
                         thickness: 1,
                         color: c.border,
+                        indent: 60,
                       ),
                   ],
                 ],
@@ -80,30 +110,35 @@ class SettingRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
+    final iconBg = danger ? c.attention.withValues(alpha: 0.08) : c.bg;
+    final iconColor = danger ? c.attention : c.inkSoft;
+    final labelColor = danger ? c.attention : c.ink;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap?.call();
+        },
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 13, 16, 13),
+          padding: const EdgeInsets.fromLTRB(14, 14, 16, 14),
           child: Row(
             children: [
               Container(
-                width: 30,
-                height: 30,
+                width: 34,
+                height: 34,
                 decoration: BoxDecoration(
-                  color: danger ? Colors.transparent : c.bg,
-                  borderRadius: BorderRadius.circular(9),
-                  border: danger
-                      ? Border.all(color: c.borderHi)
-                      : null,
+                  color: iconBg,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: danger
+                        ? c.attention.withValues(alpha: 0.2)
+                        : c.border,
+                  ),
                 ),
                 alignment: Alignment.center,
-                child: Icon(
-                  icon,
-                  size: 16,
-                  color: danger ? c.attention : c.inkSoft,
-                ),
+                child: Icon(icon, size: 16, color: iconColor),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -115,19 +150,19 @@ class SettingRow extends StatelessWidget {
                       label,
                       style: TextStyle(
                         fontFamily: 'BeVietnamPro',
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
                         letterSpacing: -0.2,
-                        color: danger ? c.attention : c.ink,
+                        color: labelColor,
                       ),
                     ),
                     if (sub != null) ...[
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 3),
                       Text(
                         sub!,
                         style: TextStyle(
                           fontFamily: 'BeVietnamPro',
-                          fontSize: 10,
+                          fontSize: 10.5,
                           fontWeight: FontWeight.w600,
                           letterSpacing: 0.1,
                           color: c.inkFaint,
