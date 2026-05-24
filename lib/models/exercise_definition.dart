@@ -8,6 +8,7 @@ import '../exercise/plank/plank.dart';
 import '../exercise/lunge/lunge.dart';
 import '../exercise/push up/push_up.dart';
 import '../exercise/squat/squat.dart';
+import '../exercise/warrior_1/warrior_one.dart';
 
 /* =========================================================================
    ExerciseDefinition — Metadata + factory for each exercise type.
@@ -304,6 +305,34 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'resting': const Color(0xFF00E676),
       'ascending': const Color(0xFFFFD600),
       'descending': const Color(0xFF00B0FF),
+    },
+  ),
+   ExerciseDefinition(
+    id: 'warrior_one',
+    name: 'Warrior I',
+    subtitle: 'Virabhadrasana I',
+    description:
+        'Giữ tư thế chiến binh tĩnh, mỗi bên 30 giây.\nAI theo dõi thân người, cổ, tay và chân sau theo thời gian thực.',
+    icon: Icons.self_improvement,
+    primaryColor: const Color(0xFFFFB300),
+    secondaryColor: const Color(0xFFFF8F00),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Đùi', 'Mông', 'Hông'],
+    duration: '2 × 30s',
+    cameraHint: 'Quay nghiêng người so với camera.',
+    framingHint: 'Giữ vai, hông, tai, hai tay và cả hai chân trong khung hình.',
+    setupTips: [
+      'Đặt camera ngang hông, cách bạn khoảng 2–3 mét.',
+      'Quay nghiêng 90° để AI thấy rõ chân trước, chân sau và thân người.',
+      'Chừa khoảng trống phía trên đầu vì hai tay sẽ vươn cao.',
+    ],
+    safetyWarning:
+        'Giữ thân người thẳng, không gập lưng quá mức. Dừng lại nếu thấy đau lưng dưới hoặc đầu gối.',
+    createExercise: () => WarriorOne(),
+    phaseColors: {
+      'entry': const Color(0xFFFFB300),
+      'hold': const Color(0xFF00E676),
+      'exit': const Color(0xFF29B6F6),
     },
   ),
 ];

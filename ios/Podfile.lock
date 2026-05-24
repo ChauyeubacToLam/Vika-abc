@@ -218,21 +218,21 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/url_launcher_ios/ios"
 
 SPEC CHECKSUMS:
-  app_links: 6d01271b3907b0ee7325c5297c75d697c4226c4d
+  app_links: a754cbec3c255bd4bbb4d236ecc06f28cd9a7ce8
   AppAuth: d4f13a8fe0baf391b2108511793e4b479691fb73
   AppCheckCore: cc8fd0a3a230ddd401f326489c99990b013f0c4f
-  audioplayers_darwin: f15e209a3e856d1a7edcf98dc029f484fead2242
-  camera_avfoundation: 769d252259fa21e39ada7399c9dc9c0921af8165
+  audioplayers_darwin: 835ced6edd4c9fc8ebb0a7cc9e294a91d99917d5
+  camera_avfoundation: 968a9a5323c79a99c166ad9d7866bfd2047b5a9b
   FBAEMKit: 56a4f5a9607957b547b6458b17a98c5bb2736367
   FBSDKCoreKit: 54f1240567e16862ab71c53c33dc347db5c524c5
   FBSDKCoreKit_Basics: eb530cd6a79030dbb11df460aafb2767bcad9028
   FBSDKLoginKit: 6a70798793e499335a98fab1a758d7da34af196e
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
-  flutter_facebook_auth: 08ab1a6be157d7fce8348b881787e7608f763267
-  flutter_secure_storage_darwin: 557817588b80e60213cbecb573c45c76b788018d
-  google_mlkit_commons: 1e6ef6605d7281f35baf2b355e6049b9984fd624
-  google_mlkit_pose_detection: 765dbe5fc48366b3472379f64d891652ed606835
-  google_sign_in_ios: 7411fab6948df90490dc4620ecbcabdc3ca04017
+  flutter_facebook_auth: fa3b69b1df0831d2178fe87a05ee2d7d0156db70
+  flutter_secure_storage_darwin: acdb3f316ed05a3e68f856e0353b133eec373a23
+  google_mlkit_commons: a5e4ffae5bc59ea4c7b9025dc72cb6cb79dc1166
+  google_mlkit_pose_detection: 211eabf55f5ea8d6a9537fdade0a37148fc84d8b
+  google_sign_in_ios: b48bb9af78576358a168361173155596c845f0b9
   GoogleDataTransport: aae35b7ea0c09004c3797d53c8c41f66f219d6a7
   GoogleMLKit: b1eee21a41c57704fe72483b15c85cb2c0cd7444
   GoogleSignIn: ce8c89bb9b37fb624b92e7514cc67335d1e277e4
@@ -252,12 +252,12 @@ SPEC CHECKSUMS:
   MLKitVision: 39a5a812db83c4a0794445088e567f3631c11961
   MLKitXenoCommon: 1a4268c1222a6043047af5bb9435028206c63287
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
-  native_device_orientation: 42487b19c552fb5a6a2b51e61b93366f628113df
-  permission_handler_apple: 9878588469a2b0d0fc1e048d9f43605f92e6cec2
+  native_device_orientation: f3ba5f2ddbab3deee23a5f6693b4f97b02dafea2
+  permission_handler_apple: 4ed2196e43d0651e8ff7ca3483a069d469701f2d
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
-  shared_preferences_foundation: 5086985c1d43c5ba4d5e69a4e8083a389e2909e6
-  sign_in_with_apple: f3bf75217ea4c2c8b91823f225d70230119b8440
-  url_launcher_ios: bb13df5870e8c4234ca12609d04010a21be43dfa
+  shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
+  sign_in_with_apple: c5dcc141574c8c54d5ac99dd2163c0c72ad22418
+  url_launcher_ios: 7a95fa5b60cc718a708b8f2966718e93db0cef1b
 
 PODFILE CHECKSUM: 9e99d495d373294bb8e76463b7f7e69a57f1f092
 

@@ -309,6 +309,15 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
     yoga: true,
   ),
   AllExerciseRowMock(
+    idx: 12,
+    name: 'Warrior I',
+    cat: 'Yoga · Giữ 30s/bên',
+    diff: 'Trung bình',
+    ai: true,
+    glyph: PoseGlyphType.lunge,
+    definitionName: 'Warrior I',
+  ),
+  AllExerciseRowMock(
     idx: 11,
     name: 'Tư thế em bé',
     cat: 'Yoga · 3 phút',

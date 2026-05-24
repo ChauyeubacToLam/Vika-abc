@@ -29,6 +29,7 @@ import 'rest_screen.dart';
 import 'widgets/skeleton_annotation.dart';
 import 'package:vika/services/session_persistence.dart';
 import 'package:vika/services/exercise_comparison_service.dart';
+import '../../exercise/warrior_1/warrior_one.dart';
 
 class ExerciseExperienceScreen extends StatefulWidget {
   const ExerciseExperienceScreen({
@@ -693,6 +694,15 @@ class _ExerciseExperienceSpec {
           restSeconds: overrideRest,
           videoDuration: '1:10',
           createExercise: (repsPerSet) => JumpingJack(maxRep: repsPerSet),
+        );
+        case 'warrior_one':
+        return _generic(
+          definition: definition,
+          sets: overrideSets ?? 1,
+          repsPerSet: overrideReps ?? 2, // 2 lần giữ = 2 bên
+          restSeconds: overrideRest,
+          videoDuration: '1:20',
+          createExercise: (repsPerSet) => WarriorOne(maxHolds: repsPerSet),
         );
       case 'glute_bridge':
         return _generic(
