@@ -31,9 +31,29 @@ enum BodyRegion {
 
 @immutable
 class PlanExercise {
-  const PlanExercise({required this.name, required this.form});
+  const PlanExercise({
+    required this.name,
+    required this.form,
+    this.exerciseId,
+    this.hasAi = false,
+    this.volumeLabel = '',
+  });
   final String name;
   final int form;
+
+  /// Catalog id from the recommendation engine. Lets a row tap launch
+  /// the right exercise screen later.
+  final String? exerciseId;
+
+  /// True when the camera-AI form coach is available for this slot.
+  /// Drives the gold name color in the new Plan day expansion (matches
+  /// the convention established on Home).
+  final bool hasAi;
+
+  /// Short volume label for the new Plan day expansion — e.g. "3 × 8 rep".
+  /// Kept separate from [name] so the UI can lay it out as a trailing
+  /// detail rather than mashed into the name string.
+  final String volumeLabel;
 }
 
 @immutable

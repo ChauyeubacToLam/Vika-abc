@@ -36,11 +36,11 @@ bool _hasCompletedOnboarding = false;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final appConfig = await _loadAppConfig();
 
   await Supabase.initialize(
-    url: "https://frjtlfzbvdgwgzegfzxh.supabase.co",
-    anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZyanRsZnpidmRnd2d6ZWdmenhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4Mjk2NjUsImV4cCI6MjA5MTQwNTY2NX0.Eprv5NtWbZqigYPZdOEeRIyvYVxp0l2hmbXXyEdh8nI',
+    url: appConfig.supabaseUrl,
+    anonKey: appConfig.supabaseAnonKey,
   );
 
   await OrientationLock.portraitOnly();
@@ -53,6 +53,80 @@ Future<void> main() async {
   _cameras = await availableCameras();
   _hasCompletedOnboarding = await isOnboardingComplete();
   runApp(const VikaApp());
+}
+
+class _AppConfig {
+  const _AppConfig({
+    required this.supabaseUrl,
+    required this.supabaseAnonKey,
+  });
+
+  final String supabaseUrl;
+  final String supabaseAnonKey;
+}
+
+Future<_AppConfig> _loadAppConfig() async {
+  const defineSupabaseUrl = String.fromEnvironment('SUPABASE_URL');
+  const defineSupabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+
+  final env = await _loadBundledDotEnv();
+  final supabaseUrl = _firstNonEmpty(
+    defineSupabaseUrl,
+    env['SUPABASE_URL'],
+  );
+  final supabaseAnonKey = _firstNonEmpty(
+    defineSupabaseAnonKey,
+    env['SUPABASE_ANON_KEY'],
+  );
+
+  if (supabaseUrl == null || supabaseAnonKey == null) {
+    throw StateError(
+      'Missing Supabase config. Provide SUPABASE_URL and '
+      'SUPABASE_ANON_KEY in .env or with --dart-define.',
+    );
+  }
+
+  return _AppConfig(
+    supabaseUrl: supabaseUrl,
+    supabaseAnonKey: supabaseAnonKey,
+  );
+}
+
+Future<Map<String, String>> _loadBundledDotEnv() async {
+  try {
+    final raw = await rootBundle.loadString('.env');
+    final values = <String, String>{};
+    for (final rawLine in raw.split('\n')) {
+      final line = rawLine.trim();
+      if (line.isEmpty || line.startsWith('#')) continue;
+      final separator = line.indexOf('=');
+      if (separator <= 0) continue;
+      final key = line.substring(0, separator).trim();
+      final value = line.substring(separator + 1).trim();
+      values[key] = _stripEnvQuotes(value);
+    }
+    return values;
+  } catch (_) {
+    return const {};
+  }
+}
+
+String _stripEnvQuotes(String value) {
+  if (value.length < 2) return value;
+  final first = value[0];
+  final last = value[value.length - 1];
+  if ((first == '"' && last == '"') || (first == "'" && last == "'")) {
+    return value.substring(1, value.length - 1);
+  }
+  return value;
+}
+
+String? _firstNonEmpty(String? first, String? second) {
+  final a = first?.trim();
+  if (a != null && a.isNotEmpty) return a;
+  final b = second?.trim();
+  if (b != null && b.isNotEmpty) return b;
+  return null;
 }
 
 // Add this at the top level of the file for easy access everywhere
@@ -181,7 +255,10 @@ class VikaApp extends StatelessWidget {
                 prescription: launchArgs.prescription,
                 recommendationId: launchArgs.recommendationId,
                 weekNumber: launchArgs.weekNumber,
+                sessionIndex: launchArgs.sessionIndex,
                 slotName: launchArgs.slotName,
+                sequence: launchArgs.sequence,
+                sequenceIndex: launchArgs.sequenceIndex,
               ),
             );
           case '/weekly-check-in':

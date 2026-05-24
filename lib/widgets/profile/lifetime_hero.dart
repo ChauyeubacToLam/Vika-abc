@@ -1,59 +1,84 @@
-// LifetimeHero — warm-dark hero on Profile. "MỤC TIÊU CỦA BẠN" eyebrow,
-// italic goal title, italic user-quote with yellow left border, lifetime
-// stat trio (sessions / hours / form%), coach line.
+// LifetimeHero — warm-dark card carrying the user's lifetime stats and
+// the coach voice. Sits below the goal card on the Profile page.
 //
-// Mirrors `LifetimeStatsHero` and `LifetimeStat` in
-// vika-main-app-ivory-v1.jsx.
+// v2 split: goal title / quote / progress meter are now in the
+// separate GoalCard widget. This file focuses on the stats trio +
+// editorial kicker + coach line.
 
 import 'package:flutter/material.dart';
 
 import '../../data/profile_mock.dart';
+import '../../theme/app_colors.dart';
 import '../../theme/vf_theme.dart';
 import '../plan/plan_typography.dart';
-import '../../theme/app_colors.dart';
+
 class LifetimeHero extends StatelessWidget {
   const LifetimeHero({
     super.key,
-    required this.goalTitle,
-    required this.goalQuote,
     required this.stats,
     required this.coach,
-    this.onEdit,
+    this.kicker = 'HÀNH TRÌNH TÍNH ĐẾN HÔM NAY',
   });
 
-  final String goalTitle;
-  final String goalQuote;
   final List<ProfileLifetimeStat> stats;
   final String coach;
-  final VoidCallback? onEdit;
+  final String kicker;
 
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
     return Container(
-      padding: const EdgeInsets.fromLTRB(22, 24, 22, 22),
+      padding: const EdgeInsets.fromLTRB(24, 22, 24, 22),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: c.bgInverse,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: c.ink.withValues(alpha: 0.18),
+            blurRadius: 32,
+            offset: const Offset(0, 12),
+          ),
+        ],
       ),
       child: Stack(
         children: [
+          // Yellow radial wash, top-right.
           Positioned(
-            top: -50,
-            right: -50,
+            top: -70,
+            right: -60,
             child: IgnorePointer(
               child: Container(
-                width: 200,
-                height: 200,
+                width: 220,
+                height: 220,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      c.yellow.withValues(alpha: 0.18),
+                      c.yellow.withValues(alpha: 0.22),
                       c.yellow.withValues(alpha: 0),
                     ],
                     stops: const [0, 0.65],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // Soft terracotta wash, bottom-left.
+          Positioned(
+            bottom: -110,
+            left: -90,
+            child: IgnorePointer(
+              child: Container(
+                width: 260,
+                height: 260,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      Color(0x33CD7C45),
+                      Color(0x00CD7C45),
+                    ],
                   ),
                 ),
               ),
@@ -64,57 +89,32 @@ class LifetimeHero extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Expanded(
-                    child: PlanEyebrow(
-                      'MỤC TIÊU CỦA BẠN',
-                      size: 9,
-                      letterSpacing: 2,
+                  Container(
+                    width: 5,
+                    height: 5,
+                    decoration: BoxDecoration(
                       color: c.yellow,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(color: c.yellow, blurRadius: 6),
+                      ],
                     ),
                   ),
-                  GestureDetector(
-                    onTap: onEdit,
-                    child: Text(
-                      'SỬA',
-                      style: TextStyle(
-                        fontFamily: 'BeVietnamPro',
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.2,
-                        color: c.invInkFaint,
-                      ),
+                  const SizedBox(width: 10),
+                  Text(
+                    kicker,
+                    style: TextStyle(
+                      fontFamily: 'BeVietnamPro',
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.8,
+                      color: c.yellow,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
-              PlanH1('$goalTitle.', size: 26, dark: true, letterSpacing: -1.2,
-                  height: 1),
-              const SizedBox(height: 10),
-              IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Container(width: 2, color: c.yellow),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        '"$goalQuote"',
-                        style: TextStyle(
-                          fontFamily: 'BeVietnamPro',
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          fontStyle: FontStyle.italic,
-                          color: c.invInkSoft,
-                          height: 1.45,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
               const SizedBox(height: 22),
-              // Stats trio.
+              // Stats trio inside its own hairline-bordered band.
               Container(
                 padding: const EdgeInsets.symmetric(vertical: 18),
                 decoration: BoxDecoration(
@@ -123,47 +123,60 @@ class LifetimeHero extends StatelessWidget {
                     bottom: BorderSide(color: c.borderDark),
                   ),
                 ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    for (var i = 0; i < stats.length; i++) ...[
-                      Expanded(
-                        child: _StatTile(
-                          stat: stats[i],
-                          yellow: i == stats.length - 1,
+                child: IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (var i = 0; i < stats.length; i++) ...[
+                        Expanded(
+                          child: _StatTile(
+                            stat: stats[i],
+                            yellow: i == stats.length - 1,
+                          ),
                         ),
-                      ),
-                      if (i < stats.length - 1)
-                        Container(
-                          width: 1,
-                          height: 32,
-                          color: c.borderDark,
-                        ),
+                        if (i < stats.length - 1)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Container(width: 1, color: c.borderDark),
+                          ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               Row(
                 children: [
                   const CoachMark(small: true),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   PlanEyebrow(
                     'HUẤN LUYỆN VIÊN GHI',
-                    size: 9,
+                    size: 9.5,
                     letterSpacing: 1.6,
                     dark: true,
                   ),
+                  const Spacer(),
+                  Text(
+                    '“',
+                    style: TextStyle(
+                      fontFamily: 'BeVietnamPro',
+                      fontSize: 36,
+                      fontWeight: FontWeight.w800,
+                      fontStyle: FontStyle.italic,
+                      height: 0.4,
+                      color: c.yellow.withValues(alpha: 0.45),
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               PlanP(
                 coach,
                 dark: true,
                 italic: true,
-                size: 14,
+                size: 14.5,
                 letterSpacing: -0.2,
-                height: 1.45,
+                height: 1.5,
               ),
             ],
           ),
@@ -182,43 +195,92 @@ class _StatTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // FittedBox keeps long values ("1.8", "74") from crossing the
+          // hairline divider, matching the polish we did on Tien bo.
+          SizedBox(
+            height: 34,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    stat.value,
+                    style: TextStyle(
+                      fontFamily: 'BeVietnamPro',
+                      fontSize: 32,
+                      fontWeight: FontWeight.w800,
+                      fontStyle: FontStyle.italic,
+                      letterSpacing: -1.6,
+                      height: 0.9,
+                      color: yellow ? c.yellow : c.invInk,
+                      fontFeatures: VikaIvoryMain.tabularFigures,
+                    ),
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    stat.unit,
+                    style: TextStyle(
+                      fontFamily: 'BeVietnamPro',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.2,
+                      color: c.invInkSoft,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            width: 14,
+            height: 1,
+            color: yellow
+                ? c.yellow
+                : c.invInkSoft.withValues(alpha: 0.3),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            stat.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontFamily: 'BeVietnamPro',
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.4,
+              color: c.invInkSoft.withValues(alpha: 0.7),
+            ),
+          ),
+          if (stat.delta != null) ...[
+            const SizedBox(height: 4),
             Text(
-              stat.value,
+              stat.delta!,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontFamily: 'BeVietnamPro',
-                fontSize: 30,
-                fontWeight: FontWeight.w800,
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
                 fontStyle: FontStyle.italic,
-                letterSpacing: -1.4,
-                height: 0.85,
-                color: yellow ? c.yellow : c.invInk,
+                height: 1.3,
+                letterSpacing: -0.1,
+                color: yellow ? c.yellow : c.invInkFaint,
                 fontFeatures: VikaIvoryMain.tabularFigures,
               ),
             ),
-            const SizedBox(width: 3),
-            Text(
-              stat.unit,
-              style: TextStyle(
-                fontFamily: 'BeVietnamPro',
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.2,
-                color: c.invInkSoft,
-              ),
-            ),
           ],
-        ),
-        const SizedBox(height: 5),
-        PlanEyebrow(stat.label, size: 9, letterSpacing: 1.4, dark: true),
-      ],
+        ],
+      ),
     );
   }
 }

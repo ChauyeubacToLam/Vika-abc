@@ -24,6 +24,9 @@ class ExecutiveSummaryPage extends StatefulWidget {
     this.vsLastWeekPct,
     this.lastOverallDifficulty,
     this.onOverallDifficulty,
+    this.sessionProgressLabel,
+    this.doneLabel = 'Hoàn tất',
+    this.isFinalWorkoutSlot = true,
   });
 
   final PostExerciseData report;
@@ -38,6 +41,9 @@ class ExecutiveSummaryPage extends StatefulWidget {
   final int? vsLastWeekPct;
   final String? lastOverallDifficulty;
   final ValueChanged<String>? onOverallDifficulty;
+  final String? sessionProgressLabel;
+  final String doneLabel;
+  final bool isFinalWorkoutSlot;
 
   @override
   State<ExecutiveSummaryPage> createState() => _ExecutiveSummaryPageState();
@@ -133,6 +139,10 @@ class _ExecutiveSummaryPageState extends State<ExecutiveSummaryPage>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (widget.sessionProgressLabel != null) ...[
+                _SequenceProgressHeader(label: widget.sessionProgressLabel!),
+                SizedBox(height: 14 * s),
+              ],
               _BeatReveal(
                 animation: _beat0,
                 child: _HeroPhotoCard(
@@ -142,12 +152,13 @@ class _ExecutiveSummaryPageState extends State<ExecutiveSummaryPage>
                   isFirstSession: widget.isFirstSession,
                   comparison: widget.comparison,
                   streakDays: widget.streakDays,
+                  isFinalWorkoutSlot: widget.isFinalWorkoutSlot,
                   onShare: () => _showShareStub('Chỉnh ảnh & chia sẻ'),
                   onShareToZalo: () => _showShareStub('Chia sẻ qua Zalo'),
                 ),
               ),
               SizedBox(height: 24 * s),
-              if (widget.comparison != null)
+              if (widget.comparison != null && widget.isFinalWorkoutSlot)
                 _BeatReveal(
                   animation: _beat1,
                   child: _ComparisonBanner(comparison: widget.comparison!),
@@ -188,6 +199,7 @@ class _ExecutiveSummaryPageState extends State<ExecutiveSummaryPage>
                 child: _DoneSection(
                   shimmer: _shimmerController,
                   disabled: _selectedDifficulty == null,
+                  label: widget.doneLabel,
                   onDone: widget.onDone,
                 ),
               ),
@@ -229,6 +241,40 @@ class _BeatReveal extends StatelessWidget {
   }
 }
 
+class _SequenceProgressHeader extends StatelessWidget {
+  const _SequenceProgressHeader({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = VFTheme.scale(context);
+    return Row(
+      children: [
+        Container(
+          width: 7 * s,
+          height: 7 * s,
+          decoration: const BoxDecoration(
+            color: Color(0xFF18594A),
+            shape: BoxShape.circle,
+          ),
+        ),
+        SizedBox(width: 8 * s),
+        Text(
+          label,
+          style: VFTheme.textStyle(
+            context,
+            size: 10,
+            weight: FontWeight.w800,
+            color: const Color(0xFF5A5A52),
+            letterSpacing: 1.3,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _HeroPhotoCard extends StatelessWidget {
   const _HeroPhotoCard({
     required this.report,
@@ -237,6 +283,7 @@ class _HeroPhotoCard extends StatelessWidget {
     required this.isFirstSession,
     required this.comparison,
     required this.streakDays,
+    required this.isFinalWorkoutSlot,
     required this.onShare,
     required this.onShareToZalo,
   });
@@ -247,6 +294,7 @@ class _HeroPhotoCard extends StatelessWidget {
   final bool isFirstSession;
   final SessionComparison? comparison;
   final int streakDays;
+  final bool isFinalWorkoutSlot;
   final VoidCallback onShare;
   final VoidCallback onShareToZalo;
 
@@ -254,12 +302,15 @@ class _HeroPhotoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = VFTheme.scale(context);
     final accent = _accent(report.formScore);
-    final headline = _scoreHeadline(report.formScore);
-    final subtitle = _heroSubtitle(
-      score: report.formScore,
-      comparison: comparison,
-      isFirstSession: isFirstSession,
-    );
+    final headline =
+        isFinalWorkoutSlot ? _scoreHeadline(report.formScore) : 'Bài này xong';
+    final subtitle = isFinalWorkoutSlot
+        ? _heroSubtitle(
+            score: report.formScore,
+            comparison: comparison,
+            isFirstSession: isFirstSession,
+          )
+        : 'Nghỉ ngắn rồi chuyển sang bài tiếp theo.';
 
     return Container(
       height: 420 * s,
@@ -489,57 +540,33 @@ class _HeroPhotoCard extends StatelessWidget {
                         ),
                       ),
                       SizedBox(height: 12 * s),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _HeroActionButton(
-                              onTap: onShare,
-                              label: 'Chỉnh ảnh & chia sẻ',
-                              icon: Icons.edit_outlined,
-                              fillColor: Colors.white.withValues(alpha: 0.1),
-                              borderColor: Colors.white.withValues(alpha: 0.12),
-                              textColor: Colors.white,
+                      if (isFinalWorkoutSlot)
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _HeroActionButton(
+                                onTap: onShare,
+                                label: 'Chỉnh ảnh & chia sẻ',
+                                icon: Icons.edit_outlined,
+                                fillColor: Colors.white.withValues(alpha: 0.1),
+                                borderColor:
+                                    Colors.white.withValues(alpha: 0.12),
+                                textColor: Colors.white,
+                              ),
                             ),
-                          ),
-                          SizedBox(width: 8 * s),
-                          _HeroActionButton(
-                            onTap: onShareToZalo,
-                            label: 'Zalo',
-                            fillColor: Colors.white.withValues(alpha: 0.06),
-                            borderColor: Colors.white.withValues(alpha: 0.08),
-                            textColor: Colors.white.withValues(alpha: 0.45),
-                          ),
-                        ],
-                      ),
+                            SizedBox(width: 8 * s),
+                            _HeroActionButton(
+                              onTap: onShareToZalo,
+                              label: 'Zalo',
+                              fillColor: Colors.white.withValues(alpha: 0.06),
+                              borderColor: Colors.white.withValues(alpha: 0.08),
+                              textColor: Colors.white.withValues(alpha: 0.45),
+                            ),
+                          ],
+                        ),
                     ],
                   ),
                 ],
-              ),
-            ),
-          ),
-          Positioned(
-            top: 18 * s,
-            right: 20 * s,
-            child: Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: 10 * s,
-                vertical: 4 * s,
-              ),
-              decoration: BoxDecoration(
-                color: const Color(0xFF34D399).withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8 * s),
-                border: Border.all(
-                  color: const Color(0xFF34D399).withValues(alpha: 0.18),
-                ),
-              ),
-              child: Text(
-                'Rep 7 · 95đ ★',
-                style: VFTheme.textStyle(
-                  context,
-                  size: 9,
-                  weight: FontWeight.w700,
-                  color: const Color(0xFF34D399),
-                ),
               ),
             ),
           ),
@@ -1430,11 +1457,13 @@ class _DoneSection extends StatelessWidget {
   const _DoneSection({
     required this.shimmer,
     required this.onDone,
+    required this.label,
     this.disabled = false,
   });
 
   final Animation<double> shimmer;
   final VoidCallback onDone;
+  final String label;
   final bool disabled;
 
   @override
@@ -1497,7 +1526,7 @@ class _DoneSection extends StatelessWidget {
                     padding: EdgeInsets.symmetric(vertical: 16 * s),
                     child: Center(
                       child: Text(
-                        'Hoàn tất',
+                        label,
                         style: VFTheme.textStyle(
                           context,
                           size: 15,

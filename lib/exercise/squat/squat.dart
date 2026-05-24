@@ -31,7 +31,6 @@ class SquatConfig {
 enum SquatState { standing, descending, bottom, ascending }
 
 // --- Squat ---
-//
 // DATA LOGGING PIPELINE:
 // 1. frameBuffer (Per-Frame):
 //    - kneeAngle: used for state transitions and finding the peak_knee_angle

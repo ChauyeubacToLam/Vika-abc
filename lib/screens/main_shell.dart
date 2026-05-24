@@ -1,16 +1,15 @@
-// MainShell — top-level scaffold for the main app tabs (Trang chủ, Lộ
-// trình, Tiến bộ, Hồ sơ) plus the Library sheet that slides up from the
-// central FAB. Premium Ivory v1.
+// MainShell — top-level scaffold for the main app tabs. Premium Ivory v2.
 //
-// Replaces the legacy jade-green VFTheme shell. The new shell:
-//   • Background = c.bg (#F4EEE2 cream)
-//   • Frosted-glass IvoryBottomNav with 4 tabs + central yellow FAB
-//   • IndexedStack so each tab keeps its scroll state
-//   • Library sheet animates up via AnimatedSlide / AnimatedOpacity
+// Five equal tabs in the bottom nav, all backed by real screens in an
+// IndexedStack so each tab keeps its scroll state:
+//   0 Trang chủ  → DashboardHomeScreen
+//   1 Lộ trình   → PlanScreen
+//   2 Khám phá   → LibraryScreen   (was a sheet overlay; now a real page)
+//   3 Tiến bộ    → ProgressScreen
+//   4 Hồ sơ      → ProfileScreen
 //
-// UserProgramService is still loaded at startup and forwarded into Plan
-// (and Home, currently unused). When real wiring lands per the Wiring
-// Report, the screens will start consuming the program data.
+// The prior floating-FAB sheet (ExerciseBrowser) is gone — the
+// IvoryBottomNav uses five equal tabs, and Library is a regular page.
 
 import 'dart:async';
 
@@ -19,15 +18,16 @@ import 'package:flutter/services.dart';
 
 import '../models/exercise_definition.dart';
 import '../services/user_program_service.dart';
+import '../services/user_profile_service.dart';
+import '../theme/app_colors.dart';
+import '../theme/responsive.dart';
 import '../utils/orientation_lock.dart';
 import '../widgets/ivory/bottom_nav.dart';
 import 'dashboard_home_screen.dart';
-import 'exercise_browser.dart';
+import 'library_screen.dart';
 import 'plan_screen.dart';
 import 'profile_screen.dart';
 import 'progress_screen.dart';
-import '../theme/app_colors.dart';
-import '../theme/responsive.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -38,14 +38,15 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
-  bool _browserOpen = false;
   UserProgramData? _program;
+  AppUserProfile? _profile;
 
   @override
   void initState() {
     super.initState();
     unawaited(OrientationLock.portraitOnly());
     _loadProgram();
+    _loadProfile();
   }
 
   Future<void> _loadProgram() async {
@@ -54,12 +55,17 @@ class _MainShellState extends State<MainShell> {
     setState(() => _program = program);
   }
 
-  void _toggleBrowser() {
-    setState(() => _browserOpen = !_browserOpen);
+  Future<void> _loadProfile() async {
+    final profile = await UserProfileService().fetchCurrentProfile();
+    if (!mounted) return;
+    setState(() => _profile = profile);
   }
 
-  void _openExerciseFromBrowser(ExerciseDefinition definition) {
-    setState(() => _browserOpen = false);
+  void _handleProfileChanged(AppUserProfile profile) {
+    setState(() => _profile = profile);
+  }
+
+  void _openExerciseFromLibrary(ExerciseDefinition definition) {
     Navigator.of(context).pushNamed('/exercise', arguments: definition);
   }
 
@@ -70,22 +76,38 @@ class _MainShellState extends State<MainShell> {
     final mediaQuery = MediaQuery.of(context);
     final bottomInset = mediaQuery.padding.bottom;
     final isDark = MediaQuery.platformBrightnessOf(context) == Brightness.dark;
-    // Capsule height (~76) + drop shadow + capsule top margin.
-    final navCapsule = r.w(100);
-    final contentBottomPadding = navCapsule + bottomInset + r.w(8);
+    // Slim pill capsule (~58pt) + tighter margin above the home indicator.
+    final navCapsule = r.w(68);
+    final contentBottomPadding = navCapsule + bottomInset + r.w(4);
 
     final screens = [
       DashboardHomeScreen(
         bottomPadding: contentBottomPadding,
-        onOpenBrowser: _toggleBrowser,
+        // Library is its own tab now — Home's "browse" callback just
+        // switches to the Library tab.
+        onOpenBrowser: () => setState(() => _currentIndex = 2),
         program: _program,
+        userProfile: _profile,
+        onProfileChanged: _handleProfileChanged,
       ),
       PlanScreen(
         bottomPadding: contentBottomPadding,
         program: _program,
+        onProfileChanged: _handleProfileChanged,
       ),
-      ProgressScreen(bottomPadding: contentBottomPadding),
-      ProfileScreen(bottomPadding: contentBottomPadding),
+      LibraryScreen(
+        bottomPadding: contentBottomPadding,
+        onSelectExercise: _openExerciseFromLibrary,
+      ),
+      ProgressScreen(
+        bottomPadding: contentBottomPadding,
+        userProfile: _profile,
+      ),
+      ProfileScreen(
+        bottomPadding: contentBottomPadding,
+        userProfile: _profile,
+        onProfileChanged: _handleProfileChanged,
+      ),
     ];
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -97,53 +119,17 @@ class _MainShellState extends State<MainShell> {
       child: Scaffold(
         extendBody: true,
         backgroundColor: c.bg,
-        body: Stack(
-          fit: StackFit.expand,
-          children: [
-            SafeArea(
-              bottom: false,
-              child: IndexedStack(
-                index: _currentIndex,
-                children: screens,
-              ),
-            ),
-            // Library sheet (slides up over content).
-            Positioned.fill(
-              child: IgnorePointer(
-                ignoring: !_browserOpen,
-                child: AnimatedOpacity(
-                  duration: const Duration(milliseconds: 200),
-                  opacity: _browserOpen ? 1 : 0,
-                  child: AnimatedSlide(
-                    duration: const Duration(milliseconds: 280),
-                    curve: Curves.easeOutCubic,
-                    offset: _browserOpen ? Offset.zero : const Offset(0, 1),
-                    child: ExerciseBrowser(
-                      bottomPadding: contentBottomPadding,
-                      onClose: _toggleBrowser,
-                      onSelectExercise: _openExerciseFromBrowser,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        bottomNavigationBar: AnimatedSlide(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
-          offset: _browserOpen ? const Offset(0, 1.1) : Offset.zero,
-          child: IvoryBottomNav(
-            currentIndex: _currentIndex,
-            bottomInset: bottomInset,
-            onTap: (idx) {
-              setState(() {
-                _currentIndex = idx;
-                _browserOpen = false;
-              });
-            },
-            onBrowse: _toggleBrowser,
+        body: SafeArea(
+          bottom: false,
+          child: IndexedStack(
+            index: _currentIndex,
+            children: screens,
           ),
+        ),
+        bottomNavigationBar: IvoryBottomNav(
+          currentIndex: _currentIndex,
+          bottomInset: bottomInset,
+          onTap: (idx) => setState(() => _currentIndex = idx),
         ),
       ),
     );

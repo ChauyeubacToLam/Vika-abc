@@ -1,18 +1,28 @@
-// IvoryBottomNav — frosted-glass capsule pill at the bottom of the main app
-// shell. 4 tab items with a central yellow FAB ("Khám phá") that opens the
-// Library/Browser sheet.
+// IvoryBottomNav — frosted-glass pill capsule at the bottom of the main
+// app shell. Five EQUAL tabs (Trang chủ, Lộ trình, Khám phá, Tiến bộ,
+// Hồ sơ) — no floating FAB.
 //
-// Mirrors `BottomNav`, `NavItem`, and `BrowseFAB` in
-// vika-main-app-ivory-v1.jsx — including the soft cream gradient that fades
-// content above the capsule into transparency, so the nav feels like it's
-// floating over the page.
+// Why 5 equal tabs (no FAB):
+//   The prior center FAB ("circle button popping above the bar") read
+//   as an orphan element. Premium app navs (Apple Music, Spotify,
+//   Apple Fitness+) use equal-weight tabs in a pill — cleaner, more
+//   iOS-native, and the visual rhythm is far more elegant than a giant
+//   raised button breaking the bar's line.
 //
-// Active tab gets ink color + filled icon background; inactive tabs are
-// muted ink with bare-stroke glyphs.
+// The center "Khám phá" tab opens the Library sheet via [onBrowse]
+// (preserving the current overlay UX) instead of switching screens.
+// Other 4 tabs map to the IndexedStack screens in MainShell via
+// [onTap(int)].
+//
+// Active state: subtle yellow halo behind the icon + ink color + bold
+// label. Inactive: faint stroke + faint label. Tap feedback: smooth
+// 0.96 press scale + haptic selection click.
 
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
 import '../../theme/app_colors.dart';
 
 class IvoryBottomNav extends StatelessWidget {
@@ -21,23 +31,23 @@ class IvoryBottomNav extends StatelessWidget {
     required this.currentIndex,
     required this.bottomInset,
     required this.onTap,
-    required this.onBrowse,
   });
 
-  final int currentIndex; // 0..3 mapped to Home, Plan, Progress, Profile
+  /// Screen index, 0..4: Home, Plan, Library, Progress, Profile.
+  final int currentIndex;
   final double bottomInset;
   final ValueChanged<int> onTap;
-  final VoidCallback onBrowse;
 
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
     return Stack(
       children: [
-        // Cream-fade gradient above the capsule so chrome dissolves into bg.
+        // Cream-fade gradient — content above the pill dissolves into
+        // the cream background.
         IgnorePointer(
           child: Container(
-            height: 130 + bottomInset,
+            height: 80 + bottomInset,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.bottomCenter,
@@ -52,24 +62,25 @@ class IvoryBottomNav extends StatelessWidget {
             ),
           ),
         ),
-        // The capsule itself.
+        // Pill capsule
         Padding(
-          padding: EdgeInsets.fromLTRB(18, 10, 18, 26 + bottomInset),
+          padding: EdgeInsets.fromLTRB(20, 6, 20, 4 + bottomInset),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(999),
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
                 decoration: BoxDecoration(
-                  color: c.bgRaised.withValues(alpha: 0.88),
+                  color: c.bgRaised.withValues(alpha: 0.92),
                   borderRadius: BorderRadius.circular(999),
                   border: Border.all(color: c.border),
                   boxShadow: [
                     BoxShadow(
                       color: c.ink.withValues(alpha: 0.10),
-                      blurRadius: 28,
-                      offset: const Offset(0, 8),
+                      blurRadius: 32,
+                      offset: const Offset(0, 10),
                     ),
                   ],
                 ),
@@ -91,21 +102,28 @@ class IvoryBottomNav extends StatelessWidget {
                         onTap: () => onTap(1),
                       ),
                     ),
-                    _BrowseFAB(onTap: onBrowse),
                     Expanded(
                       child: _NavItem(
-                        icon: _NavIcon.progress,
-                        label: 'Tiến bộ',
+                        icon: _NavIcon.library,
+                        label: 'Khám phá',
                         active: currentIndex == 2,
                         onTap: () => onTap(2),
                       ),
                     ),
                     Expanded(
                       child: _NavItem(
-                        icon: _NavIcon.profile,
-                        label: 'Hồ sơ',
+                        icon: _NavIcon.progress,
+                        label: 'Tiến bộ',
                         active: currentIndex == 3,
                         onTap: () => onTap(3),
+                      ),
+                    ),
+                    Expanded(
+                      child: _NavItem(
+                        icon: _NavIcon.profile,
+                        label: 'Hồ sơ',
+                        active: currentIndex == 4,
+                        onTap: () => onTap(4),
                       ),
                     ),
                   ],
@@ -119,9 +137,9 @@ class IvoryBottomNav extends StatelessWidget {
   }
 }
 
-enum _NavIcon { home, plan, progress, profile }
+enum _NavIcon { home, plan, library, progress, profile }
 
-class _NavItem extends StatelessWidget {
+class _NavItem extends StatefulWidget {
   const _NavItem({
     required this.icon,
     required this.label,
@@ -135,42 +153,71 @@ class _NavItem extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
+  State<_NavItem> createState() => _NavItemState();
+}
+
+class _NavItemState extends State<_NavItem> {
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    final color = active ? c.ink : c.inkFaint;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+    final labelColor = widget.active ? c.ink : c.inkFaint;
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        widget.onTap();
+      },
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedScale(
+        scale: _pressed ? 0.94 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 6),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              SizedBox(
-                width: 22,
-                height: 22,
-                child: CustomPaint(
-                  painter: _NavIconPainter(
-                    icon: icon,
-                    active: active,
-                    ink: c.ink,
-                    inkFaint: c.inkFaint,
-                    yellow: c.yellow,
+              // Icon area — when active, sits inside a subtle yellow
+              // halo pill so the user feels the selection.
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 5),
+                decoration: BoxDecoration(
+                  color: widget.active ? c.yellowGhost : Colors.transparent,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CustomPaint(
+                    painter: _NavIconPainter(
+                      icon: widget.icon,
+                      active: widget.active,
+                      ink: c.ink,
+                      inkFaint: c.inkFaint,
+                      yellow: c.yellow,
+                    ),
                   ),
                 ),
               ),
               const SizedBox(height: 4),
-              Text(
-                label,
+              AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
                 style: TextStyle(
                   fontFamily: 'BeVietnamPro',
-                    fontSize: 9,
-                    fontWeight: active ? FontWeight.w800 : FontWeight.w700,
-                    letterSpacing: 0.3,
-                    color: color,
+                  fontSize: 9,
+                  fontWeight: widget.active ? FontWeight.w800 : FontWeight.w700,
+                  letterSpacing: 0.3,
+                  color: labelColor,
                 ),
+                child: Text(widget.label),
               ),
             ],
           ),
@@ -202,18 +249,14 @@ class _NavIconPainter extends CustomPainter {
 
     final stroke = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5 * scale
+      ..strokeWidth = 1.6 * scale
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..color = active ? ink : inkFaint;
 
-    final fillPaint = active
-        ? (Paint()..color = yellow.withValues(alpha: 0.35))
-        : null;
-
     switch (icon) {
       case _NavIcon.home:
-        // House outline: 5 points (ridge, two eaves, walls, base).
+        // House outline
         final path = Path()
           ..moveTo(3 * scale, 9 * scale)
           ..lineTo(10 * scale, 3 * scale)
@@ -225,25 +268,35 @@ class _NavIconPainter extends CustomPainter {
           ..lineTo(7 * scale, 17 * scale)
           ..lineTo(3 * scale, 17 * scale)
           ..close();
-        if (fillPaint != null) canvas.drawPath(path, fillPaint);
         canvas.drawPath(path, stroke);
         break;
 
       case _NavIcon.plan:
-        // Calendar.
+        // Calendar
         final rect = RRect.fromRectAndRadius(
           Rect.fromLTRB(3 * scale, 4 * scale, 17 * scale, 17 * scale),
           Radius.circular(2 * scale),
         );
-        if (fillPaint != null) canvas.drawRRect(rect, fillPaint);
         canvas.drawRRect(rect, stroke);
         canvas.drawLine(p(3, 8), p(17, 8), stroke);
         canvas.drawLine(p(7, 2), p(7, 6), stroke);
         canvas.drawLine(p(13, 2), p(13, 6), stroke);
         break;
 
+      case _NavIcon.library:
+        // Magnifying glass — universal "find / explore" glyph
+        final cx = 9 * scale;
+        final cy = 9 * scale;
+        canvas.drawCircle(Offset(cx, cy), 6 * scale, stroke);
+        canvas.drawLine(
+          Offset(13.5 * scale, 13.5 * scale),
+          Offset(17.5 * scale, 17.5 * scale),
+          stroke,
+        );
+        break;
+
       case _NavIcon.progress:
-        // Trending line + endpoint star.
+        // Trending line + endpoint star
         final path = Path()
           ..moveTo(3 * scale, 16 * scale)
           ..lineTo(8 * scale, 11 * scale)
@@ -253,18 +306,15 @@ class _NavIconPainter extends CustomPainter {
         canvas.drawCircle(
           p(17, 7),
           2 * scale,
-          Paint()
-            ..color = active ? yellow : Colors.transparent,
+          Paint()..color = active ? yellow : Colors.transparent,
         );
         canvas.drawCircle(p(17, 7), 2 * scale, stroke);
         break;
 
       case _NavIcon.profile:
-        // Head + shoulders.
-        final headRect = Rect.fromCircle(center: p(10, 7), radius: 3.5 * scale);
-        if (fillPaint != null) {
-          canvas.drawArc(headRect, 0, 6.283, true, fillPaint);
-        }
+        // Head + shoulders
+        final headRect =
+            Rect.fromCircle(center: p(10, 7), radius: 3.5 * scale);
         canvas.drawArc(headRect, 0, 6.283, false, stroke);
         final shoulders = Path()
           ..moveTo(3 * scale, 17 * scale)
@@ -281,82 +331,4 @@ class _NavIconPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _NavIconPainter oldDelegate) =>
       oldDelegate.icon != icon || oldDelegate.active != active;
-}
-
-class _BrowseFAB extends StatelessWidget {
-  const _BrowseFAB({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = VikaColors.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Transform.translate(
-        offset: const Offset(0, -12),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(999),
-            child: Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: c.yellow,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: c.yellow.withValues(alpha: 0.32),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              alignment: Alignment.center,
-              child: SizedBox(
-                width: 22,
-                height: 22,
-                child: CustomPaint(
-                  painter: _BrowseGridPainter(ink: c.ink),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _BrowseGridPainter extends CustomPainter {
-  _BrowseGridPainter({required this.ink});
-
-  final Color ink;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final scale = size.width / 22;
-    final stroke = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.6 * scale
-      ..color = ink;
-    void box(double x, double y) {
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(x * scale, y * scale, 7 * scale, 7 * scale),
-          Radius.circular(1.5 * scale),
-        ),
-        stroke,
-      );
-    }
-    box(3, 4);
-    box(12, 4);
-    box(3, 13);
-    box(12, 13);
-  }
-
-  @override
-  bool shouldRepaint(covariant _BrowseGridPainter oldDelegate) => false;
 }

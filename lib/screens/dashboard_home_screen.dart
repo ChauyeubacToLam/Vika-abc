@@ -1,16 +1,35 @@
-// DashboardHomeScreen — the Home tab. Premium Ivory v1.
+// DashboardHomeScreen — polished Stage Home (Premium Ivory v5).
 //
-// Mirrors HomeScreen in vika-main-app-ivory-v1.jsx:
-//   • Wordmark header
-//   • Greeting block
-//   • §01 Hôm nay — horizontal HeroDayCard rail (today's card + tomorrow peek)
-//   • §02 Đang tiến bộ — StreakRing + FormWeekChart side-by-side
-//   • Journal entry quote
-//   • BrowseShortcut → opens Library sheet
-//   • Editorial closer
+// Two registers, one cohesive page:
 //
-// Class name DashboardHomeScreen kept for MainShell compatibility; the
-// content is fully new.
+//   ┌─ DARK STAGE HERO (bleeds to top edge, owns the fold)
+//   │     • Inverted WordmarkHeader
+//   │     • Sparkle eyebrow ('HÔM NAY · BUỔI 03')
+//   │     • Italic display headline (2 lines)
+//   │     • Stat row with breathing yellow live dot
+//   │     • SESSION BRIEF card:
+//   │         - vertical-timeline exercise list (uniform gold dots, AI
+//   │           as inline yellow accent on the detail line)
+//   │         - inner hairline
+//   │         - coach voice quote + attribution (embedded — no separate
+//   │           coach card stacked below)
+//   │     • Halo CTA pill
+//   │
+//   ├─ WEEKLY CHECK-IN BANNER (when due, real data)
+//   │
+//   └─ VITALS SPREAD (cream, NO CARD — magazine typography spread)
+//         • Header rail: TUẦN 03 ─── NỀN TẢNG
+//         • Drop-cap sessions hero: BIG italic 3 + /4 + progress dots +
+//           label + italic standfirst
+//         • Hairline divider
+//         • Streak + form supporting metrics (vertical hairline between)
+//         • Sign-off colophon
+//
+// The previous v4 stacked TWO raised cards below the hero (vitals panel
+// + coach card) — that read as "lazy stacking". v5 absorbs coach into
+// the hero (cohesive action surface) and renders vitals as naked
+// typography on cream (editorial, no card chrome). One card surface
+// total below the hero, only when a weekly check-in is actually due.
 
 import 'dart:async';
 
@@ -18,22 +37,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data/home_mock.dart';
-import '../models/exercise_lookup.dart';
+import '../screens/exercise/exercise_launch_args.dart';
 import '../services/recommendation/recommendation_service.dart';
 import '../services/recommendation/weekly_check_in_service.dart';
+import '../services/session_persistence.dart';
 import '../services/user_program_service.dart';
+import '../services/user_profile_service.dart';
+import '../services/workout_launch_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/orientation_lock.dart';
+import '../widgets/home/home_signoff.dart';
+import '../widgets/home/home_stage_hero.dart';
+import '../widgets/home/home_vitals_spread.dart';
 import 'weekly_check_in_screen.dart';
-import '../widgets/home/browse_shortcut.dart';
-import '../widgets/home/form_week_chart.dart';
-import '../widgets/home/greeting_block.dart';
-import '../widgets/home/hero_day_card.dart';
-import '../widgets/home/journal_entry.dart';
-import '../widgets/home/streak_ring.dart';
-import '../widgets/plan/editorial_closer.dart';
-import '../widgets/plan/section_mark.dart';
-import '../widgets/plan/wordmark_header.dart';
 
 class DashboardHomeScreen extends StatefulWidget {
   const DashboardHomeScreen({
@@ -41,14 +57,21 @@ class DashboardHomeScreen extends StatefulWidget {
     required this.bottomPadding,
     required this.onOpenBrowser,
     this.program,
+    this.userProfile,
+    this.onProfileChanged,
   });
 
   final double bottomPadding;
   final VoidCallback onOpenBrowser;
 
-  /// Real program data passed from MainShell. Currently unused — the new
-  /// design runs on `homeMock*` constants. Wiring notes in the report.
+  /// Real program data passed from MainShell. The CTA launches the
+  /// first available program exercise; hero copy and vitals still render
+  /// from `homeMock*` constants until the dashboard summary API lands.
+  // TODO(wiring): derive today's session copy, vitals spread session
+  // counts, streak, and form 7-day from `program` + RecommendationService.
   final UserProgramData? program;
+  final AppUserProfile? userProfile;
+  final ValueChanged<AppUserProfile>? onProfileChanged;
 
   @override
   State<DashboardHomeScreen> createState() => _DashboardHomeScreenState();
@@ -57,12 +80,15 @@ class DashboardHomeScreen extends StatefulWidget {
 class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
   final _recommendations = RecommendationService();
   final _checkIns = WeeklyCheckInService();
+  final _launches = WorkoutLaunchService();
+  late Future<WorkoutLaunchHomeState> _launchStateFuture;
   _CheckInPrompt? _checkInPrompt;
 
   @override
   void initState() {
     super.initState();
     unawaited(OrientationLock.portraitOnly());
+    _launchStateFuture = _launches.resolveHomeState();
     unawaited(_loadCheckInPrompt());
   }
 
@@ -86,6 +112,12 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
     });
   }
 
+  void _reloadLaunchTarget() {
+    setState(() {
+      _launchStateFuture = _launches.resolveHomeState();
+    });
+  }
+
   Future<void> _openCheckIn() async {
     final prompt = _checkInPrompt;
     if (prompt == null) return;
@@ -105,53 +137,67 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    // Status-bar overlay flips per theme. Light theme = dark icons on
-    // cream; dark theme = light icons on warm-dark.
-    final overlayStyle = c.isDark
-        ? SystemUiOverlayStyle.light.copyWith(
-            statusBarColor: Colors.transparent,
-          )
-        : SystemUiOverlayStyle.dark.copyWith(
-            statusBarColor: Colors.transparent,
-          );
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: overlayStyle,
-      child: Container(
-        color: c.bg,
+    return Container(
+      color: c.bg,
+      child: MediaQuery.removePadding(
+        context: context,
+        removeTop: true,
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
           padding: EdgeInsets.only(bottom: widget.bottomPadding),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const WordmarkHeader(
-                trailingIcon: Icons.notifications_none_rounded,
-              ),
-              GreetingBlock(
-                userName: homeMockUser.name,
-                dayLabel: homeMockUser.dayLabel,
-                sessionLabel: homeMockUser.sessionLabel,
+              FutureBuilder<WorkoutLaunchHomeState>(
+                future: _launchStateFuture,
+                builder: (context, snapshot) {
+                  final state = snapshot.data;
+                  final target = state?.target;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _HomeHeroFromTarget(
+                        state: state,
+                        target: target,
+                        loading:
+                            snapshot.connectionState == ConnectionState.waiting,
+                        onStretch: widget.onOpenBrowser,
+                        profile: widget.userProfile,
+                        onStart: target == null
+                            ? null
+                            : () => _startWorkoutTarget(target),
+                      ),
+                    ],
+                  );
+                },
               ),
               if (_checkInPrompt != null)
-                _WeeklyCheckInBanner(
+                _WeeklyCheckInAlert(
                   weekNumber: _checkInPrompt!.weekNumber,
                   onTap: _openCheckIn,
                 ),
-              const SectionMark(num: '01', label: 'Hôm nay', total: '02'),
-              const SizedBox(height: 18),
-              _HeroDayRail(onCta: () => _startTodayWorkout(context)),
-              const SectionMark(num: '02', label: 'Đang tiến bộ', total: '02'),
-              const _ProgressRow(),
-              JournalEntry(
-                dateLabel: homeMockJournalDate,
-                quote: homeMockJournalQuote,
+              FutureBuilder<WorkoutLaunchHomeState>(
+                future: _launchStateFuture,
+                builder: (context, snapshot) {
+                  final state = snapshot.data;
+                  return HomeVitalsSpread(
+                    weekLabel: homeMockWeekLabel,
+                    phaseLabel: homeMockPhaseLabel,
+                    sessionsDone: state?.completedSessionsThisWeek ??
+                        homeMockSessionsDone,
+                    sessionsTotal:
+                        state?.sessionsThisWeek ?? homeMockSessionsTotal,
+                    statusLine: homeMockVitalsStandfirst,
+                    streakDays:
+                        widget.userProfile?.streakDays ?? homeMockStreakDays,
+                    formPercent: homeMockFormToday,
+                    formDelta: homeMockFormDelta,
+                    formWeek: homeMockFormWeek,
+                  );
+                },
               ),
-              BrowseShortcut(onTap: widget.onOpenBrowser),
-              const EditorialCloser(
-                section: 'TRANG CHỦ',
-                tagline: 'Thứ Sáu · 8/5.',
-              ),
-              const SizedBox(height: 24),
+              const HomeSignoff(),
+              const SizedBox(height: 28),
             ],
           ),
         ),
@@ -159,18 +205,194 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
     );
   }
 
-  /// Start today's workout. Defaults to the Squat ExerciseDefinition until
-  /// per-day workout sequences are wired (see PREMIUM_IVORY_WIRING.md).
-  /// Fires light haptic feedback on tap so the press registers physically
-  /// — important for a fitness app where the user is bracing to start.
-  void _startTodayWorkout(BuildContext context) {
+  Future<void> _startWorkoutTarget(WorkoutLaunchTarget target) async {
     HapticFeedback.lightImpact();
-    final def = lookupExerciseDefinition('Squat');
-    if (def != null) {
-      Navigator.of(context).pushNamed('/exercise', arguments: def);
-    } else {
-      debugPrint('[Home] No ExerciseDefinition for Squat — stubbed.');
+    final first = target.firstLaunchArgs;
+    if (first == null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Buổi này chưa có bài camera phù hợp.'),
+          ),
+        );
+      return;
     }
+    final completedWorkout = await _runWorkoutSequence(first);
+    if (completedWorkout) {
+      await SessionPersistence().updateStreak();
+      final profile = await UserProfileService().fetchCurrentProfile();
+      if (profile != null) widget.onProfileChanged?.call(profile);
+    }
+    if (!mounted) return;
+    _reloadLaunchTarget();
+  }
+
+  Future<bool> _runWorkoutSequence(ExerciseLaunchArgs first) async {
+    ExerciseLaunchArgs? next = first;
+    var completedFinalSlot = false;
+    while (mounted && next != null) {
+      final result = await Navigator.of(context).pushNamed(
+        '/exercise',
+        arguments: next,
+      );
+      if (!mounted) return false;
+      if (result is Map && result['next'] is ExerciseLaunchArgs) {
+        next = result['next'] as ExerciseLaunchArgs;
+      } else {
+        completedFinalSlot = result is Map && result['completed'] == true;
+        next = null;
+      }
+    }
+    return completedFinalSlot;
+  }
+}
+
+class _HomeHeroFromTarget extends StatelessWidget {
+  const _HomeHeroFromTarget({
+    required this.state,
+    required this.target,
+    required this.loading,
+    required this.profile,
+    required this.onStart,
+    required this.onStretch,
+  });
+
+  final WorkoutLaunchHomeState? state;
+  final WorkoutLaunchTarget? target;
+  final bool loading;
+  final AppUserProfile? profile;
+  final VoidCallback? onStart;
+  final VoidCallback onStretch;
+
+  @override
+  Widget build(BuildContext context) {
+    final currentTarget = target;
+    final userInitial = profile?.initial ?? homeMockUser.initial;
+    final avatarUrl = profile?.avatarUrl;
+    if (loading) {
+      return HomeStageHero(
+        eyebrow: 'ĐANG TẢI KẾ HOẠCH',
+        titleLine1: 'Vika',
+        titleLine2: 'đang chuẩn bị.',
+        duration: homeMockToday.duration,
+        totalCount: homeMockToday.totalCount,
+        aiCount: homeMockToday.aiCount,
+        exercises: homeMockToday.exercises,
+        coachQuote: homeMockCoachQuote,
+        coachAttribution: homeMockCoachAttribution,
+        ctaLabel: '',
+        onCta: null,
+        userInitial: userInitial,
+        avatarUrl: avatarUrl,
+      );
+    }
+
+    if (state?.isRecoveryDay == true &&
+        (currentTarget == null || !currentTarget.hasLaunchableSlots)) {
+      final completedWeek = state?.hasCompletedWeek == true;
+      return HomeStageHero(
+        eyebrow: 'NGÀY PHỤC HỒI',
+        titleLine1: 'Nghỉ',
+        titleLine2: 'đúng lúc.',
+        whyLine:
+            'Cơ bắp của bạn đang tái tạo hôm nay. Nghỉ đúng lúc giúp buổi sau mạnh hơn.',
+        duration: '0 phút',
+        totalCount: 0,
+        aiCount: 0,
+        exercises: [],
+        coachQuote: completedWeek
+            ? 'Bạn đã hoàn thành đủ buổi trong tuần này. Vika chưa tìm thấy buổi tiếp theo có bài camera.'
+            : 'Hôm nay là ngày nghỉ. Vika chưa mở được bài camera cho buổi tiếp theo trong lộ trình.',
+        coachAttribution: homeMockCoachAttribution,
+        ctaLabel: '',
+        onCta: null,
+        ctaEmphasized: false,
+        secondaryCtaLabel: 'Hoặc giãn cơ nhẹ',
+        onSecondaryCta: onStretch,
+        userInitial: userInitial,
+        avatarUrl: avatarUrl,
+      );
+    }
+
+    if (currentTarget == null || !currentTarget.hasLaunchableSlots) {
+      return HomeStageHero(
+        eyebrow: 'CHƯA CÓ BUỔI TẬP',
+        titleLine1: 'Nghỉ',
+        titleLine2: 'hôm nay.',
+        duration: '0 phút',
+        totalCount: 0,
+        aiCount: 0,
+        exercises: [],
+        coachQuote:
+            'Vika chưa tìm thấy buổi tập camera phù hợp trong lộ trình hiện tại.',
+        coachAttribution: homeMockCoachAttribution,
+        ctaLabel: '',
+        onCta: null,
+        userInitial: userInitial,
+        avatarUrl: avatarUrl,
+      );
+    }
+
+    if (currentTarget.isOffDayPullForward) {
+      return HomeStageHero(
+        eyebrow: 'NGÀY PHỤC HỒI',
+        titleLine1: 'Nghỉ',
+        titleLine2: 'đúng lúc.',
+        whyLine:
+            'Cơ bắp của bạn đang tái tạo hôm nay. Nghỉ đúng lúc giúp buổi sau mạnh hơn.',
+        duration: _durationFor(currentTarget),
+        totalCount: currentTarget.sequence.length,
+        aiCount: currentTarget.sequence.length,
+        exercises: _exerciseRows(currentTarget),
+        coachQuote:
+            'Hôm nay là ngày nghỉ. Nếu vẫn muốn chủ động, bấm Bắt đầu để tập buổi tiếp theo trong lộ trình.',
+        coachAttribution: homeMockCoachAttribution,
+        ctaLabel: 'Bắt đầu',
+        onCta: onStart,
+        ctaEmphasized: false,
+        secondaryCtaLabel: 'Hoặc giãn cơ nhẹ',
+        onSecondaryCta: onStretch,
+        userInitial: userInitial,
+        avatarUrl: avatarUrl,
+      );
+    }
+
+    return HomeStageHero(
+      eyebrow:
+          'HÔM NAY · BUỔI ${(currentTarget.session.sessionIndex + 1).toString().padLeft(2, '0')}',
+      titleLine1: homeMockToday.titleLine1,
+      titleLine2: homeMockToday.titleLine2,
+      duration: _durationFor(currentTarget),
+      totalCount: currentTarget.sequence.length,
+      aiCount: currentTarget.sequence.length,
+      exercises: _exerciseRows(currentTarget),
+      coachQuote: homeMockCoachQuote,
+      coachAttribution: homeMockCoachAttribution,
+      ctaLabel: homeMockToday.cta,
+      onCta: onStart,
+      userInitial: userInitial,
+      avatarUrl: avatarUrl,
+    );
+  }
+
+  static String _durationFor(WorkoutLaunchTarget target) {
+    final minutes = (target.sequence.length * 5).clamp(12, 35);
+    return '$minutes phút';
+  }
+
+  static List<HomeStageExercise> _exerciseRows(WorkoutLaunchTarget target) {
+    return target.sequence
+        .map(
+          (item) => HomeStageExercise(
+            name: item.definition.name,
+            detail: item.prescription == null
+                ? ''
+                : workoutVolumeLabel(item.prescription!),
+            hasAi: true,
+          ),
+        )
+        .toList(growable: false);
   }
 }
 
@@ -184,8 +406,12 @@ class _CheckInPrompt {
   final int weekNumber;
 }
 
-class _WeeklyCheckInBanner extends StatelessWidget {
-  const _WeeklyCheckInBanner({
+/// Editorial-style weekly check-in alert. Hairline-bordered band instead
+/// of a raised card — matches the typography-first vibe of the vitals
+/// spread so we don't reintroduce a "card" right where we just removed
+/// them.
+class _WeeklyCheckInAlert extends StatelessWidget {
+  const _WeeklyCheckInAlert({
     required this.weekNumber,
     required this.onTap,
   });
@@ -197,211 +423,75 @@ class _WeeklyCheckInBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
+      padding: const EdgeInsets.fromLTRB(24, 30, 24, 0),
       child: Material(
-        color: c.bgRaised,
-        borderRadius: BorderRadius.circular(8),
+        color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(8),
           onTap: onTap,
+          borderRadius: BorderRadius.circular(2),
           child: Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(vertical: 14),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: c.border),
+              border: Border(
+                top: BorderSide(color: c.border),
+                bottom: BorderSide(color: c.border),
+              ),
             ),
             child: Row(
               children: [
                 Container(
-                  width: 36,
-                  height: 36,
+                  width: 22,
+                  height: 22,
                   decoration: BoxDecoration(
                     color: c.yellow,
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     Icons.tune_rounded,
-                    size: 17,
+                    size: 12,
                     color: c.yellowInk,
                   ),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Check-in tuần $weekNumber',
-                        style: TextStyle(
-                          fontFamily: 'BeVietnamPro',
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: c.ink,
-                        ),
+                  child: RichText(
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    text: TextSpan(
+                      style: const TextStyle(
+                        fontFamily: 'BeVietnamPro',
+                        fontSize: 13,
+                        letterSpacing: -0.1,
                       ),
-                      const SizedBox(height: 3),
-                      Text(
-                        '30 giây để Vika hiểu cơ thể bạn hơn.',
-                        style: TextStyle(
-                          fontFamily: 'BeVietnamPro',
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: c.inkSoft,
+                      children: [
+                        TextSpan(
+                          text: 'Check-in tuần $weekNumber',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: c.ink,
+                          ),
                         ),
-                      ),
-                    ],
+                        TextSpan(
+                          text: '   ·   30 giây',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: c.inkSoft,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                Icon(Icons.chevron_right_rounded, color: c.inkSoft),
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 14,
+                  color: c.inkSoft,
+                ),
               ],
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _HeroDayRail extends StatelessWidget {
-  const _HeroDayRail({required this.onCta});
-
-  final VoidCallback onCta;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = VikaColors.of(context);
-    // Stack draws bottom-up. Cards sit underneath; the sticker is drawn
-    // LAST so it floats over the top edge of the first card — matches
-    // the JSX intent (sticker overlaps the top of the today card).
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        // 1. Cards rail.
-        Padding(
-          padding: const EdgeInsets.only(top: 18),
-          child: SizedBox(
-            height: 470,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              physics: const PageScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              itemCount: homeMockHeroDays.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 12),
-              itemBuilder: (context, idx) {
-                final mock = homeMockHeroDays[idx];
-                return HeroDayCard(
-                  eyebrow: mock.eyebrow,
-                  titleLine1: mock.titleLine1,
-                  titleLine2: mock.titleLine2,
-                  stats: mock.stats,
-                  cta: mock.cta,
-                  isToday: mock.isToday,
-                  onCta: mock.isToday ? onCta : null,
-                );
-              },
-            ),
-          ),
-        ),
-        // 2. Bottom dots.
-        Positioned(
-          bottom: -2,
-          left: 0,
-          right: 0,
-          child: _RailDots(
-            count: homeMockHeroDays.length,
-            activeIndex: 0,
-          ),
-        ),
-        // 3. "Gợi ý cho bạn" sticker — drawn LAST so it floats over the
-        // top edge of the today card. Slightly rotated for a "stuck on"
-        // feel; the shadow gives it a paper-tag pop.
-        Positioned(
-          top: -8,
-          left: 36,
-          child: Transform.rotate(
-            angle: -0.026, // -1.5°
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-              decoration: BoxDecoration(
-                color: c.yellow,
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                    color: c.ink.withValues(alpha: 0.16),
-                    blurRadius: 14,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Text(
-                'GỢI Ý CHO BẠN',
-                style: TextStyle(
-                  fontFamily: 'BeVietnamPro',
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.4,
-                  color: c.yellowInk,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _RailDots extends StatelessWidget {
-  const _RailDots({required this.count, required this.activeIndex});
-
-  final int count;
-  final int activeIndex;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = VikaColors.of(context);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        for (var i = 0; i < count; i++) ...[
-          Container(
-            width: i == activeIndex ? 22 : 4,
-            height: 4,
-            decoration: BoxDecoration(
-              color: i == activeIndex ? c.ink : c.inkGhost,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          if (i < count - 1) const SizedBox(width: 4),
-        ],
-      ],
-    );
-  }
-}
-
-class _ProgressRow extends StatelessWidget {
-  const _ProgressRow();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          StreakRing(
-            days: homeMockStreakDays,
-            weekDots: homeMockWeekDots,
-          ),
-          const SizedBox(width: 24),
-          const Expanded(
-            child: FormWeekChart(
-              todayPercent: homeMockFormToday,
-              delta: homeMockFormDelta,
-              weekValues: homeMockFormWeek,
-            ),
-          ),
-        ],
       ),
     );
   }

@@ -1,6 +1,27 @@
-// PlanScreen — Premium Ivory plan page restored to the old horizontal week
-// pager design, but backed by the real v4.4 recommendation plan instead of
-// phaseWeeksMock.
+// PlanScreen — polished Stage Plan (Premium Ivory v2).
+//
+// Real data wiring (RecommendationService, FitnessRetestService,
+// _PlanWeekMapper) preserved verbatim from v1. The rendering layer is
+// fully redesigned to match Home's Stage aesthetic:
+//
+//   ┌─ DARK STAGE HERO (PlanStageHero, bleeds to top edge)
+//   │     Adapts to selected week's status (current / done / future)
+//   │     CTA on current week is the "Bắt đầu Buổi N" launch
+//   │
+//   ├─ WEEK RAIL (PlanWeekRail)
+//   │     Horizontal scrollable pills, 7 weeks, tap to select
+//   │
+//   ├─ DAY TIMELINE (PlanDayTimeline)
+//   │     Vertical 7-day list for the SELECTED week
+//   │     Tap any non-rest day to expand and see its exercise list
+//   │     Today is expanded by default; recheck day has diamond marker +
+//   │     its own CTA inside the expansion
+//   │
+//   └─ EditorialCloser
+//
+// The dark hero defeats MainShell's top SafeArea via
+// MediaQuery.removePadding(removeTop: true), then re-applies status-bar
+// padding inside itself — same trick as Home.
 
 import 'dart:async';
 
@@ -12,14 +33,15 @@ import '../screens/exercise/exercise_launch_args.dart';
 import '../services/recommendation/fitness_retest_service.dart';
 import '../services/recommendation/models/plan.dart' as reco;
 import '../services/recommendation/recommendation_service.dart';
+import '../services/session_persistence.dart';
 import '../services/user_program_service.dart';
+import '../services/user_profile_service.dart';
+import '../services/workout_launch_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/orientation_lock.dart';
 import '../widgets/plan/editorial_closer.dart';
-import '../widgets/plan/page_hero.dart';
-import '../widgets/plan/section_mark.dart';
-import '../widgets/plan/week_page.dart';
-import '../widgets/plan/wordmark_header.dart';
+import '../widgets/plan/plan_day_timeline.dart';
+import '../widgets/plan/plan_stage_hero.dart';
 import 'plan_retest_screen.dart';
 
 class PlanScreen extends StatefulWidget {
@@ -27,10 +49,12 @@ class PlanScreen extends StatefulWidget {
     super.key,
     required this.bottomPadding,
     this.program,
+    this.onProfileChanged,
   });
 
   final double bottomPadding;
   final UserProgramData? program;
+  final ValueChanged<AppUserProfile>? onProfileChanged;
 
   @override
   State<PlanScreen> createState() => _PlanScreenState();
@@ -93,7 +117,7 @@ class _PlanScreenState extends State<PlanScreen> {
             );
           }
 
-          return _RealPlanPager(
+          return _PlanContent(
             key: ValueKey(
               '${data.plan.recommendationId}:'
               '${snapshot.data?.pendingRetest?.recommendationId ?? 'ready'}',
@@ -101,6 +125,8 @@ class _PlanScreenState extends State<PlanScreen> {
             snapshot: data,
             pendingRetest: snapshot.data?.pendingRetest,
             bottomPadding: widget.bottomPadding,
+            onReload: _reload,
+            onProfileChanged: widget.onProfileChanged,
           );
         },
       ),
@@ -108,27 +134,34 @@ class _PlanScreenState extends State<PlanScreen> {
   }
 }
 
-class _RealPlanPager extends StatefulWidget {
-  const _RealPlanPager({
+// ═══════════════════════════════════════════════════════════════
+// CONTENT — selected-week state + new composition
+// ═══════════════════════════════════════════════════════════════
+
+class _PlanContent extends StatefulWidget {
+  const _PlanContent({
     super.key,
     required this.snapshot,
     required this.pendingRetest,
     required this.bottomPadding,
+    required this.onReload,
+    this.onProfileChanged,
   });
 
   final PlanSnapshot snapshot;
   final PendingFitnessRetest? pendingRetest;
   final double bottomPadding;
+  final VoidCallback onReload;
+  final ValueChanged<AppUserProfile>? onProfileChanged;
 
   @override
-  State<_RealPlanPager> createState() => _RealPlanPagerState();
+  State<_PlanContent> createState() => _PlanContentState();
 }
 
-class _RealPlanPagerState extends State<_RealPlanPager> {
+class _PlanContentState extends State<_PlanContent> {
+  final _launches = WorkoutLaunchService();
   late final List<PlanWeek> _weeks;
-  late final int _initialIndex;
-  late final PageController _controller;
-  late int _activeWeek;
+  late int _selectedIndex;
 
   @override
   void initState() {
@@ -137,97 +170,38 @@ class _RealPlanPagerState extends State<_RealPlanPager> {
       widget.snapshot,
       pendingRetest: widget.pendingRetest,
     );
-    _initialIndex = _weeks.indexWhere((w) => w.status == WeekStatus.current);
-    final index = _initialIndex == -1 ? 0 : _initialIndex;
-    _activeWeek = index + 1;
-    _controller = PageController(initialPage: index);
+    final currentIndex =
+        _weeks.indexWhere((w) => w.status == WeekStatus.current);
+    _selectedIndex = currentIndex == -1 ? 0 : currentIndex;
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+  void _selectWeek(int i) {
+    if (i == _selectedIndex) return;
+    setState(() => _selectedIndex = i);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final plan = widget.snapshot.plan;
-    return Column(
-      children: [
-        const WordmarkHeader(),
-        SectionMark(
-          num: '01',
-          label: 'Lộ trình ${_weeks.length} tuần',
-        ),
-        PageHero(
-          weeks: _weeks,
-          activeWeek: _activeWeek,
-        ),
-        const SizedBox(height: 18),
-        Expanded(
-          child: PageView.builder(
-            controller: _controller,
-            onPageChanged: (idx) {
-              setState(() => _activeWeek = idx + 1);
-            },
-            itemCount: _weeks.length,
-            itemBuilder: (context, idx) {
-              final week = _weeks[idx];
-              final next = idx + 1 < _weeks.length ? _weeks[idx + 1] : null;
-              final sourceWeek = plan.weeks[idx];
-              return SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Padding(
-                  padding: EdgeInsets.only(bottom: widget.bottomPadding),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      WeekPage(
-                        week: week,
-                        isActive: week.num == _activeWeek,
-                        nextWeek: next,
-                        onStartToday: () => _startWeek(context, sourceWeek),
-                        onStartRecheck: widget.pendingRetest == null
-                            ? null
-                            : () => _startRetest(
-                                  context,
-                                  widget.pendingRetest!,
-                                ),
-                      ),
-                      EditorialCloser(
-                        section: 'LỘ TRÌNH',
-                        tagline: '${_weeks.length} tuần · ${week.name}.',
-                      ),
-                      const SizedBox(height: 24),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
+  reco.WeekPlan get _selectedRecoWeek =>
+      widget.snapshot.plan.weeks[_selectedIndex];
+
+  PlanWeek get _selectedWeek => _weeks[_selectedIndex];
+
+  bool get _isShowingCurrentWeek => _selectedWeek.status == WeekStatus.current;
+
+  void _startCurrentSession() {
+    unawaited(_startWeek(_selectedRecoWeek));
+  }
+
+  Future<void> _startWeek(reco.WeekPlan week) async {
+    final target = await _launches.resolveFromSnapshot(
+      widget.snapshot,
+      week: week,
     );
-  }
-
-  void _startWeek(BuildContext context, reco.WeekPlan week) {
-    final slots = week.sessions.isEmpty
-        ? const <reco.SlotAssignment>[]
-        : week.sessions.first.slots;
-    for (final slot in slots) {
-      final definition = lookupExerciseDefinition(slot.exerciseId);
-      if (definition == null) continue;
-      Navigator.of(context).pushNamed(
-        '/exercise',
-        arguments: ExerciseLaunchArgs(
-          definition: definition,
-          catalogExerciseId: slot.exerciseId,
-          prescription: slot.volume,
-          recommendationId: widget.snapshot.plan.recommendationId,
-          weekNumber: week.weekNumber,
-          slotName: slot.slotName,
-        ),
-      );
+    if (!mounted) return;
+    final first = target?.firstLaunchArgs;
+    if (first != null) {
+      await _runWorkoutSequence(first);
+      if (!mounted) return;
+      widget.onReload();
       return;
     }
 
@@ -240,31 +214,84 @@ class _RealPlanPagerState extends State<_RealPlanPager> {
       );
   }
 
-  Future<void> _startRetest(
-    BuildContext context,
-    PendingFitnessRetest pending,
-  ) async {
+  Future<void> _runWorkoutSequence(ExerciseLaunchArgs first) async {
+    ExerciseLaunchArgs? next = first;
+    var completedFinalSlot = false;
+    while (mounted && next != null) {
+      final result = await Navigator.of(context).pushNamed(
+        '/exercise',
+        arguments: next,
+      );
+      if (!mounted) return;
+      if (result is Map && result['next'] is ExerciseLaunchArgs) {
+        next = result['next'] as ExerciseLaunchArgs;
+      } else {
+        completedFinalSlot = result is Map && result['completed'] == true;
+        next = null;
+      }
+    }
+    if (completedFinalSlot) {
+      await SessionPersistence().updateStreak();
+      final profile = await UserProfileService().fetchCurrentProfile();
+      if (profile != null) widget.onProfileChanged?.call(profile);
+    }
+  }
+
+  Future<void> _startRetest() async {
+    final pending = widget.pendingRetest;
+    if (pending == null) return;
     final completed = await Navigator.of(context).pushNamed(
       '/plan-retest',
       arguments: PlanRetestLaunchArgs(pending: pending),
     );
     if (!context.mounted || completed != true) return;
-    // Rebuild the pager so the recheck card disappears after the retest row
-    // is written.
-    final state = context.findAncestorStateOfType<_PlanScreenState>();
-    state?._reload();
+    widget.onReload();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MediaQuery.removePadding(
+      // Defeat MainShell's top SafeArea so the dark hero bleeds into the
+      // status bar area, same as Home.
+      context: context,
+      removeTop: true,
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: EdgeInsets.only(bottom: widget.bottomPadding),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            PlanStageHero(
+              weeks: _weeks,
+              selectedIndex: _selectedIndex,
+              onSelectWeek: _selectWeek,
+              onStartCurrentSession: _startCurrentSession,
+              userInitial: 'N',
+            ),
+            PlanDayTimeline(
+              days: _selectedWeek.days,
+              weekStatus: _selectedWeek.status,
+              weekNumber: _selectedWeek.num,
+              phaseName: _selectedWeek.name,
+              onStartSession:
+                  _isShowingCurrentWeek ? _startCurrentSession : null,
+              onStartRetest: widget.pendingRetest == null ? null : _startRetest,
+            ),
+            EditorialCloser(
+              section: 'LỘ TRÌNH',
+              tagline: '${_weeks.length} tuần · ${_selectedWeek.name}.',
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
   }
 }
 
-class _PlanScreenData {
-  const _PlanScreenData({
-    required this.snapshot,
-    required this.pendingRetest,
-  });
-
-  final PlanSnapshot? snapshot;
-  final PendingFitnessRetest? pendingRetest;
-}
+// ═══════════════════════════════════════════════════════════════
+// SHELL MESSAGE — loading / empty states
+// ═══════════════════════════════════════════════════════════════
 
 class _PlanShellMessage extends StatelessWidget {
   const _PlanShellMessage({
@@ -284,63 +311,66 @@ class _PlanShellMessage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    return Column(
-      children: [
-        const WordmarkHeader(),
-        const SectionMark(
-          num: '01',
-          label: 'Lộ trình',
-        ),
-        Expanded(
-          child: Center(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(28, 0, 28, bottomPadding + 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: 'BeVietnamPro',
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
-                      fontStyle: FontStyle.italic,
-                      letterSpacing: -1.2,
-                      color: c.ink,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    body,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: 'BeVietnamPro',
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      height: 1.45,
-                      color: c.inkSoft,
-                    ),
-                  ),
-                  if (actionLabel != null && onAction != null) ...[
-                    const SizedBox(height: 18),
-                    FilledButton(
-                      onPressed: onAction,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: c.yellow,
-                        foregroundColor: c.yellowInk,
-                      ),
-                      child: Text(actionLabel!),
-                    ),
-                  ],
-                ],
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(28, 0, 28, bottomPadding + 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'BeVietnamPro',
+                fontSize: 28,
+                fontWeight: FontWeight.w800,
+                fontStyle: FontStyle.italic,
+                letterSpacing: -1.2,
+                color: c.ink,
               ),
             ),
-          ),
+            const SizedBox(height: 10),
+            Text(
+              body,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'BeVietnamPro',
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                height: 1.45,
+                color: c.inkSoft,
+              ),
+            ),
+            if (actionLabel != null && onAction != null) ...[
+              const SizedBox(height: 18),
+              FilledButton(
+                onPressed: onAction,
+                style: FilledButton.styleFrom(
+                  backgroundColor: c.yellow,
+                  foregroundColor: c.yellowInk,
+                ),
+                child: Text(actionLabel!),
+              ),
+            ],
+          ],
         ),
-      ],
+      ),
     );
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DATA + MAPPER — kept verbatim from v1
+// ═══════════════════════════════════════════════════════════════
+
+class _PlanScreenData {
+  const _PlanScreenData({
+    required this.snapshot,
+    required this.pendingRetest,
+  });
+
+  final PlanSnapshot? snapshot;
+  final PendingFitnessRetest? pendingRetest;
 }
 
 class _PlanWeekMapper {
@@ -353,7 +383,7 @@ class _PlanWeekMapper {
     final plan = snapshot.plan;
     final currentWeek = snapshot.currentWeekNumber;
     final anchor = snapshot.startedAt ?? snapshot.generatedAt ?? DateTime.now();
-    final weekOneStart = _localDay(anchor);
+    final weekOneStart = _mondayOfWeek(_localDay(anchor));
     final lastWeekNumber = plan.weeks.isEmpty ? 0 : plan.weeks.last.weekNumber;
 
     return plan.weeks.map((week) {
@@ -369,6 +399,7 @@ class _PlanWeekMapper {
         week: week,
         status: status,
         weekStart: weekStart,
+        scheduleDayIndexes: snapshot.scheduleDayIndexes,
         hasPendingRetest:
             pendingRetest != null && week.weekNumber == lastWeekNumber,
       );
@@ -410,9 +441,11 @@ class _PlanWeekMapper {
     required reco.WeekPlan week,
     required WeekStatus status,
     required DateTime weekStart,
+    required List<int> scheduleDayIndexes,
     required bool hasPendingRetest,
   }) {
-    final sessionDayIndexes = _sessionDayIndexes(week.sessions.length);
+    final sessionDayIndexes =
+        _sessionDayIndexes(week.sessions.length, scheduleDayIndexes);
     var sessionCursor = 0;
 
     return [
@@ -457,8 +490,18 @@ class _PlanWeekMapper {
       coach:
           'Làm lại bài kiểm tra ngắn. Sau khi xong, bạn vẫn có thể tập tiếp hôm nay.',
       exercises: const [
-        PlanExercise(name: 'Squat assessment', form: 0),
-        PlanExercise(name: 'Wall push-up assessment', form: 0),
+        PlanExercise(
+          name: 'Squat assessment',
+          volumeLabel: 'Đo lực chân',
+          hasAi: true,
+          form: 0,
+        ),
+        PlanExercise(
+          name: 'Wall push-up assessment',
+          volumeLabel: 'Đo lực thân trên',
+          hasAi: true,
+          form: 0,
+        ),
       ],
     );
   }
@@ -473,8 +516,10 @@ class _PlanWeekMapper {
     final exercises = session.slots
         .map(
           (slot) => PlanExercise(
-            name: '${_exerciseLabel(slot.exerciseId)} · '
-                '${_volumeLabel(slot.volume)}',
+            name: _exerciseLabel(slot.exerciseId),
+            volumeLabel: _volumeLabel(slot.volume),
+            exerciseId: slot.exerciseId,
+            hasAi: lookupExerciseDefinition(slot.exerciseId) != null,
             form: 78,
           ),
         )
@@ -518,7 +563,19 @@ class _PlanWeekMapper {
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
-  static List<int> _sessionDayIndexes(int sessionCount) {
+  static List<int> _sessionDayIndexes(
+    int sessionCount,
+    List<int> scheduleDayIndexes,
+  ) {
+    final scheduleDays = scheduleDayIndexes
+        .where((day) => day >= 0 && day <= 6)
+        .toSet()
+        .toList()
+      ..sort();
+    if (scheduleDays.length >= sessionCount) {
+      return scheduleDays.take(sessionCount).toList(growable: false);
+    }
+
     return switch (sessionCount) {
       <= 0 => const <int>[],
       1 => const [0],
@@ -530,8 +587,14 @@ class _PlanWeekMapper {
     };
   }
 
-  static DateTime _localDay(DateTime date) =>
-      DateTime(date.year, date.month, date.day);
+  static DateTime _localDay(DateTime date) {
+    final local = date.toLocal();
+    return DateTime(local.year, local.month, local.day);
+  }
+
+  static DateTime _mondayOfWeek(DateTime date) {
+    return date.subtract(Duration(days: date.weekday - DateTime.monday));
+  }
 
   static String _shortDate(DateTime date) => '${date.day}/${date.month}';
 

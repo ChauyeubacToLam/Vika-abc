@@ -6,12 +6,44 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../exercise/exercise_base.dart';
 import '../../exercise/calorie_estimator_registry.dart';
+import '../../exercise/curl_up/curl_up.dart';
 import '../../exercise/glute bridge/glute_bridge.dart';
+import '../../exercise/glute bridge/metrics/glute_bridge_hip_extension.dart'
+    as bridge_hip;
+import '../../exercise/glute bridge/metrics/glute_bridge_knee_angle.dart'
+    as bridge_knee;
+import '../../exercise/glute bridge/metrics/glute_bridge_neck_head.dart'
+    as bridge_neck;
+import '../../exercise/glute bridge/metrics/glute_bridge_speed_control.dart'
+    as bridge_speed;
 import '../../exercise/jumping jack/jumping_jack.dart';
+import '../../exercise/jumping jack/metrics/arm_extension_metric.dart'
+    as jj_arm;
+import '../../exercise/jumping jack/metrics/leg_spread_metric.dart' as jj_leg;
+import '../../exercise/jumping jack/metrics/tempo_metric.dart' as jj_tempo;
 import '../../exercise/lunge/lunge.dart';
+import '../../exercise/lunge/metrics/lunge_depth_metric.dart' as lunge_depth;
+import '../../exercise/lunge/metrics/lunge_heel_lift_metric.dart' as lunge_heel;
+import '../../exercise/lunge/metrics/lunge_lumbar_proxy_metric.dart'
+    as lunge_core;
+import '../../exercise/lunge/metrics/lunge_trunk_lean_metric.dart'
+    as lunge_trunk;
 import '../../exercise/plank/plank.dart';
+import '../../exercise/plank/metrics/head_neck_metric.dart' as plank_neck;
+import '../../exercise/plank/metrics/knee_extension_metric.dart' as plank_knee;
+import '../../exercise/plank/metrics/trunk_alignment_metric.dart'
+    as plank_trunk;
 import '../../exercise/push up/push_up.dart';
+import '../../exercise/push up/metrics/depth_metric.dart' as push_depth;
+import '../../exercise/push up/metrics/tempo_metric.dart' as push_tempo;
+import '../../exercise/push up/metrics/trunk_alignment_metric.dart'
+    as push_trunk;
 import '../../exercise/report_builder_registry.dart';
+import '../../exercise/curl_up/metrics/curl_up_knee_extension.dart'
+    as curl_knee;
+import '../../exercise/curl_up/metrics/curl_up_neck_pulling.dart' as curl_neck;
+import '../../exercise/curl_up/metrics/curl_up_trunk_elevation.dart'
+    as curl_trunk;
 import '../../exercise/squat/metrics/heel_rise_metric.dart';
 import '../../exercise/squat/metrics/tempo_metric.dart';
 import '../../exercise/squat/metrics/trunk_lean_metric.dart';
@@ -23,6 +55,7 @@ import '../../services/recommendation/progression_service.dart';
 import '../../utils/exercise_logger.dart';
 import '../../utils/orientation_lock.dart';
 import 'active_exercise_page.dart';
+import 'exercise_launch_args.dart';
 import 'exercise_intro_page.dart';
 import 'executive_summary_page.dart';
 import 'rest_screen.dart';
@@ -38,7 +71,10 @@ class ExerciseExperienceScreen extends StatefulWidget {
     this.prescription,
     this.recommendationId,
     this.weekNumber,
+    this.sessionIndex,
     this.slotName,
+    this.sequence = const [],
+    this.sequenceIndex = 0,
   });
 
   final ExerciseDefinition definition;
@@ -46,7 +82,10 @@ class ExerciseExperienceScreen extends StatefulWidget {
   final VolumePrescription? prescription;
   final String? recommendationId;
   final int? weekNumber;
+  final int? sessionIndex;
   final String? slotName;
+  final List<ExerciseSequenceItem> sequence;
+  final int sequenceIndex;
 
   @override
   State<ExerciseExperienceScreen> createState() =>
@@ -87,6 +126,33 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
   bool get _isAssessment => widget.definition.id.endsWith('_assessment');
   String get _sessionExerciseId =>
       widget.catalogExerciseId ?? widget.definition.id;
+  bool get _isWorkoutSequence => widget.sequence.length > 1;
+  bool get _isContinuationSlot =>
+      _isWorkoutSequence && widget.sequenceIndex > 0;
+  String? get _sessionProgressLabel => _isWorkoutSequence
+      ? 'Buổi tập · Bài ${widget.sequenceIndex + 1}/${widget.sequence.length}'
+      : null;
+  ExerciseLaunchArgs? get _nextInSequence {
+    final args = ExerciseLaunchArgs(
+      definition: widget.definition,
+      catalogExerciseId: widget.catalogExerciseId,
+      prescription: widget.prescription,
+      recommendationId: widget.recommendationId,
+      weekNumber: widget.weekNumber,
+      sessionIndex: widget.sessionIndex,
+      slotName: widget.slotName,
+      sequence: widget.sequence,
+      sequenceIndex: widget.sequenceIndex,
+    );
+    return args.nextInSequence();
+  }
+
+  String get _summaryDoneLabel {
+    final next = _nextInSequence;
+    if (next != null) return 'Bài tiếp theo: ${next.definition.name}';
+    if (_isWorkoutSequence) return 'Hoàn thành buổi tập';
+    return 'Hoàn tất';
+  }
 
   void _setFlowState(VoidCallback mutation) {
     if (!mounted) return;
@@ -324,6 +390,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
         'set_number': i + 1,
         'recommendation_id': widget.recommendationId,
         'week_number': widget.weekNumber,
+        'session_index': widget.sessionIndex,
         'is_deload_week': widget.prescription?.isDeloadWeek ?? false,
         'prescribed_reps': prescribedReps,
         'actual_reps': logger.repLogs.length,
@@ -384,10 +451,6 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
         );
       }
     }
-
-    // Update streak on profiles after successful session write.
-    // Fire-and-forget — errors don't block UX.
-    await SessionPersistence().updateStreak();
   }
 
   /// Called from ExecutiveSummaryPage when user taps a difficulty emoji.
@@ -416,7 +479,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
 
       final builderEntry = reportBuilders[widget.definition.id];
       SessionComparison? comparison;
-      if (builderEntry != null) {
+      if (builderEntry != null && _sessionHistory.isNotEmpty) {
         comparison = ExerciseComparisonService().buildExecutiveComparison(
           currentFormScore: report.formScore,
           currentFaultCounts: faultCounts,
@@ -467,11 +530,16 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
           totalSets: _spec.sets,
           repsPerSet: _spec.repsPerSet,
           videoDuration: _spec.videoDuration,
+          targetLabel: _spec.targetLabel,
+          secondsPerUnit: _spec.secondsPerUnit,
           muscles: _spec.muscles,
           tips: _spec.tips,
           badges: _spec.badges,
           callouts: _spec.callouts,
+          posture: _spec.posture,
           coachNote: _coachNote,
+          sessionProgressLabel: _sessionProgressLabel,
+          isContinuation: _isContinuationSlot,
           onStart: _beginWorkout,
           onBack: () => Navigator.of(context).pop(),
         ),
@@ -508,7 +576,13 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
               ? _sessionHistory.last.overallDifficulty
               : null,
           onOverallDifficulty: _handleOverallDifficulty,
-          onDone: () => Navigator.of(context).pop(),
+          sessionProgressLabel: _sessionProgressLabel,
+          doneLabel: _summaryDoneLabel,
+          isFinalWorkoutSlot: _nextInSequence == null,
+          onDone: () => Navigator.of(context).pop({
+            'completed': true,
+            'next': _nextInSequence,
+          }),
         ),
     };
 
@@ -527,6 +601,9 @@ class _ExerciseExperienceSpec {
     required this.repsPerSet,
     required this.videoDuration,
     required this.restSeconds,
+    required this.targetLabel,
+    required this.secondsPerUnit,
+    required this.posture,
     required this.muscles,
     required this.tips,
     required this.badges,
@@ -538,6 +615,9 @@ class _ExerciseExperienceSpec {
   final int repsPerSet;
   final String videoDuration;
   final int restSeconds;
+  final String targetLabel;
+  final double secondsPerUnit;
+  final SkeletonPosture posture;
   final List<String> muscles;
   final List<String> tips;
   final List<ExerciseIntroBadge> badges;
@@ -559,6 +639,9 @@ class _ExerciseExperienceSpec {
           repsPerSet: 5,
           videoDuration: '1:18',
           restSeconds: overrideRest ?? 45,
+          targetLabel: 'REP/HIỆP',
+          secondsPerUnit: 4,
+          posture: SkeletonPosture.standing,
           muscles: definition.targetMuscles,
           tips: definition.setupTips,
           badges: [
@@ -602,7 +685,7 @@ class _ExerciseExperienceSpec {
           createExercise: (repsPerSet) => Squat(maxRep: repsPerSet),
         );
       case 'wall_pushup_assessment':
-        return _generic(
+        return _pushUpSpec(
           definition: definition,
           sets: 1,
           repsPerSet: 5,
@@ -616,6 +699,9 @@ class _ExerciseExperienceSpec {
           repsPerSet: overrideReps ?? 8,
           videoDuration: '2:15',
           restSeconds: overrideRest ?? 45,
+          targetLabel: 'REP/HIỆP',
+          secondsPerUnit: 4,
+          posture: SkeletonPosture.standing,
           muscles: definition.targetMuscles,
           tips: definition.setupTips,
           badges: [
@@ -659,7 +745,7 @@ class _ExerciseExperienceSpec {
           createExercise: (repsPerSet) => Squat(maxRep: repsPerSet),
         );
       case 'lunge':
-        return _generic(
+        return _lungeSpec(
           definition: definition,
           sets: overrideSets ?? 3,
           repsPerSet: overrideReps ?? 8,
@@ -668,7 +754,7 @@ class _ExerciseExperienceSpec {
           createExercise: (repsPerSet) => Lunge(maxRep: repsPerSet),
         );
       case 'push_up':
-        return _generic(
+        return _pushUpSpec(
           definition: definition,
           sets: overrideSets ?? 3,
           repsPerSet: overrideReps ?? 6,
@@ -677,7 +763,7 @@ class _ExerciseExperienceSpec {
           createExercise: (repsPerSet) => PushUp(maxRep: repsPerSet),
         );
       case 'plank':
-        return _generic(
+        return _plankSpec(
           definition: definition,
           sets: overrideSets ?? 3,
           repsPerSet: overrideReps ?? 3,
@@ -686,7 +772,7 @@ class _ExerciseExperienceSpec {
           createExercise: (repsPerSet) => Plank(maxRep: repsPerSet),
         );
       case 'jumping_jack':
-        return _generic(
+        return _jumpingJackSpec(
           definition: definition,
           sets: overrideSets ?? 3,
           repsPerSet: overrideReps ?? 15,
@@ -695,13 +781,22 @@ class _ExerciseExperienceSpec {
           createExercise: (repsPerSet) => JumpingJack(maxRep: repsPerSet),
         );
       case 'glute_bridge':
-        return _generic(
+        return _gluteBridgeSpec(
           definition: definition,
           sets: overrideSets ?? 3,
           repsPerSet: overrideReps ?? 15,
           restSeconds: overrideRest,
           videoDuration: '1:36',
           createExercise: (repsPerSet) => GluteBridge(maxRep: repsPerSet),
+        );
+      case 'curl_up':
+        return _curlUpSpec(
+          definition: definition,
+          sets: overrideSets ?? 3,
+          repsPerSet: overrideReps ?? 12,
+          restSeconds: overrideRest,
+          videoDuration: '1:34',
+          createExercise: (repsPerSet) => CurlUp(maxRep: repsPerSet),
         );
       default:
         return _generic(
@@ -728,6 +823,9 @@ class _ExerciseExperienceSpec {
       repsPerSet: repsPerSet,
       videoDuration: videoDuration,
       restSeconds: restSeconds ?? 45,
+      targetLabel: 'REP/HIỆP',
+      secondsPerUnit: 4,
+      posture: SkeletonPosture.standing,
       muscles: definition.targetMuscles,
       tips: definition.setupTips,
       badges: [
@@ -763,6 +861,330 @@ class _ExerciseExperienceSpec {
           color: const Color(0xFFB84435),
           alignment: const Alignment(0.90, 0.34),
           anchor: const Offset(0.20, 0.88),
+        ),
+      ],
+      createExercise: createExercise,
+    );
+  }
+
+  static _ExerciseExperienceSpec _lungeSpec({
+    required ExerciseDefinition definition,
+    required int sets,
+    required int repsPerSet,
+    int? restSeconds,
+    required String videoDuration,
+    required ExerciseBase Function(int repsPerSet) createExercise,
+  }) {
+    return _ExerciseExperienceSpec(
+      sets: sets,
+      repsPerSet: repsPerSet,
+      videoDuration: videoDuration,
+      restSeconds: restSeconds ?? 45,
+      targetLabel: 'REP/HIỆP',
+      secondsPerUnit: 4,
+      posture: SkeletonPosture.standing,
+      muscles: definition.targetMuscles,
+      tips: definition.setupTips,
+      badges: const [],
+      callouts: [
+        SkeletonCallout(
+          title: 'Lưng nghiêng',
+          value:
+              '${lunge_trunk.LungeTrunkLeanConfig.GOOD_LEAN_RANGE[0]}° — ${lunge_trunk.LungeTrunkLeanConfig.GOOD_LEAN_RANGE[1]}°',
+          color: const Color(0xFFB87320),
+          alignment: const Alignment(0.90, -0.44),
+          anchor: const Offset(0.24, 0.56),
+        ),
+        SkeletonCallout(
+          title: 'Độ sâu gối',
+          value:
+              '${lunge_depth.LungeDepthConfig.GOOD_DEPTH_RANGE[0]}° — ${lunge_depth.LungeDepthConfig.GOOD_DEPTH_RANGE[1]}°',
+          color: const Color(0xFF1B6B52),
+          alignment: const Alignment(0.90, -0.05),
+          anchor: const Offset(0.18, 0.73),
+        ),
+        SkeletonCallout(
+          title: 'Gót chân',
+          value:
+              'Nhấc < ${(lunge_heel.LungeHeelLiftConfig.WARNING_THRESHOLD * 100).round()}% thân',
+          color: const Color(0xFFB84435),
+          alignment: const Alignment(0.90, 0.34),
+          anchor: const Offset(0.20, 0.88),
+        ),
+        SkeletonCallout(
+          title: 'Core & hông',
+          value:
+              '≥ ${lunge_core.LungeLumbarProxyConfig.GOOD_THRESHOLD.round()}°',
+          color: const Color(0xFF2B5EA6),
+          alignment: const Alignment(-0.90, -0.18),
+          anchor: const Offset(0.35, 0.62),
+        ),
+      ],
+      createExercise: createExercise,
+    );
+  }
+
+  static _ExerciseExperienceSpec _pushUpSpec({
+    required ExerciseDefinition definition,
+    required int sets,
+    required int repsPerSet,
+    int? restSeconds,
+    required String videoDuration,
+    required ExerciseBase Function(int repsPerSet) createExercise,
+  }) {
+    return _ExerciseExperienceSpec(
+      sets: sets,
+      repsPerSet: repsPerSet,
+      videoDuration: videoDuration,
+      restSeconds: restSeconds ?? 45,
+      targetLabel: 'REP/HIỆP',
+      secondsPerUnit: 4,
+      posture: SkeletonPosture.lyingFaceDown,
+      muscles: definition.targetMuscles,
+      tips: definition.setupTips,
+      badges: [
+        ExerciseIntroBadge(
+          title: 'Nhịp xuống',
+          value: '≥ ${push_tempo.TempoConfig.DESCENT_GOOD_MIN}s',
+          color: const Color(0xFF2B5EA6),
+        ),
+      ],
+      callouts: [
+        SkeletonCallout(
+          title: 'Thân người',
+          value:
+              'Võng < ${push_trunk.TrunkAlignmentConfig.SAG_GOOD_MAX.round()}°',
+          color: const Color(0xFFB87320),
+          alignment: const Alignment(0.90, -0.40),
+          anchor: const Offset(0.38, 0.56),
+        ),
+        SkeletonCallout(
+          title: 'Độ sâu khuỷu',
+          value:
+              '${push_depth.DepthConfig.goodDepthMin.round()}° — ${push_depth.DepthConfig.goodDepthMax.round()}°',
+          color: const Color(0xFF1B6B52),
+          alignment: const Alignment(0.90, -0.02),
+          anchor: const Offset(0.22, 0.56),
+        ),
+        SkeletonCallout(
+          title: 'Khoá khuỷu',
+          value: '≥ ${push_depth.DepthConfig.LOCKOUT_ANGLE.round()}°',
+          color: const Color(0xFFB84435),
+          alignment: const Alignment(0.90, 0.34),
+          anchor: const Offset(0.18, 0.52),
+        ),
+      ],
+      createExercise: createExercise,
+    );
+  }
+
+  static _ExerciseExperienceSpec _plankSpec({
+    required ExerciseDefinition definition,
+    required int sets,
+    required int repsPerSet,
+    int? restSeconds,
+    required String videoDuration,
+    required ExerciseBase Function(int repsPerSet) createExercise,
+  }) {
+    return _ExerciseExperienceSpec(
+      sets: sets,
+      repsPerSet: repsPerSet,
+      videoDuration: videoDuration,
+      restSeconds: restSeconds ?? PlankConfig.REST_DURATION.round(),
+      targetLabel: 'LẦN GIỮ/HIỆP',
+      secondsPerUnit: PlankConfig.HOLD_DURATION,
+      posture: SkeletonPosture.lyingFaceDown,
+      muscles: definition.targetMuscles,
+      tips: definition.setupTips,
+      badges: [
+        ExerciseIntroBadge(
+          title: 'Thời gian giữ',
+          value: '${PlankConfig.HOLD_DURATION.round()}s',
+          color: const Color(0xFF7040B8),
+        ),
+      ],
+      callouts: [
+        SkeletonCallout(
+          title: 'Thân người',
+          value:
+              'Lệch < ${plank_trunk.TrunkAlignmentConfig.SAG_GOOD_MAX.toStringAsFixed(1)}°',
+          color: const Color(0xFFB87320),
+          alignment: const Alignment(0.90, -0.40),
+          anchor: const Offset(0.38, 0.56),
+        ),
+        SkeletonCallout(
+          title: 'Đầu cổ',
+          value:
+              'Lệch < ${plank_neck.HeadNeckConfig.WARNING_DEVIATION.round()}°',
+          color: const Color(0xFF1B6B52),
+          alignment: const Alignment(0.90, -0.02),
+          anchor: const Offset(0.18, 0.50),
+        ),
+        SkeletonCallout(
+          title: 'Đầu gối',
+          value: '≥ ${plank_knee.KneeExtensionConfig.GOOD_MIN.round()}°',
+          color: const Color(0xFFB84435),
+          alignment: const Alignment(0.90, 0.34),
+          anchor: const Offset(0.68, 0.60),
+        ),
+      ],
+      createExercise: createExercise,
+    );
+  }
+
+  static _ExerciseExperienceSpec _jumpingJackSpec({
+    required ExerciseDefinition definition,
+    required int sets,
+    required int repsPerSet,
+    int? restSeconds,
+    required String videoDuration,
+    required ExerciseBase Function(int repsPerSet) createExercise,
+  }) {
+    return _ExerciseExperienceSpec(
+      sets: sets,
+      repsPerSet: repsPerSet,
+      videoDuration: videoDuration,
+      restSeconds: restSeconds ?? 35,
+      targetLabel: 'REP/HIỆP',
+      secondsPerUnit: 1.2,
+      posture: SkeletonPosture.standing,
+      muscles: definition.targetMuscles,
+      tips: definition.setupTips,
+      badges: [
+        ExerciseIntroBadge(
+          title: 'Nhịp rep',
+          value:
+              '${jj_tempo.TempoConfig.REP_MIN_GOOD}s — ${jj_tempo.TempoConfig.REP_MAX_GOOD}s',
+          color: const Color(0xFF2B5EA6),
+        ),
+      ],
+      callouts: [
+        SkeletonCallout(
+          title: 'Tay qua đầu',
+          value: '≥ ${jj_arm.ArmExtensionConfig.ELEVATION_GOOD.round()}°',
+          color: const Color(0xFFB87320),
+          alignment: const Alignment(0.90, -0.45),
+          anchor: const Offset(0.25, 0.32),
+        ),
+        SkeletonCallout(
+          title: 'Khuỷu tay',
+          value: '≥ ${jj_arm.ArmExtensionConfig.ELBOW_GOOD.round()}°',
+          color: const Color(0xFF1B6B52),
+          alignment: const Alignment(0.90, -0.04),
+          anchor: const Offset(0.30, 0.40),
+        ),
+        SkeletonCallout(
+          title: 'Chân rộng',
+          value:
+              '≥ ${jj_leg.LegSpreadConfig.SPREAD_GOOD.toStringAsFixed(1)}× vai',
+          color: const Color(0xFFB84435),
+          alignment: const Alignment(0.90, 0.34),
+          anchor: const Offset(0.32, 0.90),
+        ),
+      ],
+      createExercise: createExercise,
+    );
+  }
+
+  static _ExerciseExperienceSpec _gluteBridgeSpec({
+    required ExerciseDefinition definition,
+    required int sets,
+    required int repsPerSet,
+    int? restSeconds,
+    required String videoDuration,
+    required ExerciseBase Function(int repsPerSet) createExercise,
+  }) {
+    return _ExerciseExperienceSpec(
+      sets: sets,
+      repsPerSet: repsPerSet,
+      videoDuration: videoDuration,
+      restSeconds: restSeconds ?? 45,
+      targetLabel: 'REP/HIỆP',
+      secondsPerUnit: 4,
+      posture: SkeletonPosture.lyingFaceUp,
+      muscles: definition.targetMuscles,
+      tips: definition.setupTips,
+      badges: [
+        ExerciseIntroBadge(
+          title: 'Hạ hông',
+          value:
+              '≥ ${bridge_speed.SpeedControlConfig.MIN_ECCENTRIC_RATIO.toStringAsFixed(1)}× nhịp nâng',
+          color: const Color(0xFF2B5EA6),
+        ),
+      ],
+      callouts: [
+        SkeletonCallout(
+          title: 'Nâng hông',
+          value:
+              '${bridge_hip.HipExtensionConfig.GOOD_MIN_ANGLE.round()}° — 175°',
+          color: const Color(0xFFB87320),
+          alignment: const Alignment(0.90, -0.40),
+          anchor: const Offset(0.46, 0.55),
+        ),
+        SkeletonCallout(
+          title: 'Góc gối',
+          value:
+              '${bridge_knee.KneeAngleConfig.GOOD_MIN.round()}° — ${bridge_knee.KneeAngleConfig.GOOD_MAX.round()}°',
+          color: const Color(0xFF1B6B52),
+          alignment: const Alignment(0.90, -0.02),
+          anchor: const Offset(0.64, 0.66),
+        ),
+        SkeletonCallout(
+          title: 'Đầu cổ',
+          value:
+              'Nâng < ${(bridge_neck.NeckHeadConfig.HEAD_LIFT_THRESHOLD * 100).round()}% thân',
+          color: const Color(0xFFB84435),
+          alignment: const Alignment(0.90, 0.34),
+          anchor: const Offset(0.20, 0.56),
+        ),
+      ],
+      createExercise: createExercise,
+    );
+  }
+
+  static _ExerciseExperienceSpec _curlUpSpec({
+    required ExerciseDefinition definition,
+    required int sets,
+    required int repsPerSet,
+    int? restSeconds,
+    required String videoDuration,
+    required ExerciseBase Function(int repsPerSet) createExercise,
+  }) {
+    return _ExerciseExperienceSpec(
+      sets: sets,
+      repsPerSet: repsPerSet,
+      videoDuration: videoDuration,
+      restSeconds: restSeconds ?? 45,
+      targetLabel: 'REP/HIỆP',
+      secondsPerUnit: 4,
+      posture: SkeletonPosture.lyingFaceUp,
+      muscles: definition.targetMuscles,
+      tips: definition.setupTips,
+      badges: const [],
+      callouts: [
+        SkeletonCallout(
+          title: 'Biên độ cuộn',
+          value:
+              '${curl_trunk.TrunkElevationConfig.WARNING_LOW.round()}° — ${curl_trunk.TrunkElevationConfig.WARNING_HIGH.round()}°',
+          color: const Color(0xFFB87320),
+          alignment: const Alignment(0.90, -0.40),
+          anchor: const Offset(0.30, 0.52),
+        ),
+        SkeletonCallout(
+          title: 'Gối giữ cong',
+          value:
+              '< ${curl_knee.KneeExtensionConfig.WARNING_THRESHOLD.round()}°',
+          color: const Color(0xFF1B6B52),
+          alignment: const Alignment(0.90, -0.02),
+          anchor: const Offset(0.66, 0.67),
+        ),
+        SkeletonCallout(
+          title: 'Không kéo cổ',
+          value:
+              'Lệch < ${curl_neck.NeckPullingConfig.WARNING_DEVIATION.round()}°',
+          color: const Color(0xFFB84435),
+          alignment: const Alignment(0.90, 0.34),
+          anchor: const Offset(0.22, 0.48),
         ),
       ],
       createExercise: createExercise,

@@ -32,25 +32,219 @@ class BodyHeatMap extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
     return Container(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
       decoration: BoxDecoration(
         color: c.bgRaised,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: c.border),
+        boxShadow: [
+          BoxShadow(
+            color: c.ink.withValues(alpha: 0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Body silhouette gets full breathing room — centered, tall.
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Center(
+              child: _BodyFigure(
+                areas: areas,
+                gender: gender,
+                width: 124,
+                height: 324,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          // Intensity legend — small editorial key under the figure.
+          _IntensityLegend(),
+          const SizedBox(height: 14),
+          Container(height: 1, color: c.border),
+          const SizedBox(height: 16),
+          // 2×2 grid of area cards.
+          LayoutBuilder(
+            builder: (context, bc) {
+              const gap = 10.0;
+              final tileWidth = (bc.maxWidth - gap) / 2;
+              return Wrap(
+                spacing: gap,
+                runSpacing: gap,
+                children: [
+                  for (final a in areas)
+                    SizedBox(
+                      width: tileWidth,
+                      child: _AreaTile(area: a),
+                    ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Small three-dot key showing the meaning of intensity colors. Sits
+/// directly under the silhouette so users learn the visual language.
+class _IntensityLegend extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    Widget item(Color dot, String label, {bool glow = false}) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(
+              color: dot,
+              shape: BoxShape.circle,
+              boxShadow:
+                  glow ? [BoxShadow(color: dot, blurRadius: 5)] : null,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'BeVietnamPro',
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.2,
+              color: c.inkFaint,
+            ),
+          ),
+        ],
+      );
+    }
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        item(c.yellow, 'MẠNH', glow: true),
+        const SizedBox(width: 18),
+        item(c.attention, 'VỪA'),
+        const SizedBox(width: 18),
+        item(c.inkGhost, 'NHẸ'),
+      ],
+    );
+  }
+}
+
+class _AreaTile extends StatelessWidget {
+  const _AreaTile({required this.area});
+  final BodyHeatArea area;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    final isStrong = area.intensity == 'strong';
+    final isMedium = area.intensity == 'medium';
+    final accent = isStrong
+        ? c.yellow
+        : isMedium
+            ? c.attention
+            : c.inkGhost;
+    final deltaColor = isStrong
+        ? c.yellow
+        : isMedium
+            ? c.attention
+            : c.inkSoft;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      decoration: BoxDecoration(
+        color: c.bg,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: c.border),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          _BodyFigure(areas: areas, gender: gender),
-          const SizedBox(width: 18),
-          Expanded(
-            child: Column(
-              children: [
-                for (var i = 0; i < areas.length; i++) ...[
-                  _HeatRow(area: areas[i]),
-                  if (i < areas.length - 1) const SizedBox(height: 14),
-                ],
-              ],
+          Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: accent,
+                  shape: BoxShape.circle,
+                  boxShadow: isStrong
+                      ? [
+                          BoxShadow(color: accent, blurRadius: 6),
+                        ]
+                      : null,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  area.area,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'BeVietnamPro',
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.2,
+                    color: c.ink,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                area.delta,
+                style: TextStyle(
+                  fontFamily: 'BeVietnamPro',
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  fontStyle: FontStyle.italic,
+                  letterSpacing: -1.2,
+                  height: 0.95,
+                  color: deltaColor,
+                  fontFeatures: VikaIvoryMain.tabularFigures,
+                ),
+              ),
+              const SizedBox(width: 2),
+              Text(
+                '%',
+                style: TextStyle(
+                  fontFamily: 'BeVietnamPro',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: deltaColor.withValues(alpha: 0.7),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Container(width: 14, height: 1, color: accent),
+          const SizedBox(height: 8),
+          Text(
+            area.note,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontFamily: 'BeVietnamPro',
+              fontSize: 10.5,
+              fontWeight: FontWeight.w600,
+              fontStyle: FontStyle.italic,
+              height: 1.4,
+              letterSpacing: 0.05,
+              color: c.inkFaint,
             ),
           ),
         ],
@@ -60,13 +254,23 @@ class BodyHeatMap extends StatelessWidget {
 }
 
 class _BodyFigure extends StatelessWidget {
-  const _BodyFigure({required this.areas, required this.gender});
+  const _BodyFigure({
+    required this.areas,
+    required this.gender,
+    this.width,
+    this.height,
+  });
 
   final List<BodyHeatArea> areas;
   final BodyGender gender;
 
-  // Body silhouette + heat zones. Per-gender layout matches JSX:
-  // figures normalize to 245px tall but male is 78 wide, female is 86.
+  /// Optional explicit sizing. If omitted, falls back to per-gender
+  /// defaults matching the JSX (male 78×245, female 86×245).
+  final double? width;
+  final double? height;
+
+  // Per-gender default layout: figures normalize to 245px tall but
+  // male is 78 wide, female is 86.
   static const _figureWidth = {BodyGender.male: 78.0, BodyGender.female: 86.0};
   static const _figureHeight = 245.0;
 
@@ -80,8 +284,8 @@ class _BodyFigure extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    final w = _figureWidth[gender]!;
-    final h = _figureHeight;
+    final w = width ?? _figureWidth[gender]!;
+    final h = height ?? _figureHeight;
     final assetPath = gender == BodyGender.male
         ? 'assets/images/body_male.png'
         : 'assets/images/body_female.png';
@@ -200,101 +404,3 @@ class _HeatZone extends StatelessWidget {
   }
 }
 
-class _HeatRow extends StatelessWidget {
-  const _HeatRow({required this.area});
-
-  final BodyHeatArea area;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = VikaColors.of(context);
-    final isStrong = area.intensity == 'strong';
-    final isMedium = area.intensity == 'medium';
-    final dotColor = isStrong
-        ? c.yellow
-        : isMedium
-            ? c.attention
-            : c.inkGhost;
-    final deltaColor = isStrong
-        ? c.yellow
-        : isMedium
-            ? c.attention
-            : c.inkSoft;
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          margin: const EdgeInsets.only(top: 4),
-          decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Expanded(
-                    child: Text(
-                      area.area,
-                      style: TextStyle(
-                        fontFamily: 'BeVietnamPro',
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.2,
-                        color: c.ink,
-                      ),
-                    ),
-                  ),
-                  RichText(
-                    text: TextSpan(
-                      children: [
-                        TextSpan(
-                          text: area.delta,
-                          style: TextStyle(
-                            fontFamily: 'BeVietnamPro',
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                            fontStyle: FontStyle.italic,
-                            letterSpacing: -0.3,
-                            color: deltaColor,
-                            fontFeatures: VikaIvoryMain.tabularFigures,
-                          ),
-                        ),
-                        TextSpan(
-                          text: '%',
-                          style: TextStyle(
-                            fontFamily: 'BeVietnamPro',
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: deltaColor.withValues(alpha: 0.75),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 2),
-              Text(
-                area.note,
-                style: TextStyle(
-                  fontFamily: 'BeVietnamPro',
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.1,
-                  color: c.inkFaint,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
