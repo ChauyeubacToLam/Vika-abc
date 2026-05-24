@@ -29,6 +29,7 @@ import 'metrics/trunk_lean_metric.dart';
 import 'metrics/cervical_safety_metric.dart';
 import 'metrics/arm_position_metric.dart';
 import 'metrics/back_knee_metric.dart';
+import 'metrics/BackStraightMetric.dart';
 
 // --- Config (Week 1-4 launch defaults; tighten per spec threshold table) ---
 
@@ -78,16 +79,18 @@ class WarriorOne extends ExerciseBase {
   WarriorOneState previousHoldState = WarriorOneState.entry;
 
   // --- Metrics ---
-  final TrunkLeanMetric trunkLeanMetric = TrunkLeanMetric();
+ final TrunkLeanMetric trunkLeanMetric = TrunkLeanMetric();
   final CervicalSafetyMetric cervicalMetric = CervicalSafetyMetric();
   final ArmPositionMetric armMetric = ArmPositionMetric();
   final BackKneeMetric backKneeMetric = BackKneeMetric();
+  final BackStraightMetric backStraightMetric = BackStraightMetric(); // <--- THÊM DÒNG NÀY
 
   late final List<WarriorOneMetricBase> _metrics = [
     trunkLeanMetric,
     cervicalMetric,
     armMetric,
     backKneeMetric,
+    backStraightMetric, // <--- THÊM DÒNG NÀY
   ];
 
   // --- Hold timing ---
@@ -326,12 +329,15 @@ class WarriorOne extends ExerciseBase {
 
     final double frontKneeAngle = calculateAngle(
         firstPoint: front.hip!, midPoint: front.knee!, lastPoint: front.ankle!);
+    final double spineAngle = calculateAngle(
+        firstPoint: ear, midPoint: shoulder, lastPoint: hip);
 
     final bool wristVisible =
         ExerciseBase.isLandmarkConfident(wrist) && wrist.y > 0.0;
 
     final double stance =
         scaleFactor > 0 ? _dist(front.ankle!, back.ankle!) / scaleFactor : 0.0;
+
 
     // 5. Hip Y-velocity → "is still?".
     final bool isStill = _updateStill(hip.y, now);
@@ -343,6 +349,7 @@ class WarriorOne extends ExerciseBase {
       armVerticalAngle: armVerticalAngle,
       elbowAngle: elbowAngle,
       backKneeAngle: backKneeAngle,
+      spineAngle: spineAngle,
       wristVisible: wristVisible,
       holdState: holdState,
       frameTimestamp: now,
@@ -360,6 +367,7 @@ class WarriorOne extends ExerciseBase {
     debugData['cervicalAngle'] = cervicalAngle.toStringAsFixed(1);
     debugData['armVertical'] = armVerticalAngle.toStringAsFixed(1);
     debugData['elbowAngle'] = elbowAngle.toStringAsFixed(1);
+    debugData['spineAngle'] = spineAngle.toStringAsFixed(1);
     debugData['frontKnee'] = frontKneeAngle.toStringAsFixed(1);
     debugData['backKnee'] = backKneeAngle.toStringAsFixed(1);
     debugData['stance'] = stance.toStringAsFixed(2);

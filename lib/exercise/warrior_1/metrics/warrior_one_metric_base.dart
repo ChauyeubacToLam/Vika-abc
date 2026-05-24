@@ -54,6 +54,7 @@ class HoldContext {
 
   /// Torso length (shoulder→hip) used to normalize distance metrics.
   final double scaleFactor;
+  final double spineAngle;
 
   /// Personal references captured during hold-still (ENTRY → HOLD).
   /// May be null on the very first frames before capture.
@@ -76,6 +77,7 @@ class HoldContext {
     required this.trunkBaseline,
     required this.cervicalBaseline,
     required this.resultIssues,
+    required this.spineAngle,
   });
 }
 
