@@ -39,6 +39,7 @@ import '../exercise/pranamasana/pranamasana.dart';
 import '../exercise/hasta_uttanasana/hasta_uttanasana.dart';
 import '../exercise/hastapaadasana/hastapaadasana.dart';
 import '../exercise/ashwa_sanchalanasana/ashwa_sanchalanasana.dart';
+import '../exercise/parvatasana/parvatasana.dart';
 
 /* =========================================================================
    ExerciseDefinition — Metadata + factory for each exercise type.
@@ -800,6 +801,27 @@ ExerciseDefinition(
     ],
     createExercise: () => AshwaSanchalanasana(),
     phaseColors: const { 'setup': Colors.grey, 'holding': Colors.orange },
+  ),
+  ExerciseDefinition(
+    id: 'parvatasana',
+    name: 'Parvatasana',
+    subtitle: 'Chữ V ngược',
+    description: 'Tư thế thứ năm trong chuỗi Chào mặt trời, tăng cường sức mạnh cánh tay và vai, kéo giãn lưng và gân kheo.',
+    icon: Icons.change_history,
+    primaryColor: const Color(0xFF673AB7),
+    secondaryColor: const Color(0xFF512DA8),
+    difficulty: 'Trung bình',
+    targetMuscles: const ['Vai', 'Lưng', 'Gân kheo', 'Bắp chân'],
+    duration: '1.5s hold',
+    cameraHint: 'Quay ngang người (Side View).',
+    framingHint: 'Đảm bảo thấy toàn bộ cơ thể tạo thành hình chữ V ngược.',
+    setupTips: const [
+      'Từ tư thế kỵ sĩ, rút chân trước ra sau ngang với chân kia.',
+      'Đẩy cao hông lên tạo thành chữ V ngược.',
+      'Ép vai xuống, duỗi thẳng lưng, gót chân hướng về thảm.',
+    ],
+    createExercise: () => Parvatasana(),
+    phaseColors: const { 'setup': Colors.grey, 'holding': Colors.deepPurple },
   ),
   ExerciseDefinition(
     id: 'russian_twist',
