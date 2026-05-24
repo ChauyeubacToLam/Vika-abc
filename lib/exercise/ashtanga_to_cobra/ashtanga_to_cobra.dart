@@ -3,6 +3,15 @@ import '../../utils/pose_math_helpers.dart';
 import '../exercise_base.dart';
 import '../side_tracked_exercise_mixin.dart';
 
+import '../Cobra/cobra.dart';
+import '../Cobra/metrics/cobra_metric_base.dart';
+import '../Cobra/metrics/cobra_elevation_metric.dart';
+import '../Cobra/metrics/cobra_elbow_metric.dart';
+import '../Cobra/metrics/cobra_hand_placement_metric.dart';
+import '../Cobra/metrics/cobra_cervical_metric.dart';
+import '../Cobra/metrics/cobra_descent_metric.dart';
+import '../Cobra/metrics/cobra_hold_stability_metric.dart';
+
 enum AshtangaToCobraState {
   ashtangaSetup,
   ashtangaHolding,
@@ -33,8 +42,7 @@ class AshtangaToCobra extends ExerciseBase with SideTrackedExerciseMixin {
 
   @override
   Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
-        VikaImageOrientation.landscapeLeft,
-        VikaImageOrientation.landscapeRight,
+        VikaImageOrientation.portrait,
       };
 
   @override
@@ -48,11 +56,28 @@ class AshtangaToCobra extends ExerciseBase with SideTrackedExerciseMixin {
       };
 
   AshtangaToCobraState state = AshtangaToCobraState.ashtangaSetup;
-  double targetAshtangaHoldTime = 1.5;
-  double targetCobraHoldTime = 2.0;
+  double targetAshtangaHoldTime = 15.0; // Updated to 15s per requirement
+  double targetCobraHoldTime = 15.0; // Updated to 15s per requirement
   
   double _holdStartTimeMs = 0;
   double _currentHoldTime = 0;
+
+  // --- Cobra Metrics ---
+  final _pelvicMetric = CobraPelvicMetric();
+  final _elbowMetric = CobraElbowMetric();
+  final _handPlacementMetric = CobraHandPlacementMetric();
+  final _cervicalMetric = CobraCervicalMetric();
+  final _descentMetric = CobraDescentMetric();
+  final _holdStabilityMetric = CobraHoldStabilityMetric();
+
+  late final List<CobraMetricBase> _metrics = [
+    _elbowMetric,
+    _handPlacementMetric,
+    _cervicalMetric,
+    _descentMetric,
+    _pelvicMetric,
+    _holdStabilityMetric,
+  ];
 
   @override
   bool requestStop() => repCount >= 1;
@@ -60,6 +85,10 @@ class AshtangaToCobra extends ExerciseBase with SideTrackedExerciseMixin {
   void _resetState() {
     state = AshtangaToCobraState.ashtangaSetup;
     _currentHoldTime = 0;
+    
+    for (final metric in _metrics) {
+      metric.reset();
+    }
   }
 
   @override
@@ -100,6 +129,11 @@ class AshtangaToCobra extends ExerciseBase with SideTrackedExerciseMixin {
     final knee = lm['knee']!;
     final wrist = lm['wrist']!;
     final elbow = lm['elbow']!;
+    final ear = getSideLandmark(
+      landmarks: smoothedLandmarks, 
+      rightType: PoseLandmarkType.rightEar, 
+      leftType: PoseLandmarkType.leftEar
+    );
 
     // Chống nhiễu: Tọa độ X của Đầu gối luôn phải nằm phía sau Tọa độ X của Vai.
     bool isFacingRight = trackedSide == TrackedSide.right;
@@ -120,17 +154,56 @@ class AshtangaToCobra extends ExerciseBase with SideTrackedExerciseMixin {
 
     // --- Điều kiện Cobra ---
     double trunkClockAngle = calculateVerticalAngle(pivot: hip, point: shoulder);
-    bool isCobraPosition = false;
+    double horizontalTarget = isFacingRight
+        ? CobraConfig.HORIZONTAL_CLOCK_RIGHT
+        : CobraConfig.HORIZONTAL_CLOCK_LEFT;
     
-    // Hông chạm thảm: hông nên xấp xỉ mức của đầu gối (đang quỳ/nằm)
-    bool isHipOnFloor = (hip.y - knee.y).abs() < bodyHeight * 0.4; 
+    double trunkDeviation = clockAngleDeviation(trunkClockAngle, horizontalTarget);
+    
+    // Floor & standing detection
+    PoseLandmark? foot = smoothedLandmarks[PoseLandmarkType.leftFootIndex] ??
+        smoothedLandmarks[PoseLandmarkType.rightFootIndex];
+    PoseLandmark? heel = smoothedLandmarks[PoseLandmarkType.leftHeel] ??
+        smoothedLandmarks[PoseLandmarkType.rightHeel];
 
-    // Cobra: Góc thân trên nâng cao tối thiểu 25 độ
-    if (isFacingRight) {
-       isCobraPosition = trunkClockAngle < (90.0 - 25.0) && isHipOnFloor;
-    } else {
-       isCobraPosition = trunkClockAngle > (270.0 + 25.0) && isHipOnFloor;
+    double floorY = foot?.y ?? heel?.y ?? knee.y;
+    double hipToFloor = (floorY - hip.y).abs() / scaleFactor;
+    bool isStanding = hipToFloor > CobraConfig.STANDING_HIP_FLOOR_THRESHOLD;
+
+    bool isCobraPosition = false;
+    if (!isStanding) {
+      if (isFacingRight) {
+         isCobraPosition = trunkClockAngle < (CobraConfig.HORIZONTAL_CLOCK_RIGHT - CobraConfig.COBRA_MIN_ELEVATION);
+      } else {
+         isCobraPosition = trunkClockAngle > (CobraConfig.HORIZONTAL_CLOCK_LEFT + CobraConfig.COBRA_MIN_ELEVATION);
+      }
     }
+
+    CobraState mappedCobraState = CobraState.setup;
+    if (state == AshtangaToCobraState.cobraHolding) {
+      mappedCobraState = CobraState.holding;
+    }
+    
+    final ctx = RepContext(
+      trunkClockAngle: trunkClockAngle,
+      trunkDeviation: trunkDeviation,
+      isStanding: isStanding,
+      state: mappedCobraState,
+      frameTimestampMs: frameTimestampMs,
+      scaleFactor: scaleFactor,
+      resultIssues: resultIssues,
+      cameraFacing: cameraFacing,
+      shoulder: shoulder,
+      hip: hip,
+      elbow: elbow,
+      wrist: wrist,
+      ear: ear,
+      knee: knee,
+      // No baselines for Ashtanga start
+      baselineHipY: null,
+      baselineTrunkLength: null, 
+      baselineCervicalAngle: null,
+    );
 
     // Xử lý State Machine
     switch(state) {
@@ -173,9 +246,15 @@ class AshtangaToCobra extends ExerciseBase with SideTrackedExerciseMixin {
       case AshtangaToCobraState.cobraTransition:
         resultIssues.addInstruction(currentPhaseKey, 'Pose', "Hạ hông xuống sàn, trườn người lên Rắn hổ mang.");
         
+        // Cập nhật metric tay (chỉ cần chạy metric setup)
+        _handPlacementMetric.update(ctx);
+        
         if (isCobraPosition) {
           state = AshtangaToCobraState.cobraHolding;
           _holdStartTimeMs = frameTimestampMs.toDouble();
+          for (final metric in _metrics) {
+            metric.onStateTransition(CobraState.setup, CobraState.holding, frameTimestampMs);
+          }
           resultIssues.addInstruction(currentPhaseKey, 'Status', "Đang ở Rắn hổ mang. Giữ tĩnh...");
         }
         break;
@@ -183,7 +262,15 @@ class AshtangaToCobra extends ExerciseBase with SideTrackedExerciseMixin {
       case AshtangaToCobraState.cobraHolding:
         if (!isCobraPosition) {
            state = AshtangaToCobraState.cobraTransition;
+           for (final metric in _metrics) {
+             metric.onStateTransition(CobraState.holding, CobraState.setup, frameTimestampMs);
+           }
            return;
+        }
+
+        // Chạy tất cả các metric của Cobra
+        for (final metric in _metrics) {
+          metric.update(ctx);
         }
 
         _currentHoldTime = (frameTimestampMs - _holdStartTimeMs) / 1000.0;
@@ -201,8 +288,22 @@ class AshtangaToCobra extends ExerciseBase with SideTrackedExerciseMixin {
     // Debug Data
     debugData['state'] = state.name;
     debugData['currentHoldTime'] = _currentHoldTime;
+    
+    // Add holdProgress for yellow ring
+    if (state == AshtangaToCobraState.ashtangaHolding) {
+      debugData['holdProgress'] = (_currentHoldTime / targetAshtangaHoldTime).clamp(0.0, 1.0);
+    } else if (state == AshtangaToCobraState.cobraHolding) {
+      debugData['holdProgress'] = (_currentHoldTime / targetCobraHoldTime).clamp(0.0, 1.0);
+    } else {
+      debugData.remove('holdProgress');
+    }
+    
     debugData['trunkAngle'] = trunkClockAngle;
     debugData['isCobraPosition'] = isCobraPosition;
-    debugData['isHipOnFloor'] = isHipOnFloor;
+    
+    // Mix in metrics debug data
+    for (final metric in _metrics) {
+      debugData.addAll(metric.debugData);
+    }
   }
 }
