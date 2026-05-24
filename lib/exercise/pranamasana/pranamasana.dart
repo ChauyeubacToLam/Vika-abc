@@ -53,17 +53,17 @@ class Pranamasana extends ExerciseBase {
 
   @override
   void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
+    resultIssues.instructions.clear();
     bool isVerified = _verifyPose(smoothedLandmarks);
 
     if (isVerified) {
       if (state == PranamasanaState.setup) {
         state = PranamasanaState.holding;
         _holdStartTimeMs = frameTimestampMs.toDouble();
-        resultIssues.feedback["Pose"] = "State = 1. Pose: Pranamasana - Verified. Ready for Pose 2 (Hastauttanasana)...";
+        resultIssues.addInstruction(currentPhaseKey, 'Status', "Form chuẩn. Giữ tĩnh...");
       } else if (state == PranamasanaState.holding) {
         _currentHoldTime = (frameTimestampMs - _holdStartTimeMs) / 1000.0;
-        resultIssues.feedback["Time"] = "Giữ tĩnh: ${_currentHoldTime.toStringAsFixed(1)}s / ${targetHoldTime}s";
-        resultIssues.feedback["Pose"] = "State = 1. Pose: Pranamasana - Verified. Ready for Pose 2 (Hastauttanasana)...";
+        resultIssues.addInstruction(currentPhaseKey, 'Status', "Giữ tĩnh: ${_currentHoldTime.toStringAsFixed(1)}s / ${targetHoldTime}s");
 
         if (_currentHoldTime >= targetHoldTime) {
           // Rep completed
@@ -76,7 +76,7 @@ class Pranamasana extends ExerciseBase {
       // If broken, reset timer
       state = PranamasanaState.setup;
       _currentHoldTime = 0;
-      resultIssues.feedback["Pose"] = "Chưa đúng tư thế. Hãy đứng thẳng và chắp tay trước ngực.";
+      resultIssues.addInstruction(currentPhaseKey, 'Pose', "Chưa đúng tư thế. Hãy đứng thẳng và chắp tay trước ngực.");
     }
     
     debugData['currentHoldTime'] = _currentHoldTime;

@@ -60,6 +60,7 @@ class Hastapaadasana extends ExerciseBase {
 
   @override
   void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
+    resultIssues.instructions.clear();
     final isLeft = cameraFacing == CameraFacing.left || cameraFacing == CameraFacing.front;
     
     // Select landmarks
@@ -114,11 +115,11 @@ class Hastapaadasana extends ExerciseBase {
         isVerified = true;
     } else {
         if (!headLowerThanHip) {
-            resultIssues.feedback["Pose"] = "Gập sâu người xuống, để đầu thấp hơn hông.";
+            resultIssues.addInstruction(currentPhaseKey, 'Pose', "Gập sâu người xuống, để đầu thấp hơn hông.");
         } else if (!hipFlexed) {
-            resultIssues.feedback["Pose"] = "Gập hông sâu hơn nữa.";
+            resultIssues.addInstruction(currentPhaseKey, 'Pose', "Gập hông sâu hơn nữa.");
         } else if (!armsValid) {
-            resultIssues.feedback["Pose"] = "Với tay chạm sát vào mũi chân/cổ chân.";
+            resultIssues.addInstruction(currentPhaseKey, 'Pose', "Với tay chạm sát vào mũi chân/cổ chân.");
         }
         _resetState();
         return;
@@ -129,7 +130,7 @@ class Hastapaadasana extends ExerciseBase {
     String warningMsg = "";
     if (hkaAngle < 140) {
         warningMsg = "Cố gắng đẩy đỉnh mông lên cao, duỗi thẳng chân hơn một chút để kéo giãn cơ khoeo nhé";
-        resultIssues.feedback["Cảnh báo nhẹ"] = warningMsg;
+        resultIssues.addInstruction(currentPhaseKey, 'Pose', warningMsg);
     }
     
     // 5. Log AI & Chuyển trạng thái
@@ -137,17 +138,16 @@ class Hastapaadasana extends ExerciseBase {
       if (state == HastapaadasanaState.setup) {
         state = HastapaadasanaState.holding;
         _holdStartTimeMs = frameTimestampMs.toDouble();
-        resultIssues.feedback["Pose"] = "Form chuẩn. Giữ tĩnh...";
+        resultIssues.addInstruction(currentPhaseKey, 'Status', "Form chuẩn. Giữ tĩnh...");
       } else if (state == HastapaadasanaState.holding) {
         _currentHoldTime = (frameTimestampMs - _holdStartTimeMs) / 1000.0;
-        resultIssues.feedback["Time"] = "Giữ tĩnh: ${_currentHoldTime.toStringAsFixed(1)}s / ${targetHoldTime}s";
-        resultIssues.feedback["Pose"] = "Form chuẩn. Giữ tĩnh...";
+        resultIssues.addInstruction(currentPhaseKey, 'Status', "Giữ tĩnh: ${_currentHoldTime.toStringAsFixed(1)}s / ${targetHoldTime}s");
 
         if (_currentHoldTime >= targetHoldTime) {
           repCount += 1;
           _currentHoldTime = 0;
           state = HastapaadasanaState.setup;
-          resultIssues.feedback["Pose"] = "State = 3. Pose: Hastapaadasana - Verified. Ready for Pose 4 (Ashwa Sanchalanasana)...";
+          resultIssues.addInstruction(currentPhaseKey, 'Status', "Hoàn thành Hastapaadasana");
         }
       }
     }

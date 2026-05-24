@@ -38,6 +38,7 @@ import '../exercise/step_back_burpee/step_back_burpee.dart';
 import '../exercise/pranamasana/pranamasana.dart';
 import '../exercise/hasta_uttanasana/hasta_uttanasana.dart';
 import '../exercise/hastapaadasana/hastapaadasana.dart';
+import '../exercise/ashwa_sanchalanasana/ashwa_sanchalanasana.dart';
 
 /* =========================================================================
    ExerciseDefinition — Metadata + factory for each exercise type.
@@ -777,6 +778,27 @@ ExerciseDefinition(
       'Cố gắng giữ chân thẳng, không gập gối quá nhiều.',
     ],
     createExercise: () => Hastapaadasana(),
+    phaseColors: const { 'setup': Colors.grey, 'holding': Colors.orange },
+  ),
+  ExerciseDefinition(
+    id: 'ashwa_sanchalanasana',
+    name: 'Ashwa Sanchalanasana',
+    subtitle: 'Tư thế kỵ sĩ',
+    description: 'Tư thế thứ tư trong chuỗi Chào mặt trời, kéo giãn gân kheo chân sau và mở rộng khớp hông chân trước.',
+    icon: Icons.directions_walk,
+    primaryColor: const Color(0xFFFF6D00),
+    secondaryColor: const Color(0xFFE65100),
+    difficulty: 'Trung bình',
+    targetMuscles: const ['Hông', 'Gân kheo', 'Đùi'],
+    duration: '1.5s hold',
+    cameraHint: 'Quay ngang người (Side View).',
+    framingHint: 'Đảm bảo thấy toàn bộ cơ thể từ đầu đến gót chân sau.',
+    setupTips: const [
+      'Từ tư thế cúi gập người, bước dài một chân ra sau.',
+      'Hạ đầu gối chân sau xuống thảm, hạ thấp hông.',
+      'Đầu gối chân trước vuông góc, vươn ngực và nhìn thẳng.',
+    ],
+    createExercise: () => AshwaSanchalanasana(),
     phaseColors: const { 'setup': Colors.grey, 'holding': Colors.orange },
   ),
   ExerciseDefinition(

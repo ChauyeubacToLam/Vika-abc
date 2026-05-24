@@ -62,6 +62,7 @@ class HastaUttanasana extends ExerciseBase {
 
   @override
   void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
+    resultIssues.instructions.clear();
     // 1. Xác định hướng (Facing)
     final isLeft = cameraFacing == CameraFacing.left || cameraFacing == CameraFacing.front;
     int direction = isLeft ? -1 : 1;
@@ -109,7 +110,7 @@ class HastaUttanasana extends ExerciseBase {
             double deltaShoulder = (shoulder.x - _shoulderXT1!).abs();
             
             if (deltaShoulder > 0.15 * bodyHeight && deltaHip < 0.05 * bodyHeight) {
-              resultIssues.feedback["Lỗi"] = "Đẩy hông về trước, siết bụng lại! Không bẻ gãy thắt lưng!";
+              resultIssues.addInstruction(currentPhaseKey, 'Pose', "Đẩy hông về trước, siết bụng lại! Không bẻ gãy thắt lưng!");
               _resetState();
               return;
             }
@@ -119,30 +120,30 @@ class HastaUttanasana extends ExerciseBase {
           if (khsAngle >= 136 && khsAngle <= 170) {
             isVerified = true; // Form chuẩn
           } else if (khsAngle < 130) {
-            resultIssues.feedback["Lỗi"] = "Ngả quá sâu, có thể gây chấn thương thắt lưng!";
+            resultIssues.addInstruction(currentPhaseKey, 'Pose', "Ngả quá sâu, có thể gây chấn thương thắt lưng!");
             _resetState();
             return;
           } else if (khsAngle > 170) {
-             resultIssues.feedback["Pose"] = "Tiếp tục ngả vai ra sau và đẩy hông về trước.";
+             resultIssues.addInstruction(currentPhaseKey, 'Pose', "Tiếp tục ngả vai ra sau và đẩy hông về trước.");
              _resetState();
              return;
           }
         } else {
            if (!hipForward) {
-             resultIssues.feedback["Pose"] = "Đẩy hông về phía trước.";
+             resultIssues.addInstruction(currentPhaseKey, 'Pose', "Đẩy hông về phía trước.");
            } else {
-             resultIssues.feedback["Pose"] = "Ngả vai ra sau.";
+             resultIssues.addInstruction(currentPhaseKey, 'Pose', "Ngả vai ra sau.");
            }
            _resetState();
            return;
         }
       } else {
-        resultIssues.feedback["Pose"] = "Duỗi thẳng cánh tay (góc hiện tại: ${armAngle.toStringAsFixed(0)}°).";
+        resultIssues.addInstruction(currentPhaseKey, 'Pose', "Duỗi thẳng cánh tay (góc hiện tại: ${armAngle.toStringAsFixed(0)}°).");
         _resetState();
         return;
       }
     } else {
-      resultIssues.feedback["Pose"] = "Nâng hai tay cao qua đầu.";
+      resultIssues.addInstruction(currentPhaseKey, 'Pose', "Nâng hai tay cao qua đầu.");
       _resetState();
       return;
     }
@@ -152,17 +153,16 @@ class HastaUttanasana extends ExerciseBase {
       if (state == HastaUttanasanaState.setup) {
         state = HastaUttanasanaState.holding;
         _holdStartTimeMs = frameTimestampMs.toDouble();
-        resultIssues.feedback["Pose"] = "Form chuẩn. Giữ tĩnh...";
+        resultIssues.addInstruction(currentPhaseKey, 'Status', "Form chuẩn. Giữ tĩnh...");
       } else if (state == HastaUttanasanaState.holding) {
         _currentHoldTime = (frameTimestampMs - _holdStartTimeMs) / 1000.0;
-        resultIssues.feedback["Time"] = "Giữ tĩnh: ${_currentHoldTime.toStringAsFixed(1)}s / ${targetHoldTime}s";
-        resultIssues.feedback["Pose"] = "Form chuẩn. Giữ tĩnh...";
+        resultIssues.addInstruction(currentPhaseKey, 'Status', "Giữ tĩnh: ${_currentHoldTime.toStringAsFixed(1)}s / ${targetHoldTime}s");
 
         if (_currentHoldTime >= targetHoldTime) {
           repCount += 1;
           _currentHoldTime = 0;
           state = HastaUttanasanaState.setup;
-          resultIssues.feedback["Pose"] = "State = 2. Pose: Hasta Uttanasana - Verified. Ready for Pose 3 (Padahastasana)...";
+          resultIssues.addInstruction(currentPhaseKey, 'Status', "Hoàn thành Hasta Uttanasana");
         }
       }
     }
