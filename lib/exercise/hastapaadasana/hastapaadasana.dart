@@ -9,7 +9,7 @@ class Hastapaadasana extends ExerciseBase {
   
   double _holdStartTimeMs = 0.0;
   double _currentHoldTime = 0.0;
-  static const double targetHoldTime = 1.5;
+  static const double targetHoldTime = 15.0;
 
   double? _previousWristY;
 
@@ -18,8 +18,7 @@ class Hastapaadasana extends ExerciseBase {
 
   @override
   Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
-        VikaImageOrientation.landscapeLeft,
-        VikaImageOrientation.landscapeRight,
+        VikaImageOrientation.portrait,
       };
 
   @override
@@ -154,6 +153,9 @@ class Hastapaadasana extends ExerciseBase {
         }
       }
     }
+    
+    debugData['currentHoldTime'] = _currentHoldTime;
+    debugData['holdProgress'] = (_currentHoldTime / targetHoldTime).clamp(0.0, 1.0);
   }
 
   void _resetState() {

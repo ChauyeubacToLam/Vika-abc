@@ -24,8 +24,7 @@ class Parvatasana extends ExerciseBase with SideTrackedExerciseMixin {
 
   @override
   Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
-        VikaImageOrientation.landscapeLeft,
-        VikaImageOrientation.landscapeRight,
+        VikaImageOrientation.portrait,
       };
 
   @override
@@ -39,7 +38,7 @@ class Parvatasana extends ExerciseBase with SideTrackedExerciseMixin {
       };
 
   ParvatasanaState state = ParvatasanaState.setup;
-  double targetHoldTime = 1.5;
+  double targetHoldTime = 15.0;
   double _holdStartTimeMs = 0;
   double _currentHoldTime = 0;
 
@@ -164,6 +163,7 @@ class Parvatasana extends ExerciseBase with SideTrackedExerciseMixin {
     }
     
     debugData['currentHoldTime'] = _currentHoldTime;
+    debugData['holdProgress'] = (_currentHoldTime / targetHoldTime).clamp(0.0, 1.0);
     debugData['deltaXAnkle'] = deltaXAnkle;
     debugData['isHipHighest'] = isHipHighest;
     debugData['armAngle'] = armAngle;

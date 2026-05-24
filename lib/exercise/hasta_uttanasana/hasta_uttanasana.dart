@@ -9,18 +9,14 @@ class HastaUttanasana extends ExerciseBase {
   
   double _holdStartTimeMs = 0.0;
   double _currentHoldTime = 0.0;
-  static const double targetHoldTime = 3.0;
-
-  double? _hipXT1;
-  double? _shoulderXT1;
+  static const double targetHoldTime = 15.0;
 
   @override
   String get exerciseName => 'Hasta Uttanasana';
 
   @override
   Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
-        VikaImageOrientation.landscapeLeft,
-        VikaImageOrientation.landscapeRight,
+        VikaImageOrientation.portrait,
       };
 
   @override
@@ -68,24 +64,12 @@ class HastaUttanasana extends ExerciseBase {
     resultIssues.instructions.clear();
     // 1. Xác định hướng (Facing)
     final isLeft = cameraFacing == CameraFacing.left || cameraFacing == CameraFacing.front;
-    int direction = isLeft ? -1 : 1;
     
     // Select landmarks (Ưu tiên bên hiển thị rõ hơn, ở đây ta lấy theo cameraFacing)
     final shoulder = isLeft ? smoothedLandmarks[PoseLandmarkType.leftShoulder]! : smoothedLandmarks[PoseLandmarkType.rightShoulder]!;
-    final hip = isLeft ? smoothedLandmarks[PoseLandmarkType.leftHip]! : smoothedLandmarks[PoseLandmarkType.rightHip]!;
-    final knee = isLeft ? smoothedLandmarks[PoseLandmarkType.leftKnee]! : smoothedLandmarks[PoseLandmarkType.rightKnee]!;
-    final ankle = isLeft ? smoothedLandmarks[PoseLandmarkType.leftAnkle]! : smoothedLandmarks[PoseLandmarkType.rightAnkle]!;
-    
-    final wrist = isLeft ? smoothedLandmarks[PoseLandmarkType.leftWrist]! : smoothedLandmarks[PoseLandmarkType.rightWrist]!;
     final elbow = isLeft ? smoothedLandmarks[PoseLandmarkType.leftElbow]! : smoothedLandmarks[PoseLandmarkType.rightElbow]!;
+    final wrist = isLeft ? smoothedLandmarks[PoseLandmarkType.leftWrist]! : smoothedLandmarks[PoseLandmarkType.rightWrist]!;
     final nose = smoothedLandmarks[PoseLandmarkType.nose]!;
-
-    // Capture T1 (Trạm 1) khi cơ thể đang đứng thẳng (Góc > 170 độ)
-    final khsAngle = calculateAngle(firstPoint: knee, midPoint: hip, lastPoint: shoulder);
-    if (khsAngle > 170 && _hipXT1 == null) {
-      _hipXT1 = hip.x;
-      _shoulderXT1 = shoulder.x;
-    }
 
     bool isVerified = false;
     
@@ -95,51 +79,7 @@ class HastaUttanasana extends ExerciseBase {
       // 3. Validation: Độ thẳng của tay (Shoulder - Elbow - Wrist)
       final armAngle = calculateAngle(firstPoint: shoulder, midPoint: elbow, lastPoint: wrist);
       if (armAngle >= 150 && armAngle <= 180) {
-        
-        // Validation: Hông đẩy về trước, Vai ngả ra sau
-        // direction = 1 (mặt quay phải): hip.x > ankle.x -> (hip.x - ankle.x) * 1 > 0
-        // direction = -1 (mặt quay trái): hip.x < ankle.x -> (hip.x - ankle.x) * -1 > 0
-        bool hipForward = (hip.x - ankle.x) * direction > 0;
-        bool shoulderBack = (shoulder.x - ankle.x) * direction < 0;
-        
-        if (hipForward && shoulderBack) {
-          
-          // 4. Bắt lỗi riêng (Metric P2) - Bẻ gập thắt lưng
-          double bodyHeight = calculateDistance(nose, ankle);
-          if (bodyHeight == 0) bodyHeight = 1;
-          
-          if (_hipXT1 != null && _shoulderXT1 != null) {
-            double deltaHip = (hip.x - _hipXT1!).abs();
-            double deltaShoulder = (shoulder.x - _shoulderXT1!).abs();
-            
-            if (deltaShoulder > 0.15 * bodyHeight && deltaHip < 0.05 * bodyHeight) {
-              resultIssues.addInstruction(currentPhaseKey, 'Pose', "Đẩy hông về trước, siết bụng lại! Không bẻ gãy thắt lưng!");
-              _resetState();
-              return;
-            }
-          }
-          
-          // 5. Đo lường biên độ (Extension Angle)
-          if (khsAngle >= 136 && khsAngle <= 170) {
-            isVerified = true; // Form chuẩn
-          } else if (khsAngle < 130) {
-            resultIssues.addInstruction(currentPhaseKey, 'Pose', "Ngả quá sâu, có thể gây chấn thương thắt lưng!");
-            _resetState();
-            return;
-          } else if (khsAngle > 170) {
-             resultIssues.addInstruction(currentPhaseKey, 'Pose', "Tiếp tục ngả vai ra sau và đẩy hông về trước.");
-             _resetState();
-             return;
-          }
-        } else {
-           if (!hipForward) {
-             resultIssues.addInstruction(currentPhaseKey, 'Pose', "Đẩy hông về phía trước.");
-           } else {
-             resultIssues.addInstruction(currentPhaseKey, 'Pose', "Ngả vai ra sau.");
-           }
-           _resetState();
-           return;
-        }
+        isVerified = true; // Form chuẩn đã được nới lỏng theo yêu cầu
       } else {
         resultIssues.addInstruction(currentPhaseKey, 'Pose', "Duỗi thẳng cánh tay (góc hiện tại: ${armAngle.toStringAsFixed(0)}°).");
         _resetState();
@@ -169,6 +109,9 @@ class HastaUttanasana extends ExerciseBase {
         }
       }
     }
+
+    debugData['currentHoldTime'] = _currentHoldTime;
+    debugData['holdProgress'] = (_currentHoldTime / targetHoldTime).clamp(0.0, 1.0);
   }
 
   void _resetState() {

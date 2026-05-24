@@ -9,15 +9,14 @@ class Pranamasana extends ExerciseBase {
 
   double _holdStartTimeMs = 0.0;
   double _currentHoldTime = 0.0;
-  static const double targetHoldTime = 5.0; // 5 seconds
+  static const double targetHoldTime = 15.0; // 15 seconds
 
   @override
   String get exerciseName => 'Pranamasana';
 
   @override
   Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
-        VikaImageOrientation.landscapeLeft,
-        VikaImageOrientation.landscapeRight,
+        VikaImageOrientation.portrait,
       };
 
   @override
@@ -83,6 +82,7 @@ class Pranamasana extends ExerciseBase {
     }
     
     debugData['currentHoldTime'] = _currentHoldTime;
+    debugData['holdProgress'] = (_currentHoldTime / targetHoldTime).clamp(0.0, 1.0);
   }
 
   bool _verifyPose(Map<PoseLandmarkType, PoseLandmark> landmarks) {
