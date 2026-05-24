@@ -24,7 +24,7 @@ import '../exercise/10.Vup/v_up.dart';
 import '../exercise/12.Dead Bug/dead_bug.dart';
 import '../exercise/13.Plank Up-Down/plank_up_down.dart';
 import '../exercise/14.Bear Plank/bear_plank.dart';
-import '../exercise/suryanamaskar/suryanamaskar.dart';
+
 import '../exercise/cossack_squat/cossack_squat.dart';
 import '../exercise/walking_lunge/walking_lunge.dart';
 import '../exercise/tricep_dip/tricep_dip.dart';
@@ -34,6 +34,37 @@ import '../exercise/Jump_Squat/jump_squat.dart';
 import '../exercise/bow_pose/bow_pose.dart';
 import '../exercise/side_plank_dip/side_plank_dip.dart';
 import '../exercise/step_back_burpee/step_back_burpee.dart';
+import '../exercise/cmt_1/cmt_1.dart';
+import '../exercise/cmt_2/cmt_2.dart';
+import '../exercise/cmt_3/cmt_3.dart';
+import '../exercise/cmt_4/cmt_4.dart';
+import '../exercise/cmt_5/cmt_5.dart';
+import '../exercise/cmt_6/cmt_6.dart';
+import '../exercise/cmt_7/cmt_7.dart';
+import '../exercise/cmt_8/cmt_8.dart';
+import '../exercise/cmt_9/cmt_9.dart';
+import '../exercise/cmt_10/cmt_10.dart';
+import '../exercise/cmt_11/cmt_11.dart';
+import '../exercise/cmt_12/cmt_12.dart';
+
+ExerciseBase _createCmtExercise(int index) {
+  switch (index) {
+    case 1: return Cmt1();
+    case 2: return Cmt2();
+    case 3: return Cmt3();
+    case 4: return Cmt4();
+    case 5: return Cmt5();
+    case 6: return Cmt6();
+    case 7: return Cmt7();
+    case 8: return Cmt8();
+    case 9: return Cmt9();
+    case 10: return Cmt10();
+    case 11: return Cmt11();
+    case 12: return Cmt12();
+    default: return Cmt1();
+  }
+}
+
 /* =========================================================================
    ExerciseDefinition — Metadata + factory for each exercise type.
 
@@ -616,9 +647,9 @@ ExerciseDefinition(
     createExercise: () => BearPlank(),
     phaseColors: const { 'setup': Colors.grey, 'hovering': Colors.green, 'fatiguing': Colors.red },
   ),
-  ExerciseDefinition(
-    id: 'suryanamaskar',
-    name: 'Suryanamaskar',
+  ...List.generate(12, (index) => ExerciseDefinition(
+    id: 'cmt_${index + 1}',
+    name: 'Chào mặt trời ${index + 1}',
     subtitle: 'Chuỗi Chào Mặt Trời 12 bước',
     description: 'Chuỗi 12 tư thế Yoga liên hoàn giúp kích hoạt toàn thân, tăng độ dẻo dai cột sống và cải thiện nhịp thở.\nMỗi vòng đi qua 12 trạm từ Cầu nguyện → Rắn hổ mang → trở về.',
     icon: Icons.self_improvement,
@@ -635,7 +666,7 @@ ExerciseDefinition(
       'Hít thở sâu, bắt đầu ở tư thế đứng thẳng tay chắp trước ngực.',
     ],
     safetyWarning: 'Không gượng ép nếu đau lưng. Dừng lại ngay nếu chóng mặt.',
-    createExercise: () => Suryanamaskar(),
+    createExercise: () => _createCmtExercise(index + 1),
     phaseColors: const {
       'p1_pranamasana': Color(0xFF00E676),
       'p2_hasta_uttanasana': Color(0xFFFFD600),
@@ -650,7 +681,7 @@ ExerciseDefinition(
       'p11_hasta_uttanasana_return': Color(0xFFFFD600),
       'p12_pranamasana_return': Color(0xFF00E676),
     },
-  ),
+  )),
   ExerciseDefinition(
     id: 'cossack_squat',
     name: 'Cossack Squat',
