@@ -19,7 +19,6 @@ class HastaUttanasana extends ExerciseBase {
 
   @override
   Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
-        VikaImageOrientation.portrait,
         VikaImageOrientation.landscapeLeft,
         VikaImageOrientation.landscapeRight,
       };
@@ -31,6 +30,10 @@ class HastaUttanasana extends ExerciseBase {
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+    if (cameraFacing != CameraFacing.left && cameraFacing != CameraFacing.right) {
+      return "Vui lòng xoay người hoàn toàn sang ngang để máy quét được tư thế.";
+    }
+
     final req = [
       PoseLandmarkType.nose,
       PoseLandmarkType.leftShoulder,

@@ -63,6 +63,9 @@ class Parvatasana extends ExerciseBase with SideTrackedExerciseMixin {
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+    if (cameraFacing != CameraFacing.left && cameraFacing != CameraFacing.right) {
+      return "Vui lòng xoay người hoàn toàn sang ngang để máy quét được tư thế.";
+    }
     return null; // Return null (no safety error) by default
   }
 

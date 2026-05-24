@@ -16,7 +16,6 @@ class Pranamasana extends ExerciseBase {
 
   @override
   Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
-        VikaImageOrientation.portrait,
         VikaImageOrientation.landscapeLeft,
         VikaImageOrientation.landscapeRight,
       };
@@ -28,6 +27,10 @@ class Pranamasana extends ExerciseBase {
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+    if (cameraFacing != CameraFacing.left && cameraFacing != CameraFacing.right) {
+      return "Vui lòng xoay người hoàn toàn sang ngang để máy quét được tư thế.";
+    }
+
     // Require upper body to knees
     final req = [
       PoseLandmarkType.leftShoulder,
@@ -98,8 +101,7 @@ class Pranamasana extends ExerciseBase {
     }
 
     // Validation 1: Body Axis 170-180
-    // Use the side that is more visible or just average
-    final isLeft = cameraFacing == CameraFacing.left || cameraFacing == CameraFacing.front;
+    final isLeft = cameraFacing == CameraFacing.left;
     final shoulder = isLeft ? ls : rs;
     final hip = isLeft ? lh : rh;
     final ankle = isLeft ? la : ra;
@@ -109,39 +111,27 @@ class Pranamasana extends ExerciseBase {
       return false;
     }
 
-    // Validation 3: Hands folded in front of chest
-    if (lw == null && rw == null) return false;
-
-    final shoulderY = (ls.y + rs.y) / 2;
-    final hipY = (lh.y + rh.y) / 2;
-    final chestX = (ls.x + rs.x) / 2;
+    final wrist = isLeft ? lw : rw;
+    if (wrist == null) return false;
     
-    // Scale threshold based on shoulder width
-    final shoulderWidth = (ls.x - rs.x).abs();
-    final wristThreshold = shoulderWidth * 0.5; // very close
+    final wristConf = ExerciseBase.isLandmarkConfident(wrist);
+    if (!wristConf) return false;
 
+    // Use shoulder-to-hip distance for scaling threshold
+    final bodyHeight = calculateDistance(shoulder, hip);
+    final wristThreshold = bodyHeight * 0.4; // Valid range in front of chest
+
+    bool isFacingRight = cameraFacing == CameraFacing.right;
     bool handsValid = false;
 
-    final lwConf = lw != null && ExerciseBase.isLandmarkConfident(lw);
-    final rwConf = rw != null && ExerciseBase.isLandmarkConfident(rw);
-
-    if (lwConf && rwConf) {
-      // Both wrists detected
-      final wristDist = calculateDistance(lw, rw);
-      final avgWristY = (lw.y + rw.y) / 2;
-      
-      if (wristDist < wristThreshold && avgWristY > shoulderY && avgWristY < hipY) {
-        handsValid = true;
-      }
-    } else if (lwConf || rwConf) {
-      // Occlusion: 1 wrist detected
-      final w = lwConf ? lw : rw!;
-      
-      // Check if it's in the middle of the chest
-      final distToChestMidX = (w.x - chestX).abs();
-      if (distToChestMidX < wristThreshold && w.y > shoulderY && w.y < hipY) {
-        handsValid = true;
-      }
+    // Check if hands are folded in front of chest (wrist in front of shoulder on X-axis)
+    bool inFront = isFacingRight ? wrist.x > shoulder.x : wrist.x < shoulder.x;
+    
+    if (inFront && wrist.y > shoulder.y && wrist.y < hip.y) {
+       final distX = (wrist.x - shoulder.x).abs();
+       if (distX < wristThreshold) {
+         handsValid = true;
+       }
     }
 
     if (!handsValid) return false;

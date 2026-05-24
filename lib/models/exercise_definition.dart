@@ -40,6 +40,7 @@ import '../exercise/hasta_uttanasana/hasta_uttanasana.dart';
 import '../exercise/hastapaadasana/hastapaadasana.dart';
 import '../exercise/ashwa_sanchalanasana/ashwa_sanchalanasana.dart';
 import '../exercise/parvatasana/parvatasana.dart';
+import '../exercise/ashtanga_namaskara/ashtanga_namaskara.dart';
 
 /* =========================================================================
    ExerciseDefinition — Metadata + factory for each exercise type.
@@ -822,6 +823,27 @@ ExerciseDefinition(
     ],
     createExercise: () => Parvatasana(),
     phaseColors: const { 'setup': Colors.grey, 'holding': Colors.deepPurple },
+  ),
+  ExerciseDefinition(
+    id: 'ashtanga_namaskara',
+    name: 'Ashtanga Namaskara',
+    subtitle: 'Tư thế 8 điểm chạm sàn',
+    description: 'Tư thế thứ sáu trong chuỗi Chào mặt trời, tăng cường sức mạnh cánh tay và vai, cải thiện sự linh hoạt của cột sống.',
+    icon: Icons.accessibility,
+    primaryColor: const Color(0xFFE91E63),
+    secondaryColor: const Color(0xFFC2185B),
+    difficulty: 'Trung bình',
+    targetMuscles: const ['Vai', 'Cánh tay', 'Ngực', 'Core'],
+    duration: '1.5s hold',
+    cameraHint: 'Quay ngang người (Side View).',
+    framingHint: 'Đảm bảo thấy toàn bộ cơ thể tạo thành tư thế 8 điểm chạm sàn.',
+    setupTips: const [
+      'Từ tư thế chữ V ngược, hạ đầu gối xuống thảm.',
+      'Hạ ngực và cằm xuống thảm, hông nhô cao.',
+      'Khép chặt khuỷu tay vào sườn, không để bụng chạm thảm.',
+    ],
+    createExercise: () => AshtangaNamaskara(),
+    phaseColors: const { 'setup': Colors.grey, 'holding': Colors.pink },
   ),
   ExerciseDefinition(
     id: 'russian_twist',
