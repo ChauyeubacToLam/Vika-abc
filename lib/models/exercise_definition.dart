@@ -37,6 +37,7 @@ import '../exercise/step_back_burpee/step_back_burpee.dart';
 // import '../exercise/suryanamaskar/suryanamaskar.dart';
 import '../exercise/pranamasana/pranamasana.dart';
 import '../exercise/hasta_uttanasana/hasta_uttanasana.dart';
+import '../exercise/hastapaadasana/hastapaadasana.dart';
 
 /* =========================================================================
    ExerciseDefinition — Metadata + factory for each exercise type.
@@ -755,6 +756,27 @@ ExerciseDefinition(
       'Giữ yên trong 3 giây.',
     ],
     createExercise: () => HastaUttanasana(),
+    phaseColors: const { 'setup': Colors.grey, 'holding': Colors.orange },
+  ),
+  ExerciseDefinition(
+    id: 'hastapaadasana',
+    name: 'Hastapaadasana',
+    subtitle: 'Gập người chạm tay xuống đất',
+    description: 'Tư thế thứ ba trong chuỗi Chào mặt trời, kéo giãn cơ gân kheo và lưng dưới.',
+    icon: Icons.accessibility_new,
+    primaryColor: const Color(0xFFFF9800),
+    secondaryColor: const Color(0xFFF57C00),
+    difficulty: 'Trung bình',
+    targetMuscles: const ['Gân kheo', 'Lưng dưới', 'Mông'],
+    duration: '1.5s hold',
+    cameraHint: 'Quay ngang người (Side View).',
+    framingHint: 'Đảm bảo thấy toàn bộ cơ thể từ đầu đến gót chân.',
+    setupTips: const [
+      'Thở ra, gập người từ hông, giữ lưng thẳng.',
+      'Hai tay chạm xuống sàn hoặc ôm lấy cổ chân.',
+      'Cố gắng giữ chân thẳng, không gập gối quá nhiều.',
+    ],
+    createExercise: () => Hastapaadasana(),
     phaseColors: const { 'setup': Colors.grey, 'holding': Colors.orange },
   ),
   ExerciseDefinition(
