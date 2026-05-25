@@ -29,7 +29,7 @@ import 'metrics/trunk_lean_metric.dart';
 import 'metrics/cervical_safety_metric.dart';
 import 'metrics/arm_position_metric.dart';
 import 'metrics/back_knee_metric.dart';
-import 'metrics/BackStraightMetric.dart';
+import 'metrics/back_straight_metric.dart';
 
 // --- Config (Week 1-4 launch defaults; tighten per spec threshold table) ---
 
@@ -79,18 +79,18 @@ class WarriorOne extends ExerciseBase {
   WarriorOneState previousHoldState = WarriorOneState.entry;
 
   // --- Metrics ---
- final TrunkLeanMetric trunkLeanMetric = TrunkLeanMetric();
+  final TrunkLeanMetric trunkLeanMetric = TrunkLeanMetric();
   final CervicalSafetyMetric cervicalMetric = CervicalSafetyMetric();
   final ArmPositionMetric armMetric = ArmPositionMetric();
   final BackKneeMetric backKneeMetric = BackKneeMetric();
-  final BackStraightMetric backStraightMetric = BackStraightMetric(); // <--- THÊM DÒNG NÀY
+  final BackStraightMetric backStraightMetric = BackStraightMetric();
 
   late final List<WarriorOneMetricBase> _metrics = [
     trunkLeanMetric,
     cervicalMetric,
     armMetric,
     backKneeMetric,
-    backStraightMetric, // <--- THÊM DÒNG NÀY
+    backStraightMetric,
   ];
 
   // --- Hold timing ---
@@ -98,7 +98,6 @@ class WarriorOne extends ExerciseBase {
   final StickyDebouncer _stillDebouncer = StickyDebouncer(
       requiredFrames: WarriorOneConfig.STILL_FRAMES, currentState: false);
   double? _prevHipY;
-  int? _prevHipTs;
 
   // --- Baselines (captured at ENTRY → HOLD) ---
   double? _trunkBaseline;
@@ -313,7 +312,7 @@ class WarriorOne extends ExerciseBase {
     final double trunkLean =
         convertClockAngleToTrunkLean(clockAngle, cameraFacing);
 
-    final double cervicalAngle = calculateAngle(
+    final double cervicalAngle = calculateAngleNormalized(
         firstPoint: ear, midPoint: shoulder, lastPoint: hip);
 
     // Arm "overhead-ness": deviation of wrist→shoulder line from straight up.
@@ -321,15 +320,15 @@ class WarriorOne extends ExerciseBase {
         calculateVerticalAngle(pivot: shoulder, point: wrist);
     final double armVerticalAngle = math.min(armClock, 360.0 - armClock);
 
-    final double elbowAngle = calculateAngle(
+    final double elbowAngle = calculateAngleNormalized(
         firstPoint: shoulder, midPoint: elbow, lastPoint: wrist);
 
-    final double backKneeAngle = calculateAngle(
+    final double backKneeAngle = calculateAngleNormalized(
         firstPoint: back.hip!, midPoint: back.knee!, lastPoint: back.ankle!);
 
-    final double frontKneeAngle = calculateAngle(
+    final double frontKneeAngle = calculateAngleNormalized(
         firstPoint: front.hip!, midPoint: front.knee!, lastPoint: front.ankle!);
-    final double spineAngle = calculateAngle(
+    final double spineAngle = calculateAngleNormalized(
         firstPoint: ear, midPoint: shoulder, lastPoint: hip);
 
     final bool wristVisible =
@@ -338,10 +337,9 @@ class WarriorOne extends ExerciseBase {
     final double stance =
         scaleFactor > 0 ? _dist(front.ankle!, back.ankle!) / scaleFactor : 0.0;
 
-
     // 5. Hip Y-velocity → "is still?".
     final bool isStill = _updateStill(hip.y, now);
- 
+
     // 6. Build HoldContext.
     final ctx = HoldContext(
       trunkLean: trunkLean,
@@ -386,24 +384,27 @@ class WarriorOne extends ExerciseBase {
 
       case WarriorOneState.hold:
         // Track depth + decay for Check 3.
-        _minFrontKnee = (_minFrontKnee == null || frontKneeAngle < _minFrontKnee!)
-            ? frontKneeAngle
-            : _minFrontKnee;
-        _maxFrontKnee = (_maxFrontKnee == null || frontKneeAngle > _maxFrontKnee!)
-            ? frontKneeAngle
-            : _maxFrontKnee;
+        _minFrontKnee =
+            (_minFrontKnee == null || frontKneeAngle < _minFrontKnee!)
+                ? frontKneeAngle
+                : _minFrontKnee;
+        _maxFrontKnee =
+            (_maxFrontKnee == null || frontKneeAngle > _maxFrontKnee!)
+                ? frontKneeAngle
+                : _maxFrontKnee;
 
         for (final metric in _metrics) {
           metric.update(ctx);
         }
 
-        final remaining = (WarriorOneConfig.HOLD_DURATION - _currentHoldSeconds())
-            .clamp(0.0, WarriorOneConfig.HOLD_DURATION);
+        final remaining =
+            (WarriorOneConfig.HOLD_DURATION - _currentHoldSeconds())
+                .clamp(0.0, WarriorOneConfig.HOLD_DURATION);
         resultIssues.addInstruction(
             'hold', 'Status', 'Giữ! ${remaining.toStringAsFixed(0)}s');
-        debugData['holdProgress'] = (_currentHoldSeconds() /
-                WarriorOneConfig.HOLD_DURATION)
-            .clamp(0.0, 1.0);
+        debugData['holdProgress'] =
+            (_currentHoldSeconds() / WarriorOneConfig.HOLD_DURATION)
+                .clamp(0.0, 1.0);
         break;
 
       case WarriorOneState.exit:
@@ -456,7 +457,8 @@ class WarriorOne extends ExerciseBase {
     }
     if (_minFrontKnee != null &&
         _maxFrontKnee != null &&
-        (_maxFrontKnee! - _minFrontKnee!) > WarriorOneConfig.DEPTH_DECAY_LIMIT) {
+        (_maxFrontKnee! - _minFrontKnee!) >
+            WarriorOneConfig.DEPTH_DECAY_LIMIT) {
       // Knee crept up during the hold — fatigue / position decay.
       resultIssues.addInstruction(
           'exit', 'Depth', 'Cố giữ độ sâu đều trong suốt thời gian giữ nhé.');
@@ -528,7 +530,6 @@ class WarriorOne extends ExerciseBase {
   void _resetForNextSide() {
     _holdStartMs = null;
     _prevHipY = null;
-    _prevHipTs = null;
     _stillDebouncer.reset();
     _trunkBaseline = null;
     _cervicalBaseline = null;
@@ -546,7 +547,7 @@ class WarriorOne extends ExerciseBase {
 
   /// Hip Y-velocity gate. True once velocity has been below threshold for
   /// STILL_FRAMES consecutive frames.
-   bool _updateStill(double hipY, int now) {
+  bool _updateStill(double hipY, int now) {
     bool stillFrame = false;
     if (_prevHipY != null) {
       final deltaPx = (hipY - _prevHipY!).abs(); // pixels/frame
@@ -554,10 +555,8 @@ class WarriorOne extends ExerciseBase {
       stillFrame = deltaPx < WarriorOneConfig.STILL_VELOCITY_THRESHOLD;
     }
     _prevHipY = hipY;
-    _prevHipTs = now; // giữ để debug, không dùng để tính nữa
     return _stillDebouncer.update(stillFrame);
   }
-
 
   double _currentHoldSeconds() {
     if (_holdStartMs == null) return 0.0;

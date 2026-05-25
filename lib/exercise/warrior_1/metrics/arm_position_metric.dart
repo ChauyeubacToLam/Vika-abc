@@ -30,8 +30,8 @@ class ArmPositionConfig {
   static const double TOO_LOW = 40.0;
 
   /// Sub-A good band.
-  static const double GOOD_MIN = 30.0;
-  static const double GOOD_MAX = -20.0;
+  static const double GOOD_MIN = 0.0;
+  static const double GOOD_MAX = 40.0;
 
   /// Sub-B: below this = elbow too bent.
   static const double ELBOW_TOO_BENT = 150.0;
@@ -70,7 +70,8 @@ class ArmPositionMetric extends WarriorOneMetricBase {
     _debugData['wristVisible'] = ctx.wristVisible;
 
     // --- Sub-A: arms overhead? ---
-    final bool tooLow = _tooLowDebouncer.update(armV > ArmPositionConfig.TOO_LOW);
+    final bool tooLow =
+        _tooLowDebouncer.update(armV > ArmPositionConfig.TOO_LOW);
     if (tooLow) {
       ctx.resultIssues.feedback['arms'] = 'Vươn tay cao hơn nhé!';
       if (!_lowInstructionSet) {

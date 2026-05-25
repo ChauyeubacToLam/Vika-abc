@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -37,7 +38,7 @@ class RecommendationService {
       final profile = await _client
           .from('profiles')
           .select(
-            'fitness_level, fork, goals, why_primary, training_duration, schedule_sessions',
+            'fitness_level, fork, goals, training_duration, schedule_sessions',
           )
           .eq('id', user.id)
           .maybeSingle();
@@ -88,7 +89,6 @@ class RecommendationService {
             'fitness_level': profile['fitness_level'],
             'fork': fork,
             'goals': goals,
-            'why_primary': profile['why_primary'],
             'active_pain_areas': activePainAreas,
             'training_duration': profile['training_duration'],
             'schedule_sessions': sessionsPerWeek,
@@ -139,6 +139,45 @@ class RecommendationService {
     return _fetchPlanSnapshotForCurrentUser(activeOnly: false);
   }
 
+  Future<Map<String, ExerciseLaunchCatalogInfo>>
+      fetchLaunchCatalogInfoForExerciseIds(
+    Iterable<String> exerciseIds,
+  ) async {
+    final ids = exerciseIds
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+    if (ids.isEmpty) return const {};
+
+    String? cleanString(dynamic value) {
+      if (value is! String) return null;
+      final trimmed = value.trim();
+      return trimmed.isEmpty ? null : trimmed;
+    }
+
+    try {
+      final rows = await _client
+          .from('exercise_catalog')
+          .select('id, english_name, class_key, is_form_checked')
+          .inFilter('id', ids);
+
+      return {
+        for (final raw in rows as List)
+          if ((raw as Map)['id'] is String)
+            raw['id'] as String: ExerciseLaunchCatalogInfo(
+              id: raw['id'] as String,
+              englishName: cleanString(raw['english_name']),
+              classKey: cleanString(raw['class_key']),
+              isFormChecked: raw['is_form_checked'] == true,
+            ),
+      };
+    } catch (e) {
+      debugPrint('[RecommendationService] launch catalog fetch failed: $e');
+      return const {};
+    }
+  }
+
   Future<PlanSnapshot?> _fetchPlanSnapshotForCurrentUser({
     required bool activeOnly,
   }) async {
@@ -163,6 +202,7 @@ class RecommendationService {
         generatedAt: _dateTimeOrNull(row['generated_at']),
         startedAt: _dateTimeOrNull(row['plan_started_at']),
         completedAt: _dateTimeOrNull(row['plan_completed_at']),
+        scheduleDayIndexes: _scheduleDayIndexesFromRow(row),
       );
     } catch (e) {
       debugPrint('[RecommendationService] latest plan fetch failed: $e');
@@ -175,27 +215,9 @@ class RecommendationService {
     bool activeOnly = false,
   }) async {
     const selectWithLifecycle =
-        'id, user_id, generated_at, template_key, plan_structure, plan_started_at, plan_completed_at';
-    final rememberedId = await _readLatestRecommendationId();
-
-    if (rememberedId != null) {
-      try {
-        final row = await _client
-            .from('recommendations_log')
-            .select(selectWithLifecycle)
-            .eq('user_id', userId)
-            .eq('id', rememberedId)
-            .maybeSingle();
-        if (row != null) {
-          final cast = row.cast<String, dynamic>();
-          if (!activeOnly || cast['plan_completed_at'] == null) return cast;
-        }
-      } catch (_) {
-        // Fall through to the canonical generated_at lookup below.
-      }
-    }
-
-    final row = activeOnly
+        'id, user_id, generated_at, template_key, plan_structure, '
+        'plan_started_at, plan_completed_at, user_snapshot, parameters';
+    final canonicalRow = activeOnly
         ? await _client
             .from('recommendations_log')
             .select(selectWithLifecycle)
@@ -211,7 +233,32 @@ class RecommendationService {
             .order('generated_at', ascending: false)
             .limit(1)
             .maybeSingle();
-    return row?.cast<String, dynamic>();
+    if (canonicalRow != null) {
+      final cast = canonicalRow.cast<String, dynamic>();
+      unawaited(_rememberLatestRecommendationId(cast['id'] as String));
+      return cast;
+    }
+
+    final rememberedId = await _readLatestRecommendationId();
+
+    if (rememberedId != null) {
+      try {
+        final row = await _client
+            .from('recommendations_log')
+            .select(selectWithLifecycle)
+            .eq('user_id', userId)
+            .eq('id', rememberedId)
+            .maybeSingle();
+        if (row != null) {
+          final cast = row.cast<String, dynamic>();
+          if (!activeOnly || cast['plan_completed_at'] == null) return cast;
+        }
+      } catch (_) {
+        // Ignore stale local cache misses.
+      }
+    }
+
+    return null;
   }
 
   Future<List<String>> _fetchActivePainAreas(String userId) async {
@@ -307,6 +354,47 @@ class RecommendationService {
     if (value is String) return DateTime.tryParse(value);
     return null;
   }
+
+  List<int> _scheduleDayIndexesFromRow(Map<String, dynamic> row) {
+    final raw = _scheduleListFromPayload(row['user_snapshot']) ??
+        _scheduleListFromPayload(row['parameters']);
+    if (raw == null) return const [];
+
+    final days = raw
+        .map(_scheduleTokenToDayIndex)
+        .whereType<int>()
+        .where((day) => day >= 0 && day <= 6)
+        .toSet()
+        .toList()
+      ..sort();
+    return days;
+  }
+
+  List<dynamic>? _scheduleListFromPayload(dynamic payload) {
+    if (payload is! Map) return null;
+    final map = payload.cast<String, dynamic>();
+    final scheduleKeys = map['schedule_keys'];
+    if (scheduleKeys is List) return scheduleKeys;
+    final scheduleSessions = map['schedule_sessions'];
+    if (scheduleSessions is List) return scheduleSessions;
+    return null;
+  }
+
+  int? _scheduleTokenToDayIndex(dynamic value) {
+    final token = value.toString().trim().toUpperCase();
+    final vietnamese = RegExp(r'^T([2-7])').firstMatch(token);
+    if (vietnamese != null) {
+      return int.parse(vietnamese.group(1)!) - 2;
+    }
+    if (token.startsWith('CN') || token.startsWith('SUN')) return 6;
+    if (token.startsWith('MON')) return 0;
+    if (token.startsWith('TUE')) return 1;
+    if (token.startsWith('WED')) return 2;
+    if (token.startsWith('THU')) return 3;
+    if (token.startsWith('FRI')) return 4;
+    if (token.startsWith('SAT')) return 5;
+    return null;
+  }
 }
 
 class PlanSnapshot {
@@ -315,19 +403,23 @@ class PlanSnapshot {
     this.generatedAt,
     this.startedAt,
     this.completedAt,
+    this.scheduleDayIndexes = const [],
   });
 
   final Plan plan;
   final DateTime? generatedAt;
   final DateTime? startedAt;
   final DateTime? completedAt;
+  final List<int> scheduleDayIndexes;
 
   int get currentWeekNumber {
     if (plan.weeks.isEmpty) return 1;
     if (completedAt != null) return plan.weeks.last.weekNumber;
     final anchor = startedAt ?? generatedAt;
     if (anchor == null) return 1;
-    final days = DateTime.now().difference(anchor).inDays;
+    final localAnchor = _mondayOfWeek(_localDay(anchor));
+    final localToday = _localDay(DateTime.now());
+    final days = localToday.difference(localAnchor).inDays;
     final week = (days ~/ 7) + 1;
     return week.clamp(1, plan.weeks.length).toInt();
   }
@@ -339,4 +431,35 @@ class PlanSnapshot {
       orElse: () => plan.weeks.first,
     );
   }
+}
+
+class ExerciseLaunchCatalogInfo {
+  const ExerciseLaunchCatalogInfo({
+    required this.id,
+    required this.isFormChecked,
+    this.englishName,
+    this.classKey,
+  });
+
+  final String id;
+  final bool isFormChecked;
+  final String? englishName;
+  final String? classKey;
+
+  Iterable<String> get lookupKeys sync* {
+    final keys = [classKey, id, englishName];
+    for (final key in keys) {
+      final value = key?.trim();
+      if (value != null && value.isNotEmpty) yield value;
+    }
+  }
+}
+
+DateTime _localDay(DateTime date) {
+  final local = date.toLocal();
+  return DateTime(local.year, local.month, local.day);
+}
+
+DateTime _mondayOfWeek(DateTime date) {
+  return date.subtract(Duration(days: date.weekday - DateTime.monday));
 }

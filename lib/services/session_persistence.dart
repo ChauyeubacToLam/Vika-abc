@@ -193,6 +193,107 @@ class SessionPersistence {
     }
   }
 
+  /// MVP workout completion count for v4.4.
+  ///
+  /// `exercise_sessions` is per exercise, not per workout. Until a real
+  /// workout-level table exists, count distinct local completion dates for
+  /// exercise rows whose set data belongs to the requested recommendation week.
+  Future<int> countCompletedWorkoutDaysForWeek({
+    required String recommendationId,
+    required int weekNumber,
+  }) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return 0;
+
+    try {
+      final rows = await _client
+          .from('exercise_sessions')
+          .select('completed_at, set_data')
+          .eq('user_id', userId)
+          .eq('recommendation_id', recommendationId);
+
+      final completedSessionIndexes = <int>{};
+      final completedDays = <String>{};
+      for (final row in rows as List) {
+        final data = row as Map<String, dynamic>;
+        if (!_setDataContainsWeek(data['set_data'], weekNumber)) continue;
+        completedSessionIndexes.addAll(
+          _setDataSessionIndexesForWeek(data['set_data'], weekNumber),
+        );
+        final completedAt = DateTime.tryParse(
+          (data['completed_at'] as String?) ?? '',
+        );
+        if (completedAt == null) continue;
+        final local = completedAt.toLocal();
+        completedDays.add('${local.year}-${local.month}-${local.day}');
+      }
+      if (completedSessionIndexes.isNotEmpty) {
+        return completedSessionIndexes.length;
+      }
+      return completedDays.length;
+    } catch (e) {
+      debugPrint('[Vika] countCompletedWorkoutDaysForWeek failed: $e');
+      return 0;
+    }
+  }
+
+  /// Exact workout session indexes completed in a recommendation week.
+  ///
+  /// New workout launches write `week_number` + `session_index` into each
+  /// exercise row's `set_data`. Unstarted sessions have no row, so callers
+  /// compare these completed indexes against the plan_structure sessions.
+  Future<Set<int>> completedWorkoutSessionIndexesForWeek({
+    required String recommendationId,
+    required int weekNumber,
+  }) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return const <int>{};
+
+    try {
+      final rows = await _client
+          .from('exercise_sessions')
+          .select('set_data')
+          .eq('user_id', userId)
+          .eq('recommendation_id', recommendationId);
+
+      final completedSessionIndexes = <int>{};
+      for (final row in rows as List) {
+        final data = row as Map<String, dynamic>;
+        completedSessionIndexes.addAll(
+          _setDataSessionIndexesForWeek(data['set_data'], weekNumber),
+        );
+      }
+      return completedSessionIndexes;
+    } catch (e) {
+      debugPrint('[Vika] completedWorkoutSessionIndexesForWeek failed: $e');
+      return const <int>{};
+    }
+  }
+
+  bool _setDataContainsWeek(dynamic rawSetData, int weekNumber) {
+    if (rawSetData is! List) return false;
+    for (final rawSet in rawSetData) {
+      if (rawSet is! Map) continue;
+      final value = rawSet['week_number'];
+      if (value is num && value.toInt() == weekNumber) return true;
+    }
+    return false;
+  }
+
+  Set<int> _setDataSessionIndexesForWeek(dynamic rawSetData, int weekNumber) {
+    final indexes = <int>{};
+    if (rawSetData is! List) return indexes;
+    for (final rawSet in rawSetData) {
+      if (rawSet is! Map) continue;
+      final week = rawSet['week_number'];
+      final session = rawSet['session_index'];
+      if (week is num && week.toInt() == weekNumber && session is num) {
+        indexes.add(session.toInt());
+      }
+    }
+    return indexes;
+  }
+
   /// Update overall_difficulty for a session. Called from executive summary
   /// after user taps a difficulty emoji. Fire-and-forget.
   Future<void> updateSessionDifficulty({
