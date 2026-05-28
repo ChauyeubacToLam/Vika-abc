@@ -1,3 +1,4 @@
+import '../../pose/vika_image_orientation.dart';
 import 'package:vika/exercise/exercise_base.dart';
 import 'package:vika/utils/exercise_logger.dart';
 import '../../utils/pose_math_helpers.dart';
@@ -150,6 +151,7 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
 
     frameBuffer.addFrame(FrameSnapshot(log: {
       "shoulderY": shoulder.y,
+      "hipY": hip.y,
       "elbowAngle": elbowAngle,
     }, timeStamp: now));
 
@@ -196,26 +198,25 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
   }
 
   void _updateStateMachine(double elbowAngle, int now) {
-    // final shoulderYChange = frameBuffer.getAngleChange("shoulderY");
-    final elbowAngleChange = frameBuffer.getAngleChange("elbowAngle");
+    final hipYChange = frameBuffer.getChange("hipY", 3);
+    final elbowAngleChange = frameBuffer.getChange("elbowAngle", 3);
 
     if (tricepState == TricepDipState.setup_top) {
       if (elbowAngle < TricepDipConfig.DESCENDING_ELBOW_ANGLE) {
         _transitionState(TricepDipState.descending, now);
       }
     } else if (tricepState == TricepDipState.descending) {
-      // Bottom when elbow angle is tight or shoulder stops moving down
-      if (elbowAngle < TricepDipConfig.BOTTOM_ELBOW_ANGLE || elbowAngleChange == AngleChangeState.increasing) {
+      if (hipYChange == ChangeState.increasing) {
         _transitionState(TricepDipState.bottom, now);
       }
     } else if (tricepState == TricepDipState.bottom) {
-      if (elbowAngleChange == AngleChangeState.increasing && elbowAngle > TricepDipConfig.BOTTOM_ELBOW_ANGLE + 10) {
+      if (hipYChange == ChangeState.decreasing || elbowAngle > 120) {
         _transitionState(TricepDipState.ascending, now);
       }
     } else if (tricepState == TricepDipState.ascending) {
       if (elbowAngle > TricepDipConfig.ASCENDING_ELBOW_ANGLE) {
         _transitionState(TricepDipState.setup_top, now);
-      } else if (elbowAngleChange == AngleChangeState.decreasing && elbowAngle < TricepDipConfig.ASCENDING_ELBOW_ANGLE - 10) {
+      } else if (elbowAngleChange == ChangeState.decreasing && elbowAngle < TricepDipConfig.ASCENDING_ELBOW_ANGLE - 10) {
         // They started descending again without reaching full extension
         _transitionState(TricepDipState.descending, now);
         _completeRep(); // Count it as a rep (it will likely have the 'no_full_extension' fault)

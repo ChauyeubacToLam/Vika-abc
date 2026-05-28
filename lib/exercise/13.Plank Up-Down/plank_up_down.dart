@@ -4,6 +4,7 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/debouncer.dart';
 import '../../utils/exercise_logger.dart';
+import '../../pose/vika_image_orientation.dart';
 import '../exercise_base.dart';
 import 'metrics/plank_up_down_metric_base.dart';
 import 'metrics/trunk_alignment_metric.dart';
@@ -97,19 +98,19 @@ class PlankUpDown extends ExerciseBase {
 
     bool useLeft = leftValid && (!rightValid || (lHip.likelihood >= rHip.likelihood));
 
-    final shoulder = useLeft ? lShoulder! : rShoulder!;
-    final hip = useLeft ? lHip! : rHip!;
-    final ankle = useLeft ? lAnkle! : rAnkle!;
+    final shoulder = (useLeft ? lShoulder : rShoulder)!;
+    final hip = (useLeft ? lHip : rHip)!;
+    final ankle = (useLeft ? lAnkle : rAnkle)!;
 
     final bodyAngle = calculateAngleNormalized(firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
 
     final leftElbowAngle = leftValid
-        ? calculateAngleNormalized(firstPoint: lShoulder!, midPoint: lElbow!, lastPoint: lWrist!)
-        : (rightValid ? calculateAngleNormalized(firstPoint: rShoulder!, midPoint: rElbow!, lastPoint: rWrist!) : 90.0);
+        ? calculateAngleNormalized(firstPoint: lShoulder, midPoint: lElbow, lastPoint: lWrist)
+        : (rightValid ? calculateAngleNormalized(firstPoint: rShoulder, midPoint: rElbow, lastPoint: rWrist) : 90.0);
 
     final rightElbowAngle = rightValid
-        ? calculateAngleNormalized(firstPoint: rShoulder!, midPoint: rElbow!, lastPoint: rWrist!)
-        : (leftValid ? calculateAngleNormalized(firstPoint: lShoulder!, midPoint: lElbow!, lastPoint: lWrist!) : 90.0);
+        ? calculateAngleNormalized(firstPoint: rShoulder, midPoint: rElbow, lastPoint: rWrist)
+        : (leftValid ? calculateAngleNormalized(firstPoint: lShoulder, midPoint: lElbow, lastPoint: lWrist) : 90.0);
 
     // Cả 2 góc cùi chỏ phải đang ở tư thế gập cẳng tay (forearm plank)
     return bodyAngle >= PlankConfig.BODY_ALIGNMENT_START_MIN &&
@@ -151,22 +152,22 @@ class PlankUpDown extends ExerciseBase {
     // Choose primary side based on likelihood of hip
     bool useLeft = leftValid && (!rightValid || (lHip.likelihood >= rHip.likelihood));
 
-    final shoulder = useLeft ? lShoulder! : rShoulder!;
-    final hip = useLeft ? lHip! : rHip!;
-    final knee = useLeft ? lKnee! : rKnee!;
-    final ankle = useLeft ? lAnkle! : rAnkle!;
+    final shoulder = (useLeft ? lShoulder : rShoulder)!;
+    final hip = (useLeft ? lHip : rHip)!;
+    final knee = (useLeft ? lKnee : rKnee)!;
+    final ankle = (useLeft ? lAnkle : rAnkle)!;
 
     scaleFactor = calculateDistance(shoulder, hip);
     final bodyAngle = calculateAngleNormalized(firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
     final kneeAngle = calculateAngleNormalized(firstPoint: hip, midPoint: knee, lastPoint: ankle);
 
     final leftElbowAngle = leftValid
-        ? calculateAngleNormalized(firstPoint: lShoulder!, midPoint: lElbow!, lastPoint: lWrist!)
-        : (rightValid ? calculateAngleNormalized(firstPoint: rShoulder!, midPoint: rElbow!, lastPoint: rWrist!) : 90.0);
+        ? calculateAngleNormalized(firstPoint: lShoulder, midPoint: lElbow, lastPoint: lWrist)
+        : (rightValid ? calculateAngleNormalized(firstPoint: rShoulder, midPoint: rElbow, lastPoint: rWrist) : 90.0);
 
     final rightElbowAngle = rightValid
-        ? calculateAngleNormalized(firstPoint: rShoulder!, midPoint: rElbow!, lastPoint: rWrist!)
-        : (leftValid ? calculateAngleNormalized(firstPoint: lShoulder!, midPoint: lElbow!, lastPoint: lWrist!) : 90.0);
+        ? calculateAngleNormalized(firstPoint: rShoulder, midPoint: rElbow, lastPoint: rWrist)
+        : (leftValid ? calculateAngleNormalized(firstPoint: lShoulder, midPoint: lElbow, lastPoint: lWrist) : 90.0);
 
     // GHI LOG TELEMETRY
     _telemetryLog.add({

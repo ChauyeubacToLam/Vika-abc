@@ -1,6 +1,7 @@
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/exercise_logger.dart';
+import '../../pose/vika_image_orientation.dart';
 import '../exercise_base.dart';
 import 'metrics/seated_forward_metric_base.dart';
 import 'metrics/knee_extension_metric.dart';

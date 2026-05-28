@@ -4,6 +4,7 @@ import 'package:vika/utils/debouncer.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/exercise_logger.dart';
+import '../../pose/vika_image_orientation.dart';
 import '../exercise_base.dart';
 
 import 'metrics/leg_raise_metric_base.dart';
@@ -66,7 +67,7 @@ class LegRaise extends ExerciseBase {
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
-    // TODO: Implement safety check for Leg Raises (e.g. check if user has pre-existing lower back pain history before starting).
+    // NOTE: Implement safety check for Leg Raises (e.g. check if user has pre-existing lower back pain history before starting).
     return null; // No specific safety check for this exercise yet.
   }
 

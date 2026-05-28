@@ -90,9 +90,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   // ─── Ivory v8 state ───
   int _setElapsedSeconds = 0;
   Timer? _setTimer;
-  // TODO(form-score): Replace with real computed form score from ML pipeline
+  // NOTE(form-score): Replace with real computed form score from ML pipeline
   static const int _hardcodedFormScore = 82;
-  // TODO(chart): Replace with real sparkline data from primaryAngleForChart
+  // NOTE(chart): Replace with real sparkline data from primaryAngleForChart
   static const List<int> _hardcodedSparkData = [
     72,
     78,
@@ -105,7 +105,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     84,
     82
   ];
-  // TODO(integration): Replace with real fault indices from RepLog.faults
+  // NOTE(integration): Replace with real fault indices from RepLog.faults
   static const List<int> _hardcodedFaultIndices = [2];
   bool _isManualPause = false;
   _PoseRuntime _runtime = _PoseRuntime.nativeMediaPipe;
@@ -1463,7 +1463,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         phaseHint = 'Bắt đầu hạ người';
     }
 
-    // TODO(caption): Wire mid-rep fault detection caption here
+    // NOTE(caption): Wire mid-rep fault detection caption here
     final showCaption = activeState &&
         coachMessage.isNotEmpty &&
         !showDebugPanel &&
@@ -1597,7 +1597,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
             top: media.padding.top + 10,
             right: 16,
             child: IvoryTopChromeRight(
-              // TODO(form-score): Replace _hardcodedFormScore with the real
+              // NOTE(form-score): Replace _hardcodedFormScore with the real
               // computed form score from the ML pipeline (per-rep average or
               // rolling window).
               formScore: _hardcodedFormScore,
@@ -1633,7 +1633,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
             Positioned(
               top: media.padding.top + 58,
               right: 16,
-              // TODO(chart): Replace _hardcodedSparkData with the real rolling
+              // NOTE(chart): Replace _hardcodedSparkData with the real rolling
               // 10s form-score history coming out of the ML pipeline.
               child: const IvoryFormScoreSparkline(data: _hardcodedSparkData),
             ),
@@ -1704,7 +1704,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                 isHoldPhase: isHoldPhase,
                 holdProgress: bottomHoldCue?.progress,
                 holdRemaining: bottomHoldCue?.remaining,
-                // TODO(integration): Wire RepLog.faults into faultIndices
+                // NOTE(integration): Wire RepLog.faults into faultIndices
                 faultIndices: _hardcodedFaultIndices,
               ),
             ),

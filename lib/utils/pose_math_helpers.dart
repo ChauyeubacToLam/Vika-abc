@@ -355,3 +355,29 @@ double clockAngleDeviation(double clockAngle, double target) {
   if (diff < -180) diff += 360;
   return diff;
 }
+
+/* =========================================================================
+   Determine if a point is on the physical left side of the body
+   ========================================================================= */
+/// Calculates if a given point (e.g., Ankle or Wrist) is on the physical
+/// left side of the body using the vector from Right Parent to Left Parent 
+/// (e.g., Hip or Shoulder) as the horizontal axis.
+/// If the dot product is positive, the point is on the left side.
+bool isPhysicalLeftSide(PoseLandmark point, PoseLandmark leftParent, PoseLandmark rightParent) {
+  // Vector from Right to Left Parent (Hip or Shoulder)
+  double axisX = leftParent.x - rightParent.x;
+  double axisY = leftParent.y - rightParent.y;
+
+  // Midpoint between Left and Right
+  double midX = (leftParent.x + rightParent.x) / 2;
+  double midY = (leftParent.y + rightParent.y) / 2;
+
+  // Vector from Midpoint to Point
+  double pointX = point.x - midX;
+  double pointY = point.y - midY;
+
+  // Dot product
+  double dotProduct = (axisX * pointX) + (axisY * pointY);
+
+  return dotProduct > 0;
+}

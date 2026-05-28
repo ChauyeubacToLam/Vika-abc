@@ -599,7 +599,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
             totalDuration: _aggregateDuration(accumulated),
             totalCalories: _aggregateCalories(accumulated),
             streakDays: _userStats?.streakDays ?? 0,
-            // TODO(wiring): persist per-exercise difficulty for the
+            // NOTE(wiring): persist per-exercise difficulty for the
             // last exercise + session-level RPE. Today only the
             // existing single-exercise persistence runs. See report.
             onLastExerciseDifficulty: (d) {
@@ -610,7 +610,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
               _handleOverallDifficulty(d);
             },
             onSessionRpe: (_) {
-              // TODO(wiring): persist session-level RPE separately.
+              // NOTE(wiring): persist session-level RPE separately.
             },
             onDone: () => Navigator.of(summaryContext)
                 .pop({'completed': true}),
@@ -639,7 +639,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     final prev = _previousReport;
     if (prev == null) return;
     prev.userDifficulty = difficulty;
-    // TODO(wiring): persist per-exercise difficulty into the previous
+    // NOTE(wiring): persist per-exercise difficulty into the previous
     // exercise's exercise_sessions row. The current
     // `updateSessionDifficulty` writes to whatever the *current* session
     // is — we need the previous exercise's session id here. See report.

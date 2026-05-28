@@ -2,6 +2,7 @@
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/debouncer.dart';
+import '../../pose/vika_image_orientation.dart';
 import '../exercise_base.dart';
 import 'metrics/superman_metric_base.dart';
 import 'metrics/limb_elevation_metric.dart';

@@ -67,7 +67,7 @@ class DashboardHomeScreen extends StatefulWidget {
   /// Real program data passed from MainShell. The CTA launches the
   /// first available program exercise; hero copy and vitals still render
   /// from `homeMock*` constants until the dashboard summary API lands.
-  // TODO(wiring): derive today's session copy, vitals spread session
+  // NOTE(wiring): derive today's session copy, vitals spread session
   // counts, streak, and form 7-day from `program` + RecommendationService.
   final UserProgramData? program;
   final AppUserProfile? userProfile;

@@ -1,6 +1,7 @@
 // ignore_for_file: curly_braces_in_flow_control_structures
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
+import '../../pose/vika_image_orientation.dart';
 import '../exercise_base.dart';
 import 'metrics/mountain_climber_metric_base.dart';
 import 'metrics/trunk_stability_metric.dart';
@@ -60,9 +61,6 @@ class MountainClimber extends ExerciseBase {
   int? _exerciseStartTimeMs;
   bool _isTimeout = false;
 
-  /// Khoảng cách nghỉ chuẩn hóa của 2 chân, đo ở Setup
-  double? _restDistLeft;
-  double? _restDistRight;
 
   // ---------------------------------------------------------------------------
   // Safety check
@@ -118,8 +116,6 @@ class MountainClimber extends ExerciseBase {
           (lm.rightKnee.x - lm.shoulder.x).abs() / scale;
 
       // Lấy trung bình 3 frame để ổn định (đơn giản: gán thẳng khi form đạt)
-      _restDistLeft  = distL;
-      _restDistRight = distR;
       _leftCounter.calibrate(distL);
       _rightCounter.calibrate(distR);
 

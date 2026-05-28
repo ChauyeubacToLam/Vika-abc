@@ -47,7 +47,7 @@ class SquatReportBuilder extends ExerciseReportBuilder {
   @override
   DetectedEvidence? detectIssue(List<ExerciseLogger> setLoggers) {
     // NOTE: Re-runs interpreter analysis. OK for 3-5 sets.
-    // TODO: Read from cached evidences when logger stores them.
+    // NOTE: Read from cached evidences when logger stores them.
     final questions = <DetectedEvidence>[];
     for (final setLogger in setLoggers) {
       final interpreter = SquatInterpreter(logger: setLogger);

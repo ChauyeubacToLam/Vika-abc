@@ -1,5 +1,4 @@
 import 'dart:math';
-import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'standing_kte_metric_base.dart';
 import '../standing_knee_to_elbow.dart';
 

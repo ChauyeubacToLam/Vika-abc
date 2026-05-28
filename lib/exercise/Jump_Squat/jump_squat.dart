@@ -1,9 +1,9 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, non_constant_identifier_names
 
-import 'package:vika/utils/debouncer.dart';
 import '../../utils/pose_math_helpers.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
+import '../../pose/vika_image_orientation.dart';
 import '../exercise_base.dart';
 import 'metrics/jump_squat_metric_base.dart';
 import 'metrics/landing_knee_flexion_metric.dart';
@@ -39,8 +39,6 @@ class JumpSquat extends ExerciseBase {
   // Dữ liệu tham chiếu sàn động
   double? _baselineFloorY;
   double? _previousHipY;
-  
-  final Debouncer _entryDebouncer = Debouncer(requiredFrames: 2);
 
   // Metrics
   final LandingKneeFlexionMetric landingFlexionMetric = LandingKneeFlexionMetric();

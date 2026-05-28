@@ -1,6 +1,4 @@
 // ignore_for_file: constant_identifier_names
-
-import '../step_back_burpee.dart';
 import '../../exercise_base.dart';
 import '../../fault_record.dart';
 export '../../fault_record.dart';

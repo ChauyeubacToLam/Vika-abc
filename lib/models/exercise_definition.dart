@@ -9,6 +9,38 @@ import '../exercise/lunge/lunge.dart';
 import '../exercise/push up/push_up.dart';
 import '../exercise/squat/squat.dart';
 import '../exercise/warrior_1/warrior_one.dart';
+import '../exercise/1.Bird Dog/bird_dog.dart';
+import '../exercise/10.Vup/v_up.dart';
+import '../exercise/12.Dead Bug/dead_bug.dart';
+import '../exercise/13.Plank Up-Down/plank_up_down.dart';
+import '../exercise/14.Bear Plank/bear_plank.dart';
+import '../exercise/2.Sit-Up/sit_up.dart';
+import '../exercise/3.High Plank/high_plank.dart';
+import '../exercise/4.Mountain Climber/mountain_climber.dart';
+import '../exercise/5.Superman/superman.dart';
+import '../exercise/7.Plank Shoulder Tap/plank_shoulder_tap.dart';
+import '../exercise/8.Leg Raises (Supine)/leg_raise.dart';
+import '../exercise/9.Reverse Crunch/reverse_crunch.dart';
+import '../exercise/ashtanga_namaskara/ashtanga_namaskara.dart';
+import '../exercise/ashtanga_to_cobra/ashtanga_to_cobra.dart';
+import '../exercise/ashwa_sanchalanasana/ashwa_sanchalanasana.dart';
+import '../exercise/bow_pose/bow_pose.dart';
+import '../exercise/butterfly_stretch/butterfly_stretch.dart';
+import '../exercise/Cobra/cobra.dart';
+import '../exercise/cossack_squat/cossack_squat.dart';
+import '../exercise/hastapaadasana/hastapaadasana.dart';
+import '../exercise/hasta_uttanasana/hasta_uttanasana.dart';
+import '../exercise/Jump_Squat/jump_squat.dart';
+import '../exercise/parvatasana/parvatasana.dart';
+import '../exercise/pranamasana/pranamasana.dart';
+import '../exercise/russian_twist/russian_twist.dart';
+import '../exercise/seated_forward_fold/seated_forward_fold.dart';
+import '../exercise/side_plank_dip/side_plank_dip.dart';
+import '../exercise/Sphinx_Pose/sphinx_stretch.dart';
+import '../exercise/standing_knee_to_elbow/standing_knee_to_elbow.dart';
+import '../exercise/step_back_burpee/step_back_burpee.dart';
+import '../exercise/tricep_dip/tricep_dip.dart';
+import '../exercise/walking_lunge/walking_lunge.dart';
 
 /* =========================================================================
    ExerciseDefinition — Metadata + factory for each exercise type.
@@ -335,4 +367,709 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'exit': const Color(0xFF29B6F6),
     },
   ),
+  ExerciseDefinition(
+    id: 'bird__dog',
+    name: 'Bird Dog',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập Bird Dog.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => BirdDog(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'v__up',
+    name: 'V-Up',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập V-Up.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => VUp(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'dead__bug',
+    name: 'Dead Bug',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập Dead Bug.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => DeadBug(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'plank__up__down',
+    name: 'Plank Up-Down',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập Plank Up-Down.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => PlankUpDown(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'bear__plank',
+    name: 'Bear Plank',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập Bear Plank.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => BearPlank(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'sit__up',
+    name: 'Sit Up',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập Sit Up.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => SitUp(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'high__plank',
+    name: 'High Plank',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập High Plank.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => HighPlank(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'mountain__climber',
+    name: 'Mountain Climber',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập Mountain Climber.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => MountainClimber(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'superman',
+    name: 'Superman',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập Superman.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => Superman(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'plank__shoulder__tap',
+    name: 'Plank Shoulder Tap',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập Plank Shoulder Tap.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => PlankShoulderTap(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'leg__raises',
+    name: 'Leg Raises',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập Leg Raises.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => LegRaise(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'reverse__crunch',
+    name: 'Reverse Crunch',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập Reverse Crunch.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => ReverseCrunch(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'ashtanga__namaskara',
+    name: 'Ashtanga Namaskara',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập Ashtanga Namaskara.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => AshtangaNamaskara(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'ashtanga_to__cobra',
+    name: 'Ashtanga to Cobra',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập Ashtanga to Cobra.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => AshtangaToCobra(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'ashwa__sanchalanasana',
+    name: 'Ashwa Sanchalanasana',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập Ashwa Sanchalanasana.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => AshwaSanchalanasana(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'bow_',
+    name: 'Bow Pose',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập Bow Pose.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => BowPose(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'butterfly__stretch',
+    name: 'Butterfly Stretch',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập Butterfly Stretch.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => ButterflyStretch(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'cobra_',
+    name: 'Cobra Pose',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập Cobra Pose.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => Cobra(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'cossack__squat',
+    name: 'Cossack Squat',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập Cossack Squat.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => CossackSquat(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'hastapaadasana',
+    name: 'Hastapaadasana',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập Hastapaadasana.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => Hastapaadasana(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'hasta__uttanasana',
+    name: 'Hasta Uttanasana',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập Hasta Uttanasana.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => HastaUttanasana(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'jump__squat',
+    name: 'Jump Squat',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập Jump Squat.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => JumpSquat(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'parvatasana',
+    name: 'Parvatasana',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập Parvatasana.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => Parvatasana(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'pranamasana',
+    name: 'Pranamasana',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập Pranamasana.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => Pranamasana(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'russian__twist',
+    name: 'Russian Twist',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập Russian Twist.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => RussianTwist(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'seated__forward__fold',
+    name: 'Seated Forward Fold',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập Seated Forward Fold.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => SeatedForwardFold(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'side__plank_with__hip__dip',
+    name: 'Side Plank with Hip Dip',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập Side Plank with Hip Dip.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => SidePlankDip(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'sphinx_',
+    name: 'Sphinx Pose',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập Sphinx Pose.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => SphinxStretch(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'standing__knee_to__elbow',
+    name: 'Standing Knee-to-Elbow',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập Standing Knee-to-Elbow.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => StandingKneeToElbow(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'step__back__burpee',
+    name: 'Step-Back Burpee',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập Step-Back Burpee.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => StepBackBurpee(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'tricep__dip_(_floor)',
+    name: 'Tricep Dip (Floor)',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập Tricep Dip (Floor).',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => TricepDip(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'walking__lunge',
+    name: 'Walking Lunge',
+    subtitle: 'Chưa có mô tả',
+    description: 'Bản xem trước của bài tập Walking Lunge.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => WalkingLunge(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+
 ];

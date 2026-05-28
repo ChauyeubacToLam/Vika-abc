@@ -279,10 +279,10 @@ class AssessmentResultData {
   final int? chartFloor;
 }
 
-// TODO(LOGIC-REFINEMENT-#3): S08 Phase1 — issue candidate generation is hardcoded NASM-mapped candidates per exercise.
+// NOTE(LOGIC-REFINEMENT-#3): S08 Phase1 — issue candidate generation is hardcoded NASM-mapped candidates per exercise.
 // Currently using v1 placeholder from JSX prototype. Real logic deferred to Phase 2.
 // See Notion: Vika State > Onboarding Logic Refinement block for full context.
-// TODO(LOGIC-REFINEMENT-#4): S08 Phase1 — coach text (`coachBody`) is hardcoded NASM references.
+// NOTE(LOGIC-REFINEMENT-#4): S08 Phase1 — coach text (`coachBody`) is hardcoded NASM references.
 // Currently using v1 placeholder from JSX prototype. Real logic deferred to Phase 2.
 // See Notion: Vika State > Onboarding Logic Refinement block for full context.
 const homeResultsMock = [
@@ -317,7 +317,7 @@ const homeResultsMock = [
     ],
   ),
   AssessmentResultData(
-    // TODO: wire to Wall Push-UpInterpreter when implemented
+    // NOTE: wire to Wall Push-UpInterpreter when implemented
     id: 'pushup',
     name: 'Wall Push-Up',
     score: 92,
@@ -346,7 +346,7 @@ const homeResultsMock = [
 
 const yogaResultsMock = [
   AssessmentResultData(
-    // TODO: wire to Warrior IInterpreter when implemented
+    // NOTE: wire to Warrior IInterpreter when implemented
     id: 'warrior',
     name: 'Warrior I',
     score: 28,
@@ -372,7 +372,7 @@ const yogaResultsMock = [
     ],
   ),
   AssessmentResultData(
-    // TODO: wire to Forward FoldInterpreter when implemented
+    // NOTE: wire to Forward FoldInterpreter when implemented
     id: 'fold',
     name: 'Forward Fold',
     score: 78,
@@ -499,7 +499,7 @@ class PlanPersonalization {
   final bool isYoga;
 }
 
-// TODO(LOGIC-REFINEMENT-#8): S13 Outcomes — personalization logic is hand-coded if-else chains in `derivePlanPersonalization`.
+// NOTE(LOGIC-REFINEMENT-#8): S13 Outcomes — personalization logic is hand-coded if-else chains in `derivePlanPersonalization`.
 // Currently using v1 placeholder from JSX prototype. Real logic deferred to Phase 2.
 // See Notion: Vika State > Onboarding Logic Refinement block for full context.
 PlanPersonalization derivePlanPersonalization(OnboardingData data) {

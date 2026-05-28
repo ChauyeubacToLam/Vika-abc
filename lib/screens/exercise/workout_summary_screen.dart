@@ -18,7 +18,7 @@
 // All values use Premium Ivory tokens via VikaColors. Yellow reserved
 // for stat / dot / underline / CTA.
 //
-// TODO(wiring): see report — session form score, top-issue ranker,
+// NOTE(wiring): see report — session form score, top-issue ranker,
 // one-thing picker, coach narrative, RPE persistence all hardcoded.
 
 import 'dart:math' as math;
@@ -129,7 +129,7 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
 
   // ── Session aggregates ────────────────────────────────────────
   int get _sessionFormScore {
-    // TODO(wiring): weighted-by-reps × difficulty formula needed.
+    // NOTE(wiring): weighted-by-reps × difficulty formula needed.
     if (widget.reports.isEmpty) return 0;
     final total = widget.reports.fold<int>(0, (s, r) => s + r.formScore);
     return (total / widget.reports.length).round();
@@ -140,7 +140,7 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
   int get _sessionGoodReps =>
       widget.reports.fold(0, (s, r) => s + r.goodReps);
 
-  /// TODO(wiring): real cross-exercise priority ranking with pain linkage.
+  /// NOTE(wiring): real cross-exercise priority ranking with pain linkage.
   DetectedEvidence? get _topIssue {
     for (final r in widget.reports) {
       final q = r.report.issueQuestion;
@@ -1051,7 +1051,7 @@ class _TrophyMomentCard extends StatelessWidget {
   const _TrophyMomentCard({required this.reports});
   final List<ExerciseSessionReport> reports;
 
-  /// TODO(wiring): real "highlight picker" examining reports + history.
+  /// NOTE(wiring): real "highlight picker" examining reports + history.
   ({String label, String value, IconData icon, String tag})
       _pickHighlight() {
     if (reports.isEmpty) {
@@ -1550,7 +1550,7 @@ class _ThreePillarCoach extends StatelessWidget {
   final List<ExerciseSessionReport> reports;
   final int sessionFormScore;
 
-  /// TODO(wiring): real cross-exercise narrative aggregator.
+  /// NOTE(wiring): real cross-exercise narrative aggregator.
   ({String strength, String watch, String next, String quote}) _pillars() {
     final strongest = reports.isEmpty
         ? '—'

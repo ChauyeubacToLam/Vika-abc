@@ -1,6 +1,4 @@
-import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'tricep_metric_base.dart';
-import '../tricep_dip.dart';
 import '../../exercise_base.dart';
 
 class ScapularElevationMetric extends TricepMetricBase {

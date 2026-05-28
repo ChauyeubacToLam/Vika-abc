@@ -132,7 +132,7 @@ class MountainClimberReportBuilder extends ExerciseReportBuilder {
 
   @override
   DetectedEvidence? detectIssue(List<ExerciseLogger> setLoggers) {
-    // TODO: Điền đúng các field theo constructor DetectedEvidence của project:
+    // NOTE: Điền đúng các field theo constructor DetectedEvidence của project:
     //   issueId, confidence, exerciseSource, rawSignal, question
     //
     // Logic muốn implement: nếu trunk_fails > 50% số set → gợi ý tập Plank

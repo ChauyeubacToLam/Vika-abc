@@ -4,6 +4,7 @@ import 'package:vika/utils/debouncer.dart';
 import '../../utils/pose_math_helpers.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
+import '../../pose/vika_image_orientation.dart';
 import '../exercise_base.dart';
 import 'metrics/step_back_burpee_metric_base.dart';
 import 'metrics/squat_hinge_metric.dart';
@@ -92,9 +93,9 @@ class StepBackBurpee extends ExerciseBase {
     final report = reportBuilder.buildReport(_setStartTime ?? DateTime.now().millisecondsSinceEpoch, DateTime.now().millisecondsSinceEpoch);
     
     // Đẩy data lên UI (Giả lập console log)
-    print("Spine Safety: ${report.spineSafetyScore}%");
-    print("Plank Extension: ${report.plankExtensionScore}%");
-    print("Pace: ${report.repsPerMinute} reps/min");
+    logger.pushKey("Spine Safety", report.spineSafetyScore);
+    logger.pushKey("Plank Extension", report.plankExtensionScore);
+    logger.pushKey("Pace", report.repsPerMinute);
   }
 
   @override
@@ -125,8 +126,8 @@ class StepBackBurpee extends ExerciseBase {
     double elbowAngle = calculateAngle(firstPoint: shoulder, midPoint: elbow, lastPoint: wrist);
     double shoulderToArmAngle = calculateAngle(firstPoint: hip, midPoint: shoulder, lastPoint: wrist);
     
-    double wristAnkleDistX = (wrist.x - ankle.x).abs() / scaleFactor!; // Chuẩn hóa theo tỷ lệ cơ thể
-    double shoulderWristDistY = (wrist.y - shoulder.y).abs() / scaleFactor!; // Khoảng cách Y giữa vai và tay
+    double wristAnkleDistX = (wrist.x - ankle.x).abs() / scaleFactor; // Chuẩn hóa theo tỷ lệ cơ thể
+    double shoulderWristDistY = (wrist.y - shoulder.y).abs() / scaleFactor; // Khoảng cách Y giữa vai và tay
     double wristY = wrist.y;
     double kneeY = knee.y;
     int now = frameTimestampMs;

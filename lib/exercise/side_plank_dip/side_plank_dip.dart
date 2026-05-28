@@ -4,6 +4,7 @@ import 'package:vika/utils/debouncer.dart';
 import '../../utils/pose_math_helpers.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
+import '../../pose/vika_image_orientation.dart';
 import '../exercise_base.dart';
 import 'metrics/side_plank_dip_metric_base.dart';
 import 'metrics/shoulder_alignment_metric.dart';
@@ -101,9 +102,9 @@ class SidePlankDip extends ExerciseBase {
   @override
   void onSetComplete() {
     final report = reportBuilder.buildReport(_setStartTime ?? DateTime.now().millisecondsSinceEpoch, DateTime.now().millisecondsSinceEpoch);
-    print("Shoulder Safety: ${report.shoulderSafetyScore}%");
-    print("Anti-Rotation: ${report.antiRotationScore}%");
-    print("Dip Depth: ${report.dipDepthScore}%");
+    logger.pushKey("Shoulder Safety", report.shoulderSafetyScore);
+    logger.pushKey("Anti-Rotation", report.antiRotationScore);
+    logger.pushKey("Dip Depth", report.dipDepthScore);
   }
 
   @override
@@ -130,7 +131,7 @@ class SidePlankDip extends ExerciseBase {
 
     // 1. Tính toán Hình học
     double bodyAngle = calculateAngle(firstPoint: supportShoulder, midPoint: supportHip, lastPoint: supportAnkle);
-    double shoulderElbowOffsetX = (supportShoulder.x - supportElbow.x).abs() / (scaleFactor ?? 1.0);
+    double shoulderElbowOffsetX = (supportShoulder.x - supportElbow.x).abs() / scaleFactor;
     
     double shoulderWidthX = (lShoulder.x - rShoulder.x).abs();
     double shoulderWidthY = (lShoulder.y - rShoulder.y).abs();

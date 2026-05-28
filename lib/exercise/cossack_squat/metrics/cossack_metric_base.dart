@@ -1,4 +1,3 @@
-import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../exercise_base.dart';
 import '../cossack_squat.dart';
 import '../../fault_record.dart';

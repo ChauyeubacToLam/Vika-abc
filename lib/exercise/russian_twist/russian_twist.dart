@@ -1,4 +1,5 @@
 import 'package:vika/exercise/exercise_base.dart';
+import '../../pose/vika_image_orientation.dart';
 import 'package:vika/exercise/side_tracked_exercise_mixin.dart';
 
 import '../../utils/frame_buffer.dart';
@@ -186,29 +187,29 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
   }
 
   void _updateStateMachine(double wristHipDx, double kneeHipDx, int now) {
-    final wristChange = frameBuffer.getAngleChange("wristHipDx");
+    final wristChange = frameBuffer.getChange("wristHipDx", 3);
 
     if (russianState == RussianTwistState.center_setup) {
       // If moving forward (towards knees) or backward (towards hips)
-      if (wristChange == AngleChangeState.increasing) {
+      if (wristChange == ChangeState.increasing) {
         currentDirection = TwistDirection.forward;
         _transitionState(RussianTwistState.twisting, now);
-      } else if (wristChange == AngleChangeState.decreasing) {
+      } else if (wristChange == ChangeState.decreasing) {
         currentDirection = TwistDirection.backward;
         _transitionState(RussianTwistState.twisting, now);
       }
     } else if (russianState == RussianTwistState.twisting) {
       // Reached max point when velocity stops
-      if (currentDirection == TwistDirection.forward && wristChange != AngleChangeState.increasing) {
+      if (currentDirection == TwistDirection.forward && wristChange != ChangeState.increasing) {
          _transitionState(RussianTwistState.max_point, now);
-      } else if (currentDirection == TwistDirection.backward && wristChange != AngleChangeState.decreasing) {
+      } else if (currentDirection == TwistDirection.backward && wristChange != ChangeState.decreasing) {
          _transitionState(RussianTwistState.max_point, now);
       }
     } else if (russianState == RussianTwistState.max_point) {
       // Started returning
-      if (currentDirection == TwistDirection.forward && wristChange == AngleChangeState.decreasing) {
+      if (currentDirection == TwistDirection.forward && wristChange == ChangeState.decreasing) {
         _transitionState(RussianTwistState.returning, now);
-      } else if (currentDirection == TwistDirection.backward && wristChange == AngleChangeState.increasing) {
+      } else if (currentDirection == TwistDirection.backward && wristChange == ChangeState.increasing) {
         _transitionState(RussianTwistState.returning, now);
       }
     } else if (russianState == RussianTwistState.returning) {
@@ -222,7 +223,7 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
 
       bool inCenterZone = wristHipDx > centerMin && wristHipDx < centerMax;
       
-      if (inCenterZone || (currentDirection == TwistDirection.forward && wristChange == AngleChangeState.increasing) || (currentDirection == TwistDirection.backward && wristChange == AngleChangeState.decreasing)) {
+      if (inCenterZone || (currentDirection == TwistDirection.forward && wristChange == ChangeState.increasing) || (currentDirection == TwistDirection.backward && wristChange == ChangeState.decreasing)) {
         _transitionState(RussianTwistState.center_setup, now);
         _completeHalfRep();
       }

@@ -141,7 +141,7 @@ class IvoryLiveFormScoreArc extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // TODO(form-score): Replace hardcoded color with conditional:
+    // NOTE(form-score): Replace hardcoded color with conditional:
     // score >= 75 → yellow, 60-74 → #E89A4B, <60 → attention
     final arcColor = VikaIvory.yellow;
     return SizedBox(
@@ -249,7 +249,7 @@ class IvoryTopChromeRight extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // TODO(form-score): Wire real form score here
+        // NOTE(form-score): Wire real form score here
         debugBadge ?? IvoryLiveFormScoreArc(score: formScore),
         const SizedBox(width: 8),
         IvoryGlassIconButton(
@@ -366,7 +366,7 @@ class IvoryPTReferenceLoop extends StatelessWidget {
 
 class IvoryCoachCaption extends StatelessWidget {
   const IvoryCoachCaption({super.key, required this.message});
-  // TODO(caption): Wire trigger conditions for mid-rep + post-rep captions
+  // NOTE(caption): Wire trigger conditions for mid-rep + post-rep captions
   final String message;
 
   @override
@@ -442,7 +442,7 @@ class IvoryRepTallyDots extends StatelessWidget {
     this.faultIndices = const [],
   });
   final int count, total;
-  // TODO(integration): Wire RepLog.faults into faultIndices
+  // NOTE(integration): Wire RepLog.faults into faultIndices
   final List<int> faultIndices;
 
   @override

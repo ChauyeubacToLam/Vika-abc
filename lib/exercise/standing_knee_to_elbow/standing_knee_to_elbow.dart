@@ -1,6 +1,6 @@
 import 'package:vika/exercise/exercise_base.dart';
+import '../../pose/vika_image_orientation.dart';
 import '../../utils/pose_math_helpers.dart';
-import '../../utils/frame_buffer.dart';
 import 'package:vika/utils/exercise_logger.dart';
 import 'package:vika/exercise/side_tracked_exercise_mixin.dart';
 

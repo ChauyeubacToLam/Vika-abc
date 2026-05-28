@@ -2,6 +2,7 @@
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/frame_snapshot.dart';
+import '../../pose/vika_image_orientation.dart';
 import '../exercise_base.dart';
 import 'metrics/reverse_crunch_metric_base.dart';
 import 'metrics/swinging_momentum_metric.dart';
@@ -72,7 +73,7 @@ class ReverseCrunch extends ExerciseBase {
     
     double kneeAngle = calculateAngleNormalized(firstPoint: lm['hip']!, midPoint: lm['knee']!, lastPoint: lm['ankle']!);
     // Đánh giá góc người so với mặt sàn. (Mặt sàn ~ phương ngang)
-    double trunkHorizontalAngle = calculateAngleToHorizontal(lm['shoulder']!, lm['hip']!);
+    double trunkHorizontalAngle = calculateHorizontalAngle(point1: lm['shoulder']!, point2: lm['hip']!);
     
     debugData['Setup_Diagnostic'] = {
       'kneeAngle': kneeAngle.toStringAsFixed(1),

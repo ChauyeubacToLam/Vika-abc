@@ -79,7 +79,6 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
   String _lastPushUpEvent = 'init';
   String _lastNoCountReason = 'none';
   String _lastRejectType = 'none';
-  String _lastRejectReason = 'none';
   File? _debugTraceFile;
   bool _debugTraceHeaderWritten = false;
   int _debugTraceLastWriteMs = 0;
@@ -322,10 +321,6 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
       }
     }
 
-    for (final metric in _metrics) {
-      // debugData.addAll(metric.debugData);
-    }
-
     _updatePhaseInstructions();
   }
 
@@ -383,10 +378,6 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
         final ascent = tempoMetric.ascentDuration!.toStringAsFixed(1);
         resultIssues.feedback['Tempo'] = '↓${descent}s ↑${ascent}s';
       }
-    }
-
-    for (final metric in _metrics) {
-      // debugData.addAll(metric.debugData);
     }
 
     final minElbow =
@@ -493,7 +484,6 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
       _repRejectType = null;
       _kneeMovedThisRep = false;
       _lastRejectType = 'none';
-      _lastRejectReason = 'none';
       _resetGuardDebouncers();
       resultIssues.instructions.clear();
     } else if (newState == PushUpState.bottom) {
@@ -592,7 +582,6 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
       _repRejectReason ??= status.reason;
       _repRejectType ??= status.type;
       _lastRejectType = status.type;
-      _lastRejectReason = status.reason ?? 'Giữ đúng tư thế';
       _lastPushUpEvent = 'reject ${status.type}';
       debugData['event'] = _lastPushUpEvent;
       debugData['reject'] = _repRejectType ?? _lastRejectType;

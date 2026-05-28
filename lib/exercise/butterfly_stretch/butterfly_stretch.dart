@@ -1,6 +1,7 @@
 import 'package:vika/utils/debouncer.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/frame_snapshot.dart';
+import '../../pose/vika_image_orientation.dart';
 import '../exercise_base.dart';
 import 'metrics/butterfly_metric_base.dart';
 import 'metrics/knee_separation_metric.dart';
@@ -72,7 +73,9 @@ class ButterflyStretch extends ExerciseBase {
     final rShoulder = landmarks[PoseLandmarkType.rightShoulder];
 
     if (lKnee == null || rKnee == null || lAnkle == null || rAnkle == null ||
-        lShoulder == null || rShoulder == null) return false;
+        lShoulder == null || rShoulder == null) {
+      return false;
+    }
 
     double shoulderDist = (lShoulder.x - rShoulder.x).abs();
     if (shoulderDist < 10) return false;
@@ -118,7 +121,9 @@ class ButterflyStretch extends ExerciseBase {
     final lHip = smoothedLandmarks[PoseLandmarkType.leftHip];
 
     if (lKnee == null || rKnee == null || lAnkle == null || rAnkle == null ||
-        lShoulder == null || rShoulder == null || lHip == null) return;
+        lShoulder == null || rShoulder == null || lHip == null) {
+      return;
+    }
 
     double kneeSep = (lKnee.x - rKnee.x).abs();
     double ankleSep = (lAnkle.x - rAnkle.x).abs();

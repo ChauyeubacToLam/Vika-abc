@@ -1,5 +1,6 @@
 import 'package:vika/exercise/exercise_base.dart';
 import 'package:vika/utils/exercise_logger.dart';
+import '../../pose/vika_image_orientation.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/frame_buffer.dart';
 import '../../utils/frame_snapshot.dart';
@@ -308,15 +309,15 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
 
   void _updateStateMachine(WalkingRepContext ctx) {
     int now = ctx.frameTimestamp;
-    final hipYChange = frameBuffer.getAngleChange("hipY");
-    final stepXChange = frameBuffer.getAngleChange("stepLengthX");
+    final hipYChange = frameBuffer.getChange("hipY", 3);
+    final stepXChange = frameBuffer.getChange("stepLengthX", 3);
 
     if (walkingState == WalkingState.standing) {
       if (ctx.stepLengthX > 80 || ctx.frontKneeAngle < 160) {
         _transitionState(WalkingState.stepping, now);
       }
     } else if (walkingState == WalkingState.stepping) {
-      if (hipYChange == AngleChangeState.increasing) {
+      if (hipYChange == ChangeState.increasing) {
         _transitionState(WalkingState.descending, now);
       } else if (ctx.stepLengthX < 50 && ctx.frontKneeAngle > 160 && ctx.rearKneeAngle > 160) {
         // False start, returned to standing
@@ -324,7 +325,7 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
       }
     } else if (walkingState == WalkingState.descending) {
       // Bottom when hip stops moving down or knee hits 100
-      if (ctx.frontKneeAngle <= 100 || hipYChange == AngleChangeState.decreasing) {
+      if (ctx.frontKneeAngle <= 100 || hipYChange == ChangeState.decreasing) {
         if (ctx.frontKneeAngle > 135) {
           // Knee didn't bend enough. This is just normal walking, not a lunge attempt.
           _transitionState(WalkingState.stepping, now);
@@ -339,7 +340,7 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
       _bottomStartTime ??= now;
       
       // Pulling through when hip moves up
-      if (hipYChange == AngleChangeState.decreasing || ctx.frontKneeAngle > 120) {
+      if (hipYChange == ChangeState.decreasing || ctx.frontKneeAngle > 120) {
         _transitionState(WalkingState.pulling_through, now);
       }
     } else if (walkingState == WalkingState.pulling_through) {
@@ -351,7 +352,7 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
          // Continuous walking: stepped out for next rep
          _completeRep();
          _transitionState(WalkingState.stepping, now);
-      } else if (hipYChange == AngleChangeState.increasing && ctx.stepLengthX > 80 && stepXChange == AngleChangeState.increasing) {
+      } else if (hipYChange == ChangeState.increasing && ctx.stepLengthX > 80 && stepXChange == ChangeState.increasing) {
          // Continuous walking: immediately started descending
          _completeRep();
          _transitionState(WalkingState.descending, now);

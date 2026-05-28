@@ -3,8 +3,8 @@ import 'package:vika/utils/exercise_logger.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/frame_buffer.dart';
 import '../../utils/frame_snapshot.dart';
+import '../../pose/vika_image_orientation.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
-import '../fault_record.dart';
 import 'metrics/cossack_metric_base.dart';
 import 'metrics/knee_valgus_metric.dart';
 import 'metrics/heel_lift_metric.dart';
@@ -51,9 +51,6 @@ class CossackSquat extends ExerciseBase {
     torsoMetric,
   ];
 
-  // Variables to track hip center for movement detection
-  double _standingHipCenterX = 0.0;
-  
   @override
   String get exerciseName => 'Cossack Squat';
 
@@ -191,10 +188,9 @@ class CossackSquat extends ExerciseBase {
     }, timeStamp: now));
 
     if (cossackState == CossackState.standing) {
-      _standingHipCenterX = hipCenterX;
       // Detect working leg if we start descending
-      final angleChange = frameBuffer.getAngleChange("hipY"); // If hipY increases, user is going down
-      if (angleChange == AngleChangeState.increasing) {
+      final angleChange = frameBuffer.getChange("hipY", 3); // If hipY increases, user is going down
+      if (angleChange == ChangeState.increasing) {
         // Hip is moving down. Which way is it moving horizontally?
         // Note: X coordinates are mirrored if front camera.
         // Actually, let's just use knee angles to determine working leg.
@@ -285,16 +281,16 @@ class CossackSquat extends ExerciseBase {
 
   void _updateStateMachine(double leftKneeAngle, double rightKneeAngle, double hipY, int now) {
     double workingKneeAngle = currentWorkingLeg == WorkingLeg.left ? leftKneeAngle : rightKneeAngle;
-    final hipYChange = frameBuffer.getAngleChange("hipY");
+    final hipYChange = frameBuffer.getChange("hipY", 3);
 
     if (cossackState == CossackState.descending) {
       // Reached bottom if hip stops moving down or knee is very bent
-      if (workingKneeAngle < CossackConfig.BOTTOM_KNEE_ANGLE_THRESHOLD || hipYChange == AngleChangeState.decreasing) {
+      if (workingKneeAngle < CossackConfig.BOTTOM_KNEE_ANGLE_THRESHOLD || hipYChange == ChangeState.decreasing) {
         _transitionState(CossackState.bottom, now);
       }
     } else if (cossackState == CossackState.bottom) {
       // Ascending if hip starts moving up
-      if (hipYChange == AngleChangeState.decreasing || workingKneeAngle > CossackConfig.BOTTOM_KNEE_ANGLE_THRESHOLD + 10) {
+      if (hipYChange == ChangeState.increasing || workingKneeAngle > CossackConfig.BOTTOM_KNEE_ANGLE_THRESHOLD + 10) {
         _transitionState(CossackState.ascending, now);
       }
     } else if (cossackState == CossackState.ascending) {
