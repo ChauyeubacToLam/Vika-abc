@@ -1,0 +1,234 @@
+// ignore_for_file: curly_braces_in_flow_control_structures
+import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import '../../utils/pose_math_helpers.dart';
+import '../../utils/frame_snapshot.dart';
+import '../exercise_base.dart';
+import 'metrics/reverse_crunch_metric_base.dart';
+import 'metrics/swinging_momentum_metric.dart';
+import 'metrics/pelvic_curl_metric.dart';
+import 'metrics/eccentric_tempo_metric.dart';
+import '../../utils/exercise_logger.dart';
+import '../../utils/debouncer.dart';
+
+class ReverseCrunch extends ExerciseBase {
+  @override
+  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+        VikaImageOrientation.landscapeLeft,
+        VikaImageOrientation.landscapeRight,
+      };
+
+  @override
+  String get exerciseName => 'Reverse Crunch';
+
+  ReverseCrunchState crunchState = ReverseCrunchState.lying;
+  ReverseCrunchState previousState = ReverseCrunchState.lying;
+  int? _exerciseStartTimeMs;
+  bool _isTimeout = false;
+  double? _baselineTrunkKneeAngle;
+  double? _minTrunkKneeAngleThisRep;
+
+  final Debouncer _curlingDebouncer = Debouncer(requiredFrames: 2);
+  final Debouncer _topDebouncer = Debouncer(requiredFrames: 2);
+  final Debouncer _loweringDebouncer = Debouncer(requiredFrames: 2);
+  final Debouncer _lyingDebouncer = Debouncer(requiredFrames: 2);
+
+  final SwingingMomentumMetric momentumMetric = SwingingMomentumMetric();
+  final PelvicCurlMetric curlMetric = PelvicCurlMetric();
+  final EccentricTempoMetric tempoMetric = EccentricTempoMetric();
+  
+  late final List<ReverseCrunchMetricBase> _metrics = [
+    momentumMetric, curlMetric, tempoMetric
+  ];
+
+  // =========================================================================
+  // FIX: THÊM CÁC OVERRIDE BẮT BUỘC TỪ ExerciseBase
+  // =========================================================================
+  @override
+  String get currentPhaseKey => crunchState.name;
+
+  @override
+  String get currentPhaseLabel {
+    switch (crunchState) {
+      case ReverseCrunchState.lying: return 'Nằm chuẩn bị';
+      case ReverseCrunchState.curling: return 'Cuộn lên';
+      case ReverseCrunchState.top: return 'Đỉnh';
+      case ReverseCrunchState.lowering: return 'Hạ xuống';
+    }
+  }
+
+  @override
+  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+    if (cameraFacing == CameraFacing.front) {
+      return "Vui lòng đặt camera quay ngang (Side View).";
+    }
+    return null;
+  }
+  // =========================================================================
+
+  @override
+  bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+    final lm = _getLandmarks(landmarks);
+    if (lm == null) return false;
+    
+    double kneeAngle = calculateAngleNormalized(firstPoint: lm['hip']!, midPoint: lm['knee']!, lastPoint: lm['ankle']!);
+    // Đánh giá góc người so với mặt sàn. (Mặt sàn ~ phương ngang)
+    double trunkHorizontalAngle = calculateAngleToHorizontal(lm['shoulder']!, lm['hip']!);
+    
+    debugData['Setup_Diagnostic'] = {
+      'kneeAngle': kneeAngle.toStringAsFixed(1),
+      'trunkHorizontal': trunkHorizontalAngle.toStringAsFixed(1),
+      'isKneeLocked': kneeAngle >= ReverseCrunchConfig.SETUP_KNEE_ANGLE_RANGE[0] && kneeAngle <= ReverseCrunchConfig.SETUP_KNEE_ANGLE_RANGE[1],
+      'isLyingFlat': trunkHorizontalAngle < 35.0,
+    };
+
+    if (kneeAngle < ReverseCrunchConfig.SETUP_KNEE_ANGLE_RANGE[0] || kneeAngle > ReverseCrunchConfig.SETUP_KNEE_ANGLE_RANGE[1]) return false;
+    if (trunkHorizontalAngle > 35.0) return false;
+    return true;
+  }
+
+  @override
+  bool requestStop() {
+    if (_exerciseStartTimeMs != null && (frameTimestampMs - _exerciseStartTimeMs!) > ReverseCrunchConfig.MAX_DURATION_MS) {
+      _isTimeout = true;
+      return true;
+    }
+    return repCount >= ReverseCrunchConfig.MAX_REP;
+  }
+
+  @override
+  void checkingPose(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+    _exerciseStartTimeMs ??= frameTimestampMs;
+    final now = frameTimestampMs;
+    final lm = _getLandmarks(landmarks);
+    if (lm == null) return;
+    
+    scaleFactor = calculateDistance(lm['shoulder']!, lm['hip']!);
+    if (scaleFactor == 0) scaleFactor = 1;
+
+    double trunkKneeAngle = calculateAngleNormalized(firstPoint: lm['shoulder']!, midPoint: lm['hip']!, lastPoint: lm['knee']!);
+    double kneeAngle = calculateAngleNormalized(firstPoint: lm['hip']!, midPoint: lm['knee']!, lastPoint: lm['ankle']!);
+
+    if (crunchState == ReverseCrunchState.lying) {
+      _baselineTrunkKneeAngle = trunkKneeAngle;
+    }
+
+    // Dùng FrameBuffer để tính vận tốc cuộn (TrunkKneeAngle)
+    frameBuffer.addFrame(FrameSnapshot(log: {"trunkKneeAngle": trunkKneeAngle}, timeStamp: now));
+    double trunkKneeVelocity = _calculateVelocityFromBuffer("trunkKneeAngle");
+
+    debugData['Diagnostic_Table'] = {
+      'State': crunchState.name,
+      'Time_s': ((now - _exerciseStartTimeMs!) / 1000).toStringAsFixed(1),
+      'TrunkKneeAngle': trunkKneeAngle.toStringAsFixed(1),
+      'KneeAngle': kneeAngle.toStringAsFixed(1),
+      'TrunkKneeVel': trunkKneeVelocity.toStringAsFixed(2),
+      'Hip_Y': lm['hip']!.y.toStringAsFixed(1),
+    };
+
+    final ctx = RepContext(
+      state: crunchState, frameTimestamp: now, scaleFactor: scaleFactor,
+      trunkKneeAngle: trunkKneeAngle, kneeAngle: kneeAngle,
+      hipY: lm['hip']!.y, trunkKneeVelocity: trunkKneeVelocity,
+      resultIssues: resultIssues,
+    );
+
+    _updateStateMachine(ctx);
+    for (final metric in _metrics) {
+      metric.update(ctx);
+      debugData.addAll(metric.debugData);
+    }
+  }
+
+  void _updateStateMachine(RepContext ctx) {
+    if (_baselineTrunkKneeAngle == null) return;
+
+    if (crunchState == ReverseCrunchState.curling || crunchState == ReverseCrunchState.top) {
+      if (_minTrunkKneeAngleThisRep == null || ctx.trunkKneeAngle < _minTrunkKneeAngleThisRep!) {
+        _minTrunkKneeAngleThisRep = ctx.trunkKneeAngle;
+      }
+    }
+
+    if (_curlingDebouncer.update(crunchState == ReverseCrunchState.lying && 
+        ctx.trunkKneeAngle < _baselineTrunkKneeAngle! - ReverseCrunchConfig.LIFT_START_ANGLE_DROP)) {
+      _transitionState(ReverseCrunchState.curling, ctx.frameTimestamp);
+      _minTrunkKneeAngleThisRep = ctx.trunkKneeAngle;
+    } 
+    else if (_topDebouncer.update(crunchState == ReverseCrunchState.curling && 
+             ctx.trunkKneeAngle <= _baselineTrunkKneeAngle! - ReverseCrunchConfig.PELVIC_CURL_ANGLE_MIN_DROP)) {
+      _transitionState(ReverseCrunchState.top, ctx.frameTimestamp);
+    }
+    else if (_loweringDebouncer.update((crunchState == ReverseCrunchState.top || crunchState == ReverseCrunchState.curling) && 
+             _minTrunkKneeAngleThisRep != null && ctx.trunkKneeAngle > _minTrunkKneeAngleThisRep! + 5.0)) {
+      _transitionState(ReverseCrunchState.lowering, ctx.frameTimestamp);
+    }
+    else if (_lyingDebouncer.update(crunchState == ReverseCrunchState.lowering && 
+             ctx.trunkKneeAngle >= _baselineTrunkKneeAngle! - 5.0)) {
+      _completeRep(ctx);
+      _minTrunkKneeAngleThisRep = null;
+    }
+  }
+
+  void _transitionState(ReverseCrunchState newState, int timestampMs) {
+    if (newState == crunchState) return;
+    previousState = crunchState;
+    crunchState = newState;
+    for (final metric in _metrics) metric.onStateTransition(previousState, newState, timestampMs);
+  }
+
+  void _completeRep(RepContext ctx) {
+    repCount++;
+    for (final metric in _metrics) metric.evaluateRepEnd(ctx);
+    
+    final allFaults = <FaultRecord>[];
+    for (final metric in _metrics) allFaults.addAll(metric.faults);
+    
+    correctForm = !allFaults.any((f) => f.affectsForm);
+    
+    logger.addRepLog(RepLog(
+      correctForm: correctForm,
+      repNumber: repCount,
+      data: {
+        "fault_types": allFaults.map((e) => e.type).toSet().toList()
+      },
+    ));
+
+    _transitionState(ReverseCrunchState.lying, ctx.frameTimestamp);
+    for (final metric in _metrics) metric.resetAndCountFault();
+  }
+
+  double _calculateVelocityFromBuffer(String key) {
+    if (frameBuffer.frameBuffer.length < 3) return 0;
+    var last = frameBuffer.frameBuffer.last;
+    var first = frameBuffer.frameBuffer.first;
+    double dAngle = (last.log[key] as num).toDouble() - (first.log[key] as num).toDouble();
+    double dt = (last.timeStamp - first.timeStamp) / 1000.0;
+    return dt == 0 ? 0 : dAngle / dt; // degrees per second
+  }
+
+  Map<String, PoseLandmark>? _getLandmarks(Map<PoseLandmarkType, PoseLandmark> lm) {
+    final shoulder = lm[PoseLandmarkType.leftShoulder];
+    final hip = lm[PoseLandmarkType.leftHip];
+    final knee = lm[PoseLandmarkType.leftKnee];
+    final ankle = lm[PoseLandmarkType.leftAnkle];
+
+    if (shoulder == null || hip == null || knee == null || ankle == null) {
+      return null;
+    }
+
+    return {
+      'shoulder': shoulder,
+      'hip': hip,
+      'knee': knee,
+      'ankle': ankle,
+    };
+  }
+
+  @override
+  void onSetComplete() {
+    logger.pushKey("timeout", _isTimeout);
+    logger.pushKey("momentum_fails", momentumMetric.faultsCount);
+    logger.pushKey("curl_fails", curlMetric.faultsCount);
+    logger.pushKey("tempo_fails", tempoMetric.faultsCount);
+    logger.pushGoodRepCount();
+  }
+}

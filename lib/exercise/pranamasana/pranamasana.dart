@@ -1,0 +1,161 @@
+import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import '../../utils/pose_math_helpers.dart';
+import '../exercise_base.dart';
+
+enum PranamasanaState { setup, holding }
+
+class Pranamasana extends ExerciseBase {
+  PranamasanaState state = PranamasanaState.setup;
+
+  double _holdStartTimeMs = 0.0;
+  double _currentHoldTime = 0.0;
+  static const double targetHoldTime = 15.0; // 15 seconds
+
+  @override
+  String get exerciseName => 'Pranamasana';
+
+  @override
+  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+        VikaImageOrientation.portrait,
+      };
+
+  @override
+  bool requestStop() {
+    return _currentHoldTime >= targetHoldTime;
+  }
+
+  @override
+  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+    if (cameraFacing != CameraFacing.left && cameraFacing != CameraFacing.right) {
+      return "Vui lòng xoay người hoàn toàn sang ngang để máy quét được tư thế.";
+    }
+
+    // Require upper body to knees
+    final req = [
+      PoseLandmarkType.leftShoulder,
+      PoseLandmarkType.rightShoulder,
+      PoseLandmarkType.leftHip,
+      PoseLandmarkType.rightHip,
+      PoseLandmarkType.leftKnee,
+      PoseLandmarkType.rightKnee,
+    ];
+
+    for (final type in req) {
+      if (landmarks[type] == null || !ExerciseBase.isLandmarkConfident(landmarks[type]!)) {
+        return "Cơ thể chưa nằm trọn trong khung hình hoặc ánh sáng yếu.";
+      }
+    }
+    return null;
+  }
+
+  @override
+  bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+    return true; // Simple trigger, we rely on checkingPose for the actual start
+  }
+
+  @override
+  void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
+    resultIssues.instructions.clear();
+    bool isVerified = _verifyPose(smoothedLandmarks);
+
+    if (isVerified) {
+      if (state == PranamasanaState.setup) {
+        state = PranamasanaState.holding;
+        _holdStartTimeMs = frameTimestampMs.toDouble();
+        resultIssues.addInstruction(currentPhaseKey, 'Status', "Form chuẩn. Giữ tĩnh...");
+      } else if (state == PranamasanaState.holding) {
+        _currentHoldTime = (frameTimestampMs - _holdStartTimeMs) / 1000.0;
+        resultIssues.addInstruction(currentPhaseKey, 'Status', "Giữ tĩnh: ${_currentHoldTime.toStringAsFixed(1)}s / ${targetHoldTime}s");
+
+        if (_currentHoldTime >= targetHoldTime) {
+          // Rep completed
+          repCount += 1;
+          _currentHoldTime = 0; // reset for next rep or stop
+          state = PranamasanaState.setup;
+        }
+      }
+    } else {
+      // If broken, reset timer
+      state = PranamasanaState.setup;
+      _currentHoldTime = 0;
+      resultIssues.addInstruction(currentPhaseKey, 'Pose', "Chưa đúng tư thế. Hãy đứng thẳng và chắp tay trước ngực.");
+    }
+    
+    debugData['currentHoldTime'] = _currentHoldTime;
+    debugData['holdProgress'] = (_currentHoldTime / targetHoldTime).clamp(0.0, 1.0);
+  }
+
+  bool _verifyPose(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+    final ls = landmarks[PoseLandmarkType.leftShoulder];
+    final rs = landmarks[PoseLandmarkType.rightShoulder];
+    final lh = landmarks[PoseLandmarkType.leftHip];
+    final rh = landmarks[PoseLandmarkType.rightHip];
+    final la = landmarks[PoseLandmarkType.leftAnkle] ?? landmarks[PoseLandmarkType.leftKnee];
+    final ra = landmarks[PoseLandmarkType.rightAnkle] ?? landmarks[PoseLandmarkType.rightKnee];
+    
+    final lw = landmarks[PoseLandmarkType.leftWrist];
+    final rw = landmarks[PoseLandmarkType.rightWrist];
+
+    if (ls == null || rs == null || lh == null || rh == null || la == null || ra == null) {
+      return false;
+    }
+
+    // Validation 1: Body Axis 170-180
+    final isLeft = cameraFacing == CameraFacing.left;
+    final shoulder = isLeft ? ls : rs;
+    final hip = isLeft ? lh : rh;
+    final ankle = isLeft ? la : ra;
+
+    final bodyAngle = calculateAngleNormalized(firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
+    if (bodyAngle < 165 || bodyAngle > 180) { // Slight tolerance for 165
+      return false;
+    }
+
+    final wrist = isLeft ? lw : rw;
+    if (wrist == null) return false;
+    
+    final wristConf = ExerciseBase.isLandmarkConfident(wrist);
+    if (!wristConf) return false;
+
+    // Use shoulder-to-hip distance for scaling threshold
+    final bodyHeight = calculateDistance(shoulder, hip);
+    final wristThreshold = bodyHeight * 0.4; // Valid range in front of chest
+
+    bool isFacingRight = cameraFacing == CameraFacing.right;
+    bool handsValid = false;
+
+    // Check if hands are folded in front of chest (wrist in front of shoulder on X-axis)
+    bool inFront = isFacingRight ? wrist.x > shoulder.x : wrist.x < shoulder.x;
+    
+    if (inFront && wrist.y > shoulder.y && wrist.y < hip.y) {
+       final distX = (wrist.x - shoulder.x).abs();
+       if (distX < wristThreshold) {
+         handsValid = true;
+       }
+    }
+
+    if (!handsValid) return false;
+
+    // Validation 2: Static state (v approx 0)
+    // Implicitly handled by the 5s hold timer resetting if pose is broken.
+    // We could add frameBuffer tracking, but keeping the pose validates it.
+
+    return true;
+  }
+
+  @override
+  String get currentPhaseKey => state.name;
+
+  @override
+  String get currentPhaseLabel {
+    switch (state) {
+      case PranamasanaState.setup: return 'Chuẩn bị';
+      case PranamasanaState.holding: return 'Giữ tĩnh';
+    }
+  }
+
+  @override
+  void onSetComplete() {
+    // End of exercise
+  }
+}

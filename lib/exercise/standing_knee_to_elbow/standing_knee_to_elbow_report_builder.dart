@@ -1,0 +1,71 @@
+import 'package:vika/models/post_exercise_data.dart';
+import 'package:vika/interpreter/interpreter_base.dart';
+import 'package:vika/utils/exercise_logger.dart';
+
+class StandingKneeToElbowReportBuilder extends ExerciseReportBuilder {
+  @override
+  Map<String, String> praiseMetricNames() => {
+        'knee_valgus_fails': 'Ổn định gối trụ',
+        'core_drive_fails': 'Nâng đùi',
+        'cross_rom_fails': 'Chạm chéo',
+      };
+
+  @override
+  Map<String, String> faultToTipMap() => {
+        'knee_valgus_fails': 'Gồng chặt chân trụ, mở gối ra ngoài',
+        'core_drive_fails': 'Nhấc cao đùi lên bằng cơ bụng, đừng rụt cổ',
+        'cross_rom_fails': 'Vặn người mạnh hơn, cho tay chạm gối',
+      };
+
+  @override
+  DetectedEvidence? detectIssue(List<ExerciseLogger> setLoggers) {
+    return null;
+  }
+
+  @override
+  List<DetailCard> buildDetailCards(List<ExerciseLogger> setLoggers) {
+    final allReps = setLoggers.expand((l) => l.repLogs).toList();
+    final totalReps = allReps.length;
+    if (totalReps == 0) return [];
+
+    int kneeValgusFails = 0;
+    int coreDriveFails = 0;
+    int crossRomFails = 0;
+    for (final logger in setLoggers) {
+      kneeValgusFails += (logger.setLogs['knee_valgus_fails'] as num?)?.toInt() ?? 0;
+      coreDriveFails += (logger.setLogs['core_drive_fails'] as num?)?.toInt() ?? 0;
+      crossRomFails += (logger.setLogs['cross_rom_fails'] as num?)?.toInt() ?? 0;
+    }
+
+    final kneeSafetyScore = ((totalReps - kneeValgusFails) / totalReps * 100).roundToDouble();
+    final coreDriveScore = ((totalReps - coreDriveFails) / totalReps * 100).roundToDouble();
+    final crossRomScore = ((totalReps - crossRomFails) / totalReps * 100).roundToDouble();
+
+    return [
+      DetailCard(
+        label: 'Ổn định Khớp Gối',
+        value: '${kneeSafetyScore.round()}%',
+        subLabel: 'Không sụp gối',
+        useRadial: true,
+        radialValue: kneeSafetyScore,
+        color: kneeSafetyScore >= 80 ? 'jade' : 'amber',
+      ),
+      DetailCard(
+        label: 'Độ gập cốt lõi',
+        value: '${coreDriveScore.round()}%',
+        subLabel: 'Nâng cao đùi',
+        useRadial: true,
+        radialValue: coreDriveScore,
+        color: coreDriveScore >= 80 ? 'jade' : 'amber',
+      ),
+      DetailCard(
+        label: 'Biên độ chạm chéo',
+        value: '${crossRomScore.round()}%',
+        subLabel: 'Tay chạm gối',
+        useRadial: true,
+        radialValue: crossRomScore,
+        color: crossRomScore >= 80 ? 'jade' : 'amber',
+      ),
+    ];
+  }
+}
