@@ -130,7 +130,8 @@ class JumpSquat extends ExerciseBase {
 
     // 1. Tính toán Geometry
     double kneeAngle = calculateAngle(firstPoint: hip, midPoint: knee, lastPoint: ankle);
-    double trunkVerticalAngle = calculateVerticalAngle(pivot: hip, point: shoulder);
+    double backAngle = calculateVerticalAngle(pivot: hip, point: shoulder);
+    double trunkVerticalAngle = convertClockAngleToTrunkLean(backAngle, cameraFacing).abs();
     double footY = footIndex.y;
     double hipY = hip.y;
     int now = frameTimestampMs;

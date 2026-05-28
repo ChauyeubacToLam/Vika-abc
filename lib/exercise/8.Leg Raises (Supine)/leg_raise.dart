@@ -239,6 +239,11 @@ class LegRaise extends ExerciseBase {
       return;
     }
 
+    if (state != LegRaiseState.lying && ctx.kneeStraightnessAngle < 160.0) {
+      ctx.resultIssues.feedback['Error'] = 'Gập gối';
+      ctx.resultIssues.addInstruction('BLOCK', 'Error', 'Hãy duỗi thẳng chân ra!');
+    }
+
     if (_raisingDebouncer.update(state == LegRaiseState.lying && hipFlexion < LegRaiseConfig.RAISING_ANGLE)) {
       _transitionState(LegRaiseState.raising, now);
     } 
@@ -262,7 +267,6 @@ class LegRaise extends ExerciseBase {
   }
 
   void _completeRep(LegRaiseRepContext ctx) {
-    repCount++;
     romMetric.evaluateRep(ctx);
     tempoMetric.evaluateRep(ctx);
 
@@ -271,6 +275,13 @@ class LegRaise extends ExerciseBase {
     correctForm = !allFaults.any((f) => f.affectsForm);
     
     if (!correctForm) resultIssues.feedback['Result'] = 'Fix Form';
+
+    bool hasBentKnee = allFaults.any((f) => f.type == 'BentKnee');
+    if (!hasBentKnee) {
+      repCount++;
+    } else {
+      ctx.resultIssues.feedback['Error'] = 'Không tính rep';
+    }
 
     logger.addRepLog(RepLog(correctForm: correctForm, repNumber: repCount, data: {
        "min_hip_flexion": romMetric.minHipFlexion ?? 180.0,

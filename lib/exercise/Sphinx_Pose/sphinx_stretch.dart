@@ -2,11 +2,11 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/exercise_logger.dart';
 import '../exercise_base.dart';
-import 'Metrics/sphinx_metric_base.dart';
-import 'Metrics/hip_ground_metric.dart';
-import 'Metrics/hold_tempo_metric.dart';
-import 'Metrics/elbow_angle_metric.dart';
-import 'Metrics/neck_shoulder_metric.dart';
+import 'metrics/sphinx_metric_base.dart';
+import 'metrics/hip_ground_metric.dart';
+import 'metrics/hold_tempo_metric.dart';
+import 'metrics/elbow_angle_metric.dart';
+import 'metrics/neck_shoulder_metric.dart';
 
 class SphinxStretch extends ExerciseBase {
   SphinxState state = SphinxState.proneSetup;

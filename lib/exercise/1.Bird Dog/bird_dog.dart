@@ -55,11 +55,13 @@ class BirdDog extends ExerciseBase {
   bool? _peakLeftLeg;
   bool? _peakLeftArm;
   bool? _lastPeakLeftLeg;
+  bool? _lastPeakLeftArm;
 
   BirdDog({this.maxRep = BirdDogConfig.MAX_REP});
 
   @override
-  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+  Set<VikaImageOrientation> get supportedOrientations =>
+      const <VikaImageOrientation>{
         VikaImageOrientation.landscapeLeft,
         VikaImageOrientation.landscapeRight,
       };
@@ -73,16 +75,21 @@ class BirdDog extends ExerciseBase {
   @override
   String get currentPhaseLabel {
     switch (state) {
-      case BirdDogState.neutral: return 'Chuẩn bị';
-      case BirdDogState.extending: return 'Đang duỗi';
-      case BirdDogState.hold_extended: return 'Giữ 5s!';
-      case BirdDogState.returning: return 'Thu về';
+      case BirdDogState.neutral:
+        return 'Chuẩn bị';
+      case BirdDogState.extending:
+        return 'Đang duỗi';
+      case BirdDogState.hold_extended:
+        return 'Giữ 5s!';
+      case BirdDogState.returning:
+        return 'Thu về';
     }
   }
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    if (cameraFacing != CameraFacing.left && cameraFacing != CameraFacing.right) {
+    if (cameraFacing != CameraFacing.left &&
+        cameraFacing != CameraFacing.right) {
       return 'Vui lòng quay ngang người 100% với camera!';
     }
     return null;
@@ -90,25 +97,44 @@ class BirdDog extends ExerciseBase {
 
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    bool checkSide(PoseLandmark? shoulder, PoseLandmark? hip, PoseLandmark? knee, PoseLandmark? ankle, PoseLandmark? wrist) {
-      if (shoulder == null || hip == null || knee == null || ankle == null || wrist == null) return false;
-      
+    bool checkSide(PoseLandmark? shoulder, PoseLandmark? hip,
+        PoseLandmark? knee, PoseLandmark? ankle, PoseLandmark? wrist) {
+      if (shoulder == null ||
+          hip == null ||
+          knee == null ||
+          ankle == null ||
+          wrist == null) return false;
+
       // Ensure the user is facing down (wrist below shoulder, knee below hip)
       if (wrist.y < shoulder.y) return false;
       if (knee.y < hip.y) return false;
 
-      double kneeAngle = calculateAngleNormalized(firstPoint: hip, midPoint: knee, lastPoint: ankle);
-      double armAngle = calculateAngleNormalized(firstPoint: hip, midPoint: shoulder, lastPoint: wrist);
+      double kneeAngle = calculateAngleNormalized(
+          firstPoint: hip, midPoint: knee, lastPoint: ankle);
+      double armAngle = calculateAngleNormalized(
+          firstPoint: hip, midPoint: shoulder, lastPoint: wrist);
       double trunkHoriz = _calcHorizontalAngle(shoulder, hip);
 
-      if (kneeAngle < BirdDogConfig.START_KNEE_MIN || kneeAngle > BirdDogConfig.START_KNEE_MAX) return false;
-      if (armAngle < BirdDogConfig.START_ARM_MIN || armAngle > BirdDogConfig.START_ARM_MAX) return false;
+      if (kneeAngle < BirdDogConfig.START_KNEE_MIN ||
+          kneeAngle > BirdDogConfig.START_KNEE_MAX) return false;
+      if (armAngle < BirdDogConfig.START_ARM_MIN ||
+          armAngle > BirdDogConfig.START_ARM_MAX) return false;
       if (trunkHoriz > BirdDogConfig.START_TRUNK_HORIZ_MAX) return false;
       return true;
     }
 
-    bool isLeftValid = checkSide(landmarks[PoseLandmarkType.leftShoulder], landmarks[PoseLandmarkType.leftHip], landmarks[PoseLandmarkType.leftKnee], landmarks[PoseLandmarkType.leftAnkle], landmarks[PoseLandmarkType.leftWrist]);
-    bool isRightValid = checkSide(landmarks[PoseLandmarkType.rightShoulder], landmarks[PoseLandmarkType.rightHip], landmarks[PoseLandmarkType.rightKnee], landmarks[PoseLandmarkType.rightAnkle], landmarks[PoseLandmarkType.rightWrist]);
+    bool isLeftValid = checkSide(
+        landmarks[PoseLandmarkType.leftShoulder],
+        landmarks[PoseLandmarkType.leftHip],
+        landmarks[PoseLandmarkType.leftKnee],
+        landmarks[PoseLandmarkType.leftAnkle],
+        landmarks[PoseLandmarkType.leftWrist]);
+    bool isRightValid = checkSide(
+        landmarks[PoseLandmarkType.rightShoulder],
+        landmarks[PoseLandmarkType.rightHip],
+        landmarks[PoseLandmarkType.rightKnee],
+        landmarks[PoseLandmarkType.rightAnkle],
+        landmarks[PoseLandmarkType.rightWrist]);
 
     return isLeftValid || isRightValid;
   }
@@ -143,48 +169,72 @@ class BirdDog extends ExerciseBase {
     }
 
     // --- XÁC ĐỊNH CHÂN (Live Data) ---
-    final leftKneeAngle = calculateAngleNormalized(firstPoint: landmarks[PoseLandmarkType.leftHip]!, midPoint: landmarks[PoseLandmarkType.leftKnee]!, lastPoint: landmarks[PoseLandmarkType.leftAnkle]!);
-    final rightKneeAngle = calculateAngleNormalized(firstPoint: landmarks[PoseLandmarkType.rightHip]!, midPoint: landmarks[PoseLandmarkType.rightKnee]!, lastPoint: landmarks[PoseLandmarkType.rightAnkle]!);
+    final leftKneeAngle = calculateAngleNormalized(
+        firstPoint: landmarks[PoseLandmarkType.leftHip]!,
+        midPoint: landmarks[PoseLandmarkType.leftKnee]!,
+        lastPoint: landmarks[PoseLandmarkType.leftAnkle]!);
+    final rightKneeAngle = calculateAngleNormalized(
+        firstPoint: landmarks[PoseLandmarkType.rightHip]!,
+        midPoint: landmarks[PoseLandmarkType.rightKnee]!,
+        lastPoint: landmarks[PoseLandmarkType.rightAnkle]!);
 
     // --- XÁC ĐỊNH TAY (Live Data) ---
-    final leftArmAngle = calculateAngleNormalized(firstPoint: landmarks[PoseLandmarkType.leftHip]!, midPoint: landmarks[PoseLandmarkType.leftShoulder]!, lastPoint: landmarks[PoseLandmarkType.leftWrist]!);
-    final rightArmAngle = calculateAngleNormalized(firstPoint: landmarks[PoseLandmarkType.rightHip]!, midPoint: landmarks[PoseLandmarkType.rightShoulder]!, lastPoint: landmarks[PoseLandmarkType.rightWrist]!);
+    final leftArmAngle = calculateAngleNormalized(
+        firstPoint: landmarks[PoseLandmarkType.leftHip]!,
+        midPoint: landmarks[PoseLandmarkType.leftShoulder]!,
+        lastPoint: landmarks[PoseLandmarkType.leftWrist]!);
+    final rightArmAngle = calculateAngleNormalized(
+        firstPoint: landmarks[PoseLandmarkType.rightHip]!,
+        midPoint: landmarks[PoseLandmarkType.rightShoulder]!,
+        lastPoint: landmarks[PoseLandmarkType.rightWrist]!);
 
     // ML Kit Label có thể bị sai. Tạm thời xác định "cái nào đang giơ lên" dựa vào nhãn hiện tại
     bool mlKitActiveLegIsLeft = leftKneeAngle > rightKneeAngle;
     bool mlKitActiveArmIsLeft = leftArmAngle > rightArmAngle;
 
-    double activeKneeAngle = mlKitActiveLegIsLeft ? leftKneeAngle : rightKneeAngle;
+    double activeKneeAngle =
+        mlKitActiveLegIsLeft ? leftKneeAngle : rightKneeAngle;
     double activeArmAngle = mlKitActiveArmIsLeft ? leftArmAngle : rightArmAngle;
-    double nonActiveKneeAngle = mlKitActiveLegIsLeft ? rightKneeAngle : leftKneeAngle;
+    double nonActiveKneeAngle =
+        mlKitActiveLegIsLeft ? rightKneeAngle : leftKneeAngle;
 
-    // Tính toán Tọa độ vật lý (Physical Side) bằng Toán Hình học để chống lỗi nhảy nhãn của ML Kit
-    PoseLandmark activeAnkle = mlKitActiveLegIsLeft ? landmarks[PoseLandmarkType.leftAnkle]! : landmarks[PoseLandmarkType.rightAnkle]!;
-    PoseLandmark activeWrist = mlKitActiveArmIsLeft ? landmarks[PoseLandmarkType.leftWrist]! : landmarks[PoseLandmarkType.rightWrist]!;
-    
-    bool physicalLeftLeg = isPhysicalLeftSide(activeAnkle, landmarks[PoseLandmarkType.leftHip]!, landmarks[PoseLandmarkType.rightHip]!);
-    bool physicalLeftArm = isPhysicalLeftSide(activeWrist, landmarks[PoseLandmarkType.leftShoulder]!, landmarks[PoseLandmarkType.rightShoulder]!);
+    PoseLandmark activeAnkle = mlKitActiveLegIsLeft
+        ? landmarks[PoseLandmarkType.leftAnkle]!
+        : landmarks[PoseLandmarkType.rightAnkle]!;
+    PoseLandmark activeWrist = mlKitActiveArmIsLeft
+        ? landmarks[PoseLandmarkType.leftWrist]!
+        : landmarks[PoseLandmarkType.rightWrist]!;
+
+    // Bird Dog's pair rule is anatomical: left arm must pair with right leg
+    // and vice versa. Use ML Kit side labels for this rule; a global mirror or
+    // global left/right swap still preserves same-side vs opposite-side checks.
+    bool activeLegLabelIsLeft = mlKitActiveLegIsLeft;
+    bool activeArmLabelIsLeft = mlKitActiveArmIsLeft;
 
     // --- SNAPSHOT DATA (Chỉ chốt số liệu tay chân khi đang ở đỉnh rep) ---
     if (state == BirdDogState.hold_extended) {
-      _peakLeftLeg = physicalLeftLeg;
-      _peakLeftArm = physicalLeftArm;
+      _peakLeftLeg = activeLegLabelIsLeft;
+      _peakLeftArm = activeArmLabelIsLeft;
     }
 
     // --- EVALUATION DATA (Dữ liệu chống nhiễu dùng để chấm điểm) ---
-    bool evalLeftLeg = (state == BirdDogState.returning || state == BirdDogState.neutral) && _peakLeftLeg != null 
-        ? _peakLeftLeg! 
-        : physicalLeftLeg;
-        
-    bool evalLeftArm = (state == BirdDogState.returning || state == BirdDogState.neutral) && _peakLeftArm != null 
-        ? _peakLeftArm! 
-        : physicalLeftArm;
+    bool evalLeftLeg =
+        (state == BirdDogState.returning || state == BirdDogState.neutral) &&
+                _peakLeftLeg != null
+            ? _peakLeftLeg!
+            : activeLegLabelIsLeft;
+
+    bool evalLeftArm =
+        (state == BirdDogState.returning || state == BirdDogState.neutral) &&
+                _peakLeftArm != null
+            ? _peakLeftArm!
+            : activeArmLabelIsLeft;
 
     // Không còn bắt lỗi Push-up (Plank) quá gắt vì góc chéo 45 độ làm biến dạng hình chiếu 2D của chân trụ
     // Vẫn giữ lại safety catch nếu cần nhưng nới lỏng
     if (nonActiveKneeAngle > 150 && state != BirdDogState.neutral) {
       _transitionState(BirdDogState.neutral, now);
-      _peakLeftLeg = null; 
+      _peakLeftLeg = null;
       _peakLeftArm = null;
       resultIssues.feedback['Error'] = 'Sai tư thế (Đang Plank)';
       resultIssues.addInstruction('BLOCK', 'Error', 'Hạ hai gối xuống sàn!');
@@ -194,15 +244,23 @@ class BirdDog extends ExerciseBase {
     bool isSameSide = (evalLeftLeg == evalLeftArm);
 
     // Vẫn lấy dữ liệu bằng ML Kit labels cho việc render (nếu có)
-    final hip = landmarks[mlKitActiveLegIsLeft ? PoseLandmarkType.leftHip : PoseLandmarkType.rightHip]!;
+    final hip = landmarks[mlKitActiveLegIsLeft
+        ? PoseLandmarkType.leftHip
+        : PoseLandmarkType.rightHip]!;
     final ankle = activeAnkle;
-    final shoulder = landmarks[mlKitActiveArmIsLeft ? PoseLandmarkType.leftShoulder : PoseLandmarkType.rightShoulder]!;
+    final shoulder = landmarks[mlKitActiveArmIsLeft
+        ? PoseLandmarkType.leftShoulder
+        : PoseLandmarkType.rightShoulder]!;
     final wrist = activeWrist;
-    final ear = landmarks[mlKitActiveArmIsLeft ? PoseLandmarkType.leftEar : PoseLandmarkType.rightEar] ?? landmarks[PoseLandmarkType.leftEar]!;
+    final ear = landmarks[mlKitActiveArmIsLeft
+            ? PoseLandmarkType.leftEar
+            : PoseLandmarkType.rightEar] ??
+        landmarks[PoseLandmarkType.leftEar]!;
 
     scaleFactor = calculateDistance(shoulder, hip);
 
-    double shaAngle = calculateAngleNormalized(firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
+    double shaAngle = calculateAngleNormalized(
+        firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
     double trunkHoriz = _calcHorizontalAngle(shoulder, hip);
     double armHoriz = _calcHorizontalAngle(shoulder, wrist);
     double legHoriz = _calcHorizontalAngle(hip, ankle);
@@ -220,22 +278,30 @@ class BirdDog extends ExerciseBase {
       shoulderY: shoulder.y,
       scaleFactor: scaleFactor,
       isLeftLegActive: evalLeftLeg,
+      isLeftArmActive: evalLeftArm,
       isSameSide: isSameSide,
       state: state,
       frameTimestamp: now,
       resultIssues: resultIssues,
     );
 
+    final blockingFault = _blockingFaultFor(ctx);
+    if (blockingFault != null && state != BirdDogState.neutral) {
+      _publishBlockingFault(blockingFault);
+    }
+
     _updateStateMachine(activeKneeAngle, activeArmAngle, now);
 
     // --- HIỆN ĐỒNG HỒ ĐẾM NGƯỢC 5S CHO UI ---
-    if (state == BirdDogState.hold_extended && tempoMetric.holdStartMs != null) {
+    if (state == BirdDogState.hold_extended &&
+        tempoMetric.holdStartMs != null) {
       double elapsed = (now - tempoMetric.holdStartMs!) / 1000.0;
       double progress = (elapsed / 5.0).clamp(0.0, 1.0);
       resultIssues.feedback['progress'] = progress.toStringAsFixed(2);
-      
+
       if (progress < 1.0) {
-        resultIssues.addInstruction('HOLD', 'Timer', 'Giữ: ${(progress * 100).toInt()}%');
+        resultIssues.addInstruction(
+            'HOLD', 'Timer', 'Giữ: ${(progress * 100).toInt()}%');
       } else {
         resultIssues.addInstruction('HOLD', 'Timer', 'Tốt! Thu về');
       }
@@ -243,7 +309,8 @@ class BirdDog extends ExerciseBase {
       resultIssues.feedback['progress'] = '0.0';
     }
 
-    if (state == BirdDogState.neutral && previousState == BirdDogState.returning) {
+    if (state == BirdDogState.neutral &&
+        previousState == BirdDogState.returning) {
       _completeRep(ctx);
       previousState = BirdDogState.neutral;
       return;
@@ -255,13 +322,15 @@ class BirdDog extends ExerciseBase {
   }
 
   void _updateStateMachine(double kneeAngle, double armAngle, int now) {
-    if (state == BirdDogState.neutral && kneeAngle > BirdDogConfig.EXTENDING_KNEE_START) {
+    if (state == BirdDogState.neutral &&
+        kneeAngle > BirdDogConfig.EXTENDING_KNEE_START) {
       _transitionState(BirdDogState.extending, now);
     } else if (_holdDebouncer.update(state == BirdDogState.extending &&
         kneeAngle > BirdDogConfig.HOLD_KNEE_THRESHOLD &&
         armAngle > BirdDogConfig.HOLD_ARM_THRESHOLD)) {
       _transitionState(BirdDogState.hold_extended, now);
-    } else if (state == BirdDogState.extending && kneeAngle < BirdDogConfig.NEUTRAL_KNEE_THRESHOLD) {
+    } else if (state == BirdDogState.extending &&
+        kneeAngle < BirdDogConfig.NEUTRAL_KNEE_THRESHOLD) {
       // FIX DEADLOCK: Đang giơ lên mà rớt xuống luôn thì clear về chuẩn bị
       _transitionState(BirdDogState.neutral, now);
       _peakLeftLeg = null;
@@ -279,34 +348,79 @@ class BirdDog extends ExerciseBase {
     if (newState == state) return;
     previousState = state;
     state = newState;
-    for (var metric in _metrics) metric.onStateTransition(previousState, newState, now);
+    for (var metric in _metrics)
+      metric.onStateTransition(previousState, newState, now);
   }
 
   void _completeRep(BirdDogRepContext ctx) {
+    final blockingFault = _blockingFaultFor(ctx);
+    if (blockingFault != null) {
+      _publishBlockingFault(blockingFault);
+      _resetRepState();
+      return;
+    }
+
     repCount++;
-    tempoMetric.markLegUsed(ctx.isLeftLegActive);
     tempoMetric.evaluateRep(ctx);
-    
+
     final allFaults = <FaultRecord>[];
     for (var metric in _metrics) allFaults.addAll(metric.faults);
 
-    if (ctx.isSameSide) {
-      allFaults.add(FaultRecord(phase: ctx.state.name, type: 'SameSide', message: 'Cùng tay cùng chân', voiceMessage: 'Nhớ đổi tay đổi chân nhé', affectsForm: true, priority: 0));
-    } else if (_lastPeakLeftLeg != null && _lastPeakLeftLeg == ctx.isLeftLegActive) {
-      allFaults.add(FaultRecord(phase: ctx.state.name, type: 'NotAlternating', message: 'Chưa đổi bên', voiceMessage: 'Hãy luân phiên đổi bên', affectsForm: true, priority: 0));
-    }
-    
     _lastPeakLeftLeg = ctx.isLeftLegActive;
+    _lastPeakLeftArm = ctx.isLeftArmActive;
 
     correctForm = !allFaults.any((f) => f.affectsForm);
     if (!correctForm) resultIssues.feedback['Result'] = 'Sai Form';
 
-    logger.addRepLog(RepLog(correctForm: correctForm, repNumber: repCount, data: {
+    logger
+        .addRepLog(RepLog(correctForm: correctForm, repNumber: repCount, data: {
       "hold_time": tempoMetric.holdDuration ?? 0,
       "fault_types": allFaults.map((e) => e.type).toSet().toList()
     }));
 
     _resetRepState();
+  }
+
+  FaultRecord? _blockingFaultFor(BirdDogRepContext ctx) {
+    if (ctx.isSameSide) {
+      return FaultRecord(
+        phase: ctx.state.name,
+        type: 'SameSide',
+        message: 'Không cùng tay cùng chân',
+        voiceMessage: 'Giơ tay và chân đối diện',
+        affectsForm: true,
+        priority: BirdDogFaultPriority.alignment,
+      );
+    }
+
+    final hasPreviousRep = _lastPeakLeftLeg != null && _lastPeakLeftArm != null;
+    final repeatedLeg =
+        hasPreviousRep && _lastPeakLeftLeg == ctx.isLeftLegActive;
+    final repeatedArm =
+        hasPreviousRep && _lastPeakLeftArm == ctx.isLeftArmActive;
+
+    if (repeatedLeg || repeatedArm) {
+      return FaultRecord(
+        phase: ctx.state.name,
+        type: 'NotAlternating',
+        message: 'Chưa luân phiên tay và chân',
+        voiceMessage: 'Đổi sang tay và chân còn lại',
+        affectsForm: true,
+        priority: BirdDogFaultPriority.alignment,
+      );
+    }
+
+    return null;
+  }
+
+  void _publishBlockingFault(FaultRecord fault) {
+    resultIssues.feedback['Result'] = 'Không tính rep';
+    resultIssues.feedback['Error'] = fault.message;
+    resultIssues.addInstruction(
+      currentPhaseKey,
+      'Error',
+      fault.voiceMessage ?? fault.message,
+    );
   }
 
   void _resetRepState() {
