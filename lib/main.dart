@@ -259,6 +259,7 @@ class VikaApp extends StatelessWidget {
                 slotName: launchArgs.slotName,
                 sequence: launchArgs.sequence,
                 sequenceIndex: launchArgs.sequenceIndex,
+                priorReports: launchArgs.priorReports,
               ),
             );
           case '/weekly-check-in':

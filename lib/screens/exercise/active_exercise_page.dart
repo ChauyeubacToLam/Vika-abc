@@ -2482,49 +2482,150 @@ class _CenterOverlay extends StatelessWidget {
             : (remainingSeconds < 1
                 ? remainingSeconds.toStringAsFixed(1)
                 : remainingSeconds.ceil().toString());
-        return FormScoreArc(
-          progress: clamped,
-          size: 144,
-          color: VikaIvory.yellow,
-          trackColor: VikaIvory.glass12,
-          strokeWidth: 5,
-          glow: true,
-          // Snappier than the default 900 ms — this is a live activation
-          // gauge, not a one-shot reveal.
-          duration: const Duration(milliseconds: 240),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                remainingLabel,
-                style: TextStyle(
-                  fontFamily: VikaIvory.fontFamily,
-                  fontSize: isReadyToStart ? 22 : 38,
-                  fontWeight: FontWeight.w800,
-                  color: VikaIvory.yellow,
-                  letterSpacing: isReadyToStart ? 0.1 : -1.6,
-                  height: 1,
-                  shadows: [
-                    Shadow(
-                      color: VikaIvory.yellowGlow,
-                      blurRadius: 18,
+        // Live activation gauge with a frosted-glass backing disc.
+        //
+        // Why all this layered chrome:
+        //   1. FormScoreArc — yellow progress ring that traces around
+        //      the outside; readable on ANY background regardless of
+        //      camera content.
+        //   2. Outer breathing pulse — wider yellow halo that gently
+        //      breathes (driven by the existing pulseController) to
+        //      pull the eye from across the room.
+        //   3. ClipOval + BackdropFilter blur — the camera scene
+        //      behind the disc is physically blurred, so any color
+        //      under the disc is washed out before our backing
+        //      composites on top. Strongest possible contrast.
+        //   4. Warm-dark backing disc at 0.92 alpha + yellow border —
+        //      brand-consistent surface for the numeral.
+        //   5. Numeral with brand yellow glow + crisp dark text stroke
+        //      so the edge stays sharp even where backing alpha fades.
+        return AnimatedBuilder(
+          animation: pulseController,
+          builder: (context, child) {
+            // Subtle breathing 0.96 → 1.04 over a full pulse cycle.
+            final breathe = 1.0 + (pulseController.value * 0.06) - 0.03;
+            final haloAlpha = 0.35 + (pulseController.value * 0.25);
+            return Transform.scale(
+              scale: breathe,
+              child: Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  // Wider breathing yellow halo — pulls attention from
+                  // far away. Sits OUTSIDE the form score arc.
+                  IgnorePointer(
+                    child: Container(
+                      width: 184,
+                      height: 184,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: VikaIvory.yellow.withValues(alpha: haloAlpha),
+                            blurRadius: 44,
+                            spreadRadius: 6,
+                          ),
+                        ],
+                      ),
                     ),
-                  ],
-                ),
+                  ),
+                  FormScoreArc(
+                    progress: clamped,
+                    size: 156,
+                    color: VikaIvory.yellow,
+                    trackColor: VikaIvory.glass12,
+                    strokeWidth: 6,
+                    glow: true,
+                    duration: const Duration(milliseconds: 240),
+                    child: ClipOval(
+                      child: BackdropFilter(
+                        // Frosted glass — physically blurs whatever
+                        // camera content sits behind the disc.
+                        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                        child: Container(
+                          width: 124,
+                          height: 124,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: VikaIvory.heroBg.withValues(alpha: 0.92),
+                            border: Border.all(
+                              color: VikaIvory.yellow.withValues(alpha: 0.5),
+                              width: 1.5,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.5),
+                                blurRadius: 24,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              // FittedBox so the numeral never overflows
+                              // on small screens or with large system
+                              // text scaling.
+                              SizedBox(
+                                height: isReadyToStart ? 28 : 56,
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    remainingLabel,
+                                    style: TextStyle(
+                                      fontFamily: VikaIvory.fontFamily,
+                                      fontSize: isReadyToStart ? 22 : 48,
+                                      fontWeight: FontWeight.w800,
+                                      color: VikaIvory.yellow,
+                                      letterSpacing:
+                                          isReadyToStart ? 0.1 : -2.2,
+                                      height: 1,
+                                      shadows: [
+                                        Shadow(
+                                          color: VikaIvory.yellowGlow,
+                                          blurRadius: 14,
+                                        ),
+                                        Shadow(
+                                          color: Colors.black
+                                              .withValues(alpha: 0.85),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 1),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                isReadyToStart ? 'Bắt đầu tập' : 'Giữ yên',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontFamily: VikaIvory.fontFamily,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: VikaIvory.invInk,
+                                  letterSpacing: 1.0,
+                                  shadows: [
+                                    Shadow(
+                                      color: Colors.black
+                                          .withValues(alpha: 0.7),
+                                      blurRadius: 4,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 4),
-              Text(
-                isReadyToStart ? 'Bắt đầu tập' : 'Giữ yên',
-                style: TextStyle(
-                  fontFamily: VikaIvory.fontFamily,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: VikaIvory.invInkSoft,
-                  letterSpacing: 0.6,
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         );
       case _LiveOverlayState.active:
         return const SizedBox.shrink();

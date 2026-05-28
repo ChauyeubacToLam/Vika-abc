@@ -20,6 +20,7 @@ import '../push_up.dart';
 import '../../exercise_base.dart';
 import '../../fault_record.dart';
 export '../../fault_record.dart';
+
 /* =========================================================================
    RepContext — Shared per-frame state, passed to all metrics.
    Avoids each metric needing to recalculate the same geometry.
@@ -55,13 +56,15 @@ class RepContext {
   });
 }
 
-
 /* =========================================================================
    PushUpMetricBase — Interface every push-up metric implements.
    ========================================================================= */
 abstract class PushUpMetricBase {
   /// Human-readable name for debug/logging.
   String get name;
+
+  /// Number of counted reps where this metric produced at least one fault.
+  int faultsCount = 0;
 
   /// Called every frame during an active rep (pushUpState != plank).
   /// Writes feedback + instructions directly to ctx.resultIssues.
@@ -75,6 +78,14 @@ abstract class PushUpMetricBase {
 
   /// Reset all internal state for the next rep.
   void reset();
+
+  /// Reset after a counted rep and roll up whether this metric faulted.
+  void resetAndCountFault() {
+    if (faults.isNotEmpty) {
+      faultsCount++;
+    }
+    reset();
+  }
 
   /// Called when push-up state transitions (e.g. descending → bottom).
   /// Override in metrics that care about transitions (tempo).

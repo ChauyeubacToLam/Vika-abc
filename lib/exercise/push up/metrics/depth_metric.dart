@@ -30,9 +30,8 @@ class DepthConfig {
   /// Error: > 110° — way too shallow, barely bending
   // (anything above SHALLOW_WARNING_MAX is error)
 
-  /// Top lockout: elbow should reach ≥160° at plank position
-  static const double LOCKOUT_ANGLE =
-      PushUpConfig.PLANK_ANGLE_THRESHOLD; // 160.0
+  /// Top lockout fallback before PushUp captures the user's plank baseline.
+  static const double LOCKOUT_ANGLE = PushUpConfig.PLANK_ANGLE_THRESHOLD;
 }
 
 class DepthMetric extends PushUpMetricBase {

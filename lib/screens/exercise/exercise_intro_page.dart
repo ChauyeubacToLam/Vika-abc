@@ -26,6 +26,8 @@ import 'package:flutter/services.dart';
 
 import '../../theme/app_colors.dart';
 import '../../theme/vf_theme.dart';
+import '../../widgets/exercise/auto_start_countdown.dart';
+import '../../widgets/exercise/previous_exercise_rating_dialog.dart';
 import 'widgets/metric_diagrams.dart';
 import 'widgets/skeleton_annotation.dart';
 
@@ -65,6 +67,9 @@ class ExerciseIntroPage extends StatefulWidget {
     this.secondsPerUnit = 4,
     this.sessionProgressLabel,
     this.isContinuation = false,
+    this.previousExerciseName,
+    this.previousExerciseFormScore,
+    this.onPreviousDifficulty,
   });
 
   final String title;
@@ -98,12 +103,47 @@ class ExerciseIntroPage extends StatefulWidget {
   final String? sessionProgressLabel;
   final bool isContinuation;
 
+  /// When non-null, an "đánh giá bài vừa rồi" block surfaces at the top
+  /// of the body. Filled in only for exercises after the first in a
+  /// multi-exercise sequence. The sticky CTA stays gated (locked + grey)
+  /// until the user picks a difficulty.
+  final String? previousExerciseName;
+  final int? previousExerciseFormScore;
+  final ValueChanged<String>? onPreviousDifficulty;
+
   @override
   State<ExerciseIntroPage> createState() => _ExerciseIntroPageState();
 }
 
 class _ExerciseIntroPageState extends State<ExerciseIntroPage> {
   bool _saved = false;
+  String? _selectedPreviousDifficulty;
+  bool _ratingPopupHandled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // For continuation slots, surface the rating popup as soon as the
+    // intro lands. The popup is barrier-non-dismissible — the user can
+    // only close it by selecting a rating. After that, the auto-start
+    // countdown CTA at the bottom takes over.
+    if (widget.previousExerciseName != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _promptRating());
+    }
+  }
+
+  Future<void> _promptRating() async {
+    if (!mounted || _ratingPopupHandled) return;
+    _ratingPopupHandled = true;
+    final result = await showPreviousExerciseRatingDialog(
+      context,
+      exerciseName: widget.previousExerciseName!,
+      formScore: widget.previousExerciseFormScore,
+    );
+    if (!mounted) return;
+    setState(() => _selectedPreviousDifficulty = result);
+    widget.onPreviousDifficulty?.call(result);
+  }
 
   /// Combine callouts (anatomy) + badges (temporal) into unified
   /// metric configs. Anatomical ones are numbered first.
@@ -280,9 +320,19 @@ class _ExerciseIntroPageState extends State<ExerciseIntroPage> {
     // The hero uses this so its top bar (back / save / share) clears
     // the status bar even though the dark gradient itself bleeds all
     // the way to the top edge.
-    final statusBarInset = MediaQuery.viewPaddingOf(context).top;
+    final mq = MediaQuery.of(context);
+    final statusBarInset = mq.viewPadding.top;
+    // Clamp accessibility text scaling so the giant italic hero title
+    // and tabular session-target numerals can't push themselves off the
+    // page on devices with maxed-out system text.
+    final clampedScaler = mq.textScaler.clamp(
+      minScaleFactor: 0.92,
+      maxScaleFactor: 1.12,
+    );
 
-    return Scaffold(
+    return MediaQuery(
+      data: mq.copyWith(textScaler: clampedScaler),
+      child: Scaffold(
       backgroundColor: c.bg,
       body: Stack(
         children: [
@@ -294,34 +344,35 @@ class _ExerciseIntroPageState extends State<ExerciseIntroPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (widget.isContinuation)
-                    _ContinueHeader(
-                      title: widget.title,
-                      progressLabel: widget.sessionProgressLabel,
-                      onBack: widget.onBack,
-                    )
-                  else
-                    _StageHero(
-                      statusBarInset: statusBarInset,
-                      title: widget.title,
-                      subtitle: widget.subtitle ??
-                          'Phân tích tư thế · $_estimatedMinutes',
-                      muscles: widget.muscles,
-                      difficulty: widget.difficulty,
-                      difficultyDots: _difficultyDots,
-                      videoDuration: widget.videoDuration,
-                      saved: _saved,
-                      sessionProgressLabel: widget.sessionProgressLabel,
-                      onBack: widget.onBack,
-                      onWatchVideo: widget.onWatchVideo,
-                      onSaveTap: () {
-                        HapticFeedback.selectionClick();
-                        setState(() => _saved = !_saved);
-                        widget.onSaveTap?.call();
-                      },
-                      onShareTap: widget.onShareTap,
-                    ),
+                  // Hero is rendered for EVERY exercise, including
+                  // continuation slots. Earlier we collapsed continuation
+                  // slots to a compact header, but the user wanted the
+                  // full hero presence to anchor the page consistently.
+                  _StageHero(
+                    statusBarInset: statusBarInset,
+                    title: widget.title,
+                    subtitle: widget.subtitle ??
+                        'Phân tích tư thế · $_estimatedMinutes',
+                    muscles: widget.muscles,
+                    difficulty: widget.difficulty,
+                    difficultyDots: _difficultyDots,
+                    videoDuration: widget.videoDuration,
+                    saved: _saved,
+                    sessionProgressLabel: widget.sessionProgressLabel,
+                    onBack: widget.onBack,
+                    onWatchVideo: widget.onWatchVideo,
+                    onSaveTap: () {
+                      HapticFeedback.selectionClick();
+                      setState(() => _saved = !_saved);
+                      widget.onSaveTap?.call();
+                    },
+                    onShareTap: widget.onShareTap,
+                  ),
                   const SizedBox(height: 24),
+
+                  // Continuation rating is collected via the forced
+                  // popup launched in `initState`, not inline on the page
+                  // — so we drop directly into CHUẨN BỊ here.
 
                   // 1. CHUẨN BỊ — moved up so the people-who-just-want-
                   // to-start crowd see setup first.
@@ -373,26 +424,52 @@ class _ExerciseIntroPageState extends State<ExerciseIntroPage> {
                   ),
 
                   // Bottom-of-page safe space for the sticky dock.
+                  // Tall enough for the notice line + button + insets so
+                  // the last section never sits underneath the dock.
                   SizedBox(
-                    height: 110 + MediaQuery.viewPaddingOf(context).bottom,
+                    height: 168 + MediaQuery.viewPaddingOf(context).bottom,
                   ),
                 ],
               ),
             ),
           ),
 
-          // Sticky CTA dock.
+          // Sticky CTA dock:
+          //   • First exercise / no prev rating needed → classic
+          //     "Bắt đầu tập" pill, force-press model.
+          //   • Continuation slot, rating already collected via popup →
+          //     auto-countdown CTA (30s) with start-now + extend.
+          //   • Continuation slot, popup still up (rating null) → nothing
+          //     visible at the bottom (the popup itself blocks everything).
           Positioned(
             left: 0,
             right: 0,
             bottom: 0,
-            child: _StickyCtaDock(
-              onStart: widget.onStart,
-              onWatchVideo: widget.onWatchVideo,
-            ),
+            child: _buildBottomDock(context),
           ),
         ],
       ),
+      ),
+    );
+  }
+
+  Widget _buildBottomDock(BuildContext context) {
+    final isContinuation = widget.previousExerciseName != null;
+    if (isContinuation && _selectedPreviousDifficulty == null) {
+      // Popup is up — leave the dock empty so the page reads cleanly
+      // behind the dialog.
+      return const SizedBox.shrink();
+    }
+    if (isContinuation) {
+      return AutoStartCountdown(
+        totalSeconds: 30,
+        onStartNow: widget.onStart,
+      );
+    }
+    return _StickyCtaDock(
+      onStart: widget.onStart,
+      onWatchVideo: widget.onWatchVideo,
+      showReadNotice: true,
     );
   }
 }
@@ -483,84 +560,6 @@ class _Adaptation {
       _AdaptationDirection.unchanged => Icons.drag_handle_rounded,
       _AdaptationDirection.baseline => Icons.fiber_manual_record_rounded,
     };
-  }
-}
-
-class _ContinueHeader extends StatelessWidget {
-  const _ContinueHeader({
-    required this.title,
-    required this.progressLabel,
-    required this.onBack,
-  });
-
-  final String title;
-  final String? progressLabel;
-  final VoidCallback onBack;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = VikaColors.of(context);
-    final top = MediaQuery.viewPaddingOf(context).top;
-    return Container(
-      padding: EdgeInsets.fromLTRB(20, top + 10, 20, 18),
-      decoration: BoxDecoration(
-        color: c.bgRaised,
-        border: Border(bottom: BorderSide(color: c.border)),
-      ),
-      child: Row(
-        children: [
-          Tooltip(
-            message: 'Quay lại',
-            child: IconButton(
-              onPressed: onBack,
-              icon: Icon(Icons.arrow_back_rounded, color: c.ink),
-              style: IconButton.styleFrom(
-                backgroundColor: c.bg,
-                side: BorderSide(color: c.border),
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (progressLabel != null) ...[
-                  _SessionProgressThread(label: progressLabel!),
-                  const SizedBox(height: 8),
-                ],
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontFamily: 'BeVietnamPro',
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                    fontStyle: FontStyle.italic,
-                    letterSpacing: -1.1,
-                    color: c.ink,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Tiếp tục buổi tập · kiểm tra setup nhanh rồi vào bài.',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontFamily: 'BeVietnamPro',
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    height: 1.35,
-                    color: c.inkSoft,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 
@@ -2066,10 +2065,15 @@ class _StickyCtaDock extends StatefulWidget {
   const _StickyCtaDock({
     required this.onStart,
     this.onWatchVideo,
+    this.showReadNotice = false,
   });
 
   final VoidCallback onStart;
   final VoidCallback? onWatchVideo;
+
+  /// When true, a small editorial notice sits above the CTA telling
+  /// the user to read the page before starting.
+  final bool showReadNotice;
 
   @override
   State<_StickyCtaDock> createState() => _StickyCtaDockState();
@@ -2083,89 +2087,186 @@ class _StickyCtaDockState extends State<_StickyCtaDock> {
     final c = VikaColors.of(context);
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
     return Container(
-      padding: EdgeInsets.fromLTRB(16, 14, 16, 14 + bottomInset),
+      padding: EdgeInsets.fromLTRB(16, 12, 16, 14 + bottomInset),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
             c.bg.withValues(alpha: 0),
-            c.bg.withValues(alpha: 0.85),
+            c.bg.withValues(alpha: 0.92),
             c.bg,
           ],
-          stops: const [0.0, 0.35, 0.75],
+          stops: const [0.0, 0.4, 0.78],
         ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (widget.showReadNotice) ...[
+            const _ReadNotice(),
+            const SizedBox(height: 10),
+          ],
+          Row(
+            children: [
+              if (widget.onWatchVideo != null) ...[
+                _WatchVideoCircle(onTap: widget.onWatchVideo!),
+                const SizedBox(width: 10),
+              ],
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    HapticFeedback.mediumImpact();
+                    widget.onStart();
+                  },
+                  onTapDown: (_) => setState(() => _pressed = true),
+                  onTapUp: (_) => setState(() => _pressed = false),
+                  onTapCancel: () => setState(() => _pressed = false),
+                  behavior: HitTestBehavior.opaque,
+                  child: AnimatedScale(
+                    scale: _pressed ? 0.98 : 1.0,
+                    duration: const Duration(milliseconds: 120),
+                    curve: Curves.easeOut,
+                    child: Container(
+                      height: 60,
+                      padding: const EdgeInsets.fromLTRB(20, 0, 8, 0),
+                      decoration: BoxDecoration(
+                        color: c.yellow,
+                        borderRadius: BorderRadius.circular(999),
+                        boxShadow: [
+                          BoxShadow(
+                            color: c.yellow.withValues(alpha: 0.5),
+                            blurRadius: 24,
+                            offset: const Offset(0, 10),
+                          ),
+                          BoxShadow(
+                            color: c.ink.withValues(alpha: 0.15),
+                            blurRadius: 2,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Bắt đầu tập',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontFamily: 'BeVietnamPro',
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                fontStyle: FontStyle.italic,
+                                letterSpacing: -0.4,
+                                color: c.yellowInk,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: c.ink,
+                              shape: BoxShape.circle,
+                            ),
+                            alignment: Alignment.center,
+                            child: Icon(
+                              Icons.play_arrow_rounded,
+                              size: 22,
+                              color: c.yellow,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReadNotice extends StatelessWidget {
+  const _ReadNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    const headline = 'Đọc kỹ trước — form chuẩn từ rep đầu tiên';
+    const tagText = 'NHẮC NHẸ';
+    final accent = c.yellow;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 9, 14, 9),
+      decoration: BoxDecoration(
+        color: c.bgRaised,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: accent.withValues(alpha: 0.45),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: c.ink.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Row(
         children: [
-          if (widget.onWatchVideo != null) ...[
-            _WatchVideoCircle(onTap: widget.onWatchVideo!),
-            const SizedBox(width: 10),
-          ],
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: accent,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(color: accent.withValues(alpha: 0.6), blurRadius: 6),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: accent.withValues(alpha: 0.35),
+                width: 1,
+              ),
+            ),
+            child: Text(
+              tagText,
+              style: TextStyle(
+                fontFamily: 'BeVietnamPro',
+                fontSize: 8.5,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.4,
+                color: accent,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
           Expanded(
-            child: GestureDetector(
-              onTap: () {
-                HapticFeedback.lightImpact();
-                widget.onStart();
-              },
-              onTapDown: (_) => setState(() => _pressed = true),
-              onTapUp: (_) => setState(() => _pressed = false),
-              onTapCancel: () => setState(() => _pressed = false),
-              behavior: HitTestBehavior.opaque,
-              child: AnimatedScale(
-                scale: _pressed ? 0.98 : 1.0,
-                duration: const Duration(milliseconds: 120),
-                curve: Curves.easeOut,
-                child: Container(
-                  height: 58,
-                  padding: const EdgeInsets.fromLTRB(20, 0, 8, 0),
-                  decoration: BoxDecoration(
-                    color: c.yellow,
-                    borderRadius: BorderRadius.circular(999),
-                    boxShadow: [
-                      BoxShadow(
-                        color: c.yellow.withValues(alpha: 0.5),
-                        blurRadius: 24,
-                        offset: const Offset(0, 10),
-                      ),
-                      BoxShadow(
-                        color: c.ink.withValues(alpha: 0.15),
-                        blurRadius: 2,
-                        offset: const Offset(0, 1),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Text(
-                        'Bắt đầu tập',
-                        style: TextStyle(
-                          fontFamily: 'BeVietnamPro',
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          fontStyle: FontStyle.italic,
-                          letterSpacing: -0.4,
-                          color: c.yellowInk,
-                        ),
-                      ),
-                      const Spacer(),
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: c.ink,
-                          shape: BoxShape.circle,
-                        ),
-                        alignment: Alignment.center,
-                        child: Icon(
-                          Icons.play_arrow_rounded,
-                          size: 22,
-                          color: c.yellow,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+            child: Text(
+              headline,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: 'BeVietnamPro',
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                fontStyle: FontStyle.italic,
+                letterSpacing: -0.2,
+                color: c.ink,
               ),
             ),
           ),

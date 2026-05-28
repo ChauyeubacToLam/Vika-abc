@@ -45,11 +45,15 @@ class DepthMetric extends SquatMetricBase {
   @override
   double? get value => _kneeAngle;
 
-  @override
-  ThresholdBand? get threshold => ThresholdBand(
-        warningAbove: DepthMetricConfig.GOOD_DEPTH_RANGE[1].toDouble(),
-        faultAbove: SquatConfig.SQUAT_DESCEND_ANGLE_THRESHOLD.toDouble(),
-      );
+  // In squat_depth_metric.dart, add a field:
+double? baselineAngle;
+
+// Update the threshold getter to use it:
+@override
+ThresholdBand? get threshold => ThresholdBand(
+    warningAbove: DepthMetricConfig.GOOD_DEPTH_RANGE[1].toDouble(),
+    faultAbove: (baselineAngle ?? SquatConfig.SQUAT_STAND_ANGLE_THRESHOLD) - SquatConfig.ERROR_ALLOW,
+);
 
   @override
   MetricStatus get status => _status;

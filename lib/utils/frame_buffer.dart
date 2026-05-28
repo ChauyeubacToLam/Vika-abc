@@ -1,13 +1,12 @@
+import 'dart:math' as math;
+
 import 'frame_snapshot.dart';
 
-enum AngleChangeState {
+enum ChangeState {
   increasing,
   decreasing,
   stable,
 }
-
-const double ANGLE_GATE =
-    0.5; // degrees of change required to count as increasing/decreasing
 
 class FrameBuffer {
   List<FrameSnapshot> frameBuffer = [];
@@ -20,58 +19,84 @@ class FrameBuffer {
     frameBuffer.clear();
   }
 
-  AngleChangeState getAngleChange(String angleName) {
+  ChangeState getChange(String key, double gate) {
     if (frameBuffer.length < 2) {
-      return AngleChangeState.stable;
+      return ChangeState.stable;
     }
     final prevFrame = frameBuffer[frameBuffer.length - 2];
     final currFrame = frameBuffer.last;
-    final prevAngle = prevFrame.log[angleName];
-    final currAngle = currFrame.log[angleName];
+    final prevAngle = prevFrame.log[key];
+    final currAngle = currFrame.log[key];
     if (prevAngle == null || currAngle == null) {
-      return AngleChangeState.stable;
+      return ChangeState.stable;
     }
-    if (currAngle > prevAngle + ANGLE_GATE) {
-      return AngleChangeState.increasing;
-    } else if (currAngle < prevAngle - ANGLE_GATE) {
-      return AngleChangeState.decreasing;
+    if (currAngle > prevAngle + gate) {
+      return ChangeState.increasing;
+    } else if (currAngle < prevAngle - gate) {
+      return ChangeState.decreasing;
     } else {
-      return AngleChangeState.stable;
+      return ChangeState.stable;
     }
   }
 
-  FrameSnapshot? getPeakMax(String angleName) {
+  FrameSnapshot? getPeakMax(String key) {
     if (frameBuffer.isEmpty) {
       return null;
     }
     FrameSnapshot peakFrame = frameBuffer.first;
     for (int i = 1; i < frameBuffer.length; i++) {
-      if (frameBuffer[i].log[angleName] == null ||
-          peakFrame.log[angleName] == null) {
+      if (frameBuffer[i].log[key] == null || peakFrame.log[key] == null) {
         continue;
       }
-      if (frameBuffer[i].log[angleName]! > peakFrame.log[angleName]!) {
+      if (frameBuffer[i].log[key]! > peakFrame.log[key]!) {
         peakFrame = frameBuffer[i];
       }
     }
     return peakFrame;
   }
 
-  FrameSnapshot? getPeakMin(String angleName) {
+  FrameSnapshot? getPeakMin(String key) {
     if (frameBuffer.isEmpty) {
       return null;
     }
     FrameSnapshot peakFrame = frameBuffer.first;
     for (int i = 1; i < frameBuffer.length; i++) {
-      if (frameBuffer[i].log[angleName] == null ||
-          peakFrame.log[angleName] == null) {
+      if (frameBuffer[i].log[key] == null || peakFrame.log[key] == null) {
         continue;
       }
-      if (frameBuffer[i].log[angleName]! < peakFrame.log[angleName]!) {
+      if (frameBuffer[i].log[key]! < peakFrame.log[key]!) {
         peakFrame = frameBuffer[i];
       }
     }
     return peakFrame;
+  }
+
+  double getTravel(String key) {
+    final maxValue = getPeakMax(key)?.log[key];
+    final minValue = getPeakMin(key)?.log[key];
+    if (maxValue == null || minValue == null) return 0.0;
+    return (maxValue - minValue).abs();
+  }
+
+  double getMaxAbs(String key) {
+    var result = 0.0;
+    for (final frame in frameBuffer) {
+      final value = frame.log[key];
+      if (value == null) continue;
+      result = math.max(result, value.abs());
+    }
+    return result;
+  }
+
+  double getMaxAbsFromBaseline(String key, double? baseline) {
+    if (baseline == null) return 0.0;
+    var result = 0.0;
+    for (final frame in frameBuffer) {
+      final value = frame.log[key];
+      if (value == null) continue;
+      result = math.max(result, (value - baseline).abs());
+    }
+    return result;
   }
 
   int getElapseTime() {

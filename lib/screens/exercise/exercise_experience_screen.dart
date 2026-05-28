@@ -50,6 +50,7 @@ import '../../exercise/squat/metrics/trunk_lean_metric.dart';
 import '../../exercise/squat/squat.dart';
 import '../../models/exercise_definition.dart';
 import '../../models/post_exercise_data.dart';
+import '../../models/workout_session_report.dart';
 import '../../services/recommendation/models/plan.dart';
 import '../../services/recommendation/progression_service.dart';
 import '../../utils/exercise_logger.dart';
@@ -57,11 +58,11 @@ import '../../utils/orientation_lock.dart';
 import 'active_exercise_page.dart';
 import 'exercise_launch_args.dart';
 import 'exercise_intro_page.dart';
-import 'executive_summary_page.dart';
+import 'exercise_transition_moment.dart';
 import 'rest_screen.dart';
 import 'widgets/skeleton_annotation.dart';
+import 'workout_summary_screen.dart';
 import 'package:vika/services/session_persistence.dart';
-import 'package:vika/services/exercise_comparison_service.dart';
 import '../../exercise/warrior_1/warrior_one.dart';
 
 class ExerciseExperienceScreen extends StatefulWidget {
@@ -76,6 +77,7 @@ class ExerciseExperienceScreen extends StatefulWidget {
     this.slotName,
     this.sequence = const [],
     this.sequenceIndex = 0,
+    this.priorReports = const [],
   });
 
   final ExerciseDefinition definition;
@@ -87,6 +89,12 @@ class ExerciseExperienceScreen extends StatefulWidget {
   final String? slotName;
   final List<ExerciseSequenceItem> sequence;
   final int sequenceIndex;
+
+  /// Reports from earlier exercises in this same workout sequence. The
+  /// last entry may have a null `userDifficulty` — the intro page of
+  /// this exercise collects that rating before unlocking the auto-start
+  /// countdown.
+  final List<ExerciseSessionReport> priorReports;
 
   @override
   State<ExerciseExperienceScreen> createState() =>
@@ -106,7 +114,6 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
   ExerciseLogger? _currentSetLogger;
   Duration? _completedDuration;
   int? _estimatedCalories;
-  SessionComparison? _comparison;
   String? _currentSessionId;
   String? _pendingOverallDifficulty;
 
@@ -133,8 +140,12 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
   String? get _sessionProgressLabel => _isWorkoutSequence
       ? 'Buổi tập · Bài ${widget.sequenceIndex + 1}/${widget.sequence.length}'
       : null;
-  ExerciseLaunchArgs? get _nextInSequence {
-    final args = ExerciseLaunchArgs(
+
+  /// Returns the next launch args in the sequence with [reports] threaded
+  /// forward as priorReports. Returns null when this is the final
+  /// exercise in the sequence.
+  ExerciseLaunchArgs? _nextInSequenceWith(List<ExerciseSessionReport> reports) {
+    final base = ExerciseLaunchArgs(
       definition: widget.definition,
       catalogExerciseId: widget.catalogExerciseId,
       prescription: widget.prescription,
@@ -144,15 +155,26 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       slotName: widget.slotName,
       sequence: widget.sequence,
       sequenceIndex: widget.sequenceIndex,
+      priorReports: widget.priorReports,
     );
-    return args.nextInSequence();
+    return base.nextInSequence(carryForwardReports: reports);
   }
 
-  String get _summaryDoneLabel {
-    final next = _nextInSequence;
-    if (next != null) return 'Bài tiếp theo: ${next.definition.name}';
-    if (_isWorkoutSequence) return 'Hoàn thành buổi tập';
-    return 'Hoàn tất';
+  bool get _hasNextInSequence =>
+      widget.sequenceIndex + 1 < widget.sequence.length;
+
+  String? get _nextExerciseName {
+    final nextIdx = widget.sequenceIndex + 1;
+    if (nextIdx >= widget.sequence.length) return null;
+    return widget.sequence[nextIdx].definition.name;
+  }
+
+  /// The exercise that just finished before this one, if any. Used to
+  /// surface the "rate the previous exercise" block on the intro of
+  /// continuation slots.
+  ExerciseSessionReport? get _previousReport {
+    if (widget.priorReports.isEmpty) return null;
+    return widget.priorReports.last;
   }
 
   void _setFlowState(VoidCallback mutation) {
@@ -261,7 +283,6 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       _currentSetLogger = null;
       _completedDuration = null;
       _estimatedCalories = null;
-      _comparison = null;
       _currentSessionId = null;
       _pendingOverallDifficulty = null;
       _currentSet = 1;
@@ -319,6 +340,28 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     }
 
     final report = _buildReport();
+
+    // Last set: skip the rest screen entirely and route straight to the
+    // cinematic transition moment. Earlier sets still get the rest screen.
+    if (_currentSet >= _spec.sets) {
+      final completedDuration =
+          DateTime.now().difference(_startedAt ?? DateTime.now());
+      final calories = _estimateCalories(
+        report: report,
+        totalDuration: completedDuration,
+      );
+      _setFlowState(() {
+        _currentSetReport = report.sets.last;
+        _currentSetLogger = logger;
+        _fullReport = report;
+        _completedDuration = completedDuration;
+        _estimatedCalories = calories;
+        _activeExercise = null;
+        _phase = _WorkoutFlowPhase.transition;
+      });
+      _persistSession(report);
+      return;
+    }
 
     _setFlowState(() {
       _currentSetReport = report.sets.last;
@@ -474,34 +517,19 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
   void _handleSummaryNext() {
     if (_currentSet >= _spec.sets) {
       final report = _buildReport();
-      final faultCounts = _aggregateFaultCounts(_setLoggers);
       final completedDuration =
           DateTime.now().difference(_startedAt ?? DateTime.now());
-
-      final builderEntry = reportBuilders[widget.definition.id];
-      SessionComparison? comparison;
-      if (builderEntry != null && _sessionHistory.isNotEmpty) {
-        comparison = ExerciseComparisonService().buildExecutiveComparison(
-          currentFormScore: report.formScore,
-          currentFaultCounts: faultCounts,
-          history: _sessionHistory,
-          userPainAreas: _painAreas,
-          painToFaultMap: builderEntry.builder.painToFaultMap(),
-          faultLabels: builderEntry.builder.praiseMetricNames(),
-          streakLength: _userStats?.streakDays ?? 0,
-        );
-      }
+      final calories = _estimateCalories(
+        report: report,
+        totalDuration: completedDuration,
+      );
 
       _setFlowState(() {
         _fullReport = report;
         _completedDuration = completedDuration;
-        _estimatedCalories = _estimateCalories(
-          report: report,
-          totalDuration: completedDuration,
-        );
-        _comparison = comparison;
+        _estimatedCalories = calories;
         _activeExercise = null;
-        _phase = _WorkoutFlowPhase.executive;
+        _phase = _WorkoutFlowPhase.transition;
       });
 
       if (!_isAssessment) {
@@ -518,12 +546,113 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     });
   }
 
+  /// Praise line for the 3.5-sec transition moment. Picks the highest
+  /// non-null per-set praise; falls back to a generic line if every set
+  /// returned null (e.g. nothing in the praise ladder triggered).
+  String _transitionPraiseLine() {
+    final report = _fullReport;
+    if (report == null) return 'Bài này xong — bạn vừa đẩy thêm một bước.';
+    for (final set in report.sets.reversed) {
+      final p = set.praiseSentence;
+      if (p != null && p.isNotEmpty) return p;
+    }
+    return 'Bài này xong — bạn vừa đẩy thêm một bước.';
+  }
+
+  /// Called when the 3.5-sec transition cinematic finishes auto-advancing.
+  /// Builds the [ExerciseSessionReport] for THIS exercise, appends it
+  /// onto `widget.priorReports`, and routes to either the next exercise
+  /// or the workout-wide summary screen.
+  void _handleTransitionComplete() {
+    final report = _fullReport;
+    if (report == null) {
+      // Defensive: shouldn't happen, but bail to home cleanly.
+      Navigator.of(context).pop({'completed': true});
+      return;
+    }
+    final newEntry = ExerciseSessionReport(
+      definition: widget.definition,
+      report: report,
+      duration: _completedDuration ?? Duration.zero,
+      calories: _estimatedCalories ?? 0,
+      // userDifficulty is collected on the NEXT exercise's intro (or on
+      // the workout summary for the last exercise).
+    );
+    final accumulated = [...widget.priorReports, newEntry];
+
+    if (_hasNextInSequence) {
+      final next = _nextInSequenceWith(accumulated);
+      Navigator.of(context).pop({'completed': true, 'next': next});
+    } else {
+      // Final exercise — push the workout summary on top, then when the
+      // user dismisses it, pop back to the caller with `completed: true`.
+      //
+      // IMPORTANT: We `pushReplacement` so this experience screen state
+      // is disposed once the summary is up. That means the callbacks
+      // below MUST NOT close over `this.context` (which becomes invalid
+      // after dispose) — instead, the summary screen's own BuildContext
+      // is used to pop.
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (summaryContext) => WorkoutSummaryScreen(
+            reports: accumulated,
+            totalDuration: _aggregateDuration(accumulated),
+            totalCalories: _aggregateCalories(accumulated),
+            streakDays: _userStats?.streakDays ?? 0,
+            // TODO(wiring): persist per-exercise difficulty for the
+            // last exercise + session-level RPE. Today only the
+            // existing single-exercise persistence runs. See report.
+            onLastExerciseDifficulty: (d) {
+              // _handleOverallDifficulty reads from this defunct state,
+              // but it's safe because it only touches in-memory fields
+              // that were captured before pushReplacement. The pending
+              // overall difficulty path keeps working via SharedPrefs.
+              _handleOverallDifficulty(d);
+            },
+            onSessionRpe: (_) {
+              // TODO(wiring): persist session-level RPE separately.
+            },
+            onDone: () => Navigator.of(summaryContext)
+                .pop({'completed': true}),
+          ),
+        ),
+      );
+    }
+  }
+
+  Duration _aggregateDuration(List<ExerciseSessionReport> reports) {
+    var total = Duration.zero;
+    for (final r in reports) {
+      total += r.duration;
+    }
+    return total;
+  }
+
+  int _aggregateCalories(List<ExerciseSessionReport> reports) {
+    return reports.fold(0, (s, r) => s + r.calories);
+  }
+
+  /// Called when the user picks a difficulty for the *previous* exercise
+  /// on this exercise's intro page (or the last exercise's difficulty on
+  /// the summary screen).
+  void _handlePreviousExerciseDifficulty(String difficulty) {
+    final prev = _previousReport;
+    if (prev == null) return;
+    prev.userDifficulty = difficulty;
+    // TODO(wiring): persist per-exercise difficulty into the previous
+    // exercise's exercise_sessions row. The current
+    // `updateSessionDifficulty` writes to whatever the *current* session
+    // is — we need the previous exercise's session id here. See report.
+  }
+
   @override
   Widget build(BuildContext context) {
     final backgroundColor = switch (_phase) {
       _WorkoutFlowPhase.active => const Color(0xFF15110D),
+      _WorkoutFlowPhase.transition => const Color(0xFF15110D),
       _ => const Color(0xFFF0EDE6),
     };
+    final prev = _previousReport;
     final phaseBody = switch (_phase) {
       _WorkoutFlowPhase.intro => ExerciseIntroPage(
           title: widget.definition.name,
@@ -541,6 +670,11 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
           coachNote: _coachNote,
           sessionProgressLabel: _sessionProgressLabel,
           isContinuation: _isContinuationSlot,
+          previousExerciseName: prev?.exerciseName,
+          previousExerciseFormScore: prev?.formScore,
+          onPreviousDifficulty: prev != null
+              ? _handlePreviousExerciseDifficulty
+              : null,
           onStart: _beginWorkout,
           onBack: () => Navigator.of(context).pop(),
         ),
@@ -565,25 +699,14 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
           previousSession: _sessionHistory,
           onDifficultyAnswer: _handleDifficultyAnswer,
         ),
-      _WorkoutFlowPhase.executive => ExecutiveSummaryPage(
-          report: _fullReport!,
-          comparison: _comparison,
-          calories: _estimatedCalories ?? 0,
-          userWeightKg: _userWeightKg,
-          totalDuration: _completedDuration ?? Duration.zero,
-          isFirstSession: _sessionHistory.isEmpty,
-          streakDays: _userStats?.streakDays ?? 0,
-          lastOverallDifficulty: _sessionHistory.isNotEmpty
-              ? _sessionHistory.last.overallDifficulty
-              : null,
-          onOverallDifficulty: _handleOverallDifficulty,
-          sessionProgressLabel: _sessionProgressLabel,
-          doneLabel: _summaryDoneLabel,
-          isFinalWorkoutSlot: _nextInSequence == null,
-          onDone: () => Navigator.of(context).pop({
-            'completed': true,
-            'next': _nextInSequence,
-          }),
+      _WorkoutFlowPhase.transition => ExerciseTransitionMoment(
+          exerciseName: widget.definition.name,
+          formScore: _fullReport?.formScore ?? 0,
+          praiseLine: _transitionPraiseLine(),
+          nextExerciseName: _hasNextInSequence
+              ? 'Bài tiếp theo · ${_nextExerciseName ?? ''}'
+              : 'Tổng kết buổi tập',
+          onComplete: _handleTransitionComplete,
         ),
     };
 
@@ -594,7 +717,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
   }
 }
 
-enum _WorkoutFlowPhase { intro, active, rest, executive }
+enum _WorkoutFlowPhase { intro, active, rest, transition }
 
 class _ExerciseExperienceSpec {
   const _ExerciseExperienceSpec({

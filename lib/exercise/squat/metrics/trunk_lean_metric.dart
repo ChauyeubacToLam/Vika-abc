@@ -13,7 +13,7 @@ class TrunkLeanConfig {
   /// Good forward lean range (degrees from vertical)
   /// Keep a bit more tolerance here so the chest-up cue is less trigger-happy
   /// on natural forward lean during descent.
-  static const List<double> GOOD_LEAN_RANGE = [15, 40];
+  static const List<double> GOOD_LEAN_RANGE = [15, 45];
   static const double WarningLean =
       30.0; // Leaning forward but not past good range yet
 

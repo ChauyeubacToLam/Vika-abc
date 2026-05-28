@@ -245,22 +245,22 @@ abstract class ExerciseBase {
 
     _syncPresenceState(hasPose: true);
 
-    debugData['hasPose'] = true;
-    debugData['personRatio'] = _personDetector.lastPersonRatio;
-    debugData['personSoftRatio'] = _personDetector.lastSoftPersonRatio;
-    debugData['personSmoothedRatio'] = _personDetector.smoothedPersonRatio;
-    debugData['personSmoothedSoftRatio'] =
-        _personDetector.smoothedSoftPersonRatio;
-    debugData['personScore'] = _personDetector.presenceScore;
-    debugData['personDetected'] = _personDetector.personDetected;
-    debugData['personPresent'] = _personDetector.personDetected;
-    debugData['segIntervalMs'] =
-        _personDetector.configuredMinProcessIntervalMs ?? '-';
-    debugData['segEvents'] = _personDetector.segmentationEventCount;
-    debugData['segEventAgeMs'] =
-        _personDetector.lastSegmentationEventAgeMs ?? '-';
-    debugData['segTriggerCounts'] = _personDetector.triggerCountByReason;
-    debugData['isPaused'] = _isPaused;
+    // debugData['hasPose'] = true;
+    // debugData['personRatio'] = _personDetector.lastPersonRatio;
+    // debugData['personSoftRatio'] = _personDetector.lastSoftPersonRatio;
+    // debugData['personSmoothedRatio'] = _personDetector.smoothedPersonRatio;
+    // debugData['personSmoothedSoftRatio'] =
+    //     _personDetector.smoothedSoftPersonRatio;
+    // debugData['personScore'] = _personDetector.presenceScore;
+    // debugData['personDetected'] = _personDetector.personDetected;
+    // debugData['personPresent'] = _personDetector.personDetected;
+    // debugData['segIntervalMs'] =
+    //     _personDetector.configuredMinProcessIntervalMs ?? '-';
+    // debugData['segEvents'] = _personDetector.segmentationEventCount;
+    // debugData['segEventAgeMs'] =
+    //     _personDetector.lastSegmentationEventAgeMs ?? '-';
+    // debugData['segTriggerCounts'] = _personDetector.triggerCountByReason;
+    // debugData['isPaused'] = _isPaused;
 
     // Person detection — only before activation
     if (exerciseState == ExerciseState.notActivated && !_personConfirmed) {
@@ -337,20 +337,20 @@ abstract class ExerciseBase {
     checkExerciseState(smoothedLandmarks, exerciseState);
 
     _populateBaseDebugData();
-    debugData['posePresenceBaseline'] = _posePresenceDetector.baseline;
-    debugData['posePresenceRecent'] = _posePresenceDetector.recent;
-    debugData['posePresenceDelta'] = _posePresenceDetector.currentDelta;
-    debugData['posePresenceAnomaly'] = _posePresenceDetector.isAnomalyConfirmed;
-    debugData['poseLowPresence'] = poseLowPresence;
-    debugData['poseFrameEdgeRisk'] = poseFrameEdgeRisk;
-    debugData['personPresent'] = _personDetector.personDetected;
-    debugData['segIntervalMs'] =
-        _personDetector.configuredMinProcessIntervalMs ?? '-';
-    debugData['segEvents'] = _personDetector.segmentationEventCount;
-    debugData['segEventAgeMs'] =
-        _personDetector.lastSegmentationEventAgeMs ?? '-';
-    debugData['segTriggerCounts'] = _personDetector.triggerCountByReason;
-    debugData['scaleFactor'] = scaleFactor;
+    // debugData['posePresenceBaseline'] = _posePresenceDetector.baseline;
+    // debugData['posePresenceRecent'] = _posePresenceDetector.recent;
+    // debugData['posePresenceDelta'] = _posePresenceDetector.currentDelta;
+    // debugData['posePresenceAnomaly'] = _posePresenceDetector.isAnomalyConfirmed;
+    // debugData['poseLowPresence'] = poseLowPresence;
+    // debugData['poseFrameEdgeRisk'] = poseFrameEdgeRisk;
+    // debugData['personPresent'] = _personDetector.personDetected;
+    // debugData['segIntervalMs'] =
+    //     _personDetector.configuredMinProcessIntervalMs ?? '-';
+    // debugData['segEvents'] = _personDetector.segmentationEventCount;
+    // debugData['segEventAgeMs'] =
+    //     _personDetector.lastSegmentationEventAgeMs ?? '-';
+    // debugData['segTriggerCounts'] = _personDetector.triggerCountByReason;
+    // debugData['scaleFactor'] = scaleFactor;
 
     if (exerciseState == ExerciseState.activated) {
       checkingPose(smoothedLandmarks);
@@ -397,22 +397,22 @@ abstract class ExerciseBase {
     _syncPresenceState(hasPose: false);
     _populateBaseDebugData();
 
-    debugData['hasPose'] = false;
-    debugData['personRatio'] = _personDetector.lastPersonRatio;
-    debugData['personSoftRatio'] = _personDetector.lastSoftPersonRatio;
-    debugData['personSmoothedRatio'] = _personDetector.smoothedPersonRatio;
-    debugData['personSmoothedSoftRatio'] =
-        _personDetector.smoothedSoftPersonRatio;
-    debugData['personScore'] = _personDetector.presenceScore;
-    debugData['personDetected'] = _personDetector.personDetected;
-    debugData['personPresent'] = _personDetector.personDetected;
-    debugData['segIntervalMs'] =
-        _personDetector.configuredMinProcessIntervalMs ?? '-';
-    debugData['segEvents'] = _personDetector.segmentationEventCount;
-    debugData['segEventAgeMs'] =
-        _personDetector.lastSegmentationEventAgeMs ?? '-';
-    debugData['segTriggerCounts'] = _personDetector.triggerCountByReason;
-    debugData['isPaused'] = _isPaused;
+    // debugData['hasPose'] = false;
+    // debugData['personRatio'] = _personDetector.lastPersonRatio;
+    // debugData['personSoftRatio'] = _personDetector.lastSoftPersonRatio;
+    // debugData['personSmoothedRatio'] = _personDetector.smoothedPersonRatio;
+    // debugData['personSmoothedSoftRatio'] =
+    //     _personDetector.smoothedSoftPersonRatio;
+    // debugData['personScore'] = _personDetector.presenceScore;
+    // debugData['personDetected'] = _personDetector.personDetected;
+    // debugData['personPresent'] = _personDetector.personDetected;
+    // debugData['segIntervalMs'] =
+    //     _personDetector.configuredMinProcessIntervalMs ?? '-';
+    // debugData['segEvents'] = _personDetector.segmentationEventCount;
+    // debugData['segEventAgeMs'] =
+    //     _personDetector.lastSegmentationEventAgeMs ?? '-';
+    // debugData['segTriggerCounts'] = _personDetector.triggerCountByReason;
+    // debugData['isPaused'] = _isPaused;
 
     if (exerciseState == ExerciseState.completed) {
       _trackDebugFrame();
@@ -450,7 +450,7 @@ abstract class ExerciseBase {
 
   void _populateBaseDebugData() {
     // debugData['exerciseState'] = exerciseState.toString().split('.').last;
-    debugData['cameraFacing'] = cameraFacing.toString().split('.').last;
+    // debugData['cameraFacing'] = cameraFacing.toString().split('.').last;
     // debugData['personConfirmed'] = _personConfirmed;
   }
 

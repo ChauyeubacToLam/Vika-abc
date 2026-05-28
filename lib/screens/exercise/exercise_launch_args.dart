@@ -1,4 +1,5 @@
 import '../../models/exercise_definition.dart';
+import '../../models/workout_session_report.dart';
 import '../../services/recommendation/models/plan.dart';
 
 class ExerciseSequenceItem {
@@ -32,6 +33,7 @@ class ExerciseLaunchArgs {
     this.slotName,
     this.sequence = const [],
     this.sequenceIndex = 0,
+    this.priorReports = const [],
   });
 
   final ExerciseDefinition definition;
@@ -44,7 +46,14 @@ class ExerciseLaunchArgs {
   final List<ExerciseSequenceItem> sequence;
   final int sequenceIndex;
 
-  ExerciseLaunchArgs? nextInSequence() {
+  /// Reports from previously-finished exercises in this same workout
+  /// sequence. The last entry's [ExerciseSessionReport.userDifficulty]
+  /// is null on entry — this screen's intro collects it.
+  final List<ExerciseSessionReport> priorReports;
+
+  ExerciseLaunchArgs? nextInSequence({
+    List<ExerciseSessionReport>? carryForwardReports,
+  }) {
     final nextIndex = sequenceIndex + 1;
     if (nextIndex >= sequence.length) return null;
     final next = sequence[nextIndex];
@@ -58,6 +67,7 @@ class ExerciseLaunchArgs {
       slotName: next.slotName,
       sequence: sequence,
       sequenceIndex: nextIndex,
+      priorReports: carryForwardReports ?? priorReports,
     );
   }
 }

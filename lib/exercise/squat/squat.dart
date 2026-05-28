@@ -21,11 +21,14 @@ import '../../services/squat_voice_coach.dart';
 // --- Config ---
 
 class SquatConfig {
+  static const double ERROR_ALLOW = 2;
   static const int MAX_REP = 15;
-  static const int SQUAT_STAND_ANGLE_THRESHOLD = 160;
-  static const int SQUAT_DESCEND_ANGLE_THRESHOLD = 152;
+  static const double SQUAT_STAND_ANGLE_THRESHOLD = 160;
   static const List<int> SQUAT_BOTTOM_ANGLE_THRESHOLD = [80, 100];
   static const double BOTTOM_RELEASE_READY_TOLERANCE_SECONDS = 0.05;
+  static const double ANGLE_STABLE_GATE = 2; // degrees, for FrameBuffer angle change detection
+  static const double ROM_GATE = 36; // degrees, minimum angle change to confirm direction switch from descending to ascending
+
 }
 
 enum SquatState { standing, descending, bottom, ascending }
@@ -72,6 +75,7 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
 
   static String bottomHoldStatus(double remainingSeconds) =>
       'Hold! ${remainingSeconds.toStringAsFixed(1)}s';
+
 
   static bool isHoldStatus(String statusText) {
     return statusText.startsWith('Hold') || statusText.contains('Giữ');
@@ -184,6 +188,9 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
   final Debouncer _standingDebouncer = Debouncer(requiredFrames: 2);
   final StickyDebouncer directionDetection = StickyDebouncer();
 
+  // base 
+  double _baselineKneeAngle = SquatConfig.SQUAT_STAND_ANGLE_THRESHOLD; // Updated when standing still at the top to adapt to user differences and tracking noise.
+
   // --- UI Bridge ---
 
   @override
@@ -244,8 +251,9 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
       midPoint: knee,
       lastPoint: ankle,
     );
-    if (kneeAngle < 155.0) return false;
-
+    if (kneeAngle < _baselineKneeAngle - SquatConfig.ERROR_ALLOW ) return false;
+    _baselineKneeAngle = kneeAngle; // Set baseline for this user
+    
     return true;
   }
 
@@ -351,6 +359,8 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
     debugData['heelDistance'] = heelDistanceToFloor;
     debugData['heelLiftPct'] = normalizedHeelLift * 100;
 
+// 4.5 Sync baseline to depth metric for debug threshold
+depthMetric.baselineAngle = _baselineKneeAngle;
     // 5. Buffer frame & update state machine
     frameBuffer.addFrame(FrameSnapshot(log: {
       "kneeAngle": kneeAngle,
@@ -388,6 +398,10 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
   void _completeRep(RepContext ctx) {
     final finalState = previousSquatState;
     final reachedBottom = _reachedBottomThisRep;
+
+    if(previousSquatState != SquatState.descending) {
+  
+    
     repCount += 1;
 
     // Evaluate final metrics for this rep
@@ -453,14 +467,21 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
       "descending_time": tempoMetric.descentDuration ?? 0.0,
       "fault_types": allFaults.map((f) => f.type).toSet().toList(),
     }));
+      for (final metric in _metrics) {
+      metric.resetAndCountFault();
+    }
+    }else{
+        resultIssues.feedback['Status'] = 'Xuống thấp hơn nhé';
+            for (final metric in _metrics) {
+      metric.reset();
+    }
+
+    }
 
     // Reset for next rep
     correctForm = true;
     _reachedBottomThisRep = false;
     previousSquatState = SquatState.standing;
-    for (final metric in _metrics) {
-      metric.resetAndCountFault();
-    }
   }
 
   // --- Phase Instructions ---
@@ -499,30 +520,31 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
   // Uses frame buffer angle change direction + debouncers for robust transitions.
 
   void _updateStateBuffer(double kneeAngle, int timestampMs) {
-    final angleChange = frameBuffer.getAngleChange("kneeAngle");
-    final isDescendingFrame = angleChange == AngleChangeState.decreasing;
-    final isAscendingFrame = angleChange == AngleChangeState.increasing;
+    final angleChange = frameBuffer.getChange("kneeAngle", SquatConfig.ANGLE_STABLE_GATE);
+    final isDescendingFrame = angleChange == ChangeState.decreasing;
+    final isAscendingFrame = angleChange == ChangeState.increasing;
+    double kneeAngleChangeFromBaseline = _baselineKneeAngle - kneeAngle;
+    // debugData['kneeAngleChangeFromBaseline'] = kneeAngleChangeFromBaseline;
 
     // Direction-based transitions
-    if (angleChange != AngleChangeState.stable) {
+    if (angleChange != ChangeState.stable) {
       final isIncreasing = directionDetection.update(isAscendingFrame);
 
       if (!isIncreasing &&
-          squatState == SquatState.standing &&
-          kneeAngle < SquatConfig.SQUAT_STAND_ANGLE_THRESHOLD - 5) {
+          squatState == SquatState.standing && kneeAngleChangeFromBaseline > SquatConfig.ROM_GATE) {
         _transitionState(SquatState.descending, timestampMs);
         frameBuffer.clear();
       } else if (isIncreasing &&
-          (squatState == SquatState.bottom ||
-              squatState == SquatState.descending)) {
+              squatState == SquatState.descending ) {
         _transitionState(SquatState.ascending, timestampMs);
       }
     }
 
-    if (squatState == SquatState.bottom &&
-        kneeAngle > SquatConfig.SQUAT_BOTTOM_ANGLE_THRESHOLD[1] + 5) {
-      _transitionState(SquatState.ascending, timestampMs);
-    }
+  if (squatState == SquatState.bottom) {
+  if (isAscendingFrame) {
+    _transitionState(SquatState.ascending, timestampMs);
+  } 
+}
 
     // Debounced threshold transitions
     if (_bottomDebouncer.update(
@@ -530,7 +552,7 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
             squatState == SquatState.descending)) {
       _transitionState(SquatState.bottom, timestampMs);
     } else if (_standingDebouncer.update(
-        kneeAngle > SquatConfig.SQUAT_STAND_ANGLE_THRESHOLD &&
+        kneeAngle > _baselineKneeAngle  &&
             (squatState == SquatState.ascending ||
                 squatState == SquatState.descending) &&
             !isDescendingFrame)) {
@@ -557,4 +579,5 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
       metric.onStateTransition(previousSquatState, newState, timestampMs);
     }
   }
+
 }
