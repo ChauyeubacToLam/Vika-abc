@@ -58,13 +58,13 @@ class AuthService {
     try {
       await _clearInteractiveAuthState();
 
-      if (_googleWebClientId.startsWith('YOUR_WEB_CLIENT_ID')) {
+      if (googleWebClientId.startsWith('YOUR_WEB_CLIENT_ID')) {
         throw Exception(
           'Thiếu Google Web Client ID. Hãy cấu hình VIKA_GOOGLE_WEB_CLIENT_ID.',
         );
       }
 
-      final googleSignIn = GoogleSignIn(serverClientId: _googleWebClientId);
+      final googleSignIn = GoogleSignIn(serverClientId: googleWebClientId);
       final googleUser = await googleSignIn.signIn();
 
       if (googleUser == null) {
@@ -251,7 +251,7 @@ class AuthService {
 
   Future<void> _safeGoogleSignOut() async {
     try {
-      await GoogleSignIn(serverClientId: _googleWebClientId).signOut();
+      await GoogleSignIn(serverClientId: googleWebClientId).signOut();
     } catch (_) {
       // Best effort: stale Google SDK state should not block another provider.
     }
