@@ -3,10 +3,6 @@ import 'dart:io' show Platform;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-
-import 'package:vika/services/auth_service.dart';
-
 import '../../onboarding_data.dart';
 import '../v5_models.dart';
 import '../v5_primitives.dart';

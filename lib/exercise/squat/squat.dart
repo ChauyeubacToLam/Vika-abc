@@ -58,6 +58,12 @@ enum SquatState { standing, descending, bottom, ascending }
 //    - hip_shoulder_sync_fails_count: from the sum of all hip_shoulder_sync_fails_count
 
 class Squat extends ExerciseBase with SideTrackedExerciseMixin {
+  @override
+  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+        VikaImageOrientation.landscapeLeft,
+        VikaImageOrientation.landscapeRight,
+      };
+
   static const String standingStatus = 'Xuống';
   static const String descendingStatus = 'Going Down...';
   static const String ascendingStatus = 'Đứng lên';

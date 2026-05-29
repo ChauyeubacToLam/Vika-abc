@@ -6,7 +6,6 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
-import 'package:native_device_orientation/native_device_orientation.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -27,6 +26,7 @@ import 'widgets/form_score_arc.dart';
 import 'widgets/ivory_chrome.dart';
 import 'widgets/pose_overlay_painter.dart';
 import 'widgets/system_banner.dart';
+import 'package:native_device_orientation/native_device_orientation.dart';
 
 class ActiveExercisePage extends StatefulWidget {
   const ActiveExercisePage({

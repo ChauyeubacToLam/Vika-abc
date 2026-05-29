@@ -2,6 +2,17 @@ import '../models/post_exercise_data.dart';
 import '../utils/exercise_logger.dart';
 import '../interpreter/interpreter_base.dart';
 import 'squat/squat_report_builder.dart';
+import '8.Leg Raises (Supine)/leg_raise_report_builder.dart';
+import '9.Reverse Crunch/reverse_crunch_report_builder.dart';
+import '10.Vup/v_up_report_builder.dart';
+import '12.Dead Bug/dead_bug_report_builder.dart';
+import '13.Plank Up-Down/plank_up_down_report_builder.dart';
+import '14.Bear Plank/bear_plank_report_builder.dart';
+import 'cossack_squat/cossack_squat_report_builder.dart';
+import 'walking_lunge/walking_lunge_report_builder.dart';
+import 'tricep_dip/tricep_dip_report_builder.dart';
+import 'russian_twist/russian_twist_report_builder.dart';
+import 'standing_knee_to_elbow/standing_knee_to_elbow_report_builder.dart';
 
 // ═══════════════════════════════════════════════════════════════
 // REGISTRY
@@ -16,6 +27,17 @@ final Map<String, ({ExerciseReportBuilder builder, double met})>
     reportBuilders = {
   'squat': (builder: SquatReportBuilder(), met: 5.0),
   'squat_assessment': (builder: SquatReportBuilder(), met: 5.0),
+  'leg_raise': (builder: LegRaiseReportBuilder(), met: 3.5),
+  'reverse_crunch': (builder: ReverseCrunchReportBuilder(), met: 3.5),
+  'v_up': (builder: VUpReportBuilder(), met: 4.0),
+  'dead_bug': (builder: DeadBugReportBuilder(), met: 3.0),
+  'plank_up_down': (builder: PlankUpDownReportBuilder(), met: 4.5),
+  'bear_plank': (builder: BearPlankReportBuilder(), met: 3.5),
+  'cossack_squat': (builder: CossackSquatReportBuilder(), met: 5.0),
+  'walking_lunge': (builder: WalkingLungeReportBuilder(), met: 6.0),
+  'tricep_dip': (builder: TricepDipReportBuilder(), met: 3.5),
+  'russian_twist': (builder: RussianTwistReportBuilder(), met: 5.0),
+  'standing_knee_to_elbow': (builder: StandingKneeToElbowReportBuilder(), met: 7.0),
   // 'glute_bridge': (builder: GluteBridgeReportBuilder(), met: 3.5),
   // 'wall_push_up': (builder: WallPushUpReportBuilder(), met: 3.0),
 };
