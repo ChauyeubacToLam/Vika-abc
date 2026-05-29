@@ -5,15 +5,12 @@ import '../models/exercise_lookup.dart';
 import '../screens/exercise/exercise_launch_args.dart';
 import 'recommendation/models/plan.dart';
 import 'recommendation/recommendation_service.dart';
-import 'session_persistence.dart';
 
 class WorkoutLaunchTarget {
   const WorkoutLaunchTarget({
     required this.snapshot,
     required this.week,
     required this.session,
-    required this.scheduledDate,
-    required this.isTodayScheduled,
     required this.sequence,
     required this.completedSessionsThisWeek,
   });
@@ -21,18 +18,15 @@ class WorkoutLaunchTarget {
   final PlanSnapshot snapshot;
   final WeekPlan week;
   final SessionPlan session;
-  final DateTime scheduledDate;
-  final bool isTodayScheduled;
   final List<ExerciseSequenceItem> sequence;
   final int completedSessionsThisWeek;
 
   bool get hasLaunchableSlots => sequence.isNotEmpty;
-  bool get isOffDayPullForward => !isTodayScheduled;
   bool get hasCompletedWeek =>
       completedSessionsThisWeek >= week.sessions.length &&
       week.sessions.isNotEmpty;
 
-  ExerciseLaunchArgs? get firstLaunchArgs {
+  ExerciseLaunchArgs? firstLaunchArgs({String? workoutSessionId}) {
     if (sequence.isEmpty) return null;
     final first = sequence.first;
     return ExerciseLaunchArgs(
@@ -45,6 +39,7 @@ class WorkoutLaunchTarget {
       slotName: first.slotName,
       sequence: sequence,
       sequenceIndex: 0,
+      workoutSessionId: workoutSessionId,
     );
   }
 }
@@ -52,7 +47,6 @@ class WorkoutLaunchTarget {
 class WorkoutLaunchHomeState {
   const WorkoutLaunchHomeState({
     required this.hasActivePlan,
-    required this.isRecoveryDay,
     required this.hasCompletedWeek,
     required this.completedSessionsThisWeek,
     required this.sessionsThisWeek,
@@ -60,7 +54,6 @@ class WorkoutLaunchHomeState {
   });
 
   final bool hasActivePlan;
-  final bool isRecoveryDay;
   final bool hasCompletedWeek;
   final int completedSessionsThisWeek;
   final int sessionsThisWeek;
@@ -68,14 +61,10 @@ class WorkoutLaunchHomeState {
 }
 
 class WorkoutLaunchService {
-  WorkoutLaunchService({
-    RecommendationService? recommendations,
-    SessionPersistence? sessions,
-  })  : _recommendations = recommendations ?? RecommendationService(),
-        _sessions = sessions ?? SessionPersistence();
+  WorkoutLaunchService({RecommendationService? recommendations})
+      : _recommendations = recommendations ?? RecommendationService();
 
   final RecommendationService _recommendations;
-  final SessionPersistence _sessions;
 
   Future<WorkoutLaunchTarget?> resolveTodayOrNextInCurrentWeek() async {
     final snapshot =
@@ -90,7 +79,6 @@ class WorkoutLaunchService {
     if (snapshot == null) {
       return const WorkoutLaunchHomeState(
         hasActivePlan: false,
-        isRecoveryDay: false,
         hasCompletedWeek: false,
         completedSessionsThisWeek: 0,
         sessionsThisWeek: 0,
@@ -101,31 +89,18 @@ class WorkoutLaunchService {
     if (week == null || week.sessions.isEmpty) {
       return const WorkoutLaunchHomeState(
         hasActivePlan: true,
-        isRecoveryDay: false,
         hasCompletedWeek: false,
         completedSessionsThisWeek: 0,
         sessionsThisWeek: 0,
       );
     }
 
-    final completed = await _sessions.countCompletedWorkoutDaysForWeek(
-      recommendationId: snapshot.plan.recommendationId,
-      weekNumber: week.weekNumber,
-    );
-    final todayIndex = _localDay(DateTime.now())
-        .difference(
-          _weekStart(snapshot, week),
-        )
-        .inDays;
-    final isTodayScheduled = _sessionDayIndexes(
-      week.sessions.length,
-      snapshot.scheduleDayIndexes,
-    ).contains(todayIndex);
+    final completed = snapshot.completionMap[week.weekNumber]?.length ?? 0;
+
     final target = await resolveFromSnapshot(snapshot);
 
     return WorkoutLaunchHomeState(
       hasActivePlan: true,
-      isRecoveryDay: !isTodayScheduled,
       hasCompletedWeek: _hasCompletedWeek(completed, week),
       completedSessionsThisWeek: _clampCompletedCount(completed, week),
       sessionsThisWeek: week.sessions.length,
@@ -134,113 +109,38 @@ class WorkoutLaunchService {
   }
 
   Future<WorkoutLaunchTarget?> resolveFromSnapshot(
-    PlanSnapshot snapshot, {
-    WeekPlan? week,
-  }) async {
-    if (snapshot.plan.weeks.isEmpty) return null;
-    final startWeekNumber = week?.weekNumber ?? snapshot.currentWeekNumber;
-    final candidateWeeks = snapshot.plan.weeks
-        .where((candidate) => candidate.weekNumber >= startWeekNumber)
-        .toList(growable: false)
-      ..sort((a, b) => a.weekNumber.compareTo(b.weekNumber));
+      PlanSnapshot snapshot) async {
+    final pos = snapshot.currentPosition;
 
-    for (final candidateWeek in candidateWeeks) {
-      if (candidateWeek.sessions.isEmpty) continue;
-      final target = await _resolveNextInWeek(
-        snapshot: snapshot,
-        week: candidateWeek,
-      );
-      if (target != null) return target;
-    }
-    return null;
+    final startWeek = snapshot.currentWeek;
+    if (snapshot.plan.weeks.isEmpty || pos == null || startWeek == null)
+      return null;
+    final startSessionIndex = pos.$2;
+
+    final target = await _buildTarget(
+      snapshot: snapshot,
+      week: startWeek,
+      session: startWeek.sessions[startSessionIndex],
+    );
+
+    return target;
   }
 
-  Future<WorkoutLaunchTarget?> _resolveNextInWeek({
+  Future<WorkoutLaunchTarget> _buildTarget({
     required PlanSnapshot snapshot,
     required WeekPlan week,
+    required SessionPlan session,
   }) async {
-    final today = _localDay(DateTime.now());
-    final weekStart = _weekStart(snapshot, week);
-    final sessionDays =
-        _sessionDayIndexes(week.sessions.length, snapshot.scheduleDayIndexes);
-    final todayIndex = today.difference(weekStart).inDays;
-    final completed = await _sessions.countCompletedWorkoutDaysForWeek(
-      recommendationId: snapshot.plan.recommendationId,
-      weekNumber: week.weekNumber,
-    );
-    final completedSessionIndexes =
-        await _sessions.completedWorkoutSessionIndexesForWeek(
-      recommendationId: snapshot.plan.recommendationId,
-      weekNumber: week.weekNumber,
-    );
-    final completedCursors = _completedCursorsForWeek(
-      week,
-      completedSessionIndexes,
-      fallbackCompletedCount: completed,
-    );
-
-    final sessionCursor = _selectNextSessionCursor(
-      todayIndex: todayIndex,
-      sessionDays: sessionDays,
-      completedCursors: completedCursors,
-    );
-    if (sessionCursor == null || sessionCursor >= week.sessions.length) {
-      return null;
-    }
-
-    final session = week.sessions[sessionCursor];
-    final scheduledDate =
-        weekStart.add(Duration(days: sessionDays[sessionCursor]));
     final sequence =
         await _sequenceFor(snapshot.plan.recommendationId, week, session);
+    final completed = snapshot.completionMap[week.weekNumber]?.length ?? 0;
     return WorkoutLaunchTarget(
       snapshot: snapshot,
       week: week,
       session: session,
-      scheduledDate: scheduledDate,
-      isTodayScheduled: sessionDays[sessionCursor] == todayIndex,
       sequence: sequence,
       completedSessionsThisWeek: _clampCompletedCount(completed, week),
     );
-  }
-
-  int? _selectNextSessionCursor({
-    required int todayIndex,
-    required List<int> sessionDays,
-    required Set<int> completedCursors,
-  }) {
-    if (sessionDays.isEmpty) return null;
-    bool isIncomplete(int cursor) => !completedCursors.contains(cursor);
-
-    for (var i = 0; i < sessionDays.length; i++) {
-      if (sessionDays[i] >= todayIndex && isIncomplete(i)) return i;
-    }
-
-    return null;
-  }
-
-  Set<int> _completedCursorsForWeek(
-    WeekPlan week,
-    Set<int> completedSessionIndexes, {
-    required int fallbackCompletedCount,
-  }) {
-    if (completedSessionIndexes.isNotEmpty) {
-      final cursors = <int>{};
-      for (var cursor = 0; cursor < week.sessions.length; cursor++) {
-        if (completedSessionIndexes
-            .contains(week.sessions[cursor].sessionIndex)) {
-          cursors.add(cursor);
-        }
-      }
-      return cursors;
-    }
-
-    return {
-      for (var cursor = 0;
-          cursor < fallbackCompletedCount && cursor < week.sessions.length;
-          cursor++)
-        cursor,
-    };
   }
 
   int _clampCompletedCount(int completed, WeekPlan week) {
@@ -314,44 +214,6 @@ class WorkoutLaunchService {
       if (definition != null) return definition;
     }
     return null;
-  }
-
-  DateTime _weekStart(PlanSnapshot snapshot, WeekPlan week) {
-    final anchor = _mondayOfWeek(_localDay(
-      snapshot.startedAt ?? snapshot.generatedAt ?? DateTime.now(),
-    ));
-    return anchor.add(Duration(days: (week.weekNumber - 1) * 7));
-  }
-
-  DateTime _localDay(DateTime date) =>
-      DateTime(date.toLocal().year, date.toLocal().month, date.toLocal().day);
-
-  DateTime _mondayOfWeek(DateTime date) {
-    return date.subtract(Duration(days: date.weekday - DateTime.monday));
-  }
-
-  List<int> _sessionDayIndexes(
-    int sessionCount,
-    List<int> scheduleDayIndexes,
-  ) {
-    final scheduleDays = scheduleDayIndexes
-        .where((day) => day >= 0 && day <= 6)
-        .toSet()
-        .toList()
-      ..sort();
-    if (scheduleDays.length >= sessionCount) {
-      return scheduleDays.take(sessionCount).toList(growable: false);
-    }
-
-    return switch (sessionCount) {
-      <= 0 => const <int>[],
-      1 => const [0],
-      2 => const [0, 3],
-      3 => const [0, 2, 4],
-      4 => const [0, 1, 3, 5],
-      5 => const [0, 1, 2, 3, 4],
-      _ => const [0, 1, 2, 3, 4, 5],
-    };
   }
 }
 

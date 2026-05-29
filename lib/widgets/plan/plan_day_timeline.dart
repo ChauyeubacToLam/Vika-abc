@@ -88,9 +88,8 @@ class _PlanDayTimelineState extends State<PlanDayTimeline> {
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    final sessionCount = widget.days
-        .where((d) => d.status != DayStatus.rest)
-        .length;
+    final sessionCount =
+        widget.days.where((d) => d.status != DayStatus.rest).length;
     return Padding(
       padding: widget.padding,
       child: Column(
@@ -208,15 +207,9 @@ class _DayRowState extends State<_DayRow> {
       curve: Curves.easeOut,
       child: GestureDetector(
         onTap: widget.onTap,
-        onTapDown: tappable
-            ? (_) => setState(() => _pressed = true)
-            : null,
-        onTapUp: tappable
-            ? (_) => setState(() => _pressed = false)
-            : null,
-        onTapCancel: tappable
-            ? () => setState(() => _pressed = false)
-            : null,
+        onTapDown: tappable ? (_) => setState(() => _pressed = true) : null,
+        onTapUp: tappable ? (_) => setState(() => _pressed = false) : null,
+        onTapCancel: tappable ? () => setState(() => _pressed = false) : null,
         behavior: HitTestBehavior.opaque,
         // Stack instead of IntrinsicHeight+Row — IntrinsicHeight can't
         // compute a stable intrinsic size when AnimatedSize is changing

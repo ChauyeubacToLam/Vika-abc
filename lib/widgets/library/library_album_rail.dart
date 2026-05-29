@@ -42,7 +42,8 @@ class LibraryAlbumRail extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: EdgeInsets.fromLTRB(gutter, 0, gutter, intro == null ? 16 : 10),
+          padding:
+              EdgeInsets.fromLTRB(gutter, 0, gutter, intro == null ? 16 : 10),
           child: Row(
             children: [
               Container(
@@ -369,8 +370,7 @@ class _LibraryAlbumCardState extends State<LibraryAlbumCard> {
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.w600,
                                 color: _cream.withValues(alpha: 0.62),
-                                fontFeatures:
-                                    VikaIvoryMain.tabularFigures,
+                                fontFeatures: VikaIvoryMain.tabularFigures,
                               ),
                             ),
                           ],

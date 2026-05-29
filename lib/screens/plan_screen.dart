@@ -1,48 +1,45 @@
-// PlanScreen — polished Stage Plan (Premium Ivory v2).
+// PlanScreen — the completion-anchored Plan tab ("Progress Ledger on a Spine").
 //
-// Real data wiring (RecommendationService, FitnessRetestService,
-// _PlanWeekMapper) preserved verbatim from v1. The rendering layer is
-// fully redesigned to match Home's Stage aesthetic:
+// THE MODEL SHIFT: progression advances by COMPLETING sessions, never by the
+// calendar. There are no dates, no weekday pins, no "this week = 7 dates". A
+// "block" is a progression unit (shown as "TUẦN N · <phase>"); its sessions
+// are an ordered sequence ("Buổi 1 / 2 / 3"). Every status — block, session,
+// retest — is derived ONLY from completion (done · current · upcoming), and the
+// single NEXT session is the one unmistakable thing to tap.
 //
-//   ┌─ DARK STAGE HERO (PlanStageHero, bleeds to top edge)
-//   │     Adapts to selected week's status (current / done / future)
-//   │     CTA on current week is the "Bắt đầu Buổi N" launch
-//   │
-//   ├─ WEEK RAIL (PlanWeekRail)
-//   │     Horizontal scrollable pills, 7 weeks, tap to select
-//   │
-//   ├─ DAY TIMELINE (PlanDayTimeline)
-//   │     Vertical 7-day list for the SELECTED week
-//   │     Tap any non-rest day to expand and see its exercise list
-//   │     Today is expanded by default; recheck day has diamond marker +
-//   │     its own CTA inside the expansion
-//   │
-//   └─ EditorialCloser
+// Composition, top → bottom:
+//   • ProgramStageHero      dark stage: completion bezel + current block +
+//                           NEXT-up entry + the one halo CTA
+//   • ProgramSessionLedger  §SỔ BUỔI — selected block's sessions (done show
+//                           form + difficulty; done rows expand per-exercise)
+//   • ProgramBlockSequence  §CHẶNG ĐƯỜNG — the 7 blocks on a continuous spine
+//   • ProgramRetestBeat     end-of-program retest (completion-gated lock)
+//   • EditorialCloser
 //
-// The dark hero defeats MainShell's top SafeArea via
-// MediaQuery.removePadding(removeTop: true), then re-applies status-bar
-// padding inside itself — same trick as Home.
+// DATA SEAM: this screen is driven ENTIRELY by `loadMockProgramPlan()` (see
+// lib/data/program_mock.dart). It deliberately calls NO backend — no Supabase,
+// no RecommendationService, no WorkoutLaunchService, no SessionPersistence.
+// Swapping the mock for real data is a single provider change: replace
+// `loadMockProgramPlan()` with a `ProgramPlan` mapper over the engine snapshot
+// + completion records. The previous real-data loading + workout-launch wiring
+// is preserved intact in plan_screen_legacy.dart for that work.
 
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../data/plan_mock.dart';
-import '../models/exercise_lookup.dart';
-import '../screens/exercise/exercise_launch_args.dart';
-import '../services/recommendation/fitness_retest_service.dart';
-import '../services/recommendation/models/plan.dart' as reco;
-import '../services/recommendation/recommendation_service.dart';
-import '../services/session_persistence.dart';
-import '../services/user_program_service.dart';
+import '../data/program_mock.dart';
 import '../services/user_profile_service.dart';
-import '../services/workout_launch_service.dart';
+import '../services/user_program_service.dart';
 import '../theme/app_colors.dart';
+import '../theme/responsive.dart';
 import '../utils/orientation_lock.dart';
 import '../widgets/plan/editorial_closer.dart';
-import '../widgets/plan/plan_day_timeline.dart';
-import '../widgets/plan/plan_stage_hero.dart';
-import 'plan_retest_screen.dart';
+import '../widgets/plan/program/program_session_ledger.dart';
+import '../widgets/plan/program/program_stage_hero.dart';
+import '../services/workout_launch_service.dart';
+import '../services/session_persistence.dart';
+import 'exercise/exercise_launch_args.dart';
 
 class PlanScreen extends StatefulWidget {
   const PlanScreen({
@@ -53,7 +50,17 @@ class PlanScreen extends StatefulWidget {
   });
 
   final double bottomPadding;
+
+  /// Real assigned-program data from MainShell. UNUSED by this mock-driven
+  /// presentation — kept as the wiring seam: a future `ProgramPlan` mapper
+  /// would consume `program` (+ the engine snapshot) instead of the mock.
+  // TODO(wiring): map `program` / PlanSnapshot → ProgramPlan and feed it here.
   final UserProgramData? program;
+
+  /// Forwarded on workout completion once real launching is wired. Unused in
+  /// the mock path (no session is actually launched).
+  // TODO(wiring): call onProfileChanged after a real session completes
+  // (see plan_screen_legacy.dart for the streak + profile refresh flow).
   final ValueChanged<AppUserProfile>? onProfileChanged;
 
   @override
@@ -61,160 +68,75 @@ class PlanScreen extends StatefulWidget {
 }
 
 class _PlanScreenState extends State<PlanScreen> {
-  final _service = RecommendationService();
-  final _retests = FitnessRetestService();
-  late Future<_PlanScreenData> _planDataFuture;
+  // TODO(wiring): replace loadMockProgramPlan() with the real mapper. This is
+  // the ONLY line that changes to go from mock → real data.
+  final ProgramPlan _program = loadMockProgramPlan();
+
+  late int _selectedBlockIndex;
+  int? _expandedSessionIndex;
 
   @override
   void initState() {
     super.initState();
     unawaited(OrientationLock.portraitOnly());
-    _planDataFuture = _loadPlanData();
+    _selectedBlockIndex = _program.currentBlockIndex;
   }
 
-  Future<_PlanScreenData> _loadPlanData() async {
-    final snapshot = await _service.ensurePlanForCurrentUser(
-      trigger: 'onboarding',
-    );
-    final pendingRetest = await _retests.fetchPendingRetestForCurrentUser();
-    return _PlanScreenData(
-      snapshot: snapshot,
-      pendingRetest: pendingRetest,
-    );
-  }
+  ProgramBlock get _selectedBlock => _program.blocks[_selectedBlockIndex];
 
-  void _reload() {
+  void _selectBlock(int index) {
+    if (index == _selectedBlockIndex) return;
     setState(() {
-      _planDataFuture = _loadPlanData();
+      _selectedBlockIndex = index;
+      // Expansion is per-block; don't carry an open row across blocks.
+      _expandedSessionIndex = null;
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final c = VikaColors.of(context);
-    return Container(
-      color: c.bg,
-      child: FutureBuilder<_PlanScreenData>(
-        future: _planDataFuture,
-        builder: (context, snapshot) {
-          final data = snapshot.data?.snapshot;
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return _PlanShellMessage(
-              title: 'Đang tải lộ trình',
-              body: 'Vika đang lấy kế hoạch mới nhất từ tài khoản của bạn.',
-              bottomPadding: widget.bottomPadding,
-            );
-          }
-
-          if (data == null || data.plan.weeks.isEmpty) {
-            return _PlanShellMessage(
-              title: 'Chưa có lộ trình',
-              body:
-                  'Vika chưa lưu được kế hoạch. Thử lại để tạo lộ trình từ thuật toán mới.',
-              actionLabel: 'Thử lại',
-              onAction: _reload,
-              bottomPadding: widget.bottomPadding,
-            );
-          }
-
-          return _PlanContent(
-            key: ValueKey(
-              '${data.plan.recommendationId}:'
-              '${snapshot.data?.pendingRetest?.recommendationId ?? 'ready'}',
-            ),
-            snapshot: data,
-            pendingRetest: snapshot.data?.pendingRetest,
-            bottomPadding: widget.bottomPadding,
-            onReload: _reload,
-            onProfileChanged: widget.onProfileChanged,
-          );
-        },
-      ),
-    );
+  void _toggleSessionExpand(int sessionIndex) {
+    setState(() {
+      _expandedSessionIndex =
+          _expandedSessionIndex == sessionIndex ? null : sessionIndex;
+    });
   }
-}
 
-// ═══════════════════════════════════════════════════════════════
-// CONTENT — selected-week state + new composition
-// ═══════════════════════════════════════════════════════════════
-
-class _PlanContent extends StatefulWidget {
-  const _PlanContent({
-    super.key,
-    required this.snapshot,
-    required this.pendingRetest,
-    required this.bottomPadding,
-    required this.onReload,
-    this.onProfileChanged,
-  });
-
-  final PlanSnapshot snapshot;
-  final PendingFitnessRetest? pendingRetest;
-  final double bottomPadding;
-  final VoidCallback onReload;
-  final ValueChanged<AppUserProfile>? onProfileChanged;
-
-  @override
-  State<_PlanContent> createState() => _PlanContentState();
-}
-
-class _PlanContentState extends State<_PlanContent> {
+  /// CTA handler for the single next session. M// add near the other fields
   final _launches = WorkoutLaunchService();
-  late final List<PlanWeek> _weeks;
-  late int _selectedIndex;
 
-  @override
-  void initState() {
-    super.initState();
-    _weeks = _PlanWeekMapper.fromSnapshot(
-      widget.snapshot,
-      pendingRetest: widget.pendingRetest,
-    );
-    final currentIndex =
-        _weeks.indexWhere((w) => w.status == WeekStatus.current);
-    _selectedIndex = currentIndex == -1 ? 0 : currentIndex;
-  }
-
-  void _selectWeek(int i) {
-    if (i == _selectedIndex) return;
-    setState(() => _selectedIndex = i);
-  }
-
-  reco.WeekPlan get _selectedRecoWeek =>
-      widget.snapshot.plan.weeks[_selectedIndex];
-
-  PlanWeek get _selectedWeek => _weeks[_selectedIndex];
-
-  bool get _isShowingCurrentWeek => _selectedWeek.status == WeekStatus.current;
-
-  void _startCurrentSession() {
-    unawaited(_startWeek(_selectedRecoWeek));
-  }
-
-  Future<void> _startWeek(reco.WeekPlan week) async {
-    final target = await _launches.resolveFromSnapshot(
-      widget.snapshot,
-      week: week,
-    );
+  Future<void> _startNextSession() async {
+    final target = await _launches.resolveTodayOrNextInCurrentWeek();
     if (!mounted) return;
-    final first = target?.firstLaunchArgs;
-    if (first != null) {
-      await _runWorkoutSequence(first);
-      if (!mounted) return;
-      widget.onReload();
+    if (target == null || !target.hasLaunchableSlots) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(
+          content: Text('Buổi này chưa có bài camera phù hợp.'),
+        ));
       return;
     }
 
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(
-          content: Text('Bài tập này chưa có màn hình camera trong app.'),
-        ),
+    final base = target.firstLaunchArgs();
+    if (base == null) return;
+
+    String? workoutSessionId;
+    if (base.recommendationId != null) {
+      workoutSessionId = await SessionPersistence().startWorkoutSession(
+        recommendationId: base.recommendationId!,
+        weekNumber: base.weekNumber!,
+        sessionIndex: base.sessionIndex!,
       );
+    }
+
+    final first = target.firstLaunchArgs(workoutSessionId: workoutSessionId);
+    final completed = await _runWorkoutSequence(first!);
+    if (completed) {
+      await SessionPersistence().updateStreak();
+      final profile = await UserProfileService().fetchCurrentProfile();
+      if (profile != null) widget.onProfileChanged?.call(profile);
+    }
   }
 
-  Future<void> _runWorkoutSequence(ExerciseLaunchArgs first) async {
+  Future<bool> _runWorkoutSequence(ExerciseLaunchArgs first) async {
     ExerciseLaunchArgs? next = first;
     var completedFinalSlot = false;
     while (mounted && next != null) {
@@ -222,7 +144,7 @@ class _PlanContentState extends State<_PlanContent> {
         '/exercise',
         arguments: next,
       );
-      if (!mounted) return;
+      if (!mounted) return false;
       if (result is Map && result['next'] is ExerciseLaunchArgs) {
         next = result['next'] as ExerciseLaunchArgs;
       } else {
@@ -230,452 +152,61 @@ class _PlanContentState extends State<_PlanContent> {
         next = null;
       }
     }
-    if (completedFinalSlot) {
-      await SessionPersistence().updateStreak();
-      final profile = await UserProfileService().fetchCurrentProfile();
-      if (profile != null) widget.onProfileChanged?.call(profile);
-    }
+    return completedFinalSlot;
   }
-
-  Future<void> _startRetest() async {
-    final pending = widget.pendingRetest;
-    if (pending == null) return;
-    final completed = await Navigator.of(context).pushNamed(
-      '/plan-retest',
-      arguments: PlanRetestLaunchArgs(pending: pending),
-    );
-    if (!context.mounted || completed != true) return;
-    widget.onReload();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return MediaQuery.removePadding(
-      // Defeat MainShell's top SafeArea so the dark hero bleeds into the
-      // status bar area, same as Home.
-      context: context,
-      removeTop: true,
-      child: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: EdgeInsets.only(bottom: widget.bottomPadding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            PlanStageHero(
-              weeks: _weeks,
-              selectedIndex: _selectedIndex,
-              onSelectWeek: _selectWeek,
-              onStartCurrentSession: _startCurrentSession,
-              userInitial: 'N',
-            ),
-            PlanDayTimeline(
-              days: _selectedWeek.days,
-              weekStatus: _selectedWeek.status,
-              weekNumber: _selectedWeek.num,
-              phaseName: _selectedWeek.name,
-              onStartSession:
-                  _isShowingCurrentWeek ? _startCurrentSession : null,
-              onStartRetest: widget.pendingRetest == null ? null : _startRetest,
-            ),
-            EditorialCloser(
-              section: 'LỘ TRÌNH',
-              tagline: '${_weeks.length} tuần · ${_selectedWeek.name}.',
-            ),
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// SHELL MESSAGE — loading / empty states
-// ═══════════════════════════════════════════════════════════════
-
-class _PlanShellMessage extends StatelessWidget {
-  const _PlanShellMessage({
-    required this.title,
-    required this.body,
-    required this.bottomPadding,
-    this.actionLabel,
-    this.onAction,
-  });
-
-  final String title;
-  final String body;
-  final String? actionLabel;
-  final VoidCallback? onAction;
-  final double bottomPadding;
 
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(28, 0, 28, bottomPadding + 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: 'BeVietnamPro',
-                fontSize: 28,
-                fontWeight: FontWeight.w800,
-                fontStyle: FontStyle.italic,
-                letterSpacing: -1.2,
-                color: c.ink,
+    final r = Responsive.of(context);
+    // The retest is folded into the session ledger as the final session of the
+    // LAST block (no separate card); show it only when that block is selected.
+    final isLastBlock = _selectedBlockIndex == _program.blocks.length - 1;
+
+    return Container(
+      color: c.bg,
+      child: MediaQuery.removePadding(
+        // Defeat MainShell's top SafeArea so the dark hero bleeds into the
+        // status-bar area, then re-apply the inset inside the hero — same
+        // trick as Home.
+        context: context,
+        removeTop: true,
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: EdgeInsets.only(bottom: widget.bottomPadding),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ProgramStageHero(
+                program: _program,
+                selectedIndex: _selectedBlockIndex,
+                onSelectBlock: _selectBlock,
+                onStartNext: _startNextSession,
+                userInitial: 'N',
               ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              body,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: 'BeVietnamPro',
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                height: 1.45,
-                color: c.inkSoft,
+              SizedBox(height: r.gap(34)),
+              ProgramSessionLedger(
+                block: _selectedBlock,
+                expandedIndex: _expandedSessionIndex,
+                onToggleExpand: _toggleSessionExpand,
+                onStartNext: _startNextSession,
+                retest: isLastBlock ? _program.retest : null,
+                retestUnlocked: _program.allBlocksDone,
+                // Locked in the mid-program mock; the unlocked launch is wired
+                // alongside the real session-launch flow.
+                onStartRetest:
+                    _program.allBlocksDone ? _startNextSession : null,
               ),
-            ),
-            if (actionLabel != null && onAction != null) ...[
-              const SizedBox(height: 18),
-              FilledButton(
-                onPressed: onAction,
-                style: FilledButton.styleFrom(
-                  backgroundColor: c.yellow,
-                  foregroundColor: c.yellowInk,
-                ),
-                child: Text(actionLabel!),
+              SizedBox(height: r.gap(38)),
+              const EditorialCloser(
+                section: 'LỘ TRÌNH',
+                tagline: 'Tiến từng buổi, không vội.',
               ),
+              const SizedBox(height: 28),
             ],
-          ],
+          ),
         ),
       ),
     );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// DATA + MAPPER — kept verbatim from v1
-// ═══════════════════════════════════════════════════════════════
-
-class _PlanScreenData {
-  const _PlanScreenData({
-    required this.snapshot,
-    required this.pendingRetest,
-  });
-
-  final PlanSnapshot? snapshot;
-  final PendingFitnessRetest? pendingRetest;
-}
-
-class _PlanWeekMapper {
-  const _PlanWeekMapper._();
-
-  static List<PlanWeek> fromSnapshot(
-    PlanSnapshot snapshot, {
-    PendingFitnessRetest? pendingRetest,
-  }) {
-    final plan = snapshot.plan;
-    final currentWeek = snapshot.currentWeekNumber;
-    final anchor = snapshot.startedAt ?? snapshot.generatedAt ?? DateTime.now();
-    final weekOneStart = _mondayOfWeek(_localDay(anchor));
-    final lastWeekNumber = plan.weeks.isEmpty ? 0 : plan.weeks.last.weekNumber;
-
-    return plan.weeks.map((week) {
-      final status = week.weekNumber < currentWeek
-          ? WeekStatus.done
-          : week.weekNumber == currentWeek
-              ? WeekStatus.current
-              : WeekStatus.future;
-      final weekStart = weekOneStart.add(
-        Duration(days: (week.weekNumber - 1) * 7),
-      );
-      final days = _daysForWeek(
-        week: week,
-        status: status,
-        weekStart: weekStart,
-        scheduleDayIndexes: snapshot.scheduleDayIndexes,
-        hasPendingRetest:
-            pendingRetest != null && week.weekNumber == lastWeekNumber,
-      );
-      final completed = days.where((d) => d.status == DayStatus.done).length;
-
-      return PlanWeek(
-        num: week.weekNumber,
-        name: week.phaseName,
-        dates: '${_shortDate(weekStart)} – '
-            '${_shortDate(weekStart.add(const Duration(days: 6)))}',
-        status: status,
-        sessions: week.sessions.length,
-        completed: completed,
-        bodyFocus: week.isDeloadWeek ? 'Phục hồi' : _bodyFocus(week),
-        focus: _focusLine(week),
-        body: _usesHipFocus(week) ? BodyRegion.hip : BodyRegion.none,
-        avgForm: status == WeekStatus.done ? 78 : null,
-        recap: week.isDeloadWeek
-            ? 'Tuần giảm tải đã hoàn tất. Cơ thể có khoảng nghỉ trước khi kiểm tra tiến độ.'
-            : 'Tuần này hoàn tất. Bài tập giữ ổn định để bạn xây nền thật chắc.',
-        bestDay: completed > 0
-            ? days.firstWhere((d) => d.status == DayStatus.done).weekday
-            : null,
-        coachLine: week.isDeloadWeek
-            ? 'Tuần này nhẹ hơn có chủ đích. Giữ form sạch, thở đều và để cơ thể hồi lại.'
-            : 'Bài tập giữ quen thuộc, mục tiêu tăng vừa đủ để bạn thấy tiến bộ mà không bị quá sức.',
-        chapterLine: week.isDeloadWeek
-            ? 'Một tuần nhẹ hơn để cơ thể hấp thụ tiến bộ trước bài kiểm tra lại.'
-            : 'Bài tập tiếp tục từ nền hiện tại, với mục tiêu tăng dần theo thuật toán.',
-        unlockNote: week.isDeloadWeek
-            ? 'Mở sau khi hoàn tất các tuần phát triển.'
-            : 'Mở khoá khi bạn đi đến tuần này.',
-        days: days,
-      );
-    }).toList(growable: false);
-  }
-
-  static List<PlanDay> _daysForWeek({
-    required reco.WeekPlan week,
-    required WeekStatus status,
-    required DateTime weekStart,
-    required List<int> scheduleDayIndexes,
-    required bool hasPendingRetest,
-  }) {
-    final sessionDayIndexes =
-        _sessionDayIndexes(week.sessions.length, scheduleDayIndexes);
-    var sessionCursor = 0;
-
-    return [
-      for (var i = 0; i < 7; i++)
-        if (hasPendingRetest && i == 6)
-          _retestDay(
-            date: weekStart.add(Duration(days: i)),
-          )
-        else if (sessionDayIndexes.contains(i))
-          _sessionDay(
-            week: week,
-            session: week.sessions[sessionCursor++],
-            status: _dayStatusFor(
-              weekStatus: status,
-              date: weekStart.add(Duration(days: i)),
-            ),
-            date: weekStart.add(Duration(days: i)),
-          )
-        else
-          PlanDay(
-            weekday: _weekdayShortForDate(weekStart.add(Duration(days: i))),
-            weekdayLong: _weekdayLongForDate(
-              weekStart.add(Duration(days: i)),
-            ),
-            date: _shortDate(weekStart.add(Duration(days: i))),
-            status: DayStatus.rest,
-          ),
-    ];
-  }
-
-  static PlanDay _retestDay({
-    required DateTime date,
-  }) {
-    return PlanDay(
-      weekday: _weekdayShortForDate(date),
-      weekdayLong: _weekdayLongForDate(date),
-      date: _shortDate(date),
-      status: DayStatus.recheck,
-      title: 'Kiểm tra lại thể lực',
-      duration: '5 phút',
-      count: 2,
-      coach:
-          'Làm lại bài kiểm tra ngắn. Sau khi xong, bạn vẫn có thể tập tiếp hôm nay.',
-      exercises: const [
-        PlanExercise(
-          name: 'Squat assessment',
-          volumeLabel: 'Đo lực chân',
-          hasAi: true,
-          form: 0,
-        ),
-        PlanExercise(
-          name: 'Wall push-up assessment',
-          volumeLabel: 'Đo lực thân trên',
-          hasAi: true,
-          form: 0,
-        ),
-      ],
-    );
-  }
-
-  static PlanDay _sessionDay({
-    required reco.WeekPlan week,
-    required reco.SessionPlan session,
-    required DayStatus status,
-    required DateTime date,
-  }) {
-    final count = session.slots.length;
-    final exercises = session.slots
-        .map(
-          (slot) => PlanExercise(
-            name: _exerciseLabel(slot.exerciseId),
-            volumeLabel: _volumeLabel(slot.volume),
-            exerciseId: slot.exerciseId,
-            hasAi: lookupExerciseDefinition(slot.exerciseId) != null,
-            form: 78,
-          ),
-        )
-        .toList(growable: false);
-    final sessionNum = session.sessionIndex + 1;
-
-    return PlanDay(
-      weekday: _weekdayShortForDate(date),
-      weekdayLong: _weekdayLongForDate(date),
-      date: _shortDate(date),
-      status: status,
-      title: week.isDeloadWeek
-          ? 'Phục hồi nhẹ'
-          : sessionNum == 1
-              ? 'Buổi mở tuần'
-              : 'Buổi ${sessionNum.toString().padLeft(2, '0')}',
-      duration: '${(count * 5).clamp(12, 35)} phút',
-      count: count,
-      form: status == DayStatus.done ? 78 : null,
-      coach: week.isDeloadWeek
-          ? 'Giữ nhẹ, chậm và chắc. Đây là tuần hồi phục có chủ đích.'
-          : 'Mục tiêu hôm nay: hoàn thành đủ số rep/giây với form ổn định.',
-      exercises: exercises,
-    );
-  }
-
-  static DayStatus _dayStatusFor({
-    required WeekStatus weekStatus,
-    required DateTime date,
-  }) {
-    return switch (weekStatus) {
-      WeekStatus.done => DayStatus.done,
-      WeekStatus.future => DayStatus.planned,
-      WeekStatus.current => _isSameLocalDay(date, DateTime.now())
-          ? DayStatus.today
-          : DayStatus.planned,
-    };
-  }
-
-  static bool _isSameLocalDay(DateTime a, DateTime b) {
-    return a.year == b.year && a.month == b.month && a.day == b.day;
-  }
-
-  static List<int> _sessionDayIndexes(
-    int sessionCount,
-    List<int> scheduleDayIndexes,
-  ) {
-    final scheduleDays = scheduleDayIndexes
-        .where((day) => day >= 0 && day <= 6)
-        .toSet()
-        .toList()
-      ..sort();
-    if (scheduleDays.length >= sessionCount) {
-      return scheduleDays.take(sessionCount).toList(growable: false);
-    }
-
-    return switch (sessionCount) {
-      <= 0 => const <int>[],
-      1 => const [0],
-      2 => const [0, 3],
-      3 => const [0, 2, 4],
-      4 => const [0, 1, 3, 5],
-      5 => const [0, 1, 2, 3, 4],
-      _ => const [0, 1, 2, 3, 4, 5],
-    };
-  }
-
-  static DateTime _localDay(DateTime date) {
-    final local = date.toLocal();
-    return DateTime(local.year, local.month, local.day);
-  }
-
-  static DateTime _mondayOfWeek(DateTime date) {
-    return date.subtract(Duration(days: date.weekday - DateTime.monday));
-  }
-
-  static String _shortDate(DateTime date) => '${date.day}/${date.month}';
-
-  static String _weekdayShortForDate(DateTime date) {
-    const values = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-    final index = date.weekday - DateTime.monday;
-    return values[index.clamp(0, values.length - 1)];
-  }
-
-  static String _weekdayLongForDate(DateTime date) {
-    const values = [
-      'Thứ Hai',
-      'Thứ Ba',
-      'Thứ Tư',
-      'Thứ Năm',
-      'Thứ Sáu',
-      'Thứ Bảy',
-      'Chủ Nhật',
-    ];
-    final index = date.weekday - DateTime.monday;
-    return values[index.clamp(0, values.length - 1)];
-  }
-
-  static String _bodyFocus(reco.WeekPlan week) {
-    final ids = week.sessions
-        .expand((session) => session.slots)
-        .map((slot) => slot.slotName)
-        .join(' ');
-    if (ids.contains('yoga') || ids.contains('mobility')) return 'Dẻo dai';
-    if (ids.contains('core')) return 'Cốt lõi';
-    if (ids.contains('lower')) return 'Chân & hông';
-    if (ids.contains('upper')) return 'Thân trên';
-    return week.phaseName;
-  }
-
-  static String _focusLine(reco.WeekPlan week) {
-    final firstSlot = week.sessions.isEmpty || week.sessions.first.slots.isEmpty
-        ? null
-        : week.sessions.first.slots.first;
-    if (firstSlot == null) return 'Giữ nhịp tập ổn định';
-    return '${_exerciseLabel(firstSlot.exerciseId)} · '
-        '${_volumeLabel(firstSlot.volume)}';
-  }
-
-  static bool _usesHipFocus(reco.WeekPlan week) {
-    final ids = week.sessions
-        .expand((session) => session.slots)
-        .map((slot) => '${slot.slotName} ${slot.exerciseId}')
-        .join(' ');
-    return ids.contains('lower') ||
-        ids.contains('hip') ||
-        ids.contains('glute') ||
-        ids.contains('squat');
-  }
-
-  static String _exerciseLabel(String id) {
-    final definition = lookupExerciseDefinition(id);
-    if (definition != null) return definition.name;
-    return switch (id) {
-      'squat_bw' => 'Squat',
-      'wall_pushup' || 'wall_pushup_assessment' => 'Wall Push-Up',
-      'glute_bridge_bw' => 'Glute Bridge',
-      'mcgill_curl_up' => 'Curl-Up',
-      'warrior_i' => 'Warrior I',
-      'standing_forward_fold' => 'Standing Forward Fold',
-      'cobra' => 'Cobra',
-      _ => id
-          .split('_')
-          .where((part) => part.isNotEmpty)
-          .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
-          .join(' '),
-    };
-  }
-
-  static String _volumeLabel(reco.VolumePrescription volume) {
-    final target = volume.reps != null
-        ? '${volume.reps} rep'
-        : volume.seconds != null
-            ? '${volume.seconds} giây'
-            : '';
-    if (target.isEmpty) return '${volume.sets} hiệp';
-    return '${volume.sets} x $target';
   }
 }

@@ -196,8 +196,20 @@ const String progressMockStreakSummary =
     'Tập đều từ 27/4. Hơn 3 trên 4 ngày trong tuần.';
 // 14-day completion array, last entry = today.
 const List<bool> progressMockStreakBars = [
-  true, false, true, true, false, true, true,
-  true, false, true, true, false, true, true,
+  true,
+  false,
+  true,
+  true,
+  false,
+  true,
+  true,
+  true,
+  false,
+  true,
+  true,
+  false,
+  true,
+  true,
 ];
 
 // ═══════════════════════════════════════════════════════════════
@@ -273,8 +285,20 @@ const Map<String, List<int>> progressMockScoreTrend = {
   'week': [69, 70, 70, 72, 73, 73, 74],
   'month': [63, 65, 66, 67, 68, 70, 71, 72, 73, 73, 74],
   'program': [
-    60, 61, 62, 63, 64, 65, 66,
-    67, 68, 69, 70, 71, 72, 73,
+    60,
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
     74,
   ],
 };

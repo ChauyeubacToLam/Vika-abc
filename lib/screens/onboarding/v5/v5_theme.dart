@@ -471,8 +471,8 @@ class V5Responsive {
     double minHeight = 640,
     double maxHeight = 900,
   }) {
-    final t = ((size.height - minHeight) / (maxHeight - minHeight))
-        .clamp(0.0, 1.0);
+    final t =
+        ((size.height - minHeight) / (maxHeight - minHeight)).clamp(0.0, 1.0);
     return min + (max - min) * t;
   }
 
@@ -486,6 +486,9 @@ class V5Responsive {
   /// Standard bottom padding clearing the floating [V5PillCTA]. The CTA
   /// itself is 60pt tall + 32pt bottom inset; we add breathing room.
   double get ctaBottomPadding {
-    return viewPadding.bottom + 60 + 32 + pick(cozy: 24.0, short: 16.0, veryShort: 10.0);
+    return viewPadding.bottom +
+        60 +
+        32 +
+        pick(cozy: 24.0, short: 16.0, veryShort: 10.0);
   }
 }

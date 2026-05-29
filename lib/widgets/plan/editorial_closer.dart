@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 
 import '../../theme/vf_theme.dart';
 import '../../theme/app_colors.dart';
+
 class EditorialCloser extends StatelessWidget {
   const EditorialCloser({
     super.key,

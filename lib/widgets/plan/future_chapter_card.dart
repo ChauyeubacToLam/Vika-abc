@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import '../../data/plan_mock.dart';
 import 'plan_typography.dart';
 import '../../theme/app_colors.dart';
+
 class FutureChapterCard extends StatelessWidget {
   const FutureChapterCard({super.key, required this.week});
 
@@ -100,8 +101,7 @@ class FutureChapterCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.only(top: 16),
                   decoration: BoxDecoration(
-                    border:
-                        Border(top: BorderSide(color: c.border)),
+                    border: Border(top: BorderSide(color: c.border)),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -130,8 +130,8 @@ class FutureChapterCard extends StatelessWidget {
                 const SizedBox(height: 14),
                 // Unlock note — dashed, with lock icon.
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
                     color: c.bg,
                     borderRadius: BorderRadius.circular(12),

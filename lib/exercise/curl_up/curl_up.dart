@@ -69,10 +69,9 @@ class CurlUpConfig {
   /// "out of position." Used to gate state machine entry and exit.
   /// Smoothed by 10-frame StickyDebouncer to filter ML Kit landmark noise.
   static const double KNEE_DISPLACEMENT_MAX = 15.0;
-  
-  // Angle gate for detecting stable vs changing angle in FrameBuffer. 
-  static const double ANGLE_STABLE_GATE = 0.5; // degrees
 
+  // Angle gate for detecting stable vs changing angle in FrameBuffer.
+  static const double ANGLE_STABLE_GATE = 0.5; // degrees
 }
 
 enum CurlUpState { resting, ascending, descending }
@@ -410,12 +409,14 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
     //    Per-signal stable refresh tracks natural rest without letting
     //    movement drift the baseline.
     if (curlUpState == CurlUpState.resting) {
-      final trunkChange = frameBuffer.getChange("trunkAngle", CurlUpConfig.ANGLE_STABLE_GATE);
+      final trunkChange =
+          frameBuffer.getChange("trunkAngle", CurlUpConfig.ANGLE_STABLE_GATE);
       if (trunkChange == ChangeState.stable) {
         _baselineTrunkAngle = trunkAngle;
       }
       if (hipKneeAnkleAngle != null) {
-        final kneeChange = frameBuffer.getChange("hipKneeAnkleAngle", CurlUpConfig.ANGLE_STABLE_GATE);
+        final kneeChange = frameBuffer.getChange(
+            "hipKneeAnkleAngle", CurlUpConfig.ANGLE_STABLE_GATE);
         if (kneeChange == ChangeState.stable) {
           _holdStillHipKneeAnkle = hipKneeAnkleAngle;
         }
@@ -578,7 +579,8 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
 
     final trunkElev = trunkAngle - base; // positive = curled up
 
-    final angleChange = frameBuffer.getChange("trunkAngle", CurlUpConfig.ANGLE_STABLE_GATE);
+    final angleChange =
+        frameBuffer.getChange("trunkAngle", CurlUpConfig.ANGLE_STABLE_GATE);
     debugData["angleChange"] = angleChange.toString().split('.').last;
     final isCurlingUpFrame = angleChange == ChangeState.increasing;
     final isReturningFrame = angleChange == ChangeState.decreasing;

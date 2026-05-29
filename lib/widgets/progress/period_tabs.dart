@@ -7,6 +7,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
+
 enum PeriodTab { week, month, program }
 
 class PeriodTabs extends StatelessWidget {
@@ -32,7 +33,9 @@ class PeriodTabs extends StatelessWidget {
       child: Row(
         children: [
           for (final t in PeriodTab.values)
-            Expanded(child: _Pill(tab: t, active: t == value, onTap: () => onChanged(t))),
+            Expanded(
+                child: _Pill(
+                    tab: t, active: t == value, onTap: () => onChanged(t))),
         ],
       ),
     );

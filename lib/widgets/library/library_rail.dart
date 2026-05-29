@@ -51,7 +51,8 @@ class LibraryRail extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: EdgeInsets.fromLTRB(gutter, 0, gutter, intro == null ? 16 : 10),
+          padding:
+              EdgeInsets.fromLTRB(gutter, 0, gutter, intro == null ? 16 : 10),
           child: Row(
             children: [
               Container(
@@ -121,9 +122,8 @@ class LibraryRail extends StatelessWidget {
               return LibraryCard(
                 data: cards[i],
                 width: cardWidth,
-                indexLabel: showIndices
-                    ? (i + 1).toString().padLeft(2, '0')
-                    : null,
+                indexLabel:
+                    showIndices ? (i + 1).toString().padLeft(2, '0') : null,
                 onTap: () => onSelectCard(cards[i]),
               );
             },

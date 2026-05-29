@@ -156,7 +156,7 @@ class SpeedControlMetric extends GluteBridgeMetricBase {
     if (_descentStartMs != null) {
       _eccentricDuration = (timestampMs - _descentStartMs!) / 1000.0;
       _debugData['eccentricDur'] = _eccentricDuration!.toStringAsFixed(2);
-      
+
       // Evaluate outright speed error using the peak recorded velocity
       if (_peakDescentVelocity >= SpeedControlConfig.RAPID_VELOCITY_ERROR) {
         _faults.add(FaultRecord(

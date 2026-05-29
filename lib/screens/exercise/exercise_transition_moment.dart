@@ -66,13 +66,13 @@ class _ExerciseTransitionMomentState extends State<ExerciseTransitionMoment>
   late final AnimationController _embers;
 
   // Choreographed sub-animations, normalized to the 5s master timeline.
-  late final Animation<double> _enter;        // 0.00 → 0.16
-  late final Animation<double> _scoreCount;   // 0.08 → 0.48
-  late final Animation<double> _starBurst;    // 0.40 → 0.56
-  late final Animation<double> _praiseIn;     // 0.36 → 0.72
-  late final Animation<double> _underline;    // 0.42 → 0.78
-  late final Animation<double> _nextIn;       // 0.60 → 0.90
-  late final Animation<double> _exit;         // 0.90 → 1.00
+  late final Animation<double> _enter; // 0.00 → 0.16
+  late final Animation<double> _scoreCount; // 0.08 → 0.48
+  late final Animation<double> _starBurst; // 0.40 → 0.56
+  late final Animation<double> _praiseIn; // 0.36 → 0.72
+  late final Animation<double> _underline; // 0.42 → 0.78
+  late final Animation<double> _nextIn; // 0.60 → 0.90
+  late final Animation<double> _exit; // 0.90 → 1.00
 
   @override
   void initState() {
@@ -134,79 +134,80 @@ class _ExerciseTransitionMomentState extends State<ExerciseTransitionMoment>
     return MediaQuery(
       data: mq.copyWith(textScaler: clampedScaler),
       child: Scaffold(
-      backgroundColor: c.bgInverse,
-      body: SafeArea(
-        child: AnimatedBuilder(
-          animation: Listenable.merge([_master, _ringPulse, _embers]),
-          builder: (context, _) {
-            final exitFade = 1.0 - _exit.value;
-            return Opacity(
-              opacity: exitFade,
-              child: Transform.translate(
-                offset: Offset(0, -20 * _exit.value),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    _Backdrop(enter: _enter.value),
-                    CustomPaint(
-                      painter: _EmbersPainter(
-                        progress: _embers.value,
-                        opacity: _enter.value,
-                      ),
-                    ),
-                    CustomPaint(
-                      painter: _CornerRaysPainter(opacity: _enter.value * 0.65),
-                    ),
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _Eyebrow(
-                              opacity: _enter.value,
-                              text:
-                                  'BÀI VỪA RỒI · ${widget.exerciseName.toUpperCase()}',
-                            ),
-                            const SizedBox(height: 30),
-                            _ScoreMonument(
-                              targetScore: widget.formScore,
-                              countProgress: _scoreCount.value,
-                              ringPulse: _ringPulse.value,
-                              starBurst: _starBurst.value,
-                            ),
-                            const SizedBox(height: 38),
-                            _PraiseTypewriter(
-                              text: widget.praiseLine,
-                              progress: _praiseIn.value,
-                              underlineProgress: _underline.value,
-                            ),
-                          ],
+        backgroundColor: c.bgInverse,
+        body: SafeArea(
+          child: AnimatedBuilder(
+            animation: Listenable.merge([_master, _ringPulse, _embers]),
+            builder: (context, _) {
+              final exitFade = 1.0 - _exit.value;
+              return Opacity(
+                opacity: exitFade,
+                child: Transform.translate(
+                  offset: Offset(0, -20 * _exit.value),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _Backdrop(enter: _enter.value),
+                      CustomPaint(
+                        painter: _EmbersPainter(
+                          progress: _embers.value,
+                          opacity: _enter.value,
                         ),
                       ),
-                    ),
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 64,
-                      child: _NextBanner(
-                        text: widget.nextExerciseName,
-                        opacity: _nextIn.value,
+                      CustomPaint(
+                        painter:
+                            _CornerRaysPainter(opacity: _enter.value * 0.65),
                       ),
-                    ),
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 26,
-                      child: _ProgressTicker(animation: _master),
-                    ),
-                  ],
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _Eyebrow(
+                                opacity: _enter.value,
+                                text:
+                                    'BÀI VỪA RỒI · ${widget.exerciseName.toUpperCase()}',
+                              ),
+                              const SizedBox(height: 30),
+                              _ScoreMonument(
+                                targetScore: widget.formScore,
+                                countProgress: _scoreCount.value,
+                                ringPulse: _ringPulse.value,
+                                starBurst: _starBurst.value,
+                              ),
+                              const SizedBox(height: 38),
+                              _PraiseTypewriter(
+                                text: widget.praiseLine,
+                                progress: _praiseIn.value,
+                                underlineProgress: _underline.value,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 64,
+                        child: _NextBanner(
+                          text: widget.nextExerciseName,
+                          opacity: _nextIn.value,
+                        ),
+                      ),
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 26,
+                        child: _ProgressTicker(animation: _master),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
-      ),
       ),
     );
   }
@@ -342,9 +343,8 @@ class _EmbersPainter extends CustomPainter {
           math.sin(t * 2 * math.pi + i) * 16;
       final dy = (1 - t) * size.height + 20;
       final r = 1.4 + rng.nextDouble() * 2.6;
-      final alpha = opacity *
-          (1 - t).clamp(0.0, 1.0) *
-          (0.35 + rng.nextDouble() * 0.45);
+      final alpha =
+          opacity * (1 - t).clamp(0.0, 1.0) * (0.35 + rng.nextDouble() * 0.45);
       paint.color = (i % 3 == 0 ? amber : yellow).withValues(alpha: alpha);
       canvas.drawCircle(Offset(dx, dy), r, paint);
       paint.color =
@@ -375,15 +375,15 @@ class _CornerRaysPainter extends CustomPainter {
     canvas.drawLine(const Offset(28, 28), const Offset(28, 64), p);
     canvas.drawLine(const Offset(28, 28), const Offset(64, 28), p);
     // Top-right
-    canvas.drawLine(Offset(size.width - 28, 28),
-        Offset(size.width - 28, 64), p);
-    canvas.drawLine(Offset(size.width - 28, 28),
-        Offset(size.width - 64, 28), p);
+    canvas.drawLine(
+        Offset(size.width - 28, 28), Offset(size.width - 28, 64), p);
+    canvas.drawLine(
+        Offset(size.width - 28, 28), Offset(size.width - 64, 28), p);
     // Bottom-left
-    canvas.drawLine(Offset(28, size.height - 28),
-        Offset(28, size.height - 64), p);
-    canvas.drawLine(Offset(28, size.height - 28),
-        Offset(64, size.height - 28), p);
+    canvas.drawLine(
+        Offset(28, size.height - 28), Offset(28, size.height - 64), p);
+    canvas.drawLine(
+        Offset(28, size.height - 28), Offset(64, size.height - 28), p);
     // Bottom-right
     canvas.drawLine(Offset(size.width - 28, size.height - 28),
         Offset(size.width - 28, size.height - 64), p);
@@ -557,8 +557,8 @@ class _ScoreMonument extends StatelessWidget {
                         fontFeatures: VikaIvoryMain.tabularFigures,
                         shadows: [
                           Shadow(
-                            color: c.yellow
-                                .withValues(alpha: 0.32 * ringOpacity),
+                            color:
+                                c.yellow.withValues(alpha: 0.32 * ringOpacity),
                             blurRadius: 30,
                           ),
                         ],
@@ -719,8 +719,7 @@ class _ScoreArcPainter extends CustomPainter {
         size.width / 2 + rect.width / 2 * math.cos(theta),
         size.height / 2 + rect.height / 2 * math.sin(theta),
       );
-      final dotGlow = Paint()
-        ..color = color.withValues(alpha: 0.55 * opacity);
+      final dotGlow = Paint()..color = color.withValues(alpha: 0.55 * opacity);
       canvas.drawCircle(dot, 9, dotGlow);
       final dotCore = Paint()..color = color.withValues(alpha: opacity);
       canvas.drawCircle(dot, 4, dotCore);
@@ -729,9 +728,7 @@ class _ScoreArcPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ScoreArcPainter old) =>
-      old.progress != progress ||
-      old.opacity != opacity ||
-      old.color != color;
+      old.progress != progress || old.opacity != opacity || old.color != color;
 }
 
 // ─── PRAISE TYPEWRITER: word-by-word reveal + underline trace ───
@@ -774,8 +771,7 @@ class _PraiseTypewriter extends StatelessWidget {
                 for (var i = 0; i < words.length; i++)
                   _WordCell(
                     word: words[i],
-                    activate:
-                        ((progress * words.length) - i).clamp(0.0, 1.0),
+                    activate: ((progress * words.length) - i).clamp(0.0, 1.0),
                   ),
               ],
             ),
@@ -911,9 +907,8 @@ class _ChevronStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    final icon = reverse
-        ? Icons.chevron_left_rounded
-        : Icons.chevron_right_rounded;
+    final icon =
+        reverse ? Icons.chevron_left_rounded : Icons.chevron_right_rounded;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [

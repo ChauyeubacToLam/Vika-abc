@@ -105,9 +105,8 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
     _b7 = _beat(0.58, 0.82);
     _b8 = _beat(0.66, 1.0);
 
-    _lastDifficulty = widget.reports.isNotEmpty
-        ? widget.reports.last.userDifficulty
-        : null;
+    _lastDifficulty =
+        widget.reports.isNotEmpty ? widget.reports.last.userDifficulty : null;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _entry.forward();
@@ -137,8 +136,7 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
 
   int get _sessionTotalReps =>
       widget.reports.fold(0, (s, r) => s + r.totalReps);
-  int get _sessionGoodReps =>
-      widget.reports.fold(0, (s, r) => s + r.goodReps);
+  int get _sessionGoodReps => widget.reports.fold(0, (s, r) => s + r.goodReps);
 
   /// TODO(wiring): real cross-exercise priority ranking with pain linkage.
   DetectedEvidence? get _topIssue {
@@ -151,8 +149,7 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
 
   bool get _isLastDifficultyAnswered => _lastDifficulty != null;
   bool get _isSessionRpeAnswered => _sessionRpe != null;
-  bool get _isDoneEnabled =>
-      _isLastDifficultyAnswered && _isSessionRpeAnswered;
+  bool get _isDoneEnabled => _isLastDifficultyAnswered && _isSessionRpeAnswered;
 
   void _handleLastDifficulty(String d) {
     if (_lastDifficulty != null) return;
@@ -173,9 +170,8 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
     final hasLastExercise = widget.reports.isNotEmpty;
-    final lastExerciseName = hasLastExercise
-        ? widget.reports.last.exerciseName
-        : 'Bài cuối';
+    final lastExerciseName =
+        hasLastExercise ? widget.reports.last.exerciseName : 'Bài cuối';
 
     // Clamp accessibility text scaling. Without this, a user with
     // "Larger Text" maxed out in iOS / Android system settings would
@@ -210,91 +206,92 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-              _BeatReveal(animation: _b0, child: const _PageHeader()),
-              const SizedBox(height: 20),
-              _BeatReveal(
-                animation: _b1,
-                child: _MagazineHero(
-                  formScore: _sessionFormScore,
-                  totalReps: _sessionTotalReps,
-                  goodReps: _sessionGoodReps,
-                  reports: widget.reports,
-                  totalDuration: widget.totalDuration,
-                  calories: widget.totalCalories,
-                  streakDays: widget.streakDays,
-                  heroPulse: _heroPulse,
-                  onShare: widget.onShare ?? () => _stub('Chia sẻ'),
-                  onShareToZalo:
-                      widget.onShareToZalo ?? () => _stub('Zalo'),
-                ),
-              ),
-              const SizedBox(height: 28),
-              _BeatReveal(
-                animation: _b2,
-                child: _TrophyMomentCard(reports: widget.reports),
-              ),
-              const SizedBox(height: 28),
-              _BeatReveal(
-                animation: _b3,
-                child: _FormArcSection(reports: widget.reports),
-              ),
-              const SizedBox(height: 28),
-              _BeatReveal(
-                animation: _b4,
-                child: _ThreePillarCoach(
-                  reports: widget.reports,
-                  sessionFormScore: _sessionFormScore,
-                ),
-              ),
-              if (_topIssue != null) ...[
-                const SizedBox(height: 18),
-                _BeatReveal(
-                  animation: _b4,
-                  child: _IssueCard(issue: _topIssue!),
-                ),
-              ],
-              const SizedBox(height: 28),
-              if (hasLastExercise)
-                _BeatReveal(
-                  animation: _b5,
-                  child: DifficultyRatingBlock(
-                    exerciseName: lastExerciseName,
-                    eyebrow: 'BÀI CUỐI · ${lastExerciseName.toUpperCase()}',
-                    selected: _lastDifficulty,
-                    locked: _lastDifficulty != null,
-                    onSelect: _handleLastDifficulty,
-                  ),
-                ),
-              const SizedBox(height: 28),
-              _BeatReveal(
-                animation: _b6,
-                child: _SectionEyebrow(
-                  label: 'CHI TIẾT TỪNG BÀI',
-                  meta: '${widget.reports.length} BÀI',
-                ),
-              ),
-              const SizedBox(height: 14),
-              _BeatReveal(
-                animation: _b6,
-                child: _VisualStatsGrid(reports: widget.reports),
-              ),
-              const SizedBox(height: 28),
-              _BeatReveal(
-                animation: _b7,
-                child: _SessionRpeBlock(
-                  selected: _sessionRpe,
-                  onSelect: _handleSessionRpe,
-                ),
-              ),
-              const SizedBox(height: 28),
-              _BeatReveal(
-                animation: _b8,
-                child: _DoneCta(
-                  enabled: _isDoneEnabled,
-                  shimmer: _shimmer,
-                  onTap: widget.onDone,
-                ),
-              ),
+                    _BeatReveal(animation: _b0, child: const _PageHeader()),
+                    const SizedBox(height: 20),
+                    _BeatReveal(
+                      animation: _b1,
+                      child: _MagazineHero(
+                        formScore: _sessionFormScore,
+                        totalReps: _sessionTotalReps,
+                        goodReps: _sessionGoodReps,
+                        reports: widget.reports,
+                        totalDuration: widget.totalDuration,
+                        calories: widget.totalCalories,
+                        streakDays: widget.streakDays,
+                        heroPulse: _heroPulse,
+                        onShare: widget.onShare ?? () => _stub('Chia sẻ'),
+                        onShareToZalo:
+                            widget.onShareToZalo ?? () => _stub('Zalo'),
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+                    _BeatReveal(
+                      animation: _b2,
+                      child: _TrophyMomentCard(reports: widget.reports),
+                    ),
+                    const SizedBox(height: 28),
+                    _BeatReveal(
+                      animation: _b3,
+                      child: _FormArcSection(reports: widget.reports),
+                    ),
+                    const SizedBox(height: 28),
+                    _BeatReveal(
+                      animation: _b4,
+                      child: _ThreePillarCoach(
+                        reports: widget.reports,
+                        sessionFormScore: _sessionFormScore,
+                      ),
+                    ),
+                    if (_topIssue != null) ...[
+                      const SizedBox(height: 18),
+                      _BeatReveal(
+                        animation: _b4,
+                        child: _IssueCard(issue: _topIssue!),
+                      ),
+                    ],
+                    const SizedBox(height: 28),
+                    if (hasLastExercise)
+                      _BeatReveal(
+                        animation: _b5,
+                        child: DifficultyRatingBlock(
+                          exerciseName: lastExerciseName,
+                          eyebrow:
+                              'BÀI CUỐI · ${lastExerciseName.toUpperCase()}',
+                          selected: _lastDifficulty,
+                          locked: _lastDifficulty != null,
+                          onSelect: _handleLastDifficulty,
+                        ),
+                      ),
+                    const SizedBox(height: 28),
+                    _BeatReveal(
+                      animation: _b6,
+                      child: _SectionEyebrow(
+                        label: 'CHI TIẾT TỪNG BÀI',
+                        meta: '${widget.reports.length} BÀI',
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    _BeatReveal(
+                      animation: _b6,
+                      child: _VisualStatsGrid(reports: widget.reports),
+                    ),
+                    const SizedBox(height: 28),
+                    _BeatReveal(
+                      animation: _b7,
+                      child: _SessionRpeBlock(
+                        selected: _sessionRpe,
+                        onSelect: _handleSessionRpe,
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+                    _BeatReveal(
+                      animation: _b8,
+                      child: _DoneCta(
+                        enabled: _isDoneEnabled,
+                        shimmer: _shimmer,
+                        onTap: widget.onDone,
+                      ),
+                    ),
                     const SizedBox(height: 28),
                   ],
                 ),
@@ -461,8 +458,7 @@ class _MagazineHero extends StatelessWidget {
                   ? 'Buổi giữ form.'
                   : 'Buổi đặt nền.';
 
-  String get _subtitle =>
-      'Vika đã theo dõi mọi rep — đây là phim cuối buổi.';
+  String get _subtitle => 'Vika đã theo dõi mọi rep — đây là phim cuối buổi.';
 
   String _formatClock(Duration d) {
     final m = d.inMinutes;
@@ -861,8 +857,7 @@ class _DnaPainter extends CustomPainter {
     final axis = Paint()
       ..color = dim.withValues(alpha: 0.18)
       ..strokeWidth = 1;
-    canvas.drawLine(
-        Offset(0, baseline), Offset(size.width, baseline), axis);
+    canvas.drawLine(Offset(0, baseline), Offset(size.width, baseline), axis);
 
     // Bars + dots
     for (var i = 0; i < n; i++) {
@@ -973,9 +968,7 @@ class _HeroActionState extends State<_HeroAction> {
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    final bg = widget.primary
-        ? c.yellow
-        : Colors.white.withValues(alpha: 0.06);
+    final bg = widget.primary ? c.yellow : Colors.white.withValues(alpha: 0.06);
     final fg = widget.primary ? c.yellowInk : c.invInk;
     final border =
         widget.primary ? c.yellow : Colors.white.withValues(alpha: 0.12);
@@ -1036,8 +1029,18 @@ class _HeroActionState extends State<_HeroAction> {
 
 String _formatHeroDate(DateTime dt) {
   const months = [
-    'Th 1', 'Th 2', 'Th 3', 'Th 4', 'Th 5', 'Th 6',
-    'Th 7', 'Th 8', 'Th 9', 'Th 10', 'Th 11', 'Th 12',
+    'Th 1',
+    'Th 2',
+    'Th 3',
+    'Th 4',
+    'Th 5',
+    'Th 6',
+    'Th 7',
+    'Th 8',
+    'Th 9',
+    'Th 10',
+    'Th 11',
+    'Th 12',
   ];
   return '${dt.day} ${months[dt.month - 1]}';
 }
@@ -1052,8 +1055,7 @@ class _TrophyMomentCard extends StatelessWidget {
   final List<ExerciseSessionReport> reports;
 
   /// TODO(wiring): real "highlight picker" examining reports + history.
-  ({String label, String value, IconData icon, String tag})
-      _pickHighlight() {
+  ({String label, String value, IconData icon, String tag}) _pickHighlight() {
     if (reports.isEmpty) {
       return (
         label: 'Có mặt là thắng rồi',
@@ -1063,8 +1065,7 @@ class _TrophyMomentCard extends StatelessWidget {
       );
     }
     final best = reports.reduce((a, b) => a.formScore >= b.formScore ? a : b);
-    final totalGood =
-        reports.fold<int>(0, (s, r) => s + r.goodReps);
+    final totalGood = reports.fold<int>(0, (s, r) => s + r.goodReps);
     if (best.formScore >= 88) {
       return (
         label: '${best.exerciseName} sạch như nước',
@@ -1132,13 +1133,11 @@ class _TrophyMomentCard extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: c.yellow.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(999),
-                  border:
-                      Border.all(color: c.yellow.withValues(alpha: 0.4)),
+                  border: Border.all(color: c.yellow.withValues(alpha: 0.4)),
                 ),
                 child: Text(
                   highlight.tag,
@@ -1381,9 +1380,7 @@ class _FormArcPainter extends CustomPainter {
         : (size.width - padX * 2) / (scores.length - 1);
     final points = <Offset>[];
     for (var i = 0; i < scores.length; i++) {
-      final x = scores.length == 1
-          ? size.width / 2
-          : padX + stepX * i;
+      final x = scores.length == 1 ? size.width / 2 : padX + stepX * i;
       final y = bottomY - (scores[i] / 100) * usableH;
       points.add(Offset(x, y));
     }
@@ -1438,8 +1435,7 @@ class _FormArcPainter extends CustomPainter {
       final isBest = i == bestIdx;
 
       if (isBest) {
-        final halo = Paint()
-          ..color = color.withValues(alpha: 0.18 * pProg);
+        final halo = Paint()..color = color.withValues(alpha: 0.18 * pProg);
         canvas.drawCircle(p, 16, halo);
       }
       final ring = Paint()
@@ -1889,8 +1885,7 @@ class _IssueAnswer extends StatelessWidget {
     final selectedFg = primary ? c.yellow : c.yellow;
     final bg = selected ? selectedBg : c.bgRaised;
     final fg = selected ? selectedFg : c.ink;
-    final borderColor =
-        selected ? (primary ? c.ink : c.ink) : c.border;
+    final borderColor = selected ? (primary ? c.ink : c.ink) : c.border;
     // Material + InkWell so hit testing is delegated to the framework's
     // standard button stack. The previous GestureDetector-inside-
     // AnimatedContainer setup occasionally failed to receive the second
@@ -2040,8 +2035,7 @@ class _VisualStatCard extends StatelessWidget {
         : score >= 60
             ? c.ink
             : c.attention;
-    final setScores =
-        report.report.sets.map((s) => s.score).toList();
+    final setScores = report.report.sets.map((s) => s.score).toList();
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
       decoration: BoxDecoration(
@@ -2174,8 +2168,8 @@ class _VisualStatCard extends StatelessWidget {
               ),
               const SizedBox(width: 14),
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: c.bg,
                   borderRadius: BorderRadius.circular(999),
@@ -2347,9 +2341,7 @@ class _SetSparkPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _SetSparkPainter old) =>
-      old.scores != scores ||
-      old.accent != accent ||
-      old.dim != dim;
+      old.scores != scores || old.accent != accent || old.dim != dim;
 }
 
 // ─── Session RPE block ───
@@ -2411,8 +2403,7 @@ class _SessionRpeBlock extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: c.yellowGhost,
                     borderRadius: BorderRadius.circular(999),
-                    border:
-                        Border.all(color: c.yellow.withValues(alpha: 0.35)),
+                    border: Border.all(color: c.yellow.withValues(alpha: 0.35)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -2638,8 +2629,7 @@ class _DoneCtaState extends State<_DoneCta> {
                               child: DecoratedBox(
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
-                                    begin:
-                                        Alignment(-1.6 + (v * 3.2), -1),
+                                    begin: Alignment(-1.6 + (v * 3.2), -1),
                                     end: Alignment(-0.6 + (v * 3.2), 1),
                                     colors: [
                                       Colors.white.withValues(alpha: 0),

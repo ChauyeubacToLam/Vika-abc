@@ -63,9 +63,7 @@ class _StatusDot extends StatelessWidget {
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(3),
-        border: isFuture
-            ? Border.all(color: c.inkGhost, width: 1.5)
-            : null,
+        border: isFuture ? Border.all(color: c.inkGhost, width: 1.5) : null,
       ),
     );
   }

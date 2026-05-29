@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import '../../data/library_mock.dart';
 import '../../theme/vf_theme.dart';
 import '../../theme/app_colors.dart';
+
 class ProgramsRail extends StatelessWidget {
   const ProgramsRail({super.key, required this.programs});
 
@@ -100,9 +101,7 @@ class _ProgramCard extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: isCurrent
                               ? c.yellow
-                              : (isDark
-                                  ? c.invInk
-                                  : c.ink),
+                              : (isDark ? c.invInk : c.ink),
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
@@ -114,9 +113,7 @@ class _ProgramCard extends StatelessWidget {
                             letterSpacing: 1.2,
                             color: isCurrent
                                 ? c.yellowInk
-                                : (isDark
-                                    ? c.ink
-                                    : c.bg),
+                                : (isDark ? c.ink : c.bg),
                           ),
                         ),
                       ),
@@ -203,9 +200,7 @@ class _ProgramMeta extends StatelessWidget {
         fontSize: 10,
         fontWeight: FontWeight.w700,
         letterSpacing: 0.2,
-        color: dark
-            ? c.invInk.withValues(alpha: 0.78)
-            : c.inkSoft,
+        color: dark ? c.invInk.withValues(alpha: 0.78) : c.inkSoft,
         fontFeatures: VikaIvoryMain.tabularFigures,
       ),
     );

@@ -13,6 +13,7 @@ import '../../theme/vf_theme.dart';
 import 'plan_painters.dart';
 import 'plan_typography.dart';
 import '../../theme/app_colors.dart';
+
 class WeekFocusCard extends StatelessWidget {
   const WeekFocusCard({super.key, required this.week});
 

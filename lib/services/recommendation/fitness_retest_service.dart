@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vika/services/recommendation/recommendation_service.dart';
 
 import '../../utils/exercise_logger.dart';
 import 'fitness_test_scoring.dart';
@@ -44,7 +45,8 @@ class FitnessRetestService {
 
   final SupabaseClient _client;
 
-  Future<PendingFitnessRetest?> fetchPendingRetestForCurrentUser() async {
+  Future<PendingFitnessRetest?> fetchPendingRetestForCurrentUser(
+      PlanSnapshot snapshot) async {
     final user = _client.auth.currentUser;
     if (user == null) return null;
 
@@ -60,10 +62,7 @@ class FitnessRetestService {
       );
       if (plan.endOfPlanRetest == null || plan.weeks.isEmpty) return null;
 
-      final isRetestDay = _isOnOrAfterRetestDay(
-        generatedAt: _dateTimeOrNull(row['generated_at']),
-        totalWeeks: plan.weeks.length,
-      );
+      final isRetestDay = snapshot.currentPosition == null;
       if (!isRetestDay) return null;
 
       final existing = await _client
@@ -226,33 +225,6 @@ class FitnessRetestService {
       debugPrint('[FitnessRetest] decline failed: $e');
       return false;
     }
-  }
-
-  bool _isOnOrAfterRetestDay({
-    required DateTime? generatedAt,
-    required int totalWeeks,
-  }) {
-    if (generatedAt == null) return false;
-    if (totalWeeks < 1) return false;
-
-    final generatedLocal = generatedAt.toLocal();
-    final planStartDay = DateTime(
-      generatedLocal.year,
-      generatedLocal.month,
-      generatedLocal.day,
-    );
-    final finalPlanDay = planStartDay.add(
-      Duration(days: (totalWeeks * 7) - 1),
-    );
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    return !today.isBefore(finalPlanDay);
-  }
-
-  DateTime? _dateTimeOrNull(dynamic value) {
-    if (value == null) return null;
-    if (value is String) return DateTime.tryParse(value);
-    return null;
   }
 }
 

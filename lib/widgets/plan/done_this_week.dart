@@ -19,7 +19,10 @@ import '../../theme/vf_theme.dart';
 import '../../theme/app_colors.dart';
 
 class DoneThisWeek extends StatelessWidget {
-  const DoneThisWeek({super.key, required this.days, required this.completed,
+  const DoneThisWeek(
+      {super.key,
+      required this.days,
+      required this.completed,
       required this.sessions});
 
   final List<PlanDay> days;
@@ -29,9 +32,8 @@ class DoneThisWeek extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    final doneDays = days
-        .where((d) => d.status == DayStatus.done)
-        .toList(growable: false);
+    final doneDays =
+        days.where((d) => d.status == DayStatus.done).toList(growable: false);
     if (doneDays.isEmpty) return const SizedBox.shrink();
 
     // Section role is provided by the §02 "Tuần này" mark in WeekPage.
@@ -50,9 +52,11 @@ class DoneThisWeek extends StatelessWidget {
               _DoneRow(day: doneDays[i]),
               if (i < doneDays.length - 1)
                 Divider(
-                  height: 1, thickness: 1,
+                  height: 1,
+                  thickness: 1,
                   color: c.border,
-                  indent: 16, endIndent: 16,
+                  indent: 16,
+                  endIndent: 16,
                 ),
             ],
           ],
@@ -131,9 +135,7 @@ class _DoneRow extends StatelessWidget {
             decoration: BoxDecoration(
               color: high ? c.yellow : c.bg,
               borderRadius: BorderRadius.circular(999),
-              border: high
-                  ? null
-                  : Border.all(color: c.border),
+              border: high ? null : Border.all(color: c.border),
             ),
             child: RichText(
               text: TextSpan(
@@ -145,9 +147,7 @@ class _DoneRow extends StatelessWidget {
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
                       letterSpacing: -0.3,
-                      color: high
-                          ? c.yellowInk
-                          : c.ink,
+                      color: high ? c.yellowInk : c.ink,
                       fontFeatures: VikaIvoryMain.tabularFigures,
                     ),
                   ),
@@ -157,9 +157,7 @@ class _DoneRow extends StatelessWidget {
                       fontFamily: 'BeVietnamPro',
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
-                      color: high
-                          ? c.yellowInk
-                          : c.inkSoft,
+                      color: high ? c.yellowInk : c.inkSoft,
                     ),
                   ),
                 ],

@@ -142,114 +142,114 @@ class _S11BodyInfoState extends State<S11BodyInfo>
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 520),
           child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          V5ScreenHeader(
-            eyebrow: 'Vóc dáng',
-            title: 'Vài thông số\nvề cơ thể.',
-            size: (r.isNarrow || veryCompact)
-                ? V5HeaderSize.medium
-                : V5HeaderSize.large,
-          ),
-          SizedBox(height: r.pick(cozy: V5.space12, short: V5.space8)),
-          if (showHero) ...[
-            V5FadeIn(
-              delay: const Duration(milliseconds: 140),
-              child: SizedBox(
-                height: 132,
-                child: _BodyStatsHero(
-                  height: _height,
-                  weight: _weight,
-                  age: _age,
-                  bmi: _animatedBmi,
-                  zone: zone,
-                ),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              V5ScreenHeader(
+                eyebrow: 'Vóc dáng',
+                title: 'Vài thông số\nvề cơ thể.',
+                size: (r.isNarrow || veryCompact)
+                    ? V5HeaderSize.medium
+                    : V5HeaderSize.large,
               ),
-            ),
-            const SizedBox(height: V5.space12),
-          ],
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: V5.surface,
-              border: Border.all(color: V5.border),
-              borderRadius: BorderRadius.circular(V5.radiusMd),
-              boxShadow: V5.elevation1,
-            ),
-            child: Row(
-              children: metrics.map((m) {
-                final isActive = _activeMetric == m.id;
-                return Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => setState(() => _activeMetric = m.id),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 220),
-                      curve: V5.curveSharp,
-                      padding: EdgeInsets.symmetric(
-                        vertical: veryCompact ? 7 : 9,
-                        horizontal: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isActive ? V5.ink : Colors.transparent,
-                        borderRadius: BorderRadius.circular(V5.radiusSm),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            m.label.toUpperCase(),
-                            style: V5.eyebrow(
-                              context,
-                              color: isActive ? V5.invInkSoft : V5.inkSoft,
-                            ),
-                          ),
-                          const SizedBox(height: V5.space2),
-                          Text(
-                            '${m.value} ${m.unit}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: V5
-                                .titleSm(
-                                  context,
-                                  color: isActive ? V5.yellow : V5.ink,
-                                )
-                                .copyWith(fontWeight: FontWeight.w800),
-                          ),
-                        ],
-                      ),
+              SizedBox(height: r.pick(cozy: V5.space12, short: V5.space8)),
+              if (showHero) ...[
+                V5FadeIn(
+                  delay: const Duration(milliseconds: 140),
+                  child: SizedBox(
+                    height: 132,
+                    child: _BodyStatsHero(
+                      height: _height,
+                      weight: _weight,
+                      age: _age,
+                      bmi: _animatedBmi,
+                      zone: zone,
                     ),
                   ),
-                );
-              }).toList(),
-            ),
-          ),
-          SizedBox(height: r.pick(cozy: V5.space10, short: V5.space8)),
-          V5RulerPicker(
-            key: ValueKey(active.id),
-            label: active.label,
-            value: active.value,
-            min: active.min,
-            max: active.max,
-            unit: active.unit,
-            compact: compact,
-            onChanged: _setMetricValue,
-          ),
-          SizedBox(height: r.pick(cozy: V5.space14, short: V5.space8)),
-          Text(
-            'GIỚI TÍNH',
-            style: V5.eyebrow(context, color: V5.inkSoft),
-          ),
-          SizedBox(height: veryCompact ? V5.space6 : V5.space8),
-          Row(
-            children: [
-              _genderChip('male', 'Nam', Icons.male_rounded),
-              const SizedBox(width: V5.space10),
-              _genderChip('female', 'Nữ', Icons.female_rounded),
+                ),
+                const SizedBox(height: V5.space12),
+              ],
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: V5.surface,
+                  border: Border.all(color: V5.border),
+                  borderRadius: BorderRadius.circular(V5.radiusMd),
+                  boxShadow: V5.elevation1,
+                ),
+                child: Row(
+                  children: metrics.map((m) {
+                    final isActive = _activeMetric == m.id;
+                    return Expanded(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => setState(() => _activeMetric = m.id),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 220),
+                          curve: V5.curveSharp,
+                          padding: EdgeInsets.symmetric(
+                            vertical: veryCompact ? 7 : 9,
+                            horizontal: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isActive ? V5.ink : Colors.transparent,
+                            borderRadius: BorderRadius.circular(V5.radiusSm),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                m.label.toUpperCase(),
+                                style: V5.eyebrow(
+                                  context,
+                                  color: isActive ? V5.invInkSoft : V5.inkSoft,
+                                ),
+                              ),
+                              const SizedBox(height: V5.space2),
+                              Text(
+                                '${m.value} ${m.unit}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: V5
+                                    .titleSm(
+                                      context,
+                                      color: isActive ? V5.yellow : V5.ink,
+                                    )
+                                    .copyWith(fontWeight: FontWeight.w800),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              SizedBox(height: r.pick(cozy: V5.space10, short: V5.space8)),
+              V5RulerPicker(
+                key: ValueKey(active.id),
+                label: active.label,
+                value: active.value,
+                min: active.min,
+                max: active.max,
+                unit: active.unit,
+                compact: compact,
+                onChanged: _setMetricValue,
+              ),
+              SizedBox(height: r.pick(cozy: V5.space14, short: V5.space8)),
+              Text(
+                'GIỚI TÍNH',
+                style: V5.eyebrow(context, color: V5.inkSoft),
+              ),
+              SizedBox(height: veryCompact ? V5.space6 : V5.space8),
+              Row(
+                children: [
+                  _genderChip('male', 'Nam', Icons.male_rounded),
+                  const SizedBox(width: V5.space10),
+                  _genderChip('female', 'Nữ', Icons.female_rounded),
+                ],
+              ),
             ],
           ),
-        ],
-      ),
         ),
       ),
     );
@@ -544,63 +544,64 @@ class _Under16Dialog extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
         child: Padding(
-        padding: const EdgeInsets.fromLTRB(22, 24, 22, 18),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: V5.danger.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: V5.danger.withValues(alpha: 0.32),
-                ),
-              ),
-              child: const Icon(
-                Icons.lock_outline_rounded,
-                color: V5.danger,
-                size: 24,
-              ),
-            ),
-            const SizedBox(height: V5.space12),
-            Text(
-              'Vika chỉ dành cho người từ 16 tuổi',
-              style: V5.title(context).copyWith(height: 1.2),
-            ),
-            const SizedBox(height: V5.space6),
-            Text(
-              'Bạn cần đủ 16 tuổi trở lên để dùng Vika. '
-              'Hãy chỉnh lại tuổi để tiếp tục.',
-              style: V5.bodySm(context, color: V5.inkSoft).copyWith(height: 1.4),
-            ),
-            const SizedBox(height: V5.space14),
-            Align(
-              alignment: Alignment.centerRight,
-              child: GestureDetector(
-                onTap: onClose,
-                behavior: HitTestBehavior.opaque,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: V5.ink,
-                    borderRadius: BorderRadius.circular(V5.radiusFull),
-                    boxShadow: V5.elevation1,
-                  ),
-                  child: Text(
-                    'Đã hiểu',
-                    style: V5.titleSm(context, color: V5.invInk),
+          padding: const EdgeInsets.fromLTRB(22, 24, 22, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: V5.danger.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: V5.danger.withValues(alpha: 0.32),
                   ),
                 ),
+                child: const Icon(
+                  Icons.lock_outline_rounded,
+                  color: V5.danger,
+                  size: 24,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: V5.space12),
+              Text(
+                'Vika chỉ dành cho người từ 16 tuổi',
+                style: V5.title(context).copyWith(height: 1.2),
+              ),
+              const SizedBox(height: V5.space6),
+              Text(
+                'Bạn cần đủ 16 tuổi trở lên để dùng Vika. '
+                'Hãy chỉnh lại tuổi để tiếp tục.',
+                style:
+                    V5.bodySm(context, color: V5.inkSoft).copyWith(height: 1.4),
+              ),
+              const SizedBox(height: V5.space14),
+              Align(
+                alignment: Alignment.centerRight,
+                child: GestureDetector(
+                  onTap: onClose,
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 22, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: V5.ink,
+                      borderRadius: BorderRadius.circular(V5.radiusFull),
+                      boxShadow: V5.elevation1,
+                    ),
+                    child: Text(
+                      'Đã hiểu',
+                      style: V5.titleSm(context, color: V5.invInk),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-    ),
     );
   }
 }

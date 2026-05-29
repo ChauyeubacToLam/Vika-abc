@@ -81,9 +81,7 @@ class _MilestoneRow extends StatelessWidget {
                   width: 2,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: isFirst
-                        ? Colors.transparent
-                        : c.border,
+                    color: isFirst ? Colors.transparent : c.border,
                     borderRadius: BorderRadius.circular(1),
                   ),
                 ),
@@ -142,9 +140,7 @@ class _MilestoneRow extends StatelessWidget {
                   color: isToday ? c.bgRaised : c.bg,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: isToday
-                        ? c.yellow.withValues(alpha: 0.3)
-                        : c.border,
+                    color: isToday ? c.yellow.withValues(alpha: 0.3) : c.border,
                     width: isToday ? 1.2 : 1,
                   ),
                   boxShadow: isToday

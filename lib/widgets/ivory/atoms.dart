@@ -88,7 +88,8 @@ class _PoseGlyphPainter extends CustomPainter {
         canvas.drawLine(p(14, 14), p(17, 19), strokePaint);
         canvas.drawLine(p(11, 19), p(10, 23), strokePaint);
         canvas.drawLine(p(17, 19), p(18, 23), strokePaint);
-        canvas.drawCircle(p(14, 6), 2.5 * scale, accent..color = yellow.withValues(alpha: 0.5));
+        canvas.drawCircle(p(14, 6), 2.5 * scale,
+            accent..color = yellow.withValues(alpha: 0.5));
         break;
 
       case PoseGlyphType.wallPushUp:
@@ -194,7 +195,8 @@ class PillCTA extends StatelessWidget {
 
   final String label;
   final VoidCallback onTap;
-  final bool dark; // dark = ink pill (used on warm-dark surfaces); light = yellow
+  final bool
+      dark; // dark = ink pill (used on warm-dark surfaces); light = yellow
   final bool fullWidth;
 
   @override
@@ -224,17 +226,18 @@ class PillCTA extends StatelessWidget {
                 label,
                 style: TextStyle(
                   fontFamily: 'BeVietnamPro',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.2,
-                    color: fg,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.2,
+                  color: fg,
                 ),
               ),
               const SizedBox(width: 12),
               Container(
                 width: 36,
                 height: 36,
-                decoration: BoxDecoration(color: knobBg, shape: BoxShape.circle),
+                decoration:
+                    BoxDecoration(color: knobBg, shape: BoxShape.circle),
                 alignment: Alignment.center,
                 child: Icon(
                   Icons.arrow_forward_rounded,

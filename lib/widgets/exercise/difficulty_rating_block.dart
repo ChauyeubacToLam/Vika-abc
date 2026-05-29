@@ -40,9 +40,8 @@ class DifficultyRatingBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    final eyebrowColor = dark
-        ? c.invInkSoft.withValues(alpha: 0.55)
-        : c.inkFaint;
+    final eyebrowColor =
+        dark ? c.invInkSoft.withValues(alpha: 0.55) : c.inkFaint;
     final titleColor = dark ? c.invInk : c.ink;
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
@@ -50,9 +49,7 @@ class DifficultyRatingBlock extends StatelessWidget {
         color: dark ? Colors.white.withValues(alpha: 0.04) : c.bgRaised,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: dark
-              ? Colors.white.withValues(alpha: 0.10)
-              : c.border,
+          color: dark ? Colors.white.withValues(alpha: 0.10) : c.border,
         ),
         boxShadow: dark
             ? null
@@ -90,8 +87,7 @@ class DifficultyRatingBlock extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              if (selected != null)
-                _LockedBadge(dark: dark),
+              if (selected != null) _LockedBadge(dark: dark),
             ],
           ),
           const SizedBox(height: 10),
@@ -276,9 +272,7 @@ class _LockedBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: dark
-            ? Colors.white.withValues(alpha: 0.06)
-            : c.yellowGhost,
+        color: dark ? Colors.white.withValues(alpha: 0.06) : c.yellowGhost,
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
           color: dark

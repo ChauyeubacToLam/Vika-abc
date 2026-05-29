@@ -190,7 +190,7 @@ class OnboardingPersistence {
         'fork_recommended': rec.fork,
         'fork_chosen': data.fork,
         'raw_score': rec.rawScore,
-        'confidence': rec.confidence, 
+        'confidence': rec.confidence,
         'dominant_signal': rec.dominantSignal,
         'reason_text': rec.reason,
         'contribution_goal': rec.signalContributions['goal'],

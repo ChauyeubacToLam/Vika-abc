@@ -389,10 +389,12 @@ class _PainZoneTile extends StatelessWidget {
                                 area.label,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: V5.titleSm(
-                                  context,
-                                  color: selected ? V5.invInk : V5.ink,
-                                ).copyWith(height: 1.12),
+                                style: V5
+                                    .titleSm(
+                                      context,
+                                      color: selected ? V5.invInk : V5.ink,
+                                    )
+                                    .copyWith(height: 1.12),
                               ),
                               if (!dense) ...[
                                 const SizedBox(height: V5.space2),
@@ -402,9 +404,8 @@ class _PainZoneTile extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                   style: V5.caption(
                                     context,
-                                    color: selected
-                                        ? V5.invInkSoft
-                                        : V5.inkFaint,
+                                    color:
+                                        selected ? V5.invInkSoft : V5.inkFaint,
                                   ),
                                 ),
                               ],

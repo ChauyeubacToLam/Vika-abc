@@ -32,7 +32,8 @@ class IvoryGlassIconButton extends StatelessWidget {
             decoration: BoxDecoration(
               color: VikaIvory.glass08,
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: VikaIvory.glass12.withValues(alpha: 0.10)),
+              border:
+                  Border.all(color: VikaIvory.glass12.withValues(alpha: 0.10)),
             ),
             alignment: Alignment.center,
             child: child,
@@ -66,7 +67,8 @@ class IvoryTopChromeLeft extends StatelessWidget {
       children: [
         IvoryGlassIconButton(
           onTap: onBack,
-          child: Icon(Icons.arrow_back_ios_new_rounded, size: 14, color: VikaIvory.invInk),
+          child: Icon(Icons.arrow_back_ios_new_rounded,
+              size: 14, color: VikaIvory.invInk),
         ),
         const SizedBox(width: 10),
         ClipRRect(
@@ -209,7 +211,11 @@ class IvoryAILivePulsePill extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: VikaIvory.live,
                   shape: BoxShape.circle,
-                  boxShadow: [BoxShadow(color: VikaIvory.live.withValues(alpha: 0.7), blurRadius: 6)],
+                  boxShadow: [
+                    BoxShadow(
+                        color: VikaIvory.live.withValues(alpha: 0.7),
+                        blurRadius: 6)
+                  ],
                 ),
               ),
               const SizedBox(width: 6),
@@ -254,7 +260,8 @@ class IvoryTopChromeRight extends StatelessWidget {
         const SizedBox(width: 8),
         IvoryGlassIconButton(
           onTap: onFlipCamera,
-          child: Icon(Icons.cameraswitch_rounded, size: 14, color: VikaIvory.invInk),
+          child: Icon(Icons.cameraswitch_rounded,
+              size: 14, color: VikaIvory.invInk),
         ),
         const SizedBox(width: 8),
         IvoryGlassIconButton(
@@ -323,11 +330,15 @@ class IvoryPTReferenceLoop extends StatelessWidget {
               width: 1,
             ),
             boxShadow: [
-              BoxShadow(color: const Color(0xFF15110D).withValues(alpha: 0.4), blurRadius: 24, offset: const Offset(0, 8)),
+              BoxShadow(
+                  color: const Color(0xFF15110D).withValues(alpha: 0.4),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8)),
             ],
           ),
           child: Center(
-            child: Icon(Icons.play_circle_outline_rounded, color: VikaIvory.invInkDim, size: 28),
+            child: Icon(Icons.play_circle_outline_rounded,
+                color: VikaIvory.invInkDim, size: 28),
           ),
         ),
         const SizedBox(height: 6),
@@ -342,7 +353,9 @@ class IvoryPTReferenceLoop extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: VikaIvory.yellow,
                   shape: BoxShape.circle,
-                  boxShadow: [BoxShadow(color: VikaIvory.yellowGlow, blurRadius: 6)],
+                  boxShadow: [
+                    BoxShadow(color: VikaIvory.yellowGlow, blurRadius: 6)
+                  ],
                 ),
               ),
               const SizedBox(width: 5),
@@ -395,7 +408,9 @@ class IvoryCoachCaption extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: VikaIvory.yellow,
                   shape: BoxShape.circle,
-                  boxShadow: [BoxShadow(color: VikaIvory.yellowGlow, blurRadius: 8)],
+                  boxShadow: [
+                    BoxShadow(color: VikaIvory.yellowGlow, blurRadius: 8)
+                  ],
                 ),
               ),
               const SizedBox(width: 6),
@@ -422,8 +437,12 @@ class IvoryCoachCaption extends StatelessWidget {
             letterSpacing: -0.2,
             height: 1.35,
             shadows: [
-              Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.95), blurRadius: 16),
-              Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.7), blurRadius: 4),
+              Shadow(
+                  color: const Color(0xFF15110D).withValues(alpha: 0.95),
+                  blurRadius: 16),
+              Shadow(
+                  color: const Color(0xFF15110D).withValues(alpha: 0.7),
+                  blurRadius: 4),
             ],
           ),
         ),
@@ -463,8 +482,18 @@ class IvoryRepTallyDots extends StatelessWidget {
             decoration: BoxDecoration(
               color: filled ? VikaIvory.yellow : VikaIvory.invInkDim,
               shape: BoxShape.circle,
-              border: hasFault && filled ? Border.all(color: VikaIvory.attention, width: 1.5) : null,
-              boxShadow: isCurrent ? [BoxShadow(color: VikaIvory.yellowGlow, blurRadius: 8)] : (hasFault && filled ? [BoxShadow(color: VikaIvory.attention.withValues(alpha: 0.5), blurRadius: 4)] : null),
+              border: hasFault && filled
+                  ? Border.all(color: VikaIvory.attention, width: 1.5)
+                  : null,
+              boxShadow: isCurrent
+                  ? [BoxShadow(color: VikaIvory.yellowGlow, blurRadius: 8)]
+                  : (hasFault && filled
+                      ? [
+                          BoxShadow(
+                              color: VikaIvory.attention.withValues(alpha: 0.5),
+                              blurRadius: 4)
+                        ]
+                      : null),
             ),
           ),
         );
@@ -519,7 +548,11 @@ class IvoryBottomChrome extends StatelessWidget {
               fontWeight: FontWeight.w700,
               color: VikaIvory.invInkFaint,
               letterSpacing: 1.6,
-              shadows: [Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.6), blurRadius: 6)],
+              shadows: [
+                Shadow(
+                    color: const Color(0xFF15110D).withValues(alpha: 0.6),
+                    blurRadius: 6)
+              ],
             )),
         const SizedBox(height: 3),
         Text(phaseVerb,
@@ -532,7 +565,9 @@ class IvoryBottomChrome extends StatelessWidget {
               height: 0.9,
               shadows: [
                 Shadow(color: VikaIvory.yellowGlowWeak, blurRadius: 14),
-                Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.6), blurRadius: 4),
+                Shadow(
+                    color: const Color(0xFF15110D).withValues(alpha: 0.6),
+                    blurRadius: 4),
               ],
             )),
         const SizedBox(height: 4),
@@ -544,7 +579,11 @@ class IvoryBottomChrome extends StatelessWidget {
               color: VikaIvory.invInkSoft,
               letterSpacing: -0.1,
               height: 1.3,
-              shadows: [Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.6), blurRadius: 6)],
+              shadows: [
+                Shadow(
+                    color: const Color(0xFF15110D).withValues(alpha: 0.6),
+                    blurRadius: 6)
+              ],
             )),
       ],
     );
@@ -564,7 +603,11 @@ class IvoryBottomChrome extends StatelessWidget {
               fontWeight: FontWeight.w700,
               color: VikaIvory.yellow,
               letterSpacing: 1.8,
-              shadows: [Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.6), blurRadius: 6)],
+              shadows: [
+                Shadow(
+                    color: const Color(0xFF15110D).withValues(alpha: 0.6),
+                    blurRadius: 6)
+              ],
             )),
         const SizedBox(height: 4),
         Row(
@@ -585,7 +628,8 @@ class IvoryBottomChrome extends StatelessWidget {
                     builder: (context, animatedProgress, _) {
                       return CustomPaint(
                         size: const Size(68, 68),
-                        painter: HoldTimerRingPainter(progress: animatedProgress),
+                        painter:
+                            HoldTimerRingPainter(progress: animatedProgress),
                       );
                     },
                   ),
@@ -605,7 +649,9 @@ class IvoryBottomChrome extends StatelessWidget {
                           color: VikaIvory.yellow,
                           letterSpacing: -1.0,
                           height: 1,
-                          shadows: [Shadow(color: VikaIvory.yellowGlow, blurRadius: 10)],
+                          shadows: [
+                            Shadow(color: VikaIvory.yellowGlow, blurRadius: 10)
+                          ],
                         ),
                       );
                     },
@@ -628,7 +674,10 @@ class IvoryBottomChrome extends StatelessWidget {
                       height: 0.9,
                       shadows: [
                         Shadow(color: VikaIvory.yellowGlowWeak, blurRadius: 14),
-                        Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.6), blurRadius: 4),
+                        Shadow(
+                            color:
+                                const Color(0xFF15110D).withValues(alpha: 0.6),
+                            blurRadius: 4),
                       ],
                     )),
                 const SizedBox(height: 3),
@@ -639,7 +688,12 @@ class IvoryBottomChrome extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                       color: VikaIvory.invInkSoft,
                       letterSpacing: -0.1,
-                      shadows: [Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.6), blurRadius: 6)],
+                      shadows: [
+                        Shadow(
+                            color:
+                                const Color(0xFF15110D).withValues(alpha: 0.6),
+                            blurRadius: 6)
+                      ],
                     )),
               ],
             ),
@@ -661,7 +715,11 @@ class IvoryBottomChrome extends StatelessWidget {
               fontWeight: FontWeight.w700,
               color: VikaIvory.invInkSoft,
               letterSpacing: 1.8,
-              shadows: [Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.6), blurRadius: 6)],
+              shadows: [
+                Shadow(
+                    color: const Color(0xFF15110D).withValues(alpha: 0.6),
+                    blurRadius: 6)
+              ],
             )),
         const SizedBox(height: 4),
         Row(
@@ -679,7 +737,9 @@ class IvoryBottomChrome extends StatelessWidget {
                   height: 0.9,
                   shadows: [
                     Shadow(color: VikaIvory.yellowGlow, blurRadius: 16),
-                    Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.6), blurRadius: 4),
+                    Shadow(
+                        color: const Color(0xFF15110D).withValues(alpha: 0.6),
+                        blurRadius: 4),
                   ],
                 )),
             const SizedBox(width: 4),
@@ -690,12 +750,17 @@ class IvoryBottomChrome extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                   color: VikaIvory.invInkSoft,
                   letterSpacing: -0.4,
-                  shadows: [Shadow(color: const Color(0xFF15110D).withValues(alpha: 0.6), blurRadius: 4)],
+                  shadows: [
+                    Shadow(
+                        color: const Color(0xFF15110D).withValues(alpha: 0.6),
+                        blurRadius: 4)
+                  ],
                 )),
           ],
         ),
         const SizedBox(height: 8),
-        IvoryRepTallyDots(count: repCount, total: totalReps, faultIndices: faultIndices),
+        IvoryRepTallyDots(
+            count: repCount, total: totalReps, faultIndices: faultIndices),
       ],
     );
   }
@@ -749,7 +814,9 @@ class IvoryPauseOverlay extends StatelessWidget {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    isManualPause ? Icons.pause_rounded : Icons.person_off_rounded,
+                    isManualPause
+                        ? Icons.pause_rounded
+                        : Icons.person_off_rounded,
                     size: 22,
                     color: VikaIvory.attention,
                   ),
@@ -779,7 +846,9 @@ class IvoryPauseOverlay extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  isManualPause ? 'Tiến độ set này được giữ nguyên.\nẤn nút bên dưới để tiếp tục tập.' : 'Quay lại khung hình để AI tiếp tục theo dõi, hoặc ấn nút bên dưới.',
+                  isManualPause
+                      ? 'Tiến độ set này được giữ nguyên.\nẤn nút bên dưới để tiếp tục tập.'
+                      : 'Quay lại khung hình để AI tiếp tục theo dõi, hoặc ấn nút bên dưới.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontFamily: _font,
@@ -820,7 +889,8 @@ class IvoryPauseOverlay extends StatelessWidget {
                             color: VikaIvory.yellow,
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          child: Icon(Icons.play_arrow_rounded, size: 20, color: VikaIvory.yellowInk),
+                          child: Icon(Icons.play_arrow_rounded,
+                              size: 20, color: VikaIvory.yellowInk),
                         ),
                       ],
                     ),
@@ -831,7 +901,8 @@ class IvoryPauseOverlay extends StatelessWidget {
                 GestureDetector(
                   onTap: onEnd,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 10, horizontal: 16),
                     child: Text('Kết thúc buổi tập',
                         style: TextStyle(
                           fontFamily: _font,

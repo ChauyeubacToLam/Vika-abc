@@ -100,29 +100,28 @@ class IssuesService {
     // 'confirmed' when camera + user now agree), otherwise insert new.
     try {
       final existing = await _client
-    .from('user_pain_areas')
-    .select('id, source, flag_count')   
-    .eq('user_id', userId)
-    .eq('body_region', bodyRegion)
-    .eq('status', 'active')
-    .maybeSingle();
+          .from('user_pain_areas')
+          .select('id, source, flag_count')
+          .eq('user_id', userId)
+          .eq('body_region', bodyRegion)
+          .eq('status', 'active')
+          .maybeSingle();
 
-if (existing != null) {
-  final updates = <String, dynamic>{
-    'last_reaffirmed_at': now,
-    'flag_count': ((existing as Map)['flag_count'] as int? ?? 1) + 1,
-  };
-  if (existing['source'] == 'self_reported') {
-    updates['source'] = 'confirmed';
-  }
-  await _client
-      .from('user_pain_areas')
-      .update(updates)
-      .eq('id', existing['id']);
-}
+      if (existing != null) {
+        final updates = <String, dynamic>{
+          'last_reaffirmed_at': now,
+          'flag_count': ((existing as Map)['flag_count'] as int? ?? 1) + 1,
+        };
+        if (existing['source'] == 'self_reported') {
+          updates['source'] = 'confirmed';
+        }
+        await _client
+            .from('user_pain_areas')
+            .update(updates)
+            .eq('id', existing['id']);
+      }
     } catch (e) {
-      debugPrint(
-          '[IssuesService] respondToIssue pain area write failed: $e');
+      debugPrint('[IssuesService] respondToIssue pain area write failed: $e');
     }
   }
 

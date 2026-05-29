@@ -70,8 +70,7 @@ class IvoryBottomNav extends StatelessWidget {
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
                 decoration: BoxDecoration(
                   color: c.bgRaised.withValues(alpha: 0.92),
                   borderRadius: BorderRadius.circular(999),
@@ -186,8 +185,8 @@ class _NavItemState extends State<_NavItem> {
               AnimatedContainer(
                 duration: const Duration(milliseconds: 220),
                 curve: Curves.easeOutCubic,
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
                 decoration: BoxDecoration(
                   color: widget.active ? c.yellowGhost : Colors.transparent,
                   borderRadius: BorderRadius.circular(999),
@@ -313,8 +312,7 @@ class _NavIconPainter extends CustomPainter {
 
       case _NavIcon.profile:
         // Head + shoulders
-        final headRect =
-            Rect.fromCircle(center: p(10, 7), radius: 3.5 * scale);
+        final headRect = Rect.fromCircle(center: p(10, 7), radius: 3.5 * scale);
         canvas.drawArc(headRect, 0, 6.283, false, stroke);
         final shoulders = Path()
           ..moveTo(3 * scale, 17 * scale)

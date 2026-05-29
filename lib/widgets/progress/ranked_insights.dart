@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import '../../data/progress_mock.dart';
 import 'exercise_insight.dart';
 import '../../theme/app_colors.dart';
+
 class RankedInsights extends StatefulWidget {
   const RankedInsights({super.key, required this.ranked});
 

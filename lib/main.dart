@@ -250,6 +250,7 @@ class VikaApp extends StatelessWidget {
                   );
             return MaterialPageRoute(
               builder: (_) => ExerciseExperienceScreen(
+                workoutSessionId: launchArgs.workoutSessionId,
                 definition: launchArgs.definition,
                 catalogExerciseId: launchArgs.catalogExerciseId,
                 prescription: launchArgs.prescription,

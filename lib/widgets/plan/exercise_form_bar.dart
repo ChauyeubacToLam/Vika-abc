@@ -25,9 +25,7 @@ class ExerciseFormBar extends StatelessWidget {
     final f = exercise.form;
     final high = f >= 80;
     final low = f < 65;
-    final barColor = high
-        ? c.yellow
-        : (low ? c.attention : c.ink);
+    final barColor = high ? c.yellow : (low ? c.attention : c.ink);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2.5),
@@ -41,10 +39,10 @@ class ExerciseFormBar extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontFamily: 'BeVietnamPro',
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.1,
-                  color: c.inkSoft,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.1,
+                color: c.inkSoft,
               ),
             ),
           ),
@@ -71,11 +69,11 @@ class ExerciseFormBar extends StatelessWidget {
               textAlign: TextAlign.right,
               style: TextStyle(
                 fontFamily: 'BeVietnamPro',
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.1,
-                  color: c.ink,
-                  fontFeatures: VikaIvoryMain.tabularFigures,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.1,
+                color: c.ink,
+                fontFeatures: VikaIvoryMain.tabularFigures,
               ),
             ),
           ),

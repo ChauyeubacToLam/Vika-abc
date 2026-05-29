@@ -138,9 +138,8 @@ class _S09Phase1State extends State<S09Phase1>
                       const SizedBox(height: V5.space12),
                       _AnalysisCard(
                         ex: ex,
-                        selected:
-                            widget.data.feedbackByExercise[ex.id] ??
-                                const <String>[],
+                        selected: widget.data.feedbackByExercise[ex.id] ??
+                            const <String>[],
                         onToggle: (id) => _toggleFeedbackFor(ex, id),
                       ),
                     ],

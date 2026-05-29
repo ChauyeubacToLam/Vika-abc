@@ -109,9 +109,7 @@ class _RecordCardState extends State<_RecordCard> {
               color: c.bgRaised,
               borderRadius: BorderRadius.circular(22),
               border: Border.all(
-                color: r.isNew
-                    ? c.yellow.withValues(alpha: 0.35)
-                    : c.border,
+                color: r.isNew ? c.yellow.withValues(alpha: 0.35) : c.border,
                 width: r.isNew ? 1.2 : 1,
               ),
               boxShadow: [
@@ -248,8 +246,7 @@ class _RecordCardState extends State<_RecordCard> {
                                   letterSpacing: -1.8,
                                   height: 0.95,
                                   color: c.ink,
-                                  fontFeatures:
-                                      VikaIvoryMain.tabularFigures,
+                                  fontFeatures: VikaIvoryMain.tabularFigures,
                                 ),
                               ),
                             ),
@@ -328,8 +325,7 @@ class _RecordCardState extends State<_RecordCard> {
                   const Positioned.fill(
                     child: IgnorePointer(
                       child: ClipRRect(
-                        borderRadius:
-                            BorderRadius.all(Radius.circular(22)),
+                        borderRadius: BorderRadius.all(Radius.circular(22)),
                         child: _CelebrationOverlay(),
                       ),
                     ),

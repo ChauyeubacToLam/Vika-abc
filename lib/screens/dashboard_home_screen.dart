@@ -96,8 +96,9 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
     final snapshot =
         await _recommendations.fetchLatestPlanSnapshotForCurrentUser();
     final plan = snapshot?.plan;
-    if (snapshot == null || plan == null) return;
-    final weekNumber = snapshot.currentWeekNumber;
+    final position = snapshot?.currentPosition;
+    if (snapshot == null || plan == null || position == null) return;
+    final weekNumber = position.$1;
     if (!plan.weeklyCheckInWeeks.contains(weekNumber)) return;
     final due = await _checkIns.isDue(
       recommendationId: plan.recommendationId,
@@ -207,8 +208,8 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
 
   Future<void> _startWorkoutTarget(WorkoutLaunchTarget target) async {
     HapticFeedback.lightImpact();
-    final first = target.firstLaunchArgs;
-    if (first == null) {
+    final base = target.firstLaunchArgs();
+    if (base == null) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
@@ -218,7 +219,16 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
         );
       return;
     }
-    final completedWorkout = await _runWorkoutSequence(first);
+    String? workoutSessionId;
+    if (base.recommendationId != null) {
+      workoutSessionId = await SessionPersistence().startWorkoutSession(
+        recommendationId: base.recommendationId!,
+        weekNumber: base.weekNumber!,
+        sessionIndex: base.sessionIndex!,
+      );
+    }
+    final first = target.firstLaunchArgs(workoutSessionId: workoutSessionId);
+    final completedWorkout = await _runWorkoutSequence(first!);
     if (completedWorkout) {
       await SessionPersistence().updateStreak();
       final profile = await UserProfileService().fetchCurrentProfile();
@@ -288,33 +298,6 @@ class _HomeHeroFromTarget extends StatelessWidget {
       );
     }
 
-    if (state?.isRecoveryDay == true &&
-        (currentTarget == null || !currentTarget.hasLaunchableSlots)) {
-      final completedWeek = state?.hasCompletedWeek == true;
-      return HomeStageHero(
-        eyebrow: 'NGÀY PHỤC HỒI',
-        titleLine1: 'Nghỉ',
-        titleLine2: 'đúng lúc.',
-        whyLine:
-            'Cơ bắp của bạn đang tái tạo hôm nay. Nghỉ đúng lúc giúp buổi sau mạnh hơn.',
-        duration: '0 phút',
-        totalCount: 0,
-        aiCount: 0,
-        exercises: [],
-        coachQuote: completedWeek
-            ? 'Bạn đã hoàn thành đủ buổi trong tuần này. Vika chưa tìm thấy buổi tiếp theo có bài camera.'
-            : 'Hôm nay là ngày nghỉ. Vika chưa mở được bài camera cho buổi tiếp theo trong lộ trình.',
-        coachAttribution: homeMockCoachAttribution,
-        ctaLabel: '',
-        onCta: null,
-        ctaEmphasized: false,
-        secondaryCtaLabel: 'Hoặc giãn cơ nhẹ',
-        onSecondaryCta: onStretch,
-        userInitial: userInitial,
-        avatarUrl: avatarUrl,
-      );
-    }
-
     if (currentTarget == null || !currentTarget.hasLaunchableSlots) {
       return HomeStageHero(
         eyebrow: 'CHƯA CÓ BUỔI TẬP',
@@ -329,30 +312,6 @@ class _HomeHeroFromTarget extends StatelessWidget {
         coachAttribution: homeMockCoachAttribution,
         ctaLabel: '',
         onCta: null,
-        userInitial: userInitial,
-        avatarUrl: avatarUrl,
-      );
-    }
-
-    if (currentTarget.isOffDayPullForward) {
-      return HomeStageHero(
-        eyebrow: 'NGÀY PHỤC HỒI',
-        titleLine1: 'Nghỉ',
-        titleLine2: 'đúng lúc.',
-        whyLine:
-            'Cơ bắp của bạn đang tái tạo hôm nay. Nghỉ đúng lúc giúp buổi sau mạnh hơn.',
-        duration: _durationFor(currentTarget),
-        totalCount: currentTarget.sequence.length,
-        aiCount: currentTarget.sequence.length,
-        exercises: _exerciseRows(currentTarget),
-        coachQuote:
-            'Hôm nay là ngày nghỉ. Nếu vẫn muốn chủ động, bấm Bắt đầu để tập buổi tiếp theo trong lộ trình.',
-        coachAttribution: homeMockCoachAttribution,
-        ctaLabel: 'Bắt đầu',
-        onCta: onStart,
-        ctaEmphasized: false,
-        secondaryCtaLabel: 'Hoặc giãn cơ nhẹ',
-        onSecondaryCta: onStretch,
         userInitial: userInitial,
         avatarUrl: avatarUrl,
       );

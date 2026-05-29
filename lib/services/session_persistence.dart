@@ -85,6 +85,7 @@ class SessionPersistence {
     required int totalGoodReps,
     required int totalSets,
     required int? calories,
+    required String? workoutSessionId,
     required Map<String, int> faultCounts,
     required List<String?> difficultyRatings,
     required List<Map<String, dynamic>> setData,
@@ -112,6 +113,7 @@ class SessionPersistence {
             'set_data': setData,
             'recommendation_id': recommendationId,
             'slot_name': slotName,
+            'workout_session_id': workoutSessionId,
           })
           .select('id')
           .single();
@@ -190,6 +192,35 @@ class SessionPersistence {
     } catch (e) {
       debugPrint('[Vika] getSessionHistory failed: $e');
       return [];
+    }
+  }
+
+  /// {weekNumber: {done session indexes}} for a plan, from workout_sessions.
+  /// A session counts as done only when completed_at is set.
+  Future<Map<int, Set<int>>> completionMapForPlan({
+    required String recommendationId,
+  }) async {
+    final user = _client.auth.currentUser;
+    if (user == null) return const {};
+    try {
+      final rows = await _client
+          .from('workout_sessions')
+          .select('week_number, session_index')
+          .eq('user_id', user.id)
+          .eq('recommendation_id', recommendationId)
+          .not('completed_at', 'is', null);
+      final map = <int, Set<int>>{};
+      for (final raw in rows as List) {
+        final row = (raw as Map).cast<String, dynamic>();
+        final week = (row['week_number'] as num?)?.toInt();
+        final session = (row['session_index'] as num?)?.toInt();
+        if (week == null || session == null) continue;
+        (map[week] ??= <int>{}).add(session);
+      }
+      return map;
+    } catch (e) {
+      debugPrint('[SessionPersistence] completion map fetch failed: $e');
+      return const {};
     }
   }
 
@@ -397,6 +428,63 @@ class SessionPersistence {
       }).eq('id', userId);
     } catch (e) {
       debugPrint('[Vika] updateStreak failed: $e');
+    }
+  }
+
+  Future<String?> startWorkoutSession({
+    required String recommendationId,
+    required int weekNumber,
+    required int sessionIndex,
+  }) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return null;
+
+    try {
+      final response = await _client
+          .from('workout_sessions')
+          .insert({
+            'user_id': userId,
+            'recommendation_id': recommendationId,
+            'week_number': weekNumber,
+            'session_index': sessionIndex,
+          })
+          .select('id')
+          .single();
+      return response['id'] as String;
+    } catch (e) {
+      debugPrint('[Vika] startWorkoutSession failed: $e');
+      return null;
+    }
+  }
+
+  Future<void> completeWorkoutSession({
+    required String? workoutSessionId,
+    required String recommendationId,
+    required int weekNumber,
+    required int sessionIndex,
+  }) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return;
+    if (workoutSessionId == null || workoutSessionId.isEmpty) {
+      try {
+        await _client.from('workout_sessions').insert({
+          'user_id': userId,
+          'recommendation_id': recommendationId,
+          'week_number': weekNumber,
+          'session_index': sessionIndex,
+          'completed_at': DateTime.now().toUtc().toIso8601String()
+        });
+      } catch (e) {
+        debugPrint('[Vika] completeWorkoutSession fallback insert failed: $e');
+      }
+    } else {
+      try {
+        await _client.from('workout_sessions').update({
+          'completed_at': DateTime.now().toUtc().toIso8601String()
+        }).eq('id', workoutSessionId);
+      } catch (e) {
+        debugPrint('[Vika] completeWorkoutSession failed: $e');
+      }
     }
   }
 }

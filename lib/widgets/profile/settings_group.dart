@@ -132,9 +132,8 @@ class SettingRow extends StatelessWidget {
                   color: iconBg,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: danger
-                        ? c.attention.withValues(alpha: 0.2)
-                        : c.border,
+                    color:
+                        danger ? c.attention.withValues(alpha: 0.2) : c.border,
                   ),
                 ),
                 alignment: Alignment.center,

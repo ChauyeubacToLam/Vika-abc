@@ -43,9 +43,8 @@ class LibraryStageHero extends StatelessWidget {
   final VoidCallback? onAvatarTap;
   final VoidCallback? onSearchTap;
 
-  LibraryFilter get _selected =>
-      filters.firstWhere((f) => f.id == selectedFilterId,
-          orElse: () => filters.first);
+  LibraryFilter get _selected => filters
+      .firstWhere((f) => f.id == selectedFilterId, orElse: () => filters.first);
 
   String get _eyebrow {
     if (_selected.id == 'all') return 'THƯ VIỆN  ·  $totalCount BÀI';
@@ -55,16 +54,11 @@ class LibraryStageHero extends StatelessWidget {
 
   String get _subtitle {
     return switch (_selected.id) {
-      'program' =>
-        'Lộ trình nhiều tuần. Mỗi tuần một mục tiêu rõ ràng.',
-      'collection' =>
-        'Bộ sưu tập ngắn. Tập nhanh, gọn, theo mục đích.',
-      'exercise' =>
-        'Bài tập riêng lẻ. Chọn theo phần thân hoặc cường độ.',
-      'ai' =>
-        'Camera Vika theo dõi tư thế của bạn theo thời gian thực.',
-      'yoga' =>
-        'Tư thế yoga để linh hoạt, thư giãn, cân bằng.',
+      'program' => 'Lộ trình nhiều tuần. Mỗi tuần một mục tiêu rõ ràng.',
+      'collection' => 'Bộ sưu tập ngắn. Tập nhanh, gọn, theo mục đích.',
+      'exercise' => 'Bài tập riêng lẻ. Chọn theo phần thân hoặc cường độ.',
+      'ai' => 'Camera Vika theo dõi tư thế của bạn theo thời gian thực.',
+      'yoga' => 'Tư thế yoga để linh hoạt, thư giãn, cân bằng.',
       _ => 'Tìm bài tập, lộ trình, bộ sưu tập theo mục tiêu.',
     };
   }

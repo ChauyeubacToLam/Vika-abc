@@ -97,7 +97,8 @@ class TrunkAlignmentMetric extends PushUpMetricBase {
               'plank', 'Back', 'Lưng võng nguy hiểm — siết cơ bụng mạnh hơn!');
           _sagInstructionSet = true;
         }
-        _logFault(phase, 'Lưng võng quá mức — nguy hiểm', voiceMessage: 'Siết cơ bụng');
+        _logFault(phase, 'Lưng võng quá mức — nguy hiểm',
+            voiceMessage: 'Siết cơ bụng');
       } else if (isSagError) {
         ctx.resultIssues.feedback['Back'] = 'Hông hơi võng — siết cơ bụng!';
         if (!_sagInstructionSet) {
@@ -145,8 +146,8 @@ class TrunkAlignmentMetric extends PushUpMetricBase {
         _faults.isNotEmpty ? '⚠️ ${_faults.last.message}' : '✅';
   }
 
-void _logFault(String phase, String message, {String? voiceMessage}) {
-    if (!_faults.any((f) => f.phase == phase && f.message == message)) {        
+  void _logFault(String phase, String message, {String? voiceMessage}) {
+    if (!_faults.any((f) => f.phase == phase && f.message == message)) {
       _faults.add(FaultRecord(
         phase: phase,
         type: 'Back',

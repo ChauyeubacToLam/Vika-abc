@@ -26,9 +26,10 @@ class SquatConfig {
   static const double SQUAT_STAND_ANGLE_THRESHOLD = 160;
   static const List<int> SQUAT_BOTTOM_ANGLE_THRESHOLD = [80, 100];
   static const double BOTTOM_RELEASE_READY_TOLERANCE_SECONDS = 0.05;
-  static const double ANGLE_STABLE_GATE = 2; // degrees, for FrameBuffer angle change detection
-  static const double ROM_GATE = 36; // degrees, minimum angle change to confirm direction switch from descending to ascending
-
+  static const double ANGLE_STABLE_GATE =
+      2; // degrees, for FrameBuffer angle change detection
+  static const double ROM_GATE =
+      36; // degrees, minimum angle change to confirm direction switch from descending to ascending
 }
 
 enum SquatState { standing, descending, bottom, ascending }
@@ -75,7 +76,6 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
 
   static String bottomHoldStatus(double remainingSeconds) =>
       'Hold! ${remainingSeconds.toStringAsFixed(1)}s';
-
 
   static bool isHoldStatus(String statusText) {
     return statusText.startsWith('Hold') || statusText.contains('Giữ');
@@ -188,8 +188,9 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
   final Debouncer _standingDebouncer = Debouncer(requiredFrames: 2);
   final StickyDebouncer directionDetection = StickyDebouncer();
 
-  // base 
-  double _baselineKneeAngle = SquatConfig.SQUAT_STAND_ANGLE_THRESHOLD; // Updated when standing still at the top to adapt to user differences and tracking noise.
+  // base
+  double _baselineKneeAngle = SquatConfig
+      .SQUAT_STAND_ANGLE_THRESHOLD; // Updated when standing still at the top to adapt to user differences and tracking noise.
 
   // --- UI Bridge ---
 
@@ -251,9 +252,9 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
       midPoint: knee,
       lastPoint: ankle,
     );
-    if (kneeAngle < _baselineKneeAngle - SquatConfig.ERROR_ALLOW ) return false;
+    if (kneeAngle < _baselineKneeAngle - SquatConfig.ERROR_ALLOW) return false;
     _baselineKneeAngle = kneeAngle; // Set baseline for this user
-    
+
     return true;
   }
 
@@ -360,7 +361,7 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
     debugData['heelLiftPct'] = normalizedHeelLift * 100;
 
 // 4.5 Sync baseline to depth metric for debug threshold
-depthMetric.baselineAngle = _baselineKneeAngle;
+    depthMetric.baselineAngle = _baselineKneeAngle;
     // 5. Buffer frame & update state machine
     frameBuffer.addFrame(FrameSnapshot(log: {
       "kneeAngle": kneeAngle,
@@ -399,83 +400,80 @@ depthMetric.baselineAngle = _baselineKneeAngle;
     final finalState = previousSquatState;
     final reachedBottom = _reachedBottomThisRep;
 
-    if(previousSquatState != SquatState.descending) {
-  
-    
-    repCount += 1;
+    if (previousSquatState != SquatState.descending) {
+      repCount += 1;
 
-    // Evaluate final metrics for this rep
-    depthMetric.checkRepCompletion(
-      finalState: finalState,
-      reachedBottom: reachedBottom,
-      ctx: ctx,
-    );
-    tempoMetric.evaluateRep(ctx);
-    for (final trackedMetric in _trackedMetrics) {
-      trackedMetric.onTick(ctx.frameTimestamp);
-    }
-
-    // Collect faults from all metrics
-    final allFaults = <FaultRecord>[];
-    for (final metric in _metrics) {
-      allFaults.addAll(metric.faults);
-    }
-
-    // Determine rep quality
-    correctForm = !allFaults.any((f) => f.affectsForm);
-    resultIssues.feedback['Result'] = correctForm ? 'Good Rep!' : 'Fix Form';
-
-    // Build fault map grouped by phase
-    final faultMap = <String, Map<String, String>>{};
-    for (final fault in allFaults) {
-      faultMap.putIfAbsent(fault.phase, () => {});
-      faultMap[fault.phase]![fault.type] = fault.message;
-    }
-
-    final topVoicedFault = Squat.topVoicedFault(allFaults);
-    lastRepFaultVoiceMessages = Squat.orderedUniqueVoiceMessages(allFaults);
-    lastRepTopVoiceMessage = topVoicedFault?.voiceMessage;
-    lastRepTopVoicePriority = topVoicedFault?.priority;
-    lastRepWasClean = correctForm;
-
-    setFeedback.add({correctForm: faultMap});
-
-    // Update debug data with metric outputs
-    for (final metric in _metrics) {
-      debugData.addAll(metric.debugData);
-    }
-
-    // Tempo feedback for UI
-    if (tempoMetric.descentDuration != null) {
-      final descent = tempoMetric.descentDuration!.toStringAsFixed(1);
-      resultIssues.feedback['Tempo'] = '↓${descent}s';
-      if (tempoMetric.ascentDuration != null) {
-        final ascent = tempoMetric.ascentDuration!.toStringAsFixed(1);
-        resultIssues.feedback['Tempo'] = '↓${descent}s ↑${ascent}s';
+      // Evaluate final metrics for this rep
+      depthMetric.checkRepCompletion(
+        finalState: finalState,
+        reachedBottom: reachedBottom,
+        ctx: ctx,
+      );
+      tempoMetric.evaluateRep(ctx);
+      for (final trackedMetric in _trackedMetrics) {
+        trackedMetric.onTick(ctx.frameTimestamp);
       }
-    }
 
-    // Log per-rep data
-    final peakKneeSnapshot = frameBuffer.getPeakMin("kneeAngle");
-    logger
-        .addRepLog(RepLog(correctForm: correctForm, repNumber: repCount, data: {
-      "peak_heel_distance":
-          frameBuffer.getPeakMax("heelDistance")?.log["heelDistance"] ?? 0,
-      "peak_knee_angle": peakKneeSnapshot?.log["kneeAngle"] ?? 0,
-      "trunk_lean_at_bottom": peakKneeSnapshot?.log["trunkLean"] ?? 0,
-      "ascending_time": tempoMetric.ascentDuration ?? 0.0,
-      "descending_time": tempoMetric.descentDuration ?? 0.0,
-      "fault_types": allFaults.map((f) => f.type).toSet().toList(),
-    }));
+      // Collect faults from all metrics
+      final allFaults = <FaultRecord>[];
       for (final metric in _metrics) {
-      metric.resetAndCountFault();
-    }
-    }else{
-        resultIssues.feedback['Status'] = 'Xuống thấp hơn nhé';
-            for (final metric in _metrics) {
-      metric.reset();
-    }
+        allFaults.addAll(metric.faults);
+      }
 
+      // Determine rep quality
+      correctForm = !allFaults.any((f) => f.affectsForm);
+      resultIssues.feedback['Result'] = correctForm ? 'Good Rep!' : 'Fix Form';
+
+      // Build fault map grouped by phase
+      final faultMap = <String, Map<String, String>>{};
+      for (final fault in allFaults) {
+        faultMap.putIfAbsent(fault.phase, () => {});
+        faultMap[fault.phase]![fault.type] = fault.message;
+      }
+
+      final topVoicedFault = Squat.topVoicedFault(allFaults);
+      lastRepFaultVoiceMessages = Squat.orderedUniqueVoiceMessages(allFaults);
+      lastRepTopVoiceMessage = topVoicedFault?.voiceMessage;
+      lastRepTopVoicePriority = topVoicedFault?.priority;
+      lastRepWasClean = correctForm;
+
+      setFeedback.add({correctForm: faultMap});
+
+      // Update debug data with metric outputs
+      for (final metric in _metrics) {
+        debugData.addAll(metric.debugData);
+      }
+
+      // Tempo feedback for UI
+      if (tempoMetric.descentDuration != null) {
+        final descent = tempoMetric.descentDuration!.toStringAsFixed(1);
+        resultIssues.feedback['Tempo'] = '↓${descent}s';
+        if (tempoMetric.ascentDuration != null) {
+          final ascent = tempoMetric.ascentDuration!.toStringAsFixed(1);
+          resultIssues.feedback['Tempo'] = '↓${descent}s ↑${ascent}s';
+        }
+      }
+
+      // Log per-rep data
+      final peakKneeSnapshot = frameBuffer.getPeakMin("kneeAngle");
+      logger.addRepLog(
+          RepLog(correctForm: correctForm, repNumber: repCount, data: {
+        "peak_heel_distance":
+            frameBuffer.getPeakMax("heelDistance")?.log["heelDistance"] ?? 0,
+        "peak_knee_angle": peakKneeSnapshot?.log["kneeAngle"] ?? 0,
+        "trunk_lean_at_bottom": peakKneeSnapshot?.log["trunkLean"] ?? 0,
+        "ascending_time": tempoMetric.ascentDuration ?? 0.0,
+        "descending_time": tempoMetric.descentDuration ?? 0.0,
+        "fault_types": allFaults.map((f) => f.type).toSet().toList(),
+      }));
+      for (final metric in _metrics) {
+        metric.resetAndCountFault();
+      }
+    } else {
+      resultIssues.feedback['Status'] = 'Xuống thấp hơn nhé';
+      for (final metric in _metrics) {
+        metric.reset();
+      }
     }
 
     // Reset for next rep
@@ -520,7 +518,8 @@ depthMetric.baselineAngle = _baselineKneeAngle;
   // Uses frame buffer angle change direction + debouncers for robust transitions.
 
   void _updateStateBuffer(double kneeAngle, int timestampMs) {
-    final angleChange = frameBuffer.getChange("kneeAngle", SquatConfig.ANGLE_STABLE_GATE);
+    final angleChange =
+        frameBuffer.getChange("kneeAngle", SquatConfig.ANGLE_STABLE_GATE);
     final isDescendingFrame = angleChange == ChangeState.decreasing;
     final isAscendingFrame = angleChange == ChangeState.increasing;
     double kneeAngleChangeFromBaseline = _baselineKneeAngle - kneeAngle;
@@ -531,31 +530,30 @@ depthMetric.baselineAngle = _baselineKneeAngle;
       final isIncreasing = directionDetection.update(isAscendingFrame);
 
       if (!isIncreasing &&
-          squatState == SquatState.standing && kneeAngleChangeFromBaseline > SquatConfig.ROM_GATE) {
+          squatState == SquatState.standing &&
+          kneeAngleChangeFromBaseline > SquatConfig.ROM_GATE) {
         _transitionState(SquatState.descending, timestampMs);
         frameBuffer.clear();
-      } else if (isIncreasing &&
-              squatState == SquatState.descending ) {
+      } else if (isIncreasing && squatState == SquatState.descending) {
         _transitionState(SquatState.ascending, timestampMs);
       }
     }
 
-  if (squatState == SquatState.bottom) {
-  if (isAscendingFrame) {
-    _transitionState(SquatState.ascending, timestampMs);
-  } 
-}
+    if (squatState == SquatState.bottom) {
+      if (isAscendingFrame) {
+        _transitionState(SquatState.ascending, timestampMs);
+      }
+    }
 
     // Debounced threshold transitions
     if (_bottomDebouncer.update(
         kneeAngle <= SquatConfig.SQUAT_BOTTOM_ANGLE_THRESHOLD[1] &&
             squatState == SquatState.descending)) {
       _transitionState(SquatState.bottom, timestampMs);
-    } else if (_standingDebouncer.update(
-        kneeAngle > _baselineKneeAngle  &&
-            (squatState == SquatState.ascending ||
-                squatState == SquatState.descending) &&
-            !isDescendingFrame)) {
+    } else if (_standingDebouncer.update(kneeAngle > _baselineKneeAngle &&
+        (squatState == SquatState.ascending ||
+            squatState == SquatState.descending) &&
+        !isDescendingFrame)) {
       _transitionState(SquatState.standing, timestampMs);
     }
   }
@@ -579,5 +577,4 @@ depthMetric.baselineAngle = _baselineKneeAngle;
       metric.onStateTransition(previousSquatState, newState, timestampMs);
     }
   }
-
 }

@@ -69,6 +69,7 @@ class ExerciseExperienceScreen extends StatefulWidget {
   const ExerciseExperienceScreen({
     super.key,
     required this.definition,
+    this.workoutSessionId,
     this.catalogExerciseId,
     this.prescription,
     this.recommendationId,
@@ -81,6 +82,7 @@ class ExerciseExperienceScreen extends StatefulWidget {
   });
 
   final ExerciseDefinition definition;
+  final String? workoutSessionId;
   final String? catalogExerciseId;
   final VolumePrescription? prescription;
   final String? recommendationId;
@@ -156,6 +158,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       sequence: widget.sequence,
       sequenceIndex: widget.sequenceIndex,
       priorReports: widget.priorReports,
+      workoutSessionId: widget.workoutSessionId,
     );
     return base.nextInSequence(carryForwardReports: reports);
   }
@@ -478,6 +481,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       faultCounts: faultCounts,
       difficultyRatings: ratings,
       setData: setData,
+      workoutSessionId: widget.workoutSessionId,
     );
 
     debugPrint('[Vika] Session persisted: $sessionId');
@@ -592,6 +596,13 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       // below MUST NOT close over `this.context` (which becomes invalid
       // after dispose) — instead, the summary screen's own BuildContext
       // is used to pop.
+      SessionPersistence().completeWorkoutSession(
+        workoutSessionId: widget.workoutSessionId,
+        recommendationId: widget.recommendationId!,
+        weekNumber: widget.weekNumber!,
+        sessionIndex: widget.sessionIndex!,
+      );
+
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (summaryContext) => WorkoutSummaryScreen(
@@ -612,8 +623,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
             onSessionRpe: (_) {
               // TODO(wiring): persist session-level RPE separately.
             },
-            onDone: () => Navigator.of(summaryContext)
-                .pop({'completed': true}),
+            onDone: () => Navigator.of(summaryContext).pop({'completed': true}),
           ),
         ),
       );
@@ -672,9 +682,8 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
           isContinuation: _isContinuationSlot,
           previousExerciseName: prev?.exerciseName,
           previousExerciseFormScore: prev?.formScore,
-          onPreviousDifficulty: prev != null
-              ? _handlePreviousExerciseDifficulty
-              : null,
+          onPreviousDifficulty:
+              prev != null ? _handlePreviousExerciseDifficulty : null,
           onStart: _beginWorkout,
           onBack: () => Navigator.of(context).pop(),
         ),
@@ -904,7 +913,7 @@ class _ExerciseExperienceSpec {
           videoDuration: '1:10',
           createExercise: (repsPerSet) => JumpingJack(maxRep: repsPerSet),
         );
-        case 'warrior_one':
+      case 'warrior_one':
         return _generic(
           definition: definition,
           sets: overrideSets ?? 1,

@@ -11,6 +11,7 @@ import '../../data/progress_mock.dart';
 import '../../theme/vf_theme.dart';
 import '../plan/plan_typography.dart';
 import '../../theme/app_colors.dart';
+
 class HeadlineHero extends StatelessWidget {
   const HeadlineHero({super.key, required this.data});
 

@@ -12,6 +12,7 @@ import '../../theme/vf_theme.dart';
 import '../ivory/atoms.dart';
 import '../plan/plan_typography.dart';
 import '../../theme/app_colors.dart';
+
 class IntentCollection extends StatelessWidget {
   const IntentCollection({super.key, required this.mock});
 
@@ -83,7 +84,8 @@ class IntentCollection extends StatelessWidget {
                     children: [
                       for (var i = 0; i < mock.small.length; i++) ...[
                         Expanded(child: _SmallCard(ex: mock.small[i])),
-                        if (i < mock.small.length - 1) const SizedBox(height: 8),
+                        if (i < mock.small.length - 1)
+                          const SizedBox(height: 8),
                       ],
                     ],
                   ),
@@ -247,10 +249,26 @@ class _SmallCard extends StatelessWidget {
             child: ColorFiltered(
               colorFilter: ex.yoga
                   ? const ColorFilter.matrix([
-                      0.4, 0, 0, 0, 0,
-                      0, 0.4, 0, 0, 0,
-                      0, 0, 0.4, 0, 0,
-                      0, 0, 0, 1, 0,
+                      0.4,
+                      0,
+                      0,
+                      0,
+                      0,
+                      0,
+                      0.4,
+                      0,
+                      0,
+                      0,
+                      0,
+                      0,
+                      0.4,
+                      0,
+                      0,
+                      0,
+                      0,
+                      0,
+                      1,
+                      0,
                     ])
                   : const ColorFilter.mode(Colors.transparent, BlendMode.dst),
               child: PoseGlyph(

@@ -381,8 +381,7 @@ class _RetryPanel extends StatelessWidget {
             behavior: HitTestBehavior.opaque,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
               decoration: BoxDecoration(
                 color: busy ? V5.yellow.withValues(alpha: 0.4) : V5.yellow,
                 borderRadius: BorderRadius.circular(V5.radiusFull),
@@ -397,8 +396,7 @@ class _RetryPanel extends StatelessWidget {
                       height: 12,
                       child: CircularProgressIndicator(
                         strokeWidth: 1.6,
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(V5.yellowInk),
+                        valueColor: AlwaysStoppedAnimation<Color>(V5.yellowInk),
                       ),
                     ),
                     const SizedBox(width: V5.space8),
@@ -510,219 +508,219 @@ class _WeekCard extends StatelessWidget {
                     color: V5.yellow,
                   ),
                 ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Single-element week badge — just the number, big and
-                  // confident. No more "TUẦN" stacked above a digit inside a
-                  // tiny circle (it overflowed at week 10+ and looked cramped).
-                  Container(
-                    width: dense ? 40 : 46,
-                    height: dense ? 40 : 46,
-                    decoration: BoxDecoration(
-                      color: dark ? V5.yellow : V5.yellowSoft,
-                      shape: BoxShape.circle,
-                      border: dark
-                          ? null
-                          : Border.all(
-                              color: V5.yellow.withValues(alpha: 0.32),
-                            ),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      '${week.number}',
-                      style: V5.text(
-                        context,
-                        size: dense ? 17 : 19,
-                        weight: FontWeight.w800,
-                        color: dark ? V5.yellowInk : V5.yellowDeep,
-                        letterSpacing: -0.6,
-                        height: 1,
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: dense ? V5.space10 : V5.space12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'TUẦN ${week.number}',
-                          style: V5
-                              .eyebrow(context, color: fgSoft)
-                              .copyWith(letterSpacing: 1.4),
-                        ),
-                        const SizedBox(height: V5.space2),
-                        Text(
-                          week.theme,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: V5.titleSm(context, color: fg),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (dark)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: V5.yellow,
-                        borderRadius: BorderRadius.circular(V5.radiusFull),
-                      ),
-                      child: Text(
-                        loading ? 'ĐANG TẠO' : 'BẮT ĐẦU',
-                        style: V5
-                            .eyebrow(context, color: V5.yellowInk)
-                            .copyWith(letterSpacing: 1.0),
-                      ),
-                    ),
-                ],
-              ),
-              SizedBox(height: dense ? V5.space10 : V5.space14),
-              Text(
-                week.headline,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: V5.titleSm(context, color: fg).copyWith(height: 1.22),
-              ),
-              if (!dense) ...[
-                const SizedBox(height: V5.space6),
-                Text(
-                  week.feeling,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: V5.bodySm(context, color: fgSoft),
-                ),
-              ],
-              Padding(
-                padding: EdgeInsets.symmetric(
-                    vertical: dense ? V5.space8 : V5.space14),
-                child: V5Divider(dark: dark),
-              ),
-              Row(
-                children: [
-                  Text(
-                    'BÀI TẬP TUẦN NÀY',
-                    style: V5.eyebrow(context, color: fgSoft),
-                  ),
-                  const Spacer(),
-                  Text(
-                    week.tag,
-                    style: V5
-                        .eyebrow(
-                          context,
-                          color: dark ? V5.yellow : V5.yellowDeep,
-                        )
-                        .copyWith(letterSpacing: 1.0),
-                  ),
-                ],
-              ),
-              SizedBox(height: dense ? 6 : 8),
-              // Expanded so the bullet stack absorbs extra height when the
-              // card is roomy AND shrinks (clipping with overflow:clip if
-              // needed) when squeezed by the retry panel above.
-              Expanded(
-                child: SingleChildScrollView(
-                  physics: const NeverScrollableScrollPhysics(),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      for (final ex in visibleExercises)
+                      // Single-element week badge — just the number, big and
+                      // confident. No more "TUẦN" stacked above a digit inside a
+                      // tiny circle (it overflowed at week 10+ and looked cramped).
+                      Container(
+                        width: dense ? 40 : 46,
+                        height: dense ? 40 : 46,
+                        decoration: BoxDecoration(
+                          color: dark ? V5.yellow : V5.yellowSoft,
+                          shape: BoxShape.circle,
+                          border: dark
+                              ? null
+                              : Border.all(
+                                  color: V5.yellow.withValues(alpha: 0.32),
+                                ),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '${week.number}',
+                          style: V5.text(
+                            context,
+                            size: dense ? 17 : 19,
+                            weight: FontWeight.w800,
+                            color: dark ? V5.yellowInk : V5.yellowDeep,
+                            letterSpacing: -0.6,
+                            height: 1,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: dense ? V5.space10 : V5.space12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'TUẦN ${week.number}',
+                              style: V5
+                                  .eyebrow(context, color: fgSoft)
+                                  .copyWith(letterSpacing: 1.4),
+                            ),
+                            const SizedBox(height: V5.space2),
+                            Text(
+                              week.theme,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: V5.titleSm(context, color: fg),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (dark)
                         Container(
-                          margin: EdgeInsets.only(bottom: dense ? 4 : 5),
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: dense ? 6 : 8,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
                           ),
                           decoration: BoxDecoration(
-                            color: dark
-                                ? Colors.white.withValues(alpha: 0.05)
-                                : V5.bgSoft,
-                            borderRadius:
-                                BorderRadius.circular(V5.radiusSm),
-                            border: dark
-                                ? Border.all(color: V5.heroBorderHi)
-                                : null,
+                            color: V5.yellow,
+                            borderRadius: BorderRadius.circular(V5.radiusFull),
                           ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 16,
-                                height: 16,
-                                decoration: BoxDecoration(
-                                  color:
-                                      V5.yellow.withValues(alpha: 0.18),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Center(
-                                  child: Container(
-                                    width: 5,
-                                    height: 5,
-                                    decoration: const BoxDecoration(
-                                      color: V5.yellow,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  ex,
-                                  maxLines: dense ? 1 : 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: V5.text(
-                                    context,
-                                    size: dense ? 10.8 : 11.5,
-                                    weight: FontWeight.w700,
-                                    color: fg,
-                                    letterSpacing: -0.1,
-                                    height: 1.25,
-                                  ),
-                                ),
-                              ),
-                            ],
+                          child: Text(
+                            loading ? 'ĐANG TẠO' : 'BẮT ĐẦU',
+                            style: V5
+                                .eyebrow(context, color: V5.yellowInk)
+                                .copyWith(letterSpacing: 1.0),
                           ),
                         ),
                     ],
                   ),
-                ),
-              ),
-              V5Divider(dark: dark),
-              SizedBox(height: dense ? 8 : 12),
-              Row(
-                children: [
-                  Icon(
-                    Icons.schedule_rounded,
-                    size: 14,
-                    color: dark ? V5.yellow : V5.yellowDeep,
-                  ),
-                  const SizedBox(width: 6),
+                  SizedBox(height: dense ? V5.space10 : V5.space14),
                   Text(
-                    '${week.sessionCount} buổi',
-                    style: V5
-                        .bodySm(context, color: fg)
-                        .copyWith(fontWeight: FontWeight.w700),
+                    week.headline,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style:
+                        V5.titleSm(context, color: fg).copyWith(height: 1.22),
                   ),
-                  const Spacer(),
-                  Text(
-                    '~${(week.sessionCount * minutes / 60).toStringAsFixed(1)}h',
-                    style: V5.caption(context, color: fgSoft),
+                  if (!dense) ...[
+                    const SizedBox(height: V5.space6),
+                    Text(
+                      week.feeling,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: V5.bodySm(context, color: fgSoft),
+                    ),
+                  ],
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                        vertical: dense ? V5.space8 : V5.space14),
+                    child: V5Divider(dark: dark),
+                  ),
+                  Row(
+                    children: [
+                      Text(
+                        'BÀI TẬP TUẦN NÀY',
+                        style: V5.eyebrow(context, color: fgSoft),
+                      ),
+                      const Spacer(),
+                      Text(
+                        week.tag,
+                        style: V5
+                            .eyebrow(
+                              context,
+                              color: dark ? V5.yellow : V5.yellowDeep,
+                            )
+                            .copyWith(letterSpacing: 1.0),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: dense ? 6 : 8),
+                  // Expanded so the bullet stack absorbs extra height when the
+                  // card is roomy AND shrinks (clipping with overflow:clip if
+                  // needed) when squeezed by the retry panel above.
+                  Expanded(
+                    child: SingleChildScrollView(
+                      physics: const NeverScrollableScrollPhysics(),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (final ex in visibleExercises)
+                            Container(
+                              margin: EdgeInsets.only(bottom: dense ? 4 : 5),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: dense ? 6 : 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: dark
+                                    ? Colors.white.withValues(alpha: 0.05)
+                                    : V5.bgSoft,
+                                borderRadius:
+                                    BorderRadius.circular(V5.radiusSm),
+                                border: dark
+                                    ? Border.all(color: V5.heroBorderHi)
+                                    : null,
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 16,
+                                    height: 16,
+                                    decoration: BoxDecoration(
+                                      color: V5.yellow.withValues(alpha: 0.18),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Center(
+                                      child: Container(
+                                        width: 5,
+                                        height: 5,
+                                        decoration: const BoxDecoration(
+                                          color: V5.yellow,
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      ex,
+                                      maxLines: dense ? 1 : 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: V5.text(
+                                        context,
+                                        size: dense ? 10.8 : 11.5,
+                                        weight: FontWeight.w700,
+                                        color: fg,
+                                        letterSpacing: -0.1,
+                                        height: 1.25,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  V5Divider(dark: dark),
+                  SizedBox(height: dense ? 8 : 12),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.schedule_rounded,
+                        size: 14,
+                        color: dark ? V5.yellow : V5.yellowDeep,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${week.sessionCount} buổi',
+                        style: V5
+                            .bodySm(context, color: fg)
+                            .copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '~${(week.sessionCount * minutes / 60).toStringAsFixed(1)}h',
+                        style: V5.caption(context, color: fgSoft),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ],
           ),
-        ],
-      ),
-    );
+        );
       },
     );
   }
