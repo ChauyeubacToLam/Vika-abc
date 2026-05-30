@@ -36,23 +36,70 @@ bool _hasCompletedOnboarding = false;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final appConfig = await _loadAppConfig();
 
-  await Supabase.initialize(
-    url: appConfig.supabaseUrl,
-    anonKey: appConfig.supabaseAnonKey,
-  );
+  Object? startupError;
+  StackTrace? startupStackTrace;
 
-  await OrientationLock.portraitOnly();
+  try {
+    final appConfig = await _loadAppConfig();
+
+    await Supabase.initialize(
+      url: appConfig.supabaseUrl,
+      anonKey: appConfig.supabaseAnonKey,
+    );
+  } catch (error, stackTrace) {
+    startupError = error;
+    startupStackTrace = stackTrace;
+  }
+
+  await _configureAppChrome();
+
+  if (startupError == null) {
+    await _loadDeviceCameras();
+    _hasCompletedOnboarding = await _loadInitialOnboardingCompletion();
+    runApp(const VikaApp());
+    return;
+  }
+
+  debugPrint('[Vika] Startup failed: $startupError');
+  debugPrintStack(stackTrace: startupStackTrace);
+  runApp(_VikaStartupErrorApp(error: startupError));
+}
+
+Future<void> _configureAppChrome() async {
+  try {
+    await OrientationLock.portraitOnly();
+  } catch (error, stackTrace) {
+    debugPrint('[Vika] Failed to lock portrait orientation: $error');
+    debugPrintStack(stackTrace: stackTrace);
+  }
+
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.light,
     ),
   );
-  _cameras = await availableCameras();
-  _hasCompletedOnboarding = await isOnboardingComplete();
-  runApp(const VikaApp());
+}
+
+Future<void> _loadDeviceCameras() async {
+  try {
+    _cameras = await availableCameras();
+  } catch (error, stackTrace) {
+    debugPrint('[Vika] Failed to list cameras: $error');
+    debugPrintStack(stackTrace: stackTrace);
+    _cameras = const <CameraDescription>[];
+  }
+}
+
+Future<bool> _loadInitialOnboardingCompletion() async {
+  try {
+    return await isOnboardingComplete();
+  } catch (error, stackTrace) {
+    debugPrint('[Vika] Failed to read onboarding state: $error');
+    debugPrintStack(stackTrace: stackTrace);
+    return false;
+  }
 }
 
 class _AppConfig {
@@ -69,7 +116,7 @@ Future<_AppConfig> _loadAppConfig() async {
   const defineSupabaseUrl = String.fromEnvironment('SUPABASE_URL');
   const defineSupabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
 
-  final env = await _loadBundledDotEnv();
+  final env = await _loadOptionalBundledDotEnv();
   final supabaseUrl = _firstNonEmpty(
     defineSupabaseUrl,
     env['SUPABASE_URL'],
@@ -82,7 +129,7 @@ Future<_AppConfig> _loadAppConfig() async {
   if (supabaseUrl == null || supabaseAnonKey == null) {
     throw StateError(
       'Missing Supabase config. Provide SUPABASE_URL and '
-      'SUPABASE_ANON_KEY in .env or with --dart-define.',
+      'SUPABASE_ANON_KEY with --dart-define.',
     );
   }
 
@@ -92,7 +139,7 @@ Future<_AppConfig> _loadAppConfig() async {
   );
 }
 
-Future<Map<String, String>> _loadBundledDotEnv() async {
+Future<Map<String, String>> _loadOptionalBundledDotEnv() async {
   try {
     final raw = await rootBundle.loadString('.env');
     final values = <String, String>{};
@@ -127,6 +174,97 @@ String? _firstNonEmpty(String? first, String? second) {
   final b = second?.trim();
   if (b != null && b.isNotEmpty) return b;
   return null;
+}
+
+class _VikaStartupErrorApp extends StatelessWidget {
+  const _VikaStartupErrorApp({required this.error});
+
+  final Object error;
+
+  @override
+  Widget build(BuildContext context) {
+    const background = Color(0xFFFFFBF5);
+    const ink = Color(0xFF1D2939);
+    const muted = Color(0xFF667085);
+    const accent = Color(0xFF0E8F6E);
+
+    return MaterialApp(
+      title: 'Vika',
+      debugShowCheckedModeBanner: false,
+      home: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.dark,
+          statusBarBrightness: Brightness.light,
+        ),
+        child: Scaffold(
+          backgroundColor: background,
+          body: SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 440),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.fitness_center_rounded,
+                          color: accent,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        'Không thể khởi động Vika',
+                        style: TextStyle(
+                          color: ink,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Ứng dụng đang thiếu cấu hình máy chủ. Hãy thêm '
+                        'SUPABASE_URL và SUPABASE_ANON_KEY bằng --dart-define '
+                        'hoặc biến bảo mật trên Codemagic.',
+                        style: TextStyle(
+                          color: muted,
+                          fontSize: 15,
+                          height: 1.45,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      if (!kReleaseMode) ...[
+                        const SizedBox(height: 18),
+                        SelectableText(
+                          '$error',
+                          style: const TextStyle(
+                            color: Color(0xFFB42318),
+                            fontSize: 12,
+                            height: 1.35,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // Add this at the top level of the file for easy access everywhere
