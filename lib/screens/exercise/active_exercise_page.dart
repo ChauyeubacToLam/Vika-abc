@@ -26,6 +26,7 @@ import '../../theme/vf_theme.dart';
 import 'widgets/form_score_arc.dart';
 import 'widgets/ivory_chrome.dart';
 import 'widgets/pose_overlay_painter.dart';
+import 'widgets/rep_reward_layer.dart';
 import 'widgets/system_banner.dart';
 
 class ActiveExercisePage extends StatefulWidget {
@@ -90,23 +91,15 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   // ─── Ivory v8 state ───
   int _setElapsedSeconds = 0;
   Timer? _setTimer;
-  // TODO(form-score): Replace with real computed form score from ML pipeline
-  static const int _hardcodedFormScore = 82;
-  // TODO(chart): Replace with real sparkline data from primaryAngleForChart
-  static const List<int> _hardcodedSparkData = [
-    72,
-    78,
-    84,
-    80,
-    76,
-    82,
-    86,
-    88,
-    84,
-    82
-  ];
-  // TODO(integration): Replace with real fault indices from RepLog.faults
-  static const List<int> _hardcodedFaultIndices = [2];
+
+  // ─── Ambient reward (Hearthlight) ───
+  // Drives the additive warm-light feedback layer. A clean rep blooms and
+  // raises the hearth pool; a faulted rep is met with silence. There is no
+  // real-time form score on this screen — the verdict is computed after the
+  // set, never during.
+  int _rewardRepSeen = 0; // highest repCount already evaluated for reward
+  int _cleanRepCount = 0; // cumulative clean reps this set (drives pool level)
+  int _rewardPulseId = 0; // bumps once per clean rep (fires a bloom)
   bool _isManualPause = false;
   _PoseRuntime _runtime = _PoseRuntime.nativeMediaPipe;
   DebugMode _settingsDebugMode = DebugMode.off;
@@ -1151,6 +1144,38 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         imageSize: _imageSize == Size.zero ? null : _imageSize,
       ),
     );
+    _maybeEmitRepReward();
+  }
+
+  /// Feeds the ambient Hearthlight reward layer off real rep completions.
+  ///
+  /// A clean rep accumulates and fires a bloom; a faulted rep is met with
+  /// silence (the pool holds, nothing flashes). The per-rep clean/faulted
+  /// verdict comes straight from the interpreter via [ExerciseLogger.repLogs] —
+  /// faulted reps still increment the rep count but never trigger a reward.
+  void _maybeEmitRepReward() {
+    final reps = widget.exercise.repCount;
+    if (reps <= _rewardRepSeen) {
+      _rewardRepSeen = reps; // tolerate a counter reset between sets
+      return;
+    }
+    final logs = widget.exercise.logger.repLogs;
+    for (var n = _rewardRepSeen + 1; n <= reps; n++) {
+      if (_repWasClean(logs, n)) {
+        _cleanRepCount++;
+        _rewardPulseId++;
+      }
+    }
+    _rewardRepSeen = reps;
+  }
+
+  bool _repWasClean(List<RepLog> logs, int repNumber) {
+    for (final log in logs) {
+      if (log.repNumber == repNumber) return log.correctForm;
+    }
+    // A counted rep without a matching log shouldn't happen; stay silent rather
+    // than risk rewarding a rep we can't confirm was clean.
+    return false;
   }
 
   void _schedulePersonDetection([InputImage? inputImage]) {
@@ -1577,6 +1602,20 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
             ),
           ),
 
+          // ── Layer 4.5: Ambient reward (Hearthlight) ──
+          // Additive warm-light feedback for clean reps. Sits above the camera
+          // + scrims but below the chrome, and is bottom/edge anchored +
+          // transparent through the center, so the live body and the jade
+          // skeleton stay fully visible. Always mounted (even when paused) so
+          // the accumulated hearth pool persists across the whole set.
+          Positioned.fill(
+            child: RepRewardLayer(
+              cleanReps: _cleanRepCount,
+              totalReps: widget.totalReps,
+              pulseId: _rewardPulseId,
+            ),
+          ),
+
           // ── Layer 4: Top chrome left (back + HIỆP pill) ──
           Positioned(
             top: media.padding.top + 10,
@@ -1589,18 +1628,14 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
             ),
           ),
 
-          // ── Layer 5: Top chrome right (form arc + flip + pause) ──
-          // JSX v8: form arc lives inline with the icon buttons. The pulse pill
-          // is the "minimal richness" alternative and is deliberately omitted —
-          // we ship at the medium-richness default (form arc visible).
+          // ── Layer 5: Top chrome right (flip + pause) ──
+          // No live form score lives here — real-time feedback on this screen
+          // is encouragement and safety only, never a verdict the user performs
+          // under. The form verdict is computed after the set.
           Positioned(
             top: media.padding.top + 10,
             right: 16,
             child: IvoryTopChromeRight(
-              // TODO(form-score): Replace _hardcodedFormScore with the real
-              // computed form score from the ML pipeline (per-rep average or
-              // rolling window).
-              formScore: _hardcodedFormScore,
               onPause: () {
                 _isManualPause = true;
                 widget.exercise.manualPause();
@@ -1624,19 +1659,6 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                   : null,
             ),
           ),
-
-          // ── Layer 6: Sparkline (below top-right chrome row) ──
-          // JSX positions sparkline ~6px under the chrome row (top:112 with
-          // chrome at top:64). In Flutter that maps to chrome top + chrome
-          // height (44) + 4 ≈ media.padding.top + 58.
-          if (activeState && !debugEnabled && guidanceCopy == null)
-            Positioned(
-              top: media.padding.top + 58,
-              right: 16,
-              // TODO(chart): Replace _hardcodedSparkData with the real rolling
-              // 10s form-score history coming out of the ML pipeline.
-              child: const IvoryFormScoreSparkline(data: _hardcodedSparkData),
-            ),
 
           // ── Layer 7: PT reference loop (top-left, just below chrome row) ──
           // JSX places it at top:116 (16px below chrome bottom). chrome bottom
@@ -1704,8 +1726,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                 isHoldPhase: isHoldPhase,
                 holdProgress: bottomHoldCue?.progress,
                 holdRemaining: bottomHoldCue?.remaining,
-                // TODO(integration): Wire RepLog.faults into faultIndices
-                faultIndices: _hardcodedFaultIndices,
+                // No fault marking on the live rep tally — feedback during the
+                // set is additive only. The dots fill warm as reps land; the
+                // form verdict is computed after the set, never during.
               ),
             ),
 

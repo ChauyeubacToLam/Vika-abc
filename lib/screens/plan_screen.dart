@@ -16,29 +16,33 @@
 //   • ProgramRetestBeat     end-of-program retest (completion-gated lock)
 //   • EditorialCloser
 //
-// DATA SEAM: this screen is driven ENTIRELY by `loadMockProgramPlan()` (see
-// lib/data/program_mock.dart). It deliberately calls NO backend — no Supabase,
-// no RecommendationService, no WorkoutLaunchService, no SessionPersistence.
-// Swapping the mock for real data is a single provider change: replace
-// `loadMockProgramPlan()` with a `ProgramPlan` mapper over the engine snapshot
-// + completion records. The previous real-data loading + workout-launch wiring
-// is preserved intact in plan_screen_legacy.dart for that work.
+// DATA: a real ProgramPlan, mapped from the engine snapshot + completion
+// records via ProgramPlanMapper.fromSnapshot. Loaded async in _loadProgram
+// (active plan snapshot + catalog name/AI lookup), and reloaded after a
+// completed workout so the ledger reflects the session just finished. The
+// prior mock-only presentation is preserved in plan_screen_legacy.dart.
+//
+// STILL STUBBED (session-summary pass): per-session and per-exercise
+// formScore/difficulty come back null from the mapper, so done rows render
+// without form numbers until those aggregators land.
 
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 
 import '../data/program_mock.dart';
+import '../services/recommendation/program_plan_mapper.dart';
+import '../services/recommendation/recommendation_service.dart';
+import '../services/session_persistence.dart';
 import '../services/user_profile_service.dart';
 import '../services/user_program_service.dart';
+import '../services/workout_launch_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/responsive.dart';
 import '../utils/orientation_lock.dart';
 import '../widgets/plan/editorial_closer.dart';
 import '../widgets/plan/program/program_session_ledger.dart';
 import '../widgets/plan/program/program_stage_hero.dart';
-import '../services/workout_launch_service.dart';
-import '../services/session_persistence.dart';
 import 'exercise/exercise_launch_args.dart';
 
 class PlanScreen extends StatefulWidget {
@@ -51,16 +55,12 @@ class PlanScreen extends StatefulWidget {
 
   final double bottomPadding;
 
-  /// Real assigned-program data from MainShell. UNUSED by this mock-driven
-  /// presentation — kept as the wiring seam: a future `ProgramPlan` mapper
-  /// would consume `program` (+ the engine snapshot) instead of the mock.
-  // TODO(wiring): map `program` / PlanSnapshot → ProgramPlan and feed it here.
+  /// Real assigned-program data from MainShell. Not consumed directly — the
+  /// screen loads its own PlanSnapshot via RecommendationService and maps it.
+  /// Kept so MainShell's existing wiring compiles unchanged.
   final UserProgramData? program;
 
-  /// Forwarded on workout completion once real launching is wired. Unused in
-  /// the mock path (no session is actually launched).
-  // TODO(wiring): call onProfileChanged after a real session completes
-  // (see plan_screen_legacy.dart for the streak + profile refresh flow).
+  /// Forwarded on workout completion so MainShell can refresh streak/profile.
   final ValueChanged<AppUserProfile>? onProfileChanged;
 
   @override
@@ -68,21 +68,57 @@ class PlanScreen extends StatefulWidget {
 }
 
 class _PlanScreenState extends State<PlanScreen> {
-  // TODO(wiring): replace loadMockProgramPlan() with the real mapper. This is
-  // the ONLY line that changes to go from mock → real data.
-  final ProgramPlan _program = loadMockProgramPlan();
+  final _recommendations = RecommendationService();
+  final _launches = WorkoutLaunchService();
 
-  late int _selectedBlockIndex;
+  /// null = still loading. Non-null with empty blocks = no active plan.
+  ProgramPlan? _program;
+  int _selectedBlockIndex = 0;
   int? _expandedSessionIndex;
 
   @override
   void initState() {
     super.initState();
     unawaited(OrientationLock.portraitOnly());
-    _selectedBlockIndex = _program.currentBlockIndex;
+    unawaited(_loadProgram());
   }
 
-  ProgramBlock get _selectedBlock => _program.blocks[_selectedBlockIndex];
+  /// Loads (or reloads) the real plan + completion state and maps it to a
+  /// ProgramPlan. Safe to call again after a workout to refresh status.
+  Future<void> _loadProgram() async {
+    final snapshot =
+        await _recommendations.fetchLatestActivePlanSnapshotForCurrentUser();
+
+    if (snapshot == null) {
+      if (!mounted) return;
+      setState(() => _program = const ProgramPlan(blocks: [], retest: null));
+      return;
+    }
+
+    // Every exercise_id in the plan (slots + retest) needs a name + AI flag.
+    final ids = <String>{
+      for (final w in snapshot.plan.weeks)
+        for (final s in w.sessions)
+          for (final slot in s.slots) slot.exerciseId,
+      for (final e in snapshot.plan.endOfPlanRetest?.exercises ?? const [])
+        e.exerciseId,
+    };
+    final catalog =
+        await _recommendations.fetchLaunchCatalogInfoForExerciseIds(ids);
+
+    if (!mounted) return;
+    final mapped =
+        ProgramPlanMapper.fromSnapshot(snapshot, catalogById: catalog);
+    setState(() {
+      _program = mapped;
+      // Re-point to the current block (advances after a completed session).
+      _selectedBlockIndex =
+          mapped.blocks.isEmpty ? 0 : mapped.currentBlockIndex;
+      _expandedSessionIndex = null;
+    });
+  }
+
+  ProgramBlock get _selectedBlock => _program!.blocks[_selectedBlockIndex];
 
   void _selectBlock(int index) {
     if (index == _selectedBlockIndex) return;
@@ -99,9 +135,6 @@ class _PlanScreenState extends State<PlanScreen> {
           _expandedSessionIndex == sessionIndex ? null : sessionIndex;
     });
   }
-
-  /// CTA handler for the single next session. M// add near the other fields
-  final _launches = WorkoutLaunchService();
 
   Future<void> _startNextSession() async {
     final target = await _launches.resolveTodayOrNextInCurrentWeek();
@@ -134,6 +167,9 @@ class _PlanScreenState extends State<PlanScreen> {
       final profile = await UserProfileService().fetchCurrentProfile();
       if (profile != null) widget.onProfileChanged?.call(profile);
     }
+    if (!mounted) return;
+    // Refresh the ledger so the just-completed session flips to done.
+    await _loadProgram();
   }
 
   Future<bool> _runWorkoutSequence(ExerciseLaunchArgs first) async {
@@ -159,9 +195,36 @@ class _PlanScreenState extends State<PlanScreen> {
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
     final r = Responsive.of(context);
-    // The retest is folded into the session ledger as the final session of the
+
+    final program = _program;
+
+    // Loading: snapshot/catalog fetch in flight.
+    if (program == null) {
+      return Container(
+        color: c.bg,
+        alignment: Alignment.center,
+        child: CircularProgressIndicator(color: c.yellow, strokeWidth: 2.4),
+      );
+    }
+
+    // No active plan (e.g. onboarding not finished). Graceful, never crashes
+    // the block indexing below.
+    if (program.blocks.isEmpty) {
+      return Container(
+        color: c.bg,
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Text(
+          'Chưa có lộ trình. Hoàn tất phần thiết lập để Vika dựng kế hoạch cho bạn nhé.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: c.inkSoft, height: 1.5),
+        ),
+      );
+    }
+
+    // The retest is folded into the session ledger as the final beat of the
     // LAST block (no separate card); show it only when that block is selected.
-    final isLastBlock = _selectedBlockIndex == _program.blocks.length - 1;
+    final isLastBlock = _selectedBlockIndex == program.blocks.length - 1;
 
     return Container(
       color: c.bg,
@@ -178,7 +241,7 @@ class _PlanScreenState extends State<PlanScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               ProgramStageHero(
-                program: _program,
+                program: program,
                 selectedIndex: _selectedBlockIndex,
                 onSelectBlock: _selectBlock,
                 onStartNext: _startNextSession,
@@ -190,12 +253,10 @@ class _PlanScreenState extends State<PlanScreen> {
                 expandedIndex: _expandedSessionIndex,
                 onToggleExpand: _toggleSessionExpand,
                 onStartNext: _startNextSession,
-                retest: isLastBlock ? _program.retest : null,
-                retestUnlocked: _program.allBlocksDone,
-                // Locked in the mid-program mock; the unlocked launch is wired
-                // alongside the real session-launch flow.
+                retest: isLastBlock ? program.retest : null,
+                retestUnlocked: program.allBlocksDone,
                 onStartRetest:
-                    _program.allBlocksDone ? _startNextSession : null,
+                    program.allBlocksDone ? _startNextSession : null,
               ),
               SizedBox(height: r.gap(38)),
               const EditorialCloser(

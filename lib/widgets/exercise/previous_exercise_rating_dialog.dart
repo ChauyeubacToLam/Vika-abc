@@ -13,6 +13,7 @@
 //
 // Returns the selected difficulty id ('light' / 'medium' / 'heavy').
 
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -315,7 +316,8 @@ class _PreviousExerciseRatingDialogState
 }
 
 // ─── Form score badge — poster-style stat block at the top of the
-// dialog. Shows the exercise name + the form score they just earned. ───
+// dialog. Shows the exercise name + the form score they just earned, with
+// a band-colored gauge dial that echoes the transition-moment score. ───
 class _FormScoreBadge extends StatelessWidget {
   const _FormScoreBadge({
     required this.formScore,
@@ -330,12 +332,6 @@ class _FormScoreBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    final score = formScore ?? 0;
-    final scoreColor = score >= 78
-        ? c.yellow
-        : score >= 60
-            ? c.ink
-            : c.attention;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
@@ -345,54 +341,9 @@ class _FormScoreBadge extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Left: form score in a poster-style numeral
           if (formScore != null) ...[
-            Stack(
-              alignment: Alignment.center,
-              children: [
-                // Soft halo behind the score
-                IgnorePointer(
-                  child: Container(
-                    width: 62,
-                    height: 62,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: scoreColor.withValues(alpha: 0.12 + pulse * 0.08),
-                    ),
-                  ),
-                ),
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '$score',
-                      style: TextStyle(
-                        fontFamily: 'BeVietnamPro',
-                        fontSize: 30,
-                        fontWeight: FontWeight.w800,
-                        fontStyle: FontStyle.italic,
-                        height: 1.0,
-                        letterSpacing: -1.4,
-                        color: scoreColor,
-                        fontFeatures: VikaIvoryMain.tabularFigures,
-                      ),
-                    ),
-                    Text(
-                      '/100',
-                      style: TextStyle(
-                        fontFamily: 'BeVietnamPro',
-                        fontSize: 8.5,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.0,
-                        color: c.inkFaint,
-                        fontFeatures: VikaIvoryMain.tabularFigures,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(width: 14),
+            _ScoreDial(score: formScore!, pulse: pulse),
+            const SizedBox(width: 16),
           ],
           Expanded(
             child: Column(
@@ -446,6 +397,173 @@ class _FormScoreBadge extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Performance bands matching the transition-moment score: ≥80 gold (reserved
+/// yellow), 60–79 amber, <60 burnt orange. On this light surface the band
+/// colors live in the gauge arc + halo (not the numeral) so the score stays
+/// crisp and readable.
+Color _dialBandColor(int score, VikaColors c) {
+  if (score >= 80) return c.yellow;
+  if (score >= 60) return const Color(0xFFE89A4B);
+  return const Color(0xFFD67B3E);
+}
+
+// ─── Mini score dial: a band-colored gauge arc traced around the numeral,
+// mirroring the active-screen FormScoreArc + the transition monument. ───
+class _ScoreDial extends StatelessWidget {
+  const _ScoreDial({required this.score, required this.pulse});
+
+  final int score;
+  final double pulse;
+
+  static const double _size = 66;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    final band = _dialBandColor(score, c);
+    return SizedBox(
+      width: _size,
+      height: _size,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Soft band halo, breathing with the dialog pulse.
+          IgnorePointer(
+            child: Container(
+              width: _size,
+              height: _size,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    band.withValues(alpha: 0.18 + pulse * 0.08),
+                    band.withValues(alpha: 0.0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          CustomPaint(
+            size: const Size(_size, _size),
+            painter: _ScoreDialPainter(
+              progress: (score / 100).clamp(0.0, 1.0),
+              band: band,
+              track: c.border,
+            ),
+          ),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '$score',
+                style: TextStyle(
+                  fontFamily: 'BeVietnamPro',
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  fontStyle: FontStyle.italic,
+                  height: 1.0,
+                  letterSpacing: -1.4,
+                  color: c.ink,
+                  fontFeatures: VikaIvoryMain.tabularFigures,
+                ),
+              ),
+              const SizedBox(height: 1),
+              Text(
+                '/100',
+                style: TextStyle(
+                  fontFamily: 'BeVietnamPro',
+                  fontSize: 8,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.8,
+                  color: c.inkFaint,
+                  fontFeatures: VikaIvoryMain.tabularFigures,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScoreDialPainter extends CustomPainter {
+  const _ScoreDialPainter({
+    required this.progress,
+    required this.band,
+    required this.track,
+  });
+
+  final double progress;
+  final Color band;
+  final Color track;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const stroke = 3.5;
+    final center = size.center(Offset.zero);
+    final radius = (size.shortestSide - stroke) / 2;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+
+    // Track
+    canvas.drawArc(
+      rect,
+      0,
+      2 * math.pi,
+      false,
+      Paint()
+        ..color = track
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = stroke,
+    );
+
+    final sweep = 2 * math.pi * progress.clamp(0.0, 1.0);
+
+    // Soft glow under the band arc.
+    canvas.drawArc(
+      rect,
+      -math.pi / 2,
+      sweep,
+      false,
+      Paint()
+        ..color = band.withValues(alpha: 0.22)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = stroke + 3
+        ..strokeCap = StrokeCap.round
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+    );
+
+    // Band arc
+    canvas.drawArc(
+      rect,
+      -math.pi / 2,
+      sweep,
+      false,
+      Paint()
+        ..color = band
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = stroke
+        ..strokeCap = StrokeCap.round,
+    );
+
+    // End dot
+    if (progress > 0.02) {
+      final theta = -math.pi / 2 + sweep;
+      final dot = Offset(
+        center.dx + radius * math.cos(theta),
+        center.dy + radius * math.sin(theta),
+      );
+      canvas.drawCircle(
+          dot, stroke + 1.5, Paint()..color = band.withValues(alpha: 0.5));
+      canvas.drawCircle(dot, stroke * 0.7, Paint()..color = band);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ScoreDialPainter old) =>
+      old.progress != progress || old.band != band || old.track != track;
 }
 
 class _DifficultyOption {

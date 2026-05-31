@@ -474,8 +474,8 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       slotName: widget.slotName,
       startedAt: _startedAt ?? DateTime.now(),
       formScore: report.formScore,
-      totalReps: report.sets.fold(0, (sum, s) => sum + s.totalReps),
-      totalGoodReps: report.sets.fold(0, (sum, s) => sum + s.goodReps),
+      totalReps: report.sets.fold(0, (sum, s) => sum + (s.totalReps ?? 0)),
+      totalGoodReps: report.sets.fold(0, (sum, s) => sum + (s.goodReps ?? 0)),
       totalSets: report.sets.length,
       calories: _estimatedCalories,
       faultCounts: faultCounts,
@@ -548,19 +548,6 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       _pendingNextRepsTarget = null;
       _prepareActiveSet();
     });
-  }
-
-  /// Praise line for the 3.5-sec transition moment. Picks the highest
-  /// non-null per-set praise; falls back to a generic line if every set
-  /// returned null (e.g. nothing in the praise ladder triggered).
-  String _transitionPraiseLine() {
-    final report = _fullReport;
-    if (report == null) return 'Bài này xong — bạn vừa đẩy thêm một bước.';
-    for (final set in report.sets.reversed) {
-      final p = set.praiseSentence;
-      if (p != null && p.isNotEmpty) return p;
-    }
-    return 'Bài này xong — bạn vừa đẩy thêm một bước.';
   }
 
   /// Called when the 3.5-sec transition cinematic finishes auto-advancing.
@@ -711,7 +698,8 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       _WorkoutFlowPhase.transition => ExerciseTransitionMoment(
           exerciseName: widget.definition.name,
           formScore: _fullReport?.formScore ?? 0,
-          praiseLine: _transitionPraiseLine(),
+          setResults: _fullReport?.sets ?? const [],
+          timeBased: _fullReport?.isSecondBased ?? false,
           nextExerciseName: _hasNextInSequence
               ? 'Bài tiếp theo · ${_nextExerciseName ?? ''}'
               : 'Tổng kết buổi tập',

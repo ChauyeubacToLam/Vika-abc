@@ -453,6 +453,7 @@ class ExerciseLaunchCatalogInfo {
   const ExerciseLaunchCatalogInfo({
     required this.id,
     required this.isFormChecked,
+    this.vietnameseName,
     this.englishName,
     this.classKey,
   });
@@ -460,6 +461,7 @@ class ExerciseLaunchCatalogInfo {
   final String id;
   final bool isFormChecked;
   final String? englishName;
+  final String? vietnameseName;
   final String? classKey;
 
   Iterable<String> get lookupKeys sync* {

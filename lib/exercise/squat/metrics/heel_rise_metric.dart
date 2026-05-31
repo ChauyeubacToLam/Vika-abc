@@ -16,7 +16,7 @@ import '../../../utils/debouncer.dart';
 class HeelRiseConfig {
   /// Heel lift threshold normalized to back length (shoulder-to-hip).
   // ignore: constant_identifier_names
-  static const double LIFT_THRESHOLD = 0.1;
+  static const double LIFT_THRESHOLD = 0.18;
 }
 
 class HeelRiseMetric extends SquatMetricBase {
