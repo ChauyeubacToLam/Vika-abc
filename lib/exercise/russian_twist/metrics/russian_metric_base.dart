@@ -3,7 +3,6 @@ import '../russian_twist.dart';
 import '../../fault_record.dart';
 export '../../fault_record.dart';
 
-
 class RussianRepContext {
   final double wristX;
   final double wristY;
@@ -13,11 +12,11 @@ class RussianRepContext {
   final double hipY;
   final double shoulderX;
   final double shoulderY;
-  
+
   final double wristHipDx;
   final double kneeHipDx;
   final double directionMultiplier;
-  
+
   final RussianTwistState state;
   final TwistDirection direction;
   final int frameTimestamp;
@@ -52,7 +51,8 @@ abstract class RussianMetricBase {
 
   void update(RussianRepContext ctx);
 
-  void onStateTransition(RussianTwistState oldState, RussianTwistState newState, TwistDirection dir, int timestampMs) {}
+  void onStateTransition(RussianTwistState oldState, RussianTwistState newState,
+      TwistDirection dir, int timestampMs) {}
 
   void addFault(FaultRecord fault) {
     if (!_faults.any((f) => f.type == fault.type)) {

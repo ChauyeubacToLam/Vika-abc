@@ -10,6 +10,7 @@ import '../../data/library_mock.dart';
 import '../../theme/vf_theme.dart';
 import '../ivory/atoms.dart';
 import '../../theme/app_colors.dart';
+
 class AllExercisesGrid extends StatefulWidget {
   const AllExercisesGrid({
     super.key,
@@ -66,8 +67,7 @@ class _AllExercisesGridState extends State<AllExercisesGrid> {
               for (final r in widget.rows) ...[
                 _ExerciseRow(
                   row: r,
-                  onTap: () =>
-                      widget.onSelectByName?.call(r.definitionName),
+                  onTap: () => widget.onSelectByName?.call(r.definitionName),
                 ),
                 const SizedBox(height: 6),
               ],
@@ -219,90 +219,90 @@ class _ExerciseRow extends StatelessWidget {
             border: Border.all(color: c.border),
           ),
           child: Row(
-        children: [
-          SizedBox(
-            width: 22,
-            child: Text(
-              row.idx.toString().padLeft(2, '0'),
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                fontFamily: 'BeVietnamPro',
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.4,
-                color: c.inkFaint,
-                fontFeatures: VikaIvoryMain.tabularFigures,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: row.yoga ? c.powder : c.bgInverse,
-              borderRadius: BorderRadius.circular(9),
-            ),
-            alignment: Alignment.center,
-            child: PoseGlyph(type: row.glyph, size: 22, dark: !row.yoga),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        row.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontFamily: 'BeVietnamPro',
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.2,
-                          color: c.ink,
-                        ),
-                      ),
-                    ),
-                    if (row.ai) ...[
-                      const SizedBox(width: 6),
-                      const AIDot(small: true),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  '${row.cat} · ${row.diff}',
+            children: [
+              SizedBox(
+                width: 22,
+                child: Text(
+                  row.idx.toString().padLeft(2, '0'),
+                  textAlign: TextAlign.right,
                   style: TextStyle(
                     fontFamily: 'BeVietnamPro',
                     fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.2,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.4,
                     color: c.inkFaint,
+                    fontFeatures: VikaIvoryMain.tabularFigures,
                   ),
                 ),
-              ],
-            ),
-          ),
-          Container(
-            width: 26,
-            height: 26,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: c.border),
-            ),
-            alignment: Alignment.center,
-            child: Icon(
-              Icons.arrow_forward_rounded,
-              size: 12,
-              color: c.inkSoft,
-            ),
-          ),
-        ],
+              ),
+              const SizedBox(width: 12),
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: row.yoga ? c.powder : c.bgInverse,
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                alignment: Alignment.center,
+                child: PoseGlyph(type: row.glyph, size: 22, dark: !row.yoga),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            row.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: 'BeVietnamPro',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.2,
+                              color: c.ink,
+                            ),
+                          ),
+                        ),
+                        if (row.ai) ...[
+                          const SizedBox(width: 6),
+                          const AIDot(small: true),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${row.cat} · ${row.diff}',
+                      style: TextStyle(
+                        fontFamily: 'BeVietnamPro',
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.2,
+                        color: c.inkFaint,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: c.border),
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 12,
+                  color: c.inkSoft,
+                ),
+              ),
+            ],
           ),
         ),
       ),

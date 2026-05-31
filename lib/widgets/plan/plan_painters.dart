@@ -50,7 +50,8 @@ class CoachMarkPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
 
     // Head.
-    canvas.drawCircle(p(9, 5.5), 1.1 * scale, Paint()..color = VikaIvoryMain.ink);
+    canvas.drawCircle(
+        p(9, 5.5), 1.1 * scale, Paint()..color = VikaIvoryMain.ink);
     // Body.
     canvas.drawLine(p(9, 6.6), p(9, 10), ink);
     // Arms (single horizontal line).
@@ -158,10 +159,20 @@ class FigureSkeletonPainter extends CustomPainter {
 
     // Joint dots — yellow filled circles at every articulation.
     const joints = [
-      [60.0, 24.0], [44.0, 50.0], [76.0, 50.0], [60.0, 70.0],
-      [48.0, 100.0], [72.0, 100.0],
-      [38.0, 80.0], [82.0, 80.0], [40.0, 100.0], [80.0, 100.0],
-      [44.0, 138.0], [76.0, 138.0], [46.0, 178.0], [74.0, 178.0],
+      [60.0, 24.0],
+      [44.0, 50.0],
+      [76.0, 50.0],
+      [60.0, 70.0],
+      [48.0, 100.0],
+      [72.0, 100.0],
+      [38.0, 80.0],
+      [82.0, 80.0],
+      [40.0, 100.0],
+      [80.0, 100.0],
+      [44.0, 138.0],
+      [76.0, 138.0],
+      [46.0, 178.0],
+      [74.0, 178.0],
     ];
     final jointPaint = Paint()..color = VikaIvoryMain.yellow;
     for (final j in joints) {
@@ -173,8 +184,10 @@ class FigureSkeletonPainter extends CustomPainter {
       ..color = VikaIvoryMain.yellow.withValues(alpha: 0.6)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0 * sx;
-    _dashedCircle(canvas, p(44, 138), 6 * sx, ringPaint, dashLen: 2 * sx, gapLen: 2 * sx);
-    _dashedCircle(canvas, p(76, 138), 6 * sx, ringPaint, dashLen: 2 * sx, gapLen: 2 * sx);
+    _dashedCircle(canvas, p(44, 138), 6 * sx, ringPaint,
+        dashLen: 2 * sx, gapLen: 2 * sx);
+    _dashedCircle(canvas, p(76, 138), 6 * sx, ringPaint,
+        dashLen: 2 * sx, gapLen: 2 * sx);
   }
 
   // Tiny helper to draw a dashed circle (Flutter has no built-in path dash).
@@ -244,7 +257,8 @@ class BodyDiagramPainter extends CustomPainter {
       _dashedCircle(canvas, p(28, 36), 11 * sx, ringPaint,
           dashLen: 2 * sx, gapLen: 3 * sx);
       // Filled hip dot.
-      canvas.drawCircle(p(28, 36), 3 * sx, Paint()..color = VikaIvoryMain.yellow);
+      canvas.drawCircle(
+          p(28, 36), 3 * sx, Paint()..color = VikaIvoryMain.yellow);
     }
   }
 

@@ -76,7 +76,7 @@ class LungeHeelLiftMetric extends LungeMetricBase {
     // Warning: ratio 0.05 – 0.08
     else if (_heelWarnDebouncer
         .update(ratio > LungeHeelLiftConfig.WARNING_THRESHOLD)) {
-      ctx.resultIssues.feedback['Feet'] = 'Gót hơi nhấc — ấn gót xuống';        
+      ctx.resultIssues.feedback['Feet'] = 'Gót hơi nhấc — ấn gót xuống';
 
       if (!_instructionSet) {
         ctx.resultIssues.addInstruction(

@@ -6,7 +6,7 @@ class KneeExtensionMetric extends VUpMetricBase {
   String get name => 'KneeExtension';
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
-  
+
   final Debouncer _faultDebouncer = Debouncer(requiredFrames: 3);
 
   @override
@@ -17,7 +17,7 @@ class KneeExtensionMetric extends VUpMetricBase {
   @override
   void update(VUpRepContext ctx) {
     if (ctx.state == VUpState.lying) return;
-    
+
     if (_faultDebouncer.update(ctx.hipKneeAnkleAngle < 150.0)) {
       if (!_faults.any((f) => f.type == 'BentKnee')) {
         _faults.add(FaultRecord(

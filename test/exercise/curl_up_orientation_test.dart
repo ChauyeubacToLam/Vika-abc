@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:vika/exercise/curl_up/curl_up.dart';
 import 'package:vika/exercise/exercise_base.dart';
-import 'package:vika/pose/vika_image_orientation.dart';
 
 PoseLandmark _landmark(
   PoseLandmarkType type,

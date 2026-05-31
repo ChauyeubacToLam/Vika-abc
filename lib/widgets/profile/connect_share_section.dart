@@ -273,9 +273,7 @@ class ConnectionsList extends StatelessWidget {
             for (var i = 0; i < services.length; i++) ...[
               _ConnectionRow(
                 service: services[i],
-                onTap: onConnect == null
-                    ? null
-                    : () => onConnect!(services[i]),
+                onTap: onConnect == null ? null : () => onConnect!(services[i]),
               ),
               if (i < services.length - 1)
                 Divider(
@@ -360,8 +358,8 @@ class _ConnectionRow extends StatelessWidget {
               ),
               // Connect pill / connected check.
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: service.connected ? c.yellow : c.ink,
                   borderRadius: BorderRadius.circular(999),
@@ -370,8 +368,7 @@ class _ConnectionRow extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (service.connected) ...[
-                      Icon(Icons.check_rounded,
-                          size: 13, color: c.yellowInk),
+                      Icon(Icons.check_rounded, size: 13, color: c.yellowInk),
                       const SizedBox(width: 4),
                     ],
                     Text(

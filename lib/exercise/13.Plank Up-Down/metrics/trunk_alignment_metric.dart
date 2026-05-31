@@ -4,7 +4,7 @@ import '../../../utils/debouncer.dart';
 class TrunkAlignmentMetric extends PlankMetricBase {
   @override
   String get name => 'Trunk Alignment';
-  
+
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
   final Debouncer _sagDebouncer = Debouncer(requiredFrames: 3);
@@ -17,7 +17,7 @@ class TrunkAlignmentMetric extends PlankMetricBase {
   @override
   void update(PlankRepContext ctx) {
     bool isSagging = ctx.bodyAngle < PlankConfig.BODY_ALIGNMENT_SAG_THRESHOLD;
-    
+
     if (_sagDebouncer.update(isSagging)) {
       ctx.resultIssues.feedback['Trunk'] = 'Sụt hông! Gồng chặt cơ bụng';
       if (!_faults.any((f) => f.type == 'Sagging')) {

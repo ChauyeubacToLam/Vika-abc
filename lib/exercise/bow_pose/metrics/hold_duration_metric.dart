@@ -13,7 +13,7 @@ class HoldDurationMetric extends BowPoseMetricBase {
 
   @override
   List<FaultRecord> get faults => _faults;
-  
+
   @override
   Map<String, dynamic> get debugData => _debugData;
 
@@ -34,13 +34,14 @@ class HoldDurationMetric extends BowPoseMetricBase {
         _maxHoldSeconds = _currentHoldSeconds;
       }
       _debugData['holdTime'] = '${_currentHoldSeconds.toStringAsFixed(1)}s';
-      ctx.resultIssues.feedback['Timer'] = 'Giữ: ${_currentHoldSeconds.toStringAsFixed(1)}s';
+      ctx.resultIssues.feedback['Timer'] =
+          'Giữ: ${_currentHoldSeconds.toStringAsFixed(1)}s';
     }
   }
 
   @override
   void evaluateRep(RepContext ctx) {
-    if (_maxHoldSeconds < 15.0) { 
+    if (_maxHoldSeconds < 15.0) {
       _faults.add(FaultRecord(
         phase: 'REP_COMPLETE',
         type: 'HoldDuration',
@@ -48,7 +49,8 @@ class HoldDurationMetric extends BowPoseMetricBase {
         affectsForm: true,
       ));
     }
-    ctx.resultIssues.feedback['MaxHold'] = '${_maxHoldSeconds.toStringAsFixed(1)}s';
+    ctx.resultIssues.feedback['MaxHold'] =
+        '${_maxHoldSeconds.toStringAsFixed(1)}s';
   }
 
   @override

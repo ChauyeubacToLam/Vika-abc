@@ -2,7 +2,8 @@ import 'russian_metric_base.dart';
 import '../russian_twist.dart';
 
 class ThoracicRotationMetric extends RussianMetricBase {
-  static const double SHOULDER_MOVEMENT_MIN = 0.15; // Shoulder must move at least 15% of hip-to-knee distance to count as torso twist
+  static const double SHOULDER_MOVEMENT_MIN =
+      0.15; // Shoulder must move at least 15% of hip-to-knee distance to count as torso twist
 
   double? _setupShoulderHipDx;
 
@@ -16,8 +17,9 @@ class ThoracicRotationMetric extends RussianMetricBase {
     if (ctx.state == RussianTwistState.max_point) {
       if (_setupShoulderHipDx != null) {
         double currentShoulderHipDx = ctx.shoulderX - ctx.hipX;
-        double shoulderMovement = (currentShoulderHipDx - _setupShoulderHipDx!).abs();
-        
+        double shoulderMovement =
+            (currentShoulderHipDx - _setupShoulderHipDx!).abs();
+
         // Normalize by kneeHipDx to be scale invariant
         double movementRatio = shoulderMovement / ctx.kneeHipDx;
         debugData['shoulderMovementRatio'] = movementRatio;
@@ -27,7 +29,8 @@ class ThoracicRotationMetric extends RussianMetricBase {
           addFault(
             FaultRecord(
               type: 'arm_swinging',
-              message: 'Đừng chỉ vung vẩy tay! Hãy vặn cả bờ vai và ngực của bạn!',
+              message:
+                  'Đừng chỉ vung vẩy tay! Hãy vặn cả bờ vai và ngực của bạn!',
               affectsForm: true, // Critical error
               phase: ctx.direction.name,
               priority: 1,

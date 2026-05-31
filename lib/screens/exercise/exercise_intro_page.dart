@@ -333,122 +333,122 @@ class _ExerciseIntroPageState extends State<ExerciseIntroPage> {
     return MediaQuery(
       data: mq.copyWith(textScaler: clampedScaler),
       child: Scaffold(
-      backgroundColor: c.bg,
-      body: Stack(
-        children: [
-          MediaQuery.removePadding(
-            context: context,
-            removeTop: true,
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Hero is rendered for EVERY exercise, including
-                  // continuation slots. Earlier we collapsed continuation
-                  // slots to a compact header, but the user wanted the
-                  // full hero presence to anchor the page consistently.
-                  _StageHero(
-                    statusBarInset: statusBarInset,
-                    title: widget.title,
-                    subtitle: widget.subtitle ??
-                        'Phân tích tư thế · $_estimatedMinutes',
-                    muscles: widget.muscles,
-                    difficulty: widget.difficulty,
-                    difficultyDots: _difficultyDots,
-                    videoDuration: widget.videoDuration,
-                    saved: _saved,
-                    sessionProgressLabel: widget.sessionProgressLabel,
-                    onBack: widget.onBack,
-                    onWatchVideo: widget.onWatchVideo,
-                    onSaveTap: () {
-                      HapticFeedback.selectionClick();
-                      setState(() => _saved = !_saved);
-                      widget.onSaveTap?.call();
-                    },
-                    onShareTap: widget.onShareTap,
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Continuation rating is collected via the forced
-                  // popup launched in `initState`, not inline on the page
-                  // — so we drop directly into CHUẨN BỊ here.
-
-                  // 1. CHUẨN BỊ — moved up so the people-who-just-want-
-                  // to-start crowd see setup first.
-                  _SectionHeader(
-                    eyebrow: 'CHUẨN BỊ',
-                    meta: '${widget.tips.length} BƯỚC',
-                    intro:
-                        'Vài giây để dựng camera đúng. AI cần thấy rõ dáng của bạn.',
-                  ),
-                  const SizedBox(height: 14),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: _SetupChecklist(tips: widget.tips),
-                  ),
-                  const SizedBox(height: 40),
-
-                  // 2. AI THEO DÕI — diagram + per-metric config list.
-                  _SectionHeader(
-                    eyebrow: 'AI THEO DÕI',
-                    meta: '${_metrics.length} ĐIỂM ĐO',
-                    intro:
-                        'Các điểm AI đo theo thời gian thực — ngưỡng cá nhân hoá theo buổi tập trước.',
-                  ),
-                  const SizedBox(height: 14),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: _AiSpecCard(
-                      posture: widget.posture,
-                      metrics: _metrics,
-                      tempoChips: _tempoChips,
-                      callouts: widget.callouts,
+        backgroundColor: c.bg,
+        body: Stack(
+          children: [
+            MediaQuery.removePadding(
+              context: context,
+              removeTop: true,
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Hero is rendered for EVERY exercise, including
+                    // continuation slots. Earlier we collapsed continuation
+                    // slots to a compact header, but the user wanted the
+                    // full hero presence to anchor the page consistently.
+                    _StageHero(
+                      statusBarInset: statusBarInset,
+                      title: widget.title,
+                      subtitle: widget.subtitle ??
+                          'Phân tích tư thế · $_estimatedMinutes',
+                      muscles: widget.muscles,
+                      difficulty: widget.difficulty,
+                      difficultyDots: _difficultyDots,
+                      videoDuration: widget.videoDuration,
+                      saved: _saved,
+                      sessionProgressLabel: widget.sessionProgressLabel,
+                      onBack: widget.onBack,
+                      onWatchVideo: widget.onWatchVideo,
+                      onSaveTap: () {
+                        HapticFeedback.selectionClick();
+                        setState(() => _saved = !_saved);
+                        widget.onSaveTap?.call();
+                      },
+                      onShareTap: widget.onShareTap,
                     ),
-                  ),
-                  const SizedBox(height: 40),
+                    const SizedBox(height: 24),
 
-                  // 3. MỤC TIÊU BUỔI NÀY — session targets.
-                  _SectionHeader(
-                    eyebrow: 'MỤC TIÊU BUỔI NÀY',
-                    intro:
-                        'Con số bạn cần đẩy. AI sẽ giữ rep mục tiêu khi form chuẩn.',
-                  ),
-                  const SizedBox(height: 14),
-                  _SessionTargetBand(
-                    sets: widget.totalSets,
-                    repsPerSet: widget.repsPerSet,
-                    restSeconds: widget.restSeconds,
-                    estimatedMinutes: _estimatedMinutes,
-                    targetLabel: widget.targetLabel,
-                  ),
+                    // Continuation rating is collected via the forced
+                    // popup launched in `initState`, not inline on the page
+                    // — so we drop directly into CHUẨN BỊ here.
 
-                  // Bottom-of-page safe space for the sticky dock.
-                  // Tall enough for the notice line + button + insets so
-                  // the last section never sits underneath the dock.
-                  SizedBox(
-                    height: 168 + MediaQuery.viewPaddingOf(context).bottom,
-                  ),
-                ],
+                    // 1. CHUẨN BỊ — moved up so the people-who-just-want-
+                    // to-start crowd see setup first.
+                    _SectionHeader(
+                      eyebrow: 'CHUẨN BỊ',
+                      meta: '${widget.tips.length} BƯỚC',
+                      intro:
+                          'Vài giây để dựng camera đúng. AI cần thấy rõ dáng của bạn.',
+                    ),
+                    const SizedBox(height: 14),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: _SetupChecklist(tips: widget.tips),
+                    ),
+                    const SizedBox(height: 40),
+
+                    // 2. AI THEO DÕI — diagram + per-metric config list.
+                    _SectionHeader(
+                      eyebrow: 'AI THEO DÕI',
+                      meta: '${_metrics.length} ĐIỂM ĐO',
+                      intro:
+                          'Các điểm AI đo theo thời gian thực — ngưỡng cá nhân hoá theo buổi tập trước.',
+                    ),
+                    const SizedBox(height: 14),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: _AiSpecCard(
+                        posture: widget.posture,
+                        metrics: _metrics,
+                        tempoChips: _tempoChips,
+                        callouts: widget.callouts,
+                      ),
+                    ),
+                    const SizedBox(height: 40),
+
+                    // 3. MỤC TIÊU BUỔI NÀY — session targets.
+                    _SectionHeader(
+                      eyebrow: 'MỤC TIÊU BUỔI NÀY',
+                      intro:
+                          'Con số bạn cần đẩy. AI sẽ giữ rep mục tiêu khi form chuẩn.',
+                    ),
+                    const SizedBox(height: 14),
+                    _SessionTargetBand(
+                      sets: widget.totalSets,
+                      repsPerSet: widget.repsPerSet,
+                      restSeconds: widget.restSeconds,
+                      estimatedMinutes: _estimatedMinutes,
+                      targetLabel: widget.targetLabel,
+                    ),
+
+                    // Bottom-of-page safe space for the sticky dock.
+                    // Tall enough for the notice line + button + insets so
+                    // the last section never sits underneath the dock.
+                    SizedBox(
+                      height: 168 + MediaQuery.viewPaddingOf(context).bottom,
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
 
-          // Sticky CTA dock:
-          //   • First exercise / no prev rating needed → classic
-          //     "Bắt đầu tập" pill, force-press model.
-          //   • Continuation slot, rating already collected via popup →
-          //     auto-countdown CTA (30s) with start-now + extend.
-          //   • Continuation slot, popup still up (rating null) → nothing
-          //     visible at the bottom (the popup itself blocks everything).
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: _buildBottomDock(context),
-          ),
-        ],
-      ),
+            // Sticky CTA dock:
+            //   • First exercise / no prev rating needed → classic
+            //     "Bắt đầu tập" pill, force-press model.
+            //   • Continuation slot, rating already collected via popup →
+            //     auto-countdown CTA (30s) with start-now + extend.
+            //   • Continuation slot, popup still up (rating null) → nothing
+            //     visible at the bottom (the popup itself blocks everything).
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: _buildBottomDock(context),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -303,8 +303,7 @@ class _TileState extends State<_Tile> {
                                     fontWeight: FontWeight.w800,
                                     letterSpacing: 1.2,
                                     color: c.inkFaint,
-                                    fontFeatures:
-                                        VikaIvoryMain.tabularFigures,
+                                    fontFeatures: VikaIvoryMain.tabularFigures,
                                   ),
                                 ),
                               ),

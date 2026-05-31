@@ -23,7 +23,7 @@ class AlternatingLeadArmMetric extends PlankMetricBase {
     if (ctx.currentState == PlankState.pushing_up && currentLeadArm == null) {
       detectLeadArm(ctx.leftElbowAngle, ctx.rightElbowAngle);
     }
-    
+
     _debugData['leftLeadCount'] = leftLeadCount;
     _debugData['rightLeadCount'] = rightLeadCount;
     _debugData['currentLeadArm'] = currentLeadArm ?? 'None';

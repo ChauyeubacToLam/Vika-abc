@@ -51,9 +51,11 @@ class S01Welcome extends StatelessWidget {
             child: Padding(
               padding: EdgeInsets.fromLTRB(
                 V5.gutter,
-                r.viewPadding.top + r.pick(cozy: 28.0, short: 18.0, veryShort: 10.0),
+                r.viewPadding.top +
+                    r.pick(cozy: 28.0, short: 18.0, veryShort: 10.0),
                 V5.gutter,
-                bottomInset + r.pick(cozy: 132.0, short: 116.0, veryShort: 102.0),
+                bottomInset +
+                    r.pick(cozy: 132.0, short: 116.0, veryShort: 102.0),
               ),
               child: Column(
                 children: [
@@ -370,16 +372,16 @@ class _WelcomeStagePainter extends CustomPainter {
     final hip = Offset(fx, fy + figureScale * 0.06);
     final shoulderL = neck + Offset(-figureScale * 0.16, figureScale * 0.02);
     final shoulderR = neck + Offset(figureScale * 0.16, figureScale * 0.02);
-    final elbowL = shoulderL +
-        Offset(-figureScale * 0.10, figureScale * (0.16 - flex));
-    final elbowR = shoulderR +
-        Offset(figureScale * 0.10, figureScale * (0.16 - flex));
+    final elbowL =
+        shoulderL + Offset(-figureScale * 0.10, figureScale * (0.16 - flex));
+    final elbowR =
+        shoulderR + Offset(figureScale * 0.10, figureScale * (0.16 - flex));
     final handL = elbowL + Offset(-figureScale * 0.04, figureScale * 0.14);
     final handR = elbowR + Offset(figureScale * 0.04, figureScale * 0.14);
-    final kneeL = hip +
-        Offset(-figureScale * 0.10, figureScale * (0.22 + flex * 1.4));
-    final kneeR = hip +
-        Offset(figureScale * 0.10, figureScale * (0.22 + flex * 1.4));
+    final kneeL =
+        hip + Offset(-figureScale * 0.10, figureScale * (0.22 + flex * 1.4));
+    final kneeR =
+        hip + Offset(figureScale * 0.10, figureScale * (0.22 + flex * 1.4));
     final footL = Offset(kneeL.dx, fy + figureScale * 0.46);
     final footR = Offset(kneeR.dx, fy + figureScale * 0.46);
 
@@ -424,7 +426,8 @@ class _WelcomeStagePainter extends CustomPainter {
       footL,
       footR,
     ];
-    final activeIndex = (progress * joints.length * 1.6).floor() % joints.length;
+    final activeIndex =
+        (progress * joints.length * 1.6).floor() % joints.length;
     for (var i = 0; i < joints.length; i++) {
       final j = joints[i];
       final isActive = i == activeIndex;

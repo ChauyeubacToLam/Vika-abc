@@ -11,10 +11,14 @@ class DeadBugReportBuilder extends ExerciseReportBuilder {
 
   @override
   Map<String, String> faultToTipMap() => {
-        'anti_extension_fails_count': 'Lưng hở khỏi sàn là dấu hiệu cơ bụng đã ngừng làm việc. Hãy hít sâu và ép chặt thắt lưng xuống thảm.',
-        'coordination_fails_count': 'Việc chuyển động cùng bên sẽ làm mất đi khả năng rèn luyện dây thần kinh cơ chéo của bài tập.',
-        'stable_limbs_fails_count': 'Chỉ di chuyển 2 chi, 2 chi còn lại phải "đóng băng". Sự cô lập này là chìa khóa của sức mạnh cốt lõi.',
-        'tempo_fails_count': 'Bạn đang tập luyện hệ thần kinh chứ không phải chạy đua. Càng chậm càng tốt.',
+        'anti_extension_fails_count':
+            'Lưng hở khỏi sàn là dấu hiệu cơ bụng đã ngừng làm việc. Hãy hít sâu và ép chặt thắt lưng xuống thảm.',
+        'coordination_fails_count':
+            'Việc chuyển động cùng bên sẽ làm mất đi khả năng rèn luyện dây thần kinh cơ chéo của bài tập.',
+        'stable_limbs_fails_count':
+            'Chỉ di chuyển 2 chi, 2 chi còn lại phải "đóng băng". Sự cô lập này là chìa khóa của sức mạnh cốt lõi.',
+        'tempo_fails_count':
+            'Bạn đang tập luyện hệ thần kinh chứ không phải chạy đua. Càng chậm càng tốt.',
       };
 
   @override
@@ -32,7 +36,9 @@ class DeadBugReportBuilder extends ExerciseReportBuilder {
       };
 
   @override
-  DetectedEvidence? detectIssue(List<ExerciseLogger> setLoggers) { return null; }
+  DetectedEvidence? detectIssue(List<ExerciseLogger> setLoggers) {
+    return null;
+  }
 
   @override
   List<DetailCard> buildDetailCards(List<ExerciseLogger> setLoggers) {
@@ -41,16 +47,27 @@ class DeadBugReportBuilder extends ExerciseReportBuilder {
     if (totalReps == 0) return [];
 
     // Điểm Anti-Extension Score (% không bị võng lưng)
-    int antiExtFails = setLoggers.map((l) => l.setLogs['anti_extension_fails_count'] as int? ?? 0).fold(0, (a, b) => a + b);
-    double antiExtScore = totalReps > 0 ? ((totalReps - antiExtFails) / totalReps) * 100 : 0;
+    int antiExtFails = setLoggers
+        .map((l) => l.setLogs['anti_extension_fails_count'] as int? ?? 0)
+        .fold(0, (a, b) => a + b);
+    double antiExtScore =
+        totalReps > 0 ? ((totalReps - antiExtFails) / totalReps) * 100 : 0;
 
     // Coordination Accuracy (% đi đúng chéo chi)
-    int coordFails = setLoggers.map((l) => l.setLogs['coordination_fails_count'] as int? ?? 0).fold(0, (a, b) => a + b);
-    double coordScore = totalReps > 0 ? ((totalReps - coordFails) / totalReps) * 100 : 0;
+    int coordFails = setLoggers
+        .map((l) => l.setLogs['coordination_fails_count'] as int? ?? 0)
+        .fold(0, (a, b) => a + b);
+    double coordScore =
+        totalReps > 0 ? ((totalReps - coordFails) / totalReps) * 100 : 0;
 
     // Tempo Control
-    final allTempos = allReps.map((r) => (r.data['extending_time'] as num?)?.toDouble() ?? 0).where((t) => t > 0).toList();
-    final avgTempo = allTempos.isEmpty ? 0.0 : allTempos.reduce((a, b) => a + b) / allTempos.length;
+    final allTempos = allReps
+        .map((r) => (r.data['extending_time'] as num?)?.toDouble() ?? 0)
+        .where((t) => t > 0)
+        .toList();
+    final avgTempo = allTempos.isEmpty
+        ? 0.0
+        : allTempos.reduce((a, b) => a + b) / allTempos.length;
 
     return [
       DetailCard(

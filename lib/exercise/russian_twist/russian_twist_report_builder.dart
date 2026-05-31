@@ -32,13 +32,16 @@ class RussianTwistReportBuilder extends ExerciseReportBuilder {
     int thoracicFails = 0;
     int romFails = 0;
     for (final logger in setLoggers) {
-      kneeWobbleFails += (logger.setLogs['knee_wobble_fails'] as num?)?.toInt() ?? 0;
+      kneeWobbleFails +=
+          (logger.setLogs['knee_wobble_fails'] as num?)?.toInt() ?? 0;
       thoracicFails += (logger.setLogs['thoracic_fails'] as num?)?.toInt() ?? 0;
       romFails += (logger.setLogs['rom_fails'] as num?)?.toInt() ?? 0;
     }
 
-    final anchoringScore = ((totalReps - kneeWobbleFails) / totalReps * 100).roundToDouble();
-    final twistQualityScore = ((totalReps - thoracicFails) / totalReps * 100).roundToDouble();
+    final anchoringScore =
+        ((totalReps - kneeWobbleFails) / totalReps * 100).roundToDouble();
+    final twistQualityScore =
+        ((totalReps - thoracicFails) / totalReps * 100).roundToDouble();
     final romScore = ((totalReps - romFails) / totalReps * 100).roundToDouble();
 
     return [

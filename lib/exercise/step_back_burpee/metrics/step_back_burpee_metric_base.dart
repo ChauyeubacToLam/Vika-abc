@@ -31,7 +31,7 @@ class RepContext {
 
   /// Khoảng cách trục X giữa Cổ tay và Mắt cá (Đo độ dài Plank)
   final double wristAnkleDistX;
-  
+
   /// Tọa độ Y của Cổ tay (Đo việc chạm sàn)
   final double wristY;
 

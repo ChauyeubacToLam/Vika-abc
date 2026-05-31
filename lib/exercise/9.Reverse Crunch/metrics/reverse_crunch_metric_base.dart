@@ -10,15 +10,23 @@ class ReverseCrunchConfig {
   static const int MAX_DURATION_MS = 90000; // 90s timeout
 
   // Setup thresholds
-  static const List<double> SETUP_KNEE_ANGLE_RANGE = [60.0, 140.0]; // Mở rộng góc gối để dễ setup
-  static const double LIFT_START_ANGLE_DROP = 5.0; // Góc Vai-Hông-Gối giảm 5 độ -> Bắt đầu cuộn
-  
+  static const List<double> SETUP_KNEE_ANGLE_RANGE = [
+    60.0,
+    140.0
+  ]; // Mở rộng góc gối để dễ setup
+  static const double LIFT_START_ANGLE_DROP =
+      5.0; // Góc Vai-Hông-Gối giảm 5 độ -> Bắt đầu cuộn
+
   // Y Khoa (McGill & Sarti) thresholds
-  static const double PELVIC_CURL_ANGLE_MIN_DROP = 15.0; // Ở Top, góc Vai-Hông-Gối phải giảm > 15 độ
-  static const double HIP_LIFT_MIN_NORMALIZED = 0.05; // Hông phải rời mặt sàn tối thiểu
-  
-  static const double KNEE_SWING_TOLERANCE = 20.0; // Biên độ dao động tối đa của góc gối (tránh vung chân lấy đà)
-  static const double ECCENTRIC_MIN_TIME = 1.5; // Giây: Thời gian hạ hông có kiểm soát
+  static const double PELVIC_CURL_ANGLE_MIN_DROP =
+      15.0; // Ở Top, góc Vai-Hông-Gối phải giảm > 15 độ
+  static const double HIP_LIFT_MIN_NORMALIZED =
+      0.05; // Hông phải rời mặt sàn tối thiểu
+
+  static const double KNEE_SWING_TOLERANCE =
+      20.0; // Biên độ dao động tối đa của góc gối (tránh vung chân lấy đà)
+  static const double ECCENTRIC_MIN_TIME =
+      1.5; // Giây: Thời gian hạ hông có kiểm soát
 }
 
 class CrunchVoicePriority {
@@ -35,10 +43,11 @@ class RepContext {
   // Angles
   final double trunkKneeAngle; // Vai - Hông - Đầu gối (Góc cuộn bụng)
   final double kneeAngle; // Hông - Đầu gối - Mắt cá (Khóa góc này chống vung)
-  
+
   // Coordinates & Velocity
-  final double hipY; 
-  final double trunkKneeVelocity; // Vận tốc góc cuộn (Âm = đang gập vào, Dương = đang duỗi ra)
+  final double hipY;
+  final double
+      trunkKneeVelocity; // Vận tốc góc cuộn (Âm = đang gập vào, Dương = đang duỗi ra)
 
   final ResultIssues resultIssues;
 
@@ -65,6 +74,8 @@ abstract class ReverseCrunchMetricBase {
     if (faults.isNotEmpty) faultsCount++;
     reset();
   }
-  void onStateTransition(ReverseCrunchState from, ReverseCrunchState to, int timestampMs) {}
+
+  void onStateTransition(
+      ReverseCrunchState from, ReverseCrunchState to, int timestampMs) {}
   void evaluateRepEnd(RepContext ctx) {}
 }

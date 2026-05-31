@@ -64,14 +64,14 @@ class FaultRecord {
 abstract class CobraMetricBase {
   String get name;
   int faultsCount = 0;
-  
+
   void update(RepContext ctx);
-  
+
   List<FaultRecord> get faults;
   Map<String, dynamic> get debugData;
-  
+
   void reset();
-  
+
   void resetAndCountFault() {
     if (faults.isNotEmpty) faultsCount++;
     reset();

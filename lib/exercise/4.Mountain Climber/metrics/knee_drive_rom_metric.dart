@@ -31,10 +31,8 @@ class KneeDriveRomMetric extends ClimberMetricBase {
   void update(RepContext ctx) {
     final double scale = ctx.scaleFactor == 0 ? 1.0 : ctx.scaleFactor;
 
-    final double distLeft =
-        (ctx.leftKneeX - ctx.shoulderX).abs() / scale;
-    final double distRight =
-        (ctx.rightKneeX - ctx.shoulderX).abs() / scale;
+    final double distLeft = (ctx.leftKneeX - ctx.shoulderX).abs() / scale;
+    final double distRight = (ctx.rightKneeX - ctx.shoulderX).abs() / scale;
 
     // Cập nhật min cho từng chân
     if (_minDistLeft == null || distLeft < _minDistLeft!) {

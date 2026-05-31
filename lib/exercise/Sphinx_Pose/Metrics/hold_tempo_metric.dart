@@ -35,11 +35,12 @@ class HoldTempoMetric extends SphinxMetricBase {
   void update(SphinxContext ctx) {
     if (ctx.state == SphinxState.isometricHold) {
       if (_holdStartMs != null) {
-        final double currentHold = (ctx.frameTimestampMs - _holdStartMs!) / 1000.0;
+        final double currentHold =
+            (ctx.frameTimestampMs - _holdStartMs!) / 1000.0;
         // Live feedback: hiển thị thời gian đang giữ
         ctx.resultIssues.feedback['Time'] =
             '${(activeHoldSeconds + currentHold).toStringAsFixed(1)}s / ${SphinxConfig.Ae_Min_Hold_Time}s';
-        
+
         // Ghi nhận góc lưng để đánh giá rung lắc cuối rep
         _spineAnglesDuringHold.add(ctx.spineAngle);
       }
@@ -67,13 +68,13 @@ class HoldTempoMetric extends SphinxMetricBase {
     if (_spineAnglesDuringHold.length < 2) return;
 
     // Tính trung bình góc lưng
-    final double mean =
-        _spineAnglesDuringHold.reduce((a, b) => a + b) / _spineAnglesDuringHold.length;
+    final double mean = _spineAnglesDuringHold.reduce((a, b) => a + b) /
+        _spineAnglesDuringHold.length;
 
     // Tính phương sai (Variance) -> đo độ rung lắc
     final double variance = _spineAnglesDuringHold
-        .map((x) => pow(x - mean, 2).toDouble())
-        .reduce((a, b) => a + b) /
+            .map((x) => pow(x - mean, 2).toDouble())
+            .reduce((a, b) => a + b) /
         _spineAnglesDuringHold.length;
 
     // Chuyển variance thành điểm 0-100 (rung nhiều thì điểm thấp)

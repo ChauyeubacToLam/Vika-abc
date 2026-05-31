@@ -7,7 +7,7 @@ import 'side_plank_dip_metric_base.dart';
 
 class ShoulderConfig {
   static const double OFFSET_WARNING = 10.0; // Khoảng lệch tương đối
-  static const double OFFSET_DANGER = 18.0; 
+  static const double OFFSET_DANGER = 18.0;
 }
 
 class ShoulderAlignmentMetric extends SidePlankDipMetricBase {
@@ -16,7 +16,7 @@ class ShoulderAlignmentMetric extends SidePlankDipMetricBase {
 
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
-  
+
   double? _maxOffsetX;
 
   @override
@@ -30,14 +30,16 @@ class ShoulderAlignmentMetric extends SidePlankDipMetricBase {
     if (_maxOffsetX == null || ctx.shoulderElbowOffsetX > _maxOffsetX!) {
       _maxOffsetX = ctx.shoulderElbowOffsetX;
     }
-    
+
     if (ctx.shoulderElbowOffsetX > ShoulderConfig.OFFSET_DANGER) {
-      ctx.resultIssues.feedback['Shoulder'] = 'RÚT TAY LẠI! Khuỷu tay phải nằm dưới vai.';
+      ctx.resultIssues.feedback['Shoulder'] =
+          'RÚT TAY LẠI! Khuỷu tay phải nằm dưới vai.';
     }
   }
 
   @override
-  void onStateTransition(SidePlankState from, SidePlankState to, int timestampMs) {
+  void onStateTransition(
+      SidePlankState from, SidePlankState to, int timestampMs) {
     if (to == SidePlankState.top && _maxOffsetX != null) {
       if (_maxOffsetX! > ShoulderConfig.OFFSET_DANGER) {
         _faults.add(FaultRecord(

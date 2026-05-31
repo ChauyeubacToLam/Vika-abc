@@ -10,6 +10,7 @@ import '../../data/plan_mock.dart';
 import '../../theme/vf_theme.dart';
 import 'plan_typography.dart';
 import '../../theme/app_colors.dart';
+
 class WeekRecapCard extends StatelessWidget {
   const WeekRecapCard({super.key, required this.week});
 

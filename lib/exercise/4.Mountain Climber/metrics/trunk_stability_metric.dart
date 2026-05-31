@@ -45,11 +45,9 @@ class TrunkStabilityMetric extends ClimberMetricBase {
         ctx.trunkAngle < ClimberConfig.HIP_DROP_TRUNK_ANGLE;
 
     // --- Kiểm tra 2: Nhấp nhô hông ---
-    final double hipVarianceNorm =
-        (ctx.hipY - _baselineHipY!).abs() /
+    final double hipVarianceNorm = (ctx.hipY - _baselineHipY!).abs() /
         (ctx.scaleFactor == 0 ? 1.0 : ctx.scaleFactor);
-    final bool isBouncing =
-        hipVarianceNorm > ClimberConfig.HIP_BOUNCE_NORM;
+    final bool isBouncing = hipVarianceNorm > ClimberConfig.HIP_BOUNCE_NORM;
 
     // --- Cập nhật debug ---
     _debugData['TS_trunkAngle'] = ctx.trunkAngle.toStringAsFixed(1);

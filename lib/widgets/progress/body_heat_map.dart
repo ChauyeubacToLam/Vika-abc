@@ -16,6 +16,7 @@ import 'package:flutter/material.dart';
 import '../../data/progress_mock.dart';
 import '../../theme/vf_theme.dart';
 import '../../theme/app_colors.dart';
+
 enum BodyGender { male, female }
 
 class BodyHeatMap extends StatelessWidget {
@@ -106,8 +107,7 @@ class _IntensityLegend extends StatelessWidget {
             decoration: BoxDecoration(
               color: dot,
               shape: BoxShape.circle,
-              boxShadow:
-                  glow ? [BoxShadow(color: dot, blurRadius: 5)] : null,
+              boxShadow: glow ? [BoxShadow(color: dot, blurRadius: 5)] : null,
             ),
           ),
           const SizedBox(width: 6),
@@ -124,6 +124,7 @@ class _IntensityLegend extends StatelessWidget {
         ],
       );
     }
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -276,9 +277,9 @@ class _BodyFigure extends StatelessWidget {
 
   static const _zonesByRegion = {
     'shoulders': _Zone(cyPct: 26, rxPct: 76, ryPct: 11),
-    'core':      _Zone(cyPct: 43, rxPct: 58, ryPct: 13),
-    'glutes':    _Zone(cyPct: 56, rxPct: 76, ryPct: 9),
-    'legs':      _Zone(cyPct: 76, rxPct: 78, ryPct: 18),
+    'core': _Zone(cyPct: 43, rxPct: 58, ryPct: 13),
+    'glutes': _Zone(cyPct: 56, rxPct: 76, ryPct: 9),
+    'legs': _Zone(cyPct: 76, rxPct: 78, ryPct: 18),
   };
 
   @override
@@ -403,4 +404,3 @@ class _HeatZone extends StatelessWidget {
     );
   }
 }
-

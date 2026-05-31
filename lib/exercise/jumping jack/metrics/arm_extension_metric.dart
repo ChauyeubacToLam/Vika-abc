@@ -161,10 +161,10 @@ class ArmExtensionMetric extends JJMetricBase {
 
     if (peakMin < ArmExtensionConfig.ELEVATION_WARNING) {
       _logFault(
-          'REP_COMPLETE', 'Tay quá thấp (${peakMin.toStringAsFixed(0)}°)');     
+          'REP_COMPLETE', 'Tay quá thấp (${peakMin.toStringAsFixed(0)}°)');
     } else if (peakMin < ArmExtensionConfig.ELEVATION_GOOD) {
       _logFault(
-          'REP_COMPLETE', 'Tay chưa đủ cao (${peakMin.toStringAsFixed(0)}°)');  
+          'REP_COMPLETE', 'Tay chưa đủ cao (${peakMin.toStringAsFixed(0)}°)');
     }
   }
 

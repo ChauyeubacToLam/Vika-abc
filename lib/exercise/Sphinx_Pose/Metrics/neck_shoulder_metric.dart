@@ -17,7 +17,7 @@ class NeckShoulderMetric extends SphinxMetricBase {
 
   bool _shrugInstructionSet = false;
   bool _hyperInstructionSet = false;
-  
+
   // Biến lưu trạng thái ngửa cổ để dùng chung giữa các hàm
   bool _isHyper = false;
 
@@ -29,7 +29,10 @@ class NeckShoulderMetric extends SphinxMetricBase {
 
   @override
   void update(SphinxContext ctx) {
-    if (ctx.state != SphinxState.isometricHold && ctx.state != SphinxState.ascending) return;
+    if (ctx.state != SphinxState.isometricHold &&
+        ctx.state != SphinxState.ascending) {
+      return;
+    }
 
     // Đảo thứ tự: Gọi _checkHyperextension trước để cập nhật _isHyper cho frame hiện tại
     _checkHyperextension(ctx);
@@ -38,10 +41,12 @@ class NeckShoulderMetric extends SphinxMetricBase {
 
   // --- Nhánh 1: Rụt vai / nhô vai (shrug) ---
   void _checkShrug(SphinxContext ctx) {
-    final double normalizedDist = ctx.earShoulderDist / (ctx.scaleFactor <= 0 ? 1 : ctx.scaleFactor);
+    final double normalizedDist =
+        ctx.earShoulderDist / (ctx.scaleFactor <= 0 ? 1 : ctx.scaleFactor);
     _debugData['neckDistNorm'] = normalizedDist.toStringAsFixed(3);
 
-    if (_shrugDebouncer.update(normalizedDist < SphinxConfig.Ag_Neck_Shrug_Tol)) {
+    if (_shrugDebouncer
+        .update(normalizedDist < SphinxConfig.Ag_Neck_Shrug_Tol)) {
       ctx.resultIssues.feedback['Neck'] = 'Thẳng vai!';
       if (!_shrugInstructionSet) {
         ctx.resultIssues.addInstruction(
@@ -51,7 +56,8 @@ class NeckShoulderMetric extends SphinxMetricBase {
         );
         _shrugInstructionSet = true;
       }
-      _logFault(ctx.state.name, 'NeckShrug', 'Lỗi rụt vai', 'Thẳng vai ra', SphinxFaultVoicePriority.shrugNeck);
+      _logFault(ctx.state.name, 'NeckShrug', 'Lỗi rụt vai', 'Thẳng vai ra',
+          SphinxFaultVoicePriority.shrugNeck);
     } else {
       // Chỉ set feedback "tốt" nếu nhánh hyperextension cũng không lỗi
       // để tránh ghi đè lên nhau. Nhánh hyper sẽ ghi đè lên nếu có lỗi.
@@ -66,9 +72,10 @@ class NeckShoulderMetric extends SphinxMetricBase {
   // Góc trung tính ~160-170 độ. Ngửa cổ nhiều góc sẽ thu nhỏ < Ai_Neck_Hyper_Tol.
   void _checkHyperextension(SphinxContext ctx) {
     _debugData['neckAngle'] = ctx.neckAngle.toStringAsFixed(1);
-    
+
     // Lưu kết quả của debouncer vào _isHyper
-    _isHyper = _hyperDebouncer.update(ctx.neckAngle < SphinxConfig.Ai_Neck_Hyper_Tol);
+    _isHyper =
+        _hyperDebouncer.update(ctx.neckAngle < SphinxConfig.Ai_Neck_Hyper_Tol);
 
     if (_isHyper) {
       ctx.resultIssues.feedback['Neck'] = 'Hạ cằm xuống!';
@@ -90,7 +97,8 @@ class NeckShoulderMetric extends SphinxMetricBase {
     }
   }
 
-  void _logFault(String phase, String type, String message, String voiceMessage, int priority) {
+  void _logFault(String phase, String type, String message, String voiceMessage,
+      int priority) {
     // Chỉ log 1 lỗi mỗi loại trong 1 rep
     if (!_faults.any((f) => f.phase == phase && f.type == type)) {
       _faults.add(FaultRecord(

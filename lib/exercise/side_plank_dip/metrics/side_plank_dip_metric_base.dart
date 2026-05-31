@@ -4,12 +4,12 @@ import '../../fault_record.dart';
 export '../../fault_record.dart';
 
 enum SidePlankState {
-  setupPlank,  // Tư thế plank cơ bản
-  basePlank,   // Chuẩn bị, hông cao
-  descending,  // Đang hạ hông
-  bottom,      // Đáy
-  ascending,   // Đang nâng hông
-  top          // Đỉnh điểm (Hoàn thành 1 Rep)
+  setupPlank, // Tư thế plank cơ bản
+  basePlank, // Chuẩn bị, hông cao
+  descending, // Đang hạ hông
+  bottom, // Đáy
+  ascending, // Đang nâng hông
+  top // Đỉnh điểm (Hoàn thành 1 Rep)
 }
 
 /* =========================================================================
@@ -57,5 +57,6 @@ abstract class SidePlankDipMetricBase {
   List<FaultRecord> get faults;
   Map<String, dynamic> get debugData;
   void reset();
-  void onStateTransition(SidePlankState from, SidePlankState to, int timestampMs) {}
+  void onStateTransition(
+      SidePlankState from, SidePlankState to, int timestampMs) {}
 }

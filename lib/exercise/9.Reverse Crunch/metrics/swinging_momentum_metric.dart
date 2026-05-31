@@ -3,7 +3,7 @@ import 'reverse_crunch_metric_base.dart';
 class SwingingMomentumMetric extends ReverseCrunchMetricBase {
   @override
   String get name => 'SwingingMomentum';
-  
+
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
 
@@ -16,9 +16,11 @@ class SwingingMomentumMetric extends ReverseCrunchMetricBase {
   Map<String, dynamic> get debugData => _debugData;
 
   @override
-  void onStateTransition(ReverseCrunchState from, ReverseCrunchState to, int timestampMs) {
+  void onStateTransition(
+      ReverseCrunchState from, ReverseCrunchState to, int timestampMs) {
     if (to == ReverseCrunchState.lying) {
-      _setupKneeAngle = null; // Sẽ lấy mẫu frame đầu tiên khi bắt đầu pha LYING để tránh nhiễu và drift
+      _setupKneeAngle =
+          null; // Sẽ lấy mẫu frame đầu tiên khi bắt đầu pha LYING để tránh nhiễu và drift
     }
   }
 
@@ -51,13 +53,18 @@ class SwingingMomentumMetric extends ReverseCrunchMetricBase {
 
   @override
   void evaluateRepEnd(RepContext ctx) {
-    if (_maxKneeDeviation != null && _maxKneeDeviation! > ReverseCrunchConfig.KNEE_SWING_TOLERANCE) {
+    if (_maxKneeDeviation != null &&
+        _maxKneeDeviation! > ReverseCrunchConfig.KNEE_SWING_TOLERANCE) {
       _faults.add(FaultRecord(
-        phase: 'CURLING', type: 'Swinging', message: 'Dùng đà vung chân',
-        affectsForm: true, priority: CrunchVoicePriority.momentum, 
-        voiceMessage: 'Khóa chặt góc đầu gối! Đừng búng cẳng chân để lấy đà.'
-      ));
-      ctx.resultIssues.addInstruction('lying', 'KneeLock', 'Rep trước bạn vung chân lấy đà. Giữ cẳng chân cố định!');
+          phase: 'CURLING',
+          type: 'Swinging',
+          message: 'Dùng đà vung chân',
+          affectsForm: true,
+          priority: CrunchVoicePriority.momentum,
+          voiceMessage:
+              'Khóa chặt góc đầu gối! Đừng búng cẳng chân để lấy đà.'));
+      ctx.resultIssues.addInstruction('lying', 'KneeLock',
+          'Rep trước bạn vung chân lấy đà. Giữ cẳng chân cố định!');
     }
   }
 

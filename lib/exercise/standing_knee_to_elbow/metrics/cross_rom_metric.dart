@@ -2,7 +2,8 @@ import 'standing_kte_metric_base.dart';
 import '../standing_knee_to_elbow.dart';
 
 class CrossRomMetric extends StandingKteMetricBase {
-  static const double MAX_TOUCH_DISTANCE_RATIO = 0.5; // Distance D > 50% of torso length
+  static const double MAX_TOUCH_DISTANCE_RATIO =
+      0.5; // Distance D > 50% of torso length
 
   double _minDistanceRatio = 100.0;
 
@@ -15,14 +16,15 @@ class CrossRomMetric extends StandingKteMetricBase {
       if (distanceRatio < _minDistanceRatio) {
         _minDistanceRatio = distanceRatio;
       }
-      
+
       debugData['crossRomDistanceRatio'] = distanceRatio;
       debugData['minCrossRomDistanceRatio'] = _minDistanceRatio;
     }
   }
 
   @override
-  void onStateTransition(KteState oldState, KteState newState, int timestampMs) {
+  void onStateTransition(
+      KteState oldState, KteState newState, int timestampMs) {
     if (oldState == KteState.touch && newState == KteState.returning) {
       if (_minDistanceRatio > MAX_TOUCH_DISTANCE_RATIO) {
         addFault(

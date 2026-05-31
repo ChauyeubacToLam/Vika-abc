@@ -6,7 +6,7 @@ class KneeStraightnessMetric extends LegRaiseMetricBase {
   String get name => 'KneeStraightness';
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
-  
+
   final Debouncer _faultDebouncer = Debouncer(requiredFrames: 3);
 
   @override
@@ -17,7 +17,7 @@ class KneeStraightnessMetric extends LegRaiseMetricBase {
   @override
   void update(LegRaiseRepContext ctx) {
     if (ctx.state == LegRaiseState.lying) return; // Không bắt lúc đang nằm thở
-    
+
     // Yêu cầu góc gối >= 160 độ trong suốt quá trình rep
     if (_faultDebouncer.update(ctx.kneeStraightnessAngle < 160.0)) {
       if (!_faults.any((f) => f.type == 'BentKnee')) {

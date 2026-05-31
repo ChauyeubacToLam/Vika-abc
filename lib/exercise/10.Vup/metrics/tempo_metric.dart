@@ -29,14 +29,16 @@ class TempoMetric extends VUpMetricBase {
   void evaluateRep(VUpRepContext ctx) {
     // Không được thả rơi thân người và chân
     if (loweringDuration != null && loweringDuration! < 1.0) {
-       _faults.add(FaultRecord(
-          phase: 'REP_COMPLETE',
-          type: 'Tempo',
-          message: 'Thả rơi tự do ở pha hạ (${loweringDuration!.toStringAsFixed(1)}s)',
-          voiceMessage: 'Hạ chậm lại! Việc nhả cơ chậm sẽ xây dựng cơ bụng rất tốt.',
-          affectsForm: true,
-          priority: VUpFaultPriority.tempo,
-        ));
+      _faults.add(FaultRecord(
+        phase: 'REP_COMPLETE',
+        type: 'Tempo',
+        message:
+            'Thả rơi tự do ở pha hạ (${loweringDuration!.toStringAsFixed(1)}s)',
+        voiceMessage:
+            'Hạ chậm lại! Việc nhả cơ chậm sẽ xây dựng cơ bụng rất tốt.',
+        affectsForm: true,
+        priority: VUpFaultPriority.tempo,
+      ));
     }
   }
 

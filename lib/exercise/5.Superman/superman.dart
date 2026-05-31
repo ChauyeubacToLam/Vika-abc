@@ -1,8 +1,9 @@
 // ignore_for_file: curly_braces_in_flow_control_structures
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:vika/debug/tracked_metric.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/debouncer.dart';
-import '../../pose/vika_image_orientation.dart';
+import '../../utils/exercise_logger.dart';
 import '../exercise_base.dart';
 import 'metrics/superman_metric_base.dart';
 import 'metrics/limb_elevation_metric.dart';
@@ -12,7 +13,8 @@ import 'metrics/lumbar_extension_metric.dart';
 
 class Superman extends ExerciseBase {
   @override
-  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+  Set<VikaImageOrientation> get supportedOrientations =>
+      const <VikaImageOrientation>{
         VikaImageOrientation.landscapeLeft,
         VikaImageOrientation.landscapeRight,
       };
@@ -24,7 +26,8 @@ class Superman extends ExerciseBase {
   SupermanState previousState = SupermanState.setup;
   int? _startTimeMs;
   bool _isTimeout = false;
-  double? _baselineHipY; // Biến lưu vị trí hông ban đầu để so sánh khi nâng người
+  double?
+      _baselineHipY; // Biến lưu vị trí hông ban đầu để so sánh khi nâng người
 
   final LimbElevationMetric elevationMetric = LimbElevationMetric();
   final HipGroundingMetric hipMetric = HipGroundingMetric();
@@ -32,12 +35,23 @@ class Superman extends ExerciseBase {
   final LumbarExtensionMetric lumbarMetric = LumbarExtensionMetric();
 
   late final List<SupermanMetricBase> _metrics = [
-    elevationMetric, 
-    hipMetric, 
-    holdMetric, 
+    elevationMetric,
+    hipMetric,
+    holdMetric,
     lumbarMetric
   ];
-  
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
+
   final Debouncer _liftDebouncer = Debouncer(requiredFrames: 3);
   final Debouncer _lowerDebouncer = Debouncer(requiredFrames: 3);
 
@@ -47,10 +61,14 @@ class Superman extends ExerciseBase {
   @override
   String get currentPhaseLabel {
     switch (superState) {
-      case SupermanState.setup: return 'Nằm sấp';
-      case SupermanState.lifting: return 'Nâng lên';
-      case SupermanState.hold: return 'Giữ';
-      case SupermanState.lowering: return 'Hạ xuống';
+      case SupermanState.setup:
+        return 'Nằm sấp';
+      case SupermanState.lifting:
+        return 'Nâng lên';
+      case SupermanState.hold:
+        return 'Giữ';
+      case SupermanState.lowering:
+        return 'Hạ xuống';
     }
   }
 
@@ -62,25 +80,26 @@ class Superman extends ExerciseBase {
   }
 
   // Ràng buộc BẮT BUỘC nằm sấp (Prone)
-  bool _isProne(Map<PoseLandmarkType, PoseLandmark> landmarks, double scaleFactor) {
+  bool _isProne(
+      Map<PoseLandmarkType, PoseLandmark> landmarks, double scaleFactor) {
     final nose = landmarks[PoseLandmarkType.nose];
     final leftEar = landmarks[PoseLandmarkType.leftEar];
     final rightEar = landmarks[PoseLandmarkType.rightEar];
-    
+
     PoseLandmark? ear;
     if (leftEar != null && rightEar != null) {
       ear = leftEar.likelihood > rightEar.likelihood ? leftEar : rightEar;
     } else {
       ear = leftEar ?? rightEar;
     }
-    
+
     if (nose != null && ear != null && scaleFactor > 0) {
-      // Trục Y hướng xuống. 
+      // Trục Y hướng xuống.
       // Nằm sấp: Mũi úp xuống đất (Y lớn) hoặc ngang tai (nếu ngẩng đầu nhìn tới).
       // Nằm ngửa: Mũi chỉ lên trần (Y nhỏ), tai gần đất (Y lớn).
       double faceVerticalDiff = (nose.y - ear.y) / scaleFactor;
       // Nằm ngửa thì mũi cao hơn tai rất nhiều (faceVerticalDiff âm lớn)
-      if (faceVerticalDiff < -0.2) return false; 
+      if (faceVerticalDiff < -0.2) return false;
     }
 
     // Kiểm tra bằng hướng của bàn chân (nếu nhìn thấy)
@@ -92,8 +111,12 @@ class Superman extends ExerciseBase {
     PoseLandmark? heel;
     PoseLandmark? footIndex;
 
-    if (leftHeel != null && leftFootIndex != null && rightHeel != null && rightFootIndex != null) {
-      if (leftHeel.likelihood + leftFootIndex.likelihood > rightHeel.likelihood + rightFootIndex.likelihood) {
+    if (leftHeel != null &&
+        leftFootIndex != null &&
+        rightHeel != null &&
+        rightFootIndex != null) {
+      if (leftHeel.likelihood + leftFootIndex.likelihood >
+          rightHeel.likelihood + rightFootIndex.likelihood) {
         heel = leftHeel;
         footIndex = leftFootIndex;
       } else {
@@ -105,7 +128,11 @@ class Superman extends ExerciseBase {
       footIndex = leftFootIndex ?? rightFootIndex;
     }
 
-    if (heel != null && footIndex != null && scaleFactor > 0 && heel.likelihood > 0.3 && footIndex.likelihood > 0.3) {
+    if (heel != null &&
+        footIndex != null &&
+        scaleFactor > 0 &&
+        heel.likelihood > 0.3 &&
+        footIndex.likelihood > 0.3) {
       // Nằm ngửa (supine): ngón chân (footIndex) hướng lên trần nhà (Y nhỏ hơn gót chân)
       // Nằm sấp (prone): ngón chân úp xuống sàn (Y lớn hơn hoặc bằng gót chân)
       double footVerticalDiff = (heel.y - footIndex.y) / scaleFactor;
@@ -113,16 +140,18 @@ class Superman extends ExerciseBase {
       if (footVerticalDiff > 0.15) return false;
     }
 
-    return true; 
+    return true;
   }
 
   // Chống gian lận: Nằm nghiêng
-  bool _isNotOnSide(Map<PoseLandmarkType, PoseLandmark> landmarks, double scaleFactor) {
+  bool _isNotOnSide(
+      Map<PoseLandmarkType, PoseLandmark> landmarks, double scaleFactor) {
     final leftShoulder = landmarks[PoseLandmarkType.leftShoulder];
     final rightShoulder = landmarks[PoseLandmarkType.rightShoulder];
-    
+
     if (leftShoulder != null && rightShoulder != null && scaleFactor > 0) {
-      double shoulderDiffY = (leftShoulder.y - rightShoulder.y).abs() / scaleFactor;
+      double shoulderDiffY =
+          (leftShoulder.y - rightShoulder.y).abs() / scaleFactor;
       // Nằm nghiêng thì 1 vai ở trên trần, 1 vai dưới đất -> chênh lệch Y rất lớn
       // Nằm sấp/ngửa thì 2 vai gần bằng nhau về trục Y.
       if (shoulderDiffY > 0.35) return false;
@@ -132,22 +161,25 @@ class Superman extends ExerciseBase {
 
   // Lấy độ cao THẤP NHẤT giữa bên trái và bên phải (Bắt buộc nhấc cả 2 bên)
   double _getStrictLimbElevation(
-      PoseLandmark? leftJoint, PoseLandmark? rightJoint, 
-      PoseLandmark? leftBase, PoseLandmark? rightBase, 
+      PoseLandmark? leftJoint,
+      PoseLandmark? rightJoint,
+      PoseLandmark? leftBase,
+      PoseLandmark? rightBase,
       double scaleFactor) {
-    
     List<double> elevations = [];
     // Tính khi landmark có độ tin cậy > 0.3
     if (leftJoint != null && leftBase != null && leftJoint.likelihood > 0.3) {
       elevations.add((leftBase.y - leftJoint.y) / scaleFactor);
     }
-    if (rightJoint != null && rightBase != null && rightJoint.likelihood > 0.3) {
+    if (rightJoint != null &&
+        rightBase != null &&
+        rightJoint.likelihood > 0.3) {
       elevations.add((rightBase.y - rightJoint.y) / scaleFactor);
     }
-    
+
     if (elevations.isEmpty) return 0.0;
     // Trả về mức nâng thấp nhất để ép người dùng phải nhấc cả hai bên
-    return elevations.reduce((a, b) => a < b ? a : b); 
+    return elevations.reduce((a, b) => a < b ? a : b);
   }
 
   @override
@@ -159,23 +191,25 @@ class Superman extends ExerciseBase {
     if (torso == 0) return false;
 
     // Chặn trường hợp nằm ngửa gập bụng hoặc nằm nghiêng
-    if (!_isProne(landmarks, torso) || !_isNotOnSide(landmarks, torso)) return false;
+    if (!_isProne(landmarks, torso) || !_isNotOnSide(landmarks, torso))
+      return false;
 
     final shoulderHipDiff = (lm['shoulder']!.y - lm['hip']!.y).abs();
-    
+
     bool isHorizontal = torso > 0 && shoulderHipDiff / torso < 0.25;
-    
+
     // Lưu lại vị trí hông lúc thả lỏng làm mốc
     if (isHorizontal) {
       _baselineHipY = lm['hip']!.y;
     }
-    
+
     return isHorizontal;
   }
 
   @override
   bool requestStop() {
-    if (_startTimeMs != null && (frameTimestampMs - _startTimeMs!) > SupermanConfig.MAX_DURATION_MS) {
+    if (_startTimeMs != null &&
+        (frameTimestampMs - _startTimeMs!) > SupermanConfig.MAX_DURATION_MS) {
       _isTimeout = true;
       return true;
     }
@@ -186,7 +220,7 @@ class Superman extends ExerciseBase {
   void checkingPose(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     _startTimeMs ??= frameTimestampMs;
     final now = frameTimestampMs;
-    
+
     final lm = _getLandmarks(landmarks);
     if (lm == null) return;
 
@@ -194,35 +228,39 @@ class Superman extends ExerciseBase {
     if (scaleFactor == 0) scaleFactor = 1;
 
     // CHỐNG GIAN LẬN: Xử lý ngay trong lúc tập nếu người dùng lật ngửa hoặc nằm nghiêng
-    if (!_isProne(landmarks, scaleFactor) || !_isNotOnSide(landmarks, scaleFactor)) {
+    if (!_isProne(landmarks, scaleFactor) ||
+        !_isNotOnSide(landmarks, scaleFactor)) {
       if (superState != SupermanState.setup) {
         _transition(SupermanState.setup, now);
         for (final m in _metrics) m.reset(); // Reset số liệu của rep lỗi này
       }
-      return; 
+      return;
     }
 
     // Tính toán khắt khe: Bắt buộc nhấc cả 2 tay và 2 chân
     final armElevation = _getStrictLimbElevation(
-      landmarks[PoseLandmarkType.leftWrist], landmarks[PoseLandmarkType.rightWrist],
-      landmarks[PoseLandmarkType.leftShoulder], landmarks[PoseLandmarkType.rightShoulder],
-      scaleFactor
-    );
+        landmarks[PoseLandmarkType.leftWrist],
+        landmarks[PoseLandmarkType.rightWrist],
+        landmarks[PoseLandmarkType.leftShoulder],
+        landmarks[PoseLandmarkType.rightShoulder],
+        scaleFactor);
 
     final legElevation = _getStrictLimbElevation(
-      landmarks[PoseLandmarkType.leftAnkle], landmarks[PoseLandmarkType.rightAnkle],
-      landmarks[PoseLandmarkType.leftHip], landmarks[PoseLandmarkType.rightHip],
-      scaleFactor
-    );
+        landmarks[PoseLandmarkType.leftAnkle],
+        landmarks[PoseLandmarkType.rightAnkle],
+        landmarks[PoseLandmarkType.leftHip],
+        landmarks[PoseLandmarkType.rightHip],
+        scaleFactor);
 
     // Tính toán độ nâng hông (Chống hít đất/plank)
     double hipElevation = 0.0;
     if (_baselineHipY != null) {
       hipElevation = (_baselineHipY! - lm['hip']!.y) / scaleFactor;
-      if (hipElevation < 0) hipElevation = 0.0; 
+      if (hipElevation < 0) hipElevation = 0.0;
     }
 
-    final spineAngle = calculateHorizontalAngle(point1: lm['shoulder']!, point2: lm['hip']!);
+    final spineAngle =
+        calculateHorizontalAngle(point1: lm['shoulder']!, point2: lm['hip']!);
 
     debugData['arm_elev'] = armElevation.toStringAsFixed(3);
     debugData['leg_elev'] = legElevation.toStringAsFixed(3);
@@ -232,7 +270,7 @@ class Superman extends ExerciseBase {
     final ctx = SupermanRepContext(
       armElevation: armElevation,
       legElevation: legElevation,
-      hipElevation: hipElevation, 
+      hipElevation: hipElevation,
       spineAngle: spineAngle,
       scaleFactor: scaleFactor,
       currentState: superState,
@@ -250,18 +288,20 @@ class Superman extends ExerciseBase {
 
   void _updateStateMachine(SupermanRepContext ctx) {
     bool isLifted = ctx.armElevation > SupermanConfig.LIFT_THRESHOLD &&
-                    ctx.legElevation > SupermanConfig.LIFT_THRESHOLD;
+        ctx.legElevation > SupermanConfig.LIFT_THRESHOLD;
     bool isLowered = ctx.armElevation <= 0 && ctx.legElevation <= 0;
 
     switch (superState) {
       case SupermanState.setup:
-        if (_liftDebouncer.update(isLifted)) _transition(SupermanState.lifting, ctx.frameTimestampMs);
+        if (_liftDebouncer.update(isLifted))
+          _transition(SupermanState.lifting, ctx.frameTimestampMs);
         break;
       case SupermanState.lifting:
         if (isLifted) _transition(SupermanState.hold, ctx.frameTimestampMs);
         break;
       case SupermanState.hold:
-        if (_lowerDebouncer.update(!isLifted)) _transition(SupermanState.lowering, ctx.frameTimestampMs);
+        if (_lowerDebouncer.update(!isLifted))
+          _transition(SupermanState.lowering, ctx.frameTimestampMs);
         break;
       case SupermanState.lowering:
         if (isLowered) _completeRep(ctx);
@@ -284,27 +324,47 @@ class Superman extends ExerciseBase {
     for (final m in _metrics) faults.addAll(m.faults);
     correctForm = !faults.any((f) => f.affectsForm);
 
+    if (!correctForm) resultIssues.feedback['Result'] = 'Fix Form';
+
+    logger.addRepLog(RepLog(
+      correctForm: correctForm,
+      repNumber: repCount,
+      data: {
+        'hold_time': holdMetric.lastHoldDurationMs / 1000.0,
+        'fault_types': faults.map((e) => e.type).toSet().toList(),
+      },
+    ));
+
     _transition(SupermanState.setup, ctx.frameTimestampMs);
     for (final m in _metrics) m.resetAndCountFault();
+    correctForm = true;
   }
 
   @override
   void onSetComplete() {
+    logger.pushKey("max_rep", SupermanConfig.MAX_REP);
     logger.pushKey("timeout", _isTimeout);
     logger.pushKey("elevation_fails", elevationMetric.faultsCount);
     logger.pushKey("hip_fails", hipMetric.faultsCount);
     logger.pushKey("hold_fails", holdMetric.faultsCount);
-    logger.pushKey("lumbar_fails", lumbarMetric.faultsCount); 
+    logger.pushKey("lumbar_fails", lumbarMetric.faultsCount);
     logger.pushGoodRepCount();
   }
 
-  Map<String, PoseLandmark>? _getLandmarks(Map<PoseLandmarkType, PoseLandmark> lm) {
-    final shoulder = lm[PoseLandmarkType.leftShoulder] ?? lm[PoseLandmarkType.rightShoulder];
-    final hip      = lm[PoseLandmarkType.leftHip]      ?? lm[PoseLandmarkType.rightHip];
-    final wrist    = lm[PoseLandmarkType.leftWrist]    ?? lm[PoseLandmarkType.rightWrist];
-    final ankle    = lm[PoseLandmarkType.leftAnkle]    ?? lm[PoseLandmarkType.rightAnkle];
+  Map<String, PoseLandmark>? _getLandmarks(
+      Map<PoseLandmarkType, PoseLandmark> lm) {
+    final shoulder =
+        lm[PoseLandmarkType.leftShoulder] ?? lm[PoseLandmarkType.rightShoulder];
+    final hip = lm[PoseLandmarkType.leftHip] ?? lm[PoseLandmarkType.rightHip];
+    final wrist =
+        lm[PoseLandmarkType.leftWrist] ?? lm[PoseLandmarkType.rightWrist];
+    final ankle =
+        lm[PoseLandmarkType.leftAnkle] ?? lm[PoseLandmarkType.rightAnkle];
 
-    if (shoulder == null || hip == null || wrist == null || ankle == null) return null;
+    if (shoulder == null || hip == null || wrist == null || ankle == null)
+      return null;
+    if (![shoulder, hip, wrist, ankle].every(ExerciseBase.isLandmarkConfident))
+      return null;
     return {'shoulder': shoulder, 'hip': hip, 'wrist': wrist, 'ankle': ankle};
   }
 }

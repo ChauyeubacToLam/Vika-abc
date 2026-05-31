@@ -32,14 +32,18 @@ class WalkingLungeReportBuilder extends ExerciseReportBuilder {
     int kneeFails = 0;
     int torsoFails = 0;
     for (final logger in setLoggers) {
-      stepFails += (logger.setLogs['step_consistency_fails'] as num?)?.toInt() ?? 0;
+      stepFails +=
+          (logger.setLogs['step_consistency_fails'] as num?)?.toInt() ?? 0;
       kneeFails += (logger.setLogs['front_knee_fails'] as num?)?.toInt() ?? 0;
       torsoFails += (logger.setLogs['torso_lean_fails'] as num?)?.toInt() ?? 0;
     }
 
-    final strideScore = ((totalReps - stepFails) / totalReps * 100).roundToDouble();
-    final kneeScore = ((totalReps - kneeFails) / totalReps * 100).roundToDouble();
-    final torsoScore = ((totalReps - torsoFails) / totalReps * 100).roundToDouble();
+    final strideScore =
+        ((totalReps - stepFails) / totalReps * 100).roundToDouble();
+    final kneeScore =
+        ((totalReps - kneeFails) / totalReps * 100).roundToDouble();
+    final torsoScore =
+        ((totalReps - torsoFails) / totalReps * 100).roundToDouble();
 
     return [
       DetailCard(

@@ -11,9 +11,12 @@ class HighPlankReportBuilder extends ExerciseReportBuilder {
 
   @override
   Map<String, String> faultToTipMap() => {
-        'sagging_fails_count': 'Lỗi võng lưng rất nguy hiểm. Hãy tưởng tượng bạn đang rút rốn về phía cột sống.',
-        'piked_fails_count': 'Chổng mông làm bài tập trở nên quá dễ và mất tác dụng vào cơ Core.',
-        'elbow_fails_count': 'Đừng gập tay, xương cánh tay thẳng đứng sẽ giúp khóa khớp và tiết kiệm sức.',
+        'sagging_fails_count':
+            'Lỗi võng lưng rất nguy hiểm. Hãy tưởng tượng bạn đang rút rốn về phía cột sống.',
+        'piked_fails_count':
+            'Chổng mông làm bài tập trở nên quá dễ và mất tác dụng vào cơ Core.',
+        'elbow_fails_count':
+            'Đừng gập tay, xương cánh tay thẳng đứng sẽ giúp khóa khớp và tiết kiệm sức.',
       };
 
   @override
@@ -29,22 +32,33 @@ class HighPlankReportBuilder extends ExerciseReportBuilder {
       };
 
   @override
-  DetectedEvidence? detectIssue(List<ExerciseLogger> setLoggers) { return null; }
+  DetectedEvidence? detectIssue(List<ExerciseLogger> setLoggers) {
+    return null;
+  }
 
   @override
   List<DetailCard> buildDetailCards(List<ExerciseLogger> setLoggers) {
     if (setLoggers.isEmpty) return [];
 
     // Tính tổng thời gian perfect hold
-    int totalPerfectTimeMs = setLoggers.map((l) => l.setLogs['total_perfect_time_ms'] as int? ?? 0).reduce((a, b) => a + b);
+    int totalPerfectTimeMs = setLoggers
+        .map((l) => l.setLogs['total_perfect_time_ms'] as int? ?? 0)
+        .reduce((a, b) => a + b);
     double perfectSeconds = totalPerfectTimeMs / 1000.0;
-    
+
     // Tính Sagging Penalty (Số lần trigger lỗi võng lưng / giả định 1 lỗi làm mất 2s đánh giá)
-    int sagFails = setLoggers.map((l) => l.setLogs['sagging_fails_count'] as int? ?? 0).reduce((a, b) => a + b);
-    
+    int sagFails = setLoggers
+        .map((l) => l.setLogs['sagging_fails_count'] as int? ?? 0)
+        .reduce((a, b) => a + b);
+
     // Độ ổn định Hông: Càng ít lỗi chổng/võng thì điểm càng cao
-    int totalFails = sagFails + setLoggers.map((l) => l.setLogs['piked_fails_count'] as int? ?? 0).reduce((a, b) => a + b);
-    double stabilityScore = totalFails == 0 ? 100 : (100 - (totalFails * 5)).clamp(0, 100).toDouble();
+    int totalFails = sagFails +
+        setLoggers
+            .map((l) => l.setLogs['piked_fails_count'] as int? ?? 0)
+            .reduce((a, b) => a + b);
+    double stabilityScore = totalFails == 0
+        ? 100
+        : (100 - (totalFails * 5)).clamp(0, 100).toDouble();
 
     return [
       DetailCard(

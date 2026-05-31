@@ -5,16 +5,22 @@ import 'package:vika/utils/exercise_logger.dart';
 class PlankShoulderTapReportBuilder extends ExerciseReportBuilder {
   @override
   Map<String, List<String>> painToFaultMap() => {
-        'lower_back': ['rotation_fails', 'alignment_fails'], // Vặn hông/Võng lưng dồn áp lực đĩa đệm
+        'lower_back': [
+          'rotation_fails',
+          'alignment_fails'
+        ], // Vặn hông/Võng lưng dồn áp lực đĩa đệm
         'wrist': ['tempo_fails'], // Tập quá nhanh/giật cục đập cổ tay xuống sàn
         'shoulder': ['rotation_fails'],
       };
 
   @override
   Map<String, String> faultToTipMap() => {
-        'rotation_fails': 'Mở rộng hai chân hơn vai để tăng chân đế (Base of support). Siết chặt bụng, không để hông lắc lư khi nhấc tay.',
-        'alignment_fails': 'Không chổng mông hay võng lưng. Cơ thể phải là một đường thẳng căng cứng.',
-        'tap_fails': 'Chạm tay dứt khoát lên vai đối diện để kiểm soát trọng tâm tốt hơn.',
+        'rotation_fails':
+            'Mở rộng hai chân hơn vai để tăng chân đế (Base of support). Siết chặt bụng, không để hông lắc lư khi nhấc tay.',
+        'alignment_fails':
+            'Không chổng mông hay võng lưng. Cơ thể phải là một đường thẳng căng cứng.',
+        'tap_fails':
+            'Chạm tay dứt khoát lên vai đối diện để kiểm soát trọng tâm tốt hơn.',
       };
 
   @override
@@ -33,20 +39,29 @@ class PlankShoulderTapReportBuilder extends ExerciseReportBuilder {
   List<DetailCard> buildDetailCards(List<ExerciseLogger> setLoggers) {
     final allReps = setLoggers.expand((l) => l.repLogs).toList();
     final totalReps = allReps.length;
-    
+
     if (totalReps == 0) return [];
 
     // Điểm Chống Xoay (Anti-Rotation Score)
-    int totalRotFails = setLoggers.fold(0, (sum, log) => sum + (log.setLogs['rotation_fails'] as int? ?? 0));
-    double rotScore = ((totalReps - totalRotFails) / totalReps * 100).clamp(0, 100).roundToDouble();
+    int totalRotFails = setLoggers.fold(
+        0, (sum, log) => sum + (log.setLogs['rotation_fails'] as int? ?? 0));
+    double rotScore = ((totalReps - totalRotFails) / totalReps * 100)
+        .clamp(0, 100)
+        .roundToDouble();
 
     // Điểm Ổn định cốt lõi (Core Alignment)
-    int totalAlignFails = setLoggers.fold(0, (sum, log) => sum + (log.setLogs['alignment_fails'] as int? ?? 0));
-    double alignScore = ((totalReps - totalAlignFails) / totalReps * 100).clamp(0, 100).roundToDouble();
+    int totalAlignFails = setLoggers.fold(
+        0, (sum, log) => sum + (log.setLogs['alignment_fails'] as int? ?? 0));
+    double alignScore = ((totalReps - totalAlignFails) / totalReps * 100)
+        .clamp(0, 100)
+        .roundToDouble();
 
     // Tỷ lệ chạm vai hoàn hảo (Clear Tap Rate)
-    int totalTapFails = setLoggers.fold(0, (sum, log) => sum + (log.setLogs['tap_fails'] as int? ?? 0));
-    double tapScore = ((totalReps - totalTapFails) / totalReps * 100).clamp(0, 100).roundToDouble();
+    int totalTapFails = setLoggers.fold(
+        0, (sum, log) => sum + (log.setLogs['tap_fails'] as int? ?? 0));
+    double tapScore = ((totalReps - totalTapFails) / totalReps * 100)
+        .clamp(0, 100)
+        .roundToDouble();
 
     return [
       DetailCard(
@@ -75,7 +90,7 @@ class PlankShoulderTapReportBuilder extends ExerciseReportBuilder {
       ),
     ];
   }
-  
+
   @override
   DetectedEvidence? detectIssue(List<ExerciseLogger> setLoggers) {
     return null;

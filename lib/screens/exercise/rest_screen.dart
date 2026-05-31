@@ -76,8 +76,7 @@ class RestScreen extends StatefulWidget {
   State<RestScreen> createState() => _RestScreenState();
 }
 
-class _RestScreenState extends State<RestScreen>
-    with TickerProviderStateMixin {
+class _RestScreenState extends State<RestScreen> with TickerProviderStateMixin {
   Timer? _timer;
   String? _selectedDifficulty;
   bool _showFaults = false;
@@ -246,9 +245,8 @@ class _RestScreenState extends State<RestScreen>
                     padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
                     child: ConstrainedBox(
                       constraints: BoxConstraints(
-                        minHeight: math
-                            .max(0, constraints.maxHeight - 32)
-                            .toDouble(),
+                        minHeight:
+                            math.max(0, constraints.maxHeight - 32).toDouble(),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -273,8 +271,7 @@ class _RestScreenState extends State<RestScreen>
                                   goodReps: widget.setReport.goodReps,
                                   totalReps: widget.setReport.totalReps,
                                 ),
-                                if (widget
-                                    .setReport.repResults.isNotEmpty) ...[
+                                if (widget.setReport.repResults.isNotEmpty) ...[
                                   const SizedBox(height: 16),
                                   Wrap(
                                     alignment: WrapAlignment.center,
@@ -283,8 +280,8 @@ class _RestScreenState extends State<RestScreen>
                                     children: [
                                       for (var i = 0;
                                           i <
-                                              widget.setReport.repResults
-                                                  .length;
+                                              widget
+                                                  .setReport.repResults.length;
                                           i++)
                                         _RepResultDot(
                                           isGood:
@@ -323,13 +320,12 @@ class _RestScreenState extends State<RestScreen>
                                         () => _showFaults = !_showFaults),
                                   ),
                                   AnimatedSize(
-                                    duration:
-                                        const Duration(milliseconds: 240),
+                                    duration: const Duration(milliseconds: 240),
                                     curve: Curves.easeOutCubic,
                                     child: _showFaults
                                         ? Padding(
-                                            padding: const EdgeInsets.only(
-                                                top: 10),
+                                            padding:
+                                                const EdgeInsets.only(top: 10),
                                             child: ConstrainedBox(
                                               constraints: const BoxConstraints(
                                                 maxWidth: 340,

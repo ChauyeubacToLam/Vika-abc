@@ -1,10 +1,10 @@
 // ignore_for_file: curly_braces_in_flow_control_structures
 
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:vika/debug/tracked_metric.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/debouncer.dart';
 import '../../utils/exercise_logger.dart';
-import '../../pose/vika_image_orientation.dart';
 import '../exercise_base.dart';
 import 'metrics/plank_up_down_metric_base.dart';
 import 'metrics/trunk_alignment_metric.dart';
@@ -14,7 +14,8 @@ import 'metrics/alternating_lead_arm_metric.dart';
 
 class PlankUpDown extends ExerciseBase {
   @override
-  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+  Set<VikaImageOrientation> get supportedOrientations =>
+      const <VikaImageOrientation>{
         VikaImageOrientation.landscapeLeft,
         VikaImageOrientation.landscapeRight,
       };
@@ -22,7 +23,7 @@ class PlankUpDown extends ExerciseBase {
   final int maxRep;
   PlankState plankState = PlankState.forearm_plank;
   PlankState previousPlankState = PlankState.forearm_plank;
-  
+
   int? _exerciseStartTimeMs;
   bool _isTimeout = false;
 
@@ -40,6 +41,17 @@ class PlankUpDown extends ExerciseBase {
     armExtensionMetric,
     leadArmMetric,
   ];
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
 
   // Debouncers cho State Machine
   final Debouncer _pushingDebouncer = Debouncer(requiredFrames: 2);
@@ -58,10 +70,14 @@ class PlankUpDown extends ExerciseBase {
   @override
   String get currentPhaseLabel {
     switch (plankState) {
-      case PlankState.forearm_plank: return 'Forearm Plank';
-      case PlankState.pushing_up: return 'Đẩy lên...';
-      case PlankState.high_plank: return 'High Plank';
-      case PlankState.lowering: return 'Hạ xuống...';
+      case PlankState.forearm_plank:
+        return 'Forearm Plank';
+      case PlankState.pushing_up:
+        return 'Đẩy lên...';
+      case PlankState.high_plank:
+        return 'High Plank';
+      case PlankState.lowering:
+        return 'Hạ xuống...';
     }
   }
 
@@ -91,26 +107,50 @@ class PlankUpDown extends ExerciseBase {
     final rElbow = landmarks[PoseLandmarkType.rightElbow];
     final rWrist = landmarks[PoseLandmarkType.rightWrist];
 
-    bool leftValid = lShoulder != null && lHip != null && lKnee != null && lAnkle != null && lElbow != null && lWrist != null;
-    bool rightValid = rShoulder != null && rHip != null && rKnee != null && rAnkle != null && rElbow != null && rWrist != null;
+    bool leftValid = lShoulder != null &&
+        lHip != null &&
+        lKnee != null &&
+        lAnkle != null &&
+        lElbow != null &&
+        lWrist != null &&
+        [lShoulder, lHip, lKnee, lAnkle, lElbow, lWrist]
+            .every(ExerciseBase.isLandmarkConfident);
+    bool rightValid = rShoulder != null &&
+        rHip != null &&
+        rKnee != null &&
+        rAnkle != null &&
+        rElbow != null &&
+        rWrist != null &&
+        [rShoulder, rHip, rKnee, rAnkle, rElbow, rWrist]
+            .every(ExerciseBase.isLandmarkConfident);
 
     if (!leftValid && !rightValid) return false;
 
-    bool useLeft = leftValid && (!rightValid || (lHip.likelihood >= rHip.likelihood));
+    bool useLeft =
+        leftValid && (!rightValid || (lHip.likelihood >= rHip.likelihood));
 
     final shoulder = (useLeft ? lShoulder : rShoulder)!;
     final hip = (useLeft ? lHip : rHip)!;
     final ankle = (useLeft ? lAnkle : rAnkle)!;
 
-    final bodyAngle = calculateAngleNormalized(firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
+    final bodyAngle = calculateAngleNormalized(
+        firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
 
     final leftElbowAngle = leftValid
-        ? calculateAngleNormalized(firstPoint: lShoulder, midPoint: lElbow, lastPoint: lWrist)
-        : (rightValid ? calculateAngleNormalized(firstPoint: rShoulder, midPoint: rElbow, lastPoint: rWrist) : 90.0);
+        ? calculateAngleNormalized(
+            firstPoint: lShoulder, midPoint: lElbow, lastPoint: lWrist)
+        : (rightValid
+            ? calculateAngleNormalized(
+                firstPoint: rShoulder, midPoint: rElbow, lastPoint: rWrist)
+            : 90.0);
 
     final rightElbowAngle = rightValid
-        ? calculateAngleNormalized(firstPoint: rShoulder, midPoint: rElbow, lastPoint: rWrist)
-        : (leftValid ? calculateAngleNormalized(firstPoint: lShoulder, midPoint: lElbow, lastPoint: lWrist) : 90.0);
+        ? calculateAngleNormalized(
+            firstPoint: rShoulder, midPoint: rElbow, lastPoint: rWrist)
+        : (leftValid
+            ? calculateAngleNormalized(
+                firstPoint: lShoulder, midPoint: lElbow, lastPoint: lWrist)
+            : 90.0);
 
     // Cả 2 góc cùi chỏ phải đang ở tư thế gập cẳng tay (forearm plank)
     return bodyAngle >= PlankConfig.BODY_ALIGNMENT_START_MIN &&
@@ -144,13 +184,28 @@ class PlankUpDown extends ExerciseBase {
     final rElbow = smoothedLandmarks[PoseLandmarkType.rightElbow];
     final rWrist = smoothedLandmarks[PoseLandmarkType.rightWrist];
 
-    bool leftValid = lShoulder != null && lHip != null && lKnee != null && lAnkle != null && lElbow != null && lWrist != null;
-    bool rightValid = rShoulder != null && rHip != null && rKnee != null && rAnkle != null && rElbow != null && rWrist != null;
+    bool leftValid = lShoulder != null &&
+        lHip != null &&
+        lKnee != null &&
+        lAnkle != null &&
+        lElbow != null &&
+        lWrist != null &&
+        [lShoulder, lHip, lKnee, lAnkle, lElbow, lWrist]
+            .every(ExerciseBase.isLandmarkConfident);
+    bool rightValid = rShoulder != null &&
+        rHip != null &&
+        rKnee != null &&
+        rAnkle != null &&
+        rElbow != null &&
+        rWrist != null &&
+        [rShoulder, rHip, rKnee, rAnkle, rElbow, rWrist]
+            .every(ExerciseBase.isLandmarkConfident);
 
     if (!leftValid && !rightValid) return; // early return to prevent null crash
 
     // Choose primary side based on likelihood of hip
-    bool useLeft = leftValid && (!rightValid || (lHip.likelihood >= rHip.likelihood));
+    bool useLeft =
+        leftValid && (!rightValid || (lHip.likelihood >= rHip.likelihood));
 
     final shoulder = (useLeft ? lShoulder : rShoulder)!;
     final hip = (useLeft ? lHip : rHip)!;
@@ -158,16 +213,26 @@ class PlankUpDown extends ExerciseBase {
     final ankle = (useLeft ? lAnkle : rAnkle)!;
 
     scaleFactor = calculateDistance(shoulder, hip);
-    final bodyAngle = calculateAngleNormalized(firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
-    final kneeAngle = calculateAngleNormalized(firstPoint: hip, midPoint: knee, lastPoint: ankle);
+    final bodyAngle = calculateAngleNormalized(
+        firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
+    final kneeAngle = calculateAngleNormalized(
+        firstPoint: hip, midPoint: knee, lastPoint: ankle);
 
     final leftElbowAngle = leftValid
-        ? calculateAngleNormalized(firstPoint: lShoulder, midPoint: lElbow, lastPoint: lWrist)
-        : (rightValid ? calculateAngleNormalized(firstPoint: rShoulder, midPoint: rElbow, lastPoint: rWrist) : 90.0);
+        ? calculateAngleNormalized(
+            firstPoint: lShoulder, midPoint: lElbow, lastPoint: lWrist)
+        : (rightValid
+            ? calculateAngleNormalized(
+                firstPoint: rShoulder, midPoint: rElbow, lastPoint: rWrist)
+            : 90.0);
 
     final rightElbowAngle = rightValid
-        ? calculateAngleNormalized(firstPoint: rShoulder, midPoint: rElbow, lastPoint: rWrist)
-        : (leftValid ? calculateAngleNormalized(firstPoint: lShoulder, midPoint: lElbow, lastPoint: lWrist) : 90.0);
+        ? calculateAngleNormalized(
+            firstPoint: rShoulder, midPoint: rElbow, lastPoint: rWrist)
+        : (leftValid
+            ? calculateAngleNormalized(
+                firstPoint: lShoulder, midPoint: lElbow, lastPoint: lWrist)
+            : 90.0);
 
     // GHI LOG TELEMETRY
     _telemetryLog.add({
@@ -179,9 +244,12 @@ class PlankUpDown extends ExerciseBase {
       'rightElbowAngle': double.parse(rightElbowAngle.toStringAsFixed(1)),
       'kneeAngle': double.parse(kneeAngle.toStringAsFixed(1)),
       'hipY': double.parse(hip.y.toStringAsFixed(1)),
-      'visibility': (useLeft ? [lShoulder, lHip, lKnee, lAnkle, lElbow, lWrist] : [rShoulder, rHip, rKnee, rAnkle, rElbow, rWrist])
-          .map((l) => l!.likelihood)
-          .reduce((a, b) => a + b) / 6, // Avg confidence
+      'visibility': (useLeft
+                  ? [lShoulder, lHip, lKnee, lAnkle, lElbow, lWrist]
+                  : [rShoulder, rHip, rKnee, rAnkle, rElbow, rWrist])
+              .map((l) => l!.likelihood)
+              .reduce((a, b) => a + b) /
+          6, // Avg confidence
     });
 
     final ctx = PlankRepContext(
@@ -203,7 +271,9 @@ class PlankUpDown extends ExerciseBase {
     debugData['Knee_Angle'] = kneeAngle.toStringAsFixed(1);
     debugData['Left_Elbow'] = leftElbowAngle.toStringAsFixed(1);
     debugData['Right_Elbow'] = rightElbowAngle.toStringAsFixed(1);
-    debugData['Time_Left'] = ((PlankConfig.MAX_DURATION_MS - (now - _exerciseStartTimeMs!)) / 1000).toStringAsFixed(1);
+    debugData['Time_Left'] =
+        ((PlankConfig.MAX_DURATION_MS - (now - _exerciseStartTimeMs!)) / 1000)
+            .toStringAsFixed(1);
 
     _updateStateMachine(leftElbowAngle, rightElbowAngle, kneeAngle, now);
 
@@ -214,7 +284,8 @@ class PlankUpDown extends ExerciseBase {
     }
   }
 
-  void _updateStateMachine(double leftElbowAngle, double rightElbowAngle, double kneeAngle, int now) {
+  void _updateStateMachine(double leftElbowAngle, double rightElbowAngle,
+      double kneeAngle, int now) {
     if (kneeAngle < PlankConfig.KNEE_EXTENSION_MIN) {
       resultIssues.feedback['Knee'] = 'Thẳng đầu gối ra!';
       return; // Dừng State Machine, không đếm rep nếu gối bị co
@@ -224,22 +295,30 @@ class PlankUpDown extends ExerciseBase {
 
     switch (plankState) {
       case PlankState.forearm_plank:
-        if (_pushingDebouncer.update(leftElbowAngle > PlankConfig.ELBOW_PUSHING_THRESHOLD || rightElbowAngle > PlankConfig.ELBOW_PUSHING_THRESHOLD)) {
+        if (_pushingDebouncer.update(
+            leftElbowAngle > PlankConfig.ELBOW_PUSHING_THRESHOLD ||
+                rightElbowAngle > PlankConfig.ELBOW_PUSHING_THRESHOLD)) {
           _transitionState(PlankState.pushing_up, now);
         }
         break;
       case PlankState.pushing_up:
-        if (_highPlankDebouncer.update(leftElbowAngle > PlankConfig.ELBOW_HIGH_PLANK_MIN && rightElbowAngle > PlankConfig.ELBOW_HIGH_PLANK_MIN)) {
+        if (_highPlankDebouncer.update(
+            leftElbowAngle > PlankConfig.ELBOW_HIGH_PLANK_MIN &&
+                rightElbowAngle > PlankConfig.ELBOW_HIGH_PLANK_MIN)) {
           _transitionState(PlankState.high_plank, now);
         }
         break;
       case PlankState.high_plank:
-        if (_loweringDebouncer.update(leftElbowAngle < PlankConfig.ELBOW_LOWERING_THRESHOLD || rightElbowAngle < PlankConfig.ELBOW_LOWERING_THRESHOLD)) {
+        if (_loweringDebouncer.update(
+            leftElbowAngle < PlankConfig.ELBOW_LOWERING_THRESHOLD ||
+                rightElbowAngle < PlankConfig.ELBOW_LOWERING_THRESHOLD)) {
           _transitionState(PlankState.lowering, now);
         }
         break;
       case PlankState.lowering:
-        if (_forearmDebouncer.update(leftElbowAngle < PlankConfig.ELBOW_FOREARM_MAX && rightElbowAngle < PlankConfig.ELBOW_FOREARM_MAX)) {
+        if (_forearmDebouncer.update(
+            leftElbowAngle < PlankConfig.ELBOW_FOREARM_MAX &&
+                rightElbowAngle < PlankConfig.ELBOW_FOREARM_MAX)) {
           _transitionState(PlankState.forearm_plank, now);
           _completeRep();
         }
@@ -259,12 +338,12 @@ class PlankUpDown extends ExerciseBase {
     repCount++;
     bool isRepGood = true;
     final allFaults = <FaultRecord>[];
-    
+
     for (var metric in _metrics) {
-      if (metric.faults.isNotEmpty) isRepGood = false;
       allFaults.addAll(metric.faults);
     }
-    
+    isRepGood = !allFaults.any((f) => f.affectsForm);
+
     correctForm = isRepGood;
 
     logger.addRepLog(RepLog(
@@ -275,9 +354,9 @@ class PlankUpDown extends ExerciseBase {
         "fault_types": allFaults.map((e) => e.type).toSet().toList(),
       },
     ));
-    
+
     logger.pushGoodRepCount();
-    
+
     for (var metric in _metrics) {
       metric.resetAndCountFault();
     }
@@ -288,6 +367,7 @@ class PlankUpDown extends ExerciseBase {
 
   @override
   void onSetComplete() {
+    logger.pushKey("max_rep", maxRep);
     logger.pushKey("timeout_triggered", _isTimeout);
     logger.pushKey("trunk_sagging_fails", trunkMetric.faultsCount);
     logger.pushKey("hip_rotation_fails", hipRotationMetric.faultsCount);

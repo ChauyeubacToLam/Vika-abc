@@ -291,6 +291,20 @@ double calculateHorizontalAngle(
   return degrees.clamp(0.0, 90.0);
 }
 
+/// Absolute angle from the horizontal axis, in degrees.
+///
+/// Unlike [calculateHorizontalAngle], this does not clamp "below horizontal"
+/// to zero, so it is suitable for trunk/limb alignment checks that only care
+/// about magnitude.
+double calculateAbsoluteHorizontalAngle({
+  required PoseLandmark point1,
+  required PoseLandmark point2,
+}) {
+  final dy = (point2.y - point1.y).abs();
+  final dx = (point2.x - point1.x).abs();
+  return math.atan2(dy, dx) * (180.0 / math.pi);
+}
+
 /// Calculate the absolute angle to horizontal without clamping to 0-90
 double calculateAngleToHorizontal(PoseLandmark point1, PoseLandmark point2) {
   double dy = point1.y - point2.y;
@@ -367,10 +381,11 @@ double clockAngleDeviation(double clockAngle, double target) {
    Determine if a point is on the physical left side of the body
    ========================================================================= */
 /// Calculates if a given point (e.g., Ankle or Wrist) is on the physical
-/// left side of the body using the vector from Right Parent to Left Parent 
+/// left side of the body using the vector from Right Parent to Left Parent
 /// (e.g., Hip or Shoulder) as the horizontal axis.
 /// If the dot product is positive, the point is on the left side.
-bool isPhysicalLeftSide(PoseLandmark point, PoseLandmark leftParent, PoseLandmark rightParent) {
+bool isPhysicalLeftSide(
+    PoseLandmark point, PoseLandmark leftParent, PoseLandmark rightParent) {
   // Vector from Right to Left Parent (Hip or Shoulder)
   double axisX = leftParent.x - rightParent.x;
   double axisY = leftParent.y - rightParent.y;

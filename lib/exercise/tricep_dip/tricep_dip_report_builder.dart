@@ -35,15 +35,23 @@ class TricepDipReportBuilder extends ExerciseReportBuilder {
     int extensionFails = 0;
     int shruggingFails = 0;
     for (final logger in setLoggers) {
-      hipThrustFails += (logger.setLogs['hip_thrust_fails'] as num?)?.toInt() ?? 0;
+      hipThrustFails +=
+          (logger.setLogs['hip_thrust_fails'] as num?)?.toInt() ?? 0;
       romFails += (logger.setLogs['rom_fails'] as num?)?.toInt() ?? 0;
-      extensionFails += (logger.setLogs['extension_fails'] as num?)?.toInt() ?? 0;
-      shruggingFails += (logger.setLogs['shrugging_fails'] as num?)?.toInt() ?? 0;
+      extensionFails +=
+          (logger.setLogs['extension_fails'] as num?)?.toInt() ?? 0;
+      shruggingFails +=
+          (logger.setLogs['shrugging_fails'] as num?)?.toInt() ?? 0;
     }
 
-    final isolationScore = ((totalReps - hipThrustFails) / totalReps * 100).roundToDouble();
-    final romScore = ((totalReps - (romFails + extensionFails)) / totalReps * 100).clamp(0, 100).roundToDouble();
-    final stabilityScore = ((totalReps - shruggingFails) / totalReps * 100).roundToDouble();
+    final isolationScore =
+        ((totalReps - hipThrustFails) / totalReps * 100).roundToDouble();
+    final romScore =
+        ((totalReps - (romFails + extensionFails)) / totalReps * 100)
+            .clamp(0, 100)
+            .roundToDouble();
+    final stabilityScore =
+        ((totalReps - shruggingFails) / totalReps * 100).roundToDouble();
 
     return [
       DetailCard(

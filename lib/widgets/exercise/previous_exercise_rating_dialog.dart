@@ -127,47 +127,68 @@ class _PreviousExerciseRatingDialogState
             child: Center(
               child: ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: dialogMaxWidth),
-              child: Material(
-                color: Colors.transparent,
-                child: AnimatedBuilder(
-                  animation: _pulse,
-                  builder: (context, _) {
-                    return Container(
-                      decoration: BoxDecoration(
-                        color: c.bgRaised,
-                        borderRadius: BorderRadius.circular(30),
-                        border: Border.all(color: c.border),
-                        boxShadow: [
-                          BoxShadow(
-                            color: c.ink.withValues(alpha: 0.45),
-                            blurRadius: 64,
-                            offset: const Offset(0, 26),
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(30),
-                        child: Stack(
-                          children: [
-                            // Atmospheric stack — top-right yellow glow,
-                            // bottom-left amber bloom. Matches the
-                            // transition-moment world so it reads as the
-                            // same surface.
-                            Positioned(
-                              top: -90,
-                              right: -70,
-                              child: IgnorePointer(
-                                child: Opacity(
-                                  opacity: 0.6 + (_pulse.value * 0.3),
+                child: Material(
+                  color: Colors.transparent,
+                  child: AnimatedBuilder(
+                    animation: _pulse,
+                    builder: (context, _) {
+                      return Container(
+                        decoration: BoxDecoration(
+                          color: c.bgRaised,
+                          borderRadius: BorderRadius.circular(30),
+                          border: Border.all(color: c.border),
+                          boxShadow: [
+                            BoxShadow(
+                              color: c.ink.withValues(alpha: 0.45),
+                              blurRadius: 64,
+                              offset: const Offset(0, 26),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(30),
+                          child: Stack(
+                            children: [
+                              // Atmospheric stack — top-right yellow glow,
+                              // bottom-left amber bloom. Matches the
+                              // transition-moment world so it reads as the
+                              // same surface.
+                              Positioned(
+                                top: -90,
+                                right: -70,
+                                child: IgnorePointer(
+                                  child: Opacity(
+                                    opacity: 0.6 + (_pulse.value * 0.3),
+                                    child: SizedBox(
+                                      width: 240,
+                                      height: 240,
+                                      child: DecoratedBox(
+                                        decoration: BoxDecoration(
+                                          gradient: RadialGradient(
+                                            colors: [
+                                              c.yellow.withValues(alpha: 0.28),
+                                              c.yellow.withValues(alpha: 0),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                bottom: -110,
+                                left: -80,
+                                child: IgnorePointer(
                                   child: SizedBox(
                                     width: 240,
-                                    height: 240,
-                                    child: DecoratedBox(
+                                    height: 220,
+                                    child: const DecoratedBox(
                                       decoration: BoxDecoration(
                                         gradient: RadialGradient(
                                           colors: [
-                                            c.yellow.withValues(alpha: 0.28),
-                                            c.yellow.withValues(alpha: 0),
+                                            Color(0x33CD7C45),
+                                            Color(0x00CD7C45),
                                           ],
                                         ),
                                       ),
@@ -175,140 +196,119 @@ class _PreviousExerciseRatingDialogState
                                   ),
                                 ),
                               ),
-                            ),
-                            Positioned(
-                              bottom: -110,
-                              left: -80,
-                              child: IgnorePointer(
-                                child: SizedBox(
-                                  width: 240,
-                                  height: 220,
-                                  child: const DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      gradient: RadialGradient(
-                                        colors: [
-                                          Color(0x33CD7C45),
-                                          Color(0x00CD7C45),
-                                        ],
+                              Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(24, 26, 24, 22),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    _FormScoreBadge(
+                                      formScore: widget.formScore,
+                                      exerciseName: widget.exerciseName,
+                                      pulse: _pulse.value,
+                                    ),
+                                    const SizedBox(height: 22),
+                                    // The question — italic, big, no
+                                    // surrounding chrome.
+                                    Text(
+                                      'Cảm giác',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontFamily: 'BeVietnamPro',
+                                        fontSize: 40,
+                                        fontWeight: FontWeight.w800,
+                                        fontStyle: FontStyle.italic,
+                                        height: 1.0,
+                                        letterSpacing: -2.2,
+                                        color: c.ink,
                                       ),
                                     ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Padding(
-                              padding:
-                                  const EdgeInsets.fromLTRB(24, 26, 24, 22),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.stretch,
-                                children: [
-                                  _FormScoreBadge(
-                                    formScore: widget.formScore,
-                                    exerciseName: widget.exerciseName,
-                                    pulse: _pulse.value,
-                                  ),
-                                  const SizedBox(height: 22),
-                                  // The question — italic, big, no
-                                  // surrounding chrome.
-                                  Text(
-                                    'Cảm giác',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontFamily: 'BeVietnamPro',
-                                      fontSize: 40,
-                                      fontWeight: FontWeight.w800,
-                                      fontStyle: FontStyle.italic,
-                                      height: 1.0,
-                                      letterSpacing: -2.2,
-                                      color: c.ink,
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'thế nào?',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontFamily: 'BeVietnamPro',
+                                        fontSize: 40,
+                                        fontWeight: FontWeight.w800,
+                                        fontStyle: FontStyle.italic,
+                                        height: 1.0,
+                                        letterSpacing: -2.2,
+                                        color: c.ink,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'thế nào?',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontFamily: 'BeVietnamPro',
-                                      fontSize: 40,
-                                      fontWeight: FontWeight.w800,
-                                      fontStyle: FontStyle.italic,
-                                      height: 1.0,
-                                      letterSpacing: -2.2,
-                                      color: c.ink,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 26),
-                                  // 3 visual tiles — IntrinsicHeight gives
-                                  // the Row a bounded height so `stretch`
-                                  // can equalize the tiles without forcing
-                                  // an infinite vertical constraint.
-                                  IntrinsicHeight(
-                                    child: Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      children: [
-                                        for (var i = 0;
-                                            i < _options.length;
-                                            i++) ...[
-                                          Expanded(
-                                            child: _Tile(
-                                              option: _options[i],
-                                              selected: _selected ==
-                                                  _options[i].id,
-                                              locked: _selected != null,
-                                              onTap: () =>
-                                                  _pick(_options[i].id),
+                                    const SizedBox(height: 26),
+                                    // 3 visual tiles — IntrinsicHeight gives
+                                    // the Row a bounded height so `stretch`
+                                    // can equalize the tiles without forcing
+                                    // an infinite vertical constraint.
+                                    IntrinsicHeight(
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          for (var i = 0;
+                                              i < _options.length;
+                                              i++) ...[
+                                            Expanded(
+                                              child: _Tile(
+                                                option: _options[i],
+                                                selected:
+                                                    _selected == _options[i].id,
+                                                locked: _selected != null,
+                                                onTap: () =>
+                                                    _pick(_options[i].id),
+                                              ),
                                             ),
-                                          ),
-                                          if (i < _options.length - 1)
-                                            const SizedBox(width: 10),
+                                            if (i < _options.length - 1)
+                                              const SizedBox(width: 10),
+                                          ],
                                         ],
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 18),
-                                  // Footline — one short italic nudge
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.menu_book_rounded,
-                                        size: 12,
-                                        color: c.inkFaint,
                                       ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        _selected == null
-                                            ? 'Đọc giới thiệu phía dưới sau khi chọn'
-                                            : 'Đã ghi nhận',
-                                        style: TextStyle(
-                                          fontFamily: 'BeVietnamPro',
-                                          fontSize: 11.5,
-                                          fontWeight: FontWeight.w700,
-                                          fontStyle: FontStyle.italic,
-                                          letterSpacing: -0.1,
+                                    ),
+                                    const SizedBox(height: 18),
+                                    // Footline — one short italic nudge
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.menu_book_rounded,
+                                          size: 12,
                                           color: c.inkFaint,
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          _selected == null
+                                              ? 'Đọc giới thiệu phía dưới sau khi chọn'
+                                              : 'Đã ghi nhận',
+                                          style: TextStyle(
+                                            fontFamily: 'BeVietnamPro',
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.w700,
+                                            fontStyle: FontStyle.italic,
+                                            letterSpacing: -0.1,
+                                            color: c.inkFaint,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
           ),
         ),
-      ),
       ),
     );
   }

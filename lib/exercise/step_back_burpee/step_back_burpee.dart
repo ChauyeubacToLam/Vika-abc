@@ -4,7 +4,6 @@ import 'package:vika/utils/debouncer.dart';
 import '../../utils/pose_math_helpers.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
-import '../../pose/vika_image_orientation.dart';
 import '../exercise_base.dart';
 import 'metrics/step_back_burpee_metric_base.dart';
 import 'metrics/squat_hinge_metric.dart';
@@ -14,14 +13,15 @@ import 'report/step_back_burpee_report_builder.dart';
 class BurpeeConfig {
   static const int MAX_REP = 15;
   static const double STANDING_BODY_ANGLE = 165.0; // Góc đứng thẳng
-  
+
   // Ngưỡng khoảng cách ngang (X) để xác định Plank (đơn vị tương đối)
   static const double PLANK_MIN_DIST_X = 0.4; // % chiều cao cơ thể
 }
 
 class StepBackBurpee extends ExerciseBase {
   @override
-  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+  Set<VikaImageOrientation> get supportedOrientations =>
+      const <VikaImageOrientation>{
         VikaImageOrientation.landscapeLeft,
         VikaImageOrientation.landscapeRight,
       };
@@ -31,17 +31,18 @@ class StepBackBurpee extends ExerciseBase {
 
   BurpeeState burpeeState = BurpeeState.standing;
   BurpeeState previousBurpeeState = BurpeeState.standing;
-  
+
   // Lưu thời điểm bắt đầu set để tính Pace (Tốc độ)
   int? _setStartTime;
-  
+
   final Debouncer _plankDebouncer = Debouncer(requiredFrames: 3);
   final Debouncer _standingDebouncer = Debouncer(requiredFrames: 3);
 
   // Metrics & Report
   final SquatHingeMetric squatHingeMetric = SquatHingeMetric();
   final PlankFormMetric plankFormMetric = PlankFormMetric();
-  final StepBackBurpeeReportBuilder reportBuilder = StepBackBurpeeReportBuilder();
+  final StepBackBurpeeReportBuilder reportBuilder =
+      StepBackBurpeeReportBuilder();
 
   late final List<StepBackBurpeeMetricBase> _metrics = [
     squatHingeMetric,
@@ -57,30 +58,60 @@ class StepBackBurpee extends ExerciseBase {
   @override
   String get currentPhaseLabel {
     switch (burpeeState) {
-      case BurpeeState.standing: return 'Đứng thẳng';
-      case BurpeeState.squattingDown: return 'Hạ người';
-      case BurpeeState.steppingBack: return 'Bước lùi';
-      case BurpeeState.highPlank: return 'Nằm xuống'; // Thay vì Plank
-      case BurpeeState.steppingForward: return 'Bước lên';
-      case BurpeeState.standingUp: return 'Đứng lên';
+      case BurpeeState.standing:
+        return 'Đứng thẳng';
+      case BurpeeState.squattingDown:
+        return 'Hạ người';
+      case BurpeeState.steppingBack:
+        return 'Bước lùi';
+      case BurpeeState.highPlank:
+        return 'Nằm xuống'; // Thay vì Plank
+      case BurpeeState.steppingForward:
+        return 'Bước lên';
+      case BurpeeState.standingUp:
+        return 'Đứng lên';
     }
   }
 
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    final shoulder = getSideLandmark(landmarks: landmarks, rightType: PoseLandmarkType.rightShoulder, leftType: PoseLandmarkType.leftShoulder);
-    final hip = getSideLandmark(landmarks: landmarks, rightType: PoseLandmarkType.rightHip, leftType: PoseLandmarkType.leftHip);
-    final ankle = getSideLandmark(landmarks: landmarks, rightType: PoseLandmarkType.rightAnkle, leftType: PoseLandmarkType.leftAnkle);
-    final wrist = getSideLandmark(landmarks: landmarks, rightType: PoseLandmarkType.rightWrist, leftType: PoseLandmarkType.leftWrist);
-    final knee = getSideLandmark(landmarks: landmarks, rightType: PoseLandmarkType.rightKnee, leftType: PoseLandmarkType.leftKnee);
+    final shoulder = getSideLandmark(
+        landmarks: landmarks,
+        rightType: PoseLandmarkType.rightShoulder,
+        leftType: PoseLandmarkType.leftShoulder);
+    final hip = getSideLandmark(
+        landmarks: landmarks,
+        rightType: PoseLandmarkType.rightHip,
+        leftType: PoseLandmarkType.leftHip);
+    final ankle = getSideLandmark(
+        landmarks: landmarks,
+        rightType: PoseLandmarkType.rightAnkle,
+        leftType: PoseLandmarkType.leftAnkle);
+    final wrist = getSideLandmark(
+        landmarks: landmarks,
+        rightType: PoseLandmarkType.rightWrist,
+        leftType: PoseLandmarkType.leftWrist);
+    final knee = getSideLandmark(
+        landmarks: landmarks,
+        rightType: PoseLandmarkType.rightKnee,
+        leftType: PoseLandmarkType.leftKnee);
 
-    if (shoulder == null || hip == null || ankle == null || wrist == null || knee == null) return false;
+    if (shoulder == null ||
+        hip == null ||
+        ankle == null ||
+        wrist == null ||
+        knee == null) return false;
 
     // Yêu cầu nhìn rõ toàn thân, tránh việc bị ngoại suy khi mới thấy nửa người
-    if (shoulder.likelihood < 0.5 || hip.likelihood < 0.5 || ankle.likelihood < 0.5 || wrist.likelihood < 0.5 || knee.likelihood < 0.5) return false;
+    if (shoulder.likelihood < 0.5 ||
+        hip.likelihood < 0.5 ||
+        ankle.likelihood < 0.5 ||
+        wrist.likelihood < 0.5 ||
+        knee.likelihood < 0.5) return false;
 
-    double bodyAngle = calculateAngle(firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
-    
+    double bodyAngle =
+        calculateAngle(firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
+
     if (bodyAngle < BurpeeConfig.STANDING_BODY_ANGLE) return false;
     return true;
   }
@@ -90,8 +121,10 @@ class StepBackBurpee extends ExerciseBase {
 
   @override
   void onSetComplete() {
-    final report = reportBuilder.buildReport(_setStartTime ?? DateTime.now().millisecondsSinceEpoch, DateTime.now().millisecondsSinceEpoch);
-    
+    final report = reportBuilder.buildReport(
+        _setStartTime ?? DateTime.now().millisecondsSinceEpoch,
+        DateTime.now().millisecondsSinceEpoch);
+
     // Đẩy data lên UI (Giả lập console log)
     logger.pushKey("Spine Safety", report.spineSafetyScore);
     logger.pushKey("Plank Extension", report.plankExtensionScore);
@@ -109,25 +142,55 @@ class StepBackBurpee extends ExerciseBase {
   @override
   void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
     _setStartTime ??= frameTimestampMs;
-    
-    PoseLandmark? shoulder = getSideLandmark(landmarks: smoothedLandmarks, rightType: PoseLandmarkType.rightShoulder, leftType: PoseLandmarkType.leftShoulder);
-    PoseLandmark? elbow = getSideLandmark(landmarks: smoothedLandmarks, rightType: PoseLandmarkType.rightElbow, leftType: PoseLandmarkType.leftElbow);
-    PoseLandmark? wrist = getSideLandmark(landmarks: smoothedLandmarks, rightType: PoseLandmarkType.rightWrist, leftType: PoseLandmarkType.leftWrist);
-    PoseLandmark? hip = getSideLandmark(landmarks: smoothedLandmarks, rightType: PoseLandmarkType.rightHip, leftType: PoseLandmarkType.leftHip);
-    PoseLandmark? knee = getSideLandmark(landmarks: smoothedLandmarks, rightType: PoseLandmarkType.rightKnee, leftType: PoseLandmarkType.leftKnee);
-    PoseLandmark? ankle = getSideLandmark(landmarks: smoothedLandmarks, rightType: PoseLandmarkType.rightAnkle, leftType: PoseLandmarkType.leftAnkle);
 
-    if (shoulder == null || elbow == null || wrist == null || hip == null || knee == null || ankle == null) return;
+    PoseLandmark? shoulder = getSideLandmark(
+        landmarks: smoothedLandmarks,
+        rightType: PoseLandmarkType.rightShoulder,
+        leftType: PoseLandmarkType.leftShoulder);
+    PoseLandmark? elbow = getSideLandmark(
+        landmarks: smoothedLandmarks,
+        rightType: PoseLandmarkType.rightElbow,
+        leftType: PoseLandmarkType.leftElbow);
+    PoseLandmark? wrist = getSideLandmark(
+        landmarks: smoothedLandmarks,
+        rightType: PoseLandmarkType.rightWrist,
+        leftType: PoseLandmarkType.leftWrist);
+    PoseLandmark? hip = getSideLandmark(
+        landmarks: smoothedLandmarks,
+        rightType: PoseLandmarkType.rightHip,
+        leftType: PoseLandmarkType.leftHip);
+    PoseLandmark? knee = getSideLandmark(
+        landmarks: smoothedLandmarks,
+        rightType: PoseLandmarkType.rightKnee,
+        leftType: PoseLandmarkType.leftKnee);
+    PoseLandmark? ankle = getSideLandmark(
+        landmarks: smoothedLandmarks,
+        rightType: PoseLandmarkType.rightAnkle,
+        leftType: PoseLandmarkType.leftAnkle);
+
+    if (shoulder == null ||
+        elbow == null ||
+        wrist == null ||
+        hip == null ||
+        knee == null ||
+        ankle == null) return;
 
     // 1. Tính toán Hình học
-    double kneeAngle = calculateAngle(firstPoint: hip, midPoint: knee, lastPoint: ankle);
-    double bodyAlignmentAngle = calculateAngle(firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
-    double hipAngle = calculateAngle(firstPoint: shoulder, midPoint: hip, lastPoint: knee);
-    double elbowAngle = calculateAngle(firstPoint: shoulder, midPoint: elbow, lastPoint: wrist);
-    double shoulderToArmAngle = calculateAngle(firstPoint: hip, midPoint: shoulder, lastPoint: wrist);
-    
-    double wristAnkleDistX = (wrist.x - ankle.x).abs() / scaleFactor; // Chuẩn hóa theo tỷ lệ cơ thể
-    double shoulderWristDistY = (wrist.y - shoulder.y).abs() / scaleFactor; // Khoảng cách Y giữa vai và tay
+    double kneeAngle =
+        calculateAngle(firstPoint: hip, midPoint: knee, lastPoint: ankle);
+    double bodyAlignmentAngle =
+        calculateAngle(firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
+    double hipAngle =
+        calculateAngle(firstPoint: shoulder, midPoint: hip, lastPoint: knee);
+    double elbowAngle =
+        calculateAngle(firstPoint: shoulder, midPoint: elbow, lastPoint: wrist);
+    double shoulderToArmAngle =
+        calculateAngle(firstPoint: hip, midPoint: shoulder, lastPoint: wrist);
+
+    double wristAnkleDistX =
+        (wrist.x - ankle.x).abs() / scaleFactor; // Chuẩn hóa theo tỷ lệ cơ thể
+    double shoulderWristDistY = (wrist.y - shoulder.y).abs() /
+        scaleFactor; // Khoảng cách Y giữa vai và tay
     double wristY = wrist.y;
     double kneeY = knee.y;
     int now = frameTimestampMs;
@@ -152,7 +215,8 @@ class StepBackBurpee extends ExerciseBase {
     debugData['ShWrDistY'] = shoulderWristDistY.toStringAsFixed(2);
 
     // 2. State Machine Update
-    _updateState(kneeAngle, bodyAlignmentAngle, wristAnkleDistX, wristY, kneeY, shoulderToArmAngle, shoulderWristDistY, now);
+    _updateState(kneeAngle, bodyAlignmentAngle, wristAnkleDistX, wristY, kneeY,
+        shoulderToArmAngle, shoulderWristDistY, now);
 
     // 3. Update Metrics
     for (final metric in _metrics) {
@@ -161,9 +225,10 @@ class StepBackBurpee extends ExerciseBase {
     }
 
     // 4. Hoàn thành 1 Rep (từ StandingUp -> Standing)
-    if (burpeeState == BurpeeState.standing && previousBurpeeState == BurpeeState.standingUp) {
+    if (burpeeState == BurpeeState.standing &&
+        previousBurpeeState == BurpeeState.standingUp) {
       repCount += 1;
-      
+
       final allFaults = <FaultRecord>[];
       for (final metric in _metrics) allFaults.addAll(metric.faults);
 
@@ -181,43 +246,54 @@ class StepBackBurpee extends ExerciseBase {
 
       correctForm = true;
       for (final metric in _metrics) metric.reset();
-      previousBurpeeState = BurpeeState.standing; 
+      previousBurpeeState = BurpeeState.standing;
     }
   }
 
-  void _updateState(double kneeAngle, double bodyAngle, double distX, double wristY, double kneeY, double shoulderToArmAngle, double shoulderWristDistY, int timestampMs) {
+  void _updateState(
+      double kneeAngle,
+      double bodyAngle,
+      double distX,
+      double wristY,
+      double kneeY,
+      double shoulderToArmAngle,
+      double shoulderWristDistY,
+      int timestampMs) {
     // Logic nhận diện trạng thái qua khoảng cách ngang (DistX) và tư thế
     bool isCrouching = kneeAngle < 120 && bodyAngle < 120; // Đang co người
-    
+
     // Yêu cầu nằm hoàn toàn xuống sàn: vai phải hạ thấp gần bằng cổ tay (khoảng cách Y nhỏ)
     bool isLyingOnFloor = _plankDebouncer.update(
-      distX > BurpeeConfig.PLANK_MIN_DIST_X && 
-      bodyAngle > 140 &&
-      shoulderWristDistY < 0.6 && // Nằm hoàn toàn xuống sàn (vai hạ thấp)
-      shoulderToArmAngle > 45 && shoulderToArmAngle < 135 // Tay tạo thành góc vuông với vai
-    );
-    
-    bool isStandingStraight = _standingDebouncer.update(bodyAngle > BurpeeConfig.STANDING_BODY_ANGLE);
+        distX > BurpeeConfig.PLANK_MIN_DIST_X &&
+            bodyAngle > 140 &&
+            shoulderWristDistY < 0.6 && // Nằm hoàn toàn xuống sàn (vai hạ thấp)
+            shoulderToArmAngle > 45 &&
+            shoulderToArmAngle < 135 // Tay tạo thành góc vuông với vai
+        );
+
+    bool isStandingStraight =
+        _standingDebouncer.update(bodyAngle > BurpeeConfig.STANDING_BODY_ANGLE);
 
     if (burpeeState == BurpeeState.standing && !isStandingStraight) {
       _transitionState(BurpeeState.squattingDown, timestampMs);
-    } 
-    else if (burpeeState == BurpeeState.squattingDown && isCrouching && distX > 0.2) {
+    } else if (burpeeState == BurpeeState.squattingDown &&
+        isCrouching &&
+        distX > 0.2) {
       _transitionState(BurpeeState.steppingBack, timestampMs);
-    } 
-    else if ((burpeeState == BurpeeState.steppingBack || burpeeState == BurpeeState.squattingDown) && isLyingOnFloor) {
-      _transitionState(BurpeeState.highPlank, timestampMs); // Sử dụng highPlank state làm trạng thái nằm
-    } 
-    else if (burpeeState == BurpeeState.highPlank && !isLyingOnFloor && distX < BurpeeConfig.PLANK_MIN_DIST_X) {
+    } else if ((burpeeState == BurpeeState.steppingBack ||
+            burpeeState == BurpeeState.squattingDown) &&
+        isLyingOnFloor) {
+      _transitionState(BurpeeState.highPlank,
+          timestampMs); // Sử dụng highPlank state làm trạng thái nằm
+    } else if (burpeeState == BurpeeState.highPlank &&
+        !isLyingOnFloor &&
+        distX < BurpeeConfig.PLANK_MIN_DIST_X) {
       _transitionState(BurpeeState.steppingForward, timestampMs);
-    } 
-    else if (burpeeState == BurpeeState.steppingForward && bodyAngle > 100) {
+    } else if (burpeeState == BurpeeState.steppingForward && bodyAngle > 100) {
       _transitionState(BurpeeState.standingUp, timestampMs);
-    } 
-    else if (burpeeState == BurpeeState.standingUp && isStandingStraight) {
+    } else if (burpeeState == BurpeeState.standingUp && isStandingStraight) {
       _transitionState(BurpeeState.standing, timestampMs);
-    }
-    else if (isStandingStraight && burpeeState != BurpeeState.standing) {
+    } else if (isStandingStraight && burpeeState != BurpeeState.standing) {
       // Reset state if user stands up without completing the full sequence
       _transitionState(BurpeeState.standing, timestampMs);
     }

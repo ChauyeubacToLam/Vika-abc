@@ -23,6 +23,7 @@ import '../../theme/vf_theme.dart';
 import 'exercise_form_bar.dart';
 import 'plan_typography.dart';
 import '../../theme/app_colors.dart';
+
 class DayTimelineRow extends StatelessWidget {
   const DayTimelineRow({
     super.key,
@@ -304,8 +305,8 @@ class _Header extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(top: 1),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 7, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                     decoration: BoxDecoration(
                       color: c.yellowGhost,
                       borderRadius: BorderRadius.circular(5),
@@ -343,9 +344,7 @@ class _Header extends StatelessWidget {
           decoration: BoxDecoration(
             color: isBest ? c.yellow : c.bg,
             borderRadius: BorderRadius.circular(999),
-            border: isBest
-                ? null
-                : Border.all(color: c.border),
+            border: isBest ? null : Border.all(color: c.border),
           ),
           child: RichText(
             text: TextSpan(
@@ -367,9 +366,7 @@ class _Header extends StatelessWidget {
                     fontFamily: 'BeVietnamPro',
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
-                    color: isBest
-                        ? c.yellowInk
-                        : c.inkSoft,
+                    color: isBest ? c.yellowInk : c.inkSoft,
                   ),
                 ),
               ],
@@ -426,8 +423,7 @@ class TimelineTerminator extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: c.bg,
                       shape: BoxShape.circle,
-                      border:
-                          Border.all(color: c.borderHi, width: 2),
+                      border: Border.all(color: c.borderHi, width: 2),
                     ),
                     alignment: Alignment.center,
                     child: Icon(

@@ -8,16 +8,16 @@ enum BowPoseState { prone, setup, ascending, hold, descending }
 
 class RepContext {
   final double referenceLength; // Khoảng cách Vai - Hông (Base body length)
-  final double thighLength;     // Khoảng cách Hông - Đầu gối
-  final double rawShoulderY;    // Tọa độ Y thô của vai để check việc "dâng lên"
-  
-  final double wristAnkleDist;  // Đã chuẩn hóa theo referenceLength
-  final double chestLift;       // Đã chuẩn hóa theo referenceLength
+  final double thighLength; // Khoảng cách Hông - Đầu gối
+  final double rawShoulderY; // Tọa độ Y thô của vai để check việc "dâng lên"
+
+  final double wristAnkleDist; // Đã chuẩn hóa theo referenceLength
+  final double chestLift; // Đã chuẩn hóa theo referenceLength
   final double thighLiftRelative; // Đã chuẩn hóa theo thighLength
   final double kneeAngle;
-  
+
   final BowPoseState bowPoseState;
-  final int frameTimestamp; 
+  final int frameTimestamp;
   final ResultIssues resultIssues;
 
   RepContext({
@@ -41,5 +41,5 @@ abstract class BowPoseMetricBase {
   Map<String, dynamic> get debugData;
   void reset();
   void onStateTransition(BowPoseState from, BowPoseState to, int timestampMs) {}
-  void evaluateRep(RepContext ctx) {} 
+  void evaluateRep(RepContext ctx) {}
 }

@@ -10,13 +10,16 @@ class PelvicDropMetric extends StandingKteMetricBase {
     if (ctx.state == KteState.approaching || ctx.state == KteState.touch) {
       // Calculate angle of the line connecting the two hips relative to the horizontal
       double dx = (ctx.liftingHip.x - ctx.standingHip.x).abs();
-      double dy = (ctx.liftingHip.y - ctx.standingHip.y).abs(); // We only care about magnitude of tilt
-      
-      if (dx == 0) return; // Edge case, perfectly vertical (which shouldn't happen for hips)
-      
+      double dy = (ctx.liftingHip.y - ctx.standingHip.y)
+          .abs(); // We only care about magnitude of tilt
+
+      if (dx == 0) {
+        return; // Edge case, perfectly vertical (which shouldn't happen for hips)
+      }
+
       double tiltAngleRadians = atan2(dy, dx);
       double tiltAngleDegrees = tiltAngleRadians * 180 / pi;
-      
+
       debugData['pelvicTiltDegrees'] = tiltAngleDegrees;
 
       // Specifically check if the lifting hip dropped (Trendelenburg sign).

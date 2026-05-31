@@ -6,7 +6,7 @@ class HoldTempoMetric extends SeatedForwardMetricBase {
 
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
-  
+
   int? _holdStartMs;
   double activeHoldSeconds = 0.0;
 
@@ -17,7 +17,8 @@ class HoldTempoMetric extends SeatedForwardMetricBase {
   Map<String, dynamic> get debugData => _debugData;
 
   @override
-  void onStateTransition(SeatedForwardState from, SeatedForwardState to, int timestampMs) {
+  void onStateTransition(
+      SeatedForwardState from, SeatedForwardState to, int timestampMs) {
     if (to == SeatedForwardState.isometricHold) {
       _holdStartMs = timestampMs;
     } else if (from == SeatedForwardState.isometricHold) {
@@ -29,8 +30,10 @@ class HoldTempoMetric extends SeatedForwardMetricBase {
   @override
   void update(SeatedForwardContext ctx) {
     if (ctx.state == SeatedForwardState.isometricHold && _holdStartMs != null) {
-      final double currentHold = (ctx.frameTimestampMs - _holdStartMs!) / 1000.0;
-      ctx.resultIssues.feedback['Time'] = '${(activeHoldSeconds + currentHold).toStringAsFixed(1)}s / ${SeatedForwardConfig.At_Min_Hold_Time}s';
+      final double currentHold =
+          (ctx.frameTimestampMs - _holdStartMs!) / 1000.0;
+      ctx.resultIssues.feedback['Time'] =
+          '${(activeHoldSeconds + currentHold).toStringAsFixed(1)}s / ${SeatedForwardConfig.At_Min_Hold_Time}s';
     }
   }
 

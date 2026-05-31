@@ -5,7 +5,7 @@ class TrunkStabilityMetric extends BirdDogMetricBase {
   String get name => 'TrunkStability';
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
-  
+
   double? _neutralHipY;
 
   @override
@@ -24,13 +24,13 @@ class TrunkStabilityMetric extends BirdDogMetricBase {
   @override
   void update(BirdDogRepContext ctx) {
     _neutralHipY ??= ctx.hipY;
-    
+
     if (ctx.state == BirdDogState.hold_extended && ctx.scaleFactor != null) {
       // Sụt hông: Khoảng cách Y thay đổi > 15% độ dài thân
       double deviation = (ctx.hipY - _neutralHipY!).abs() / ctx.scaleFactor!;
-      
+
       if (deviation > 0.15) {
-         if (!_faults.any((f) => f.type == 'Trunk')) {
+        if (!_faults.any((f) => f.type == 'Trunk')) {
           _faults.add(FaultRecord(
             phase: ctx.state.name,
             type: 'Trunk',

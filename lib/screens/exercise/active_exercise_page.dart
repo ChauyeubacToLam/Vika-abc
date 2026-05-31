@@ -16,7 +16,6 @@ import '../../debug/debug_types.dart';
 import '../../exercise/exercise_base.dart';
 import '../../pose/pose_landmarker_adapter.dart';
 import '../../pose/pose_landmarker_channel.dart';
-import '../../pose/vika_image_orientation.dart';
 import '../../models/exercise_definition.dart';
 import '../../utils/exercise_logger.dart';
 import '../../utils/orientation_lock.dart';
@@ -2521,7 +2520,8 @@ class _CenterOverlay extends StatelessWidget {
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: VikaIvory.yellow.withValues(alpha: haloAlpha),
+                            color:
+                                VikaIvory.yellow.withValues(alpha: haloAlpha),
                             blurRadius: 44,
                             spreadRadius: 6,
                           ),
@@ -2609,8 +2609,8 @@ class _CenterOverlay extends StatelessWidget {
                                   letterSpacing: 1.0,
                                   shadows: [
                                     Shadow(
-                                      color: Colors.black
-                                          .withValues(alpha: 0.7),
+                                      color:
+                                          Colors.black.withValues(alpha: 0.7),
                                       blurRadius: 4,
                                     ),
                                   ],

@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 
 import '../../theme/vf_theme.dart';
 import '../../theme/app_colors.dart';
+
 class StreakRing extends StatelessWidget {
   const StreakRing({
     super.key,
@@ -36,72 +37,73 @@ class StreakRing extends StatelessWidget {
       label: '$days ${label.toLowerCase()}',
       child: ExcludeSemantics(
         child: SizedBox(
-      width: size,
-      height: size,
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.center,
-        children: [
-          CustomPaint(
-            size: Size(size, size),
-            painter: _RingPainter(
-              ratio: ratio,
-              trackColor: c.borderHi,
-              yellow: c.yellow,
-            ),
-          ),
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+          width: size,
+          height: size,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
             children: [
-              Text(
-                '$days',
-                style: TextStyle(
-                  fontFamily: 'BeVietnamPro',
-                  fontSize: 50,
-                  fontWeight: FontWeight.w800,
-                  fontStyle: FontStyle.italic,
-                  letterSpacing: -3,
-                  height: 0.9,
-                  color: c.ink,
-                  fontFeatures: VikaIvoryMain.tabularFigures,
+              CustomPaint(
+                size: Size(size, size),
+                painter: _RingPainter(
+                  ratio: ratio,
+                  trackColor: c.borderHi,
+                  yellow: c.yellow,
                 ),
               ),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                style: TextStyle(
-                  fontFamily: 'BeVietnamPro',
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.4,
-                  color: c.inkFaint,
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    '$days',
+                    style: TextStyle(
+                      fontFamily: 'BeVietnamPro',
+                      fontSize: 50,
+                      fontWeight: FontWeight.w800,
+                      fontStyle: FontStyle.italic,
+                      letterSpacing: -3,
+                      height: 0.9,
+                      color: c.ink,
+                      fontFeatures: VikaIvoryMain.tabularFigures,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontFamily: 'BeVietnamPro',
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.4,
+                      color: c.inkFaint,
+                    ),
+                  ),
+                ],
+              ),
+              // Badge pinned at the bottom.
+              Positioned(
+                bottom: -6,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: c.ink,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    badge,
+                    style: TextStyle(
+                      fontFamily: 'BeVietnamPro',
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1,
+                      color: c.yellow,
+                    ),
+                  ),
                 ),
               ),
             ],
           ),
-          // Badge pinned at the bottom.
-          Positioned(
-            bottom: -6,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-              decoration: BoxDecoration(
-                color: c.ink,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                badge,
-                style: TextStyle(
-                  fontFamily: 'BeVietnamPro',
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1,
-                  color: c.yellow,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
         ),
       ),
     );

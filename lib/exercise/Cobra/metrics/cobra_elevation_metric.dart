@@ -61,7 +61,8 @@ class CobraPelvicMetric extends CobraMetricBase {
     if (_errorDebouncer.update(hipLiftNorm >= _errorMin)) {
       ctx.resultIssues.feedback['Hips'] = '⚠️ Hông nâng quá cao!';
       ctx.resultIssues.addInstruction(
-        'holding', 'hipLifted',
+        'holding',
+        'hipLifted',
         'Giữ hông sát sàn. Đừng nâng quá cao.',
       );
       _logFault(phase, 'Hip significantly lifted', 'HipLift');
@@ -79,7 +80,10 @@ class CobraPelvicMetric extends CobraMetricBase {
   void _logFault(String phase, String message, String type) {
     if (!_faults.any((f) => f.type == type)) {
       _faults.add(FaultRecord(
-        phase: phase, type: type, message: message, affectsForm: true,
+        phase: phase,
+        type: type,
+        message: message,
+        affectsForm: true,
       ));
     }
   }

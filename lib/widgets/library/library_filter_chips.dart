@@ -97,8 +97,7 @@ class _FilterChip extends StatelessWidget {
     final Color countFg;
     if (inverted) {
       bg = selected ? c.yellow : Colors.white.withValues(alpha: 0.05);
-      borderColor =
-          selected ? c.yellow : Colors.white.withValues(alpha: 0.18);
+      borderColor = selected ? c.yellow : Colors.white.withValues(alpha: 0.18);
       labelColor = selected ? c.yellowInk : c.invInk;
       countBg = selected
           ? c.yellow.withValues(alpha: 0.2)
@@ -108,9 +107,7 @@ class _FilterChip extends StatelessWidget {
       bg = selected ? c.ink : Colors.transparent;
       borderColor = selected ? c.ink : c.borderHi;
       labelColor = selected ? c.invInk : c.ink;
-      countBg = selected
-          ? c.yellow.withValues(alpha: 0.24)
-          : c.yellowGhost;
+      countBg = selected ? c.yellow.withValues(alpha: 0.24) : c.yellowGhost;
       countFg = selected ? c.yellow : c.ink;
     }
     return GestureDetector(
@@ -150,8 +147,7 @@ class _FilterChip extends StatelessWidget {
             if (filter.count != null) ...[
               const SizedBox(width: 6),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                 decoration: BoxDecoration(
                   color: countBg,
                   borderRadius: BorderRadius.circular(4),

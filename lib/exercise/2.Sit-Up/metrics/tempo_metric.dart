@@ -34,7 +34,8 @@ class TempoMetric extends SitUpMetricBase {
       _faults.add(FaultRecord(
         phase: 'REP_COMPLETE',
         type: 'Tempo',
-        message: 'Hạ người quá nhanh (${loweringDuration!.toStringAsFixed(1)}s)',
+        message:
+            'Hạ người quá nhanh (${loweringDuration!.toStringAsFixed(1)}s)',
         voiceMessage: 'Hạ lưng xuống chậm lại, cảm nhận cơ bụng căng ra',
         affectsForm: true,
         priority: SitUpFaultPriority.tempo,

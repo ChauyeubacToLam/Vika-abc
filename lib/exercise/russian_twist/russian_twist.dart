@@ -1,5 +1,4 @@
 import 'package:vika/exercise/exercise_base.dart';
-import '../../pose/vika_image_orientation.dart';
 import 'package:vika/exercise/side_tracked_exercise_mixin.dart';
 
 import '../../utils/frame_buffer.dart';
@@ -13,6 +12,7 @@ import 'metrics/twist_rom_metric.dart';
 import 'metrics/spinal_flexion_metric.dart';
 
 enum RussianTwistState { center_setup, twisting, max_point, returning }
+
 enum TwistDirection { none, forward, backward }
 
 class RussianTwistConfig {
@@ -29,10 +29,22 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
 
   @override
   Map<String, SideLandmarkPair> get requiredSideLandmarks => const {
-        'shoulder': (right: PoseLandmarkType.rightShoulder, left: PoseLandmarkType.leftShoulder),
-        'hip': (right: PoseLandmarkType.rightHip, left: PoseLandmarkType.leftHip),
-        'knee': (right: PoseLandmarkType.rightKnee, left: PoseLandmarkType.leftKnee),
-        'wrist': (right: PoseLandmarkType.rightWrist, left: PoseLandmarkType.leftWrist),
+        'shoulder': (
+          right: PoseLandmarkType.rightShoulder,
+          left: PoseLandmarkType.leftShoulder
+        ),
+        'hip': (
+          right: PoseLandmarkType.rightHip,
+          left: PoseLandmarkType.leftHip
+        ),
+        'knee': (
+          right: PoseLandmarkType.rightKnee,
+          left: PoseLandmarkType.leftKnee
+        ),
+        'wrist': (
+          right: PoseLandmarkType.rightWrist,
+          left: PoseLandmarkType.leftWrist
+        ),
       };
 
   final int maxRep;
@@ -92,7 +104,8 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    if (cameraFacing == CameraFacing.front || cameraFacing == CameraFacing.undefined) {
+    if (cameraFacing == CameraFacing.front ||
+        cameraFacing == CameraFacing.undefined) {
       return "⚠️ Vui lòng đặt camera ở góc ngang hoặc ngang lệch để hệ thống thấy rõ lưng và chân của bạn.";
     }
     final sideLandmarks = getSideTrackedLandmarks(landmarks);
@@ -135,7 +148,7 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
     // Calculate relative positions
     double wristHipDx = (wrist.x - hip.x) * directionMultiplier;
     double kneeHipDx = (knee.x - hip.x) * directionMultiplier;
-    
+
     // Fallback if knee is directly under hip (shouldn't happen sitting)
     if (kneeHipDx <= 0) kneeHipDx = 1.0;
 
@@ -172,7 +185,7 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
     debugData['russianState'] = russianState.name;
     debugData['direction'] = currentDirection.name;
     debugData['halfRepCount'] = _halfRepCount;
-    
+
     for (final metric in _metrics) {
       debugData.addAll(metric.debugData);
     }
@@ -200,30 +213,38 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
       }
     } else if (russianState == RussianTwistState.twisting) {
       // Reached max point when velocity stops
-      if (currentDirection == TwistDirection.forward && wristChange != ChangeState.increasing) {
-         _transitionState(RussianTwistState.max_point, now);
-      } else if (currentDirection == TwistDirection.backward && wristChange != ChangeState.decreasing) {
-         _transitionState(RussianTwistState.max_point, now);
+      if (currentDirection == TwistDirection.forward &&
+          wristChange != ChangeState.increasing) {
+        _transitionState(RussianTwistState.max_point, now);
+      } else if (currentDirection == TwistDirection.backward &&
+          wristChange != ChangeState.decreasing) {
+        _transitionState(RussianTwistState.max_point, now);
       }
     } else if (russianState == RussianTwistState.max_point) {
       // Started returning
-      if (currentDirection == TwistDirection.forward && wristChange == ChangeState.decreasing) {
+      if (currentDirection == TwistDirection.forward &&
+          wristChange == ChangeState.decreasing) {
         _transitionState(RussianTwistState.returning, now);
-      } else if (currentDirection == TwistDirection.backward && wristChange == ChangeState.increasing) {
+      } else if (currentDirection == TwistDirection.backward &&
+          wristChange == ChangeState.increasing) {
         _transitionState(RussianTwistState.returning, now);
       }
     } else if (russianState == RussianTwistState.returning) {
       // We consider returning to center when velocity stops again, OR when it crosses the middle.
       // A common pattern is sweeping from forward to backward directly.
       // So if velocity changes direction, or we cross the center zone, we reset.
-      
+
       // Center zone is around 30% to 50% of kneeHipDx.
       double centerMin = kneeHipDx * 0.25;
       double centerMax = kneeHipDx * 0.55;
 
       bool inCenterZone = wristHipDx > centerMin && wristHipDx < centerMax;
-      
-      if (inCenterZone || (currentDirection == TwistDirection.forward && wristChange == ChangeState.increasing) || (currentDirection == TwistDirection.backward && wristChange == ChangeState.decreasing)) {
+
+      if (inCenterZone ||
+          (currentDirection == TwistDirection.forward &&
+              wristChange == ChangeState.increasing) ||
+          (currentDirection == TwistDirection.backward &&
+              wristChange == ChangeState.decreasing)) {
         _transitionState(RussianTwistState.center_setup, now);
         _completeHalfRep();
       }
@@ -232,16 +253,18 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
 
   void _transitionState(RussianTwistState newState, int timestampMs) {
     if (newState == russianState) return;
-    
+
     previousRussianState = russianState;
     russianState = newState;
 
-    if (newState == RussianTwistState.twisting && previousRussianState == RussianTwistState.center_setup) {
+    if (newState == RussianTwistState.twisting &&
+        previousRussianState == RussianTwistState.center_setup) {
       resultIssues.instructions.clear();
     }
 
     for (final metric in _metrics) {
-      metric.onStateTransition(previousRussianState, newState, currentDirection, timestampMs);
+      metric.onStateTransition(
+          previousRussianState, newState, currentDirection, timestampMs);
     }
   }
 
@@ -251,7 +274,7 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
     for (final metric in _metrics) {
       allFaults.addAll(metric.faults);
     }
-    
+
     bool hasRomFault = allFaults.any((f) => f.type == 'shallow_twist');
 
     // Only process valid alternating reps if ROM was good enough.
@@ -260,7 +283,11 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
       if (currentDirection == lastCompletedTwistDirection) {
         // Repeated the same side!
         resultIssues.feedback['Result'] = 'Lỗi!';
-        setFeedback.add({false: {'General': {'duplicate_side': 'Vui lòng vặn luân phiên 2 bên!'}}});
+        setFeedback.add({
+          false: {
+            'General': {'duplicate_side': 'Vui lòng vặn luân phiên 2 bên!'}
+          }
+        });
         logger.addRepLog(RepLog(correctForm: false, repNumber: repCount, data: {
           "fault_types": ['duplicate_side'],
         }));
@@ -281,10 +308,12 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
         if (_halfRepCount % 2 == 0) {
           repCount++;
           correctForm = isGoodHalf;
-          resultIssues.feedback['Result'] = correctForm ? 'Good Rep!' : 'Fix Form';
-          
+          resultIssues.feedback['Result'] =
+              correctForm ? 'Good Rep!' : 'Fix Form';
+
           setFeedback.add({correctForm: faultMap});
-          logger.addRepLog(RepLog(correctForm: correctForm, repNumber: repCount, data: {
+          logger.addRepLog(
+              RepLog(correctForm: correctForm, repNumber: repCount, data: {
             "fault_types": allFaults.map((f) => f.type).toSet().toList(),
           }));
         }
@@ -302,7 +331,7 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
     for (final metric in _metrics) {
       metric.resetAndCountFault();
     }
-    
+
     currentDirection = TwistDirection.none;
   }
 }

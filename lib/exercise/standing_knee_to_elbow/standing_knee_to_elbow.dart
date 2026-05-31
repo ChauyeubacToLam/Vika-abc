@@ -1,5 +1,4 @@
 import 'package:vika/exercise/exercise_base.dart';
-import '../../pose/vika_image_orientation.dart';
 import '../../utils/pose_math_helpers.dart';
 import 'package:vika/utils/exercise_logger.dart';
 import 'package:vika/exercise/side_tracked_exercise_mixin.dart';
@@ -20,7 +19,8 @@ class StandingKneeToElbowConfig {
 
 class StandingKneeToElbow extends ExerciseBase {
   @override
-  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+  Set<VikaImageOrientation> get supportedOrientations =>
+      const <VikaImageOrientation>{
         VikaImageOrientation.portrait,
       };
 
@@ -91,7 +91,7 @@ class StandingKneeToElbow extends ExerciseBase {
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.front) return false;
-    
+
     final leftHip = landmarks[PoseLandmarkType.leftHip];
     final rightHip = landmarks[PoseLandmarkType.rightHip];
     final leftKnee = landmarks[PoseLandmarkType.leftKnee];
@@ -103,14 +103,23 @@ class StandingKneeToElbow extends ExerciseBase {
     final leftWrist = landmarks[PoseLandmarkType.leftWrist];
     final rightWrist = landmarks[PoseLandmarkType.rightWrist];
 
-    if (leftHip == null || rightHip == null || leftKnee == null || rightKnee == null || 
-        leftAnkle == null || rightAnkle == null || leftShoulder == null || rightShoulder == null ||
-        leftWrist == null || rightWrist == null) {
+    if (leftHip == null ||
+        rightHip == null ||
+        leftKnee == null ||
+        rightKnee == null ||
+        leftAnkle == null ||
+        rightAnkle == null ||
+        leftShoulder == null ||
+        rightShoulder == null ||
+        leftWrist == null ||
+        rightWrist == null) {
       return false;
     }
 
-    double leftLegAngle = calculateAngleNormalized(firstPoint: leftHip, midPoint: leftKnee, lastPoint: leftAnkle);
-    double rightLegAngle = calculateAngleNormalized(firstPoint: rightHip, midPoint: rightKnee, lastPoint: rightAnkle);
+    double leftLegAngle = calculateAngleNormalized(
+        firstPoint: leftHip, midPoint: leftKnee, lastPoint: leftAnkle);
+    double rightLegAngle = calculateAngleNormalized(
+        firstPoint: rightHip, midPoint: rightKnee, lastPoint: rightAnkle);
 
     if (leftLegAngle < 165.0 || rightLegAngle < 165.0) {
       resultIssues.feedback['System'] = 'Hãy đứng thẳng cả 2 chân.';
@@ -120,14 +129,15 @@ class StandingKneeToElbow extends ExerciseBase {
     double shoulderTilt = (leftShoulder.y - rightShoulder.y).abs();
     double shoulderWidth = (leftShoulder.x - rightShoulder.x).abs();
     double torsoLength = (leftShoulder.y - leftHip.y).abs();
-    
+
     // Check if shoulders are roughly level (tilt < 10% of width)
     if (shoulderWidth > 0 && shoulderTilt / shoulderWidth > 0.15) {
       resultIssues.feedback['System'] = 'Giữ 2 vai thăng bằng.';
       return false;
     }
 
-    if (leftWrist.y > leftShoulder.y + torsoLength * 0.1 || rightWrist.y > rightShoulder.y + torsoLength * 0.1) {
+    if (leftWrist.y > leftShoulder.y + torsoLength * 0.1 ||
+        rightWrist.y > rightShoulder.y + torsoLength * 0.1) {
       resultIssues.feedback['System'] = 'Hãy đặt 2 tay sau đầu.';
       return false;
     }
@@ -148,14 +158,21 @@ class StandingKneeToElbow extends ExerciseBase {
     final leftElbow = smoothedLandmarks[PoseLandmarkType.leftElbow];
     final rightElbow = smoothedLandmarks[PoseLandmarkType.rightElbow];
 
-    if (leftHip == null || rightHip == null || leftKnee == null || rightKnee == null || 
-        leftAnkle == null || rightAnkle == null || leftShoulder == null || rightShoulder == null ||
-        leftElbow == null || rightElbow == null) {
+    if (leftHip == null ||
+        rightHip == null ||
+        leftKnee == null ||
+        rightKnee == null ||
+        leftAnkle == null ||
+        rightAnkle == null ||
+        leftShoulder == null ||
+        rightShoulder == null ||
+        leftElbow == null ||
+        rightElbow == null) {
       return;
     }
 
     int now = frameTimestampMs;
-    
+
     // Dynamic Leg Detection based on Knee Y movement
     double leftKneeY = leftKnee.y;
     double rightKneeY = rightKnee.y;
@@ -177,26 +194,35 @@ class StandingKneeToElbow extends ExerciseBase {
       }
     }
 
-    PoseLandmark liftingKnee = _liftingLegSide == TrackedSide.left ? leftKnee : rightKnee;
-    PoseLandmark opposingElbow = _liftingLegSide == TrackedSide.left ? rightElbow : leftElbow;
-    
-    PoseLandmark liftingHip = _liftingLegSide == TrackedSide.left ? leftHip : rightHip;
-    PoseLandmark standingHip = _standingLegSide == TrackedSide.left ? leftHip : rightHip;
-    
-    PoseLandmark liftingShoulder = _liftingLegSide == TrackedSide.left ? leftShoulder : rightShoulder;
-    
-    PoseLandmark standingKnee = _standingLegSide == TrackedSide.left ? leftKnee : rightKnee;
-    PoseLandmark standingAnkle = _standingLegSide == TrackedSide.left ? leftAnkle : rightAnkle;
+    PoseLandmark liftingKnee =
+        _liftingLegSide == TrackedSide.left ? leftKnee : rightKnee;
+    PoseLandmark opposingElbow =
+        _liftingLegSide == TrackedSide.left ? rightElbow : leftElbow;
+
+    PoseLandmark liftingHip =
+        _liftingLegSide == TrackedSide.left ? leftHip : rightHip;
+    PoseLandmark standingHip =
+        _standingLegSide == TrackedSide.left ? leftHip : rightHip;
+
+    PoseLandmark liftingShoulder =
+        _liftingLegSide == TrackedSide.left ? leftShoulder : rightShoulder;
+
+    PoseLandmark standingKnee =
+        _standingLegSide == TrackedSide.left ? leftKnee : rightKnee;
+    PoseLandmark standingAnkle =
+        _standingLegSide == TrackedSide.left ? leftAnkle : rightAnkle;
 
     double hipWidth = (leftHip.x - rightHip.x).abs();
-    double torsoLength = (leftShoulder.y - leftHip.y).abs(); // Approx torso length
+    double torsoLength =
+        (leftShoulder.y - leftHip.y).abs(); // Approx torso length
     double distanceD = calculateDistance(opposingElbow, liftingKnee);
 
     frameBuffer.addFrame(FrameSnapshot(log: {
       "distanceD": distanceD,
     }, timeStamp: now));
 
-    _updateStateMachine(distanceD, liftingKnee.y, standingKnee.y, torsoLength, now);
+    _updateStateMachine(
+        distanceD, liftingKnee.y, standingKnee.y, torsoLength, now);
 
     final ctx = StandingKteRepContext(
       standingLegSide: _standingLegSide,
@@ -224,7 +250,7 @@ class StandingKneeToElbow extends ExerciseBase {
     debugData['kteState'] = kteState.name;
     debugData['liftingLeg'] = _liftingLegSide.name;
     debugData['distanceD'] = distanceD;
-    
+
     for (final metric in _metrics) {
       debugData.addAll(metric.debugData);
     }
@@ -238,7 +264,8 @@ class StandingKneeToElbow extends ExerciseBase {
     }
   }
 
-  void _updateStateMachine(double distanceD, double liftingKneeY, double standingKneeY, double torsoLength, int now) {
+  void _updateStateMachine(double distanceD, double liftingKneeY,
+      double standingKneeY, double torsoLength, int now) {
     if (kteState == KteState.standing_base) {
       if (liftingKneeY < standingKneeY - torsoLength * 0.15) {
         _transitionState(KteState.approaching, now);
@@ -253,7 +280,8 @@ class StandingKneeToElbow extends ExerciseBase {
       }
     } else if (kteState == KteState.touch) {
       // Relaxed exit threshold from 0.8 to 1.0 to give time to reach peak
-      if (distanceD > torsoLength * 1.0 || liftingKneeY > standingKneeY - torsoLength * 0.2) {
+      if (distanceD > torsoLength * 1.0 ||
+          liftingKneeY > standingKneeY - torsoLength * 0.2) {
         _transitionState(KteState.returning, now);
       }
     } else if (kteState == KteState.returning) {
@@ -267,11 +295,12 @@ class StandingKneeToElbow extends ExerciseBase {
 
   void _transitionState(KteState newState, int timestampMs) {
     if (newState == kteState) return;
-    
+
     previousKteState = kteState;
     kteState = newState;
 
-    if (newState == KteState.approaching && previousKteState == KteState.standing_base) {
+    if (newState == KteState.approaching &&
+        previousKteState == KteState.standing_base) {
       resultIssues.instructions.clear();
     }
 
@@ -299,7 +328,8 @@ class StandingKneeToElbow extends ExerciseBase {
 
     setFeedback.add({correctForm: faultMap});
 
-    logger.addRepLog(RepLog(correctForm: correctForm, repNumber: repCount, data: {
+    logger
+        .addRepLog(RepLog(correctForm: correctForm, repNumber: repCount, data: {
       "fault_types": allFaults.map((f) => f.type).toSet().toList(),
     }));
 

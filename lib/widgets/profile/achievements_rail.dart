@@ -252,9 +252,7 @@ class _MedallionState extends State<_Medallion> {
                             ),
                             const SizedBox(width: 5),
                             Text(
-                              unlocked
-                                  ? (a.unlockedOn ?? '✓')
-                                  : 'CHƯA MỞ',
+                              unlocked ? (a.unlockedOn ?? '✓') : 'CHƯA MỞ',
                               style: TextStyle(
                                 fontFamily: 'BeVietnamPro',
                                 fontSize: 9,

@@ -1,11 +1,11 @@
 // ignore_for_file: non_constant_identifier_names, curly_braces_in_flow_control_structures
-import 'dart:math';
 import 'package:vika/utils/debouncer.dart';
+import 'package:vika/debug/tracked_metric.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/exercise_logger.dart';
-import '../../pose/vika_image_orientation.dart';
 import '../exercise_base.dart';
+import '../side_tracked_exercise_mixin.dart';
 
 import 'metrics/sit_up_metric_base.dart';
 import 'metrics/rom_metric.dart';
@@ -31,7 +31,7 @@ class SitUpConfig {
   static const double LYING_TRUNK_THRESHOLD = 15.0;
 }
 
-class SitUp extends ExerciseBase {
+class SitUp extends ExerciseBase with SideTrackedExerciseMixin {
   final int maxRep;
   SitUpState state = SitUpState.lying;
   SitUpState previousState = SitUpState.lying;
@@ -48,8 +48,22 @@ class SitUp extends ExerciseBase {
   final TempoMetric tempoMetric = TempoMetric();
 
   late final List<SitUpMetricBase> _metrics = [
-    romMetric, jerkingMetric, stabilityMetric, tempoMetric
+    romMetric,
+    jerkingMetric,
+    stabilityMetric,
+    tempoMetric
   ];
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
 
   final Debouncer _risingDebouncer = Debouncer(requiredFrames: 2);
   final Debouncer _uprightDebouncer = Debouncer(requiredFrames: 2);
@@ -59,9 +73,30 @@ class SitUp extends ExerciseBase {
   SitUp({this.maxRep = SitUpConfig.MAX_REP});
 
   @override
-  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+  Set<VikaImageOrientation> get supportedOrientations =>
+      const <VikaImageOrientation>{
         VikaImageOrientation.landscapeLeft,
         VikaImageOrientation.landscapeRight,
+      };
+
+  @override
+  Map<String, SideLandmarkPair> get requiredSideLandmarks => const {
+        'shoulder': (
+          right: PoseLandmarkType.rightShoulder,
+          left: PoseLandmarkType.leftShoulder
+        ),
+        'hip': (
+          right: PoseLandmarkType.rightHip,
+          left: PoseLandmarkType.leftHip
+        ),
+        'knee': (
+          right: PoseLandmarkType.rightKnee,
+          left: PoseLandmarkType.leftKnee
+        ),
+        'ankle': (
+          right: PoseLandmarkType.rightAnkle,
+          left: PoseLandmarkType.leftAnkle
+        ),
       };
 
   @override
@@ -73,10 +108,14 @@ class SitUp extends ExerciseBase {
   @override
   String get currentPhaseLabel {
     switch (state) {
-      case SitUpState.lying: return 'Nằm (Chuẩn bị)';
-      case SitUpState.rising: return 'Cuộn người lên';
-      case SitUpState.upright: return 'Giữ!';
-      case SitUpState.lowering: return 'Hạ người';
+      case SitUpState.lying:
+        return 'Nằm (Chuẩn bị)';
+      case SitUpState.rising:
+        return 'Cuộn người lên';
+      case SitUpState.upright:
+        return 'Giữ!';
+      case SitUpState.lowering:
+        return 'Hạ người';
     }
   }
 
@@ -89,18 +128,25 @@ class SitUp extends ExerciseBase {
 
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    final shoulder = landmarks[PoseLandmarkType.leftShoulder];
-    final hip = landmarks[PoseLandmarkType.leftHip];
-    final knee = landmarks[PoseLandmarkType.leftKnee];
-    final ankle = landmarks[PoseLandmarkType.leftAnkle];
+    final tracked = getSideTrackedLandmarks(landmarks);
+    if (tracked == null) return false;
 
-    if (shoulder == null || hip == null || knee == null || ankle == null) return false;
+    final shoulder = tracked['shoulder']!;
+    final hip = tracked['hip']!;
+    final knee = tracked['knee']!;
+    final ankle = tracked['ankle']!;
+    if (![shoulder, hip, knee, ankle].every(ExerciseBase.isLandmarkConfident)) {
+      return false;
+    }
 
-    double trunkHoriz = _calcHorizontalAngle(shoulder, hip);
-    double kneeAngle = calculateAngleNormalized(firstPoint: hip, midPoint: knee, lastPoint: ankle);
+    double trunkHoriz =
+        calculateAbsoluteHorizontalAngle(point1: shoulder, point2: hip);
+    double kneeAngle = calculateAngleNormalized(
+        firstPoint: hip, midPoint: knee, lastPoint: ankle);
 
     if (trunkHoriz > SitUpConfig.START_TRUNK_HORIZ_MAX) return false;
-    if (kneeAngle < SitUpConfig.START_KNEE_MIN || kneeAngle > SitUpConfig.START_KNEE_MAX) return false;
+    if (kneeAngle < SitUpConfig.START_KNEE_MIN ||
+        kneeAngle > SitUpConfig.START_KNEE_MAX) return false;
 
     return true;
   }
@@ -110,6 +156,7 @@ class SitUp extends ExerciseBase {
 
   @override
   void onSetComplete() {
+    logger.pushKey("max_rep", maxRep);
     logger.pushKey("rom_fails_count", romMetric.faultsCount);
     logger.pushKey("jerking_fails_count", jerkingMetric.faultsCount);
     logger.pushKey("stability_fails_count", stabilityMetric.faultsCount);
@@ -119,7 +166,8 @@ class SitUp extends ExerciseBase {
     StringBuffer dump = StringBuffer();
     dump.writeln("=== DIAGNOSTIC LOG (SIT-UP) ===");
     for (var log in _diagnosticLog) {
-      dump.writeln("${log['time']} | ${log['state']} | ${log['trunk'].toStringAsFixed(1)} | ${log['khs'].toStringAsFixed(1)} | ${log['ankleY'].toStringAsFixed(1)}");
+      dump.writeln(
+          "${log['time']} | ${log['state']} | ${log['trunk'].toStringAsFixed(1)} | ${log['khs'].toStringAsFixed(1)} | ${log['ankleY'].toStringAsFixed(1)}");
     }
     logger.pushKey("diagnostic_dump", dump.toString());
   }
@@ -134,15 +182,24 @@ class SitUp extends ExerciseBase {
       return;
     }
 
-    final shoulder = landmarks[PoseLandmarkType.leftShoulder]!;
-    final hip = landmarks[PoseLandmarkType.leftHip]!;
-    final knee = landmarks[PoseLandmarkType.leftKnee]!;
-    final ankle = landmarks[PoseLandmarkType.leftAnkle]!;
+    final tracked = getSideTrackedLandmarks(landmarks);
+    if (tracked == null) return;
+
+    final shoulder = tracked['shoulder']!;
+    final hip = tracked['hip']!;
+    final knee = tracked['knee']!;
+    final ankle = tracked['ankle']!;
+    if (![shoulder, hip, knee, ankle].every(ExerciseBase.isLandmarkConfident)) {
+      return;
+    }
 
     scaleFactor = calculateDistance(shoulder, hip);
-    double trunkHoriz = _calcHorizontalAngle(shoulder, hip);
-    double kneeAngle = calculateAngleNormalized(firstPoint: hip, midPoint: knee, lastPoint: ankle);
-    double khsAngle = calculateAngleNormalized(firstPoint: knee, midPoint: hip, lastPoint: shoulder);
+    double trunkHoriz =
+        calculateAbsoluteHorizontalAngle(point1: shoulder, point2: hip);
+    double kneeAngle = calculateAngleNormalized(
+        firstPoint: hip, midPoint: knee, lastPoint: ankle);
+    double khsAngle = calculateAngleNormalized(
+        firstPoint: knee, midPoint: hip, lastPoint: shoulder);
 
     final ctx = SitUpRepContext(
       trunkHorizontalAngle: trunkHoriz,
@@ -174,7 +231,7 @@ class SitUp extends ExerciseBase {
       previousState = SitUpState.lying; // Thêm dòng này để reset trạng thái
       return;
     }
-    
+
     if (state != SitUpState.lying) {
       for (final metric in _metrics) metric.update(ctx);
     }
@@ -183,13 +240,18 @@ class SitUp extends ExerciseBase {
   }
 
   void _updateStateMachine(double trunkHoriz, double khsAngle, int now) {
-    if (_risingDebouncer.update(state == SitUpState.lying && trunkHoriz > SitUpConfig.RISING_TRUNK_START)) {
+    if (_risingDebouncer.update(state == SitUpState.lying &&
+        trunkHoriz > SitUpConfig.RISING_TRUNK_START)) {
       _transitionState(SitUpState.rising, now);
-    } else if (_uprightDebouncer.update(state == SitUpState.rising && khsAngle <= SitUpConfig.UPRIGHT_KHS_THRESHOLD)) {
+    } else if (_uprightDebouncer.update(state == SitUpState.rising &&
+        khsAngle <= SitUpConfig.UPRIGHT_KHS_THRESHOLD)) {
       _transitionState(SitUpState.upright, now);
-    } else if (_loweringDebouncer.update(state == SitUpState.upright && khsAngle > SitUpConfig.LOWERING_KHS_THRESHOLD)) {
+    } else if (_loweringDebouncer.update(state == SitUpState.upright &&
+        khsAngle > SitUpConfig.LOWERING_KHS_THRESHOLD)) {
       _transitionState(SitUpState.lowering, now);
-    } else if (_lyingDebouncer.update((state == SitUpState.lowering || state == SitUpState.rising) && trunkHoriz < SitUpConfig.LYING_TRUNK_THRESHOLD)) {
+    } else if (_lyingDebouncer.update(
+        (state == SitUpState.lowering || state == SitUpState.rising) &&
+            trunkHoriz < SitUpConfig.LYING_TRUNK_THRESHOLD)) {
       _transitionState(SitUpState.lying, now);
     }
   }
@@ -198,7 +260,8 @@ class SitUp extends ExerciseBase {
     if (newState == state) return;
     previousState = state;
     state = newState;
-    for (var metric in _metrics) metric.onStateTransition(previousState, newState, now);
+    for (var metric in _metrics)
+      metric.onStateTransition(previousState, newState, now);
   }
 
   void _completeRep(SitUpRepContext ctx) {
@@ -222,26 +285,20 @@ class SitUp extends ExerciseBase {
 
     correctForm = !allFaults.any((f) => f.affectsForm);
 
-    if (!correctForm) resultIssues.feedback['Result'] = isLegLifted ? 'Không tính rep' : 'Fix Form';
+    if (!correctForm)
+      resultIssues.feedback['Result'] =
+          isLegLifted ? 'Không tính rep' : 'Fix Form';
 
-    logger.addRepLog(RepLog(
-      correctForm: correctForm,
-      repNumber: repCount,
-      data: {
-        "min_khs_angle": romMetric.minKneeHipShoulder ?? 180.0,
-        "lowering_time": tempoMetric.loweringDuration ?? 0.0,
-        "fault_types": allFaults.map((e) => e.type).toSet().toList()
-      }
-    ));
+    logger
+        .addRepLog(RepLog(correctForm: correctForm, repNumber: repCount, data: {
+      "min_khs_angle": romMetric.minKneeHipShoulder ?? 180.0,
+      "lowering_time": tempoMetric.loweringDuration ?? 0.0,
+      "fault_types": allFaults.map((e) => e.type).toSet().toList()
+    }));
 
     correctForm = true;
     for (var metric in _metrics) metric.resetAndCountFault();
   }
 
   // FIX: Dùng atan2 thay vì (dy/dx * 180/π) — công thức cũ trả về tan(θ)×(180/π), không phải góc thật
-  double _calcHorizontalAngle(PoseLandmark p1, PoseLandmark p2) {
-    double dy = (p2.y - p1.y).abs();
-    double dx = (p2.x - p1.x).abs();
-    return atan2(dy, dx) * (180 / pi);
-  }
 }

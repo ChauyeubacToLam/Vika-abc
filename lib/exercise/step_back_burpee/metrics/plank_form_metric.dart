@@ -10,7 +10,7 @@ import 'step_back_burpee_metric_base.dart';
 class PlankConfig {
   static const double SAG_WARNING = 160.0;
   static const double SAG_DANGER = 150.0; // Góc trục thân (võng)
-  
+
   static const double SHORT_STEP_WARNING = 160.0; // Góc hông mở (bear plank)
   static const double ARM_BENT_WARNING = 150.0; // Góc khuỷu tay
 }
@@ -39,7 +39,7 @@ class PlankFormMetric extends StepBackBurpeeMetricBase {
       if (_minBodyAngle == null || ctx.bodyAlignmentAngle < _minBodyAngle!) {
         _minBodyAngle = ctx.bodyAlignmentAngle;
       }
-      
+
       // 2. Check biên độ bước (tìm góc lớn nhất của Hông mở ra)
       if (_maxHipAngle == null || ctx.hipAngle > _maxHipAngle!) {
         _maxHipAngle = ctx.hipAngle;
@@ -62,8 +62,8 @@ class PlankFormMetric extends StepBackBurpeeMetricBase {
   @override
   void onStateTransition(BurpeeState from, BurpeeState to, int timestampMs) {
     // Vừa thoát khỏi Plank để bước lên -> Chốt đánh giá
-    if (from == BurpeeState.highPlank && (to == BurpeeState.steppingForward || to == BurpeeState.standingUp)) {
-      
+    if (from == BurpeeState.highPlank &&
+        (to == BurpeeState.steppingForward || to == BurpeeState.standingUp)) {
       // Lỗi võng lưng
       if (_minBodyAngle != null && _minBodyAngle! < PlankConfig.SAG_DANGER) {
         _faults.add(FaultRecord(
@@ -73,9 +73,10 @@ class PlankFormMetric extends StepBackBurpeeMetricBase {
           affectsForm: true,
         ));
       }
-      
+
       // Lỗi bước ngắn (bear plank / co gập khi nằm)
-      if (_maxHipAngle != null && _maxHipAngle! < PlankConfig.SHORT_STEP_WARNING) {
+      if (_maxHipAngle != null &&
+          _maxHipAngle! < PlankConfig.SHORT_STEP_WARNING) {
         _faults.add(FaultRecord(
           phase: 'REP_COMPLETE',
           type: 'Amplitude',

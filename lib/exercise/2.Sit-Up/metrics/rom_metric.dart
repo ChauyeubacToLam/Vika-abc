@@ -17,7 +17,8 @@ class RomMetric extends SitUpMetricBase {
   @override
   void update(SitUpRepContext ctx) {
     if (ctx.state == SitUpState.rising || ctx.state == SitUpState.upright) {
-      if (minKneeHipShoulder == null || ctx.kneeHipShoulderAngle < minKneeHipShoulder!) {
+      if (minKneeHipShoulder == null ||
+          ctx.kneeHipShoulderAngle < minKneeHipShoulder!) {
         minKneeHipShoulder = ctx.kneeHipShoulderAngle;
       }
     }
@@ -29,7 +30,8 @@ class RomMetric extends SitUpMetricBase {
       _faults.add(FaultRecord(
         phase: 'REP_COMPLETE',
         type: 'ROM',
-        message: 'Chưa lên cao nhất: ${minKneeHipShoulder!.toStringAsFixed(1)} độ',
+        message:
+            'Chưa lên cao nhất: ${minKneeHipShoulder!.toStringAsFixed(1)} độ',
         voiceMessage: 'Cố gắng cuộn người cao hơn nữa',
         affectsForm: true,
         priority: SitUpFaultPriority.rom,

@@ -4,9 +4,9 @@ import '../../../utils/debouncer.dart';
 class LumbarExtensionMetric extends SupermanMetricBase {
   @override
   String get name => 'LumbarExtension';
-  
+
   // Fix #2: Bỏ ghi đè _faults, _debugData và get faults, get debugData
-  
+
   final Debouncer _dangerDebouncer = Debouncer(requiredFrames: 3);
 
   double? _minTrunkAngle;
@@ -21,11 +21,16 @@ class LumbarExtensionMetric extends SupermanMetricBase {
     debugData['minTrunkAngle'] = _minTrunkAngle?.toStringAsFixed(1) ?? '-';
 
     // Fix #3: Đổi điều kiện uốn cong lưng âm dần thành < -LUMBAR_EXTENSION_DANGER
-    bool isDangerousExtension = ctx.trunkAngle < -SupermanConfig.LUMBAR_EXTENSION_DANGER;
+    bool isDangerousExtension =
+        ctx.trunkAngle < -SupermanConfig.LUMBAR_EXTENSION_DANGER;
 
     if (_dangerDebouncer.update(isDangerousExtension)) {
       ctx.resultIssues.feedback['Spine'] = 'Uốn lưng quá gắt! Hạ thấp tay chân';
-      _logFault(ctx.state.name.toUpperCase(), 'Uốn lưng quá mức', 'Hạ thấp tay chân xuống, không uốn cong lưng quá gắt!', SupermanVoicePriority.lumbarExtension);
+      _logFault(
+          ctx.state.name.toUpperCase(),
+          'Uốn lưng quá mức',
+          'Hạ thấp tay chân xuống, không uốn cong lưng quá gắt!',
+          SupermanVoicePriority.lumbarExtension);
     } else {
       ctx.resultIssues.feedback['Spine'] = 'Cột sống an toàn';
     }
@@ -35,8 +40,12 @@ class LumbarExtensionMetric extends SupermanMetricBase {
     if (!faults.any((f) => f.type == type)) {
       // Fix #2: Sử dụng addFault() của base class
       addFault(FaultRecord(
-        phase: phase, type: type, message: msg, affectsForm: true, priority: priority, voiceMessage: msg
-      ));
+          phase: phase,
+          type: type,
+          message: msg,
+          affectsForm: true,
+          priority: priority,
+          voiceMessage: msg));
     }
   }
 

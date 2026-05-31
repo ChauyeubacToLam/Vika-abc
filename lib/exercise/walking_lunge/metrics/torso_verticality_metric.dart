@@ -2,7 +2,8 @@ import 'walking_metric_base.dart';
 import '../walking_lunge.dart';
 
 class TorsoVerticalityMetric extends WalkingMetricBase {
-  static const double MAX_FORWARD_LEAN = 20.0; // 10 degrees is too strict, use 20.
+  static const double MAX_FORWARD_LEAN =
+      20.0; // 10 degrees is too strict, use 20.
 
   @override
   void update(WalkingRepContext ctx) {
@@ -13,9 +14,9 @@ class TorsoVerticalityMetric extends WalkingMetricBase {
         FaultRecord(
           type: 'torso_lean',
           message: 'Lưng bị gập quá nhiều. Hãy giữ thân thẳng đứng.',
-          affectsForm: false, 
+          affectsForm: false,
           phase: ctx.state.name,
-          priority: 3, // Medium
+          priority: WalkingFaultPriority.torsoLean,
           voiceMessage: 'Giữ lưng thẳng lên!',
         ),
       );

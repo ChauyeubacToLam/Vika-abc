@@ -345,8 +345,7 @@ class _SearchField extends StatelessWidget {
               behavior: HitTestBehavior.opaque,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Icon(Icons.close_rounded,
-                    size: 16, color: c.inkSoft),
+                child: Icon(Icons.close_rounded, size: 16, color: c.inkSoft),
               ),
             )
           else
@@ -470,12 +469,10 @@ class _Chip extends StatelessWidget {
             ),
             const SizedBox(width: 6),
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
               decoration: BoxDecoration(
-                color: active
-                    ? c.yellow.withValues(alpha: 0.22)
-                    : c.yellowGhost,
+                color:
+                    active ? c.yellow.withValues(alpha: 0.22) : c.yellowGhost,
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
@@ -613,8 +610,7 @@ class _CatalogRow extends StatelessWidget {
                   borderRadius: BorderRadius.circular(9),
                 ),
                 alignment: Alignment.center,
-                child: PoseGlyph(
-                    type: row.glyph, size: 22, dark: !row.yoga),
+                child: PoseGlyph(type: row.glyph, size: 22, dark: !row.yoga),
               ),
               const SizedBox(width: 12),
               Expanded(

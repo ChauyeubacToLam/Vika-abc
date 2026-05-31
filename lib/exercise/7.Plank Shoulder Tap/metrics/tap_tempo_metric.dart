@@ -3,7 +3,7 @@ import 'plank_shoulder_tap_metric_base.dart';
 class TapTempoMetric extends PlankTapMetricBase {
   @override
   String get name => 'TapTempo';
-  
+
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
 
@@ -15,7 +15,8 @@ class TapTempoMetric extends PlankTapMetricBase {
   Map<String, dynamic> get debugData => _debugData;
 
   @override
-  void onStateTransition(PlankTapState from, PlankTapState to, int timestampMs) {
+  void onStateTransition(
+      PlankTapState from, PlankTapState to, int timestampMs) {
     if (from == PlankTapState.base && to == PlankTapState.lifting) {
       _liftStartMs = timestampMs;
     }
@@ -35,9 +36,12 @@ class TapTempoMetric extends PlankTapMetricBase {
       double totalLiftTime = (ctx.frameTimestamp - _liftStartMs!) / 1000.0;
       if (totalLiftTime < PlankTapConfig.MIN_TAP_TIME) {
         _faults.add(FaultRecord(
-          phase: 'RETURNING', type: 'TooFast', message: 'Tập giật cục, quá nhanh',
-          affectsForm: false, priority: PlankTapVoicePriority.tempo, voiceMessage: 'Chậm lại! Kiểm soát nhịp độ khi nhấc tay'
-        ));
+            phase: 'RETURNING',
+            type: 'TooFast',
+            message: 'Tập giật cục, quá nhanh',
+            affectsForm: false,
+            priority: PlankTapVoicePriority.tempo,
+            voiceMessage: 'Chậm lại! Kiểm soát nhịp độ khi nhấc tay'));
       }
     }
   }

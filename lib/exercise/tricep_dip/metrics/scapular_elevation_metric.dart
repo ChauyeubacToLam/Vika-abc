@@ -2,16 +2,18 @@ import 'tricep_metric_base.dart';
 import '../../exercise_base.dart';
 
 class ScapularElevationMetric extends TricepMetricBase {
-  static const double SHRUG_THRESHOLD_RATIO = 0.5; // Ear to shoulder distance is very small relative to forearm
+  static const double SHRUG_THRESHOLD_RATIO =
+      0.5; // Ear to shoulder distance is very small relative to forearm
 
   @override
   void update(TricepRepContext ctx) {
     if (ctx.ear == null || !ExerciseBase.isLandmarkConfident(ctx.ear!)) return;
 
     double earToShoulderY = (ctx.ear!.y - ctx.shoulder.y).abs();
-    
+
     // Normalize using forearm length
-    double ratio = ctx.forearmLength > 0 ? (earToShoulderY / ctx.forearmLength) : 1.0;
+    double ratio =
+        ctx.forearmLength > 0 ? (earToShoulderY / ctx.forearmLength) : 1.0;
 
     // If ear is very close to shoulder vertically
     if (ratio < SHRUG_THRESHOLD_RATIO) {

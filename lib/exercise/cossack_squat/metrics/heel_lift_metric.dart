@@ -6,13 +6,17 @@ class CossackHeelLiftMetric extends CossackMetricBase {
 
   @override
   void update(CossackRepContext ctx) {
-    if (ctx.state == CossackState.standing || ctx.workingLeg == WorkingLeg.none) return;
+    if (ctx.state == CossackState.standing ||
+        ctx.workingLeg == WorkingLeg.none) {
+      return;
+    }
 
     if (ctx.workingHeelDistance > HEEL_LIFT_THRESHOLD) {
       addFault(
         FaultRecord(
           type: 'heel_lift',
-          message: 'Gót chân trụ phải chạm sàn. Nếu không làm được, hãy squat nông lại!',
+          message:
+              'Gót chân trụ phải chạm sàn. Nếu không làm được, hãy squat nông lại!',
           affectsForm: true,
           phase: ctx.state.name,
           priority: 2, // High

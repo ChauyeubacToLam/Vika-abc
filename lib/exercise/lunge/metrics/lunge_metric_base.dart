@@ -8,6 +8,7 @@ import '../lunge.dart';
 import '../../exercise_base.dart';
 import '../../fault_record.dart';
 export '../../fault_record.dart';
+
 /* =========================================================================
    LungeRepContext — Shared per-frame state, passed to all metrics.
    Avoids each metric needing to recalculate the same geometry.
@@ -45,7 +46,6 @@ class LungeRepContext {
     required this.resultIssues,
   });
 }
-
 
 /* =========================================================================
    LungeMetricBase — Interface every lunge metric implements.

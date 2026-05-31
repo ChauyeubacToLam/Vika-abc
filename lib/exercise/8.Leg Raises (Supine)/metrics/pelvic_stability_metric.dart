@@ -6,7 +6,7 @@ class PelvicStabilityMetric extends LegRaiseMetricBase {
   String get name => 'PelvicStability';
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
-  
+
   double? _baselineHipY; // Tọa độ hông chuẩn khi nằm sát sàn
   final Debouncer _faultDebouncer = Debouncer(requiredFrames: 3);
 
@@ -16,10 +16,11 @@ class PelvicStabilityMetric extends LegRaiseMetricBase {
   Map<String, dynamic> get debugData => _debugData;
 
   @override
-  void onStateTransition(LegRaiseState from, LegRaiseState to, int timestampMs) {
+  void onStateTransition(
+      LegRaiseState from, LegRaiseState to, int timestampMs) {
     // Cập nhật điểm gốc khi chuẩn bị nâng lên (Lúc này lưng đang áp sát sàn nhất)
     if (from == LegRaiseState.lying && to == LegRaiseState.raising) {
-       // Note: Reset baseline each rep is safer to account for body slight shifts
+      // Note: Reset baseline each rep is safer to account for body slight shifts
       _baselineHipY = null;
     }
   }
@@ -43,7 +44,8 @@ class PelvicStabilityMetric extends LegRaiseMetricBase {
             phase: ctx.state.name,
             type: 'PelvicInstability',
             message: 'Khung chậu bất ổn / Võng lưng',
-            voiceMessage: 'Võng lưng! Đừng hạ chân quá sâu nếu bạn không giữ được lưng sát sàn!',
+            voiceMessage:
+                'Võng lưng! Đừng hạ chân quá sâu nếu bạn không giữ được lưng sát sàn!',
             affectsForm: true,
             priority: LegRaiseFaultPriority.pelvicInstability,
           ));

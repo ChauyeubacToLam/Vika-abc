@@ -8,7 +8,8 @@ class HoldTimeMetric extends SupermanMetricBase {
   double lastHoldDurationMs = 0;
 
   @override
-  void onStateTransition(SupermanState from, SupermanState to, int timestampMs) {
+  void onStateTransition(
+      SupermanState from, SupermanState to, int timestampMs) {
     if (to == SupermanState.hold) {
       _holdStartMs = timestampMs;
     } else if (from == SupermanState.hold && _holdStartMs != null) {

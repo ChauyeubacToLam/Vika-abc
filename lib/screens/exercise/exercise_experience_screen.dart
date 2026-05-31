@@ -301,8 +301,8 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     _phase = _WorkoutFlowPhase.active;
   }
 
-  ({ExerciseReportBuilder builder, double met}) _resolveReportEntry() {
-    return reportBuilders[widget.definition.id] ??
+  ReportBuilderEntry _resolveReportEntry() {
+    return resolveReportBuilder(widget.definition.id) ??
         (builder: GenericReportBuilder(), met: 3.5);
   }
 
@@ -321,7 +321,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     required PostExerciseData report,
     required Duration totalDuration,
   }) {
-    final estimator = calorieEstimators[widget.definition.id] ??
+    final estimator = resolveCalorieEstimator(widget.definition.id) ??
         const GenericMetCalorieEstimator();
     return estimator.estimateCalories(
       setLoggers: _setLoggers,
@@ -612,8 +612,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
             onSessionRpe: (_) {
               // NOTE(wiring): persist session-level RPE separately.
             },
-            onDone: () => Navigator.of(summaryContext)
-                .pop({'completed': true}),
+            onDone: () => Navigator.of(summaryContext).pop({'completed': true}),
           ),
         ),
       );
@@ -672,9 +671,8 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
           isContinuation: _isContinuationSlot,
           previousExerciseName: prev?.exerciseName,
           previousExerciseFormScore: prev?.formScore,
-          onPreviousDifficulty: prev != null
-              ? _handlePreviousExerciseDifficulty
-              : null,
+          onPreviousDifficulty:
+              prev != null ? _handlePreviousExerciseDifficulty : null,
           onStart: _beginWorkout,
           onBack: () => Navigator.of(context).pop(),
         ),
@@ -904,7 +902,7 @@ class _ExerciseExperienceSpec {
           videoDuration: '1:10',
           createExercise: (repsPerSet) => JumpingJack(maxRep: repsPerSet),
         );
-        case 'warrior_one':
+      case 'warrior_one':
         return _generic(
           definition: definition,
           sets: overrideSets ?? 1,

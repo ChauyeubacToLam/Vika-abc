@@ -339,7 +339,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'descending': const Color(0xFF00B0FF),
     },
   ),
-   ExerciseDefinition(
+  ExerciseDefinition(
     id: 'warrior_one',
     name: 'Warrior I',
     subtitle: 'Virabhadrasana I',
@@ -1071,5 +1071,4 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'default': const Color(0xFF00E676),
     },
   ),
-
 ];

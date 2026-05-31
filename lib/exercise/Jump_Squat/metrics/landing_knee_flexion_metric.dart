@@ -35,22 +35,28 @@ class LandingKneeFlexionMetric extends JumpSquatMetricBase {
   void update(RepContext ctx) {
     // Chỉ tracking tìm góc gối sâu nhất trong pha LANDING
     if (ctx.jumpSquatState == JumpSquatState.landing) {
-      if (_minLandingKneeAngle == null || ctx.kneeAngle < _minLandingKneeAngle!) {
+      if (_minLandingKneeAngle == null ||
+          ctx.kneeAngle < _minLandingKneeAngle!) {
         _minLandingKneeAngle = ctx.kneeAngle;
       }
-      _debugData['minLandingKnee'] = _minLandingKneeAngle?.toStringAsFixed(1) ?? '-';
+      _debugData['minLandingKnee'] =
+          _minLandingKneeAngle?.toStringAsFixed(1) ?? '-';
     }
   }
 
   @override
-  void onStateTransition(JumpSquatState from, JumpSquatState to, int timestampMs) {
+  void onStateTransition(
+      JumpSquatState from, JumpSquatState to, int timestampMs) {
     // Chuyển từ hạ gối tiếp đất sang đứng thẳng -> Chốt sổ đánh giá
-    if (from == JumpSquatState.landing && to == JumpSquatState.standing && !_evaluated) {
-      _evaluateLanding(RepContext); // RepContext ở đây lấy tham chiếu gián tiếp, nhưng ta dùng biến local
+    if (from == JumpSquatState.landing &&
+        to == JumpSquatState.standing &&
+        !_evaluated) {
+      _evaluateLanding(
+          RepContext); // RepContext ở đây lấy tham chiếu gián tiếp, nhưng ta dùng biến local
       _evaluated = true;
     }
   }
-  
+
   void _evaluateLanding(Type repContextType) {
     if (_minLandingKneeAngle == null) return;
 
@@ -61,14 +67,16 @@ class LandingKneeFlexionMetric extends JumpSquatMetricBase {
       _faults.add(FaultRecord(
         phase: phase,
         type: 'Knee',
-        message: 'Tiếp đất chân quá thẳng (${angle.toStringAsFixed(0)}°)! Nguy hiểm khớp gối.',
+        message:
+            'Tiếp đất chân quá thẳng (${angle.toStringAsFixed(0)}°)! Nguy hiểm khớp gối.',
         affectsForm: true, // Hủy rep, tính là form hỏng nặng
       ));
     } else if (angle > LandingConfig.SAFE_FLEXION_MAX) {
       _faults.add(FaultRecord(
         phase: phase,
         type: 'Knee',
-        message: 'Tiếp đất chưa đủ sâu (${angle.toStringAsFixed(0)}°). Hãy trùng gối thêm!',
+        message:
+            'Tiếp đất chưa đủ sâu (${angle.toStringAsFixed(0)}°). Hãy trùng gối thêm!',
         affectsForm: false, // Cảnh báo
       ));
     }

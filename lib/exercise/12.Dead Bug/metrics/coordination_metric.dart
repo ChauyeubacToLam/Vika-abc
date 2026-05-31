@@ -5,7 +5,7 @@ class CoordinationMetric extends DeadBugMetricBase {
   String get name => 'Coordination';
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
-  
+
   bool _evaluatedThisRep = false;
   bool? _lastWasLeftArm;
 
@@ -16,9 +16,11 @@ class CoordinationMetric extends DeadBugMetricBase {
 
   @override
   void update(DeadBugRepContext ctx) {
-    if ((ctx.state == DeadBugState.extending || ctx.state == DeadBugState.hold) && !_evaluatedThisRep) {
-      
-      bool sameSide = ctx.physicalLeftArmExtending == ctx.physicalLeftLegExtending;
+    if ((ctx.state == DeadBugState.extending ||
+            ctx.state == DeadBugState.hold) &&
+        !_evaluatedThisRep) {
+      bool sameSide =
+          ctx.physicalLeftArmExtending == ctx.physicalLeftLegExtending;
 
       if (sameSide) {
         _faults.add(FaultRecord(
@@ -30,22 +32,21 @@ class CoordinationMetric extends DeadBugMetricBase {
           priority: DeadBugFaultPriority.coordination,
         ));
         _evaluatedThisRep = true;
-      }
-      else {
-         // Chuyển động chéo chính xác (Khác bên)
-         bool currentIsLeftArm = ctx.physicalLeftArmExtending;
-         if (_lastWasLeftArm != null && _lastWasLeftArm == currentIsLeftArm) {
-             _faults.add(FaultRecord(
-               phase: ctx.state.name,
-               type: 'NotAlternating',
-               message: 'Không luân phiên đổi bên',
-               voiceMessage: 'Nhớ đổi bên sau mỗi lần nhé',
-               affectsForm: true,
-               priority: DeadBugFaultPriority.coordination,
-             ));
-         }
-         _lastWasLeftArm = currentIsLeftArm;
-         _evaluatedThisRep = true;
+      } else {
+        // Chuyển động chéo chính xác (Khác bên)
+        bool currentIsLeftArm = ctx.physicalLeftArmExtending;
+        if (_lastWasLeftArm != null && _lastWasLeftArm == currentIsLeftArm) {
+          _faults.add(FaultRecord(
+            phase: ctx.state.name,
+            type: 'NotAlternating',
+            message: 'Không luân phiên đổi bên',
+            voiceMessage: 'Nhớ đổi bên sau mỗi lần nhé',
+            affectsForm: true,
+            priority: DeadBugFaultPriority.coordination,
+          ));
+        }
+        _lastWasLeftArm = currentIsLeftArm;
+        _evaluatedThisRep = true;
       }
     }
   }

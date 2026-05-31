@@ -5,7 +5,7 @@ class SyncElevationMetric extends VUpMetricBase {
   String get name => 'SyncElevation';
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
-  
+
   double? _baselineShoulderY;
   double? _baselineAnkleY;
   bool _evaluatedThisRep = false;
@@ -18,7 +18,7 @@ class SyncElevationMetric extends VUpMetricBase {
   @override
   void onStateTransition(VUpState from, VUpState to, int timestampMs) {
     if (from == VUpState.lying && to == VUpState.rising) {
-       _evaluatedThisRep = false;
+      _evaluatedThisRep = false;
     }
   }
 
@@ -30,11 +30,15 @@ class SyncElevationMetric extends VUpMetricBase {
       return;
     }
 
-    if (ctx.state == VUpState.rising && !_evaluatedThisRep && ctx.scaleFactor != null && _baselineShoulderY != null) {
+    if (ctx.state == VUpState.rising &&
+        !_evaluatedThisRep &&
+        ctx.scaleFactor != null &&
+        _baselineShoulderY != null) {
       // Y hướng xuống sàn. Nhấc lên -> Y giảm.
-      double shoulderLift = (_baselineShoulderY! - ctx.shoulderY) / ctx.scaleFactor!;
+      double shoulderLift =
+          (_baselineShoulderY! - ctx.shoulderY) / ctx.scaleFactor!;
       double ankleLift = (_baselineAnkleY! - ctx.ankleY) / ctx.scaleFactor!;
-      
+
       _debugData['shldLift'] = shoulderLift.toStringAsFixed(2);
       _debugData['ankleLift'] = ankleLift.toStringAsFixed(2);
 
@@ -53,7 +57,7 @@ class SyncElevationMetric extends VUpMetricBase {
         ));
         _evaluatedThisRep = true; // Chỉ log 1 lần mỗi rep
       }
-      
+
       // Nếu cả 2 đều đã lên quá 15% mà không dính lỗi -> form tốt, bỏ qua đánh giá tiếp
       if (shoulderLift > 0.15 && ankleLift > 0.15) {
         _evaluatedThisRep = true;

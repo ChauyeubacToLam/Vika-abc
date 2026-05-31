@@ -21,8 +21,9 @@ class AnkleDorsiflexionMetric extends SeatedForwardMetricBase {
     if (ctx.state == SeatedForwardState.setup) return;
 
     _debugData['ankleAngle'] = ctx.ankleAngle.toStringAsFixed(1);
-    
-    bool isPlantarFlexion = ctx.ankleAngle > SeatedForwardConfig.Ad_Fault_Ankle_Angle;
+
+    bool isPlantarFlexion =
+        ctx.ankleAngle > SeatedForwardConfig.Ad_Fault_Ankle_Angle;
 
     if (_ankleDebouncer.update(isPlantarFlexion)) {
       ctx.resultIssues.feedback['Ankle'] = 'Bẻ gập mũi chân!';
@@ -47,7 +48,7 @@ class AnkleDorsiflexionMetric extends SeatedForwardMetricBase {
         type: 'AnklePlantar',
         message: 'Lỗi duỗi mũi chân',
         voiceMessage: voiceMessage,
-        affectsForm: false, 
+        affectsForm: false,
         priority: SeatedForwardFaultVoicePriority.ankleDorsi,
       ));
     }

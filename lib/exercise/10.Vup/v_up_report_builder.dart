@@ -11,9 +11,12 @@ class VUpReportBuilder extends ExerciseReportBuilder {
 
   @override
   Map<String, String> faultToTipMap() => {
-        'sync_fails_count': 'Nâng tay lên trước sẽ tạo áp lực bẻ cong thắt lưng. Hãy tưởng tượng tay và chân bạn được nối bằng một sợi dây.',
-        'jerking_fails_count': 'Lực giật là kẻ thù của đĩa đệm. Hãy lên bằng sức căng của cơ bụng.',
-        'rom_fails_count': 'Bạn chưa gập thành hình chữ V. Cố ép bụng vào đùi sâu hơn nữa.',
+        'sync_fails_count':
+            'Nâng tay lên trước sẽ tạo áp lực bẻ cong thắt lưng. Hãy tưởng tượng tay và chân bạn được nối bằng một sợi dây.',
+        'jerking_fails_count':
+            'Lực giật là kẻ thù của đĩa đệm. Hãy lên bằng sức căng của cơ bụng.',
+        'rom_fails_count':
+            'Bạn chưa gập thành hình chữ V. Cố ép bụng vào đùi sâu hơn nữa.',
       };
 
   @override
@@ -31,7 +34,9 @@ class VUpReportBuilder extends ExerciseReportBuilder {
       };
 
   @override
-  DetectedEvidence? detectIssue(List<ExerciseLogger> setLoggers) { return null; }
+  DetectedEvidence? detectIssue(List<ExerciseLogger> setLoggers) {
+    return null;
+  }
 
   @override
   List<DetailCard> buildDetailCards(List<ExerciseLogger> setLoggers) {
@@ -40,16 +45,27 @@ class VUpReportBuilder extends ExerciseReportBuilder {
     if (totalReps == 0) return [];
 
     // Tính điểm Đồng bộ (Sync)
-    int syncFails = setLoggers.map((l) => l.setLogs['sync_fails_count'] as int? ?? 0).reduce((a, b) => a + b);
-    double syncScore = totalReps > 0 ? ((totalReps - syncFails) / totalReps) * 100 : 0;
+    int syncFails = setLoggers
+        .map((l) => l.setLogs['sync_fails_count'] as int? ?? 0)
+        .reduce((a, b) => a + b);
+    double syncScore =
+        totalReps > 0 ? ((totalReps - syncFails) / totalReps) * 100 : 0;
 
     // V-Angle Completeness (% rep gập sâu)
-    int romFails = setLoggers.map((l) => l.setLogs['rom_fails_count'] as int? ?? 0).reduce((a, b) => a + b);
-    double romCompleteness = totalReps > 0 ? ((totalReps - romFails) / totalReps) * 100 : 0;
+    int romFails = setLoggers
+        .map((l) => l.setLogs['rom_fails_count'] as int? ?? 0)
+        .reduce((a, b) => a + b);
+    double romCompleteness =
+        totalReps > 0 ? ((totalReps - romFails) / totalReps) * 100 : 0;
 
     // Eccentric Tempo
-    final allTempos = allReps.map((r) => (r.data['lowering_time'] as num?)?.toDouble() ?? 0).where((t) => t > 0).toList();
-    final avgTempo = allTempos.isEmpty ? 0.0 : allTempos.reduce((a, b) => a + b) / allTempos.length;
+    final allTempos = allReps
+        .map((r) => (r.data['lowering_time'] as num?)?.toDouble() ?? 0)
+        .where((t) => t > 0)
+        .toList();
+    final avgTempo = allTempos.isEmpty
+        ? 0.0
+        : allTempos.reduce((a, b) => a + b) / allTempos.length;
 
     return [
       DetailCard(

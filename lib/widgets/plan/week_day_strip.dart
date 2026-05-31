@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import '../../data/plan_mock.dart';
 import '../../theme/vf_theme.dart';
 import '../../theme/app_colors.dart';
+
 class WeekDayStrip extends StatelessWidget {
   const WeekDayStrip({
     super.key,
@@ -98,9 +99,7 @@ class _Cell extends StatelessWidget {
               letterSpacing: -0.4,
               height: 1,
               fontFeatures: VikaIvoryMain.tabularFigures,
-              color: isToday
-                  ? c.yellowInk
-                  : (isRest ? c.inkGhost : c.ink),
+              color: isToday ? c.yellowInk : (isRest ? c.inkGhost : c.ink),
             ),
           ),
           const SizedBox(height: 6),

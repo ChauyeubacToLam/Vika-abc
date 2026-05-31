@@ -67,11 +67,13 @@ class BackKneeMetric extends WarriorOneMetricBase {
             'Duỗi thẳng chân sau hơn nhé! Siết cơ đùi trước để giữ chân vững.');
         _instructionSet = true;
       }
-      _logFault(phase, 'Back knee bent / floppy', voiceMessage: 'Duỗi thẳng chân sau');
+      _logFault(phase, 'Back knee bent / floppy',
+          voiceMessage: 'Duỗi thẳng chân sau');
     } else if (angle >= BackKneeConfig.WARN_THRESHOLD &&
         angle < BackKneeConfig.GOOD_THRESHOLD) {
       // 150°–160° warning band — feedback only, no fault.
-      ctx.resultIssues.feedback['back_knee'] = 'Chân sau gần thẳng rồi, cố thêm chút!';
+      ctx.resultIssues.feedback['back_knee'] =
+          'Chân sau gần thẳng rồi, cố thêm chút!';
     } else {
       ctx.resultIssues.feedback['back_knee'] = 'Chân sau thẳng tốt!';
     }

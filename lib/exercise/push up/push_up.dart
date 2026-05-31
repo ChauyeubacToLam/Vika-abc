@@ -5,7 +5,6 @@ import 'dart:math' as math;
 
 import 'package:vika/utils/debouncer.dart';
 import 'package:vika/utils/frame_buffer.dart';
-import 'package:vika/pose/vika_image_orientation.dart';
 
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/frame_snapshot.dart';

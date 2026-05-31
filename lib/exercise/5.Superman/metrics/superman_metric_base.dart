@@ -1,5 +1,7 @@
 import '../../exercise_base.dart';
 import '../../fault_record.dart';
+import '../../../debug/debug_types.dart';
+export '../../../debug/debug_types.dart';
 export '../../fault_record.dart';
 
 // ─── State Machine ───────────────────────────────────────────────────────────
@@ -49,16 +51,29 @@ class SupermanRepContext {
 }
 
 // ─── Metric Base ─────────────────────────────────────────────────────────────
-abstract class SupermanMetricBase {
+abstract class SupermanMetricBase implements DebugMetricSource {
   int faultsCount = 0;
   final List<FaultRecord> _faults = [];
+  @override
   final Map<String, dynamic> debugData = {};
 
   List<FaultRecord> get faults => List.unmodifiable(_faults);
+  @override
   String get name;
+  @override
+  double? get value => null;
+  @override
+  ThresholdBand? get threshold => null;
+  @override
+  MetricStatus get status => MetricStatus.pass;
+  @override
+  String? get nameVi => null;
+  @override
+  bool get devOnly => false;
 
   void update(SupermanRepContext ctx);
-  void onStateTransition(SupermanState from, SupermanState to, int timestampMs) {}
+  void onStateTransition(
+      SupermanState from, SupermanState to, int timestampMs) {}
   void evaluateRepEnd(SupermanRepContext ctx) {}
 
   void addFault(FaultRecord fault) => _faults.add(fault);

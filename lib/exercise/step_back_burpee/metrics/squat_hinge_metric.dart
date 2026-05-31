@@ -31,12 +31,15 @@ class SquatHingeMetric extends StepBackBurpeeMetricBase {
 
   @override
   void update(RepContext ctx) {
-    if (ctx.burpeeState == BurpeeState.squattingDown || ctx.burpeeState == BurpeeState.steppingBack) {
-      if (_minKneeAngleDuringSquat == null || ctx.kneeAngle < _minKneeAngleDuringSquat!) {
+    if (ctx.burpeeState == BurpeeState.squattingDown ||
+        ctx.burpeeState == BurpeeState.steppingBack) {
+      if (_minKneeAngleDuringSquat == null ||
+          ctx.kneeAngle < _minKneeAngleDuringSquat!) {
         _minKneeAngleDuringSquat = ctx.kneeAngle;
       }
-      _debugData['squatKnee'] = _minKneeAngleDuringSquat?.toStringAsFixed(1) ?? '-';
-      
+      _debugData['squatKnee'] =
+          _minKneeAngleDuringSquat?.toStringAsFixed(1) ?? '-';
+
       // Live feedback
       if (ctx.kneeAngle > SquatHingeConfig.STIFF_LEG_DANGER) {
         ctx.resultIssues.feedback['Back'] = 'Trùng gối xuống! Đừng cúi lưng.';
@@ -53,11 +56,13 @@ class SquatHingeMetric extends StepBackBurpeeMetricBase {
           _faults.add(FaultRecord(
             phase: 'REP_COMPLETE',
             type: 'Spine',
-            message: 'Lỗi nguy hiểm: Cúi gập lưng với chân thẳng. Hãy trùng gối!',
+            message:
+                'Lỗi nguy hiểm: Cúi gập lưng với chân thẳng. Hãy trùng gối!',
             affectsForm: true,
           ));
-        } else if (_minKneeAngleDuringSquat! > SquatHingeConfig.SAFE_KNEE_FLEXION) {
-           _faults.add(FaultRecord(
+        } else if (_minKneeAngleDuringSquat! >
+            SquatHingeConfig.SAFE_KNEE_FLEXION) {
+          _faults.add(FaultRecord(
             phase: 'REP_COMPLETE',
             type: 'Spine',
             message: 'Hạ hông và gập gối sâu hơn nữa khi chạm đất.',

@@ -15,7 +15,8 @@ class TempoMetric extends LegRaiseMetricBase {
   Map<String, dynamic> get debugData => _debugData;
 
   @override
-  void onStateTransition(LegRaiseState from, LegRaiseState to, int timestampMs) {
+  void onStateTransition(
+      LegRaiseState from, LegRaiseState to, int timestampMs) {
     if (to == LegRaiseState.lowering) {
       _loweringStartMs = timestampMs;
     } else if (to == LegRaiseState.lying && _loweringStartMs != null) {
@@ -28,15 +29,18 @@ class TempoMetric extends LegRaiseMetricBase {
 
   void evaluateRep(LegRaiseRepContext ctx) {
     // Nếu rớt tự do < TEMPO_FAULT_THRESHOLD (ví dụ < 2.0s)
-    if (loweringDuration != null && loweringDuration! < LegRaiseConfig.TEMPO_FAULT_THRESHOLD) {
-       _faults.add(FaultRecord(
-          phase: 'REP_COMPLETE',
-          type: 'Tempo',
-          message: 'Thả rơi chân quá nhanh (${loweringDuration!.toStringAsFixed(1)}s)',
-          voiceMessage: 'Từ từ thôi! Hạ chân chậm lại để giữ an toàn cho thắt lưng!',
-          affectsForm: true,
-          priority: LegRaiseFaultPriority.tempo,
-        ));
+    if (loweringDuration != null &&
+        loweringDuration! < LegRaiseConfig.TEMPO_FAULT_THRESHOLD) {
+      _faults.add(FaultRecord(
+        phase: 'REP_COMPLETE',
+        type: 'Tempo',
+        message:
+            'Thả rơi chân quá nhanh (${loweringDuration!.toStringAsFixed(1)}s)',
+        voiceMessage:
+            'Từ từ thôi! Hạ chân chậm lại để giữ an toàn cho thắt lưng!',
+        affectsForm: true,
+        priority: LegRaiseFaultPriority.tempo,
+      ));
     }
   }
 

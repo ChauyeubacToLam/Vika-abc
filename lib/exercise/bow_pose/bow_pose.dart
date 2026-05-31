@@ -2,7 +2,6 @@
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/debouncer.dart';
-import '../../pose/vika_image_orientation.dart';
 import '../exercise_base.dart';
 import 'metrics/bow_pose_metric_base.dart';
 import 'metrics/connection_metric.dart';
@@ -11,9 +10,9 @@ import 'metrics/hold_duration_metric.dart';
 import 'metrics/stability_metric.dart';
 
 class BowPoseConfig {
-  static const int MAX_REP = 3; 
+  static const int MAX_REP = 3;
 
-  static const double KNEE_SETUP_ANGLE = 135.0; 
+  static const double KNEE_SETUP_ANGLE = 135.0;
   static const double CHEST_LIFT_THRESHOLD = 0.08;
   static const double THIGH_LIFT_THRESHOLD = 0.01;
   static const double RELEASE_DIST_THRESHOLD = 0.50;
@@ -21,7 +20,8 @@ class BowPoseConfig {
 
 class BowPose extends ExerciseBase {
   @override
-  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+  Set<VikaImageOrientation> get supportedOrientations =>
+      const <VikaImageOrientation>{
         VikaImageOrientation.landscapeLeft,
         VikaImageOrientation.landscapeRight,
       };
@@ -32,14 +32,14 @@ class BowPose extends ExerciseBase {
   BowPoseState bowPoseState = BowPoseState.prone;
   BowPoseState previousState = BowPoseState.prone;
 
-  double _baselineShoulderY = 0.0; 
+  double _baselineShoulderY = 0.0;
 
   final Debouncer _stateDebouncer = Debouncer(requiredFrames: 3);
 
   final ConnectionMetric connectionMetric = ConnectionMetric();
   final LiftFormMetric liftFormMetric = LiftFormMetric();
   final HoldDurationMetric holdDurationMetric = HoldDurationMetric();
-  final StabilityMetric stabilityMetric = StabilityMetric(); 
+  final StabilityMetric stabilityMetric = StabilityMetric();
 
   late final List<BowPoseMetricBase> _metrics = [
     connectionMetric,
@@ -57,19 +57,33 @@ class BowPose extends ExerciseBase {
   @override
   String get currentPhaseLabel {
     switch (bowPoseState) {
-      case BowPoseState.prone: return 'Nằm sấp';
-      case BowPoseState.setup: return 'Gập gối';
-      case BowPoseState.ascending: return 'Lên cung';
-      case BowPoseState.hold: return 'Giữ tĩnh';
-      case BowPoseState.descending: return 'Hạ xuống';
+      case BowPoseState.prone:
+        return 'Nằm sấp';
+      case BowPoseState.setup:
+        return 'Gập gối';
+      case BowPoseState.ascending:
+        return 'Lên cung';
+      case BowPoseState.hold:
+        return 'Giữ tĩnh';
+      case BowPoseState.descending:
+        return 'Hạ xuống';
     }
   }
 
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    PoseLandmark? shoulder = getSideLandmark(landmarks: landmarks, rightType: PoseLandmarkType.rightShoulder, leftType: PoseLandmarkType.leftShoulder);
-    PoseLandmark? hip = getSideLandmark(landmarks: landmarks, rightType: PoseLandmarkType.rightHip, leftType: PoseLandmarkType.leftHip);
-    PoseLandmark? knee = getSideLandmark(landmarks: landmarks, rightType: PoseLandmarkType.rightKnee, leftType: PoseLandmarkType.leftKnee);
+    PoseLandmark? shoulder = getSideLandmark(
+        landmarks: landmarks,
+        rightType: PoseLandmarkType.rightShoulder,
+        leftType: PoseLandmarkType.leftShoulder);
+    PoseLandmark? hip = getSideLandmark(
+        landmarks: landmarks,
+        rightType: PoseLandmarkType.rightHip,
+        leftType: PoseLandmarkType.leftHip);
+    PoseLandmark? knee = getSideLandmark(
+        landmarks: landmarks,
+        rightType: PoseLandmarkType.rightKnee,
+        leftType: PoseLandmarkType.leftKnee);
 
     if (shoulder == null || hip == null || knee == null) return false;
 
@@ -81,7 +95,13 @@ class BowPose extends ExerciseBase {
 
     if (yDiffShoulderHip > 0.35 || yDiffHipKnee > 0.35) return false;
 
-    double kneeAngle = calculateAngle(firstPoint: hip, midPoint: knee, lastPoint: getSideLandmark(landmarks: landmarks, rightType: PoseLandmarkType.rightAnkle, leftType: PoseLandmarkType.leftAnkle)!);
+    double kneeAngle = calculateAngle(
+        firstPoint: hip,
+        midPoint: knee,
+        lastPoint: getSideLandmark(
+            landmarks: landmarks,
+            rightType: PoseLandmarkType.rightAnkle,
+            leftType: PoseLandmarkType.leftAnkle)!);
     if (kneeAngle < 150.0) return false;
 
     return true;
@@ -103,25 +123,48 @@ class BowPose extends ExerciseBase {
 
   @override
   void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
-    PoseLandmark? shoulder = getSideLandmark(landmarks: smoothedLandmarks, rightType: PoseLandmarkType.rightShoulder, leftType: PoseLandmarkType.leftShoulder);
-    PoseLandmark? hip = getSideLandmark(landmarks: smoothedLandmarks, rightType: PoseLandmarkType.rightHip, leftType: PoseLandmarkType.leftHip);
-    PoseLandmark? knee = getSideLandmark(landmarks: smoothedLandmarks, rightType: PoseLandmarkType.rightKnee, leftType: PoseLandmarkType.leftKnee);
-    PoseLandmark? ankle = getSideLandmark(landmarks: smoothedLandmarks, rightType: PoseLandmarkType.rightAnkle, leftType: PoseLandmarkType.leftAnkle);
-    PoseLandmark? wrist = getSideLandmark(landmarks: smoothedLandmarks, rightType: PoseLandmarkType.rightWrist, leftType: PoseLandmarkType.leftWrist);
+    PoseLandmark? shoulder = getSideLandmark(
+        landmarks: smoothedLandmarks,
+        rightType: PoseLandmarkType.rightShoulder,
+        leftType: PoseLandmarkType.leftShoulder);
+    PoseLandmark? hip = getSideLandmark(
+        landmarks: smoothedLandmarks,
+        rightType: PoseLandmarkType.rightHip,
+        leftType: PoseLandmarkType.leftHip);
+    PoseLandmark? knee = getSideLandmark(
+        landmarks: smoothedLandmarks,
+        rightType: PoseLandmarkType.rightKnee,
+        leftType: PoseLandmarkType.leftKnee);
+    PoseLandmark? ankle = getSideLandmark(
+        landmarks: smoothedLandmarks,
+        rightType: PoseLandmarkType.rightAnkle,
+        leftType: PoseLandmarkType.leftAnkle);
+    PoseLandmark? wrist = getSideLandmark(
+        landmarks: smoothedLandmarks,
+        rightType: PoseLandmarkType.rightWrist,
+        leftType: PoseLandmarkType.leftWrist);
 
-    if (shoulder == null || hip == null || knee == null || ankle == null || wrist == null) return;
-    if (shoulder.likelihood < 0.5 || hip.likelihood < 0.5 || knee.likelihood < 0.5 || ankle.likelihood < 0.5) return;
+    if (shoulder == null ||
+        hip == null ||
+        knee == null ||
+        ankle == null ||
+        wrist == null) return;
+    if (shoulder.likelihood < 0.5 ||
+        hip.likelihood < 0.5 ||
+        knee.likelihood < 0.5 ||
+        ankle.likelihood < 0.5) return;
 
     double refLen = calculateDistance(shoulder, hip);
     if (refLen < 10) refLen = 10;
-    
-    double thighLen = calculateDistance(hip, knee); 
+
+    double thighLen = calculateDistance(hip, knee);
     if (thighLen < 10) thighLen = 10;
 
     double wristAnkleDist = calculateDistance(wrist, ankle) / refLen;
-    double chestLift = (hip.y - shoulder.y) / refLen; 
-    double thighLiftRelative = (hip.y - knee.y) / thighLen; 
-    double kneeAngle = calculateAngle(firstPoint: hip, midPoint: knee, lastPoint: ankle);
+    double chestLift = (hip.y - shoulder.y) / refLen;
+    double thighLiftRelative = (hip.y - knee.y) / thighLen;
+    double kneeAngle =
+        calculateAngle(firstPoint: hip, midPoint: knee, lastPoint: ankle);
 
     int now = frameTimestampMs;
 
@@ -141,16 +184,17 @@ class BowPose extends ExerciseBase {
     _updateStateMachine(ctx, now);
 
     // Chốt Rep
-    if (bowPoseState == BowPoseState.prone && previousState == BowPoseState.descending) {
+    if (bowPoseState == BowPoseState.prone &&
+        previousState == BowPoseState.descending) {
       repCount += 1;
-      
+
       for (final metric in _metrics) {
         metric.evaluateRep(ctx);
       }
 
       final allFaults = <FaultRecord>[];
       for (final metric in _metrics) allFaults.addAll(metric.faults);
-      
+
       correctForm = !allFaults.any((f) => f.affectsForm);
 
       final faultMap = <String, Map<String, String>>{};
@@ -165,7 +209,7 @@ class BowPose extends ExerciseBase {
       for (final metric in _metrics) metric.reset();
       _stateDebouncer.reset();
       previousState = bowPoseState;
-      return; 
+      return;
     }
 
     if (bowPoseState != BowPoseState.prone) {
@@ -174,36 +218,42 @@ class BowPose extends ExerciseBase {
     for (final metric in _metrics) debugData.addAll(metric.debugData);
 
     // UI Coaching State
-    if (bowPoseState == BowPoseState.setup) resultIssues.addInstruction('setup', 'Status', 'Gập gối');
-    else if (bowPoseState == BowPoseState.ascending) resultIssues.addInstruction('ascending', 'Status', 'Lên cung');
-    else if (bowPoseState == BowPoseState.hold) resultIssues.addInstruction('hold', 'Status', 'Giữ tĩnh');
-    else if (bowPoseState == BowPoseState.descending) resultIssues.addInstruction('descending', 'Status', 'Hạ xuống');
+    if (bowPoseState == BowPoseState.setup)
+      resultIssues.addInstruction('setup', 'Status', 'Gập gối');
+    else if (bowPoseState == BowPoseState.ascending)
+      resultIssues.addInstruction('ascending', 'Status', 'Lên cung');
+    else if (bowPoseState == BowPoseState.hold)
+      resultIssues.addInstruction('hold', 'Status', 'Giữ tĩnh');
+    else if (bowPoseState == BowPoseState.descending)
+      resultIssues.addInstruction('descending', 'Status', 'Hạ xuống');
   }
 
   void _updateStateMachine(RepContext ctx, int now) {
     BowPoseState targetState = bowPoseState;
 
     if (bowPoseState == BowPoseState.prone) {
-      _baselineShoulderY = ctx.rawShoulderY; 
+      _baselineShoulderY = ctx.rawShoulderY;
       if (ctx.kneeAngle < BowPoseConfig.KNEE_SETUP_ANGLE) {
         targetState = BowPoseState.setup;
       }
-    } 
-    else if (bowPoseState == BowPoseState.setup) {
+    } else if (bowPoseState == BowPoseState.setup) {
       bool grabbed = ctx.wristAnkleDist < ConnectionConfig.GRAB_THRESHOLD;
-      bool shoulderRising = ctx.rawShoulderY < (_baselineShoulderY - (ctx.referenceLength * 0.02));
-      
+      bool shoulderRising = ctx.rawShoulderY <
+          (_baselineShoulderY - (ctx.referenceLength * 0.02));
+
       if (grabbed && shoulderRising) {
         targetState = BowPoseState.ascending;
       }
-    } 
-    else if (bowPoseState == BowPoseState.ascending && ctx.chestLift > BowPoseConfig.CHEST_LIFT_THRESHOLD && ctx.thighLiftRelative > BowPoseConfig.THIGH_LIFT_THRESHOLD) {
+    } else if (bowPoseState == BowPoseState.ascending &&
+        ctx.chestLift > BowPoseConfig.CHEST_LIFT_THRESHOLD &&
+        ctx.thighLiftRelative > BowPoseConfig.THIGH_LIFT_THRESHOLD) {
       targetState = BowPoseState.hold;
-    } 
-    else if (bowPoseState == BowPoseState.hold && (ctx.chestLift < 0.05 || ctx.wristAnkleDist > BowPoseConfig.RELEASE_DIST_THRESHOLD)) {
+    } else if (bowPoseState == BowPoseState.hold &&
+        (ctx.chestLift < 0.05 ||
+            ctx.wristAnkleDist > BowPoseConfig.RELEASE_DIST_THRESHOLD)) {
       targetState = BowPoseState.descending;
-    } 
-    else if (bowPoseState == BowPoseState.descending && ctx.kneeAngle > 150.0) {
+    } else if (bowPoseState == BowPoseState.descending &&
+        ctx.kneeAngle > 150.0) {
       targetState = BowPoseState.prone;
     }
 
@@ -219,9 +269,9 @@ class BowPose extends ExerciseBase {
   void _transitionState(BowPoseState newState, int timestampMs) {
     previousState = bowPoseState;
     bowPoseState = newState;
-    
+
     if (newState == BowPoseState.setup) resultIssues.instructions.clear();
-    
+
     for (final metric in _metrics) {
       metric.onStateTransition(previousState, newState, timestampMs);
     }

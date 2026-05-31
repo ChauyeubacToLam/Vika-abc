@@ -1,7 +1,6 @@
 // ignore_for_file: curly_braces_in_flow_control_structures
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
-import '../../pose/vika_image_orientation.dart';
 import '../exercise_base.dart';
 import 'metrics/mountain_climber_metric_base.dart';
 import 'metrics/trunk_stability_metric.dart';
@@ -34,10 +33,14 @@ class MountainClimber extends ExerciseBase {
   @override
   String get currentPhaseLabel {
     switch (_displayState) {
-      case ClimberState.high_plank_base:    return 'Chuẩn bị';
-      case ClimberState.knee_driving_in:    return 'Kéo gối lên';
-      case ClimberState.max_flexion:        return 'Chạm đỉnh';
-      case ClimberState.knee_driving_out:   return 'Duỗi chân về';
+      case ClimberState.high_plank_base:
+        return 'Chuẩn bị';
+      case ClimberState.knee_driving_in:
+        return 'Kéo gối lên';
+      case ClimberState.max_flexion:
+        return 'Chạm đỉnh';
+      case ClimberState.knee_driving_out:
+        return 'Duỗi chân về';
     }
   }
 
@@ -60,7 +63,6 @@ class MountainClimber extends ExerciseBase {
 
   int? _exerciseStartTimeMs;
   bool _isTimeout = false;
-
 
   // ---------------------------------------------------------------------------
   // Safety check
@@ -107,13 +109,10 @@ class MountainClimber extends ExerciseBase {
         trunkAngle > ClimberConfig.TRUNK_STRAIGHT_RANGE[1]) return false;
 
     // --- Calibrate ngưỡng zone theo tư thế thực tế của người dùng ---
-    final double scale =
-        calculateDistance(lm.shoulder, lm.hip);
+    final double scale = calculateDistance(lm.shoulder, lm.hip);
     if (scale > 0) {
-      final double distL =
-          (lm.leftKnee.x - lm.shoulder.x).abs() / scale;
-      final double distR =
-          (lm.rightKnee.x - lm.shoulder.x).abs() / scale;
+      final double distL = (lm.leftKnee.x - lm.shoulder.x).abs() / scale;
+      final double distR = (lm.rightKnee.x - lm.shoulder.x).abs() / scale;
 
       // Lấy trung bình 3 frame để ổn định (đơn giản: gán thẳng khi form đạt)
       _leftCounter.calibrate(distL);
@@ -216,8 +215,7 @@ class MountainClimber extends ExerciseBase {
     debugData['Diag'] = {
       'state': _displayState.name,
       'repCount': repCount,
-      'elapsed_s':
-          ((now - _exerciseStartTimeMs!) / 1000).toStringAsFixed(1),
+      'elapsed_s': ((now - _exerciseStartTimeMs!) / 1000).toStringAsFixed(1),
       'armAngle': armAngle.toStringAsFixed(1),
       'trunkAngle': trunkAngle.toStringAsFixed(1),
       'L_dist': _leftCounter.smoothedDist.toStringAsFixed(2),
@@ -256,8 +254,7 @@ class MountainClimber extends ExerciseBase {
   }
 
   void _updateDisplayState() {
-    final bool anyInZone =
-        _leftCounter.isInZone || _rightCounter.isInZone;
+    final bool anyInZone = _leftCounter.isInZone || _rightCounter.isInZone;
 
     if (anyInZone) {
       // Đơn giản: nếu đang trong zone thì hiển thị knee_driving_in hoặc max_flexion
@@ -280,22 +277,25 @@ class MountainClimber extends ExerciseBase {
   // Landmark extraction
   // ---------------------------------------------------------------------------
 
-  _LandmarkSet? _extractLandmarks(
-      Map<PoseLandmarkType, PoseLandmark> lm) {
+  _LandmarkSet? _extractLandmarks(Map<PoseLandmarkType, PoseLandmark> lm) {
     // Xác định side nhìn rõ hơn dựa trên likelihood (nếu API cung cấp),
     // fallback: dùng bên trái làm reference cho shoulder/elbow/wrist/hip/ankle.
     // Cả 2 đầu gối luôn được lấy để track độc lập.
     final PoseLandmark? shoulder = lm[PoseLandmarkType.leftShoulder];
-    final PoseLandmark? elbow    = lm[PoseLandmarkType.leftElbow];
-    final PoseLandmark? wrist    = lm[PoseLandmarkType.leftWrist];
-    final PoseLandmark? hip      = lm[PoseLandmarkType.leftHip];
-    final PoseLandmark? ankle    = lm[PoseLandmarkType.leftAnkle];
-    final PoseLandmark? leftKnee  = lm[PoseLandmarkType.leftKnee];
+    final PoseLandmark? elbow = lm[PoseLandmarkType.leftElbow];
+    final PoseLandmark? wrist = lm[PoseLandmarkType.leftWrist];
+    final PoseLandmark? hip = lm[PoseLandmarkType.leftHip];
+    final PoseLandmark? ankle = lm[PoseLandmarkType.leftAnkle];
+    final PoseLandmark? leftKnee = lm[PoseLandmarkType.leftKnee];
     final PoseLandmark? rightKnee = lm[PoseLandmarkType.rightKnee];
 
-    if (shoulder == null || elbow == null || wrist == null ||
-        hip == null || ankle == null ||
-        leftKnee == null || rightKnee == null) {
+    if (shoulder == null ||
+        elbow == null ||
+        wrist == null ||
+        hip == null ||
+        ankle == null ||
+        leftKnee == null ||
+        rightKnee == null) {
       return null;
     }
 

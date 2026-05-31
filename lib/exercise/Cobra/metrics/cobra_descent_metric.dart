@@ -2,7 +2,6 @@
 import 'cobra_metric_base.dart';
 import '../cobra.dart';
 
-
 /// MET-4: Descent Velocity Control (Eccentric Deceleration)
 /// Tracks shoulder y-velocity during descent phase.
 /// MUST use frameTimestampMs (timestamp-based, not frame count).
@@ -80,7 +79,8 @@ class CobraDescentMetric extends CobraMetricBase {
           if (_crashFrameCount >= _crashFramesRequired) {
             ctx.resultIssues.feedback['Descent'] = '⚠️ Hạ quá nhanh!';
             ctx.resultIssues.addInstruction(
-              'descent', 'crashDescent',
+              'descent',
+              'crashDescent',
               'Hạ người xuống chậm hơn. Kiểm soát chuyển động bằng cơ lưng.',
             );
             _logFault('descent', 'Crash descent', 'CrashDescent');
@@ -98,7 +98,8 @@ class CobraDescentMetric extends CobraMetricBase {
 
         // Check total descent duration
         if (_descentStartMs != null) {
-          final descentDuration = (ctx.frameTimestampMs - _descentStartMs!) / 1000.0;
+          final descentDuration =
+              (ctx.frameTimestampMs - _descentStartMs!) / 1000.0;
           _debugData['descentDur'] = descentDuration.toStringAsFixed(1);
           // Beginner: flag if total descent < 0.8s
           if (ctx.trunkDeviation.abs() < 5.0 && descentDuration < 0.8) {
@@ -115,7 +116,10 @@ class CobraDescentMetric extends CobraMetricBase {
   void _logFault(String phase, String message, String type) {
     if (!_faults.any((f) => f.type == type)) {
       _faults.add(FaultRecord(
-        phase: phase, type: type, message: message, affectsForm: true,
+        phase: phase,
+        type: type,
+        message: message,
+        affectsForm: true,
       ));
     }
   }

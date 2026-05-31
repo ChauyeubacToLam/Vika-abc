@@ -1,6 +1,8 @@
 import '../../exercise_base.dart';
 import '../../fault_record.dart';
+import '../../../debug/debug_types.dart';
 
+export '../../../debug/debug_types.dart';
 export '../../fault_record.dart';
 
 enum BirdDogState { neutral, extending, hold_extended, returning }
@@ -52,14 +54,31 @@ class BirdDogFaultPriority {
   static const int alignment = 3;
 }
 
-abstract class BirdDogMetricBase {
+abstract class BirdDogMetricBase implements DebugMetricSource {
+  @override
   String get name;
   int faultsCount = 0;
 
   void update(BirdDogRepContext ctx);
 
   List<FaultRecord> get faults;
+  @override
   Map<String, dynamic> get debugData;
+
+  @override
+  double? get value => null;
+
+  @override
+  ThresholdBand? get threshold => null;
+
+  @override
+  MetricStatus get status => MetricStatus.pass;
+
+  @override
+  String? get nameVi => null;
+
+  @override
+  bool get devOnly => false;
 
   void reset();
 

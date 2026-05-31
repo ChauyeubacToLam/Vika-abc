@@ -1,6 +1,6 @@
 import 'package:vika/exercise/exercise_base.dart';
+import 'package:vika/debug/tracked_metric.dart';
 import 'package:vika/utils/exercise_logger.dart';
-import '../../pose/vika_image_orientation.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/frame_buffer.dart';
 import '../../utils/frame_snapshot.dart';
@@ -17,11 +17,15 @@ enum WalkingState { standing, stepping, descending, bottom, pulling_through }
 
 class WalkingLungeConfig {
   static const int MAX_REP = 20; // 10 per leg
+  static const double STEP_START_NORM = 0.55;
+  static const double STEP_CLOSE_NORM = 0.35;
+  static const double FRAME_EDGE_MARGIN_RATIO = 0.04;
 }
 
 class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
   @override
-  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+  Set<VikaImageOrientation> get supportedOrientations =>
+      const <VikaImageOrientation>{
         VikaImageOrientation.landscapeLeft,
         VikaImageOrientation.landscapeRight,
       };
@@ -34,13 +38,15 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
 
   int? _bottomStartTime;
   final List<FaultRecord> _localFaults = [];
+  Size? _lastImageSize;
 
   // Which leg is currently in front
   TrackedSide _frontLegSide = TrackedSide.left;
 
   // Metrics
   final StepLengthMetric stepLengthMetric = StepLengthMetric();
-  final FrontKneeControlMetric frontKneeControlMetric = FrontKneeControlMetric();
+  final FrontKneeControlMetric frontKneeControlMetric =
+      FrontKneeControlMetric();
   final RearKneeDepthMetric rearKneeDepthMetric = RearKneeDepthMetric();
   final TorsoVerticalityMetric torsoMetric = TorsoVerticalityMetric();
 
@@ -50,14 +56,40 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
     rearKneeDepthMetric,
     torsoMetric,
   ];
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
 
   @override
   Map<String, SideLandmarkPair> get requiredSideLandmarks => const {
-        'hip': (right: PoseLandmarkType.rightHip, left: PoseLandmarkType.leftHip),
-        'shoulder': (right: PoseLandmarkType.rightShoulder, left: PoseLandmarkType.leftShoulder),
-        'knee': (right: PoseLandmarkType.rightKnee, left: PoseLandmarkType.leftKnee),
-        'ankle': (right: PoseLandmarkType.rightAnkle, left: PoseLandmarkType.leftAnkle),
-        'foot': (right: PoseLandmarkType.rightFootIndex, left: PoseLandmarkType.leftFootIndex),
+        'hip': (
+          right: PoseLandmarkType.rightHip,
+          left: PoseLandmarkType.leftHip
+        ),
+        'shoulder': (
+          right: PoseLandmarkType.rightShoulder,
+          left: PoseLandmarkType.leftShoulder
+        ),
+        'knee': (
+          right: PoseLandmarkType.rightKnee,
+          left: PoseLandmarkType.leftKnee
+        ),
+        'ankle': (
+          right: PoseLandmarkType.rightAnkle,
+          left: PoseLandmarkType.leftAnkle
+        ),
+        'foot': (
+          right: PoseLandmarkType.rightFootIndex,
+          left: PoseLandmarkType.leftFootIndex
+        ),
       };
 
   @override
@@ -120,7 +152,7 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
         if (lm.x > maxX) maxX = lm.x;
       }
     }
-    
+
     // We don't have access to imageSize directly here without passing it, but we know coordinates are scaled
     // Wait, coordinate system: let's assume image width is rough distance.
     // Instead of using imageSize, we can just check if they are near the edge.
@@ -129,12 +161,13 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
     // A better approach is to ask them to step back.
     // I'll skip the >50% check since we don't have the exact image width in `isInStartPosition` easily.
     // Or I can just check if they are near the edge.
-    
+
     // Legs straight
     final hip = req['hip']!;
     final knee = req['knee']!;
     final ankle = req['ankle']!;
-    final angle = calculateAngleNormalized(firstPoint: hip, midPoint: knee, lastPoint: ankle);
+    final angle = calculateAngleNormalized(
+        firstPoint: hip, midPoint: knee, lastPoint: ankle);
     if (angle < 160.0) {
       resultIssues.feedback['System'] = 'Hãy đứng thẳng để bắt đầu.';
       return false;
@@ -150,7 +183,8 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
       if (walkingState != WalkingState.standing) {
         _transitionState(WalkingState.standing, frameTimestampMs);
       }
-      resultIssues.feedback['System'] = "Không thấy rõ người! Vui lòng giữ toàn thân trong khung hình.";
+      resultIssues.feedback['System'] =
+          "Không thấy rõ người! Vui lòng giữ toàn thân trong khung hình.";
       return;
     }
 
@@ -159,26 +193,31 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
     final leftAnkle = smoothedLandmarks[PoseLandmarkType.leftAnkle];
     final rightAnkle = smoothedLandmarks[PoseLandmarkType.rightAnkle];
 
-    if (leftKnee == null || rightKnee == null || leftAnkle == null || rightAnkle == null ||
-        leftKnee.likelihood < 0.5 || rightKnee.likelihood < 0.5 || 
-        leftAnkle.likelihood < 0.5 || rightAnkle.likelihood < 0.5) {
+    if (leftKnee == null ||
+        rightKnee == null ||
+        leftAnkle == null ||
+        rightAnkle == null ||
+        ![
+          leftKnee,
+          rightKnee,
+          leftAnkle,
+          rightAnkle,
+        ].every(ExerciseBase.isLandmarkConfident)) {
       if (walkingState != WalkingState.standing) {
         _transitionState(WalkingState.standing, frameTimestampMs);
       }
-      resultIssues.feedback['System'] = "Chưa nhìn thấy hết toàn bộ 2 chân! Hãy lùi lại.";
+      resultIssues.feedback['System'] =
+          "Chưa nhìn thấy hết toàn bộ 2 chân! Hãy lùi lại.";
       return;
     }
 
     final hip = req['hip']!;
     final shoulder = req['shoulder']!;
-    
+
     // Out of frame warning
     bool nearEdge = false;
     for (var lm in [req['foot']!, req['shoulder']!, req['hip']!]) {
-      // Very rough check, usually coordinates are between 0 and Image Width.
-      // We will rely on PersonDetector bounds if we could, but here we just check if X is very close to 0 or very large.
-      // Assuming typical width is ~1280 or ~720 depending on rotation.
-      if (lm.x < 10 || lm.x > 1000) { // Rough assumption
+      if (_isNearFrameEdge(lm)) {
         nearEdge = true;
       }
     }
@@ -194,28 +233,56 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
     // Determine which leg is in front
     if (cameraFacing == CameraFacing.left) {
       // Facing left: smaller X is in front
-      _frontLegSide = leftAnkle.x < rightAnkle.x ? TrackedSide.left : TrackedSide.right;
+      _frontLegSide =
+          leftAnkle.x < rightAnkle.x ? TrackedSide.left : TrackedSide.right;
     } else {
       // Facing right: larger X is in front
-      _frontLegSide = leftAnkle.x > rightAnkle.x ? TrackedSide.left : TrackedSide.right;
+      _frontLegSide =
+          leftAnkle.x > rightAnkle.x ? TrackedSide.left : TrackedSide.right;
     }
 
     // Extract landmarks based on front/rear
-    final frontKnee = smoothedLandmarks[_frontLegSide == TrackedSide.left ? PoseLandmarkType.leftKnee : PoseLandmarkType.rightKnee]!;
-    final frontAnkle = smoothedLandmarks[_frontLegSide == TrackedSide.left ? PoseLandmarkType.leftAnkle : PoseLandmarkType.rightAnkle]!;
-    final frontFoot = smoothedLandmarks[_frontLegSide == TrackedSide.left ? PoseLandmarkType.leftFootIndex : PoseLandmarkType.rightFootIndex]!;
-    
-    final rearKnee = smoothedLandmarks[_frontLegSide == TrackedSide.left ? PoseLandmarkType.rightKnee : PoseLandmarkType.leftKnee]!;
-    final rearAnkle = smoothedLandmarks[_frontLegSide == TrackedSide.left ? PoseLandmarkType.rightAnkle : PoseLandmarkType.leftAnkle]!;
-    
-    final frontHip = smoothedLandmarks[_frontLegSide == TrackedSide.left ? PoseLandmarkType.leftHip : PoseLandmarkType.rightHip]!;
-    final rearHip = smoothedLandmarks[_frontLegSide == TrackedSide.left ? PoseLandmarkType.rightHip : PoseLandmarkType.leftHip]!;
+    final frontKnee = smoothedLandmarks[_frontLegSide == TrackedSide.left
+        ? PoseLandmarkType.leftKnee
+        : PoseLandmarkType.rightKnee];
+    final frontAnkle = smoothedLandmarks[_frontLegSide == TrackedSide.left
+        ? PoseLandmarkType.leftAnkle
+        : PoseLandmarkType.rightAnkle];
+    final frontFoot = smoothedLandmarks[_frontLegSide == TrackedSide.left
+        ? PoseLandmarkType.leftFootIndex
+        : PoseLandmarkType.rightFootIndex];
 
-    double frontKneeAngle = calculateAngleNormalized(firstPoint: frontHip, midPoint: frontKnee, lastPoint: frontAnkle);
-    double rearKneeAngle = calculateAngleNormalized(firstPoint: rearHip, midPoint: rearKnee, lastPoint: rearAnkle);
+    final rearKnee = smoothedLandmarks[_frontLegSide == TrackedSide.left
+        ? PoseLandmarkType.rightKnee
+        : PoseLandmarkType.leftKnee];
+    final rearAnkle = smoothedLandmarks[_frontLegSide == TrackedSide.left
+        ? PoseLandmarkType.rightAnkle
+        : PoseLandmarkType.leftAnkle];
 
-    double torsoAngle = calculateVerticalAngle(pivot: hip, point: shoulder);
-    if (torsoAngle > 180) torsoAngle = 360 - torsoAngle;
+    final frontHip = smoothedLandmarks[_frontLegSide == TrackedSide.left
+        ? PoseLandmarkType.leftHip
+        : PoseLandmarkType.rightHip];
+    final rearHip = smoothedLandmarks[_frontLegSide == TrackedSide.left
+        ? PoseLandmarkType.rightHip
+        : PoseLandmarkType.leftHip];
+    if (frontKnee == null ||
+        frontAnkle == null ||
+        frontFoot == null ||
+        rearKnee == null ||
+        rearAnkle == null ||
+        frontHip == null ||
+        rearHip == null) {
+      return;
+    }
+
+    double frontKneeAngle = calculateAngleNormalized(
+        firstPoint: frontHip, midPoint: frontKnee, lastPoint: frontAnkle);
+    double rearKneeAngle = calculateAngleNormalized(
+        firstPoint: rearHip, midPoint: rearKnee, lastPoint: rearAnkle);
+
+    final torsoClockAngle = calculateVerticalAngle(pivot: hip, point: shoulder);
+    double torsoAngle =
+        convertClockAngleToTrunkLean(torsoClockAngle, cameraFacing).abs();
 
     double thighLength = calculateDistance(frontHip, frontKnee);
     double stepLengthX = (frontAnkle.x - rearAnkle.x).abs();
@@ -311,15 +378,19 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
     int now = ctx.frameTimestamp;
     final hipYChange = frameBuffer.getChange("hipY", 3);
     final stepXChange = frameBuffer.getChange("stepLengthX", 3);
+    final stepNorm = ctx.normalizedStepLength;
 
     if (walkingState == WalkingState.standing) {
-      if (ctx.stepLengthX > 80 || ctx.frontKneeAngle < 160) {
+      if (stepNorm > WalkingLungeConfig.STEP_START_NORM ||
+          ctx.frontKneeAngle < 160) {
         _transitionState(WalkingState.stepping, now);
       }
     } else if (walkingState == WalkingState.stepping) {
       if (hipYChange == ChangeState.increasing) {
         _transitionState(WalkingState.descending, now);
-      } else if (ctx.stepLengthX < 50 && ctx.frontKneeAngle > 160 && ctx.rearKneeAngle > 160) {
+      } else if (stepNorm < WalkingLungeConfig.STEP_CLOSE_NORM &&
+          ctx.frontKneeAngle > 160 &&
+          ctx.rearKneeAngle > 160) {
         // False start, returned to standing
         _transitionState(WalkingState.standing, now);
       }
@@ -338,32 +409,39 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
       }
     } else if (walkingState == WalkingState.bottom) {
       _bottomStartTime ??= now;
-      
+
       // Pulling through when hip moves up
       if (hipYChange == ChangeState.decreasing || ctx.frontKneeAngle > 120) {
         _transitionState(WalkingState.pulling_through, now);
       }
     } else if (walkingState == WalkingState.pulling_through) {
       // Rep is completed when both knees are mostly straight
-      if (ctx.frontKneeAngle > 150 && ctx.rearKneeAngle > 150 && ctx.stepLengthX < 80) {
-         _completeRep();
-         _transitionState(WalkingState.standing, now);
-      } else if (ctx.stepLengthX > 80 && ctx.frontKneeAngle > 140 && ctx.rearKneeAngle > 140) {
-         // Continuous walking: stepped out for next rep
-         _completeRep();
-         _transitionState(WalkingState.stepping, now);
-      } else if (hipYChange == ChangeState.increasing && ctx.stepLengthX > 80 && stepXChange == ChangeState.increasing) {
-         // Continuous walking: immediately started descending
-         _completeRep();
-         _transitionState(WalkingState.descending, now);
+      if (ctx.frontKneeAngle > 150 &&
+          ctx.rearKneeAngle > 150 &&
+          stepNorm < WalkingLungeConfig.STEP_START_NORM) {
+        _completeRep();
+        _transitionState(WalkingState.standing, now);
+      } else if (stepNorm > WalkingLungeConfig.STEP_START_NORM &&
+          ctx.frontKneeAngle > 140 &&
+          ctx.rearKneeAngle > 140) {
+        // Continuous walking: stepped out for next rep
+        _completeRep();
+        _transitionState(WalkingState.stepping, now);
+      } else if (hipYChange == ChangeState.increasing &&
+          stepNorm > WalkingLungeConfig.STEP_START_NORM &&
+          stepXChange == ChangeState.increasing) {
+        // Continuous walking: immediately started descending
+        _completeRep();
+        _transitionState(WalkingState.descending, now);
       }
     }
   }
 
   void _transitionState(WalkingState newState, int timestampMs) {
     if (newState == walkingState) return;
-    
-    if (walkingState == WalkingState.bottom && newState == WalkingState.pulling_through) {
+
+    if (walkingState == WalkingState.bottom &&
+        newState == WalkingState.pulling_through) {
       if (_bottomStartTime != null) {
         int elapsed = timestampMs - _bottomStartTime!;
         if (elapsed < 2000) {
@@ -373,7 +451,7 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
               message: 'Chưa giữ đủ 2 giây!',
               affectsForm: true,
               phase: 'bottom',
-              priority: 1,
+              priority: WalkingFaultPriority.hold,
               voiceMessage: 'Phải giữ đủ 2 giây!',
             ));
           }
@@ -384,7 +462,8 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
     previousWalkingState = walkingState;
     walkingState = newState;
 
-    if (newState == WalkingState.stepping && previousWalkingState == WalkingState.standing) {
+    if (newState == WalkingState.stepping &&
+        previousWalkingState == WalkingState.standing) {
       resultIssues.instructions.clear();
     }
 
@@ -413,12 +492,15 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
 
     setFeedback.add({correctForm: faultMap});
 
-    logger.addRepLog(RepLog(correctForm: correctForm, repNumber: repCount, data: {
+    logger
+        .addRepLog(RepLog(correctForm: correctForm, repNumber: repCount, data: {
       "fault_types": allFaults.map((f) => f.type).toSet().toList(),
     }));
 
     correctForm = true;
     _localFaults.clear();
+    _bottomStartTime = null;
+    frameBuffer.clear();
     for (final metric in _metrics) {
       metric.resetAndCountFault();
     }
@@ -428,8 +510,20 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
   Map<PoseLandmarkType, PoseLandmark>? smoothedLandmarks;
 
   @override
-  List<dynamic>? processPose(Map<PoseLandmarkType, PoseLandmark> landmarks, {InputImage? inputImage, Size? imageSize}) {
+  List<dynamic>? processPose(Map<PoseLandmarkType, PoseLandmark> landmarks,
+      {InputImage? inputImage, Size? imageSize}) {
+    _lastImageSize = imageSize;
     smoothedLandmarks = poseSmoother.smoothing(landmarks);
-    return super.processPose(landmarks, inputImage: inputImage, imageSize: imageSize);
+    return super
+        .processPose(landmarks, inputImage: inputImage, imageSize: imageSize);
+  }
+
+  bool _isNearFrameEdge(PoseLandmark landmark) {
+    final imageSize = _lastImageSize;
+    if (imageSize == null || imageSize.width <= 0) {
+      return false;
+    }
+    final margin = imageSize.width * WalkingLungeConfig.FRAME_EDGE_MARGIN_RATIO;
+    return landmark.x < margin || landmark.x > imageSize.width - margin;
   }
 }

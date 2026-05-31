@@ -29,14 +29,16 @@ class TempoMetric extends DeadBugMetricBase {
   void evaluateRep(DeadBugRepContext ctx) {
     // Không được thả tay chân rơi rầm xuống (< 1.5s là quá nhanh)
     if (extendingDuration != null && extendingDuration! < 1.5) {
-       _faults.add(FaultRecord(
-          phase: 'REP_COMPLETE',
-          type: 'Tempo',
-          message: 'Thả rơi tay/chân nhanh (${extendingDuration!.toStringAsFixed(1)}s)',
-          voiceMessage: 'Hạ tay chân chậm lại khoảng 2 giây để kích hoạt cơ bụng sâu!',
-          affectsForm: true,
-          priority: DeadBugFaultPriority.tempo,
-        ));
+      _faults.add(FaultRecord(
+        phase: 'REP_COMPLETE',
+        type: 'Tempo',
+        message:
+            'Thả rơi tay/chân nhanh (${extendingDuration!.toStringAsFixed(1)}s)',
+        voiceMessage:
+            'Hạ tay chân chậm lại khoảng 2 giây để kích hoạt cơ bụng sâu!',
+        affectsForm: true,
+        priority: DeadBugFaultPriority.tempo,
+      ));
     }
   }
 

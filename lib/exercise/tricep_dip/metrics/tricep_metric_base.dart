@@ -4,7 +4,6 @@ import '../tricep_dip.dart';
 import '../../fault_record.dart';
 export '../../fault_record.dart';
 
-
 class TricepRepContext {
   final double elbowAngle;
   final PoseLandmark shoulder;
@@ -13,7 +12,7 @@ class TricepRepContext {
   final PoseLandmark hip;
   final PoseLandmark? ear;
   final double forearmLength;
-  
+
   final TricepDipState state;
   final int frameTimestamp;
   final ResultIssues resultIssues;
@@ -42,7 +41,8 @@ abstract class TricepMetricBase {
 
   void update(TricepRepContext ctx);
 
-  void onStateTransition(TricepDipState oldState, TricepDipState newState, int timestampMs) {}
+  void onStateTransition(
+      TricepDipState oldState, TricepDipState newState, int timestampMs) {}
 
   void addFault(FaultRecord fault) {
     if (!_faults.any((f) => f.type == fault.type)) {

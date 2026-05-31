@@ -2,8 +2,8 @@ import 'bow_pose_metric_base.dart';
 import '../../../../utils/debouncer.dart';
 
 class ConnectionConfig {
-  static const double GRAB_THRESHOLD = 0.15; 
-  static const double DROP_THRESHOLD = 0.30; 
+  static const double GRAB_THRESHOLD = 0.15;
+  static const double DROP_THRESHOLD = 0.30;
 }
 
 class ConnectionMetric extends BowPoseMetricBase {
@@ -13,12 +13,12 @@ class ConnectionMetric extends BowPoseMetricBase {
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
   final Debouncer _dropDebouncer = Debouncer(requiredFrames: 3);
-  
+
   bool _instructionSet = false;
 
   @override
   List<FaultRecord> get faults => _faults;
-  
+
   @override
   Map<String, dynamic> get debugData => _debugData;
 
@@ -26,9 +26,10 @@ class ConnectionMetric extends BowPoseMetricBase {
   void update(RepContext ctx) {
     _debugData['wristAnkleDist'] = ctx.wristAnkleDist.toStringAsFixed(3);
 
-    if (ctx.bowPoseState == BowPoseState.ascending || ctx.bowPoseState == BowPoseState.hold) {
+    if (ctx.bowPoseState == BowPoseState.ascending ||
+        ctx.bowPoseState == BowPoseState.hold) {
       bool isDropped = ctx.wristAnkleDist > ConnectionConfig.DROP_THRESHOLD;
-      
+
       if (_dropDebouncer.update(isDropped)) {
         ctx.resultIssues.feedback['Connection'] = 'Tuột tay rồi!';
         if (!_instructionSet) {
@@ -40,10 +41,9 @@ class ConnectionMetric extends BowPoseMetricBase {
             affectsForm: true,
           ));
           ctx.resultIssues.addInstruction(
-            ctx.bowPoseState.toString().split('.').last, 
-            'Connection', 
-            'Hãy giữ chặt cổ chân!'
-          );
+              ctx.bowPoseState.toString().split('.').last,
+              'Connection',
+              'Hãy giữ chặt cổ chân!');
           _instructionSet = true;
         }
       } else {

@@ -51,5 +51,8 @@ class AlignmentMetric extends BirdDogMetricBase {
   }
 
   @override
-  void reset() => _faults.clear();
+  void reset() {
+    _faults.clear();
+    _debugData.clear();
+  }
 }

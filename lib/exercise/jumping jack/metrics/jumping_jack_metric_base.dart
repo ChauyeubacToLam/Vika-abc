@@ -29,6 +29,7 @@ import '../jumping_jack.dart';
 import '../../exercise_base.dart';
 import '../../fault_record.dart';
 export '../../fault_record.dart';
+
 /* =========================================================================
    RepContext — Shared per-frame state, passed to all metrics.
    Avoids each metric needing to recalculate the same geometry.
@@ -83,7 +84,6 @@ class RepContext {
     required this.resultIssues,
   });
 }
-
 
 /* =========================================================================
    JJMetricBase — Interface every jumping jack metric implements.

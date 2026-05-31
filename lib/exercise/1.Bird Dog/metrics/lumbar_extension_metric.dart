@@ -6,7 +6,7 @@ class LumbarExtensionMetric extends BirdDogMetricBase {
   String get name => 'LumbarHyperextension';
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
-  
+
   final Debouncer _faultDebouncer = Debouncer(requiredFrames: 3);
 
   @override

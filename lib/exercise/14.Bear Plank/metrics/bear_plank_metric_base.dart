@@ -1,5 +1,7 @@
 import '../../exercise_base.dart';
 import '../../fault_record.dart';
+import '../../../debug/debug_types.dart';
+export '../../../debug/debug_types.dart';
 export '../../fault_record.dart';
 
 // ─── State Machine ───────────────────────────────────────────────────────────
@@ -20,16 +22,16 @@ class BearConfig {
 }
 
 class BearVoicePriority {
-  static const int backFlat = 0;      // Critical — rủi ro cột sống
-  static const int kneeHover = 1;     // High — bù trừ cơ
-  static const int weightShift = 2;   // Medium — áp lực cổ tay
+  static const int backFlat = 0; // Critical — rủi ro cột sống
+  static const int kneeHover = 1; // High — bù trừ cơ
+  static const int weightShift = 2; // Medium — áp lực cổ tay
 }
 
 // ─── Context ─────────────────────────────────────────────────────────────────
 class BearRepContext {
   final double kneeHeightOffset;
   final double kneeAngle;
-  final double backYOffset;         // Signed: positive = shoulder below hip (sagging)
+  final double backYOffset; // Signed: positive = shoulder below hip (sagging)
   final double shoulderWristXOffset; // Abs distance, vai chúi trước cổ tay
   final double? scaleFactor;
   final BearState currentState;
@@ -49,12 +51,25 @@ class BearRepContext {
 }
 
 // ─── Metric Base ─────────────────────────────────────────────────────────────
-abstract class BearMetricBase {
+abstract class BearMetricBase implements DebugMetricSource {
   int faultsCount = 0;
   final List<FaultRecord> _faults = [];
+  @override
   final Map<String, dynamic> debugData = {};
 
   List<FaultRecord> get faults => List.unmodifiable(_faults);
+  @override
+  String get name => runtimeType.toString();
+  @override
+  double? get value => null;
+  @override
+  ThresholdBand? get threshold => null;
+  @override
+  MetricStatus get status => MetricStatus.pass;
+  @override
+  String? get nameVi => null;
+  @override
+  bool get devOnly => false;
 
   void update(BearRepContext ctx);
   void onStateTransition(BearState from, BearState to, int timestampMs) {}

@@ -6,7 +6,8 @@ class HipGroundingMetric extends SupermanMetricBase {
 
   @override
   void update(SupermanRepContext ctx) {
-    debugData['hip_elevation'] = ctx.hipElevation.toStringAsFixed(3); // Log hip_elevation thay cho spine_angle
+    debugData['hip_elevation'] = ctx.hipElevation
+        .toStringAsFixed(3); // Log hip_elevation thay cho spine_angle
 
     if (ctx.currentState != SupermanState.hold) return;
 

@@ -4,7 +4,7 @@ import '../../../utils/debouncer.dart';
 class TrunkAlignmentMetric extends PlankTapMetricBase {
   @override
   String get name => 'TrunkAlignment';
-  
+
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
   final Debouncer _sagDebouncer = Debouncer(requiredFrames: 4);
@@ -24,9 +24,12 @@ class TrunkAlignmentMetric extends PlankTapMetricBase {
       ctx.resultIssues.feedback['Spine'] = 'Võng lưng/Chổng mông!';
       if (!_faults.any((f) => f.type == 'TrunkSag')) {
         _faults.add(FaultRecord(
-          phase: ctx.state.name.toUpperCase(), type: 'TrunkSag', message: 'Mất trục lưng thẳng',
-          affectsForm: true, priority: PlankTapVoicePriority.trunkAlignment, voiceMessage: 'Thẳng lưng lên, siết mông và cơ lõi'
-        ));
+            phase: ctx.state.name.toUpperCase(),
+            type: 'TrunkSag',
+            message: 'Mất trục lưng thẳng',
+            affectsForm: true,
+            priority: PlankTapVoicePriority.trunkAlignment,
+            voiceMessage: 'Thẳng lưng lên, siết mông và cơ lõi'));
       }
     } else {
       ctx.resultIssues.feedback['Spine'] = 'Lưng thẳng';

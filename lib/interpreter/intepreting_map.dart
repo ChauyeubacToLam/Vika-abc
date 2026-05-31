@@ -64,7 +64,7 @@ final interpretingMap = {
     ],
     bodyRegion: 'hip',
   ),
-   // ─── S09 self-report candidates ──────────────────────────────────
+  // ─── S09 self-report candidates ──────────────────────────────────
   // priority=99: only surfaced via explicit user picks, never emitted
   // by an interpreter. correctives/overactive/underactive omitted —
   // clinical metadata doesn't apply to self-reported sensations.

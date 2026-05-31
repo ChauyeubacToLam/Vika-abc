@@ -1,4 +1,3 @@
-import '../../pose/vika_image_orientation.dart';
 import 'package:vika/exercise/exercise_base.dart';
 import 'package:vika/utils/exercise_logger.dart';
 import '../../utils/pose_math_helpers.dart';
@@ -23,7 +22,8 @@ class TricepDipConfig {
 
 class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
   @override
-  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+  Set<VikaImageOrientation> get supportedOrientations =>
+      const <VikaImageOrientation>{
         VikaImageOrientation.landscapeLeft,
         VikaImageOrientation.landscapeRight,
       };
@@ -38,7 +38,8 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
   final HipThrustMetric hipThrustMetric = HipThrustMetric();
   final TricepRomMetric tricepRomMetric = TricepRomMetric();
   final FullExtensionMetric fullExtensionMetric = FullExtensionMetric();
-  final ScapularElevationMetric scapularElevationMetric = ScapularElevationMetric();
+  final ScapularElevationMetric scapularElevationMetric =
+      ScapularElevationMetric();
 
   late final List<TricepMetricBase> _metrics = [
     hipThrustMetric,
@@ -49,16 +50,34 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
 
   @override
   Map<String, SideLandmarkPair> get requiredSideLandmarks => const {
-        'shoulder': (right: PoseLandmarkType.rightShoulder, left: PoseLandmarkType.leftShoulder),
-        'elbow': (right: PoseLandmarkType.rightElbow, left: PoseLandmarkType.leftElbow),
-        'wrist': (right: PoseLandmarkType.rightWrist, left: PoseLandmarkType.leftWrist),
-        'hip': (right: PoseLandmarkType.rightHip, left: PoseLandmarkType.leftHip),
-        'ankle': (right: PoseLandmarkType.rightAnkle, left: PoseLandmarkType.leftAnkle),
+        'shoulder': (
+          right: PoseLandmarkType.rightShoulder,
+          left: PoseLandmarkType.leftShoulder
+        ),
+        'elbow': (
+          right: PoseLandmarkType.rightElbow,
+          left: PoseLandmarkType.leftElbow
+        ),
+        'wrist': (
+          right: PoseLandmarkType.rightWrist,
+          left: PoseLandmarkType.leftWrist
+        ),
+        'hip': (
+          right: PoseLandmarkType.rightHip,
+          left: PoseLandmarkType.leftHip
+        ),
+        'ankle': (
+          right: PoseLandmarkType.rightAnkle,
+          left: PoseLandmarkType.leftAnkle
+        ),
       };
-      
+
   @override
   Map<String, SideLandmarkPair> get optionalSideLandmarks => const {
-        'ear': (right: PoseLandmarkType.rightEar, left: PoseLandmarkType.leftEar),
+        'ear': (
+          right: PoseLandmarkType.rightEar,
+          left: PoseLandmarkType.leftEar
+        ),
       };
 
   @override
@@ -117,7 +136,8 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
     final ankle = req['ankle']!;
 
     // 1. Arm almost vertical / straight
-    double elbowAngle = calculateAngleNormalized(firstPoint: shoulder, midPoint: elbow, lastPoint: wrist);
+    double elbowAngle = calculateAngleNormalized(
+        firstPoint: shoulder, midPoint: elbow, lastPoint: wrist);
     if (elbowAngle < 155.0) {
       resultIssues.feedback['System'] = 'Duỗi thẳng cánh tay.';
       return false;
@@ -144,7 +164,8 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
     final hip = req['hip']!;
     final ear = req['ear'];
 
-    double elbowAngle = calculateAngleNormalized(firstPoint: shoulder, midPoint: elbow, lastPoint: wrist);
+    double elbowAngle = calculateAngleNormalized(
+        firstPoint: shoulder, midPoint: elbow, lastPoint: wrist);
     double forearmLength = calculateDistance(elbow, wrist);
 
     int now = frameTimestampMs;
@@ -157,7 +178,8 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
 
     _updateStateMachine(elbowAngle, now);
 
-    if (tricepState == TricepDipState.setup_top && previousTricepState != TricepDipState.setup_top) {
+    if (tricepState == TricepDipState.setup_top &&
+        previousTricepState != TricepDipState.setup_top) {
       _completeRep();
       return;
     }
@@ -183,7 +205,7 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
 
     debugData['tricepState'] = tricepState.name;
     debugData['elbowAngle'] = elbowAngle;
-    
+
     for (final metric in _metrics) {
       debugData.addAll(metric.debugData);
     }
@@ -216,7 +238,8 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
     } else if (tricepState == TricepDipState.ascending) {
       if (elbowAngle > TricepDipConfig.ASCENDING_ELBOW_ANGLE) {
         _transitionState(TricepDipState.setup_top, now);
-      } else if (elbowAngleChange == ChangeState.decreasing && elbowAngle < TricepDipConfig.ASCENDING_ELBOW_ANGLE - 10) {
+      } else if (elbowAngleChange == ChangeState.decreasing &&
+          elbowAngle < TricepDipConfig.ASCENDING_ELBOW_ANGLE - 10) {
         // They started descending again without reaching full extension
         _transitionState(TricepDipState.descending, now);
         _completeRep(); // Count it as a rep (it will likely have the 'no_full_extension' fault)
@@ -226,11 +249,12 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
 
   void _transitionState(TricepDipState newState, int timestampMs) {
     if (newState == tricepState) return;
-    
+
     previousTricepState = tricepState;
     tricepState = newState;
 
-    if (newState == TricepDipState.descending && previousTricepState == TricepDipState.setup_top) {
+    if (newState == TricepDipState.descending &&
+        previousTricepState == TricepDipState.setup_top) {
       resultIssues.instructions.clear();
     }
 
@@ -258,7 +282,8 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
 
     setFeedback.add({correctForm: faultMap});
 
-    logger.addRepLog(RepLog(correctForm: correctForm, repNumber: repCount, data: {
+    logger
+        .addRepLog(RepLog(correctForm: correctForm, repNumber: repCount, data: {
       "fault_types": allFaults.map((f) => f.type).toSet().toList(),
     }));
 

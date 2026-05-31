@@ -3,7 +3,7 @@ import '../../../../utils/debouncer.dart';
 
 class LiftConfig {
   static const double CHEST_GOOD_MIN = 0.10;
-  static const double THIGH_GOOD_MIN = 0.05; 
+  static const double THIGH_GOOD_MIN = 0.05;
 }
 
 class LiftFormMetric extends BowPoseMetricBase {
@@ -12,7 +12,7 @@ class LiftFormMetric extends BowPoseMetricBase {
 
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
-  
+
   final Debouncer _thighDebouncer = Debouncer(requiredFrames: 4);
   final Debouncer _chestDebouncer = Debouncer(requiredFrames: 4);
 
@@ -21,14 +21,14 @@ class LiftFormMetric extends BowPoseMetricBase {
 
   @override
   List<FaultRecord> get faults => _faults;
-  
+
   @override
   Map<String, dynamic> get debugData => _debugData;
 
   @override
   void update(RepContext ctx) {
     final chest = ctx.chestLift;
-    final thigh = ctx.thighLiftRelative; 
+    final thigh = ctx.thighLiftRelative;
 
     if (chest > _maxChestLift) _maxChestLift = chest;
     if (thigh > _maxThighLift) _maxThighLift = thigh;
@@ -70,7 +70,7 @@ class LiftFormMetric extends BowPoseMetricBase {
 
   @override
   void evaluateRep(RepContext ctx) {
-    ctx.resultIssues.feedback['MaxExtension'] = 
+    ctx.resultIssues.feedback['MaxExtension'] =
         'Ngực: ${(_maxChestLift * 100).toInt()}% lưng, Đùi: ${(_maxThighLift * 100).toInt()}% đùi';
   }
 

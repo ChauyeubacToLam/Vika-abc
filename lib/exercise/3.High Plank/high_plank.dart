@@ -1,9 +1,9 @@
 // ignore_for_file: non_constant_identifier_names, curly_braces_in_flow_control_structures
 import 'package:vika/utils/debouncer.dart';
+import 'package:vika/debug/tracked_metric.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/exercise_logger.dart';
-import '../../pose/vika_image_orientation.dart';
 import '../exercise_base.dart';
 import 'metrics/high_plank_metric_base.dart';
 import 'metrics/sagging_metric.dart';
@@ -52,14 +52,29 @@ class HighPlank extends ExerciseBase {
   final TimerMetric timerMetric = TimerMetric();
 
   late final List<HighPlankMetricBase> _metrics = [
-    saggingMetric, pikedHipMetric, elbowMetric, timerMetric
+    saggingMetric,
+    pikedHipMetric,
+    elbowMetric,
+    timerMetric
   ];
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
 
   final Debouncer _holdingDebouncer = Debouncer(requiredFrames: 4);
   final Debouncer _droppingDebouncer = Debouncer(requiredFrames: 2);
 
   @override
-  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+  Set<VikaImageOrientation> get supportedOrientations =>
+      const <VikaImageOrientation>{
         VikaImageOrientation.landscapeLeft,
         VikaImageOrientation.landscapeRight,
       };
@@ -73,9 +88,12 @@ class HighPlank extends ExerciseBase {
   @override
   String get currentPhaseLabel {
     switch (state) {
-      case HighPlankState.setup: return 'Chuẩn bị form...';
-      case HighPlankState.holding: return 'Giữ vững! Đang đếm giờ';
-      case HighPlankState.dropping: return 'Mất form! Sửa lại ngay';
+      case HighPlankState.setup:
+        return 'Chuẩn bị form...';
+      case HighPlankState.holding:
+        return 'Giữ vững! Đang đếm giờ';
+      case HighPlankState.dropping:
+        return 'Mất form! Sửa lại ngay';
     }
   }
 
@@ -84,34 +102,35 @@ class HighPlank extends ExerciseBase {
     return null;
   }
 
-  Map<String, PoseLandmark>? _getLandmarks(Map<PoseLandmarkType, PoseLandmark> lm) {
-    bool hasLeft = lm.containsKey(PoseLandmarkType.leftShoulder) && 
-                   lm.containsKey(PoseLandmarkType.leftHip) && 
-                   lm.containsKey(PoseLandmarkType.leftAnkle) &&
-                   lm.containsKey(PoseLandmarkType.leftElbow) &&
-                   lm.containsKey(PoseLandmarkType.leftWrist) &&
-                   lm.containsKey(PoseLandmarkType.leftKnee);
-                   
-    bool hasRight = lm.containsKey(PoseLandmarkType.rightShoulder) && 
-                    lm.containsKey(PoseLandmarkType.rightHip) && 
-                    lm.containsKey(PoseLandmarkType.rightAnkle) &&
-                    lm.containsKey(PoseLandmarkType.rightElbow) &&
-                    lm.containsKey(PoseLandmarkType.rightWrist) &&
-                    lm.containsKey(PoseLandmarkType.rightKnee);
+  Map<String, PoseLandmark>? _getLandmarks(
+      Map<PoseLandmarkType, PoseLandmark> lm) {
+    bool hasLeft = lm.containsKey(PoseLandmarkType.leftShoulder) &&
+        lm.containsKey(PoseLandmarkType.leftHip) &&
+        lm.containsKey(PoseLandmarkType.leftAnkle) &&
+        lm.containsKey(PoseLandmarkType.leftElbow) &&
+        lm.containsKey(PoseLandmarkType.leftWrist) &&
+        lm.containsKey(PoseLandmarkType.leftKnee);
+
+    bool hasRight = lm.containsKey(PoseLandmarkType.rightShoulder) &&
+        lm.containsKey(PoseLandmarkType.rightHip) &&
+        lm.containsKey(PoseLandmarkType.rightAnkle) &&
+        lm.containsKey(PoseLandmarkType.rightElbow) &&
+        lm.containsKey(PoseLandmarkType.rightWrist) &&
+        lm.containsKey(PoseLandmarkType.rightKnee);
 
     if (!hasLeft && !hasRight) return null;
 
     double leftScore = 0;
     if (hasLeft) {
-      leftScore = lm[PoseLandmarkType.leftShoulder]!.likelihood + 
-                  lm[PoseLandmarkType.leftHip]!.likelihood + 
-                  lm[PoseLandmarkType.leftAnkle]!.likelihood;
+      leftScore = lm[PoseLandmarkType.leftShoulder]!.likelihood +
+          lm[PoseLandmarkType.leftHip]!.likelihood +
+          lm[PoseLandmarkType.leftAnkle]!.likelihood;
     }
     double rightScore = 0;
     if (hasRight) {
-      rightScore = lm[PoseLandmarkType.rightShoulder]!.likelihood + 
-                   lm[PoseLandmarkType.rightHip]!.likelihood + 
-                   lm[PoseLandmarkType.rightAnkle]!.likelihood;
+      rightScore = lm[PoseLandmarkType.rightShoulder]!.likelihood +
+          lm[PoseLandmarkType.rightHip]!.likelihood +
+          lm[PoseLandmarkType.rightAnkle]!.likelihood;
     }
 
     if (hasLeft && leftScore >= rightScore) {
@@ -148,8 +167,8 @@ class HighPlank extends ExerciseBase {
     final ankle = lm['ankle']!;
 
     // FIX 1: Đảm bảo camera đã nhận diện rõ ràng toàn bộ cơ thể (không bị che lấp chân/hông dẫn đến nội suy sai)
-    if (shoulder.likelihood < 0.6 || elbow.likelihood < 0.6 || wrist.likelihood < 0.6 ||
-        hip.likelihood < 0.6 || knee.likelihood < 0.6 || ankle.likelihood < 0.6) {
+    if (![shoulder, elbow, wrist, hip, knee, ankle]
+        .every(ExerciseBase.isLandmarkConfident)) {
       return false;
     }
 
@@ -171,12 +190,16 @@ class HighPlank extends ExerciseBase {
       return false;
     }
 
-    double armAngle = calculateAngleNormalized(firstPoint: shoulder, midPoint: elbow, lastPoint: wrist);
-    double bodyAngle = calculateAngleNormalized(firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
-    double kneeAngle = calculateAngleNormalized(firstPoint: hip, midPoint: knee, lastPoint: ankle);
-    
+    double armAngle = calculateAngleNormalized(
+        firstPoint: shoulder, midPoint: elbow, lastPoint: wrist);
+    double bodyAngle = calculateAngleNormalized(
+        firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
+    double kneeAngle = calculateAngleNormalized(
+        firstPoint: hip, midPoint: knee, lastPoint: ankle);
+
     // FIX 2: Đo góc giữa cánh tay và thân người để tránh trường hợp nằm duỗi thẳng trên sàn (Superman pose)
-    double armBodyAngle = calculateAngleNormalized(firstPoint: hip, midPoint: shoulder, lastPoint: wrist);
+    double armBodyAngle = calculateAngleNormalized(
+        firstPoint: hip, midPoint: shoulder, lastPoint: wrist);
 
     if (armAngle < HighPlankConfig.START_ARM_MIN) return false;
     if (bodyAngle < HighPlankConfig.START_BODY_MIN) return false;
@@ -189,26 +212,38 @@ class HighPlank extends ExerciseBase {
   }
 
   @override
-  bool requestStop() => _timeoutReached || timerMetric.totalHoldingTimeMs >= HighPlankConfig.TARGET_TIME_MS;
+  bool requestStop() =>
+      _timeoutReached ||
+      timerMetric.totalHoldingTimeMs >= HighPlankConfig.TARGET_TIME_MS;
 
   @override
   void onSetComplete() {
+    final formFaults = <FaultRecord>[
+      ...saggingMetric.faults,
+      ...pikedHipMetric.faults,
+      ...elbowMetric.faults,
+    ];
+    final holdCorrect = !formFaults.any((f) => f.affectsForm);
+
+    logger.pushKey("max_rep", 1);
     logger.pushKey("sagging_fails_count", saggingMetric.faults.length);
     logger.pushKey("piked_fails_count", pikedHipMetric.faults.length);
     logger.pushKey("elbow_fails_count", elbowMetric.faults.length);
     logger.pushKey("total_perfect_time_ms", timerMetric.totalHoldingTimeMs);
 
-    logger.addRepLog(RepLog(correctForm: saggingMetric.faults.isEmpty, repNumber: 1, data: {
+    logger.addRepLog(RepLog(correctForm: holdCorrect, repNumber: 1, data: {
       "perfect_hold_time": timerMetric.totalHoldingTimeMs / 1000.0,
+      "fault_types": formFaults.map((e) => e.type).toSet().toList(),
     }));
 
-    if (saggingMetric.faults.isEmpty) logger.pushGoodRepCount();
+    logger.pushGoodRepCount();
 
     StringBuffer dump = StringBuffer();
     dump.writeln("=== DIAGNOSTIC LOG (HIGH PLANK) ===");
     dump.writeln("Time(s) | State | S-H-A | S-E-W | HipDev");
     for (var log in _diagnosticLog) {
-      dump.writeln("${log['time']} | ${log['state']} | ${log['body'].toStringAsFixed(1)} | ${log['arm'].toStringAsFixed(1)} | ${log['dev'].toStringAsFixed(2)}");
+      dump.writeln(
+          "${log['time']} | ${log['state']} | ${log['body'].toStringAsFixed(1)} | ${log['arm'].toStringAsFixed(1)} | ${log['dev'].toStringAsFixed(2)}");
     }
     logger.pushKey("diagnostic_dump", dump.toString());
   }
@@ -234,15 +269,18 @@ class HighPlank extends ExerciseBase {
     final ankle = lm['ankle']!;
 
     // Bổ sung chặn rác dữ liệu: Nếu đang tập mà có vật cản che khuất tay/chân/hông thì tạm bỏ qua frame này
-    if (shoulder.likelihood < 0.5 || elbow.likelihood < 0.5 || wrist.likelihood < 0.5 ||
-        hip.likelihood < 0.5 || knee.likelihood < 0.5 || ankle.likelihood < 0.5) {
+    if (![shoulder, elbow, wrist, hip, knee, ankle]
+        .every(ExerciseBase.isLandmarkConfident)) {
       return;
     }
 
     scaleFactor = calculateDistance(shoulder, hip);
-    double bodyAngle = calculateAngleNormalized(firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
-    double armAngle = calculateAngleNormalized(firstPoint: shoulder, midPoint: elbow, lastPoint: wrist);
-    double kneeAngle = calculateAngleNormalized(firstPoint: hip, midPoint: knee, lastPoint: ankle);
+    double bodyAngle = calculateAngleNormalized(
+        firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
+    double armAngle = calculateAngleNormalized(
+        firstPoint: shoulder, midPoint: elbow, lastPoint: wrist);
+    double kneeAngle = calculateAngleNormalized(
+        firstPoint: hip, midPoint: knee, lastPoint: ankle);
 
     double expectedHipY = _interpolateY(shoulder, ankle, hip.x);
     double rawDeviation = hip.y - expectedHipY;
@@ -278,16 +316,18 @@ class HighPlank extends ExerciseBase {
     resultIssues.addInstruction(state.name, 'Status', currentPhaseLabel);
   }
 
-  void _updateStateMachine(double bodyAngle, double armAngle, double hipDev, double kneeAngle, int now) {
-    bool isFormGoodToHold = bodyAngle >= HighPlankConfig.HOLDING_BODY_THRESHOLD &&
-                            armAngle >= HighPlankConfig.HOLDING_ARM_THRESHOLD &&
-                            kneeAngle >= HighPlankConfig.HOLDING_KNEE_THRESHOLD &&
-                            hipDev < HighPlankConfig.HOLDING_SAG_DEVIATION;
+  void _updateStateMachine(double bodyAngle, double armAngle, double hipDev,
+      double kneeAngle, int now) {
+    bool isFormGoodToHold =
+        bodyAngle >= HighPlankConfig.HOLDING_BODY_THRESHOLD &&
+            armAngle >= HighPlankConfig.HOLDING_ARM_THRESHOLD &&
+            kneeAngle >= HighPlankConfig.HOLDING_KNEE_THRESHOLD &&
+            hipDev < HighPlankConfig.HOLDING_SAG_DEVIATION;
 
     bool isFormBadToDrop = bodyAngle < HighPlankConfig.DROPPING_PIKE_ANGLE ||
-                           armAngle < HighPlankConfig.DROPPING_ARM_ANGLE ||
-                           kneeAngle < HighPlankConfig.DROPPING_KNEE_ANGLE ||
-                           hipDev >= HighPlankConfig.DROPPING_SAG_DEVIATION;
+        armAngle < HighPlankConfig.DROPPING_ARM_ANGLE ||
+        kneeAngle < HighPlankConfig.DROPPING_KNEE_ANGLE ||
+        hipDev >= HighPlankConfig.DROPPING_SAG_DEVIATION;
 
     if (state == HighPlankState.setup || state == HighPlankState.dropping) {
       if (_holdingDebouncer.update(isFormGoodToHold)) {
@@ -304,7 +344,8 @@ class HighPlank extends ExerciseBase {
     if (newState == state) return;
     previousState = state;
     state = newState;
-    for (var metric in _metrics) metric.onStateTransition(previousState, newState, now);
+    for (var metric in _metrics)
+      metric.onStateTransition(previousState, newState, now);
   }
 
   double _interpolateY(PoseLandmark p1, PoseLandmark p2, double targetX) {

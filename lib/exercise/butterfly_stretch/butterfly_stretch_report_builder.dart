@@ -4,14 +4,14 @@ import 'package:vika/interpreter/interpreter_base.dart';
 import 'butterfly_stretch.dart'; // Import để dùng ButterflyConfig.TARGET_HOLD_SECONDS
 
 class ButterflyReportBuilder extends ExerciseReportBuilder {
-
   @override
   List<DetailCard> buildDetailCards(List<ExerciseLogger> setLoggers) {
     if (setLoggers.isEmpty) return [];
 
     final latestLog = setLoggers.last.setLogs;
     final totalHold = (latestLog["total_hold_time"] as num?)?.toDouble() ?? 0.0;
-    final maxSep = (latestLog["max_knee_separation"] as num?)?.toDouble() ?? 0.0;
+    final maxSep =
+        (latestLog["max_knee_separation"] as num?)?.toDouble() ?? 0.0;
 
     return [
       DetailCard(
@@ -29,14 +29,28 @@ class ButterflyReportBuilder extends ExerciseReportBuilder {
         subLabel: 'Tổng thời gian kéo giãn',
         useRadial: true,
         // Dùng constant thay magic number — nếu target thay đổi thì cập nhật 1 chỗ duy nhất
-        radialValue: (totalHold / ButterflyConfig.TARGET_HOLD_SECONDS * 100).clamp(0, 100).toDouble(),
+        radialValue: (totalHold / ButterflyConfig.TARGET_HOLD_SECONDS * 100)
+            .clamp(0, 100)
+            .toDouble(),
         color: 'amber',
       ),
     ];
   }
 
-  (String, String, String?) pickInsight(ExerciseLogger logger, ExerciseLogger? prevLogger, int setScore, int? prevScore) {
-    final postureFails = (logger.setLogs["posture_fails_count"] as num?)?.toInt() ?? 0;
+  (String, String, String?) pickInsight(ExerciseLogger logger,
+      ExerciseLogger? prevLogger, int setScore, int? prevScore) {
+    final postureFails =
+        (logger.setLogs["posture_fails_count"] as num?)?.toInt() ?? 0;
+    final footPlacementFails =
+        (logger.setLogs["foot_placement_fails_count"] as num?)?.toInt() ?? 0;
+
+    if (footPlacementFails > 0) {
+      return (
+        'Cảnh báo: Gót chân quá xa hông',
+        'Kéo hai gót chân lại gần hông trước khi giữ tư thế để bài giãn cơ hiệu quả hơn.',
+        null,
+      );
+    }
 
     if (postureFails > 0) {
       return (

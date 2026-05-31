@@ -3,7 +3,7 @@ import 'reverse_crunch_metric_base.dart';
 class PelvicCurlMetric extends ReverseCrunchMetricBase {
   @override
   String get name => 'PelvicCurl';
-  
+
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
 
@@ -26,18 +26,24 @@ class PelvicCurlMetric extends ReverseCrunchMetricBase {
       return;
     }
 
-    if (ctx.trunkKneeAngle < _minTrunkKneeAngle) _minTrunkKneeAngle = ctx.trunkKneeAngle;
-    if (ctx.hipY < _minHipY) _minHipY = ctx.hipY;
+    if (ctx.trunkKneeAngle < _minTrunkKneeAngle) {
+      _minTrunkKneeAngle = ctx.trunkKneeAngle;
+    }
+    if (ctx.hipY < _minHipY) {
+      _minHipY = ctx.hipY;
+    }
 
     if (_baselineHipY != null && _baselineTrunkKneeAngle != null) {
       double angleDrop = _baselineTrunkKneeAngle! - ctx.trunkKneeAngle;
-      double hipLiftNorm = (_baselineHipY! - ctx.hipY) / (ctx.scaleFactor == 0 ? 1 : ctx.scaleFactor);
+      double hipLiftNorm = (_baselineHipY! - ctx.hipY) /
+          (ctx.scaleFactor == 0 ? 1 : ctx.scaleFactor);
 
       _debugData['angleDrop'] = angleDrop.toStringAsFixed(1);
       _debugData['hipLiftNorm'] = hipLiftNorm.toStringAsFixed(2);
 
       if (ctx.state == ReverseCrunchState.top) {
-        if (angleDrop >= ReverseCrunchConfig.PELVIC_CURL_ANGLE_MIN_DROP && hipLiftNorm >= ReverseCrunchConfig.HIP_LIFT_MIN_NORMALIZED) {
+        if (angleDrop >= ReverseCrunchConfig.PELVIC_CURL_ANGLE_MIN_DROP &&
+            hipLiftNorm >= ReverseCrunchConfig.HIP_LIFT_MIN_NORMALIZED) {
           ctx.resultIssues.feedback['Curl'] = 'Cuộn rất sâu!';
         } else {
           ctx.resultIssues.feedback['Curl'] = 'Cuộn mông cao lên!';
@@ -53,15 +59,21 @@ class PelvicCurlMetric extends ReverseCrunchMetricBase {
     if (_baselineHipY == null || _baselineTrunkKneeAngle == null) return;
 
     double maxAngleDrop = _baselineTrunkKneeAngle! - _minTrunkKneeAngle;
-    double maxHipLift = (_baselineHipY! - _minHipY) / (ctx.scaleFactor == 0 ? 1 : ctx.scaleFactor);
+    double maxHipLift = (_baselineHipY! - _minHipY) /
+        (ctx.scaleFactor == 0 ? 1 : ctx.scaleFactor);
 
-    if (maxAngleDrop < ReverseCrunchConfig.PELVIC_CURL_ANGLE_MIN_DROP || maxHipLift < ReverseCrunchConfig.HIP_LIFT_MIN_NORMALIZED) {
+    if (maxAngleDrop < ReverseCrunchConfig.PELVIC_CURL_ANGLE_MIN_DROP ||
+        maxHipLift < ReverseCrunchConfig.HIP_LIFT_MIN_NORMALIZED) {
       _faults.add(FaultRecord(
-        phase: 'TOP', type: 'NoPelvicTilt', message: 'Hông không rời sàn',
-        affectsForm: true, priority: CrunchVoicePriority.pelvicCurl, 
-        voiceMessage: 'Bài tập vô nghĩa nếu hông không rời sàn. Hãy cuộn mông nhấc lên khỏi mặt đất!'
-      ));
-      ctx.resultIssues.addInstruction('lying', 'Curl', 'Cố gắng nhấc thắt lưng rời khỏi sàn nhé.');
+          phase: 'TOP',
+          type: 'NoPelvicTilt',
+          message: 'Hông không rời sàn',
+          affectsForm: true,
+          priority: CrunchVoicePriority.pelvicCurl,
+          voiceMessage:
+              'Bài tập vô nghĩa nếu hông không rời sàn. Hãy cuộn mông nhấc lên khỏi mặt đất!'));
+      ctx.resultIssues.addInstruction(
+          'lying', 'Curl', 'Cố gắng nhấc thắt lưng rời khỏi sàn nhé.');
     }
   }
 

@@ -56,10 +56,10 @@ class SphinxContext {
 }
 
 class SphinxFaultVoicePriority {
-  static const int hipLift = 0;      // Nâng hông / mất decompression
-  static const int straightArm = 1;  // Lỗi form Cobra
-  static const int shrugNeck = 2;    // Rụt cổ / mỏi vai gáy
-  static const int neckHyper = 3;    // Ngửa cổ
+  static const int hipLift = 0; // Nâng hông / mất decompression
+  static const int straightArm = 1; // Lỗi form Cobra
+  static const int shrugNeck = 2; // Rụt cổ / mỏi vai gáy
+  static const int neckHyper = 3; // Ngửa cổ
 }
 
 abstract class SphinxMetricBase {

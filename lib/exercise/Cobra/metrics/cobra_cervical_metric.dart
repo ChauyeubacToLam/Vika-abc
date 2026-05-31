@@ -21,7 +21,8 @@ class CobraCervicalMetric extends CobraMetricBase {
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
 
-  final StickyDebouncer _hyperextensionDebouncer = StickyDebouncer(requiredFrames: 8);
+  final StickyDebouncer _hyperextensionDebouncer =
+      StickyDebouncer(requiredFrames: 8);
   final StickyDebouncer _warningDebouncer = StickyDebouncer(requiredFrames: 8);
 
   @override
@@ -42,9 +43,11 @@ class CobraCervicalMetric extends CobraMetricBase {
     }
 
     // Relative method: cervicalAngle = neckAngle - trunkAngle
-    final trunkAngle = calculateVerticalAngle(pivot: ctx.hip!, point: ctx.shoulder!);
-    final neckAngle = calculateVerticalAngle(pivot: ctx.shoulder!, point: ctx.ear!);
-    
+    final trunkAngle =
+        calculateVerticalAngle(pivot: ctx.hip!, point: ctx.shoulder!);
+    final neckAngle =
+        calculateVerticalAngle(pivot: ctx.shoulder!, point: ctx.ear!);
+
     // Compute cervical extension relative to trunk
     double cervicalAngle = neckAngle - trunkAngle;
     // Normalize to -180..+180
@@ -59,14 +62,15 @@ class CobraCervicalMetric extends CobraMetricBase {
     if (_hyperextensionDebouncer.update(cervicalAngle > _errorHyperextension)) {
       ctx.resultIssues.feedback['Neck'] = '⚠️ Đầu ngửa quá nhiều!';
       ctx.resultIssues.addInstruction(
-        'holding', 'neckHyperextension',
+        'holding',
+        'neckHyperextension',
         'Đừng ngửa đầu ra sau. Nhìn thẳng hoặc hơi nhìn xuống.',
       );
       _logFault(phase, 'Neck hyperextension', 'NeckHyperextension');
     }
     // Warning: outside good range
-    else if (_warningDebouncer.update(
-        cervicalAngle > _goodMax || cervicalAngle < _goodMin)) {
+    else if (_warningDebouncer
+        .update(cervicalAngle > _goodMax || cervicalAngle < _goodMin)) {
       if (cervicalAngle > _goodMax) {
         ctx.resultIssues.feedback['Neck'] = 'Hạ đầu xuống chút';
       } else {
@@ -82,7 +86,10 @@ class CobraCervicalMetric extends CobraMetricBase {
   void _logFault(String phase, String message, String type) {
     if (!_faults.any((f) => f.type == type)) {
       _faults.add(FaultRecord(
-        phase: phase, type: type, message: message, affectsForm: true,
+        phase: phase,
+        type: type,
+        message: message,
+        affectsForm: true,
       ));
     }
   }

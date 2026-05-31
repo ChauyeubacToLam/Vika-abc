@@ -47,7 +47,8 @@ class CobraElbowMetric extends CobraMetricBase {
     if (_lockoutDebouncer.update(angle >= _errorMin)) {
       ctx.resultIssues.feedback['Elbow'] = '⚠️ Khuỷu tay duỗi quá thẳng!';
       ctx.resultIssues.addInstruction(
-        'holding', 'elbowLockout',
+        'holding',
+        'elbowLockout',
         'Giữ khuỷu tay hơi cong. Đừng duỗi thẳng hoàn toàn.',
       );
       _logFault(phase, 'Elbow locked out', 'ElbowLockout');
@@ -65,7 +66,10 @@ class CobraElbowMetric extends CobraMetricBase {
   void _logFault(String phase, String message, String type) {
     if (!_faults.any((f) => f.type == type)) {
       _faults.add(FaultRecord(
-        phase: phase, type: type, message: message, affectsForm: true,
+        phase: phase,
+        type: type,
+        message: message,
+        affectsForm: true,
       ));
     }
   }

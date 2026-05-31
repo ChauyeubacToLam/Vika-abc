@@ -9,13 +9,18 @@ export '../../fault_record.dart';
 
 /// Chỉ dùng để hiển thị label UI và cho TrunkMetric biết phase.
 /// KHÔNG dùng để đếm rep nữa — việc đó thuộc về KneePeakRepCounter.
-enum ClimberState { high_plank_base, knee_driving_in, max_flexion, knee_driving_out }
+enum ClimberState {
+  high_plank_base,
+  knee_driving_in,
+  max_flexion,
+  knee_driving_out
+}
 
 enum KneeSide { left, right }
 
 class ClimberConfig {
   // --- Rep / Thời gian ---
-  static const int MAX_REP = 30;           // 15 mỗi chân
+  static const int MAX_REP = 30; // 15 mỗi chân
   static const int MAX_DURATION_MS = 90000; // 90 s
 
   // --- Setup gate ---
@@ -23,8 +28,8 @@ class ClimberConfig {
   static const List<double> TRUNK_STRAIGHT_RANGE = [170.0, 180.0];
 
   // --- Trunk stability ---
-  static const double HIP_DROP_TRUNK_ANGLE = 160.0;   // Dưới mức này = võng lưng
-  static const double HIP_BOUNCE_NORM = 0.12;          // ~10 cm / scale
+  static const double HIP_DROP_TRUNK_ANGLE = 160.0; // Dưới mức này = võng lưng
+  static const double HIP_BOUNCE_NORM = 0.12; // ~10 cm / scale
 
   // --- Peak detection ---
   /// Khi dist_chuẩn_hóa < ngưỡng này → coi là gối đã vào zone (co đủ sâu).
@@ -58,8 +63,8 @@ class RepContext {
   final double scaleFactor; // Khoảng cách Vai–Hông (pixel), dùng chuẩn hóa
 
   // Angles
-  final double armAngle;    // Vai–Khuỷu–Cổ tay
-  final double trunkAngle;  // Vai–Hông–Gót (chân trụ)
+  final double armAngle; // Vai–Khuỷu–Cổ tay
+  final double trunkAngle; // Vai–Hông–Gót (chân trụ)
 
   // Coordinates
   final double hipY;
@@ -124,8 +129,7 @@ class KneePeakRepCounter {
     final double rawDist = (kneeX - shoulderX).abs() / scale;
 
     // 2. EMA smoothing — giảm nhiễu landmark
-    _smoothedDist =
-        ClimberConfig.EMA_ALPHA * rawDist +
+    _smoothedDist = ClimberConfig.EMA_ALPHA * rawDist +
         (1.0 - ClimberConfig.EMA_ALPHA) * _smoothedDist;
 
     // 3. Vào zone
@@ -186,6 +190,5 @@ abstract class ClimberMetricBase {
     reset();
   }
 
-  void onStateTransition(
-      ClimberState from, ClimberState to, int timestampMs) {}
+  void onStateTransition(ClimberState from, ClimberState to, int timestampMs) {}
 }

@@ -32,14 +32,20 @@ class StandingKneeToElbowReportBuilder extends ExerciseReportBuilder {
     int coreDriveFails = 0;
     int crossRomFails = 0;
     for (final logger in setLoggers) {
-      kneeValgusFails += (logger.setLogs['knee_valgus_fails'] as num?)?.toInt() ?? 0;
-      coreDriveFails += (logger.setLogs['core_drive_fails'] as num?)?.toInt() ?? 0;
-      crossRomFails += (logger.setLogs['cross_rom_fails'] as num?)?.toInt() ?? 0;
+      kneeValgusFails +=
+          (logger.setLogs['knee_valgus_fails'] as num?)?.toInt() ?? 0;
+      coreDriveFails +=
+          (logger.setLogs['core_drive_fails'] as num?)?.toInt() ?? 0;
+      crossRomFails +=
+          (logger.setLogs['cross_rom_fails'] as num?)?.toInt() ?? 0;
     }
 
-    final kneeSafetyScore = ((totalReps - kneeValgusFails) / totalReps * 100).roundToDouble();
-    final coreDriveScore = ((totalReps - coreDriveFails) / totalReps * 100).roundToDouble();
-    final crossRomScore = ((totalReps - crossRomFails) / totalReps * 100).roundToDouble();
+    final kneeSafetyScore =
+        ((totalReps - kneeValgusFails) / totalReps * 100).roundToDouble();
+    final coreDriveScore =
+        ((totalReps - coreDriveFails) / totalReps * 100).roundToDouble();
+    final crossRomScore =
+        ((totalReps - crossRomFails) / totalReps * 100).roundToDouble();
 
     return [
       DetailCard(

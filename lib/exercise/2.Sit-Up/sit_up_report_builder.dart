@@ -12,9 +12,11 @@ class SitUpReportBuilder extends ExerciseReportBuilder {
   @override
   Map<String, String> faultToTipMap() => {
         'jerking_fails_count': 'Việc giật khi lên cong cột sống. Hãy chậm lại!',
-        'stability_fails_count': 'Cơ hông đang làm việc thay cơ bụng. Hãy khóa chân chặt xuống thảm.',
+        'stability_fails_count':
+            'Cơ hông đang làm việc thay cơ bụng. Hãy khóa chân chặt xuống thảm.',
         'rom_fails_count': 'Lên chưa đạt 90 độ sẽ không kích thích cơ tối đa.',
-        'tempo_fails_count': 'Pha hạ thân người là lúc cơ bụng gồng nhiều nhất, đừng thả rơi tự do xuống sàn.',
+        'tempo_fails_count':
+            'Pha hạ thân người là lúc cơ bụng gồng nhiều nhất, đừng thả rơi tự do xuống sàn.',
       };
 
   @override
@@ -32,8 +34,8 @@ class SitUpReportBuilder extends ExerciseReportBuilder {
       };
 
   @override
-  DetectedEvidence? detectIssue(List<ExerciseLogger> setLoggers) { 
-    return null; 
+  DetectedEvidence? detectIssue(List<ExerciseLogger> setLoggers) {
+    return null;
   }
 
   @override
@@ -43,14 +45,26 @@ class SitUpReportBuilder extends ExerciseReportBuilder {
     if (totalReps == 0) return [];
 
     // FIXED: Thay ?[ bằng [ vì data của RepLog đã được xác định không null
-    int romFails = allReps.where((r) => (r.data['fault_types'] as List? ?? []).contains('ROM')).length;
-    double romCompleteness = totalReps > 0 ? ((totalReps - romFails) / totalReps) * 100 : 0;
+    int romFails = allReps
+        .where((r) => (r.data['fault_types'] as List? ?? []).contains('ROM'))
+        .length;
+    double romCompleteness =
+        totalReps > 0 ? ((totalReps - romFails) / totalReps) * 100 : 0;
 
-    int jerkFails = allReps.where((r) => (r.data['fault_types'] as List? ?? []).contains('Jerking')).length;
-    double movementControl = totalReps > 0 ? ((totalReps - jerkFails) / totalReps) * 100 : 0;
+    int jerkFails = allReps
+        .where(
+            (r) => (r.data['fault_types'] as List? ?? []).contains('Jerking'))
+        .length;
+    double movementControl =
+        totalReps > 0 ? ((totalReps - jerkFails) / totalReps) * 100 : 0;
 
-    final allTempos = allReps.map((r) => (r.data['lowering_time'] as num?)?.toDouble() ?? 0).where((t) => t > 0).toList();
-    final avgTempo = allTempos.isEmpty ? 0.0 : allTempos.reduce((a, b) => a + b) / allTempos.length;
+    final allTempos = allReps
+        .map((r) => (r.data['lowering_time'] as num?)?.toDouble() ?? 0)
+        .where((t) => t > 0)
+        .toList();
+    final avgTempo = allTempos.isEmpty
+        ? 0.0
+        : allTempos.reduce((a, b) => a + b) / allTempos.length;
 
     return [
       DetailCard(

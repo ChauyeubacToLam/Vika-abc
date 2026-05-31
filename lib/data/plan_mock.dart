@@ -305,7 +305,8 @@ const List<PlanWeek> phaseWeeksMock = [
         count: 4,
         form: 76,
       ),
-      PlanDay(weekday: 'T3', date: '6/5', status: DayStatus.rest, title: 'Nghỉ'),
+      PlanDay(
+          weekday: 'T3', date: '6/5', status: DayStatus.rest, title: 'Nghỉ'),
       PlanDay(
         weekday: 'T4',
         date: '7/5',
@@ -314,7 +315,8 @@ const List<PlanWeek> phaseWeeksMock = [
         count: 5,
         form: 82,
       ),
-      PlanDay(weekday: 'T5', date: '8/5', status: DayStatus.rest, title: 'Nghỉ'),
+      PlanDay(
+          weekday: 'T5', date: '8/5', status: DayStatus.rest, title: 'Nghỉ'),
       PlanDay(
         weekday: 'T6',
         date: '9/5',
@@ -330,7 +332,8 @@ const List<PlanWeek> phaseWeeksMock = [
         title: 'Đánh giá lại',
         count: 2,
       ),
-      PlanDay(weekday: 'CN', date: '11/5', status: DayStatus.rest, title: 'Nghỉ'),
+      PlanDay(
+          weekday: 'CN', date: '11/5', status: DayStatus.rest, title: 'Nghỉ'),
     ],
   ),
 
@@ -348,7 +351,8 @@ const List<PlanWeek> phaseWeeksMock = [
         'sẽ định hình từ kết quả này.',
     unlockNote: 'Mở khoá sau khi Recheck T7 hoàn tất.',
     days: [
-      PlanDay(weekday: 'T2', date: '12/5', status: DayStatus.rest, title: 'Nghỉ'),
+      PlanDay(
+          weekday: 'T2', date: '12/5', status: DayStatus.rest, title: 'Nghỉ'),
       PlanDay(
         weekday: 'T3',
         date: '13/5',
@@ -356,8 +360,10 @@ const List<PlanWeek> phaseWeeksMock = [
         title: 'Đánh giá nhẹ',
         count: 3,
       ),
-      PlanDay(weekday: 'T4', date: '14/5', status: DayStatus.rest, title: 'Nghỉ'),
-      PlanDay(weekday: 'T5', date: '15/5', status: DayStatus.rest, title: 'Nghỉ'),
+      PlanDay(
+          weekday: 'T4', date: '14/5', status: DayStatus.rest, title: 'Nghỉ'),
+      PlanDay(
+          weekday: 'T5', date: '15/5', status: DayStatus.rest, title: 'Nghỉ'),
       PlanDay(
         weekday: 'T6',
         date: '16/5',
@@ -365,8 +371,10 @@ const List<PlanWeek> phaseWeeksMock = [
         title: 'Đánh giá đầy đủ',
         count: 4,
       ),
-      PlanDay(weekday: 'T7', date: '17/5', status: DayStatus.rest, title: 'Nghỉ'),
-      PlanDay(weekday: 'CN', date: '18/5', status: DayStatus.rest, title: 'Nghỉ'),
+      PlanDay(
+          weekday: 'T7', date: '17/5', status: DayStatus.rest, title: 'Nghỉ'),
+      PlanDay(
+          weekday: 'CN', date: '18/5', status: DayStatus.rest, title: 'Nghỉ'),
     ],
   ),
 ];

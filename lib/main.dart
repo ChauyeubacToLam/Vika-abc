@@ -879,7 +879,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     }
   }
 
- /* -----------------------------------------------------------------------
+  /* -----------------------------------------------------------------------
      POSE PIPELINE
      ----------------------------------------------------------------------- */
 
@@ -895,12 +895,12 @@ class _ExerciseScreenState extends State<ExerciseScreen>
       if (inputImage == null) return;
       await _exercise.runPersonDetection(inputImage);
       final poses = await _poseDetector.processImage(inputImage);
-      
+
       if (poses.isNotEmpty) {
         final pose = poses.first;
         _detectedPose = pose;
         _result = _exercise.processPose(pose.landmarks);
-        
+
         if (_result != null) {
           if (_exercise.exerciseState == ExerciseState.completed) {
             _repCount = _exercise.repCount;
@@ -946,7 +946,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         _frameCount = 0;
         _lastFpsTime = now;
       }
-      
+
       final nowMs = DateTime.now().millisecondsSinceEpoch;
       if (mounted &&
           nowMs - _lastUiRefreshAtMs >= _MIN_UI_REFRESH_INTERVAL_MS) {
@@ -957,6 +957,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
       debugPrint('[Vika] Detection error: $e');
     }
   }
+
   /* -----------------------------------------------------------------------
      COMPLETION — Pop with logger after short delay
      ----------------------------------------------------------------------- */

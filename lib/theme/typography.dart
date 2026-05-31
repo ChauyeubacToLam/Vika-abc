@@ -167,4 +167,3 @@ abstract final class VikaType {
     );
   }
 }
-

@@ -1,17 +1,19 @@
 import '../../exercise_base.dart';
 import '../../fault_record.dart';
+import '../../../debug/debug_types.dart';
 
+export '../../../debug/debug_types.dart';
 export '../../fault_record.dart';
 
 enum SitUpState { lying, rising, upright, lowering }
 
 class SitUpRepContext {
-  final double trunkHorizontalAngle; 
-  final double hipKneeAnkleAngle;    
-  final double kneeHipShoulderAngle; 
-  final double shoulderY; 
-  final double ankleY;    
-  final double? scaleFactor; 
+  final double trunkHorizontalAngle;
+  final double hipKneeAnkleAngle;
+  final double kneeHipShoulderAngle;
+  final double shoulderY;
+  final double ankleY;
+  final double? scaleFactor;
   final SitUpState state;
   final int frameTimestampMs;
   final ResultIssues resultIssues;
@@ -30,25 +32,42 @@ class SitUpRepContext {
 }
 
 class SitUpFaultPriority {
-  static const int jerking = 0;   // Giật (Critical)
-  static const int heelLift = 1;  // Nhấc chân (High)
-  static const int rom = 2;       // Lên chưa tới (Medium)
-  static const int tempo = 3;     // Hạ nhanh quá (Medium)
+  static const int jerking = 0; // Giật (Critical)
+  static const int heelLift = 1; // Nhấc chân (High)
+  static const int rom = 2; // Lên chưa tới (Medium)
+  static const int tempo = 3; // Hạ nhanh quá (Medium)
 }
 
-abstract class SitUpMetricBase {
+abstract class SitUpMetricBase implements DebugMetricSource {
+  @override
   String get name;
   int faultsCount = 0;
-  
+
   void update(SitUpRepContext ctx);
   List<FaultRecord> get faults;
+  @override
   Map<String, dynamic> get debugData;
+
+  @override
+  double? get value => null;
+
+  @override
+  ThresholdBand? get threshold => null;
+
+  @override
+  MetricStatus get status => MetricStatus.pass;
+
+  @override
+  String? get nameVi => null;
+
+  @override
+  bool get devOnly => false;
   void reset();
-  
+
   void resetAndCountFault() {
     if (faults.isNotEmpty) faultsCount++;
     reset();
   }
-  
+
   void onStateTransition(SitUpState from, SitUpState to, int timestampMs) {}
 }

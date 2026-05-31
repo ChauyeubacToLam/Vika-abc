@@ -41,7 +41,7 @@ class CobraHoldStabilityMetric extends CobraMetricBase {
     }
 
     _debugData['holdDur'] = _holdDuration.toStringAsFixed(1);
-    
+
     // Compute running SD if enough samples
     if (_trunkAngles.length >= 10) {
       final sd = _computeSD(_trunkAngles);
@@ -67,7 +67,7 @@ class CobraHoldStabilityMetric extends CobraMetricBase {
     if (_trunkAngles.length < 5) return;
 
     final sd = _computeSD(_trunkAngles);
-    
+
     _debugData['finalHoldDur'] = _holdDuration.toStringAsFixed(1);
     _debugData['finalHoldSD'] = sd.toStringAsFixed(1);
 

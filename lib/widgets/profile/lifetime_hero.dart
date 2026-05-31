@@ -244,9 +244,7 @@ class _StatTile extends StatelessWidget {
           Container(
             width: 14,
             height: 1,
-            color: yellow
-                ? c.yellow
-                : c.invInkSoft.withValues(alpha: 0.3),
+            color: yellow ? c.yellow : c.invInkSoft.withValues(alpha: 0.3),
           ),
           const SizedBox(height: 8),
           Text(

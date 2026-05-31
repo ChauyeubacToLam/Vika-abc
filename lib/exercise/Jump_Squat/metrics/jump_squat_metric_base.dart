@@ -18,7 +18,7 @@ class RepContext {
   /// Tọa độ Y của mũi chân (dùng để xác định lơ lửng/tiếp đất).
   /// Trong ML Kit: Y = 0 ở đỉnh màn hình, Y tăng dần xuống dưới.
   final double footY;
-  
+
   /// Tọa độ Y của hông (dùng để xác định hướng di chuyển cơ thể).
   final double hipY;
 
@@ -46,5 +46,6 @@ abstract class JumpSquatMetricBase {
   List<FaultRecord> get faults;
   Map<String, dynamic> get debugData;
   void reset();
-  void onStateTransition(JumpSquatState from, JumpSquatState to, int timestampMs) {}
+  void onStateTransition(
+      JumpSquatState from, JumpSquatState to, int timestampMs) {}
 }

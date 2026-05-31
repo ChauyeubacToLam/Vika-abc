@@ -17,6 +17,7 @@ import '../glute_bridge.dart';
 import '../../exercise_base.dart';
 import '../../fault_record.dart';
 export '../../fault_record.dart';
+
 /* =========================================================================
    RepContext — Shared per-frame state passed to all metrics.
    ========================================================================= */
@@ -77,7 +78,6 @@ class RepContext {
     required this.resultIssues,
   });
 }
-
 
 /* =========================================================================
    GluteBridgeMetricBase — Interface every glute-bridge metric implements.

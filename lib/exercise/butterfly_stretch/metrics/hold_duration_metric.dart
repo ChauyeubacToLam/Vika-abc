@@ -19,7 +19,8 @@ class HoldDurationMetric extends ButterflyMetricBase {
 
   /// Không cần onStateTransition ở đây nữa — ButterflyStretch tự xử lý _holdStartMs.
   @override
-  void onStateTransition(ButterflyState from, ButterflyState to, int timestampMs) {}
+  void onStateTransition(
+      ButterflyState from, ButterflyState to, int timestampMs) {}
 
   @override
   void update(StretchContext ctx) {

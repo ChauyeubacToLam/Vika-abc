@@ -18,10 +18,13 @@ class KneeExtensionMetric extends SeatedForwardMetricBase {
 
   @override
   void update(SeatedForwardContext ctx) {
-    if (ctx.state == SeatedForwardState.setup || ctx.state == SeatedForwardState.ascending) return;
+    if (ctx.state == SeatedForwardState.setup ||
+        ctx.state == SeatedForwardState.ascending) {
+      return;
+    }
 
     _debugData['kneeAngle'] = ctx.kneeAngle.toStringAsFixed(1);
-    
+
     bool isKneeBent = ctx.kneeAngle < SeatedForwardConfig.Ak_Fault_Knee_Angle;
 
     if (_kneeBendDebouncer.update(isKneeBent)) {
@@ -47,7 +50,7 @@ class KneeExtensionMetric extends SeatedForwardMetricBase {
         type: 'KneeBent',
         message: 'Lỗi co gối',
         voiceMessage: voiceMessage,
-        affectsForm: true, 
+        affectsForm: true,
         priority: SeatedForwardFaultVoicePriority.kneeBent,
       ));
     }

@@ -11,7 +11,8 @@ class StepLengthMetric extends WalkingMetricBase {
   }
 
   @override
-  void onStateTransition(WalkingState oldState, WalkingState newState, int timestampMs) {
+  void onStateTransition(
+      WalkingState oldState, WalkingState newState, int timestampMs) {
     if (newState == WalkingState.bottom) {}
   }
 
@@ -27,15 +28,17 @@ class StepLengthMetric extends WalkingMetricBase {
       return;
     }
 
-    final diff = (normalizedStep - firstRepNormalizedStepLength!).abs() / firstRepNormalizedStepLength!;
+    final diff = (normalizedStep - firstRepNormalizedStepLength!).abs() /
+        firstRepNormalizedStepLength!;
     if (diff > TOLERANCE) {
       addFault(
         FaultRecord(
           type: 'inconsistent_step',
-          message: 'Sải bước không đều! Hãy cố gắng duy trì độ dài bước chân ổn định.',
+          message:
+              'Sải bước không đều! Hãy cố gắng duy trì độ dài bước chân ổn định.',
           affectsForm: false,
           phase: ctx.state.name,
-          priority: 3, // Medium
+          priority: WalkingFaultPriority.stepConsistency,
           voiceMessage: 'Giữ sải bước đều nhau!',
         ),
       );

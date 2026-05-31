@@ -22,7 +22,8 @@ class CobraHandPlacementMetric extends CobraMetricBase {
   final Map<String, dynamic> _debugData = {};
 
   final StickyDebouncer _tooFarDebouncer = StickyDebouncer(requiredFrames: 12);
-  final StickyDebouncer _tooCloseDebouncer = StickyDebouncer(requiredFrames: 12);
+  final StickyDebouncer _tooCloseDebouncer =
+      StickyDebouncer(requiredFrames: 12);
 
   @override
   List<FaultRecord> get faults => _faults;
@@ -48,7 +49,8 @@ class CobraHandPlacementMetric extends CobraMetricBase {
     if (_tooFarDebouncer.update(handOffset >= _errorTooFar)) {
       ctx.resultIssues.feedback['Hands'] = '⚠️ Tay đặt quá xa!';
       ctx.resultIssues.addInstruction(
-        'setup', 'handsTooForward',
+        'setup',
+        'handsTooForward',
         'Đặt tay gần xương sườn hơn, ngay dưới vai.',
       );
       _logFault(phase, 'Hands placed too far forward', 'HandsTooFar');
@@ -70,7 +72,10 @@ class CobraHandPlacementMetric extends CobraMetricBase {
   void _logFault(String phase, String message, String type) {
     if (!_faults.any((f) => f.type == type)) {
       _faults.add(FaultRecord(
-        phase: phase, type: type, message: message, affectsForm: true,
+        phase: phase,
+        type: type,
+        message: message,
+        affectsForm: true,
       ));
     }
   }

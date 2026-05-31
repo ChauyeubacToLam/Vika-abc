@@ -41,14 +41,22 @@ class BirdDogReportBuilder extends ExerciseReportBuilder {
     final allReps = setLoggers.expand((l) => l.repLogs).toList();
     final totalReps = allReps.length;
     final totalGood = allReps.where((r) => r.correctForm).length;
-    
+
     if (totalReps == 0) return [];
 
-    final allTempos = allReps.map((r) => (r.data['hold_time'] as num?)?.toDouble() ?? 0).where((t) => t > 0).toList();
-    final avgTempo = allTempos.isEmpty ? 0.0 : allTempos.reduce((a, b) => a + b) / allTempos.length;
+    final allTempos = allReps
+        .map((r) => (r.data['hold_time'] as num?)?.toDouble() ?? 0)
+        .where((t) => t > 0)
+        .toList();
+    final avgTempo = allTempos.isEmpty
+        ? 0.0
+        : allTempos.reduce((a, b) => a + b) / allTempos.length;
 
-    int lumbarFails = setLoggers.map((l) => (l as dynamic).data['lumbar_fails_count'] as int? ?? 0).reduce((a, b) => a + b);
-    double spineNeutrality = totalReps > 0 ? ((totalReps - lumbarFails) / totalReps) * 100 : 0;
+    int lumbarFails = setLoggers
+        .map((l) => (l as dynamic).data['lumbar_fails_count'] as int? ?? 0)
+        .reduce((a, b) => a + b);
+    double spineNeutrality =
+        totalReps > 0 ? ((totalReps - lumbarFails) / totalReps) * 100 : 0;
 
     return [
       DetailCard(

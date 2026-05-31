@@ -1,9 +1,9 @@
 // ignore_for_file: non_constant_identifier_names, curly_braces_in_flow_control_structures
 import 'package:vika/utils/debouncer.dart';
+import 'package:vika/debug/tracked_metric.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/exercise_logger.dart';
-import '../../pose/vika_image_orientation.dart';
 import '../exercise_base.dart';
 import 'metrics/bird_dog_metric_base.dart';
 import 'metrics/lumbar_extension_metric.dart';
@@ -47,10 +47,22 @@ class BirdDog extends ExerciseBase {
     trunkMetric,
     tempoMetric
   ];
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
 
   final Debouncer _holdDebouncer = Debouncer(requiredFrames: 3);
   final Debouncer _returningDebouncer = Debouncer(requiredFrames: 2);
   final Debouncer _neutralDebouncer = Debouncer(requiredFrames: 3);
+  final Debouncer _extendingDebouncer = Debouncer(requiredFrames: 2);
 
   // Biến Snapshot: Chỉ lưu tay/chân đang thao tác ở đúng đỉnh của rep
   bool? _peakLeftLeg;
@@ -105,6 +117,10 @@ class BirdDog extends ExerciseBase {
           knee == null ||
           ankle == null ||
           wrist == null) return false;
+      if (![shoulder, hip, knee, ankle, wrist]
+          .every(ExerciseBase.isLandmarkConfident)) {
+        return false;
+      }
 
       // Ensure the user is facing down (wrist below shoulder, knee below hip)
       if (wrist.y < shoulder.y) return false;
@@ -114,7 +130,10 @@ class BirdDog extends ExerciseBase {
           firstPoint: hip, midPoint: knee, lastPoint: ankle);
       double armAngle = calculateAngleNormalized(
           firstPoint: hip, midPoint: shoulder, lastPoint: wrist);
-      double trunkHoriz = _calcHorizontalAngle(shoulder, hip);
+      double trunkHoriz = calculateAbsoluteHorizontalAngle(
+        point1: shoulder,
+        point2: hip,
+      );
 
       if (kneeAngle < BirdDogConfig.START_KNEE_MIN ||
           kneeAngle > BirdDogConfig.START_KNEE_MAX) return false;
@@ -148,6 +167,7 @@ class BirdDog extends ExerciseBase {
 
   @override
   void onSetComplete() {
+    logger.pushKey("max_rep", maxRep);
     logger.pushKey("lumbar_fails_count", lumbarMetric.faultsCount);
     logger.pushKey("alignment_fails_count", alignmentMetric.faultsCount);
     logger.pushKey("trunk_fails_count", trunkMetric.faultsCount);
@@ -170,6 +190,25 @@ class BirdDog extends ExerciseBase {
     }
 
     // --- XÁC ĐỊNH CHÂN (Live Data) ---
+    final requiredTypes = [
+      PoseLandmarkType.leftShoulder,
+      PoseLandmarkType.rightShoulder,
+      PoseLandmarkType.leftHip,
+      PoseLandmarkType.rightHip,
+      PoseLandmarkType.leftKnee,
+      PoseLandmarkType.rightKnee,
+      PoseLandmarkType.leftAnkle,
+      PoseLandmarkType.rightAnkle,
+      PoseLandmarkType.leftWrist,
+      PoseLandmarkType.rightWrist,
+    ];
+    final requiredLandmarks =
+        requiredTypes.map((type) => landmarks[type]).toList();
+    if (requiredLandmarks.any((landmark) =>
+        landmark == null || !ExerciseBase.isLandmarkConfident(landmark))) {
+      return;
+    }
+
     final leftKneeAngle = calculateAngleNormalized(
         firstPoint: landmarks[PoseLandmarkType.leftHip]!,
         midPoint: landmarks[PoseLandmarkType.leftKnee]!,
@@ -206,11 +245,14 @@ class BirdDog extends ExerciseBase {
         ? landmarks[PoseLandmarkType.leftWrist]!
         : landmarks[PoseLandmarkType.rightWrist]!;
 
-    // Bird Dog's pair rule is anatomical: left arm must pair with right leg
-    // and vice versa. Use ML Kit side labels for this rule; a global mirror or
-    // global left/right swap still preserves same-side vs opposite-side checks.
-    bool activeLegLabelIsLeft = mlKitActiveLegIsLeft;
-    bool activeArmLabelIsLeft = mlKitActiveArmIsLeft;
+    final leftHip = landmarks[PoseLandmarkType.leftHip]!;
+    final rightHip = landmarks[PoseLandmarkType.rightHip]!;
+    final leftShoulder = landmarks[PoseLandmarkType.leftShoulder]!;
+    final rightShoulder = landmarks[PoseLandmarkType.rightShoulder]!;
+    bool activeLegLabelIsLeft =
+        isPhysicalLeftSide(activeAnkle, leftHip, rightHip);
+    bool activeArmLabelIsLeft =
+        isPhysicalLeftSide(activeWrist, leftShoulder, rightShoulder);
 
     // --- SNAPSHOT DATA (Chỉ chốt số liệu tay chân khi đang ở đỉnh rep) ---
     if (state == BirdDogState.hold_extended) {
@@ -256,15 +298,20 @@ class BirdDog extends ExerciseBase {
     final ear = landmarks[mlKitActiveArmIsLeft
             ? PoseLandmarkType.leftEar
             : PoseLandmarkType.rightEar] ??
-        landmarks[PoseLandmarkType.leftEar]!;
+        landmarks[PoseLandmarkType.leftEar] ??
+        landmarks[PoseLandmarkType.rightEar] ??
+        shoulder;
 
     scaleFactor = calculateDistance(shoulder, hip);
 
     double shaAngle = calculateAngleNormalized(
         firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
-    double trunkHoriz = _calcHorizontalAngle(shoulder, hip);
-    double armHoriz = _calcHorizontalAngle(shoulder, wrist);
-    double legHoriz = _calcHorizontalAngle(hip, ankle);
+    double trunkHoriz =
+        calculateAbsoluteHorizontalAngle(point1: shoulder, point2: hip);
+    double armHoriz =
+        calculateAbsoluteHorizontalAngle(point1: shoulder, point2: wrist);
+    double legHoriz =
+        calculateAbsoluteHorizontalAngle(point1: hip, point2: ankle);
 
     final ctx = BirdDogRepContext(
       activeKneeAngle: activeKneeAngle,
@@ -323,8 +370,8 @@ class BirdDog extends ExerciseBase {
   }
 
   void _updateStateMachine(double kneeAngle, double armAngle, int now) {
-    if (state == BirdDogState.neutral &&
-        kneeAngle > BirdDogConfig.EXTENDING_KNEE_START) {
+    if (_extendingDebouncer.update(state == BirdDogState.neutral &&
+        kneeAngle > BirdDogConfig.EXTENDING_KNEE_START)) {
       _transitionState(BirdDogState.extending, now);
     } else if (_holdDebouncer.update(state == BirdDogState.extending &&
         kneeAngle > BirdDogConfig.HOLD_KNEE_THRESHOLD &&
@@ -430,12 +477,5 @@ class BirdDog extends ExerciseBase {
     // Xóa snapshot để chu trình sau nhận diện lại từ đầu
     _peakLeftLeg = null;
     _peakLeftArm = null;
-  }
-
-  double _calcHorizontalAngle(PoseLandmark p1, PoseLandmark p2) {
-    double dy = (p2.y - p1.y).abs();
-    double dx = (p2.x - p1.x).abs();
-    if (dx == 0) return 90.0;
-    return (dy / dx) * (180 / 3.14159);
   }
 }

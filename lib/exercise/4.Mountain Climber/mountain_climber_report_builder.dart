@@ -10,8 +10,8 @@ class MountainClimberReportBuilder extends ExerciseReportBuilder {
   @override
   Map<String, List<String>> painToFaultMap() => {
         'lower_back': ['trunk_fails_count'], // Võng lưng dồn lực lên cột sống
-        'shoulder':   ['trunk_fails_count'], // Mất ổn định trục thân
-        'wrist':      ['trunk_fails_count'],
+        'shoulder': ['trunk_fails_count'], // Mất ổn định trục thân
+        'wrist': ['trunk_fails_count'],
       };
 
   // ---------------------------------------------------------------------------
@@ -33,13 +33,13 @@ class MountainClimberReportBuilder extends ExerciseReportBuilder {
   @override
   Map<String, String Function(int count, int total)> praiseSentenceMap() => {
         'Core': (c, t) => 'Giữ form cực đỉnh $c/$t rep!',
-        'ROM':  (c, t) => 'Biên độ sâu $c/$t rep, rất ăn bụng!',
+        'ROM': (c, t) => 'Biên độ sâu $c/$t rep, rất ăn bụng!',
       };
 
   @override
   Map<String, String> praiseMetricNames() => {
         'trunk_fails_count': 'Core',
-        'rom_fails_count':   'ROM',
+        'rom_fails_count': 'ROM',
       };
 
   // ---------------------------------------------------------------------------
@@ -48,13 +48,13 @@ class MountainClimberReportBuilder extends ExerciseReportBuilder {
 
   @override
   List<DetailCard> buildDetailCards(List<ExerciseLogger> setLoggers) {
-    final allReps   = setLoggers.expand((l) => l.repLogs).toList();
+    final allReps = setLoggers.expand((l) => l.repLogs).toList();
     final totalReps = allReps.length;
 
     if (totalReps == 0) return [];
 
     final totalGood = allReps.where((r) => r.correctForm).length;
-    final accuracy  = (totalGood / totalReps * 100).roundToDouble();
+    final accuracy = (totalGood / totalReps * 100).roundToDouble();
 
     // --- Core Stability Score ---
     // Lấy từ core_stability_ratio thực tế (% frame hông ổn định), đã được
@@ -66,7 +66,8 @@ class MountainClimberReportBuilder extends ExerciseReportBuilder {
           (sum, log) =>
               sum +
               (double.tryParse(
-                      log.setLogs['core_stability_ratio']?.toString() ?? '1.0') ??
+                      log.setLogs['core_stability_ratio']?.toString() ??
+                          '1.0') ??
                   1.0),
         ) /
         setLoggers.length;
@@ -84,10 +85,9 @@ class MountainClimberReportBuilder extends ExerciseReportBuilder {
 
     // --- Pace: reps/phút ---
     final double totalMinutes = setLoggers.fold<double>(
-          0.0,
-          (sum, log) =>
-              sum + (log.setLogs['duration_ms'] as int? ?? 0) / 60000.0,
-        );
+      0.0,
+      (sum, log) => sum + (log.setLogs['duration_ms'] as int? ?? 0) / 60000.0,
+    );
     final String paceLabel = totalMinutes > 0
         ? '${(totalReps / totalMinutes).round()} rep/phút'
         : '-';

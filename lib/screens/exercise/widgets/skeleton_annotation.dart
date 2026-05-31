@@ -429,13 +429,16 @@ class _AnatomyPainter extends CustomPainter {
 
     switch (posture) {
       case SkeletonPosture.standing:
-        _drawStanding(canvas, size, body, softLimb, jointFill, jointHalo, ground);
+        _drawStanding(
+            canvas, size, body, softLimb, jointFill, jointHalo, ground);
         break;
       case SkeletonPosture.lyingFaceUp:
-        _drawLyingFaceUp(canvas, size, body, softLimb, jointFill, jointHalo, ground);
+        _drawLyingFaceUp(
+            canvas, size, body, softLimb, jointFill, jointHalo, ground);
         break;
       case SkeletonPosture.lyingFaceDown:
-        _drawLyingFaceDown(canvas, size, body, softLimb, jointFill, jointHalo, ground);
+        _drawLyingFaceDown(
+            canvas, size, body, softLimb, jointFill, jointHalo, ground);
         break;
     }
   }

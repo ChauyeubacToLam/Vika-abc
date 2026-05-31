@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../plan/plan_typography.dart';
 import '../../theme/app_colors.dart';
+
 class IdentityBlock extends StatelessWidget {
   const IdentityBlock({
     super.key,

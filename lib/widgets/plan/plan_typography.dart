@@ -100,8 +100,8 @@ class PlanEyebrow extends StatelessWidget {
         weight: FontWeight.w800,
         letterSpacing: letterSpacing,
         height: 1.2,
-        color: color ??
-            (dark ? VikaIvoryMain.invInkSoft : VikaIvoryMain.inkSoft),
+        color:
+            color ?? (dark ? VikaIvoryMain.invInkSoft : VikaIvoryMain.inkSoft),
         fontFeatures: tabular ? VikaIvoryMain.tabularFigures : null,
       ),
     );
@@ -138,7 +138,8 @@ class PlanH1 extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final resolvedColor = color ?? (dark ? VikaIvoryMain.invInk : VikaIvoryMain.ink);
+    final resolvedColor =
+        color ?? (dark ? VikaIvoryMain.invInk : VikaIvoryMain.ink);
     final style = italic
         ? frauncesItalic(
             size: size,
@@ -269,8 +270,8 @@ class _CoachMarkInline extends CustomPainter {
       ..strokeWidth = 0.9 * scale
       ..strokeCap = StrokeCap.round;
 
-    canvas.drawCircle(p(9, 5.5), 1.1 * scale,
-        Paint()..color = VikaIvoryMain.ink);
+    canvas.drawCircle(
+        p(9, 5.5), 1.1 * scale, Paint()..color = VikaIvoryMain.ink);
     canvas.drawLine(p(9, 6.6), p(9, 10), ink);
     canvas.drawLine(p(6.5, 8), p(11.5, 8), ink);
     canvas.drawLine(p(9, 10), p(7.5, 13), ink);

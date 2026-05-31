@@ -5,14 +5,20 @@ import 'package:vika/utils/exercise_logger.dart';
 class ReverseCrunchReportBuilder extends ExerciseReportBuilder {
   @override
   Map<String, List<String>> painToFaultMap() => {
-        'lower_back': ['momentum_fails', 'curl_fails'], // Vung chân (shear stress), không cuộn chậu
+        'lower_back': [
+          'momentum_fails',
+          'curl_fails'
+        ], // Vung chân (shear stress), không cuộn chậu
       };
 
   @override
   Map<String, String> faultToTipMap() => {
-        'momentum_fails': 'Tập trung dùng cơ bụng dưới kéo đùi về phía ngực thay vì vung chân. Giữ nguyên góc chân 90 độ.',
-        'curl_fails': 'Nâng mông nhấc lên khỏi thảm mới kích hoạt được bụng dưới. Hãy cuộn xương chậu lên.',
-        'tempo_fails': 'Lúc thả chân xuống, cơ bụng phải gồng lại. Hạ chân từ từ trong 2 giây!',
+        'momentum_fails':
+            'Tập trung dùng cơ bụng dưới kéo đùi về phía ngực thay vì vung chân. Giữ nguyên góc chân 90 độ.',
+        'curl_fails':
+            'Nâng mông nhấc lên khỏi thảm mới kích hoạt được bụng dưới. Hãy cuộn xương chậu lên.',
+        'tempo_fails':
+            'Lúc thả chân xuống, cơ bụng phải gồng lại. Hạ chân từ từ trong 2 giây!',
       };
 
   @override
@@ -31,23 +37,32 @@ class ReverseCrunchReportBuilder extends ExerciseReportBuilder {
   List<DetailCard> buildDetailCards(List<ExerciseLogger> setLoggers) {
     final allReps = setLoggers.expand((l) => l.repLogs).toList();
     final totalReps = allReps.length;
-    
+
     if (totalReps == 0) return [];
 
     // =========================================================================
     // FIX: THAY ĐỔI 'log.data' THÀNH 'log.setLogs'
     // =========================================================================
     // Điểm Cô Lập (Không vung chân)
-    int totalMomFails = setLoggers.fold(0, (sum, log) => sum + (log.setLogs['momentum_fails'] as int? ?? 0));
-    double isoScore = ((totalReps - totalMomFails) / totalReps * 100).clamp(0, 100).roundToDouble();
+    int totalMomFails = setLoggers.fold(
+        0, (sum, log) => sum + (log.setLogs['momentum_fails'] as int? ?? 0));
+    double isoScore = ((totalReps - totalMomFails) / totalReps * 100)
+        .clamp(0, 100)
+        .roundToDouble();
 
     // Điểm Cuộn Khung Chậu
-    int totalCurlFails = setLoggers.fold(0, (sum, log) => sum + (log.setLogs['curl_fails'] as int? ?? 0));
-    double curlScore = ((totalReps - totalCurlFails) / totalReps * 100).clamp(0, 100).roundToDouble();
+    int totalCurlFails = setLoggers.fold(
+        0, (sum, log) => sum + (log.setLogs['curl_fails'] as int? ?? 0));
+    double curlScore = ((totalReps - totalCurlFails) / totalReps * 100)
+        .clamp(0, 100)
+        .roundToDouble();
 
     // Điểm Nhịp Độ Ly Tâm (Eccentric Tempo)
-    int totalTempoFails = setLoggers.fold(0, (sum, log) => sum + (log.setLogs['tempo_fails'] as int? ?? 0));
-    double tempoScore = ((totalReps - totalTempoFails) / totalReps * 100).clamp(0, 100).roundToDouble();
+    int totalTempoFails = setLoggers.fold(
+        0, (sum, log) => sum + (log.setLogs['tempo_fails'] as int? ?? 0));
+    double tempoScore = ((totalReps - totalTempoFails) / totalReps * 100)
+        .clamp(0, 100)
+        .roundToDouble();
     // =========================================================================
 
     return [

@@ -3,7 +3,8 @@ import '../cossack_squat.dart';
 
 class CossackWorkingDepthMetric extends CossackMetricBase {
   static const double MIN_DEPTH_ANGLE = 60.0;
-  static const double MAX_DEPTH_ANGLE = 95.0; // Allow a bit more than 90 for leniency
+  static const double MAX_DEPTH_ANGLE =
+      95.0; // Allow a bit more than 90 for leniency
 
   bool _reachedDepth = false;
 
@@ -21,7 +22,8 @@ class CossackWorkingDepthMetric extends CossackMetricBase {
           FaultRecord(
             type: 'too_deep',
             message: 'Xuống quá sâu, có thể gây áp lực lên khớp gối.',
-            affectsForm: false, // Don't fail the rep for going too deep, just a warning
+            affectsForm:
+                false, // Don't fail the rep for going too deep, just a warning
             phase: ctx.state.name,
             priority: 4,
           ),
@@ -31,8 +33,10 @@ class CossackWorkingDepthMetric extends CossackMetricBase {
   }
 
   @override
-  void onStateTransition(CossackState oldState, CossackState newState, int timestampMs) {
-    if (newState == CossackState.standing && oldState != CossackState.standing) {
+  void onStateTransition(
+      CossackState oldState, CossackState newState, int timestampMs) {
+    if (newState == CossackState.standing &&
+        oldState != CossackState.standing) {
       if (!_reachedDepth) {
         addFault(
           FaultRecord(

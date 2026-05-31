@@ -170,8 +170,7 @@ class _AngleOneEuro {
     if (dt <= 0.0) return _xPrev!;
 
     final double dx = (x - _xPrev!) / dt;
-    final double edx =
-        _lowPass(dx, _dxPrev!, _alpha(dt, dCutoff));
+    final double edx = _lowPass(dx, _dxPrev!, _alpha(dt, dCutoff));
     _dxPrev = edx;
 
     final double cutoff = minCutoff + beta * edx.abs();

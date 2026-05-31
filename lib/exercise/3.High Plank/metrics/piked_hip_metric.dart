@@ -23,7 +23,8 @@ class PikedHipMetric extends HighPlankMetricBase {
       return;
     }
 
-    if (ctx.shoulderHipAnkleAngle < HighPlankConfig.DROPPING_PIKE_ANGLE && ctx.hipDeviation < -0.05) {
+    if (ctx.shoulderHipAnkleAngle < HighPlankConfig.DROPPING_PIKE_ANGLE &&
+        ctx.hipDeviation < -0.05) {
       if (!_isFaulting) {
         _faults.add(FaultRecord(
           phase: ctx.state.name,

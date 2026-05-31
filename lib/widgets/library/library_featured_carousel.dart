@@ -103,8 +103,7 @@ class _LibraryFeaturedCarouselState extends State<LibraryFeaturedCarousel> {
               clipBehavior: Clip.none,
               itemBuilder: (context, i) {
                 final s = widget.slides[i];
-                final indexLabel =
-                    '${(i + 1).toString().padLeft(2, '0')}'
+                final indexLabel = '${(i + 1).toString().padLeft(2, '0')}'
                     ' / '
                     '${total.toString().padLeft(2, '0')}';
                 return AnimatedBuilder(
@@ -135,8 +134,7 @@ class _LibraryFeaturedCarouselState extends State<LibraryFeaturedCarousel> {
                       ctaLabel: s.ctaLabel,
                       watermarkNumeral: s.watermarkNumeral,
                       onTap: s.onTap,
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
                     ),
                   ),
                 );
@@ -170,9 +168,7 @@ class _PaginationDots extends StatelessWidget {
             width: i == active ? 22 : 6,
             height: 6,
             decoration: BoxDecoration(
-              color: i == active
-                  ? c.yellow
-                  : c.inkFaint.withValues(alpha: 0.3),
+              color: i == active ? c.yellow : c.inkFaint.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(3),
               boxShadow: i == active
                   ? [

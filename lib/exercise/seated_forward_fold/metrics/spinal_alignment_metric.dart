@@ -21,7 +21,7 @@ class SpinalAlignmentMetric extends SeatedForwardMetricBase {
     if (ctx.state == SeatedForwardState.setup) return;
 
     _debugData['spineAngle'] = ctx.spineAngle.toStringAsFixed(1);
-    
+
     bool isRounding = ctx.spineAngle < SeatedForwardConfig.As_Fault_Spine_Angle;
 
     if (_spineRoundDebouncer.update(isRounding)) {
@@ -47,7 +47,7 @@ class SpinalAlignmentMetric extends SeatedForwardMetricBase {
         type: 'SpineRound',
         message: 'Lỗi gù lưng',
         voiceMessage: voiceMessage,
-        affectsForm: true, 
+        affectsForm: true,
         priority: SeatedForwardFaultVoicePriority.spineRound,
       ));
     }

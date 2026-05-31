@@ -20,7 +20,7 @@ class AntiRotationMetric extends SidePlankDipMetricBase {
   double _baselineShoulderWidth = 0;
   double _baselineHipWidth = 0;
   bool _baselineCaptured = false;
-  
+
   bool _hasTwisted = false;
 
   @override
@@ -28,14 +28,14 @@ class AntiRotationMetric extends SidePlankDipMetricBase {
 
   @override
   Map<String, dynamic> get debugData => _debugData;
-  
+
   // Được gọi từ main class lúc isInStartPosition
   void captureBaseline(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     final lS = landmarks[PoseLandmarkType.leftShoulder];
     final rS = landmarks[PoseLandmarkType.rightShoulder];
     final lH = landmarks[PoseLandmarkType.leftHip];
     final rH = landmarks[PoseLandmarkType.rightHip];
-    
+
     if (lS != null && rS != null && lH != null && rH != null) {
       _baselineShoulderWidth = (lS.x - rS.x).abs();
       _baselineHipWidth = (lH.x - rH.x).abs();
@@ -46,9 +46,10 @@ class AntiRotationMetric extends SidePlankDipMetricBase {
   @override
   void update(RepContext ctx) {
     if (!_baselineCaptured) return;
-    
+
     // Nếu khoảng cách bị thu hẹp đáng kể, chứng tỏ người dùng đang xoay ra trước/sau so với camera
-    if (ctx.shoulderWidthX < _baselineShoulderWidth * RotationConfig.TWIST_THRESHOLD || 
+    if (ctx.shoulderWidthX <
+            _baselineShoulderWidth * RotationConfig.TWIST_THRESHOLD ||
         ctx.hipWidthX < _baselineHipWidth * RotationConfig.TWIST_THRESHOLD) {
       _hasTwisted = true;
       ctx.resultIssues.feedback['Core'] = 'Đừng đổ người! Giữ hông vuông góc.';
@@ -56,7 +57,8 @@ class AntiRotationMetric extends SidePlankDipMetricBase {
   }
 
   @override
-  void onStateTransition(SidePlankState from, SidePlankState to, int timestampMs) {
+  void onStateTransition(
+      SidePlankState from, SidePlankState to, int timestampMs) {
     if (to == SidePlankState.top && _hasTwisted) {
       _faults.add(FaultRecord(
         phase: 'REP_COMPLETE',

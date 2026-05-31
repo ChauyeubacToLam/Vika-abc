@@ -1,6 +1,5 @@
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
-import '../../pose/vika_image_orientation.dart';
 import '../exercise_base.dart';
 
 enum PranamasanaState { setup, holding }
@@ -16,7 +15,8 @@ class Pranamasana extends ExerciseBase {
   String get exerciseName => 'Pranamasana';
 
   @override
-  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+  Set<VikaImageOrientation> get supportedOrientations =>
+      const <VikaImageOrientation>{
         VikaImageOrientation.portrait,
       };
 
@@ -27,7 +27,8 @@ class Pranamasana extends ExerciseBase {
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    if (cameraFacing != CameraFacing.left && cameraFacing != CameraFacing.right) {
+    if (cameraFacing != CameraFacing.left &&
+        cameraFacing != CameraFacing.right) {
       return "Vui lòng xoay người hoàn toàn sang ngang để máy quét được tư thế.";
     }
 
@@ -42,7 +43,8 @@ class Pranamasana extends ExerciseBase {
     ];
 
     for (final type in req) {
-      if (landmarks[type] == null || !ExerciseBase.isLandmarkConfident(landmarks[type]!)) {
+      if (landmarks[type] == null ||
+          !ExerciseBase.isLandmarkConfident(landmarks[type]!)) {
         return "Cơ thể chưa nằm trọn trong khung hình hoặc ánh sáng yếu.";
       }
     }
@@ -63,10 +65,12 @@ class Pranamasana extends ExerciseBase {
       if (state == PranamasanaState.setup) {
         state = PranamasanaState.holding;
         _holdStartTimeMs = frameTimestampMs.toDouble();
-        resultIssues.addInstruction(currentPhaseKey, 'Status', "Form chuẩn. Giữ tĩnh...");
+        resultIssues.addInstruction(
+            currentPhaseKey, 'Status', "Form chuẩn. Giữ tĩnh...");
       } else if (state == PranamasanaState.holding) {
         _currentHoldTime = (frameTimestampMs - _holdStartTimeMs) / 1000.0;
-        resultIssues.addInstruction(currentPhaseKey, 'Status', "Giữ tĩnh: ${_currentHoldTime.toStringAsFixed(1)}s / ${targetHoldTime}s");
+        resultIssues.addInstruction(currentPhaseKey, 'Status',
+            "Giữ tĩnh: ${_currentHoldTime.toStringAsFixed(1)}s / ${targetHoldTime}s");
 
         if (_currentHoldTime >= targetHoldTime) {
           // Rep completed
@@ -79,11 +83,13 @@ class Pranamasana extends ExerciseBase {
       // If broken, reset timer
       state = PranamasanaState.setup;
       _currentHoldTime = 0;
-      resultIssues.addInstruction(currentPhaseKey, 'Pose', "Chưa đúng tư thế. Hãy đứng thẳng và chắp tay trước ngực.");
+      resultIssues.addInstruction(currentPhaseKey, 'Pose',
+          "Chưa đúng tư thế. Hãy đứng thẳng và chắp tay trước ngực.");
     }
-    
+
     debugData['currentHoldTime'] = _currentHoldTime;
-    debugData['holdProgress'] = (_currentHoldTime / targetHoldTime).clamp(0.0, 1.0);
+    debugData['holdProgress'] =
+        (_currentHoldTime / targetHoldTime).clamp(0.0, 1.0);
   }
 
   bool _verifyPose(Map<PoseLandmarkType, PoseLandmark> landmarks) {
@@ -91,13 +97,20 @@ class Pranamasana extends ExerciseBase {
     final rs = landmarks[PoseLandmarkType.rightShoulder];
     final lh = landmarks[PoseLandmarkType.leftHip];
     final rh = landmarks[PoseLandmarkType.rightHip];
-    final la = landmarks[PoseLandmarkType.leftAnkle] ?? landmarks[PoseLandmarkType.leftKnee];
-    final ra = landmarks[PoseLandmarkType.rightAnkle] ?? landmarks[PoseLandmarkType.rightKnee];
-    
+    final la = landmarks[PoseLandmarkType.leftAnkle] ??
+        landmarks[PoseLandmarkType.leftKnee];
+    final ra = landmarks[PoseLandmarkType.rightAnkle] ??
+        landmarks[PoseLandmarkType.rightKnee];
+
     final lw = landmarks[PoseLandmarkType.leftWrist];
     final rw = landmarks[PoseLandmarkType.rightWrist];
 
-    if (ls == null || rs == null || lh == null || rh == null || la == null || ra == null) {
+    if (ls == null ||
+        rs == null ||
+        lh == null ||
+        rh == null ||
+        la == null ||
+        ra == null) {
       return false;
     }
 
@@ -107,14 +120,16 @@ class Pranamasana extends ExerciseBase {
     final hip = isLeft ? lh : rh;
     final ankle = isLeft ? la : ra;
 
-    final bodyAngle = calculateAngleNormalized(firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
-    if (bodyAngle < 165 || bodyAngle > 180) { // Slight tolerance for 165
+    final bodyAngle = calculateAngleNormalized(
+        firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
+    if (bodyAngle < 165 || bodyAngle > 180) {
+      // Slight tolerance for 165
       return false;
     }
 
     final wrist = isLeft ? lw : rw;
     if (wrist == null) return false;
-    
+
     final wristConf = ExerciseBase.isLandmarkConfident(wrist);
     if (!wristConf) return false;
 
@@ -127,12 +142,12 @@ class Pranamasana extends ExerciseBase {
 
     // Check if hands are folded in front of chest (wrist in front of shoulder on X-axis)
     bool inFront = isFacingRight ? wrist.x > shoulder.x : wrist.x < shoulder.x;
-    
+
     if (inFront && wrist.y > shoulder.y && wrist.y < hip.y) {
-       final distX = (wrist.x - shoulder.x).abs();
-       if (distX < wristThreshold) {
-         handsValid = true;
-       }
+      final distX = (wrist.x - shoulder.x).abs();
+      if (distX < wristThreshold) {
+        handsValid = true;
+      }
     }
 
     if (!handsValid) return false;
@@ -150,8 +165,10 @@ class Pranamasana extends ExerciseBase {
   @override
   String get currentPhaseLabel {
     switch (state) {
-      case PranamasanaState.setup: return 'Chuẩn bị';
-      case PranamasanaState.holding: return 'Giữ tĩnh';
+      case PranamasanaState.setup:
+        return 'Chuẩn bị';
+      case PranamasanaState.holding:
+        return 'Giữ tĩnh';
     }
   }
 

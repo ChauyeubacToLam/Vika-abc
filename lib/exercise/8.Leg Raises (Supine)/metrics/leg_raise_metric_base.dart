@@ -5,7 +5,7 @@ export '../../fault_record.dart';
 class LegRaiseConfig {
   static const int MAX_REP = 12; // Beginner/Conservative
   static const int TIMEOUT_MS = 90000; // 90s
-  
+
   // Start Position Limits
   static const double START_HIP_FLEXION_MIN = 165.0; // Gần 180 độ
   static const double START_KNEE_STRAIGHT_MIN = 160.0; // Phải duỗi gối
@@ -19,7 +19,7 @@ class LegRaiseConfig {
   // Tempo Thresholds (Unified: fault if < 2.0s, target if >= 2.0s)
   static const double TEMPO_FAULT_THRESHOLD = 2.0;
   static const double TEMPO_TARGET_THRESHOLD = 2.0;
-  
+
   // Trunk Angle Limit
   static const double MAX_TRUNK_ANGLE = 45.0;
 }
@@ -27,14 +27,15 @@ class LegRaiseConfig {
 enum LegRaiseState { lying, raising, top, lowering }
 
 class LegRaiseRepContext {
-  final double hipFlexionAngle;     // Góc Vai-Hông-Đầu gối (ROM)
+  final double hipFlexionAngle; // Góc Vai-Hông-Đầu gối (ROM)
   final double kneeStraightnessAngle; // Góc Hông-Đầu gối-Mắt cá (Độ thẳng chân)
-  final double trunkHorizontalAngle; // Góc ngang của thân người (chống gian lận bằng cách ngồi dậy)
-  
+  final double
+      trunkHorizontalAngle; // Góc ngang của thân người (chống gian lận bằng cách ngồi dậy)
+
   final double hipY; // Tọa độ Y của hông để đo độ võng lưng (Pelvic tilt)
   final double ankleY; // Dùng để đo vận tốc khi ở pha TOP
   final double scaleFactor; // Khoảng cách Shoulder-Hip (chuẩn hóa kích thước)
-  
+
   final LegRaiseState state;
   final int frameTimestampMs;
   final ResultIssues resultIssues;
@@ -54,9 +55,9 @@ class LegRaiseRepContext {
 
 class LegRaiseFaultPriority {
   static const int pelvicInstability = 0; // Võng lưng/Nhấc hông (Critical)
-  static const int tempo = 1;             // Thả rơi chân (Critical)
-  static const int bentKnee = 2;          // Gập gối (Medium)
-  static const int rom = 3;               // Lên chưa đủ cao (Low)
+  static const int tempo = 1; // Thả rơi chân (Critical)
+  static const int bentKnee = 2; // Gập gối (Medium)
+  static const int rom = 3; // Lên chưa đủ cao (Low)
 }
 
 abstract class LegRaiseMetricBase {
@@ -70,5 +71,7 @@ abstract class LegRaiseMetricBase {
     if (faults.isNotEmpty) faultsCount++;
     reset();
   }
-  void onStateTransition(LegRaiseState from, LegRaiseState to, int timestampMs) {}
+
+  void onStateTransition(
+      LegRaiseState from, LegRaiseState to, int timestampMs) {}
 }

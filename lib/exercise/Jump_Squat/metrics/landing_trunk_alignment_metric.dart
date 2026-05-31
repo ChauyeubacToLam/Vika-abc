@@ -35,7 +35,7 @@ class LandingTrunkAlignmentMetric extends JumpSquatMetricBase {
         _maxLeanAngle = ctx.trunkVerticalAngle;
       }
       _debugData['maxLean'] = _maxLeanAngle?.toStringAsFixed(1) ?? '-';
-      
+
       // Live feedback nếu đang rạp lưng
       if (ctx.trunkVerticalAngle > TrunkLandingConfig.MAX_LEAN_ANGLE) {
         ctx.resultIssues.feedback['Back'] = 'Cảnh báo: Rạp lưng khi tiếp đất!';
@@ -44,13 +44,16 @@ class LandingTrunkAlignmentMetric extends JumpSquatMetricBase {
   }
 
   @override
-  void onStateTransition(JumpSquatState from, JumpSquatState to, int timestampMs) {
+  void onStateTransition(
+      JumpSquatState from, JumpSquatState to, int timestampMs) {
     if (from == JumpSquatState.landing && to == JumpSquatState.standing) {
-      if (_maxLeanAngle != null && _maxLeanAngle! > TrunkLandingConfig.MAX_LEAN_ANGLE) {
+      if (_maxLeanAngle != null &&
+          _maxLeanAngle! > TrunkLandingConfig.MAX_LEAN_ANGLE) {
         _faults.add(FaultRecord(
           phase: 'REP_COMPLETE',
           type: 'Back',
-          message: 'Lưng rạp úp quá mức khi tiếp đất (${_maxLeanAngle!.toStringAsFixed(0)}°)! Giữ ngực cao.',
+          message:
+              'Lưng rạp úp quá mức khi tiếp đất (${_maxLeanAngle!.toStringAsFixed(0)}°)! Giữ ngực cao.',
           voiceMessage: 'Giữ thẳng lưng',
           affectsForm: true,
         ));

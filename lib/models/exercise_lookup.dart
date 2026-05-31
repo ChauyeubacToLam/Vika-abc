@@ -1,11 +1,11 @@
 import 'exercise_definition.dart';
 
 ExerciseDefinition? lookupExerciseDefinition(String query) {
-  final normalizedQuery = _normalizeExerciseKey(_exerciseAlias(query));
+  final normalizedQuery = normalizeExerciseKey(_exerciseAlias(query));
 
   for (final definition in exerciseDefinitions) {
-    if (_normalizeExerciseKey(definition.id) == normalizedQuery ||
-        _normalizeExerciseKey(definition.name) == normalizedQuery) {
+    if (normalizeExerciseKey(definition.id) == normalizedQuery ||
+        normalizeExerciseKey(definition.name) == normalizedQuery) {
       return definition;
     }
   }
@@ -14,7 +14,7 @@ ExerciseDefinition? lookupExerciseDefinition(String query) {
 }
 
 String _exerciseAlias(String value) {
-  return switch (_normalizeExerciseKey(value)) {
+  return switch (normalizeExerciseKey(value)) {
     'airsquat' => 'squat',
     'squats' => 'squat',
     'squatbw' => 'squat',
@@ -92,6 +92,6 @@ String _exerciseAlias(String value) {
   };
 }
 
-String _normalizeExerciseKey(String value) {
+String normalizeExerciseKey(String value) {
   return value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '');
 }

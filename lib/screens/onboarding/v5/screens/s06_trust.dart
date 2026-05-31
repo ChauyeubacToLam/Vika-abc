@@ -18,8 +18,7 @@ class _S06TrustState extends State<S06Trust> {
     _PolicySection(
       number: '01',
       title: 'Camera & xử lý tại thiết bị',
-      body:
-          'Mọi xử lý video chạy ngay trên máy của bạn. Vika không tải video '
+      body: 'Mọi xử lý video chạy ngay trên máy của bạn. Vika không tải video '
           'lên máy chủ, không lưu lại sau khi phân tích và không có ai xem video. '
           'Chỉ kết quả phân tích (góc khớp, số rep, điểm form) được lưu để theo dõi.',
     ),
@@ -228,7 +227,10 @@ class _PolicyCardState extends State<_PolicyCard> {
                             gradient: LinearGradient(
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
-                              colors: [V5.surface, V5.surface.withValues(alpha: 0)],
+                              colors: [
+                                V5.surface,
+                                V5.surface.withValues(alpha: 0)
+                              ],
                             ),
                           ),
                         ),
@@ -249,7 +251,10 @@ class _PolicyCardState extends State<_PolicyCard> {
                             gradient: LinearGradient(
                               begin: Alignment.bottomCenter,
                               end: Alignment.topCenter,
-                              colors: [V5.surface, V5.surface.withValues(alpha: 0)],
+                              colors: [
+                                V5.surface,
+                                V5.surface.withValues(alpha: 0)
+                              ],
                             ),
                           ),
                         ),
@@ -316,7 +321,8 @@ class _PolicyHeader extends StatelessWidget {
                   'Hiệu lực 16 / 05 / 2026 • Vika',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: V5.eyebrow(context, color: V5.inkSoft)
+                  style: V5
+                      .eyebrow(context, color: V5.inkSoft)
                       .copyWith(letterSpacing: 1.0),
                 ),
               ],
@@ -332,7 +338,8 @@ class _PolicyHeader extends StatelessWidget {
               ),
               child: Text(
                 'V1',
-                style: V5.eyebrow(context, color: V5.invInk)
+                style: V5
+                    .eyebrow(context, color: V5.invInk)
                     .copyWith(letterSpacing: 0.6),
               ),
             ),
@@ -365,7 +372,8 @@ class _PolicySectionTile extends StatelessWidget {
           alignment: Alignment.center,
           child: Text(
             section.number,
-            style: V5.eyebrow(context, color: V5.invInk)
+            style: V5
+                .eyebrow(context, color: V5.invInk)
                 .copyWith(letterSpacing: 0.4, fontSize: 10),
           ),
         ),
@@ -382,8 +390,9 @@ class _PolicySectionTile extends StatelessWidget {
               const SizedBox(height: V5.space4),
               Text(
                 section.body,
-                style:
-                    V5.bodySm(context, color: V5.inkSoft).copyWith(height: 1.45),
+                style: V5
+                    .bodySm(context, color: V5.inkSoft)
+                    .copyWith(height: 1.45),
               ),
             ],
           ),
@@ -409,14 +418,10 @@ class _AcceptRow extends StatelessWidget {
         curve: V5.curveSharp,
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
         decoration: BoxDecoration(
-          color: accepted
-              ? V5.yellow.withValues(alpha: 0.12)
-              : V5.surface,
+          color: accepted ? V5.yellow.withValues(alpha: 0.12) : V5.surface,
           borderRadius: BorderRadius.circular(V5.radiusMd),
           border: Border.all(
-            color: accepted
-                ? V5.yellow.withValues(alpha: 0.46)
-                : V5.border,
+            color: accepted ? V5.yellow.withValues(alpha: 0.46) : V5.border,
           ),
           boxShadow: V5.elevation1,
         ),

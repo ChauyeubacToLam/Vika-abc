@@ -3,18 +3,17 @@ import '../cossack_squat.dart';
 import '../../fault_record.dart';
 export '../../fault_record.dart';
 
-
 class CossackRepContext {
   final WorkingLeg workingLeg;
   final double workingHeelDistance;
   final double workingKneeX;
   final double workingAnkleX;
   final double workingFootIndexX;
-  
+
   final double workingKneeAngle;
   final double straightKneeAngle;
   final double torsoAngle;
-  
+
   final CossackState state;
   final int frameTimestamp;
   final ResultIssues resultIssues;
@@ -44,7 +43,8 @@ abstract class CossackMetricBase {
 
   void update(CossackRepContext ctx);
 
-  void onStateTransition(CossackState oldState, CossackState newState, int timestampMs) {}
+  void onStateTransition(
+      CossackState oldState, CossackState newState, int timestampMs) {}
 
   void addFault(FaultRecord fault) {
     if (!_faults.any((f) => f.type == fault.type)) {

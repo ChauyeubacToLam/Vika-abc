@@ -19,22 +19,22 @@ class JerkingMetric extends VUpMetricBase {
   @override
   void update(VUpRepContext ctx) {
     if (ctx.state != VUpState.rising || ctx.scaleFactor == null) return;
-    
+
     if (_lastShoulderY != null && _lastTimeMs != null) {
       double dt = (ctx.frameTimestampMs - _lastTimeMs!) / 1000.0;
       if (dt > 0) {
         double dShld = (_lastShoulderY! - ctx.shoulderY) / ctx.scaleFactor!;
         double dAnkle = (_lastAnkleY! - ctx.ankleY) / ctx.scaleFactor!;
-        
+
         // Lấy vận tốc lớn hơn giữa vai và gót chân
         double vel = (dShld > dAnkle ? dShld : dAnkle) / dt;
-        
+
         if (vel > _maxVelocity) _maxVelocity = vel;
         _debugData['maxVelocity'] = _maxVelocity.toStringAsFixed(2);
-        
+
         // Ngưỡng vận tốc gia tốc cục bộ (Spike) - Tinh chỉnh bằng Diagnostic Log nếu cần
         if (vel > 2.5 && !_faults.any((f) => f.type == 'Jerking')) {
-           _faults.add(FaultRecord(
+          _faults.add(FaultRecord(
             phase: ctx.state.name,
             type: 'Jerking',
             message: 'Dùng lực quán tính để giật lên',

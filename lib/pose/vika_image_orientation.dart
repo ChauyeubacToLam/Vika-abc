@@ -1,5 +1,6 @@
 import 'dart:ui' show Size;
 import 'package:native_device_orientation/native_device_orientation.dart';
+
 enum VikaImageOrientation {
   portrait,
   landscapeLeft,

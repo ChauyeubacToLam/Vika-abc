@@ -160,7 +160,8 @@ String _dominantSignal(Map<String, double> contributions) {
 
 // ── Reason generator ────────────────────────────────────────────
 
-String _generateReason(String dominantSignal, String fork, OnboardingData data) {
+String _generateReason(
+    String dominantSignal, String fork, OnboardingData data) {
   switch (dominantSignal) {
     case 'goal':
       return _reasonFromGoal(data.goal);

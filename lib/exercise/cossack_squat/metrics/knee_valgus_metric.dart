@@ -4,7 +4,10 @@ import '../cossack_squat.dart';
 class CossackKneeValgusMetric extends CossackMetricBase {
   @override
   void update(CossackRepContext ctx) {
-    if (ctx.state == CossackState.standing || ctx.workingLeg == WorkingLeg.none) return;
+    if (ctx.state == CossackState.standing ||
+        ctx.workingLeg == WorkingLeg.none) {
+      return;
+    }
 
     // Check knee valgus using X coordinates.
     // In camera facing front, x increases from left to right on screen.
@@ -19,18 +22,19 @@ class CossackKneeValgusMetric extends CossackMetricBase {
     // A safer way: Check if knee is closer to the OTHER ankle than the working ankle is.
     // Or just use the Foot Index. The knee should be vertically aligned with the ankle/foot.
     // Let's calculate the horizontal distance from knee to ankle.
-    
+
     // In ML Kit Front Camera:
     // User's Left is on screen Right (higher X). User's Right is on screen Left (lower X).
-    // Working Leg Left (higher X): Valgus means knee collapses inward (towards center, lower X). 
+    // Working Leg Left (higher X): Valgus means knee collapses inward (towards center, lower X).
     // So if workingKneeX < workingAnkleX, it's collapsing inward.
     // Working Leg Right (lower X): Valgus means knee collapses inward (towards center, higher X).
     // So if workingKneeX > workingAnkleX, it's collapsing inward.
-    
+
     bool isValgus = false;
     if (ctx.workingLeg == WorkingLeg.left) {
       // Left leg (screen right). Inward is smaller X.
-      if (ctx.workingKneeX < ctx.workingAnkleX - 0.02) { // Add small threshold
+      if (ctx.workingKneeX < ctx.workingAnkleX - 0.02) {
+        // Add small threshold
         isValgus = true;
       }
     } else if (ctx.workingLeg == WorkingLeg.right) {

@@ -26,7 +26,8 @@ class HipAmplitudeMetric extends SidePlankDipMetricBase {
 
   @override
   void update(RepContext ctx) {
-    if (ctx.plankState == SidePlankState.bottom || ctx.plankState == SidePlankState.descending) {
+    if (ctx.plankState == SidePlankState.bottom ||
+        ctx.plankState == SidePlankState.descending) {
       if (_minBodyAngle == null || ctx.bodyAngle < _minBodyAngle!) {
         _minBodyAngle = ctx.bodyAngle;
       }
@@ -34,7 +35,8 @@ class HipAmplitudeMetric extends SidePlankDipMetricBase {
   }
 
   @override
-  void onStateTransition(SidePlankState from, SidePlankState to, int timestampMs) {
+  void onStateTransition(
+      SidePlankState from, SidePlankState to, int timestampMs) {
     if (to == SidePlankState.top && _minBodyAngle != null) {
       if (_minBodyAngle! > AmplitudeConfig.SHALLOW_BOTTOM_ANGLE) {
         _faults.add(FaultRecord(

@@ -40,14 +40,17 @@ class TakeOffDepthMetric extends JumpSquatMetricBase {
   }
 
   @override
-  void onStateTransition(JumpSquatState from, JumpSquatState to, int timestampMs) {
+  void onStateTransition(
+      JumpSquatState from, JumpSquatState to, int timestampMs) {
     // Chốt góc lấy đà khi bắt đầu bung người phóng lên
     if (from == JumpSquatState.squatting && to == JumpSquatState.launching) {
-      if (_minSquatAngle != null && _minSquatAngle! > TakeOffConfig.SHALLOW_WARNING) {
+      if (_minSquatAngle != null &&
+          _minSquatAngle! > TakeOffConfig.SHALLOW_WARNING) {
         _faults.add(FaultRecord(
           phase: 'REP_COMPLETE',
           type: 'Power',
-          message: 'Lấy đà quá nông (${_minSquatAngle!.toStringAsFixed(0)}°). Hạ hông sâu hơn!',
+          message:
+              'Lấy đà quá nông (${_minSquatAngle!.toStringAsFixed(0)}°). Hạ hông sâu hơn!',
           affectsForm: false,
         ));
       }

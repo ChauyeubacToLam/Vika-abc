@@ -5,7 +5,7 @@ class VShapeRomMetric extends VUpMetricBase {
   String get name => 'VShapeROM';
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
-  
+
   double? minVAngle;
   double? minWristAnkleDist;
 
@@ -20,7 +20,8 @@ class VShapeRomMetric extends VUpMetricBase {
       if (minVAngle == null || ctx.shoulderHipAnkleAngle < minVAngle!) {
         minVAngle = ctx.shoulderHipAnkleAngle;
       }
-      if (minWristAnkleDist == null || ctx.wristAnkleDistance < minWristAnkleDist!) {
+      if (minWristAnkleDist == null ||
+          ctx.wristAnkleDistance < minWristAnkleDist!) {
         minWristAnkleDist = ctx.wristAnkleDistance;
       }
       _debugData['minVAngle'] = minVAngle?.toStringAsFixed(1);
@@ -31,14 +32,15 @@ class VShapeRomMetric extends VUpMetricBase {
   void evaluateRep(VUpRepContext ctx) {
     // Góc phải khép lại <= ROM_TARGET_ANGLE mới tính là đạt
     if (minVAngle != null && minVAngle! > VUpConfig.ROM_TARGET_ANGLE) {
-       _faults.add(FaultRecord(
-          phase: 'REP_COMPLETE',
-          type: 'ROM',
-          message: 'Chưa gập đủ sâu (Góc nhỏ nhất: ${minVAngle!.toStringAsFixed(1)}°)',
-          voiceMessage: 'Cố gắng rướn tay chạm vào mũi chân nhé',
-          affectsForm: true,
-          priority: VUpFaultPriority.rom,
-        ));
+      _faults.add(FaultRecord(
+        phase: 'REP_COMPLETE',
+        type: 'ROM',
+        message:
+            'Chưa gập đủ sâu (Góc nhỏ nhất: ${minVAngle!.toStringAsFixed(1)}°)',
+        voiceMessage: 'Cố gắng rướn tay chạm vào mũi chân nhé',
+        affectsForm: true,
+        priority: VUpFaultPriority.rom,
+      ));
     }
   }
 

@@ -6,7 +6,7 @@ class AntiExtensionMetric extends DeadBugMetricBase {
   String get name => 'AntiExtension';
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
-  
+
   double? _baselineHipY;
   final Debouncer _faultDebouncer = Debouncer(requiredFrames: 3);
 
@@ -18,7 +18,7 @@ class AntiExtensionMetric extends DeadBugMetricBase {
   @override
   void onStateTransition(DeadBugState from, DeadBugState to, int timestampMs) {
     if (from == DeadBugState.setup && to == DeadBugState.extending) {
-       _baselineHipY = null; // Khởi tạo lại mỗi rep để tránh sai số tịnh tiến
+      _baselineHipY = null; // Khởi tạo lại mỗi rep để tránh sai số tịnh tiến
     }
   }
 
@@ -39,7 +39,8 @@ class AntiExtensionMetric extends DeadBugMetricBase {
               phase: ctx.state.name,
               type: 'AntiExtension',
               message: 'Lưng bị cong khỏi mặt sàn',
-              voiceMessage: 'Lưng bị cong! Hãy gồng bụng ép chặt thắt lưng xuống sàn!',
+              voiceMessage:
+                  'Lưng bị cong! Hãy gồng bụng ép chặt thắt lưng xuống sàn!',
               affectsForm: true,
               priority: DeadBugFaultPriority.antiExtension,
             ));

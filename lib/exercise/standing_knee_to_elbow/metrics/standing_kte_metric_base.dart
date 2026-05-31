@@ -5,7 +5,6 @@ import '../standing_knee_to_elbow.dart';
 import '../../fault_record.dart';
 export '../../fault_record.dart';
 
-
 class StandingKteRepContext {
   final TrackedSide standingLegSide;
   final PoseLandmark standingKnee;
@@ -14,12 +13,12 @@ class StandingKteRepContext {
   final PoseLandmark standingHip;
   final PoseLandmark liftingHip;
   final PoseLandmark liftingShoulder; // Shoulder on the side of the lifting leg
-  final PoseLandmark opposingElbow;   // Elbow moving towards the lifting knee
-  
+  final PoseLandmark opposingElbow; // Elbow moving towards the lifting knee
+
   final double hipWidth;
   final double torsoLength;
   final double distanceD; // Distance between opposingElbow and liftingKnee
-  
+
   final KteState state;
   final int frameTimestamp;
   final ResultIssues resultIssues;
@@ -52,7 +51,8 @@ abstract class StandingKteMetricBase {
 
   void update(StandingKteRepContext ctx);
 
-  void onStateTransition(KteState oldState, KteState newState, int timestampMs) {}
+  void onStateTransition(
+      KteState oldState, KteState newState, int timestampMs) {}
 
   void addFault(FaultRecord fault) {
     if (!_faults.any((f) => f.type == fault.type)) {

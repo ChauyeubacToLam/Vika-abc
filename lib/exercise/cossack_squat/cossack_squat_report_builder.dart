@@ -33,12 +33,15 @@ class CossackSquatReportBuilder extends ExerciseReportBuilder {
     int kneeValgusFails = 0;
     int depthFails = 0;
     for (final logger in setLoggers) {
-      kneeValgusFails += (logger.setLogs['knee_valgus_fails'] as num?)?.toInt() ?? 0;
+      kneeValgusFails +=
+          (logger.setLogs['knee_valgus_fails'] as num?)?.toInt() ?? 0;
       depthFails += (logger.setLogs['depth_fails'] as num?)?.toInt() ?? 0;
     }
 
-    final kneeScore = ((totalReps - kneeValgusFails) / totalReps * 100).roundToDouble();
-    final depthScore = ((totalReps - depthFails) / totalReps * 100).roundToDouble();
+    final kneeScore =
+        ((totalReps - kneeValgusFails) / totalReps * 100).roundToDouble();
+    final depthScore =
+        ((totalReps - depthFails) / totalReps * 100).roundToDouble();
     final accuracy = (totalGood / totalReps * 100).roundToDouble();
 
     return [

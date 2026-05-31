@@ -596,8 +596,7 @@ class _FromToBar extends StatelessWidget {
           children: [
             Row(
               children: [
-                PlanEyebrow('BẮT ĐẦU',
-                    size: 9, letterSpacing: 1.4, dark: true),
+                PlanEyebrow('BẮT ĐẦU', size: 9, letterSpacing: 1.4, dark: true),
                 const SizedBox(width: 8),
                 Text(
                   '$from',
@@ -627,8 +626,7 @@ class _FromToBar extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                PlanEyebrow('HÔM NAY',
-                    size: 9, letterSpacing: 1.4, dark: true),
+                PlanEyebrow('HÔM NAY', size: 9, letterSpacing: 1.4, dark: true),
               ],
             ),
           ],

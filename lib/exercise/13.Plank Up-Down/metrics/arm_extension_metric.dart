@@ -3,7 +3,7 @@ import 'plank_up_down_metric_base.dart';
 class ArmExtensionMetric extends PlankMetricBase {
   @override
   String get name => 'Arm Extension';
-  
+
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
   bool _reachedFullExtension = false;

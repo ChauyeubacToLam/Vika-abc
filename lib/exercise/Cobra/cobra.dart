@@ -51,7 +51,7 @@ class Cobra extends ExerciseBase {
   int? _restStartMs;
 
   final Debouncer _positionDebouncer = Debouncer(requiredFrames: 2);
-  
+
   // --- All Metrics (MET-1 through MET-6) ---
   final _pelvicMetric = CobraPelvicMetric();
   final _elbowMetric = CobraElbowMetric();
@@ -61,12 +61,12 @@ class Cobra extends ExerciseBase {
   final _holdStabilityMetric = CobraHoldStabilityMetric();
 
   late final List<CobraMetricBase> _metrics = [
-    _elbowMetric,          // MET-1: CRITICAL
-    _handPlacementMetric,  // MET-2: IMPORTANT
-    _cervicalMetric,       // MET-3: CRITICAL (safety)
-    _descentMetric,        // MET-4: IMPORTANT
-    _pelvicMetric,         // MET-5: IMPORTANT (safety)
-    _holdStabilityMetric,  // MET-6: NICE-TO-HAVE
+    _elbowMetric, // MET-1: CRITICAL
+    _handPlacementMetric, // MET-2: IMPORTANT
+    _cervicalMetric, // MET-3: CRITICAL (safety)
+    _descentMetric, // MET-4: IMPORTANT
+    _pelvicMetric, // MET-5: IMPORTANT (safety)
+    _holdStabilityMetric, // MET-6: NICE-TO-HAVE
   ];
 
   // --- MET-7: Calibration Baselines ---
@@ -247,7 +247,7 @@ class Cobra extends ExerciseBase {
     double horizontalTarget = cameraFacing == CameraFacing.right
         ? CobraConfig.HORIZONTAL_CLOCK_RIGHT
         : CobraConfig.HORIZONTAL_CLOCK_LEFT;
-    
+
     double trunkDeviation =
         clockAngleDeviation(trunkClockAngle, horizontalTarget);
 
@@ -260,7 +260,7 @@ class Cobra extends ExerciseBase {
     double floorY = foot?.y ?? heel?.y ?? knee?.y ?? hip.y;
     double hipToFloor = (floorY - hip.y).abs() / scaleFactor;
     bool isStanding = hipToFloor > CobraConfig.STANDING_HIP_FLOOR_THRESHOLD;
-    
+
     int now = frameTimestampMs;
 
     _updateCobraState(trunkDeviation, now, isStanding, trunkClockAngle);
@@ -312,7 +312,7 @@ class Cobra extends ExerciseBase {
     debugData['repCount'] = repCount.toString();
     debugData['isStanding'] = isStanding;
     debugData['calibrated'] = _isCalibrated;
-    
+
     for (final metric in _metrics) {
       debugData.addAll(metric.debugData);
     }
@@ -340,15 +340,18 @@ class Cobra extends ExerciseBase {
     }
   }
 
-  void _updateCobraState(
-      double trunkDeviation, int timestampMs, bool isStanding, double trunkClockAngle) {
-    
+  void _updateCobraState(double trunkDeviation, int timestampMs,
+      bool isStanding, double trunkClockAngle) {
     bool isCobraPosition = false;
     if (!isStanding) {
       if (cameraFacing == CameraFacing.right) {
-         isCobraPosition = trunkClockAngle < (CobraConfig.HORIZONTAL_CLOCK_RIGHT - CobraConfig.COBRA_MIN_ELEVATION);
+        isCobraPosition = trunkClockAngle <
+            (CobraConfig.HORIZONTAL_CLOCK_RIGHT -
+                CobraConfig.COBRA_MIN_ELEVATION);
       } else if (cameraFacing == CameraFacing.left) {
-         isCobraPosition = trunkClockAngle > (CobraConfig.HORIZONTAL_CLOCK_LEFT + CobraConfig.COBRA_MIN_ELEVATION);
+        isCobraPosition = trunkClockAngle >
+            (CobraConfig.HORIZONTAL_CLOCK_LEFT +
+                CobraConfig.COBRA_MIN_ELEVATION);
       }
     }
 
@@ -368,7 +371,7 @@ class Cobra extends ExerciseBase {
           _transitionState(CobraState.resting, timestampMs);
         } else if (!confirmedCobra) {
           if (trunkDeviation.abs() < CobraConfig.PRONE_TOLERANCE) {
-              _transitionState(CobraState.setup, timestampMs);
+            _transitionState(CobraState.setup, timestampMs);
           }
         }
         break;
@@ -404,7 +407,7 @@ class Cobra extends ExerciseBase {
         _holdStartMs = null;
         break;
     }
-    
+
     for (final metric in _metrics) {
       metric.onStateTransition(previousCobraState, newState, timestampMs);
     }
@@ -412,20 +415,21 @@ class Cobra extends ExerciseBase {
 
   void _onHoldComplete() {
     repCount += 1;
-    
+
     final allFaults = <FaultRecord>[];
     for (final metric in _metrics) {
       allFaults.addAll(metric.faults);
     }
-    
+
     correctForm = !allFaults.any((f) => f.affectsForm);
     resultIssues.feedback['Result'] = correctForm ? 'Tốt lắm!' : 'Chỉnh tư thế';
 
     final faultMap = <String, Map<String, String>>{};
     setFeedback.add({correctForm: faultMap});
 
-    logger.addRepLog(RepLog(correctForm: correctForm, repNumber: repCount, data: {}));
-    
+    logger.addRepLog(
+        RepLog(correctForm: correctForm, repNumber: repCount, data: {}));
+
     for (final metric in _metrics) {
       metric.resetAndCountFault();
     }

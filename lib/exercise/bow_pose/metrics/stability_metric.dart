@@ -7,12 +7,12 @@ class StabilityMetric extends BowPoseMetricBase {
 
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
-  
+
   final List<double> _shoulderYHistory = [];
 
   @override
   List<FaultRecord> get faults => _faults;
-  
+
   @override
   Map<String, dynamic> get debugData => _debugData;
 
@@ -30,12 +30,14 @@ class StabilityMetric extends BowPoseMetricBase {
       return;
     }
 
-    double mean = _shoulderYHistory.reduce((a, b) => a + b) / _shoulderYHistory.length;
-    
+    double mean =
+        _shoulderYHistory.reduce((a, b) => a + b) / _shoulderYHistory.length;
+
     double variance = _shoulderYHistory
-        .map((y) => math.pow(y - mean, 2))
-        .reduce((a, b) => a + b) / _shoulderYHistory.length;
-    
+            .map((y) => math.pow(y - mean, 2))
+            .reduce((a, b) => a + b) /
+        _shoulderYHistory.length;
+
     double stdDev = math.sqrt(variance);
 
     // StdDev 0.05 (5% body length) = 0 điểm. Càng tĩnh điểm càng cao.
@@ -44,13 +46,13 @@ class StabilityMetric extends BowPoseMetricBase {
 
     _debugData['stabilityScore'] = '$score%';
     ctx.resultIssues.feedback['StabilityScore'] = '$score%';
-    
+
     if (score < 50) {
-       _faults.add(FaultRecord(
+      _faults.add(FaultRecord(
         phase: 'REP_COMPLETE',
         type: 'Stability',
         message: 'Tư thế bị rung lắc nhiều (Score: $score%)',
-        affectsForm: false, 
+        affectsForm: false,
       ));
     }
   }

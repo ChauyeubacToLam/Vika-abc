@@ -3,7 +3,6 @@ import 'package:vika/utils/exercise_logger.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/frame_buffer.dart';
 import '../../utils/frame_snapshot.dart';
-import '../../pose/vika_image_orientation.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'metrics/cossack_metric_base.dart';
 import 'metrics/knee_valgus_metric.dart';
@@ -13,18 +12,21 @@ import 'metrics/straight_leg_metric.dart';
 import 'metrics/torso_verticality_metric.dart';
 
 enum CossackState { standing, descending, bottom, ascending }
+
 enum WorkingLeg { none, left, right }
 
 class CossackConfig {
   static const int MAX_REP = 16; // 8 per side
   static const double STANDING_HIP_VELOCITY_Y_THRESHOLD = 0.01;
-  static const double BOTTOM_KNEE_ANGLE_THRESHOLD = 95.0; // Angle to consider bottom
+  static const double BOTTOM_KNEE_ANGLE_THRESHOLD =
+      95.0; // Angle to consider bottom
   static const double STANDING_KNEE_ANGLE_THRESHOLD = 160.0;
 }
 
 class CossackSquat extends ExerciseBase {
   @override
-  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+  Set<VikaImageOrientation> get supportedOrientations =>
+      const <VikaImageOrientation>{
         VikaImageOrientation.portrait,
       };
 
@@ -41,7 +43,8 @@ class CossackSquat extends ExerciseBase {
   final CossackHeelLiftMetric heelLiftMetric = CossackHeelLiftMetric();
   final CossackWorkingDepthMetric depthMetric = CossackWorkingDepthMetric();
   final CossackStraightLegMetric straightLegMetric = CossackStraightLegMetric();
-  final CossackTorsoVerticalityMetric torsoMetric = CossackTorsoVerticalityMetric();
+  final CossackTorsoVerticalityMetric torsoMetric =
+      CossackTorsoVerticalityMetric();
 
   late final List<CossackMetricBase> _metrics = [
     kneeValgusMetric,
@@ -92,11 +95,16 @@ class CossackSquat extends ExerciseBase {
     }
 
     final requiredTypes = [
-      PoseLandmarkType.leftShoulder, PoseLandmarkType.rightShoulder,
-      PoseLandmarkType.leftHip, PoseLandmarkType.rightHip,
-      PoseLandmarkType.leftKnee, PoseLandmarkType.rightKnee,
-      PoseLandmarkType.leftAnkle, PoseLandmarkType.rightAnkle,
-      PoseLandmarkType.leftFootIndex, PoseLandmarkType.rightFootIndex,
+      PoseLandmarkType.leftShoulder,
+      PoseLandmarkType.rightShoulder,
+      PoseLandmarkType.leftHip,
+      PoseLandmarkType.rightHip,
+      PoseLandmarkType.leftKnee,
+      PoseLandmarkType.rightKnee,
+      PoseLandmarkType.leftAnkle,
+      PoseLandmarkType.rightAnkle,
+      PoseLandmarkType.leftFootIndex,
+      PoseLandmarkType.rightFootIndex,
     ];
 
     for (var type in requiredTypes) {
@@ -121,7 +129,14 @@ class CossackSquat extends ExerciseBase {
     final leftKnee = landmarks[PoseLandmarkType.leftKnee];
     final rightKnee = landmarks[PoseLandmarkType.rightKnee];
 
-    if (leftAnkle == null || rightAnkle == null || leftShoulder == null || rightShoulder == null || leftHip == null || rightHip == null || leftKnee == null || rightKnee == null) {
+    if (leftAnkle == null ||
+        rightAnkle == null ||
+        leftShoulder == null ||
+        rightShoulder == null ||
+        leftHip == null ||
+        rightHip == null ||
+        leftKnee == null ||
+        rightKnee == null) {
       return false;
     }
 
@@ -130,15 +145,19 @@ class CossackSquat extends ExerciseBase {
 
     // Stance must be very wide (> 1.5x shoulder width)
     if (ankleDistance < shoulderDistance * 1.5) {
-      resultIssues.feedback['System'] = 'Hãy bước 2 chân rộng hơn nữa (gấp 1.5 - 2 lần vai).';
+      resultIssues.feedback['System'] =
+          'Hãy bước 2 chân rộng hơn nữa (gấp 1.5 - 2 lần vai).';
       return false;
     }
 
     // Both legs must be straight (> 170 degrees)
-    final leftLegAngle = calculateAngleNormalized(firstPoint: leftHip, midPoint: leftKnee, lastPoint: leftAnkle);
-    final rightLegAngle = calculateAngleNormalized(firstPoint: rightHip, midPoint: rightKnee, lastPoint: rightAnkle);
+    final leftLegAngle = calculateAngleNormalized(
+        firstPoint: leftHip, midPoint: leftKnee, lastPoint: leftAnkle);
+    final rightLegAngle = calculateAngleNormalized(
+        firstPoint: rightHip, midPoint: rightKnee, lastPoint: rightAnkle);
 
-    if (leftLegAngle < 165.0 || rightLegAngle < 165.0) { // Slight leniency
+    if (leftLegAngle < 165.0 || rightLegAngle < 165.0) {
+      // Slight leniency
       resultIssues.feedback['System'] = 'Hãy đứng thẳng cả hai chân.';
       return false;
     }
@@ -165,21 +184,33 @@ class CossackSquat extends ExerciseBase {
     final hipCenterY = (leftHip.y + rightHip.y) / 2;
     final shoulderCenterX = (leftShoulder.x + rightShoulder.x) / 2;
     final shoulderCenterY = (leftShoulder.y + rightShoulder.y) / 2;
-    
+
     // Create a virtual mid-shoulder and mid-hip for torso angle
     final torsoAngle = calculateVerticalAngle(
-      pivot: PoseLandmark(type: PoseLandmarkType.leftHip, x: hipCenterX, y: hipCenterY, z: 0, likelihood: 1.0),
-      point: PoseLandmark(type: PoseLandmarkType.leftShoulder, x: shoulderCenterX, y: shoulderCenterY, z: 0, likelihood: 1.0)
-    );
+        pivot: PoseLandmark(
+            type: PoseLandmarkType.leftHip,
+            x: hipCenterX,
+            y: hipCenterY,
+            z: 0,
+            likelihood: 1.0),
+        point: PoseLandmark(
+            type: PoseLandmarkType.leftShoulder,
+            x: shoulderCenterX,
+            y: shoulderCenterY,
+            z: 0,
+            likelihood: 1.0));
 
-    double leftKneeAngle = calculateAngleNormalized(firstPoint: leftHip, midPoint: leftKnee, lastPoint: leftAnkle);
-    double rightKneeAngle = calculateAngleNormalized(firstPoint: rightHip, midPoint: rightKnee, lastPoint: rightAnkle);
+    double leftKneeAngle = calculateAngleNormalized(
+        firstPoint: leftHip, midPoint: leftKnee, lastPoint: leftAnkle);
+    double rightKneeAngle = calculateAngleNormalized(
+        firstPoint: rightHip, midPoint: rightKnee, lastPoint: rightAnkle);
 
     double leftHeelDist = leftHeel != null ? (leftFoot.y - leftHeel.y) : 0.0;
-    double rightHeelDist = rightHeel != null ? (rightFoot.y - rightHeel.y) : 0.0;
+    double rightHeelDist =
+        rightHeel != null ? (rightFoot.y - rightHeel.y) : 0.0;
 
     int now = frameTimestampMs;
-    
+
     frameBuffer.addFrame(FrameSnapshot(log: {
       "hipY": hipCenterY,
       "hipX": hipCenterX,
@@ -189,7 +220,8 @@ class CossackSquat extends ExerciseBase {
 
     if (cossackState == CossackState.standing) {
       // Detect working leg if we start descending
-      final angleChange = frameBuffer.getChange("hipY", 3); // If hipY increases, user is going down
+      final angleChange = frameBuffer.getChange(
+          "hipY", 3); // If hipY increases, user is going down
       if (angleChange == ChangeState.increasing) {
         // Hip is moving down. Which way is it moving horizontally?
         // Note: X coordinates are mirrored if front camera.
@@ -207,7 +239,8 @@ class CossackSquat extends ExerciseBase {
       _updateStateMachine(leftKneeAngle, rightKneeAngle, hipCenterY, now);
     }
 
-    if (cossackState == CossackState.standing && previousCossackState != CossackState.standing) {
+    if (cossackState == CossackState.standing &&
+        previousCossackState != CossackState.standing) {
       // Rep completed
       _completeRep();
       previousCossackState = cossackState;
@@ -232,7 +265,8 @@ class CossackSquat extends ExerciseBase {
     } else if (currentWorkingLeg == WorkingLeg.right) {
       workingKneeAngle = rightKneeAngle;
       straightKneeAngle = leftKneeAngle;
-      workingHeelDistance = rightHeelDist / (scaleFactor == 0 ? 1 : scaleFactor);
+      workingHeelDistance =
+          rightHeelDist / (scaleFactor == 0 ? 1 : scaleFactor);
       workingKneeX = rightKnee.x;
       workingAnkleX = rightAnkle.x;
       workingFootIndexX = rightFoot.x;
@@ -268,7 +302,7 @@ class CossackSquat extends ExerciseBase {
     for (final metric in _metrics) {
       debugData.addAll(metric.debugData);
     }
-    
+
     // UI Instructions
     if (cossackState == CossackState.descending) {
       resultIssues.addInstruction('descending', 'Status', 'Đang xuống...');
@@ -279,23 +313,28 @@ class CossackSquat extends ExerciseBase {
     }
   }
 
-  void _updateStateMachine(double leftKneeAngle, double rightKneeAngle, double hipY, int now) {
-    double workingKneeAngle = currentWorkingLeg == WorkingLeg.left ? leftKneeAngle : rightKneeAngle;
+  void _updateStateMachine(
+      double leftKneeAngle, double rightKneeAngle, double hipY, int now) {
+    double workingKneeAngle =
+        currentWorkingLeg == WorkingLeg.left ? leftKneeAngle : rightKneeAngle;
     final hipYChange = frameBuffer.getChange("hipY", 3);
 
     if (cossackState == CossackState.descending) {
       // Reached bottom if hip stops moving down or knee is very bent
-      if (workingKneeAngle < CossackConfig.BOTTOM_KNEE_ANGLE_THRESHOLD || hipYChange == ChangeState.decreasing) {
+      if (workingKneeAngle < CossackConfig.BOTTOM_KNEE_ANGLE_THRESHOLD ||
+          hipYChange == ChangeState.decreasing) {
         _transitionState(CossackState.bottom, now);
       }
     } else if (cossackState == CossackState.bottom) {
       // Ascending if hip starts moving up
-      if (hipYChange == ChangeState.increasing || workingKneeAngle > CossackConfig.BOTTOM_KNEE_ANGLE_THRESHOLD + 10) {
+      if (hipYChange == ChangeState.increasing ||
+          workingKneeAngle > CossackConfig.BOTTOM_KNEE_ANGLE_THRESHOLD + 10) {
         _transitionState(CossackState.ascending, now);
       }
     } else if (cossackState == CossackState.ascending) {
       // Standing if legs are straight again
-      if (leftKneeAngle > CossackConfig.STANDING_KNEE_ANGLE_THRESHOLD && rightKneeAngle > CossackConfig.STANDING_KNEE_ANGLE_THRESHOLD) {
+      if (leftKneeAngle > CossackConfig.STANDING_KNEE_ANGLE_THRESHOLD &&
+          rightKneeAngle > CossackConfig.STANDING_KNEE_ANGLE_THRESHOLD) {
         _transitionState(CossackState.standing, now);
       }
     }
@@ -303,11 +342,12 @@ class CossackSquat extends ExerciseBase {
 
   void _transitionState(CossackState newState, int timestampMs) {
     if (newState == cossackState) return;
-    
+
     previousCossackState = cossackState;
     cossackState = newState;
 
-    if (newState == CossackState.descending && previousCossackState == CossackState.standing) {
+    if (newState == CossackState.descending &&
+        previousCossackState == CossackState.standing) {
       resultIssues.instructions.clear();
     } else if (newState == CossackState.standing) {
       currentWorkingLeg = WorkingLeg.none;
@@ -337,7 +377,8 @@ class CossackSquat extends ExerciseBase {
 
     setFeedback.add({correctForm: faultMap});
 
-    logger.addRepLog(RepLog(correctForm: correctForm, repNumber: repCount, data: {
+    logger
+        .addRepLog(RepLog(correctForm: correctForm, repNumber: repCount, data: {
       "fault_types": allFaults.map((f) => f.type).toSet().toList(),
     }));
 

@@ -1,7 +1,6 @@
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/exercise_logger.dart';
-import '../../pose/vika_image_orientation.dart';
 import '../exercise_base.dart';
 import 'metrics/seated_forward_metric_base.dart';
 import 'metrics/knee_extension_metric.dart';
@@ -11,7 +10,8 @@ import 'metrics/ankle_dorsiflexion_metric.dart';
 
 class SeatedForwardFold extends ExerciseBase {
   @override
-  Set<VikaImageOrientation> get supportedOrientations => const <VikaImageOrientation>{
+  Set<VikaImageOrientation> get supportedOrientations =>
+      const <VikaImageOrientation>{
         VikaImageOrientation.landscapeLeft,
         VikaImageOrientation.landscapeRight,
       };
@@ -26,8 +26,8 @@ class SeatedForwardFold extends ExerciseBase {
 
   double _lastHipAngle = -1.0;
   int _lastTimestampMs = -1;
-  double _currentVelocity = 0.0; 
-  int? _stableStartTimeMs;       
+  double _currentVelocity = 0.0;
+  int? _stableStartTimeMs;
 
   final KneeExtensionMetric kneeMetric = KneeExtensionMetric();
   final SpinalAlignmentMetric spineMetric = SpinalAlignmentMetric();
@@ -35,7 +35,10 @@ class SeatedForwardFold extends ExerciseBase {
   final AnkleDorsiflexionMetric ankleMetric = AnkleDorsiflexionMetric();
 
   late final List<SeatedForwardMetricBase> _metrics = [
-    kneeMetric, spineMetric, tempoMetric, ankleMetric
+    kneeMetric,
+    spineMetric,
+    tempoMetric,
+    ankleMetric
   ];
 
   @override
@@ -51,13 +54,20 @@ class SeatedForwardFold extends ExerciseBase {
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    if (cameraFacing == CameraFacing.front) return "Vui lòng đặt camera quay ngang hông (Side View).";
+    if (cameraFacing == CameraFacing.front) {
+      return "Vui lòng đặt camera quay ngang hông (Side View).";
+    }
     final req = [
-      PoseLandmarkType.leftEar, PoseLandmarkType.leftShoulder, PoseLandmarkType.leftHip,
-      PoseLandmarkType.leftKnee, PoseLandmarkType.leftHeel, PoseLandmarkType.leftFootIndex,
+      PoseLandmarkType.leftEar,
+      PoseLandmarkType.leftShoulder,
+      PoseLandmarkType.leftHip,
+      PoseLandmarkType.leftKnee,
+      PoseLandmarkType.leftHeel,
+      PoseLandmarkType.leftFootIndex,
     ];
     for (final type in req) {
-      if (landmarks[type] == null || !ExerciseBase.isLandmarkConfident(landmarks[type]!)) {
+      if (landmarks[type] == null ||
+          !ExerciseBase.isLandmarkConfident(landmarks[type]!)) {
         return "Các điểm khớp bị khuất. Hãy ngồi trọn trong khung hình.";
       }
     }
@@ -66,32 +76,64 @@ class SeatedForwardFold extends ExerciseBase {
 
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    final shoulder = isLeftTracked ? landmarks[PoseLandmarkType.leftShoulder] : landmarks[PoseLandmarkType.rightShoulder];
-    final hip      = isLeftTracked ? landmarks[PoseLandmarkType.leftHip]      : landmarks[PoseLandmarkType.rightHip];
-    final knee     = isLeftTracked ? landmarks[PoseLandmarkType.leftKnee]     : landmarks[PoseLandmarkType.rightKnee];
-    final heel     = isLeftTracked ? landmarks[PoseLandmarkType.leftHeel]     : landmarks[PoseLandmarkType.rightHeel];
+    final shoulder = isLeftTracked
+        ? landmarks[PoseLandmarkType.leftShoulder]
+        : landmarks[PoseLandmarkType.rightShoulder];
+    final hip = isLeftTracked
+        ? landmarks[PoseLandmarkType.leftHip]
+        : landmarks[PoseLandmarkType.rightHip];
+    final knee = isLeftTracked
+        ? landmarks[PoseLandmarkType.leftKnee]
+        : landmarks[PoseLandmarkType.rightKnee];
+    final heel = isLeftTracked
+        ? landmarks[PoseLandmarkType.leftHeel]
+        : landmarks[PoseLandmarkType.rightHeel];
 
-    if (shoulder == null || hip == null || knee == null || heel == null) return false;
-    double ah = calculateAngleNormalized(firstPoint: shoulder, midPoint: hip, lastPoint: knee);
-    double ak = calculateAngleNormalized(firstPoint: hip, midPoint: knee, lastPoint: heel);
-    return ak >= SeatedForwardConfig.Ak_Start_Knee_Angle && 
-           ah >= SeatedForwardConfig.Ah_Start_Hip_Angle[0] && 
-           ah <= SeatedForwardConfig.Ah_Start_Hip_Angle[1];
+    if (shoulder == null || hip == null || knee == null || heel == null) {
+      return false;
+    }
+    double ah = calculateAngleNormalized(
+        firstPoint: shoulder, midPoint: hip, lastPoint: knee);
+    double ak = calculateAngleNormalized(
+        firstPoint: hip, midPoint: knee, lastPoint: heel);
+    return ak >= SeatedForwardConfig.Ak_Start_Knee_Angle &&
+        ah >= SeatedForwardConfig.Ah_Start_Hip_Angle[0] &&
+        ah <= SeatedForwardConfig.Ah_Start_Hip_Angle[1];
   }
 
   @override
   void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
-    final ear      = isLeftTracked ? smoothedLandmarks[PoseLandmarkType.leftEar]      : smoothedLandmarks[PoseLandmarkType.rightEar];
-    final shoulder = isLeftTracked ? smoothedLandmarks[PoseLandmarkType.leftShoulder] : smoothedLandmarks[PoseLandmarkType.rightShoulder];
-    final hip      = isLeftTracked ? smoothedLandmarks[PoseLandmarkType.leftHip]      : smoothedLandmarks[PoseLandmarkType.rightHip];
-    final knee     = isLeftTracked ? smoothedLandmarks[PoseLandmarkType.leftKnee]     : smoothedLandmarks[PoseLandmarkType.rightKnee];
-    final heel     = isLeftTracked ? smoothedLandmarks[PoseLandmarkType.leftHeel]     : smoothedLandmarks[PoseLandmarkType.rightHeel];
-    final toe      = isLeftTracked ? smoothedLandmarks[PoseLandmarkType.leftFootIndex] : smoothedLandmarks[PoseLandmarkType.rightFootIndex];
+    final ear = isLeftTracked
+        ? smoothedLandmarks[PoseLandmarkType.leftEar]
+        : smoothedLandmarks[PoseLandmarkType.rightEar];
+    final shoulder = isLeftTracked
+        ? smoothedLandmarks[PoseLandmarkType.leftShoulder]
+        : smoothedLandmarks[PoseLandmarkType.rightShoulder];
+    final hip = isLeftTracked
+        ? smoothedLandmarks[PoseLandmarkType.leftHip]
+        : smoothedLandmarks[PoseLandmarkType.rightHip];
+    final knee = isLeftTracked
+        ? smoothedLandmarks[PoseLandmarkType.leftKnee]
+        : smoothedLandmarks[PoseLandmarkType.rightKnee];
+    final heel = isLeftTracked
+        ? smoothedLandmarks[PoseLandmarkType.leftHeel]
+        : smoothedLandmarks[PoseLandmarkType.rightHeel];
+    final toe = isLeftTracked
+        ? smoothedLandmarks[PoseLandmarkType.leftFootIndex]
+        : smoothedLandmarks[PoseLandmarkType.rightFootIndex];
 
-    if (ear == null || shoulder == null || hip == null || knee == null || heel == null || toe == null) return;
+    if (ear == null ||
+        shoulder == null ||
+        hip == null ||
+        knee == null ||
+        heel == null ||
+        toe == null) {
+      return;
+    }
 
-    double ah = calculateAngleNormalized(firstPoint: shoulder, midPoint: hip, lastPoint: knee);
-    
+    double ah = calculateAngleNormalized(
+        firstPoint: shoulder, midPoint: hip, lastPoint: knee);
+
     if (_lastHipAngle >= 0 && _lastTimestampMs > 0) {
       double dt = (frameTimestampMs - _lastTimestampMs) / 1000.0;
       if (dt > 0) {
@@ -104,11 +146,14 @@ class SeatedForwardFold extends ExerciseBase {
     final scaleFactor = calculateDistance(shoulder, hip);
 
     final ctx = SeatedForwardContext(
-      kneeAngle: calculateAngleNormalized(firstPoint: hip, midPoint: knee, lastPoint: heel), 
-      hipAngle: ah, 
+      kneeAngle: calculateAngleNormalized(
+          firstPoint: hip, midPoint: knee, lastPoint: heel),
+      hipAngle: ah,
       hipVelocity: _currentVelocity,
-      spineAngle: calculateAngleNormalized(firstPoint: ear, midPoint: shoulder, lastPoint: hip), 
-      ankleAngle: calculateAngleNormalized(firstPoint: knee, midPoint: heel, lastPoint: toe), 
+      spineAngle: calculateAngleNormalized(
+          firstPoint: ear, midPoint: shoulder, lastPoint: hip),
+      ankleAngle: calculateAngleNormalized(
+          firstPoint: knee, midPoint: heel, lastPoint: toe),
       scaleFactor: scaleFactor,
       state: state,
       frameTimestampMs: frameTimestampMs,
@@ -130,21 +175,21 @@ class SeatedForwardFold extends ExerciseBase {
 
     switch (state) {
       case SeatedForwardState.setup:
-        if (ctx.hipAngle < SeatedForwardConfig.Ah_Start_Hip_Angle[0] && ctx.hipVelocity < -10.0) {
+        if (ctx.hipAngle < SeatedForwardConfig.Ah_Start_Hip_Angle[0] &&
+            ctx.hipVelocity < -10.0) {
           newState = SeatedForwardState.descending;
         }
         break;
-      
+
       case SeatedForwardState.descending:
         if (ctx.hipAngle < _minHipAngleThisRep) {
           _minHipAngleThisRep = ctx.hipAngle;
         }
-        
+
         double targetDepth = _userMaxRom != null ? _userMaxRom! * 1.15 : 120.0;
-        
-        if (ctx.hipAngle < targetDepth && 
+
+        if (ctx.hipAngle < targetDepth &&
             ctx.hipVelocity.abs() < SeatedForwardConfig.Av_Stable_Velocity) {
-              
           if (_stableStartTimeMs == null) {
             _stableStartTimeMs = ctx.frameTimestampMs;
           } else if (ctx.frameTimestampMs - _stableStartTimeMs! >= 2000) {
@@ -152,7 +197,7 @@ class SeatedForwardFold extends ExerciseBase {
             _stableStartTimeMs = null;
           }
         } else {
-          _stableStartTimeMs = null; 
+          _stableStartTimeMs = null;
         }
         break;
 
@@ -160,7 +205,8 @@ class SeatedForwardFold extends ExerciseBase {
         if (ctx.hipAngle < _minHipAngleThisRep) {
           _minHipAngleThisRep = ctx.hipAngle;
         }
-        if (ctx.hipAngle > _minHipAngleThisRep + SeatedForwardConfig.Ascending_Threshold) {
+        if (ctx.hipAngle >
+            _minHipAngleThisRep + SeatedForwardConfig.Ascending_Threshold) {
           newState = SeatedForwardState.ascending;
         }
         break;
@@ -179,7 +225,8 @@ class SeatedForwardFold extends ExerciseBase {
       prevState = state;
       state = newState;
 
-      if (state == SeatedForwardState.setup && prevState == SeatedForwardState.ascending) {
+      if (state == SeatedForwardState.setup &&
+          prevState == SeatedForwardState.ascending) {
         _completeRep(ctx);
       }
     }
@@ -193,20 +240,22 @@ class SeatedForwardFold extends ExerciseBase {
     }
 
     final allFaults = <FaultRecord>[
-      ...kneeMetric.faults, ...spineMetric.faults, 
-      ...tempoMetric.faults, ...ankleMetric.faults,
+      ...kneeMetric.faults,
+      ...spineMetric.faults,
+      ...tempoMetric.faults,
+      ...ankleMetric.faults,
     ];
-    
-    correctForm = !allFaults.any((f) => 
-      f.priority == SeatedForwardFaultVoicePriority.kneeBent || 
-      f.priority == SeatedForwardFaultVoicePriority.spineRound);
+
+    correctForm = !allFaults.any((f) =>
+        f.priority == SeatedForwardFaultVoicePriority.kneeBent ||
+        f.priority == SeatedForwardFaultVoicePriority.spineRound);
 
     logger.addRepLog(RepLog(
       repNumber: repCount,
       correctForm: correctForm,
       data: {
         "max_depth_angle": _lastMaxDepth,
-        "hold_time": tempoMetric.activeHoldSeconds, 
+        "hold_time": tempoMetric.activeHoldSeconds,
         "fault_types": allFaults.map((f) => f.type).toSet().toList(),
       },
     ));
@@ -224,10 +273,14 @@ class SeatedForwardFold extends ExerciseBase {
   @override
   String get currentPhaseLabel {
     switch (state) {
-      case SeatedForwardState.setup:    return 'Chuẩn bị';
-      case SeatedForwardState.descending: return 'Gập người';
-      case SeatedForwardState.isometricHold: return 'Giữ tĩnh';
-      case SeatedForwardState.ascending:  return 'Nhả cơ';
+      case SeatedForwardState.setup:
+        return 'Chuẩn bị';
+      case SeatedForwardState.descending:
+        return 'Gập người';
+      case SeatedForwardState.isometricHold:
+        return 'Giữ tĩnh';
+      case SeatedForwardState.ascending:
+        return 'Nhả cơ';
     }
   }
 

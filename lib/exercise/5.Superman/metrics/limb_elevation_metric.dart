@@ -19,7 +19,8 @@ class LimbElevationMetric extends SupermanMetricBase {
           message: 'Nâng tay cao hơn!',
           voiceMessage: 'Nâng tay lên cao hơn',
           affectsForm: true,
-          priority: SupermanVoicePriority.limbElevation, // Fix #6: Sử dụng priority riêng
+          priority: SupermanVoicePriority
+              .limbElevation, // Fix #6: Sử dụng priority riêng
         ));
       }
     }
@@ -31,7 +32,8 @@ class LimbElevationMetric extends SupermanMetricBase {
           message: 'Nâng chân cao hơn!',
           voiceMessage: 'Nâng chân lên cao hơn',
           affectsForm: true,
-          priority: SupermanVoicePriority.limbElevation, // Fix #6: Sử dụng priority riêng
+          priority: SupermanVoicePriority
+              .limbElevation, // Fix #6: Sử dụng priority riêng
         ));
       }
     }
