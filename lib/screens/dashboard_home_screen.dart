@@ -82,6 +82,7 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
   final _checkIns = WeeklyCheckInService();
   final _launches = WorkoutLaunchService();
   late Future<WorkoutLaunchHomeState> _launchStateFuture;
+  late Future<int> _streakFuture;
   _CheckInPrompt? _checkInPrompt;
 
   @override
@@ -89,6 +90,7 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
     super.initState();
     unawaited(OrientationLock.portraitOnly());
     _launchStateFuture = _launches.resolveHomeState();
+    _streakFuture = SessionPersistence().currentStreak();
     unawaited(_loadCheckInPrompt());
   }
 
@@ -116,6 +118,7 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
   void _reloadLaunchTarget() {
     setState(() {
       _launchStateFuture = _launches.resolveHomeState();
+      _streakFuture = SessionPersistence().currentStreak();
     });
   }
 
@@ -181,19 +184,25 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
                 future: _launchStateFuture,
                 builder: (context, snapshot) {
                   final state = snapshot.data;
-                  return HomeVitalsSpread(
-                    weekLabel: homeMockWeekLabel,
-                    phaseLabel: homeMockPhaseLabel,
-                    sessionsDone: state?.completedSessionsThisWeek ??
-                        homeMockSessionsDone,
-                    sessionsTotal:
-                        state?.sessionsThisWeek ?? homeMockSessionsTotal,
-                    statusLine: homeMockVitalsStandfirst,
-                    streakDays:
-                        widget.userProfile?.streakDays ?? homeMockStreakDays,
-                    formPercent: homeMockFormToday,
-                    formDelta: homeMockFormDelta,
-                    formWeek: homeMockFormWeek,
+                  return FutureBuilder<int>(
+                    future: _streakFuture,
+                    builder: (context, streakSnapshot) {
+                      return HomeVitalsSpread(
+                        weekLabel: homeMockWeekLabel,
+                        phaseLabel: homeMockPhaseLabel,
+                        sessionsDone: state?.completedSessionsThisWeek ??
+                            homeMockSessionsDone,
+                        sessionsTotal:
+                            state?.sessionsThisWeek ?? homeMockSessionsTotal,
+                        statusLine: homeMockVitalsStandfirst,
+                        streakDays: streakSnapshot.data ??
+                            widget.userProfile?.streakDays ??
+                            homeMockStreakDays,
+                        formPercent: homeMockFormToday,
+                        formDelta: homeMockFormDelta,
+                        formWeek: homeMockFormWeek,
+                      );
+                    },
                   );
                 },
               ),
@@ -230,7 +239,6 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
     final first = target.firstLaunchArgs(workoutSessionId: workoutSessionId);
     final completedWorkout = await _runWorkoutSequence(first!);
     if (completedWorkout) {
-      await SessionPersistence().updateStreak();
       final profile = await UserProfileService().fetchCurrentProfile();
       if (profile != null) widget.onProfileChanged?.call(profile);
     }

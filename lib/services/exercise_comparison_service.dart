@@ -49,7 +49,7 @@ class ExerciseComparisonService {
   ///
   /// [history] must be oldest-first (matches getSessionHistory return).
   /// [faultLabels] maps fault keys to Vietnamese display names.
-  /// [streakLength] is consecutive days of workouts, from UserStats.
+  /// [streakLength] is consecutive local workout days, from currentStreak().
   SessionComparison buildExecutiveComparison({
     required int currentFormScore,
     required Map<String, int> currentFaultCounts,

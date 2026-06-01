@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'session_persistence.dart';
+
 class AppUserProfile {
   const AppUserProfile({
     required this.id,
@@ -121,7 +123,7 @@ class UserProfileService {
       row = await _client
           .from('profiles')
           .select(
-            'id, display_name, avatar_url, created_at, updated_at, streak, '
+            'id, display_name, avatar_url, created_at, updated_at, '
             'last_workout_at, height_cm, weight_kg, age, fitness_level',
           )
           .eq('id', user.id)
@@ -133,13 +135,15 @@ class UserProfileService {
     final displayName =
         _firstString([row?['display_name'], oauthName]) ?? 'Bạn';
     final avatarUrl = _firstString([row?['avatar_url'], oauthAvatar]);
+    final streakDays =
+        await SessionPersistence(client: _client).currentStreak();
     final profile = AppUserProfile(
       id: user.id,
       displayName: displayName,
       initial: _initialFor(displayName),
       email: user.email,
       avatarUrl: avatarUrl,
-      streakDays: (row?['streak'] as num?)?.toInt() ?? 0,
+      streakDays: streakDays,
       createdAt: _dateTimeOrNull(row?['created_at']) ??
           _dateTimeOrNull(user.createdAt),
       lastWorkoutAt: _dateTimeOrNull(row?['last_workout_at']),

@@ -40,32 +40,14 @@ class PreviousSessionSummary {
   }
 }
 
-/// User-level stats loaded from the profiles table.
-/// Single source of truth for streak and last workout timestamp.
-class UserStats {
-  final int streakDays;
-  final DateTime? lastWorkoutDate;
-
-  const UserStats({
-    required this.streakDays,
-    this.lastWorkoutDate,
-  });
-
-  factory UserStats.fromRow(Map<String, dynamic> row) {
-    return UserStats(
-      streakDays: (row['streak'] as num?)?.toInt() ?? 0,
-      lastWorkoutDate: row['last_workout_at'] != null
-          ? DateTime.parse(row['last_workout_at'] as String)
-          : null,
-    );
-  }
-}
-
 /// Persistence layer for exercise sessions + user-level stats.
 /// All methods are fire-and-forget where possible — errors are logged
 /// but do not interrupt the workout UX.
 class SessionPersistence {
-  final _client = Supabase.instance.client;
+  SessionPersistence({SupabaseClient? client})
+      : _client = client ?? Supabase.instance.client;
+
+  final SupabaseClient _client;
 
   // ─── Exercise sessions ─────────────────────────────────────────────
 
@@ -340,27 +322,74 @@ class SessionPersistence {
     }
   }
 
-  // ─── User-level stats (profiles table) ─────────────────────────────
+  // ─── User-level derived stats ──────────────────────────────────────
 
-  /// Read user-level stats (streak, last workout date) from profiles.
-  /// Returns null if user is not authenticated or query fails.
-  Future<UserStats?> getUserStats() async {
+  Future<int> currentStreak({bool assumeTodayComplete = false}) async {
     final userId = _client.auth.currentUser?.id;
-    if (userId == null) return null;
+    if (userId == null) return 0;
 
     try {
-      final row = await _client
-          .from('profiles')
-          .select('streak, last_workout_at')
-          .eq('id', userId) // profiles PK is 'id', matches auth.users.id
-          .maybeSingle();
+      final rows = await _client
+          .from('workout_sessions')
+          .select('completed_at')
+          .eq('user_id', userId)
+          .not('completed_at', 'is', null)
+          .order('completed_at', ascending: false)
+          .limit(400);
 
-      if (row == null) return null;
-      return UserStats.fromRow(row);
+      final completedAtValues = <DateTime>[];
+      for (final raw in rows as List) {
+        final row = raw as Map<String, dynamic>;
+        final completedAt = _dateTimeOrNull(row['completed_at']);
+        if (completedAt != null) {
+          completedAtValues.add(completedAt);
+        }
+      }
+
+      return deriveCurrentStreakForTest(
+        completedAtValues,
+        assumeTodayComplete: assumeTodayComplete,
+      );
     } catch (e) {
-      debugPrint('[Vika] getUserStats failed: $e');
-      return null;
+      debugPrint('[Vika] currentStreak failed: $e');
+      return 0;
     }
+  }
+
+  @visibleForTesting
+  static int deriveCurrentStreakForTest(
+    Iterable<DateTime> completedAtValues, {
+    bool assumeTodayComplete = false,
+    DateTime? now,
+  }) {
+    final localNow = (now ?? DateTime.now()).toLocal();
+    final today = _LocalDate(localNow.year, localNow.month, localNow.day);
+    final completedDates = <_LocalDate>{
+      for (final completedAt in completedAtValues)
+        _LocalDate.fromDateTime(completedAt.toLocal()),
+    };
+
+    if (assumeTodayComplete) {
+      completedDates.add(today);
+    }
+
+    final yesterday = today.previous;
+    _LocalDate anchor;
+    if (completedDates.contains(today)) {
+      anchor = today;
+    } else if (completedDates.contains(yesterday)) {
+      anchor = yesterday;
+    } else {
+      return 0;
+    }
+
+    var count = 0;
+    var cursor = anchor;
+    while (completedDates.contains(cursor)) {
+      count += 1;
+      cursor = cursor.previous;
+    }
+    return count;
   }
 
   /// Returns list of active body_region strings from user_pain_areas.
@@ -383,51 +412,6 @@ class SessionPersistence {
     } catch (e) {
       debugPrint('[Vika] getActivePainAreas failed: $e');
       return [];
-    }
-  }
-
-  /// Update streak + last_workout_at on profiles after a session completes.
-  /// Rules:
-  /// - Same calendar day as last workout: no change (user did multiple sessions today)
-  /// - Gap of 1 day: increment streak
-  /// - Gap of 2+ days: reset to 1
-  /// - No previous workout: set to 1
-  /// Fire-and-forget. Errors logged but do not interrupt UX.
-  Future<void> updateStreak() async {
-    final userId = _client.auth.currentUser?.id;
-    if (userId == null) return;
-
-    try {
-      final stats = await getUserStats();
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-
-      int newStreak;
-      if (stats?.lastWorkoutDate == null) {
-        newStreak = 1;
-      } else {
-        final lastDate = DateTime(
-          stats!.lastWorkoutDate!.year,
-          stats.lastWorkoutDate!.month,
-          stats.lastWorkoutDate!.day,
-        );
-        final dayDiff = today.difference(lastDate).inDays;
-
-        if (dayDiff == 0) {
-          newStreak = stats.streakDays; // same day, no change
-        } else if (dayDiff == 1) {
-          newStreak = stats.streakDays + 1; // consecutive day
-        } else {
-          newStreak = 1; // gap, reset
-        }
-      }
-
-      await _client.from('profiles').update({
-        'streak': newStreak,
-        'last_workout_at': now.toIso8601String(),
-      }).eq('id', userId);
-    } catch (e) {
-      debugPrint('[Vika] updateStreak failed: $e');
     }
   }
 
@@ -459,32 +443,65 @@ class SessionPersistence {
 
   Future<void> completeWorkoutSession({
     required String? workoutSessionId,
-    required String recommendationId,
-    required int weekNumber,
-    required int sessionIndex,
+    required int rawFormScore,
+    required int sessionFormScore,
   }) async {
+    if (workoutSessionId == null || workoutSessionId.isEmpty) {
+      debugPrint(
+        '[Vika] completeWorkoutSession skipped: missing workoutSessionId',
+      );
+      return;
+    }
+
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return;
-    if (workoutSessionId == null || workoutSessionId.isEmpty) {
-      try {
-        await _client.from('workout_sessions').insert({
-          'user_id': userId,
-          'recommendation_id': recommendationId,
-          'week_number': weekNumber,
-          'session_index': sessionIndex,
-          'completed_at': DateTime.now().toUtc().toIso8601String()
-        });
-      } catch (e) {
-        debugPrint('[Vika] completeWorkoutSession fallback insert failed: $e');
-      }
-    } else {
-      try {
-        await _client.from('workout_sessions').update({
-          'completed_at': DateTime.now().toUtc().toIso8601String()
-        }).eq('id', workoutSessionId);
-      } catch (e) {
-        debugPrint('[Vika] completeWorkoutSession failed: $e');
-      }
+
+    try {
+      await _client
+          .from('workout_sessions')
+          .update({
+            'completed_at': DateTime.now().toUtc().toIso8601String(),
+            'raw_form_score': rawFormScore,
+            'session_form_score': sessionFormScore,
+          })
+          .eq('id', workoutSessionId)
+          .eq('user_id', userId);
+    } catch (e) {
+      debugPrint('[Vika] completeWorkoutSession failed: $e');
     }
   }
+}
+
+DateTime? _dateTimeOrNull(Object? value) {
+  if (value is DateTime) return value;
+  if (value is String) return DateTime.tryParse(value);
+  return null;
+}
+
+class _LocalDate {
+  const _LocalDate(this.year, this.month, this.day);
+
+  factory _LocalDate.fromDateTime(DateTime value) {
+    return _LocalDate(value.year, value.month, value.day);
+  }
+
+  final int year;
+  final int month;
+  final int day;
+
+  _LocalDate get previous {
+    final value = DateTime(year, month, day - 1);
+    return _LocalDate(value.year, value.month, value.day);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is _LocalDate &&
+        other.year == year &&
+        other.month == month &&
+        other.day == day;
+  }
+
+  @override
+  int get hashCode => Object.hash(year, month, day);
 }

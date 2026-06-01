@@ -18,8 +18,8 @@
 // All values use Premium Ivory tokens via VikaColors. Yellow reserved
 // for stat / dot / underline / CTA.
 //
-// TODO(wiring): see report — session form score, top-issue ranker,
-// one-thing picker, coach narrative, RPE persistence all hardcoded.
+// TODO(wiring): see report — top-issue ranker, one-thing picker,
+// coach narrative, RPE persistence all hardcoded.
 
 import 'dart:math' as math;
 
@@ -28,6 +28,7 @@ import 'package:flutter/services.dart';
 
 import '../../interpreter/interpreter_base.dart';
 import '../../models/workout_session_report.dart';
+import '../../services/session_summary_builder.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/vf_theme.dart';
 import '../../widgets/exercise/difficulty_rating_block.dart';
@@ -36,9 +37,9 @@ class WorkoutSummaryScreen extends StatefulWidget {
   const WorkoutSummaryScreen({
     super.key,
     required this.reports,
+    required this.sessionSummary,
     required this.totalDuration,
     required this.totalCalories,
-    required this.streakDays,
     required this.onDone,
     this.onShare,
     this.onShareToZalo,
@@ -47,9 +48,9 @@ class WorkoutSummaryScreen extends StatefulWidget {
   });
 
   final List<ExerciseSessionReport> reports;
+  final SessionSummary sessionSummary;
   final Duration totalDuration;
   final int totalCalories;
-  final int streakDays;
   final VoidCallback onDone;
   final VoidCallback? onShare;
   final VoidCallback? onShareToZalo;
@@ -127,13 +128,6 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
       );
 
   // ── Session aggregates ────────────────────────────────────────
-  int get _sessionFormScore {
-    // TODO(wiring): weighted-by-reps × difficulty formula needed.
-    if (widget.reports.isEmpty) return 0;
-    final total = widget.reports.fold<int>(0, (s, r) => s + r.formScore);
-    return (total / widget.reports.length).round();
-  }
-
   int get _sessionTotalReps =>
       widget.reports.fold(0, (s, r) => s + r.totalReps);
   int get _sessionGoodReps => widget.reports.fold(0, (s, r) => s + r.goodReps);
@@ -211,13 +205,15 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
                     _BeatReveal(
                       animation: _b1,
                       child: _MagazineHero(
-                        formScore: _sessionFormScore,
+                        formScore: widget.sessionSummary.sessionFormScore,
+                        rawFormScore: widget.sessionSummary.rawFormScore,
+                        streakBonus: widget.sessionSummary.streakBonus,
                         totalReps: _sessionTotalReps,
                         goodReps: _sessionGoodReps,
                         reports: widget.reports,
                         totalDuration: widget.totalDuration,
                         calories: widget.totalCalories,
-                        streakDays: widget.streakDays,
+                        streakDays: widget.sessionSummary.streakDays,
                         heroPulse: _heroPulse,
                         onShare: widget.onShare ?? () => _stub('Chia sẻ'),
                         onShareToZalo:
@@ -239,7 +235,8 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
                       animation: _b4,
                       child: _ThreePillarCoach(
                         reports: widget.reports,
-                        sessionFormScore: _sessionFormScore,
+                        sessionFormScore:
+                            widget.sessionSummary.sessionFormScore,
                       ),
                     ),
                     if (_topIssue != null) ...[
@@ -426,6 +423,8 @@ class _PageHeader extends StatelessWidget {
 class _MagazineHero extends StatelessWidget {
   const _MagazineHero({
     required this.formScore,
+    required this.rawFormScore,
+    required this.streakBonus,
     required this.totalReps,
     required this.goodReps,
     required this.reports,
@@ -438,6 +437,8 @@ class _MagazineHero extends StatelessWidget {
   });
 
   final int formScore;
+  final int rawFormScore;
+  final int streakBonus;
   final int totalReps;
   final int goodReps;
   final List<ExerciseSessionReport> reports;
@@ -469,6 +470,7 @@ class _MagazineHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
+    final hasStreakBonus = streakBonus > 0;
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
@@ -481,275 +483,409 @@ class _MagazineHero extends StatelessWidget {
           ),
         ],
       ),
-      child: AnimatedBuilder(
-        animation: heroPulse,
-        builder: (context, _) {
-          return Stack(
-            children: [
-              // Base warm-dark gradient
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: const Alignment(-0.8, -1),
-                      end: const Alignment(0.8, 1),
-                      colors: [c.bgInverse, c.bgInverseHi],
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: 1),
+        duration: hasStreakBonus
+            ? const Duration(milliseconds: 1450)
+            : const Duration(milliseconds: 700),
+        curve: Curves.linear,
+        builder: (context, climb, _) {
+          final climbProgress =
+              hasStreakBonus ? Curves.easeOutCubic.transform(climb) : 1.0;
+          final scoreStart = hasStreakBonus ? rawFormScore : formScore;
+          final scoreDelta = formScore - scoreStart;
+          final displayScore =
+              scoreStart + (scoreDelta * climbProgress).round();
+          final bonusReveal =
+              hasStreakBonus ? ((climb - 0.68) / 0.32).clamp(0.0, 1.0) : 0.0;
+
+          return AnimatedBuilder(
+            animation: heroPulse,
+            builder: (context, _) {
+              return Stack(
+                children: [
+                  // Base warm-dark gradient
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: const Alignment(-0.8, -1),
+                          end: const Alignment(0.8, 1),
+                          colors: [c.bgInverse, c.bgInverseHi],
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-              // Pulsing yellow ambient glow top-right
-              Positioned(
-                top: -120,
-                right: -100,
-                child: IgnorePointer(
-                  child: Opacity(
-                    opacity: 0.65 + (heroPulse.value * 0.25),
-                    child: SizedBox(
-                      width: 420,
-                      height: 420,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: RadialGradient(
-                            colors: [
-                              c.yellow.withValues(alpha: 0.22),
-                              c.yellow.withValues(alpha: 0),
-                            ],
+                  // Pulsing yellow ambient glow top-right
+                  Positioned(
+                    top: -120,
+                    right: -100,
+                    child: IgnorePointer(
+                      child: Opacity(
+                        opacity: 0.65 + (heroPulse.value * 0.25),
+                        child: SizedBox(
+                          width: 420,
+                          height: 420,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: RadialGradient(
+                                colors: [
+                                  c.yellow.withValues(alpha: 0.22),
+                                  c.yellow.withValues(alpha: 0),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ),
-              // Amber bottom-left bloom
-              Positioned(
-                bottom: -180,
-                left: -130,
-                child: IgnorePointer(
-                  child: SizedBox(
-                    width: 420,
-                    height: 360,
-                    child: const DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: RadialGradient(
-                          colors: [Color(0x44CD7C45), Color(0x00CD7C45)],
+                  // Amber bottom-left bloom
+                  Positioned(
+                    bottom: -180,
+                    left: -130,
+                    child: IgnorePointer(
+                      child: SizedBox(
+                        width: 420,
+                        height: 360,
+                        child: const DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: RadialGradient(
+                              colors: [Color(0x44CD7C45), Color(0x00CD7C45)],
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ),
-              // Grain
-              Positioned.fill(
-                child: CustomPaint(painter: const _HeroGrainPainter()),
-              ),
-              // Big italic score on the right — bleeds slightly off-edge
-              Positioned(
-                top: 38,
-                right: -18,
-                child: IgnorePointer(
-                  child: Text(
-                    '$formScore',
-                    style: TextStyle(
-                      fontFamily: 'BeVietnamPro',
-                      fontSize: 220,
-                      fontWeight: FontWeight.w800,
-                      fontStyle: FontStyle.italic,
-                      letterSpacing: -14,
-                      height: 0.85,
-                      color: c.invInk.withValues(alpha: 0.06),
-                      fontFeatures: VikaIvoryMain.tabularFigures,
+                  // Grain
+                  Positioned.fill(
+                    child: CustomPaint(painter: const _HeroGrainPainter()),
+                  ),
+                  // Big italic score on the right — bleeds slightly off-edge
+                  Positioned(
+                    top: 38,
+                    right: -18,
+                    child: IgnorePointer(
+                      child: Text(
+                        '$displayScore',
+                        style: TextStyle(
+                          fontFamily: 'BeVietnamPro',
+                          fontSize: 220,
+                          fontWeight: FontWeight.w800,
+                          fontStyle: FontStyle.italic,
+                          letterSpacing: -14,
+                          height: 0.85,
+                          color: c.invInk.withValues(alpha: 0.06),
+                          fontFeatures: VikaIvoryMain.tabularFigures,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-              // Foreground content
-              Padding(
-                padding: const EdgeInsets.fromLTRB(22, 22, 22, 22),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+                  // Foreground content
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(22, 22, 22, 22),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: c.yellow.withValues(alpha: 0.14),
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(
+                                  color: c.yellow.withValues(alpha: 0.42),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 5,
+                                    height: 5,
+                                    decoration: BoxDecoration(
+                                      color: c.yellow,
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                            color: c.yellow, blurRadius: 5),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'VIKA · BUỔI TẬP',
+                                    style: TextStyle(
+                                      fontFamily: 'BeVietnamPro',
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 1.6,
+                                      color: c.yellow,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              _formatHeroDate(DateTime.now()).toUpperCase(),
+                              style: TextStyle(
+                                fontFamily: 'BeVietnamPro',
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.4,
+                                color: c.invInkFaint,
+                                fontFeatures: VikaIvoryMain.tabularFigures,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 48),
+                        // Headline + subtitle
+                        Text(
+                          _headline,
+                          style: TextStyle(
+                            fontFamily: 'BeVietnamPro',
+                            fontSize: 48,
+                            fontWeight: FontWeight.w800,
+                            fontStyle: FontStyle.italic,
+                            height: 0.96,
+                            letterSpacing: -2.4,
+                            color: c.invInk,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 24,
+                              height: 2,
+                              margin: const EdgeInsets.only(top: 8),
+                              decoration: BoxDecoration(
+                                color: c.yellow,
+                                borderRadius: BorderRadius.circular(1),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: c.yellow.withValues(alpha: 0.5),
+                                    blurRadius: 8,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                _subtitle,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontFamily: 'BeVietnamPro',
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  fontStyle: FontStyle.italic,
+                                  height: 1.5,
+                                  letterSpacing: -0.2,
+                                  color: c.invInkSoft,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (hasStreakBonus) ...[
+                          const SizedBox(height: 18),
+                          _StreakBonusMoment(
+                            streakDays: streakDays,
+                            streakBonus: streakBonus,
+                            reveal: bonusReveal,
+                            pulse: heroPulse.value,
+                          ),
+                        ],
+                        const SizedBox(height: 28),
+                        // Session DNA sparkline strip
+                        _SessionDnaStrip(reports: reports),
+                        const SizedBox(height: 22),
+                        // Tabular stats grid
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 6),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                           decoration: BoxDecoration(
-                            color: c.yellow.withValues(alpha: 0.14),
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                              color: c.yellow.withValues(alpha: 0.42),
+                            border: Border(
+                              top: BorderSide(
+                                color: Colors.white.withValues(alpha: 0.08),
+                              ),
+                              bottom: BorderSide(
+                                color: Colors.white.withValues(alpha: 0.08),
+                              ),
                             ),
                           ),
                           child: Row(
-                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Container(
-                                width: 5,
-                                height: 5,
-                                decoration: BoxDecoration(
-                                  color: c.yellow,
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(color: c.yellow, blurRadius: 5),
-                                  ],
+                              Expanded(
+                                child: _HeroStat(
+                                  label: 'BÀI',
+                                  value: '${reports.length}',
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'VIKA · BUỔI TẬP',
-                                style: TextStyle(
-                                  fontFamily: 'BeVietnamPro',
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 1.6,
-                                  color: c.yellow,
+                              _HeroDivider(),
+                              Expanded(
+                                child: _HeroStat(
+                                  label: 'REPS',
+                                  value: '$goodReps/$totalReps',
+                                ),
+                              ),
+                              _HeroDivider(),
+                              Expanded(
+                                child: _HeroStat(
+                                  label: 'GIỜ',
+                                  value: _formatClock(totalDuration),
+                                ),
+                              ),
+                              _HeroDivider(),
+                              Expanded(
+                                child: _HeroStat(
+                                  label: 'KCAL',
+                                  value: '~$calories',
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        const Spacer(),
-                        Text(
-                          _formatHeroDate(DateTime.now()).toUpperCase(),
-                          style: TextStyle(
-                            fontFamily: 'BeVietnamPro',
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.4,
-                            color: c.invInkFaint,
-                            fontFeatures: VikaIvoryMain.tabularFigures,
-                          ),
+                        const SizedBox(height: 18),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _HeroAction(
+                                onTap: onShare,
+                                icon: Icons.edit_outlined,
+                                label: 'Chỉnh ảnh & chia sẻ',
+                                primary: true,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _HeroAction(
+                              onTap: onShareToZalo,
+                              label: 'Zalo',
+                              primary: false,
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                    const SizedBox(height: 48),
-                    // Headline + subtitle
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _StreakBonusMoment extends StatelessWidget {
+  const _StreakBonusMoment({
+    required this.streakDays,
+    required this.streakBonus,
+    required this.reveal,
+    required this.pulse,
+  });
+
+  final int streakDays;
+  final int streakBonus;
+  final double reveal;
+  final double pulse;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    final eased = Curves.easeOutCubic.transform(reveal.clamp(0.0, 1.0));
+    return Opacity(
+      opacity: eased,
+      child: Transform.translate(
+        offset: Offset(0, (1 - eased) * 8),
+        child: Transform.scale(
+          alignment: Alignment.centerLeft,
+          scale: 0.98 + eased * 0.02,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+                decoration: BoxDecoration(
+                  color: c.yellow.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: c.yellow.withValues(alpha: 0.52),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: c.yellow.withValues(alpha: 0.18 + pulse * 0.12),
+                      blurRadius: 18,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                     Text(
-                      _headline,
+                      '🔥 CHUỖI $streakDays NGÀY',
                       style: TextStyle(
                         fontFamily: 'BeVietnamPro',
-                        fontSize: 48,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.2,
+                        color: c.yellow,
+                        fontFeatures: VikaIvoryMain.tabularFigures,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Container(
+                      width: 1,
+                      height: 13,
+                      color: c.yellow.withValues(alpha: 0.4),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      '+$streakBonus ĐIỂM',
+                      style: TextStyle(
+                        fontFamily: 'BeVietnamPro',
+                        fontSize: 13,
                         fontWeight: FontWeight.w800,
                         fontStyle: FontStyle.italic,
-                        height: 0.96,
-                        letterSpacing: -2.4,
+                        letterSpacing: 0,
                         color: c.invInk,
+                        fontFeatures: VikaIvoryMain.tabularFigures,
                       ),
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 24,
-                          height: 2,
-                          margin: const EdgeInsets.only(top: 8),
-                          decoration: BoxDecoration(
-                            color: c.yellow,
-                            borderRadius: BorderRadius.circular(1),
-                            boxShadow: [
-                              BoxShadow(
-                                color: c.yellow.withValues(alpha: 0.5),
-                                blurRadius: 8,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            _subtitle,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontFamily: 'BeVietnamPro',
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              fontStyle: FontStyle.italic,
-                              height: 1.5,
-                              letterSpacing: -0.2,
-                              color: c.invInkSoft,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 28),
-                    // Session DNA sparkline strip
-                    _SessionDnaStrip(reports: reports),
-                    const SizedBox(height: 22),
-                    // Tabular stats grid
-                    Container(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      decoration: BoxDecoration(
-                        border: Border(
-                          top: BorderSide(
-                            color: Colors.white.withValues(alpha: 0.08),
-                          ),
-                          bottom: BorderSide(
-                            color: Colors.white.withValues(alpha: 0.08),
-                          ),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _HeroStat(
-                              label: 'BÀI',
-                              value: '${reports.length}',
-                            ),
-                          ),
-                          _HeroDivider(),
-                          Expanded(
-                            child: _HeroStat(
-                              label: 'REPS',
-                              value: '$goodReps/$totalReps',
-                            ),
-                          ),
-                          _HeroDivider(),
-                          Expanded(
-                            child: _HeroStat(
-                              label: 'GIỜ',
-                              value: _formatClock(totalDuration),
-                            ),
-                          ),
-                          _HeroDivider(),
-                          Expanded(
-                            child: _HeroStat(
-                              label: 'KCAL',
-                              value: '~$calories',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _HeroAction(
-                            onTap: onShare,
-                            icon: Icons.edit_outlined,
-                            label: 'Chỉnh ảnh & chia sẻ',
-                            primary: true,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        _HeroAction(
-                          onTap: onShareToZalo,
-                          label: 'Zalo',
-                          primary: false,
-                        ),
-                      ],
                     ),
                   ],
                 ),
               ),
+              const SizedBox(height: 8),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 340),
+                child: Text(
+                  'Đi tập đều $streakDays ngày liền, Vika thưởng thêm $streakBonus điểm 🔥',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'BeVietnamPro',
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    fontStyle: FontStyle.italic,
+                    height: 1.45,
+                    letterSpacing: 0,
+                    color: c.invInkSoft,
+                  ),
+                ),
+              ),
             ],
-          );
-        },
+          ),
+        ),
       ),
     );
   }

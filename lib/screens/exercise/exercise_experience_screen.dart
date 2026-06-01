@@ -53,6 +53,7 @@ import '../../models/post_exercise_data.dart';
 import '../../models/workout_session_report.dart';
 import '../../services/recommendation/models/plan.dart';
 import '../../services/recommendation/progression_service.dart';
+import '../../services/session_summary_builder.dart';
 import '../../utils/exercise_logger.dart';
 import '../../utils/orientation_lock.dart';
 import 'active_exercise_page.dart';
@@ -129,7 +130,6 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       'Buổi này AI sẽ ưu tiên nhịp chậm, form chắc và sự ổn định trong từng rep.';
 
   // User-level data loaded once at screen init, passed to comparison service.
-  UserStats? _userStats;
   List<String> _painAreas = [];
   List<PreviousSessionSummary> _sessionHistory = [];
 
@@ -200,7 +200,6 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     _loadCoachNote();
     _loadUserWeight();
     _loadSessionHistory();
-    _loadUserStats();
     _loadPainAreas();
   }
 
@@ -209,12 +208,6 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     final storedWeight = prefs.getDouble('user_weight');
     if (!mounted || storedWeight == null) return;
     setState(() => _userWeightKg = storedWeight);
-  }
-
-  Future<void> _loadUserStats() async {
-    final stats = await SessionPersistence().getUserStats();
-    if (!mounted) return;
-    setState(() => _userStats = stats);
   }
 
   Future<void> _loadPainAreas() async {
@@ -554,7 +547,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
   /// Builds the [ExerciseSessionReport] for THIS exercise, appends it
   /// onto `widget.priorReports`, and routes to either the next exercise
   /// or the workout-wide summary screen.
-  void _handleTransitionComplete() {
+  Future<void> _handleTransitionComplete() async {
     final report = _fullReport;
     if (report == null) {
       // Defensive: shouldn't happen, but bail to home cleanly.
@@ -566,6 +559,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       report: report,
       duration: _completedDuration ?? Duration.zero,
       calories: _estimatedCalories ?? 0,
+      sessionId: _currentSessionId,
       // userDifficulty is collected on the NEXT exercise's intro (or on
       // the workout summary for the last exercise).
     );
@@ -583,20 +577,29 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       // below MUST NOT close over `this.context` (which becomes invalid
       // after dispose) — instead, the summary screen's own BuildContext
       // is used to pop.
+      final streakDays = await SessionPersistence().currentStreak(
+        assumeTodayComplete: true,
+      );
+      if (!mounted) return;
+
+      final sessionSummary = SessionSummaryBuilder.build(
+        accumulated,
+        streakDays,
+      );
+
       SessionPersistence().completeWorkoutSession(
         workoutSessionId: widget.workoutSessionId,
-        recommendationId: widget.recommendationId!,
-        weekNumber: widget.weekNumber!,
-        sessionIndex: widget.sessionIndex!,
+        rawFormScore: sessionSummary.rawFormScore,
+        sessionFormScore: sessionSummary.sessionFormScore,
       );
 
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (summaryContext) => WorkoutSummaryScreen(
             reports: accumulated,
+            sessionSummary: sessionSummary,
             totalDuration: _aggregateDuration(accumulated),
             totalCalories: _aggregateCalories(accumulated),
-            streakDays: _userStats?.streakDays ?? 0,
             // TODO(wiring): persist per-exercise difficulty for the
             // last exercise + session-level RPE. Today only the
             // existing single-exercise persistence runs. See report.
@@ -636,10 +639,14 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     final prev = _previousReport;
     if (prev == null) return;
     prev.userDifficulty = difficulty;
-    // TODO(wiring): persist per-exercise difficulty into the previous
-    // exercise's exercise_sessions row. The current
-    // `updateSessionDifficulty` writes to whatever the *current* session
-    // is — we need the previous exercise's session id here. See report.
+    final prevId = prev.sessionId;
+    if (prevId == null) {
+      return; // persist hadn't landed; rating dropped (acceptable, it's secondary)
+    }
+    SessionPersistence().updateSessionDifficulty(
+      sessionId: prevId,
+      difficulty: difficulty,
+    );
   }
 
   @override

@@ -19,6 +19,7 @@ class ExerciseSessionReport {
     required this.report,
     required this.duration,
     required this.calories,
+    this.sessionId,
     this.userDifficulty,
   });
 
@@ -26,6 +27,7 @@ class ExerciseSessionReport {
   final PostExerciseData report;
   final Duration duration;
   final int calories;
+  final String? sessionId;
 
   /// 'light' / 'medium' / 'heavy' — collected on the NEXT intro (or on
   /// the workout summary for the last exercise).

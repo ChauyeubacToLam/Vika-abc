@@ -163,7 +163,6 @@ class _PlanScreenState extends State<PlanScreen> {
     final first = target.firstLaunchArgs(workoutSessionId: workoutSessionId);
     final completed = await _runWorkoutSequence(first!);
     if (completed) {
-      await SessionPersistence().updateStreak();
       final profile = await UserProfileService().fetchCurrentProfile();
       if (profile != null) widget.onProfileChanged?.call(profile);
     }
@@ -255,8 +254,7 @@ class _PlanScreenState extends State<PlanScreen> {
                 onStartNext: _startNextSession,
                 retest: isLastBlock ? program.retest : null,
                 retestUnlocked: program.allBlocksDone,
-                onStartRetest:
-                    program.allBlocksDone ? _startNextSession : null,
+                onStartRetest: program.allBlocksDone ? _startNextSession : null,
               ),
               SizedBox(height: r.gap(38)),
               const EditorialCloser(

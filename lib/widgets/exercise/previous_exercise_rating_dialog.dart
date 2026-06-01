@@ -214,22 +214,10 @@ class _PreviousExerciseRatingDialogState
                                     // The question — italic, big, no
                                     // surrounding chrome.
                                     Text(
-                                      'Cảm giác',
+                                      'Mấy rep cuối của ${widget.exerciseName} có nặng không?',
                                       textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontFamily: 'BeVietnamPro',
-                                        fontSize: 40,
-                                        fontWeight: FontWeight.w800,
-                                        fontStyle: FontStyle.italic,
-                                        height: 1.0,
-                                        letterSpacing: -2.2,
-                                        color: c.ink,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      'thế nào?',
-                                      textAlign: TextAlign.center,
+                                      maxLines: 3,
+                                      softWrap: true,
                                       style: TextStyle(
                                         fontFamily: 'BeVietnamPro',
                                         fontSize: 40,
