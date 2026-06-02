@@ -11,16 +11,15 @@
 //
 // Sections (top to bottom):
 //   1. Hero Sharable Card         — magazine-cover layout
-//   2. One-Thing Trophy Card      — large stat + icon, share-anchor moment
+//   2. One-Thing Trophy Card      — large stat + icon, from SessionTrophyPicker
 //   3. Form Arc Chart             — mountain line across exercises
-//   4. Coach AI Three-Pillar      — Mạnh / Để ý / Buổi sau, icon cards
+//   4. Coach AI                   — composed quote + Để ý / Buổi sau (Watch + Next)
 //   5. Session Stats Grid         — per-ex form bars + set sparklines
 //   6. Done CTA                   — yellow shimmer (always active)
 //
 // All values use Premium Ivory tokens via VikaColors. Yellow reserved
 // for stat / dot / underline / CTA.
 //
-// TODO(wiring): see report — one-thing picker, coach narrative hardcoded.
 
 import 'dart:math' as math;
 
@@ -32,6 +31,8 @@ import '../../services/session_summary_builder.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/vf_theme.dart';
 import '../../widgets/exercise/previous_exercise_rating_dialog.dart';
+import '../../services/session_trophy_picker.dart';
+import '../../services/session_coach_builder.dart';
 
 class WorkoutSummaryScreen extends StatefulWidget {
   const WorkoutSummaryScreen({
@@ -41,6 +42,8 @@ class WorkoutSummaryScreen extends StatefulWidget {
     required this.totalDuration,
     required this.totalCalories,
     required this.onDone,
+    required this.trophy,
+    required this.coach,
     this.onShare,
     this.onShareToZalo,
     this.onLastExerciseDifficulty,
@@ -55,6 +58,8 @@ class WorkoutSummaryScreen extends StatefulWidget {
   final VoidCallback? onShare;
   final VoidCallback? onShareToZalo;
   final ValueChanged<String>? onLastExerciseDifficulty;
+  final Trophy trophy;
+  final SessionCoach coach;
 
   // TODO(wiring): RPE is removed from the summary UI pending a separate
   // decision. This param is intentionally retained but currently unused; do
@@ -158,8 +163,9 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
 
   // ── Session aggregates ────────────────────────────────────────
   int get _sessionTotalReps =>
-      widget.reports.fold(0, (s, r) => s + r.totalReps);
-  int get _sessionGoodReps => widget.reports.fold(0, (s, r) => s + r.goodReps);
+      widget.reports.fold<int>(0, (s, r) => s + (r.totalReps ?? 0));
+  int get _sessionGoodReps =>
+      widget.reports.fold<int>(0, (s, r) => s + (r.goodReps ?? 0));
 
   @override
   Widget build(BuildContext context) {
@@ -222,7 +228,7 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
                     const SizedBox(height: 28),
                     _BeatReveal(
                       animation: _b2,
-                      child: _TrophyMomentCard(reports: widget.reports),
+                      child: _TrophyMomentCard(trophy: widget.trophy),
                     ),
                     const SizedBox(height: 28),
                     _BeatReveal(
@@ -232,11 +238,7 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
                     const SizedBox(height: 28),
                     _BeatReveal(
                       animation: _b4,
-                      child: _ThreePillarCoach(
-                        reports: widget.reports,
-                        sessionFormScore:
-                            widget.sessionSummary.sessionFormScore,
-                      ),
+                      child: _CoachSection(coach: widget.coach),
                     ),
                     const SizedBox(height: 28),
                     _BeatReveal(
@@ -1157,53 +1159,41 @@ String _formatHeroDate(DateTime dt) {
 
 // ═══════════════════════════════════════════════════════════════
 // TROPHY MOMENT — single-stat celebration card.
-// Big number, big icon, big italic.
+// Big number, big icon, big italic. Driven by SessionTrophyPicker.
 // ═══════════════════════════════════════════════════════════════
 
 class _TrophyMomentCard extends StatelessWidget {
-  const _TrophyMomentCard({required this.reports});
-  final List<ExerciseSessionReport> reports;
+  const _TrophyMomentCard({required this.trophy});
+  final Trophy trophy;
 
-  /// TODO(wiring): real "highlight picker" examining reports + history.
-  ({String label, String value, IconData icon, String tag}) _pickHighlight() {
-    if (reports.isEmpty) {
-      return (
-        label: 'Có mặt là thắng rồi',
-        value: '01',
-        icon: Icons.bolt_rounded,
-        tag: 'CHECK-IN',
+  ({String label, String value, IconData icon, String tag}) _highlight() => (
+        label: trophy.label,
+        value: trophy.value,
+        icon: _iconForTier(trophy.tier),
+        tag: trophy.tag,
       );
+
+  IconData _iconForTier(TrophyTier tier) {
+    switch (tier) {
+      case TrophyTier.allTimePb:
+        return Icons.emoji_events_rounded;
+      case TrophyTier.recentPb:
+        return Icons.trending_up_rounded;
+      case TrophyTier.streakMilestone:
+        return Icons.local_fire_department_rounded;
+      case TrophyTier.cleanSession:
+        return Icons.workspace_premium_rounded;
+      case TrophyTier.volume:
+        return Icons.fitness_center_rounded;
+      case TrophyTier.showedUp:
+        return Icons.flag_rounded;
     }
-    final best = reports.reduce((a, b) => a.formScore >= b.formScore ? a : b);
-    final totalGood = reports.fold<int>(0, (s, r) => s + r.goodReps);
-    if (best.formScore >= 88) {
-      return (
-        label: '${best.exerciseName} sạch như nước',
-        value: '${best.formScore}',
-        icon: Icons.workspace_premium_rounded,
-        tag: 'FORM ĐỈNH',
-      );
-    }
-    if (totalGood >= 30) {
-      return (
-        label: 'rep đúng form trong buổi này',
-        value: '$totalGood',
-        icon: Icons.local_fire_department_rounded,
-        tag: 'KHỐI LƯỢNG',
-      );
-    }
-    return (
-      label: 'bài đã hoàn thành — kiên trì',
-      value: '${reports.length}',
-      icon: Icons.flag_rounded,
-      tag: 'KIÊN TRÌ',
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    final highlight = _pickHighlight();
+    final highlight = _highlight();
     return Container(
       padding: const EdgeInsets.fromLTRB(22, 22, 22, 22),
       decoration: BoxDecoration(
@@ -1644,47 +1634,25 @@ class _FormArcPainter extends CustomPainter {
 enum _LabelAnchor { midCenter, midLeft }
 
 // ═══════════════════════════════════════════════════════════════
-// THREE-PILLAR COACH — 3 icon cards instead of text wall.
-// Mạnh / Để ý / Buổi sau.
+// COACH SECTION — composed quote + two pillars (Để ý / Buổi sau).
+// Strength pillar dropped: the trophy already celebrates the win.
+// All copy comes from SessionCoach (SessionCoachBuilder output).
 // ═══════════════════════════════════════════════════════════════
 
-class _ThreePillarCoach extends StatelessWidget {
-  const _ThreePillarCoach({
-    required this.reports,
-    required this.sessionFormScore,
-  });
-  final List<ExerciseSessionReport> reports;
-  final int sessionFormScore;
-
-  /// TODO(wiring): real cross-exercise narrative aggregator.
-  ({String strength, String watch, String next, String quote}) _pillars() {
-    final strongest = reports.isEmpty
-        ? '—'
-        : reports
-            .reduce((a, b) => a.formScore >= b.formScore ? a : b)
-            .exerciseName;
-    final weakest = reports.isEmpty
-        ? '—'
-        : reports
-            .reduce((a, b) => a.formScore <= b.formScore ? a : b)
-            .exerciseName;
-    final quote = sessionFormScore >= 80
-        ? 'Buổi này AI nhìn thấy nhịp đẹp từ đầu đến cuối — bạn đã giữ form ổn định ở những set khó nhất.'
-        : sessionFormScore >= 65
-            ? 'Buổi này có điểm sáng rõ và vài chỗ AI muốn bạn để ý buổi sau — đừng vội nâng tải.'
-            : 'Đây là buổi đặt nền. Lặp lại đều, form sẽ chắc dần — Vika sẽ giảm nhẹ ngưỡng nếu cần.';
-    return (
-      strength: 'Form $strongest trong sáng',
-      watch: '$weakest cần nhịp chậm hơn',
-      next: 'Giữ rep mục tiêu, nhịp xuống ổn định',
-      quote: quote,
-    );
-  }
+class _CoachSection extends StatelessWidget {
+  const _CoachSection({required this.coach});
+  final SessionCoach coach;
 
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    final p = _pillars();
+    final isPerfect = coach.kind == CoachWatchKind.perfect;
+    // watchExerciseName is non-null only on a cross-exercise session, so it
+    // is inert at single-exercise launch.
+    final watchBody = coach.watchExerciseName == null
+        ? coach.watch
+        : '${coach.watchExerciseName}: ${coach.watch}';
+
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 22),
       decoration: BoxDecoration(
@@ -1765,7 +1733,7 @@ class _ThreePillarCoach extends StatelessWidget {
               ),
             ),
             child: Text(
-              p.quote,
+              coach.quote,
               style: TextStyle(
                 fontFamily: 'BeVietnamPro',
                 fontSize: 14,
@@ -1786,19 +1754,12 @@ class _ThreePillarCoach extends StatelessWidget {
               children: [
                 Expanded(
                   child: _CoachPillar(
-                    icon: Icons.bolt_rounded,
-                    label: 'ĐIỂM MẠNH',
-                    body: p.strength,
-                    accent: c.yellow,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _CoachPillar(
-                    icon: Icons.center_focus_strong_rounded,
+                    icon: isPerfect
+                        ? Icons.check_circle_rounded
+                        : Icons.center_focus_strong_rounded,
                     label: 'ĐỂ Ý',
-                    body: p.watch,
-                    accent: c.attention,
+                    body: watchBody,
+                    accent: isPerfect ? c.yellow : c.attention,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -1806,7 +1767,7 @@ class _ThreePillarCoach extends StatelessWidget {
                   child: _CoachPillar(
                     icon: Icons.east_rounded,
                     label: 'BUỔI SAU',
-                    body: p.next,
+                    body: coach.next,
                     accent: c.ink,
                   ),
                 ),
@@ -1980,6 +1941,26 @@ class _VisualStatCard extends StatelessWidget {
     };
   }
 
+  String _formatReportWork(ExerciseSessionReport report) {
+    if (report.report.isSecondBased) {
+      final good = report.report.goodSeconds ?? 0;
+      final total = report.report.totalSeconds ?? 0;
+      return '${_formatSeconds(good)}/${_formatSeconds(total)}';
+    }
+
+    return '${report.goodReps ?? 0}/${report.totalReps ?? 0} reps';
+  }
+
+  String _formatSeconds(double seconds) {
+    final rounded = seconds.round();
+    if (rounded < 60) return '${rounded}s';
+
+    final minutes = rounded ~/ 60;
+    final remainder = rounded % 60;
+    if (remainder == 0) return '${minutes}m';
+    return '${minutes}m ${remainder}s';
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
@@ -2054,7 +2035,7 @@ class _VisualStatCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${report.report.sets.length} hiệp · ${report.goodReps}/${report.totalReps} reps · ${_formatClock(report.duration)}',
+                      '${report.report.sets.length} hiệp · ${_formatReportWork(report)} · ${_formatClock(report.duration)}',
                       style: TextStyle(
                         fontFamily: 'BeVietnamPro',
                         fontSize: 11.5,

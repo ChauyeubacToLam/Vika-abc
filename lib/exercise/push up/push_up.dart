@@ -322,10 +322,6 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
       }
     }
 
-    for (final metric in _metrics) {
-      // debugData.addAll(metric.debugData);
-    }
-
     _updatePhaseInstructions();
   }
 
@@ -383,10 +379,6 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
         final ascent = tempoMetric.ascentDuration!.toStringAsFixed(1);
         resultIssues.feedback['Tempo'] = '↓${descent}s ↑${ascent}s';
       }
-    }
-
-    for (final metric in _metrics) {
-      // debugData.addAll(metric.debugData);
     }
 
     final minElbow =
@@ -792,6 +784,7 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
       ..['event'] = _lastPushUpEvent
       ..['fail'] = _lastNoCountReason
       ..['reject'] = _repRejectType ?? _lastRejectType
+      ..['rejectReason'] = _lastRejectReason
       ..['elbow'] = geometry.elbowAngle.toStringAsFixed(1)
       ..['minElbow'] = _debugMinElbowLabel()
       ..['rom'] = (_topElbowAngle - geometry.elbowAngle).toStringAsFixed(1)

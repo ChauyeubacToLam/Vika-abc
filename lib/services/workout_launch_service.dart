@@ -113,8 +113,9 @@ class WorkoutLaunchService {
     final pos = snapshot.currentPosition;
 
     final startWeek = snapshot.currentWeek;
-    if (snapshot.plan.weeks.isEmpty || pos == null || startWeek == null)
+    if (snapshot.plan.weeks.isEmpty || pos == null || startWeek == null) {
       return null;
+    }
     final startSessionIndex = pos.$2;
 
     final target = await _buildTarget(

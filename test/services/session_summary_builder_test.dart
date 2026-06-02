@@ -84,6 +84,37 @@ void main() {
     expect(summary.sessionFormScore, 50);
     expect(summary.exercises.map((e) => e.formScore), [100, 0]);
   });
+
+  test('post-exercise totals expose only the active scoring unit', () {
+    final reps = _report(
+      name: 'Squat',
+      formScore: 70,
+      totalReps: 10,
+      goodReps: 7,
+    ).report;
+    final hold = _report(
+      name: 'Plank',
+      formScore: 75,
+      totalSeconds: 20,
+      goodSeconds: 15,
+      isSecondBased: true,
+    ).report;
+    final empty = _report(name: 'Empty', formScore: 0, totalReps: 0).report;
+
+    expect(reps.totalReps, 10);
+    expect(reps.totalGoodReps, 7);
+    expect(reps.totalSeconds, isNull);
+    expect(reps.goodSeconds, isNull);
+    expect(reps.cleanRatio, 0.7);
+
+    expect(hold.totalReps, isNull);
+    expect(hold.totalGoodReps, isNull);
+    expect(hold.totalSeconds, 20);
+    expect(hold.goodSeconds, 15);
+    expect(hold.cleanRatio, 0.75);
+
+    expect(empty.cleanRatio, isNull);
+  });
 }
 
 ExerciseSessionReport _report({
@@ -97,6 +128,7 @@ ExerciseSessionReport _report({
 }) {
   return ExerciseSessionReport(
     definition: _definition(name),
+    exerciseKey: name.toLowerCase().replaceAll(' ', '_'),
     report: PostExerciseData(
       exerciseName: name,
       metValue: 1,

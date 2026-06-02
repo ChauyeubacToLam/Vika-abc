@@ -447,7 +447,7 @@ class _HeroPhotoCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${report.exerciseName} · ${report.sets.length} hiệp · ${report.totalReps} reps',
+                        '${report.exerciseName} · ${report.sets.length} hiệp · ${_formatReportWork(report)}',
                         style: VFTheme.textStyle(
                           context,
                           size: 10,
@@ -2121,6 +2121,26 @@ String _issueObservation(DetectedEvidence issue) => switch (issue.issueId) {
 
 String _formatHeroDate(DateTime date) {
   return '${date.day} Thg ${date.month}, ${date.year}';
+}
+
+String _formatReportWork(PostExerciseData report) {
+  if (report.isSecondBased) {
+    final good = report.goodSeconds ?? 0;
+    final total = report.totalSeconds ?? 0;
+    return '${_formatSeconds(good)}/${_formatSeconds(total)}';
+  }
+
+  return '${report.totalGoodReps ?? 0}/${report.totalReps ?? 0} reps';
+}
+
+String _formatSeconds(double seconds) {
+  final rounded = seconds.round();
+  if (rounded < 60) return '${rounded}s';
+
+  final minutes = rounded ~/ 60;
+  final remainder = rounded % 60;
+  if (remainder == 0) return '${minutes}m';
+  return '${minutes}m ${remainder}s';
 }
 
 String _formatClock(Duration duration) {

@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vika/services/session_coach_builder.dart';
 
 import '../../exercise/exercise_base.dart';
 import '../../exercise/calorie_estimator_registry.dart';
@@ -49,11 +50,13 @@ import '../../exercise/squat/metrics/tempo_metric.dart';
 import '../../exercise/squat/metrics/trunk_lean_metric.dart';
 import '../../exercise/squat/squat.dart';
 import '../../models/exercise_definition.dart';
+import '../../models/fault_candidate.dart';
 import '../../models/post_exercise_data.dart';
 import '../../models/workout_session_report.dart';
 import '../../services/recommendation/models/plan.dart';
 import '../../services/recommendation/progression_service.dart';
 import '../../services/session_summary_builder.dart';
+import '../../services/session_trophy_picker.dart';
 import '../../utils/exercise_logger.dart';
 import '../../utils/orientation_lock.dart';
 import 'active_exercise_page.dart';
@@ -556,6 +559,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     }
     final newEntry = ExerciseSessionReport(
       definition: widget.definition,
+      exerciseKey: _sessionExerciseId,
       report: report,
       duration: _completedDuration ?? Duration.zero,
       calories: _estimatedCalories ?? 0,
@@ -587,11 +591,69 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
         streakDays,
       );
 
-      SessionPersistence().completeWorkoutSession(
+      // These reads exclude the current workout_session_id and return
+      // oldest-first form histories for the trophy picker.
+      final priorSessionForms =
+          await SessionPersistence().fetchPriorSessionFormsScores(
+        widget.workoutSessionId,
+      );
+      final exerciseIds =
+          accumulated.map((r) => r.exerciseKey).toSet().toList();
+      final priorExerciseForms =
+          await SessionPersistence().fetchPriorExerciseFormsScores(
+        widget.workoutSessionId,
+        exerciseIds,
+      );
+
+      final candidates = <FaultCandidate>[];
+      for (final r in accumulated) {
+        final builder =
+            reportBuilders[r.definition.id]?.builder ?? GenericReportBuilder();
+        candidates.addAll(
+          builder.buildFaultCandidates(
+            exerciseId: r.exerciseKey,
+            exerciseName: r.exerciseName,
+            exerciseFormScore: r.formScore,
+            faultCounts: r.report.faultCounts,
+            totalReps: r.totalReps ?? 0,
+            userPainAreas: _painAreas,
+          ),
+        );
+      }
+
+      var trophy = SessionTrophyPicker.pick(
+        reports: accumulated,
+        sessionRawFormScore: sessionSummary.rawFormScore,
+        streakDays: streakDays,
+        priorSessionForms: priorSessionForms,
+        priorExerciseForms: priorExerciseForms,
+      );
+      if (sessionSummary.rawFormScore == 0) {
+        trophy = const Trophy(
+          tier: TrophyTier.showedUp,
+          value: '1',
+          label: 'Có mặt là đẳng cấp rồi',
+          tag: 'CÓ MẶT',
+        );
+      }
+      final coach = SessionCoachBuilder.build(
+        candidates: candidates,
+        trophy: trophy,
+      );
+
+      await SessionPersistence().completeWorkoutSession(
         workoutSessionId: widget.workoutSessionId,
         rawFormScore: sessionSummary.rawFormScore,
         sessionFormScore: sessionSummary.sessionFormScore,
+        totalReps: accumulated.fold<int>(0, (s, r) => s + (r.totalReps ?? 0)),
+        totalGoodReps:
+            accumulated.fold<int>(0, (s, r) => s + (r.goodReps ?? 0)),
+        totalCalories: _aggregateCalories(accumulated),
+        totalDurationSeconds: _aggregateDuration(accumulated).inSeconds,
+        coachNote: {'trophy': trophy.toJson(), 'coach': coach.toJson()},
+        summaryVersion: 'summary-v1',
       );
+      if (!mounted) return;
 
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
@@ -600,6 +662,8 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
             sessionSummary: sessionSummary,
             totalDuration: _aggregateDuration(accumulated),
             totalCalories: _aggregateCalories(accumulated),
+            trophy: trophy,
+            coach: coach,
             onLastExerciseDifficulty: (d) {
               // Overall difficulty for the last exercise persists to its own
               // exercise_sessions row via updateSessionDifficulty (queued in

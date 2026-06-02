@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vika/models/fault_candidate.dart';
 import 'package:vika/services/session_coach_builder.dart';
 import 'package:vika/services/session_trophy_picker.dart';
 
@@ -21,7 +22,6 @@ void main() {
         ),
       ],
       trophy: _trophy(),
-      difficulty: SessionDifficulty.moderate,
     );
 
     expect(coach.kind, CoachWatchKind.fault);
@@ -53,7 +53,6 @@ void main() {
         ),
       ],
       trophy: _trophy(),
-      difficulty: SessionDifficulty.moderate,
     );
 
     expect(coach.watch, 'Lunge watch');
@@ -81,7 +80,6 @@ void main() {
         ),
       ],
       trophy: _trophy(),
-      difficulty: SessionDifficulty.moderate,
     );
 
     expect(coach.watch, 'Push Up watch');
@@ -94,20 +92,18 @@ void main() {
         _candidate(
           faultKey: 'tempo',
           rate: 0.40,
-          criticalityRank: 2,
           sortIndex: 0,
           watchCopy: 'Tempo watch',
         ),
         _candidate(
           faultKey: 'depth',
           rate: 0.40,
-          criticalityRank: 1,
+          isCritical: true,
           sortIndex: 3,
           watchCopy: 'Depth watch',
         ),
       ],
       trophy: _trophy(),
-      difficulty: SessionDifficulty.moderate,
     );
 
     final sortIndexCoach = SessionCoachBuilder.build(
@@ -115,39 +111,36 @@ void main() {
         _candidate(
           faultKey: 'tempo',
           rate: 0.40,
-          criticalityRank: 1,
+          isCritical: true,
           sortIndex: 5,
           watchCopy: 'Tempo watch',
         ),
         _candidate(
           faultKey: 'heel',
           rate: 0.40,
-          criticalityRank: 1,
+          isCritical: true,
           sortIndex: 2,
           watchCopy: 'Heel watch',
         ),
       ],
       trophy: _trophy(),
-      difficulty: SessionDifficulty.moderate,
     );
 
     expect(criticalityCoach.watch, 'Depth watch');
     expect(sortIndexCoach.watch, 'Heel watch');
   });
 
-  test('faults below gate take perfect path with difficulty nudge', () {
+  test('faults below gate take perfect path with perfect copy', () {
     final easyCoach = SessionCoachBuilder.build(
       candidates: [
         _candidate(rate: 0.09),
       ],
       trophy: _trophy(),
-      difficulty: SessionDifficulty.easy,
     );
 
     final moderateCoach = SessionCoachBuilder.build(
       candidates: const [],
       trophy: _trophy(),
-      difficulty: SessionDifficulty.moderate,
     );
 
     final hardCoach = SessionCoachBuilder.build(
@@ -155,20 +148,16 @@ void main() {
         _candidate(rate: 0.01),
       ],
       trophy: _trophy(),
-      difficulty: SessionDifficulty.hard,
     );
 
     expect(easyCoach.kind, CoachWatchKind.perfect);
     expect(
       easyCoach.watch,
-      'Buổi tập hoàn hảo, không có gì phải chỉnh. Cứ đà này nhé!',
+      'Buổi tập hoàn hảo, chuẩn không cần chỉnh',
     );
-    expect(easyCoach.next, 'Buổi sau thử thêm 2-3 rep mỗi set xem sao.');
-    expect(
-      moderateCoach.next,
-      'Giữ nguyên mức này, buổi sau sẽ mượt hơn nữa.',
-    );
-    expect(hardCoach.next, 'Buổi sau cứ giữ nhịp này, cơ thể sẽ quen dần.');
+    expect(easyCoach.next, 'Giữ nguyên mức này, buổi sau sẽ mượt hơn nữa.');
+    expect(moderateCoach.next, 'Giữ nguyên mức này, buổi sau sẽ mượt hơn nữa.');
+    expect(hardCoach.next, 'Giữ nguyên mức này, buổi sau sẽ mượt hơn nữa.');
   });
 
   test('quote composes win and the path-specific tail', () {
@@ -177,13 +166,11 @@ void main() {
         _candidate(rate: 0.10),
       ],
       trophy: _trophy(tier: TrophyTier.streakMilestone, value: '7'),
-      difficulty: SessionDifficulty.moderate,
     );
 
     final perfectCoach = SessionCoachBuilder.build(
       candidates: const [],
       trophy: _trophy(tier: TrophyTier.cleanSession),
-      difficulty: SessionDifficulty.moderate,
     );
 
     expect(
@@ -214,7 +201,6 @@ void main() {
         ),
       ],
       trophy: _trophy(),
-      difficulty: SessionDifficulty.moderate,
     );
 
     expect(coach.kind, CoachWatchKind.fault);
@@ -227,11 +213,11 @@ void main() {
 FaultCandidate _candidate({
   String exerciseId = 'squat',
   String exerciseName = 'Squat',
-  double exerciseFormScore = 70,
+  int exerciseFormScore = 70,
   String faultKey = 'depth',
   double rate = 0.20,
   bool isPainLinked = false,
-  int criticalityRank = 0,
+  bool isCritical = false,
   int sortIndex = 0,
   String watchCopy = 'Watch copy',
   String nextCopy = 'Next copy',
@@ -243,7 +229,7 @@ FaultCandidate _candidate({
     faultKey: faultKey,
     rate: rate,
     isPainLinked: isPainLinked,
-    criticalityRank: criticalityRank,
+    isCritical: isCritical,
     sortIndex: sortIndex,
     watchCopy: watchCopy,
     nextCopy: nextCopy,

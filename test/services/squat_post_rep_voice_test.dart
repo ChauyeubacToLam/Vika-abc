@@ -33,11 +33,11 @@ void main() {
   test('heel rise fault adds a post-rep voice cue with highest priority', () {
     final metric = HeelRiseMetric();
 
-    for (var i = 0; i < 4; i++) {
+    for (var i = 0; i < 5; i++) {
       metric.update(
         _buildRepContext(
           squatState: SquatState.bottom,
-          heelDistance: 16,
+          heelDistance: 19,
           scaleFactor: 100,
         ),
       );
@@ -117,7 +117,7 @@ void main() {
       metric.update(
         _buildRepContext(
           squatState: SquatState.descending,
-          trunkLean: 41,
+          trunkLean: 61,
         ),
       );
     }

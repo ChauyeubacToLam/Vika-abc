@@ -111,13 +111,13 @@ class SessionSummaryBuilder {
     final formScore = _clampFormScore(report.formScore);
     if (report.report.isSecondBased) {
       final seconds = report.report.totalSeconds;
-      return seconds > 0
+      return seconds != null && seconds > 0
           ? _ScoreInput(_ScoreModality.hold, formScore, seconds)
           : _ScoreInput.unscoreable(formScore);
     }
 
     final reps = report.totalReps;
-    return reps > 0
+    return reps != null && reps > 0
         ? _ScoreInput(_ScoreModality.rep, formScore, reps.toDouble())
         : _ScoreInput.unscoreable(formScore);
   }

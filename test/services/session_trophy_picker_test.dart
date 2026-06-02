@@ -44,6 +44,31 @@ void main() {
     expect(trophy.exerciseName, 'Squat');
   });
 
+  test('exercise PB history uses persisted exercise key, not definition id',
+      () {
+    final trophy = SessionTrophyPicker.pick(
+      reports: [
+        _report(
+          id: 'curl_up',
+          exerciseKey: 'mcgill_curlup',
+          name: 'Curl Up',
+          formScore: 75,
+          totalReps: 10,
+        ),
+      ],
+      sessionRawFormScore: 75,
+      streakDays: 0,
+      priorSessionForms: const [100],
+      priorExerciseForms: const {
+        'mcgill_curlup': [68],
+      },
+    );
+
+    expect(trophy.tier, TrophyTier.allTimePb);
+    expect(trophy.value, '75');
+    expect(trophy.exerciseName, 'Curl Up');
+  });
+
   test('recent PB fires when recent bar is beaten but all-time is not', () {
     final trophy = SessionTrophyPicker.pick(
       reports: [
@@ -203,14 +228,17 @@ ExerciseSessionReport _report({
   required String name,
   required int formScore,
   String? id,
+  String? exerciseKey,
   int? totalReps,
   int? goodReps,
 }) {
+  final definitionId = id ?? name.toLowerCase().replaceAll(' ', '_');
   return ExerciseSessionReport(
     definition: _definition(
-      id: id ?? name.toLowerCase().replaceAll(' ', '_'),
+      id: definitionId,
       name: name,
     ),
+    exerciseKey: exerciseKey ?? definitionId,
     report: PostExerciseData(
       exerciseName: name,
       metValue: 1,

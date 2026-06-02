@@ -441,18 +441,26 @@ class SessionPersistence {
     }
   }
 
+  /// Freezes the workout summary after the final exercise.
+  ///
+  /// [coachNote] stores the summary blob shape
+  /// `{ 'trophy': trophy.toJson(), 'coach': coach.toJson() }`.
   Future<void> completeWorkoutSession({
     required String? workoutSessionId,
     required int rawFormScore,
     required int sessionFormScore,
+    required int totalReps,
+    required int totalGoodReps,
+    required int totalCalories,
+    required int totalDurationSeconds,
+    required Map<String, dynamic> coachNote,
+    required String summaryVersion,
   }) async {
     if (workoutSessionId == null || workoutSessionId.isEmpty) {
       debugPrint(
-        '[Vika] completeWorkoutSession skipped: missing workoutSessionId',
-      );
+          '[Vika] completeWorkoutSession skipped: missing workoutSessionId');
       return;
     }
-
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return;
 
@@ -463,11 +471,74 @@ class SessionPersistence {
             'completed_at': DateTime.now().toUtc().toIso8601String(),
             'raw_form_score': rawFormScore,
             'session_form_score': sessionFormScore,
+            'total_reps': totalReps,
+            'total_good_reps': totalGoodReps,
+            'total_calories': totalCalories,
+            'total_duration_seconds': totalDurationSeconds,
+            'coach_note': coachNote,
+            'summary_version': summaryVersion,
           })
           .eq('id', workoutSessionId)
           .eq('user_id', userId);
     } catch (e) {
       debugPrint('[Vika] completeWorkoutSession failed: $e');
+    }
+  }
+
+  Future<List<int>> fetchPriorSessionFormsScores(
+      String? workoutSessionId) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null || workoutSessionId == null) return [];
+
+    try {
+      final response = await _client
+          .from('workout_sessions')
+          .select('raw_form_score')
+          .eq('user_id', userId)
+          .neq('id', workoutSessionId)
+          .not('raw_form_score', 'is', null)
+          .order('completed_at', ascending: true);
+
+      return (response as List)
+          .map((row) => (row as Map<String, dynamic>)['raw_form_score'] as num?)
+          .whereType<num>()
+          .map((v) => v.toInt())
+          .toList();
+    } catch (e) {
+      debugPrint('[Vika] fetchPriorSessionFormsScores failed: $e');
+      return [];
+    }
+  }
+
+  Future<Map<String, List<int>>> fetchPriorExerciseFormsScores(
+      String? workoutSessionId, List<String> sessionIds) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null || workoutSessionId == null) return {};
+
+    try {
+      final response = await _client
+          .from('exercise_sessions')
+          .select('exercise_id, form_score')
+          .eq('user_id', userId)
+          .inFilter('exercise_id', sessionIds)
+          .neq('workout_session_id',
+              workoutSessionId) // CRITICAL here, see below
+          .not('form_score', 'is', null)
+          .order('completed_at', ascending: true);
+
+      final map = <String, List<int>>{};
+      for (final raw in response as List) {
+        final row = raw as Map<String, dynamic>;
+        final id = row['exercise_id'] as String;
+        final score = (row['form_score'] as num?)?.toInt();
+        if (score == null) continue;
+        (map[id] ??= <int>[]).add(score);
+      }
+
+      return map;
+    } catch (e) {
+      debugPrint('[Vika] fetchPriorExerciseFormsScores failed: $e');
+      return {};
     }
   }
 }

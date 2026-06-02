@@ -18,35 +18,32 @@ class SquatReportBuilder extends ExerciseReportBuilder {
   @override
   Map<String, FaultTipCopy> faultToTipMap() => {
         'heel_fails_count': (
-          watch: 'PLACEHOLDER: Để ý gót chân trong từng rep.',
+          watch: 'Trong bài Squat: Để ý gót chân hơn khi ngồi xuống.',
           next: 'Giữ trọng lượng dồn vào gót, đẩy đầu gối ra ngoài',
         ),
         'trunk_lean_fails_count': (
-          watch: 'PLACEHOLDER: Để ý lưng khi ngồi xuống.',
+          watch: 'Trong bài Squat: Để ý lưng hơn khi ngồi xuống.',
           next: 'Mang lưng về phía sau khi ngồi xuống',
         ),
         'depth_fails_count': (
-          watch: 'PLACEHOLDER: Để ý độ sâu ở cuối rep.',
+          watch: 'Trong bài Squat: Để ý độ sâu ở cuối rep.',
           next: 'Ngồi xuống sâu hơn nữa',
         ),
         'tempo_fails_count': (
-          watch: 'PLACEHOLDER: Để ý nhịp xuống và lên.',
+          watch: 'Trong bài Squat: Để ý nhịp xuống và lên.',
           next: 'Kiểm soát chuyển động, giữ 2 giây trước khi lên',
         ),
         'hip_shoulder_sync_fails_count': (
-          watch: 'PLACEHOLDER: Để ý hông và vai đi cùng nhau.',
+          watch: 'Trong bài Squat: Để ý hông và vai đi cùng nhau.',
           next: 'Chỉ đầu gối chuyển động, hông vai phải giữ nguyên',
         ),
       };
 
   @override
-  List<String> metricCriticalityOrder() => const [
+  Set<String> criticalMetrics() => {
         'depth_fails_count',
         'trunk_lean_fails_count',
-        'heel_fails_count',
-        'hip_shoulder_sync_fails_count',
-        'tempo_fails_count',
-      ];
+      };
 
   @override
   Map<String, String Function(int count, int total)> praiseSentenceMap() => {

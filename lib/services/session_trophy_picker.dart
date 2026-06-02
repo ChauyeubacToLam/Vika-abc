@@ -25,6 +25,13 @@ class Trophy {
     required this.tag,
     this.exerciseName,
   });
+  Map<String, dynamic> toJson() => {
+        'tier': tier.name,
+        'value': value,
+        'label': label,
+        'tag': tag,
+        if (exerciseName != null) 'exercise_name': exerciseName,
+      };
 }
 
 class SessionTrophyPicker {
@@ -81,7 +88,7 @@ class SessionTrophyPicker {
     if (cleanSession != null) return cleanSession;
 
     final goodReps =
-        reports.fold<int>(0, (sum, report) => sum + report.goodReps);
+        reports.fold<int>(0, (sum, report) => sum + (report.goodReps ?? 0));
     if (goodReps >= _volumeFloor) {
       return Trophy(
         tier: TrophyTier.volume,
@@ -133,7 +140,8 @@ class SessionTrophyPicker {
     for (final report in reports) {
       final exerciseMargin = _clearedPbMargin(
         current: report.formScore,
-        baseline: priorExerciseForms[report.definition.id] ?? const <int>[],
+        baseline:
+            priorExerciseForms[_exerciseHistoryKey(report)] ?? const <int>[],
         margin: _pbMargin,
         floor: _pbFloor,
       );
@@ -180,7 +188,8 @@ class SessionTrophyPicker {
     }
 
     for (final report in reports) {
-      final history = priorExerciseForms[report.definition.id] ?? const <int>[];
+      final history =
+          priorExerciseForms[_exerciseHistoryKey(report)] ?? const <int>[];
       final exerciseMargin = _recentPbMargin(
         current: report.formScore,
         allTimeBaseline: history,
@@ -278,6 +287,15 @@ class SessionTrophyPicker {
     if (values.length <= count) return values;
     return values.sublist(values.length - count);
   }
+
+  /// Key for per-exercise PB history lookups.
+  ///
+  /// This is the persisted `exercise_sessions.exercise_id`, not
+  /// `definition.id`; catalog-launched aliases such as `mcgill_curlup` can
+  /// resolve to builder IDs such as `curl_up`, so PB reads must use the same
+  /// raw key that was written.
+  static String _exerciseHistoryKey(ExerciseSessionReport report) =>
+      report.exerciseKey;
 }
 
 class _PbCandidate {

@@ -1,34 +1,7 @@
+import '../models/fault_candidate.dart';
 import 'session_trophy_picker.dart';
 
 enum CoachWatchKind { fault, perfect }
-
-enum SessionDifficulty { easy, moderate, hard }
-
-class FaultCandidate {
-  final String exerciseId;
-  final String exerciseName;
-  final double exerciseFormScore;
-  final String faultKey;
-  final double rate;
-  final bool isPainLinked;
-  final int criticalityRank;
-  final int sortIndex;
-  final String watchCopy;
-  final String nextCopy;
-
-  const FaultCandidate({
-    required this.exerciseId,
-    required this.exerciseName,
-    required this.exerciseFormScore,
-    required this.faultKey,
-    required this.rate,
-    required this.isPainLinked,
-    required this.criticalityRank,
-    required this.sortIndex,
-    required this.watchCopy,
-    required this.nextCopy,
-  });
-}
 
 class SessionCoach {
   final String quote;
@@ -44,6 +17,13 @@ class SessionCoach {
     required this.kind,
     this.watchExerciseName,
   });
+  Map<String, dynamic> toJson() => {
+        'quote': quote,
+        'watch': watch,
+        'next': next,
+        'kind': kind.name,
+        if (watchExerciseName != null) 'watch_exercise_name': watchExerciseName,
+      };
 }
 
 class SessionCoachBuilder {
@@ -52,26 +32,22 @@ class SessionCoachBuilder {
   static const double _gateRate = 0.10;
 
   static const String _perfectWatch =
-      'Buổi tập hoàn hảo, không có gì phải chỉnh. Cứ đà này nhé!';
-  static const String _easyNext = 'Buổi sau thử thêm 2-3 rep mỗi set xem sao.';
-  static const String _moderateNext =
+      'Buổi tập hoàn hảo, chuẩn không cần chỉnh';
+  static const String _perfectNext =
       'Giữ nguyên mức này, buổi sau sẽ mượt hơn nữa.';
-  static const String _hardNext =
-      'Buổi sau cứ giữ nhịp này, cơ thể sẽ quen dần.';
   static const String _faultQuoteTail = 'Tinh chỉnh chút xíu nữa là chuẩn.';
   static const String _perfectQuoteTail = 'Giữ vững nhé!';
 
   static SessionCoach build({
     required List<FaultCandidate> candidates,
     required Trophy trophy,
-    required SessionDifficulty difficulty,
   }) {
     final chosen = _selectWatchCandidate(candidates);
     if (chosen == null) {
       return SessionCoach(
         quote: _composeQuote(trophy: trophy, tail: _perfectQuoteTail),
         watch: _perfectWatch,
-        next: _progressionNudge(difficulty),
+        next: _perfectNext,
         kind: CoachWatchKind.perfect,
       );
     }
@@ -113,8 +89,7 @@ class SessionCoachBuilder {
     final rateOrder = b.rate.compareTo(a.rate);
     if (rateOrder != 0) return rateOrder;
 
-    final criticalityOrder = a.criticalityRank.compareTo(b.criticalityRank);
-    if (criticalityOrder != 0) return criticalityOrder;
+    if (a.isCritical != b.isCritical) return a.isCritical ? -1 : 1;
 
     return a.sortIndex.compareTo(b.sortIndex);
   }
@@ -126,17 +101,6 @@ class SessionCoachBuilder {
       if (candidate.exerciseId != firstExerciseId) return true;
     }
     return false;
-  }
-
-  static String _progressionNudge(SessionDifficulty difficulty) {
-    switch (difficulty) {
-      case SessionDifficulty.easy:
-        return _easyNext;
-      case SessionDifficulty.moderate:
-        return _moderateNext;
-      case SessionDifficulty.hard:
-        return _hardNext;
-    }
   }
 
   static String _composeQuote({
