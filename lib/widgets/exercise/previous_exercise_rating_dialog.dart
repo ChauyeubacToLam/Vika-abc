@@ -19,6 +19,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../interpreter/interpreter_base.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/vf_theme.dart';
 
@@ -26,6 +27,7 @@ Future<String> showPreviousExerciseRatingDialog(
   BuildContext context, {
   required String exerciseName,
   int? formScore,
+  DetectedEvidence? issueQuestion,
 }) async {
   final result = await showGeneralDialog<String>(
     context: context,
@@ -37,6 +39,7 @@ Future<String> showPreviousExerciseRatingDialog(
       return _PreviousExerciseRatingDialog(
         exerciseName: exerciseName,
         formScore: formScore,
+        issueQuestion: issueQuestion,
       );
     },
     transitionBuilder: (context, anim, secondaryAnim, child) {
@@ -66,10 +69,16 @@ class _PreviousExerciseRatingDialog extends StatefulWidget {
   const _PreviousExerciseRatingDialog({
     required this.exerciseName,
     required this.formScore,
+    this.issueQuestion,
   });
 
   final String exerciseName;
   final int? formScore;
+
+  /// When non-null, a thin-divider issue-confirm section renders below the
+  /// difficulty tiles. The difficulty pick stays required; the issue tap is
+  /// optional and the user proceeds via an explicit "Tiếp tục" button.
+  final DetectedEvidence? issueQuestion;
 
   @override
   State<_PreviousExerciseRatingDialog> createState() =>
@@ -80,7 +89,12 @@ class _PreviousExerciseRatingDialogState
     extends State<_PreviousExerciseRatingDialog>
     with SingleTickerProviderStateMixin {
   String? _selected;
+  // Optional issue-confirm answer (true = Có, false = Không). Captured for a
+  // deferred wiring hook only — never persisted or threaded to any consumer.
+  bool? _issueAnswer;
   late final AnimationController _pulse;
+
+  bool get _hasIssue => widget.issueQuestion != null;
 
   @override
   void initState() {
@@ -101,9 +115,26 @@ class _PreviousExerciseRatingDialogState
     if (_selected != null) return;
     setState(() => _selected = id);
     HapticFeedback.mediumImpact();
+    // No-issue mode keeps the original auto-close. With an issue section, the
+    // dialog stays open so the optional Có/Không tap remains reachable; the
+    // user proceeds via the explicit "Tiếp tục" button instead.
+    if (_hasIssue) return;
     Future.delayed(const Duration(milliseconds: 320), () {
       if (mounted) Navigator.of(context).pop(id);
     });
+  }
+
+  void _answerIssue(bool answer) {
+    setState(() => _issueAnswer = answer);
+    HapticFeedback.selectionClick();
+    // TODO(wiring): capture issue-confirm answer (_issueAnswer); it is not
+    // persisted and not threaded to any consumer.
+  }
+
+  void _continue() {
+    if (_selected == null) return;
+    HapticFeedback.mediumImpact();
+    Navigator.of(context).pop(_selected);
   }
 
   @override
@@ -197,7 +228,12 @@ class _PreviousExerciseRatingDialogState
                                   ),
                                 ),
                               ),
-                              Padding(
+                              // Scrollable so the taller issue-confirm layout
+                              // (and large accessibility text) can never
+                              // overflow on small phones. The card shrink-wraps
+                              // to content when short, caps at the available
+                              // height and scrolls when tall.
+                              SingleChildScrollView(
                                 padding:
                                     const EdgeInsets.fromLTRB(24, 26, 24, 22),
                                 child: Column(
@@ -258,32 +294,41 @@ class _PreviousExerciseRatingDialogState
                                       ),
                                     ),
                                     const SizedBox(height: 18),
-                                    // Footline — one short italic nudge
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.menu_book_rounded,
-                                          size: 12,
-                                          color: c.inkFaint,
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          _selected == null
-                                              ? 'Đọc giới thiệu phía dưới sau khi chọn'
-                                              : 'Đã ghi nhận',
-                                          style: TextStyle(
-                                            fontFamily: 'BeVietnamPro',
-                                            fontSize: 11.5,
-                                            fontWeight: FontWeight.w700,
-                                            fontStyle: FontStyle.italic,
-                                            letterSpacing: -0.1,
+                                    if (_hasIssue)
+                                      _IssueConfirmSection(
+                                        question: widget.issueQuestion!.question,
+                                        answer: _issueAnswer,
+                                        onAnswer: _answerIssue,
+                                        continueEnabled: _selected != null,
+                                        onContinue: _continue,
+                                      )
+                                    else
+                                      // Footline — one short italic nudge
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.menu_book_rounded,
+                                            size: 12,
                                             color: c.inkFaint,
                                           ),
-                                        ),
-                                      ],
-                                    ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            _selected == null
+                                                ? 'Đọc giới thiệu phía dưới sau khi chọn'
+                                                : 'Đã ghi nhận',
+                                            style: TextStyle(
+                                              fontFamily: 'BeVietnamPro',
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.w700,
+                                              fontStyle: FontStyle.italic,
+                                              letterSpacing: -0.1,
+                                              color: c.inkFaint,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                   ],
                                 ),
                               ),
@@ -382,6 +427,213 @@ class _FormScoreBadge extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Issue-confirm section — renders below a thin divider when the popup
+// carries a DetectedEvidence. A positive lead line, the detected question,
+// an optional Có / Không choice, and the explicit "Tiếp tục" affordance that
+// gates on the (required) difficulty pick. The difficulty contract is
+// unchanged: the dialog still returns only the difficulty string. ───
+class _IssueConfirmSection extends StatelessWidget {
+  const _IssueConfirmSection({
+    required this.question,
+    required this.answer,
+    required this.onAnswer,
+    required this.continueEnabled,
+    required this.onContinue,
+  });
+
+  final String question;
+  final bool? answer;
+  final ValueChanged<bool> onAnswer;
+  final bool continueEnabled;
+  final VoidCallback onContinue;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Thin divider separating difficulty from the optional issue check.
+        Divider(height: 1, thickness: 1, color: c.border),
+        const SizedBox(height: 18),
+        // Positive lead line — reassures this is a quick, friendly ask.
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 5,
+              height: 5,
+              decoration: BoxDecoration(
+                color: c.yellow,
+                shape: BoxShape.circle,
+                boxShadow: [BoxShadow(color: c.yellow, blurRadius: 4)],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Vika hỏi nhanh để hiểu bạn hơn',
+              style: TextStyle(
+                fontFamily: 'BeVietnamPro',
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                fontStyle: FontStyle.italic,
+                letterSpacing: -0.1,
+                color: c.inkFaint,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Text(
+          question,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontFamily: 'BeVietnamPro',
+            fontSize: 19,
+            fontWeight: FontWeight.w800,
+            fontStyle: FontStyle.italic,
+            height: 1.1,
+            letterSpacing: -0.7,
+            color: c.ink,
+          ),
+        ),
+        const SizedBox(height: 14),
+        // Optional Có / Không — two segmented pills.
+        Row(
+          children: [
+            Expanded(
+              child: _IssuePill(
+                label: 'Có',
+                selected: answer == true,
+                onTap: () => onAnswer(true),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _IssuePill(
+                label: 'Không',
+                selected: answer == false,
+                onTap: () => onAnswer(false),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        // Explicit continue affordance — gated on the required difficulty pick.
+        _ContinueButton(enabled: continueEnabled, onTap: onContinue),
+      ],
+    );
+  }
+}
+
+class _IssuePill extends StatelessWidget {
+  const _IssuePill({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    return Material(
+      color: selected ? c.yellow : c.bg,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: selected ? c.yellow : c.border,
+              width: 1.4,
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 13),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontFamily: 'BeVietnamPro',
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                fontStyle: FontStyle.italic,
+                letterSpacing: -0.4,
+                color: selected ? c.yellowInk : c.ink,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ContinueButton extends StatelessWidget {
+  const _ContinueButton({required this.enabled, required this.onTap});
+
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    return AnimatedOpacity(
+      opacity: enabled ? 1.0 : 0.4,
+      duration: const Duration(milliseconds: 200),
+      child: Material(
+        color: c.yellow,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          borderRadius: BorderRadius.circular(18),
+          child: Ink(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: enabled
+                  ? [
+                      BoxShadow(
+                        color: c.yellow.withValues(alpha: 0.45),
+                        blurRadius: 22,
+                        offset: const Offset(0, 8),
+                      ),
+                    ]
+                  : null,
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  enabled ? 'Tiếp tục' : 'Chọn mức độ để tiếp tục',
+                  style: TextStyle(
+                    fontFamily: 'BeVietnamPro',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    fontStyle: FontStyle.italic,
+                    letterSpacing: -0.4,
+                    color: c.yellowInk,
+                  ),
+                ),
+                if (enabled) ...[
+                  const SizedBox(width: 6),
+                  Icon(Icons.arrow_forward_rounded,
+                      size: 18, color: c.yellowInk),
+                ],
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

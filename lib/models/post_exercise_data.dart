@@ -37,8 +37,10 @@ class PostExerciseData {
 
   int get totalReps => sets.fold(0, (sum, s) => sum + (s.totalReps ?? 0));
   int get totalGoodReps => sets.fold(0, (sum, s) => sum + (s.goodReps ?? 0));
-  double get totalSeconds => sets.fold(0, (sum, s) => sum + (s.totalSeconds ?? 0));
-  double get goodSeconds => sets.fold(0, (sum, s) => sum + (s.goodSeconds ?? 0));
+  double get totalSeconds =>
+      sets.fold(0, (sum, s) => sum + (s.totalSeconds ?? 0));
+  double get goodSeconds =>
+      sets.fold(0, (sum, s) => sum + (s.goodSeconds ?? 0));
   List<int> get setScores => sets.map((s) => s.score).toList();
 }
 
@@ -90,6 +92,8 @@ class DetailCard {
   });
 }
 
+typedef FaultTipCopy = ({String watch, String next});
+
 // ═══════════════════════════════════════════════════════════════
 // BUILDER BASE CLASS
 // ═══════════════════════════════════════════════════════════════
@@ -110,7 +114,6 @@ abstract class ExerciseReportBuilder {
 
   DetectedEvidence? detectIssue(List<ExerciseLogger> setLoggers);
 
-
   // ── Subclasses override these maps ──
 
   bool get isSecondBased => false;
@@ -124,9 +127,12 @@ abstract class ExerciseReportBuilder {
   /// Values are FAIL counts: high number = bad.
   Map<String, String> praiseMetricNames() => {};
 
-  /// Maps fault count keys to forward-looking coaching tips.
-  /// Tips use external cueing (B3): "push the floor" not "extend your knees".
-  Map<String, String> faultToTipMap() => {};
+  /// Maps fault count keys to watch and forward-looking coaching copy.
+  /// Next tips use external cueing (B3): "push the floor" not "extend your knees".
+  Map<String, FaultTipCopy> faultToTipMap() => {};
+
+  /// Fault keys ordered from most critical to least critical for this exercise.
+  List<String> metricCriticalityOrder() => const [];
 
   /// Maps metric labels to Vietnamese praise sentence templates.
   /// Labels must match values in praiseMetricNames().
@@ -253,7 +259,7 @@ abstract class ExerciseReportBuilder {
     }
 
     if (worstKey == null || worstCount == 0) return null;
-    return tipMap[worstKey];
+    return tipMap[worstKey]?.next;
   }
 
   // ── Helpers for praise ladder ──
@@ -286,7 +292,7 @@ abstract class ExerciseReportBuilder {
     final tipMap = faultToTipMap();
     String? matchingFaultKey;
     for (final entry in tipMap.entries) {
-      if (entry.value == previousSetCoachTip) {
+      if (entry.value.next == previousSetCoachTip) {
         matchingFaultKey = entry.key;
         break;
       }
@@ -482,8 +488,10 @@ abstract class ExerciseReportBuilder {
 
       final maxRep = (logger.setLogs["max_rep"] as num?)?.toInt() ?? 0;
       final goodReps = (logger.setLogs["good_rep_count"] as num?)?.toInt() ?? 0;
-      final totalSeconds = (logger.setLogs["total_seconds"] as num?)?.toDouble() ?? 0.0;
-      final goodSeconds = (logger.setLogs["good_seconds"] as num?)?.toDouble() ?? 0.0;
+      final totalSeconds =
+          (logger.setLogs["total_seconds"] as num?)?.toDouble() ?? 0.0;
+      final goodSeconds =
+          (logger.setLogs["good_seconds"] as num?)?.toDouble() ?? 0.0;
       final score = maxRep > 0 ? (goodReps / maxRep * 100).round() : 0;
 
       final repResults = logger.repLogs.map((r) => r.correctForm).toList();
@@ -512,31 +520,33 @@ abstract class ExerciseReportBuilder {
     final setScores = sets.map((s) => s.score).toList();
     final totalReps = sets.fold<int>(0, (sum, s) => sum + (s.totalReps ?? 0));
     final totalGood = sets.fold<int>(0, (sum, s) => sum + (s.goodReps ?? 0));
-    final totalSeconds = sets.fold<double>(0, (sum, s) => sum + (s.totalSeconds ?? 0));
-    final goodSeconds = sets.fold<double>(0, (sum, s) => sum + (s.goodSeconds ?? 0));
-    
-    switch(isSecondBased) {
+    final totalSeconds =
+        sets.fold<double>(0, (sum, s) => sum + (s.totalSeconds ?? 0));
+    final goodSeconds =
+        sets.fold<double>(0, (sum, s) => sum + (s.goodSeconds ?? 0));
+
+    switch (isSecondBased) {
       case true:
         return PostExerciseData(
           exerciseName: exerciseName,
           metValue: metValue,
           sets: sets,
-          formScore: totalSeconds > 0 ? (goodSeconds / totalSeconds * 100).round() : 0,
+          formScore:
+              totalSeconds > 0 ? (goodSeconds / totalSeconds * 100).round() : 0,
           coachText: generateCoachText(setScores),
           issueQuestion: detectIssue(setLoggers),
           isSecondBased: true,
         );
       case false:
-      return PostExerciseData(
-      exerciseName: exerciseName,
-      metValue: metValue,
-      sets: sets,
-      formScore: totalReps > 0 ? (totalGood / totalReps * 100).round() : 0,
-      coachText: generateCoachText(setScores),
-      issueQuestion: detectIssue(setLoggers),
-      isSecondBased: false,
-    );
-  
+        return PostExerciseData(
+          exerciseName: exerciseName,
+          metValue: metValue,
+          sets: sets,
+          formScore: totalReps > 0 ? (totalGood / totalReps * 100).round() : 0,
+          coachText: generateCoachText(setScores),
+          issueQuestion: detectIssue(setLoggers),
+          isSecondBased: false,
+        );
     }
   }
 }

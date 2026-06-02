@@ -4,34 +4,34 @@
 // score on the hero, a sparkline DNA strip, exercise medallions, then
 // editorial section blocks with visualization, not text walls.
 //
+// This is a pure reward screen — all interactive tasks were moved off it.
+// The post-exercise reflection popup (difficulty + optional issue-confirm)
+// now fires on entry for the last exercise, gated BEFORE the celebration
+// reveal, so every section below is passive.
+//
 // Sections (top to bottom):
-//   1. Hero Sharable Card         — magazine-cover layout (kept per spec)
+//   1. Hero Sharable Card         — magazine-cover layout
 //   2. One-Thing Trophy Card      — large stat + icon, share-anchor moment
 //   3. Form Arc Chart             — mountain line across exercises
 //   4. Coach AI Three-Pillar      — Mạnh / Để ý / Buổi sau, icon cards
-//   5. Top Issue Card             — kept mechanic, polished surface
-//   6. Last Exercise Rating       — reused DifficultyRatingBlock
-//   7. Session Stats Grid         — per-ex form bars + set sparklines
-//   8. Session RPE                — 4-tile perceived-intensity
-//   9. Done CTA                   — yellow shimmer
+//   5. Session Stats Grid         — per-ex form bars + set sparklines
+//   6. Done CTA                   — yellow shimmer (always active)
 //
 // All values use Premium Ivory tokens via VikaColors. Yellow reserved
 // for stat / dot / underline / CTA.
 //
-// TODO(wiring): see report — top-issue ranker, one-thing picker,
-// coach narrative, RPE persistence all hardcoded.
+// TODO(wiring): see report — one-thing picker, coach narrative hardcoded.
 
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../interpreter/interpreter_base.dart';
 import '../../models/workout_session_report.dart';
 import '../../services/session_summary_builder.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/vf_theme.dart';
-import '../../widgets/exercise/difficulty_rating_block.dart';
+import '../../widgets/exercise/previous_exercise_rating_dialog.dart';
 
 class WorkoutSummaryScreen extends StatefulWidget {
   const WorkoutSummaryScreen({
@@ -55,6 +55,10 @@ class WorkoutSummaryScreen extends StatefulWidget {
   final VoidCallback? onShare;
   final VoidCallback? onShareToZalo;
   final ValueChanged<String>? onLastExerciseDifficulty;
+
+  // TODO(wiring): RPE is removed from the summary UI pending a separate
+  // decision. This param is intentionally retained but currently unused; do
+  // not wire it until that decision lands.
   final ValueChanged<String>? onSessionRpe;
 
   @override
@@ -67,9 +71,6 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
   late final AnimationController _shimmer;
   late final AnimationController _heroPulse;
 
-  String? _lastDifficulty;
-  String? _sessionRpe;
-
   late final Animation<double> _b0;
   late final Animation<double> _b1;
   late final Animation<double> _b2;
@@ -77,8 +78,11 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
   late final Animation<double> _b4;
   late final Animation<double> _b5;
   late final Animation<double> _b6;
-  late final Animation<double> _b7;
-  late final Animation<double> _b8;
+
+  /// Drives the hero score count-up. Linear over an interval of [_entry] so the
+  /// climb stays gated behind the entry controller — it plays when the
+  /// celebration lands, not while hidden behind the rating popup.
+  late final Animation<double> _heroClimb;
 
   @override
   void initState() {
@@ -96,22 +100,47 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
       duration: const Duration(milliseconds: 2600),
     )..repeat(reverse: true);
 
-    _b0 = _beat(0.00, 0.18);
-    _b1 = _beat(0.06, 0.32);
-    _b2 = _beat(0.18, 0.42);
-    _b3 = _beat(0.26, 0.50);
-    _b4 = _beat(0.34, 0.58);
-    _b5 = _beat(0.42, 0.66);
-    _b6 = _beat(0.50, 0.74);
-    _b7 = _beat(0.58, 0.82);
-    _b8 = _beat(0.66, 1.0);
+    // Seven beats mapped to the remaining passive sections:
+    // header, hero, trophy, form arc, coach, stats grid, Done.
+    _b0 = _beat(0.00, 0.20);
+    _b1 = _beat(0.10, 0.40);
+    _b2 = _beat(0.22, 0.52);
+    _b3 = _beat(0.34, 0.62);
+    _b4 = _beat(0.46, 0.72);
+    _b5 = _beat(0.58, 0.84);
+    _b6 = _beat(0.70, 1.0);
 
-    _lastDifficulty =
-        widget.reports.isNotEmpty ? widget.reports.last.userDifficulty : null;
+    // ~1450ms of the 1700ms timeline, starting as the hero lands — matches the
+    // original standalone climb duration but is now gated by _entry.
+    _heroClimb = CurvedAnimation(
+      parent: _entry,
+      curve: const Interval(0.12, 0.97, curve: Curves.linear),
+    );
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _entry.forward();
-    });
+    // Gate the celebration: fire the post-exercise reflection popup for the
+    // last exercise on entry, then play the beat reveal once it resolves. The
+    // dark popup barrier covers the un-revealed (opacity-0) summary behind it.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _promptThenReveal());
+  }
+
+  Future<void> _promptThenReveal() async {
+    if (!mounted) return;
+    final reports = widget.reports;
+    if (reports.isNotEmpty && reports.last.userDifficulty == null) {
+      final last = reports.last;
+      final difficulty = await showPreviousExerciseRatingDialog(
+        context,
+        exerciseName: last.exerciseName,
+        formScore: last.formScore,
+        issueQuestion: last.report.issueQuestion,
+      );
+      if (!mounted) return;
+      last.userDifficulty = difficulty;
+      widget.onLastExerciseDifficulty?.call(difficulty);
+      // Issue-confirm answer is captured inside the popup as a TODO(wiring)
+      // no-op — nothing to route here.
+    }
+    if (mounted) _entry.forward();
   }
 
   @override
@@ -132,40 +161,9 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
       widget.reports.fold(0, (s, r) => s + r.totalReps);
   int get _sessionGoodReps => widget.reports.fold(0, (s, r) => s + r.goodReps);
 
-  /// TODO(wiring): real cross-exercise priority ranking with pain linkage.
-  DetectedEvidence? get _topIssue {
-    for (final r in widget.reports) {
-      final q = r.report.issueQuestion;
-      if (q != null) return q;
-    }
-    return null;
-  }
-
-  bool get _isLastDifficultyAnswered => _lastDifficulty != null;
-  bool get _isSessionRpeAnswered => _sessionRpe != null;
-  bool get _isDoneEnabled => _isLastDifficultyAnswered && _isSessionRpeAnswered;
-
-  void _handleLastDifficulty(String d) {
-    if (_lastDifficulty != null) return;
-    setState(() => _lastDifficulty = d);
-    if (widget.reports.isNotEmpty) {
-      widget.reports.last.userDifficulty = d;
-    }
-    widget.onLastExerciseDifficulty?.call(d);
-  }
-
-  void _handleSessionRpe(String d) {
-    if (_sessionRpe != null) return;
-    setState(() => _sessionRpe = d);
-    widget.onSessionRpe?.call(d);
-  }
-
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    final hasLastExercise = widget.reports.isNotEmpty;
-    final lastExerciseName =
-        hasLastExercise ? widget.reports.last.exerciseName : 'Bài cuối';
 
     // Clamp accessibility text scaling. Without this, a user with
     // "Larger Text" maxed out in iOS / Android system settings would
@@ -215,6 +213,7 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
                         calories: widget.totalCalories,
                         streakDays: widget.sessionSummary.streakDays,
                         heroPulse: _heroPulse,
+                        heroClimb: _heroClimb,
                         onShare: widget.onShare ?? () => _stub('Chia sẻ'),
                         onShareToZalo:
                             widget.onShareToZalo ?? () => _stub('Zalo'),
@@ -239,29 +238,9 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
                             widget.sessionSummary.sessionFormScore,
                       ),
                     ),
-                    if (_topIssue != null) ...[
-                      const SizedBox(height: 18),
-                      _BeatReveal(
-                        animation: _b4,
-                        child: _IssueCard(issue: _topIssue!),
-                      ),
-                    ],
-                    const SizedBox(height: 28),
-                    if (hasLastExercise)
-                      _BeatReveal(
-                        animation: _b5,
-                        child: DifficultyRatingBlock(
-                          exerciseName: lastExerciseName,
-                          eyebrow:
-                              'BÀI CUỐI · ${lastExerciseName.toUpperCase()}',
-                          selected: _lastDifficulty,
-                          locked: _lastDifficulty != null,
-                          onSelect: _handleLastDifficulty,
-                        ),
-                      ),
                     const SizedBox(height: 28),
                     _BeatReveal(
-                      animation: _b6,
+                      animation: _b5,
                       child: _SectionEyebrow(
                         label: 'CHI TIẾT TỪNG BÀI',
                         meta: '${widget.reports.length} BÀI',
@@ -269,22 +248,15 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
                     ),
                     const SizedBox(height: 14),
                     _BeatReveal(
-                      animation: _b6,
+                      animation: _b5,
                       child: _VisualStatsGrid(reports: widget.reports),
                     ),
                     const SizedBox(height: 28),
                     _BeatReveal(
-                      animation: _b7,
-                      child: _SessionRpeBlock(
-                        selected: _sessionRpe,
-                        onSelect: _handleSessionRpe,
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-                    _BeatReveal(
-                      animation: _b8,
+                      animation: _b6,
+                      // The summary is now a pure reward screen — nothing on it
+                      // is "completed", so Done is always active.
                       child: _DoneCta(
-                        enabled: _isDoneEnabled,
                         shimmer: _shimmer,
                         onTap: widget.onDone,
                       ),
@@ -432,6 +404,7 @@ class _MagazineHero extends StatelessWidget {
     required this.calories,
     required this.streakDays,
     required this.heroPulse,
+    required this.heroClimb,
     required this.onShare,
     required this.onShareToZalo,
   });
@@ -446,6 +419,7 @@ class _MagazineHero extends StatelessWidget {
   final int calories;
   final int streakDays;
   final AnimationController heroPulse;
+  final Animation<double> heroClimb;
   final VoidCallback onShare;
   final VoidCallback onShareToZalo;
 
@@ -483,13 +457,13 @@ class _MagazineHero extends StatelessWidget {
           ),
         ],
       ),
-      child: TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0, end: 1),
-        duration: hasStreakBonus
-            ? const Duration(milliseconds: 1450)
-            : const Duration(milliseconds: 700),
-        curve: Curves.linear,
-        builder: (context, climb, _) {
+      child: AnimatedBuilder(
+        // Score-climb is driven by heroClimb (an interval of the entry
+        // controller), so the count-up plays when the celebration lands rather
+        // than completing while hidden behind the rating popup.
+        animation: heroClimb,
+        builder: (context, _) {
+          final climb = heroClimb.value;
           final climbProgress =
               hasStreakBonus ? Curves.easeOutCubic.transform(climb) : 1.0;
           final scoreStart = hasStreakBonus ? rawFormScore : formScore;
@@ -1913,162 +1887,6 @@ class _CoachPillar extends StatelessWidget {
   }
 }
 
-// ─── Issue card (top issue across all exercises) ───
-class _IssueCard extends StatefulWidget {
-  const _IssueCard({required this.issue});
-  final DetectedEvidence issue;
-  @override
-  State<_IssueCard> createState() => _IssueCardState();
-}
-
-class _IssueCardState extends State<_IssueCard> {
-  String? _answer;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = VikaColors.of(context);
-    final attention = c.attention;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            attention.withValues(alpha: 0.06),
-            attention.withValues(alpha: 0.10),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: attention.withValues(alpha: 0.18)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.center_focus_strong_rounded,
-                  size: 14, color: attention),
-              const SizedBox(width: 8),
-              Text(
-                'AI PHÁT HIỆN',
-                style: TextStyle(
-                  fontFamily: 'BeVietnamPro',
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.6,
-                  color: attention,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            widget.issue.question,
-            style: TextStyle(
-              fontFamily: 'BeVietnamPro',
-              fontSize: 15.5,
-              fontWeight: FontWeight.w700,
-              fontStyle: FontStyle.italic,
-              height: 1.45,
-              letterSpacing: -0.3,
-              color: c.ink,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _IssueAnswer(
-                  label: 'Có',
-                  selected: _answer == 'yes',
-                  primary: true,
-                  onTap: () => setState(() => _answer = 'yes'),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _IssueAnswer(
-                  label: 'Không',
-                  selected: _answer == 'no',
-                  primary: false,
-                  onTap: () => setState(() => _answer = 'no'),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _IssueAnswer extends StatelessWidget {
-  const _IssueAnswer({
-    required this.label,
-    required this.selected,
-    required this.primary,
-    required this.onTap,
-  });
-  final String label;
-  final bool selected;
-  final bool primary;
-  final VoidCallback onTap;
-  @override
-  Widget build(BuildContext context) {
-    final c = VikaColors.of(context);
-    final selectedBg = primary ? c.ink : c.ink;
-    final selectedFg = primary ? c.yellow : c.yellow;
-    final bg = selected ? selectedBg : c.bgRaised;
-    final fg = selected ? selectedFg : c.ink;
-    final borderColor = selected ? (primary ? c.ink : c.ink) : c.border;
-    // Material + InkWell so hit testing is delegated to the framework's
-    // standard button stack. The previous GestureDetector-inside-
-    // AnimatedContainer setup occasionally failed to receive the second
-    // tap when only the bg color changed between frames.
-    return Material(
-      color: bg,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.selectionClick();
-          onTap();
-        },
-        borderRadius: BorderRadius.circular(14),
-        child: Ink(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: borderColor, width: 1.2),
-            boxShadow: selected
-                ? [
-                    BoxShadow(
-                      color: c.ink.withValues(alpha: 0.1),
-                      blurRadius: 14,
-                      offset: const Offset(0, 5),
-                    ),
-                  ]
-                : null,
-          ),
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          child: Center(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontFamily: 'BeVietnamPro',
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-                fontStyle: FontStyle.italic,
-                letterSpacing: -0.2,
-                color: fg,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 // ─── Section eyebrow ───
 class _SectionEyebrow extends StatelessWidget {
   const _SectionEyebrow({required this.label, this.meta});
@@ -2480,224 +2298,12 @@ class _SetSparkPainter extends CustomPainter {
       old.scores != scores || old.accent != accent || old.dim != dim;
 }
 
-// ─── Session RPE block ───
-class _SessionRpeBlock extends StatelessWidget {
-  const _SessionRpeBlock({
-    required this.selected,
-    required this.onSelect,
-  });
-  final String? selected;
-  final ValueChanged<String> onSelect;
-
-  static const _opts = [
-    (id: 'easy', label: 'Dễ', meter: 1),
-    (id: 'sustainable', label: 'Vừa sức', meter: 2),
-    (id: 'hard', label: 'Nặng', meter: 3),
-    (id: 'brutal', label: 'Cháy', meter: 4),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final c = VikaColors.of(context);
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
-      decoration: BoxDecoration(
-        color: c.bgRaised,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: c.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 5,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: c.yellow,
-                  shape: BoxShape.circle,
-                  boxShadow: [BoxShadow(color: c.yellow, blurRadius: 4)],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'CẢM GIÁC CẢ BUỔI',
-                style: TextStyle(
-                  fontFamily: 'BeVietnamPro',
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.6,
-                  color: c.inkFaint,
-                ),
-              ),
-              const Spacer(),
-              if (selected != null)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: c.yellowGhost,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: c.yellow.withValues(alpha: 0.35)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.check_rounded, size: 11, color: c.ink),
-                      const SizedBox(width: 4),
-                      Text(
-                        'ĐÃ GHI NHẬN',
-                        style: TextStyle(
-                          fontFamily: 'BeVietnamPro',
-                          fontSize: 8.5,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.4,
-                          color: c.ink,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Tổng thể buổi tập này thế nào?',
-            style: TextStyle(
-              fontFamily: 'BeVietnamPro',
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              fontStyle: FontStyle.italic,
-              height: 1.3,
-              letterSpacing: -0.5,
-              color: c.ink,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              for (var i = 0; i < _opts.length; i++) ...[
-                Expanded(
-                  child: _RpeTile(
-                    label: _opts[i].label,
-                    meter: _opts[i].meter,
-                    selected: selected == _opts[i].id,
-                    locked: selected != null,
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      onSelect(_opts[i].id);
-                    },
-                  ),
-                ),
-                if (i < _opts.length - 1) const SizedBox(width: 6),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RpeTile extends StatelessWidget {
-  const _RpeTile({
-    required this.label,
-    required this.meter,
-    required this.selected,
-    required this.locked,
-    required this.onTap,
-  });
-  final String label;
-  final int meter;
-  final bool selected;
-  final bool locked;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = VikaColors.of(context);
-    final disabled = locked && !selected;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: disabled ? null : onTap,
-      child: AnimatedOpacity(
-        opacity: disabled ? 0.35 : 1.0,
-        duration: const Duration(milliseconds: 220),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 280),
-          curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
-          decoration: BoxDecoration(
-            color: selected ? c.yellow : c.bg,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: selected ? c.yellow : c.border,
-              width: 1.2,
-            ),
-            boxShadow: selected
-                ? [
-                    BoxShadow(
-                      color: c.yellow.withValues(alpha: 0.35),
-                      blurRadius: 14,
-                      offset: const Offset(0, 5),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  for (var i = 1; i <= 4; i++) ...[
-                    Container(
-                      width: 4,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: i <= meter
-                            ? (selected ? c.yellowInk : c.ink)
-                            : (selected
-                                ? c.yellowInk.withValues(alpha: 0.25)
-                                : c.inkFaint.withValues(alpha: 0.4)),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    if (i < 4) const SizedBox(width: 2),
-                  ],
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontFamily: 'BeVietnamPro',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  fontStyle: FontStyle.italic,
-                  letterSpacing: -0.3,
-                  color: selected ? c.yellowInk : c.ink,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 // ─── Done CTA ───
 class _DoneCta extends StatefulWidget {
   const _DoneCta({
-    required this.enabled,
     required this.shimmer,
     required this.onTap,
   });
-  final bool enabled;
   final AnimationController shimmer;
   final VoidCallback onTap;
 
@@ -2711,111 +2317,99 @@ class _DoneCtaState extends State<_DoneCta> {
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    final disabled = !widget.enabled;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        AnimatedOpacity(
-          opacity: disabled ? 0.4 : 1.0,
-          duration: const Duration(milliseconds: 220),
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: disabled
-                ? null
-                : () {
-                    HapticFeedback.mediumImpact();
-                    widget.onTap();
-                  },
-            onTapDown: (_) => setState(() => _pressed = true),
-            onTapUp: (_) => setState(() => _pressed = false),
-            onTapCancel: () => setState(() => _pressed = false),
-            child: AnimatedScale(
-              scale: _pressed ? 0.98 : 1.0,
-              duration: const Duration(milliseconds: 120),
-              child: AnimatedBuilder(
-                animation: widget.shimmer,
-                builder: (context, _) {
-                  final v = widget.shimmer.value;
-                  return Container(
-                    height: 62,
-                    decoration: BoxDecoration(
-                      color: c.yellow,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: disabled
-                          ? null
-                          : [
-                              BoxShadow(
-                                color: c.yellow.withValues(alpha: 0.5),
-                                blurRadius: 26,
-                                offset: const Offset(0, 10),
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            HapticFeedback.mediumImpact();
+            widget.onTap();
+          },
+          onTapDown: (_) => setState(() => _pressed = true),
+          onTapUp: (_) => setState(() => _pressed = false),
+          onTapCancel: () => setState(() => _pressed = false),
+          child: AnimatedScale(
+            scale: _pressed ? 0.98 : 1.0,
+            duration: const Duration(milliseconds: 120),
+            child: AnimatedBuilder(
+              animation: widget.shimmer,
+              builder: (context, _) {
+                final v = widget.shimmer.value;
+                return Container(
+                  height: 62,
+                  decoration: BoxDecoration(
+                    color: c.yellow,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: c.yellow.withValues(alpha: 0.5),
+                        blurRadius: 26,
+                        offset: const Offset(0, 10),
+                      ),
+                      BoxShadow(
+                        color: c.yellow.withValues(alpha: 0.25),
+                        blurRadius: 56,
+                        offset: const Offset(0, 20),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment(-1.6 + (v * 3.2), -1),
+                                end: Alignment(-0.6 + (v * 3.2), 1),
+                                colors: [
+                                  Colors.white.withValues(alpha: 0),
+                                  Colors.white.withValues(alpha: 0.32),
+                                  Colors.white.withValues(alpha: 0),
+                                ],
+                                stops: const [0.35, 0.5, 0.65],
                               ),
-                              BoxShadow(
-                                color: c.yellow.withValues(alpha: 0.25),
-                                blurRadius: 56,
-                                offset: const Offset(0, 20),
-                              ),
-                            ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: Stack(
-                        children: [
-                          if (!disabled)
-                            Positioned.fill(
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment(-1.6 + (v * 3.2), -1),
-                                    end: Alignment(-0.6 + (v * 3.2), 1),
-                                    colors: [
-                                      Colors.white.withValues(alpha: 0),
-                                      Colors.white.withValues(alpha: 0.32),
-                                      Colors.white.withValues(alpha: 0),
-                                    ],
-                                    stops: const [0.35, 0.5, 0.65],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          Center(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'Hoàn thành buổi tập',
-                                  style: TextStyle(
-                                    fontFamily: 'BeVietnamPro',
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w800,
-                                    fontStyle: FontStyle.italic,
-                                    letterSpacing: -0.3,
-                                    color: c.yellowInk,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Icon(
-                                  Icons.arrow_forward_rounded,
-                                  size: 18,
-                                  color: c.yellowInk,
-                                ),
-                              ],
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                        Center(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Hoàn thành buổi tập',
+                                style: TextStyle(
+                                  fontFamily: 'BeVietnamPro',
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  fontStyle: FontStyle.italic,
+                                  letterSpacing: -0.3,
+                                  color: c.yellowInk,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Icon(
+                                Icons.arrow_forward_rounded,
+                                size: 18,
+                                color: c.yellowInk,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  );
-                },
-              ),
+                  ),
+                );
+              },
             ),
           ),
         ),
         const SizedBox(height: 12),
         Center(
           child: Text(
-            disabled
-                ? 'Trả lời 2 câu phía trên để hoàn tất'
-                : 'Hẹn buổi sau 👋',
+            'Hẹn buổi sau 👋',
             style: TextStyle(
               fontFamily: 'BeVietnamPro',
               fontSize: 11.5,

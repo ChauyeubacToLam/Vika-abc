@@ -1,10 +1,13 @@
-// Difficulty rating block surfaced on intermediate exercise intros (to
-// rate the *previous* exercise) and on the workout summary (to rate the
-// final exercise + the overall session).
+// Difficulty rating block — three thin pill-cards with a tiny dot-meter
+// indicator. Selection locks the row and lifts a faint shadow.
+//
+// FLAG: dead — no remaining references in lib/. Its only former call site
+// (the "BÀI CUỐI" inline rating on the workout summary) was removed when the
+// last-exercise difficulty moved into the entry popup
+// (showPreviousExerciseRatingDialog). Kept intentionally, not deleted.
 //
 // Design intent: feel "clean and expensive" per user direction. No emoji
-// buttons. Three thin pill-cards with a tiny dot-meter indicator.
-// Selection locks the row and lifts a faint shadow.
+// buttons.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

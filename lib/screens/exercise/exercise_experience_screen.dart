@@ -600,14 +600,10 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
             sessionSummary: sessionSummary,
             totalDuration: _aggregateDuration(accumulated),
             totalCalories: _aggregateCalories(accumulated),
-            // TODO(wiring): persist per-exercise difficulty for the
-            // last exercise + session-level RPE. Today only the
-            // existing single-exercise persistence runs. See report.
             onLastExerciseDifficulty: (d) {
-              // _handleOverallDifficulty reads from this defunct state,
-              // but it's safe because it only touches in-memory fields
-              // that were captured before pushReplacement. The pending
-              // overall difficulty path keeps working via SharedPrefs.
+              // Overall difficulty for the last exercise persists to its own
+              // exercise_sessions row via updateSessionDifficulty (queued in
+              // _pendingOverallDifficulty if the rating beats the save).
               _handleOverallDifficulty(d);
             },
             onSessionRpe: (_) {
@@ -676,6 +672,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
           isContinuation: _isContinuationSlot,
           previousExerciseName: prev?.exerciseName,
           previousExerciseFormScore: prev?.formScore,
+          previousExerciseIssueQuestion: prev?.report.issueQuestion,
           onPreviousDifficulty:
               prev != null ? _handlePreviousExerciseDifficulty : null,
           onStart: _beginWorkout,
