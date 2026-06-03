@@ -24,6 +24,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../interpreter/interpreter_base.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/vf_theme.dart';
 import '../../widgets/exercise/auto_start_countdown.dart';
@@ -69,6 +70,7 @@ class ExerciseIntroPage extends StatefulWidget {
     this.isContinuation = false,
     this.previousExerciseName,
     this.previousExerciseFormScore,
+    this.previousExerciseIssueQuestion,
     this.onPreviousDifficulty,
   });
 
@@ -109,6 +111,10 @@ class ExerciseIntroPage extends StatefulWidget {
   /// until the user picks a difficulty.
   final String? previousExerciseName;
   final int? previousExerciseFormScore;
+
+  /// Optional detected form issue from the previous exercise. When present,
+  /// the rating popup adds a short, optional issue-confirm section.
+  final DetectedEvidence? previousExerciseIssueQuestion;
   final ValueChanged<String>? onPreviousDifficulty;
 
   @override
@@ -139,6 +145,7 @@ class _ExerciseIntroPageState extends State<ExerciseIntroPage> {
       context,
       exerciseName: widget.previousExerciseName!,
       formScore: widget.previousExerciseFormScore,
+      issueQuestion: widget.previousExerciseIssueQuestion,
     );
     if (!mounted) return;
     setState(() => _selectedPreviousDifficulty = result);

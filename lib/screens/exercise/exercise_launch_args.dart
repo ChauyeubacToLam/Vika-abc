@@ -25,6 +25,7 @@ class ExerciseSequenceItem {
 class ExerciseLaunchArgs {
   const ExerciseLaunchArgs({
     required this.definition,
+    this.workoutSessionId,
     this.catalogExerciseId,
     this.prescription,
     this.recommendationId,
@@ -37,6 +38,7 @@ class ExerciseLaunchArgs {
   });
 
   final ExerciseDefinition definition;
+  final String? workoutSessionId;
   final String? catalogExerciseId;
   final VolumePrescription? prescription;
   final String? recommendationId;
@@ -59,6 +61,7 @@ class ExerciseLaunchArgs {
     final next = sequence[nextIndex];
     return ExerciseLaunchArgs(
       definition: next.definition,
+      workoutSessionId: workoutSessionId,
       catalogExerciseId: next.catalogExerciseId,
       prescription: next.prescription,
       recommendationId: next.recommendationId,

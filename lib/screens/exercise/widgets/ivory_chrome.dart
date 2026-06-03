@@ -135,55 +135,6 @@ class IvoryTopChromeLeft extends StatelessWidget {
   }
 }
 
-// ─── Live Form Score Arc (44px) ───
-
-class IvoryLiveFormScoreArc extends StatelessWidget {
-  const IvoryLiveFormScoreArc({super.key, required this.score});
-  final int score;
-
-  @override
-  Widget build(BuildContext context) {
-    // NOTE(form-score): Replace hardcoded color with conditional:
-    // score >= 75 → yellow, 60-74 → #E89A4B, <60 → attention
-    final arcColor = VikaIvory.yellow;
-    return SizedBox(
-      width: 44,
-      height: 44,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          CustomPaint(
-            size: const Size(44, 44),
-            painter: FormScoreArcPainter(score: score, arcColor: arcColor),
-          ),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('$score',
-                  style: TextStyle(
-                    fontFamily: _font,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: VikaIvory.invInk,
-                    letterSpacing: -0.6,
-                    height: 1,
-                  )),
-              Text('FORM',
-                  style: TextStyle(
-                    fontFamily: _font,
-                    fontSize: 6,
-                    fontWeight: FontWeight.w700,
-                    color: VikaIvory.invInkFaint,
-                    letterSpacing: 0.6,
-                  )),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 // ─── AI Live Pulse Pill (minimal richness only) ───
 
 class IvoryAILivePulsePill extends StatelessWidget {
@@ -240,12 +191,10 @@ class IvoryAILivePulsePill extends StatelessWidget {
 class IvoryTopChromeRight extends StatelessWidget {
   const IvoryTopChromeRight({
     super.key,
-    required this.formScore,
     required this.onPause,
     required this.onFlipCamera,
     this.debugBadge,
   });
-  final int formScore;
   final VoidCallback onPause;
   final VoidCallback onFlipCamera;
   final Widget? debugBadge;
@@ -255,9 +204,13 @@ class IvoryTopChromeRight extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // NOTE(form-score): Wire real form score here
-        debugBadge ?? IvoryLiveFormScoreArc(score: formScore),
-        const SizedBox(width: 8),
+        // The live form arc has been removed — no real-time verdict lives on
+        // the active screen. When staff debug is on, the debug badge takes the
+        // leading slot; otherwise the row is simply flip + pause.
+        if (debugBadge != null) ...[
+          debugBadge!,
+          const SizedBox(width: 8),
+        ],
         IvoryGlassIconButton(
           onTap: onFlipCamera,
           child: Icon(Icons.cameraswitch_rounded,
@@ -268,37 +221,6 @@ class IvoryTopChromeRight extends StatelessWidget {
           onTap: onPause,
           child: Icon(Icons.pause_rounded, size: 14, color: VikaIvory.invInk),
         ),
-      ],
-    );
-  }
-}
-
-// ─── Form Score Sparkline ───
-
-class IvoryFormScoreSparkline extends StatelessWidget {
-  const IvoryFormScoreSparkline({super.key, required this.data});
-  final List<int> data;
-
-  @override
-  Widget build(BuildContext context) {
-    if (data.length < 2) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        CustomPaint(
-          size: const Size(60, 18),
-          painter: SparklinePainter(data: data),
-        ),
-        const SizedBox(height: 2),
-        Text('10s qua',
-            style: TextStyle(
-              fontFamily: _font,
-              fontSize: 7,
-              fontWeight: FontWeight.w700,
-              color: VikaIvory.invInkFaint,
-              letterSpacing: 0.8,
-            )),
       ],
     );
   }
@@ -379,7 +301,7 @@ class IvoryPTReferenceLoop extends StatelessWidget {
 
 class IvoryCoachCaption extends StatelessWidget {
   const IvoryCoachCaption({super.key, required this.message});
-  // NOTE(caption): Wire trigger conditions for mid-rep + post-rep captions
+  // TODO(caption): Wire trigger conditions for mid-rep + post-rep captions
   final String message;
 
   @override
@@ -461,7 +383,7 @@ class IvoryRepTallyDots extends StatelessWidget {
     this.faultIndices = const [],
   });
   final int count, total;
-  // NOTE(integration): Wire RepLog.faults into faultIndices
+  // TODO(integration): Wire RepLog.faults into faultIndices
   final List<int> faultIndices;
 
   @override

@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vika/services/session_persistence.dart';
 
 import 'models/exercise_catalog_entry.dart';
 import 'models/plan.dart';
@@ -17,14 +18,17 @@ class RecommendationService {
     SupabaseClient? client,
     RecommendationEngine? engine,
     RecommendationProgressionService? progressionService,
+    SessionPersistence? sessions,
   })  : _client = client ?? Supabase.instance.client,
         _engine = engine ?? const RecommendationEngine(),
         _progression = progressionService ??
-            RecommendationProgressionService(client: client);
+            RecommendationProgressionService(client: client),
+        _sessions = sessions ?? SessionPersistence();
 
   final SupabaseClient _client;
   final RecommendationEngine _engine;
   final RecommendationProgressionService _progression;
+  final SessionPersistence _sessions;
   static const _latestRecommendationIdKey = 'latest_recommendation_id';
 
   Future<RecommendationResult?> generatePlanForCurrentUser({
@@ -197,12 +201,17 @@ class RecommendationService {
         templateKey: row['template_key'] as String,
         planStructure: (row['plan_structure'] as Map).cast<String, dynamic>(),
       );
+
+      final completionMap = await _sessions.completionMapForPlan(
+        recommendationId: plan.recommendationId,
+      );
       return PlanSnapshot(
         plan: plan,
         generatedAt: _dateTimeOrNull(row['generated_at']),
         startedAt: _dateTimeOrNull(row['plan_started_at']),
         completedAt: _dateTimeOrNull(row['plan_completed_at']),
         scheduleDayIndexes: _scheduleDayIndexesFromRow(row),
+        completionMap: completionMap,
       );
     } catch (e) {
       debugPrint('[RecommendationService] latest plan fetch failed: $e');
@@ -403,6 +412,7 @@ class PlanSnapshot {
     this.generatedAt,
     this.startedAt,
     this.completedAt,
+    this.completionMap = const {},
     this.scheduleDayIndexes = const [],
   });
 
@@ -411,24 +421,30 @@ class PlanSnapshot {
   final DateTime? startedAt;
   final DateTime? completedAt;
   final List<int> scheduleDayIndexes;
+  final Map<int, Set<int>> completionMap;
 
-  int get currentWeekNumber {
-    if (plan.weeks.isEmpty) return 1;
-    if (completedAt != null) return plan.weeks.last.weekNumber;
-    final anchor = startedAt ?? generatedAt;
-    if (anchor == null) return 1;
-    final localAnchor = _mondayOfWeek(_localDay(anchor));
-    final localToday = _localDay(DateTime.now());
-    final days = localToday.difference(localAnchor).inDays;
-    final week = (days ~/ 7) + 1;
-    return week.clamp(1, plan.weeks.length).toInt();
+  (int, int)? get currentPosition {
+    if (plan.weeks.isEmpty) return null;
+    if (completedAt != null) return null;
+
+    for (final week in plan.weeks) {
+      int weekNumber = week.weekNumber;
+      final done = completionMap[weekNumber];
+      for (final session in week.sessions) {
+        if (done == null || !done.contains(session.sessionIndex)) {
+          return (weekNumber, session.sessionIndex);
+        }
+      }
+    }
+    return null;
   }
 
   WeekPlan? get currentWeek {
     if (plan.weeks.isEmpty) return null;
+    (int, int)? position = currentPosition;
     return plan.weeks.firstWhere(
-      (week) => week.weekNumber == currentWeekNumber,
-      orElse: () => plan.weeks.first,
+      (week) => week.weekNumber == position?.$1,
+      orElse: () => plan.weeks.last,
     );
   }
 }
@@ -437,6 +453,7 @@ class ExerciseLaunchCatalogInfo {
   const ExerciseLaunchCatalogInfo({
     required this.id,
     required this.isFormChecked,
+    this.vietnameseName,
     this.englishName,
     this.classKey,
   });
@@ -444,6 +461,7 @@ class ExerciseLaunchCatalogInfo {
   final String id;
   final bool isFormChecked;
   final String? englishName;
+  final String? vietnameseName;
   final String? classKey;
 
   Iterable<String> get lookupKeys sync* {
@@ -453,13 +471,4 @@ class ExerciseLaunchCatalogInfo {
       if (value != null && value.isNotEmpty) yield value;
     }
   }
-}
-
-DateTime _localDay(DateTime date) {
-  final local = date.toLocal();
-  return DateTime(local.year, local.month, local.day);
-}
-
-DateTime _mondayOfWeek(DateTime date) {
-  return date.subtract(Duration(days: date.weekday - DateTime.monday));
 }

@@ -190,6 +190,9 @@ class _RestScreenState extends State<RestScreen> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
+    final goodReps = widget.setReport.goodReps ??
+        widget.setReport.repResults.where((isGood) => isGood).length;
+    final totalReps = widget.setReport.totalReps ?? widget.currentReps;
     return Scaffold(
       backgroundColor: c.bg,
       body: DecoratedBox(
@@ -268,8 +271,8 @@ class _RestScreenState extends State<RestScreen> with TickerProviderStateMixin {
                                 ),
                                 const SizedBox(height: 22),
                                 _ScoreLine(
-                                  goodReps: widget.setReport.goodReps,
-                                  totalReps: widget.setReport.totalReps,
+                                  goodReps: goodReps,
+                                  totalReps: totalReps,
                                 ),
                                 if (widget.setReport.repResults.isNotEmpty) ...[
                                   const SizedBox(height: 16),
@@ -340,9 +343,7 @@ class _RestScreenState extends State<RestScreen> with TickerProviderStateMixin {
                                                               bottom: 8),
                                                       child: _FaultRow(
                                                         fault: fault,
-                                                        totalReps: widget
-                                                            .setReport
-                                                            .totalReps,
+                                                        totalReps: totalReps,
                                                       ),
                                                     ),
                                                 ],

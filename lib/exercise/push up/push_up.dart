@@ -780,6 +780,7 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
       ..['event'] = _lastPushUpEvent
       ..['fail'] = _lastNoCountReason
       ..['reject'] = _repRejectType ?? _lastRejectType
+      ..['rejectReason'] = _lastRejectReason
       ..['elbow'] = geometry.elbowAngle.toStringAsFixed(1)
       ..['minElbow'] = _debugMinElbowLabel()
       ..['rom'] = (_topElbowAngle - geometry.elbowAngle).toStringAsFixed(1)

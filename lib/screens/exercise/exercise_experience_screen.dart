@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vika/services/session_coach_builder.dart';
 
 import '../../exercise/exercise_base.dart';
 import '../../exercise/calorie_estimator_registry.dart';
@@ -49,10 +51,13 @@ import '../../exercise/squat/metrics/tempo_metric.dart';
 import '../../exercise/squat/metrics/trunk_lean_metric.dart';
 import '../../exercise/squat/squat.dart';
 import '../../models/exercise_definition.dart';
+import '../../models/fault_candidate.dart';
 import '../../models/post_exercise_data.dart';
 import '../../models/workout_session_report.dart';
 import '../../services/recommendation/models/plan.dart';
 import '../../services/recommendation/progression_service.dart';
+import '../../services/session_summary_builder.dart';
+import '../../services/session_trophy_picker.dart';
 import '../../utils/exercise_logger.dart';
 import '../../utils/orientation_lock.dart';
 import 'active_exercise_page.dart';
@@ -69,6 +74,7 @@ class ExerciseExperienceScreen extends StatefulWidget {
   const ExerciseExperienceScreen({
     super.key,
     required this.definition,
+    this.workoutSessionId,
     this.catalogExerciseId,
     this.prescription,
     this.recommendationId,
@@ -81,6 +87,7 @@ class ExerciseExperienceScreen extends StatefulWidget {
   });
 
   final ExerciseDefinition definition;
+  final String? workoutSessionId;
   final String? catalogExerciseId;
   final VolumePrescription? prescription;
   final String? recommendationId;
@@ -116,6 +123,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
   int? _estimatedCalories;
   String? _currentSessionId;
   String? _pendingOverallDifficulty;
+  Future<String?>? _currentSessionSaveFuture;
 
   int _currentSet = 1;
   int _currentRepsTarget = 0;
@@ -127,7 +135,6 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       'Buổi này AI sẽ ưu tiên nhịp chậm, form chắc và sự ổn định trong từng rep.';
 
   // User-level data loaded once at screen init, passed to comparison service.
-  UserStats? _userStats;
   List<String> _painAreas = [];
   List<PreviousSessionSummary> _sessionHistory = [];
 
@@ -140,6 +147,8 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
   String? get _sessionProgressLabel => _isWorkoutSequence
       ? 'Buổi tập · Bài ${widget.sequenceIndex + 1}/${widget.sequence.length}'
       : null;
+
+  static const Duration _sessionSaveTransitionTimeout = Duration(seconds: 2);
 
   /// Returns the next launch args in the sequence with [reports] threaded
   /// forward as priorReports. Returns null when this is the final
@@ -156,6 +165,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       sequence: widget.sequence,
       sequenceIndex: widget.sequenceIndex,
       priorReports: widget.priorReports,
+      workoutSessionId: widget.workoutSessionId,
     );
     return base.nextInSequence(carryForwardReports: reports);
   }
@@ -197,7 +207,6 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     _loadCoachNote();
     _loadUserWeight();
     _loadSessionHistory();
-    _loadUserStats();
     _loadPainAreas();
   }
 
@@ -206,12 +215,6 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     final storedWeight = prefs.getDouble('user_weight');
     if (!mounted || storedWeight == null) return;
     setState(() => _userWeightKg = storedWeight);
-  }
-
-  Future<void> _loadUserStats() async {
-    final stats = await SessionPersistence().getUserStats();
-    if (!mounted) return;
-    setState(() => _userStats = stats);
   }
 
   Future<void> _loadPainAreas() async {
@@ -285,6 +288,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       _estimatedCalories = null;
       _currentSessionId = null;
       _pendingOverallDifficulty = null;
+      _currentSessionSaveFuture = null;
       _currentSet = 1;
       _currentRepsTarget = _spec.repsPerSet;
       _pendingNextRepsTarget = null;
@@ -301,8 +305,8 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     _phase = _WorkoutFlowPhase.active;
   }
 
-  ReportBuilderEntry _resolveReportEntry() {
-    return resolveReportBuilder(widget.definition.id) ??
+  ({ExerciseReportBuilder builder, double met}) _resolveReportEntry() {
+    return reportBuilders[widget.definition.id] ??
         (builder: GenericReportBuilder(), met: 3.5);
   }
 
@@ -321,7 +325,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     required PostExerciseData report,
     required Duration totalDuration,
   }) {
-    final estimator = resolveCalorieEstimator(widget.definition.id) ??
+    final estimator = calorieEstimators[widget.definition.id] ??
         const GenericMetCalorieEstimator();
     return estimator.estimateCalories(
       setLoggers: _setLoggers,
@@ -359,7 +363,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
         _activeExercise = null;
         _phase = _WorkoutFlowPhase.transition;
       });
-      _persistSession(report);
+      _startPersistSession(report);
       return;
     }
 
@@ -406,21 +410,6 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     });
   }
 
-  /// Aggregate fault counts across all sets. Pure function: returns a map,
-  /// doesn't mutate fields. Call this whenever fresh totals are needed.
-  Map<String, int> _aggregateFaultCounts(List<ExerciseLogger> setLoggers) {
-    final counts = <String, int>{};
-    for (final logger in setLoggers) {
-      for (final entry in logger.setLogs.entries) {
-        if (entry.key.endsWith('_fails_count') && entry.value is num) {
-          counts[entry.key] =
-              (counts[entry.key] ?? 0) + (entry.value as num).toInt();
-        }
-      }
-    }
-    return counts;
-  }
-
   List<Map<String, dynamic>> _buildSetData(List<ExerciseLogger> setLogs) {
     return setLogs.asMap().entries.map((entry) {
       final i = entry.key;
@@ -454,8 +443,13 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     }).toList();
   }
 
-  Future<void> _persistSession(PostExerciseData report) async {
-    final faultCounts = _aggregateFaultCounts(_setLoggers);
+  void _startPersistSession(PostExerciseData report) {
+    final future = _persistSession(report);
+    _currentSessionSaveFuture = future;
+    unawaited(future);
+  }
+
+  Future<String?> _persistSession(PostExerciseData report) async {
     final setData = _buildSetData(_setLoggers);
 
     // Fixed-length list: one slot per set, null if user skipped rating that set.
@@ -471,13 +465,14 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       slotName: widget.slotName,
       startedAt: _startedAt ?? DateTime.now(),
       formScore: report.formScore,
-      totalReps: report.sets.fold(0, (sum, s) => sum + s.totalReps),
-      totalGoodReps: report.sets.fold(0, (sum, s) => sum + s.goodReps),
+      totalReps: report.sets.fold(0, (sum, s) => sum + (s.totalReps ?? 0)),
+      totalGoodReps: report.sets.fold(0, (sum, s) => sum + (s.goodReps ?? 0)),
       totalSets: report.sets.length,
       calories: _estimatedCalories,
-      faultCounts: faultCounts,
+      faultCounts: report.faultCounts,
       difficultyRatings: ratings,
       setData: setData,
+      workoutSessionId: widget.workoutSessionId,
     );
 
     debugPrint('[Vika] Session persisted: $sessionId');
@@ -494,6 +489,33 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
           difficulty: pending,
         );
       }
+    }
+
+    return sessionId;
+  }
+
+  Future<String?> _sessionIdForTransition() async {
+    final readyId = _currentSessionId;
+    if (readyId != null) return readyId;
+
+    final saveFuture = _currentSessionSaveFuture;
+    if (saveFuture == null) return null;
+
+    try {
+      return await saveFuture.timeout(
+        _sessionSaveTransitionTimeout,
+        onTimeout: () {
+          debugPrint(
+            '[Vika] Session save still pending after '
+            '${_sessionSaveTransitionTimeout.inSeconds}s; '
+            'continuing transition without session id',
+          );
+          return null;
+        },
+      );
+    } catch (e) {
+      debugPrint('[Vika] Session save unavailable for transition: $e');
+      return null;
     }
   }
 
@@ -533,7 +555,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       });
 
       if (!_isAssessment) {
-        _persistSession(report);
+        _startPersistSession(report);
       }
       return;
     }
@@ -546,35 +568,27 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     });
   }
 
-  /// Praise line for the 3.5-sec transition moment. Picks the highest
-  /// non-null per-set praise; falls back to a generic line if every set
-  /// returned null (e.g. nothing in the praise ladder triggered).
-  String _transitionPraiseLine() {
-    final report = _fullReport;
-    if (report == null) return 'Bài này xong — bạn vừa đẩy thêm một bước.';
-    for (final set in report.sets.reversed) {
-      final p = set.praiseSentence;
-      if (p != null && p.isNotEmpty) return p;
-    }
-    return 'Bài này xong — bạn vừa đẩy thêm một bước.';
-  }
-
   /// Called when the 3.5-sec transition cinematic finishes auto-advancing.
   /// Builds the [ExerciseSessionReport] for THIS exercise, appends it
   /// onto `widget.priorReports`, and routes to either the next exercise
   /// or the workout-wide summary screen.
-  void _handleTransitionComplete() {
+  Future<void> _handleTransitionComplete() async {
     final report = _fullReport;
     if (report == null) {
       // Defensive: shouldn't happen, but bail to home cleanly.
       Navigator.of(context).pop({'completed': true});
       return;
     }
+    final sessionId = await _sessionIdForTransition();
+    if (!mounted) return;
+
     final newEntry = ExerciseSessionReport(
       definition: widget.definition,
+      exerciseKey: _sessionExerciseId,
       report: report,
       duration: _completedDuration ?? Duration.zero,
       calories: _estimatedCalories ?? 0,
+      sessionId: sessionId,
       // userDifficulty is collected on the NEXT exercise's intro (or on
       // the workout summary for the last exercise).
     );
@@ -592,25 +606,100 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       // below MUST NOT close over `this.context` (which becomes invalid
       // after dispose) — instead, the summary screen's own BuildContext
       // is used to pop.
+      final streakDays = await SessionPersistence().currentStreak(
+        assumeTodayComplete: true,
+      );
+      if (!mounted) return;
+
+      final sessionSummary = SessionSummaryBuilder.build(
+        accumulated,
+        streakDays,
+      );
+
+      // These reads exclude the current workout_session_id and return
+      // oldest-first form histories for the trophy picker.
+      final priorSessionForms =
+          await SessionPersistence().fetchPriorSessionFormsScores(
+        widget.workoutSessionId,
+      );
+      final exerciseIds =
+          accumulated.map((r) => r.exerciseKey).toSet().toList();
+      final priorExerciseForms =
+          await SessionPersistence().fetchPriorExerciseFormsScores(
+        widget.workoutSessionId,
+        exerciseIds,
+      );
+
+      final candidates = <FaultCandidate>[];
+      int lowestFormScore = double.infinity.toInt();
+      for (final r in accumulated) {
+        lowestFormScore = min(r.formScore, lowestFormScore);
+        final builder =
+            reportBuilders[r.definition.id]?.builder ?? GenericReportBuilder();
+        candidates.addAll(
+          builder.buildFaultCandidates(
+            exerciseId: r.exerciseKey,
+            exerciseName: r.exerciseName,
+            exerciseFormScore: r.formScore,
+            faultCounts: r.report.faultCounts,
+            totalReps: r.totalReps ?? 0,
+            userPainAreas: _painAreas,
+          ),
+        );
+      }
+
+      var trophy = SessionTrophyPicker.pick(
+        reports: accumulated,
+        sessionRawFormScore: sessionSummary.rawFormScore,
+        streakDays: streakDays,
+        priorSessionForms: priorSessionForms,
+        priorExerciseForms: priorExerciseForms,
+      );
+      if (sessionSummary.rawFormScore == 0) {
+        trophy = const Trophy(
+          tier: TrophyTier.showedUp,
+          value: '1',
+          label: 'Có mặt là đẳng cấp rồi',
+          tag: 'CÓ MẶT',
+        );
+      }
+      final coach = SessionCoachBuilder.build(
+        candidates: candidates,
+        lowestFormScore: lowestFormScore,
+        trophy: trophy,
+      );
+
+      await SessionPersistence().completeWorkoutSession(
+        workoutSessionId: widget.workoutSessionId,
+        rawFormScore: sessionSummary.rawFormScore,
+        sessionFormScore: sessionSummary.sessionFormScore,
+        totalReps: accumulated.fold<int>(0, (s, r) => s + (r.totalReps ?? 0)),
+        totalGoodReps:
+            accumulated.fold<int>(0, (s, r) => s + (r.goodReps ?? 0)),
+        totalCalories: _aggregateCalories(accumulated),
+        totalDurationSeconds: _aggregateDuration(accumulated).inSeconds,
+        coachNote: {'trophy': trophy.toJson(), 'coach': coach.toJson()},
+        summaryVersion: 'summary-v1',
+      );
+      if (!mounted) return;
+
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (summaryContext) => WorkoutSummaryScreen(
             reports: accumulated,
+            sessionSummary: sessionSummary,
             totalDuration: _aggregateDuration(accumulated),
             totalCalories: _aggregateCalories(accumulated),
-            streakDays: _userStats?.streakDays ?? 0,
-            // NOTE(wiring): persist per-exercise difficulty for the
-            // last exercise + session-level RPE. Today only the
-            // existing single-exercise persistence runs. See report.
+            trophy: trophy,
+            coach: coach,
             onLastExerciseDifficulty: (d) {
-              // _handleOverallDifficulty reads from this defunct state,
-              // but it's safe because it only touches in-memory fields
-              // that were captured before pushReplacement. The pending
-              // overall difficulty path keeps working via SharedPrefs.
+              // Overall difficulty for the last exercise persists to its own
+              // exercise_sessions row via updateSessionDifficulty (queued in
+              // _pendingOverallDifficulty if the rating beats the save).
               _handleOverallDifficulty(d);
             },
             onSessionRpe: (_) {
-              // NOTE(wiring): persist session-level RPE separately.
+              // TODO(wiring): persist session-level RPE separately.
             },
             onDone: () => Navigator.of(summaryContext).pop({'completed': true}),
           ),
@@ -638,10 +727,17 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     final prev = _previousReport;
     if (prev == null) return;
     prev.userDifficulty = difficulty;
-    // NOTE(wiring): persist per-exercise difficulty into the previous
-    // exercise's exercise_sessions row. The current
-    // `updateSessionDifficulty` writes to whatever the *current* session
-    // is — we need the previous exercise's session id here. See report.
+    final prevId = prev.sessionId;
+    if (prevId == null) {
+      debugPrint(
+        '[Vika] Cannot persist previous exercise difficulty; session id missing',
+      );
+      return;
+    }
+    SessionPersistence().updateSessionDifficulty(
+      sessionId: prevId,
+      difficulty: difficulty,
+    );
   }
 
   @override
@@ -671,6 +767,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
           isContinuation: _isContinuationSlot,
           previousExerciseName: prev?.exerciseName,
           previousExerciseFormScore: prev?.formScore,
+          previousExerciseIssueQuestion: prev?.report.issueQuestion,
           onPreviousDifficulty:
               prev != null ? _handlePreviousExerciseDifficulty : null,
           onStart: _beginWorkout,
@@ -700,7 +797,8 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       _WorkoutFlowPhase.transition => ExerciseTransitionMoment(
           exerciseName: widget.definition.name,
           formScore: _fullReport?.formScore ?? 0,
-          praiseLine: _transitionPraiseLine(),
+          setResults: _fullReport?.sets ?? const [],
+          timeBased: _fullReport?.isSecondBased ?? false,
           nextExerciseName: _hasNextInSequence
               ? 'Bài tiếp theo · ${_nextExerciseName ?? ''}'
               : 'Tổng kết buổi tập',

@@ -38,6 +38,8 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
+  final ValueNotifier<int> _planRefreshNudge = ValueNotifier<int>(0);
+  final ValueNotifier<int> _progressRefreshNudge = ValueNotifier<int>(0);
   UserProgramData? _program;
   AppUserProfile? _profile;
 
@@ -65,8 +67,25 @@ class _MainShellState extends State<MainShell> {
     setState(() => _profile = profile);
   }
 
+  void _handleTabTap(int idx) {
+    if (idx == _currentIndex) return;
+    setState(() => _currentIndex = idx);
+    if (idx == 1) {
+      _planRefreshNudge.value++;
+    } else if (idx == 3) {
+      _progressRefreshNudge.value++;
+    }
+  }
+
   void _openExerciseFromLibrary(ExerciseDefinition definition) {
     Navigator.of(context).pushNamed('/exercise', arguments: definition);
+  }
+
+  @override
+  void dispose() {
+    _planRefreshNudge.dispose();
+    _progressRefreshNudge.dispose();
+    super.dispose();
   }
 
   @override
@@ -93,6 +112,7 @@ class _MainShellState extends State<MainShell> {
       PlanScreen(
         bottomPadding: contentBottomPadding,
         program: _program,
+        refreshListenable: _planRefreshNudge,
         onProfileChanged: _handleProfileChanged,
       ),
       LibraryScreen(
@@ -101,7 +121,9 @@ class _MainShellState extends State<MainShell> {
       ),
       ProgressScreen(
         bottomPadding: contentBottomPadding,
+        refreshListenable: _progressRefreshNudge,
         userProfile: _profile,
+        onProfileChanged: _handleProfileChanged,
       ),
       ProfileScreen(
         bottomPadding: contentBottomPadding,
@@ -129,7 +151,7 @@ class _MainShellState extends State<MainShell> {
         bottomNavigationBar: IvoryBottomNav(
           currentIndex: _currentIndex,
           bottomInset: bottomInset,
-          onTap: (idx) => setState(() => _currentIndex = idx),
+          onTap: _handleTabTap,
         ),
       ),
     );

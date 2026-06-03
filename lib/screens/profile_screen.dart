@@ -19,6 +19,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../data/profile_mock.dart';
 import '../services/user_profile_service.dart';
@@ -56,6 +58,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _showStickyBar = false;
   AppUserProfile? _profile;
 
+  static const String _onboardingCompleteKey = 'onboarding_complete';
   static const double _stickyBarThreshold = 260;
 
   @override
@@ -123,6 +126,56 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(content: Text('Đã cập nhật hồ sơ.')),
+        );
+    }
+  }
+
+  Future<void> _confirmSignOut() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        final c = VikaColors.of(dialogContext);
+        return AlertDialog(
+          title: const Text('Đăng xuất?'),
+          content: const Text(
+            'Bạn sẽ quay về màn hình bắt đầu. Tiến trình của bạn vẫn được giữ khi đăng nhập lại.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Ở lại'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: c.attention,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Đăng xuất'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !mounted) return;
+
+    final rootNavigator = Navigator.of(context, rootNavigator: true);
+    try {
+      await Supabase.instance.client.auth.signOut();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_onboardingCompleteKey);
+      if (!rootNavigator.mounted) return;
+      rootNavigator.pushNamedAndRemoveUntil(
+        '/',
+        (route) => false,
+        arguments: {'onboardingComplete': false},
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text('Chưa đăng xuất được: $e')),
         );
     }
   }
@@ -284,60 +337,71 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         SettingsGroup(
                           label: 'Tập luyện',
+                          accentColor: c.phase1,
                           rows: [
                             SettingRow(
                               icon: Icons.notifications_none_rounded,
                               label: 'Nhắc tập',
                               sub: 'T2 / T4 / T6 · 17:30',
+                              accentColor: c.phase1,
                               onTap: () {},
                             ),
                             SettingRow(
                               icon: Icons.mic_none_rounded,
                               label: 'Giọng huấn luyện viên',
                               sub: 'Nữ · Tự nhiên',
+                              accentColor: c.phase1,
                               onTap: () {},
                             ),
                           ],
                         ),
                         SettingsGroup(
                           label: 'Quyền riêng tư',
+                          accentColor: c.phase4,
                           rows: [
                             SettingRow(
                               icon: Icons.shield_outlined,
                               label: 'Camera xử lý trong máy',
                               sub: 'Hình ảnh không rời thiết bị',
+                              accentColor: c.phase4,
                               onTap: () {},
                             ),
                             SettingRow(
                               icon: Icons.download_rounded,
                               label: 'Tải dữ liệu của bạn',
+                              accentColor: c.phase4,
                               onTap: () {},
                             ),
                           ],
                         ),
                         SettingsGroup(
                           label: 'Hỗ trợ',
+                          accentColor: c.phase2,
                           rows: [
                             SettingRow(
                               icon: Icons.help_outline_rounded,
                               label: 'Trợ giúp & Phản hồi',
+                              accentColor: c.phase2,
                               onTap: () {},
                             ),
                             SettingRow(
                               icon: Icons.info_outline_rounded,
                               label: 'Về Vika',
                               sub: profileMockVersion,
+                              accentColor: c.phase2,
                               onTap: () {},
                             ),
                           ],
                         ),
                         SettingsGroup(
                           label: 'Tài khoản',
+                          accentColor: c.phase3,
                           rows: [
                             SettingRow(
                               icon: Icons.person_outline_rounded,
                               label: 'Sửa hồ sơ',
                               sub: displayName,
+                              accentColor: c.phase3,
                               onTap: _openEditProfileSheet,
                             ),
                             if (profile?.email != null)
@@ -345,13 +409,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 icon: Icons.alternate_email_rounded,
                                 label: 'Email',
                                 sub: profile!.email,
+                                accentColor: c.phase3,
                                 onTap: () {},
                               ),
                             SettingRow(
                               icon: Icons.logout_rounded,
                               label: 'Đăng xuất',
                               danger: true,
-                              onTap: () {},
+                              onTap: _confirmSignOut,
                             ),
                           ],
                         ),
@@ -547,78 +612,223 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
+    final accent = c.phase3;
+    final sheetTint = Color.lerp(c.bgRaised, accent, c.isDark ? 0.10 : 0.055)!;
+    final fieldFill = Color.lerp(c.bg, c.bgRaised, c.isDark ? 0.20 : 0.58)!;
+    final outline = Color.lerp(c.border, accent, c.isDark ? 0.28 : 0.34)!;
     return Padding(
       padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        bottom: MediaQuery.viewInsetsOf(context).bottom + 16,
+        left: 12,
+        right: 12,
+        bottom: MediaQuery.viewInsetsOf(context).bottom + 12,
       ),
       child: Material(
-        color: c.bgRaised,
-        borderRadius: BorderRadius.circular(24),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    'Sửa hồ sơ',
-                    style: TextStyle(
-                      fontFamily: 'BeVietnamPro',
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      fontStyle: FontStyle.italic,
-                      color: c.ink,
-                    ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ],
+        color: Colors.transparent,
+        child: Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [c.bgRaised, sheetTint],
+            ),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: outline),
+            boxShadow: [
+              BoxShadow(
+                color: accent.withValues(alpha: c.isDark ? 0.14 : 0.16),
+                blurRadius: 34,
+                offset: const Offset(0, 16),
               ),
-              const SizedBox(height: 14),
-              Center(
-                child: GestureDetector(
-                  onTap: _pickAvatar,
-                  child: _EditableAvatarPreview(
-                    initial: widget.current?.initial ?? profileMockInitial,
-                    avatarUrl: widget.current?.avatarUrl,
-                    localAvatar: _selectedAvatar,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _nameController,
-                textInputAction: TextInputAction.done,
-                decoration: const InputDecoration(
-                  labelText: 'Tên hiển thị',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: _saving ? null : _save,
-                icon: _saving
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.check_rounded),
-                label: const Text('Lưu thay đổi'),
-              ),
-              TextButton.icon(
-                onPressed: _pickAvatar,
-                icon: const Icon(Icons.photo_camera_outlined),
-                label: const Text('Đổi ảnh đại diện'),
+              BoxShadow(
+                color: c.ink.withValues(alpha: c.isDark ? 0.30 : 0.12),
+                blurRadius: 42,
+                offset: const Offset(0, 22),
               ),
             ],
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Align(
+                  alignment: Alignment.center,
+                  child: Container(
+                    width: 44,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: c.borderHi,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: accent.withValues(alpha: c.isDark ? 0.16 : 0.12),
+                        borderRadius: BorderRadius.circular(13),
+                        border: Border.all(
+                          color: accent.withValues(alpha: 0.34),
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.person_outline_rounded,
+                        size: 18,
+                        color: Color.lerp(
+                          accent,
+                          c.ink,
+                          c.isDark ? 0.06 : 0.34,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Hồ sơ',
+                            style: TextStyle(
+                              fontFamily: 'BeVietnamPro',
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.5,
+                              color: c.inkSoft,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Sửa thông tin',
+                            style: TextStyle(
+                              fontFamily: 'BeVietnamPro',
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              fontStyle: FontStyle.italic,
+                              letterSpacing: -0.7,
+                              color: c.ink,
+                              height: 1.05,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton.filled(
+                      style: IconButton.styleFrom(
+                        backgroundColor: c.bg.withValues(alpha: 0.72),
+                        foregroundColor: c.ink,
+                      ),
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Center(
+                  child: GestureDetector(
+                    onTap: _pickAvatar,
+                    child: _EditableAvatarPreview(
+                      initial: widget.current?.initial ?? profileMockInitial,
+                      avatarUrl: widget.current?.avatarUrl,
+                      localAvatar: _selectedAvatar,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                TextField(
+                  controller: _nameController,
+                  textInputAction: TextInputAction.done,
+                  cursorColor: accent,
+                  style: TextStyle(
+                    fontFamily: 'BeVietnamPro',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: c.ink,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'Tên hiển thị',
+                    labelStyle: TextStyle(
+                      fontFamily: 'BeVietnamPro',
+                      fontWeight: FontWeight.w700,
+                      color: c.inkSoft,
+                    ),
+                    prefixIcon: Icon(
+                      Icons.badge_outlined,
+                      size: 18,
+                      color: accent,
+                    ),
+                    filled: true,
+                    fillColor: fieldFill,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 16),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(color: c.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(color: accent, width: 1.4),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                SizedBox(
+                  height: 50,
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: c.yellow,
+                      disabledBackgroundColor: c.yellowGhost,
+                      foregroundColor: c.yellowInk,
+                      disabledForegroundColor: c.inkSoft,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      textStyle: const TextStyle(
+                        fontFamily: 'BeVietnamPro',
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    onPressed: _saving ? null : _save,
+                    icon: _saving
+                        ? SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: c.yellowInk,
+                            ),
+                          )
+                        : const Icon(Icons.check_rounded),
+                    label: const Text('Lưu thay đổi'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  style: TextButton.styleFrom(
+                    foregroundColor: c.ink,
+                    textStyle: const TextStyle(
+                      fontFamily: 'BeVietnamPro',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  onPressed: _saving ? null : _pickAvatar,
+                  icon: Icon(
+                    Icons.photo_camera_outlined,
+                    size: 17,
+                    color: accent,
+                  ),
+                  label: const Text('Đổi ảnh đại diện'),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -646,27 +856,35 @@ class _EditableAvatarPreview extends StatelessWidget {
     final c = VikaColors.of(context);
     final local = localAvatar;
     final remote = avatarUrl;
+    final hasImage = local != null || remote != null;
     return Stack(
       clipBehavior: Clip.none,
       children: [
         Container(
-          width: 92,
-          height: 92,
+          width: 96,
+          height: 96,
           decoration: BoxDecoration(
             color: c.ink,
             shape: BoxShape.circle,
-            border: Border.all(color: c.yellow, width: 2),
+            border: hasImage ? null : Border.all(color: c.yellow, width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: c.ink.withValues(alpha: c.isDark ? 0.34 : 0.18),
+                blurRadius: 22,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
           clipBehavior: Clip.antiAlias,
           alignment: Alignment.center,
           child: local != null
-              ? Image.file(local, fit: BoxFit.cover, width: 92, height: 92)
+              ? Image.file(local, fit: BoxFit.cover, width: 96, height: 96)
               : remote != null
                   ? Image.network(
                       remote,
                       fit: BoxFit.cover,
-                      width: 92,
-                      height: 92,
+                      width: 96,
+                      height: 96,
                       errorBuilder: (_, __, ___) =>
                           _AvatarInitial(initial: initial),
                     )
@@ -679,14 +897,14 @@ class _EditableAvatarPreview extends StatelessWidget {
             width: 30,
             height: 30,
             decoration: BoxDecoration(
-              color: c.yellow,
+              color: c.bgInverse,
               shape: BoxShape.circle,
               border: Border.all(color: c.bgRaised, width: 2),
             ),
             child: Icon(
               Icons.photo_camera_outlined,
               size: 15,
-              color: c.yellowInk,
+              color: c.yellow,
             ),
           ),
         ),
@@ -798,7 +1016,9 @@ class _StickyPillBar extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: c.bgInverse,
                         shape: BoxShape.circle,
-                        border: Border.all(color: c.yellow, width: 1.5),
+                        border: avatarUrl == null
+                            ? Border.all(color: c.yellow, width: 1.5)
+                            : null,
                       ),
                       clipBehavior: Clip.antiAlias,
                       alignment: Alignment.center,

@@ -6,6 +6,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:native_device_orientation/native_device_orientation.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -16,6 +17,7 @@ import '../../debug/debug_types.dart';
 import '../../exercise/exercise_base.dart';
 import '../../pose/pose_landmarker_adapter.dart';
 import '../../pose/pose_landmarker_channel.dart';
+import '../../pose/vika_image_orientation.dart';
 import '../../models/exercise_definition.dart';
 import '../../utils/exercise_logger.dart';
 import '../../utils/orientation_lock.dart';
@@ -24,8 +26,8 @@ import '../../theme/vf_theme.dart';
 import 'widgets/form_score_arc.dart';
 import 'widgets/ivory_chrome.dart';
 import 'widgets/pose_overlay_painter.dart';
+import 'widgets/rep_reward_layer.dart';
 import 'widgets/system_banner.dart';
-import 'package:native_device_orientation/native_device_orientation.dart';
 
 class ActiveExercisePage extends StatefulWidget {
   const ActiveExercisePage({
@@ -89,23 +91,15 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   // ─── Ivory v8 state ───
   int _setElapsedSeconds = 0;
   Timer? _setTimer;
-  // NOTE(form-score): Replace with real computed form score from ML pipeline
-  static const int _hardcodedFormScore = 82;
-  // NOTE(chart): Replace with real sparkline data from primaryAngleForChart
-  static const List<int> _hardcodedSparkData = [
-    72,
-    78,
-    84,
-    80,
-    76,
-    82,
-    86,
-    88,
-    84,
-    82
-  ];
-  // NOTE(integration): Replace with real fault indices from RepLog.faults
-  static const List<int> _hardcodedFaultIndices = [2];
+
+  // ─── Ambient reward (Hearthlight) ───
+  // Drives the additive warm-light feedback layer. A clean rep blooms and
+  // raises the hearth pool; a faulted rep is met with silence. There is no
+  // real-time form score on this screen — the verdict is computed after the
+  // set, never during.
+  int _rewardRepSeen = 0; // highest repCount already evaluated for reward
+  int _cleanRepCount = 0; // cumulative clean reps this set (drives pool level)
+  int _rewardPulseId = 0; // bumps once per clean rep (fires a bloom)
   bool _isManualPause = false;
   _PoseRuntime _runtime = _PoseRuntime.nativeMediaPipe;
   DebugMode _settingsDebugMode = DebugMode.off;
@@ -1150,6 +1144,38 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         imageSize: _imageSize == Size.zero ? null : _imageSize,
       ),
     );
+    _maybeEmitRepReward();
+  }
+
+  /// Feeds the ambient Hearthlight reward layer off real rep completions.
+  ///
+  /// A clean rep accumulates and fires a bloom; a faulted rep is met with
+  /// silence (the pool holds, nothing flashes). The per-rep clean/faulted
+  /// verdict comes straight from the interpreter via [ExerciseLogger.repLogs] —
+  /// faulted reps still increment the rep count but never trigger a reward.
+  void _maybeEmitRepReward() {
+    final reps = widget.exercise.repCount;
+    if (reps <= _rewardRepSeen) {
+      _rewardRepSeen = reps; // tolerate a counter reset between sets
+      return;
+    }
+    final logs = widget.exercise.logger.repLogs;
+    for (var n = _rewardRepSeen + 1; n <= reps; n++) {
+      if (_repWasClean(logs, n)) {
+        _cleanRepCount++;
+        _rewardPulseId++;
+      }
+    }
+    _rewardRepSeen = reps;
+  }
+
+  bool _repWasClean(List<RepLog> logs, int repNumber) {
+    for (final log in logs) {
+      if (log.repNumber == repNumber) return log.correctForm;
+    }
+    // A counted rep without a matching log shouldn't happen; stay silent rather
+    // than risk rewarding a rep we can't confirm was clean.
+    return false;
   }
 
   void _schedulePersonDetection([InputImage? inputImage]) {
@@ -1440,10 +1466,6 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         trackedMetrics.isNotEmpty && (debugEnabled || _isStaffUser);
     final showDebugPanel = debugEnabled && _debugPanelOpen;
     final previewFit = _previewFit;
-    final holdSeconds = widget.exercise.liveHoldSeconds;
-    final holdTargetSeconds = widget.exercise.liveHoldTargetSeconds;
-    final showLiveHoldTimer =
-        activeState && holdSeconds != null && !showDebugPanel;
 
     // Derive ivory phase verb from squat state machine phases.
     // Standing = default resting position (not a "ready" state).
@@ -1452,22 +1474,6 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     String phaseVerb;
     String phaseHint;
     switch (phaseKey) {
-      case 'forearm_plank':
-        phaseVerb = isHoldPhase ? 'GI\u1eee' : 'L\u00caN';
-        phaseHint = isHoldPhase
-            ? 'Gi\u1eef c\u1eb3ng tay \u0111\u1ee7 3 gi\u00e2y'
-            : '\u0110\u1ea9y l\u00ean c\u00f3 ki\u1ec3m so\u00e1t';
-      case 'pushing_up':
-        phaseVerb = 'L\u00caN';
-        phaseHint = '\u0110\u1ea9y t\u1eeb c\u1eb3ng tay l\u00ean high plank';
-      case 'high_plank':
-        phaseVerb = isHoldPhase ? 'GI\u1eee' : 'XU\u1ed0NG';
-        phaseHint = isHoldPhase
-            ? 'Gi\u1eef high plank \u0111\u1ee7 3 gi\u00e2y'
-            : 'H\u1ea1 v\u1ec1 c\u1eb3ng tay c\u00f3 ki\u1ec3m so\u00e1t';
-      case 'lowering':
-        phaseVerb = 'XU\u1ed0NG';
-        phaseHint = 'H\u1ea1 t\u1eeb high plank v\u1ec1 c\u1eb3ng tay';
       case 'descending':
         phaseVerb = 'XUỐNG';
         phaseHint = 'Hạ chậm, kiểm soát';
@@ -1482,7 +1488,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         phaseHint = 'Bắt đầu hạ người';
     }
 
-    // NOTE(caption): Wire mid-rep fault detection caption here
+    // TODO(caption): Wire mid-rep fault detection caption here
     final showCaption = activeState &&
         coachMessage.isNotEmpty &&
         !showDebugPanel &&
@@ -1596,6 +1602,20 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
             ),
           ),
 
+          // ── Layer 4.5: Ambient reward (Hearthlight) ──
+          // Additive warm-light feedback for clean reps. Sits above the camera
+          // + scrims but below the chrome, and is bottom/edge anchored +
+          // transparent through the center, so the live body and the jade
+          // skeleton stay fully visible. Always mounted (even when paused) so
+          // the accumulated hearth pool persists across the whole set.
+          Positioned.fill(
+            child: RepRewardLayer(
+              cleanReps: _cleanRepCount,
+              totalReps: widget.totalReps,
+              pulseId: _rewardPulseId,
+            ),
+          ),
+
           // ── Layer 4: Top chrome left (back + HIỆP pill) ──
           Positioned(
             top: media.padding.top + 10,
@@ -1608,18 +1628,14 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
             ),
           ),
 
-          // ── Layer 5: Top chrome right (form arc + flip + pause) ──
-          // JSX v8: form arc lives inline with the icon buttons. The pulse pill
-          // is the "minimal richness" alternative and is deliberately omitted —
-          // we ship at the medium-richness default (form arc visible).
+          // ── Layer 5: Top chrome right (flip + pause) ──
+          // No live form score lives here — real-time feedback on this screen
+          // is encouragement and safety only, never a verdict the user performs
+          // under. The form verdict is computed after the set.
           Positioned(
             top: media.padding.top + 10,
             right: 16,
             child: IvoryTopChromeRight(
-              // NOTE(form-score): Replace _hardcodedFormScore with the real
-              // computed form score from the ML pipeline (per-rep average or
-              // rolling window).
-              formScore: _hardcodedFormScore,
               onPause: () {
                 _isManualPause = true;
                 widget.exercise.manualPause();
@@ -1644,36 +1660,12 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
             ),
           ),
 
-          // ── Layer 6: Sparkline (below top-right chrome row) ──
-          // JSX positions sparkline ~6px under the chrome row (top:112 with
-          // chrome at top:64). In Flutter that maps to chrome top + chrome
-          // height (44) + 4 ≈ media.padding.top + 58.
-          if (activeState && !debugEnabled && guidanceCopy == null)
-            Positioned(
-              top: media.padding.top + 58,
-              right: 16,
-              // NOTE(chart): Replace _hardcodedSparkData with the real rolling
-              // 10s form-score history coming out of the ML pipeline.
-              child: const IvoryFormScoreSparkline(data: _hardcodedSparkData),
-            ),
-
           // ── Layer 7: PT reference loop (top-left, just below chrome row) ──
           // JSX places it at top:116 (16px below chrome bottom). chrome bottom
           // = media.padding.top + 10 + 36 = +46, so PT loop sits at +56.
-          if (showLiveHoldTimer)
-            Positioned(
-              top: media.padding.top + 58,
-              left: 16,
-              child: _LiveHoldTimerChip(
-                seconds: holdSeconds,
-                targetSeconds: holdTargetSeconds,
-              ),
-            ),
-
           if (activeState &&
               !(debugEnabled && _debugPanelOpen) &&
-              guidanceCopy == null &&
-              !showLiveHoldTimer)
+              guidanceCopy == null)
             Positioned(
               top: media.padding.top + 56,
               left: 16,
@@ -1734,8 +1726,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                 isHoldPhase: isHoldPhase,
                 holdProgress: bottomHoldCue?.progress,
                 holdRemaining: bottomHoldCue?.remaining,
-                // NOTE(integration): Wire RepLog.faults into faultIndices
-                faultIndices: _hardcodedFaultIndices,
+                // No fault marking on the live rep tally — feedback during the
+                // set is additive only. The dots fill warm as reps land; the
+                // form verdict is computed after the set, never during.
               ),
             ),
 
@@ -2099,15 +2092,6 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     if (value.contains('pause')) {
       return 'Giữ đáy thêm một nhịp rồi mới đứng lên.';
     }
-    if (value == 'Ready to push') {
-      return '\u0110\u1ea9y l\u00ean khi \u0111\u00e3 gi\u1eef \u0111\u1ee7 3 gi\u00e2y.';
-    }
-    if (value == 'Pushing up') {
-      return '\u0110\u1ea9y t\u1eeb c\u1eb3ng tay l\u00ean high plank.';
-    }
-    if (value == 'Lower with control') {
-      return 'H\u1ea1 v\u1ec1 c\u1eb3ng tay c\u00f3 ki\u1ec3m so\u00e1t.';
-    }
     if (value == 'Going Down...') {
       return 'Hạ người chậm và kiểm soát.';
     }
@@ -2136,15 +2120,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   String _translateStatus(String value) {
     final seconds = _extractDurationSeconds(value);
     if (_isHoldStatus(value)) {
-      final holdTarget = widget.exercise.currentPhaseKey == 'bottom'
-          ? '\u0111\u00e1y'
-          : 't\u01b0 th\u1ebf';
-      final releaseCue = widget.exercise.currentPhaseKey == 'bottom'
-          ? 'r\u1ed3i \u0111\u1ea9y l\u00ean'
-          : 'tr\u01b0\u1edbc khi chuy\u1ec3n pha';
       return seconds == null
-          ? 'Gi\u1eef $holdTarget $releaseCue.'
-          : 'Gi\u1eef $holdTarget ${seconds.toStringAsFixed(1)} gi\u00e2y $releaseCue.';
+          ? 'Giữ đáy rồi đẩy lên.'
+          : 'Giữ đáy ${seconds.toStringAsFixed(1)} giây rồi đẩy lên.';
     }
     if (_isReleaseStatus(value)) {
       return 'Đẩy lên ngay.';
@@ -2357,74 +2335,6 @@ class _BottomHoldCue {
   final double progress;
   final double? remaining;
   final bool readyToPush;
-}
-
-class _LiveHoldTimerChip extends StatelessWidget {
-  const _LiveHoldTimerChip({
-    required this.seconds,
-    required this.targetSeconds,
-  });
-
-  final double seconds;
-  final double? targetSeconds;
-
-  @override
-  Widget build(BuildContext context) {
-    final target = targetSeconds;
-    final value = target == null
-        ? '${seconds.toStringAsFixed(1)}s'
-        : '${seconds.toStringAsFixed(1)}s / ${target.toStringAsFixed(0)}s';
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(100),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          height: 36,
-          padding: const EdgeInsets.fromLTRB(10, 0, 12, 0),
-          decoration: BoxDecoration(
-            color: VikaIvory.heroBg.withValues(alpha: 0.66),
-            borderRadius: BorderRadius.circular(100),
-            border: Border.all(color: VikaIvory.yellow.withValues(alpha: 0.34)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.26),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.timer_rounded,
-                size: 16,
-                color: VikaIvory.yellow,
-              ),
-              const SizedBox(width: 7),
-              Text(
-                value,
-                style: TextStyle(
-                  fontFamily: VikaIvory.fontFamily,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: VikaIvory.invInk,
-                  height: 1,
-                  shadows: [
-                    Shadow(
-                      color: Colors.black.withValues(alpha: 0.72),
-                      blurRadius: 6,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class _SetupGuidancePanel extends StatelessWidget {

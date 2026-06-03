@@ -6,6 +6,7 @@ library;
 
 import '../utils/exercise_logger.dart';
 import '../interpreter/interpreter_base.dart';
+import 'fault_candidate.dart';
 import '../services/session_persistence.dart';
 
 // ═══════════════════════════════════════════════════════════════
@@ -19,7 +20,12 @@ class PostExerciseData {
   final int formScore;
   final String coachText;
   final DetectedEvidence? issueQuestion;
-  final List<DetailCard> detailCards;
+  final Map<String, int> faultCounts;
+
+  /// True when this exercise is scored on time-under-tension (holds), not
+  /// reps — carried from the builder's [ExerciseReportBuilder.isSecondBased]
+  /// so UI layers can pick a time-based vs rep-based presentation.
+  final bool isSecondBased;
 
   const PostExerciseData({
     required this.exerciseName,
@@ -28,19 +34,50 @@ class PostExerciseData {
     required this.formScore,
     required this.coachText,
     this.issueQuestion,
-    required this.detailCards,
+    this.isSecondBased = false,
+    this.faultCounts = const {},
   });
 
-  int get totalReps => sets.fold(0, (sum, s) => sum + s.totalReps);
-  int get totalGoodReps => sets.fold(0, (sum, s) => sum + s.goodReps);
+  // Reps are real for rep-based, null for holds. Seconds are the mirror.
+  // null = "this exercise doesn't measure that unit", distinct from 0.
+  int? get totalReps => isSecondBased
+      ? null
+      : sets.fold<int>(0, (sum, s) => sum + (s.totalReps ?? 0));
+  int? get totalGoodReps => isSecondBased
+      ? null
+      : sets.fold<int>(0, (sum, s) => sum + (s.goodReps ?? 0));
+  double? get totalSeconds => isSecondBased
+      ? sets.fold<double>(0, (sum, s) => sum + (s.totalSeconds ?? 0))
+      : null;
+  double? get goodSeconds => isSecondBased
+      ? sets.fold<double>(0, (sum, s) => sum + (s.goodSeconds ?? 0))
+      : null;
+
   List<int> get setScores => sets.map((s) => s.score).toList();
+
+  /// Clean fraction (0-1) in whatever unit this exercise scores on, or null
+  /// when there's no scoreable work. This is formScore before the x100 round,
+  /// so it's the same truth at higher precision, not a second scoring source.
+  double? get cleanRatio {
+    if (isSecondBased) {
+      final total = totalSeconds;
+      if (total == null || total == 0) return null;
+      return (goodSeconds ?? 0) / total;
+    } else {
+      final total = totalReps;
+      if (total == null || total == 0) return null;
+      return (totalGoodReps ?? 0) / total;
+    }
+  }
 }
 
 class SetReportData {
   final int setIndex;
   final int score;
-  final int goodReps;
-  final int totalReps;
+  final int? goodReps;
+  final int? totalReps;
+  final double? totalSeconds;
+  final double? goodSeconds;
   final List<bool> repResults;
   final String? praiseSentence;
   final String? coachTip;
@@ -48,8 +85,10 @@ class SetReportData {
   const SetReportData({
     required this.setIndex,
     required this.score,
-    required this.goodReps,
-    required this.totalReps,
+    this.goodSeconds,
+    this.totalSeconds,
+    this.goodReps,
+    this.totalReps,
     required this.repResults,
     this.praiseSentence,
     this.coachTip,
@@ -80,6 +119,8 @@ class DetailCard {
   });
 }
 
+typedef FaultTipCopy = ({String watch, String next});
+
 // ═══════════════════════════════════════════════════════════════
 // BUILDER BASE CLASS
 // ═══════════════════════════════════════════════════════════════
@@ -88,7 +129,6 @@ class DetailCard {
 ///
 /// Subclasses implement 2 exercise-specific methods + 4 maps:
 ///   - detectIssue()
-///   - buildDetailCards()
 ///   - praiseMetricNames()
 ///   - faultToTipMap()
 ///   - praiseSentenceMap()
@@ -101,9 +141,12 @@ abstract class ExerciseReportBuilder {
 
   DetectedEvidence? detectIssue(List<ExerciseLogger> setLoggers);
 
-  List<DetailCard> buildDetailCards(List<ExerciseLogger> setLoggers);
+  List<DetailCard> buildDetailCards(List<ExerciseLogger> setLoggers) =>
+      const [];
 
   // ── Subclasses override these maps ──
+
+  bool get isSecondBased => false;
 
   /// B7: Maps user pain area IDs to fault count keys this exercise tracks.
   /// Empty default for exercises without relevant pain mappings.
@@ -114,9 +157,64 @@ abstract class ExerciseReportBuilder {
   /// Values are FAIL counts: high number = bad.
   Map<String, String> praiseMetricNames() => {};
 
-  /// Maps fault count keys to forward-looking coaching tips.
-  /// Tips use external cueing (B3): "push the floor" not "extend your knees".
-  Map<String, String> faultToTipMap() => {};
+  /// Maps fault count keys to watch and forward-looking coaching copy.
+  /// Next tips use external cueing (B3): "push the floor" not "extend your knees".
+  Map<String, FaultTipCopy> faultToTipMap() => {};
+
+  /// Fault keys considered critical for this exercise.
+  Set<String> criticalMetrics() => {};
+
+  /// Builds one coach candidate per fired fault.
+  ///
+  /// Rate is the pooled fault count divided by pooled reps for the exercise.
+  /// Faults without complete tip copy are skipped because they are not
+  /// coachable in the frozen session note.
+  List<FaultCandidate> buildFaultCandidates({
+    required String exerciseId,
+    required String exerciseName,
+    required int exerciseFormScore,
+    required Map<String, int> faultCounts,
+    required int totalReps,
+    required List<String> userPainAreas,
+  }) {
+    final painFaultKeys = _painFaultKeys(userPainAreas);
+    final criticalMetricKeys = criticalMetrics();
+    final tipMap = faultToTipMap();
+    final candidates = <FaultCandidate>[];
+    var sortIndex = 0;
+
+    for (final entry in faultCounts.entries) {
+      final key = entry.key;
+      final count = entry.value;
+      if (count <= 0) continue;
+
+      final rate = _faultRatio(count: count, reps: totalReps);
+      if (rate == null) continue;
+
+      final tip = tipMap[key];
+      final watchCopy = tip?.watch ?? '';
+      final nextCopy = tip?.next ?? '';
+      if (watchCopy.isEmpty || nextCopy.isEmpty) continue;
+
+      candidates.add(
+        FaultCandidate(
+          exerciseId: exerciseId,
+          exerciseName: exerciseName,
+          exerciseFormScore: exerciseFormScore,
+          faultKey: key,
+          rate: rate,
+          isPainLinked: painFaultKeys.contains(key),
+          isCritical: criticalMetricKeys.contains(key),
+          sortIndex: sortIndex,
+          watchCopy: watchCopy,
+          nextCopy: nextCopy,
+        ),
+      );
+      sortIndex += 1;
+    }
+
+    return candidates;
+  }
 
   /// Maps metric labels to Vietnamese praise sentence templates.
   /// Labels must match values in praiseMetricNames().
@@ -243,7 +341,7 @@ abstract class ExerciseReportBuilder {
     }
 
     if (worstKey == null || worstCount == 0) return null;
-    return tipMap[worstKey];
+    return tipMap[worstKey]?.next;
   }
 
   // ── Helpers for praise ladder ──
@@ -265,6 +363,11 @@ abstract class ExerciseReportBuilder {
     return (totalReps - fails) / totalReps;
   }
 
+  double? _faultRatio({required int count, required int? reps}) {
+    if (reps == null || reps == 0) return null;
+    return count / reps;
+  }
+
   /// Did the previous set's coach tip correspond to a fault that dropped
   /// in the current set? If yes, returns the fault key. Else null.
   String? _closedCoachingLoop({
@@ -276,7 +379,7 @@ abstract class ExerciseReportBuilder {
     final tipMap = faultToTipMap();
     String? matchingFaultKey;
     for (final entry in tipMap.entries) {
-      if (entry.value == previousSetCoachTip) {
+      if (entry.value.next == previousSetCoachTip) {
         matchingFaultKey = entry.key;
         break;
       }
@@ -453,6 +556,21 @@ abstract class ExerciseReportBuilder {
     return 'Form ổn định ($scoreStr%). Buổi tập chắc chắn.';
   }
 
+  // Aggregate fault counts across all sets. Pure function: returns a map,
+  /// doesn't mutate fields. Call this whenever fresh totals are needed.
+  Map<String, int> _aggregateFaultCounts(List<ExerciseLogger> setLoggers) {
+    final counts = <String, int>{};
+    for (final logger in setLoggers) {
+      for (final entry in logger.setLogs.entries) {
+        if (entry.key.endsWith('_fails_count') && entry.value is num) {
+          counts[entry.key] =
+              (counts[entry.key] ?? 0) + (entry.value as num).toInt();
+        }
+      }
+    }
+    return counts;
+  }
+
   // ── Report builder (entry point) ──
 
   PostExerciseData buildReport({
@@ -472,7 +590,17 @@ abstract class ExerciseReportBuilder {
 
       final maxRep = (logger.setLogs["max_rep"] as num?)?.toInt() ?? 0;
       final goodReps = (logger.setLogs["good_rep_count"] as num?)?.toInt() ?? 0;
-      final score = maxRep > 0 ? (goodReps / maxRep * 100).round() : 0;
+      final totalSeconds =
+          (logger.setLogs["total_seconds"] as num?)?.toDouble() ?? 0.0;
+      final goodSeconds =
+          (logger.setLogs["good_seconds"] as num?)?.toDouble() ?? 0.0;
+      final score = isSecondBased
+          ? totalSeconds > 0
+              ? (goodSeconds / totalSeconds * 100).round()
+              : 0
+          : maxRep > 0
+              ? (goodReps / maxRep * 100).round()
+              : 0;
 
       final repResults = logger.repLogs.map((r) => r.correctForm).toList();
 
@@ -481,6 +609,8 @@ abstract class ExerciseReportBuilder {
         score: score,
         goodReps: goodReps,
         totalReps: maxRep,
+        totalSeconds: totalSeconds,
+        goodSeconds: goodSeconds,
         repResults: repResults,
         praiseSentence: buildPraiseSentence(
           logger,
@@ -494,20 +624,39 @@ abstract class ExerciseReportBuilder {
         coachTip: buildCoachTip(logger),
       ));
     }
-
+    final faultCounts = _aggregateFaultCounts(setLoggers);
     final setScores = sets.map((s) => s.score).toList();
-    final totalReps = sets.fold<int>(0, (sum, s) => sum + s.totalReps);
-    final totalGood = sets.fold<int>(0, (sum, s) => sum + s.goodReps);
-    final formScore = totalReps > 0 ? (totalGood / totalReps * 100).round() : 0;
+    final totalReps = sets.fold<int>(0, (sum, s) => sum + (s.totalReps ?? 0));
+    final totalGood = sets.fold<int>(0, (sum, s) => sum + (s.goodReps ?? 0));
+    final totalSeconds =
+        sets.fold<double>(0, (sum, s) => sum + (s.totalSeconds ?? 0));
+    final goodSeconds =
+        sets.fold<double>(0, (sum, s) => sum + (s.goodSeconds ?? 0));
 
-    return PostExerciseData(
-      exerciseName: exerciseName,
-      metValue: metValue,
-      sets: sets,
-      formScore: formScore,
-      coachText: generateCoachText(setScores),
-      issueQuestion: detectIssue(setLoggers),
-      detailCards: buildDetailCards(setLoggers),
-    );
+    switch (isSecondBased) {
+      case true:
+        return PostExerciseData(
+          exerciseName: exerciseName,
+          metValue: metValue,
+          sets: sets,
+          formScore:
+              totalSeconds > 0 ? (goodSeconds / totalSeconds * 100).round() : 0,
+          coachText: generateCoachText(setScores),
+          issueQuestion: detectIssue(setLoggers),
+          isSecondBased: true,
+          faultCounts: faultCounts,
+        );
+      case false:
+        return PostExerciseData(
+          exerciseName: exerciseName,
+          metValue: metValue,
+          sets: sets,
+          formScore: totalReps > 0 ? (totalGood / totalReps * 100).round() : 0,
+          coachText: generateCoachText(setScores),
+          issueQuestion: detectIssue(setLoggers),
+          isSecondBased: false,
+          faultCounts: faultCounts,
+        );
+    }
   }
 }
