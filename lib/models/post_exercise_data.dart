@@ -556,6 +556,21 @@ abstract class ExerciseReportBuilder {
     return 'Form ổn định ($scoreStr%). Buổi tập chắc chắn.';
   }
 
+  // Aggregate fault counts across all sets. Pure function: returns a map,
+  /// doesn't mutate fields. Call this whenever fresh totals are needed.
+  Map<String, int> _aggregateFaultCounts(List<ExerciseLogger> setLoggers) {
+    final counts = <String, int>{};
+    for (final logger in setLoggers) {
+      for (final entry in logger.setLogs.entries) {
+        if (entry.key.endsWith('_fails_count') && entry.value is num) {
+          counts[entry.key] =
+              (counts[entry.key] ?? 0) + (entry.value as num).toInt();
+        }
+      }
+    }
+    return counts;
+  }
+
   // ── Report builder (entry point) ──
 
   PostExerciseData buildReport({
@@ -609,7 +624,7 @@ abstract class ExerciseReportBuilder {
         coachTip: buildCoachTip(logger),
       ));
     }
-
+    final faultCounts = _aggregateFaultCounts(setLoggers);
     final setScores = sets.map((s) => s.score).toList();
     final totalReps = sets.fold<int>(0, (sum, s) => sum + (s.totalReps ?? 0));
     final totalGood = sets.fold<int>(0, (sum, s) => sum + (s.goodReps ?? 0));
@@ -629,6 +644,7 @@ abstract class ExerciseReportBuilder {
           coachText: generateCoachText(setScores),
           issueQuestion: detectIssue(setLoggers),
           isSecondBased: true,
+          faultCounts: faultCounts,
         );
       case false:
         return PostExerciseData(
@@ -639,6 +655,7 @@ abstract class ExerciseReportBuilder {
           coachText: generateCoachText(setScores),
           issueQuestion: detectIssue(setLoggers),
           isSecondBased: false,
+          faultCounts: faultCounts,
         );
     }
   }

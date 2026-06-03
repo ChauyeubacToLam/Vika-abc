@@ -1,7 +1,7 @@
 import '../models/fault_candidate.dart';
 import 'session_trophy_picker.dart';
 
-enum CoachWatchKind { fault, perfect }
+enum CoachWatchKind { fault, perfect, lowForm }
 
 class SessionCoach {
   final String quote;
@@ -41,9 +41,19 @@ class SessionCoachBuilder {
   static SessionCoach build({
     required List<FaultCandidate> candidates,
     required Trophy trophy,
+    required int lowestFormScore,
   }) {
     final chosen = _selectWatchCandidate(candidates);
     if (chosen == null) {
+      if (lowestFormScore <= SessionTrophyPicker.solidFloor) {
+        return SessionCoach(
+            quote: 'Buổi nay chưa vào form lắm, nhưng bạn đã tập xong rồi đó.',
+            watch:
+                'Nhiều rep chưa vào đúng form, nhưng chuyện đó bình thường thôi.',
+            next:
+                'Buổi sau mình thử chậm lại, ít rep thôi nhưng chắc từng cái nhé.',
+            kind: CoachWatchKind.lowForm);
+      }
       return SessionCoach(
         quote: _composeQuote(trophy: trophy, tail: _perfectQuoteTail),
         watch: _perfectWatch,

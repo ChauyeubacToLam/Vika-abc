@@ -634,8 +634,8 @@ class _ScoreMonument extends StatelessWidget {
                         fontFeatures: VikaIvoryMain.tabularFigures,
                         shadows: [
                           Shadow(
-                            color: bandColor.withValues(
-                                alpha: 0.45 * ringOpacity),
+                            color:
+                                bandColor.withValues(alpha: 0.45 * ringOpacity),
                             blurRadius: 30,
                           ),
                         ],
@@ -937,8 +937,7 @@ class _RepOrb extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: clean ? color : color.withValues(alpha: 0.14),
-                border:
-                    clean ? null : Border.all(color: color, width: 2.2),
+                border: clean ? null : Border.all(color: color, width: 2.2),
                 boxShadow: [
                   BoxShadow(
                     color: color.withValues(alpha: (clean ? 0.55 : 0.32) * e),
@@ -1107,7 +1106,8 @@ class _HoldBarPainter extends CustomPainter {
     final trackRRect = RRect.fromRectAndRadius(Offset.zero & size, r);
 
     // Dim track in the bar's own hue.
-    canvas.drawRRect(trackRRect, Paint()..color = color.withValues(alpha: 0.16));
+    canvas.drawRRect(
+        trackRRect, Paint()..color = color.withValues(alpha: 0.16));
 
     final fillLen = (w * fill).clamp(0.0, w);
     if (fillLen <= 0) return;

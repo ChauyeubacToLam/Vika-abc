@@ -18,13 +18,10 @@
 //
 // DATA: a real ProgramPlan, mapped from the engine snapshot + completion
 // records via ProgramPlanMapper.fromSnapshot. Loaded async in _loadProgram
-// (active plan snapshot + catalog name/AI lookup), and reloaded after a
-// completed workout so the ledger reflects the session just finished. The
-// prior mock-only presentation is preserved in plan_screen_legacy.dart.
-//
-// STILL STUBBED (session-summary pass): per-session and per-exercise
-// formScore/difficulty come back null from the mapper, so done rows render
-// without form numbers until those aggregators land.
+// (active plan snapshot + catalog name/AI lookup + logged session results),
+// and reloaded after a completed workout so the ledger reflects the session
+// just finished. The prior mock-only presentation is preserved in
+// plan_screen_legacy.dart.
 
 import 'dart:async';
 
@@ -50,6 +47,7 @@ class PlanScreen extends StatefulWidget {
     super.key,
     required this.bottomPadding,
     this.program,
+    this.refreshListenable,
     this.onProfileChanged,
   });
 
@@ -59,6 +57,9 @@ class PlanScreen extends StatefulWidget {
   /// screen loads its own PlanSnapshot via RecommendationService and maps it.
   /// Kept so MainShell's existing wiring compiles unchanged.
   final UserProgramData? program;
+
+  /// Bumped by MainShell when the Plan tab becomes visible.
+  final Listenable? refreshListenable;
 
   /// Forwarded on workout completion so MainShell can refresh streak/profile.
   final ValueChanged<AppUserProfile>? onProfileChanged;
@@ -70,52 +71,97 @@ class PlanScreen extends StatefulWidget {
 class _PlanScreenState extends State<PlanScreen> {
   final _recommendations = RecommendationService();
   final _launches = WorkoutLaunchService();
+  final _sessions = SessionPersistence();
 
   /// null = still loading. Non-null with empty blocks = no active plan.
   ProgramPlan? _program;
   int _selectedBlockIndex = 0;
   int? _expandedSessionIndex;
+  bool _loadingProgram = false;
+  bool _programReloadQueued = false;
 
   @override
   void initState() {
     super.initState();
     unawaited(OrientationLock.portraitOnly());
+    widget.refreshListenable?.addListener(_handleRefreshNudge);
+    unawaited(_loadProgram());
+  }
+
+  @override
+  void didUpdateWidget(covariant PlanScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshListenable != widget.refreshListenable) {
+      oldWidget.refreshListenable?.removeListener(_handleRefreshNudge);
+      widget.refreshListenable?.addListener(_handleRefreshNudge);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.refreshListenable?.removeListener(_handleRefreshNudge);
+    super.dispose();
+  }
+
+  void _handleRefreshNudge() {
     unawaited(_loadProgram());
   }
 
   /// Loads (or reloads) the real plan + completion state and maps it to a
   /// ProgramPlan. Safe to call again after a workout to refresh status.
   Future<void> _loadProgram() async {
-    final snapshot =
-        await _recommendations.fetchLatestActivePlanSnapshotForCurrentUser();
-
-    if (snapshot == null) {
-      if (!mounted) return;
-      setState(() => _program = const ProgramPlan(blocks: [], retest: null));
+    if (_loadingProgram) {
+      _programReloadQueued = true;
       return;
     }
+    _loadingProgram = true;
+    try {
+      final snapshot =
+          await _recommendations.fetchLatestActivePlanSnapshotForCurrentUser();
 
-    // Every exercise_id in the plan (slots + retest) needs a name + AI flag.
-    final ids = <String>{
-      for (final w in snapshot.plan.weeks)
-        for (final s in w.sessions)
-          for (final slot in s.slots) slot.exerciseId,
-      for (final e in snapshot.plan.endOfPlanRetest?.exercises ?? const [])
-        e.exerciseId,
-    };
-    final catalog =
-        await _recommendations.fetchLaunchCatalogInfoForExerciseIds(ids);
+      if (snapshot == null) {
+        if (!mounted) return;
+        setState(() => _program = const ProgramPlan(blocks: [], retest: null));
+        return;
+      }
 
-    if (!mounted) return;
-    final mapped =
-        ProgramPlanMapper.fromSnapshot(snapshot, catalogById: catalog);
-    setState(() {
-      _program = mapped;
-      // Re-point to the current block (advances after a completed session).
-      _selectedBlockIndex =
-          mapped.blocks.isEmpty ? 0 : mapped.currentBlockIndex;
-      _expandedSessionIndex = null;
-    });
+      // Every exercise_id in the plan (slots + retest) needs a name + AI flag.
+      final ids = <String>{
+        for (final w in snapshot.plan.weeks)
+          for (final s in w.sessions)
+            for (final slot in s.slots) slot.exerciseId,
+        for (final e in snapshot.plan.endOfPlanRetest?.exercises ?? const [])
+          e.exerciseId,
+      };
+      final catalogFuture =
+          _recommendations.fetchLaunchCatalogInfoForExerciseIds(ids);
+      final ledgerResultsFuture = _sessions.ledgerResultsForPlan(
+        recommendationId: snapshot.plan.recommendationId,
+      );
+
+      final catalog = await catalogFuture;
+      final ledgerResults = await ledgerResultsFuture;
+
+      if (!mounted) return;
+      final mapped = ProgramPlanMapper.fromSnapshot(
+        snapshot,
+        catalogById: catalog,
+        ledgerResults: ledgerResults,
+      );
+      setState(() {
+        _program = mapped;
+        // Re-point to the current block (advances after a completed session).
+        _selectedBlockIndex =
+            mapped.blocks.isEmpty ? 0 : mapped.currentBlockIndex;
+        _expandedSessionIndex = null;
+      });
+    } finally {
+      _loadingProgram = false;
+      if (_programReloadQueued && mounted) {
+        _programReloadQueued = false;
+        unawaited(_loadProgram());
+      }
+    }
   }
 
   ProgramBlock get _selectedBlock => _program!.blocks[_selectedBlockIndex];
@@ -153,7 +199,7 @@ class _PlanScreenState extends State<PlanScreen> {
 
     String? workoutSessionId;
     if (base.recommendationId != null) {
-      workoutSessionId = await SessionPersistence().startWorkoutSession(
+      workoutSessionId = await _sessions.startWorkoutSession(
         recommendationId: base.recommendationId!,
         weekNumber: base.weekNumber!,
         sessionIndex: base.sessionIndex!,

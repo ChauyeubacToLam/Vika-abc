@@ -107,7 +107,8 @@ class _RepRewardLayerState extends State<RepRewardLayer>
   void didUpdateWidget(RepRewardLayer oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.pulseId != oldWidget.pulseId && widget.pulseId > 0) {
-      _milestone = (widget.cleanReps > 0 && widget.cleanReps % 5 == 0) ? 1.0 : 0.0;
+      _milestone =
+          (widget.cleanReps > 0 && widget.cleanReps % 5 == 0) ? 1.0 : 0.0;
       _bloom.forward(from: 0);
     }
   }
@@ -193,7 +194,8 @@ class _EmberFramePainter extends CustomPainter {
     // blink: the brightness ramps over ~0.5s, holds, then fades over ~1s.
     double env = 0;
     if (bloom > 0.0001) {
-      final attack = Curves.easeOutSine.transform((bloom / 0.34).clamp(0.0, 1.0));
+      final attack =
+          Curves.easeOutSine.transform((bloom / 0.34).clamp(0.0, 1.0));
       final release =
           bloom <= 0.34 ? 1.0 : (1 - (bloom - 0.34) / 0.66).clamp(0.0, 1.0);
       env = attack * Curves.easeInOutSine.transform(release);

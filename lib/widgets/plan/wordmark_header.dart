@@ -180,13 +180,14 @@ class _HeaderAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final imageUrl = avatarUrl;
+    final hasImage = imageUrl != null;
     return Container(
       width: _iconVisualSize,
       height: _iconVisualSize,
       decoration: BoxDecoration(
         color: backgroundColor,
         shape: BoxShape.circle,
-        border: Border.all(color: borderColor, width: 1.5),
+        border: hasImage ? null : Border.all(color: borderColor, width: 1.5),
       ),
       clipBehavior: Clip.antiAlias,
       alignment: Alignment.center,

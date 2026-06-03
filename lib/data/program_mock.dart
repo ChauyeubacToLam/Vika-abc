@@ -30,6 +30,21 @@ enum ProgramStatus { done, current, upcoming }
 /// engine already records.
 enum SessionDifficulty { light, moderate, hard }
 
+typedef PlanLedgerSessionKey = (int weekNumber, int sessionIndex);
+
+typedef PlanLedgerExerciseResult = ({
+  int? formScore,
+  String? difficulty,
+});
+
+typedef PlanLedgerSessionResult = ({
+  int? sessionFormScore,
+  Map<String, PlanLedgerExerciseResult> exercises,
+});
+
+typedef PlanLedgerSessionResults
+    = Map<PlanLedgerSessionKey, PlanLedgerSessionResult>;
+
 extension SessionDifficultyX on SessionDifficulty {
   /// Vietnamese glanceable label.
   String get label => switch (this) {
@@ -109,7 +124,7 @@ class PlanSession {
   /// Estimated duration label, e.g. "15 phút". Display-only.
   final String durationLabel;
 
-  /// Overall logged form 0–100 for a DONE session. Null otherwise.
+  /// Overall logged form 0–105 for a DONE session. Null otherwise.
   final int? formScore;
 
   /// Overall logged difficulty for a DONE session. Null otherwise.

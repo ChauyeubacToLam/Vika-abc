@@ -10,11 +10,6 @@
 // as PlanSnapshot.currentPosition (the first incomplete (week, session)).
 // Reusing that one rule keeps Plan / Home / retest consistent by construction.
 //
-// STUBBED THIS PASS (task-2 / summary-page work, intentionally null here):
-//   • PlanSession.formScore / .difficulty   (session aggregate formulas)
-//   • SessionExercise.formScore / .difficulty (per-exercise logged reads)
-// Filling these is the session-summary intelligence pass, not this one.
-//
 // COPY is static v1 (block/session/retest coach notes, focus). Dynamic coach
 // text comes later from the three-pillar aggregator.
 
@@ -31,9 +26,13 @@ class ProgramPlanMapper {
   /// [catalogById] resolves exercise_id -> display name + isFormChecked.
   /// Caller fetches it via RecommendationService.fetchLaunchCatalogInfo
   /// ForExerciseIds over every exercise_id in the plan.
+  ///
+  /// [ledgerResults] is keyed by `(weekNumber, sessionIndex)` and contains
+  /// completed workout summaries + per-exercise rows fetched by the caller.
   static ProgramPlan fromSnapshot(
     PlanSnapshot snapshot, {
     required Map<String, ExerciseLaunchCatalogInfo> catalogById,
+    PlanLedgerSessionResults ledgerResults = const {},
     String programTitle = '',
   }) {
     final plan = snapshot.plan;
@@ -42,7 +41,13 @@ class ProgramPlanMapper {
     final current = snapshot.currentPosition;
 
     final blocks = plan.weeks
-        .map((week) => _mapBlock(week, completion, current, catalogById))
+        .map((week) => _mapBlock(
+              week,
+              completion,
+              current,
+              catalogById,
+              ledgerResults,
+            ))
         .toList(growable: false);
 
     return ProgramPlan(
@@ -81,8 +86,7 @@ class ProgramPlanMapper {
     if (sessionStatuses.isEmpty) return ProgramStatus.upcoming;
     final allDone = sessionStatuses.every((s) => s == ProgramStatus.done);
     if (allDone) return ProgramStatus.done;
-    final hasCurrent =
-        sessionStatuses.any((s) => s == ProgramStatus.current);
+    final hasCurrent = sessionStatuses.any((s) => s == ProgramStatus.current);
     return hasCurrent ? ProgramStatus.current : ProgramStatus.upcoming;
   }
 
@@ -93,6 +97,7 @@ class ProgramPlanMapper {
     Map<int, Set<int>> completion,
     (int, int)? current,
     Map<String, ExerciseLaunchCatalogInfo> catalogById,
+    PlanLedgerSessionResults ledgerResults,
   ) {
     final sessions = week.sessions.map((session) {
       final status = _sessionStatus(
@@ -101,16 +106,24 @@ class ProgramPlanMapper {
         completion,
         current,
       );
+      final ledgerResult = status == ProgramStatus.done
+          ? ledgerResults[(week.weekNumber, session.sessionIndex)]
+          : null;
+      final exerciseDifficulties = ledgerResult?.exercises.values
+          .map((result) => _difficultyFromDb(result.difficulty));
       return PlanSession(
         index: session.sessionIndex,
         label: 'Buổi ${(session.sessionIndex + 1).toString().padLeft(2, '0')}',
         status: status,
         coachNote: _sessionCoachNote(status, week.isDeloadWeek),
-        // STUB (summary pass): aggregate form + difficulty for done sessions.
-        formScore: null,
-        difficulty: null,
+        formScore: ledgerResult?.sessionFormScore,
+        difficulty: _modalDifficulty(exerciseDifficulties ?? const []),
         exercises: session.slots
-            .map((slot) => _mapExercise(slot, catalogById))
+            .map((slot) => _mapExercise(
+                  slot,
+                  catalogById,
+                  result: ledgerResult?.exercises[slot.exerciseId],
+                ))
             .toList(growable: false),
       );
     }).toList(growable: false);
@@ -130,18 +143,59 @@ class ProgramPlanMapper {
 
   static SessionExercise _mapExercise(
     SlotAssignment slot,
-    Map<String, ExerciseLaunchCatalogInfo> catalogById,
-  ) {
+    Map<String, ExerciseLaunchCatalogInfo> catalogById, {
+    PlanLedgerExerciseResult? result,
+  }) {
     final info = catalogById[slot.exerciseId];
     return SessionExercise(
       name: info?.vietnameseName ?? slot.exerciseId,
       volumeLabel: workoutVolumeLabel(slot.volume),
       exerciseId: slot.exerciseId,
       hasAi: info?.isFormChecked ?? false,
-      // STUB (summary pass): per-exercise logged form + difficulty.
-      formScore: null,
-      difficulty: null,
+      formScore: result?.formScore,
+      difficulty: _difficultyFromDb(result?.difficulty),
     );
+  }
+
+  static SessionDifficulty? _difficultyFromDb(String? value) {
+    return switch (value?.trim().toLowerCase()) {
+      'light' => SessionDifficulty.light,
+      'medium' => SessionDifficulty.moderate,
+      'heavy' => SessionDifficulty.hard,
+      _ => null,
+    };
+  }
+
+  static SessionDifficulty? _modalDifficulty(
+    Iterable<SessionDifficulty?> values,
+  ) {
+    final counts = <SessionDifficulty, int>{};
+    for (final value in values) {
+      if (value == null) continue;
+      counts[value] = (counts[value] ?? 0) + 1;
+    }
+    if (counts.isEmpty) return null;
+
+    SessionDifficulty? best;
+    var bestCount = -1;
+    for (final entry in counts.entries) {
+      final currentRank = _difficultyRank(entry.key);
+      final bestRank = best == null ? -1 : _difficultyRank(best);
+      if (entry.value > bestCount ||
+          (entry.value == bestCount && currentRank > bestRank)) {
+        best = entry.key;
+        bestCount = entry.value;
+      }
+    }
+    return best;
+  }
+
+  static int _difficultyRank(SessionDifficulty difficulty) {
+    return switch (difficulty) {
+      SessionDifficulty.light => 0,
+      SessionDifficulty.moderate => 1,
+      SessionDifficulty.hard => 2,
+    };
   }
 
   // ── Retest beat ───────────────────────────────────────────────────────────

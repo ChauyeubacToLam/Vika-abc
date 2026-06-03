@@ -39,20 +39,28 @@ class ProgressScreen extends StatefulWidget {
   const ProgressScreen({
     super.key,
     required this.bottomPadding,
+    this.refreshListenable,
     this.userProfile,
+    this.onProfileChanged,
   });
 
   final double bottomPadding;
+  final Listenable? refreshListenable;
   final AppUserProfile? userProfile;
+  final ValueChanged<AppUserProfile>? onProfileChanged;
 
   @override
   State<ProgressScreen> createState() => _ProgressScreenState();
 }
 
 class _ProgressScreenState extends State<ProgressScreen> {
+  final _profileService = UserProfileService();
   PeriodTab _period = PeriodTab.program;
   final ScrollController _scrollController = ScrollController();
   bool _showStickyBar = false;
+  AppUserProfile? _profile;
+  bool _loadingProfile = false;
+  bool _profileReloadQueued = false;
 
   /// Scroll offset past which the sticky pill bar fades in.
   static const double _stickyBarThreshold = 240;
@@ -61,14 +69,53 @@ class _ProgressScreenState extends State<ProgressScreen> {
   void initState() {
     super.initState();
     unawaited(OrientationLock.portraitOnly());
+    _profile = widget.userProfile;
+    widget.refreshListenable?.addListener(_handleRefreshNudge);
     _scrollController.addListener(_onScroll);
   }
 
   @override
+  void didUpdateWidget(covariant ProgressScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.userProfile != widget.userProfile) {
+      _profile = widget.userProfile;
+    }
+    if (oldWidget.refreshListenable != widget.refreshListenable) {
+      oldWidget.refreshListenable?.removeListener(_handleRefreshNudge);
+      widget.refreshListenable?.addListener(_handleRefreshNudge);
+    }
+  }
+
+  @override
   void dispose() {
+    widget.refreshListenable?.removeListener(_handleRefreshNudge);
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _handleRefreshNudge() {
+    unawaited(_loadProfile());
+  }
+
+  Future<void> _loadProfile() async {
+    if (_loadingProfile) {
+      _profileReloadQueued = true;
+      return;
+    }
+    _loadingProfile = true;
+    try {
+      final profile = await _profileService.fetchCurrentProfile();
+      if (!mounted || profile == null) return;
+      setState(() => _profile = profile);
+      widget.onProfileChanged?.call(profile);
+    } finally {
+      _loadingProfile = false;
+      if (_profileReloadQueued && mounted) {
+        _profileReloadQueued = false;
+        unawaited(_loadProfile());
+      }
+    }
   }
 
   void _onScroll() {
@@ -115,8 +162,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
     final totalSessions = planTotalSessions(phaseWeeksMock);
     final phaseLabel =
         'PHASE 1 · $totalDone / $totalSessions BUỔI · TUẦN 3 / 7';
-    final userInitial = widget.userProfile?.initial ?? 'N';
-    final streakDays = widget.userProfile?.streakDays ?? progressMockStreakDays;
+    final profile = _profile ?? widget.userProfile;
+    final userInitial = profile?.initial ?? 'N';
+    final streakDays = profile?.streakDays ?? progressMockStreakDays;
     final summary = _summaryWithStreak(
       progressMockSummaries[periodKey]!,
       streakDays,
@@ -140,7 +188,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     period: _period,
                     onPeriodChanged: (p) => setState(() => _period = p),
                     userInitial: userInitial,
-                    avatarUrl: widget.userProfile?.avatarUrl,
+                    avatarUrl: profile?.avatarUrl,
                     phaseLabel: phaseLabel,
                     weekLabel: _weekLabel(),
                   ),

@@ -1646,8 +1646,13 @@ class _CoachSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    final isPerfect = coach.kind == CoachWatchKind.perfect;
-    // watchExerciseName is non-null only on a cross-exercise session, so it
+// Watch-pillar treatment per coach state: celebratory (perfect),
+// attention (fault), neutral-supportive (low form, nothing to name).
+    final (IconData watchIcon, Color watchAccent) = switch (coach.kind) {
+      CoachWatchKind.perfect => (Icons.check_circle_rounded, c.yellow),
+      CoachWatchKind.fault => (Icons.center_focus_strong_rounded, c.attention),
+      CoachWatchKind.lowForm => (Icons.self_improvement_rounded, c.inkSoft),
+    }; // watchExerciseName is non-null only on a cross-exercise session, so it
     // is inert at single-exercise launch.
     final watchBody = coach.watchExerciseName == null
         ? coach.watch
@@ -1754,12 +1759,10 @@ class _CoachSection extends StatelessWidget {
               children: [
                 Expanded(
                   child: _CoachPillar(
-                    icon: isPerfect
-                        ? Icons.check_circle_rounded
-                        : Icons.center_focus_strong_rounded,
+                    icon: watchIcon,
                     label: 'ĐỂ Ý',
                     body: watchBody,
-                    accent: isPerfect ? c.yellow : c.attention,
+                    accent: watchAccent,
                   ),
                 ),
                 const SizedBox(width: 8),

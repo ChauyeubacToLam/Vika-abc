@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -122,6 +123,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
   int? _estimatedCalories;
   String? _currentSessionId;
   String? _pendingOverallDifficulty;
+  Future<String?>? _currentSessionSaveFuture;
 
   int _currentSet = 1;
   int _currentRepsTarget = 0;
@@ -145,6 +147,8 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
   String? get _sessionProgressLabel => _isWorkoutSequence
       ? 'Buổi tập · Bài ${widget.sequenceIndex + 1}/${widget.sequence.length}'
       : null;
+
+  static const Duration _sessionSaveTransitionTimeout = Duration(seconds: 2);
 
   /// Returns the next launch args in the sequence with [reports] threaded
   /// forward as priorReports. Returns null when this is the final
@@ -284,6 +288,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       _estimatedCalories = null;
       _currentSessionId = null;
       _pendingOverallDifficulty = null;
+      _currentSessionSaveFuture = null;
       _currentSet = 1;
       _currentRepsTarget = _spec.repsPerSet;
       _pendingNextRepsTarget = null;
@@ -358,7 +363,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
         _activeExercise = null;
         _phase = _WorkoutFlowPhase.transition;
       });
-      _persistSession(report);
+      _startPersistSession(report);
       return;
     }
 
@@ -405,21 +410,6 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     });
   }
 
-  /// Aggregate fault counts across all sets. Pure function: returns a map,
-  /// doesn't mutate fields. Call this whenever fresh totals are needed.
-  Map<String, int> _aggregateFaultCounts(List<ExerciseLogger> setLoggers) {
-    final counts = <String, int>{};
-    for (final logger in setLoggers) {
-      for (final entry in logger.setLogs.entries) {
-        if (entry.key.endsWith('_fails_count') && entry.value is num) {
-          counts[entry.key] =
-              (counts[entry.key] ?? 0) + (entry.value as num).toInt();
-        }
-      }
-    }
-    return counts;
-  }
-
   List<Map<String, dynamic>> _buildSetData(List<ExerciseLogger> setLogs) {
     return setLogs.asMap().entries.map((entry) {
       final i = entry.key;
@@ -453,8 +443,13 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     }).toList();
   }
 
-  Future<void> _persistSession(PostExerciseData report) async {
-    final faultCounts = _aggregateFaultCounts(_setLoggers);
+  void _startPersistSession(PostExerciseData report) {
+    final future = _persistSession(report);
+    _currentSessionSaveFuture = future;
+    unawaited(future);
+  }
+
+  Future<String?> _persistSession(PostExerciseData report) async {
     final setData = _buildSetData(_setLoggers);
 
     // Fixed-length list: one slot per set, null if user skipped rating that set.
@@ -474,7 +469,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       totalGoodReps: report.sets.fold(0, (sum, s) => sum + (s.goodReps ?? 0)),
       totalSets: report.sets.length,
       calories: _estimatedCalories,
-      faultCounts: faultCounts,
+      faultCounts: report.faultCounts,
       difficultyRatings: ratings,
       setData: setData,
       workoutSessionId: widget.workoutSessionId,
@@ -494,6 +489,33 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
           difficulty: pending,
         );
       }
+    }
+
+    return sessionId;
+  }
+
+  Future<String?> _sessionIdForTransition() async {
+    final readyId = _currentSessionId;
+    if (readyId != null) return readyId;
+
+    final saveFuture = _currentSessionSaveFuture;
+    if (saveFuture == null) return null;
+
+    try {
+      return await saveFuture.timeout(
+        _sessionSaveTransitionTimeout,
+        onTimeout: () {
+          debugPrint(
+            '[Vika] Session save still pending after '
+            '${_sessionSaveTransitionTimeout.inSeconds}s; '
+            'continuing transition without session id',
+          );
+          return null;
+        },
+      );
+    } catch (e) {
+      debugPrint('[Vika] Session save unavailable for transition: $e');
+      return null;
     }
   }
 
@@ -533,7 +555,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       });
 
       if (!_isAssessment) {
-        _persistSession(report);
+        _startPersistSession(report);
       }
       return;
     }
@@ -557,13 +579,16 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       Navigator.of(context).pop({'completed': true});
       return;
     }
+    final sessionId = await _sessionIdForTransition();
+    if (!mounted) return;
+
     final newEntry = ExerciseSessionReport(
       definition: widget.definition,
       exerciseKey: _sessionExerciseId,
       report: report,
       duration: _completedDuration ?? Duration.zero,
       calories: _estimatedCalories ?? 0,
-      sessionId: _currentSessionId,
+      sessionId: sessionId,
       // userDifficulty is collected on the NEXT exercise's intro (or on
       // the workout summary for the last exercise).
     );
@@ -606,7 +631,9 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       );
 
       final candidates = <FaultCandidate>[];
+      int lowestFormScore = double.infinity.toInt();
       for (final r in accumulated) {
+        lowestFormScore = min(r.formScore, lowestFormScore);
         final builder =
             reportBuilders[r.definition.id]?.builder ?? GenericReportBuilder();
         candidates.addAll(
@@ -638,6 +665,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       }
       final coach = SessionCoachBuilder.build(
         candidates: candidates,
+        lowestFormScore: lowestFormScore,
         trophy: trophy,
       );
 
@@ -701,7 +729,10 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     prev.userDifficulty = difficulty;
     final prevId = prev.sessionId;
     if (prevId == null) {
-      return; // persist hadn't landed; rating dropped (acceptable, it's secondary)
+      debugPrint(
+        '[Vika] Cannot persist previous exercise difficulty; session id missing',
+      );
+      return;
     }
     SessionPersistence().updateSessionDifficulty(
       sessionId: prevId,

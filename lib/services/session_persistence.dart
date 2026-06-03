@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../data/program_mock.dart';
 import 'recommendation/progression_service.dart';
 
 /// Summary of a completed exercise session, loaded from Supabase.
@@ -202,6 +203,90 @@ class SessionPersistence {
       return map;
     } catch (e) {
       debugPrint('[SessionPersistence] completion map fetch failed: $e');
+      return const {};
+    }
+  }
+
+  /// Completed workout-level + per-exercise ledger results for a plan.
+  ///
+  /// Keyed by `(weekNumber, sessionIndex)`. If a user redoes the same planned
+  /// session, the latest completed workout session wins.
+  Future<PlanLedgerSessionResults> ledgerResultsForPlan({
+    required String recommendationId,
+  }) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return const {};
+
+    try {
+      final workoutRows = await _client
+          .from('workout_sessions')
+          .select(
+            'id, week_number, session_index, completed_at, session_form_score',
+          )
+          .eq('user_id', userId)
+          .eq('recommendation_id', recommendationId)
+          .not('completed_at', 'is', null)
+          .order('completed_at', ascending: false);
+
+      final latestBySlot = <PlanLedgerSessionKey,
+          ({
+        String id,
+        DateTime completedAt,
+        int? sessionFormScore,
+      })>{};
+
+      for (final raw in workoutRows as List) {
+        final row = (raw as Map).cast<String, dynamic>();
+        final id = row['id'] as String?;
+        final week = (row['week_number'] as num?)?.toInt();
+        final session = (row['session_index'] as num?)?.toInt();
+        final completedAt = _dateTimeOrNull(row['completed_at']);
+        if (id == null ||
+            week == null ||
+            session == null ||
+            completedAt == null) {
+          continue;
+        }
+
+        final key = (week, session);
+        final existing = latestBySlot[key];
+        if (existing == null || completedAt.isAfter(existing.completedAt)) {
+          latestBySlot[key] = (
+            id: id,
+            completedAt: completedAt,
+            sessionFormScore: (row['session_form_score'] as num?)?.toInt(),
+          );
+        }
+      }
+
+      final results = <PlanLedgerSessionKey, PlanLedgerSessionResult>{};
+      for (final entry in latestBySlot.entries) {
+        final exerciseRows = await _client
+            .from('exercise_sessions')
+            .select('exercise_id, form_score, overall_difficulty')
+            .eq('user_id', userId)
+            .eq('workout_session_id', entry.value.id);
+
+        final exercises = <String, PlanLedgerExerciseResult>{};
+        for (final raw in exerciseRows as List) {
+          final row = (raw as Map).cast<String, dynamic>();
+          final exerciseId = row['exercise_id'] as String?;
+          if (exerciseId == null || exerciseId.isEmpty) continue;
+          exercises[exerciseId] = (
+            formScore: (row['form_score'] as num?)?.toInt(),
+            difficulty: row['overall_difficulty'] as String?,
+          );
+        }
+
+        results[entry.key] = (
+          sessionFormScore: entry.value.sessionFormScore,
+          exercises: exercises,
+        );
+      }
+
+      return results;
+    } catch (e) {
+      debugPrint('[SessionPersistence] ledger results fetch failed: $e');
       return const {};
     }
   }

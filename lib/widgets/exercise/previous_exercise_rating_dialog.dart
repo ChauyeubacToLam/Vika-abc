@@ -2,14 +2,20 @@
 // Surfaces immediately on intro mount and cannot be dismissed without
 // picking a difficulty rating.
 //
-// v2 redesign — visual-first, minimal text:
-//   • Big italic display question — no eyebrows, no body copy
-//   • Tactile 3-tile rating row with icons + meter dots (no labels above)
-//   • Visual contrast: the previous exercise's form score sits in a
-//     compact poster-style stat block above the tiles, so users see
-//     "what they earned" before deciding how it felt
-//   • One inline foot-line (italic) nudges them to read the intro — no
-//     paragraph-style notice
+// v3 redesign — "debrief poster":
+//   • Built on the app's signature STAGE-HERO shape: a warm-dark gradient
+//     header (yellow + amber atmospheric glows + film grain) that curves
+//     its rounded bottom into the cream body — the same grammar Home /
+//     Plan / Library and the transition-moment use, so the popup reads as
+//     a native fragment of the app rather than a generic dialog.
+//   • The form score the user just earned lives in that dark header as a
+//     band-colored gauge dial — a trophy, mirroring the transition moment.
+//   • The cream body is calm and editorial: one restrained eyebrow with a
+//     yellow underline, a single mid-size italic question (no more shouty
+//     40pt display), then a tactile 3-tile effort row.
+//   • Optional issue-confirm section keeps the same contract: difficulty
+//     is required, the issue tap is optional, and the user proceeds via an
+//     explicit "Tiếp tục" button.
 //
 // Returns the selected difficulty id ('light' / 'medium' / 'heavy').
 
@@ -34,7 +40,7 @@ Future<String> showPreviousExerciseRatingDialog(
     barrierDismissible: false,
     barrierLabel: 'rating',
     barrierColor: const Color(0xFF15110D).withValues(alpha: 0.82),
-    transitionDuration: const Duration(milliseconds: 420),
+    transitionDuration: const Duration(milliseconds: 440),
     pageBuilder: (context, anim1, anim2) {
       return _PreviousExerciseRatingDialog(
         exerciseName: exerciseName,
@@ -54,9 +60,12 @@ Future<String> showPreviousExerciseRatingDialog(
         ),
         child: Opacity(
           opacity: anim.value,
-          child: Transform.scale(
-            scale: 0.88 + (0.12 * eased.value.clamp(0.0, 1.0)),
-            child: child,
+          child: Transform.translate(
+            offset: Offset(0, (1 - anim.value) * 18),
+            child: Transform.scale(
+              scale: 0.9 + (0.1 * eased.value.clamp(0.0, 1.0)),
+              child: child,
+            ),
           ),
         ),
       );
@@ -119,7 +128,7 @@ class _PreviousExerciseRatingDialogState
     // dialog stays open so the optional Có/Không tap remains reachable; the
     // user proceeds via the explicit "Tiếp tục" button instead.
     if (_hasIssue) return;
-    Future.delayed(const Duration(milliseconds: 320), () {
+    Future.delayed(const Duration(milliseconds: 360), () {
       if (mounted) Navigator.of(context).pop(id);
     });
   }
@@ -140,15 +149,15 @@ class _PreviousExerciseRatingDialogState
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    // Clamp accessibility text scaling so the 40pt italic question
-    // can't push the tile row off-screen on small phones.
+    // Clamp accessibility text scaling so the headline + tiles can't push
+    // the layout past the card on small phones.
     final mq = MediaQuery.of(context);
     final clampedScaler = mq.textScaler.clamp(
       minScaleFactor: 0.9,
       maxScaleFactor: 1.1,
     );
     // Tighter dialog max-width on phones, wider on tablets.
-    final dialogMaxWidth = mq.size.shortestSide >= 600 ? 520.0 : 420.0;
+    final dialogMaxWidth = mq.size.shortestSide >= 600 ? 480.0 : 388.0;
     return MediaQuery(
       data: mq.copyWith(textScaler: clampedScaler),
       child: PopScope(
@@ -179,160 +188,85 @@ class _PreviousExerciseRatingDialogState
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(30),
-                          child: Stack(
-                            children: [
-                              // Atmospheric stack — top-right yellow glow,
-                              // bottom-left amber bloom. Matches the
-                              // transition-moment world so it reads as the
-                              // same surface.
-                              Positioned(
-                                top: -90,
-                                right: -70,
-                                child: IgnorePointer(
-                                  child: Opacity(
-                                    opacity: 0.6 + (_pulse.value * 0.3),
-                                    child: SizedBox(
-                                      width: 240,
-                                      height: 240,
-                                      child: DecoratedBox(
-                                        decoration: BoxDecoration(
-                                          gradient: RadialGradient(
-                                            colors: [
-                                              c.yellow.withValues(alpha: 0.28),
-                                              c.yellow.withValues(alpha: 0),
-                                            ],
-                                          ),
+                          child: SingleChildScrollView(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // ── Dark stage-hero poster header ──
+                                _PosterHeader(
+                                  exerciseName: widget.exerciseName,
+                                  formScore: widget.formScore,
+                                  pulse: _pulse.value,
+                                ),
+                                // ── Cream editorial body ──
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(22, 22, 22, 22),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      const _BodyEyebrow(label: 'MỨC GẮNG SỨC'),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        'Mấy rep cuối có nặng không?',
+                                        style: TextStyle(
+                                          fontFamily: 'BeVietnamPro',
+                                          fontSize: 25,
+                                          fontWeight: FontWeight.w800,
+                                          fontStyle: FontStyle.italic,
+                                          height: 1.12,
+                                          letterSpacing: -1.0,
+                                          color: c.ink,
                                         ),
                                       ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              Positioned(
-                                bottom: -110,
-                                left: -80,
-                                child: IgnorePointer(
-                                  child: SizedBox(
-                                    width: 240,
-                                    height: 220,
-                                    child: const DecoratedBox(
-                                      decoration: BoxDecoration(
-                                        gradient: RadialGradient(
-                                          colors: [
-                                            Color(0x33CD7C45),
-                                            Color(0x00CD7C45),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              // Scrollable so the taller issue-confirm layout
-                              // (and large accessibility text) can never
-                              // overflow on small phones. The card shrink-wraps
-                              // to content when short, caps at the available
-                              // height and scrolls when tall.
-                              SingleChildScrollView(
-                                padding:
-                                    const EdgeInsets.fromLTRB(24, 26, 24, 22),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    _FormScoreBadge(
-                                      formScore: widget.formScore,
-                                      exerciseName: widget.exerciseName,
-                                      pulse: _pulse.value,
-                                    ),
-                                    const SizedBox(height: 22),
-                                    // The question — italic, big, no
-                                    // surrounding chrome.
-                                    Text(
-                                      'Mấy rep cuối của ${widget.exerciseName} có nặng không?',
-                                      textAlign: TextAlign.center,
-                                      maxLines: 3,
-                                      softWrap: true,
-                                      style: TextStyle(
-                                        fontFamily: 'BeVietnamPro',
-                                        fontSize: 40,
-                                        fontWeight: FontWeight.w800,
-                                        fontStyle: FontStyle.italic,
-                                        height: 1.0,
-                                        letterSpacing: -2.2,
-                                        color: c.ink,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 26),
-                                    // 3 visual tiles — IntrinsicHeight gives
-                                    // the Row a bounded height so `stretch`
-                                    // can equalize the tiles without forcing
-                                    // an infinite vertical constraint.
-                                    IntrinsicHeight(
-                                      child: Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.stretch,
-                                        children: [
-                                          for (var i = 0;
-                                              i < _options.length;
-                                              i++) ...[
-                                            Expanded(
-                                              child: _Tile(
-                                                option: _options[i],
-                                                selected:
-                                                    _selected == _options[i].id,
-                                                locked: _selected != null,
-                                                onTap: () =>
-                                                    _pick(_options[i].id),
+                                      const SizedBox(height: 20),
+                                      // 3 effort tiles — IntrinsicHeight gives
+                                      // the Row a bounded height so `stretch`
+                                      // can equalize the tiles.
+                                      IntrinsicHeight(
+                                        child: Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.stretch,
+                                          children: [
+                                            for (var i = 0;
+                                                i < _options.length;
+                                                i++) ...[
+                                              Expanded(
+                                                child: _Tile(
+                                                  option: _options[i],
+                                                  selected: _selected ==
+                                                      _options[i].id,
+                                                  locked: _selected != null,
+                                                  onTap: () =>
+                                                      _pick(_options[i].id),
+                                                ),
                                               ),
-                                            ),
-                                            if (i < _options.length - 1)
-                                              const SizedBox(width: 10),
+                                              if (i < _options.length - 1)
+                                                const SizedBox(width: 10),
+                                            ],
                                           ],
-                                        ],
+                                        ),
                                       ),
-                                    ),
-                                    const SizedBox(height: 18),
-                                    if (_hasIssue)
-                                      _IssueConfirmSection(
-                                        question: widget.issueQuestion!.question,
-                                        answer: _issueAnswer,
-                                        onAnswer: _answerIssue,
-                                        continueEnabled: _selected != null,
-                                        onContinue: _continue,
-                                      )
-                                    else
-                                      // Footline — one short italic nudge
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Icons.menu_book_rounded,
-                                            size: 12,
-                                            color: c.inkFaint,
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            _selected == null
-                                                ? 'Đọc giới thiệu phía dưới sau khi chọn'
-                                                : 'Đã ghi nhận',
-                                            style: TextStyle(
-                                              fontFamily: 'BeVietnamPro',
-                                              fontSize: 11.5,
-                                              fontWeight: FontWeight.w700,
-                                              fontStyle: FontStyle.italic,
-                                              letterSpacing: -0.1,
-                                              color: c.inkFaint,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                  ],
+                                      const SizedBox(height: 18),
+                                      if (_hasIssue)
+                                        _IssueConfirmSection(
+                                          question:
+                                              widget.issueQuestion!.question,
+                                          answer: _issueAnswer,
+                                          onAnswer: _answerIssue,
+                                          continueEnabled: _selected != null,
+                                          onContinue: _continue,
+                                        )
+                                      else
+                                        _Footline(selected: _selected != null),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       );
@@ -348,86 +282,305 @@ class _PreviousExerciseRatingDialogState
   }
 }
 
-// ─── Form score badge — poster-style stat block at the top of the
-// dialog. Shows the exercise name + the form score they just earned, with
-// a band-colored gauge dial that echoes the transition-moment score. ───
-class _FormScoreBadge extends StatelessWidget {
-  const _FormScoreBadge({
-    required this.formScore,
+// ═══════════════════════════════════════════════════════════════
+// POSTER HEADER — the warm-dark stage hero. Exercise name + band
+// label on the left, earned form-score dial on the right. Rounded
+// bottom corners curve into the cream body below (the app's
+// signature stage-hero shape).
+// ═══════════════════════════════════════════════════════════════
+
+class _PosterHeader extends StatelessWidget {
+  const _PosterHeader({
     required this.exerciseName,
+    required this.formScore,
     required this.pulse,
   });
 
-  final int? formScore;
   final String exerciseName;
+  final int? formScore;
   final double pulse;
+
+  String _bandLabel(int s) {
+    if (s >= 80) return 'Form sắc nét';
+    if (s >= 60) return 'Form ổn định';
+    return 'Còn dư địa';
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-      decoration: BoxDecoration(
-        color: c.bg,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: c.border),
+    final score = formScore;
+    final band = score != null ? _dialBandColor(score, c) : c.yellow;
+    return ClipRRect(
+      // Top corners match the card's 30 radius; bottom corners curve at a
+      // slightly tighter 26 so the cream body reads as rising into the dark.
+      borderRadius: const BorderRadius.only(
+        topLeft: Radius.circular(30),
+        topRight: Radius.circular(30),
+        bottomLeft: Radius.circular(26),
+        bottomRight: Radius.circular(26),
       ),
-      child: Row(
-        children: [
-          if (formScore != null) ...[
-            _ScoreDial(score: formScore!, pulse: pulse),
-            const SizedBox(width: 16),
-          ],
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 5,
-                      height: 5,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: const Alignment(-0.7, -1),
+            end: const Alignment(0.7, 1),
+            colors: [c.bgInverse, c.bgInverseHi],
+          ),
+        ),
+        child: Stack(
+          children: [
+            // Yellow ambient glow — top-right, breathing with the pulse.
+            Positioned(
+              top: -70,
+              right: -50,
+              child: IgnorePointer(
+                child: Opacity(
+                  opacity: 0.55 + (pulse * 0.3),
+                  child: SizedBox(
+                    width: 210,
+                    height: 210,
+                    child: DecoratedBox(
                       decoration: BoxDecoration(
-                        color: c.yellow,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(color: c.yellow, blurRadius: 4),
+                        gradient: RadialGradient(
+                          colors: [
+                            c.yellow.withValues(alpha: 0.26),
+                            c.yellow.withValues(alpha: 0),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Amber bloom — bottom-left.
+            Positioned(
+              bottom: -80,
+              left: -60,
+              child: IgnorePointer(
+                child: SizedBox(
+                  width: 210,
+                  height: 190,
+                  child: const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        colors: [
+                          Color(0x33CD7C45),
+                          Color(0x00CD7C45),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'BÀI VỪA RỒI',
-                      style: TextStyle(
-                        fontFamily: 'BeVietnamPro',
-                        fontSize: 9,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.6,
-                        color: c.inkFaint,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  exerciseName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontFamily: 'BeVietnamPro',
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    fontStyle: FontStyle.italic,
-                    letterSpacing: -0.6,
-                    color: c.ink,
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
-        ],
+            // Deterministic film grain (never time-based).
+            Positioned.fill(
+              child: IgnorePointer(
+                child: CustomPaint(painter: const _PosterGrainPainter()),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(22, 20, 20, 26),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Eyebrow — yellow dot + label.
+                  Row(
+                    children: [
+                      Container(
+                        width: 5,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: c.yellow,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(color: c.yellow, blurRadius: 5),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'BÀI VỪA RỒI',
+                        style: TextStyle(
+                          fontFamily: 'BeVietnamPro',
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 2.0,
+                          color: c.yellow,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              exerciseName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontFamily: 'BeVietnamPro',
+                                fontSize: 30,
+                                fontWeight: FontWeight.w800,
+                                fontStyle: FontStyle.italic,
+                                letterSpacing: -1.4,
+                                height: 1.0,
+                                color: c.invInk,
+                              ),
+                            ),
+                            if (score != null) ...[
+                              const SizedBox(height: 11),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 18,
+                                    height: 2,
+                                    decoration: BoxDecoration(
+                                      color: band,
+                                      borderRadius: BorderRadius.circular(1),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: band.withValues(alpha: 0.5),
+                                          blurRadius: 6,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 9),
+                                  Flexible(
+                                    child: Text(
+                                      _bandLabel(score),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontFamily: 'BeVietnamPro',
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w700,
+                                        fontStyle: FontStyle.italic,
+                                        letterSpacing: -0.2,
+                                        color: c.invInkSoft,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      if (score != null) ...[
+                        const SizedBox(width: 14),
+                        _ScoreDial(score: score, pulse: pulse, onDark: true),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+class _PosterGrainPainter extends CustomPainter {
+  const _PosterGrainPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rng = math.Random(4242);
+    final paint = Paint();
+    for (var i = 0; i < 90; i++) {
+      final dx = rng.nextDouble() * size.width;
+      final dy = rng.nextDouble() * size.height;
+      paint.color =
+          Colors.white.withValues(alpha: 0.012 + rng.nextDouble() * 0.02);
+      canvas.drawCircle(Offset(dx, dy), 0.6, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _PosterGrainPainter old) => false;
+}
+
+// ─── Body eyebrow — thin yellow underline accent + uppercase label,
+// matching the section-header grammar used across the app. ───
+class _BodyEyebrow extends StatelessWidget {
+  const _BodyEyebrow({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    return Row(
+      children: [
+        Container(
+          width: 22,
+          height: 2,
+          decoration: BoxDecoration(
+            color: c.yellow,
+            borderRadius: BorderRadius.circular(1),
+            boxShadow: [
+              BoxShadow(color: c.yellow.withValues(alpha: 0.5), blurRadius: 8),
+            ],
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'BeVietnamPro',
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.8,
+            color: c.inkSoft,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Footline — one quiet italic caption under the tiles (no-issue mode).
+class _Footline extends StatelessWidget {
+  const _Footline({required this.selected});
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(
+          selected ? Icons.check_circle_rounded : Icons.touch_app_rounded,
+          size: 12,
+          color: selected ? c.yellow : c.inkFaint,
+        ),
+        const SizedBox(width: 6),
+        Text(
+          selected ? 'Đã ghi nhận' : 'Chạm mức bạn vừa cảm nhận',
+          style: TextStyle(
+            fontFamily: 'BeVietnamPro',
+            fontSize: 11.5,
+            fontWeight: FontWeight.w700,
+            fontStyle: FontStyle.italic,
+            letterSpacing: -0.1,
+            color: c.inkFaint,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -463,7 +616,6 @@ class _IssueConfirmSection extends StatelessWidget {
         const SizedBox(height: 18),
         // Positive lead line — reassures this is a quick, friendly ask.
         Row(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
               width: 5,
@@ -476,13 +628,12 @@ class _IssueConfirmSection extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Text(
-              'Vika hỏi nhanh để hiểu bạn hơn',
+              'VIKA HỎI NHANH',
               style: TextStyle(
                 fontFamily: 'BeVietnamPro',
-                fontSize: 11.5,
-                fontWeight: FontWeight.w700,
-                fontStyle: FontStyle.italic,
-                letterSpacing: -0.1,
+                fontSize: 9.5,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.8,
                 color: c.inkFaint,
               ),
             ),
@@ -491,13 +642,12 @@ class _IssueConfirmSection extends StatelessWidget {
         const SizedBox(height: 10),
         Text(
           question,
-          textAlign: TextAlign.center,
           style: TextStyle(
             fontFamily: 'BeVietnamPro',
-            fontSize: 19,
+            fontSize: 18,
             fontWeight: FontWeight.w800,
             fontStyle: FontStyle.italic,
-            height: 1.1,
+            height: 1.15,
             letterSpacing: -0.7,
             color: c.ink,
           ),
@@ -640,9 +790,8 @@ class _ContinueButton extends StatelessWidget {
 }
 
 /// Performance bands matching the transition-moment score: ≥80 gold (reserved
-/// yellow), 60–79 amber, <60 burnt orange. On this light surface the band
-/// colors live in the gauge arc + halo (not the numeral) so the score stays
-/// crisp and readable.
+/// yellow), 60–79 amber, <60 burnt orange. On the dark poster header the band
+/// color carries the numeral; on cream surfaces it lives in the gauge arc.
 Color _dialBandColor(int score, VikaColors c) {
   if (score >= 80) return c.yellow;
   if (score >= 60) return const Color(0xFFE89A4B);
@@ -650,19 +799,29 @@ Color _dialBandColor(int score, VikaColors c) {
 }
 
 // ─── Mini score dial: a band-colored gauge arc traced around the numeral,
-// mirroring the active-screen FormScoreArc + the transition monument. ───
+// mirroring the active-screen FormScoreArc + the transition monument. On the
+// dark poster header (`onDark`) the numeral takes the band color and the
+// track goes translucent-white; on cream it stays ink on a hairline track. ───
 class _ScoreDial extends StatelessWidget {
-  const _ScoreDial({required this.score, required this.pulse});
+  const _ScoreDial({
+    required this.score,
+    required this.pulse,
+    this.onDark = false,
+  });
 
   final int score;
   final double pulse;
+  final bool onDark;
 
-  static const double _size = 66;
+  static const double _size = 72;
 
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
     final band = _dialBandColor(score, c);
+    final numeralColor = onDark ? band : c.ink;
+    final subColor = onDark ? c.invInkFaint : c.inkFaint;
+    final trackColor = onDark ? Colors.white.withValues(alpha: 0.12) : c.border;
     return SizedBox(
       width: _size,
       height: _size,
@@ -678,7 +837,8 @@ class _ScoreDial extends StatelessWidget {
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    band.withValues(alpha: 0.18 + pulse * 0.08),
+                    band.withValues(
+                        alpha: (onDark ? 0.26 : 0.18) + pulse * 0.08),
                     band.withValues(alpha: 0.0),
                   ],
                 ),
@@ -690,7 +850,7 @@ class _ScoreDial extends StatelessWidget {
             painter: _ScoreDialPainter(
               progress: (score / 100).clamp(0.0, 1.0),
               band: band,
-              track: c.border,
+              track: trackColor,
             ),
           ),
           Column(
@@ -700,13 +860,21 @@ class _ScoreDial extends StatelessWidget {
                 '$score',
                 style: TextStyle(
                   fontFamily: 'BeVietnamPro',
-                  fontSize: 26,
+                  fontSize: 28,
                   fontWeight: FontWeight.w800,
                   fontStyle: FontStyle.italic,
                   height: 1.0,
-                  letterSpacing: -1.4,
-                  color: c.ink,
+                  letterSpacing: -1.5,
+                  color: numeralColor,
                   fontFeatures: VikaIvoryMain.tabularFigures,
+                  shadows: onDark
+                      ? [
+                          Shadow(
+                            color: band.withValues(alpha: 0.4),
+                            blurRadius: 16,
+                          ),
+                        ]
+                      : null,
                 ),
               ),
               const SizedBox(height: 1),
@@ -717,7 +885,7 @@ class _ScoreDial extends StatelessWidget {
                   fontSize: 8,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0.8,
-                  color: c.inkFaint,
+                  color: subColor,
                   fontFeatures: VikaIvoryMain.tabularFigures,
                 ),
               ),

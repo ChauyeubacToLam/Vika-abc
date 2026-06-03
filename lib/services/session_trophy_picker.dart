@@ -45,6 +45,8 @@ class SessionTrophyPicker {
   static const int _volumeFloor = 30;
   static const int _solidFloor = 50;
 
+  static int get solidFloor => _solidFloor;
+
   static Trophy pick({
     required List<ExerciseSessionReport> reports,
     required int sessionRawFormScore,
