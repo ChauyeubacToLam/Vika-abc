@@ -7,36 +7,53 @@ export '../../fault_record.dart';
 enum VUpState { lying, rising, v_position, lowering }
 
 class VUpConfig {
-  static const int MAX_REP = 12; // Cường độ cao, dừng ở 12
-  static const int TIMEOUT_MS = 90000; // 90s
+  static const int MAX_REP = 12;
+  static const int TIMEOUT_MS = 90000;
 
-  // Start Position Limits
-  static const double START_BODY_MIN = 165.0; // Duỗi thẳng người
+  // Start position must be a real flat, extended V-up baseline.
+  static const double START_BODY_MIN = 170.0;
+  static const double START_KNEE_MIN = 165.0;
+  static const double START_TRUNK_HORIZ_MAX = 12.0;
+  static const double START_LEG_HORIZ_MAX = 12.0;
+  static const double START_Y_SPREAD_MAX = 0.22;
+  static const double START_WRIST_ANKLE_DIST_MIN = 2.2;
 
-  // State Transition Thresholds
-  static const double RISING_ANGLE = 160.0;
-  static const double V_POSITION_THRESHOLD =
-      80.0; // Ngưỡng để nhận diện pha đỉnh (state machine)
-  static const double ROM_TARGET_ANGLE =
-      60.0; // Góc mục tiêu cho gập sâu hoàn hảo
-  static const double LOWERING_THRESHOLD_DIFF =
-      5.0; // Góc mở ra 5 độ so với đỉnh
-  static const double LYING_ANGLE = 160.0;
+  // Rep gating.
+  static const int REP_READY_FRAMES = 3;
+  static const double RISING_ANGLE = 155.0;
+  static const double RISING_MIN_LIFT = 0.10;
+  static const double V_POSITION_THRESHOLD = 85.0;
+  static const double ROM_TARGET_ANGLE = 60.0;
+  static const double TOP_TRUNK_HORIZ_MIN = 25.0;
+  static const double TOP_LEG_HORIZ_MIN = 25.0;
+  static const double TOP_MIN_LIFT = 0.25;
+  static const double TOP_WRIST_ANKLE_DIST_MAX = 1.35;
+  static const double TOP_WRIST_ANKLE_CLOSURE_MIN = 1.1;
+  static const double ACTIVE_KNEE_MIN = 160.0;
+  static const double LOWERING_THRESHOLD_DIFF = 8.0;
+  static const double LYING_ANGLE = 165.0;
 }
 
 class VUpRepContext {
-  final double shoulderHipAnkleAngle; // Góc chữ V
-  final double hipKneeAnkleAngle; // Độ thẳng gối
-  final double wristAnkleDistance; // Khoảng cách tay - chân (chuẩn hóa)
+  final double shoulderHipAnkleAngle;
+  final double hipKneeAnkleAngle;
+  final double wristAnkleDistance;
+  final double trunkHorizontalAngle;
+  final double legHorizontalAngle;
 
   final double shoulderY;
   final double ankleY;
   final double hipY;
-  final double? scaleFactor; // Khoảng cách Shoulder-Hip (chuẩn hóa kích thước)
+  final double? scaleFactor;
+  final double shoulderLiftFromBaseline;
+  final double ankleLiftFromBaseline;
+  final double wristAnkleClosureFromBaseline;
 
   final bool isHorizontal;
   final bool bothArmsLifted;
   final bool bothLegsLifted;
+  final bool isStrictLying;
+  final bool isStrictVPosition;
 
   final VUpState state;
   final int frameTimestampMs;
@@ -46,25 +63,57 @@ class VUpRepContext {
     required this.shoulderHipAnkleAngle,
     required this.hipKneeAnkleAngle,
     required this.wristAnkleDistance,
+    required this.trunkHorizontalAngle,
+    required this.legHorizontalAngle,
     required this.shoulderY,
     required this.ankleY,
     required this.hipY,
     required this.scaleFactor,
+    required this.shoulderLiftFromBaseline,
+    required this.ankleLiftFromBaseline,
+    required this.wristAnkleClosureFromBaseline,
     required this.isHorizontal,
     required this.bothArmsLifted,
     required this.bothLegsLifted,
+    required this.isStrictLying,
+    required this.isStrictVPosition,
     required this.state,
     required this.frameTimestampMs,
     required this.resultIssues,
   });
+
+  VUpRepContext copyWith({VUpState? state}) {
+    return VUpRepContext(
+      shoulderHipAnkleAngle: shoulderHipAnkleAngle,
+      hipKneeAnkleAngle: hipKneeAnkleAngle,
+      wristAnkleDistance: wristAnkleDistance,
+      trunkHorizontalAngle: trunkHorizontalAngle,
+      legHorizontalAngle: legHorizontalAngle,
+      shoulderY: shoulderY,
+      ankleY: ankleY,
+      hipY: hipY,
+      scaleFactor: scaleFactor,
+      shoulderLiftFromBaseline: shoulderLiftFromBaseline,
+      ankleLiftFromBaseline: ankleLiftFromBaseline,
+      wristAnkleClosureFromBaseline: wristAnkleClosureFromBaseline,
+      isHorizontal: isHorizontal,
+      bothArmsLifted: bothArmsLifted,
+      bothLegsLifted: bothLegsLifted,
+      isStrictLying: isStrictLying,
+      isStrictVPosition: isStrictVPosition,
+      state: state ?? this.state,
+      frameTimestampMs: frameTimestampMs,
+      resultIssues: resultIssues,
+    );
+  }
 }
 
 class VUpFaultPriority {
-  static const int syncElevation = 0; // Mất đồng bộ (Critical)
-  static const int jerking = 1; // Giật cục (Critical)
-  static const int rom = 2; // Góc hông rộng (High)
-  static const int bentKnee = 3; // Gập gối (Medium)
-  static const int tempo = 4; // Thả người nhanh (Medium)
+  static const int syncElevation = 0;
+  static const int jerking = 1;
+  static const int rom = 2;
+  static const int bentKnee = 3;
+  static const int tempo = 4;
 }
 
 abstract class VUpMetricBase implements DebugMetricSource {

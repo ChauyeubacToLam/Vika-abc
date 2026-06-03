@@ -349,9 +349,9 @@ class BirdDog extends ExerciseBase {
 
       if (progress < 1.0) {
         resultIssues.addInstruction(
-            'HOLD', 'Timer', 'Giữ: ${(progress * 100).toInt()}%');
+            'HOLD', 'Timer', 'Giữ: ${elapsed.toStringAsFixed(1)}s');
       } else {
-        resultIssues.addInstruction('HOLD', 'Timer', 'Tốt! Thu về');
+        resultIssues.addInstruction('HOLD', 'Timer', 'Tốt! Hạ chân xuống');
       }
     } else {
       resultIssues.feedback['progress'] = '0.0';
