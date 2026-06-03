@@ -80,6 +80,15 @@ class BearPlank extends ExerciseBase {
   }
 
   @override
+  double? get liveHoldSeconds =>
+      bearState == BearState.hovering || bearState == BearState.fatiguing
+          ? _totalHoverTimeMs / 1000.0
+          : null;
+
+  @override
+  double? get liveHoldTargetSeconds => BearConfig.TARGET_HOVER_MS / 1000.0;
+
+  @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing == CameraFacing.front) {
       return "⚠️ Yêu cầu quay ngang (Side) để đo độ phẳng của lưng và độ cao đầu gối.";

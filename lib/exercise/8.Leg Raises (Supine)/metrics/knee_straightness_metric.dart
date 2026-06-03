@@ -19,7 +19,8 @@ class KneeStraightnessMetric extends LegRaiseMetricBase {
     if (ctx.state == LegRaiseState.lying) return; // Không bắt lúc đang nằm thở
 
     // Yêu cầu góc gối >= 160 độ trong suốt quá trình rep
-    if (_faultDebouncer.update(ctx.kneeStraightnessAngle < 160.0)) {
+    if (_faultDebouncer.update(
+        ctx.kneeStraightnessAngle < LegRaiseConfig.START_KNEE_STRAIGHT_MIN)) {
       if (!_faults.any((f) => f.type == 'BentKnee')) {
         _faults.add(FaultRecord(
           phase: ctx.state.name,

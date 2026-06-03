@@ -1440,6 +1440,10 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         trackedMetrics.isNotEmpty && (debugEnabled || _isStaffUser);
     final showDebugPanel = debugEnabled && _debugPanelOpen;
     final previewFit = _previewFit;
+    final holdSeconds = widget.exercise.liveHoldSeconds;
+    final holdTargetSeconds = widget.exercise.liveHoldTargetSeconds;
+    final showLiveHoldTimer =
+        activeState && holdSeconds != null && !showDebugPanel;
 
     // Derive ivory phase verb from squat state machine phases.
     // Standing = default resting position (not a "ready" state).
@@ -1448,6 +1452,22 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     String phaseVerb;
     String phaseHint;
     switch (phaseKey) {
+      case 'forearm_plank':
+        phaseVerb = isHoldPhase ? 'GI\u1eee' : 'L\u00caN';
+        phaseHint = isHoldPhase
+            ? 'Gi\u1eef c\u1eb3ng tay \u0111\u1ee7 3 gi\u00e2y'
+            : '\u0110\u1ea9y l\u00ean c\u00f3 ki\u1ec3m so\u00e1t';
+      case 'pushing_up':
+        phaseVerb = 'L\u00caN';
+        phaseHint = '\u0110\u1ea9y t\u1eeb c\u1eb3ng tay l\u00ean high plank';
+      case 'high_plank':
+        phaseVerb = isHoldPhase ? 'GI\u1eee' : 'XU\u1ed0NG';
+        phaseHint = isHoldPhase
+            ? 'Gi\u1eef high plank \u0111\u1ee7 3 gi\u00e2y'
+            : 'H\u1ea1 v\u1ec1 c\u1eb3ng tay c\u00f3 ki\u1ec3m so\u00e1t';
+      case 'lowering':
+        phaseVerb = 'XU\u1ed0NG';
+        phaseHint = 'H\u1ea1 t\u1eeb high plank v\u1ec1 c\u1eb3ng tay';
       case 'descending':
         phaseVerb = 'XUỐNG';
         phaseHint = 'Hạ chậm, kiểm soát';
@@ -1640,9 +1660,20 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
           // ── Layer 7: PT reference loop (top-left, just below chrome row) ──
           // JSX places it at top:116 (16px below chrome bottom). chrome bottom
           // = media.padding.top + 10 + 36 = +46, so PT loop sits at +56.
+          if (showLiveHoldTimer)
+            Positioned(
+              top: media.padding.top + 58,
+              left: 16,
+              child: _LiveHoldTimerChip(
+                seconds: holdSeconds,
+                targetSeconds: holdTargetSeconds,
+              ),
+            ),
+
           if (activeState &&
               !(debugEnabled && _debugPanelOpen) &&
-              guidanceCopy == null)
+              guidanceCopy == null &&
+              !showLiveHoldTimer)
             Positioned(
               top: media.padding.top + 56,
               left: 16,
@@ -2068,6 +2099,15 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     if (value.contains('pause')) {
       return 'Giữ đáy thêm một nhịp rồi mới đứng lên.';
     }
+    if (value == 'Ready to push') {
+      return '\u0110\u1ea9y l\u00ean khi \u0111\u00e3 gi\u1eef \u0111\u1ee7 3 gi\u00e2y.';
+    }
+    if (value == 'Pushing up') {
+      return '\u0110\u1ea9y t\u1eeb c\u1eb3ng tay l\u00ean high plank.';
+    }
+    if (value == 'Lower with control') {
+      return 'H\u1ea1 v\u1ec1 c\u1eb3ng tay c\u00f3 ki\u1ec3m so\u00e1t.';
+    }
     if (value == 'Going Down...') {
       return 'Hạ người chậm và kiểm soát.';
     }
@@ -2096,9 +2136,15 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   String _translateStatus(String value) {
     final seconds = _extractDurationSeconds(value);
     if (_isHoldStatus(value)) {
+      final holdTarget = widget.exercise.currentPhaseKey == 'bottom'
+          ? '\u0111\u00e1y'
+          : 't\u01b0 th\u1ebf';
+      final releaseCue = widget.exercise.currentPhaseKey == 'bottom'
+          ? 'r\u1ed3i \u0111\u1ea9y l\u00ean'
+          : 'tr\u01b0\u1edbc khi chuy\u1ec3n pha';
       return seconds == null
-          ? 'Giữ đáy rồi đẩy lên.'
-          : 'Giữ đáy ${seconds.toStringAsFixed(1)} giây rồi đẩy lên.';
+          ? 'Gi\u1eef $holdTarget $releaseCue.'
+          : 'Gi\u1eef $holdTarget ${seconds.toStringAsFixed(1)} gi\u00e2y $releaseCue.';
     }
     if (_isReleaseStatus(value)) {
       return 'Đẩy lên ngay.';
@@ -2311,6 +2357,74 @@ class _BottomHoldCue {
   final double progress;
   final double? remaining;
   final bool readyToPush;
+}
+
+class _LiveHoldTimerChip extends StatelessWidget {
+  const _LiveHoldTimerChip({
+    required this.seconds,
+    required this.targetSeconds,
+  });
+
+  final double seconds;
+  final double? targetSeconds;
+
+  @override
+  Widget build(BuildContext context) {
+    final target = targetSeconds;
+    final value = target == null
+        ? '${seconds.toStringAsFixed(1)}s'
+        : '${seconds.toStringAsFixed(1)}s / ${target.toStringAsFixed(0)}s';
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(100),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          height: 36,
+          padding: const EdgeInsets.fromLTRB(10, 0, 12, 0),
+          decoration: BoxDecoration(
+            color: VikaIvory.heroBg.withValues(alpha: 0.66),
+            borderRadius: BorderRadius.circular(100),
+            border: Border.all(color: VikaIvory.yellow.withValues(alpha: 0.34)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.26),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.timer_rounded,
+                size: 16,
+                color: VikaIvory.yellow,
+              ),
+              const SizedBox(width: 7),
+              Text(
+                value,
+                style: TextStyle(
+                  fontFamily: VikaIvory.fontFamily,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: VikaIvory.invInk,
+                  height: 1,
+                  shadows: [
+                    Shadow(
+                      color: Colors.black.withValues(alpha: 0.72),
+                      blurRadius: 6,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _SetupGuidancePanel extends StatelessWidget {

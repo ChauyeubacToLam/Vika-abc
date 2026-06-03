@@ -85,6 +85,7 @@ class GluteBridge extends ExerciseBase {
 
   // --- Peak hip position tracked during ascending ---
   double? _peakHipY;
+  int? _topHoldStartMs;
 
   // --- Angle and deviation at peak hip (for HipExtension per-rep check) ---
   double? _peakShoulderHipKneeAngle;
@@ -111,6 +112,12 @@ class GluteBridge extends ExerciseBase {
     speedControlMetric,
     neckHeadMetric,
   ];
+
+  @override
+  double? get liveHoldSeconds =>
+      gluteState == GluteBridgeState.topHold && _topHoldStartMs != null
+          ? (frameTimestampMs - _topHoldStartMs!) / 1000.0
+          : null;
 
   /* -----------------------------------------------------------------------
      UI BRIDGE
@@ -609,6 +616,7 @@ class GluteBridge extends ExerciseBase {
   void _transitionState(GluteBridgeState newState, int timestampMs) {
     previousGluteState = gluteState;
     gluteState = newState;
+    _topHoldStartMs = newState == GluteBridgeState.topHold ? timestampMs : null;
 
     // Clear coaching instructions at the start of a new rep.
     if (newState == GluteBridgeState.ascending) {

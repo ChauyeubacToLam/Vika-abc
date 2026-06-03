@@ -97,6 +97,13 @@ class Cobra extends ExerciseBase {
   }
 
   @override
+  double? get liveHoldSeconds =>
+      cobraState == CobraState.holding ? _currentHoldSeconds() : null;
+
+  @override
+  double? get liveHoldTargetSeconds => CobraConfig.HOLD_DURATION;
+
+  @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     final shoulder = getSideLandmark(
       landmarks: landmarks,

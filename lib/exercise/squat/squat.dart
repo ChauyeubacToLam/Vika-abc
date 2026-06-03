@@ -224,6 +224,18 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
     }
   }
 
+  @override
+  double? get liveHoldSeconds {
+    if (squatState != SquatState.bottom) return null;
+    final remaining = tempoMetric.bottomHoldRemaining(frameTimestampMs);
+    if (remaining == null) return null;
+    return (TempoConfig.BOTTOM_HOLD_MIN - remaining)
+        .clamp(0.0, TempoConfig.BOTTOM_HOLD_MIN);
+  }
+
+  @override
+  double? get liveHoldTargetSeconds => TempoConfig.BOTTOM_HOLD_MIN;
+
   bool get hasCompletedBottomHold {
     final holdDuration = tempoMetric.bottomHoldDuration;
     if (holdDuration != null) {

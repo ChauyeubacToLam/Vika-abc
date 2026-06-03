@@ -44,6 +44,13 @@ class HoldTempoMetric extends SeatedForwardMetricBase {
     }
   }
 
+  double getLiveHoldTime(int currentMs) {
+    if (_holdStartMs != null) {
+      return activeHoldSeconds + ((currentMs - _holdStartMs!) / 1000.0);
+    }
+    return activeHoldSeconds;
+  }
+
   void _validateHoldTime() {
     if (activeHoldSeconds < SeatedForwardConfig.At_Min_Hold_Time) {
       if (!_faults.any((f) => f.type == 'TempoShort')) {

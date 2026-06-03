@@ -21,10 +21,11 @@ class DeadBugConfig {
   static const double START_ANGLE_MAX = 130.0;
 
   // State Transition Thresholds (Dựa vào góc mở của chi đang hạ xuống)
-  static const double EXTENDING_THRESHOLD = 120.0;
-  static const double HOLD_THRESHOLD = 160.0; // Gần sát sàn
-  static const double RETURNING_THRESHOLD = 150.0;
-  static const double SETUP_THRESHOLD = 110.0;
+  static const double EXTENDING_THRESHOLD = 115.0;
+  static const double HOLD_THRESHOLD = 145.0;
+  static const double RETURNING_THRESHOLD = 135.0;
+  static const double SETUP_THRESHOLD = 115.0;
+  static const double OPPOSITE_PAIR_MARGIN = 10.0;
 }
 
 class DeadBug extends ExerciseBase {
@@ -40,6 +41,7 @@ class DeadBug extends ExerciseBase {
   DeadBugState previousState = DeadBugState.setup;
 
   int? _exerciseStartTimeMs;
+  int? _holdStartTimeMs;
   bool _timeoutReached = false;
 
   // DIAGNOSTIC LOG
@@ -100,6 +102,12 @@ class DeadBug extends ExerciseBase {
         return 'Thu về';
     }
   }
+
+  @override
+  double? get liveHoldSeconds =>
+      state == DeadBugState.hold && _holdStartTimeMs != null
+          ? (frameTimestampMs - _holdStartTimeMs!) / 1000.0
+          : null;
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
@@ -255,24 +263,35 @@ class DeadBug extends ExerciseBase {
     bool physicalLeftArm =
         isPhysicalLeftSide(activeWrist, lShoulder, rShoulder);
 
-    final leftArmExtended = lArmAng > DeadBugConfig.EXTENDING_THRESHOLD;
-    final rightArmExtended = rArmAng > DeadBugConfig.EXTENDING_THRESHOLD;
-    final leftLegExtended = lHipAng > DeadBugConfig.EXTENDING_THRESHOLD;
-    final rightLegExtended = rHipAng > DeadBugConfig.EXTENDING_THRESHOLD;
-    final validLeftArmRightLeg = leftArmExtended &&
-        rightLegExtended &&
-        !rightArmExtended &&
-        !leftLegExtended;
-    final validRightArmLeftLeg = rightArmExtended &&
-        leftLegExtended &&
-        !leftArmExtended &&
-        !rightLegExtended;
+    final leftArmRightLegScore = lArmAng < rHipAng ? lArmAng : rHipAng;
+    final rightArmLeftLegScore = rArmAng < lHipAng ? rArmAng : lHipAng;
+    final leftArmLeftLegScore = lArmAng < lHipAng ? lArmAng : lHipAng;
+    final rightArmRightLegScore = rArmAng < rHipAng ? rArmAng : rHipAng;
+    final bestSameSideScore = leftArmLeftLegScore > rightArmRightLegScore
+        ? leftArmLeftLegScore
+        : rightArmRightLegScore;
+    final validLeftArmRightLeg = leftArmRightLegScore >= rightArmLeftLegScore &&
+        leftArmRightLegScore > DeadBugConfig.EXTENDING_THRESHOLD &&
+        leftArmRightLegScore >=
+            bestSameSideScore + DeadBugConfig.OPPOSITE_PAIR_MARGIN;
+    final validRightArmLeftLeg = rightArmLeftLegScore > leftArmRightLegScore &&
+        rightArmLeftLegScore > DeadBugConfig.EXTENDING_THRESHOLD &&
+        rightArmLeftLegScore >=
+            bestSameSideScore + DeadBugConfig.OPPOSITE_PAIR_MARGIN;
     final hasValidOppositePair = validLeftArmRightLeg || validRightArmLeftLeg;
     final pairExtensionAngle = validLeftArmRightLeg
-        ? (lArmAng < rHipAng ? lArmAng : rHipAng)
+        ? leftArmRightLegScore
         : validRightArmLeftLeg
-            ? (rArmAng < lHipAng ? rArmAng : lHipAng)
+            ? rightArmLeftLegScore
             : 0.0;
+
+    if (validLeftArmRightLeg) {
+      physicalLeftArm = isPhysicalLeftSide(lWrist, lShoulder, rShoulder);
+      physicalLeftLeg = isPhysicalLeftSide(rAnkle, lHip, rHip);
+    } else if (validRightArmLeftLeg) {
+      physicalLeftArm = isPhysicalLeftSide(rWrist, lShoulder, rShoulder);
+      physicalLeftLeg = isPhysicalLeftSide(lAnkle, lHip, rHip);
+    }
 
     if (state == DeadBugState.hold) {
       _peakPhysicalLeftArm = physicalLeftArm;
@@ -366,6 +385,7 @@ class DeadBug extends ExerciseBase {
     if (newState == state) return;
     previousState = state;
     state = newState;
+    _holdStartTimeMs = newState == DeadBugState.hold ? now : null;
     for (var metric in _metrics)
       metric.onStateTransition(previousState, newState, now);
   }
@@ -438,6 +458,7 @@ class DeadBug extends ExerciseBase {
     correctForm = true;
     _peakPhysicalLeftArm = null;
     _peakPhysicalLeftLeg = null;
+    _holdStartTimeMs = null;
     for (var metric in _metrics) metric.resetAndCountFault();
   }
 }

@@ -26,6 +26,9 @@ class PlankUpDown extends ExerciseBase {
 
   int? _exerciseStartTimeMs;
   bool _isTimeout = false;
+  int? _holdStartTimeMs;
+  bool _holdCompleteForState = false;
+  bool _reachedHighPlankInCycle = false;
 
   // Telemetry: Lưu dữ liệu từng frame để debug
   final List<Map<String, dynamic>> _telemetryLog = [];
@@ -82,6 +85,15 @@ class PlankUpDown extends ExerciseBase {
   }
 
   // Yêu cầu góc ngang (Side)
+  @override
+  double? get liveHoldSeconds =>
+      _isHoldState(plankState) && !_holdCompleteForState
+          ? _holdElapsedSeconds(frameTimestampMs)
+          : null;
+
+  @override
+  double? get liveHoldTargetSeconds => PlankConfig.HOLD_DURATION_SECONDS;
+
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing == CameraFacing.front) {
@@ -288,31 +300,46 @@ class PlankUpDown extends ExerciseBase {
       double kneeAngle, int now) {
     if (kneeAngle < PlankConfig.KNEE_EXTENSION_MIN) {
       resultIssues.feedback['Knee'] = 'Thẳng đầu gối ra!';
+      _resetHoldTimer();
+      _updatePhaseInstruction(now);
       return; // Dừng State Machine, không đếm rep nếu gối bị co
     } else {
       resultIssues.feedback.remove('Knee');
     }
 
+    _updateHoldGate(leftElbowAngle, rightElbowAngle, now);
+
     switch (plankState) {
       case PlankState.forearm_plank:
-        if (_pushingDebouncer.update(
-            leftElbowAngle > PlankConfig.ELBOW_PUSHING_THRESHOLD ||
-                rightElbowAngle > PlankConfig.ELBOW_PUSHING_THRESHOLD)) {
+        if (_holdCompleteForState && _reachedHighPlankInCycle) {
+          _completeRep();
+          _reachedHighPlankInCycle = false;
+        }
+        if (_holdCompleteForState &&
+            _pushingDebouncer.update(
+                leftElbowAngle > PlankConfig.ELBOW_PUSHING_THRESHOLD ||
+                    rightElbowAngle > PlankConfig.ELBOW_PUSHING_THRESHOLD)) {
           _transitionState(PlankState.pushing_up, now);
+        } else if (!_holdCompleteForState) {
+          _pushingDebouncer.reset();
         }
         break;
       case PlankState.pushing_up:
         if (_highPlankDebouncer.update(
             leftElbowAngle > PlankConfig.ELBOW_HIGH_PLANK_MIN &&
                 rightElbowAngle > PlankConfig.ELBOW_HIGH_PLANK_MIN)) {
+          _reachedHighPlankInCycle = true;
           _transitionState(PlankState.high_plank, now);
         }
         break;
       case PlankState.high_plank:
-        if (_loweringDebouncer.update(
-            leftElbowAngle < PlankConfig.ELBOW_LOWERING_THRESHOLD ||
-                rightElbowAngle < PlankConfig.ELBOW_LOWERING_THRESHOLD)) {
+        if (_holdCompleteForState &&
+            _loweringDebouncer.update(
+                leftElbowAngle < PlankConfig.ELBOW_LOWERING_THRESHOLD ||
+                    rightElbowAngle < PlankConfig.ELBOW_LOWERING_THRESHOLD)) {
           _transitionState(PlankState.lowering, now);
+        } else if (!_holdCompleteForState) {
+          _loweringDebouncer.reset();
         }
         break;
       case PlankState.lowering:
@@ -320,15 +347,120 @@ class PlankUpDown extends ExerciseBase {
             leftElbowAngle < PlankConfig.ELBOW_FOREARM_MAX &&
                 rightElbowAngle < PlankConfig.ELBOW_FOREARM_MAX)) {
           _transitionState(PlankState.forearm_plank, now);
-          _completeRep();
         }
         break;
     }
+
+    _updatePhaseInstruction(now);
+  }
+
+  void _updateHoldGate(double leftElbowAngle, double rightElbowAngle, int now) {
+    if (!_isHoldState(plankState)) {
+      _holdStartTimeMs = null;
+      _clearHoldDebugData();
+      return;
+    }
+
+    if (_holdCompleteForState) return;
+
+    final isHoldingPose =
+        _isHoldingPose(plankState, leftElbowAngle, rightElbowAngle);
+    if (!isHoldingPose) {
+      _holdStartTimeMs = null;
+      return;
+    }
+
+    _holdStartTimeMs ??= now;
+    if (now - _holdStartTimeMs! >= PlankConfig.HOLD_DURATION_MS) {
+      _holdCompleteForState = true;
+    }
+  }
+
+  bool _isHoldState(PlankState state) =>
+      state == PlankState.forearm_plank || state == PlankState.high_plank;
+
+  bool _isHoldingPose(
+      PlankState state, double leftElbowAngle, double rightElbowAngle) {
+    switch (state) {
+      case PlankState.forearm_plank:
+        return leftElbowAngle <= PlankConfig.ELBOW_FOREARM_MAX &&
+            rightElbowAngle <= PlankConfig.ELBOW_FOREARM_MAX;
+      case PlankState.high_plank:
+        return leftElbowAngle >= PlankConfig.ELBOW_HIGH_PLANK_MIN &&
+            rightElbowAngle >= PlankConfig.ELBOW_HIGH_PLANK_MIN;
+      case PlankState.pushing_up:
+      case PlankState.lowering:
+        return false;
+    }
+  }
+
+  double _holdElapsedSeconds(int now) {
+    if (_holdStartTimeMs == null) return 0.0;
+    return ((now - _holdStartTimeMs!) / 1000.0)
+        .clamp(0.0, PlankConfig.HOLD_DURATION_SECONDS);
+  }
+
+  double _holdRemainingSeconds(int now) =>
+      (PlankConfig.HOLD_DURATION_SECONDS - _holdElapsedSeconds(now))
+          .clamp(0.0, PlankConfig.HOLD_DURATION_SECONDS);
+
+  double _holdProgress(int now) =>
+      (_holdElapsedSeconds(now) / PlankConfig.HOLD_DURATION_SECONDS)
+          .clamp(0.0, 1.0);
+
+  void _updatePhaseInstruction(int now) {
+    debugData['Hold_Complete'] = _holdCompleteForState;
+
+    if (_isHoldState(plankState) && !_holdCompleteForState) {
+      final remaining = _holdRemainingSeconds(now);
+      resultIssues.addInstruction(
+          plankState.name, 'Status', 'Hold! ${remaining.toStringAsFixed(1)}s');
+      debugData['holdProgress'] = _holdProgress(now);
+      debugData['holdRemaining'] = remaining;
+      debugData['Hold_Remaining'] = remaining.toStringAsFixed(1);
+      return;
+    }
+
+    _clearHoldDebugData();
+
+    switch (plankState) {
+      case PlankState.forearm_plank:
+        resultIssues.addInstruction(plankState.name, 'Status', 'Ready to push');
+        break;
+      case PlankState.pushing_up:
+        resultIssues.addInstruction(plankState.name, 'Status', 'Pushing up');
+        break;
+      case PlankState.high_plank:
+        resultIssues.addInstruction(
+            plankState.name, 'Status', 'Lower with control');
+        break;
+      case PlankState.lowering:
+        resultIssues.addInstruction(plankState.name, 'Status', 'Going Down...');
+        break;
+    }
+  }
+
+  void _resetHoldTimer() {
+    _holdStartTimeMs = null;
+    _holdCompleteForState = false;
+    _clearHoldDebugData();
+  }
+
+  void _clearHoldDebugData() {
+    debugData.remove('holdProgress');
+    debugData.remove('holdRemaining');
+    debugData.remove('Hold_Remaining');
   }
 
   void _transitionState(PlankState newState, int now) {
     previousPlankState = plankState;
     plankState = newState;
+    _holdStartTimeMs = _isHoldState(newState) ? now : null;
+    _holdCompleteForState = !_isHoldState(newState);
+    _pushingDebouncer.reset();
+    _highPlankDebouncer.reset();
+    _loweringDebouncer.reset();
+    _forearmDebouncer.reset();
     for (var metric in _metrics) {
       metric.onStateTransition(previousPlankState, newState, now);
     }

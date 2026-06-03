@@ -751,6 +751,15 @@ abstract class ExerciseBase {
   String get exerciseName;
   String get currentPhaseKey;
   String get currentPhaseLabel;
+
+  /// Live hold timer for exercises that require the user to hold a pose.
+  ///
+  /// Return null when the current phase is not an active hold so the camera UI
+  /// can hide the shared hold timer.
+  double? get liveHoldSeconds => null;
+
+  /// Optional target used by the shared hold timer UI.
+  double? get liveHoldTargetSeconds => null;
 }
 
 class _ExerciseDebugMetricSource implements DebugMetricSource {

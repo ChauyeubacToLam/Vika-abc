@@ -15,6 +15,9 @@ enum KteState { standing_base, approaching, touch, returning }
 
 class StandingKneeToElbowConfig {
   static const int MAX_REP = 30; // 15 per side
+  static const double KNEE_LIFT_START_RATIO = 0.10;
+  static const double TOUCH_DISTANCE_RATIO = 1.05;
+  static const double TOUCH_EXIT_DISTANCE_RATIO = 1.18;
 }
 
 class StandingKneeToElbow extends ExerciseBase {
@@ -100,8 +103,8 @@ class StandingKneeToElbow extends ExerciseBase {
     final rightAnkle = landmarks[PoseLandmarkType.rightAnkle];
     final leftShoulder = landmarks[PoseLandmarkType.leftShoulder];
     final rightShoulder = landmarks[PoseLandmarkType.rightShoulder];
-    final leftWrist = landmarks[PoseLandmarkType.leftWrist];
-    final rightWrist = landmarks[PoseLandmarkType.rightWrist];
+    final leftElbow = landmarks[PoseLandmarkType.leftElbow];
+    final rightElbow = landmarks[PoseLandmarkType.rightElbow];
 
     if (leftHip == null ||
         rightHip == null ||
@@ -111,8 +114,8 @@ class StandingKneeToElbow extends ExerciseBase {
         rightAnkle == null ||
         leftShoulder == null ||
         rightShoulder == null ||
-        leftWrist == null ||
-        rightWrist == null) {
+        leftElbow == null ||
+        rightElbow == null) {
       return false;
     }
 
@@ -136,9 +139,9 @@ class StandingKneeToElbow extends ExerciseBase {
       return false;
     }
 
-    if (leftWrist.y > leftShoulder.y + torsoLength * 0.1 ||
-        rightWrist.y > rightShoulder.y + torsoLength * 0.1) {
-      resultIssues.feedback['System'] = 'Hãy đặt 2 tay sau đầu.';
+    if (leftElbow.y > leftShoulder.y + torsoLength * 0.35 ||
+        rightElbow.y > rightShoulder.y + torsoLength * 0.35) {
+      resultIssues.feedback['System'] = 'Nang hai khuyu tay len gan ngang vai.';
       return false;
     }
 
@@ -185,10 +188,14 @@ class StandingKneeToElbow extends ExerciseBase {
     if (kteState == KteState.standing_base) {
       // Fast movement: check if knee is significantly lifted relative to torso length
       double torsoLength = (leftShoulder.y - leftHip.y).abs();
-      if (leftKneeY < rightKneeY - torsoLength * 0.15) {
+      if (leftKneeY <
+          rightKneeY -
+              torsoLength * StandingKneeToElbowConfig.KNEE_LIFT_START_RATIO) {
         _liftingLegSide = TrackedSide.left;
         _standingLegSide = TrackedSide.right;
-      } else if (rightKneeY < leftKneeY - torsoLength * 0.15) {
+      } else if (rightKneeY <
+          leftKneeY -
+              torsoLength * StandingKneeToElbowConfig.KNEE_LIFT_START_RATIO) {
         _liftingLegSide = TrackedSide.right;
         _standingLegSide = TrackedSide.left;
       }
@@ -267,12 +274,15 @@ class StandingKneeToElbow extends ExerciseBase {
   void _updateStateMachine(double distanceD, double liftingKneeY,
       double standingKneeY, double torsoLength, int now) {
     if (kteState == KteState.standing_base) {
-      if (liftingKneeY < standingKneeY - torsoLength * 0.15) {
+      if (liftingKneeY <
+          standingKneeY -
+              torsoLength * StandingKneeToElbowConfig.KNEE_LIFT_START_RATIO) {
         _transitionState(KteState.approaching, now);
       }
     } else if (kteState == KteState.approaching) {
       // Relaxed entry threshold from 0.6 to 0.85
-      if (distanceD < torsoLength * 0.85) {
+      if (distanceD <
+          torsoLength * StandingKneeToElbowConfig.TOUCH_DISTANCE_RATIO) {
         _transitionState(KteState.touch, now);
       } else if (liftingKneeY > standingKneeY - torsoLength * 0.1) {
         // Returned early without reaching touch distance
@@ -280,7 +290,9 @@ class StandingKneeToElbow extends ExerciseBase {
       }
     } else if (kteState == KteState.touch) {
       // Relaxed exit threshold from 0.8 to 1.0 to give time to reach peak
-      if (distanceD > torsoLength * 1.0 ||
+      if (distanceD >
+              torsoLength *
+                  StandingKneeToElbowConfig.TOUCH_EXIT_DISTANCE_RATIO ||
           liftingKneeY > standingKneeY - torsoLength * 0.2) {
         _transitionState(KteState.returning, now);
       }

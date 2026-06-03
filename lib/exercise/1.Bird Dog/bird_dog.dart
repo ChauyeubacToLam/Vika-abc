@@ -26,6 +26,7 @@ class BirdDogConfig {
   static const double HOLD_ARM_THRESHOLD = 150;
   static const double RETURNING_KNEE_THRESHOLD = 150;
   static const double NEUTRAL_KNEE_THRESHOLD = 110;
+  static const double HOLD_TARGET_SECONDS = 5.0;
 }
 
 class BirdDog extends ExerciseBase {
@@ -98,6 +99,15 @@ class BirdDog extends ExerciseBase {
         return 'Thu về';
     }
   }
+
+  @override
+  double? get liveHoldSeconds =>
+      state == BirdDogState.hold_extended && tempoMetric.holdStartMs != null
+          ? (frameTimestampMs - tempoMetric.holdStartMs!) / 1000.0
+          : null;
+
+  @override
+  double? get liveHoldTargetSeconds => BirdDogConfig.HOLD_TARGET_SECONDS;
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {

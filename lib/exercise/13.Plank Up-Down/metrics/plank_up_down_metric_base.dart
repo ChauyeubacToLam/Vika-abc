@@ -11,6 +11,8 @@ enum PlankState { forearm_plank, pushing_up, high_plank, lowering }
 class PlankConfig {
   static const int MAX_REP = 12; // Mức Intermediate
   static const int MAX_DURATION_MS = 90000; // 90 giây timeout
+  static const int HOLD_DURATION_MS = 3000;
+  static const double HOLD_DURATION_SECONDS = HOLD_DURATION_MS / 1000;
 
   // Góc cơ thể (Shoulder-Hip-Ankle)
   static const double BODY_ALIGNMENT_START_MIN = 170.0;

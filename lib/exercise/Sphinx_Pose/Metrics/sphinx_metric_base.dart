@@ -6,8 +6,8 @@ export '../../fault_record.dart';
 // --- Quy định danh: Các biến thuật toán 'A', ký tự 2 duy nhất ---
 class SphinxConfig {
   static const double Aa_Start_Body_Angle = 170.0;
-  static const List<double> Ab_Elbow_Hold_Angle = [85.0, 100.0];
-  static const List<double> Ac_Spine_Ext_Angle = [140.0, 160.0];
+  static const List<double> Ab_Elbow_Hold_Angle = [70.0, 120.0];
+  static const List<double> Ac_Spine_Ext_Angle = [130.0, 170.0];
   static const double Ad_Hip_Ground_Tol = 0.15;
   static const int Ae_Min_Hold_Time = 3;
   static const int Af_Max_Reps = 1;

@@ -41,7 +41,7 @@ class PlankShoulderTap extends ExerciseBase {
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
-    return null;
+    return _cameraAngleGuidance();
   }
 
   PlankTapState tapState = PlankTapState.base;
@@ -65,6 +65,12 @@ class PlankShoulderTap extends ExerciseBase {
 
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+    final angleGuidance = _cameraAngleGuidance();
+    if (angleGuidance != null) {
+      resultIssues.feedback['System'] = angleGuidance;
+      return false;
+    }
+
     final lm = _getLandmarks(landmarks);
     if (lm == null) return false;
 
@@ -131,6 +137,12 @@ class PlankShoulderTap extends ExerciseBase {
   void checkingPose(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     _exerciseStartTimeMs ??= frameTimestampMs;
     final now = frameTimestampMs;
+    final angleGuidance = _cameraAngleGuidance();
+    if (angleGuidance != null) {
+      resultIssues.feedback['System'] = angleGuidance;
+      return;
+    }
+
     final lm = _getLandmarks(landmarks);
 
     // Nếu mất hẳn thân người thì bỏ qua frame, KHÔNG reset state đang tập
@@ -303,6 +315,27 @@ class PlankShoulderTap extends ExerciseBase {
         'ankle': lm[PoseLandmarkType.rightAnkle]!,
       };
     }
+  }
+
+  String? _cameraAngleGuidance() {
+    if (cameraFacing == CameraFacing.angled &&
+        frontFacingRatio >= PlankTapConfig.CAMERA_45_MIN_RATIO &&
+        frontFacingRatio <= PlankTapConfig.CAMERA_45_MAX_RATIO) {
+      return null;
+    }
+
+    if (cameraFacing == CameraFacing.front ||
+        frontFacingRatio > PlankTapConfig.CAMERA_45_MAX_RATIO) {
+      return 'Xoay nguoi nghieng khoang 45 do, dung doi dien camera.';
+    }
+
+    if (cameraFacing == CameraFacing.left ||
+        cameraFacing == CameraFacing.right ||
+        frontFacingRatio < PlankTapConfig.CAMERA_45_MIN_RATIO) {
+      return 'Xoay nguc them ve phia man hinh den goc 45 do.';
+    }
+
+    return 'Can quay nguoi khoang 45 do voi camera roi moi tap.';
   }
 
   @override

@@ -292,7 +292,8 @@ class LegRaise extends ExerciseBase {
       return;
     }
 
-    if (state != LegRaiseState.lying && ctx.kneeStraightnessAngle < 160.0) {
+    if (state != LegRaiseState.lying &&
+        ctx.kneeStraightnessAngle < LegRaiseConfig.START_KNEE_STRAIGHT_MIN) {
       ctx.resultIssues.feedback['Error'] = 'Gập gối';
       ctx.resultIssues
           .addInstruction('BLOCK', 'Error', 'Hãy duỗi thẳng chân ra!');

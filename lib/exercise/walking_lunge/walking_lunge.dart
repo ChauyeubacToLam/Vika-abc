@@ -20,6 +20,9 @@ class WalkingLungeConfig {
   static const double STEP_START_NORM = 0.55;
   static const double STEP_CLOSE_NORM = 0.35;
   static const double FRAME_EDGE_MARGIN_RATIO = 0.04;
+  static const double FRONT_BOTTOM_ANGLE_MAX = 125.0;
+  static const double REAR_BOTTOM_ANGLE_MAX = 135.0;
+  static const int MIN_BOTTOM_CONFIRM_MS = 650;
 }
 
 class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
@@ -37,6 +40,7 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
   WalkingState previousWalkingState = WalkingState.standing;
 
   int? _bottomStartTime;
+  bool _bottomDepthConfirmed = false;
   final List<FaultRecord> _localFaults = [];
   Size? _lastImageSize;
 
@@ -113,6 +117,15 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
         return 'Kéo lên';
     }
   }
+
+  @override
+  double? get liveHoldSeconds =>
+      walkingState == WalkingState.bottom && _bottomStartTime != null
+          ? (frameTimestampMs - _bottomStartTime!) / 1000.0
+          : null;
+
+  @override
+  double? get liveHoldTargetSeconds => 2.0;
 
   @override
   bool requestStop() => repCount >= maxRep;
@@ -397,10 +410,19 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
     } else if (walkingState == WalkingState.descending) {
       // Bottom when hip stops moving down or knee hits 100
       if (ctx.frontKneeAngle <= 100 || hipYChange == ChangeState.decreasing) {
-        if (ctx.frontKneeAngle > 135) {
+        if (!_isBottomDepthConfirmed(ctx)) {
           // Knee didn't bend enough. This is just normal walking, not a lunge attempt.
-          _transitionState(WalkingState.stepping, now);
+          if (ctx.frontKneeAngle > 140 && ctx.rearKneeAngle > 145) {
+            _transitionState(WalkingState.stepping, now);
+          } else {
+            ctx.resultIssues.addInstruction(
+              'descending',
+              'Depth',
+              'Ha sau hon, dau goi sau gan san roi moi len.',
+            );
+          }
         } else {
+          _bottomDepthConfirmed = true;
           _transitionState(WalkingState.bottom, now);
           _bottomStartTime = now;
           // evaluate step length here using the real context
@@ -409,32 +431,51 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
       }
     } else if (walkingState == WalkingState.bottom) {
       _bottomStartTime ??= now;
+      _bottomDepthConfirmed =
+          _bottomDepthConfirmed || _isBottomDepthConfirmed(ctx);
 
       // Pulling through when hip moves up
-      if (hipYChange == ChangeState.decreasing || ctx.frontKneeAngle > 120) {
+      final bottomElapsed = now - _bottomStartTime!;
+      if (_bottomDepthConfirmed &&
+          bottomElapsed >= WalkingLungeConfig.MIN_BOTTOM_CONFIRM_MS &&
+          (hipYChange == ChangeState.decreasing || ctx.frontKneeAngle > 120)) {
         _transitionState(WalkingState.pulling_through, now);
+      } else if (!_bottomDepthConfirmed && ctx.frontKneeAngle > 140) {
+        _transitionState(WalkingState.stepping, now);
       }
     } else if (walkingState == WalkingState.pulling_through) {
       // Rep is completed when both knees are mostly straight
-      if (ctx.frontKneeAngle > 150 &&
+      if (_bottomDepthConfirmed &&
+          ctx.frontKneeAngle > 150 &&
           ctx.rearKneeAngle > 150 &&
           stepNorm < WalkingLungeConfig.STEP_START_NORM) {
         _completeRep();
         _transitionState(WalkingState.standing, now);
-      } else if (stepNorm > WalkingLungeConfig.STEP_START_NORM &&
+      } else if (_bottomDepthConfirmed &&
+          stepNorm > WalkingLungeConfig.STEP_START_NORM &&
           ctx.frontKneeAngle > 140 &&
           ctx.rearKneeAngle > 140) {
         // Continuous walking: stepped out for next rep
         _completeRep();
         _transitionState(WalkingState.stepping, now);
-      } else if (hipYChange == ChangeState.increasing &&
+      } else if (_bottomDepthConfirmed &&
+          hipYChange == ChangeState.increasing &&
           stepNorm > WalkingLungeConfig.STEP_START_NORM &&
           stepXChange == ChangeState.increasing) {
         // Continuous walking: immediately started descending
         _completeRep();
         _transitionState(WalkingState.descending, now);
+      } else if (!_bottomDepthConfirmed &&
+          ctx.frontKneeAngle > 155 &&
+          ctx.rearKneeAngle > 155) {
+        _transitionState(WalkingState.standing, now);
       }
     }
+  }
+
+  bool _isBottomDepthConfirmed(WalkingRepContext ctx) {
+    return ctx.frontKneeAngle <= WalkingLungeConfig.FRONT_BOTTOM_ANGLE_MAX &&
+        ctx.rearKneeAngle <= WalkingLungeConfig.REAR_BOTTOM_ANGLE_MAX;
   }
 
   void _transitionState(WalkingState newState, int timestampMs) {
@@ -461,6 +502,13 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
 
     previousWalkingState = walkingState;
     walkingState = newState;
+
+    if (newState == WalkingState.standing ||
+        (newState == WalkingState.stepping &&
+            previousWalkingState != WalkingState.pulling_through)) {
+      _bottomStartTime = null;
+      _bottomDepthConfirmed = false;
+    }
 
     if (newState == WalkingState.stepping &&
         previousWalkingState == WalkingState.standing) {
@@ -500,6 +548,7 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
     correctForm = true;
     _localFaults.clear();
     _bottomStartTime = null;
+    _bottomDepthConfirmed = false;
     frameBuffer.clear();
     for (final metric in _metrics) {
       metric.resetAndCountFault();

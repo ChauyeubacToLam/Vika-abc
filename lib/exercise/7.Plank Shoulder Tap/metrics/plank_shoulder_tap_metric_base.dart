@@ -8,6 +8,8 @@ enum PlankTapState { base, lifting, tap, returning }
 class PlankTapConfig {
   static const int MAX_REP = 20; // 10 rep m
   static const int MAX_DURATION_MS = 90000; // 90s timeout
+  static const double CAMERA_45_MIN_RATIO = 0.35;
+  static const double CAMERA_45_MAX_RATIO = 0.57;
   // C nh t  chu
   static const List<double> TRUNK_STRAIGHT_RANGE = [170.0, 180.0];
 

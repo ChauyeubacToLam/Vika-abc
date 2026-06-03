@@ -73,6 +73,14 @@ class Superman extends ExerciseBase {
   }
 
   @override
+  double? get liveHoldSeconds => superState == SupermanState.hold
+      ? holdMetric.currentHoldSeconds(frameTimestampMs)
+      : null;
+
+  @override
+  double? get liveHoldTargetSeconds => SupermanConfig.HOLD_MIN_MS / 1000.0;
+
+  @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing == CameraFacing.front)
       return "Hãy quay ngang người theo đúng tay vươn.";
@@ -284,12 +292,28 @@ class Superman extends ExerciseBase {
       m.update(ctx);
       debugData.addAll(m.debugData);
     }
+
+    if (superState == SupermanState.setup) {
+      resultIssues.addInstruction('setup', 'Status', 'Nam sap, duoi tay chan');
+    } else if (superState == SupermanState.lifting) {
+      resultIssues.addInstruction('lifting', 'Status', 'Nang tay chan len');
+    } else if (superState == SupermanState.hold) {
+      final holdSeconds = holdMetric.currentHoldSeconds(now);
+      resultIssues.addInstruction(
+        'hold',
+        'Status',
+        'Giu ${holdSeconds.toStringAsFixed(1)}s',
+      );
+    } else if (superState == SupermanState.lowering) {
+      resultIssues.addInstruction('lowering', 'Status', 'Ha cham xuong');
+    }
   }
 
   void _updateStateMachine(SupermanRepContext ctx) {
     bool isLifted = ctx.armElevation > SupermanConfig.LIFT_THRESHOLD &&
         ctx.legElevation > SupermanConfig.LIFT_THRESHOLD;
-    bool isLowered = ctx.armElevation <= 0 && ctx.legElevation <= 0;
+    bool isLowered = ctx.armElevation <= SupermanConfig.LOWERED_THRESHOLD &&
+        ctx.legElevation <= SupermanConfig.LOWERED_THRESHOLD;
 
     switch (superState) {
       case SupermanState.setup:

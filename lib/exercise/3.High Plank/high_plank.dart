@@ -19,6 +19,9 @@ class HighPlankConfig {
   static const double START_ARM_MIN = 150.0;
   static const double START_BODY_MIN = 160.0;
   static const double START_KNEE_MIN = 145.0;
+  static const double FLOOR_CONTACT_Y_TOLERANCE = 0.45;
+  static const double WRIST_BELOW_SHOULDER_MIN = 0.45;
+  static const double ANKLE_BELOW_HIP_MIN = 0.10;
 
   // State Transition Thresholds
   // SETUP/DROPPING -> HOLDING (ngưỡng vào, chuẩn)
@@ -96,6 +99,15 @@ class HighPlank extends ExerciseBase {
         return 'Mất form! Sửa lại ngay';
     }
   }
+
+  @override
+  double? get liveHoldSeconds =>
+      state == HighPlankState.holding || state == HighPlankState.dropping
+          ? timerMetric.totalHoldingTimeMs / 1000.0
+          : null;
+
+  @override
+  double? get liveHoldTargetSeconds => HighPlankConfig.TARGET_TIME_MS / 1000.0;
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
@@ -190,6 +202,18 @@ class HighPlank extends ExerciseBase {
       return false;
     }
 
+    if (!_hasFloorSupport(
+      shoulder: shoulder,
+      wrist: wrist,
+      hip: hip,
+      ankle: ankle,
+      torso: torso,
+    )) {
+      resultIssues.feedback['System'] =
+          'Hay chong tay tren san, khong tap plank tren tuong.';
+      return false;
+    }
+
     double armAngle = calculateAngleNormalized(
         firstPoint: shoulder, midPoint: elbow, lastPoint: wrist);
     double bodyAngle = calculateAngleNormalized(
@@ -275,6 +299,20 @@ class HighPlank extends ExerciseBase {
     }
 
     scaleFactor = calculateDistance(shoulder, hip);
+    if (!_hasFloorSupport(
+      shoulder: shoulder,
+      wrist: wrist,
+      hip: hip,
+      ankle: ankle,
+      torso: scaleFactor == 0 ? 1 : scaleFactor,
+    )) {
+      resultIssues.feedback['System'] =
+          'Hay chong tay tren san, khong tap plank tren tuong.';
+      if (state == HighPlankState.holding) {
+        _transitionState(HighPlankState.dropping, now);
+      }
+      return;
+    }
     double bodyAngle = calculateAngleNormalized(
         firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
     double armAngle = calculateAngleNormalized(
@@ -352,5 +390,22 @@ class HighPlank extends ExerciseBase {
     if (p1.x == p2.x) return p1.y;
     double t = (targetX - p1.x) / (p2.x - p1.x);
     return p1.y + t * (p2.y - p1.y);
+  }
+
+  bool _hasFloorSupport({
+    required PoseLandmark shoulder,
+    required PoseLandmark wrist,
+    required PoseLandmark hip,
+    required PoseLandmark ankle,
+    required double torso,
+  }) {
+    final safeTorso = torso <= 0 ? 1.0 : torso;
+    final wristAnkleYGap = (wrist.y - ankle.y).abs() / safeTorso;
+    final wristBelowShoulder = (wrist.y - shoulder.y) / safeTorso;
+    final ankleBelowHip = (ankle.y - hip.y) / safeTorso;
+
+    return wristAnkleYGap <= HighPlankConfig.FLOOR_CONTACT_Y_TOLERANCE &&
+        wristBelowShoulder >= HighPlankConfig.WRIST_BELOW_SHOULDER_MIN &&
+        ankleBelowHip >= HighPlankConfig.ANKLE_BELOW_HIP_MIN;
   }
 }

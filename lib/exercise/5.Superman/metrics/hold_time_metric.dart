@@ -7,6 +7,11 @@ class HoldTimeMetric extends SupermanMetricBase {
   int? _holdStartMs;
   double lastHoldDurationMs = 0;
 
+  double currentHoldSeconds(int timestampMs) {
+    if (_holdStartMs == null) return 0.0;
+    return (timestampMs - _holdStartMs!) / 1000.0;
+  }
+
   @override
   void onStateTransition(
       SupermanState from, SupermanState to, int timestampMs) {

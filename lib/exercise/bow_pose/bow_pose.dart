@@ -12,10 +12,11 @@ import 'metrics/stability_metric.dart';
 class BowPoseConfig {
   static const int MAX_REP = 3;
 
-  static const double KNEE_SETUP_ANGLE = 135.0;
-  static const double CHEST_LIFT_THRESHOLD = 0.08;
-  static const double THIGH_LIFT_THRESHOLD = 0.01;
-  static const double RELEASE_DIST_THRESHOLD = 0.50;
+  static const double KNEE_SETUP_ANGLE = 150.0;
+  static const double CHEST_LIFT_THRESHOLD = 0.05;
+  static const double THIGH_LIFT_THRESHOLD = 0.0;
+  static const double RELEASE_DIST_THRESHOLD = 0.65;
+  static const double HOLD_TARGET_SECONDS = 15.0;
 }
 
 class BowPose extends ExerciseBase {
@@ -69,6 +70,14 @@ class BowPose extends ExerciseBase {
         return 'Hạ xuống';
     }
   }
+
+  @override
+  double? get liveHoldSeconds => bowPoseState == BowPoseState.hold
+      ? holdDurationMetric.currentHoldSeconds
+      : null;
+
+  @override
+  double? get liveHoldTargetSeconds => BowPoseConfig.HOLD_TARGET_SECONDS;
 
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {

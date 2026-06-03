@@ -91,6 +91,13 @@ class Plank extends ExerciseBase {
     }
   }
 
+  @override
+  double? get liveHoldSeconds =>
+      plankState == PlankState.holding ? _currentHoldSeconds() : null;
+
+  @override
+  double? get liveHoldTargetSeconds => PlankConfig.HOLD_DURATION;
+
   // --- Start Position ---
 
   @override

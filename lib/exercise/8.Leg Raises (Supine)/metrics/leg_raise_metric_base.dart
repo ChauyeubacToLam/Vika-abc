@@ -8,13 +8,13 @@ class LegRaiseConfig {
 
   // Start Position Limits
   static const double START_HIP_FLEXION_MIN = 165.0; // Gần 180 độ
-  static const double START_KNEE_STRAIGHT_MIN = 160.0; // Phải duỗi gối
+  static const double START_KNEE_STRAIGHT_MIN = 150.0; // Beginner-friendly
 
   // State Transition Thresholds
-  static const double RAISING_ANGLE = 170.0;
-  static const double TOP_ANGLE = 100.0; // Vai-Hông-Gối <= 100 độ
-  static const double LOWERING_ANGLE = 105.0;
-  static const double LYING_ANGLE = 165.0;
+  static const double RAISING_ANGLE = 168.0;
+  static const double TOP_ANGLE = 125.0;
+  static const double LOWERING_ANGLE = 135.0;
+  static const double LYING_ANGLE = 160.0;
 
   // Tempo Thresholds (Unified: fault if < 2.0s, target if >= 2.0s)
   static const double TEMPO_FAULT_THRESHOLD = 2.0;

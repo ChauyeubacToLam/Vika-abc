@@ -285,6 +285,15 @@ class SeatedForwardFold extends ExerciseBase {
   }
 
   @override
+  double? get liveHoldSeconds => state == SeatedForwardState.isometricHold
+      ? tempoMetric.getLiveHoldTime(frameTimestampMs)
+      : null;
+
+  @override
+  double? get liveHoldTargetSeconds =>
+      SeatedForwardConfig.At_Min_Hold_Time.toDouble();
+
+  @override
   void onSetComplete() {
     logger.pushKey("knee_bent_fails_count", kneeMetric.faultsCount);
     logger.pushKey("spine_round_fails_count", spineMetric.faultsCount);

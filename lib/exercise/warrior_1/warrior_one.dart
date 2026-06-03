@@ -175,6 +175,13 @@ class WarriorOne extends ExerciseBase {
     }
   }
 
+  @override
+  double? get liveHoldSeconds =>
+      holdState == WarriorOneState.hold ? _currentHoldSeconds() : null;
+
+  @override
+  double? get liveHoldTargetSeconds => WarriorOneConfig.HOLD_DURATION;
+
   // --- Stop Condition ---
 
   @override

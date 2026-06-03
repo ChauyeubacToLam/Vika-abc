@@ -11,6 +11,8 @@ class HoldDurationMetric extends BowPoseMetricBase {
   double _currentHoldSeconds = 0.0;
   double _maxHoldSeconds = 0.0;
 
+  double get currentHoldSeconds => _currentHoldSeconds;
+
   @override
   List<FaultRecord> get faults => _faults;
 

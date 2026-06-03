@@ -9,7 +9,8 @@ enum SupermanState { setup, lifting, hold, lowering }
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 class SupermanConfig {
-  static const double LIFT_THRESHOLD = 0.06;
+  static const double LIFT_THRESHOLD = 0.04;
+  static const double LOWERED_THRESHOLD = 0.025;
   static const double HOLD_MIN_MS = 1500.0;
   static const double SPINE_NEUTRAL_RANGE = 15.0;
   static const double LUMBAR_EXTENSION_DANGER = 25.0;

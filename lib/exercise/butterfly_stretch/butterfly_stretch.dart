@@ -79,6 +79,17 @@ class ButterflyStretch extends ExerciseBase {
   }
 
   @override
+  double? get liveHoldSeconds =>
+      stretchState == ButterflyState.isometric_hold ||
+              stretchState == ButterflyState.release
+          ? _elapsedSeconds
+          : null;
+
+  @override
+  double? get liveHoldTargetSeconds =>
+      ButterflyConfig.TARGET_HOLD_SECONDS.toDouble();
+
+  @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.front) return false;
 

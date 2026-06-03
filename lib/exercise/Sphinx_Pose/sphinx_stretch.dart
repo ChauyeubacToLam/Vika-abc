@@ -44,8 +44,17 @@ class SphinxStretch extends ExerciseBase {
     if (state == SphinxState.isometricHold) {
       tempoMetric.flushCurrentSegment(frameTimestampMs);
     }
-    return tempoMetric.activeHoldSeconds >= SphinxConfig.Ae_Min_Hold_Time;
+    return repCount >= SphinxConfig.Af_Max_Reps ||
+        tempoMetric.activeHoldSeconds >= SphinxConfig.Ae_Min_Hold_Time;
   }
+
+  @override
+  double? get liveHoldSeconds => state == SphinxState.isometricHold
+      ? tempoMetric.getLiveHoldTime(frameTimestampMs)
+      : null;
+
+  @override
+  double? get liveHoldTargetSeconds => SphinxConfig.Ae_Min_Hold_Time.toDouble();
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
@@ -53,11 +62,21 @@ class SphinxStretch extends ExerciseBase {
       return "Vui lòng đặt camera quay ngang hông (Side View).";
     }
 
-    final req = [
-      PoseLandmarkType.leftShoulder,
-      PoseLandmarkType.leftHip,
-      PoseLandmarkType.leftAnkle,
-    ];
+    if (!_selectTrackedSide(landmarks)) {
+      return "Co the chua nam tron trong khung hinh hoac anh sang yeu.";
+    }
+
+    final req = isLeftTracked
+        ? [
+            PoseLandmarkType.leftShoulder,
+            PoseLandmarkType.leftHip,
+            PoseLandmarkType.leftAnkle,
+          ]
+        : [
+            PoseLandmarkType.rightShoulder,
+            PoseLandmarkType.rightHip,
+            PoseLandmarkType.rightAnkle,
+          ];
 
     for (final type in req) {
       if (landmarks[type] == null ||
@@ -70,6 +89,8 @@ class SphinxStretch extends ExerciseBase {
 
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+    if (!_selectTrackedSide(landmarks)) return false;
+
     final shoulder = isLeftTracked
         ? landmarks[PoseLandmarkType.leftShoulder]
         : landmarks[PoseLandmarkType.rightShoulder];
@@ -89,6 +110,8 @@ class SphinxStretch extends ExerciseBase {
 
   @override
   void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
+    if (!_selectTrackedSide(smoothedLandmarks)) return;
+
     final shoulder = isLeftTracked
         ? smoothedLandmarks[PoseLandmarkType.leftShoulder]
         : smoothedLandmarks[PoseLandmarkType.rightShoulder];
@@ -158,7 +181,7 @@ class SphinxStretch extends ExerciseBase {
 
     switch (state) {
       case SphinxState.proneSetup:
-        if (ctx.elbowAngle < 130 &&
+        if (ctx.elbowAngle < 145 &&
             ctx.spineAngle < SphinxConfig.Ac_Spine_Ext_Angle[1] + 10) {
           newState = SphinxState.ascending;
         }
@@ -250,6 +273,41 @@ class SphinxStretch extends ExerciseBase {
     for (final m in _metrics) {
       m.resetAndCountFault();
     }
+  }
+
+  bool _selectTrackedSide(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+    final left = _sideConfidence(
+      landmarks,
+      PoseLandmarkType.leftShoulder,
+      PoseLandmarkType.leftHip,
+      PoseLandmarkType.leftAnkle,
+    );
+    final right = _sideConfidence(
+      landmarks,
+      PoseLandmarkType.rightShoulder,
+      PoseLandmarkType.rightHip,
+      PoseLandmarkType.rightAnkle,
+    );
+
+    if (left == null && right == null) return false;
+    isLeftTracked = right == null || (left ?? 0.0) >= right;
+    return true;
+  }
+
+  double? _sideConfidence(
+    Map<PoseLandmarkType, PoseLandmark> landmarks,
+    PoseLandmarkType shoulderType,
+    PoseLandmarkType hipType,
+    PoseLandmarkType ankleType,
+  ) {
+    final shoulder = landmarks[shoulderType];
+    final hip = landmarks[hipType];
+    final ankle = landmarks[ankleType];
+    if (shoulder == null || hip == null || ankle == null) return null;
+    if (![shoulder, hip, ankle].every(ExerciseBase.isLandmarkConfident)) {
+      return null;
+    }
+    return shoulder.likelihood + hip.likelihood + ankle.likelihood;
   }
 
   @override

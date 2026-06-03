@@ -15,7 +15,7 @@ class BurpeeConfig {
   static const double STANDING_BODY_ANGLE = 165.0; // Góc đứng thẳng
 
   // Ngưỡng khoảng cách ngang (X) để xác định Plank (đơn vị tương đối)
-  static const double PLANK_MIN_DIST_X = 0.4; // % chiều cao cơ thể
+  static const double PLANK_MIN_DIST_X = 0.65; // normalized by torso length
 }
 
 class StepBackBurpee extends ExerciseBase {
@@ -187,10 +187,16 @@ class StepBackBurpee extends ExerciseBase {
     double shoulderToArmAngle =
         calculateAngle(firstPoint: hip, midPoint: shoulder, lastPoint: wrist);
 
-    double wristAnkleDistX =
-        (wrist.x - ankle.x).abs() / scaleFactor; // Chuẩn hóa theo tỷ lệ cơ thể
-    double shoulderWristDistY = (wrist.y - shoulder.y).abs() /
-        scaleFactor; // Khoảng cách Y giữa vai và tay
+    double localScaleFactor = scaleFactor;
+    if (localScaleFactor <= 0) {
+      localScaleFactor = calculateDistance(shoulder, hip);
+    }
+    if (localScaleFactor <= 0) localScaleFactor = 1;
+
+    double wristAnkleDistX = (wrist.x - ankle.x).abs() /
+        localScaleFactor; // Chuẩn hóa theo tỷ lệ cơ thể
+    double shoulderWristDistY = (wrist.y - shoulder.y) /
+        localScaleFactor; // Duong khi co tay nam duoi vai
     double wristY = wrist.y;
     double kneeY = knee.y;
     int now = frameTimestampMs;
@@ -263,13 +269,14 @@ class StepBackBurpee extends ExerciseBase {
     bool isCrouching = kneeAngle < 120 && bodyAngle < 120; // Đang co người
 
     // Yêu cầu nằm hoàn toàn xuống sàn: vai phải hạ thấp gần bằng cổ tay (khoảng cách Y nhỏ)
-    bool isLyingOnFloor = _plankDebouncer.update(
-        distX > BurpeeConfig.PLANK_MIN_DIST_X &&
-            bodyAngle > 140 &&
-            shoulderWristDistY < 0.6 && // Nằm hoàn toàn xuống sàn (vai hạ thấp)
-            shoulderToArmAngle > 45 &&
-            shoulderToArmAngle < 135 // Tay tạo thành góc vuông với vai
-        );
+    bool isHighPlank = _plankDebouncer.update(
+      distX > BurpeeConfig.PLANK_MIN_DIST_X &&
+          bodyAngle > 135 &&
+          shoulderWristDistY > 0.25 &&
+          shoulderWristDistY < 1.60 &&
+          shoulderToArmAngle > 25 &&
+          shoulderToArmAngle < 155,
+    );
 
     bool isStandingStraight =
         _standingDebouncer.update(bodyAngle > BurpeeConfig.STANDING_BODY_ANGLE);
@@ -282,12 +289,12 @@ class StepBackBurpee extends ExerciseBase {
       _transitionState(BurpeeState.steppingBack, timestampMs);
     } else if ((burpeeState == BurpeeState.steppingBack ||
             burpeeState == BurpeeState.squattingDown) &&
-        isLyingOnFloor) {
+        isHighPlank) {
       _transitionState(BurpeeState.highPlank,
           timestampMs); // Sử dụng highPlank state làm trạng thái nằm
     } else if (burpeeState == BurpeeState.highPlank &&
-        !isLyingOnFloor &&
-        distX < BurpeeConfig.PLANK_MIN_DIST_X) {
+        !isHighPlank &&
+        distX < BurpeeConfig.PLANK_MIN_DIST_X * 1.1) {
       _transitionState(BurpeeState.steppingForward, timestampMs);
     } else if (burpeeState == BurpeeState.steppingForward && bodyAngle > 100) {
       _transitionState(BurpeeState.standingUp, timestampMs);
