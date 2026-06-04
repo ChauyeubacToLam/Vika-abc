@@ -7,7 +7,7 @@ class SphinxReportBuilder extends ExerciseReportBuilder {
   Map<String, List<String>> painToFaultMap() => {};
 
   @override
-  Map<String, String> faultToTipMap() => {};
+  Map<String, FaultTipCopy> faultToTipMap() => {};
 
   @override
   Map<String, String Function(int count, int total)> praiseSentenceMap() => {};

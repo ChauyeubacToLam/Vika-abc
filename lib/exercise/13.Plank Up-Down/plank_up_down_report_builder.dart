@@ -14,13 +14,25 @@ class PlankUpDownReportBuilder extends ExerciseReportBuilder {
       };
 
   @override
-  Map<String, String> faultToTipMap() => {
-        'trunk_sagging_fails':
-            'Võng lưng cực kỳ nguy hiểm. Hãy siết chặt cơ bụng, cuộn xương chậu trước khi đẩy tay.',
-        'hip_rotation_fails':
-            'Lắc hông làm mất tác dụng của Core. Mẹo: Mở rộng 2 chân hơn vai để tạo chân đế vững chắc.',
-        'arm_extension_fails':
-            'Bạn chưa duỗi thẳng tay ở pha High Plank, làm giảm hiệu quả lên cơ tay sau (Tricep).',
+  Map<String, FaultTipCopy> faultToTipMap() => {
+        'trunk_sagging_fails': (
+          watch:
+              'Võng lưng cực kỳ nguy hiểm. Hãy siết chặt cơ bụng, cuộn xương chậu trước khi đẩy tay.',
+          next:
+              'Võng lưng cực kỳ nguy hiểm. Hãy siết chặt cơ bụng, cuộn xương chậu trước khi đẩy tay.',
+        ),
+        'hip_rotation_fails': (
+          watch:
+              'Lắc hông làm mất tác dụng của Core. Mẹo: Mở rộng 2 chân hơn vai để tạo chân đế vững chắc.',
+          next:
+              'Lắc hông làm mất tác dụng của Core. Mẹo: Mở rộng 2 chân hơn vai để tạo chân đế vững chắc.',
+        ),
+        'arm_extension_fails': (
+          watch:
+              'Bạn chưa duỗi thẳng tay ở pha High Plank, làm giảm hiệu quả lên cơ tay sau (Tricep).',
+          next:
+              'Bạn chưa duỗi thẳng tay ở pha High Plank, làm giảm hiệu quả lên cơ tay sau (Tricep).',
+        ),
       };
 
   @override

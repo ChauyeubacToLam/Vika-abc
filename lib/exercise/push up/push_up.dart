@@ -78,6 +78,7 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
   String _lastPushUpEvent = 'init';
   String _lastNoCountReason = 'none';
   String _lastRejectType = 'none';
+  String _lastRejectReason = 'none';
   File? _debugTraceFile;
   bool _debugTraceHeaderWritten = false;
   int _debugTraceLastWriteMs = 0;
@@ -581,6 +582,7 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
       _repRejectReason ??= status.reason;
       _repRejectType ??= status.type;
       _lastRejectType = status.type;
+      _lastRejectReason = status.reason ?? 'none';
       _lastPushUpEvent = 'reject ${status.type}';
       debugData['event'] = _lastPushUpEvent;
       debugData['reject'] = _repRejectType ?? _lastRejectType;

@@ -10,15 +10,29 @@ class SupermanReportBuilder extends ExerciseReportBuilder {
       };
 
   @override
-  Map<String, String> faultToTipMap() => {
-        'elevation_fails':
-            'Nâng đồng thời cả tay và chân, không để một bên rơi xuống khi giữ.',
-        'hip_fails':
-            'Giữ hông làm điểm tựa, tránh nhấc hông lên khỏi sàn khi vào tư thế.',
-        'hold_fails':
-            'Giữ ở điểm cao nhất đủ lâu hơn, lên chậm và không giật cục.',
-        'lumbar_fails':
-            'Giảm độ nâng tay chân một chút để cột sống thắt lưng không bị uốn quá gắt.',
+  Map<String, FaultTipCopy> faultToTipMap() => {
+        'elevation_fails': (
+          watch:
+              'Nâng đồng thời cả tay và chân, không để một bên rơi xuống khi giữ.',
+          next:
+              'Nâng đồng thời cả tay và chân, không để một bên rơi xuống khi giữ.',
+        ),
+        'hip_fails': (
+          watch:
+              'Giữ hông làm điểm tựa, tránh nhấc hông lên khỏi sàn khi vào tư thế.',
+          next:
+              'Giữ hông làm điểm tựa, tránh nhấc hông lên khỏi sàn khi vào tư thế.',
+        ),
+        'hold_fails': (
+          watch: 'Giữ ở điểm cao nhất đủ lâu hơn, lên chậm và không giật cục.',
+          next: 'Giữ ở điểm cao nhất đủ lâu hơn, lên chậm và không giật cục.',
+        ),
+        'lumbar_fails': (
+          watch:
+              'Giảm độ nâng tay chân một chút để cột sống thắt lưng không bị uốn quá gắt.',
+          next:
+              'Giảm độ nâng tay chân một chút để cột sống thắt lưng không bị uốn quá gắt.',
+        ),
       };
 
   @override

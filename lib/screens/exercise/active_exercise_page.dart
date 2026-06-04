@@ -17,7 +17,6 @@ import '../../debug/debug_types.dart';
 import '../../exercise/exercise_base.dart';
 import '../../pose/pose_landmarker_adapter.dart';
 import '../../pose/pose_landmarker_channel.dart';
-import '../../pose/vika_image_orientation.dart';
 import '../../models/exercise_definition.dart';
 import '../../utils/exercise_logger.dart';
 import '../../utils/orientation_lock.dart';

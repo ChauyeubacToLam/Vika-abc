@@ -12,11 +12,23 @@ class TricepDipReportBuilder extends ExerciseReportBuilder {
       };
 
   @override
-  Map<String, String> faultToTipMap() => {
-        'hip_thrust_fails': 'Gập khuỷu tay lại thay vì đẩy hông lên xuống',
-        'rom_fails': 'Hạ người sâu hơn cho đến khi mông gần chạm sàn',
-        'extension_fails': 'Đẩy thẳng tay hoàn toàn ở đỉnh để siết cơ',
-        'shrugging_fails': 'Hạ vai xuống, cách xa mang tai',
+  Map<String, FaultTipCopy> faultToTipMap() => {
+        'hip_thrust_fails': (
+          watch: 'Gập khuỷu tay lại thay vì đẩy hông lên xuống',
+          next: 'Gập khuỷu tay lại thay vì đẩy hông lên xuống',
+        ),
+        'rom_fails': (
+          watch: 'Hạ người sâu hơn cho đến khi mông gần chạm sàn',
+          next: 'Hạ người sâu hơn cho đến khi mông gần chạm sàn',
+        ),
+        'extension_fails': (
+          watch: 'Đẩy thẳng tay hoàn toàn ở đỉnh để siết cơ',
+          next: 'Đẩy thẳng tay hoàn toàn ở đỉnh để siết cơ',
+        ),
+        'shrugging_fails': (
+          watch: 'Hạ vai xuống, cách xa mang tai',
+          next: 'Hạ vai xuống, cách xa mang tai',
+        ),
       };
 
   @override

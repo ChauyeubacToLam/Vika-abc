@@ -12,13 +12,25 @@ class ReverseCrunchReportBuilder extends ExerciseReportBuilder {
       };
 
   @override
-  Map<String, String> faultToTipMap() => {
-        'momentum_fails':
-            'Tập trung dùng cơ bụng dưới kéo đùi về phía ngực thay vì vung chân. Giữ nguyên góc chân 90 độ.',
-        'curl_fails':
-            'Nâng mông nhấc lên khỏi thảm mới kích hoạt được bụng dưới. Hãy cuộn xương chậu lên.',
-        'tempo_fails':
-            'Lúc thả chân xuống, cơ bụng phải gồng lại. Hạ chân từ từ trong 2 giây!',
+  Map<String, FaultTipCopy> faultToTipMap() => {
+        'momentum_fails': (
+          watch:
+              'Tập trung dùng cơ bụng dưới kéo đùi về phía ngực thay vì vung chân. Giữ nguyên góc chân 90 độ.',
+          next:
+              'Tập trung dùng cơ bụng dưới kéo đùi về phía ngực thay vì vung chân. Giữ nguyên góc chân 90 độ.',
+        ),
+        'curl_fails': (
+          watch:
+              'Nâng mông nhấc lên khỏi thảm mới kích hoạt được bụng dưới. Hãy cuộn xương chậu lên.',
+          next:
+              'Nâng mông nhấc lên khỏi thảm mới kích hoạt được bụng dưới. Hãy cuộn xương chậu lên.',
+        ),
+        'tempo_fails': (
+          watch:
+              'Lúc thả chân xuống, cơ bụng phải gồng lại. Hạ chân từ từ trong 2 giây!',
+          next:
+              'Lúc thả chân xuống, cơ bụng phải gồng lại. Hạ chân từ từ trong 2 giây!',
+        ),
       };
 
   @override

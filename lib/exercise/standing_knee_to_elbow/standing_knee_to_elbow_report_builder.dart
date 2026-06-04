@@ -11,10 +11,19 @@ class StandingKneeToElbowReportBuilder extends ExerciseReportBuilder {
       };
 
   @override
-  Map<String, String> faultToTipMap() => {
-        'knee_valgus_fails': 'Gồng chặt chân trụ, mở gối ra ngoài',
-        'core_drive_fails': 'Nhấc cao đùi lên bằng cơ bụng, đừng rụt cổ',
-        'cross_rom_fails': 'Vặn người mạnh hơn, cho tay chạm gối',
+  Map<String, FaultTipCopy> faultToTipMap() => {
+        'knee_valgus_fails': (
+          watch: 'Gồng chặt chân trụ, mở gối ra ngoài',
+          next: 'Gồng chặt chân trụ, mở gối ra ngoài',
+        ),
+        'core_drive_fails': (
+          watch: 'Nhấc cao đùi lên bằng cơ bụng, đừng rụt cổ',
+          next: 'Nhấc cao đùi lên bằng cơ bụng, đừng rụt cổ',
+        ),
+        'cross_rom_fails': (
+          watch: 'Vặn người mạnh hơn, cho tay chạm gối',
+          next: 'Vặn người mạnh hơn, cho tay chạm gối',
+        ),
       };
 
   @override

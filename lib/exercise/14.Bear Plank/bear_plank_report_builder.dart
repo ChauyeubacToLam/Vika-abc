@@ -11,13 +11,25 @@ class BearPlankReportBuilder extends ExerciseReportBuilder {
       };
 
   @override
-  Map<String, String> faultToTipMap() => {
-        'knee_fails':
-            'Khi nhấc gối cao quá 10cm, đùi trước sẽ gánh lực thay vì nhóm cơ Core. Hãy giữ gối sát mặt đất.',
-        'back_fails':
-            'Võng lưng gây nén đĩa đệm thắt lưng. Hãy cuộn xương chậu và tưởng tượng bạn đang giữ một ly nước trên lưng.',
-        'weight_fails':
-            'Lỗi rướn người về trước gây đau cổ tay. Vai phải luôn nằm trên một đường thẳng đứng với cổ tay.',
+  Map<String, FaultTipCopy> faultToTipMap() => {
+        'knee_fails': (
+          watch:
+              'Khi nhấc gối cao quá 10cm, đùi trước sẽ gánh lực thay vì nhóm cơ Core. Hãy giữ gối sát mặt đất.',
+          next:
+              'Khi nhấc gối cao quá 10cm, đùi trước sẽ gánh lực thay vì nhóm cơ Core. Hãy giữ gối sát mặt đất.',
+        ),
+        'back_fails': (
+          watch:
+              'Võng lưng gây nén đĩa đệm thắt lưng. Hãy cuộn xương chậu và tưởng tượng bạn đang giữ một ly nước trên lưng.',
+          next:
+              'Võng lưng gây nén đĩa đệm thắt lưng. Hãy cuộn xương chậu và tưởng tượng bạn đang giữ một ly nước trên lưng.',
+        ),
+        'weight_fails': (
+          watch:
+              'Lỗi rướn người về trước gây đau cổ tay. Vai phải luôn nằm trên một đường thẳng đứng với cổ tay.',
+          next:
+              'Lỗi rướn người về trước gây đau cổ tay. Vai phải luôn nằm trên một đường thẳng đứng với cổ tay.',
+        ),
       };
 
   @override

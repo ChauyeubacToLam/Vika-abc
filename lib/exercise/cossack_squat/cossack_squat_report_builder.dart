@@ -11,10 +11,19 @@ class CossackSquatReportBuilder extends ExerciseReportBuilder {
       };
 
   @override
-  Map<String, String> faultToTipMap() => {
-        'knee_valgus_fails': 'Mở đầu gối ra ngoài khi ngồi xuống',
-        'heel_lift_fails': 'Giữ gót chân chạm sàn trong suốt bài tập',
-        'depth_fails': 'Cố gắng ngồi sâu hơn nữa, mông sát gót',
+  Map<String, FaultTipCopy> faultToTipMap() => {
+        'knee_valgus_fails': (
+          watch: 'Mở đầu gối ra ngoài khi ngồi xuống',
+          next: 'Mở đầu gối ra ngoài khi ngồi xuống',
+        ),
+        'heel_lift_fails': (
+          watch: 'Giữ gót chân chạm sàn trong suốt bài tập',
+          next: 'Giữ gót chân chạm sàn trong suốt bài tập',
+        ),
+        'depth_fails': (
+          watch: 'Cố gắng ngồi sâu hơn nữa, mông sát gót',
+          next: 'Cố gắng ngồi sâu hơn nữa, mông sát gót',
+        ),
       };
 
   @override

@@ -10,15 +10,31 @@ class DeadBugReportBuilder extends ExerciseReportBuilder {
       };
 
   @override
-  Map<String, String> faultToTipMap() => {
-        'anti_extension_fails_count':
-            'Lưng hở khỏi sàn là dấu hiệu cơ bụng đã ngừng làm việc. Hãy hít sâu và ép chặt thắt lưng xuống thảm.',
-        'coordination_fails_count':
-            'Việc chuyển động cùng bên sẽ làm mất đi khả năng rèn luyện dây thần kinh cơ chéo của bài tập.',
-        'stable_limbs_fails_count':
-            'Chỉ di chuyển 2 chi, 2 chi còn lại phải "đóng băng". Sự cô lập này là chìa khóa của sức mạnh cốt lõi.',
-        'tempo_fails_count':
-            'Bạn đang tập luyện hệ thần kinh chứ không phải chạy đua. Càng chậm càng tốt.',
+  Map<String, FaultTipCopy> faultToTipMap() => {
+        'anti_extension_fails_count': (
+          watch:
+              'Lưng hở khỏi sàn là dấu hiệu cơ bụng đã ngừng làm việc. Hãy hít sâu và ép chặt thắt lưng xuống thảm.',
+          next:
+              'Lưng hở khỏi sàn là dấu hiệu cơ bụng đã ngừng làm việc. Hãy hít sâu và ép chặt thắt lưng xuống thảm.',
+        ),
+        'coordination_fails_count': (
+          watch:
+              'Việc chuyển động cùng bên sẽ làm mất đi khả năng rèn luyện dây thần kinh cơ chéo của bài tập.',
+          next:
+              'Việc chuyển động cùng bên sẽ làm mất đi khả năng rèn luyện dây thần kinh cơ chéo của bài tập.',
+        ),
+        'stable_limbs_fails_count': (
+          watch:
+              'Chỉ di chuyển 2 chi, 2 chi còn lại phải "đóng băng". Sự cô lập này là chìa khóa của sức mạnh cốt lõi.',
+          next:
+              'Chỉ di chuyển 2 chi, 2 chi còn lại phải "đóng băng". Sự cô lập này là chìa khóa của sức mạnh cốt lõi.',
+        ),
+        'tempo_fails_count': (
+          watch:
+              'Bạn đang tập luyện hệ thần kinh chứ không phải chạy đua. Càng chậm càng tốt.',
+          next:
+              'Bạn đang tập luyện hệ thần kinh chứ không phải chạy đua. Càng chậm càng tốt.',
+        ),
       };
 
   @override

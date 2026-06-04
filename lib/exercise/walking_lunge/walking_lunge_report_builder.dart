@@ -11,10 +11,19 @@ class WalkingLungeReportBuilder extends ExerciseReportBuilder {
       };
 
   @override
-  Map<String, String> faultToTipMap() => {
-        'front_knee_fails': 'Bước chân dài hơn, không để gối đâm về trước',
-        'step_consistency_fails': 'Duy trì khoảng cách bước đều đặn',
-        'torso_lean_fails': 'Giữ lưng thẳng đứng trong suốt bài tập',
+  Map<String, FaultTipCopy> faultToTipMap() => {
+        'front_knee_fails': (
+          watch: 'Bước chân dài hơn, không để gối đâm về trước',
+          next: 'Bước chân dài hơn, không để gối đâm về trước',
+        ),
+        'step_consistency_fails': (
+          watch: 'Duy trì khoảng cách bước đều đặn',
+          next: 'Duy trì khoảng cách bước đều đặn',
+        ),
+        'torso_lean_fails': (
+          watch: 'Giữ lưng thẳng đứng trong suốt bài tập',
+          next: 'Giữ lưng thẳng đứng trong suốt bài tập',
+        ),
       };
 
   @override

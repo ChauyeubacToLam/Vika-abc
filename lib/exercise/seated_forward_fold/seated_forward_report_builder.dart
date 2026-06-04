@@ -10,15 +10,31 @@ class SeatedForwardReportBuilder extends ExerciseReportBuilder {
       };
 
   @override
-  Map<String, String> faultToTipMap() => {
-        'KneeBent':
-            'Bạn có xu hướng co gối để gập được sâu hơn. Hãy ưu tiên giữ thẳng gối, dù không gập được sâu, cơ gân kheo mới được kéo giãn thực sự.',
-        'SpineRound':
-            'Tránh cong lưng thắt lưng. Hãy tưởng tượng bạn đang gập người từ khớp hông (hip hinge) và đẩy ngực về phía trước mũi chân.',
-        'AnklePlantar':
-            'Để tăng biên độ kéo căng, hãy luôn bẻ gập lưng bàn chân (hướng mũi chân về phía đầu).',
-        'TempoShort':
-            'Kéo giãn tĩnh cần thời gian để cơ bắp làm quen và nhả lực. Lần tới hãy cố gắng giữ tư thế ít nhất 15 giây nhé.',
+  Map<String, FaultTipCopy> faultToTipMap() => {
+        'KneeBent': (
+          watch:
+              'Bạn có xu hướng co gối để gập được sâu hơn. Hãy ưu tiên giữ thẳng gối, dù không gập được sâu, cơ gân kheo mới được kéo giãn thực sự.',
+          next:
+              'Bạn có xu hướng co gối để gập được sâu hơn. Hãy ưu tiên giữ thẳng gối, dù không gập được sâu, cơ gân kheo mới được kéo giãn thực sự.',
+        ),
+        'SpineRound': (
+          watch:
+              'Tránh cong lưng thắt lưng. Hãy tưởng tượng bạn đang gập người từ khớp hông (hip hinge) và đẩy ngực về phía trước mũi chân.',
+          next:
+              'Tránh cong lưng thắt lưng. Hãy tưởng tượng bạn đang gập người từ khớp hông (hip hinge) và đẩy ngực về phía trước mũi chân.',
+        ),
+        'AnklePlantar': (
+          watch:
+              'Để tăng biên độ kéo căng, hãy luôn bẻ gập lưng bàn chân (hướng mũi chân về phía đầu).',
+          next:
+              'Để tăng biên độ kéo căng, hãy luôn bẻ gập lưng bàn chân (hướng mũi chân về phía đầu).',
+        ),
+        'TempoShort': (
+          watch:
+              'Kéo giãn tĩnh cần thời gian để cơ bắp làm quen và nhả lực. Lần tới hãy cố gắng giữ tư thế ít nhất 15 giây nhé.',
+          next:
+              'Kéo giãn tĩnh cần thời gian để cơ bắp làm quen và nhả lực. Lần tới hãy cố gắng giữ tư thế ít nhất 15 giây nhé.',
+        ),
       };
 
   @override

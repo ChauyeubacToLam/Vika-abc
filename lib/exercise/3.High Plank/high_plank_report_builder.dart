@@ -10,13 +10,25 @@ class HighPlankReportBuilder extends ExerciseReportBuilder {
       };
 
   @override
-  Map<String, String> faultToTipMap() => {
-        'sagging_fails_count':
-            'Lỗi võng lưng rất nguy hiểm. Hãy tưởng tượng bạn đang rút rốn về phía cột sống.',
-        'piked_fails_count':
-            'Chổng mông làm bài tập trở nên quá dễ và mất tác dụng vào cơ Core.',
-        'elbow_fails_count':
-            'Đừng gập tay, xương cánh tay thẳng đứng sẽ giúp khóa khớp và tiết kiệm sức.',
+  Map<String, FaultTipCopy> faultToTipMap() => {
+        'sagging_fails_count': (
+          watch:
+              'Lỗi võng lưng rất nguy hiểm. Hãy tưởng tượng bạn đang rút rốn về phía cột sống.',
+          next:
+              'Lỗi võng lưng rất nguy hiểm. Hãy tưởng tượng bạn đang rút rốn về phía cột sống.',
+        ),
+        'piked_fails_count': (
+          watch:
+              'Chổng mông làm bài tập trở nên quá dễ và mất tác dụng vào cơ Core.',
+          next:
+              'Chổng mông làm bài tập trở nên quá dễ và mất tác dụng vào cơ Core.',
+        ),
+        'elbow_fails_count': (
+          watch:
+              'Đừng gập tay, xương cánh tay thẳng đứng sẽ giúp khóa khớp và tiết kiệm sức.',
+          next:
+              'Đừng gập tay, xương cánh tay thẳng đứng sẽ giúp khóa khớp và tiết kiệm sức.',
+        ),
       };
 
   @override

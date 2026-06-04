@@ -10,13 +10,27 @@ class SitUpReportBuilder extends ExerciseReportBuilder {
       };
 
   @override
-  Map<String, String> faultToTipMap() => {
-        'jerking_fails_count': 'Việc giật khi lên cong cột sống. Hãy chậm lại!',
-        'stability_fails_count':
-            'Cơ hông đang làm việc thay cơ bụng. Hãy khóa chân chặt xuống thảm.',
-        'rom_fails_count': 'Lên chưa đạt 90 độ sẽ không kích thích cơ tối đa.',
-        'tempo_fails_count':
-            'Pha hạ thân người là lúc cơ bụng gồng nhiều nhất, đừng thả rơi tự do xuống sàn.',
+  Map<String, FaultTipCopy> faultToTipMap() => {
+        'jerking_fails_count': (
+          watch: 'Việc giật khi lên cong cột sống. Hãy chậm lại!',
+          next: 'Việc giật khi lên cong cột sống. Hãy chậm lại!',
+        ),
+        'stability_fails_count': (
+          watch:
+              'Cơ hông đang làm việc thay cơ bụng. Hãy khóa chân chặt xuống thảm.',
+          next:
+              'Cơ hông đang làm việc thay cơ bụng. Hãy khóa chân chặt xuống thảm.',
+        ),
+        'rom_fails_count': (
+          watch: 'Lên chưa đạt 90 độ sẽ không kích thích cơ tối đa.',
+          next: 'Lên chưa đạt 90 độ sẽ không kích thích cơ tối đa.',
+        ),
+        'tempo_fails_count': (
+          watch:
+              'Pha hạ thân người là lúc cơ bụng gồng nhiều nhất, đừng thả rơi tự do xuống sàn.',
+          next:
+              'Pha hạ thân người là lúc cơ bụng gồng nhiều nhất, đừng thả rơi tự do xuống sàn.',
+        ),
       };
 
   @override

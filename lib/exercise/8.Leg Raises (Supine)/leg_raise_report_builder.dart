@@ -10,13 +10,25 @@ class LegRaiseReportBuilder extends ExerciseReportBuilder {
       };
 
   @override
-  Map<String, String> faultToTipMap() => {
-        'pelvic_fails_count':
-            'Võng lưng báo hiệu hông bạn đã mỏi. Đừng ráng hạ chân sát mặt đất nếu lưng bạn bị hổng lên.',
-        'tempo_fails_count':
-            'Lực kéo quán tính của chân rơi tự do sẽ giật mạnh vào cột sống thắt lưng. Hãy kìm chân lại.',
-        'knee_fails_count':
-            'Cơ đùi sau (Hamstring) của bạn có vẻ bị căng cứng nên không thể duỗi thẳng. Tập giãn cơ thêm nhé.',
+  Map<String, FaultTipCopy> faultToTipMap() => {
+        'pelvic_fails_count': (
+          watch:
+              'Võng lưng báo hiệu hông bạn đã mỏi. Đừng ráng hạ chân sát mặt đất nếu lưng bạn bị hổng lên.',
+          next:
+              'Võng lưng báo hiệu hông bạn đã mỏi. Đừng ráng hạ chân sát mặt đất nếu lưng bạn bị hổng lên.',
+        ),
+        'tempo_fails_count': (
+          watch:
+              'Lực kéo quán tính của chân rơi tự do sẽ giật mạnh vào cột sống thắt lưng. Hãy kìm chân lại.',
+          next:
+              'Lực kéo quán tính của chân rơi tự do sẽ giật mạnh vào cột sống thắt lưng. Hãy kìm chân lại.',
+        ),
+        'knee_fails_count': (
+          watch:
+              'Cơ đùi sau (Hamstring) của bạn có vẻ bị căng cứng nên không thể duỗi thẳng. Tập giãn cơ thêm nhé.',
+          next:
+              'Cơ đùi sau (Hamstring) của bạn có vẻ bị căng cứng nên không thể duỗi thẳng. Tập giãn cơ thêm nhé.',
+        ),
       };
 
   @override

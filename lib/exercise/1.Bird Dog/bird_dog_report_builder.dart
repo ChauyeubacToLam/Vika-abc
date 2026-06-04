@@ -10,11 +10,23 @@ class BirdDogReportBuilder extends ExerciseReportBuilder {
       };
 
   @override
-  Map<String, String> faultToTipMap() => {
-        'lumbar_fails_count': 'Đưa chân quá cao, chú ý chỉnh.',
-        'trunk_fails_count': 'Hông cứng cáp như chuông không lắc.',
-        'alignment_fails_count': 'Đừng gập cổ, vươn dài tay chân.',
-        'tempo_fails_count': 'Kiểm soát: Giữ đủ 5s trên đỉnh.',
+  Map<String, FaultTipCopy> faultToTipMap() => {
+        'lumbar_fails_count': (
+          watch: 'Đưa chân quá cao, chú ý chỉnh.',
+          next: 'Đưa chân quá cao, chú ý chỉnh.',
+        ),
+        'trunk_fails_count': (
+          watch: 'Hông cứng cáp như chuông không lắc.',
+          next: 'Hông cứng cáp như chuông không lắc.',
+        ),
+        'alignment_fails_count': (
+          watch: 'Đừng gập cổ, vươn dài tay chân.',
+          next: 'Đừng gập cổ, vươn dài tay chân.',
+        ),
+        'tempo_fails_count': (
+          watch: 'Kiểm soát: Giữ đủ 5s trên đỉnh.',
+          next: 'Kiểm soát: Giữ đủ 5s trên đỉnh.',
+        ),
       };
 
   @override

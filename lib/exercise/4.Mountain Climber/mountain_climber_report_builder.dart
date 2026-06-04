@@ -19,11 +19,19 @@ class MountainClimberReportBuilder extends ExerciseReportBuilder {
   // ---------------------------------------------------------------------------
 
   @override
-  Map<String, String> faultToTipMap() => {
-        'trunk_fails_count':
-            'Siết chặt cơ bụng, cuộn xương cụt nhẹ xuống để khóa form lưng thẳng.',
-        'rom_fails_count':
-            'Cố gắng kéo gối cao ngang rốn hoặc sát khuỷu tay để đốt mỡ hiệu quả hơn.',
+  Map<String, FaultTipCopy> faultToTipMap() => {
+        'trunk_fails_count': (
+          watch:
+              'Siết chặt cơ bụng, cuộn xương cụt nhẹ xuống để khóa form lưng thẳng.',
+          next:
+              'Siết chặt cơ bụng, cuộn xương cụt nhẹ xuống để khóa form lưng thẳng.',
+        ),
+        'rom_fails_count': (
+          watch:
+              'Cố gắng kéo gối cao ngang rốn hoặc sát khuỷu tay để đốt mỡ hiệu quả hơn.',
+          next:
+              'Cố gắng kéo gối cao ngang rốn hoặc sát khuỷu tay để đốt mỡ hiệu quả hơn.',
+        ),
       };
 
   // ---------------------------------------------------------------------------

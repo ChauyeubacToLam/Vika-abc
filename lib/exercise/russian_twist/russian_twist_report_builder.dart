@@ -11,10 +11,19 @@ class RussianTwistReportBuilder extends ExerciseReportBuilder {
       };
 
   @override
-  Map<String, String> faultToTipMap() => {
-        'knee_wobble_fails': 'Khóa chặt đầu gối, giữ thân dưới đứng im',
-        'thoracic_fails': 'Vặn cả bờ vai và ngực thay vì chỉ vung tay',
-        'rom_fails': 'Vặn sâu hơn, tay phải chạm mép ngoài hông',
+  Map<String, FaultTipCopy> faultToTipMap() => {
+        'knee_wobble_fails': (
+          watch: 'Khóa chặt đầu gối, giữ thân dưới đứng im',
+          next: 'Khóa chặt đầu gối, giữ thân dưới đứng im',
+        ),
+        'thoracic_fails': (
+          watch: 'Vặn cả bờ vai và ngực thay vì chỉ vung tay',
+          next: 'Vặn cả bờ vai và ngực thay vì chỉ vung tay',
+        ),
+        'rom_fails': (
+          watch: 'Vặn sâu hơn, tay phải chạm mép ngoài hông',
+          next: 'Vặn sâu hơn, tay phải chạm mép ngoài hông',
+        ),
       };
 
   @override

@@ -10,13 +10,25 @@ class VUpReportBuilder extends ExerciseReportBuilder {
       };
 
   @override
-  Map<String, String> faultToTipMap() => {
-        'sync_fails_count':
-            'Nâng tay lên trước sẽ tạo áp lực bẻ cong thắt lưng. Hãy tưởng tượng tay và chân bạn được nối bằng một sợi dây.',
-        'jerking_fails_count':
-            'Lực giật là kẻ thù của đĩa đệm. Hãy lên bằng sức căng của cơ bụng.',
-        'rom_fails_count':
-            'Bạn chưa gập thành hình chữ V. Cố ép bụng vào đùi sâu hơn nữa.',
+  Map<String, FaultTipCopy> faultToTipMap() => {
+        'sync_fails_count': (
+          watch:
+              'Nâng tay lên trước sẽ tạo áp lực bẻ cong thắt lưng. Hãy tưởng tượng tay và chân bạn được nối bằng một sợi dây.',
+          next:
+              'Nâng tay lên trước sẽ tạo áp lực bẻ cong thắt lưng. Hãy tưởng tượng tay và chân bạn được nối bằng một sợi dây.',
+        ),
+        'jerking_fails_count': (
+          watch:
+              'Lực giật là kẻ thù của đĩa đệm. Hãy lên bằng sức căng của cơ bụng.',
+          next:
+              'Lực giật là kẻ thù của đĩa đệm. Hãy lên bằng sức căng của cơ bụng.',
+        ),
+        'rom_fails_count': (
+          watch:
+              'Bạn chưa gập thành hình chữ V. Cố ép bụng vào đùi sâu hơn nữa.',
+          next:
+              'Bạn chưa gập thành hình chữ V. Cố ép bụng vào đùi sâu hơn nữa.',
+        ),
       };
 
   @override

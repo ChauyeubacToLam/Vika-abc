@@ -14,13 +14,25 @@ class PlankShoulderTapReportBuilder extends ExerciseReportBuilder {
       };
 
   @override
-  Map<String, String> faultToTipMap() => {
-        'rotation_fails':
-            'Mở rộng hai chân hơn vai để tăng chân đế (Base of support). Siết chặt bụng, không để hông lắc lư khi nhấc tay.',
-        'alignment_fails':
-            'Không chổng mông hay võng lưng. Cơ thể phải là một đường thẳng căng cứng.',
-        'tap_fails':
-            'Chạm tay dứt khoát lên vai đối diện để kiểm soát trọng tâm tốt hơn.',
+  Map<String, FaultTipCopy> faultToTipMap() => {
+        'rotation_fails': (
+          watch:
+              'Mở rộng hai chân hơn vai để tăng chân đế (Base of support). Siết chặt bụng, không để hông lắc lư khi nhấc tay.',
+          next:
+              'Mở rộng hai chân hơn vai để tăng chân đế (Base of support). Siết chặt bụng, không để hông lắc lư khi nhấc tay.',
+        ),
+        'alignment_fails': (
+          watch:
+              'Không chổng mông hay võng lưng. Cơ thể phải là một đường thẳng căng cứng.',
+          next:
+              'Không chổng mông hay võng lưng. Cơ thể phải là một đường thẳng căng cứng.',
+        ),
+        'tap_fails': (
+          watch:
+              'Chạm tay dứt khoát lên vai đối diện để kiểm soát trọng tâm tốt hơn.',
+          next:
+              'Chạm tay dứt khoát lên vai đối diện để kiểm soát trọng tâm tốt hơn.',
+        ),
       };
 
   @override
