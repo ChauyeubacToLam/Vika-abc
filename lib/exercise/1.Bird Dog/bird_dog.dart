@@ -65,6 +65,11 @@ class BirdDog extends ExerciseBase {
   final Debouncer _neutralDebouncer = Debouncer(requiredFrames: 3);
   final Debouncer _extendingDebouncer = Debouncer(requiredFrames: 2);
 
+  List<String> lastRepFaultVoiceMessages = [];
+  String? lastRepTopVoiceMessage;
+  int? lastRepTopVoicePriority;
+  bool lastRepWasClean = true;
+
   // Biến Snapshot: Chỉ lưu tay/chân đang thao tác ở đúng đỉnh của rep
   bool? _peakLeftLeg;
   bool? _peakLeftArm;
@@ -82,6 +87,9 @@ class BirdDog extends ExerciseBase {
 
   @override
   String get exerciseName => 'Bird Dog';
+
+  @override
+  ExerciseVoiceCoach? createVoiceCoach() => BirdDogVoiceCoach();
 
   @override
   String get currentPhaseKey => state.toString().split('.').last;
@@ -413,6 +421,13 @@ class BirdDog extends ExerciseBase {
   void _completeRep(BirdDogRepContext ctx) {
     final blockingFault = _blockingFaultFor(ctx);
     if (blockingFault != null) {
+      lastRepFaultVoiceMessages = [
+        blockingFault.voiceMessage ?? blockingFault.message
+      ];
+      lastRepTopVoiceMessage =
+          blockingFault.voiceMessage ?? blockingFault.message;
+      lastRepTopVoicePriority = blockingFault.priority;
+      lastRepWasClean = false;
       _publishBlockingFault(blockingFault);
       _resetRepState();
       return;
@@ -424,10 +439,18 @@ class BirdDog extends ExerciseBase {
     final allFaults = <FaultRecord>[];
     for (var metric in _metrics) allFaults.addAll(metric.faults);
 
+    final voicedFaults = _orderedVoicedFaults(allFaults);
+    lastRepFaultVoiceMessages = _orderedUniqueVoiceMessages(voicedFaults);
+    lastRepTopVoiceMessage =
+        voicedFaults.isEmpty ? null : voicedFaults.first.voiceMessage;
+    lastRepTopVoicePriority =
+        voicedFaults.isEmpty ? null : voicedFaults.first.priority;
+
     _lastPeakLeftLeg = ctx.isLeftLegActive;
     _lastPeakLeftArm = ctx.isLeftArmActive;
 
     correctForm = !allFaults.any((f) => f.affectsForm);
+    lastRepWasClean = correctForm;
     if (!correctForm) resultIssues.feedback['Result'] = 'Sai Form';
 
     logger
@@ -437,6 +460,31 @@ class BirdDog extends ExerciseBase {
     }));
 
     _resetRepState();
+  }
+
+  List<FaultRecord> _orderedVoicedFaults(Iterable<FaultRecord> faults) {
+    final voicedFaults = faults
+        .where((fault) =>
+            fault.voiceMessage != null && fault.voiceMessage!.trim().isNotEmpty)
+        .toList()
+      ..sort((a, b) {
+        final priorityCompare = a.priority.compareTo(b.priority);
+        if (priorityCompare != 0) return priorityCompare;
+        return a.type.compareTo(b.type);
+      });
+    return voicedFaults;
+  }
+
+  List<String> _orderedUniqueVoiceMessages(Iterable<FaultRecord> faults) {
+    final messages = <String>[];
+    final seen = <String>{};
+    for (final fault in faults) {
+      final message = fault.voiceMessage!.trim();
+      if (seen.add(message)) {
+        messages.add(message);
+      }
+    }
+    return messages;
   }
 
   FaultRecord? _blockingFaultFor(BirdDogRepContext ctx) {
@@ -487,5 +535,246 @@ class BirdDog extends ExerciseBase {
     // Xóa snapshot để chu trình sau nhận diện lại từ đầu
     _peakLeftLeg = null;
     _peakLeftArm = null;
+  }
+}
+
+class BirdDogVoiceCoach implements ExerciseVoiceCoach {
+  static const int _setupCueGapMs = 9000;
+  static const int _phaseCueGapMs = 1400;
+  static const int _faultCueGapMs = 4500;
+  static const int _sameFaultGapMs = 9000;
+  static const int _maxReminderReps = 3;
+
+  static final Map<String, int> _previousSetFaultCounts = {};
+
+  final Map<String, int> _activeReminders = {};
+  final Map<String, int> _spokenFaultAtMs = {};
+  final Map<String, int> _setFaultCounts = {};
+
+  String? _lastPhaseKey;
+  int _lastSetupCueAtMs = 0;
+  int _lastPhaseCueAtMs = 0;
+  int _lastFaultCueAtMs = 0;
+  int _lastRepCount = 0;
+  bool _didSpeakSetupIntro = false;
+  bool _didSpeakReady = false;
+  bool _didSpeakPreviousSetAdvice = false;
+  bool _didSpeakSetComplete = false;
+
+  @override
+  void processFrame({
+    required ExerciseBase exercise,
+    required int repCount,
+    required bool hasPose,
+    required Map<String, String> feedback,
+  }) {
+    if (exercise is! BirdDog) return;
+
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+
+    if (exercise.exerciseState == ExerciseState.completed) {
+      _handleSetComplete(exercise);
+      _lastRepCount = repCount;
+      return;
+    }
+
+    if (exercise.exerciseState == ExerciseState.notActivated) {
+      _handleSetup(exercise, hasPose: hasPose, nowMs: nowMs);
+      _lastRepCount = repCount;
+      return;
+    }
+
+    if (exercise.exerciseState != ExerciseState.activated ||
+        exercise.isPaused ||
+        !hasPose) {
+      _lastPhaseKey = null;
+      _lastRepCount = repCount;
+      return;
+    }
+
+    if (!_didSpeakReady) {
+      exercise.ttsService.clearQueue();
+      exercise.ttsService.speak('Bắt đầu');
+      exercise.ttsService.speak('Giơ tay và chân đối diện');
+      _didSpeakReady = true;
+    }
+
+    if (!_didSpeakPreviousSetAdvice && _previousSetFaultCounts.isNotEmpty) {
+      final advice = _topPreviousSetAdvice();
+      if (advice != null) {
+        exercise.ttsService.speak('Set này chú ý');
+        exercise.ttsService.speak(advice);
+      }
+      _didSpeakPreviousSetAdvice = true;
+    }
+
+    final repIncreased = repCount > _lastRepCount;
+    if (repIncreased) {
+      _handleRepComplete(exercise, repCount);
+      _lastRepCount = repCount;
+      _lastPhaseKey = null;
+      return;
+    }
+
+    final liveFault = _liveFaultCue(exercise, feedback);
+    if (liveFault != null && _canSpeakFault(liveFault, nowMs)) {
+      exercise.ttsService.speak(liveFault);
+      _spokenFaultAtMs[liveFault] = nowMs;
+      _lastFaultCueAtMs = nowMs;
+      return;
+    }
+
+    _handlePhaseCue(exercise, nowMs);
+    _lastRepCount = repCount;
+  }
+
+  void _handleSetup(
+    BirdDog exercise, {
+    required bool hasPose,
+    required int nowMs,
+  }) {
+    if (nowMs - _lastSetupCueAtMs < _setupCueGapMs) return;
+
+    if (!_didSpeakSetupIntro) {
+      exercise.ttsService.speak(
+        'Vào tư thế bò bốn điểm, vai trên cổ tay, hông trên gối',
+      );
+      exercise.ttsService.speak('Quay ngang người với camera');
+      _didSpeakSetupIntro = true;
+      _lastSetupCueAtMs = nowMs;
+      return;
+    }
+
+    if (!hasPose) {
+      exercise.ttsService.speak('Giữ toàn thân trong khung hình');
+    } else if (exercise.activationProgress != null) {
+      exercise.ttsService.speak('Giữ yên để bắt đầu');
+    } else {
+      exercise.ttsService.speak('Đặt lưng phẳng, hai tay dưới vai');
+    }
+    _lastSetupCueAtMs = nowMs;
+  }
+
+  void _handleRepComplete(BirdDog exercise, int repCount) {
+    exercise.ttsService.clearPendingButKeepCurrent();
+    exercise.ttsService.speak('$repCount');
+
+    if (exercise.lastRepWasClean) {
+      exercise.ttsService.speak('tốt');
+      _activeReminders.clear();
+      return;
+    }
+
+    for (final message in exercise.lastRepFaultVoiceMessages.take(2)) {
+      _setFaultCounts[message] = (_setFaultCounts[message] ?? 0) + 1;
+      _activeReminders[message] = _maxReminderReps;
+    }
+
+    final topAdvice = exercise.lastRepTopVoiceMessage;
+    if (topAdvice != null && topAdvice.trim().isNotEmpty) {
+      exercise.ttsService.speak(topAdvice);
+      _activeReminders[topAdvice] = _maxReminderReps;
+    }
+  }
+
+  void _handlePhaseCue(BirdDog exercise, int nowMs) {
+    final phaseKey = exercise.currentPhaseKey;
+    if (phaseKey == _lastPhaseKey) return;
+    if (nowMs - _lastPhaseCueAtMs < _phaseCueGapMs) return;
+
+    final cue = switch (exercise.state) {
+      BirdDogState.neutral => _nextNeutralCue(),
+      BirdDogState.extending => 'Vươn dài tay và chân đối diện',
+      BirdDogState.hold_extended => 'Giữ lưng phẳng, siết bụng',
+      BirdDogState.returning => 'Thu tay chân về chậm',
+    };
+
+    exercise.ttsService.speak(cue);
+    _lastPhaseKey = phaseKey;
+    _lastPhaseCueAtMs = nowMs;
+  }
+
+  String _nextNeutralCue() {
+    final reminder = _nextReminder();
+    if (reminder != null) return reminder;
+    return 'Đổi bên, giơ tay và chân đối diện';
+  }
+
+  String? _nextReminder() {
+    if (_activeReminders.isEmpty) return null;
+
+    final sorted = _activeReminders.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final selected = sorted.first.key;
+    final remaining = sorted.first.value - 1;
+    if (remaining <= 0) {
+      _activeReminders.remove(selected);
+    } else {
+      _activeReminders[selected] = remaining;
+    }
+    return selected;
+  }
+
+  String? _liveFaultCue(BirdDog exercise, Map<String, String> feedback) {
+    final phaseInstruction =
+        exercise.resultIssues.instructions[exercise.currentPhaseKey];
+    final instructionError = phaseInstruction?['Error'];
+    if (instructionError != null && instructionError.trim().isNotEmpty) {
+      return instructionError.trim();
+    }
+
+    final feedbackError = feedback['Error'];
+    if (feedbackError != null) {
+      if (feedbackError.contains('cùng tay') ||
+          feedbackError.contains('cùng chân')) {
+        return 'Giơ tay và chân đối diện';
+      }
+      if (feedbackError.contains('luân phiên')) {
+        return 'Đổi sang tay và chân còn lại';
+      }
+      if (feedbackError.contains('Plank')) {
+        return 'Hạ hai gối xuống sàn';
+      }
+    }
+
+    final spine = feedback['Spine'];
+    if (spine != null && spine.contains('võng')) {
+      return 'Hạ thấp chân xuống một chút';
+    }
+
+    return null;
+  }
+
+  bool _canSpeakFault(String message, int nowMs) {
+    if (nowMs - _lastFaultCueAtMs < _faultCueGapMs) return false;
+    final lastSameFaultAt = _spokenFaultAtMs[message] ?? 0;
+    return nowMs - lastSameFaultAt >= _sameFaultGapMs;
+  }
+
+  void _handleSetComplete(BirdDog exercise) {
+    if (_didSpeakSetComplete) return;
+
+    exercise.ttsService.clearPendingButKeepCurrent();
+    exercise.ttsService.speak('Hoàn thành bài tập');
+
+    _previousSetFaultCounts
+      ..clear()
+      ..addAll(_setFaultCounts);
+
+    _didSpeakSetComplete = true;
+  }
+
+  String? _topPreviousSetAdvice() {
+    if (_previousSetFaultCounts.isEmpty) return null;
+    final sorted = _previousSetFaultCounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return sorted.first.key;
+  }
+
+  @override
+  void dispose() {
+    _activeReminders.clear();
+    _spokenFaultAtMs.clear();
+    _setFaultCounts.clear();
   }
 }
