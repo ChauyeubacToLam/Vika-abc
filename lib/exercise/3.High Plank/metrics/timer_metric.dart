@@ -26,10 +26,14 @@ class TimerMetric extends HighPlankMetricBase {
 
   @override
   void update(HighPlankRepContext ctx) {
-    if (ctx.state == HighPlankState.holding && _lastTickMs != null) {
-      int delta = ctx.frameTimestampMs - _lastTickMs!;
-      totalHoldingTimeMs += delta;
-      _lastTickMs = ctx.frameTimestampMs;
+    if (ctx.state == HighPlankState.holding) {
+      if (_lastTickMs == null) {
+        _lastTickMs = ctx.frameTimestampMs;
+      } else {
+        int delta = ctx.frameTimestampMs - _lastTickMs!;
+        totalHoldingTimeMs += delta;
+        _lastTickMs = ctx.frameTimestampMs;
+      }
     }
     _debugData['holdTime'] = (totalHoldingTimeMs / 1000.0).toStringAsFixed(1);
 
@@ -50,4 +54,8 @@ class TimerMetric extends HighPlankMetricBase {
 
   @override
   void reset() {}
+
+  void pause() {
+    _lastTickMs = null;
+  }
 }

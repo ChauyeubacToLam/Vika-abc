@@ -111,6 +111,14 @@ class HighPlank extends ExerciseBase {
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
+    if (cameraFacing != CameraFacing.left &&
+        cameraFacing != CameraFacing.right) {
+      return 'Vui lòng quay ngang người 100% với camera!';
+    }
+    final lm = _getLandmarks(smoothedLandmarks);
+    if (lm == null || !lm.values.every(ExerciseBase.isLandmarkConfident)) {
+      return 'Giữ vai, tay, hông, gối và cổ chân rõ trong khung hình.';
+    }
     return null;
   }
 
@@ -241,6 +249,12 @@ class HighPlank extends ExerciseBase {
       timerMetric.totalHoldingTimeMs >= HighPlankConfig.TARGET_TIME_MS;
 
   @override
+  Map<String, String> processNoPoseFrame() {
+    timerMetric.pause();
+    return super.processNoPoseFrame();
+  }
+
+  @override
   void onSetComplete() {
     final formFaults = <FaultRecord>[
       ...saggingMetric.faults,
@@ -249,6 +263,10 @@ class HighPlank extends ExerciseBase {
     ];
     final holdCorrect = !formFaults.any((f) => f.affectsForm);
 
+    final goodSeconds = timerMetric.totalHoldingTimeMs / 1000.0;
+    final targetSeconds = HighPlankConfig.TARGET_TIME_MS / 1000.0;
+    logger.pushKey("total_seconds", targetSeconds);
+    logger.pushKey("good_seconds", goodSeconds.clamp(0.0, targetSeconds));
     logger.pushKey("max_rep", 1);
     logger.pushKey("sagging_fails_count", saggingMetric.faults.length);
     logger.pushKey("piked_fails_count", pikedHipMetric.faults.length);
@@ -283,7 +301,10 @@ class HighPlank extends ExerciseBase {
     }
 
     final lm = _getLandmarks(landmarks);
-    if (lm == null) return;
+    if (lm == null) {
+      timerMetric.pause();
+      return;
+    }
 
     final shoulder = lm['shoulder']!;
     final elbow = lm['elbow']!;
@@ -295,6 +316,7 @@ class HighPlank extends ExerciseBase {
     // Bổ sung chặn rác dữ liệu: Nếu đang tập mà có vật cản che khuất tay/chân/hông thì tạm bỏ qua frame này
     if (![shoulder, elbow, wrist, hip, knee, ankle]
         .every(ExerciseBase.isLandmarkConfident)) {
+      timerMetric.pause();
       return;
     }
 
@@ -311,6 +333,7 @@ class HighPlank extends ExerciseBase {
       if (state == HighPlankState.holding) {
         _transitionState(HighPlankState.dropping, now);
       }
+      timerMetric.pause();
       return;
     }
     double bodyAngle = calculateAngleNormalized(
@@ -382,6 +405,8 @@ class HighPlank extends ExerciseBase {
     if (newState == state) return;
     previousState = state;
     state = newState;
+    _holdingDebouncer.reset();
+    _droppingDebouncer.reset();
     for (var metric in _metrics)
       metric.onStateTransition(previousState, newState, now);
   }

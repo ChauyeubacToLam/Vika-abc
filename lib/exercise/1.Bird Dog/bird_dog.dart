@@ -185,7 +185,8 @@ class BirdDog extends ExerciseBase {
 
   @override
   void onSetComplete() {
-    logger.pushKey("max_rep", maxRep);
+    logger.pushKey("target_rep", maxRep);
+    logger.pushKey("max_rep", repCount);
     logger.pushKey("lumbar_fails_count", lumbarMetric.faultsCount);
     logger.pushKey("alignment_fails_count", alignmentMetric.faultsCount);
     logger.pushKey("trunk_fails_count", trunkMetric.faultsCount);
@@ -224,6 +225,14 @@ class BirdDog extends ExerciseBase {
         requiredTypes.map((type) => landmarks[type]).toList();
     if (requiredLandmarks.any((landmark) =>
         landmark == null || !ExerciseBase.isLandmarkConfident(landmark))) {
+      if (state != BirdDogState.neutral) {
+        _transitionState(BirdDogState.neutral, now);
+        _resetRepState();
+        resultIssues.feedback['Result'] = 'Không tính rep';
+        resultIssues.feedback['Error'] = 'Mất mốc cơ thể';
+        resultIssues.addInstruction(
+            'BLOCK', 'Error', 'Giữ toàn thân trong khung hình');
+      }
       return;
     }
 

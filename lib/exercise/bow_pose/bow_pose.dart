@@ -93,8 +93,17 @@ class BowPose extends ExerciseBase {
         landmarks: landmarks,
         rightType: PoseLandmarkType.rightKnee,
         leftType: PoseLandmarkType.leftKnee);
+    PoseLandmark? ankle = getSideLandmark(
+        landmarks: landmarks,
+        rightType: PoseLandmarkType.rightAnkle,
+        leftType: PoseLandmarkType.leftAnkle);
 
-    if (shoulder == null || hip == null || knee == null) return false;
+    if (shoulder == null || hip == null || knee == null || ankle == null) {
+      return false;
+    }
+    if (![shoulder, hip, knee, ankle].every(ExerciseBase.isLandmarkConfident)) {
+      return false;
+    }
 
     double refLen = calculateDistance(shoulder, hip);
     if (refLen == 0) return false;
@@ -104,13 +113,8 @@ class BowPose extends ExerciseBase {
 
     if (yDiffShoulderHip > 0.35 || yDiffHipKnee > 0.35) return false;
 
-    double kneeAngle = calculateAngle(
-        firstPoint: hip,
-        midPoint: knee,
-        lastPoint: getSideLandmark(
-            landmarks: landmarks,
-            rightType: PoseLandmarkType.rightAnkle,
-            leftType: PoseLandmarkType.leftAnkle)!);
+    double kneeAngle =
+        calculateAngle(firstPoint: hip, midPoint: knee, lastPoint: ankle);
     if (kneeAngle < 150.0) return false;
 
     return true;

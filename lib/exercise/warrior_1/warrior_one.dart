@@ -20,6 +20,7 @@
 import 'dart:math' as math;
 
 import 'package:vika/exercise/exercise_base.dart';
+import 'package:vika/utils/exercise_logger.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
 import '../../utils/pose_math_helpers.dart';
@@ -98,6 +99,7 @@ class WarriorOne extends ExerciseBase {
   final StickyDebouncer _stillDebouncer = StickyDebouncer(
       requiredFrames: WarriorOneConfig.STILL_FRAMES, currentState: false);
   double? _prevHipY;
+  double _goodHoldSeconds = 0.0;
 
   // --- Baselines (captured at ENTRY → HOLD) ---
   double? _trunkBaseline;
@@ -188,14 +190,26 @@ class WarriorOne extends ExerciseBase {
   bool requestStop() => repCount >= maxHolds;
 
   @override
-  void onSetComplete() {}
+  void onSetComplete() {
+    logger.pushKey('target_holds', maxHolds);
+    logger.pushKey('max_rep', repCount);
+    logger.pushKey('total_seconds', maxHolds * WarriorOneConfig.HOLD_DURATION);
+    logger.pushKey('good_seconds', _goodHoldSeconds);
+    logger.pushKey('trunk_lean_fails_count', trunkLeanMetric.faultsCount);
+    logger.pushKey('cervical_fails_count', cervicalMetric.faultsCount);
+    logger.pushKey('arm_fails_count', armMetric.faultsCount);
+    logger.pushKey('back_knee_fails_count', backKneeMetric.faultsCount);
+    logger.pushKey('back_straight_fails_count', backStraightMetric.faultsCount);
+    logger.pushGoodRepCount();
+  }
 
   // --- Safety Checks (needs BOTH legs, like Lunge) ---
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    if (cameraFacing == CameraFacing.front) {
-      return "⚠️ Hãy quay sang bên để theo dõi Warrior I tốt hơn";
+    if (cameraFacing != CameraFacing.left &&
+        cameraFacing != CameraFacing.right) {
+      return "Hãy quay sang bên để theo dõi Warrior I tốt hơn";
     }
 
     final required = [
@@ -478,6 +492,20 @@ class WarriorOne extends ExerciseBase {
       faultMap[fault.phase]![fault.type] = fault.message;
     }
     setFeedback.add({correctForm: faultMap});
+    if (correctForm) {
+      _goodHoldSeconds += WarriorOneConfig.HOLD_DURATION;
+    }
+    logger.addRepLog(RepLog(
+      correctForm: correctForm,
+      repNumber: repCount,
+      data: {
+        'hold_time': WarriorOneConfig.HOLD_DURATION,
+        'fault_types': allFaults.map((f) => f.type).toSet().toList(),
+      },
+    ));
+    for (final metric in _metrics) {
+      metric.resetAndCountFault();
+    }
   }
 
   // --- State Machine ---
@@ -548,6 +576,18 @@ class WarriorOne extends ExerciseBase {
     for (final metric in _metrics) {
       metric.reset();
     }
+  }
+
+  @override
+  Map<String, String> processNoPoseFrame() {
+    if (holdState == WarriorOneState.hold) {
+      _resetForNextSide();
+      previousHoldState = holdState;
+      holdState = WarriorOneState.entry;
+      resultIssues.addInstruction(
+          'entry', 'Status', 'Mất mốc cơ thể, vào lại tư thế trước khi giữ.');
+    }
+    return super.processNoPoseFrame();
   }
 
   // --- Helpers ---

@@ -3,6 +3,7 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/frame_snapshot.dart';
 import '../exercise_base.dart';
+import '../side_tracked_exercise_mixin.dart';
 import 'metrics/reverse_crunch_metric_base.dart';
 import 'metrics/swinging_momentum_metric.dart';
 import 'metrics/pelvic_curl_metric.dart';
@@ -10,7 +11,27 @@ import 'metrics/eccentric_tempo_metric.dart';
 import '../../utils/exercise_logger.dart';
 import '../../utils/debouncer.dart';
 
-class ReverseCrunch extends ExerciseBase {
+class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
+  @override
+  Map<String, SideLandmarkPair> get requiredSideLandmarks => const {
+        'shoulder': (
+          right: PoseLandmarkType.rightShoulder,
+          left: PoseLandmarkType.leftShoulder
+        ),
+        'hip': (
+          right: PoseLandmarkType.rightHip,
+          left: PoseLandmarkType.leftHip
+        ),
+        'knee': (
+          right: PoseLandmarkType.rightKnee,
+          left: PoseLandmarkType.leftKnee
+        ),
+        'ankle': (
+          right: PoseLandmarkType.rightAnkle,
+          left: PoseLandmarkType.leftAnkle
+        ),
+      };
+
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
       const <VikaImageOrientation>{
@@ -27,6 +48,7 @@ class ReverseCrunch extends ExerciseBase {
   bool _isTimeout = false;
   double? _baselineTrunkKneeAngle;
   double? _minTrunkKneeAngleThisRep;
+  int _rejectedAttempts = 0;
 
   final Debouncer _curlingDebouncer = Debouncer(requiredFrames: 2);
   final Debouncer _topDebouncer = Debouncer(requiredFrames: 2);
@@ -65,6 +87,13 @@ class ReverseCrunch extends ExerciseBase {
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+    if (cameraFacing != CameraFacing.left &&
+        cameraFacing != CameraFacing.right) {
+      return "Vui lòng đặt camera quay ngang để thấy rõ thân và chân.";
+    }
+    if (getSideTrackedLandmarks(landmarks) == null) {
+      return "Không thấy đủ vai, hông, gối và cổ chân ở góc ngang.";
+    }
     if (cameraFacing == CameraFacing.front) {
       return "Vui lòng đặt camera quay ngang (Side View).";
     }
@@ -80,8 +109,8 @@ class ReverseCrunch extends ExerciseBase {
     double kneeAngle = calculateAngleNormalized(
         firstPoint: lm['hip']!, midPoint: lm['knee']!, lastPoint: lm['ankle']!);
     // Đánh giá góc người so với mặt sàn. (Mặt sàn ~ phương ngang)
-    double trunkHorizontalAngle =
-        calculateHorizontalAngle(point1: lm['shoulder']!, point2: lm['hip']!);
+    double trunkHorizontalAngle = calculateAbsoluteHorizontalAngle(
+        point1: lm['shoulder']!, point2: lm['hip']!);
 
     debugData['Setup_Diagnostic'] = {
       'kneeAngle': kneeAngle.toStringAsFixed(1),
@@ -117,7 +146,7 @@ class ReverseCrunch extends ExerciseBase {
     if (lm == null) return;
 
     scaleFactor = calculateDistance(lm['shoulder']!, lm['hip']!);
-    if (scaleFactor == 0) scaleFactor = 1;
+    if (!scaleFactor.isFinite || scaleFactor <= 1e-6) return;
 
     double trunkKneeAngle = calculateAngleNormalized(
         firstPoint: lm['shoulder']!,
@@ -127,7 +156,7 @@ class ReverseCrunch extends ExerciseBase {
         firstPoint: lm['hip']!, midPoint: lm['knee']!, lastPoint: lm['ankle']!);
 
     if (crunchState == ReverseCrunchState.lying) {
-      _baselineTrunkKneeAngle = trunkKneeAngle;
+      _baselineTrunkKneeAngle ??= trunkKneeAngle;
     }
 
     // Dùng FrameBuffer để tính vận tốc cuộn (TrunkKneeAngle)
@@ -202,18 +231,36 @@ class ReverseCrunch extends ExerciseBase {
     if (newState == crunchState) return;
     previousState = crunchState;
     crunchState = newState;
+    if (newState == ReverseCrunchState.lying) {
+      _baselineTrunkKneeAngle = null;
+      _minTrunkKneeAngleThisRep = null;
+    }
     for (final metric in _metrics)
       metric.onStateTransition(previousState, newState, timestampMs);
   }
 
   void _completeRep(RepContext ctx) {
-    repCount++;
     for (final metric in _metrics) metric.evaluateRepEnd(ctx);
 
     final allFaults = <FaultRecord>[];
     for (final metric in _metrics) allFaults.addAll(metric.faults);
 
     correctForm = !allFaults.any((f) => f.affectsForm);
+    if (!correctForm) {
+      _rejectedAttempts++;
+      resultIssues.feedback['Result'] = 'Không tính rep';
+      final faultMap = <String, Map<String, String>>{};
+      for (final fault in allFaults) {
+        faultMap.putIfAbsent(fault.phase, () => {});
+        faultMap[fault.phase]![fault.type] = fault.message;
+      }
+      setFeedback.add({false: faultMap});
+      _transitionState(ReverseCrunchState.lying, ctx.frameTimestamp);
+      for (final metric in _metrics) metric.resetAndCountFault();
+      return;
+    }
+
+    repCount++;
 
     logger.addRepLog(RepLog(
       correctForm: correctForm,
@@ -237,29 +284,18 @@ class ReverseCrunch extends ExerciseBase {
 
   Map<String, PoseLandmark>? _getLandmarks(
       Map<PoseLandmarkType, PoseLandmark> lm) {
-    final shoulder = lm[PoseLandmarkType.leftShoulder];
-    final hip = lm[PoseLandmarkType.leftHip];
-    final knee = lm[PoseLandmarkType.leftKnee];
-    final ankle = lm[PoseLandmarkType.leftAnkle];
-
-    if (shoulder == null || hip == null || knee == null || ankle == null) {
-      return null;
-    }
-
-    return {
-      'shoulder': shoulder,
-      'hip': hip,
-      'knee': knee,
-      'ankle': ankle,
-    };
+    return getSideTrackedLandmarks(lm);
   }
 
   @override
   void onSetComplete() {
     logger.pushKey("timeout", _isTimeout);
+    logger.pushKey("target_rep", ReverseCrunchConfig.MAX_REP);
+    logger.pushKey("max_rep", repCount);
     logger.pushKey("momentum_fails", momentumMetric.faultsCount);
     logger.pushKey("curl_fails", curlMetric.faultsCount);
     logger.pushKey("tempo_fails", tempoMetric.faultsCount);
+    logger.pushKey("rejected_attempts_count", _rejectedAttempts);
     logger.pushGoodRepCount();
   }
 }

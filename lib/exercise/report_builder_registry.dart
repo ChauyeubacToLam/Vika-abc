@@ -15,9 +15,12 @@ import '13.Plank Up-Down/plank_up_down_report_builder.dart';
 import '14.Bear Plank/bear_plank_report_builder.dart';
 import 'butterfly_stretch/butterfly_stretch_report_builder.dart';
 import 'cossack_squat/cossack_squat_report_builder.dart';
+import 'plank/plank_report_builder.dart';
+import 'warrior_1/warrior_one_report_builder.dart';
 import 'walking_lunge/walking_lunge_report_builder.dart';
 import 'tricep_dip/tricep_dip_report_builder.dart';
 import 'russian_twist/russian_twist_report_builder.dart';
+import 'Sphinx_Pose/sphinx_report_builder.dart';
 import 'standing_knee_to_elbow/standing_knee_to_elbow_report_builder.dart';
 
 // ═══════════════════════════════════════════════════════════════
@@ -44,11 +47,14 @@ final Map<String, ReportBuilderEntry> reportBuilders = {
   'dead_bug': (builder: DeadBugReportBuilder(), met: 3.0),
   'plank_up_down': (builder: PlankUpDownReportBuilder(), met: 4.5),
   'bear_plank': (builder: BearPlankReportBuilder(), met: 3.5),
+  'plank': (builder: PlankReportBuilder(), met: 3.5),
+  'warrior_one': (builder: WarriorOneReportBuilder(), met: 3.0),
   'butterfly_stretch': (builder: ButterflyReportBuilder(), met: 2.5),
   'cossack_squat': (builder: CossackSquatReportBuilder(), met: 5.0),
   'walking_lunge': (builder: WalkingLungeReportBuilder(), met: 6.0),
   'tricep_dip': (builder: TricepDipReportBuilder(), met: 3.5),
   'russian_twist': (builder: RussianTwistReportBuilder(), met: 5.0),
+  'sphinx_': (builder: SphinxReportBuilder(), met: 2.5),
   'standing_knee_to_elbow': (
     builder: StandingKneeToElbowReportBuilder(),
     met: 7.0
@@ -60,6 +66,11 @@ final Map<String, ReportBuilderEntry> reportBuilders = {
 ReportBuilderEntry? resolveReportBuilder(String exerciseId) {
   final direct = reportBuilders[exerciseId];
   if (direct != null) return direct;
+
+  final definition = lookupExerciseDefinition(exerciseId);
+  final byDefinitionId =
+      definition == null ? null : reportBuilders[definition.id];
+  if (byDefinitionId != null) return byDefinitionId;
 
   final normalizedId = normalizeExerciseKey(exerciseId);
   for (final entry in reportBuilders.entries) {

@@ -2,6 +2,7 @@
 
 import 'package:vika/exercise/exercise_base.dart';
 import 'package:vika/utils/debouncer.dart';
+import 'package:vika/utils/exercise_logger.dart';
 
 import '../../utils/pose_math_helpers.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
@@ -58,6 +59,7 @@ class Plank extends ExerciseBase {
   bool _ankleAvailable = true;
   bool _spoken10 = false;
   bool _spoken5 = false;
+  double _goodHoldSeconds = 0.0;
 
   final Debouncer _positionDebouncer = Debouncer(requiredFrames: 2);
 
@@ -135,14 +137,24 @@ class Plank extends ExerciseBase {
   bool requestStop() => repCount >= maxRep;
 
   @override
-  void onSetComplete() {}
+  void onSetComplete() {
+    logger.pushKey("max_rep", repCount);
+    logger.pushKey("target_rep", maxRep);
+    logger.pushKey("total_seconds", maxRep * PlankConfig.HOLD_DURATION);
+    logger.pushKey("good_seconds", _goodHoldSeconds);
+    logger.pushKey("trunk_fails_count", trunkAlignmentMetric.faultsCount);
+    logger.pushKey("neck_fails_count", headNeckMetric.faultsCount);
+    logger.pushKey("knee_fails_count", kneeExtensionMetric.faultsCount);
+    logger.pushGoodRepCount();
+  }
 
   // --- Safety Checks ---
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    if (cameraFacing == CameraFacing.front) {
-      return "⚠️ Xin hãy quay nghiêng để theo dõi tư thế Plank";
+    if (cameraFacing != CameraFacing.left &&
+        cameraFacing != CameraFacing.right) {
+      return "Xin hãy quay nghiêng để theo dõi tư thế Plank";
     }
 
     PoseLandmark? shoulder = getSideLandmark(
@@ -172,7 +184,6 @@ class Plank extends ExerciseBase {
       return "⚠️ Hình ảnh không rõ. Điều chỉnh ánh sáng hoặc vị trí";
     }
 
-    // Ankle is optional — only for knee extension metric
     PoseLandmark? ankle = getSideLandmark(
         landmarks: landmarks,
         rightType: PoseLandmarkType.rightAnkle,
@@ -181,6 +192,9 @@ class Plank extends ExerciseBase {
     _ankleAvailable = ankle != null &&
         ExerciseBase.isLandmarkConfident(ankle) &&
         ExerciseBase.isLandmarkConfident(knee);
+    if (!_ankleAvailable) {
+      return "Giữ cả cổ chân trong khung hình để kiểm tra gối.";
+    }
 
     return null;
   }
@@ -207,12 +221,24 @@ class Plank extends ExerciseBase {
         rightType: PoseLandmarkType.rightKnee,
         leftType: PoseLandmarkType.leftKnee);
 
-    if (shoulder == null || hip == null || ear == null || knee == null) return;
+    if (shoulder == null || hip == null || ear == null || knee == null) {
+      if (plankState == PlankState.holding) {
+        _transitionState(PlankState.setup, frameTimestampMs);
+      }
+      return;
+    }
 
     PoseLandmark? ankle = getSideLandmark(
         landmarks: smoothedLandmarks,
         rightType: PoseLandmarkType.rightAnkle,
         leftType: PoseLandmarkType.leftAnkle);
+    _ankleAvailable = ankle != null &&
+        ExerciseBase.isLandmarkConfident(ankle) &&
+        ExerciseBase.isLandmarkConfident(knee);
+    if (!_ankleAvailable && plankState == PlankState.holding) {
+      _transitionState(PlankState.setup, frameTimestampMs);
+      return;
+    }
 
     // 2. Calculate geometry
     double trunkClockAngle =
@@ -239,6 +265,7 @@ class Plank extends ExerciseBase {
         smoothedLandmarks[PoseLandmarkType.rightHeel];
 
     double floorY = foot?.y ?? heel?.y ?? knee.y;
+    if (!scaleFactor.isFinite || scaleFactor <= 1e-6) return;
     double hipToFloor = (floorY - hip.y).abs() / scaleFactor;
     bool isStanding = hipToFloor > PlankConfig.STANDING_HIP_FLOOR_THRESHOLD;
     int now = frameTimestampMs;
@@ -328,7 +355,9 @@ class Plank extends ExerciseBase {
         break;
 
       case PlankState.holding:
-        if (_currentHoldSeconds() >= PlankConfig.HOLD_DURATION) {
+        if (!isPlankPosition) {
+          _transitionState(PlankState.setup, timestampMs);
+        } else if (_currentHoldSeconds() >= PlankConfig.HOLD_DURATION) {
           _transitionState(PlankState.resting, timestampMs);
         }
         break;
@@ -363,6 +392,7 @@ class Plank extends ExerciseBase {
         break;
 
       case PlankState.setup:
+        _holdStartMs = null;
         break;
     }
   }
@@ -382,6 +412,7 @@ class Plank extends ExerciseBase {
 
     if (correctForm) {
       resultIssues.feedback['Result'] = 'Tốt lắm!';
+      _goodHoldSeconds += PlankConfig.HOLD_DURATION;
     } else {
       final summary = allFaults
           .where((f) => f.affectsForm)
@@ -397,15 +428,31 @@ class Plank extends ExerciseBase {
       faultMap['HOLDING']![fault.type] = fault.message;
     }
     setFeedback.add({correctForm: faultMap});
+    logger.addRepLog(RepLog(
+      correctForm: correctForm,
+      repNumber: repCount,
+      data: {
+        'hold_time': PlankConfig.HOLD_DURATION,
+        'fault_types': allFaults.map((f) => f.type).toSet().toList(),
+      },
+    ));
+
+    for (final metric in _metrics) {
+      metric.resetAndCountFault();
+    }
 
     for (final metric in _metrics) {
       debugData.addAll(metric.debugData);
     }
-
-    for (final metric in _metrics) {
-      metric.reset();
-    }
     correctForm = true;
+  }
+
+  @override
+  Map<String, String> processNoPoseFrame() {
+    if (plankState == PlankState.holding) {
+      _transitionState(PlankState.setup, frameTimestampMs);
+    }
+    return super.processNoPoseFrame();
   }
 
   // --- Helpers ---

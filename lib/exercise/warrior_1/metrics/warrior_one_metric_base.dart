@@ -85,6 +85,8 @@ class HoldContext {
    WarriorOneMetricBase — Interface every Warrior I metric implements.
    ========================================================================= */
 abstract class WarriorOneMetricBase {
+  int faultsCount = 0;
+
   /// Human-readable name for debug/logging.
   String get name;
 
@@ -100,6 +102,11 @@ abstract class WarriorOneMetricBase {
 
   /// Reset all internal state for the next hold (e.g. the other side).
   void reset();
+
+  void resetAndCountFault() {
+    if (faults.isNotEmpty) faultsCount++;
+    reset();
+  }
 
   /// Called when the hold state transitions (entry → hold → exit).
   /// Override in metrics that care about transitions.

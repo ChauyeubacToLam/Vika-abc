@@ -150,6 +150,7 @@ mixin SideTrackedExerciseMixin on ExerciseBase {
       final type = isRight ? pair.right : pair.left;
       final lm = landmarks[type];
       if (lm == null) continue;
+      if (!ExerciseBase.isLandmarkConfident(lm)) continue;
       score += 0.25 + (lm.likelihood.clamp(0.0, 1.0) as num).toDouble();
     }
     return score;
@@ -166,13 +167,16 @@ mixin SideTrackedExerciseMixin on ExerciseBase {
       final type = isRight ? entry.value.right : entry.value.left;
       final lm = landmarks[type];
       if (lm == null) return null;
+      if (!ExerciseBase.isLandmarkConfident(lm)) return null;
       result[entry.key] = lm;
     }
 
     for (final entry in optionalSideLandmarks.entries) {
       final type = isRight ? entry.value.right : entry.value.left;
       final lm = landmarks[type];
-      if (lm != null) result[entry.key] = lm;
+      if (lm != null && ExerciseBase.isLandmarkConfident(lm)) {
+        result[entry.key] = lm;
+      }
     }
 
     return result;

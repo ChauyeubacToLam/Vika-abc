@@ -9,6 +9,8 @@ class LumbarExtensionMetric extends BirdDogMetricBase {
 
   final Debouncer _faultDebouncer = Debouncer(requiredFrames: 3);
 
+  static const double _maxLegAboveTrunkDegrees = 25.0;
+
   @override
   List<FaultRecord> get faults => _faults;
 
@@ -19,10 +21,12 @@ class LumbarExtensionMetric extends BirdDogMetricBase {
   void update(BirdDogRepContext ctx) {
     if (ctx.state != BirdDogState.hold_extended) return;
 
+    final legAboveTrunk =
+        ctx.activeLegHorizontalAngle - ctx.trunkHorizontalAngle;
     _debugData['shaAngle'] = ctx.shoulderHipAnkleAngle.toStringAsFixed(1);
+    _debugData['legAboveTrunk'] = legAboveTrunk.toStringAsFixed(1);
 
-    // Chân văng lên quá cao làm góc vai-hông-gót > 185 độ -> võng lưng
-    if (_faultDebouncer.update(ctx.shoulderHipAnkleAngle > 185.0)) {
+    if (_faultDebouncer.update(legAboveTrunk > _maxLegAboveTrunkDegrees)) {
       ctx.resultIssues.feedback['Spine'] = 'Lưng bị võng!';
       if (!_faults.any((f) => f.type == 'Lumbar')) {
         _faults.add(FaultRecord(

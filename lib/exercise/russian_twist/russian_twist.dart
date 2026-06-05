@@ -56,6 +56,8 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
   TwistDirection lastCompletedTwistDirection = TwistDirection.none;
 
   int _halfRepCount = 0; // count twists, 2 twists = 1 rep
+  int _rejectedHalfTwists = 0;
+  double? _centerRotationSignal;
 
   // Metrics
   final ThoracicRotationMetric thoracicMetric = ThoracicRotationMetric();
@@ -98,8 +100,10 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
     logger.pushKey("thoracic_fails", thoracicMetric.faultsCount);
     logger.pushKey("knee_wobble_fails", kneeMetric.faultsCount);
     logger.pushKey("rom_fails", twistRomMetric.faultsCount);
+    logger.pushKey("rejected_attempts_count", _rejectedHalfTwists);
     logger.pushGoodRepCount();
-    logger.pushKey("max_rep", maxRep);
+    logger.pushKey("max_rep", repCount);
+    logger.pushKey("target_rep", maxRep);
   }
 
   @override
@@ -147,6 +151,7 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
 
     // Calculate relative positions
     double wristHipDx = (wrist.x - hip.x) * directionMultiplier;
+    double shoulderHipDx = (shoulder.x - hip.x) * directionMultiplier;
     double kneeHipDx = (knee.x - hip.x) * directionMultiplier;
 
     // Fallback if knee is directly under hip (shouldn't happen sitting)
@@ -156,9 +161,10 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
 
     frameBuffer.addFrame(FrameSnapshot(log: {
       "wristHipDx": wristHipDx,
+      "rotationSignal": shoulderHipDx,
     }, timeStamp: now));
 
-    _updateStateMachine(wristHipDx, kneeHipDx, now);
+    _updateStateMachine(shoulderHipDx, kneeHipDx, now);
 
     final ctx = RussianRepContext(
       wristX: wrist.x,
@@ -185,6 +191,7 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
     debugData['russianState'] = russianState.name;
     debugData['direction'] = currentDirection.name;
     debugData['halfRepCount'] = _halfRepCount;
+    debugData['rotationSignal'] = shoulderHipDx.toStringAsFixed(1);
 
     for (final metric in _metrics) {
       debugData.addAll(metric.debugData);
@@ -199,34 +206,35 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
     }
   }
 
-  void _updateStateMachine(double wristHipDx, double kneeHipDx, int now) {
-    final wristChange = frameBuffer.getChange("wristHipDx", 3);
+  void _updateStateMachine(double rotationSignal, double kneeHipDx, int now) {
+    final rotationChange = frameBuffer.getChange("rotationSignal", 3);
 
     if (russianState == RussianTwistState.center_setup) {
-      // If moving forward (towards knees) or backward (towards hips)
-      if (wristChange == ChangeState.increasing) {
+      _centerRotationSignal = rotationSignal;
+      // If the torso rotates forward or backward.
+      if (rotationChange == ChangeState.increasing) {
         currentDirection = TwistDirection.forward;
         _transitionState(RussianTwistState.twisting, now);
-      } else if (wristChange == ChangeState.decreasing) {
+      } else if (rotationChange == ChangeState.decreasing) {
         currentDirection = TwistDirection.backward;
         _transitionState(RussianTwistState.twisting, now);
       }
     } else if (russianState == RussianTwistState.twisting) {
       // Reached max point when velocity stops
       if (currentDirection == TwistDirection.forward &&
-          wristChange != ChangeState.increasing) {
+          rotationChange != ChangeState.increasing) {
         _transitionState(RussianTwistState.max_point, now);
       } else if (currentDirection == TwistDirection.backward &&
-          wristChange != ChangeState.decreasing) {
+          rotationChange != ChangeState.decreasing) {
         _transitionState(RussianTwistState.max_point, now);
       }
     } else if (russianState == RussianTwistState.max_point) {
       // Started returning
       if (currentDirection == TwistDirection.forward &&
-          wristChange == ChangeState.decreasing) {
+          rotationChange == ChangeState.decreasing) {
         _transitionState(RussianTwistState.returning, now);
       } else if (currentDirection == TwistDirection.backward &&
-          wristChange == ChangeState.increasing) {
+          rotationChange == ChangeState.increasing) {
         _transitionState(RussianTwistState.returning, now);
       }
     } else if (russianState == RussianTwistState.returning) {
@@ -234,17 +242,15 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
       // A common pattern is sweeping from forward to backward directly.
       // So if velocity changes direction, or we cross the center zone, we reset.
 
-      // Center zone is around 30% to 50% of kneeHipDx.
-      double centerMin = kneeHipDx * 0.25;
-      double centerMax = kneeHipDx * 0.55;
-
-      bool inCenterZone = wristHipDx > centerMin && wristHipDx < centerMax;
+      final centerTolerance = (kneeHipDx.abs() * 0.12).clamp(6.0, 24.0);
+      final inCenterZone = _centerRotationSignal != null &&
+          (rotationSignal - _centerRotationSignal!).abs() <= centerTolerance;
 
       if (inCenterZone ||
           (currentDirection == TwistDirection.forward &&
-              wristChange == ChangeState.increasing) ||
+              rotationChange == ChangeState.increasing) ||
           (currentDirection == TwistDirection.backward &&
-              wristChange == ChangeState.decreasing)) {
+              rotationChange == ChangeState.decreasing)) {
         _transitionState(RussianTwistState.center_setup, now);
         _completeHalfRep();
       }
@@ -282,15 +288,13 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
     if (!hasRomFault) {
       if (currentDirection == lastCompletedTwistDirection) {
         // Repeated the same side!
-        resultIssues.feedback['Result'] = 'Lỗi!';
+        _rejectedHalfTwists++;
+        resultIssues.feedback['Result'] = 'Không tính';
         setFeedback.add({
           false: {
             'General': {'duplicate_side': 'Vui lòng vặn luân phiên 2 bên!'}
           }
         });
-        logger.addRepLog(RepLog(correctForm: false, repNumber: repCount, data: {
-          "fault_types": ['duplicate_side'],
-        }));
       } else {
         // Valid alternate twist
         _halfRepCount++;
@@ -309,7 +313,7 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
           repCount++;
           correctForm = isGoodHalf;
           resultIssues.feedback['Result'] =
-              correctForm ? 'Good Rep!' : 'Fix Form';
+              correctForm ? 'Tốt lắm!' : 'Sửa form';
 
           setFeedback.add({correctForm: faultMap});
           logger.addRepLog(
@@ -320,6 +324,7 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
       }
     } else {
       // Shallow twist, don't count it, just log the fault.
+      _rejectedHalfTwists++;
       final faultMap = <String, Map<String, String>>{};
       for (final fault in allFaults) {
         faultMap.putIfAbsent(fault.phase, () => {});

@@ -4,6 +4,9 @@ import 'package:vika/interpreter/interpreter_base.dart';
 
 class BearPlankReportBuilder extends ExerciseReportBuilder {
   @override
+  bool get isSecondBased => true;
+
+  @override
   Map<String, List<String>> painToFaultMap() => {
         'lower_back': ['back_fails'],
         'wrist': ['weight_fails'],
