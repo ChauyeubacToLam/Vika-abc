@@ -27,6 +27,16 @@
 			<dict>
 				<key>CFBundleTypeRole</key>
 				<string>Editor</string>
+				<key>CFBundleURLName</key>
+				<string>com.vikavn.app</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>com.vikavn.app</string>
+				</array>
+			</dict>
+			<dict>
+				<key>CFBundleTypeRole</key>
+				<string>Editor</string>
 				<key>CFBundleURLSchemes</key>
 				<array>
 					<string>com.googleusercontent.apps.842720056940-6de5r778b6gqjspmhrn5u347od5oqhmc</string>

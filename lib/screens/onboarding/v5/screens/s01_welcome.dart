@@ -10,14 +10,20 @@ import '../v5_theme.dart';
 /// a living visualization that hints at the AI-camera differentiator, and a
 /// headline that lands without explaining itself.
 class S01Welcome extends StatelessWidget {
-  const S01Welcome({super.key, required this.onNext});
+  const S01Welcome({
+    super.key,
+    required this.onNext,
+    this.onLogin,
+  });
 
   final VoidCallback onNext;
+  final VoidCallback? onLogin;
 
   @override
   Widget build(BuildContext context) {
     final r = V5Responsive.of(context);
     final bottomInset = r.viewPadding.bottom;
+    final onLogin = this.onLogin;
     return V5Screen(
       index: 1,
       inverted: true,
@@ -55,7 +61,7 @@ class S01Welcome extends StatelessWidget {
                     r.pick(cozy: 28.0, short: 18.0, veryShort: 10.0),
                 V5.gutter,
                 bottomInset +
-                    r.pick(cozy: 132.0, short: 116.0, veryShort: 102.0),
+                    r.pick(cozy: 168.0, short: 150.0, veryShort: 130.0),
               ),
               child: Column(
                 children: [
@@ -107,24 +113,66 @@ class S01Welcome extends StatelessWidget {
           label: 'Bắt đầu hành trình',
           onTap: onNext,
           yellow: true,
-          bottom: 32 + bottomInset,
+          bottom:
+              r.pick(cozy: 68.0, short: 62.0, veryShort: 54.0) + bottomInset,
         ),
 
         // Footer signature
-        if (!r.isVeryShort)
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 12 + bottomInset,
-            child: Text(
-              'Phát triển tại Việt Nam  ·  16 bước trong 3 phút',
-              textAlign: TextAlign.center,
-              style: V5
-                  .caption(context, color: V5.invInkFaint)
-                  .copyWith(letterSpacing: 0.4),
-            ),
+        Positioned(
+          left: V5.gutter,
+          right: V5.gutter,
+          bottom: 10 + bottomInset,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (onLogin != null) _WelcomeLoginLink(onTap: onLogin),
+              if (!r.isVeryShort) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Phát triển tại Việt Nam  ·  16 bước trong 3 phút',
+                  textAlign: TextAlign.center,
+                  style: V5
+                      .caption(context, color: V5.invInkFaint)
+                      .copyWith(letterSpacing: 0.4),
+                ),
+              ],
+            ],
           ),
+        ),
       ],
+    );
+  }
+}
+
+class _WelcomeLoginLink extends StatelessWidget {
+  const _WelcomeLoginLink({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'Đã có tài khoản? ',
+              style: V5.caption(context, color: V5.invInkFaint),
+            ),
+            Text(
+              'Đăng nhập',
+              style: V5
+                  .caption(context, color: V5.invInk)
+                  .copyWith(fontWeight: FontWeight.w800),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

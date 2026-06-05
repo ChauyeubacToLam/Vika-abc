@@ -16,6 +16,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'exercise/exercise_base.dart';
 import 'models/exercise_definition.dart';
+import 'screens/auth/login_screen.dart';
+import 'screens/auth/magic_link_sent_screen.dart';
 import 'screens/exercise/exercise_launch_args.dart';
 import 'screens/exercise/exercise_experience_screen.dart';
 import 'screens/main_shell.dart';
@@ -166,7 +168,7 @@ Future<bool> isOnboardingComplete() async {
    UI REP LOG — For debug panel display only. Not the data pipeline.
    ========================================================================= */
 
-enum _AppEntryState { onboarding, home, loading }
+enum _AppEntryState { onboarding, login, home, loading }
 
 class UIRepLog {
   final int repNumber;
@@ -228,18 +230,38 @@ class VikaApp extends StatelessWidget {
         switch (settings.name) {
           case '/':
             final args = settings.arguments;
-            final overrideComplete = args is Map<String, dynamic>
-                ? args['onboardingComplete'] as bool?
+            final overrideCompleteValue =
+                args is Map ? args['onboardingComplete'] : null;
+            final overrideComplete =
+                overrideCompleteValue is bool ? overrideCompleteValue : null;
+            final overrideEntryStateValue =
+                args is Map ? args['entryState'] : null;
+            final overrideEntryState = overrideEntryStateValue is String
+                ? overrideEntryStateValue
                 : null;
             return MaterialPageRoute(
               builder: (_) => AppEntryGate(
                 initialOnboardingComplete:
                     overrideComplete ?? _hasCompletedOnboarding,
+                initialEntryState: overrideEntryState,
               ),
             );
           case '/onboarding':
             return MaterialPageRoute(
-              builder: (_) => const V5OnboardingNavigator(),
+              builder: (context) => V5OnboardingNavigator(
+                onRequestLogin: () {
+                  Navigator.of(context).pushNamedAndRemoveUntil(
+                    '/',
+                    (route) => false,
+                    arguments: const {'entryState': 'login'},
+                  );
+                },
+              ),
+            );
+          case '/magic-link-sent':
+            final email = settings.arguments as String? ?? '';
+            return MaterialPageRoute(
+              builder: (_) => MagicLinkSentScreen(email: email),
             );
           case '/exercise':
             final args = settings.arguments;
@@ -286,13 +308,25 @@ class VikaApp extends StatelessWidget {
   }
 }
 
+_AppEntryState? _entryStateFromRouteArg(Object? value) {
+  return switch (value) {
+    'onboarding' => _AppEntryState.onboarding,
+    'login' => _AppEntryState.login,
+    'home' => _AppEntryState.home,
+    'loading' => _AppEntryState.loading,
+    _ => null,
+  };
+}
+
 class AppEntryGate extends StatefulWidget {
   const AppEntryGate({
     super.key,
     required this.initialOnboardingComplete,
+    this.initialEntryState,
   });
 
   final bool initialOnboardingComplete;
+  final String? initialEntryState;
 
   @override
   State<AppEntryGate> createState() => _AppEntryGateState();
@@ -310,8 +344,44 @@ class _AppEntryGateState extends State<AppEntryGate> {
     _entryState = _initialEntryState();
     _authSubscription = supabase.auth.onAuthStateChange.listen(
       _handleAuthStateChange,
+      onError: _handleAuthStreamError,
     );
     _resolveEntryState();
+  }
+
+  /// Deep-link auth failures (e.g. an expired or already-used magic link)
+  /// surface as *errors* on [onAuthStateChange] via gotrue's notifyException.
+  /// Without an onError handler they escape to the zone as an unhandled
+  /// exception and crash. Swallow them, keep the user on the login screen,
+  /// and let them know they can request a fresh link.
+  void _handleAuthStreamError(Object error, StackTrace stackTrace) {
+    debugPrint('[Vika] Auth stream error: $error');
+    if (!mounted) return;
+    if (_entryState != _AppEntryState.home) {
+      _setEntryState(_AppEntryState.login);
+    }
+    ScaffoldMessenger.maybeOf(context)
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(_friendlyAuthStreamError(error)),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+  }
+
+  String _friendlyAuthStreamError(Object error) {
+    if (error is AuthException) {
+      final code = '${error.code ?? ''} ${error.statusCode ?? ''}'.toLowerCase();
+      final message = error.message.toLowerCase();
+      if (code.contains('expired') ||
+          code.contains('otp') ||
+          message.contains('expired') ||
+          message.contains('invalid')) {
+        return 'Link đăng nhập đã hết hạn hoặc đã được dùng. Vui lòng gửi lại email.';
+      }
+    }
+    return 'Không thể hoàn tất đăng nhập. Vui lòng thử lại.';
   }
 
   @override
@@ -321,6 +391,9 @@ class _AppEntryGateState extends State<AppEntryGate> {
   }
 
   _AppEntryState _initialEntryState() {
+    final override = _entryStateFromRouteArg(widget.initialEntryState);
+    if (override != null) return override;
+
     return widget.initialOnboardingComplete
         ? _AppEntryState.home
         : _AppEntryState.onboarding;
@@ -345,6 +418,8 @@ class _AppEntryGateState extends State<AppEntryGate> {
         _quietResolveEntryState();
         break;
       case 'signedOut':
+        _setEntryState(_AppEntryState.login);
+        break;
       case 'userDeleted':
         _setEntryState(_AppEntryState.onboarding);
         break;
@@ -362,8 +437,11 @@ class _AppEntryGateState extends State<AppEntryGate> {
   Future<void> _quietResolveEntryState() async {
     final session = supabase.auth.currentSession;
     if (session == null) {
-      if (_entryState != _AppEntryState.onboarding) {
-        _setEntryState(_AppEntryState.onboarding);
+      final seenBefore = await _readStoredOnboardingCompletion();
+      final target =
+          seenBefore ? _AppEntryState.login : _AppEntryState.onboarding;
+      if (_entryState != target) {
+        _setEntryState(target);
       }
       return;
     }
@@ -398,7 +476,13 @@ class _AppEntryGateState extends State<AppEntryGate> {
   Widget build(BuildContext context) {
     switch (_entryState) {
       case _AppEntryState.onboarding:
-        return const V5OnboardingNavigator();
+        return V5OnboardingNavigator(
+          onRequestLogin: () => _setEntryState(_AppEntryState.login),
+        );
+      case _AppEntryState.login:
+        return LoginScreen(
+          onBack: () => _setEntryState(_AppEntryState.onboarding),
+        );
       case _AppEntryState.home:
         return const MainShell();
       case _AppEntryState.loading:

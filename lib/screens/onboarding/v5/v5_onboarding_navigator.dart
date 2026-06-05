@@ -35,7 +35,12 @@ import 'v5_theme.dart';
 /// launches the live squat assessment between S07 and S08, and persists the
 /// collected profile on the S16 CTA.
 class V5OnboardingNavigator extends StatefulWidget {
-  const V5OnboardingNavigator({super.key});
+  const V5OnboardingNavigator({
+    super.key,
+    required this.onRequestLogin,
+  });
+
+  final VoidCallback onRequestLogin;
 
   @override
   State<V5OnboardingNavigator> createState() => _V5OnboardingNavigatorState();
@@ -268,7 +273,7 @@ class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
   }
 
   List<Widget> get _pages => [
-        S01Welcome(onNext: _next),
+        S01Welcome(onNext: _next, onLogin: widget.onRequestLogin),
         S02Mirror(data: _data, onNext: _next, onBack: _back),
         S03Barrier(onNext: _next, onBack: _back),
         S04Resolution(onNext: _next, onBack: _back),
@@ -296,7 +301,9 @@ class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
           onNext: _next,
           onBack: _back,
           onAuthenticated: () async {
-            await _ensureOnboardingPlan();
+            await _ensureOnboardingPlan(markComplete: true);
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setBool('onboarding_complete', true);
           },
         ),
         S15Journey(
