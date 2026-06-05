@@ -22,6 +22,7 @@ void main() {
         ),
       ],
       trophy: _trophy(),
+      lowestFormScore: 80,
     );
 
     expect(coach.kind, CoachWatchKind.fault);
@@ -53,6 +54,7 @@ void main() {
         ),
       ],
       trophy: _trophy(),
+      lowestFormScore: 80,
     );
 
     expect(coach.watch, 'Lunge watch');
@@ -80,6 +82,7 @@ void main() {
         ),
       ],
       trophy: _trophy(),
+      lowestFormScore: 80,
     );
 
     expect(coach.watch, 'Push Up watch');
@@ -104,6 +107,7 @@ void main() {
         ),
       ],
       trophy: _trophy(),
+      lowestFormScore: 80,
     );
 
     final sortIndexCoach = SessionCoachBuilder.build(
@@ -124,6 +128,7 @@ void main() {
         ),
       ],
       trophy: _trophy(),
+      lowestFormScore: 80,
     );
 
     expect(criticalityCoach.watch, 'Depth watch');
@@ -136,11 +141,13 @@ void main() {
         _candidate(rate: 0.09),
       ],
       trophy: _trophy(),
+      lowestFormScore: 80,
     );
 
     final moderateCoach = SessionCoachBuilder.build(
       candidates: const [],
       trophy: _trophy(),
+      lowestFormScore: 80,
     );
 
     final hardCoach = SessionCoachBuilder.build(
@@ -148,6 +155,7 @@ void main() {
         _candidate(rate: 0.01),
       ],
       trophy: _trophy(),
+      lowestFormScore: 80,
     );
 
     expect(easyCoach.kind, CoachWatchKind.perfect);
@@ -166,11 +174,13 @@ void main() {
         _candidate(rate: 0.10),
       ],
       trophy: _trophy(tier: TrophyTier.streakMilestone, value: '7'),
+      lowestFormScore: 80,
     );
 
     final perfectCoach = SessionCoachBuilder.build(
       candidates: const [],
       trophy: _trophy(tier: TrophyTier.cleanSession),
+      lowestFormScore: 80,
     );
 
     expect(
@@ -201,6 +211,7 @@ void main() {
         ),
       ],
       trophy: _trophy(),
+      lowestFormScore: 80,
     );
 
     expect(coach.kind, CoachWatchKind.fault);

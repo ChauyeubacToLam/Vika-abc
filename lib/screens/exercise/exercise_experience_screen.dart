@@ -631,7 +631,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       );
 
       final candidates = <FaultCandidate>[];
-      int lowestFormScore = double.infinity.toInt();
+      var lowestFormScore = accumulated.first.formScore;
       for (final r in accumulated) {
         lowestFormScore = min(r.formScore, lowestFormScore);
         final builder =
