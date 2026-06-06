@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../data/program_mock.dart';
+import '../widgets/progress/period_tabs.dart' show PeriodTab;
 import 'recommendation/progression_service.dart';
 
 /// Summary of a completed exercise session, loaded from Supabase.
@@ -475,6 +476,153 @@ class SessionPersistence {
       cursor = cursor.previous;
     }
     return count;
+  }
+
+  /// Home "FORM 7 NGÀY" vitals summary over a rolling 14-day window.
+  ///
+  /// Read-only display aggregate — scores are computed and frozen elsewhere.
+  /// Reads `session_form_score` — the composite shown to the user.
+  ///
+  /// Single round trip; the windowing + averaging live in
+  /// [deriveHomeFormSummaryForTest] so they stay unit-testable.
+  ///
+  ///   percent — rounded mean of the current 7-day window, or null when no
+  ///             session landed in the last 7 days (cold start)
+  ///   delta   — percent minus the rounded mean of the prior week, or null
+  ///             unless the prior week holds >= 2 sessions (no baseline -> hide)
+  ///   week    — current-window session form scores, oldest-first
+  Future<({int? percent, int? delta, List<int> week})> homeFormSummary() async {
+    try {
+      final since = DateTime.now().subtract(const Duration(days: 14));
+      final samples = await _sessionFormScoresInWindow(since: since);
+      return deriveHomeFormSummaryForTest(samples);
+    } catch (e) {
+      debugPrint('[Vika] homeFormSummary failed: $e');
+      return (percent: null, delta: null, week: const <int>[]);
+    }
+  }
+
+  /// Completed-session form samples for the current user, oldest-first.
+  ///
+  /// Single round trip shared by [homeFormSummary] and [progressFormSummary].
+  /// Reads `session_form_score` — the composite form number shown to the user
+  /// (includes the streak bonus). [since] is an optional lower bound on
+  /// `completed_at` (null = all completed sessions). Returns empty when signed
+  /// out; throws on a genuine fetch error so callers can log + fall back.
+  Future<List<({DateTime completedAt, int formScore})>>
+      _sessionFormScoresInWindow({DateTime? since}) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return const [];
+
+    var query = _client
+        .from('workout_sessions')
+        .select('session_form_score, completed_at')
+        .eq('user_id', userId)
+        .not('session_form_score', 'is', null);
+    if (since != null) {
+      query = query.gte('completed_at', since.toUtc().toIso8601String());
+    }
+    final rows = await query.order('completed_at', ascending: true);
+
+    final samples = <({DateTime completedAt, int formScore})>[];
+    for (final raw in rows as List) {
+      final row = (raw as Map).cast<String, dynamic>();
+      final completedAt = _dateTimeOrNull(row['completed_at']);
+      final score = (row['session_form_score'] as num?)?.toInt();
+      if (completedAt == null || score == null) continue;
+      samples.add((completedAt: completedAt, formScore: score));
+    }
+    return samples;
+  }
+
+  /// Progress tab "ĐIỂM FORM" gauge + "ĐƯỜNG TIẾN BỘ" trend, scoped to a
+  /// [PeriodTab] window. Read-only display aggregate — scores are computed
+  /// and frozen elsewhere; reads `session_form_score` (the composite shown
+  /// to the user).
+  ///
+  ///   trend — window session form scores, oldest-first (empty = no sessions)
+  ///   to    — latest score in the window, or null when empty
+  ///   from  — earliest score in the window, or null when empty
+  ///   delta — to - from, or null when empty
+  Future<({int? to, int? from, int? delta, List<int> trend})>
+      progressFormSummary(PeriodTab period) async {
+    try {
+      final now = DateTime.now();
+      final since = switch (period) {
+        PeriodTab.week => now.subtract(const Duration(days: 7)),
+        PeriodTab.month => now.subtract(const Duration(days: 30)),
+        // TODO(wiring): single-program MVP — this returns ALL completed
+        // sessions for the user. Scope to the active program
+        // (recommendation_id) once multi-program history lands.
+        PeriodTab.program => null,
+      };
+      final samples = await _sessionFormScoresInWindow(since: since);
+      return deriveProgressFormSummaryForTest(
+        [for (final sample in samples) sample.formScore],
+      );
+    } catch (e) {
+      debugPrint('[Vika] progressFormSummary failed: $e');
+      return (to: null, from: null, delta: null, trend: const <int>[]);
+    }
+  }
+
+  /// Pure aggregation for [progressFormSummary]. [scores] are window session
+  /// form scores, oldest-first. Kept separate so the to/from/delta math is
+  /// unit-testable without a database.
+  @visibleForTesting
+  static ({int? to, int? from, int? delta, List<int> trend})
+      deriveProgressFormSummaryForTest(List<int> scores) {
+    final trend = List<int>.unmodifiable(scores);
+    final to = trend.isEmpty ? null : trend.last;
+    final from = trend.isEmpty ? null : trend.first;
+    final delta = (to != null && from != null) ? to - from : null;
+    return (to: to, from: from, delta: delta, trend: trend);
+  }
+
+  /// Pure windowing + averaging for [homeFormSummary]. `now` is injectable so
+  /// the rolling-window math is deterministic in tests.
+  ///
+  /// Windows are rolling absolute instants — no timezone handling needed,
+  /// the comparisons are independent of UTC vs local:
+  ///   current = [now-7d, now]      prior = [now-14d, now-7d)
+  @visibleForTesting
+  static ({int? percent, int? delta, List<int> week})
+      deriveHomeFormSummaryForTest(
+    Iterable<({DateTime completedAt, int formScore})> samples, {
+    DateTime? now,
+  }) {
+    final end = now ?? DateTime.now();
+    final currentStart = end.subtract(const Duration(days: 7));
+    final priorStart = end.subtract(const Duration(days: 14));
+
+    final current = <({DateTime completedAt, int formScore})>[];
+    final prior = <int>[];
+    for (final sample in samples) {
+      final at = sample.completedAt;
+      if (!at.isBefore(currentStart) && !at.isAfter(end)) {
+        current.add(sample); // [now-7d, now]
+      } else if (!at.isBefore(priorStart) && at.isBefore(currentStart)) {
+        prior.add(sample.formScore); // [now-14d, now-7d)
+      }
+    }
+
+    current.sort((a, b) => a.completedAt.compareTo(b.completedAt));
+    final week = [for (final sample in current) sample.formScore];
+
+    final percent = week.isEmpty ? null : _roundedMean(week);
+    final delta = (percent != null && prior.length >= 2)
+        ? percent - _roundedMean(prior)
+        : null;
+
+    return (percent: percent, delta: delta, week: week);
+  }
+
+  static int _roundedMean(List<int> values) {
+    var sum = 0;
+    for (final value in values) {
+      sum += value;
+    }
+    return (sum / values.length).round();
   }
 
   /// Returns list of active body_region strings from user_pain_areas.

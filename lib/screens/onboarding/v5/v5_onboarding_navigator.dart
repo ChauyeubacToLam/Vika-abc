@@ -38,9 +38,14 @@ class V5OnboardingNavigator extends StatefulWidget {
   const V5OnboardingNavigator({
     super.key,
     required this.onRequestLogin,
+    this.onSignupAuthStarted,
   });
 
   final VoidCallback onRequestLogin;
+
+  /// Called the instant the S13 signup step begins a sign-in attempt, so the
+  /// app entry gate can stand down and let this navigator own the flow.
+  final VoidCallback? onSignupAuthStarted;
 
   @override
   State<V5OnboardingNavigator> createState() => _V5OnboardingNavigatorState();
@@ -54,9 +59,21 @@ class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
   bool _onboardingSignalsPersisted = false;
   Future<PlanSnapshot?>? _onboardingPlanFuture;
 
+  // S13 auto-skip: when the user reaches the signup step already authenticated
+  // (routed in from the standalone login because their account hadn't finished
+  // onboarding), skip it instead of asking them to sign in again.
+  // `_signupSkipping` makes S13 render a loader during the pass-through;
+  // `_signupAutoSkipped` keeps it to a single forward skip.
+  bool _signupAutoSkipped = false;
+  bool _signupSkipping = false;
+
+  bool get _hasAuthSession =>
+      Supabase.instance.client.auth.currentSession?.user != null;
+
   // Page indices used for special-case logic.
   static const _idxAssessmentIntro = 8; // S07
   static const _idxAnalyzing = 9; // S08
+  static const _idxSignup = 14; // S13
 
   // Screens with dark/inverted backgrounds — drives the status bar overlay.
   static const _darkPages = <int>{0, 9, 16}; // S01, S08, S16
@@ -76,6 +93,13 @@ class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
   void _next() {
     if (!_pc.hasClients) return;
     if (_page < 16) {
+      // Reached the signup step (S13) already authenticated — e.g. routed in
+      // from the standalone login because the account hadn't finished
+      // onboarding. Skip it so they aren't asked to sign in twice.
+      if (_page == _idxSignup - 1 && !_signupAutoSkipped && _hasAuthSession) {
+        unawaited(_autoSkipSignup());
+        return;
+      }
       _pc.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOutCubic,
@@ -116,6 +140,31 @@ class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
     return RecommendationService().ensurePlanForCurrentUser(
       trigger: 'onboarding',
     );
+  }
+
+  /// The S13 sign-in checkpoint: persist the profile + generate the plan
+  /// (marking onboarding complete) and set the local flag. Shared by the S13
+  /// sign-in callback and the already-authenticated auto-skip below.
+  Future<void> _persistSignupCheckpoint() async {
+    await _ensureOnboardingPlan(markComplete: true);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('onboarding_complete', true);
+  }
+
+  /// Skip the S13 signup step for a user who is already authenticated: record
+  /// the checkpoint (best-effort — S15 retries plan generation) and slide
+  /// straight to S15. S13 shows a loader via [_signupSkipping] during the
+  /// pass-through so its sign-in form never appears.
+  Future<void> _autoSkipSignup() async {
+    _signupAutoSkipped = true;
+    setState(() => _signupSkipping = true);
+    unawaited(_persistSignupCheckpoint().catchError((Object _) {}));
+    await _pc.animateToPage(
+      _idxSignup + 1, // S15 Journey
+      duration: const Duration(milliseconds: 360),
+      curve: Curves.easeOutCubic,
+    );
+    if (mounted) setState(() => _signupSkipping = false);
   }
 
   void _back() {
@@ -298,13 +347,11 @@ class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
         S12Schedule(data: _data, onNext: _next, onBack: _back),
         S13Signup(
           data: _data,
+          skipping: _signupSkipping,
           onNext: _next,
           onBack: _back,
-          onAuthenticated: () async {
-            await _ensureOnboardingPlan(markComplete: true);
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setBool('onboarding_complete', true);
-          },
+          onAuthStarted: widget.onSignupAuthStarted,
+          onAuthenticated: _persistSignupCheckpoint,
         ),
         S15Journey(
           data: _data,
@@ -332,9 +379,12 @@ class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
         value: _overlayStyle,
         child: Scaffold(
           backgroundColor: V5.bg,
-          // S13 has a TextField — let the keyboard resize the body so the field
-          // stays visible above it.
-          resizeToAvoidBottomInset: true,
+          // Must stay false: resizing this shared Scaffold would shrink the
+          // ENTIRE PageView when the keyboard opens, squeezing sibling pages
+          // (e.g. S15's week cards) into overflow. S13 — the only page with a
+          // TextField — owns its own keyboard resize via V5KeyboardForm's
+          // nested Scaffold, so the field stays visible without touching siblings.
+          resizeToAvoidBottomInset: false,
           body: PageView(
             controller: _pc,
             physics: const NeverScrollableScrollPhysics(),

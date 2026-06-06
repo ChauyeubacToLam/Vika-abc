@@ -15,13 +15,19 @@
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../data/profile_mock.dart';
+import '../services/data_export_service.dart';
 import '../services/user_profile_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/vf_theme.dart';
@@ -55,9 +61,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final ScrollController _scrollController = ScrollController();
   final _profileService = UserProfileService();
   bool _showStickyBar = false;
+  bool _showDownFab = false;
+  bool _deleting = false;
+  bool _exporting = false;
   AppUserProfile? _profile;
 
+  // Support contact + legal links. /terms and /support are not live yet, so
+  // only the live privacy page is linked; support is handled over email.
+  static const String _privacyUrl = 'https://vikavn.app/privacy';
+  static const String _supportEmail = 'support@vikavn.app';
+
   static const double _stickyBarThreshold = 260;
+
+  // How close to either end (in px) before the directional scroll FAB hides —
+  // there's nowhere meaningful left to jump to.
+  static const double _fabEdge = 140;
 
   @override
   void initState() {
@@ -85,9 +103,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _onScroll() {
-    final shouldShow = _scrollController.offset > _stickyBarThreshold;
-    if (shouldShow != _showStickyBar) {
-      setState(() => _showStickyBar = shouldShow);
+    final pos = _scrollController.position;
+    final offset = pos.pixels;
+    final shouldShow = offset > _stickyBarThreshold;
+
+    // "Xuống cuối" FAB — only while heading down (the sticky bar up top already
+    // covers going back to the top). Scrolling up hides it; near the bottom
+    // there's nowhere left to jump, so it hides there too. On idle the last
+    // state persists so the user can still tap after the flick settles.
+    var showDown = _showDownFab;
+    switch (pos.userScrollDirection) {
+      case ScrollDirection.reverse:
+        showDown = offset < pos.maxScrollExtent - _fabEdge;
+      case ScrollDirection.forward:
+        showDown = false;
+      case ScrollDirection.idle:
+        break;
+    }
+
+    if (shouldShow != _showStickyBar || showDown != _showDownFab) {
+      setState(() {
+        _showStickyBar = shouldShow;
+        _showDownFab = showDown;
+      });
     }
   }
 
@@ -95,6 +133,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _scrollController.animateTo(
       0,
       duration: const Duration(milliseconds: 480),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  void _scrollToBottom() {
+    _scrollController.animateTo(
+      _scrollController.position.maxScrollExtent,
+      duration: const Duration(milliseconds: 560),
       curve: Curves.easeOutCubic,
     );
   }
@@ -107,7 +153,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _openEditProfileSheet() async {
-    final saved = await showModalBottomSheet<AppUserProfile>(
+    final result = await showModalBottomSheet<_EditProfileResult>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -116,46 +162,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
         profileService: _profileService,
       ),
     );
-    if (!mounted) return;
-    if (saved != null) {
-      setState(() => _profile = saved);
-      widget.onProfileChanged?.call(saved);
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(content: Text('Đã cập nhật hồ sơ.')),
-        );
-    }
+    if (!mounted || result == null) return;
+    setState(() => _profile = result.profile);
+    widget.onProfileChanged?.call(result.profile);
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            result.emailChangePending
+                ? 'Đã lưu. Kiểm tra hộp thư email mới để xác nhận thay đổi.'
+                : 'Đã cập nhật hồ sơ.',
+          ),
+        ),
+      );
   }
 
   Future<void> _confirmSignOut() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        final c = VikaColors.of(dialogContext);
-        return AlertDialog(
-          title: const Text('Đăng xuất?'),
-          content: const Text(
-            'Bạn sẽ quay về màn hình đăng nhập. Tiến trình của bạn vẫn được giữ khi đăng nhập lại.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Ở lại'),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: c.attention,
-                foregroundColor: Colors.white,
-              ),
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Đăng xuất'),
-            ),
-          ],
-        );
-      },
+    final confirmed = await _showConfirmDialog(
+      icon: Icons.logout_rounded,
+      eyebrow: 'TÀI KHOẢN',
+      title: 'Đăng xuất?',
+      body: 'Bạn sẽ quay về màn hình đăng nhập. Tiến trình của bạn vẫn '
+          'được giữ khi đăng nhập lại.',
+      confirmLabel: 'Đăng xuất',
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
 
     final rootNavigator = Navigator.of(context, rootNavigator: true);
     try {
@@ -174,6 +206,245 @@ class _ProfileScreenState extends State<ProfileScreen> {
           SnackBar(content: Text('Chưa đăng xuất được: $e')),
         );
     }
+  }
+
+  // ─── Delete account (Apple 5.1.1(v) hard gate) ────────────────────────
+  Future<void> _confirmDeleteAccount() async {
+    if (_deleting) return;
+
+    final confirmed = await _showConfirmDialog(
+      icon: Icons.delete_outline_rounded,
+      eyebrow: 'XÓA TÀI KHOẢN',
+      title: 'Xóa tài khoản?',
+      body: 'Toàn bộ dữ liệu của bạn sẽ bị xóa vĩnh viễn và không thể '
+          'khôi phục.',
+      confirmLabel: 'Xóa vĩnh viễn',
+      destructive: true,
+    );
+    if (!confirmed || !mounted) return;
+
+    // Guard against a double-tap while the request is in flight.
+    if (_deleting) return;
+    setState(() => _deleting = true);
+
+    final messenger = ScaffoldMessenger.of(context);
+    final rootNavigator = Navigator.of(context, rootNavigator: true);
+    final client = Supabase.instance.client;
+
+    // The edge function is the real deletion. If it fails, surface the error
+    // and let the user retry — nothing has changed.
+    try {
+      await client.functions.invoke('delete-account');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _deleting = false);
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Chưa xóa được tài khoản, thử lại sau.')),
+        );
+      return;
+    }
+
+    // Account is gone server-side. Everything below is best-effort cleanup —
+    // its failure must not read as "delete failed". Sign out locally (the
+    // server session no longer exists), clear the local onboarding flag so the
+    // app starts as a brand-new user, then route to a fresh onboarding.
+    try {
+      await client.auth.signOut(scope: SignOutScope.local);
+    } catch (_) {}
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('onboarding_complete');
+    } catch (_) {}
+
+    if (!rootNavigator.mounted) return;
+    rootNavigator.pushNamedAndRemoveUntil(
+      '/',
+      (route) => false,
+      arguments: const {
+        'entryState': 'onboarding',
+        'onboardingComplete': false,
+      },
+    );
+  }
+
+  // ─── Data export (Tải dữ liệu của bạn) ────────────────────────────────
+  Future<void> _exportData() async {
+    if (_exporting) return;
+    setState(() => _exporting = true);
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final json = await DataExportService().buildExportJson();
+      if (!mounted) return;
+      if (json == null) {
+        messenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(content: Text('Hãy đăng nhập để tải dữ liệu.')),
+          );
+        return;
+      }
+      // Write to a real .json file and share *that*, not raw text — only a
+      // file lets the user "Lưu vào Files"/Drive, i.e. actually download it.
+      final dir = await Directory.systemTemp.createTemp('vika_export');
+      final file = File('${dir.path}/vika_data.json');
+      await file.writeAsString(json);
+      if (!mounted) return;
+
+      // iPad needs an anchor rect for the share popover.
+      final box = context.findRenderObject() as RenderBox?;
+      await Share.shareXFiles(
+        [
+          XFile(
+            file.path,
+            mimeType: 'application/json',
+            name: 'vika_data.json',
+          ),
+        ],
+        subject: 'Dữ liệu Vika của bạn',
+        sharePositionOrigin:
+            box != null ? box.localToGlobal(Offset.zero) & box.size : null,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Chưa tải được dữ liệu, thử lại sau.')),
+        );
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  // ─── Help & feedback — opens the user's mail app to support ────────────
+  Future<void> _openSupportMail() async {
+    final uri = Uri(
+      scheme: 'mailto',
+      path: _supportEmail,
+      queryParameters: {'subject': 'Phản hồi về Vika'},
+    );
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text('Hãy gửi phản hồi tới $_supportEmail'),
+          ),
+        );
+    }
+  }
+
+  Future<void> _openExternal(String url) async {
+    final uri = Uri.parse(url);
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Chưa mở được liên kết, thử lại sau.')),
+        );
+    }
+  }
+
+  // ─── About Vika — privacy link + version ──────────────────────────────
+  Future<void> _showAboutSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final c = VikaColors.of(sheetContext);
+        return _InfoSheet(
+          eyebrow: 'VỀ VIKA',
+          title: 'Vika',
+          body:
+              'Người bạn đồng hành tập luyện thông minh. Cảm ơn bạn đã tin Vika '
+              'trên hành trình khoẻ mạnh hơn mỗi ngày.',
+          version: profileMockVersion,
+          actions: [
+            _InfoSheetAction(
+              icon: Icons.shield_outlined,
+              label: 'Chính sách quyền riêng tư',
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                unawaited(_openExternal(_privacyUrl));
+              },
+            ),
+            _InfoSheetAction(
+              icon: Icons.mail_outline_rounded,
+              label: 'Liên hệ hỗ trợ',
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                unawaited(_openSupportMail());
+              },
+            ),
+          ],
+          accent: c.phase2,
+        );
+      },
+    );
+  }
+
+  // ─── Camera privacy explainer ─────────────────────────────────────────
+  Future<void> _showCameraInfoSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final c = VikaColors.of(sheetContext);
+        return _InfoSheet(
+          eyebrow: 'QUYỀN RIÊNG TƯ',
+          title: 'Camera xử lý trong máy',
+          body: 'Hình ảnh xử lý ngay trên máy, không gửi đi đâu cả.',
+          accent: c.phase4,
+        );
+      },
+    );
+  }
+
+  // ─── Premium Ivory confirm dialog ─────────────────────────────────────
+  // Replaces the stock AlertDialog for the destructive account actions so the
+  // moment of decision feels intentional and on-brand: blurred backdrop,
+  // gradient card, accent medallion, italic display title.
+  Future<bool> _showConfirmDialog({
+    required IconData icon,
+    required String eyebrow,
+    required String title,
+    required String body,
+    required String confirmLabel,
+    bool destructive = false,
+  }) async {
+    final result = await showGeneralDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Đóng',
+      barrierColor: const Color(0xCC0F0A06),
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (dialogContext, _, __) => _ConfirmDialog(
+        icon: icon,
+        eyebrow: eyebrow,
+        title: title,
+        body: body,
+        confirmLabel: confirmLabel,
+        destructive: destructive,
+      ),
+      transitionBuilder: (context, animation, _, child) {
+        final t = Curves.easeOutCubic.transform(
+          animation.value.clamp(0.0, 1.0),
+        );
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 7 * t, sigmaY: 7 * t),
+          child: Opacity(
+            opacity: t,
+            child: Transform.scale(scale: 0.9 + 0.1 * t, child: child),
+          ),
+        );
+      },
+    );
+    return result ?? false;
   }
 
   @override
@@ -316,6 +587,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: const ConnectionsList(
                       services: profileMockConnections,
+                      comingSoon: true,
                     ),
                   ),
                   const SizedBox(height: 40),
@@ -335,19 +607,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           label: 'Tập luyện',
                           accentColor: c.phase1,
                           rows: [
+                            // Deferred: needs flutter_local_notifications.
+                            // TODO(post-launch): wire reminders.
                             SettingRow(
                               icon: Icons.notifications_none_rounded,
                               label: 'Nhắc tập',
-                              sub: 'T2 / T4 / T6 · 17:30',
                               accentColor: c.phase1,
-                              onTap: () {},
+                              comingSoon: true,
                             ),
+                            // Deferred: waits on the final voice list.
+                            // TODO(post-launch): wire coach voice.
                             SettingRow(
                               icon: Icons.mic_none_rounded,
                               label: 'Giọng huấn luyện viên',
-                              sub: 'Nữ · Tự nhiên',
                               accentColor: c.phase1,
-                              onTap: () {},
+                              comingSoon: true,
                             ),
                           ],
                         ),
@@ -360,13 +634,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               label: 'Camera xử lý trong máy',
                               sub: 'Hình ảnh không rời thiết bị',
                               accentColor: c.phase4,
-                              onTap: () {},
+                              onTap: _showCameraInfoSheet,
                             ),
                             SettingRow(
                               icon: Icons.download_rounded,
                               label: 'Tải dữ liệu của bạn',
+                              sub: _exporting ? 'Đang chuẩn bị...' : null,
                               accentColor: c.phase4,
-                              onTap: () {},
+                              onTap: _exporting ? null : _exportData,
                             ),
                           ],
                         ),
@@ -378,14 +653,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               icon: Icons.help_outline_rounded,
                               label: 'Trợ giúp & Phản hồi',
                               accentColor: c.phase2,
-                              onTap: () {},
+                              onTap: _openSupportMail,
                             ),
                             SettingRow(
                               icon: Icons.info_outline_rounded,
                               label: 'Về Vika',
                               sub: profileMockVersion,
                               accentColor: c.phase2,
-                              onTap: () {},
+                              onTap: _showAboutSheet,
                             ),
                           ],
                         ),
@@ -401,18 +676,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               onTap: _openEditProfileSheet,
                             ),
                             if (profile?.email != null)
+                              // Display-only — changing email is an auth flow,
+                              // out of scope. No chevron, no tap.
                               SettingRow(
                                 icon: Icons.alternate_email_rounded,
                                 label: 'Email',
                                 sub: profile!.email,
                                 accentColor: c.phase3,
-                                onTap: () {},
+                                showChevron: false,
                               ),
                             SettingRow(
                               icon: Icons.logout_rounded,
                               label: 'Đăng xuất',
                               danger: true,
                               onTap: _confirmSignOut,
+                            ),
+                            SettingRow(
+                              icon: Icons.delete_outline_rounded,
+                              label: 'Xóa tài khoản',
+                              danger: true,
+                              onTap: _deleting ? null : _confirmDeleteAccount,
                             ),
                           ],
                         ),
@@ -436,6 +719,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               avatarUrl: avatarUrl,
               name: displayName,
               onTap: _scrollToTop,
+            ),
+            _ScrollDownFab(
+              visible: _showDownFab,
+              bottomInset: widget.bottomPadding,
+              onTap: _scrollToBottom,
             ),
           ],
         ),
@@ -534,10 +822,225 @@ class _SectionHeader extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// INFO SHEET — small Premium Ivory bottom sheet for read-only
+// explainers (About Vika, camera privacy). Optional version line +
+// optional action rows (external links / mail).
+// ═══════════════════════════════════════════════════════════════
+
+class _InfoSheet extends StatelessWidget {
+  const _InfoSheet({
+    required this.eyebrow,
+    required this.title,
+    required this.body,
+    required this.accent,
+    this.version,
+    this.actions = const [],
+  });
+
+  final String eyebrow;
+  final String title;
+  final String body;
+  final Color accent;
+  final String? version;
+  final List<_InfoSheetAction> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    final sheetTint = Color.lerp(c.bgRaised, accent, c.isDark ? 0.10 : 0.055)!;
+    final outline = Color.lerp(c.border, accent, c.isDark ? 0.28 : 0.34)!;
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 12,
+        right: 12,
+        bottom: MediaQuery.viewPaddingOf(context).bottom + 12,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [c.bgRaised, sheetTint],
+            ),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: outline),
+            boxShadow: [
+              BoxShadow(
+                color: c.ink.withValues(alpha: c.isDark ? 0.30 : 0.12),
+                blurRadius: 42,
+                offset: const Offset(0, 22),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(22, 12, 22, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: c.borderHi,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Container(
+                      width: 5,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: accent,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      eyebrow,
+                      style: TextStyle(
+                        fontFamily: 'BeVietnamPro',
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.6,
+                        color: c.inkSoft,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontFamily: 'BeVietnamPro',
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    fontStyle: FontStyle.italic,
+                    letterSpacing: -0.7,
+                    color: c.ink,
+                    height: 1.05,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  body,
+                  style: TextStyle(
+                    fontFamily: 'BeVietnamPro',
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w500,
+                    height: 1.5,
+                    color: c.inkSoft,
+                  ),
+                ),
+                if (version != null) ...[
+                  const SizedBox(height: 14),
+                  Text(
+                    version!,
+                    style: TextStyle(
+                      fontFamily: 'BeVietnamPro',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.2,
+                      color: c.inkFaint,
+                      fontFeatures: VikaIvoryMain.tabularFigures,
+                    ),
+                  ),
+                ],
+                if (actions.isNotEmpty) ...[
+                  const SizedBox(height: 18),
+                  for (final action in actions) ...[
+                    action,
+                    if (action != actions.last) const SizedBox(height: 10),
+                  ],
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoSheetAction extends StatelessWidget {
+  const _InfoSheetAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            color: c.bg.withValues(alpha: c.isDark ? 0.28 : 0.6),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: c.border),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 18, color: c.inkSoft),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontFamily: 'BeVietnamPro',
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.1,
+                    color: c.ink,
+                  ),
+                ),
+              ),
+              Icon(Icons.north_east_rounded, size: 16, color: c.inkFaint),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // EDIT PROFILE SHEET — owns its TextEditingController + selected
 // avatar file so the lifecycle is bound to this widget, not to a
 // parent async function.
 // ═══════════════════════════════════════════════════════════════
+
+/// Result of the edit-profile sheet. [emailChangePending] is true when the
+/// user requested a new email (which only takes effect after they confirm the
+/// link Supabase mails them), so the caller can show the right message.
+class _EditProfileResult {
+  const _EditProfileResult({
+    required this.profile,
+    required this.emailChangePending,
+  });
+
+  final AppUserProfile profile;
+  final bool emailChangePending;
+}
 
 class _EditProfileSheet extends StatefulWidget {
   const _EditProfileSheet({
@@ -556,14 +1059,20 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   late final TextEditingController _nameController = TextEditingController(
     text: widget.current?.displayName ?? profileMockName,
   );
+  late final TextEditingController _emailController = TextEditingController(
+    text: widget.current?.email ?? '',
+  );
   File? _selectedAvatar;
   bool _saving = false;
 
   @override
   void dispose() {
     _nameController.dispose();
+    _emailController.dispose();
     super.dispose();
   }
+
+  static final _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
   Future<void> _pickAvatar() async {
     try {
@@ -586,14 +1095,38 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
 
   Future<void> _save() async {
     if (_saving) return;
+
+    // Only request an email change when the field actually differs from the
+    // current address. Validate it client-side so we don't fire a doomed
+    // auth call on an obvious typo.
+    final currentEmail = widget.current?.email ?? '';
+    final newEmail = _emailController.text.trim();
+    final emailChanged = newEmail.isNotEmpty && newEmail != currentEmail;
+    if (emailChanged && !_emailPattern.hasMatch(newEmail)) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Email chưa hợp lệ.')),
+        );
+      return;
+    }
+
     setState(() => _saving = true);
     try {
       final profile = await widget.profileService.saveCurrentProfile(
         displayName: _nameController.text,
         avatarFile: _selectedAvatar,
+        email: emailChanged ? newEmail : null,
       );
       if (!mounted) return;
-      Navigator.of(context).pop(profile);
+      Navigator.of(context).pop(
+        profile == null
+            ? null
+            : _EditProfileResult(
+                profile: profile,
+                emailChangePending: emailChanged,
+              ),
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
@@ -738,7 +1271,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 const SizedBox(height: 18),
                 TextField(
                   controller: _nameController,
-                  textInputAction: TextInputAction.done,
+                  textInputAction: TextInputAction.next,
                   cursorColor: accent,
                   style: TextStyle(
                     fontFamily: 'BeVietnamPro',
@@ -755,6 +1288,52 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                     ),
                     prefixIcon: Icon(
                       Icons.badge_outlined,
+                      size: 18,
+                      color: accent,
+                    ),
+                    filled: true,
+                    fillColor: fieldFill,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 16),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(color: c.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(color: accent, width: 1.4),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.done,
+                  autocorrect: false,
+                  cursorColor: accent,
+                  style: TextStyle(
+                    fontFamily: 'BeVietnamPro',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: c.ink,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'Email',
+                    helperText: 'Đổi email cần xác nhận qua hộp thư mới.',
+                    helperStyle: TextStyle(
+                      fontFamily: 'BeVietnamPro',
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w500,
+                      color: c.inkFaint,
+                    ),
+                    labelStyle: TextStyle(
+                      fontFamily: 'BeVietnamPro',
+                      fontWeight: FontWeight.w700,
+                      color: c.inkSoft,
+                    ),
+                    prefixIcon: Icon(
+                      Icons.alternate_email_rounded,
                       size: 18,
                       color: accent,
                     ),
@@ -1289,6 +1868,285 @@ class _BackToTopButtonState extends State<_BackToTopButton> {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SCROLL-DOWN FAB — a floating "Xuống cuối" pill that appears only
+// while the user is scrolling down (going back up is handled by the
+// sticky bar at the top). Lives bottom-right, clears the bottom nav,
+// and slides away near the end of the list.
+// ═══════════════════════════════════════════════════════════════
+
+class _ScrollDownFab extends StatelessWidget {
+  const _ScrollDownFab({
+    required this.visible,
+    required this.bottomInset,
+    required this.onTap,
+  });
+
+  final bool visible;
+  final double bottomInset;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    return Positioned(
+      right: 16,
+      bottom: bottomInset + 16,
+      child: IgnorePointer(
+        ignoring: !visible,
+        child: AnimatedSlide(
+          offset: visible ? Offset.zero : const Offset(0, 1.4),
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+          child: AnimatedOpacity(
+            opacity: visible ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOut,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                HapticFeedback.selectionClick();
+                onTap();
+              },
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(16, 0, 6, 0),
+                height: 44,
+                decoration: BoxDecoration(
+                  color: c.ink,
+                  borderRadius: BorderRadius.circular(999),
+                  boxShadow: [
+                    BoxShadow(
+                      color: c.ink.withValues(alpha: c.isDark ? 0.5 : 0.24),
+                      blurRadius: 22,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Xuống cuối',
+                      style: TextStyle(
+                        fontFamily: 'BeVietnamPro',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        fontStyle: FontStyle.italic,
+                        letterSpacing: -0.2,
+                        color: c.invInk,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: c.yellow,
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        Icons.arrow_downward_rounded,
+                        size: 15,
+                        color: c.yellowInk,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONFIRM DIALOG — Premium Ivory replacement for the stock
+// AlertDialog on destructive account actions. Gradient card +
+// accent medallion + italic display title + stacked actions.
+// ═══════════════════════════════════════════════════════════════
+
+class _ConfirmDialog extends StatelessWidget {
+  const _ConfirmDialog({
+    required this.icon,
+    required this.eyebrow,
+    required this.title,
+    required this.body,
+    required this.confirmLabel,
+    this.destructive = false,
+  });
+
+  final IconData icon;
+  final String eyebrow;
+  final String title;
+  final String body;
+  final String confirmLabel;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    // Brand gold drives the whole card — gold-tinted surface, gold accent bar,
+    // gold CTA — so the dialog reads as part of the Premium Ivory UI. For a
+    // destructive action the medallion icon shifts to the warm amber alarm
+    // (which harmonises with the gold) to still signal "this is serious".
+    final sheetTint = Color.lerp(c.bgRaised, c.yellow, c.isDark ? 0.10 : 0.07)!;
+    final outline = Color.lerp(c.border, c.yellow, c.isDark ? 0.32 : 0.42)!;
+    final iconInk = destructive ? c.attention : c.ink;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Material(
+          color: Colors.transparent,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Container(
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [c.bgRaised, sheetTint],
+                ),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: outline),
+                boxShadow: [
+                  BoxShadow(
+                    color: c.yellow.withValues(alpha: c.isDark ? 0.18 : 0.22),
+                    blurRadius: 34,
+                    offset: const Offset(0, 16),
+                  ),
+                  BoxShadow(
+                    color: c.ink.withValues(alpha: c.isDark ? 0.42 : 0.16),
+                    blurRadius: 48,
+                    offset: const Offset(0, 26),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 26, 24, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: c.yellow.withValues(
+                            alpha: c.isDark ? 0.20 : 0.16,
+                          ),
+                          borderRadius: BorderRadius.circular(17),
+                          border: Border.all(
+                            color: c.yellow.withValues(alpha: 0.42),
+                          ),
+                        ),
+                        child: Icon(icon, size: 24, color: iconInk),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Container(
+                          width: 5,
+                          height: 16,
+                          decoration: BoxDecoration(
+                            color: c.yellow,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        const SizedBox(width: 9),
+                        Text(
+                          eyebrow,
+                          style: TextStyle(
+                            fontFamily: 'BeVietnamPro',
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.6,
+                            color: c.inkSoft,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontFamily: 'BeVietnamPro',
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        fontStyle: FontStyle.italic,
+                        letterSpacing: -0.7,
+                        color: c.ink,
+                        height: 1.05,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      body,
+                      style: TextStyle(
+                        fontFamily: 'BeVietnamPro',
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w500,
+                        height: 1.5,
+                        color: c.inkSoft,
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+                    SizedBox(
+                      height: 52,
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: c.yellow,
+                          foregroundColor: c.yellowInk,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          textStyle: const TextStyle(
+                            fontFamily: 'BeVietnamPro',
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        onPressed: () => Navigator.of(context).pop(true),
+                        child: Text(confirmLabel),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      height: 46,
+                      child: TextButton(
+                        style: TextButton.styleFrom(
+                          foregroundColor: c.inkSoft,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          textStyle: const TextStyle(
+                            fontFamily: 'BeVietnamPro',
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: const Text('Ở lại'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
       ),

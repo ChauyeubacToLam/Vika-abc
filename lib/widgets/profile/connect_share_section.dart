@@ -252,10 +252,15 @@ class ConnectionsList extends StatelessWidget {
     super.key,
     required this.services,
     this.onConnect,
+    this.comingSoon = false,
   });
 
   final List<ConnectedService> services;
   final ValueChanged<ConnectedService>? onConnect;
+
+  /// Renders every row visibly non-interactive with a "Sắp ra mắt" chip —
+  /// integrations aren't live yet, so they must not read as tappable.
+  final bool comingSoon;
 
   @override
   Widget build(BuildContext context) {
@@ -273,7 +278,10 @@ class ConnectionsList extends StatelessWidget {
             for (var i = 0; i < services.length; i++) ...[
               _ConnectionRow(
                 service: services[i],
-                onTap: onConnect == null ? null : () => onConnect!(services[i]),
+                comingSoon: comingSoon,
+                onTap: (comingSoon || onConnect == null)
+                    ? null
+                    : () => onConnect!(services[i]),
               ),
               if (i < services.length - 1)
                 Divider(
@@ -291,20 +299,28 @@ class ConnectionsList extends StatelessWidget {
 }
 
 class _ConnectionRow extends StatelessWidget {
-  const _ConnectionRow({required this.service, this.onTap});
+  const _ConnectionRow({
+    required this.service,
+    this.onTap,
+    this.comingSoon = false,
+  });
   final ConnectedService service;
   final VoidCallback? onTap;
+  final bool comingSoon;
 
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
+    final iconColor = comingSoon ? c.inkFaint : c.inkSoft;
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () {
-          HapticFeedback.selectionClick();
-          onTap?.call();
-        },
+        onTap: onTap == null
+            ? null
+            : () {
+                HapticFeedback.selectionClick();
+                onTap?.call();
+              },
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
           child: Row(
@@ -321,7 +337,7 @@ class _ConnectionRow extends StatelessWidget {
                 child: Icon(
                   service.icon,
                   size: 17,
-                  color: c.inkSoft,
+                  color: iconColor,
                 ),
               ),
               const SizedBox(width: 12),
@@ -337,7 +353,7 @@ class _ConnectionRow extends StatelessWidget {
                         fontSize: 13.5,
                         fontWeight: FontWeight.w800,
                         letterSpacing: -0.2,
-                        color: c.ink,
+                        color: comingSoon ? c.inkSoft : c.ink,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -356,34 +372,55 @@ class _ConnectionRow extends StatelessWidget {
                   ],
                 ),
               ),
-              // Connect pill / connected check.
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: service.connected ? c.yellow : c.ink,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (service.connected) ...[
-                      Icon(Icons.check_rounded, size: 13, color: c.yellowInk),
-                      const SizedBox(width: 4),
-                    ],
-                    Text(
-                      service.connected ? 'Đã nối' : 'Kết nối',
-                      style: TextStyle(
-                        fontFamily: 'BeVietnamPro',
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.1,
-                        color: service.connected ? c.yellowInk : c.invInk,
-                      ),
+              // "Sắp ra mắt" chip when deferred, else connect/connected pill.
+              if (comingSoon)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: c.bg.withValues(alpha: c.isDark ? 0.3 : 0.7),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: c.border),
+                  ),
+                  child: Text(
+                    'Sắp ra mắt',
+                    style: TextStyle(
+                      fontFamily: 'BeVietnamPro',
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.4,
+                      color: c.inkFaint,
                     ),
-                  ],
+                  ),
+                )
+              else
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: service.connected ? c.yellow : c.ink,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (service.connected) ...[
+                        Icon(Icons.check_rounded, size: 13, color: c.yellowInk),
+                        const SizedBox(width: 4),
+                      ],
+                      Text(
+                        service.connected ? 'Đã nối' : 'Kết nối',
+                        style: TextStyle(
+                          fontFamily: 'BeVietnamPro',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.1,
+                          color: service.connected ? c.yellowInk : c.invInk,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
         ),

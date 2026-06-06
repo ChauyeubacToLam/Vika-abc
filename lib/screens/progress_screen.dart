@@ -21,6 +21,7 @@ import 'package:flutter/services.dart';
 import '../data/plan_mock.dart'
     show phaseWeeksMock, planTotalCompleted, planTotalSessions;
 import '../data/progress_mock.dart';
+import '../services/session_persistence.dart';
 import '../services/user_profile_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/vf_theme.dart';
@@ -55,12 +56,18 @@ class ProgressScreen extends StatefulWidget {
 
 class _ProgressScreenState extends State<ProgressScreen> {
   final _profileService = UserProfileService();
+  final _sessions = SessionPersistence();
   PeriodTab _period = PeriodTab.program;
   final ScrollController _scrollController = ScrollController();
   bool _showStickyBar = false;
   AppUserProfile? _profile;
   bool _loadingProfile = false;
   bool _profileReloadQueued = false;
+
+  /// Real ĐIỂM FORM / ĐƯỜNG TIẾN BỘ summary for the active period.
+  /// Null = loading (show placeholder); a loaded record with `to == null`
+  /// = no sessions in this period (empty state).
+  ({int? to, int? from, int? delta, List<int> trend})? _formSummary;
 
   /// Scroll offset past which the sticky pill bar fades in.
   static const double _stickyBarThreshold = 240;
@@ -72,6 +79,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     _profile = widget.userProfile;
     widget.refreshListenable?.addListener(_handleRefreshNudge);
     _scrollController.addListener(_onScroll);
+    unawaited(_loadFormSummary(_period));
   }
 
   @override
@@ -96,6 +104,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   void _handleRefreshNudge() {
     unawaited(_loadProfile());
+    unawaited(_loadFormSummary(_period));
   }
 
   Future<void> _loadProfile() async {
@@ -116,6 +125,25 @@ class _ProgressScreenState extends State<ProgressScreen> {
         unawaited(_loadProfile());
       }
     }
+  }
+
+  /// Loads the real form summary for [period]. Stale responses (the user
+  /// switched period before this resolved) are discarded.
+  Future<void> _loadFormSummary(PeriodTab period) async {
+    final summary = await _sessions.progressFormSummary(period);
+    if (!mounted || period != _period) return;
+    setState(() => _formSummary = summary);
+  }
+
+  void _onPeriodChanged(PeriodTab period) {
+    if (period == _period) return;
+    setState(() {
+      _period = period;
+      // Drop to the loading placeholder so the gauge re-mounts and
+      // re-animates when the new period's data arrives.
+      _formSummary = null;
+    });
+    unawaited(_loadFormSummary(period));
   }
 
   void _onScroll() {
@@ -151,12 +179,26 @@ class _ProgressScreenState extends State<ProgressScreen> {
         PeriodTab.program => 'Cả lộ trình',
       };
 
+  /// Signed delta string: '+5', '0', '-3'. The minus is carried by the
+  /// number itself; only non-negatives get a leading '+'.
+  String _signedDelta(int d) => '${d >= 0 ? '+' : ''}$d';
+
+  /// Trend section-header meta, e.g. '+5 ĐIỂM' / '-3 ĐIỂM'. Empty trend
+  /// yields '' (defensive — the trend section is skipped when empty).
+  String _trendMeta(List<int> trend) {
+    if (trend.isEmpty) return '';
+    return '${_signedDelta(trend.last - trend.first)} ĐIỂM';
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
     final periodKey = _periodKey();
-    final headline = progressMockHeadline[periodKey]!;
-    final trend = progressMockScoreTrend[periodKey]!;
+    // Real ĐIỂM FORM / ĐƯỜNG TIẾN BỘ data; label + coach copy stay static.
+    final formSummary = _formSummary;
+    final loadingForm = formSummary == null;
+    final hasForm = formSummary != null && formSummary.to != null;
+    final mockHeadline = progressMockHeadline[periodKey]!;
     final trendAxis = progressMockTrendAxis[periodKey]!;
     final totalDone = planTotalCompleted(phaseWeeksMock);
     final totalSessions = planTotalSessions(phaseWeeksMock);
@@ -186,7 +228,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 children: [
                   ProgressStageHero(
                     period: _period,
-                    onPeriodChanged: (p) => setState(() => _period = p),
+                    onPeriodChanged: _onPeriodChanged,
                     userInitial: userInitial,
                     avatarUrl: profile?.avatarUrl,
                     phaseLabel: phaseLabel,
@@ -194,37 +236,57 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // 1. ĐIỂM FORM — score gauge card
+                  // 1. ĐIỂM FORM — score gauge card (wired to real data).
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: ScoreGaugeCard(data: headline),
+                    child: hasForm
+                        ? ScoreGaugeCard(
+                            data: HeadlineForPeriod(
+                              to: formSummary.to!,
+                              from: formSummary.from!,
+                              delta: _signedDelta(formSummary.delta ?? 0),
+                              // Keep the existing per-period label + coach copy.
+                              label: mockHeadline.label,
+                              // TODO(coach): wire dynamic coach copy. Static
+                              // stub for now — do not compute coaching text.
+                              coach: mockHeadline.coach,
+                            ),
+                          )
+                        : _GaugePlaceholder(loading: loadingForm),
                   ),
                   const SizedBox(height: 40),
 
                   // 2. TUẦN NÀY MỘT NHÌN — weekly summary band
+                  // TODO(wiring): still mock — wire to real session data.
                   WeeklySummaryBand(
                     stats: summary,
                     kicker: 'TUẦN NÀY MỘT NHÌN',
                   ),
                   const SizedBox(height: 40),
 
-                  // 3. ĐƯỜNG TIẾN BỘ — score trend chart
-                  _SectionHeader(
-                    eyebrow: 'ĐƯỜNG TIẾN BỘ',
-                    meta: '+${trend.last - trend.first} ĐIỂM',
-                    intro:
-                        'Mỗi điểm tô đậm là một buổi. Đường đi lên là form đã ổn.',
-                  ),
-                  const SizedBox(height: 14),
-                  ScoreTrendChart(
-                    points: trend,
-                    startLabel: trendAxis.$1,
-                    midLabel: trendAxis.$2,
-                    endLabel: trendAxis.$3,
-                  ),
-                  const SizedBox(height: 40),
+                  // 3. ĐƯỜNG TIẾN BỘ — score trend chart (wired to real data).
+                  // Skipped entirely when the period has no sessions.
+                  if (hasForm) ...[
+                    _SectionHeader(
+                      eyebrow: 'ĐƯỜNG TIẾN BỘ',
+                      meta: _trendMeta(formSummary.trend),
+                      intro:
+                          'Mỗi điểm tô đậm là một buổi. Đường đi lên là form đã ổn.',
+                    ),
+                    const SizedBox(height: 14),
+                    // TODO(wiring): axis labels are still static per period;
+                    // derive real dates from session timestamps later.
+                    ScoreTrendChart(
+                      points: formSummary.trend,
+                      startLabel: trendAxis.$1,
+                      midLabel: trendAxis.$2,
+                      endLabel: trendAxis.$3,
+                    ),
+                    const SizedBox(height: 40),
+                  ],
 
                   // 4. CƠ THỂ KHOẺ LÊN — body heat map
+                  // TODO(wiring): still mock — wire to real per-region data.
                   _SectionHeader(
                     eyebrow: 'CƠ THỂ KHOẺ LÊN',
                     meta: '${progressMockBodyAreas.length} VÙNG',
@@ -242,6 +304,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   const SizedBox(height: 40),
 
                   // 5. BÀI TẬP NỔI BẬT — ranked insights
+                  // TODO(wiring): still mock — wire to real per-exercise data.
                   _SectionHeader(
                     eyebrow: 'BÀI TẬP NỔI BẬT',
                     meta: '${progressMockInsights.length} BÀI · 3 ĐẦU TIÊN',
@@ -256,6 +319,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   const SizedBox(height: 40),
 
                   // 6. KỶ LỤC CÁ NHÂN — PR rail
+                  // TODO(wiring): still mock — wire to real personal records.
                   _SectionHeader(
                     eyebrow: 'KỶ LỤC CÁ NHÂN',
                     meta: '${progressMockRecords.length} KỶ LỤC',
@@ -269,6 +333,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   const SizedBox(height: 40),
 
                   // 7. CHUỖI LIÊN TIẾP — streak card
+                  // TODO(wiring): bars/summary still mock — wire to real
+                  // completion history (streak day count is already live).
                   _SectionHeader(
                     eyebrow: 'CHUỖI LIÊN TIẾP',
                     meta: '$streakDays NGÀY',
@@ -314,6 +380,47 @@ class _ProgressScreenState extends State<ProgressScreen> {
             ? WeeklyStat(value: '$streakDays', label: stat.label)
             : stat,
     ];
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GAUGE PLACEHOLDER — muted stand-in shown in the ScoreGaugeCard slot
+// while the form summary loads, or when the selected period has no
+// sessions yet. Premium Ivory tokens only.
+// ═══════════════════════════════════════════════════════════════
+
+class _GaugePlaceholder extends StatelessWidget {
+  const _GaugePlaceholder({required this.loading});
+
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 56, horizontal: 24),
+      decoration: BoxDecoration(
+        color: c.bgRaised,
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(color: c.border),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        loading
+            ? 'Đang tải điểm form…'
+            : 'Chưa có dữ liệu cho giai đoạn này',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontFamily: 'BeVietnamPro',
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          fontStyle: FontStyle.italic,
+          letterSpacing: -0.1,
+          color: c.inkSoft,
+        ),
+      ),
+    );
   }
 }
 

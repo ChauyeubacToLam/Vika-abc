@@ -53,8 +53,17 @@ class HomeVitalsSpread extends StatelessWidget {
   final String statusLine;
 
   final int streakDays;
-  final int formPercent;
-  final int formDelta;
+
+  /// Mean form % over the current 7 days. Null = no sessions this week
+  /// (cold start) — the block shows a muted placeholder instead of a numeral.
+  final int? formPercent;
+
+  /// Form % change vs the prior week. Null = no baseline (prior week had
+  /// fewer than 2 sessions) — the delta pill is hidden entirely.
+  final int? formDelta;
+
+  /// Current-window raw scores, oldest-first. Fewer than 2 points hides the
+  /// sparkline (it needs at least two to draw a segment).
   final List<int> formWeek;
 
   final EdgeInsets padding;
@@ -364,15 +373,26 @@ class _FormBlock extends StatelessWidget {
     required this.week,
   });
 
-  final int percent;
-  final int delta;
+  /// Null when no session landed in the current 7 days — renders the muted
+  /// cold-start placeholder instead of a numeral, and suppresses both the
+  /// delta pill and the sparkline.
+  final int? percent;
+
+  /// Null when there is no prior-week baseline — the delta pill is hidden
+  /// (we never render a misleading "↑+0" in place of "no data").
+  final int? delta;
+
+  /// Current-window scores, oldest-first. Fewer than 2 points hides the
+  /// sparkline — `_SparklinePainter` divides by `week.length - 1`, so a
+  /// single point would produce NaN.
   final List<int> week;
 
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    final arrow = delta >= 0 ? '↑' : '↓';
-    final sign = delta >= 0 ? '+' : '';
+    final percentValue = percent;
+    final deltaValue = delta;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -388,70 +408,91 @@ class _FormBlock extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 10),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              '$percent',
-              style: TextStyle(
-                fontFamily: 'BeVietnamPro',
-                fontSize: 44,
-                fontWeight: FontWeight.w800,
-                fontStyle: FontStyle.italic,
-                letterSpacing: -2.4,
-                height: 0.9,
-                color: c.ink,
-                fontFeatures: VikaIvoryMain.tabularFigures,
-              ),
+        if (percentValue == null) ...[
+          // Cold start: no session this week. Muted em-dash holds the
+          // numeral's slot; no delta pill, no sparkline.
+          Text(
+            '—',
+            style: TextStyle(
+              fontFamily: 'BeVietnamPro',
+              fontSize: 44,
+              fontWeight: FontWeight.w800,
+              fontStyle: FontStyle.italic,
+              height: 0.9,
+              color: c.inkFaint,
             ),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 7, left: 1),
-              child: Text(
-                '%',
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Chưa có buổi tập tuần này',
+            style: TextStyle(
+              fontFamily: 'BeVietnamPro',
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              fontStyle: FontStyle.italic,
+              height: 1.35,
+              color: c.inkSoft,
+            ),
+          ),
+        ] else ...[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '$percentValue',
                 style: TextStyle(
                   fontFamily: 'BeVietnamPro',
-                  fontSize: 16,
+                  fontSize: 44,
                   fontWeight: FontWeight.w800,
                   fontStyle: FontStyle.italic,
-                  color: c.inkSoft,
+                  letterSpacing: -2.4,
+                  height: 0.9,
+                  color: c.ink,
+                  fontFeatures: VikaIvoryMain.tabularFigures,
                 ),
               ),
-            ),
-            const SizedBox(width: 6),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: c.yellowGhost,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  '$arrow$sign$delta',
-                  style: TextStyle(
-                    fontFamily: 'BeVietnamPro',
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: c.ink,
-                    fontFeatures: VikaIvoryMain.tabularFigures,
+              if (deltaValue != null) ...[
+                const SizedBox(width: 6),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: c.yellowGhost,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      '${deltaValue >= 0 ? '↑' : '↓'}'
+                      '${deltaValue >= 0 ? '+' : ''}$deltaValue',
+                      style: TextStyle(
+                        fontFamily: 'BeVietnamPro',
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: c.ink,
+                        fontFeatures: VikaIvoryMain.tabularFigures,
+                      ),
+                    ),
                   ),
+                ),
+              ],
+            ],
+          ),
+          if (week.length >= 2) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 18,
+              child: CustomPaint(
+                size: const Size.fromHeight(18),
+                painter: _SparklinePainter(
+                  week: week,
+                  line: c.ink,
+                  accent: c.yellow,
                 ),
               ),
             ),
           ],
-        ),
-        const SizedBox(height: 10),
-        SizedBox(
-          height: 18,
-          child: CustomPaint(
-            size: const Size.fromHeight(18),
-            painter: _SparklinePainter(
-              week: week,
-              line: c.ink,
-              accent: c.yellow,
-            ),
-          ),
-        ),
+        ],
       ],
     );
   }
