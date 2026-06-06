@@ -1,5 +1,9 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, non_constant_identifier_names
 
+import 'dart:math' as math;
+
+import '../../utils/debouncer.dart';
+import '../../utils/exercise_logger.dart';
 import '../../utils/pose_math_helpers.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
@@ -19,7 +23,11 @@ class JumpSquatConfig {
 
   // Khoảng cách lơ lửng (Airborne): Tọa độ Y nhỏ hơn mức sàn bao nhiêu thì tính là bay
   // Tùy thuộc vào độ phân giải, tạm dùng mức chênh lệch tương đối
-  static const double AIRBORNE_LIFT_OFFSET = 30.0;
+  static const double AIRBORNE_FOOT_LIFT_LOWER_LEG_RATIO = 0.10;
+  static const double AIRBORNE_FOOT_LIFT_TORSO_RATIO = 0.06;
+  static const double AIRBORNE_HIP_LIFT_TORSO_RATIO = 0.08;
+  static const double GROUND_CONTACT_LIFT_RATIO = 0.45;
+  static const int MIN_REP_DURATION_MS = 450;
 }
 
 // --- Jump Squat ---
@@ -38,7 +46,15 @@ class JumpSquat extends ExerciseBase {
 
   // Dữ liệu tham chiếu sàn động
   double? _baselineFloorY;
+  double? _baselineStandingHipY;
   double? _previousHipY;
+  int? _repStartedAtMs;
+
+  final Debouncer _squattingDebouncer = Debouncer(requiredFrames: 2);
+  final Debouncer _launchingDebouncer = Debouncer(requiredFrames: 2);
+  final Debouncer _airborneDebouncer = Debouncer(requiredFrames: 2);
+  final Debouncer _landingDebouncer = Debouncer(requiredFrames: 2);
+  final Debouncer _standingDebouncer = Debouncer(requiredFrames: 2);
 
   // Metrics
   final LandingKneeFlexionMetric landingFlexionMetric =
@@ -99,6 +115,10 @@ class JumpSquat extends ExerciseBase {
         landmarks: landmarks,
         rightType: PoseLandmarkType.rightFootIndex,
         leftType: PoseLandmarkType.leftFootIndex);
+    final heel = getSideLandmark(
+        landmarks: landmarks,
+        rightType: PoseLandmarkType.rightHeel,
+        leftType: PoseLandmarkType.leftHeel);
 
     if (nose == null ||
         shoulder == null ||
@@ -126,7 +146,8 @@ class JumpSquat extends ExerciseBase {
     if (kneeAngle < 170.0) return false;
 
     // Set baseline sàn lúc bắt đầu
-    _baselineFloorY = footIndex.y;
+    _baselineFloorY = _supportY(ankle: ankle, heel: heel, footIndex: footIndex);
+    _baselineStandingHipY = hip.y;
     return true;
   }
 
@@ -134,7 +155,11 @@ class JumpSquat extends ExerciseBase {
   bool requestStop() => repCount >= maxRep;
 
   @override
-  void onSetComplete() {}
+  void onSetComplete() {
+    logger.pushKey('target_rep', maxRep);
+    logger.pushKey('max_rep', repCount);
+    logger.pushGoodRepCount();
+  }
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
@@ -167,12 +192,20 @@ class JumpSquat extends ExerciseBase {
         landmarks: smoothedLandmarks,
         rightType: PoseLandmarkType.rightFootIndex,
         leftType: PoseLandmarkType.leftFootIndex);
+    PoseLandmark? heel = getSideLandmark(
+        landmarks: smoothedLandmarks,
+        rightType: PoseLandmarkType.rightHeel,
+        leftType: PoseLandmarkType.leftHeel);
 
     if (shoulder == null ||
         hip == null ||
         knee == null ||
         ankle == null ||
         footIndex == null) return;
+    if (![shoulder, hip, knee, ankle, footIndex]
+        .every(ExerciseBase.isLandmarkConfident)) {
+      return;
+    }
 
     // 1. Tính toán Geometry
     double kneeAngle =
@@ -180,32 +213,38 @@ class JumpSquat extends ExerciseBase {
     double backAngle = calculateVerticalAngle(pivot: hip, point: shoulder);
     double trunkVerticalAngle =
         convertClockAngleToTrunkLean(backAngle, cameraFacing).abs();
-    double footY = footIndex.y;
+    scaleFactor = calculateDistance(shoulder, hip);
+    final lowerLegLength = calculateDistance(knee, ankle);
+    final supportY = _supportY(ankle: ankle, heel: heel, footIndex: footIndex);
     double hipY = hip.y;
     int now = frameTimestampMs;
 
     // Cập nhật lại baseline floor khi đứng yên liên tục để bù trừ rung lắc camera
-    if (jumpSquatState == JumpSquatState.standing && kneeAngle > 170) {
-      _baselineFloorY = (_baselineFloorY! * 0.9) + (footY * 0.1);
-    }
+    _refreshStandingBaselines(kneeAngle, supportY, hipY, lowerLegLength);
+
+    debugData['State'] = jumpSquatState.toString().split('.').last;
+    debugData['KneeAngle'] = kneeAngle.toStringAsFixed(1);
+    debugData['TrunkAng'] = trunkVerticalAngle.toStringAsFixed(1);
+    debugData['SupportLift'] = _baselineFloorY == null
+        ? '-'
+        : (_baselineFloorY! - supportY).toStringAsFixed(1);
+    debugData['HipLift'] = _baselineStandingHipY == null
+        ? '-'
+        : (_baselineStandingHipY! - hipY).toStringAsFixed(1);
+
+    // 2. State Machine Update
+    _updateState(kneeAngle, supportY, hipY, lowerLegLength, now);
+    _previousHipY = hipY;
 
     final ctx = RepContext(
       kneeAngle: kneeAngle,
       trunkVerticalAngle: trunkVerticalAngle,
-      footY: footY,
+      footY: supportY,
       hipY: hipY,
       jumpSquatState: jumpSquatState,
       frameTimestamp: now,
       resultIssues: resultIssues,
     );
-
-    debugData['State'] = jumpSquatState.toString().split('.').last;
-    debugData['KneeAngle'] = kneeAngle.toStringAsFixed(1);
-    debugData['TrunkAng'] = trunkVerticalAngle.toStringAsFixed(1);
-
-    // 2. State Machine Update
-    _updateState(kneeAngle, footY, hipY, now);
-    _previousHipY = hipY;
 
     // 3. Metric Updates
     for (final metric in _metrics) {
@@ -221,22 +260,39 @@ class JumpSquat extends ExerciseBase {
       for (final metric in _metrics) {
         allFaults.addAll(metric.faults);
       }
+      if (_isRepTooFast(now)) {
+        allFaults.add(FaultRecord(
+          phase: 'REP_COMPLETE',
+          type: 'Tempo',
+          message: 'Chuyển động quá nhanh, AI không xác nhận được rep.',
+          voiceMessage: 'Làm chậm lại và nhảy rõ hơn',
+          affectsForm: true,
+        ));
+      }
 
-      final backFaults = allFaults.where((f) => f.type == 'Back').toList();
-      bool hasBackFault = backFaults.isNotEmpty;
+      final blockingFaults = allFaults.where((f) => f.affectsForm).toList();
+      bool hasBlockingFault = blockingFaults.isNotEmpty;
 
-      if (!hasBackFault) {
+      if (!hasBlockingFault) {
         repCount += 1;
+        logger.addRepLog(RepLog(
+          correctForm: !allFaults.any((f) => f.affectsForm),
+          repNumber: repCount,
+          data: {
+            'fault_types': allFaults.map((e) => e.type).toSet().toList(),
+          },
+        ));
       } else {
-        final voiceMsg = backFaults.first.voiceMessage;
+        final voiceMsg = blockingFaults.first.voiceMessage;
         if (voiceMsg != null && voiceMsg.isNotEmpty) {
-          ttsService.speak(voiceMsg);
+          resultIssues.addInstruction(currentPhaseKey, 'Error', voiceMsg);
         }
       }
 
       correctForm = !allFaults.any((f) => f.affectsForm);
-      if (hasBackFault) {
-        resultIssues.feedback['Result'] = 'Không tính rep (Cong lưng)';
+      if (hasBlockingFault) {
+        resultIssues.feedback['Result'] = 'Không tính rep';
+        resultIssues.feedback['Error'] = blockingFaults.first.message;
       } else {
         resultIssues.feedback['Result'] =
             correctForm ? 'Hoàn hảo! 🔥' : 'Cần chú ý an toàn!';
@@ -251,6 +307,8 @@ class JumpSquat extends ExerciseBase {
 
       correctForm = true;
       for (final metric in _metrics) metric.reset();
+      _repStartedAtMs = null;
+      _resetDebouncers();
 
       // Khóa cờ chuyển rep
       previousJumpSquatState = JumpSquatState.standing;
@@ -267,39 +325,115 @@ class JumpSquat extends ExerciseBase {
 
   // --- High-Speed State Machine ---
   void _updateState(
-      double kneeAngle, double footY, double hipY, int timestampMs) {
-    if (_baselineFloorY == null || _previousHipY == null) return;
+    double kneeAngle,
+    double supportY,
+    double hipY,
+    double lowerLegLength,
+    int timestampMs,
+  ) {
+    if (_baselineFloorY == null ||
+        _baselineStandingHipY == null ||
+        _previousHipY == null) {
+      return;
+    }
 
     bool isMovingUp = hipY < _previousHipY! - 2.0; // Y giảm là đi lên
-    bool isAirborne =
-        footY < (_baselineFloorY! - JumpSquatConfig.AIRBORNE_LIFT_OFFSET);
-    bool isFeetOnGround =
-        footY >= (_baselineFloorY! - JumpSquatConfig.AIRBORNE_LIFT_OFFSET / 2);
+    final footLiftThreshold = _airborneFootLiftThreshold(lowerLegLength);
+    final hipLiftThreshold =
+        scaleFactor * JumpSquatConfig.AIRBORNE_HIP_LIFT_TORSO_RATIO;
+    final supportLift = _baselineFloorY! - supportY;
+    final hipLift = _baselineStandingHipY! - hipY;
+    final isAirborne =
+        supportLift > footLiftThreshold && hipLift > hipLiftThreshold;
+    final isFeetOnGround = supportLift <=
+        footLiftThreshold * JumpSquatConfig.GROUND_CONTACT_LIFT_RATIO;
 
-    if (jumpSquatState == JumpSquatState.standing &&
-        kneeAngle < JumpSquatConfig.SQUATTING_KNEE_THRESHOLD) {
+    if (_squattingDebouncer.update(jumpSquatState == JumpSquatState.standing &&
+        kneeAngle < JumpSquatConfig.SQUATTING_KNEE_THRESHOLD)) {
+      _repStartedAtMs = timestampMs;
       _transitionState(JumpSquatState.squatting, timestampMs);
-    } else if (jumpSquatState == JumpSquatState.squatting &&
-        isMovingUp &&
-        kneeAngle > 90) {
+    } else if (_launchingDebouncer.update(
+        jumpSquatState == JumpSquatState.squatting &&
+            isMovingUp &&
+            kneeAngle > 90)) {
       // Đang squat mà hông đột ngột bật lên
       _transitionState(JumpSquatState.launching, timestampMs);
-    } else if (jumpSquatState == JumpSquatState.launching && isAirborne) {
+    } else if (_airborneDebouncer.update(
+        (jumpSquatState == JumpSquatState.launching ||
+                jumpSquatState == JumpSquatState.squatting) &&
+            isAirborne)) {
       // Rời khỏi mặt sàn
       _transitionState(JumpSquatState.airborne, timestampMs);
-    } else if (jumpSquatState == JumpSquatState.airborne && isFeetOnGround) {
+    } else if (_landingDebouncer
+        .update(jumpSquatState == JumpSquatState.airborne && isFeetOnGround)) {
       // Chạm đất trở lại -> Bắt đầu quá trình shock absorption
       _transitionState(JumpSquatState.landing, timestampMs);
-    } else if (jumpSquatState == JumpSquatState.landing &&
-        kneeAngle > JumpSquatConfig.STANDING_KNEE_THRESHOLD &&
-        !isMovingUp) {
+    } else if (_standingDebouncer.update(
+        jumpSquatState == JumpSquatState.landing &&
+            kneeAngle > JumpSquatConfig.STANDING_KNEE_THRESHOLD &&
+            !isMovingUp &&
+            isFeetOnGround)) {
       // Sau khi nhún tiếp đất, đứng thẳng lại hoàn toàn
       _transitionState(JumpSquatState.standing, timestampMs);
     }
-    // Fallback phòng khi nhảy quá nhanh bỏ lỡ khung hình launching
-    else if (jumpSquatState == JumpSquatState.squatting && isAirborne) {
-      _transitionState(JumpSquatState.airborne, timestampMs);
+  }
+
+  double _supportY({
+    required PoseLandmark ankle,
+    PoseLandmark? heel,
+    required PoseLandmark footIndex,
+  }) {
+    final values = <double>[ankle.y, footIndex.y];
+    if (heel != null && ExerciseBase.isLandmarkConfident(heel)) {
+      values.add(heel.y);
     }
+    return values.reduce(math.max);
+  }
+
+  void _refreshStandingBaselines(
+    double kneeAngle,
+    double supportY,
+    double hipY,
+    double lowerLegLength,
+  ) {
+    if (jumpSquatState != JumpSquatState.standing || kneeAngle < 170) return;
+
+    final currentFloor = _baselineFloorY;
+    if (currentFloor == null) {
+      _baselineFloorY = supportY;
+      _baselineStandingHipY = hipY;
+      return;
+    }
+
+    final floorThreshold = _airborneFootLiftThreshold(lowerLegLength);
+    final supportIsGrounded = currentFloor - supportY <= floorThreshold * 0.5;
+    if (!supportIsGrounded) return;
+
+    _baselineFloorY = (currentFloor * 0.92) + (supportY * 0.08);
+    final currentHip = _baselineStandingHipY;
+    _baselineStandingHipY =
+        currentHip == null ? hipY : (currentHip * 0.92) + (hipY * 0.08);
+  }
+
+  double _airborneFootLiftThreshold(double lowerLegLength) {
+    return math.max(
+      lowerLegLength * JumpSquatConfig.AIRBORNE_FOOT_LIFT_LOWER_LEG_RATIO,
+      scaleFactor * JumpSquatConfig.AIRBORNE_FOOT_LIFT_TORSO_RATIO,
+    );
+  }
+
+  bool _isRepTooFast(int now) {
+    final start = _repStartedAtMs;
+    if (start == null) return true;
+    return now - start < JumpSquatConfig.MIN_REP_DURATION_MS;
+  }
+
+  void _resetDebouncers() {
+    _squattingDebouncer.reset();
+    _launchingDebouncer.reset();
+    _airborneDebouncer.reset();
+    _landingDebouncer.reset();
+    _standingDebouncer.reset();
   }
 
   void _transitionState(JumpSquatState newState, int timestampMs) {

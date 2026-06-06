@@ -28,8 +28,8 @@ import '../wall_push_up.dart';
 import 'package:vika/utils/debouncer.dart';
 
 class BodyLineConfig {
-  static const double GOOD_MIN = 155.0;
-  static const double ERROR_MAX = 145.0; // < this = error
+  static const double GOOD_MIN = 165.0;
+  static const double ERROR_MAX = 155.0; // < this = error
 }
 
 class BodyLineMetric extends WallPushUpMetricBase {
@@ -69,16 +69,16 @@ class BodyLineMetric extends WallPushUpMetricBase {
 
     if (errorConfirmed) {
       ctx.resultIssues.feedback['Body'] =
-          'Giữ vai, hông và chân trên một đường thẳng!';
+          'Giữ hông thẳng, siết bụng, không gập mông hay võng lưng.';
       if (!_instructionSet) {
         ctx.resultIssues.addInstruction('standing', 'Body',
-            'Vai, hông và chân chưa thẳng hàng — siết core và chỉnh lại tư thế.');
+            'Giữ vai, hông và chân thẳng hàng; siết bụng, không gập mông hay võng lưng.');
         _instructionSet = true;
       }
       _logFault(phase, 'Vai-hông-chân lệch khỏi đường thẳng',
           voiceMessage: 'Giữ thân thẳng', affectsForm: true);
     } else if (warningConfirmed) {
-      ctx.resultIssues.feedback['Body'] = 'Vai, hông và chân hơi lệch hàng.';
+      ctx.resultIssues.feedback['Body'] = 'Hông hơi lệch, siết core thêm.';
       if (!_instructionSet) {
         ctx.resultIssues.addInstruction('standing', 'Body',
             'Vai, hông và chân hơi lệch — giữ người thành một đường thẳng.');

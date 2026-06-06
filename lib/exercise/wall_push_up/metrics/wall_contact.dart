@@ -1,18 +1,14 @@
 /* =========================================================================
    Metric 7: Wall Contact Proxy (Are the hands anchored on the wall?)
 
-   A 2D pose model cannot see the wall plane directly. The practical proxy is:
-     1. the initial wrist X coordinate on the wall is captured at setup, and
-     2. the wrist X coordinate must stay within +/-15 px of that anchor.
-
-   Example: if setup wristDrift is 230, values from 215 to 245 pass.
-
-   shoulderHandClosure is kept as debug only. It no longer blocks rep counting
-   because live camera data showed it was too strict for setup.
+   A 2D pose model cannot see the wall plane directly. The practical proxy is
+   the wrist anchor captured at setup, normalized by the user's torso scale.
+   When a foot anchor is available, drift is measured as wrist-relative-to-foot
+   so light camera shake does not look like the hand sliding.
 
    Thresholds:
-     Wrist anchor good:  |currentX - setupX| <= 15 px
-     Wrist anchor error: |currentX - setupX| > 15 px
+     Wrist anchor good:  movement <= 8% body scale
+     Wrist anchor error: movement > 8% body scale
    ========================================================================= */
 
 import 'dart:math';
@@ -21,7 +17,7 @@ import '../wall_push_up.dart';
 import 'package:vika/utils/debouncer.dart';
 
 class WallContactConfig {
-  static const double MAX_HAND_DRIFT_PX = 15.0;
+  static const double MAX_HAND_DRIFT_RATIO = 0.08;
 }
 
 class WallContactMetric extends WallPushUpMetricBase {
@@ -35,7 +31,9 @@ class WallContactMetric extends WallPushUpMetricBase {
 
   double? _baselineHandX;
   double? _baselineHandY;
-  double? _baselineShoulderToHandDistance;
+  double? _baselineScaleFactor;
+  double? _baselineWristToFootX;
+  double? _baselineWristToFootY;
   double? _minShoulderToHandDistance;
   bool _instructionSet = false;
 
@@ -52,9 +50,20 @@ class WallContactMetric extends WallPushUpMetricBase {
     _baselineHandY = y;
   }
 
+  void captureFootBaseline(double? x, double? y) {
+    if (x == null ||
+        y == null ||
+        _baselineHandX == null ||
+        _baselineHandY == null) {
+      return;
+    }
+    _baselineWristToFootX = _baselineHandX! - x;
+    _baselineWristToFootY = _baselineHandY! - y;
+  }
+
   @override
   void captureBaseline(double? value) {
-    if (value != null && value > 0) _baselineShoulderToHandDistance = value;
+    if (value != null && value > 0) _baselineScaleFactor = value;
   }
 
   @override
@@ -63,39 +72,59 @@ class WallContactMetric extends WallPushUpMetricBase {
       return;
     }
 
-    final wristDriftValue = ctx.wristAnchorX;
-    final anchorDriftDelta = (wristDriftValue - _baselineHandX!).abs();
+    final scale = _baselineScaleFactor ?? ctx.scaleFactor;
+    if (scale == null || scale <= 0) {
+      return;
+    }
+
+    var anchorDriftDelta = 0.0;
+    var driftSource = 'image';
+    if (ctx.footAnchorX != null && ctx.footAnchorY != null) {
+      final wristToFootX = ctx.wristAnchorX - ctx.footAnchorX!;
+      final wristToFootY = ctx.wristAnchorY - ctx.footAnchorY!;
+      _baselineWristToFootX ??= wristToFootX;
+      _baselineWristToFootY ??= wristToFootY;
+
+      final dx = wristToFootX - _baselineWristToFootX!;
+      final dy = wristToFootY - _baselineWristToFootY!;
+      anchorDriftDelta = sqrt(dx * dx + dy * dy);
+      driftSource = 'wrist-foot';
+    } else {
+      final dx = ctx.wristAnchorX - _baselineHandX!;
+      final dy = ctx.wristAnchorY - _baselineHandY!;
+      anchorDriftDelta = sqrt(dx * dx + dy * dy);
+    }
+    final anchorDriftRatio = anchorDriftDelta / scale;
 
     double? shoulderClosure;
-    final baselineShoulderToHandDistance = _baselineShoulderToHandDistance;
-    if (baselineShoulderToHandDistance != null &&
-        baselineShoulderToHandDistance > 0) {
-      final shoulderDx = ctx.shoulderAnchorX - ctx.wristAnchorX;
-      final shoulderDy = ctx.shoulderAnchorY - ctx.wristAnchorY;
-      final shoulderToHandDistance =
-          sqrt(shoulderDx * shoulderDx + shoulderDy * shoulderDy);
-      if (_minShoulderToHandDistance == null ||
-          shoulderToHandDistance < _minShoulderToHandDistance!) {
-        _minShoulderToHandDistance = shoulderToHandDistance;
-      }
-      shoulderClosure =
-          (baselineShoulderToHandDistance - _minShoulderToHandDistance!) /
-              baselineShoulderToHandDistance;
+    final shoulderDx = ctx.shoulderAnchorX - ctx.wristAnchorX;
+    final shoulderDy = ctx.shoulderAnchorY - ctx.wristAnchorY;
+    final shoulderToHandDistance =
+        sqrt(shoulderDx * shoulderDx + shoulderDy * shoulderDy);
+    _minShoulderToHandDistance ??= shoulderToHandDistance;
+    if (shoulderToHandDistance < _minShoulderToHandDistance!) {
+      _minShoulderToHandDistance = shoulderToHandDistance;
+    }
+    if (shoulderToHandDistance > 0) {
+      shoulderClosure = (shoulderToHandDistance - _minShoulderToHandDistance!) /
+          shoulderToHandDistance;
     }
 
     final phase = ctx.state.toString().split('.').last.toUpperCase();
 
-    _debugData['wristDrift'] = wristDriftValue.toStringAsFixed(1);
+    _debugData['wristDrift'] = ctx.wristAnchorX.toStringAsFixed(1);
     _debugData['wristDriftBaseline'] = _baselineHandX!.toStringAsFixed(1);
     _debugData['wristDriftDelta'] = anchorDriftDelta.toStringAsFixed(1);
-    _debugData['handAnchorDrift'] = anchorDriftDelta.toStringAsFixed(1);
+    _debugData['handAnchorDrift'] =
+        '${(anchorDriftRatio * 100).toStringAsFixed(0)}%';
+    _debugData['handAnchorDriftSource'] = driftSource;
     if (shoulderClosure != null) {
       _debugData['shoulderHandClosure'] =
           '${(shoulderClosure * 100).toStringAsFixed(0)}%';
     }
 
     final isAnchorError =
-        anchorDriftDelta > WallContactConfig.MAX_HAND_DRIFT_PX;
+        anchorDriftRatio > WallContactConfig.MAX_HAND_DRIFT_RATIO;
     final anchorErrorConfirmed = _anchorErrorDebouncer.update(isAnchorError);
 
     if (anchorErrorConfirmed) {

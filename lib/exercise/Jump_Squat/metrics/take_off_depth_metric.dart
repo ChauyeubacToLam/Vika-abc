@@ -51,7 +51,8 @@ class TakeOffDepthMetric extends JumpSquatMetricBase {
           type: 'Power',
           message:
               'Lấy đà quá nông (${_minSquatAngle!.toStringAsFixed(0)}°). Hạ hông sâu hơn!',
-          affectsForm: false,
+          voiceMessage: 'Hạ hông sâu hơn rồi mới bật nhảy',
+          affectsForm: true,
         ));
       }
     }

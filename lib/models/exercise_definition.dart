@@ -145,7 +145,7 @@ final wallPushupAssessmentDefinition = ExerciseDefinition(
     'Quay nghiêng 90° để AI thấy rõ độ sâu và thân người.',
     'Giữ đủ ánh sáng ở chân và thân trên trước khi bắt đầu.',
   ],
-  createExercise: () => PushUp(maxRep: 5),
+  createExercise: () => WallPushUp(maxRep: 5),
   phaseColors: {
     'standing': const Color(0xFF00E676),
     'descending': const Color(0xFFFFD600),

@@ -40,6 +40,7 @@ import '../../exercise/push up/metrics/depth_metric.dart' as push_depth;
 import '../../exercise/push up/metrics/tempo_metric.dart' as push_tempo;
 import '../../exercise/push up/metrics/trunk_alignment_metric.dart'
     as push_trunk;
+import '../../exercise/wall_push_up/wall_push_up.dart' show WallPushUp;
 import '../../exercise/report_builder_registry.dart';
 import '../../exercise/curl_up/metrics/curl_up_knee_extension.dart'
     as curl_knee;
@@ -913,7 +914,7 @@ class _ExerciseExperienceSpec {
           repsPerSet: 5,
           restSeconds: overrideRest,
           videoDuration: '1:12',
-          createExercise: (repsPerSet) => PushUp(maxRep: repsPerSet),
+          createExercise: (repsPerSet) => WallPushUp(maxRep: repsPerSet),
         );
       case 'squat':
         return _ExerciseExperienceSpec(

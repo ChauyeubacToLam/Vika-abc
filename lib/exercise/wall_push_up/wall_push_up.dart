@@ -55,7 +55,10 @@ class WallPushUpConfig {
 
   // Start position gates (hold-still).
   static const double START_ELBOW_MIN = 155.0; // arms extended
-  static const double START_BODYLINE_MIN = 140.0; // body roughly straight
+  static const double START_BODYLINE_MIN = 155.0; // body roughly straight
+  static const double START_TRUNK_INCLINATION_MIN = 45.0;
+  static const double ACTIVE_TRUNK_INCLINATION_MIN = 40.0;
+  static const double HAND_PLACEMENT_MAX_OFFSET_RATIO = 0.25;
   static const String WALL_DISTANCE_SETUP =
       'Đứng cách tường một cánh tay + 30-40 cm, đặt tay lên tường.';
   // NOTE: normalized angle caps at 180°, so the spec's 195° upper bound
@@ -123,6 +126,10 @@ class RepContext {
   /// 180° means shoulder, hip and foot are aligned in one straight line.
   final double? shoulderHipFootLineAngle;
 
+  /// Inclination of the side-line vs the floor. Floor push-ups stay near
+  /// horizontal; wall push-ups should be closer to standing.
+  final double? trunkInclinationAngle;
+
   final double? scaleFactor; // shoulder-to-hip distance
   final WallPushUpState state;
   final int frameTimestamp; // ms
@@ -145,6 +152,7 @@ class RepContext {
     required this.footAnchorY,
     required this.bodyFootAngle,
     required this.shoulderHipFootLineAngle,
+    required this.trunkInclinationAngle,
     required this.scaleFactor,
     required this.state,
     required this.frameTimestamp,
@@ -304,6 +312,8 @@ class WallPushUp extends ExerciseBase {
   bool lastRepWasClean = true;
 
   final Debouncer _entryDebouncer = Debouncer(requiredFrames: 2);
+  final Debouncer _activeTrunkInclinationDebouncer =
+      Debouncer(requiredFrames: 4);
 
   // --- Safety/setup metrics ---
   final BodyLineMetric bodyLineMetric = BodyLineMetric();
@@ -382,8 +392,9 @@ class WallPushUp extends ExerciseBase {
   double? _baselineFootAnchorY;
   double? _baselineWristAnchorX;
   double? _baselineWristAnchorY;
-  double? _baselineShoulderToHandDistance;
   double? _baselineBodyFootAngle;
+  double? _baselineScaleFactor;
+  bool _trunkInclinationInvalidThisRep = false;
 
   // --- UI Bridge ---
 
@@ -463,6 +474,26 @@ class WallPushUp extends ExerciseBase {
     // 1. Standing, not lying down: shoulder above hip (smaller y = higher).
     if (shoulder.y >= hip.y) return false;
 
+    final shoulderToHip = calculateDistance(shoulder, hip);
+    if (shoulderToHip <= 0) return false;
+
+    final trunkInclination = calculateAbsoluteHorizontalAngle(
+      point1: shoulder,
+      point2: ankle,
+    );
+    if (trunkInclination < WallPushUpConfig.START_TRUNK_INCLINATION_MIN) {
+      resultIssues.feedback['Setup'] =
+          'Đứng nghiêng người vào tường, không chống đẩy dưới sàn.';
+      return false;
+    }
+
+    final handOffset = (wrist.y - shoulder.y).abs() / shoulderToHip;
+    if (handOffset > WallPushUpConfig.HAND_PLACEMENT_MAX_OFFSET_RATIO) {
+      resultIssues.feedback['Setup'] =
+          'Đặt tay ngang vai hoặc lệch nhẹ, không quá cao hoặc quá thấp.';
+      return false;
+    }
+
     // 2. Arms extended: elbow angle > 155°.
     final elbowAngle = calculateAngleNormalized(
         firstPoint: shoulder, midPoint: elbow, lastPoint: wrist);
@@ -482,7 +513,6 @@ class WallPushUp extends ExerciseBase {
     final nose = landmarks[PoseLandmarkType.nose];
 
     if (ear != null) {
-      final shoulderToHip = calculateDistance(shoulder, hip);
       if (shoulderToHip > 0) {
         _baselineShrugRatio = calculateDistance(ear, shoulder) / shoulderToHip;
       }
@@ -499,10 +529,7 @@ class WallPushUp extends ExerciseBase {
     _baselineFootAnchorY = footAnchor?.y;
     _baselineWristAnchorX = wrist.x;
     _baselineWristAnchorY = wrist.y;
-    final shoulderDx = shoulder.x - wrist.x;
-    final shoulderDy = shoulder.y - wrist.y;
-    _baselineShoulderToHandDistance =
-        math.sqrt(shoulderDx * shoulderDx + shoulderDy * shoulderDy);
+    _baselineScaleFactor = shoulderToHip;
     if (footIndex != null) {
       _baselineBodyFootAngle = calculateAngleNormalized(
           firstPoint: hip, midPoint: ankle, lastPoint: footIndex);
@@ -522,7 +549,9 @@ class WallPushUp extends ExerciseBase {
     footStationaryMetric.captureBaseline(_baselineBodyFootAngle);
     wallContactMetric.capturePointBaseline(
         _baselineWristAnchorX, _baselineWristAnchorY);
-    wallContactMetric.captureBaseline(_baselineShoulderToHandDistance);
+    wallContactMetric.captureFootBaseline(
+        _baselineFootAnchorX, _baselineFootAnchorY);
+    wallContactMetric.captureBaseline(_baselineScaleFactor);
   }
 
   // --- Stop Condition ---
@@ -659,6 +688,19 @@ class WallPushUp extends ExerciseBase {
             lastX: footAnchor.x,
             lastY: footAnchor.y,
           );
+    final double? trunkInclinationAngle = footAnchor == null
+        ? (ankle == null
+            ? null
+            : calculateAbsoluteHorizontalAngle(
+                point1: shoulder,
+                point2: ankle,
+              ))
+        : _calculateAbsoluteHorizontalAngleFromCoordinates(
+            firstX: shoulder.x,
+            firstY: shoulder.y,
+            secondX: footAnchor.x,
+            secondY: footAnchor.y,
+          );
 
     final int now = frameTimestampMs;
 
@@ -678,6 +720,7 @@ class WallPushUp extends ExerciseBase {
       footAnchorY: footAnchor?.y,
       bodyFootAngle: bodyFootAngle,
       shoulderHipFootLineAngle: shoulderHipFootLineAngle,
+      trunkInclinationAngle: trunkInclinationAngle,
       scaleFactor: shoulderToHip > 0 ? shoulderToHip : scaleFactor,
       state: wallPushUpState,
       frameTimestamp: now,
@@ -690,6 +733,8 @@ class WallPushUp extends ExerciseBase {
     debugData['bodyLine'] = bodyLineAngle?.toStringAsFixed(1) ?? 'N/A';
     debugData['shoulderHipFootLine'] =
         shoulderHipFootLineAngle?.toStringAsFixed(1) ?? 'N/A';
+    debugData['trunkInclination'] =
+        trunkInclinationAngle?.toStringAsFixed(1) ?? 'N/A';
     debugData['flareAngle'] = elbowFlareAngle.toStringAsFixed(1);
     debugData['bodyFootAngle'] = bodyFootAngle?.toStringAsFixed(1) ?? 'N/A';
     debugData['correctForm'] = correctForm.toString();
@@ -773,6 +818,17 @@ class WallPushUp extends ExerciseBase {
 
     // 7. Run all metrics + track effectiveness extremes (active states only)
     if (wallPushUpState != WallPushUpState.standing) {
+      final trunkInclination = trunkInclinationAngle;
+      final isFloorLike = trunkInclination != null &&
+          trunkInclination < WallPushUpConfig.ACTIVE_TRUNK_INCLINATION_MIN;
+      if (_activeTrunkInclinationDebouncer.update(isFloorLike)) {
+        _trunkInclinationInvalidThisRep = true;
+        resultIssues.feedback['Setup'] =
+            'Giữ người nghiêng vào tường, không hạ xuống như chống đẩy sàn.';
+        resultIssues.addInstruction('standing', 'Setup',
+            'Đứng nghiêng người vào tường; vai, hông và chân tạo một đường chéo rõ.');
+      }
+
       for (final metric in _metrics) {
         metric.update(ctx);
       }
@@ -846,6 +902,10 @@ class WallPushUp extends ExerciseBase {
       return 'Chưa đẩy tay thẳng về vị trí ban đầu.';
     }
 
+    if (_trunkInclinationInvalidThisRep) {
+      return 'Đây chưa giống Wall Push Up — hãy đứng nghiêng người vào tường.';
+    }
+
     final bodyInvalid = faults.any((f) => f.type == 'Body' && f.affectsForm);
     if (bodyInvalid) {
       return 'Vai, hông và chân chưa thẳng hàng.';
@@ -861,6 +921,7 @@ class WallPushUp extends ExerciseBase {
 
   String? _voiceForCountRejectReason(String reason) {
     if (reason.contains('Chưa xuống đủ sâu')) return 'Xuống thấp hơn';
+    if (reason.contains('Wall Push Up')) return 'Đứng nghiêng vào tường';
     if (reason.contains('Vai, hông') || reason.contains('thẳng hàng')) {
       return 'Giữ thân thẳng';
     }
@@ -875,6 +936,8 @@ class WallPushUp extends ExerciseBase {
     }
     _repMinElbow = null;
     _repMaxElbow = null;
+    _trunkInclinationInvalidThisRep = false;
+    _activeTrunkInclinationDebouncer.reset();
   }
 
   // --- State Machine (mirrors push-up: entry-debounced threshold machine) ---
@@ -943,6 +1006,17 @@ class WallPushUp extends ExerciseBase {
       degrees = 360.0 - degrees;
     }
     return degrees;
+  }
+
+  double _calculateAbsoluteHorizontalAngleFromCoordinates({
+    required double firstX,
+    required double firstY,
+    required double secondX,
+    required double secondY,
+  }) {
+    final dy = (secondY - firstY).abs();
+    final dx = (secondX - firstX).abs();
+    return math.atan2(dy, dx) * (180.0 / math.pi);
   }
 }
 

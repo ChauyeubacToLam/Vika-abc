@@ -11,8 +11,8 @@
 import 'jump_squat_metric_base.dart';
 
 class LandingConfig {
-  static const double SAFE_FLEXION_MAX = 60.0;
-  static const double STIFF_LANDING_MIN = 90.0; // CRITICAL ERROR
+  static const double SAFE_FLEXION_MAX = 90.0;
+  static const double STIFF_LANDING_MIN = 130.0; // CRITICAL ERROR
 }
 
 class LandingKneeFlexionMetric extends JumpSquatMetricBase {

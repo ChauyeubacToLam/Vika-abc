@@ -29,7 +29,7 @@ String _exerciseAlias(String value) {
     'wallpushup' => 'wall_push_up',
     'wallpushups' => 'wall_push_up',
     'wallpushupbw' => 'wall_push_up',
-    'pushupwall' => 'push_up',
+    'pushupwall' => 'wall_push_up',
     'inclinepushup' => 'push_up',
     'pushupexercise' => 'push_up',
     'glutebridge' => 'glute_bridge',
