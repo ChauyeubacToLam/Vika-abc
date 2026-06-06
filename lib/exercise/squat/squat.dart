@@ -62,8 +62,7 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
       const <VikaImageOrientation>{
-        VikaImageOrientation.landscapeLeft,
-        VikaImageOrientation.landscapeRight,
+        VikaImageOrientation.portrait,
       };
 
   static const String standingStatus = 'Xuống';
