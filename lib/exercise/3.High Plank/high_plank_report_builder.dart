@@ -4,6 +4,9 @@ import 'package:vika/utils/exercise_logger.dart';
 
 class HighPlankReportBuilder extends ExerciseReportBuilder {
   @override
+  bool get isSecondBased => true;
+
+  @override
   Map<String, List<String>> painToFaultMap() => {
         'lower_back': ['sagging_fails_count'],
         'shoulder': ['piked_fails_count', 'elbow_fails_count'],

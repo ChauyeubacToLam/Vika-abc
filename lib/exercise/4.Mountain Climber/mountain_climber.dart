@@ -1,6 +1,7 @@
 // ignore_for_file: curly_braces_in_flow_control_structures
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
+import '../../utils/exercise_logger.dart';
 import '../exercise_base.dart';
 import 'metrics/mountain_climber_metric_base.dart';
 import 'metrics/trunk_stability_metric.dart';
@@ -63,6 +64,7 @@ class MountainClimber extends ExerciseBase {
 
   int? _exerciseStartTimeMs;
   bool _isTimeout = false;
+  int _doubleKneeRejects = 0;
 
   // ---------------------------------------------------------------------------
   // Safety check
@@ -70,8 +72,13 @@ class MountainClimber extends ExerciseBase {
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
-    // Safety gate hiển thị popup hỏi chấn thương được xử lý ở tầng UI/UX.
-    // Tầng AI không block — chỉ trả về null ở đây.
+    if (cameraFacing != CameraFacing.left &&
+        cameraFacing != CameraFacing.right) {
+      return 'Vui lòng quay ngang người 100% với camera!';
+    }
+    if (_extractLandmarks(smoothedLandmarks) == null) {
+      return 'Giữ vai, tay, hông, gối và cổ chân rõ trong khung hình.';
+    }
     return null;
   }
 
@@ -155,6 +162,7 @@ class MountainClimber extends ExerciseBase {
     if (lm == null) return;
 
     scaleFactor = calculateDistance(lm.shoulder, lm.hip);
+    if (!scaleFactor.isFinite || scaleFactor <= 1e-6) return;
 
     final double armAngle = calculateAngleNormalized(
       firstPoint: lm.shoulder,
@@ -197,7 +205,6 @@ class MountainClimber extends ExerciseBase {
       scaleFactor: scaleFactor,
       nowMs: now,
     );
-    if (leftRep > 0) _onRepCompleted(ctx, KneeSide.left);
 
     // --- Peak counter phải ---
     final int rightRep = _rightCounter.update(
@@ -206,7 +213,19 @@ class MountainClimber extends ExerciseBase {
       scaleFactor: scaleFactor,
       nowMs: now,
     );
-    if (rightRep > 0) _onRepCompleted(ctx, KneeSide.right);
+    if (leftRep > 0 && rightRep > 0) {
+      _doubleKneeRejects++;
+      resultIssues.feedback['Result'] = 'Không tính rep';
+      resultIssues.feedback['ROM'] = 'Luân phiên từng gối';
+      resultIssues.addInstruction(
+          'high_plank_base', 'ROM', 'Kéo từng gối một, không co cả hai gối');
+      trunkMetric.resetAndCountFault();
+      romMetric.reset();
+    } else if (leftRep > 0) {
+      _onRepCompleted(ctx, KneeSide.left);
+    } else if (rightRep > 0) {
+      _onRepCompleted(ctx, KneeSide.right);
+    }
 
     // --- Cập nhật display state dựa trên zone của 2 counter ---
     _updateDisplayState();
@@ -233,12 +252,10 @@ class MountainClimber extends ExerciseBase {
   // ---------------------------------------------------------------------------
 
   void _onRepCompleted(RepContext ctx, KneeSide side) {
-    repCount++;
-
     // Lấy peakDist từ counter tương ứng
     final double peakDist = side == KneeSide.left
-        ? _leftCounter.minDistInZone
-        : _rightCounter.minDistInZone;
+        ? (_leftCounter.lastCompletedPeakDist ?? _leftCounter.minDistInZone)
+        : (_rightCounter.lastCompletedPeakDist ?? _rightCounter.minDistInZone);
 
     final double threshold = side == KneeSide.left
         ? _leftCounter.zoneThreshold
@@ -246,11 +263,27 @@ class MountainClimber extends ExerciseBase {
 
     romMetric.evaluateRepEnd(ctx, side, peakDist, threshold);
 
-    // Đánh dấu form của rep này dựa trên lỗi trunk hiện tại
-    correctForm = trunkMetric.faults.isEmpty;
+    final allFaults = <FaultRecord>[
+      ...trunkMetric.faults,
+      ...romMetric.faults,
+    ];
+    correctForm = !allFaults.any((f) => f.affectsForm);
+    repCount++;
+    if (!correctForm) resultIssues.feedback['Result'] = 'Chỉnh form';
 
-    // Sau mỗi rep, reset fault list của trunk (đếm fault theo rep)
+    logger.addRepLog(RepLog(
+      correctForm: correctForm,
+      repNumber: repCount,
+      data: {
+        'side': side.name,
+        'peak_dist': peakDist,
+        'zone_threshold': threshold,
+        'fault_types': allFaults.map((f) => f.type).toSet().toList(),
+      },
+    ));
+
     trunkMetric.resetAndCountFault();
+    romMetric.resetAndCountFault();
   }
 
   void _updateDisplayState() {
@@ -278,14 +311,18 @@ class MountainClimber extends ExerciseBase {
   // ---------------------------------------------------------------------------
 
   _LandmarkSet? _extractLandmarks(Map<PoseLandmarkType, PoseLandmark> lm) {
-    // Xác định side nhìn rõ hơn dựa trên likelihood (nếu API cung cấp),
-    // fallback: dùng bên trái làm reference cho shoulder/elbow/wrist/hip/ankle.
-    // Cả 2 đầu gối luôn được lấy để track độc lập.
-    final PoseLandmark? shoulder = lm[PoseLandmarkType.leftShoulder];
-    final PoseLandmark? elbow = lm[PoseLandmarkType.leftElbow];
-    final PoseLandmark? wrist = lm[PoseLandmarkType.leftWrist];
-    final PoseLandmark? hip = lm[PoseLandmarkType.leftHip];
-    final PoseLandmark? ankle = lm[PoseLandmarkType.leftAnkle];
+    final useRight = cameraFacing == CameraFacing.right;
+    final PoseLandmark? shoulder = lm[useRight
+        ? PoseLandmarkType.rightShoulder
+        : PoseLandmarkType.leftShoulder];
+    final PoseLandmark? elbow =
+        lm[useRight ? PoseLandmarkType.rightElbow : PoseLandmarkType.leftElbow];
+    final PoseLandmark? wrist =
+        lm[useRight ? PoseLandmarkType.rightWrist : PoseLandmarkType.leftWrist];
+    final PoseLandmark? hip =
+        lm[useRight ? PoseLandmarkType.rightHip : PoseLandmarkType.leftHip];
+    final PoseLandmark? ankle =
+        lm[useRight ? PoseLandmarkType.rightAnkle : PoseLandmarkType.leftAnkle];
     final PoseLandmark? leftKnee = lm[PoseLandmarkType.leftKnee];
     final PoseLandmark? rightKnee = lm[PoseLandmarkType.rightKnee];
 
@@ -296,6 +333,10 @@ class MountainClimber extends ExerciseBase {
         ankle == null ||
         leftKnee == null ||
         rightKnee == null) {
+      return null;
+    }
+    if (![shoulder, elbow, wrist, hip, ankle, leftKnee, rightKnee]
+        .every(ExerciseBase.isLandmarkConfident)) {
       return null;
     }
 
@@ -317,8 +358,11 @@ class MountainClimber extends ExerciseBase {
   @override
   void onSetComplete() {
     logger.pushKey('timeout_triggered', _isTimeout);
+    logger.pushKey('target_rep', ClimberConfig.MAX_REP);
+    logger.pushKey('max_rep', repCount);
     logger.pushKey('trunk_fails_count', trunkMetric.faultsCount);
     logger.pushKey('rom_fails_count', romMetric.faultsCount);
+    logger.pushKey('double_knee_rejects_count', _doubleKneeRejects);
     logger.pushKey('rom_good_count', romMetric.goodRomCount);
     logger.pushKey('rom_short_count', romMetric.shortRomCount);
     logger.pushKey('core_stability_ratio',
@@ -332,6 +376,7 @@ class MountainClimber extends ExerciseBase {
     _rightCounter.reset();
     _exerciseStartTimeMs = null;
     _isTimeout = false;
+    _doubleKneeRejects = 0;
   }
 }
 

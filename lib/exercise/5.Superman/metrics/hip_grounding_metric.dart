@@ -19,7 +19,7 @@ class HipGroundingMetric extends SupermanMetricBase {
           type: 'HipNotGrounded',
           message: 'Không nhấc hông khỏi sàn!',
           voiceMessage: 'Lấy hông làm điểm tựa, đừng nhấc hông lên',
-          affectsForm: false,
+          affectsForm: true,
           priority: SupermanVoicePriority.hipGrounding,
         ));
       }

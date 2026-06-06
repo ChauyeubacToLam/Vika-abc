@@ -306,7 +306,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
   }
 
   ({ExerciseReportBuilder builder, double met}) _resolveReportEntry() {
-    return reportBuilders[widget.definition.id] ??
+    return resolveReportBuilder(widget.definition.id) ??
         (builder: GenericReportBuilder(), met: 3.5);
   }
 
@@ -634,15 +634,17 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       int lowestFormScore = double.infinity.toInt();
       for (final r in accumulated) {
         lowestFormScore = min(r.formScore, lowestFormScore);
-        final builder =
-            reportBuilders[r.definition.id]?.builder ?? GenericReportBuilder();
+        final builder = resolveReportBuilder(r.definition.id)?.builder ??
+            GenericReportBuilder();
         candidates.addAll(
           builder.buildFaultCandidates(
             exerciseId: r.exerciseKey,
             exerciseName: r.exerciseName,
             exerciseFormScore: r.formScore,
             faultCounts: r.report.faultCounts,
-            totalReps: r.totalReps ?? 0,
+            totalReps: r.report.isSecondBased
+                ? (r.report.totalSeconds ?? 0).round()
+                : (r.totalReps ?? 0),
             userPainAreas: _painAreas,
           ),
         );

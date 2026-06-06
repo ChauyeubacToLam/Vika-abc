@@ -16,9 +16,7 @@ class CoordinationMetric extends DeadBugMetricBase {
 
   @override
   void update(DeadBugRepContext ctx) {
-    if ((ctx.state == DeadBugState.extending ||
-            ctx.state == DeadBugState.hold) &&
-        !_evaluatedThisRep) {
+    if (ctx.state == DeadBugState.hold && !_evaluatedThisRep) {
       bool sameSide =
           ctx.physicalLeftArmExtending == ctx.physicalLeftLegExtending;
 

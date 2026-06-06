@@ -38,9 +38,16 @@ class HoldTimeMetric extends SupermanMetricBase {
         type: 'HoldTooShort',
         message: 'Giữ tư thế lâu hơn!',
         voiceMessage: 'Giữ lại 2 giây ở điểm cao nhất, không giật cục',
-        affectsForm: false,
+        affectsForm: true,
         priority: SupermanVoicePriority.holdTime,
       ));
     }
+  }
+
+  @override
+  void reset() {
+    super.reset();
+    _holdStartMs = null;
+    lastHoldDurationMs = 0;
   }
 }

@@ -41,11 +41,11 @@ class SphinxStretch extends ExerciseBase {
 
   @override
   bool requestStop() {
-    if (state == SphinxState.isometricHold) {
-      tempoMetric.flushCurrentSegment(frameTimestampMs);
-    }
+    final activeHoldSeconds = state == SphinxState.isometricHold
+        ? tempoMetric.getLiveHoldTime(frameTimestampMs)
+        : tempoMetric.activeHoldSeconds;
     return repCount >= SphinxConfig.Af_Max_Reps ||
-        tempoMetric.activeHoldSeconds >= SphinxConfig.Ae_Min_Hold_Time;
+        activeHoldSeconds >= SphinxConfig.Ae_Min_Hold_Time;
   }
 
   @override
@@ -153,8 +153,10 @@ class SphinxStretch extends ExerciseBase {
           firstPoint: shoulder, midPoint: elbow, lastPoint: wrist),
       spineAngle: calculateAngleNormalized(
           firstPoint: shoulder, midPoint: hip, lastPoint: knee),
-      forearmAngle: calculateHorizontalAngle(point1: elbow, point2: wrist),
-      upperArmAngle: calculateHorizontalAngle(point1: shoulder, point2: elbow),
+      forearmAngle:
+          calculateAbsoluteHorizontalAngle(point1: elbow, point2: wrist),
+      upperArmAngle:
+          calculateAbsoluteHorizontalAngle(point1: shoulder, point2: elbow),
       neckAngle: calculateAngleNormalized(
           firstPoint: ear, midPoint: shoulder, lastPoint: hip),
       hipY: hip.y,
@@ -247,6 +249,7 @@ class SphinxStretch extends ExerciseBase {
 
   void _completeRep(SphinxContext ctx) {
     repCount += 1;
+    tempoMetric.flushCurrentSegment(ctx.frameTimestampMs);
 
     final allFaults = <FaultRecord>[
       ...hipMetric.faults,
@@ -329,10 +332,22 @@ class SphinxStretch extends ExerciseBase {
 
   @override
   void onSetComplete() {
+    if (state == SphinxState.isometricHold) {
+      tempoMetric.flushCurrentSegment(frameTimestampMs);
+    }
     logger.pushKey("hip_fails_count", hipMetric.faultsCount);
     logger.pushKey("straight_arm_fails_count", elbowMetric.faultsCount);
     logger.pushKey("shrug_neck_fails_count", neckMetric.faultsCount);
     logger.pushKey("active_hold_time", _lastHoldTime);
     logger.pushKey("stability_score", _lastStabilityScore);
+    logger.pushKey("total_seconds", SphinxConfig.Ae_Min_Hold_Time.toDouble());
+    logger.pushKey(
+        "good_seconds",
+        repCount > 0
+            ? _lastHoldTime.clamp(0.0, SphinxConfig.Ae_Min_Hold_Time.toDouble())
+            : 0.0);
+    logger.pushKey("max_rep", repCount);
+    logger.pushKey("target_rep", SphinxConfig.Af_Max_Reps);
+    logger.pushGoodRepCount();
   }
 }

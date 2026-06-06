@@ -14,6 +14,9 @@ void main() {
         'dead_bug': 'DeadBugReportBuilder',
         'plank_up_down': 'PlankUpDownReportBuilder',
         'bear_plank': 'BearPlankReportBuilder',
+        'plank': 'PlankReportBuilder',
+        'warrior_one': 'WarriorOneReportBuilder',
+        'sphinx_': 'SphinxReportBuilder',
         'walking_lunge': 'WalkingLungeReportBuilder',
       };
 
@@ -36,6 +39,8 @@ void main() {
         'dead__bug': 'DeadBugReportBuilder',
         'plank__up__down': 'PlankUpDownReportBuilder',
         'bear__plank': 'BearPlankReportBuilder',
+        'warrior__one': 'WarriorOneReportBuilder',
+        'sphinx_': 'SphinxReportBuilder',
         'walking__lunge': 'WalkingLungeReportBuilder',
       };
 
@@ -53,6 +58,9 @@ void main() {
         'V-Up': 'VUpReportBuilder',
         'Dead Bug': 'DeadBugReportBuilder',
         'Bear Plank': 'BearPlankReportBuilder',
+        'Warrior I': 'WarriorOneReportBuilder',
+        'Warrior 1': 'WarriorOneReportBuilder',
+        'Sphinx Pose': 'SphinxReportBuilder',
         'Walking Lunge': 'WalkingLungeReportBuilder',
         'walkinglunge': 'WalkingLungeReportBuilder',
       };

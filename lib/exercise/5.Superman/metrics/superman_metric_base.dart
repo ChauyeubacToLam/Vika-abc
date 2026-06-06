@@ -10,6 +10,7 @@ enum SupermanState { setup, lifting, hold, lowering }
 // ─── Config ──────────────────────────────────────────────────────────────────
 class SupermanConfig {
   static const double LIFT_THRESHOLD = 0.04;
+  static const double ROM_THRESHOLD = 0.06;
   static const double LOWERED_THRESHOLD = 0.025;
   static const double HOLD_MIN_MS = 1500.0;
   static const double SPINE_NEUTRAL_RANGE = 15.0;
@@ -81,10 +82,11 @@ abstract class SupermanMetricBase implements DebugMetricSource {
 
   void resetAndCountFault() {
     if (_faults.isNotEmpty) faultsCount++;
-    _faults.clear();
+    reset();
   }
 
   void reset() {
     _faults.clear();
+    debugData.clear();
   }
 }

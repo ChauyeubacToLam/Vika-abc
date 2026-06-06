@@ -90,8 +90,12 @@ class BearPlank extends ExerciseBase {
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    if (cameraFacing == CameraFacing.front) {
-      return "⚠️ Yêu cầu quay ngang (Side) để đo độ phẳng của lưng và độ cao đầu gối.";
+    if (cameraFacing != CameraFacing.left &&
+        cameraFacing != CameraFacing.right) {
+      return "Yêu cầu quay ngang để đo độ phẳng của lưng và độ cao đầu gối.";
+    }
+    if (_getLandmarks(landmarks) == null) {
+      return 'Giữ vai, hông, gối, cổ tay và cổ chân rõ trong khung hình.';
     }
     return null;
   }
@@ -124,7 +128,10 @@ class BearPlank extends ExerciseBase {
     }
 
     final lm = _getLandmarks(smoothedLandmarks);
-    if (lm == null) return;
+    if (lm == null) {
+      _lastFrameTimeMs = null;
+      return;
+    }
 
     final shoulder = lm['shoulder']!;
     final hip = lm['hip']!;
@@ -134,7 +141,10 @@ class BearPlank extends ExerciseBase {
     final ankle = lm['ankle']!;
 
     scaleFactor = calculateDistance(shoulder, hip);
-    if (scaleFactor == 0) scaleFactor = 1;
+    if (!scaleFactor.isFinite || scaleFactor <= 1e-6) {
+      _lastFrameTimeMs = null;
+      return;
+    }
 
     // Tính toán hình học
     // Sàn là đường thẳng nối cổ tay (wrist) và cổ chân (ankle)
@@ -259,6 +269,12 @@ class BearPlank extends ExerciseBase {
       _totalHoverTimeMs >= BearConfig.TARGET_HOVER_MS || _isTimeout;
 
   @override
+  Map<String, String> processNoPoseFrame() {
+    _lastFrameTimeMs = null;
+    return super.processNoPoseFrame();
+  }
+
+  @override
   void onSetComplete() {
     final allFaults = <FaultRecord>[
       ...kneeMetric.faults,
@@ -269,12 +285,19 @@ class BearPlank extends ExerciseBase {
         !allFaults.any((f) => f.affectsForm);
 
     // Đẩy dữ liệu tổng kết
+    final targetSeconds = BearConfig.TARGET_HOVER_MS / 1000.0;
+    final goodSeconds = (_totalHoverTimeMs / 1000.0).clamp(0.0, targetSeconds);
+    logger.pushKey("total_seconds", targetSeconds);
+    logger.pushKey("good_seconds", goodSeconds);
     logger.pushKey("max_rep", 1);
     logger.pushKey("total_hover_time_ms", _totalHoverTimeMs);
     logger.pushKey("timeout_triggered", _isTimeout);
     logger.pushKey("knee_fails", kneeMetric.faultsCount);
     logger.pushKey("back_fails", backMetric.faultsCount);
     logger.pushKey("weight_fails", weightMetric.faultsCount);
+    logger.pushKey("knee_fails_count", kneeMetric.faultsCount);
+    logger.pushKey("back_fails_count", backMetric.faultsCount);
+    logger.pushKey("weight_fails_count", weightMetric.faultsCount);
 
     // Fault frame counts — cho report builder tính % chính xác
     logger.pushKey("total_hover_frames", _totalHoverFrames);

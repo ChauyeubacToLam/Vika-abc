@@ -66,6 +66,8 @@ class FaultRecord {
    PlankMetricBase — Interface every plank metric implements.
    ========================================================================= */
 abstract class PlankMetricBase {
+  int faultsCount = 0;
+
   /// Human-readable name for debug/logging.
   String get name;
 
@@ -80,6 +82,11 @@ abstract class PlankMetricBase {
 
   /// Reset all internal state for the next hold.
   void reset();
+
+  void resetAndCountFault() {
+    if (faults.isNotEmpty) faultsCount++;
+    reset();
+  }
 
   /// Called before collecting faults at hold completion.
   /// Metrics that use fault percentage override this.

@@ -65,7 +65,7 @@ class BirdDogReportBuilder extends ExerciseReportBuilder {
         : allTempos.reduce((a, b) => a + b) / allTempos.length;
 
     int lumbarFails = setLoggers
-        .map((l) => (l as dynamic).data['lumbar_fails_count'] as int? ?? 0)
+        .map((l) => (l.setLogs['lumbar_fails_count'] as num?)?.toInt() ?? 0)
         .reduce((a, b) => a + b);
     double spineNeutrality =
         totalReps > 0 ? ((totalReps - lumbarFails) / totalReps) * 100 : 0;

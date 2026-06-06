@@ -21,6 +21,8 @@ class KneeDriveRomMetric extends ClimberMetricBase {
   int get goodRomCount => _goodRomCount;
   int get shortRomCount => _shortRomCount;
 
+  static const double _goodRomRatioOfCountZone = 0.85;
+
   @override
   List<FaultRecord> get faults => _faults;
 
@@ -59,9 +61,8 @@ class KneeDriveRomMetric extends ClimberMetricBase {
     double peakDist,
     double zoneThreshold,
   ) {
-    // Tiêu chuẩn: gối phải vượt qua ~60% khoảng shoulder-hip.
-    // Dùng chính zoneThreshold đã calibrate làm baseline "đạt chuẩn".
-    final bool isShort = peakDist > zoneThreshold;
+    final qualityThreshold = zoneThreshold * _goodRomRatioOfCountZone;
+    final bool isShort = peakDist > qualityThreshold;
 
     if (isShort) {
       _shortRomCount++;
@@ -81,6 +82,10 @@ class KneeDriveRomMetric extends ClimberMetricBase {
       _goodRomCount++;
       ctx.resultIssues.feedback['ROM'] = 'Biên độ tốt';
     }
+
+    _debugData['ROM_lastPeak_${side.name}'] = peakDist.toStringAsFixed(2);
+    _debugData['ROM_qualityThreshold_${side.name}'] =
+        qualityThreshold.toStringAsFixed(2);
 
     // Reset min dist cho chân vừa hoàn thành
     if (side == KneeSide.left) _minDistLeft = null;

@@ -45,8 +45,10 @@ class TrunkStabilityMetric extends ClimberMetricBase {
         ctx.trunkAngle < ClimberConfig.HIP_DROP_TRUNK_ANGLE;
 
     // --- Kiểm tra 2: Nhấp nhô hông ---
-    final double hipVarianceNorm = (ctx.hipY - _baselineHipY!).abs() /
-        (ctx.scaleFactor == 0 ? 1.0 : ctx.scaleFactor);
+    final scale = ctx.scaleFactor.isFinite && ctx.scaleFactor > 1e-6
+        ? ctx.scaleFactor
+        : 1.0;
+    final double hipVarianceNorm = (ctx.hipY - _baselineHipY!).abs() / scale;
     final bool isBouncing = hipVarianceNorm > ClimberConfig.HIP_BOUNCE_NORM;
 
     // --- Cập nhật debug ---
@@ -101,14 +103,20 @@ class TrunkStabilityMetric extends ClimberMetricBase {
     _debugData.clear();
     _dropDebouncer.reset();
     _bounceDebouncer.reset();
-    _stableFrames = 0;
-    _totalFrames = 0;
     // _baselineHipY KHÔNG reset — hông phải giữ nguyên suốt set
+  }
+
+  @override
+  void resetAndCountFault() {
+    if (faults.isNotEmpty) faultsCount++;
+    reset();
   }
 
   /// Gọi khi kết thúc toàn bộ set (onSetComplete) để reset cả baseline
   void fullReset() {
     reset();
+    _stableFrames = 0;
+    _totalFrames = 0;
     _baselineHipY = null;
   }
 }

@@ -4,16 +4,44 @@ import 'package:vika/utils/exercise_logger.dart';
 
 class SphinxReportBuilder extends ExerciseReportBuilder {
   @override
-  Map<String, List<String>> painToFaultMap() => {};
+  bool get isSecondBased => true;
 
   @override
-  Map<String, FaultTipCopy> faultToTipMap() => {};
+  Map<String, List<String>> painToFaultMap() => {
+        'lower_back': ['hip_fails_count'],
+        'shoulder': ['straight_arm_fails_count', 'shrug_neck_fails_count'],
+        'neck': ['shrug_neck_fails_count'],
+      };
 
   @override
-  Map<String, String Function(int count, int total)> praiseSentenceMap() => {};
+  Map<String, FaultTipCopy> faultToTipMap() => {
+        'hip_fails_count': (
+          watch: 'Hông nhấc khỏi sàn làm mất mục tiêu mở nhẹ cột sống.',
+          next: 'Ấn xương chậu xuống sàn trước khi nâng ngực.',
+        ),
+        'straight_arm_fails_count': (
+          watch: 'Duỗi thẳng tay biến Sphinx thành Cobra và tăng tải lưng.',
+          next: 'Đặt khuỷu dưới vai, để cẳng tay đỡ lực.',
+        ),
+        'shrug_neck_fails_count': (
+          watch: 'Rụt vai hoặc ngửa cổ làm vùng gáy căng quá mức.',
+          next: 'Hạ vai xa tai và nhìn chéo xuống thảm.',
+        ),
+      };
 
   @override
-  Map<String, String> praiseMetricNames() => {};
+  Map<String, String Function(int count, int total)> praiseSentenceMap() => {
+        'Hông': (c, t) => 'Hông giữ ổn định trong $c/$t giây.',
+        'Tay': (c, t) => 'Tay đỡ lực tốt trong $c/$t giây.',
+        'Cổ vai': (c, t) => 'Cổ vai thả lỏng trong $c/$t giây.',
+      };
+
+  @override
+  Map<String, String> praiseMetricNames() => {
+        'hip_fails_count': 'Hông',
+        'straight_arm_fails_count': 'Tay',
+        'shrug_neck_fails_count': 'Cổ vai',
+      };
 
   @override
   DetectedEvidence? detectIssue(List<ExerciseLogger> setLoggers) {

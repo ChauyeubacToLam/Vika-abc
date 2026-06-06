@@ -20,9 +20,8 @@ class LumbarExtensionMetric extends SupermanMetricBase {
     debugData['trunkAngle'] = ctx.trunkAngle.toStringAsFixed(1);
     debugData['minTrunkAngle'] = _minTrunkAngle?.toStringAsFixed(1) ?? '-';
 
-    // Fix #3: Đổi điều kiện uốn cong lưng âm dần thành < -LUMBAR_EXTENSION_DANGER
-    bool isDangerousExtension =
-        ctx.trunkAngle < -SupermanConfig.LUMBAR_EXTENSION_DANGER;
+    final bool isDangerousExtension =
+        ctx.trunkAngle.abs() > SupermanConfig.LUMBAR_EXTENSION_DANGER;
 
     if (_dangerDebouncer.update(isDangerousExtension)) {
       ctx.resultIssues.feedback['Spine'] = 'Uốn lưng quá gắt! Hạ thấp tay chân';

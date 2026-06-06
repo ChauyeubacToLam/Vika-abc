@@ -111,10 +111,12 @@ class KneePeakRepCounter {
   bool _isInZone = false;
   int _lastRepTimeMs = 0;
   double _minDistInZone = 1.0; // Gần nhất trong lần co hiện tại
+  double? _lastCompletedPeakDist;
 
   // --- Debug ---
   double get smoothedDist => _smoothedDist;
   double get minDistInZone => _minDistInZone;
+  double? get lastCompletedPeakDist => _lastCompletedPeakDist;
   bool get isInZone => _isInZone;
 
   /// Gọi mỗi frame. Trả về số rep được tính trong frame này (0 hoặc 1).
@@ -150,6 +152,7 @@ class KneePeakRepCounter {
       final int elapsed = nowMs - _lastRepTimeMs;
       if (elapsed >= ClimberConfig.REP_COOLDOWN_MS) {
         _lastRepTimeMs = nowMs;
+        _lastCompletedPeakDist = _minDistInZone;
         _minDistInZone = 1.0;
         return 1;
       }
@@ -168,6 +171,7 @@ class KneePeakRepCounter {
     _smoothedDist = 1.0;
     _isInZone = false;
     _minDistInZone = 1.0;
+    _lastCompletedPeakDist = null;
     // _lastRepTimeMs giữ nguyên để cooldown vẫn hoạt động xuyên rep
   }
 }

@@ -25,9 +25,13 @@ class TrunkStabilityMetric extends BirdDogMetricBase {
   void update(BirdDogRepContext ctx) {
     _neutralHipY ??= ctx.hipY;
 
-    if (ctx.state == BirdDogState.hold_extended && ctx.scaleFactor != null) {
+    final scale = ctx.scaleFactor;
+    if (ctx.state == BirdDogState.hold_extended &&
+        scale != null &&
+        scale.isFinite &&
+        scale > 1e-6) {
       // Sụt hông: Khoảng cách Y thay đổi > 15% độ dài thân
-      double deviation = (ctx.hipY - _neutralHipY!).abs() / ctx.scaleFactor!;
+      double deviation = (ctx.hipY - _neutralHipY!).abs() / scale;
 
       if (deviation > 0.15) {
         if (!_faults.any((f) => f.type == 'Trunk')) {
