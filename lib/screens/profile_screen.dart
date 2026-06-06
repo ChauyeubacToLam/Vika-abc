@@ -19,7 +19,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../data/profile_mock.dart';
@@ -58,7 +57,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _showStickyBar = false;
   AppUserProfile? _profile;
 
-  static const String _onboardingCompleteKey = 'onboarding_complete';
   static const double _stickyBarThreshold = 260;
 
   @override
@@ -138,7 +136,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return AlertDialog(
           title: const Text('Đăng xuất?'),
           content: const Text(
-            'Bạn sẽ quay về màn hình bắt đầu. Tiến trình của bạn vẫn được giữ khi đăng nhập lại.',
+            'Bạn sẽ quay về màn hình đăng nhập. Tiến trình của bạn vẫn được giữ khi đăng nhập lại.',
           ),
           actions: [
             TextButton(
@@ -162,13 +160,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final rootNavigator = Navigator.of(context, rootNavigator: true);
     try {
       await Supabase.instance.client.auth.signOut();
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_onboardingCompleteKey);
       if (!rootNavigator.mounted) return;
       rootNavigator.pushNamedAndRemoveUntil(
         '/',
         (route) => false,
-        arguments: {'onboardingComplete': false},
+        arguments: const {'entryState': 'login'},
       );
     } catch (e) {
       if (!mounted) return;

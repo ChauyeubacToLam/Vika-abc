@@ -51,6 +51,22 @@ class _S13SignupState extends State<S13Signup> {
     _authService = AuthService();
     _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen(
       _handleAuthStateChange,
+      onError: _handleAuthStreamError,
+    );
+  }
+
+  /// Auth failures (e.g. an expired/used magic link opened via deep link)
+  /// arrive as errors on this broadcast stream. Without an onError handler
+  /// they'd crash the app. Reset the in-flight auth state and surface a
+  /// friendly message instead.
+  void _handleAuthStreamError(Object error, StackTrace stackTrace) {
+    if (!mounted) return;
+    _acceptAuthEvents = false;
+    _pendingProvider = null;
+    _advancing = false;
+    setState(() => _busy = false);
+    _showError(
+      'Link đăng nhập đã hết hạn hoặc không hợp lệ. Vui lòng gửi lại email.',
     );
   }
 
