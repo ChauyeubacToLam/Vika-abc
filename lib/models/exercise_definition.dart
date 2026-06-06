@@ -34,6 +34,13 @@ import '../exercise/standing_knee_to_elbow/standing_knee_to_elbow.dart';
 import '../exercise/step_back_burpee/step_back_burpee.dart';
 import '../exercise/tricep_dip/tricep_dip.dart';
 import '../exercise/walking_lunge/walking_lunge.dart';
+import '../exercise/surya_namaskar/surya_namaskar.dart';
+import '../exercise/wall_push_up/wall_push_up.dart';
+import '../exercise/downward_dog/downward_dog.dart';
+import '../exercise/ashtanga_namaskara/ashtanga_namaskara.dart';
+import '../exercise/low_lunge/low_lunge.dart';
+import '../exercise/prayer_pose/prayer_pose.dart';
+import '../exercise/raised_arms/raised_arms.dart';
 
 /* =========================================================================
    ExerciseDefinition — Metadata + factory for each exercise type.
@@ -906,6 +913,160 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Bắt đầu khi sẵn sàng.'
     ],
     createExercise: () => WalkingLunge(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'surya_namaskar',
+    name: 'Chào Mặt Trời',
+    subtitle: 'Chuỗi 12 tư thế yoga',
+    description: 'Bản xem trước của bài tập Chào Mặt Trời.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Quay nghiêng người so với camera.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => SuryaNamaskarExercise(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'wall_push_up',
+    name: 'Wall Push Up',
+    subtitle: 'Chống đẩy tường',
+    description: 'Bản xem trước của bài tập Wall Push Up.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Dễ',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Quay nghiêng người so với camera.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => WallPushUp(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'downward_dog',
+    name: 'Chó Cúi Mặt',
+    subtitle: 'Downward Dog',
+    description: 'Bản xem trước của bài tập Downward Dog.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Quay nghiêng người so với camera.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => DownwardDog(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'ashtanga_namaskara',
+    name: 'Ashtanga Namaskara',
+    subtitle: 'Tám điểm chạm đất',
+    description: 'Bản xem trước của bài tập Ashtanga Namaskara.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Quay nghiêng người so với camera.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => AshtangaNamaskara(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'low_lunge',
+    name: 'Kỵ Sĩ',
+    subtitle: 'Low Lunge',
+    description: 'Bản xem trước của bài tập Low Lunge.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Trung bình',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Quay nghiêng người so với camera.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => LowLunge(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'prayer_pose',
+    name: 'Cầu Nguyện',
+    subtitle: 'Prayer Pose',
+    description: 'Bản xem trước của bài tập Prayer Pose.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Dễ',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Quay nghiêng người so với camera.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => PrayerPose(),
+    phaseColors: {
+      'default': const Color(0xFF00E676),
+    },
+  ),
+  ExerciseDefinition(
+    id: 'raised_arms',
+    name: 'Vươn Tay',
+    subtitle: 'Raised Arms',
+    description: 'Bản xem trước của bài tập Raised Arms.',
+    icon: Icons.fitness_center,
+    primaryColor: const Color(0xFF00E5FF),
+    secondaryColor: const Color(0xFF0091EA),
+    difficulty: 'Dễ',
+    targetMuscles: ['Toàn thân'],
+    duration: 'Tùy chọn',
+    cameraHint: 'Quay nghiêng người so với camera.',
+    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    setupTips: [
+      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
+      'Bắt đầu khi sẵn sàng.'
+    ],
+    createExercise: () => RaisedArms(),
     phaseColors: {
       'default': const Color(0xFF00E676),
     },
