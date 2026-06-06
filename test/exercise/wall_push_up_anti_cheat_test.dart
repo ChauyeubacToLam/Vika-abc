@@ -168,7 +168,9 @@ void main() {
     _pump(wallPushUp, down2, 1700);
     _pump(wallPushUp, top, 2200);
 
-    expect(wallPushUp.repCount, 0);
+    expect(wallPushUp.repCount, 1);
+    expect(double.parse(wallPushUp.debugData['peakElbow'] as String),
+        greaterThanOrEqualTo(WallPushUpConfig.LOCKOUT_GOOD_MIN));
 
     _pump(wallPushUp, top, 2600);
 

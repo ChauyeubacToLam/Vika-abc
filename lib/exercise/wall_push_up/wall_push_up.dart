@@ -739,14 +739,24 @@ class WallPushUp extends ExerciseBase {
     debugData['bodyFootAngle'] = bodyFootAngle?.toStringAsFixed(1) ?? 'N/A';
     debugData['correctForm'] = correctForm.toString();
 
-    // 5. Rep completion (return to standing after a rep)
+    // 5. Update state machine before checking completion so the frame that
+    // reaches lockout can count immediately.
+    _updateState(elbowAngle, now);
+
+    // 6. Rep completion (return to standing after a rep)
     if (wallPushUpState == WallPushUpState.standing &&
         previousWallPushUpState != WallPushUpState.standing) {
+      if (previousWallPushUpState == WallPushUpState.ascending ||
+          previousWallPushUpState == WallPushUpState.descending) {
+        if (_repMaxElbow == null || elbowAngle > _repMaxElbow!) {
+          _repMaxElbow = elbowAngle;
+        }
+      }
+
       // Effectiveness checks 6 & 8 use accumulated elbow extremes.
       _evaluateDepth(ctx);
       _evaluateLockout(ctx);
 
-      _transitionState(WallPushUpState.standing, now);
       tempoMetric.evaluateRep(ctx);
 
       // Collect faults from every metric.
@@ -812,9 +822,6 @@ class WallPushUp extends ExerciseBase {
       _resetRepCycle();
       return;
     }
-
-    // 6. Update state machine
-    _updateState(elbowAngle, now);
 
     // 7. Run all metrics + track effectiveness extremes (active states only)
     if (wallPushUpState != WallPushUpState.standing) {
@@ -931,6 +938,9 @@ class WallPushUp extends ExerciseBase {
   void _resetRepCycle() {
     // Reset for next rep. Baselines stay inside metrics by design.
     correctForm = true;
+    wallPushUpState = WallPushUpState.standing;
+    previousWallPushUpState = WallPushUpState.standing;
+    _entryDebouncer.reset();
     for (final metric in _metrics) {
       metric.reset();
     }
