@@ -115,9 +115,7 @@ class SuryaNamaskarExercise extends ExerciseBase {
         nameVi: 'Tư thế Tấm ván cao',
         shortName: 'Plank cao',
         breath: 'Giữ hơi',
-        voiceCue:
-            'Bước về tấm ván cao. Bước này đang chờ merge nên AI chưa chấm.',
-        isBlank: true,
+        voiceCue: 'Bước về tấm ván cao, vai trên cổ tay và thân người thẳng.',
       ),
       SuryaNamaskarStep(
         number: 6,
@@ -269,8 +267,8 @@ class SuryaNamaskarExercise extends ExerciseBase {
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    if (exerciseState == ExerciseState.activated &&
-        cameraFacing == CameraFacing.front) {
+    if (cameraFacing != CameraFacing.left &&
+        cameraFacing != CameraFacing.right) {
       return '⚠️ Xin hãy quay nghiêng để tập Chào Mặt Trời';
     }
 
@@ -724,8 +722,7 @@ class SuryaNamaskarExercise extends ExerciseBase {
     final roundDurationMs = timestampMs - (_roundStartedMs ?? timestampMs);
     final smoothnessVariance = _variance(_poseDurationsMs);
 
-    correctForm =
-        _roundSafetyTriggers == 0 && recognizedCount >= checkablePoseCount - 2;
+    correctForm = _roundSafetyTriggers == 0 && missedCount == 0;
     repCount += 1;
 
     logger.addRepLog(

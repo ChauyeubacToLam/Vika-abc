@@ -50,6 +50,8 @@ class SuryaSafetyOverrides {
       case SuryaPoseId.lowLungeRightBack:
       case SuryaPoseId.lowLungeLeftBack:
         return _lowLungeSafety(landmarks, cameraFacing);
+      case SuryaPoseId.highPlankBlank:
+        return _highPlankSafety(landmarks, cameraFacing);
       case SuryaPoseId.ashtangaNamaskara:
         return _ashtangaSafety(landmarks, cameraFacing);
       case SuryaPoseId.cobra:
@@ -58,7 +60,6 @@ class SuryaSafetyOverrides {
         return _downwardDogSafety(landmarks, cameraFacing);
       case SuryaPoseId.pranamasana:
       case SuryaPoseId.uttanasana:
-      case SuryaPoseId.highPlankBlank:
         return SuryaSafetyResult.none;
     }
   }
@@ -130,6 +131,27 @@ class SuryaSafetyOverrides {
       unsafe: unsafe,
       message: 'Đẩy hông lên cao, đừng sụp hông xuống ngang vai.',
       debugData: {'suryaSafetyAshtangaHipRatio': hipRatio.toStringAsFixed(3)},
+    );
+  }
+
+  SuryaSafetyResult _highPlankSafety(
+    Map<PoseLandmarkType, PoseLandmark> landmarks,
+    CameraFacing cameraFacing,
+  ) {
+    final body = _resolveFloorBody(landmarks, cameraFacing, requireWrist: true);
+    if (body == null) return SuryaSafetyResult.none;
+
+    final bodyLine = calculateAngleNormalized(
+      firstPoint: body.shoulder,
+      midPoint: body.hip,
+      lastPoint: body.ankle,
+    );
+    final unsafe = bodyLine < 145.0;
+    return _debounced(
+      code: 'high_plank_body_line',
+      unsafe: unsafe,
+      message: 'Giữ vai, hông và gót chân trên một đường thẳng.',
+      debugData: {'suryaSafetyHighPlankBodyLine': bodyLine.toStringAsFixed(1)},
     );
   }
 

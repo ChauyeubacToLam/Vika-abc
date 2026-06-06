@@ -25,6 +25,7 @@ import 'dart:math' as math;
 
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:vika/utils/debouncer.dart';
+import 'package:vika/utils/exercise_logger.dart';
 
 import '../../utils/pose_math_helpers.dart';
 import '../../services/wall_push_up_voice_coach.dart';
@@ -560,13 +561,22 @@ class WallPushUp extends ExerciseBase {
   bool requestStop() => repCount >= maxRep;
 
   @override
-  void onSetComplete() {}
+  void onSetComplete() {
+    logger.pushGoodRepCount();
+    logger.pushKey('max_rep', maxRep);
+    logger.pushKey('completed_reps', repCount);
+    logger.pushAverage('min_elbow_angle', 'avg_min_elbow_angle');
+    logger.pushAverage('max_elbow_angle', 'avg_max_elbow_angle');
+    logger.pushAverage('descent_duration', 'avg_descent_duration');
+    logger.pushAverage('ascent_duration', 'avg_ascent_duration');
+  }
 
   // --- Safety Checks ---
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    if (cameraFacing == CameraFacing.front) {
+    if (cameraFacing != CameraFacing.left &&
+        cameraFacing != CameraFacing.right) {
       return "⚠️ Xin hãy quay nghiêng để theo dõi tư thế Wall Push Up";
     }
 
@@ -806,6 +816,20 @@ class WallPushUp extends ExerciseBase {
         faultMap[fault.phase]![fault.type] = fault.message;
       }
       setFeedback.add({correctForm: faultMap});
+
+      logger.addRepLog(
+        RepLog(
+          correctForm: correctForm,
+          repNumber: repCount,
+          data: {
+            'min_elbow_angle': _repMinElbow,
+            'max_elbow_angle': _repMaxElbow,
+            'descent_duration': tempoMetric.descentDuration,
+            'ascent_duration': tempoMetric.ascentDuration,
+            'fault_types': allFaults.map((f) => f.type).toSet().toList(),
+          },
+        ),
+      );
 
       if (tempoMetric.descentDuration != null) {
         var tempo = '↓${tempoMetric.descentDuration!.toStringAsFixed(1)}s';

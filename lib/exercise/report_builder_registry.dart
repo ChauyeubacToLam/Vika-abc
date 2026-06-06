@@ -59,8 +59,14 @@ final Map<String, ReportBuilderEntry> reportBuilders = {
     builder: StandingKneeToElbowReportBuilder(),
     met: 7.0
   ),
+  'surya_namaskar': (builder: GenericReportBuilder(), met: 3.5),
+  'wall_push_up': (builder: GenericReportBuilder(), met: 3.0),
+  'downward_dog': (builder: GenericReportBuilder(), met: 3.0),
+  'ashtanga_namaskara': (builder: GenericReportBuilder(), met: 2.5),
+  'low_lunge': (builder: GenericReportBuilder(), met: 2.5),
+  'prayer_pose': (builder: GenericReportBuilder(), met: 1.5),
+  'raised_arms': (builder: GenericReportBuilder(), met: 2.0),
   // 'glute_bridge': (builder: GluteBridgeReportBuilder(), met: 3.5),
-  // 'wall_push_up': (builder: WallPushUpReportBuilder(), met: 3.0),
 };
 
 ReportBuilderEntry? resolveReportBuilder(String exerciseId) {

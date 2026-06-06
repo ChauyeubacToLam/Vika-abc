@@ -28,6 +28,7 @@
    ========================================================================= */
 
 import 'package:vika/exercise/exercise_base.dart';
+import 'package:vika/utils/exercise_logger.dart';
 import '../../utils/pose_math_helpers.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'metrics/downward_dog_metric_base.dart';
@@ -57,6 +58,8 @@ enum DownwardDogState {
 // ─────────────────────────────────────────────────────────────
 
 class DownwardDogConfig {
+  static const int MAX_HOLDS = 1;
+
   /// Default hold target (seconds).
   static const double HOLD_DURATION_SEC = 30.0;
 
@@ -93,6 +96,16 @@ class DownwardDogConfig {
 // ─────────────────────────────────────────────────────────────
 
 class DownwardDog extends ExerciseBase {
+  DownwardDog({this.maxHolds = DownwardDogConfig.MAX_HOLDS}) {
+    _spineMetric = SpineRoundMetric();
+    _shoulderMetric = ShoulderShrugMetric();
+    _legMetric = LegStraightnessMetric();
+
+    _metrics = [_spineMetric, _shoulderMetric, _legMetric];
+  }
+
+  final int maxHolds;
+
   // --- State ---
   DownwardDogState _state = DownwardDogState.entry;
   DownwardDogState get state => _state;
@@ -108,13 +121,59 @@ class DownwardDog extends ExerciseBase {
       _state == DownwardDogState.hold ? 'Giữ tư thế' : 'Vào tư thế';
 
   @override
-  bool requestStop() => holdComplete;
+  double? get liveHoldSeconds =>
+      _state == DownwardDogState.hold ? _currentHoldSeconds() : null;
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) => null;
+  double? get liveHoldTargetSeconds => DownwardDogConfig.HOLD_DURATION_SEC;
 
   @override
-  void onSetComplete() {}
+  bool requestStop() => repCount >= maxHolds;
+
+  @override
+  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+    if (cameraFacing != CameraFacing.left &&
+        cameraFacing != CameraFacing.right) {
+      return 'Hãy quay nghiêng để theo dõi tư thế Chó cúi mặt.';
+    }
+
+    final required = [
+      PoseLandmarkType.leftShoulder,
+      PoseLandmarkType.rightShoulder,
+      PoseLandmarkType.leftHip,
+      PoseLandmarkType.rightHip,
+      PoseLandmarkType.leftKnee,
+      PoseLandmarkType.rightKnee,
+      PoseLandmarkType.leftAnkle,
+      PoseLandmarkType.rightAnkle,
+      PoseLandmarkType.leftWrist,
+      PoseLandmarkType.rightWrist,
+      PoseLandmarkType.leftEar,
+      PoseLandmarkType.rightEar,
+    ];
+
+    for (final type in required) {
+      final landmark = landmarks[type];
+      if (landmark == null || !ExerciseBase.isLandmarkConfident(landmark)) {
+        return 'Giữ toàn thân trong khung hình, thấy rõ tay, vai, hông, gối và cổ chân.';
+      }
+    }
+
+    return null;
+  }
+
+  @override
+  void onSetComplete() {
+    logger.pushKey('target_holds', maxHolds);
+    logger.pushKey('max_rep', repCount);
+    logger.pushKey(
+        'total_seconds', maxHolds * DownwardDogConfig.HOLD_DURATION_SEC);
+    logger.pushKey('good_seconds', _goodHoldSeconds);
+    logger.pushKey('spine_round_fails_count', _spineMetric.faultsCount);
+    logger.pushKey('shoulder_shrug_fails_count', _shoulderMetric.faultsCount);
+    logger.pushKey('leg_straightness_fails_count', _legMetric.faultsCount);
+    logger.pushGoodRepCount();
+  }
 
   @override
   void onExerciseActivated() {
@@ -123,13 +182,10 @@ class DownwardDog extends ExerciseBase {
 
   // --- Hold timer ---
   int? _holdStartMs;
-  double get elapsedHoldSec {
-    if (_holdStartMs == null) return 0.0;
-    return (DateTime.now().millisecondsSinceEpoch - _holdStartMs!) / 1000.0;
-  }
+  double _goodHoldSeconds = 0.0;
 
   bool get holdComplete =>
-      elapsedHoldSec >= DownwardDogConfig.HOLD_DURATION_SEC;
+      _currentHoldSeconds() >= DownwardDogConfig.HOLD_DURATION_SEC;
 
   // --- Baseline values (captured at hold-still) ---
   double? _scaleFactor;
@@ -151,14 +207,6 @@ class DownwardDog extends ExerciseBase {
 
   // --- Fault accumulation across holds ---
   int holdCount = 0;
-
-  DownwardDog() {
-    _spineMetric = SpineRoundMetric();
-    _shoulderMetric = ShoulderShrugMetric();
-    _legMetric = LegStraightnessMetric();
-
-    _metrics = [_spineMetric, _shoulderMetric, _legMetric];
-  }
 
   @override
   void checkingPose(Map<PoseLandmarkType, PoseLandmark> landmarks) {
@@ -227,7 +275,7 @@ class DownwardDog extends ExerciseBase {
 
     // In ML Kit, Y increases downward. Hips are the highest point means
     // hip Y is the smallest (closest to top of frame).
-    final bool hipsHighest = hipY < shoulderY || hipY < kneeY;
+    final bool hipsHighest = hipY < shoulderY && hipY < kneeY;
 
     // Wrist and ankle are normally lower than the hip in the inverted V.
     final bool grounded = wristY > hipY && ankleY > hipY;
@@ -260,13 +308,16 @@ class DownwardDog extends ExerciseBase {
 
     if (_stillFrameCount >= DownwardDogConfig.START_POSITION_FRAMES) {
       // Capture baselines.
-      _scaleFactor = scaleFactor;
+      final localScale = calculateDistance(side.shoulder, side.hip);
+      if (localScale < 1.0) return false;
+
+      _scaleFactor = localScale;
       _spineBaseline = spineAngle;
       _apexBaseline = apexAngle;
-      _earShoulderBaseline = earShoulderDist / scaleFactor;
+      _earShoulderBaseline = earShoulderDist / localScale;
       _startPositionConfirmed = true;
 
-      debugData['scaleFactor'] = scaleFactor;
+      debugData['scaleFactor'] = localScale;
       debugData['spineBaseline'] = _spineBaseline;
       debugData['apexBaseline'] = _apexBaseline;
       debugData['earShoulderBaseline'] = _earShoulderBaseline;
@@ -333,7 +384,7 @@ class DownwardDog extends ExerciseBase {
     }
 
     debugData['state'] = _state.name;
-    debugData['elapsedSec'] = elapsedHoldSec.toStringAsFixed(1);
+    debugData['elapsedSec'] = _currentHoldSeconds().toStringAsFixed(1);
     debugData['spineAngle'] = spineAngle;
     debugData['apexAngle'] = apexAngle;
     debugData['kneeAngle'] = kneeAngle;
@@ -404,6 +455,41 @@ class DownwardDog extends ExerciseBase {
 
     _transitionTo(DownwardDogState.exit, timestampMs);
     holdCount++;
+    repCount += 1;
+
+    final allFaults = this.allFaults;
+    correctForm = !allFaults.any((f) => f.affectsForm);
+    resultIssues.feedback['Result'] =
+        correctForm ? 'Tốt lắm!' : 'Chú ý giữ lưng dài hơn';
+
+    final faultMap = <String, Map<String, String>>{};
+    for (final fault in allFaults) {
+      faultMap.putIfAbsent(fault.phase, () => {});
+      faultMap[fault.phase]![fault.type] = fault.message;
+    }
+    setFeedback.add({correctForm: faultMap});
+
+    if (correctForm) {
+      _goodHoldSeconds += DownwardDogConfig.HOLD_DURATION_SEC;
+    }
+
+    logger.addRepLog(
+      RepLog(
+        correctForm: correctForm,
+        repNumber: repCount,
+        data: {
+          'hold_time': DownwardDogConfig.HOLD_DURATION_SEC,
+          'fault_types': allFaults.map((f) => f.type).toSet().toList(),
+          'spine_angle': ctx.spineAngle,
+          'apex_angle': ctx.apexAngle,
+          'knee_angle': ctx.kneeAngle,
+        },
+      ),
+    );
+
+    for (final metric in _metrics) {
+      metric.resetAndCountFault();
+    }
   }
 
   // ───────────────────────────────────────────────────────────
@@ -496,7 +582,8 @@ class DownwardDog extends ExerciseBase {
 
   /// Returns a progress value 0.0–1.0 for the hold timer.
   double get holdProgress =>
-      (elapsedHoldSec / DownwardDogConfig.HOLD_DURATION_SEC).clamp(0.0, 1.0);
+      (_currentHoldSeconds() / DownwardDogConfig.HOLD_DURATION_SEC)
+          .clamp(0.0, 1.0);
 
   /// Reset between holds (e.g. for multi-set workouts).
   void resetHold() {
@@ -514,6 +601,36 @@ class DownwardDog extends ExerciseBase {
     _earShoulderBaseline = null;
     resultIssues.feedback.clear();
     debugData.clear();
+  }
+
+  @override
+  Map<String, String> processNoPoseFrame() {
+    if (_state == DownwardDogState.hold) {
+      _abortHold('Mất mốc cơ thể, vào lại tư thế Chó cúi mặt để tiếp tục.');
+    }
+    return super.processNoPoseFrame();
+  }
+
+  double _currentHoldSeconds() {
+    if (_holdStartMs == null) return 0.0;
+    return (frameTimestampMs - _holdStartMs!) / 1000.0;
+  }
+
+  void _abortHold(String message) {
+    _state = DownwardDogState.entry;
+    _holdStartMs = null;
+    _stillFrameCount = 0;
+    _lastHipY = null;
+    _startPositionConfirmed = false;
+    _scaleFactor = null;
+    _spineBaseline = null;
+    _apexBaseline = null;
+    _earShoulderBaseline = null;
+    for (final metric in _metrics) {
+      metric.reset();
+    }
+    resultIssues.addInstruction('entry', 'Status', message);
+    resultIssues.feedback['System'] = message;
   }
 
   // ───────────────────────────────────────────────────────────

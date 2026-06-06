@@ -39,6 +39,8 @@ class RaisedArms extends ExerciseBase {
   int? _exitStartMs;
   double? _previousHipY;
   int? _previousTimestampMs;
+  bool _exitShouldCount = false;
+  String? _exitRejectReason;
 
   final Debouncer _holdStillDebouncer =
       Debouncer(requiredFrames: RaisedArmsConfig.SETUP_STILL_FRAMES);
@@ -156,13 +158,33 @@ class RaisedArms extends ExerciseBase {
 
   @override
   void onSetComplete() {
+    logger.pushKey('target_holds', maxRep);
     logger.pushGoodRepCount();
     logger.pushKey('max_rep', maxRep);
+    logger.pushKey(
+        'lumbar_backbend_fails_count', _lumbarBackbendMetric.faultsCount);
+    logger.pushKey('cervical_fails_count', _cervicalSafetyMetric.faultsCount);
+    logger.pushKey('arm_position_fails_count', _armPositionMetric.faultsCount);
   }
 
   @override
+  void onExerciseActivated() {
+    if (raisedArmsState == RaisedArmsState.entry) {
+      _transitionState(RaisedArmsState.holding, frameTimestampMs);
+    }
+  }
+
+  @override
+  double? get liveHoldSeconds =>
+      raisedArmsState == RaisedArmsState.holding ? _currentHoldSeconds() : null;
+
+  @override
+  double? get liveHoldTargetSeconds => RaisedArmsConfig.HOLD_DURATION;
+
+  @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    if (cameraFacing == CameraFacing.front) {
+    if (cameraFacing != CameraFacing.left &&
+        cameraFacing != CameraFacing.right) {
       return '⚠️ Xin hãy quay nghiêng để theo dõi tư thế Hasta Uttanasana';
     }
 
@@ -303,9 +325,15 @@ class RaisedArms extends ExerciseBase {
         }
         break;
       case RaisedArmsState.holding:
-        if (_currentHoldSeconds() >= RaisedArmsConfig.HOLD_DURATION ||
-            brokePosition ||
-            unsafeBackbend) {
+        if (_currentHoldSeconds() >= RaisedArmsConfig.HOLD_DURATION) {
+          _exitShouldCount = true;
+          _exitRejectReason = null;
+          _transitionState(RaisedArmsState.exit, timestampMs);
+        } else if (brokePosition || unsafeBackbend) {
+          _exitShouldCount = false;
+          _exitRejectReason = unsafeBackbend
+              ? 'Ngả lưng quá sâu - đứng thẳng lại rồi giữ từ đầu.'
+              : 'Rời tư thế quá sớm - giữ Vươn tay đủ thời gian trước khi thả tay.';
           _transitionState(RaisedArmsState.exit, timestampMs);
         }
         break;
@@ -328,11 +356,13 @@ class RaisedArms extends ExerciseBase {
       case RaisedArmsState.holding:
         _holdStartMs = timestampMs;
         _exitStartMs = null;
+        _exitShouldCount = false;
+        _exitRejectReason = null;
         resultIssues.instructions.clear();
         break;
       case RaisedArmsState.exit:
         _exitStartMs = timestampMs;
-        _onHoldComplete();
+        _finalizeHold();
         break;
       case RaisedArmsState.entry:
         _holdStartMs = null;
@@ -345,22 +375,43 @@ class RaisedArms extends ExerciseBase {
     }
   }
 
-  void _onHoldComplete() {
-    repCount += 1;
-
+  void _finalizeHold() {
     final allFaults = <FaultRecord>[];
     for (final metric in _metrics) {
       allFaults.addAll(metric.faults);
     }
 
+    if (!_exitShouldCount) {
+      correctForm = false;
+      final reason =
+          _exitRejectReason ?? 'Rời tư thế quá sớm - lần này chưa được tính.';
+      resultIssues.feedback['Result'] = 'Lần này chưa tính nhé';
+      resultIssues.feedback['Form'] = reason;
+      final faultMap = _faultMapFrom(allFaults);
+      faultMap.putIfAbsent('REP_COMPLETE', () => {});
+      faultMap['REP_COMPLETE']!['NoCount'] = reason;
+      setFeedback.add({false: faultMap});
+      for (final metric in _metrics) {
+        metric.reset();
+      }
+      return;
+    }
+
+    repCount += 1;
     correctForm = !allFaults.any((f) => f.affectsForm);
     resultIssues.feedback['Result'] = correctForm ? 'Tốt lắm!' : 'Chỉnh tư thế';
 
-    final faultMap = <String, Map<String, String>>{};
+    final faultMap = _faultMapFrom(allFaults);
     setFeedback.add({correctForm: faultMap});
 
-    logger.addRepLog(
-        RepLog(correctForm: correctForm, repNumber: repCount, data: {}));
+    logger.addRepLog(RepLog(
+      correctForm: correctForm,
+      repNumber: repCount,
+      data: {
+        'hold_time': RaisedArmsConfig.HOLD_DURATION,
+        'fault_types': allFaults.map((f) => f.type).toSet().toList(),
+      },
+    ));
 
     for (final metric in _metrics) {
       metric.resetAndCountFault();
@@ -375,6 +426,10 @@ class RaisedArms extends ExerciseBase {
     _trunkBaseline = null;
     _cervicalBaseline = null;
     _isCalibrated = false;
+    _previousHipY = null;
+    _previousTimestampMs = null;
+    _exitShouldCount = false;
+    _exitRejectReason = null;
     _holdStillDebouncer.reset();
     _breakPositionDebouncer.reset();
     _lumbarExitDebouncer.reset();
@@ -396,6 +451,34 @@ class RaisedArms extends ExerciseBase {
     _previousHipY = hipY;
     _previousTimestampMs = timestampMs;
     return velocity;
+  }
+
+  Map<String, Map<String, String>> _faultMapFrom(List<FaultRecord> faults) {
+    final faultMap = <String, Map<String, String>>{};
+    for (final fault in faults) {
+      faultMap.putIfAbsent(fault.phase, () => {});
+      faultMap[fault.phase]![fault.type] = fault.message;
+    }
+    return faultMap;
+  }
+
+  @override
+  Map<String, String> processNoPoseFrame() {
+    if (raisedArmsState == RaisedArmsState.holding) {
+      raisedArmsState = RaisedArmsState.entry;
+      previousRaisedArmsState = RaisedArmsState.holding;
+      _holdStartMs = null;
+      _resetCalibration();
+      for (final metric in _metrics) {
+        metric.reset();
+      }
+      resultIssues.addInstruction(
+        'entry',
+        'Status',
+        'Mất mốc cơ thể, vào lại tư thế Vươn tay trước khi giữ.',
+      );
+    }
+    return super.processNoPoseFrame();
   }
 
   double _scaleFrom(_RaisedArmsLandmarks body) {

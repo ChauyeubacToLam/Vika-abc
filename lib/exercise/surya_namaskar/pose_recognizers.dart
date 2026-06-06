@@ -53,10 +53,7 @@ class SuryaPoseRecognizers {
           expectedFrontSide: SuryaBodySide.left,
         );
       case SuryaPoseId.highPlankBlank:
-        return const SuryaPoseRecognition(
-          recognized: false,
-          hint: 'High Plank đang để trống để chờ merge.',
-        );
+        return _recognizeHighPlank(landmarks, cameraFacing);
       case SuryaPoseId.ashtangaNamaskara:
         return _recognizeAshtanga(landmarks, cameraFacing);
       case SuryaPoseId.cobra:
@@ -253,6 +250,48 @@ class SuryaPoseRecognizers {
         'suryaAshtangaHipRatio': hipPositionRatio.toStringAsFixed(3),
         'suryaAshtangaKneesGrounded': kneesGrounded,
         'suryaAshtangaChestLow': chestLow,
+      },
+    );
+  }
+
+  static SuryaPoseRecognition _recognizeHighPlank(
+    Map<PoseLandmarkType, PoseLandmark> landmarks,
+    CameraFacing cameraFacing,
+  ) {
+    final body = _resolveFloorBody(
+      landmarks,
+      cameraFacing,
+      requireWrist: true,
+    );
+    if (body == null) {
+      return const SuryaPoseRecognition(
+        recognized: false,
+        hint: 'Đưa cổ tay, vai, hông, gối và cổ chân vào khung hình.',
+      );
+    }
+
+    final scale = calculateDistance(body.shoulder, body.hip);
+    if (scale < 1.0) return const SuryaPoseRecognition(recognized: false);
+
+    final bodyLine = calculateAngleNormalized(
+      firstPoint: body.shoulder,
+      midPoint: body.hip,
+      lastPoint: body.ankle,
+    );
+    final wristShoulderOffset = (body.wrist!.x - body.shoulder.x).abs() / scale;
+    final hipShoulderLevel = (body.hip.y - body.shoulder.y).abs() / scale;
+    final plankShape = bodyLine >= 150.0 && hipShoulderLevel <= 1.0;
+    final handStacked = wristShoulderOffset <= 1.2;
+
+    return SuryaPoseRecognition(
+      recognized: plankShape && handStacked,
+      hint: plankShape
+          ? 'Giữ vai trên cổ tay, siết bụng nhẹ.'
+          : 'Duỗi người thành một đường thẳng từ vai đến gót.',
+      debugData: {
+        'suryaHighPlankBodyLine': bodyLine.toStringAsFixed(1),
+        'suryaHighPlankWristOffset': wristShoulderOffset.toStringAsFixed(2),
+        'suryaHighPlankHipLevel': hipShoulderLevel.toStringAsFixed(2),
       },
     );
   }

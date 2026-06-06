@@ -46,6 +46,8 @@ class AshtangaNamaskara extends ExerciseBase {
   int? _recognizedStartMs;
   double? _previousShoulderY;
   int? _previousTimestampMs;
+  bool _exitShouldCount = false;
+  String? _exitRejectReason;
 
   final Debouncer _shapeDebouncer =
       Debouncer(requiredFrames: AshtangaConfig.SETUP_STILL_FRAMES);
@@ -141,9 +143,21 @@ class AshtangaNamaskara extends ExerciseBase {
   @override
   void onSetComplete() {
     logger.pushGoodRepCount();
+    logger.pushKey('target_reps', maxRep);
     logger.pushKey('max_rep', maxRep);
     logger.pushKey('mode', mode.name);
+    logger.pushKey('hip_collapse_fails_count', _hipCollapseMetric.faultsCount);
+    logger.pushKey('cervical_fails_count', _cervicalSafetyMetric.faultsCount);
   }
+
+  @override
+  double? get liveHoldSeconds =>
+      ashtangaState == AshtangaState.holding ? _currentHoldSeconds() : null;
+
+  @override
+  double? get liveHoldTargetSeconds => mode == AshtangaMode.microHold
+      ? AshtangaConfig.MICRO_HOLD_DURATION
+      : null;
 
   @override
   void onExerciseActivated() {
@@ -159,7 +173,8 @@ class AshtangaNamaskara extends ExerciseBase {
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    if (cameraFacing == CameraFacing.front) {
+    if (cameraFacing != CameraFacing.left &&
+        cameraFacing != CameraFacing.right) {
       return '⚠️ Xin hãy quay nghiêng để theo dõi tư thế Ashtanga';
     }
 
@@ -332,15 +347,28 @@ class AshtangaNamaskara extends ExerciseBase {
         }
         break;
       case AshtangaState.recognized:
-        if (_recognizedStartMs != null &&
+        if (brokeShape) {
+          _exitShouldCount = false;
+          _exitRejectReason =
+              'Rời tư thế Ashtanga quá sớm - vào lại 8 điểm chạm rồi giữ ổn định.';
+          _transitionState(AshtangaState.exit, timestampMs);
+        } else if (_recognizedStartMs != null &&
             timestampMs - _recognizedStartMs! >=
                 AshtangaConfig.RECOGNITION_WINDOW_MS) {
+          _exitShouldCount = true;
+          _exitRejectReason = null;
           _transitionState(AshtangaState.exit, timestampMs);
         }
         break;
       case AshtangaState.holding:
-        if (_currentHoldSeconds() >= AshtangaConfig.MICRO_HOLD_DURATION ||
-            brokeShape) {
+        if (_currentHoldSeconds() >= AshtangaConfig.MICRO_HOLD_DURATION) {
+          _exitShouldCount = true;
+          _exitRejectReason = null;
+          _transitionState(AshtangaState.exit, timestampMs);
+        } else if (brokeShape) {
+          _exitShouldCount = false;
+          _exitRejectReason =
+              'Rời tư thế Ashtanga quá sớm - giữ đủ thời gian trước khi thoát.';
           _transitionState(AshtangaState.exit, timestampMs);
         }
         break;
@@ -364,19 +392,23 @@ class AshtangaNamaskara extends ExerciseBase {
         _recognizedStartMs = timestampMs;
         _holdStartMs = null;
         _exitStartMs = null;
+        _exitShouldCount = false;
+        _exitRejectReason = null;
         resultIssues.instructions.clear();
         break;
       case AshtangaState.holding:
         _holdStartMs = timestampMs;
         _recognizedStartMs = null;
         _exitStartMs = null;
+        _exitShouldCount = false;
+        _exitRejectReason = null;
         resultIssues.instructions.clear();
         break;
       case AshtangaState.exit:
         _exitStartMs = timestampMs;
         _recognizedStartMs = null;
         _holdStartMs = null;
-        _onPoseComplete();
+        _finalizePose();
         break;
       case AshtangaState.entry:
         _recognizedStartMs = null;
@@ -390,25 +422,47 @@ class AshtangaNamaskara extends ExerciseBase {
     }
   }
 
-  void _onPoseComplete() {
-    if (repCount >= maxRep) return;
-
-    repCount += 1;
+  void _finalizePose() {
     final allFaults = <FaultRecord>[];
     for (final metric in _metrics) {
       allFaults.addAll(metric.faults);
     }
 
-    correctForm = mode == AshtangaMode.transient
-        ? true
-        : !allFaults.any((f) => f.affectsForm);
+    if (!_exitShouldCount || repCount >= maxRep) {
+      correctForm = false;
+      final reason =
+          _exitRejectReason ?? 'Rời tư thế quá sớm - lần này chưa được tính.';
+      resultIssues.feedback['Result'] = 'Lần này chưa tính nhé';
+      resultIssues.feedback['Form'] = reason;
+      final faultMap = _faultMapFrom(allFaults);
+      faultMap.putIfAbsent('REP_COMPLETE', () => {});
+      faultMap['REP_COMPLETE']!['NoCount'] = reason;
+      setFeedback.add({false: faultMap});
+      for (final metric in _metrics) {
+        metric.reset();
+      }
+      return;
+    }
+
+    repCount += 1;
+    correctForm = !allFaults.any((f) => f.affectsForm);
     resultIssues.feedback['Result'] = correctForm ? 'Tốt lắm!' : 'Chỉnh tư thế';
 
-    final faultMap = <String, Map<String, String>>{};
+    final faultMap = _faultMapFrom(allFaults);
     setFeedback.add({correctForm: faultMap});
 
     logger.addRepLog(
-      RepLog(correctForm: correctForm, repNumber: repCount, data: {}),
+      RepLog(
+        correctForm: correctForm,
+        repNumber: repCount,
+        data: {
+          'hold_time': mode == AshtangaMode.microHold
+              ? AshtangaConfig.MICRO_HOLD_DURATION
+              : AshtangaConfig.RECOGNITION_WINDOW_MS / 1000.0,
+          'mode': mode.name,
+          'fault_types': allFaults.map((f) => f.type).toSet().toList(),
+        },
+      ),
     );
 
     for (final metric in _metrics) {
@@ -422,6 +476,10 @@ class AshtangaNamaskara extends ExerciseBase {
     _baselineScaleFactor = null;
     _baselineCervicalAngle = null;
     _isCalibrated = false;
+    _previousShoulderY = null;
+    _previousTimestampMs = null;
+    _exitShouldCount = false;
+    _exitRejectReason = null;
     _shapeDebouncer.reset();
     _breakDebouncer.reset();
   }
@@ -443,6 +501,36 @@ class AshtangaNamaskara extends ExerciseBase {
     _previousShoulderY = shoulderY;
     _previousTimestampMs = timestampMs;
     return velocity;
+  }
+
+  Map<String, Map<String, String>> _faultMapFrom(List<FaultRecord> faults) {
+    final faultMap = <String, Map<String, String>>{};
+    for (final fault in faults) {
+      faultMap.putIfAbsent(fault.phase, () => {});
+      faultMap[fault.phase]![fault.type] = fault.message;
+    }
+    return faultMap;
+  }
+
+  @override
+  Map<String, String> processNoPoseFrame() {
+    if (ashtangaState == AshtangaState.recognized ||
+        ashtangaState == AshtangaState.holding) {
+      ashtangaState = AshtangaState.entry;
+      previousAshtangaState = AshtangaState.exit;
+      _holdStartMs = null;
+      _recognizedStartMs = null;
+      _resetCalibration();
+      for (final metric in _metrics) {
+        metric.reset();
+      }
+      resultIssues.addInstruction(
+        'entry',
+        'Status',
+        'Mất mốc cơ thể, vào lại tư thế 8 điểm chạm trước khi giữ.',
+      );
+    }
+    return super.processNoPoseFrame();
   }
 
   double _scaleFrom(_AshtangaLandmarks body) {

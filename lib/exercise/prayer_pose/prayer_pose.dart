@@ -38,6 +38,8 @@ class PrayerPose extends ExerciseBase {
   int? _exitStartMs;
   double? _previousHipY;
   int? _previousTimestampMs;
+  bool _exitShouldCount = false;
+  String? _exitRejectReason;
 
   final Debouncer _holdStillDebouncer =
       Debouncer(requiredFrames: PrayerPoseConfig.SETUP_STILL_FRAMES);
@@ -165,9 +167,19 @@ class PrayerPose extends ExerciseBase {
 
   @override
   void onSetComplete() {
+    logger.pushKey('target_holds', maxRep);
     logger.pushGoodRepCount();
     logger.pushKey('max_rep', maxRep);
+    logger.pushKey(
+        'posture_stack_fails_count', _postureStackMetric.faultsCount);
   }
+
+  @override
+  double? get liveHoldSeconds =>
+      prayerPoseState == PrayerPoseState.holding ? _currentHoldSeconds() : null;
+
+  @override
+  double? get liveHoldTargetSeconds => PrayerPoseConfig.HOLD_DURATION;
 
   @override
   void onExerciseActivated() {
@@ -178,7 +190,8 @@ class PrayerPose extends ExerciseBase {
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    if (cameraFacing == CameraFacing.front) {
+    if (cameraFacing != CameraFacing.left &&
+        cameraFacing != CameraFacing.right) {
       return '⚠️ Xin hãy quay nghiêng để theo dõi tư thế Pranamasana';
     }
 
@@ -321,8 +334,14 @@ class PrayerPose extends ExerciseBase {
         }
         break;
       case PrayerPoseState.holding:
-        if (_currentHoldSeconds() >= PrayerPoseConfig.HOLD_DURATION ||
-            brokePosition) {
+        if (_currentHoldSeconds() >= PrayerPoseConfig.HOLD_DURATION) {
+          _exitShouldCount = true;
+          _exitRejectReason = null;
+          _transitionState(PrayerPoseState.exit, timestampMs);
+        } else if (brokePosition) {
+          _exitShouldCount = false;
+          _exitRejectReason =
+              'Rời tư thế quá sớm - giữ Cầu nguyện đủ thời gian trước khi thả lỏng.';
           _transitionState(PrayerPoseState.exit, timestampMs);
         }
         break;
@@ -345,11 +364,13 @@ class PrayerPose extends ExerciseBase {
       case PrayerPoseState.holding:
         _holdStartMs = timestampMs;
         _exitStartMs = null;
+        _exitShouldCount = false;
+        _exitRejectReason = null;
         resultIssues.instructions.clear();
         break;
       case PrayerPoseState.exit:
         _exitStartMs = timestampMs;
-        _onHoldComplete();
+        _finalizeHold();
         break;
       case PrayerPoseState.entry:
         _holdStartMs = null;
@@ -362,22 +383,43 @@ class PrayerPose extends ExerciseBase {
     }
   }
 
-  void _onHoldComplete() {
-    repCount += 1;
-
+  void _finalizeHold() {
     final allFaults = <FaultRecord>[];
     for (final metric in _metrics) {
       allFaults.addAll(metric.faults);
     }
 
-    correctForm = !allFaults.any((f) => f.affectsForm);
-    resultIssues.feedback['Result'] = 'Tốt lắm!';
+    if (!_exitShouldCount) {
+      correctForm = false;
+      final reason =
+          _exitRejectReason ?? 'Rời tư thế quá sớm - lần này chưa được tính.';
+      resultIssues.feedback['Result'] = 'Lần này chưa tính nhé';
+      resultIssues.feedback['Form'] = reason;
+      final faultMap = _faultMapFrom(allFaults);
+      faultMap.putIfAbsent('REP_COMPLETE', () => {});
+      faultMap['REP_COMPLETE']!['NoCount'] = reason;
+      setFeedback.add({false: faultMap});
+      for (final metric in _metrics) {
+        metric.reset();
+      }
+      return;
+    }
 
-    final faultMap = <String, Map<String, String>>{};
+    repCount += 1;
+    correctForm = !allFaults.any((f) => f.affectsForm);
+    resultIssues.feedback['Result'] = correctForm ? 'Tốt lắm!' : 'Chỉnh tư thế';
+
+    final faultMap = _faultMapFrom(allFaults);
     setFeedback.add({correctForm: faultMap});
 
-    logger.addRepLog(
-        RepLog(correctForm: correctForm, repNumber: repCount, data: {}));
+    logger.addRepLog(RepLog(
+      correctForm: correctForm,
+      repNumber: repCount,
+      data: {
+        'hold_time': PrayerPoseConfig.HOLD_DURATION,
+        'fault_types': allFaults.map((f) => f.type).toSet().toList(),
+      },
+    ));
 
     for (final metric in _metrics) {
       metric.resetAndCountFault();
@@ -396,6 +438,10 @@ class PrayerPose extends ExerciseBase {
     _postureBaseline = null;
     _shoulderEaseBaseline = null;
     _isCalibrated = false;
+    _previousHipY = null;
+    _previousTimestampMs = null;
+    _exitShouldCount = false;
+    _exitRejectReason = null;
     _holdStillDebouncer.reset();
     _breakPositionDebouncer.reset();
     _shoulderEaseDebouncer.reset();
@@ -417,6 +463,34 @@ class PrayerPose extends ExerciseBase {
     _previousHipY = hipY;
     _previousTimestampMs = timestampMs;
     return velocity;
+  }
+
+  Map<String, Map<String, String>> _faultMapFrom(List<FaultRecord> faults) {
+    final faultMap = <String, Map<String, String>>{};
+    for (final fault in faults) {
+      faultMap.putIfAbsent(fault.phase, () => {});
+      faultMap[fault.phase]![fault.type] = fault.message;
+    }
+    return faultMap;
+  }
+
+  @override
+  Map<String, String> processNoPoseFrame() {
+    if (prayerPoseState == PrayerPoseState.holding) {
+      prayerPoseState = PrayerPoseState.entry;
+      previousPrayerPoseState = PrayerPoseState.holding;
+      _holdStartMs = null;
+      _resetCalibration();
+      for (final metric in _metrics) {
+        metric.reset();
+      }
+      resultIssues.addInstruction(
+        'entry',
+        'Status',
+        'Mất mốc cơ thể, đứng lại tư thế Cầu nguyện trước khi giữ.',
+      );
+    }
+    return super.processNoPoseFrame();
   }
 
   double _scaleFrom(_PrayerPoseLandmarks body) {

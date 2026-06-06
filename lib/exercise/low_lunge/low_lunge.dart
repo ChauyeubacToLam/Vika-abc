@@ -45,6 +45,8 @@ class LowLunge extends ExerciseBase {
   int? _exitStartMs;
   double? _previousHipY;
   int? _previousTimestampMs;
+  bool _exitShouldCount = false;
+  String? _exitRejectReason;
 
   final Debouncer _holdStillDebouncer =
       Debouncer(requiredFrames: LowLungeConfig.SETUP_STILL_FRAMES);
@@ -103,6 +105,7 @@ class LowLunge extends ExerciseBase {
     );
 
     final inStart = stanceRatio > LowLungeConfig.MIN_STANCE_RATIO &&
+        backKneeGrounded &&
         frontKneeAngle < LowLungeConfig.FRONT_KNEE_SETUP_MAX;
 
     if (inStart) _collectCalibrationData(landmarks, lunge, scale);
@@ -159,9 +162,19 @@ class LowLunge extends ExerciseBase {
 
   @override
   void onSetComplete() {
+    logger.pushKey('target_holds', maxRep);
     logger.pushGoodRepCount();
     logger.pushKey('max_rep', maxRep);
+    logger.pushKey('knee_travel_fails_count', _kneeTravelMetric.faultsCount);
+    logger.pushKey('cervical_fails_count', _cervicalSafetyMetric.faultsCount);
   }
+
+  @override
+  double? get liveHoldSeconds =>
+      lowLungeState == LowLungeState.holding ? _currentHoldSeconds() : null;
+
+  @override
+  double? get liveHoldTargetSeconds => LowLungeConfig.HOLD_DURATION;
 
   @override
   void onExerciseActivated() {
@@ -172,7 +185,8 @@ class LowLunge extends ExerciseBase {
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    if (cameraFacing == CameraFacing.front) {
+    if (cameraFacing != CameraFacing.left &&
+        cameraFacing != CameraFacing.right) {
       return '⚠️ Xin hãy quay nghiêng để theo dõi tư thế Low Lunge';
     }
 
@@ -353,7 +367,8 @@ class LowLunge extends ExerciseBase {
     required bool backKneeGrounded,
     required int timestampMs,
   }) {
-    final lungeShape = frontKneeAngle < LowLungeConfig.FRONT_KNEE_SETUP_MAX;
+    final lungeShape = frontKneeAngle < LowLungeConfig.FRONT_KNEE_SETUP_MAX &&
+        backKneeGrounded;
     final stillEnough =
         hipVelocity.abs() <= LowLungeConfig.HOLD_HIP_VELOCITY_MAX;
     final confirmedHold = _holdStillDebouncer.update(lungeShape && stillEnough);
@@ -366,8 +381,14 @@ class LowLunge extends ExerciseBase {
         if (confirmedHold) _transitionState(LowLungeState.holding, timestampMs);
         break;
       case LowLungeState.holding:
-        if (_currentHoldSeconds() >= LowLungeConfig.HOLD_DURATION ||
-            brokePosition) {
+        if (_currentHoldSeconds() >= LowLungeConfig.HOLD_DURATION) {
+          _exitShouldCount = true;
+          _exitRejectReason = null;
+          _transitionState(LowLungeState.exit, timestampMs);
+        } else if (brokePosition) {
+          _exitShouldCount = false;
+          _exitRejectReason =
+              'Rời tư thế quá sớm - giữ Low Lunge đủ thời gian trước khi đổi bên.';
           _transitionState(LowLungeState.exit, timestampMs);
         }
         break;
@@ -390,11 +411,13 @@ class LowLunge extends ExerciseBase {
       case LowLungeState.holding:
         _holdStartMs = timestampMs;
         _exitStartMs = null;
+        _exitShouldCount = false;
+        _exitRejectReason = null;
         resultIssues.instructions.clear();
         break;
       case LowLungeState.exit:
         _exitStartMs = timestampMs;
-        _onHoldComplete();
+        _finalizeHold();
         break;
       case LowLungeState.entry:
         _holdStartMs = null;
@@ -407,22 +430,43 @@ class LowLunge extends ExerciseBase {
     }
   }
 
-  void _onHoldComplete() {
-    repCount += 1;
-
+  void _finalizeHold() {
     final allFaults = <FaultRecord>[];
     for (final metric in _metrics) {
       allFaults.addAll(metric.faults);
     }
 
+    if (!_exitShouldCount) {
+      correctForm = false;
+      final reason =
+          _exitRejectReason ?? 'Rời tư thế quá sớm - lần này chưa được tính.';
+      resultIssues.feedback['Result'] = 'Lần này chưa tính nhé';
+      resultIssues.feedback['Form'] = reason;
+      final faultMap = _faultMapFrom(allFaults);
+      faultMap.putIfAbsent('REP_COMPLETE', () => {});
+      faultMap['REP_COMPLETE']!['NoCount'] = reason;
+      setFeedback.add({false: faultMap});
+      for (final metric in _metrics) {
+        metric.reset();
+      }
+      return;
+    }
+
+    repCount += 1;
     correctForm = !allFaults.any((f) => f.affectsForm);
     resultIssues.feedback['Result'] = correctForm ? 'Tốt lắm!' : 'Chỉnh tư thế';
 
-    final faultMap = <String, Map<String, String>>{};
+    final faultMap = _faultMapFrom(allFaults);
     setFeedback.add({correctForm: faultMap});
 
-    logger.addRepLog(
-        RepLog(correctForm: correctForm, repNumber: repCount, data: {}));
+    logger.addRepLog(RepLog(
+      correctForm: correctForm,
+      repNumber: repCount,
+      data: {
+        'hold_time': LowLungeConfig.HOLD_DURATION,
+        'fault_types': allFaults.map((f) => f.type).toSet().toList(),
+      },
+    ));
 
     for (final metric in _metrics) {
       metric.resetAndCountFault();
@@ -437,6 +481,10 @@ class LowLunge extends ExerciseBase {
     _baselineCervicalAngle = null;
     _frontAnkleBaselineX = null;
     _isCalibrated = false;
+    _previousHipY = null;
+    _previousTimestampMs = null;
+    _exitShouldCount = false;
+    _exitRejectReason = null;
     _holdStillDebouncer.reset();
     _breakPositionDebouncer.reset();
   }
@@ -457,6 +505,34 @@ class LowLunge extends ExerciseBase {
     _previousHipY = hipY;
     _previousTimestampMs = timestampMs;
     return velocity;
+  }
+
+  Map<String, Map<String, String>> _faultMapFrom(List<FaultRecord> faults) {
+    final faultMap = <String, Map<String, String>>{};
+    for (final fault in faults) {
+      faultMap.putIfAbsent(fault.phase, () => {});
+      faultMap[fault.phase]![fault.type] = fault.message;
+    }
+    return faultMap;
+  }
+
+  @override
+  Map<String, String> processNoPoseFrame() {
+    if (lowLungeState == LowLungeState.holding) {
+      lowLungeState = LowLungeState.entry;
+      previousLowLungeState = LowLungeState.holding;
+      _holdStartMs = null;
+      _resetCalibration();
+      for (final metric in _metrics) {
+        metric.reset();
+      }
+      resultIssues.addInstruction(
+        'entry',
+        'Status',
+        'Mất mốc cơ thể, vào lại Low Lunge trước khi giữ.',
+      );
+    }
+    return super.processNoPoseFrame();
   }
 
   double _scaleFrom(_LungeLandmarks lunge) {
