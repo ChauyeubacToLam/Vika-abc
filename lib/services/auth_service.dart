@@ -24,7 +24,8 @@ class AuthService {
   final SupabaseClient _supabase;
 
   static const String _magicLinkRedirectUrl =
-      'com.vikavn.app://login-callback/';
+      'com.vikavn.app://login-callback';
+  static const String _googleWebClientId = googleWebClientId;
 
   User? get currentUser => _supabase.auth.currentUser;
   Stream<AuthState> get onAuthStateChange => _supabase.auth.onAuthStateChange;
