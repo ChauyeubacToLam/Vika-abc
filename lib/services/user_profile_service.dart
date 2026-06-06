@@ -162,14 +162,20 @@ class UserProfileService {
     return profile;
   }
 
+  /// Saves display name + avatar, and optionally requests an auth email
+  /// change. [email] should be non-null only when it actually differs from
+  /// the current address; Supabase then sends a confirmation link and the
+  /// new address only takes effect once the user confirms it.
   Future<AppUserProfile?> saveCurrentProfile({
     required String displayName,
     File? avatarFile,
+    String? email,
   }) async {
     final user = _client.auth.currentUser;
     if (user == null) return null;
 
     final cleanName = displayName.trim().isEmpty ? 'Bạn' : displayName.trim();
+    final cleanEmail = email?.trim();
     String? avatarUrl;
     if (avatarFile != null) {
       avatarUrl = await _uploadAvatar(user.id, avatarFile);
@@ -185,6 +191,7 @@ class UserProfileService {
     await _client.from('profiles').upsert(payload, onConflict: 'id');
     await _client.auth.updateUser(
       UserAttributes(
+        email: (cleanEmail != null && cleanEmail.isNotEmpty) ? cleanEmail : null,
         data: {
           'display_name': cleanName,
           'full_name': cleanName,

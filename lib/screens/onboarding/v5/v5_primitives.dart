@@ -197,6 +197,104 @@ class V5Page extends StatelessWidget {
   }
 }
 
+/// Gold-standard keyboard-aware form scaffold.
+///
+/// The hard part of a form screen is the keyboard. When it opens it must:
+/// (a) never squeeze, rescale, or swap the layout, (b) keep the focused field
+/// visible, and (c) keep the submit button pinned directly above the keyboard.
+/// The recipe — used identically by the standalone [LoginScreen] and the S13
+/// onboarding sign-in so the two behave the same — is:
+///
+/// ```
+/// Scaffold(resizeToAvoidBottomInset: true)
+///   └ SafeArea(bottom: false)                     // top inset → never hits status bar
+///      └ Column
+///         ├ Expanded(SingleChildScrollView(child)) // scrolls; viewport ends at footer
+///         └ SafeArea(top: false) → footer          // pinned above keyboard / home bar
+/// ```
+///
+/// With [resizeToAvoidBottomInset] the Scaffold lifts the whole Column above
+/// the keyboard, so the scroll viewport ends exactly at the footer and the
+/// focused field auto-scrolls to rest right above it — the two can never
+/// overlap and no manual scrolling is needed.
+///
+/// This owns its own [Scaffold], so when used inside another resizing Scaffold
+/// (e.g. the onboarding PageView) that outer Scaffold should set
+/// `resizeToAvoidBottomInset: false` — otherwise both resize and sibling pages
+/// get squeezed.
+class V5KeyboardForm extends StatelessWidget {
+  const V5KeyboardForm({
+    super.key,
+    required this.child,
+    required this.footer,
+    this.backgroundLayers = const <Widget>[],
+    this.background = V5.bg,
+    this.scrollPadding,
+  });
+
+  /// The scrollable form content (header, fields, etc.).
+  final Widget child;
+
+  /// Pinned bottom action — rides above the keyboard when open, above the
+  /// home indicator otherwise.
+  final Widget footer;
+
+  /// Decorative layers painted behind [child] (ambient glows, textures).
+  final List<Widget> backgroundLayers;
+
+  final Color background;
+
+  /// Padding around [child] inside the scroll view. Defaults to the standard
+  /// gutter with a small top gap (chrome is expected to scroll in flow).
+  final EdgeInsets? scrollPadding;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: background,
+      resizeToAvoidBottomInset: true,
+      body: Stack(
+        children: [
+          ...backgroundLayers,
+          SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const ClampingScrollPhysics(),
+                    padding: scrollPadding ??
+                        const EdgeInsets.fromLTRB(
+                          V5.gutter,
+                          V5.space8,
+                          V5.gutter,
+                          V5.space24,
+                        ),
+                    child: child,
+                  ),
+                ),
+                SafeArea(
+                  top: false,
+                  minimum: const EdgeInsets.only(bottom: 12),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      V5.gutter,
+                      V5.space12,
+                      V5.gutter,
+                      0,
+                    ),
+                    child: footer,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class V5TopChrome extends StatelessWidget {
   const V5TopChrome({
     super.key,

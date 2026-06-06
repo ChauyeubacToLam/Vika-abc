@@ -127,6 +127,8 @@ class SettingRow extends StatelessWidget {
     this.accentColor,
     this.danger = false,
     this.onTap,
+    this.comingSoon = false,
+    this.showChevron = true,
   });
 
   final IconData icon;
@@ -136,20 +138,120 @@ class SettingRow extends StatelessWidget {
   final bool danger;
   final VoidCallback? onTap;
 
+  /// Renders the row visibly non-interactive (subdued, no tap ripple) with a
+  /// "Sắp ra mắt" chip in place of the chevron. Used for features that are
+  /// intentionally deferred, so they don't read as a working-but-inert row.
+  final bool comingSoon;
+
+  /// When false, the trailing chevron is hidden — for display-only rows
+  /// (e.g. the email row) that carry information but aren't tappable.
+  final bool showChevron;
+
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
     final accent = accentColor ?? c.phase1;
-    final iconBg = danger
-        ? c.attention.withValues(alpha: 0.10)
-        : Color.lerp(c.bg, accent, c.isDark ? 0.18 : 0.16)!;
-    final iconBorder = danger
-        ? c.attention.withValues(alpha: 0.28)
-        : accent.withValues(alpha: c.isDark ? 0.34 : 0.42);
-    final iconColor = danger
-        ? c.attention
-        : Color.lerp(accent, c.ink, c.isDark ? 0.08 : 0.36)!;
-    final labelColor = danger ? c.attention : c.ink;
+
+    // Deferred rows read as muted: no accent glow, dimmed ink, no ripple.
+    final iconBg = comingSoon
+        ? c.bg.withValues(alpha: c.isDark ? 0.24 : 0.6)
+        : danger
+            ? c.attention.withValues(alpha: 0.10)
+            : Color.lerp(c.bg, accent, c.isDark ? 0.18 : 0.16)!;
+    final iconBorder = comingSoon
+        ? c.border
+        : danger
+            ? c.attention.withValues(alpha: 0.28)
+            : accent.withValues(alpha: c.isDark ? 0.34 : 0.42);
+    final iconColor = comingSoon
+        ? c.inkFaint
+        : danger
+            ? c.attention
+            : Color.lerp(accent, c.ink, c.isDark ? 0.08 : 0.36)!;
+    final labelColor =
+        comingSoon ? c.inkSoft : (danger ? c.attention : c.ink);
+
+    // Deferred rows never fire onTap, even if one was passed by mistake.
+    final effectiveOnTap = comingSoon ? null : onTap;
+
+    final content = Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: iconBg,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: iconBorder),
+              boxShadow: (danger || comingSoon)
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: accent.withValues(alpha: 0.12),
+                        blurRadius: 12,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+            ),
+            alignment: Alignment.center,
+            child: Icon(icon, size: 17, color: iconColor),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontFamily: 'BeVietnamPro',
+                    fontSize: 13.8,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.2,
+                    color: labelColor,
+                  ),
+                ),
+                if (sub != null) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    sub!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: 'BeVietnamPro',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0,
+                      color: comingSoon ? c.inkFaint : c.inkSoft,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (comingSoon)
+            _ComingSoonChip()
+          else if (!danger && showChevron)
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: c.bg.withValues(alpha: c.isDark ? 0.28 : 0.64),
+                shape: BoxShape.circle,
+                border: Border.all(color: c.border),
+              ),
+              child: Icon(
+                Icons.chevron_right_rounded,
+                size: 18,
+                color: c.inkSoft,
+              ),
+            ),
+        ],
+      ),
+    );
 
     return Material(
       color: Colors.transparent,
@@ -157,87 +259,38 @@ class SettingRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         splashColor: accent.withValues(alpha: 0.10),
         highlightColor: accent.withValues(alpha: 0.06),
-        onTap: onTap == null
+        onTap: effectiveOnTap == null
             ? null
             : () {
                 HapticFeedback.selectionClick();
-                onTap?.call();
+                effectiveOnTap();
               },
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-          child: Row(
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: iconBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: iconBorder),
-                  boxShadow: danger
-                      ? null
-                      : [
-                          BoxShadow(
-                            color: accent.withValues(alpha: 0.12),
-                            blurRadius: 12,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                ),
-                alignment: Alignment.center,
-                child: Icon(icon, size: 17, color: iconColor),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      label,
-                      style: TextStyle(
-                        fontFamily: 'BeVietnamPro',
-                        fontSize: 13.8,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.2,
-                        color: labelColor,
-                      ),
-                    ),
-                    if (sub != null) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                        sub!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontFamily: 'BeVietnamPro',
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0,
-                          color: c.inkSoft,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              if (!danger)
-                Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: c.bg.withValues(alpha: c.isDark ? 0.28 : 0.64),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: c.border),
-                  ),
-                  child: Icon(
-                    Icons.chevron_right_rounded,
-                    size: 18,
-                    color: c.inkSoft,
-                  ),
-                ),
-            ],
-          ),
+        child: content,
+      ),
+    );
+  }
+}
+
+/// Small muted "Sắp ra mắt" chip shown on intentionally-deferred rows.
+class _ComingSoonChip extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: c.bg.withValues(alpha: c.isDark ? 0.3 : 0.7),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: c.border),
+      ),
+      child: Text(
+        'Sắp ra mắt',
+        style: TextStyle(
+          fontFamily: 'BeVietnamPro',
+          fontSize: 9.5,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.4,
+          color: c.inkFaint,
         ),
       ),
     );

@@ -65,10 +65,11 @@ class DashboardHomeScreen extends StatefulWidget {
   final VoidCallback onOpenBrowser;
 
   /// Real program data passed from MainShell. The CTA launches the
-  /// first available program exercise; hero copy and vitals still render
-  /// from `homeMock*` constants until the dashboard summary API lands.
-  // NOTE(wiring): derive today's session copy, vitals spread session
-  // counts, streak, and form 7-day from `program` + RecommendationService.
+  /// first available program exercise. Vitals (session counts, streak,
+  /// form 7-day) are wired to real data; the hero headline copy still
+  /// renders from `homeMock*` constants.
+  // TODO(wiring): derive today's session headline copy (titleLine1/2) from
+  // `program` + RecommendationService.
   final UserProgramData? program;
   final AppUserProfile? userProfile;
   final ValueChanged<AppUserProfile>? onProfileChanged;
@@ -83,6 +84,7 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
   final _launches = WorkoutLaunchService();
   late Future<WorkoutLaunchHomeState> _launchStateFuture;
   late Future<int> _streakFuture;
+  late Future<({int? percent, int? delta, List<int> week})> _formSummaryFuture;
   _CheckInPrompt? _checkInPrompt;
 
   @override
@@ -91,6 +93,7 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
     unawaited(OrientationLock.portraitOnly());
     _launchStateFuture = _launches.resolveHomeState();
     _streakFuture = SessionPersistence().currentStreak();
+    _formSummaryFuture = SessionPersistence().homeFormSummary();
     unawaited(_loadCheckInPrompt());
   }
 
@@ -119,6 +122,7 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
     setState(() {
       _launchStateFuture = _launches.resolveHomeState();
       _streakFuture = SessionPersistence().currentStreak();
+      _formSummaryFuture = SessionPersistence().homeFormSummary();
     });
   }
 
@@ -187,20 +191,27 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
                   return FutureBuilder<int>(
                     future: _streakFuture,
                     builder: (context, streakSnapshot) {
-                      return HomeVitalsSpread(
-                        weekLabel: homeMockWeekLabel,
-                        phaseLabel: homeMockPhaseLabel,
-                        sessionsDone: state?.completedSessionsThisWeek ??
-                            homeMockSessionsDone,
-                        sessionsTotal:
-                            state?.sessionsThisWeek ?? homeMockSessionsTotal,
-                        statusLine: homeMockVitalsStandfirst,
-                        streakDays: streakSnapshot.data ??
-                            widget.userProfile?.streakDays ??
-                            homeMockStreakDays,
-                        formPercent: homeMockFormToday,
-                        formDelta: homeMockFormDelta,
-                        formWeek: homeMockFormWeek,
+                      return FutureBuilder<
+                          ({int? percent, int? delta, List<int> week})>(
+                        future: _formSummaryFuture,
+                        builder: (context, formSnapshot) {
+                          final form = formSnapshot.data;
+                          return HomeVitalsSpread(
+                            weekLabel: homeMockWeekLabel,
+                            phaseLabel: homeMockPhaseLabel,
+                            sessionsDone: state?.completedSessionsThisWeek ??
+                                homeMockSessionsDone,
+                            sessionsTotal:
+                                state?.sessionsThisWeek ?? homeMockSessionsTotal,
+                            statusLine: homeMockVitalsStandfirst,
+                            streakDays: streakSnapshot.data ??
+                                widget.userProfile?.streakDays ??
+                                homeMockStreakDays,
+                            formPercent: form?.percent,
+                            formDelta: form?.delta,
+                            formWeek: form?.week ?? const <int>[],
+                          );
+                        },
                       );
                     },
                   );

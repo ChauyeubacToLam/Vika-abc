@@ -17,13 +17,25 @@ class S13Signup extends StatefulWidget {
     required this.data,
     required this.onNext,
     required this.onBack,
+    this.skipping = false,
     this.onAuthenticated,
+    this.onAuthStarted,
   });
 
   final OnboardingData data;
   final VoidCallback onNext;
   final VoidCallback onBack;
+
+  /// When true, render a loader instead of the sign-in form — the navigator is
+  /// auto-skipping this step for an already-authenticated user (routed here
+  /// from the standalone login) so they aren't asked to sign in twice.
+  final bool skipping;
+
   final Future<void> Function()? onAuthenticated;
+
+  /// Called the instant a sign-in attempt begins (any provider or magic link),
+  /// so the app entry gate can stand down while this screen owns the flow.
+  final VoidCallback? onAuthStarted;
 
   @override
   State<S13Signup> createState() => _S13SignupState();
@@ -84,6 +96,10 @@ class _S13SignupState extends State<S13Signup> {
   }
 
   void _beginAuthAttempt(String provider) {
+    // Claim auth ownership BEFORE AuthService runs — its interactive sign-in
+    // signs out any stale session first (a transient `signedOut`), and the gate
+    // must already be standing down so it doesn't bounce us to the login page.
+    widget.onAuthStarted?.call();
     _acceptAuthEvents = true;
     _pendingProvider = provider;
     setState(() {
@@ -239,24 +255,31 @@ class _S13SignupState extends State<S13Signup> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.skipping) return _buildSkippingView(context);
     final p = derivePlanPersonalization(widget.data);
     final bmi = widget.data.bmi?.toStringAsFixed(1) ?? '22.0';
     final r = V5Responsive.of(context);
     final compact = r.isShort;
     final veryCompact = r.isVeryShort;
-    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
-    final keyboardOpen = keyboardInset > 0;
-    final bottomInset = r.viewPadding.bottom;
-    final topPadding = keyboardOpen
-        ? r.viewPadding.top + r.pick(cozy: 72.0, veryShort: 58.0)
-        : r.chromeTopPadding;
-    final authContent = Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (keyboardOpen)
-          _EmailFocusHeader(busy: _busy)
-        else ...[
+
+    // Gold-standard keyboard-aware form — see [V5KeyboardForm]. Shared verbatim
+    // with the standalone LoginScreen so the two screens behave identically.
+    // The onboarding chrome (back + phase progress) renders IN FLOW as the
+    // first scroll child (not as a fixed overlay), so SafeArea keeps it clear of
+    // the status bar and it scrolls naturally when the keyboard lifts the form.
+    return V5KeyboardForm(
+      footer: _InlineMagicLinkCta(
+        label: _busy ? 'Đang xử lý...' : 'Gửi link đăng nhập',
+        disabledLabel: 'Nhập email hoặc chọn tài khoản',
+        enabled: _validEmail && !_busy,
+        onTap: _magicLink,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _OnboardingChrome(onBack: widget.onBack),
+          SizedBox(height: r.pick(cozy: V5.space24, short: V5.space14)),
           V5ScreenHeader(
             eyebrow: 'Mở khoá lộ trình',
             title: 'Lộ trình đã\nsẵn sàng.',
@@ -290,112 +313,198 @@ class _S13SignupState extends State<S13Signup> {
             const _AccountValueStrip(),
           ],
           SizedBox(height: veryCompact ? V5.space8 : V5.space12),
-        ],
-        _EmailField(
-          controller: _emailController,
-          onChanged: (v) {
-            widget.data.email = v;
-            setState(() {});
-          },
-        ),
-        const SizedBox(height: V5.space8),
-        if (_notice != null)
-          _NoticeBanner(message: _notice!)
-        else if (!keyboardOpen)
-          _SkipSignupButton(
-            enabled: !_busy,
-            onTap: widget.onNext,
+          _EmailField(
+            controller: _emailController,
+            onChanged: (v) {
+              widget.data.email = v;
+              setState(() {});
+            },
           ),
-      ],
+          const SizedBox(height: V5.space8),
+          if (_notice != null)
+            _NoticeBanner(message: _notice!)
+          else
+            _SkipSignupButton(
+              enabled: !_busy,
+              onTap: widget.onNext,
+            ),
+        ],
+      ),
     );
+  }
+
+  /// Shown while the navigator auto-skips this step for an already-authenticated
+  /// user. No chrome (back/progress) — it's a brief pass-through; the plan
+  /// generation it kicks off is surfaced by S15's own loading state.
+  Widget _buildSkippingView(BuildContext context) {
     return V5Screen(
       index: 15,
-      onBack: widget.onBack,
+      showChrome: false,
       children: [
         Positioned.fill(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              V5.gutter,
-              topPadding,
-              V5.gutter,
-              bottomInset + (keyboardOpen ? 92 : (veryCompact ? 76 : 88)),
-            ),
-            child: keyboardOpen
-                ? SingleChildScrollView(
-                    physics: const ClampingScrollPhysics(),
-                    child: authContent,
-                  )
-                : LayoutBuilder(
-                    builder: (context, constraints) {
-                      return Align(
-                        alignment: Alignment.topCenter,
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.topCenter,
-                          child: SizedBox(
-                            width: constraints.maxWidth,
-                            child: authContent,
-                          ),
-                        ),
-                      );
-                    },
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(
+                  width: 30,
+                  height: 30,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.6,
+                    valueColor: AlwaysStoppedAnimation<Color>(V5.yellow),
                   ),
+                ),
+                const SizedBox(height: V5.space16),
+                Text(
+                  'Đang tạo lộ trình cá nhân của bạn...',
+                  style: V5.bodySm(context, color: V5.inkSoft),
+                ),
+              ],
+            ),
           ),
-        ),
-        V5PillCTA(
-          label: _busy ? 'Đang xử lý...' : 'Gửi link đăng nhập',
-          disabledLabel: 'Nhập email hoặc chọn tài khoản',
-          enabled: _validEmail && !_busy,
-          onTap: _magicLink,
-          bottom: keyboardOpen ? keyboardInset + 12 : 32 + bottomInset,
         ),
       ],
     );
   }
 }
 
-class _EmailFocusHeader extends StatelessWidget {
-  const _EmailFocusHeader({required this.busy});
+/// In-flow onboarding chrome (back affordance + index + phase progress).
+/// Mirrors [V5TopChrome] but lives in the scroll flow instead of as a fixed
+/// overlay, so SafeArea keeps it clear of the status bar and it scrolls with
+/// the form when the keyboard lifts the layout.
+class _OnboardingChrome extends StatelessWidget {
+  const _OnboardingChrome({required this.onBack});
 
-  final bool busy;
+  final VoidCallback onBack;
+
+  static const int _index = 15;
+  static const int _total = 17;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: V5.space12),
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      decoration: BoxDecoration(
-        color: V5.ink,
-        borderRadius: BorderRadius.circular(V5.radiusMd),
-        boxShadow: V5.elevation2,
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: V5.yellow,
-              borderRadius: BorderRadius.circular(V5.radiusSm),
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            GestureDetector(
+              onTap: onBack,
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: V5.borderHi, width: 1),
+                ),
+                child: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: V5.ink,
+                  size: 15,
+                ),
+              ),
             ),
-            child: const Icon(
-              Icons.mark_email_read_outlined,
-              color: V5.yellowInk,
-              size: 17,
+            Text(
+              '${_index.toString().padLeft(2, '0')} — ${_total.toString().padLeft(2, '0')}',
+              style: V5.text(
+                context,
+                size: 11,
+                weight: FontWeight.w600,
+                color: V5.inkSoft,
+                letterSpacing: 1.2,
+              ),
             ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        const V5PhaseProgress(index: _index),
+      ],
+    );
+  }
+}
+
+/// Inline send button — visually identical to [V5PillCTA] but laid out in a
+/// Column (not Positioned), so it can pin to the bottom of the keyboard-aware
+/// layout. Matches the standalone LoginScreen's CTA exactly.
+class _InlineMagicLinkCta extends StatefulWidget {
+  const _InlineMagicLinkCta({
+    required this.label,
+    required this.disabledLabel,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final String label;
+  final String disabledLabel;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  State<_InlineMagicLinkCta> createState() => _InlineMagicLinkCtaState();
+}
+
+class _InlineMagicLinkCtaState extends State<_InlineMagicLinkCta> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = widget.enabled;
+    final fg = enabled ? V5.invInk : V5.inkFaint;
+    return GestureDetector(
+      onTap: enabled ? widget.onTap : null,
+      onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
+      onTapUp: enabled ? (_) => setState(() => _pressed = false) : null,
+      onTapCancel: enabled ? () => setState(() => _pressed = false) : null,
+      child: AnimatedScale(
+        duration: const Duration(milliseconds: 140),
+        curve: Curves.easeOut,
+        scale: _pressed ? 0.97 : 1.0,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: V5.curveSharp,
+          height: 60,
+          padding: EdgeInsets.fromLTRB(28, 0, enabled ? 8 : 28, 0),
+          decoration: BoxDecoration(
+            color: enabled ? V5.ink : Colors.transparent,
+            borderRadius: BorderRadius.circular(V5.radiusFull),
+            border:
+                enabled ? null : Border.all(color: V5.borderHi, width: 1.4),
+            boxShadow: enabled ? V5.elevation4 : null,
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              busy ? 'Đang tạo lộ trình...' : 'Nhận link đăng nhập',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: V5.titleSm(context, color: V5.invInk),
-            ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  enabled ? widget.label : widget.disabledLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: V5.text(
+                    context,
+                    size: 15,
+                    weight: FontWeight.w700,
+                    color: fg,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: V5.curveSharp,
+                width: enabled ? 44 : 24,
+                height: enabled ? 44 : 24,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: enabled ? V5.yellow : Colors.transparent,
+                ),
+                child: Icon(
+                  Icons.arrow_forward_rounded,
+                  size: enabled ? 19 : 14,
+                  color: enabled ? V5.yellowInk : V5.inkFaint,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          const V5PulseDot(color: V5.yellow),
-        ],
+        ),
       ),
     );
   }

@@ -63,9 +63,8 @@ const String homeMockPhaseLabel = 'NỀN TẢNG';
 const int homeMockSessionsDone = 3;
 const int homeMockSessionsTotal = 4;
 const int homeMockStreakDays = 12;
-const int homeMockFormToday = 78;
-const int homeMockFormDelta = 6;
-const List<int> homeMockFormWeek = [62, 68, 64, 71, 70, 75, 78];
+// Form 7-day vitals are wired to real data via SessionPersistence
+// .homeFormSummary(); see HomeVitalsSpread.formPercent/formDelta/formWeek.
 
 // ─── Vitals spread standfirst ─────────────────────────────────
 const String homeMockVitalsStandfirst =

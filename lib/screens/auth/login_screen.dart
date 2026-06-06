@@ -156,150 +156,93 @@ class _LoginScreenState extends State<LoginScreen> {
     final r = V5Responsive.of(context);
     final compact = r.isShort;
 
-    return Scaffold(
-      backgroundColor: V5.bg,
-      // Gold-standard keyboard-aware form: a scrollable area in an Expanded
-      // sitting ABOVE a pinned bottom button (not floating over it). With
-      // resizeToAvoidBottomInset the Scaffold lifts the whole Column above the
-      // keyboard, so the scroll viewport ends exactly at the button. The
-      // focused email field then auto-scrolls to rest right above the button —
-      // the two can never overlap, and no manual scrolling is needed.
-      resizeToAvoidBottomInset: true,
-      body: Stack(
-        children: [
-          // Soft warm halo, top-right — the only ambient on the cream canvas.
-          const Positioned(
-            top: -130,
-            right: -90,
-            child: V5AmbientGlow(
-              size: Size(320, 340),
-              opacity: 0.10,
-              color: V5.yellow,
-            ),
+    // Gold-standard keyboard-aware form — see [V5KeyboardForm]. Shared verbatim
+    // with the S13 onboarding sign-in so the two screens behave identically.
+    return V5KeyboardForm(
+      // Soft warm halo, top-right — the only ambient on the cream canvas.
+      backgroundLayers: const [
+        Positioned(
+          top: -130,
+          right: -90,
+          child: V5AmbientGlow(
+            size: Size(320, 340),
+            opacity: 0.10,
+            color: V5.yellow,
           ),
-          SafeArea(
-            bottom: false,
-            child: Column(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    physics: const ClampingScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(
-                      V5.gutter,
-                      V5.space8,
-                      V5.gutter,
-                      V5.space24,
-                    ),
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 460),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _LoginTopBar(onBack: _handleBack),
-                            SizedBox(
-                              height:
-                                  r.pick(cozy: V5.space28, short: V5.space16),
-                            ),
-                            V5ScreenHeader(
-                              eyebrow: 'Đăng nhập',
-                              title: 'Chào mừng\ntrở lại.',
-                              size: compact
-                                  ? V5HeaderSize.medium
-                                  : V5HeaderSize.large,
-                            ),
-                            SizedBox(
-                              height:
-                                  r.pick(cozy: V5.space20, short: V5.space14),
-                            ),
-                            V5FadeIn(
-                              delay: const Duration(milliseconds: 120),
-                              slideY: 10,
-                              child: AuthWelcomeCard(compact: compact),
-                            ),
-                            SizedBox(
-                              height:
-                                  r.pick(cozy: V5.space16, short: V5.space12),
-                            ),
-                            V5FadeIn(
-                              delay: const Duration(milliseconds: 180),
-                              slideY: 8,
-                              child: AuthProviderRail(
-                                busy: _busy,
-                                onApple: _signInWithApple,
-                                onGoogle: _signInWithGoogle,
-                                onFacebook: _signInWithFacebook,
-                              ),
-                            ),
-                            if (!compact) ...[
-                              const SizedBox(height: V5.space12),
-                              const V5FadeIn(
-                                delay: Duration(milliseconds: 240),
-                                child: AuthValueStrip(),
-                              ),
-                            ],
-                            SizedBox(
-                              height:
-                                  r.pick(cozy: V5.space16, short: V5.space12),
-                            ),
-                            const _OrDivider(),
-                            SizedBox(
-                              height:
-                                  r.pick(cozy: V5.space16, short: V5.space12),
-                            ),
-                            V5FadeIn(
-                              delay: const Duration(milliseconds: 300),
-                              slideY: 8,
-                              child: AuthEmailField(
-                                controller: _emailController,
-                                // Notice-clearing is handled by the controller
-                                // listener; typing must not setState the screen.
-                                onChanged: (_) {},
-                              ),
-                            ),
-                            if (_notice != null) ...[
-                              const SizedBox(height: V5.space10),
-                              Text(
-                                _notice!,
-                                style: V5.bodySm(context, color: V5.inkSoft),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
+        ),
+      ],
+      // Pinned send button. Only this rebuilds as you type — it listens to the
+      // controller, so keystrokes never touch the rest of the screen.
+      footer: AnimatedBuilder(
+        animation: _emailController,
+        builder: (context, _) => _MagicLinkCta(
+          label: _busy ? 'Đang xử lý...' : 'Gửi link đăng nhập',
+          disabledLabel: 'Nhập email để nhận link',
+          enabled: _validEmail && !_busy,
+          onTap: _sendMagicLink,
+        ),
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 460),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _LoginTopBar(onBack: _handleBack),
+              SizedBox(height: r.pick(cozy: V5.space28, short: V5.space16)),
+              V5ScreenHeader(
+                eyebrow: 'Đăng nhập',
+                title: 'Chào mừng\ntrở lại.',
+                size: compact ? V5HeaderSize.medium : V5HeaderSize.large,
+              ),
+              SizedBox(height: r.pick(cozy: V5.space20, short: V5.space14)),
+              V5FadeIn(
+                delay: const Duration(milliseconds: 120),
+                slideY: 10,
+                child: AuthWelcomeCard(compact: compact),
+              ),
+              SizedBox(height: r.pick(cozy: V5.space16, short: V5.space12)),
+              V5FadeIn(
+                delay: const Duration(milliseconds: 180),
+                slideY: 8,
+                child: AuthProviderRail(
+                  busy: _busy,
+                  onApple: _signInWithApple,
+                  onGoogle: _signInWithGoogle,
+                  onFacebook: _signInWithFacebook,
                 ),
-                // Pinned send button. Rides above the keyboard when open, above
-                // the home indicator otherwise. Only this rebuilds as you type —
-                // it listens to the controller, so keystrokes never touch the
-                // rest of the screen.
-                SafeArea(
-                  top: false,
-                  minimum: const EdgeInsets.only(bottom: 12),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      V5.gutter,
-                      V5.space12,
-                      V5.gutter,
-                      0,
-                    ),
-                    child: AnimatedBuilder(
-                      animation: _emailController,
-                      builder: (context, _) => _MagicLinkCta(
-                        label: _busy ? 'Đang xử lý...' : 'Gửi link đăng nhập',
-                        disabledLabel: 'Nhập email để nhận link',
-                        enabled: _validEmail && !_busy,
-                        onTap: _sendMagicLink,
-                      ),
-                    ),
-                  ),
+              ),
+              if (!compact) ...[
+                const SizedBox(height: V5.space12),
+                const V5FadeIn(
+                  delay: Duration(milliseconds: 240),
+                  child: AuthValueStrip(),
                 ),
               ],
-            ),
+              SizedBox(height: r.pick(cozy: V5.space16, short: V5.space12)),
+              const _OrDivider(),
+              SizedBox(height: r.pick(cozy: V5.space16, short: V5.space12)),
+              V5FadeIn(
+                delay: const Duration(milliseconds: 300),
+                slideY: 8,
+                child: AuthEmailField(
+                  controller: _emailController,
+                  // Notice-clearing is handled by the controller listener;
+                  // typing must not setState the screen.
+                  onChanged: (_) {},
+                ),
+              ),
+              if (_notice != null) ...[
+                const SizedBox(height: V5.space10),
+                Text(
+                  _notice!,
+                  style: V5.bodySm(context, color: V5.inkSoft),
+                ),
+              ],
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

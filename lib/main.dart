@@ -35,6 +35,7 @@ import 'utils/orientation_lock.dart';
 
 List<CameraDescription> _cameras = const <CameraDescription>[];
 bool _hasCompletedOnboarding = false;
+bool _hasSeenOnboarding = false;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -59,6 +60,13 @@ Future<void> main() async {
   if (startupError == null) {
     await _loadDeviceCameras();
     _hasCompletedOnboarding = await _loadInitialOnboardingCompletion();
+    try {
+      _hasSeenOnboarding = await _readStoredOnboardingCompletion();
+    } catch (error, stackTrace) {
+      debugPrint('[Vika] Failed to read seen onboarding state: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      _hasSeenOnboarding = false;
+    }
     runApp(const VikaApp());
     return;
   }
@@ -289,11 +297,26 @@ Future<bool> isOnboardingComplete() async {
         .maybeSingle();
 
     if (data == null) {
-      // Profile row missing — user was deleted server-side. Clear stale
-      // local flag and sign out so onboarding starts fresh.
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('onboarding_complete');
-      await supabase.auth.signOut();
+      // No `profiles` row. Two very different situations look identical here:
+      //
+      //  1. A brand-new user who *just* authenticated on the onboarding
+      //     signup step (S13). Their row hasn't been written yet —
+      //     OnboardingPersistence upserts it a beat later. There is no DB
+      //     trigger that auto-creates profiles, so this empty window is the
+      //     normal new-user path and must NOT be disturbed.
+      //  2. A returning user whose account was deleted server-side. Their
+      //     row is gone for good and onboarding should restart clean.
+      //
+      // Only a user who finished onboarding before carries the local
+      // completion flag, so use it to tell them apart. Without this guard,
+      // treating a missing row as a deletion signs brand-new users out
+      // mid-signup and bounces them back to the start of onboarding.
+      final seenBefore = await _readStoredOnboardingCompletion();
+      if (seenBefore) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('onboarding_complete');
+        await supabase.auth.signOut();
+      }
       return false;
     }
     return data['onboarding_complete'] as bool? ?? false;
@@ -382,6 +405,7 @@ class VikaApp extends StatelessWidget {
                 initialOnboardingComplete:
                     overrideComplete ?? _hasCompletedOnboarding,
                 initialEntryState: overrideEntryState,
+                initialSeenOnboarding: _hasSeenOnboarding,
               ),
             );
           case '/onboarding':
@@ -436,7 +460,10 @@ class VikaApp extends StatelessWidget {
             );
           default:
             return MaterialPageRoute(
-              builder: (_) => const MainShell(),
+              builder: (_) => AppEntryGate(
+                initialOnboardingComplete: _hasCompletedOnboarding,
+                initialSeenOnboarding: _hasSeenOnboarding,
+              ),
             );
         }
       },
@@ -459,10 +486,17 @@ class AppEntryGate extends StatefulWidget {
     super.key,
     required this.initialOnboardingComplete,
     this.initialEntryState,
+    this.initialSeenOnboarding = false,
   });
 
   final bool initialOnboardingComplete;
   final String? initialEntryState;
+
+  /// Whether onboarding was ever completed on this device (the local
+  /// `onboarding_complete` flag). Used only to pick the initial screen so a
+  /// signed-out returning user opens straight on login instead of flashing
+  /// the onboarding welcome for a frame.
+  final bool initialSeenOnboarding;
 
   @override
   State<AppEntryGate> createState() => _AppEntryGateState();
@@ -472,6 +506,15 @@ class _AppEntryGateState extends State<AppEntryGate> {
   StreamSubscription<AuthState>? _authSubscription;
   late _AppEntryState _entryState;
   bool _ensuredPlanForSession = false;
+
+  /// Set while the in-onboarding signup (S13) is driving a sign-in attempt.
+  /// While true, the global gate ignores the entire auth stream so it can't
+  /// race the navigator: the interactive sign-in path signs out any stale
+  /// session a beat before signing in (a transient `signedOut`), and the
+  /// navigator advances itself on the following `signedIn`. The navigator owns
+  /// its own exits — S16 completion and the login link both re-route through
+  /// `/`, which rebuilds this gate and resets the flag.
+  bool _onboardingOwnsAuth = false;
 
   @override
   void initState() {
@@ -493,6 +536,9 @@ class _AppEntryGateState extends State<AppEntryGate> {
   void _handleAuthStreamError(Object error, StackTrace stackTrace) {
     debugPrint('[Vika] Auth stream error: $error');
     if (!mounted) return;
+    // The in-onboarding signup surfaces its own auth errors (e.g. an expired
+    // magic link); don't switch to the standalone login underneath it.
+    if (_onboardingOwnsAuth) return;
     if (_entryState != _AppEntryState.home) {
       _setEntryState(_AppEntryState.login);
     }
@@ -530,9 +576,15 @@ class _AppEntryGateState extends State<AppEntryGate> {
     final override = _entryStateFromRouteArg(widget.initialEntryState);
     if (override != null) return override;
 
-    return widget.initialOnboardingComplete
-        ? _AppEntryState.home
-        : _AppEntryState.onboarding;
+    if (widget.initialOnboardingComplete) return _AppEntryState.home;
+
+    // Finished onboarding before but no live session (e.g. signed out, then
+    // relaunched): open straight on login instead of flashing S01.
+    if (widget.initialSeenOnboarding &&
+        supabase.auth.currentSession == null) {
+      return _AppEntryState.login;
+    }
+    return _AppEntryState.onboarding;
   }
 
   Future<void> _resolveEntryState() async {
@@ -540,17 +592,21 @@ class _AppEntryGateState extends State<AppEntryGate> {
   }
 
   void _handleAuthStateChange(AuthState data) {
+    // While the in-onboarding signup owns the attempt, the navigator drives
+    // everything — ignore the entire auth stream, including the transient
+    // `signedOut` that AuthService fires before each interactive sign-in.
+    // Reacting here would tear the navigator down mid-signup and bounce the
+    // user to the standalone login.
+    if (_onboardingOwnsAuth) return;
     switch (data.event.name) {
       case 'signedIn':
       case 'initialSession':
       case 'passwordRecovery':
       case 'userUpdated':
       case 'mfaChallengeVerified':
-        // If the user is mid-onboarding, do NOT flash to loading and
-        // rebuild the navigator — that disposes its State and resets the
-        // PageController back to S01. The signup screen has its own auth
-        // listener that advances the page in place. Only swap to home
-        // if onboarding is actually complete.
+        // Return-user login / app-startup resolution. (Mid-onboarding
+        // sign-ins are intercepted by the guard above, so this never disposes
+        // a live navigator.) Resolve quietly to avoid a loading flash.
         _quietResolveEntryState();
         break;
       case 'signedOut':
@@ -612,7 +668,13 @@ class _AppEntryGateState extends State<AppEntryGate> {
     switch (_entryState) {
       case _AppEntryState.onboarding:
         return V5OnboardingNavigator(
-          onRequestLogin: () => _setEntryState(_AppEntryState.login),
+          onSignupAuthStarted: () => _onboardingOwnsAuth = true,
+          onRequestLogin: () {
+            // Leaving onboarding for the standalone login: release the claim
+            // so the gate governs the return-user sign-in normally.
+            _onboardingOwnsAuth = false;
+            _setEntryState(_AppEntryState.login);
+          },
         );
       case _AppEntryState.login:
         return LoginScreen(

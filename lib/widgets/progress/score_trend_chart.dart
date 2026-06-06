@@ -242,6 +242,9 @@ class _TrendPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Need >= 2 points to draw a segment. This also guards the
+    // `points.length - 1` divisor below: a 0/1-element series (no sessions,
+    // or a single session) is skipped rather than producing NaN offsets.
     if (points.length < 2) return;
 
     const padTop = 14.0;
