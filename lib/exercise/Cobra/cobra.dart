@@ -35,6 +35,9 @@ class CobraConfig {
 
   // Calibration: frames to average for baseline
   static const int CALIBRATION_FRAMES = 20;
+
+  static const double COBRA_OVEREXTENSION_MAX = 65.0;
+  static const double COBRA_ELBOW_LOCKOUT_MIN = 179.0;
 }
 
 enum CobraState { setup, holding, resting }

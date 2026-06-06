@@ -2,7 +2,6 @@
 
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:vika/exercise/exercise_base.dart';
-import 'package:vika/pose/vika_image_orientation.dart';
 import 'package:vika/pose/vika_pose_landmark.dart';
 import 'package:vika/utils/pose_math_helpers.dart';
 import 'package:vika/utils/exercise_logger.dart';
@@ -217,7 +216,6 @@ class SuryaNamaskarExercise extends ExerciseBase {
   @override
   String get exerciseName => 'Surya Namaskar';
 
-  @override
   bool get usesSegmentationPersonGate => false;
 
   @override
