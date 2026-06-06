@@ -3,7 +3,7 @@ import '../russian_twist.dart';
 
 class ThoracicRotationMetric extends RussianMetricBase {
   static const double SHOULDER_MOVEMENT_MIN =
-      0.15; // Shoulder must move at least 15% of hip-to-knee distance to count as torso twist
+      0.10; // Shoulder must move at least 10% of hip-to-knee distance.
 
   double? _setupShoulderHipDx;
 
@@ -11,12 +11,12 @@ class ThoracicRotationMetric extends RussianMetricBase {
   void update(RussianRepContext ctx) {
     if (ctx.state == RussianTwistState.center_setup) {
       // Record the baseline shoulder-to-hip X distance
-      _setupShoulderHipDx = ctx.shoulderX - ctx.hipX;
+      _setupShoulderHipDx = ctx.shoulderHipDx;
     }
 
     if (ctx.state == RussianTwistState.max_point) {
       if (_setupShoulderHipDx != null) {
-        double currentShoulderHipDx = ctx.shoulderX - ctx.hipX;
+        double currentShoulderHipDx = ctx.shoulderHipDx;
         double shoulderMovement =
             (currentShoulderHipDx - _setupShoulderHipDx!).abs();
 

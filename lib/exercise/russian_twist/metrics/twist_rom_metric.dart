@@ -13,13 +13,15 @@ class TwistRomMetric extends RussianMetricBase {
 
       if (ctx.direction == TwistDirection.forward) {
         // Twisting towards the knees. Hands should reach past ~60% of the way to the knees.
-        if (ctx.wristHipDx > ctx.kneeHipDx * 0.6) {
+        if (ctx.wristHipDx >=
+            ctx.kneeHipDx * RussianTwistConfig.FORWARD_ROM_RATIO) {
           sufficientRom = true;
         }
       } else if (ctx.direction == TwistDirection.backward) {
         // Twisting towards the back. Hands should reach close to or behind the hips.
         // Less than 20% of the way to the knees.
-        if (ctx.wristHipDx < ctx.kneeHipDx * 0.2) {
+        if (ctx.wristHipDx <=
+            ctx.kneeHipDx * RussianTwistConfig.BACKWARD_ROM_RATIO) {
           sufficientRom = true;
         }
       }

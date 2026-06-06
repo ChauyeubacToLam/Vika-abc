@@ -25,7 +25,6 @@ class DeadBugConfig {
   static const double HOLD_THRESHOLD = 145.0;
   static const double RETURNING_THRESHOLD = 135.0;
   static const double SETUP_THRESHOLD = 115.0;
-  static const double OPPOSITE_PAIR_MARGIN = 10.0;
 }
 
 class DeadBug extends ExerciseBase {
@@ -78,6 +77,7 @@ class DeadBug extends ExerciseBase {
 
   bool? _peakPhysicalLeftArm;
   bool? _peakPhysicalLeftLeg;
+  double _peakPairAngle = 0.0;
   bool? _lastPhysicalLeftArm;
   bool? _lastPhysicalLeftLeg;
 
@@ -169,7 +169,8 @@ class DeadBug extends ExerciseBase {
 
   @override
   void onSetComplete() {
-    logger.pushKey("max_rep", maxRep);
+    logger.pushKey("target_rep", maxRep);
+    logger.pushKey("max_rep", repCount);
     logger.pushKey(
         "anti_extension_fails_count", antiExtensionMetric.faultsCount);
     logger.pushKey("coordination_fails_count", coordinationMetric.faultsCount);
@@ -248,52 +249,18 @@ class DeadBug extends ExerciseBase {
     double rHipAng = calculateAngleNormalized(
         firstPoint: rShoulder, midPoint: rHip, lastPoint: rKnee);
 
-    double maxExt =
-        [lArmAng, rArmAng, lHipAng, rHipAng].reduce((a, b) => a > b ? a : b);
+    final activeArmAngle = lArmAng > rArmAng ? lArmAng : rArmAng;
+    final activeLegAngle = lHipAng > rHipAng ? lHipAng : rHipAng;
+    final activePairAngle =
+        activeArmAngle < activeLegAngle ? activeArmAngle : activeLegAngle;
 
-    // Tính toán Physical Side bằng Dot Product
-    bool mlKitActiveLegIsLeft = lHipAng > rHipAng;
-    bool mlKitActiveArmIsLeft = lArmAng > rArmAng;
-    PoseLandmark activeAnkle = mlKitActiveLegIsLeft ? lAnkle : rAnkle;
-    PoseLandmark activeWrist = mlKitActiveArmIsLeft
-        ? landmarks[PoseLandmarkType.leftWrist]!
-        : landmarks[PoseLandmarkType.rightWrist]!;
+    // Pick the arm and leg with the larger opening angle for this frame.
+    final physicalLeftArm = lArmAng >= rArmAng;
+    final physicalLeftLeg = lHipAng >= rHipAng;
 
-    bool physicalLeftLeg = isPhysicalLeftSide(activeAnkle, lHip, rHip);
-    bool physicalLeftArm =
-        isPhysicalLeftSide(activeWrist, lShoulder, rShoulder);
-
-    final leftArmRightLegScore = lArmAng < rHipAng ? lArmAng : rHipAng;
-    final rightArmLeftLegScore = rArmAng < lHipAng ? rArmAng : lHipAng;
-    final leftArmLeftLegScore = lArmAng < lHipAng ? lArmAng : lHipAng;
-    final rightArmRightLegScore = rArmAng < rHipAng ? rArmAng : rHipAng;
-    final bestSameSideScore = leftArmLeftLegScore > rightArmRightLegScore
-        ? leftArmLeftLegScore
-        : rightArmRightLegScore;
-    final validLeftArmRightLeg = leftArmRightLegScore >= rightArmLeftLegScore &&
-        leftArmRightLegScore > DeadBugConfig.EXTENDING_THRESHOLD &&
-        leftArmRightLegScore >=
-            bestSameSideScore + DeadBugConfig.OPPOSITE_PAIR_MARGIN;
-    final validRightArmLeftLeg = rightArmLeftLegScore > leftArmRightLegScore &&
-        rightArmLeftLegScore > DeadBugConfig.EXTENDING_THRESHOLD &&
-        rightArmLeftLegScore >=
-            bestSameSideScore + DeadBugConfig.OPPOSITE_PAIR_MARGIN;
-    final hasValidOppositePair = validLeftArmRightLeg || validRightArmLeftLeg;
-    final pairExtensionAngle = validLeftArmRightLeg
-        ? leftArmRightLegScore
-        : validRightArmLeftLeg
-            ? rightArmLeftLegScore
-            : 0.0;
-
-    if (validLeftArmRightLeg) {
-      physicalLeftArm = isPhysicalLeftSide(lWrist, lShoulder, rShoulder);
-      physicalLeftLeg = isPhysicalLeftSide(rAnkle, lHip, rHip);
-    } else if (validRightArmLeftLeg) {
-      physicalLeftArm = isPhysicalLeftSide(rWrist, lShoulder, rShoulder);
-      physicalLeftLeg = isPhysicalLeftSide(lAnkle, lHip, rHip);
-    }
-
-    if (state == DeadBugState.hold) {
+    if ((state == DeadBugState.extending || state == DeadBugState.hold) &&
+        activePairAngle >= _peakPairAngle) {
+      _peakPairAngle = activePairAngle;
       _peakPhysicalLeftArm = physicalLeftArm;
       _peakPhysicalLeftLeg = physicalLeftLeg;
     }
@@ -312,7 +279,7 @@ class DeadBug extends ExerciseBase {
       _diagnosticLog.add({
         'time': ((now - _exerciseStartTimeMs!) / 1000).toStringAsFixed(1),
         'state': state.name,
-        'max': maxExt,
+        'max': activePairAngle,
         'la': lArmAng,
         'ra': rArmAng,
         'lh': lHipAng,
@@ -322,18 +289,7 @@ class DeadBug extends ExerciseBase {
       _lastDiagnosticTime = now;
     }
 
-    if (state == DeadBugState.setup &&
-        maxExt > DeadBugConfig.EXTENDING_THRESHOLD &&
-        !hasValidOppositePair) {
-      resultIssues.addInstruction(
-        'setup',
-        'Error',
-        'Duỗi một tay và chân đối diện',
-      );
-      return;
-    }
-
-    _updateStateMachine(pairExtensionAngle, hasValidOppositePair, now);
+    _updateStateMachine(activePairAngle, now);
 
     final ctx = DeadBugRepContext(
       leftArmAngle: lArmAng,
@@ -356,6 +312,11 @@ class DeadBug extends ExerciseBase {
       return;
     }
 
+    final blockingFault = _blockingFaultFor(ctx);
+    if (blockingFault != null && state != DeadBugState.setup) {
+      _publishBlockingFault(blockingFault);
+    }
+
     if (state != DeadBugState.setup) {
       for (final metric in _metrics) metric.update(ctx);
     }
@@ -363,15 +324,17 @@ class DeadBug extends ExerciseBase {
     resultIssues.addInstruction(state.name, 'Status', currentPhaseLabel);
   }
 
-  void _updateStateMachine(
-      double maxAngle, bool hasValidOppositePair, int now) {
+  void _updateStateMachine(double maxAngle, int now) {
     if (_extendingDebouncer.update(state == DeadBugState.setup &&
-        hasValidOppositePair &&
         maxAngle > DeadBugConfig.EXTENDING_THRESHOLD)) {
       _transitionState(DeadBugState.extending, now);
     } else if (_holdDebouncer.update(state == DeadBugState.extending &&
         maxAngle > DeadBugConfig.HOLD_THRESHOLD)) {
       _transitionState(DeadBugState.hold, now);
+    } else if (state == DeadBugState.extending &&
+        maxAngle < DeadBugConfig.SETUP_THRESHOLD) {
+      _transitionState(DeadBugState.setup, now);
+      _resetRepState();
     } else if (_returningDebouncer.update(state == DeadBugState.hold &&
         maxAngle < DeadBugConfig.RETURNING_THRESHOLD)) {
       _transitionState(DeadBugState.returning, now);
@@ -394,12 +357,7 @@ class DeadBug extends ExerciseBase {
     previousState = DeadBugState.setup;
     final blockingFault = _blockingFaultFor(ctx);
     if (blockingFault != null) {
-      resultIssues.feedback['Result'] = 'Không tính rep';
-      resultIssues.addInstruction(
-        currentPhaseKey,
-        'Error',
-        blockingFault.voiceMessage ?? blockingFault.message,
-      );
+      _publishBlockingFault(blockingFault);
       _resetRepState();
       return;
     }
@@ -454,10 +412,21 @@ class DeadBug extends ExerciseBase {
     return null;
   }
 
+  void _publishBlockingFault(FaultRecord fault) {
+    resultIssues.feedback['Result'] = 'Không tính rep';
+    resultIssues.feedback['Error'] = fault.message;
+    resultIssues.addInstruction(
+      currentPhaseKey,
+      'Error',
+      fault.voiceMessage ?? fault.message,
+    );
+  }
+
   void _resetRepState() {
     correctForm = true;
     _peakPhysicalLeftArm = null;
     _peakPhysicalLeftLeg = null;
+    _peakPairAngle = 0.0;
     _holdStartTimeMs = null;
     for (var metric in _metrics) metric.resetAndCountFault();
   }

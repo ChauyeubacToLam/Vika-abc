@@ -28,6 +28,12 @@ class PlankConfig {
   // Max deviation from horizontal to count as valid plank (degrees)
   static const double PLANK_POSITION_TOLERANCE = 25.0;
 
+  // Forearm plank gates copied from Plank Up-Down.
+  static const double BODY_ALIGNMENT_START_MIN = 170.0;
+  static const double BODY_ALIGNMENT_HOLD_MIN = 160.0;
+  static const double KNEE_EXTENSION_MIN = 150.0;
+  static const double ELBOW_FOREARM_MAX = 110.0;
+
   // Trunk deviation thresholds for form assessment
   static const double SAG_GOOD_MAX = 4.5;
   static const double SAG_WARNING_MAX = 5.5;
@@ -104,31 +110,8 @@ class Plank extends ExerciseBase {
 
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    final shoulder = getSideLandmark(
-      landmarks: landmarks,
-      rightType: PoseLandmarkType.rightShoulder,
-      leftType: PoseLandmarkType.leftShoulder,
-    );
-    final hip = getSideLandmark(
-      landmarks: landmarks,
-      rightType: PoseLandmarkType.rightHip,
-      leftType: PoseLandmarkType.leftHip,
-    );
-
-    if (shoulder == null || hip == null) return false;
-
-    // Trunk must be roughly horizontal (within 25°)
-    double trunkClockAngle =
-        calculateVerticalAngle(pivot: hip, point: shoulder);
-    double horizontalTarget = cameraFacing == CameraFacing.right
-        ? PlankConfig.HORIZONTAL_CLOCK_RIGHT
-        : PlankConfig.HORIZONTAL_CLOCK_LEFT;
-    double diff = trunkClockAngle - horizontalTarget;
-    if (diff > 180) diff -= 360;
-    if (diff < -180) diff += 360;
-    if (diff.abs() > 25.0) return false;
-
-    return true;
+    final geometry = _buildForearmPlankGeometry(landmarks);
+    return geometry?.isStartPose ?? false;
   }
 
   // --- Stop Condition ---
@@ -203,78 +186,23 @@ class Plank extends ExerciseBase {
 
   @override
   void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
-    // 1. Get landmarks
-    PoseLandmark? shoulder = getSideLandmark(
-        landmarks: smoothedLandmarks,
-        rightType: PoseLandmarkType.rightShoulder,
-        leftType: PoseLandmarkType.leftShoulder);
-    PoseLandmark? hip = getSideLandmark(
-        landmarks: smoothedLandmarks,
-        rightType: PoseLandmarkType.rightHip,
-        leftType: PoseLandmarkType.leftHip);
-    PoseLandmark? ear = getSideLandmark(
-        landmarks: smoothedLandmarks,
-        rightType: PoseLandmarkType.rightEar,
-        leftType: PoseLandmarkType.leftEar);
-    PoseLandmark? knee = getSideLandmark(
-        landmarks: smoothedLandmarks,
-        rightType: PoseLandmarkType.rightKnee,
-        leftType: PoseLandmarkType.leftKnee);
+    final geometry = _buildForearmPlankGeometry(smoothedLandmarks);
 
-    if (shoulder == null || hip == null || ear == null || knee == null) {
+    if (geometry == null) {
       if (plankState == PlankState.holding) {
         _transitionState(PlankState.setup, frameTimestampMs);
       }
       return;
     }
+    _ankleAvailable = true;
 
-    PoseLandmark? ankle = getSideLandmark(
-        landmarks: smoothedLandmarks,
-        rightType: PoseLandmarkType.rightAnkle,
-        leftType: PoseLandmarkType.leftAnkle);
-    _ankleAvailable = ankle != null &&
-        ExerciseBase.isLandmarkConfident(ankle) &&
-        ExerciseBase.isLandmarkConfident(knee);
-    if (!_ankleAvailable && plankState == PlankState.holding) {
-      _transitionState(PlankState.setup, frameTimestampMs);
-      return;
-    }
-
-    // 2. Calculate geometry
-    double trunkClockAngle =
-        calculateVerticalAngle(pivot: hip, point: shoulder);
-
-    double horizontalTarget = cameraFacing == CameraFacing.right
-        ? PlankConfig.HORIZONTAL_CLOCK_RIGHT
-        : PlankConfig.HORIZONTAL_CLOCK_LEFT;
-    double trunkDeviation =
-        clockAngleDeviation(trunkClockAngle, horizontalTarget);
-
-    double neckAngle =
-        calculateAngle(firstPoint: ear, midPoint: shoulder, lastPoint: hip);
-
-    double? kneeAngle;
-    if (_ankleAvailable && ankle != null) {
-      kneeAngle =
-          calculateAngle(firstPoint: hip, midPoint: knee, lastPoint: ankle);
-    }
-
-    PoseLandmark? foot = smoothedLandmarks[PoseLandmarkType.leftFootIndex] ??
-        smoothedLandmarks[PoseLandmarkType.rightFootIndex];
-    PoseLandmark? heel = smoothedLandmarks[PoseLandmarkType.leftHeel] ??
-        smoothedLandmarks[PoseLandmarkType.rightHeel];
-
-    double floorY = foot?.y ?? heel?.y ?? knee.y;
-    if (!scaleFactor.isFinite || scaleFactor <= 1e-6) return;
-    double hipToFloor = (floorY - hip.y).abs() / scaleFactor;
-    bool isStanding = hipToFloor > PlankConfig.STANDING_HIP_FLOOR_THRESHOLD;
     int now = frameTimestampMs;
 
     // 3. Build RepContext
     final ctx = RepContext(
-      trunkDeviation: trunkDeviation,
-      neckAngle: neckAngle,
-      kneeAngle: kneeAngle,
+      trunkDeviation: geometry.trunkDeviation,
+      neckAngle: geometry.neckAngle,
+      kneeAngle: geometry.kneeAngle,
       plankState: plankState,
       frameTimestamp: now,
       resultIssues: resultIssues,
@@ -282,18 +210,23 @@ class Plank extends ExerciseBase {
 
     // 4. Debug data
     debugData['plankState'] = plankState.toString().split('.').last;
-    debugData['trunkClock'] = trunkClockAngle.toStringAsFixed(1);
+    debugData['trunkClock'] = geometry.trunkClockAngle.toStringAsFixed(1);
     debugData['trunkDev'] =
-        '${trunkDeviation >= 0 ? "+" : ""}${trunkDeviation.toStringAsFixed(1)}°';
-    debugData['neckAngle'] = neckAngle.toStringAsFixed(1);
-    debugData['kneeAngle'] = kneeAngle?.toStringAsFixed(1) ?? 'N/A';
+        '${geometry.trunkDeviation >= 0 ? "+" : ""}${geometry.trunkDeviation.toStringAsFixed(1)}°';
+    debugData['neckAngle'] = geometry.neckAngle.toStringAsFixed(1);
+    debugData['bodyAngle'] = geometry.bodyAngle.toStringAsFixed(1);
+    debugData['kneeAngle'] = geometry.kneeAngle.toStringAsFixed(1);
+    debugData['elbowAngle'] = geometry.elbowAngle.toStringAsFixed(1);
     debugData['holdTime'] = _currentHoldSeconds().toStringAsFixed(1);
     debugData['repCount'] = repCount.toString();
-    debugData['isStanding'] = isStanding;
-    debugData['ankleAvail'] = _ankleAvailable;
+    debugData['isStanding'] = geometry.isStanding;
+    debugData['isForearmPlank'] = geometry.isForearmPlank;
+    debugData['bodyAligned'] = geometry.isBodyAlignedForHold;
+    debugData['kneeExtended'] = geometry.isKneeExtended;
+    debugData['ankleAvail'] = true;
 
     // 5. Update plank state
-    _updatePlankState(trunkDeviation, now, isStanding);
+    _updatePlankState(geometry, now);
 
     // 6. Rest period feedback
     if (plankState == PlankState.resting && _restStartMs != null) {
@@ -338,14 +271,21 @@ class Plank extends ExerciseBase {
 
   // --- State Machine ---
 
-  void _updatePlankState(
-      double trunkDeviation, int timestampMs, bool isStanding) {
-    bool isPlankPosition =
-        trunkDeviation.abs() <= PlankConfig.PLANK_POSITION_TOLERANCE &&
-            !isStanding;
+  void _updatePlankState(_ForearmPlankGeometry geometry, int timestampMs) {
+    bool isPlankPosition = geometry.isHoldPose;
     bool confirmedPlank = _positionDebouncer.update(isPlankPosition);
 
     debugData['isPlankPosition'] = confirmedPlank;
+
+    if (!geometry.isForearmPlank) {
+      resultIssues.feedback['Arms'] = 'Chống bằng cẳng tay để vào Plank';
+    }
+    if (!geometry.isBodyAlignedForHold) {
+      resultIssues.feedback['Body'] = 'Giữ thân người thẳng như plank';
+    }
+    if (!geometry.isKneeExtended) {
+      resultIssues.feedback['Knees'] = 'Thẳng đầu gối ra';
+    }
 
     switch (plankState) {
       case PlankState.setup:
@@ -457,8 +397,225 @@ class Plank extends ExerciseBase {
 
   // --- Helpers ---
 
+  _ForearmPlankGeometry? _buildForearmPlankGeometry(
+      Map<PoseLandmarkType, PoseLandmark> landmarks) {
+    final side = _selectForearmPlankSide(landmarks);
+    if (side == null) return null;
+
+    final trackingLandmarks = [
+      side.shoulder,
+      side.hip,
+      side.ear,
+      side.knee,
+      side.ankle,
+      side.elbow,
+      side.wrist,
+    ];
+    if (!trackingLandmarks.every(ExerciseBase.isLandmarkConfident)) {
+      return null;
+    }
+
+    final scale = calculateDistance(side.shoulder, side.hip);
+    if (!scale.isFinite || scale <= 1e-6) return null;
+
+    final trunkClockAngle =
+        calculateVerticalAngle(pivot: side.hip, point: side.shoulder);
+    final horizontalTarget = cameraFacing == CameraFacing.right
+        ? PlankConfig.HORIZONTAL_CLOCK_RIGHT
+        : PlankConfig.HORIZONTAL_CLOCK_LEFT;
+    final trunkDeviation =
+        clockAngleDeviation(trunkClockAngle, horizontalTarget);
+
+    final neckAngle = calculateAngle(
+      firstPoint: side.ear,
+      midPoint: side.shoulder,
+      lastPoint: side.hip,
+    );
+    final bodyAngle = calculateAngleNormalized(
+      firstPoint: side.shoulder,
+      midPoint: side.hip,
+      lastPoint: side.ankle,
+    );
+    final kneeAngle = calculateAngleNormalized(
+      firstPoint: side.hip,
+      midPoint: side.knee,
+      lastPoint: side.ankle,
+    );
+    final elbowAngle = calculateAngleNormalized(
+      firstPoint: side.shoulder,
+      midPoint: side.elbow,
+      lastPoint: side.wrist,
+    );
+
+    final floorY = side.foot?.y ?? side.heel?.y ?? side.knee.y;
+    final hipToFloor = (floorY - side.hip.y).abs() / scale;
+
+    return _ForearmPlankGeometry(
+      trunkClockAngle: trunkClockAngle,
+      trunkDeviation: trunkDeviation,
+      neckAngle: neckAngle,
+      bodyAngle: bodyAngle,
+      kneeAngle: kneeAngle,
+      elbowAngle: elbowAngle,
+      hipToFloor: hipToFloor,
+    );
+  }
+
+  _ForearmPlankSide? _selectForearmPlankSide(
+      Map<PoseLandmarkType, PoseLandmark> landmarks) {
+    final left = _buildForearmPlankSide(
+      landmarks,
+      shoulderType: PoseLandmarkType.leftShoulder,
+      hipType: PoseLandmarkType.leftHip,
+      earType: PoseLandmarkType.leftEar,
+      kneeType: PoseLandmarkType.leftKnee,
+      ankleType: PoseLandmarkType.leftAnkle,
+      elbowType: PoseLandmarkType.leftElbow,
+      wristType: PoseLandmarkType.leftWrist,
+      heelType: PoseLandmarkType.leftHeel,
+      footType: PoseLandmarkType.leftFootIndex,
+    );
+    final right = _buildForearmPlankSide(
+      landmarks,
+      shoulderType: PoseLandmarkType.rightShoulder,
+      hipType: PoseLandmarkType.rightHip,
+      earType: PoseLandmarkType.rightEar,
+      kneeType: PoseLandmarkType.rightKnee,
+      ankleType: PoseLandmarkType.rightAnkle,
+      elbowType: PoseLandmarkType.rightElbow,
+      wristType: PoseLandmarkType.rightWrist,
+      heelType: PoseLandmarkType.rightHeel,
+      footType: PoseLandmarkType.rightFootIndex,
+    );
+
+    if (cameraFacing == CameraFacing.right) return right ?? left;
+    if (cameraFacing == CameraFacing.left) return left ?? right;
+    if (left == null) return right;
+    if (right == null) return left;
+    return left.hip.likelihood >= right.hip.likelihood ? left : right;
+  }
+
+  _ForearmPlankSide? _buildForearmPlankSide(
+    Map<PoseLandmarkType, PoseLandmark> landmarks, {
+    required PoseLandmarkType shoulderType,
+    required PoseLandmarkType hipType,
+    required PoseLandmarkType earType,
+    required PoseLandmarkType kneeType,
+    required PoseLandmarkType ankleType,
+    required PoseLandmarkType elbowType,
+    required PoseLandmarkType wristType,
+    required PoseLandmarkType heelType,
+    required PoseLandmarkType footType,
+  }) {
+    final shoulder = landmarks[shoulderType];
+    final hip = landmarks[hipType];
+    final ear = landmarks[earType];
+    final knee = landmarks[kneeType];
+    final ankle = landmarks[ankleType];
+    final elbow = landmarks[elbowType];
+    final wrist = landmarks[wristType];
+
+    if (shoulder == null ||
+        hip == null ||
+        ear == null ||
+        knee == null ||
+        ankle == null ||
+        elbow == null ||
+        wrist == null) {
+      return null;
+    }
+
+    final heel = _confidentOptionalLandmark(landmarks[heelType]);
+    final foot = _confidentOptionalLandmark(landmarks[footType]);
+
+    return _ForearmPlankSide(
+      shoulder: shoulder,
+      hip: hip,
+      ear: ear,
+      knee: knee,
+      ankle: ankle,
+      elbow: elbow,
+      wrist: wrist,
+      heel: heel,
+      foot: foot,
+    );
+  }
+
+  PoseLandmark? _confidentOptionalLandmark(PoseLandmark? landmark) {
+    if (landmark == null) return null;
+    return ExerciseBase.isLandmarkConfident(landmark) ? landmark : null;
+  }
+
   double _currentHoldSeconds() {
     if (_holdStartMs == null) return 0.0;
     return (frameTimestampMs - _holdStartMs!) / 1000.0;
   }
+}
+
+class _ForearmPlankSide {
+  const _ForearmPlankSide({
+    required this.shoulder,
+    required this.hip,
+    required this.ear,
+    required this.knee,
+    required this.ankle,
+    required this.elbow,
+    required this.wrist,
+    required this.heel,
+    required this.foot,
+  });
+
+  final PoseLandmark shoulder;
+  final PoseLandmark hip;
+  final PoseLandmark ear;
+  final PoseLandmark knee;
+  final PoseLandmark ankle;
+  final PoseLandmark elbow;
+  final PoseLandmark wrist;
+  final PoseLandmark? heel;
+  final PoseLandmark? foot;
+}
+
+class _ForearmPlankGeometry {
+  const _ForearmPlankGeometry({
+    required this.trunkClockAngle,
+    required this.trunkDeviation,
+    required this.neckAngle,
+    required this.bodyAngle,
+    required this.kneeAngle,
+    required this.elbowAngle,
+    required this.hipToFloor,
+  });
+
+  final double trunkClockAngle;
+  final double trunkDeviation;
+  final double neckAngle;
+  final double bodyAngle;
+  final double kneeAngle;
+  final double elbowAngle;
+  final double hipToFloor;
+
+  bool get isTrunkHorizontal =>
+      trunkDeviation.abs() <= PlankConfig.PLANK_POSITION_TOLERANCE;
+  bool get isBodyAlignedForStart =>
+      bodyAngle >= PlankConfig.BODY_ALIGNMENT_START_MIN;
+  bool get isBodyAlignedForHold =>
+      bodyAngle >= PlankConfig.BODY_ALIGNMENT_HOLD_MIN;
+  bool get isKneeExtended => kneeAngle >= PlankConfig.KNEE_EXTENSION_MIN;
+  bool get isForearmPlank => elbowAngle <= PlankConfig.ELBOW_FOREARM_MAX;
+  bool get isStanding => hipToFloor > PlankConfig.STANDING_HIP_FLOOR_THRESHOLD;
+
+  bool get isStartPose =>
+      isTrunkHorizontal &&
+      isBodyAlignedForStart &&
+      isKneeExtended &&
+      isForearmPlank &&
+      !isStanding;
+
+  bool get isHoldPose =>
+      isTrunkHorizontal &&
+      isBodyAlignedForHold &&
+      isKneeExtended &&
+      isForearmPlank &&
+      !isStanding;
 }
