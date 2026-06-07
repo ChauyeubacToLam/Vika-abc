@@ -235,6 +235,26 @@ class UserProfileService {
     return fetchCurrentProfile();
   }
 
+  /// Raw `profiles.gender` for the current user ('male' / 'female' / 'other'),
+  /// or null when signed out, absent, or on error. Callers decide how to map
+  /// it (e.g. the Progress pain reporter defaults anything non-'female' to the
+  /// male silhouette).
+  Future<String?> fetchGender() async {
+    final user = _client.auth.currentUser;
+    if (user == null) return null;
+    try {
+      final row = await _client
+          .from('profiles')
+          .select('gender')
+          .eq('id', user.id)
+          .maybeSingle();
+      return row?['gender'] as String?;
+    } catch (e) {
+      debugPrint('[UserProfileService] gender fetch failed: $e');
+      return null;
+    }
+  }
+
   Future<String> _uploadAvatar(String userId, File file) async {
     final extension = file.path.split('.').last.toLowerCase();
     final safeExtension = switch (extension) {

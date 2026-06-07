@@ -42,6 +42,25 @@ class PreviousSessionSummary {
   }
 }
 
+/// One active row from `user_pain_areas`, shaped for the Progress-tab pain
+/// reporter. [intensity] is the 1..5 self-report (null on rows predating the
+/// column); [source] distinguishes a user 'self_reported' area from an
+/// interpreter-'confirmed' one; [notes] holds the free-text for an 'other'
+/// report.
+class PainReport {
+  const PainReport({
+    required this.region,
+    required this.intensity,
+    required this.source,
+    this.notes,
+  });
+
+  final String region;
+  final int? intensity;
+  final String source;
+  final String? notes;
+}
+
 /// Persistence layer for exercise sessions + user-level stats.
 /// All methods are fire-and-forget where possible — errors are logged
 /// but do not interrupt the workout UX.
@@ -753,6 +772,116 @@ class SessionPersistence {
     } catch (e) {
       debugPrint('[Vika] getActivePainAreas failed: $e');
       return [];
+    }
+  }
+
+  /// Active self-reports for the Progress-tab pain reporter — richer than
+  /// [getActivePainAreas] (which returns bare regions for plan/interpreter
+  /// callers). Carries the reported [PainReport.intensity] (1..5, null on
+  /// legacy rows), [PainReport.source] (so a 'confirmed' badge can show), and
+  /// [PainReport.notes] (the free-text behind an 'other' report). Empty when
+  /// signed out or on error.
+  Future<List<PainReport>> getActivePainReports() async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return [];
+
+    try {
+      final response = await _client
+          .from('user_pain_areas')
+          .select('body_region, intensity, source, notes')
+          .eq('user_id', userId)
+          .eq('status', 'active');
+
+      return (response as List).map((raw) {
+        final row = (raw as Map).cast<String, dynamic>();
+        return PainReport(
+          region: row['body_region'] as String,
+          intensity: (row['intensity'] as num?)?.toInt(),
+          source: row['source'] as String,
+          notes: row['notes'] as String?,
+        );
+      }).toList();
+    } catch (e) {
+      debugPrint('[Vika] getActivePainReports failed: $e');
+      return [];
+    }
+  }
+
+  /// Capture-only self-report of pain in [region] at [intensity] (1..5).
+  /// Reaffirm-or-insert, mirroring `OnboardingPersistence._writePainAreas`:
+  ///   • an existing active row is refreshed in place — new intensity,
+  ///     `last_reaffirmed_at` bumped, `flag_count` incremented, and the source
+  ///     is left untouched (a 'confirmed' row stays 'confirmed', never
+  ///     downgraded to self-reported).
+  ///   • no active row → INSERT a fresh self_reported / active row.
+  /// [notes] is persisted only for the free-text 'other' region. Best-effort;
+  /// failures are logged, never thrown.
+  Future<void> reportPainArea(
+    String region,
+    int intensity, {
+    String? notes,
+  }) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return;
+
+    try {
+      final now = DateTime.now().toIso8601String();
+      final existing = await _client
+          .from('user_pain_areas')
+          .select('id, flag_count')
+          .eq('user_id', userId)
+          .eq('body_region', region)
+          .eq('status', 'active')
+          .maybeSingle();
+
+      if (existing != null) {
+        // Reaffirm: read-modify-write flag_count. Not atomic, but a single
+        // user tapping one region isn't a contention case. Source is left as
+        // is on purpose — do not downgrade a 'confirmed' row.
+        final newCount = ((existing['flag_count'] as num?)?.toInt() ?? 1) + 1;
+        await _client.from('user_pain_areas').update({
+          'intensity': intensity,
+          'last_reaffirmed_at': now,
+          'flag_count': newCount,
+          if (region == 'other' && notes != null) 'notes': notes,
+        }).eq('id', existing['id']);
+      } else {
+        await _client.from('user_pain_areas').insert({
+          'user_id': userId,
+          'body_region': region,
+          'source': 'self_reported',
+          'status': 'active',
+          'intensity': intensity,
+          'first_flagged_at': now,
+          'last_reaffirmed_at': now,
+          'flag_count': 1,
+          if (region == 'other' && notes != null) 'notes': notes,
+        });
+      }
+    } catch (e) {
+      debugPrint('[Vika] reportPainArea failed: $e');
+    }
+  }
+
+  /// Clears a self-report by RESOLVING the active row for [region] — never a
+  /// DELETE, so the history (and any interpreter-confirmed origin) is kept.
+  /// Best-effort; failures are logged, never thrown.
+  Future<void> resolvePainArea(String region) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return;
+
+    try {
+      await _client
+          .from('user_pain_areas')
+          .update({
+            'status': 'resolved',
+            'resolved_at': DateTime.now().toIso8601String(),
+          })
+          .eq('user_id', userId)
+          .eq('body_region', region)
+          .eq('status', 'active');
+    } catch (e) {
+      debugPrint('[Vika] resolvePainArea failed: $e');
     }
   }
 

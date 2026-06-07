@@ -69,6 +69,13 @@ class _ProgressScreenState extends State<ProgressScreen> {
   /// = no sessions in this period (empty state).
   ({int? to, int? from, int? delta, List<int> trend})? _formSummary;
 
+  /// Active pain self-reports keyed by body_region. Null = loading
+  /// (show the silhouette placeholder); empty map = nothing reported yet.
+  Map<String, PainMark>? _painReports;
+
+  /// Raw `profiles.gender` for the silhouette. Null/unknown defaults to male.
+  String? _gender;
+
   /// Scroll offset past which the sticky pill bar fades in.
   static const double _stickyBarThreshold = 240;
 
@@ -80,6 +87,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
     widget.refreshListenable?.addListener(_handleRefreshNudge);
     _scrollController.addListener(_onScroll);
     unawaited(_loadFormSummary(_period));
+    unawaited(_loadPainReports());
+    unawaited(_loadGender());
   }
 
   @override
@@ -105,6 +114,44 @@ class _ProgressScreenState extends State<ProgressScreen> {
   void _handleRefreshNudge() {
     unawaited(_loadProfile());
     unawaited(_loadFormSummary(_period));
+    unawaited(_loadPainReports());
+    unawaited(_loadGender());
+  }
+
+  /// Loads active pain self-reports into [_painReports]. Maps each row's
+  /// source so interpreter-'confirmed' areas read differently from plain
+  /// self-reports in the UI.
+  Future<void> _loadPainReports() async {
+    final reports = await _sessions.getActivePainReports();
+    if (!mounted) return;
+    setState(() {
+      _painReports = {
+        for (final r in reports)
+          r.region: PainMark(
+            intensity: r.intensity,
+            confirmed: r.source == 'confirmed',
+            notes: r.notes,
+          ),
+      };
+    });
+  }
+
+  Future<void> _loadGender() async {
+    final gender = await _profileService.fetchGender();
+    if (!mounted) return;
+    setState(() => _gender = gender);
+  }
+
+  /// Capture-only: persist a self-report, then refresh the silhouette.
+  Future<void> _reportPain(String region, int intensity, String? notes) async {
+    await _sessions.reportPainArea(region, intensity, notes: notes);
+    await _loadPainReports();
+  }
+
+  /// Capture-only: resolve (never delete) a report, then refresh.
+  Future<void> _resolvePain(String region) async {
+    await _sessions.resolvePainArea(region);
+    await _loadPainReports();
   }
 
   Future<void> _loadProfile() async {
@@ -285,20 +332,45 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     const SizedBox(height: 40),
                   ],
 
-                  // 4. CƠ THỂ KHOẺ LÊN — body heat map
-                  // TODO(wiring): still mock — wire to real per-region data.
+                  // 4. CƠ THỂ — tappable pain self-report (capture-only).
                   _SectionHeader(
-                    eyebrow: 'CƠ THỂ KHOẺ LÊN',
-                    meta: '${progressMockBodyAreas.length} VÙNG',
+                    eyebrow: 'CƠ THỂ',
+                    meta: (_painReports == null || _painReports!.isEmpty)
+                        ? null
+                        : '${_painReports!.length} VÙNG',
                     intro:
-                        'Vika theo dõi từng vùng cơ. Vùng nào sáng vàng là vùng đang lên rõ nhất.',
+                        'Chạm vào vùng đang đau để Vika ghi lại. Bạn cập nhật bất cứ lúc nào.',
                   ),
                   const SizedBox(height: 14),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: const BodyHeatMap(
-                      areas: progressMockBodyAreas,
-                      gender: BodyGender.male,
+                    child: _painReports == null
+                        ? const _PainPlaceholder()
+                        : BodyPainReporter(
+                            reports: _painReports!,
+                            gender: _gender == 'female'
+                                ? BodyGender.female
+                                : BodyGender.male,
+                            onReport: _reportPain,
+                            onResolve: _resolvePain,
+                          ),
+                  ),
+                  const SizedBox(height: 14),
+                  // Safety disclaimer — pinned at the bottom of the section.
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Text(
+                      'Đây là ghi chú của riêng bạn, không phải chẩn đoán. '
+                      'Nếu cơn đau dữ dội hoặc kéo dài, bạn nên đi khám bác sĩ nhé.',
+                      style: TextStyle(
+                        fontFamily: 'BeVietnamPro',
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        fontStyle: FontStyle.italic,
+                        height: 1.5,
+                        letterSpacing: 0.1,
+                        color: c.inkSoft,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 40),
@@ -418,6 +490,54 @@ class _GaugePlaceholder extends StatelessWidget {
           fontStyle: FontStyle.italic,
           letterSpacing: -0.1,
           color: c.inkSoft,
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PAIN PLACEHOLDER — muted stand-in in the silhouette slot while the
+// active pain reports load. Premium Ivory tokens only.
+// ═══════════════════════════════════════════════════════════════
+
+class _PainPlaceholder extends StatelessWidget {
+  const _PainPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    // Dark stage that previews the loaded instrument, so loading → loaded
+    // doesn't flash cream-to-dark.
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 88, horizontal: 24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: const Alignment(-0.6, -1),
+          end: const Alignment(0.6, 1),
+          colors: [c.bgInverse, c.bgInverseHi],
+        ),
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: c.ink.withValues(alpha: 0.28),
+            blurRadius: 40,
+            offset: const Offset(0, 16),
+          ),
+        ],
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        'Đang tải vùng cơ thể…',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontFamily: 'BeVietnamPro',
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          fontStyle: FontStyle.italic,
+          letterSpacing: -0.1,
+          color: c.invInkSoft,
         ),
       ),
     );
