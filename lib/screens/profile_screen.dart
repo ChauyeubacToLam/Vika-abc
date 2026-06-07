@@ -26,6 +26,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../data/profile_goal_quote.dart';
 import '../data/profile_mock.dart';
 import '../services/data_export_service.dart';
 import '../services/user_profile_service.dart';
@@ -500,7 +501,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: GoalCard(
                       title: profileMockGoalTitle,
-                      quote: profileMockGoalQuote,
+                      quote: goalQuoteFor(profile?.goal),
                       progress: profileMockGoalProgress,
                       daysLeft: profileMockGoalDaysLeft,
                     ),

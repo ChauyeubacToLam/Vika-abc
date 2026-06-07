@@ -19,6 +19,7 @@ class AppUserProfile {
     this.weightKg,
     this.age,
     this.fitnessLevel,
+    this.goal,
   });
 
   final String id;
@@ -33,6 +34,7 @@ class AppUserProfile {
   final int? weightKg;
   final int? age;
   final String? fitnessLevel;
+  final String? goal;
 
   String get memberSinceLabel {
     final date = createdAt;
@@ -77,6 +79,7 @@ class AppUserProfile {
     int? weightKg,
     int? age,
     String? fitnessLevel,
+    String? goal,
   }) {
     return AppUserProfile(
       id: id,
@@ -91,6 +94,7 @@ class AppUserProfile {
       weightKg: weightKg ?? this.weightKg,
       age: age ?? this.age,
       fitnessLevel: fitnessLevel ?? this.fitnessLevel,
+      goal: goal ?? this.goal,
     );
   }
 }
@@ -124,7 +128,7 @@ class UserProfileService {
           .from('profiles')
           .select(
             'id, display_name, avatar_url, created_at, updated_at, '
-            'last_workout_at, height_cm, weight_kg, age, fitness_level',
+            'last_workout_at, height_cm, weight_kg, age, fitness_level, goals',
           )
           .eq('id', user.id)
           .maybeSingle();
@@ -135,6 +139,7 @@ class UserProfileService {
     final displayName =
         _firstString([row?['display_name'], oauthName]) ?? 'Bạn';
     final avatarUrl = _firstString([row?['avatar_url'], oauthAvatar]);
+    final goalsList = (row?['goals'] as List?)?.cast<String>();
     final streakDays =
         await SessionPersistence(client: _client).currentStreak();
     final profile = AppUserProfile(
@@ -151,6 +156,7 @@ class UserProfileService {
       weightKg: (row?['weight_kg'] as num?)?.round(),
       age: (row?['age'] as num?)?.toInt(),
       fitnessLevel: row?['fitness_level'] as String?,
+      goal: (goalsList != null && goalsList.isNotEmpty) ? goalsList.first : null,
     );
 
     await _syncProfileIdentityIfNeeded(
