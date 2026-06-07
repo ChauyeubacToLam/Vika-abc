@@ -209,6 +209,32 @@ class UserProfileService {
     return fetchCurrentProfile();
   }
 
+  /// Updates a subset of plan-input fields on `profiles` (body stats + goal)
+  /// from the Profile tab editors. Only non-null fields are written; the goal
+  /// is stored as a single-element `goals` array to match onboarding. Returns
+  /// the refreshed profile.
+  Future<AppUserProfile?> updateProfileFields({
+    int? heightCm,
+    int? weightKg,
+    int? age,
+    String? goal,
+  }) async {
+    final user = _client.auth.currentUser;
+    if (user == null) return null;
+
+    final payload = <String, dynamic>{
+      'id': user.id,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+      if (heightCm != null) 'height_cm': heightCm,
+      if (weightKg != null) 'weight_kg': weightKg,
+      if (age != null) 'age': age,
+      if (goal != null) 'goals': [goal],
+    };
+
+    await _client.from('profiles').upsert(payload, onConflict: 'id');
+    return fetchCurrentProfile();
+  }
+
   Future<String> _uploadAvatar(String userId, File file) async {
     final extension = file.path.split('.').last.toLowerCase();
     final safeExtension = switch (extension) {

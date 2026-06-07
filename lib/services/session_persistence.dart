@@ -478,6 +478,114 @@ class SessionPersistence {
     return count;
   }
 
+  /// Profile "Hành trình tính đến hôm nay" lifetime aggregate, computed
+  /// client-side from completed workout_sessions. Single round trip; the math
+  /// lives in [deriveLifetimeStatsForTest] so it stays unit-testable.
+  ///
+  ///   sessionCount       — completed sessions
+  ///   totalSeconds       — sum of total_duration_seconds (nulls skipped)
+  ///   avgForm            — rounded mean session_form_score, null if no scored
+  ///                        session
+  ///   formDeltaFromStart — latest minus earliest score; null when fewer than
+  ///                        3 sessions or fewer than 2 scored sessions
+  ///   sessionsThisWeek   — sessions completed within the last 7 days
+  Future<
+      ({
+        int sessionCount,
+        int totalSeconds,
+        int? avgForm,
+        int? formDeltaFromStart,
+        int sessionsThisWeek,
+      })> lifetimeStats() async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return _emptyLifetimeStats;
+
+    try {
+      final rows = await _client
+          .from('workout_sessions')
+          .select('session_form_score, total_duration_seconds, completed_at')
+          .eq('user_id', userId)
+          .not('completed_at', 'is', null)
+          .order('completed_at', ascending: true);
+
+      final samples =
+          <({DateTime completedAt, int? formScore, int? durationSeconds})>[];
+      for (final raw in rows as List) {
+        final row = (raw as Map).cast<String, dynamic>();
+        final completedAt = _dateTimeOrNull(row['completed_at']);
+        if (completedAt == null) continue;
+        samples.add((
+          completedAt: completedAt,
+          formScore: (row['session_form_score'] as num?)?.toInt(),
+          durationSeconds: (row['total_duration_seconds'] as num?)?.toInt(),
+        ));
+      }
+      return deriveLifetimeStatsForTest(samples);
+    } catch (e) {
+      debugPrint('[Vika] lifetimeStats failed: $e');
+      return _emptyLifetimeStats;
+    }
+  }
+
+  static const _emptyLifetimeStats = (
+    sessionCount: 0,
+    totalSeconds: 0,
+    avgForm: null,
+    formDeltaFromStart: null,
+    sessionsThisWeek: 0,
+  );
+
+  /// Pure aggregation for [lifetimeStats]. [samples] are completed sessions in
+  /// any order; `now` is injectable so the 7-day window is deterministic in
+  /// tests.
+  @visibleForTesting
+  static ({
+    int sessionCount,
+    int totalSeconds,
+    int? avgForm,
+    int? formDeltaFromStart,
+    int sessionsThisWeek,
+  }) deriveLifetimeStatsForTest(
+    Iterable<({DateTime completedAt, int? formScore, int? durationSeconds})>
+        samples, {
+    DateTime? now,
+  }) {
+    final sorted = [...samples]
+      ..sort((a, b) => a.completedAt.compareTo(b.completedAt));
+    final sessionCount = sorted.length;
+
+    var totalSeconds = 0;
+    final scores = <int>[];
+    for (final s in sorted) {
+      if (s.durationSeconds != null) totalSeconds += s.durationSeconds!;
+      if (s.formScore != null) scores.add(s.formScore!);
+    }
+
+    final avgForm = scores.isEmpty ? null : _roundedMean(scores);
+    // A trend only reads as real once there's enough history: 3+ sessions and
+    // at least two scored sessions to subtract.
+    final formDeltaFromStart = (sessionCount >= 3 && scores.length >= 2)
+        ? scores.last - scores.first
+        : null;
+
+    final end = now ?? DateTime.now();
+    final weekStart = end.subtract(const Duration(days: 7));
+    var sessionsThisWeek = 0;
+    for (final s in sorted) {
+      if (!s.completedAt.isBefore(weekStart) && !s.completedAt.isAfter(end)) {
+        sessionsThisWeek++;
+      }
+    }
+
+    return (
+      sessionCount: sessionCount,
+      totalSeconds: totalSeconds,
+      avgForm: avgForm,
+      formDeltaFromStart: formDeltaFromStart,
+      sessionsThisWeek: sessionsThisWeek,
+    );
+  }
+
   /// Home "FORM 7 NGÀY" vitals summary over a rolling 14-day window.
   ///
   /// Read-only display aggregate — scores are computed and frozen elsewhere.

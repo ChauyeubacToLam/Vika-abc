@@ -20,12 +20,15 @@ class BodyCard extends StatelessWidget {
     this.onEdit,
   });
 
-  final int height;
-  final int weight;
-  final int age;
-  final String bmi;
+  final int? height;
+  final int? weight;
+  final int? age;
+  final String? bmi;
   final String bmiCategory;
   final VoidCallback? onEdit;
+
+  /// Shown in place of any value that is null — never a fake number.
+  static const _placeholder = '—';
 
   @override
   Widget build(BuildContext context) {
@@ -109,7 +112,7 @@ class BodyCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: _BodyStat(
-                    value: '$height',
+                    value: height?.toString() ?? _placeholder,
                     unit: 'cm',
                     label: 'Chiều cao',
                   ),
@@ -120,7 +123,7 @@ class BodyCard extends StatelessWidget {
                 ),
                 Expanded(
                   child: _BodyStat(
-                    value: '$weight',
+                    value: weight?.toString() ?? _placeholder,
                     unit: 'kg',
                     label: 'Cân nặng',
                   ),
@@ -131,7 +134,7 @@ class BodyCard extends StatelessWidget {
                 ),
                 Expanded(
                   child: _BodyStat(
-                    value: '$age',
+                    value: age?.toString() ?? _placeholder,
                     unit: 'tuổi',
                     label: 'Tuổi',
                   ),
@@ -172,7 +175,7 @@ class BodyCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Text(
-                  bmi,
+                  bmi ?? _placeholder,
                   style: TextStyle(
                     fontFamily: 'BeVietnamPro',
                     fontSize: 20,
