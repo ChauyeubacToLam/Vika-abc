@@ -26,17 +26,19 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../data/profile_goal_quote.dart';
 import '../data/profile_mock.dart';
 import '../services/data_export_service.dart';
+import '../services/recommendation/recommendation_service.dart';
+import '../services/session_persistence.dart';
 import '../services/user_profile_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/vf_theme.dart';
 import '../utils/orientation_lock.dart';
-import '../widgets/profile/achievements_rail.dart';
 import '../widgets/profile/body_card.dart';
-import '../widgets/profile/connect_share_section.dart';
+import '../widgets/profile/body_edit_sheet.dart';
 import '../widgets/profile/goal_card.dart';
-import '../widgets/profile/journey_timeline.dart';
+import '../widgets/profile/goal_edit_sheet.dart';
 import '../widgets/profile/lifetime_hero.dart';
 import '../widgets/profile/profile_stage_hero.dart';
 import '../widgets/profile/settings_group.dart';
@@ -60,11 +62,29 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final ScrollController _scrollController = ScrollController();
   final _profileService = UserProfileService();
+  final _sessions = SessionPersistence();
+  final _recommendations = RecommendationService();
   bool _showStickyBar = false;
   bool _showDownFab = false;
   bool _deleting = false;
   bool _exporting = false;
   AppUserProfile? _profile;
+
+  // Lifetime aggregate from completed workout_sessions. Null until the first
+  // fetch resolves; treated as "no history" (0 sessions) while null so the UI
+  // never shows fake numbers before data arrives.
+  ({
+    int sessionCount,
+    int totalSeconds,
+    int? avgForm,
+    int? formDeltaFromStart,
+    int sessionsThisWeek,
+  })? _lifetime;
+
+  // Plan-derived goal progress (completion-anchored, not calendar).
+  int _goalProgress = 0;
+  String? _weeksLeftLabel; // "Còn N tuần nữa", null when no active plan
+  String? _phaseLabel; // "TUẦN n / N", null when no active plan
 
   // Support contact + legal links. /terms and /support are not live yet, so
   // only the live privacy page is linked; support is handled over email.
@@ -84,6 +104,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _scrollController.addListener(_onScroll);
     _profile = widget.userProfile;
     unawaited(_loadProfile());
+    unawaited(_loadStats());
   }
 
   @override
@@ -152,6 +173,102 @@ class _ProfileScreenState extends State<ProfileScreen> {
     widget.onProfileChanged?.call(profile);
   }
 
+  /// Loads the real lifetime aggregate + plan-derived goal progress. Both feed
+  /// the staged display (empty / counts-only / full) so the tab never shows
+  /// placeholder numbers.
+  Future<void> _loadStats() async {
+    final lifetime = await _sessions.lifetimeStats();
+
+    var goalProgress = 0;
+    String? weeksLeftLabel;
+    String? phaseLabel;
+    final snapshot =
+        await _recommendations.fetchLatestActivePlanSnapshotForCurrentUser();
+    if (snapshot != null) {
+      final weeks = snapshot.plan.weeks;
+      final totalWeeks = weeks.length;
+      if (totalWeeks > 0) {
+        // A week counts as done only when every one of its sessions is in the
+        // completion map for that week.
+        var completedWeeks = 0;
+        for (final w in weeks) {
+          final done = snapshot.completionMap[w.weekNumber] ?? const <int>{};
+          final allDone = w.sessions.isNotEmpty &&
+              w.sessions.every((s) => done.contains(s.sessionIndex));
+          if (allDone) completedWeeks++;
+        }
+        goalProgress = ((completedWeeks / totalWeeks) * 100).round();
+        weeksLeftLabel = 'Còn ${totalWeeks - completedWeeks} tuần nữa';
+        final currentWeek = snapshot.currentWeek?.weekNumber;
+        if (currentWeek != null) {
+          phaseLabel = 'TUẦN $currentWeek / $totalWeeks';
+        }
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _lifetime = lifetime;
+      _goalProgress = goalProgress;
+      _weeksLeftLabel = weeksLeftLabel;
+      _phaseLabel = phaseLabel;
+    });
+  }
+
+  /// Compact uppercase hero strip. Empty for a brand-new user (0 sessions) so
+  /// the strip is hidden rather than showing "0 NGÀY".
+  List<String> _buildInlineStats() {
+    final lt = _lifetime;
+    if (lt == null || lt.sessionCount == 0) return const [];
+    final stats = <String>[
+      '${_profile?.streakDays ?? 0} NGÀY',
+      '${lt.sessionCount} BUỔI',
+    ];
+    if (lt.avgForm != null) stats.add('${lt.avgForm}% FORM');
+    return stats;
+  }
+
+  /// Lifetime stats trio for the LifetimeHero. Deltas only appear once there's
+  /// enough history (3+ sessions); see [SessionPersistence.lifetimeStats].
+  List<ProfileLifetimeStat> _buildLifetimeStats() {
+    final lt = _lifetime;
+    // Null (pre-load) or zero sessions → the empty state is shown instead, so
+    // the trio is never rendered; return an empty list rather than fake zeros.
+    if (lt == null || lt.sessionCount == 0) return const [];
+    final showDeltas = lt.sessionCount >= 3;
+
+    // Total time reads as minutes under an hour, hours above — never a fake
+    // decimal like "0.2 giờ".
+    final (timeValue, timeUnit) = lt.totalSeconds < 3600
+        ? ('${(lt.totalSeconds / 60).round()}', 'phút')
+        : ((lt.totalSeconds / 3600).toStringAsFixed(1), 'giờ');
+
+    final delta = lt.formDeltaFromStart;
+    return [
+      ProfileLifetimeStat(
+        value: '${lt.sessionCount}',
+        unit: 'buổi',
+        label: 'ĐÃ TẬP',
+        delta: (showDeltas && lt.sessionsThisWeek > 0)
+            ? '+${lt.sessionsThisWeek} tuần này'
+            : null,
+      ),
+      ProfileLifetimeStat(
+        value: timeValue,
+        unit: timeUnit,
+        label: 'TỔNG CỘNG',
+      ),
+      ProfileLifetimeStat(
+        value: lt.avgForm != null ? '${lt.avgForm}' : '—',
+        unit: '%',
+        label: 'FORM TB',
+        delta: (showDeltas && delta != null)
+            ? '${delta >= 0 ? '+' : ''}$delta từ đầu'
+            : null,
+      ),
+    ];
+  }
+
   Future<void> _openEditProfileSheet() async {
     final result = await showModalBottomSheet<_EditProfileResult>(
       context: context,
@@ -176,6 +293,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
       );
+  }
+
+  // ─── Goal editor (GoalCard "Sửa") ─────────────────────────────────────
+  Future<void> _openGoalEditSheet() async {
+    await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => GoalEditSheet(
+        currentGoal: _profile?.goal,
+        onSave: (goal) async {
+          final updated = await _profileService.updateProfileFields(goal: goal);
+          if (updated == null) return false;
+          if (!mounted) return true;
+          setState(() => _profile = updated);
+          widget.onProfileChanged?.call(updated);
+          return true;
+        },
+      ),
+    );
+  }
+
+  // ─── Body stats editor (BodyCard "Sửa") ───────────────────────────────
+  Future<void> _openBodyEditSheet() async {
+    await showModalBottomSheet<BodyStats>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => BodyEditSheet(
+        currentHeight: _profile?.heightCm,
+        currentWeight: _profile?.weightKg,
+        currentAge: _profile?.age,
+        onSave: (stats) async {
+          final updated = await _profileService.updateProfileFields(
+            heightCm: stats.height,
+            weightKg: stats.weight,
+            age: stats.age,
+          );
+          if (updated == null) return false;
+          if (!mounted) return true;
+          setState(() => _profile = updated);
+          widget.onProfileChanged?.call(updated);
+          return true;
+        },
+      ),
+    );
   }
 
   Future<void> _confirmSignOut() async {
@@ -458,11 +621,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final memberSince = profile?.memberSinceLabel ?? profileMockMemberSince;
     final memberSinceLine =
         'Thành viên từ $memberSince · $streakDays ngày liên tiếp';
-    final height = profile?.heightCm ?? profileMockHeight;
-    final weight = profile?.weightKg ?? profileMockWeight;
-    final age = profile?.age ?? profileMockAge;
-    final bmi = profile?.bmiLabel ?? profileMockBMI;
-    final bmiCategory = profile?.bmiCategory ?? profileMockBMILabel;
+    // Body stats stay null when unknown — BodyCard renders "—", never a fake
+    // number.
+    final height = profile?.heightCm;
+    final weight = profile?.weightKg;
+    final age = profile?.age;
+    final bmi = profile?.bmiValue != null ? profile!.bmiLabel : null;
+    final bmiCategory = profile?.bmiCategory ?? 'Chưa đủ dữ liệu';
+    final lifetimeStats = _buildLifetimeStats();
+    final hasSessions = (_lifetime?.sessionCount ?? 0) > 0;
 
     return Container(
       color: c.bg,
@@ -482,14 +649,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     name: displayName,
                     userInitial: userInitial,
                     avatarUrl: avatarUrl,
-                    phaseLabel: profileMockPhaseShort,
+                    phaseLabel: _phaseLabel,
                     memberSinceLine: memberSinceLine,
-                    goalProgress: profileMockGoalProgress,
-                    inlineStats: [
-                      '$streakDays NGÀY',
-                      '8 BUỔI',
-                      '74% FORM',
-                    ],
+                    goalProgress: _goalProgress,
+                    inlineStats: _buildInlineStats(),
                     onEdit: _openEditProfileSheet,
                     onEditPhoto: _openEditProfileSheet,
                   ),
@@ -499,10 +662,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: GoalCard(
-                      title: profileMockGoalTitle,
-                      quote: profileMockGoalQuote,
-                      progress: profileMockGoalProgress,
-                      daysLeft: profileMockGoalDaysLeft,
+                      title: goalTitleFor(profile?.goal),
+                      quote: goalQuoteFor(profile?.goal),
+                      progress: _goalProgress,
+                      daysLeft: _weeksLeftLabel,
+                      onEdit: _openGoalEditSheet,
                     ),
                   ),
                   const SizedBox(height: 40),
@@ -511,35 +675,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: LifetimeHero(
-                      stats: profileMockLifetimeStats,
-                      coach: profileMockCoachLine,
+                      stats: lifetimeStats,
+                      emptyLine: hasSessions
+                          ? null
+                          : 'Hành trình của bạn bắt đầu từ buổi tập đầu tiên.',
+                      // While history is too thin for a trend, set the
+                      // expectation instead of faking deltas.
+                      footnote: (hasSessions &&
+                              (_lifetime?.sessionCount ?? 0) < 3)
+                          ? 'Thêm vài buổi nữa để thấy xu hướng form của bạn.'
+                          : null,
                     ),
-                  ),
-                  const SizedBox(height: 40),
-
-                  // 3. Thành tựu — achievements rail.
-                  _SectionHeader(
-                    eyebrow: 'THÀNH TỰU',
-                    meta:
-                        '${profileMockAchievements.where((a) => a.unlocked).length} / ${profileMockAchievements.length}',
-                    intro:
-                        'Những cột mốc Vika ghi lại trong hành trình. Mỗi chương là một dấu mốc.',
-                  ),
-                  const SizedBox(height: 14),
-                  const AchievementsRail(
-                    achievements: profileMockAchievements,
-                  ),
-                  const SizedBox(height: 40),
-
-                  // 4. Hành trình — journey timeline.
-                  _SectionHeader(
-                    eyebrow: 'HÀNH TRÌNH',
-                    meta: '${profileMockJourney.length} MỐC',
-                    intro: 'Câu chuyện của bạn từ ngày đầu đến hôm nay.',
-                  ),
-                  const SizedBox(height: 14),
-                  const JourneyTimeline(
-                    milestones: profileMockJourney,
                   ),
                   const SizedBox(height: 40),
 
@@ -557,37 +703,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       age: age,
                       bmi: bmi,
                       bmiCategory: bmiCategory,
-                      onEdit: _openEditProfileSheet,
-                    ),
-                  ),
-                  const SizedBox(height: 40),
-
-                  // 6. Mời bạn — referral card.
-                  _SectionHeader(
-                    eyebrow: 'MỜI BẠN',
-                    intro: 'Một lượt mời thành công tặng bạn 1 tuần Vika+.',
-                  ),
-                  const SizedBox(height: 14),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: ReferralCard(
-                      count: profileMockReferralCount,
-                      subtitle: profileMockReferralLine,
-                    ),
-                  ),
-                  const SizedBox(height: 40),
-
-                  // 7. Kết nối — connected services.
-                  _SectionHeader(
-                    eyebrow: 'KẾT NỐI',
-                    intro: 'Đồng bộ buổi tập với các dịch vụ sức khoẻ khác.',
-                  ),
-                  const SizedBox(height: 14),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: const ConnectionsList(
-                      services: profileMockConnections,
-                      comingSoon: true,
+                      onEdit: _openBodyEditSheet,
                     ),
                   ),
                   const SizedBox(height: 40),
@@ -603,28 +719,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        SettingsGroup(
-                          label: 'Tập luyện',
-                          accentColor: c.phase1,
-                          rows: [
-                            // Deferred: needs flutter_local_notifications.
-                            // TODO(post-launch): wire reminders.
-                            SettingRow(
-                              icon: Icons.notifications_none_rounded,
-                              label: 'Nhắc tập',
-                              accentColor: c.phase1,
-                              comingSoon: true,
-                            ),
-                            // Deferred: waits on the final voice list.
-                            // TODO(post-launch): wire coach voice.
-                            SettingRow(
-                              icon: Icons.mic_none_rounded,
-                              label: 'Giọng huấn luyện viên',
-                              accentColor: c.phase1,
-                              comingSoon: true,
-                            ),
-                          ],
-                        ),
                         SettingsGroup(
                           label: 'Quyền riêng tư',
                           accentColor: c.phase4,
@@ -740,12 +834,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({
     required this.eyebrow,
-    this.meta,
     this.intro,
   });
 
   final String eyebrow;
-  final String? meta;
   final String? intro;
 
   @override
@@ -779,20 +871,6 @@ class _SectionHeader extends StatelessWidget {
               ),
               const SizedBox(width: 14),
               Expanded(child: Container(height: 1, color: c.border)),
-              if (meta != null) ...[
-                const SizedBox(width: 14),
-                Text(
-                  meta!.toUpperCase(),
-                  style: TextStyle(
-                    fontFamily: 'BeVietnamPro',
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.4,
-                    color: c.inkFaint,
-                    fontFeatures: VikaIvoryMain.tabularFigures,
-                  ),
-                ),
-              ],
             ],
           ),
           if (intro != null) ...[

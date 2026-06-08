@@ -1,9 +1,14 @@
-// LifetimeHero — warm-dark card carrying the user's lifetime stats and
-// the coach voice. Sits below the goal card on the Profile page.
+// LifetimeHero — warm-dark card carrying the user's lifetime stats. Sits
+// below the goal card on the Profile page.
 //
 // v2 split: goal title / quote / progress meter are now in the
 // separate GoalCard widget. This file focuses on the stats trio +
-// editorial kicker + coach line.
+// editorial kicker.
+//
+// Three display stages, driven by the caller (see ProfileScreen):
+//   • 0 sessions  → [emptyLine] guided state, no stats trio
+//   • 1-2 sessions → real stats, deltas hidden, optional [footnote]
+//   • 3+ sessions  → real stats with deltas
 
 import 'package:flutter/material.dart';
 
@@ -16,12 +21,21 @@ class LifetimeHero extends StatelessWidget {
   const LifetimeHero({
     super.key,
     required this.stats,
-    required this.coach,
+    this.emptyLine,
+    this.footnote,
     this.kicker = 'HÀNH TRÌNH TÍNH ĐẾN HÔM NAY',
   });
 
   final List<ProfileLifetimeStat> stats;
-  final String coach;
+
+  /// When non-null, the card shows this single warm line instead of the stats
+  /// trio — the guided empty state for users with zero completed sessions.
+  final String? emptyLine;
+
+  /// Optional editorial line under the stats, e.g. an expectation-setting note
+  /// while the user has too little history for trends.
+  final String? footnote;
+
   final String kicker;
 
   @override
@@ -114,70 +128,60 @@ class LifetimeHero extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 22),
-              // Stats trio inside its own hairline-bordered band.
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                decoration: BoxDecoration(
-                  border: Border(
-                    top: BorderSide(color: c.borderDark),
-                    bottom: BorderSide(color: c.borderDark),
-                  ),
-                ),
-                child: IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (var i = 0; i < stats.length; i++) ...[
-                        Expanded(
-                          child: _StatTile(
-                            stat: stats[i],
-                            yellow: i == stats.length - 1,
-                          ),
-                        ),
-                        if (i < stats.length - 1)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            child: Container(width: 1, color: c.borderDark),
-                          ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  const CoachMark(small: true),
-                  const SizedBox(width: 10),
-                  PlanEyebrow(
-                    'HUẤN LUYỆN VIÊN GHI',
-                    size: 9.5,
-                    letterSpacing: 1.6,
-                    dark: true,
-                  ),
-                  const Spacer(),
-                  Text(
-                    '“',
-                    style: TextStyle(
-                      fontFamily: 'BeVietnamPro',
-                      fontSize: 36,
-                      fontWeight: FontWeight.w800,
-                      fontStyle: FontStyle.italic,
-                      height: 0.4,
-                      color: c.yellow.withValues(alpha: 0.45),
+              if (emptyLine != null)
+                // Guided empty state — one warm line, no stats trio, no fake
+                // numbers. Two parts instruction, one part delight.
+                PlanP(
+                  emptyLine!,
+                  dark: true,
+                  italic: true,
+                  size: 15,
+                  letterSpacing: -0.2,
+                  height: 1.5,
+                )
+              else ...[
+                // Stats trio inside its own hairline-bordered band.
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      top: BorderSide(color: c.borderDark),
+                      bottom: BorderSide(color: c.borderDark),
                     ),
                   ),
+                  child: IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (var i = 0; i < stats.length; i++) ...[
+                          Expanded(
+                            child: _StatTile(
+                              stat: stats[i],
+                              yellow: i == stats.length - 1,
+                            ),
+                          ),
+                          if (i < stats.length - 1)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Container(width: 1, color: c.borderDark),
+                            ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                if (footnote != null) ...[
+                  const SizedBox(height: 16),
+                  PlanP(
+                    footnote!,
+                    dark: true,
+                    italic: true,
+                    size: 13,
+                    letterSpacing: -0.1,
+                    height: 1.5,
+                  ),
                 ],
-              ),
-              const SizedBox(height: 10),
-              PlanP(
-                coach,
-                dark: true,
-                italic: true,
-                size: 14.5,
-                letterSpacing: -0.2,
-                height: 1.5,
-              ),
+              ],
             ],
           ),
         ],

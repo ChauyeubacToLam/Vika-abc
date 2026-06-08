@@ -36,7 +36,10 @@ class GoalCard extends StatelessWidget {
 
   /// 0..100.
   final int progress;
-  final String daysLeft;
+
+  /// Weeks-remaining label, e.g. "Còn 4 tuần nữa". Null hides it (no active
+  /// plan) so we never show a fake number.
+  final String? daysLeft;
   final VoidCallback? onEdit;
 
   @override
@@ -217,7 +220,7 @@ class _SplitTitle extends StatelessWidget {
 class _ProgressMeter extends StatelessWidget {
   const _ProgressMeter({required this.progress, required this.daysLeft});
   final int progress;
-  final String daysLeft;
+  final String? daysLeft;
 
   @override
   Widget build(BuildContext context) {
@@ -271,16 +274,17 @@ class _ProgressMeter extends StatelessWidget {
               ],
             ),
             const Spacer(),
-            Text(
-              daysLeft,
-              style: TextStyle(
-                fontFamily: 'BeVietnamPro',
-                fontSize: 10.5,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.4,
-                color: c.inkFaint,
+            if (daysLeft != null)
+              Text(
+                daysLeft!,
+                style: TextStyle(
+                  fontFamily: 'BeVietnamPro',
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.4,
+                  color: c.inkFaint,
+                ),
               ),
-            ),
           ],
         ),
         const SizedBox(height: 12),

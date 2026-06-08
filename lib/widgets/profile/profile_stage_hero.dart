@@ -42,7 +42,7 @@ class ProfileStageHero extends StatelessWidget {
     super.key,
     required this.name,
     required this.userInitial,
-    required this.phaseLabel,
+    this.phaseLabel,
     required this.memberSinceLine,
     required this.goalProgress,
     required this.inlineStats,
@@ -57,7 +57,10 @@ class ProfileStageHero extends StatelessWidget {
   final String name;
   final String userInitial;
   final String? avatarUrl;
-  final String phaseLabel;
+
+  /// Phase/week pill copy, e.g. "TUẦN 1 / 7". Null hides the pill (no active
+  /// plan) so we never show a fake phase.
+  final String? phaseLabel;
 
   /// Single italic line under the phase pill, e.g.
   /// "Thành viên từ 27 / 4 · 12 ngày liên tiếp".
@@ -198,9 +201,11 @@ class ProfileStageHero extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
 
-                  // Phase pill — centered.
-                  Center(child: _PhasePill(label: phaseLabel)),
-                  const SizedBox(height: 14),
+                  // Phase pill — centered. Hidden when there's no active plan.
+                  if (phaseLabel != null) ...[
+                    Center(child: _PhasePill(label: phaseLabel!)),
+                    const SizedBox(height: 14),
+                  ],
 
                   // Member-since italic — centered, narrow.
                   Padding(
@@ -221,10 +226,13 @@ class ProfileStageHero extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20),
-
                   // Inline stat strip — short uppercase, divided by dots.
-                  _InlineStatsRow(items: inlineStats),
+                  // Hidden entirely for a brand-new user (empty list) so we
+                  // never show a "0 NGÀY" placeholder strip.
+                  if (inlineStats.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    _InlineStatsRow(items: inlineStats),
+                  ],
                   const SizedBox(height: 24),
 
                   // Edit + share pill buttons, centered.
