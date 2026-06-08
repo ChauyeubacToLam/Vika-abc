@@ -40,6 +40,10 @@ class SessionTrophyPicker {
   static const int _pbMargin = 3;
   static const int _pbFloor = 60;
   static const Set<int> _streakMilestones = {3, 7, 14, 30};
+
+  /// Canonical streak milestones, exposed so other surfaces (e.g. the Progress
+  /// streak card's "next milestone" hint) stay in lockstep with the trophy.
+  static Set<int> get streakMilestones => _streakMilestones;
   static const int _rollingWindow = 5;
   static const int _cleanCut = 85;
   static const int _volumeFloor = 30;

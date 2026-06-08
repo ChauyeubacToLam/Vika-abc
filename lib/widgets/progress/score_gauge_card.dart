@@ -130,8 +130,12 @@ class _ScoreGaugeCardState extends State<ScoreGaugeCard>
               const SizedBox(height: 28),
               _GaugeBlock(data: widget.data, animation: _t),
               const SizedBox(height: 26),
-              _FromToBar(from: widget.data.from, to: widget.data.to),
-              const SizedBox(height: 24),
+              // The from→to bar only reads as real with a baseline (3+
+              // sessions). Below that, [from]/[delta] are null and we show
+              // the score alone — no delta row.
+              if (widget.data.from != null)
+                _FromToBar(from: widget.data.from!, to: widget.data.to),
+              if (widget.data.from != null) const SizedBox(height: 24),
               Container(
                 padding: const EdgeInsets.only(top: 18),
                 decoration: BoxDecoration(
@@ -145,7 +149,7 @@ class _ScoreGaugeCardState extends State<ScoreGaugeCard>
                         const CoachMark(small: true),
                         const SizedBox(width: 10),
                         PlanEyebrow(
-                          'HUẤN LUYỆN VIÊN GHI',
+                          'XU HƯỚNG',
                           size: 9.5,
                           letterSpacing: 1.6,
                           dark: true,
@@ -271,11 +275,37 @@ class _GaugeBlock extends StatelessWidget {
             child: _ArcGauge(score: data.to, animation: animation),
           ),
           const SizedBox(width: 6),
-          // Delta + descriptor stacked on the right.
+          // Delta + descriptor stacked on the right — or, below the baseline,
+          // a quiet hint in its place so the score stands alone.
           Expanded(
-            child: _DeltaBadge(delta: data.delta),
+            child: data.delta != null
+                ? _DeltaBadge(delta: data.delta!)
+                : const _GaugeHint(),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Shown in the delta slot when there's no baseline yet (< 3 sessions).
+/// Keeps the gauge composed without fabricating a delta number.
+class _GaugeHint extends StatelessWidget {
+  const _GaugeHint();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    return Text(
+      'Thêm buổi để thấy tiến triển.',
+      style: TextStyle(
+        fontFamily: 'BeVietnamPro',
+        fontSize: 12.5,
+        fontWeight: FontWeight.w600,
+        fontStyle: FontStyle.italic,
+        height: 1.45,
+        letterSpacing: -0.2,
+        color: c.invInkSoft.withValues(alpha: 0.7),
       ),
     );
   }
@@ -637,6 +667,11 @@ class _FromToBar extends StatelessWidget {
           child: LayoutBuilder(
             builder: (context, bc) {
               final width = bc.maxWidth;
+              // Composite scores can ride past 100; clamp the bar geometry to
+              // the [0,100] track so the dots never overflow, while the
+              // printed numbers above stay true.
+              final fromX = (from.clamp(0, 100) / 100) * width;
+              final toX = (to.clamp(0, 100) / 100) * width;
               return Stack(
                 clipBehavior: Clip.none,
                 children: [
@@ -667,8 +702,8 @@ class _FromToBar extends StatelessWidget {
                   // Yellow segment from→to.
                   Positioned(
                     top: 7,
-                    left: (from / 100) * width,
-                    width: ((to - from) / 100) * width,
+                    left: fromX,
+                    width: toX - fromX,
                     child: Container(
                       height: 8,
                       decoration: BoxDecoration(
@@ -692,7 +727,7 @@ class _FromToBar extends StatelessWidget {
                   // Start dot.
                   Positioned(
                     top: 4,
-                    left: (from / 100) * width - 7,
+                    left: fromX - 7,
                     child: Container(
                       width: 14,
                       height: 14,
@@ -709,7 +744,7 @@ class _FromToBar extends StatelessWidget {
                   // Today dot.
                   Positioned(
                     top: 3,
-                    left: (to / 100) * width - 8,
+                    left: toX - 8,
                     child: Container(
                       width: 16,
                       height: 16,

@@ -3,9 +3,6 @@
 // Architecture (top to bottom):
 //   ▲ Stage hero — dark, full-bleed, italic name, edit/share pills
 //   1. Mục tiêu — goal card with progress meter
-//   2. Hành trình tính đến hôm nay — lifetime stats card + coach
-//   3. Thành tựu — achievements rail (editorial medallions)
-//   4. Hành trình — journey timeline with TODAY anchor
 //   5. Vóc dáng — refined body card + BMI chip
 //   6. Mời bạn dùng Vika — referral card
 //   7. Kết nối — connected services
@@ -39,7 +36,6 @@ import '../widgets/profile/body_card.dart';
 import '../widgets/profile/body_edit_sheet.dart';
 import '../widgets/profile/goal_card.dart';
 import '../widgets/profile/goal_edit_sheet.dart';
-import '../widgets/profile/lifetime_hero.dart';
 import '../widgets/profile/profile_stage_hero.dart';
 import '../widgets/profile/settings_group.dart';
 
@@ -226,47 +222,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     ];
     if (lt.avgForm != null) stats.add('${lt.avgForm}% FORM');
     return stats;
-  }
-
-  /// Lifetime stats trio for the LifetimeHero. Deltas only appear once there's
-  /// enough history (3+ sessions); see [SessionPersistence.lifetimeStats].
-  List<ProfileLifetimeStat> _buildLifetimeStats() {
-    final lt = _lifetime;
-    // Null (pre-load) or zero sessions → the empty state is shown instead, so
-    // the trio is never rendered; return an empty list rather than fake zeros.
-    if (lt == null || lt.sessionCount == 0) return const [];
-    final showDeltas = lt.sessionCount >= 3;
-
-    // Total time reads as minutes under an hour, hours above — never a fake
-    // decimal like "0.2 giờ".
-    final (timeValue, timeUnit) = lt.totalSeconds < 3600
-        ? ('${(lt.totalSeconds / 60).round()}', 'phút')
-        : ((lt.totalSeconds / 3600).toStringAsFixed(1), 'giờ');
-
-    final delta = lt.formDeltaFromStart;
-    return [
-      ProfileLifetimeStat(
-        value: '${lt.sessionCount}',
-        unit: 'buổi',
-        label: 'ĐÃ TẬP',
-        delta: (showDeltas && lt.sessionsThisWeek > 0)
-            ? '+${lt.sessionsThisWeek} tuần này'
-            : null,
-      ),
-      ProfileLifetimeStat(
-        value: timeValue,
-        unit: timeUnit,
-        label: 'TỔNG CỘNG',
-      ),
-      ProfileLifetimeStat(
-        value: lt.avgForm != null ? '${lt.avgForm}' : '—',
-        unit: '%',
-        label: 'FORM TB',
-        delta: (showDeltas && delta != null)
-            ? '${delta >= 0 ? '+' : ''}$delta từ đầu'
-            : null,
-      ),
-    ];
   }
 
   Future<void> _openEditProfileSheet() async {
@@ -628,8 +583,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final age = profile?.age;
     final bmi = profile?.bmiValue != null ? profile!.bmiLabel : null;
     final bmiCategory = profile?.bmiCategory ?? 'Chưa đủ dữ liệu';
-    final lifetimeStats = _buildLifetimeStats();
-    final hasSessions = (_lifetime?.sessionCount ?? 0) > 0;
 
     return Container(
       color: c.bg,
@@ -667,24 +620,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       progress: _goalProgress,
                       daysLeft: _weeksLeftLabel,
                       onEdit: _openGoalEditSheet,
-                    ),
-                  ),
-                  const SizedBox(height: 40),
-
-                  // 2. Hành trình tính đến hôm nay — lifetime stats.
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: LifetimeHero(
-                      stats: lifetimeStats,
-                      emptyLine: hasSessions
-                          ? null
-                          : 'Hành trình của bạn bắt đầu từ buổi tập đầu tiên.',
-                      // While history is too thin for a trend, set the
-                      // expectation instead of faking deltas.
-                      footnote: (hasSessions &&
-                              (_lifetime?.sessionCount ?? 0) < 3)
-                          ? 'Thêm vài buổi nữa để thấy xu hướng form của bạn.'
-                          : null,
                     ),
                   ),
                   const SizedBox(height: 40),

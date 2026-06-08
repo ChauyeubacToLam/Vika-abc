@@ -88,7 +88,7 @@ class HeadlineHero extends StatelessWidget {
                 textBaseline: TextBaseline.alphabetic,
                 children: [
                   Text(
-                    data.delta,
+                    data.delta ?? '',
                     style: TextStyle(
                       fontFamily: 'BeVietnamPro',
                       fontSize: 80,
@@ -118,7 +118,7 @@ class HeadlineHero extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 22),
-              _FromToBar(from: data.from, to: data.to),
+              _FromToBar(from: data.from ?? data.to, to: data.to),
               const SizedBox(height: 20),
               Container(
                 padding: const EdgeInsets.only(top: 16),

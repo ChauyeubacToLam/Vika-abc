@@ -1,9 +1,14 @@
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../data/milestones.dart';
 import '../data/program_mock.dart';
+import '../exercise/report_builder_registry.dart';
 import '../widgets/progress/period_tabs.dart' show PeriodTab;
 import 'recommendation/progression_service.dart';
+import 'session_trophy_picker.dart';
 
 /// Summary of a completed exercise session, loaded from Supabase.
 class PreviousSessionSummary {
@@ -60,6 +65,61 @@ class PainReport {
   final String source;
   final String? notes;
 }
+
+// ─── Progress tab: ranked insights (BÀI TẬP NỔI BẬT) ──────────────────
+//
+// Per-exercise improvement ranking. Each qualifying exercise contributes
+// ONE headline, picked from an ordinal tier ladder (pain-fault → form →
+// generic-fault). The headline carries a Theil-Sen slope (oriented so
+// positive = improvement) plus the fitted start/end values for the card.
+
+/// Which signal a ranked-insight headline is built from. Tier order is the
+/// selection priority AND the cross-exercise sort rank ([Enum.index]):
+/// pain (0) → form (1) → generic (2).
+enum InsightTier { pain, form, generic }
+
+/// One per-exercise session row feeding [SessionPersistence.deriveRankedInsightsForTest].
+/// The deriver groups these by [exerciseId] in input order, so callers must
+/// pass them oldest-first (the x-axis for every slope is the session order
+/// index 0,1,2… — never a timestamp, which would distort across gaps).
+typedef RankInsightSession = ({
+  String exerciseId,
+  int formScore,
+  Map<String, int> faultCounts,
+  int totalReps,
+});
+
+/// Per-exercise metadata pulled from the exercise's report builder.
+/// [painToFaultMap] maps a user pain area → the fault keys this exercise
+/// tracks for it; [praiseMetricNames] maps a fault key → its VN label. An
+/// unregistered exercise (GenericReportBuilder) supplies empty maps, so it
+/// can only ever produce a FORM headline (no labelled fault).
+typedef RankInsightMeta = ({
+  Map<String, List<String>> painToFaultMap,
+  Map<String, String> praiseMetricNames,
+});
+
+/// One ranked-insight headline for a BÀI TẬP NỔI BẬT card. Pure data — the
+/// screen maps it to an `ExerciseInsightMock` (resolving the display name and
+/// formatting the improvement copy). For the form tier [faultKey]/[metricLabel]
+/// are null and [fromValue]/[toValue] are fitted form scores; for fault tiers
+/// they are the fitted fault rate as a % of reps (so [fromValue] > [toValue]).
+///
+/// [series] is the per-session metric, oldest-first, that backs the card's bar
+/// chart — raw form scores for the form tier, rounded fault rate % for fault
+/// tiers. [lowerIsBetter] is true for fault tiers (a falling value is progress)
+/// so the chart can orient bars as a climb regardless of metric polarity.
+typedef RankInsightHeadline = ({
+  String exerciseId,
+  InsightTier tier,
+  String? faultKey,
+  String? metricLabel,
+  double slopeMagnitude,
+  int fromValue,
+  int toValue,
+  List<int> series,
+  bool lowerIsBetter,
+});
 
 /// Persistence layer for exercise sessions + user-level stats.
 /// All methods are fire-and-forget where possible — errors are logged
@@ -616,7 +676,7 @@ class SessionPersistence {
   ///   percent — rounded mean of the current 7-day window, or null when no
   ///             session landed in the last 7 days (cold start)
   ///   delta   — percent minus the rounded mean of the prior week, or null
-  ///             unless the prior week holds >= 2 sessions (no baseline -> hide)
+  ///             unless the prior week holds >= 3 sessions (no baseline -> hide)
   ///   week    — current-window session form scores, oldest-first
   Future<({int? percent, int? delta, List<int> week})> homeFormSummary() async {
     try {
@@ -667,12 +727,22 @@ class SessionPersistence {
   /// and frozen elsewhere; reads `session_form_score` (the composite shown
   /// to the user).
   ///
-  ///   trend — window session form scores, oldest-first (empty = no sessions)
+  ///   trend      — window session form scores, oldest-first (empty = none)
+  ///   trendDates — the completed_at of each trend point, parallel to [trend]
+  ///                (UTC; call .toLocal() before formatting axis labels)
   ///   to    — latest score in the window, or null when empty
-  ///   from  — earliest score in the window, or null when empty
-  ///   delta — to - from, or null when empty
-  Future<({int? to, int? from, int? delta, List<int> trend})>
-      progressFormSummary(PeriodTab period) async {
+  ///   from  — earliest score in the window, or null until >= 3 sessions
+  ///   delta — to - from, or null until >= 3 sessions
+  ///   fact  — factual trajectory one-liner for the gauge ('' when empty)
+  Future<
+      ({
+        int? to,
+        int? from,
+        int? delta,
+        List<int> trend,
+        List<DateTime> trendDates,
+        String fact,
+      })> progressFormSummary(PeriodTab period) async {
     try {
       final now = DateTime.now();
       final since = switch (period) {
@@ -684,24 +754,44 @@ class SessionPersistence {
         PeriodTab.program => null,
       };
       final samples = await _sessionFormScoresInWindow(since: since);
-      return deriveProgressFormSummaryForTest(
+      final base = deriveProgressFormSummaryForTest(
         [for (final sample in samples) sample.formScore],
+      );
+      return (
+        to: base.to,
+        from: base.from,
+        delta: base.delta,
+        trend: base.trend,
+        trendDates: [for (final sample in samples) sample.completedAt],
+        fact: deriveTrajectoryFactForTest(trend: base.trend, delta: base.delta),
       );
     } catch (e) {
       debugPrint('[Vika] progressFormSummary failed: $e');
-      return (to: null, from: null, delta: null, trend: const <int>[]);
+      return (
+        to: null,
+        from: null,
+        delta: null,
+        trend: const <int>[],
+        trendDates: const <DateTime>[],
+        fact: '',
+      );
     }
   }
 
   /// Pure aggregation for [progressFormSummary]. [scores] are window session
   /// form scores, oldest-first. Kept separate so the to/from/delta math is
   /// unit-testable without a database.
+  ///
+  /// Progressive reveal: [to] (latest score) shows at >= 1 session, but a
+  /// baseline [from] + [delta] only read as real with >= 3 sessions of history
+  /// — below that, [from]/[delta] are null and the gauge shows the score alone.
   @visibleForTesting
   static ({int? to, int? from, int? delta, List<int> trend})
       deriveProgressFormSummaryForTest(List<int> scores) {
     final trend = List<int>.unmodifiable(scores);
     final to = trend.isEmpty ? null : trend.last;
-    final from = trend.isEmpty ? null : trend.first;
+    final hasBaseline = trend.length >= 3;
+    final from = hasBaseline ? trend.first : null;
     final delta = (to != null && from != null) ? to - from : null;
     return (to: to, from: from, delta: delta, trend: trend);
   }
@@ -737,7 +827,9 @@ class SessionPersistence {
     final week = [for (final sample in current) sample.formScore];
 
     final percent = week.isEmpty ? null : _roundedMean(week);
-    final delta = (percent != null && prior.length >= 2)
+    // Progressive reveal: a week-over-week delta only reads as real once the
+    // prior week holds >= 3 sessions (same policy as the Progress tab).
+    final delta = (percent != null && prior.length >= 3)
         ? percent - _roundedMean(prior)
         : null;
 
@@ -750,6 +842,829 @@ class SessionPersistence {
       sum += value;
     }
     return (sum / values.length).round();
+  }
+
+  // ─── Progress tab: weekly summary band (TUẦN NÀY MỘT NHÌN) ──────────
+
+  /// Rolling 7-day summary for the Progress-tab weekly band: sessions
+  /// completed, total active seconds, and mean form. Single round trip;
+  /// the windowing + deltas live in [deriveWeeklySummaryForTest].
+  ///
+  ///   sessions       — completed sessions in [now-7d, now]
+  ///   totalSeconds   — sum of total_duration_seconds in the window
+  ///   avgForm        — rounded mean session_form_score, null if none scored
+  ///   sessionsDelta  — vs the prior 7-day window, or null unless that prior
+  ///   secondsDelta     window holds >= 3 sessions (no baseline -> hide notes)
+  ///   avgFormDelta
+  Future<
+      ({
+        int sessions,
+        int totalSeconds,
+        int? avgForm,
+        int? sessionsDelta,
+        int? secondsDelta,
+        int? avgFormDelta,
+      })> weeklySummary() async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return _emptyWeeklySummary;
+
+    try {
+      final since = DateTime.now().subtract(const Duration(days: 14));
+      final rows = await _client
+          .from('workout_sessions')
+          .select('session_form_score, total_duration_seconds, completed_at')
+          .eq('user_id', userId)
+          .not('completed_at', 'is', null)
+          .gte('completed_at', since.toUtc().toIso8601String())
+          .order('completed_at', ascending: true);
+
+      final samples =
+          <({DateTime completedAt, int? formScore, int? durationSeconds})>[];
+      for (final raw in rows as List) {
+        final row = (raw as Map).cast<String, dynamic>();
+        final completedAt = _dateTimeOrNull(row['completed_at']);
+        if (completedAt == null) continue;
+        samples.add((
+          completedAt: completedAt,
+          formScore: (row['session_form_score'] as num?)?.toInt(),
+          durationSeconds: (row['total_duration_seconds'] as num?)?.toInt(),
+        ));
+      }
+      return deriveWeeklySummaryForTest(samples);
+    } catch (e) {
+      debugPrint('[Vika] weeklySummary failed: $e');
+      return _emptyWeeklySummary;
+    }
+  }
+
+  static const _emptyWeeklySummary = (
+    sessions: 0,
+    totalSeconds: 0,
+    avgForm: null,
+    sessionsDelta: null,
+    secondsDelta: null,
+    avgFormDelta: null,
+  );
+
+  /// Pure windowing for [weeklySummary]. `now` is injectable so the rolling
+  /// windows are deterministic in tests.
+  ///   current = [now-7d, now]      prior = [now-14d, now-7d)
+  @visibleForTesting
+  static ({
+    int sessions,
+    int totalSeconds,
+    int? avgForm,
+    int? sessionsDelta,
+    int? secondsDelta,
+    int? avgFormDelta,
+  }) deriveWeeklySummaryForTest(
+    Iterable<({DateTime completedAt, int? formScore, int? durationSeconds})>
+        samples, {
+    DateTime? now,
+  }) {
+    final end = now ?? DateTime.now();
+    final currentStart = end.subtract(const Duration(days: 7));
+    final priorStart = end.subtract(const Duration(days: 14));
+
+    var sessions = 0;
+    var totalSeconds = 0;
+    final currentForms = <int>[];
+
+    var priorSessions = 0;
+    var priorSeconds = 0;
+    final priorForms = <int>[];
+
+    for (final s in samples) {
+      final at = s.completedAt;
+      if (!at.isBefore(currentStart) && !at.isAfter(end)) {
+        sessions++;
+        if (s.durationSeconds != null) totalSeconds += s.durationSeconds!;
+        if (s.formScore != null) currentForms.add(s.formScore!);
+      } else if (!at.isBefore(priorStart) && at.isBefore(currentStart)) {
+        priorSessions++;
+        if (s.durationSeconds != null) priorSeconds += s.durationSeconds!;
+        if (s.formScore != null) priorForms.add(s.formScore!);
+      }
+    }
+
+    final avgForm = currentForms.isEmpty ? null : _roundedMean(currentForms);
+    // Deltas only read as real once the prior window has >= 3 sessions.
+    final hasBaseline = priorSessions >= 3;
+    final priorAvgForm = priorForms.isEmpty ? null : _roundedMean(priorForms);
+
+    return (
+      sessions: sessions,
+      totalSeconds: totalSeconds,
+      avgForm: avgForm,
+      sessionsDelta: hasBaseline ? sessions - priorSessions : null,
+      secondsDelta: hasBaseline ? totalSeconds - priorSeconds : null,
+      avgFormDelta: (hasBaseline && avgForm != null && priorAvgForm != null)
+          ? avgForm - priorAvgForm
+          : null,
+    );
+  }
+
+  // ─── Progress tab: personal records rail (KỶ LỤC CÁ NHÂN) ───────────
+
+  /// Best (max) form_score per exercise across all of the user's
+  /// exercise_sessions, highest-first. Name resolution to a display label is
+  /// the caller's job (via the exercise catalog) — this stays DB-only.
+  Future<
+          List<
+              ({
+                String exerciseId,
+                int bestScore,
+                int? previousBest,
+                DateTime achievedAt,
+              })>>
+      personalRecords() async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return const [];
+
+    try {
+      final rows = await _client
+          .from('exercise_sessions')
+          .select('exercise_id, form_score, completed_at')
+          .eq('user_id', userId)
+          .not('form_score', 'is', null)
+          .not('completed_at', 'is', null);
+
+      final sessions = <({String exerciseId, int formScore, DateTime completedAt})>[];
+      for (final raw in rows as List) {
+        final row = (raw as Map).cast<String, dynamic>();
+        final id = (row['exercise_id'] as String?)?.trim();
+        final score = (row['form_score'] as num?)?.toInt();
+        final completedAt = _dateTimeOrNull(row['completed_at']);
+        if (id == null || id.isEmpty || score == null || completedAt == null) {
+          continue;
+        }
+        sessions.add((exerciseId: id, formScore: score, completedAt: completedAt));
+      }
+      return derivePersonalRecordsForTest(sessions);
+    } catch (e) {
+      debugPrint('[Vika] personalRecords failed: $e');
+      return const [];
+    }
+  }
+
+  /// Pure best-per-exercise reduction for [personalRecords]. For each
+  /// exercise_id: [bestScore] is the max form_score, [achievedAt] is when that
+  /// best was FIRST reached, and [previousBest] is the best of the remaining
+  /// sessions (null when the exercise has only one logged session). Sorted
+  /// highest-score-first, then most-recent-first.
+  @visibleForTesting
+  static List<
+      ({
+        String exerciseId,
+        int bestScore,
+        int? previousBest,
+        DateTime achievedAt,
+      })> derivePersonalRecordsForTest(
+    Iterable<({String exerciseId, int formScore, DateTime completedAt})>
+        sessions,
+  ) {
+    final byExercise =
+        <String, List<({int formScore, DateTime completedAt})>>{};
+    for (final s in sessions) {
+      (byExercise[s.exerciseId] ??= [])
+          .add((formScore: s.formScore, completedAt: s.completedAt));
+    }
+
+    final records = <({
+      String exerciseId,
+      int bestScore,
+      int? previousBest,
+      DateTime achievedAt,
+    })>[];
+    for (final entry in byExercise.entries) {
+      final logs = entry.value;
+      var bestScore = logs.first.formScore;
+      for (final l in logs) {
+        if (l.formScore > bestScore) bestScore = l.formScore;
+      }
+      // Earliest time the best score was reached.
+      DateTime? achievedAt;
+      for (final l in logs) {
+        if (l.formScore == bestScore &&
+            (achievedAt == null || l.completedAt.isBefore(achievedAt))) {
+          achievedAt = l.completedAt;
+        }
+      }
+      // Previous best = highest score among the OTHER sessions.
+      int? previousBest;
+      if (logs.length > 1) {
+        for (final l in logs) {
+          if (identical(l.completedAt, achievedAt) &&
+              l.formScore == bestScore) {
+            continue;
+          }
+          if (previousBest == null || l.formScore > previousBest) {
+            previousBest = l.formScore;
+          }
+        }
+      }
+      records.add((
+        exerciseId: entry.key,
+        bestScore: bestScore,
+        previousBest: previousBest,
+        achievedAt: achievedAt!,
+      ));
+    }
+
+    records.sort((a, b) {
+      final byScore = b.bestScore.compareTo(a.bestScore);
+      if (byScore != 0) return byScore;
+      return b.achievedAt.compareTo(a.achievedAt);
+    });
+    return records;
+  }
+
+  // ─── Progress tab: ranked insights (BÀI TẬP NỔI BẬT) ────────────────
+
+  /// Minimum Theil-Sen slope (per session) a candidate must clear to count as
+  /// a real improvement. Slopes live on a 0..100-per-session scale — form is
+  /// points/session, a fault rate is percentage-points/session — so one
+  /// threshold gates every tier comparably. Flat or below this reads as noise,
+  /// not progress. Tunable.
+  static const double MIN_FORM_SLOPE = 1.5;
+  static const double MIN_FAULT_RATE_SLOPE = 0.03;
+
+  /// Per-exercise improvement ranking for the BÀI TẬP NỔI BẬT cards, scoped to
+  /// a [PeriodTab] window. Pulls each exercise's sessions oldest-first, derives
+  /// one headline per qualifying exercise, and returns them already sorted
+  /// (best first). Name resolution + copy formatting is the caller's job. DB
+  /// errors and signed-out fall back to an empty list (the section shows its
+  /// guided empty).
+  Future<List<RankInsightHeadline>> rankedInsights(PeriodTab period) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return const [];
+
+    try {
+      final now = DateTime.now();
+      final since = switch (period) {
+        PeriodTab.week => now.subtract(const Duration(days: 7)),
+        PeriodTab.month => now.subtract(const Duration(days: 30)),
+        // TODO(wiring): single-program MVP — all completed sessions. Scope to
+        // the active program (recommendation_id) once history lands.
+        PeriodTab.program => null,
+      };
+
+      var query = _client
+          .from('exercise_sessions')
+          .select('exercise_id, form_score, fault_counts, total_reps, completed_at')
+          .eq('user_id', userId)
+          .not('form_score', 'is', null)
+          .not('total_reps', 'is', null)
+          .not('completed_at', 'is', null);
+      if (since != null) {
+        query = query.gte('completed_at', since.toUtc().toIso8601String());
+      }
+      // Oldest-first so the session order index is the x-axis for every slope.
+      final rows = await query.order('completed_at', ascending: true);
+
+      final sessions = <RankInsightSession>[];
+      for (final raw in rows as List) {
+        final row = (raw as Map).cast<String, dynamic>();
+        final id = (row['exercise_id'] as String?)?.trim();
+        final score = (row['form_score'] as num?)?.toInt();
+        final reps = (row['total_reps'] as num?)?.toInt();
+        if (id == null || id.isEmpty || score == null || reps == null) continue;
+        final faultRaw = (row['fault_counts'] as Map?) ?? const {};
+        sessions.add((
+          exerciseId: id,
+          formScore: score,
+          totalReps: reps,
+          faultCounts: {
+            for (final e in faultRaw.entries)
+              (e.key as String): (e.value as num).toInt(),
+          },
+        ));
+      }
+
+      // Per-exercise metadata from the report-builder registry. Unregistered
+      // exercises fall back to GenericReportBuilder (empty maps) → form-only.
+      final metaByExercise = <String, RankInsightMeta>{};
+      for (final id in sessions.map((s) => s.exerciseId).toSet()) {
+        final builder = reportBuilders[id]?.builder ?? GenericReportBuilder();
+        metaByExercise[id] = (
+          painToFaultMap: builder.painToFaultMap(),
+          praiseMetricNames: builder.praiseMetricNames(),
+        );
+      }
+
+      final painAreas = (await getActivePainAreas()).toSet();
+      return deriveRankedInsightsForTest(
+        sessions: sessions,
+        activePainAreas: painAreas,
+        metaByExercise: metaByExercise,
+      );
+    } catch (e) {
+      debugPrint('[Vika] rankedInsights failed: $e');
+      return const [];
+    }
+  }
+
+  /// Pure per-exercise improvement ranking for [rankedInsights]. DB-free so the
+  /// tier ladder + Theil-Sen math stay unit-testable. [sessions] are flat and
+  /// oldest-first; they're grouped by exercise preserving that order. An
+  /// exercise with fewer than 3 sessions in the window does not qualify and is
+  /// skipped entirely. Returns headlines sorted by tier rank asc, then slope
+  /// magnitude desc, with a stable exercise-id hash as the deterministic
+  /// tiebreak (never random per render). Empty when nothing qualifies.
+  @visibleForTesting
+  static List<RankInsightHeadline> deriveRankedInsightsForTest({
+    required Iterable<RankInsightSession> sessions,
+    required Set<String> activePainAreas,
+    required Map<String, RankInsightMeta> metaByExercise,
+    double minFormSlope = MIN_FORM_SLOPE,
+    double minFaultRateSlope = MIN_FAULT_RATE_SLOPE,
+  }) {
+    final byExercise = <String, List<RankInsightSession>>{};
+    for (final s in sessions) {
+      (byExercise[s.exerciseId] ??= []).add(s);
+    }
+
+    const emptyMeta = (
+      painToFaultMap: <String, List<String>>{},
+      praiseMetricNames: <String, String>{},
+    );
+
+    final headlines = <RankInsightHeadline>[];
+    for (final entry in byExercise.entries) {
+      final series = entry.value;
+      if (series.length < 3) continue; // too few sessions to read a slope
+      final headline = _exerciseHeadline(
+        exerciseId: entry.key,
+        series: series,
+        activePainAreas: activePainAreas,
+        meta: metaByExercise[entry.key] ?? emptyMeta,
+        minFormSlope: minFormSlope,
+        minFaultRateSlope: minFaultRateSlope,
+      );
+      if (headline != null) headlines.add(headline);
+    }
+
+    headlines.sort((a, b) {
+      final byTier = a.tier.index.compareTo(b.tier.index);
+      if (byTier != 0) return byTier;
+      final bySlope = b.slopeMagnitude.compareTo(a.slopeMagnitude);
+      if (bySlope != 0) return bySlope;
+      return _stableHash(a.exerciseId).compareTo(_stableHash(b.exerciseId));
+    });
+    return headlines;
+  }
+
+  /// Picks the single headline for one exercise's [series], walking the tier
+  /// ladder pain-fault → form → generic-fault and returning the first tier that
+  /// has a qualifying candidate. Null when no tier clears its threshold.
+  static RankInsightHeadline? _exerciseHeadline({
+    required String exerciseId,
+    required List<RankInsightSession> series,
+    required Set<String> activePainAreas,
+    required RankInsightMeta meta,
+    required double minFormSlope,
+    required double minFaultRateSlope,
+  }) {
+    // Fault keys linked to one of the user's ACTIVE pain areas for this
+    // exercise (union over the active areas).
+    final painFaultKeys = <String>{};
+    for (final area in activePainAreas) {
+      final keys = meta.painToFaultMap[area];
+      if (keys != null) painFaultKeys.addAll(keys);
+    }
+
+    // Tier 0 — pain-linked faults.
+    final pain = _bestFaultCandidate(
+      series: series,
+      faultKeys: painFaultKeys,
+      labels: meta.praiseMetricNames,
+      minFaultRateSlope: minFaultRateSlope,
+    );
+    if (pain != null) {
+      return (
+        exerciseId: exerciseId,
+        tier: InsightTier.pain,
+        faultKey: pain.faultKey,
+        metricLabel: pain.label,
+        slopeMagnitude: pain.slope,
+        fromValue: pain.fromValue,
+        toValue: pain.toValue,
+        series: pain.series,
+        lowerIsBetter: true,
+      );
+    }
+
+    // Tier 1 — form (raw form score, slope as-is).
+    final fit = _theilSen([for (final s in series) s.formScore.toDouble()]);
+    if (fit.slope >= minFormSlope) {
+      return (
+        exerciseId: exerciseId,
+        tier: InsightTier.form,
+        faultKey: null,
+        metricLabel: null,
+        slopeMagnitude: fit.slope,
+        fromValue: _fitted(fit, 0, series.length),
+        toValue: _fitted(fit, series.length - 1, series.length),
+        // Actual per-session form scores, oldest-first, for the bar chart.
+        series: [for (final s in series) s.formScore.clamp(0, 100)],
+        lowerIsBetter: false,
+      );
+    }
+
+    // Tier 2 — generic faults (every other fault key seen in the window).
+    final allFaultKeys = <String>{};
+    for (final s in series) {
+      allFaultKeys.addAll(s.faultCounts.keys);
+    }
+    final generic = _bestFaultCandidate(
+      series: series,
+      faultKeys: allFaultKeys.difference(painFaultKeys),
+      labels: meta.praiseMetricNames,
+      minFaultRateSlope: minFaultRateSlope,
+    );
+    if (generic != null) {
+      return (
+        exerciseId: exerciseId,
+        tier: InsightTier.generic,
+        faultKey: generic.faultKey,
+        metricLabel: generic.label,
+        slopeMagnitude: generic.slope,
+        fromValue: generic.fromValue,
+        toValue: generic.toValue,
+        series: generic.series,
+        lowerIsBetter: true,
+      );
+    }
+
+    return null;
+  }
+
+  /// Best (largest oriented slope) qualifying fault candidate among [faultKeys].
+  /// A candidate's y-series is the per-session fault RATE as a % of reps
+  /// (rep-volume adjusted, 0..100); the slope is sign-flipped so a FALLING rate
+  /// reads positive. A key with no [labels] entry can't be rendered and is
+  /// skipped — this is why GenericReportBuilder exercises never reach a fault
+  /// tier. Null when none clears [minFaultRateSlope].
+  static ({
+    String faultKey,
+    String label,
+    double slope,
+    int fromValue,
+    int toValue,
+    List<int> series,
+  })? _bestFaultCandidate({
+    required List<RankInsightSession> series,
+    required Set<String> faultKeys,
+    required Map<String, String> labels,
+    required double minFaultRateSlope,
+  }) {
+    ({
+      String faultKey,
+      String label,
+      double slope,
+      int fromValue,
+      int toValue,
+      List<int> series,
+    })? best;
+    for (final key in faultKeys) {
+      final label = labels[key];
+      if (label == null || label.isEmpty) continue; // unlabelled → unrenderable
+
+      final rates = <double>[
+        for (final s in series)
+          s.totalReps > 0 ? (s.faultCounts[key] ?? 0) / s.totalReps * 100 : 0.0,
+      ];
+      final fit = _theilSen(rates);
+      final improvement = -fit.slope; // falling rate = positive improvement
+      if (improvement < minFaultRateSlope) continue;
+
+      if (best == null || improvement > best.slope) {
+        // Fitted endpoints stay in real rate% (not oriented), so from > to.
+        best = (
+          faultKey: key,
+          label: label,
+          slope: improvement,
+          fromValue: _fitted(fit, 0, series.length),
+          toValue: _fitted(fit, series.length - 1, series.length),
+          // Actual per-session rate %, oldest-first, for the bar chart.
+          series: [for (final r in rates) r.round().clamp(0, 100)],
+        );
+      }
+    }
+    return best;
+  }
+
+  /// Theil-Sen fitted value at session index [x], rounded and clamped to the
+  /// 0..100 display range. [n] is the series length (unused beyond clarity).
+  static int _fitted(({double slope, double intercept}) fit, int x, int n) =>
+      (fit.slope * x + fit.intercept).round().clamp(0, 100);
+
+  /// Theil-Sen line fit over points (i, y[i]): slope = median of all pairwise
+  /// slopes (y_j − y_i)/(j − i) for i < j; intercept = median of (y_i − slope·i).
+  /// All-pairs is fine at the session counts here (n ≲ 12).
+  static ({double slope, double intercept}) _theilSen(List<double> y) {
+    final n = y.length;
+    final pairwise = <double>[];
+    for (var i = 0; i < n; i++) {
+      for (var j = i + 1; j < n; j++) {
+        pairwise.add((y[j] - y[i]) / (j - i));
+      }
+    }
+    final slope = _median(pairwise);
+    final intercept = _median([for (var i = 0; i < n; i++) y[i] - slope * i]);
+    return (slope: slope, intercept: intercept);
+  }
+
+  /// Median of [values] (0 when empty). Does not mutate the input.
+  static double _median(List<double> values) {
+    if (values.isEmpty) return 0;
+    final sorted = [...values]..sort();
+    final mid = sorted.length ~/ 2;
+    return sorted.length.isOdd
+        ? sorted[mid]
+        : (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+
+  /// Deterministic 32-bit FNV-1a hash — a stable per-render tiebreak for the
+  /// ranking sort (String.hashCode can vary across runs).
+  static int _stableHash(String s) {
+    var hash = 0x811c9dc5;
+    for (final unit in s.codeUnits) {
+      hash = ((hash ^ unit) * 0x01000193) & 0xFFFFFFFF;
+    }
+    return hash;
+  }
+
+  // ─── Progress tab: streak card daily bars (CHUỖI LIÊN TIẾP) ─────────
+
+  /// Daily workout completion over the last [dayCount] days for the streak
+  /// card's bar chart, oldest-first (last entry = today). Single round trip;
+  /// the day bucketing lives in [deriveStreakBarsForTest].
+  Future<List<bool>> streakBars({int dayCount = 14}) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return List<bool>.filled(dayCount, false);
+
+    try {
+      final since = DateTime.now().subtract(Duration(days: dayCount + 1));
+      final rows = await _client
+          .from('workout_sessions')
+          .select('completed_at')
+          .eq('user_id', userId)
+          .not('completed_at', 'is', null)
+          .gte('completed_at', since.toUtc().toIso8601String());
+
+      final completedAtValues = <DateTime>[];
+      for (final raw in rows as List) {
+        final row = (raw as Map).cast<String, dynamic>();
+        final completedAt = _dateTimeOrNull(row['completed_at']);
+        if (completedAt != null) completedAtValues.add(completedAt);
+      }
+      return deriveStreakBarsForTest(completedAtValues, dayCount: dayCount);
+    } catch (e) {
+      debugPrint('[Vika] streakBars failed: $e');
+      return List<bool>.filled(dayCount, false);
+    }
+  }
+
+  /// Pure day-bucketing for [streakBars]. Buckets each completion by its LOCAL
+  /// calendar day, then emits one bool per day for the last [dayCount] days,
+  /// oldest-first (last = today). `now` is injectable for deterministic tests.
+  @visibleForTesting
+  static List<bool> deriveStreakBarsForTest(
+    Iterable<DateTime> completedAtValues, {
+    int dayCount = 14,
+    DateTime? now,
+  }) {
+    final localNow = (now ?? DateTime.now()).toLocal();
+    final completedDates = <_LocalDate>{
+      for (final at in completedAtValues)
+        _LocalDate.fromDateTime(at.toLocal()),
+    };
+
+    // Build today..(dayCount-1 days ago), then reverse to oldest-first.
+    final bars = <bool>[];
+    var cursor = _LocalDate(localNow.year, localNow.month, localNow.day);
+    for (var i = 0; i < dayCount; i++) {
+      bars.add(completedDates.contains(cursor));
+      cursor = cursor.previous;
+    }
+    return bars.reversed.toList();
+  }
+
+  /// Smallest canonical streak milestone strictly greater than [days], or null
+  /// when the streak is past the final milestone. Reuses the one set of
+  /// milestones the summary trophy picker already recognises.
+  static int? nextStreakMilestone(int days) {
+    final sorted = SessionTrophyPicker.streakMilestones.toList()..sort();
+    for (final m in sorted) {
+      if (m > days) return m;
+    }
+    return null;
+  }
+
+  // ─── Progress tab: trajectory fact (score gauge) ────────────────────
+
+  /// "high" threshold separating the steady-high row from the plain-steady
+  /// row in [deriveTrajectoryFactForTest]. Tunable.
+  static const int kTrajectoryHighThreshold = 80;
+
+  /// A factual one-liner about the score TREND for the gauge card — NOT
+  /// coaching, NOT the session coach. [trend] is the window's session form
+  /// scores oldest-first; [delta] is to−from (null below the 3-session
+  /// baseline, per the gauge gate). Priority-ordered, first match wins; rows
+  /// 4–9 never fire below N >= 3.
+  @visibleForTesting
+  static String deriveTrajectoryFactForTest({
+    required List<int> trend,
+    required int? delta,
+    int highThreshold = kTrajectoryHighThreshold,
+  }) {
+    final n = trend.length;
+    if (n == 0) return '';
+    final to = trend.last;
+    final maxV = trend.reduce(math.max);
+
+    // 1 — new all-time high (needs a prior point for "high" to mean anything).
+    if (n >= 2 && to == maxV) return 'Điểm form cao nhất từ trước đến giờ.';
+    // 2 / 3 — pre-baseline framing.
+    if (n == 1) return 'Buổi đầu đã xong, Vika bắt đầu theo dõi form.';
+    if (n == 2) return 'Hai buổi rồi, thêm một buổi nữa là thấy xu hướng.';
+    // 4–9 — only with a real baseline (N >= 3, delta resolved).
+    if (n >= 3 && delta != null) {
+      if (delta >= 8) return 'Form lên rõ qua $n buổi.';
+      if (delta >= 3) return 'Form đang đi lên.';
+      if (delta >= -2) {
+        return to >= highThreshold ? 'Giữ vững phong độ cao.' : 'Form ổn định.';
+      }
+      if (delta >= -7) return 'Form chững lại một chút so với đầu giai đoạn.';
+      return 'Form thấp hơn đầu giai đoạn.';
+    }
+    // Defensive: N >= 3 but no delta (shouldn't happen given the gate).
+    return 'Form ổn định.';
+  }
+
+  // ─── Progress tab: milestone rail (CỘT MỐC) ─────────────────────────
+
+  /// Unlock state for the full [milestoneCatalog], computed from the user's
+  /// completed workout_sessions plus their weekly scheduled-session count.
+  /// One round trip for sessions, one for the schedule; the unlock math lives
+  /// in [deriveUnlockedMilestonesForTest] so it stays unit-testable.
+  Future<List<Milestone>> milestones() async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) {
+      return deriveUnlockedMilestonesForTest(const [], scheduledPerWeek: 0);
+    }
+
+    try {
+      final rows = await _client
+          .from('workout_sessions')
+          .select('completed_at, raw_form_score')
+          .eq('user_id', userId)
+          .not('completed_at', 'is', null)
+          .order('completed_at', ascending: true);
+
+      final samples = <({DateTime completedAt, int? rawFormScore})>[];
+      for (final raw in rows as List) {
+        final row = (raw as Map).cast<String, dynamic>();
+        final completedAt = _dateTimeOrNull(row['completed_at']);
+        if (completedAt == null) continue;
+        samples.add((
+          completedAt: completedAt,
+          rawFormScore: (row['raw_form_score'] as num?)?.toInt(),
+        ));
+      }
+
+      return deriveUnlockedMilestonesForTest(
+        samples,
+        scheduledPerWeek: await _scheduledSessionsPerWeek(userId),
+      );
+    } catch (e) {
+      debugPrint('[Vika] milestones failed: $e');
+      return deriveUnlockedMilestonesForTest(const [], scheduledPerWeek: 0);
+    }
+  }
+
+  /// Weekly scheduled-session count from `profiles.schedule_sessions` (the
+  /// same source the recommendation engine reads). 0 when unset — which leaves
+  /// the consistency rungs locked rather than trivially unlocked.
+  Future<int> _scheduledSessionsPerWeek(String userId) async {
+    try {
+      final row = await _client
+          .from('profiles')
+          .select('schedule_sessions')
+          .eq('id', userId)
+          .maybeSingle();
+      final list = (row?['schedule_sessions'] as List?) ?? const [];
+      return list.length;
+    } catch (e) {
+      debugPrint('[Vika] _scheduledSessionsPerWeek failed: $e');
+      return 0;
+    }
+  }
+
+  /// Pure unlock computation for [milestones]. [sessions] are completed
+  /// sessions in any order; [scheduledPerWeek] is the user's weekly scheduled
+  /// count (0 disables the consistency rungs). `now` is accepted for symmetry
+  /// with the other derivers (unused here — every rung is all-time).
+  ///
+  ///   Streak     — all-time LONGEST run of consecutive local days.
+  ///   Sessions   — count of completed sessions.
+  ///   Form       — any session's raw_form_score.
+  ///   Tuần       — a Mon–Sun week with >= [scheduledPerWeek] sessions.
+  ///   Tháng      — a calendar month with >= [scheduledPerWeek] * 4 sessions.
+  ///
+  /// Each unlocked rung carries the 'd/M' date its threshold was first crossed.
+  @visibleForTesting
+  static List<Milestone> deriveUnlockedMilestonesForTest(
+    Iterable<({DateTime completedAt, int? rawFormScore})> sessions, {
+    required int scheduledPerWeek,
+    DateTime? now,
+    List<Milestone> catalog = milestoneCatalog,
+  }) {
+    final sorted = [...sessions]
+      ..sort((a, b) => a.completedAt.compareTo(b.completedAt));
+    final local = [
+      for (final s in sorted)
+        (
+          date: _LocalDate.fromDateTime(s.completedAt.toLocal()),
+          at: s.completedAt.toLocal(),
+          form: s.rawFormScore,
+        ),
+    ];
+
+    String fmt(DateTime d) => '${d.day}/${d.month}';
+
+    // Sessions: date of the nth completion.
+    DateTime? nthSessionDate(int n) =>
+        local.length >= n ? local[n - 1].at : null;
+
+    // Form: earliest session reaching >= threshold.
+    DateTime? formReachDate(int threshold) {
+      for (final s in local) {
+        if (s.form != null && s.form! >= threshold) return s.at;
+      }
+      return null;
+    }
+
+    // Streak: walk unique local days ascending, tracking the current run; the
+    // day a run first reaches [threshold] is when it was crossed.
+    final uniqueDays = <_LocalDate>[];
+    final seen = <_LocalDate>{};
+    for (final s in local) {
+      if (seen.add(s.date)) uniqueDays.add(s.date);
+    }
+    DateTime? streakReachDate(int threshold) {
+      var run = 0;
+      _LocalDate? prev;
+      for (final d in uniqueDays) {
+        run = (prev != null && d == prev.next) ? run + 1 : 1;
+        if (run >= threshold) return DateTime(d.year, d.month, d.day);
+        prev = d;
+      }
+      return null;
+    }
+
+    // Consistency: re-walk in order, accumulating per-span counts; the session
+    // that pushes a span to its target is when the rung was crossed.
+    DateTime? weekReachDate() {
+      if (scheduledPerWeek <= 0) return null;
+      final running = <_LocalDate, int>{};
+      for (final s in local) {
+        final monday = _mondayOf(s.date);
+        final c = (running[monday] ?? 0) + 1;
+        running[monday] = c;
+        if (c >= scheduledPerWeek) return s.at;
+      }
+      return null;
+    }
+
+    DateTime? monthReachDate() {
+      if (scheduledPerWeek <= 0) return null;
+      final target = scheduledPerWeek * 4;
+      final running = <int, int>{};
+      for (final s in local) {
+        final key = s.date.year * 100 + s.date.month;
+        final c = (running[key] ?? 0) + 1;
+        running[key] = c;
+        if (c >= target) return s.at;
+      }
+      return null;
+    }
+
+    return [
+      for (final m in catalog)
+        () {
+          final DateTime? on = switch (m.category) {
+            MilestoneCategory.streak => streakReachDate(m.threshold),
+            MilestoneCategory.sessions => nthSessionDate(m.threshold),
+            MilestoneCategory.form => formReachDate(m.threshold),
+            MilestoneCategory.consistency => m.threshold == kConsistencyWeek
+                ? weekReachDate()
+                : monthReachDate(),
+          };
+          return on == null ? m : m.asUnlocked(fmt(on));
+        }(),
+    ];
   }
 
   /// Returns list of active body_region strings from user_pain_areas.
@@ -1019,6 +1934,13 @@ DateTime? _dateTimeOrNull(Object? value) {
   return null;
 }
 
+/// The Monday (local) of the Mon–Sun week containing [d].
+_LocalDate _mondayOf(_LocalDate d) {
+  final dt = DateTime(d.year, d.month, d.day);
+  final monday = dt.subtract(Duration(days: dt.weekday - 1));
+  return _LocalDate(monday.year, monday.month, monday.day);
+}
+
 class _LocalDate {
   const _LocalDate(this.year, this.month, this.day);
 
@@ -1032,6 +1954,11 @@ class _LocalDate {
 
   _LocalDate get previous {
     final value = DateTime(year, month, day - 1);
+    return _LocalDate(value.year, value.month, value.day);
+  }
+
+  _LocalDate get next {
+    final value = DateTime(year, month, day + 1);
     return _LocalDate(value.year, value.month, value.day);
   }
 
