@@ -236,9 +236,9 @@ class JumpingJack extends ExerciseBase {
     if (_shoulderWidth == null || _shoulderWidth! <= 1.0) return;
 
     // 2. Calculate geometry
-    final leftArmAngle = calculateAngle(
+    final leftArmAngle = calculateAngleNormalized(
         firstPoint: leftShoulder, midPoint: leftElbow, lastPoint: leftWrist);
-    final rightArmAngle = calculateAngle(
+    final rightArmAngle = calculateAngleNormalized(
         firstPoint: rightShoulder, midPoint: rightElbow, lastPoint: rightWrist);
 
     final leftArmElevation = calculateAngleNormalized(

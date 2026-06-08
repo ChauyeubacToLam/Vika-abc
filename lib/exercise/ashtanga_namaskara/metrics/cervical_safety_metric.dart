@@ -21,7 +21,8 @@ class CervicalSafetyMetric extends AshtangaMetricBase {
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
 
-  final StickyDebouncer _dangerDebouncer = StickyDebouncer(requiredFrames: 8);
+  final StickyDebouncer _dangerDebouncer =
+      StickyDebouncer(requiredFrames: 8, currentState: false);
   final _OneEuro1D _euro = _OneEuro1D(minCutoff: 0.6, beta: 0.01);
   final Queue<double> _medianBuf = Queue<double>();
 

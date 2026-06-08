@@ -40,13 +40,7 @@ class SphinxStretch extends ExerciseBase {
   String get exerciseName => 'Sphinx Pose';
 
   @override
-  bool requestStop() {
-    final activeHoldSeconds = state == SphinxState.isometricHold
-        ? tempoMetric.getLiveHoldTime(frameTimestampMs)
-        : tempoMetric.activeHoldSeconds;
-    return repCount >= SphinxConfig.Af_Max_Reps ||
-        activeHoldSeconds >= SphinxConfig.Ae_Min_Hold_Time;
-  }
+  bool requestStop() => repCount >= SphinxConfig.Af_Max_Reps;
 
   @override
   double? get liveHoldSeconds => state == SphinxState.isometricHold
@@ -58,12 +52,13 @@ class SphinxStretch extends ExerciseBase {
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    if (cameraFacing == CameraFacing.front) {
+    if (cameraFacing != CameraFacing.left &&
+        cameraFacing != CameraFacing.right) {
       return "Vui lòng đặt camera quay ngang hông (Side View).";
     }
 
     if (!_selectTrackedSide(landmarks)) {
-      return "Co the chua nam tron trong khung hinh hoac anh sang yeu.";
+      return "Cơ thể chưa nằm trọn trong khung hình hoặc ánh sáng yếu.";
     }
 
     final req = isLeftTracked
@@ -212,11 +207,19 @@ class SphinxStretch extends ExerciseBase {
 
     // Logic xử lý chuyển trạng thái cũ
     if (newState != state) {
+      final oldState = state;
       for (final m in _metrics) {
         m.onStateTransition(state, newState, ctx.frameTimestampMs);
       }
       prevState = state;
       state = newState;
+
+      if (oldState == SphinxState.ascending &&
+          newState == SphinxState.isometricHold) {
+        hipMetric.reset();
+        elbowMetric.reset();
+        neckMetric.reset();
+      }
     }
 
     // --- LOGIC MỚI: ĐẾM REP THEO GIÂY TRONG LÚC HOLD ---

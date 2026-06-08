@@ -21,7 +21,7 @@ class WalkingRepContext {
   final double torsoAngle;
   final double stepLengthX;
   double get normalizedStepLength =>
-      thighLength > 0 ? stepLengthX / thighLength : 0.0;
+      thighLength > 1e-6 ? stepLengthX / thighLength : 0.0;
 
   final WalkingState state;
   final int frameTimestamp;

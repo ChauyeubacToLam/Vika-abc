@@ -38,6 +38,8 @@ class Lunge extends ExerciseBase {
 
   LungeState lungeState = LungeState.standing;
   LungeState previousLungeState = LungeState.standing;
+  bool _reachedBottomThisRep = false;
+  int _rejectedShallowAttempts = 0;
 
   final LungeDepthMetric depthMetric = LungeDepthMetric();
   final LungeTrunkLeanMetric trunkLeanMetric = LungeTrunkLeanMetric();
@@ -313,6 +315,8 @@ class Lunge extends ExerciseBase {
 
     // 5. Debug data
     debugData['lungeState'] = lungeState.toString().split('.').last;
+    debugData['reachedBottomThisRep'] = _reachedBottomThisRep;
+    debugData['rejectedShallowAttempts'] = _rejectedShallowAttempts;
     debugData['leadLeg'] = (_isLeftLegLead ?? true) ? 'Left' : 'Right';
     debugData['leadKneeAngle'] = leadKneeAngle.toStringAsFixed(1);
     debugData['trailKneeAngle'] = trailKneeAngle.toStringAsFixed(1);
@@ -327,6 +331,18 @@ class Lunge extends ExerciseBase {
     // 6. Rep completion (standing up)
     if (lungeState == LungeState.standing &&
         previousLungeState != LungeState.standing) {
+      if (!_reachedBottomThisRep) {
+        _rejectedShallowAttempts++;
+        resultIssues.feedback['Result'] = 'Không tính';
+        previousLungeState = LungeState.standing;
+        _reachedBottomThisRep = false;
+        _leadLegLocked = false;
+        for (final metric in _metrics) {
+          metric.reset();
+        }
+        return;
+      }
+
       repCount += 1;
 
       depthMetric.checkRepCompletion(lungeState, ctx);
@@ -357,6 +373,7 @@ class Lunge extends ExerciseBase {
       for (final metric in _metrics) {
         metric.reset();
       }
+      _reachedBottomThisRep = false;
       return;
     }
 
@@ -411,7 +428,10 @@ class Lunge extends ExerciseBase {
     if (newState == LungeState.descending &&
         previousLungeState == LungeState.standing) {
       _leadLegLocked = true;
+      _reachedBottomThisRep = false;
       resultIssues.instructions.clear();
+    } else if (newState == LungeState.bottom) {
+      _reachedBottomThisRep = true;
     } else if (newState == LungeState.standing) {
       _leadLegLocked = false;
     }

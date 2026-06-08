@@ -7,6 +7,7 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'side_plank_dip_metric_base.dart';
 
 class RotationConfig {
+  static const double TWIST_WIDE_RATIO = 1.3;
   static const double TWIST_THRESHOLD = 0.7; // Rút ngắn còn 70% = vặn mình
 }
 
@@ -48,9 +49,18 @@ class AntiRotationMetric extends SidePlankDipMetricBase {
     if (!_baselineCaptured) return;
 
     // Nếu khoảng cách bị thu hẹp đáng kể, chứng tỏ người dùng đang xoay ra trước/sau so với camera
-    if (ctx.shoulderWidthX <
-            _baselineShoulderWidth * RotationConfig.TWIST_THRESHOLD ||
-        ctx.hipWidthX < _baselineHipWidth * RotationConfig.TWIST_THRESHOLD) {
+    final shoulderRatio = _baselineShoulderWidth <= 1e-6
+        ? 1.0
+        : ctx.shoulderWidthX / _baselineShoulderWidth;
+    final hipRatio =
+        _baselineHipWidth <= 1e-6 ? 1.0 : ctx.hipWidthX / _baselineHipWidth;
+    _debugData['rotationShoulderRatio'] = shoulderRatio.toStringAsFixed(2);
+    _debugData['rotationHipRatio'] = hipRatio.toStringAsFixed(2);
+
+    if (shoulderRatio < RotationConfig.TWIST_THRESHOLD ||
+        shoulderRatio > RotationConfig.TWIST_WIDE_RATIO ||
+        hipRatio < RotationConfig.TWIST_THRESHOLD ||
+        hipRatio > RotationConfig.TWIST_WIDE_RATIO) {
       _hasTwisted = true;
       ctx.resultIssues.feedback['Core'] = 'Đừng đổ người! Giữ hông vuông góc.';
     }

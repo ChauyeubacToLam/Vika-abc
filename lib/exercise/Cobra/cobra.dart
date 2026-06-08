@@ -54,6 +54,7 @@ class Cobra extends ExerciseBase {
   int? _restStartMs;
 
   final Debouncer _positionDebouncer = Debouncer(requiredFrames: 2);
+  final Debouncer _exitPositionDebouncer = Debouncer(requiredFrames: 3);
 
   // --- All Metrics (MET-1 through MET-6) ---
   final _pelvicMetric = CobraPelvicMetric();
@@ -194,7 +195,8 @@ class Cobra extends ExerciseBase {
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    if (cameraFacing == CameraFacing.front) {
+    if (cameraFacing != CameraFacing.left &&
+        cameraFacing != CameraFacing.right) {
       return "⚠️ Xin hãy quay nghiêng để theo dõi tư thế Cobra";
     }
 
@@ -267,6 +269,7 @@ class Cobra extends ExerciseBase {
     PoseLandmark? heel = smoothedLandmarks[PoseLandmarkType.leftHeel] ??
         smoothedLandmarks[PoseLandmarkType.rightHeel];
 
+    if (!scaleFactor.isFinite || scaleFactor <= 1e-6) return;
     double floorY = foot?.y ?? heel?.y ?? knee?.y ?? hip.y;
     double hipToFloor = (floorY - hip.y).abs() / scaleFactor;
     bool isStanding = hipToFloor > CobraConfig.STANDING_HIP_FLOOR_THRESHOLD;
@@ -379,7 +382,7 @@ class Cobra extends ExerciseBase {
       case CobraState.holding:
         if (_currentHoldSeconds() >= CobraConfig.HOLD_DURATION) {
           _transitionState(CobraState.resting, timestampMs);
-        } else if (!confirmedCobra) {
+        } else if (_exitPositionDebouncer.update(!isCobraPosition)) {
           if (trunkDeviation.abs() < CobraConfig.PRONE_TOLERANCE) {
             _transitionState(CobraState.setup, timestampMs);
           }
@@ -400,6 +403,8 @@ class Cobra extends ExerciseBase {
   void _transitionState(CobraState newState, int timestampMs) {
     previousCobraState = cobraState;
     cobraState = newState;
+    _positionDebouncer.reset();
+    _exitPositionDebouncer.reset();
 
     switch (newState) {
       case CobraState.holding:

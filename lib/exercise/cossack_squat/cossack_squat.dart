@@ -35,6 +35,8 @@ class CossackSquat extends ExerciseBase {
 
   CossackState cossackState = CossackState.standing;
   CossackState previousCossackState = CossackState.standing;
+  bool _reachedBottomThisRep = false;
+  int _rejectedShallowAttempts = 0;
 
   WorkingLeg currentWorkingLeg = WorkingLeg.none;
 
@@ -184,6 +186,8 @@ class CossackSquat extends ExerciseBase {
     final hipCenterY = (leftHip.y + rightHip.y) / 2;
     final shoulderCenterX = (leftShoulder.x + rightShoulder.x) / 2;
     final shoulderCenterY = (leftShoulder.y + rightShoulder.y) / 2;
+    scaleFactor = (leftShoulder.x - rightShoulder.x).abs();
+    if (scaleFactor <= 1e-6) return;
 
     // Create a virtual mid-shoulder and mid-hip for torso angle
     final torsoAngle = calculateVerticalAngle(
@@ -241,9 +245,22 @@ class CossackSquat extends ExerciseBase {
 
     if (cossackState == CossackState.standing &&
         previousCossackState != CossackState.standing) {
+      if (!_reachedBottomThisRep) {
+        _rejectedShallowAttempts++;
+        resultIssues.feedback['Result'] = 'Không tính';
+        previousCossackState = CossackState.standing;
+        currentWorkingLeg = WorkingLeg.none;
+        _reachedBottomThisRep = false;
+        for (final metric in _metrics) {
+          metric.resetAndCountFault();
+        }
+        return;
+      }
+
       // Rep completed
       _completeRep();
       previousCossackState = cossackState;
+      _reachedBottomThisRep = false;
       return;
     }
 
@@ -258,15 +275,14 @@ class CossackSquat extends ExerciseBase {
     if (currentWorkingLeg == WorkingLeg.left) {
       workingKneeAngle = leftKneeAngle;
       straightKneeAngle = rightKneeAngle;
-      workingHeelDistance = leftHeelDist / (scaleFactor == 0 ? 1 : scaleFactor);
+      workingHeelDistance = leftHeelDist / scaleFactor;
       workingKneeX = leftKnee.x;
       workingAnkleX = leftAnkle.x;
       workingFootIndexX = leftFoot.x;
     } else if (currentWorkingLeg == WorkingLeg.right) {
       workingKneeAngle = rightKneeAngle;
       straightKneeAngle = leftKneeAngle;
-      workingHeelDistance =
-          rightHeelDist / (scaleFactor == 0 ? 1 : scaleFactor);
+      workingHeelDistance = rightHeelDist / scaleFactor;
       workingKneeX = rightKnee.x;
       workingAnkleX = rightAnkle.x;
       workingFootIndexX = rightFoot.x;
@@ -281,6 +297,7 @@ class CossackSquat extends ExerciseBase {
       workingKneeX: workingKneeX,
       workingAnkleX: workingAnkleX,
       workingFootIndexX: workingFootIndexX,
+      scaleFactor: scaleFactor,
       state: cossackState,
       frameTimestamp: now,
       resultIssues: resultIssues,
@@ -296,6 +313,8 @@ class CossackSquat extends ExerciseBase {
     // Debug data
     debugData['cossackState'] = cossackState.name;
     debugData['workingLeg'] = currentWorkingLeg.name;
+    debugData['reachedBottomThisRep'] = _reachedBottomThisRep;
+    debugData['rejectedShallowAttempts'] = _rejectedShallowAttempts;
     debugData['leftKneeAngle'] = leftKneeAngle;
     debugData['rightKneeAngle'] = rightKneeAngle;
     debugData['torsoAngle'] = torsoAngle;
@@ -321,8 +340,10 @@ class CossackSquat extends ExerciseBase {
 
     if (cossackState == CossackState.descending) {
       // Reached bottom if hip stops moving down or knee is very bent
-      if (workingKneeAngle < CossackConfig.BOTTOM_KNEE_ANGLE_THRESHOLD ||
-          hipYChange == ChangeState.decreasing) {
+      if (workingKneeAngle <= CossackConfig.BOTTOM_KNEE_ANGLE_THRESHOLD ||
+          (hipYChange == ChangeState.decreasing &&
+              workingKneeAngle <=
+                  CossackConfig.BOTTOM_KNEE_ANGLE_THRESHOLD + 10)) {
         _transitionState(CossackState.bottom, now);
       }
     } else if (cossackState == CossackState.bottom) {
@@ -348,7 +369,10 @@ class CossackSquat extends ExerciseBase {
 
     if (newState == CossackState.descending &&
         previousCossackState == CossackState.standing) {
+      _reachedBottomThisRep = false;
       resultIssues.instructions.clear();
+    } else if (newState == CossackState.bottom) {
+      _reachedBottomThisRep = true;
     } else if (newState == CossackState.standing) {
       currentWorkingLeg = WorkingLeg.none;
     }

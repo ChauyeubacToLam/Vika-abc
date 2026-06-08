@@ -139,8 +139,8 @@ class JumpSquat extends ExerciseBase {
       return false;
     }
 
-    double kneeAngle =
-        calculateAngle(firstPoint: hip, midPoint: knee, lastPoint: ankle);
+    double kneeAngle = calculateAngleNormalized(
+        firstPoint: hip, midPoint: knee, lastPoint: ankle);
 
     // Đứng thẳng (Hip-Knee-Ankle > 170)
     if (kneeAngle < 170.0) return false;
@@ -163,7 +163,8 @@ class JumpSquat extends ExerciseBase {
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    if (cameraFacing == CameraFacing.front) {
+    if (cameraFacing != CameraFacing.left &&
+        cameraFacing != CameraFacing.right) {
       return "⚠️ Hãy quay ngang người để AI đánh giá độ cong của lưng!";
     }
     return null;
@@ -208,8 +209,8 @@ class JumpSquat extends ExerciseBase {
     }
 
     // 1. Tính toán Geometry
-    double kneeAngle =
-        calculateAngle(firstPoint: hip, midPoint: knee, lastPoint: ankle);
+    double kneeAngle = calculateAngleNormalized(
+        firstPoint: hip, midPoint: knee, lastPoint: ankle);
     double backAngle = calculateVerticalAngle(pivot: hip, point: shoulder);
     double trunkVerticalAngle =
         convertClockAngleToTrunkLean(backAngle, cameraFacing).abs();

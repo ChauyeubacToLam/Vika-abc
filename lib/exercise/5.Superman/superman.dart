@@ -356,7 +356,15 @@ class Superman extends ExerciseBase {
     if (to == superState) return;
     final from = superState;
     superState = to;
+    _resetPhaseDebouncers();
     for (final m in _metrics) m.onStateTransition(from, to, ts);
+  }
+
+  void _resetPhaseDebouncers() {
+    _liftDebouncer.reset();
+    _topDebouncer.reset();
+    _lowerDebouncer.reset();
+    _loweredDebouncer.reset();
   }
 
   void _completeRep(SupermanRepContext ctx) {

@@ -9,6 +9,7 @@ class CossackRepContext {
   final double workingKneeX;
   final double workingAnkleX;
   final double workingFootIndexX;
+  final double scaleFactor;
 
   final double workingKneeAngle;
   final double straightKneeAngle;
@@ -24,6 +25,7 @@ class CossackRepContext {
     required this.workingKneeX,
     required this.workingAnkleX,
     required this.workingFootIndexX,
+    required this.scaleFactor,
     required this.workingKneeAngle,
     required this.straightKneeAngle,
     required this.torsoAngle,

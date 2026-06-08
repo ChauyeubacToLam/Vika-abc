@@ -17,7 +17,8 @@ class CervicalSafetyMetric extends LowLungeMetricBase {
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
 
-  final StickyDebouncer _errorDebouncer = StickyDebouncer(requiredFrames: 8);
+  final StickyDebouncer _errorDebouncer =
+      StickyDebouncer(requiredFrames: 8, currentState: false);
 
   @override
   List<FaultRecord> get faults => _faults;
@@ -37,7 +38,7 @@ class CervicalSafetyMetric extends LowLungeMetricBase {
       return;
     }
 
-    final cervicalAngle = calculateAngle(
+    final cervicalAngle = calculateAngleNormalized(
       firstPoint: ctx.ear!,
       midPoint: ctx.frontShoulder!,
       lastPoint: ctx.frontHip!,

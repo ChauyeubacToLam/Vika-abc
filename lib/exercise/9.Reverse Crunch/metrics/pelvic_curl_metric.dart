@@ -20,8 +20,8 @@ class PelvicCurlMetric extends ReverseCrunchMetricBase {
   @override
   void update(RepContext ctx) {
     if (ctx.state == ReverseCrunchState.lying) {
-      _baselineHipY = ctx.hipY;
-      _baselineTrunkKneeAngle = ctx.trunkKneeAngle;
+      _baselineHipY ??= ctx.hipY;
+      _baselineTrunkKneeAngle ??= ctx.trunkKneeAngle;
       ctx.resultIssues.feedback['Curl'] = 'Sẵn sàng cuộn';
       return;
     }
@@ -34,9 +34,9 @@ class PelvicCurlMetric extends ReverseCrunchMetricBase {
     }
 
     if (_baselineHipY != null && _baselineTrunkKneeAngle != null) {
+      if (ctx.scaleFactor <= 1e-6) return;
       double angleDrop = _baselineTrunkKneeAngle! - ctx.trunkKneeAngle;
-      double hipLiftNorm = (_baselineHipY! - ctx.hipY) /
-          (ctx.scaleFactor == 0 ? 1 : ctx.scaleFactor);
+      double hipLiftNorm = (_baselineHipY! - ctx.hipY) / ctx.scaleFactor;
 
       _debugData['angleDrop'] = angleDrop.toStringAsFixed(1);
       _debugData['hipLiftNorm'] = hipLiftNorm.toStringAsFixed(2);
@@ -57,10 +57,10 @@ class PelvicCurlMetric extends ReverseCrunchMetricBase {
   @override
   void evaluateRepEnd(RepContext ctx) {
     if (_baselineHipY == null || _baselineTrunkKneeAngle == null) return;
+    if (ctx.scaleFactor <= 1e-6) return;
 
     double maxAngleDrop = _baselineTrunkKneeAngle! - _minTrunkKneeAngle;
-    double maxHipLift = (_baselineHipY! - _minHipY) /
-        (ctx.scaleFactor == 0 ? 1 : ctx.scaleFactor);
+    double maxHipLift = (_baselineHipY! - _minHipY) / ctx.scaleFactor;
 
     if (maxAngleDrop < ReverseCrunchConfig.PELVIC_CURL_ANGLE_MIN_DROP ||
         maxHipLift < ReverseCrunchConfig.HIP_LIFT_MIN_NORMALIZED) {

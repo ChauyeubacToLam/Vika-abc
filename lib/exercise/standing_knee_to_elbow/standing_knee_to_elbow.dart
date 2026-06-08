@@ -16,8 +16,8 @@ enum KteState { standing_base, approaching, touch, returning }
 class StandingKneeToElbowConfig {
   static const int MAX_REP = 30; // 15 per side
   static const double KNEE_LIFT_START_RATIO = 0.10;
-  static const double TOUCH_DISTANCE_RATIO = 1.05;
-  static const double TOUCH_EXIT_DISTANCE_RATIO = 1.18;
+  static const double TOUCH_DISTANCE_RATIO = 0.55;
+  static const double TOUCH_EXIT_DISTANCE_RATIO = 0.80;
 }
 
 class StandingKneeToElbow extends ExerciseBase {
@@ -141,7 +141,7 @@ class StandingKneeToElbow extends ExerciseBase {
 
     if (leftElbow.y > leftShoulder.y + torsoLength * 0.35 ||
         rightElbow.y > rightShoulder.y + torsoLength * 0.35) {
-      resultIssues.feedback['System'] = 'Nang hai khuyu tay len gan ngang vai.';
+      resultIssues.feedback['System'] = 'Nâng hai khuỷu tay lên gần ngang vai.';
       return false;
     }
 
@@ -171,6 +171,20 @@ class StandingKneeToElbow extends ExerciseBase {
         rightShoulder == null ||
         leftElbow == null ||
         rightElbow == null) {
+      return;
+    }
+    if (![
+      leftHip,
+      rightHip,
+      leftKnee,
+      rightKnee,
+      leftAnkle,
+      rightAnkle,
+      leftShoulder,
+      rightShoulder,
+      leftElbow,
+      rightElbow,
+    ].every(ExerciseBase.isLandmarkConfident)) {
       return;
     }
 
@@ -248,7 +262,9 @@ class StandingKneeToElbow extends ExerciseBase {
       resultIssues: resultIssues,
     );
 
-    if (kteState != KteState.standing_base) {
+    if (kteState == KteState.standing_base) {
+      coreDriveMetric.update(ctx);
+    } else {
       for (final metric in _metrics) {
         metric.update(ctx);
       }

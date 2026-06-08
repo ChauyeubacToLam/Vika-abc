@@ -113,8 +113,8 @@ class BowPose extends ExerciseBase {
 
     if (yDiffShoulderHip > 0.35 || yDiffHipKnee > 0.35) return false;
 
-    double kneeAngle =
-        calculateAngle(firstPoint: hip, midPoint: knee, lastPoint: ankle);
+    double kneeAngle = calculateAngleNormalized(
+        firstPoint: hip, midPoint: knee, lastPoint: ankle);
     if (kneeAngle < 150.0) return false;
 
     return true;
@@ -128,7 +128,8 @@ class BowPose extends ExerciseBase {
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    if (cameraFacing == CameraFacing.front) {
+    if (cameraFacing != CameraFacing.left &&
+        cameraFacing != CameraFacing.right) {
       return "⚠️ Vui lòng quay ngang điện thoại để AI nhìn rõ độ cong lưng.";
     }
     return null;
@@ -165,7 +166,8 @@ class BowPose extends ExerciseBase {
     if (shoulder.likelihood < 0.5 ||
         hip.likelihood < 0.5 ||
         knee.likelihood < 0.5 ||
-        ankle.likelihood < 0.5) return;
+        ankle.likelihood < 0.5 ||
+        !ExerciseBase.isLandmarkConfident(wrist)) return;
 
     double refLen = calculateDistance(shoulder, hip);
     if (refLen < 10) refLen = 10;
@@ -176,8 +178,8 @@ class BowPose extends ExerciseBase {
     double wristAnkleDist = calculateDistance(wrist, ankle) / refLen;
     double chestLift = (hip.y - shoulder.y) / refLen;
     double thighLiftRelative = (hip.y - knee.y) / thighLen;
-    double kneeAngle =
-        calculateAngle(firstPoint: hip, midPoint: knee, lastPoint: ankle);
+    double kneeAngle = calculateAngleNormalized(
+        firstPoint: hip, midPoint: knee, lastPoint: ankle);
 
     int now = frameTimestampMs;
 

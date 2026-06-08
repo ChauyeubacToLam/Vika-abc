@@ -17,6 +17,7 @@ class ButterflyConfig {
   static const double HOLD_STABILITY_THRESHOLD = 0.025;
   static const double STRETCH_THRESHOLD = 0.02;
   static const double RELEASE_THRESHOLD = -0.025;
+  static const double MIN_KNEE_SEPARATION_NORM = 0.85;
   static const int MAX_BUFFER_FRAMES = 45;
 }
 
@@ -277,6 +278,8 @@ class ButterflyStretch extends ExerciseBase {
     double avgHipY = (lHip.y + rHip.y) / 2;
     double torsoHeight = (avgShoulderY - avgHipY).abs();
     final shoulderWidth = (lShoulder.x - rShoulder.x).abs();
+    final kneeSeparationNorm =
+        kneeSep / (shoulderWidth == 0 ? 1 : shoulderWidth);
     final ankleSeparationNorm =
         ankleSep / (shoulderWidth == 0 ? 1 : shoulderWidth);
     final footToHipDistanceNorm = _pointDistance(
@@ -312,7 +315,7 @@ class ButterflyStretch extends ExerciseBase {
     if (frameBuffer.frameBuffer.length > ButterflyConfig.MAX_BUFFER_FRAMES) {
       frameBuffer.frameBuffer.removeAt(0);
     }
-    _updateStateBuffer(avgKneeY, kneeSep, torsoHeight, now);
+    _updateStateBuffer(avgKneeY, kneeSep, torsoHeight, kneeSeparationNorm, now);
 
     if (stretchState != ButterflyState.setup) {
       for (final metric in _metrics) {
@@ -330,6 +333,7 @@ class ButterflyStretch extends ExerciseBase {
             normalizedShoulderTilt <= PostureConfig.TILT_THRESHOLD &&
             torsoVerticalNorm >= PostureConfig.COLLAPSE_THRESHOLD &&
             ankleSeparationNorm <= ButterflyConfig.MAX_ANKLE_SEPARATION_NORM &&
+            kneeSeparationNorm >= ButterflyConfig.MIN_KNEE_SEPARATION_NORM &&
             footToHipDistanceNorm <=
                 FootPlacementConfig.MAX_FOOT_TO_HIP_DISTANCE_NORM;
     if (stretchState == ButterflyState.isometric_hold && formClean) {
@@ -343,8 +347,8 @@ class ButterflyStretch extends ExerciseBase {
     _updatePhaseInstructions();
   }
 
-  void _updateStateBuffer(
-      double avgKneeY, double kneeSep, double torsoHeight, int timestampMs) {
+  void _updateStateBuffer(double avgKneeY, double kneeSep, double torsoHeight,
+      double kneeSeparationNorm, int timestampMs) {
     double yChange = 0.0;
     final buffer = frameBuffer.frameBuffer;
     if (buffer.length >= 2) {
@@ -357,7 +361,10 @@ class ButterflyStretch extends ExerciseBase {
     final yChangeNorm = yChange / (torsoHeight == 0 ? 1 : torsoHeight);
 
     if (stretchState == ButterflyState.setup &&
-        yChangeNorm > ButterflyConfig.STRETCH_THRESHOLD) {
+        (yChangeNorm > ButterflyConfig.STRETCH_THRESHOLD ||
+            (kneeSeparationNorm >= ButterflyConfig.MIN_KNEE_SEPARATION_NORM &&
+                _holdDebouncer.update(yChangeNorm.abs() <
+                    ButterflyConfig.HOLD_STABILITY_THRESHOLD)))) {
       _transitionState(ButterflyState.stretching, timestampMs);
     } else if ((stretchState == ButterflyState.stretching ||
             stretchState == ButterflyState.release) &&

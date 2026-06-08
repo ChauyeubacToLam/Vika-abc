@@ -1,26 +1,26 @@
 import 'dart:math' as math;
 
+import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:vika/exercise/exercise_base.dart';
 import 'package:vika/exercise/side_tracked_exercise_mixin.dart';
 import 'package:vika/pose/vika_pose_landmark.dart';
+import 'package:vika/utils/exercise_logger.dart';
 
 import '../../utils/frame_buffer.dart';
-import 'package:vika/utils/exercise_logger.dart';
 import '../../utils/frame_snapshot.dart';
 import '../../utils/pose_math_helpers.dart';
-import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
-import 'metrics/russian_metric_base.dart';
-import 'metrics/thoracic_rotation_metric.dart';
 import 'metrics/knee_anchoring_metric.dart';
-import 'metrics/twist_rom_metric.dart';
+import 'metrics/russian_metric_base.dart';
 import 'metrics/spinal_flexion_metric.dart';
+import 'metrics/thoracic_rotation_metric.dart';
+import 'metrics/twist_rom_metric.dart';
 
 enum RussianTwistState { center_setup, twisting, max_point, returning }
 
 enum TwistDirection { none, forward, backward }
 
 class RussianTwistConfig {
-  static const int MAX_REP = 20; // 10 per side
+  static const int MAX_REP = 20;
   static const double MIN_TRUNK_HORIZONTAL_ANGLE = 32.0;
   static const double MAX_TRUNK_HORIZONTAL_ANGLE = 72.0;
   static const double MIN_KNEE_HIP_DX_RATIO = 0.35;
@@ -30,6 +30,8 @@ class RussianTwistConfig {
   static const double CENTER_MAX_HAND_RATIO = 0.50;
   static const double FORWARD_ROM_RATIO = 0.60;
   static const double BACKWARD_ROM_RATIO = 0.20;
+  static const double FORWARD_GOOD_ROM_RATIO = 0.66;
+  static const double BACKWARD_GOOD_ROM_RATIO = 0.14;
   static const double HAND_VELOCITY_GATE_PX = 3.0;
 }
 
@@ -69,9 +71,10 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
   TwistDirection currentDirection = TwistDirection.none;
   TwistDirection lastCompletedTwistDirection = TwistDirection.none;
 
-  int _halfRepCount = 0; // count twists, 2 twists = 1 rep
+  int _halfRepCount = 0;
   int _rejectedHalfTwists = 0;
   double? _centerHandSignal;
+  final List<FaultRecord> _pendingFullRepFaults = [];
 
   static const Set<String> _blockingFaultTypes = {
     'shallow_twist',
@@ -81,7 +84,6 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
     'collapsed_torso',
   };
 
-  // Metrics
   final ThoracicRotationMetric thoracicMetric = ThoracicRotationMetric();
   final KneeAnchoringMetric kneeMetric = KneeAnchoringMetric();
   final TwistRomMetric twistRomMetric = TwistRomMetric();
@@ -130,19 +132,20 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    if (cameraFacing == CameraFacing.front) {
-      return "Vui lòng đặt camera chéo ngang khoảng 35-45 độ, không quay chính diện.";
+    if (cameraFacing != CameraFacing.left &&
+        cameraFacing != CameraFacing.right) {
+      if (cameraFacing == CameraFacing.front) {
+        return 'Đặt camera ngang bên hông, không quay chính diện.';
+      }
+      if (cameraFacing == CameraFacing.angled) {
+        return 'Xoay camera sang góc ngang bên hông rồi mới tập.';
+      }
+      return 'Giữ vai, hông, gối và tay trong khung hình ở góc ngang bên hông.';
     }
-    if (cameraFacing == CameraFacing.undefined) {
-      return "Vui lòng giữ vai, hông, gối và tay trong khung hình.";
-    }
-    if (cameraFacing == CameraFacing.left ||
-        cameraFacing == CameraFacing.right) {
-      return "Đừng đặt camera ngang 90 độ. Hãy xoay máy chéo 35-45 độ để thấy cả hai bên vai và tay.";
-    }
+
     final sideLandmarks = getSideTrackedLandmarks(landmarks);
     if (sideLandmarks == null) {
-      return "Không nhìn thấy đủ các điểm khớp vai, hông, gối và cổ tay.";
+      return 'Không nhìn thấy đủ các điểm khớp vai, hông, gối và cổ tay.';
     }
     return null;
   }
@@ -187,11 +190,24 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
       return false;
     }
 
+    debugData['RussianSetup'] = {
+      'cameraFacing': cameraFacing.name,
+      'frontFacingRatio': frontFacingRatio.toStringAsFixed(2),
+      'trunkAngle': trunkAngle.toStringAsFixed(1),
+      'kneeHipDx': kneeHipDx.toStringAsFixed(1),
+      'handRatio': handRatio.toStringAsFixed(2),
+    };
     return true;
   }
 
   @override
   void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
+    final safety = checkSafety(smoothedLandmarks);
+    if (safety != null) {
+      resultIssues.feedback['System'] = safety;
+      return;
+    }
+
     final sideLandmarks = getSideTrackedLandmarks(smoothedLandmarks);
     if (sideLandmarks == null) return;
 
@@ -201,24 +217,19 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
     final trackedWrist = sideLandmarks['wrist']!;
     final handPoint = _stableHandPoint(smoothedLandmarks, trackedWrist);
 
-    // Determine facing direction. If knee is to the right of hip, they face right.
-    double directionMultiplier = _directionMultiplier(hip, knee);
-
-    // Calculate relative positions
-    double wristHipDx = (handPoint.x - hip.x) * directionMultiplier;
-    double shoulderHipDx = (shoulder.x - hip.x) * directionMultiplier;
-    double kneeHipDx = _normalizedDx(knee, hip, directionMultiplier);
+    final directionMultiplier = _directionMultiplier(hip, knee);
+    final wristHipDx = (handPoint.x - hip.x) * directionMultiplier;
+    final shoulderHipDx = (shoulder.x - hip.x) * directionMultiplier;
+    var kneeHipDx = _normalizedDx(knee, hip, directionMultiplier);
     final trunkAngle = _trunkHorizontalAngle(shoulder, hip);
 
-    // Fallback if knee is directly under hip (shouldn't happen sitting)
-    if (kneeHipDx <= 0) kneeHipDx = 1.0;
+    if (kneeHipDx <= 1e-6) kneeHipDx = 1.0;
 
-    int now = frameTimestampMs;
-
+    final now = frameTimestampMs;
     frameBuffer.addFrame(FrameSnapshot(log: {
-      "wristHipDx": wristHipDx,
-      "handSignal": wristHipDx,
-      "shoulderSignal": shoulderHipDx,
+      'wristHipDx': wristHipDx,
+      'handSignal': wristHipDx,
+      'shoulderSignal': shoulderHipDx,
     }, timeStamp: now));
 
     _updateStateMachine(wristHipDx, kneeHipDx, now);
@@ -247,13 +258,19 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
       metric.update(ctx);
     }
 
-    debugData['russianState'] = russianState.name;
-    debugData['direction'] = currentDirection.name;
-    debugData['halfRepCount'] = _halfRepCount;
-    debugData['handSignal'] = wristHipDx.toStringAsFixed(1);
-    debugData['handRatio'] = (wristHipDx / kneeHipDx).toStringAsFixed(2);
-    debugData['shoulderSignal'] = shoulderHipDx.toStringAsFixed(1);
-    debugData['trunkAngle'] = trunkAngle.toStringAsFixed(1);
+    debugData['RussianTwistDebug'] = {
+      'state': russianState.name,
+      'cameraFacing': cameraFacing.name,
+      'frontFacingRatio': frontFacingRatio.toStringAsFixed(2),
+      'direction': currentDirection.name,
+      'halfRepCount': _halfRepCount,
+      'repCount': repCount,
+      'rejectedHalfTwists': _rejectedHalfTwists,
+      'handSignal': wristHipDx.toStringAsFixed(1),
+      'handRatio': (wristHipDx / kneeHipDx).toStringAsFixed(2),
+      'shoulderSignal': shoulderHipDx.toStringAsFixed(1),
+      'trunkAngle': trunkAngle.toStringAsFixed(1),
+    };
 
     for (final metric in _metrics) {
       debugData.addAll(metric.debugData);
@@ -270,7 +287,9 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
 
   void _updateStateMachine(double handSignal, double kneeHipDx, int now) {
     final handChange = frameBuffer.getChange(
-        "handSignal", RussianTwistConfig.HAND_VELOCITY_GATE_PX);
+      'handSignal',
+      RussianTwistConfig.HAND_VELOCITY_GATE_PX,
+    );
     final handRatio = handSignal / kneeHipDx;
 
     if (russianState == RussianTwistState.center_setup) {
@@ -308,12 +327,7 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
       final nearCapturedCenter = _centerHandSignal != null &&
           (handSignal - _centerHandSignal!).abs() <= centerTolerance;
 
-      if (inCenterRatio ||
-          nearCapturedCenter ||
-          (currentDirection == TwistDirection.forward &&
-              handChange == ChangeState.increasing) ||
-          (currentDirection == TwistDirection.backward &&
-              handChange == ChangeState.decreasing)) {
+      if (inCenterRatio || nearCapturedCenter) {
         _transitionState(RussianTwistState.center_setup, now);
         _completeHalfRep();
       }
@@ -333,61 +347,63 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
 
     for (final metric in _metrics) {
       metric.onStateTransition(
-          previousRussianState, newState, currentDirection, timestampMs);
+        previousRussianState,
+        newState,
+        currentDirection,
+        timestampMs,
+      );
     }
   }
 
   void _completeHalfRep() {
-    // Collect faults early to see if this attempt should count.
     final allFaults = <FaultRecord>[];
     for (final metric in _metrics) {
       allFaults.addAll(metric.faults);
     }
 
-    bool hasBlockingFault =
+    final hasBlockingFault =
         allFaults.any((f) => _blockingFaultTypes.contains(f.type));
 
-    // Only process valid alternating reps if the attempt passed anti-cheat.
-    // Blocking faults are ignored as a side so users cannot alternate bad reps.
     if (!hasBlockingFault) {
       if (currentDirection == lastCompletedTwistDirection) {
-        // Repeated the same side!
         _rejectedHalfTwists++;
         resultIssues.feedback['Result'] = 'Không tính';
         setFeedback.add({
           false: {
-            'General': {'duplicate_side': 'Vui lòng vặn luân phiên 2 bên!'}
+            'General': {'duplicate_side': 'Vui lòng vặn luân phiên 2 hướng!'}
           }
         });
       } else {
-        // Valid alternate twist
         _halfRepCount++;
         lastCompletedTwistDirection = currentDirection;
+        _pendingFullRepFaults.addAll(allFaults);
 
-        bool isGoodHalf = !allFaults.any((f) => f.affectsForm);
-
-        final faultMap = <String, Map<String, String>>{};
-        for (final fault in allFaults) {
-          faultMap.putIfAbsent(fault.phase, () => {});
-          faultMap[fault.phase]![fault.type] = fault.message;
-        }
-
-        // Every 2 valid half reps = 1 full rep count
         if (_halfRepCount % 2 == 0) {
           repCount++;
-          correctForm = isGoodHalf;
+          correctForm = !_pendingFullRepFaults.any((f) => f.affectsForm);
           resultIssues.feedback['Result'] =
-              correctForm ? 'Tốt lắm!' : 'Sửa form';
+              correctForm ? 'Tốt lắm!' : 'Chỉnh tư thế';
+
+          final faultMap = <String, Map<String, String>>{};
+          for (final fault in _pendingFullRepFaults) {
+            faultMap.putIfAbsent(fault.phase, () => {});
+            faultMap[fault.phase]![fault.type] = fault.message;
+          }
 
           setFeedback.add({correctForm: faultMap});
-          logger.addRepLog(
-              RepLog(correctForm: correctForm, repNumber: repCount, data: {
-            "fault_types": allFaults.map((f) => f.type).toSet().toList(),
-          }));
+          logger.addRepLog(RepLog(
+            correctForm: correctForm,
+            repNumber: repCount,
+            data: {
+              'fault_types':
+                  _pendingFullRepFaults.map((f) => f.type).toSet().toList(),
+              'half_rep_count': _halfRepCount,
+            },
+          ));
+          _pendingFullRepFaults.clear();
         }
       }
     } else {
-      // Failed anti-cheat, don't count it, just log the fault.
       _rejectedHalfTwists++;
       resultIssues.feedback['Result'] = 'Không tính';
       final faultMap = <String, Map<String, String>>{};

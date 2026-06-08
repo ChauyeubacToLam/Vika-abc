@@ -1,8 +1,9 @@
+import 'dart:math' as math;
+
 import 'russian_metric_base.dart';
 import '../russian_twist.dart';
 
 class KneeAnchoringMetric extends RussianMetricBase {
-  // Allow small movements (20% of hip-to-knee distance)
   static const double KNEE_WOBBLE_RATIO_LIMIT = 0.20;
 
   double? _setupKneeX;
@@ -14,35 +15,38 @@ class KneeAnchoringMetric extends RussianMetricBase {
     if (ctx.state == RussianTwistState.center_setup) {
       _setupKneeX = ctx.kneeX;
       _setupKneeY = ctx.kneeY;
-      // Calculate euclidian distance as a scale reference
-      _setupHipKneeDistance =
-          (ctx.kneeX - ctx.hipX).abs() + (ctx.kneeY - ctx.hipY).abs();
-      if (_setupHipKneeDistance == 0) _setupHipKneeDistance = 1.0;
-    } else {
-      if (_setupKneeX != null &&
-          _setupKneeY != null &&
-          _setupHipKneeDistance != null) {
-        double driftX = (ctx.kneeX - _setupKneeX!).abs();
-        double driftY = (ctx.kneeY - _setupKneeY!).abs();
-
-        // Total drift vs setup distance
-        double driftRatio = (driftX + driftY) / _setupHipKneeDistance!;
-
-        debugData['kneeDriftRatio'] = driftRatio;
-
-        if (driftRatio > KNEE_WOBBLE_RATIO_LIMIT) {
-          addFault(
-            FaultRecord(
-              type: 'knee_wobble',
-              message: 'Khóa chặt đầu gối lại! Giữ phần chân đứng im!',
-              affectsForm: true, // Critical
-              phase: ctx.state.name,
-              priority: 1,
-              voiceMessage: 'Khóa chặt đầu gối!',
-            ),
-          );
-        }
+      _setupHipKneeDistance = math.sqrt(math.pow(ctx.kneeX - ctx.hipX, 2) +
+          math.pow(ctx.kneeY - ctx.hipY, 2));
+      if (_setupHipKneeDistance! <= 1e-6) {
+        _setupHipKneeDistance = null;
       }
+      return;
+    }
+
+    if (_setupKneeX == null ||
+        _setupKneeY == null ||
+        _setupHipKneeDistance == null) {
+      return;
+    }
+
+    final driftX = ctx.kneeX - _setupKneeX!;
+    final driftY = ctx.kneeY - _setupKneeY!;
+    final drift = math.sqrt(math.pow(driftX, 2) + math.pow(driftY, 2));
+    final driftRatio = drift / _setupHipKneeDistance!;
+
+    debugData['kneeDriftRatio'] = driftRatio.toStringAsFixed(2);
+
+    if (driftRatio > KNEE_WOBBLE_RATIO_LIMIT) {
+      addFault(
+        FaultRecord(
+          type: 'knee_wobble',
+          message: 'Giữ đầu gối ổn định, đừng dùng chân lấy đà.',
+          affectsForm: true,
+          phase: ctx.state.name,
+          priority: 1,
+          voiceMessage: 'Giữ chân vững nhé.',
+        ),
+      );
     }
   }
 }

@@ -46,7 +46,7 @@ class RaisedArms extends ExerciseBase {
       Debouncer(requiredFrames: RaisedArmsConfig.SETUP_STILL_FRAMES);
   final Debouncer _breakPositionDebouncer = Debouncer(requiredFrames: 8);
   final StickyDebouncer _lumbarExitDebouncer =
-      StickyDebouncer(requiredFrames: 20);
+      StickyDebouncer(requiredFrames: 20, currentState: false);
 
   final _lumbarBackbendMetric = LumbarBackbendMetric();
   final _cervicalSafetyMetric = CervicalSafetyMetric();

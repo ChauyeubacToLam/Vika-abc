@@ -548,6 +548,7 @@ class WallPushUp extends ExerciseBase {
     footStationaryMetric.capturePointBaseline(
         _baselineFootAnchorX, _baselineFootAnchorY);
     footStationaryMetric.captureBaseline(_baselineBodyFootAngle);
+    footStationaryMetric.captureScaleBaseline(_baselineScaleFactor);
     wallContactMetric.capturePointBaseline(
         _baselineWristAnchorX, _baselineWristAnchorY);
     wallContactMetric.captureFootBaseline(

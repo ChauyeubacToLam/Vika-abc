@@ -657,7 +657,7 @@ class SuryaNamaskarExercise extends ExerciseBase {
     final lastTick = _lastHoldTickMs ?? timestampMs;
     final deltaMs = timestampMs - lastTick;
     if (isStillRecognized && deltaMs > 0) {
-      _poseHoldAccumulatedMs += deltaMs;
+      _poseHoldAccumulatedMs += deltaMs.clamp(0, 250);
     }
     _lastHoldTickMs = timestampMs;
   }

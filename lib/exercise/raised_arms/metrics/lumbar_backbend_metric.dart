@@ -16,10 +16,12 @@ class LumbarBackbendMetric extends RaisedArmsMetricBase {
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
 
-  final StickyDebouncer _warningDebouncer = StickyDebouncer(requiredFrames: 8);
-  final StickyDebouncer _errorDebouncer = StickyDebouncer(requiredFrames: 8);
+  final StickyDebouncer _warningDebouncer =
+      StickyDebouncer(requiredFrames: 8, currentState: false);
+  final StickyDebouncer _errorDebouncer =
+      StickyDebouncer(requiredFrames: 8, currentState: false);
   final StickyDebouncer _stickyErrorDebouncer =
-      StickyDebouncer(requiredFrames: 20);
+      StickyDebouncer(requiredFrames: 20, currentState: false);
 
   @override
   List<FaultRecord> get faults => _faults;

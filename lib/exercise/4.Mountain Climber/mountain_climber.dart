@@ -65,6 +65,7 @@ class MountainClimber extends ExerciseBase {
   int? _exerciseStartTimeMs;
   bool _isTimeout = false;
   int _doubleKneeRejects = 0;
+  bool _doubleKneeActive = false;
 
   // ---------------------------------------------------------------------------
   // Safety check
@@ -97,10 +98,15 @@ class MountainClimber extends ExerciseBase {
       midPoint: lm.elbow,
       lastPoint: lm.wrist,
     );
+    final leftKneeDist = (lm.leftKnee.x - lm.shoulder.x).abs() / scaleFactor;
+    final rightKneeDist = (lm.rightKnee.x - lm.shoulder.x).abs() / scaleFactor;
+    final supportAnkle =
+        leftKneeDist > rightKneeDist ? lm.leftAnkle : lm.rightAnkle;
+
     final double trunkAngle = calculateAngleNormalized(
       firstPoint: lm.shoulder,
       midPoint: lm.hip,
-      lastPoint: lm.ankle,
+      lastPoint: supportAnkle,
     );
 
     debugData['Setup'] = {
@@ -213,7 +219,12 @@ class MountainClimber extends ExerciseBase {
       scaleFactor: scaleFactor,
       nowMs: now,
     );
-    if (leftRep > 0 && rightRep > 0) {
+    final bothKneesInZone = _leftCounter.isInZone && _rightCounter.isInZone;
+    _doubleKneeActive = _doubleKneeActive || bothKneesInZone;
+    final rejectsDoubleKneeRep =
+        _doubleKneeActive && (leftRep > 0 || rightRep > 0 || bothKneesInZone);
+
+    if ((leftRep > 0 && rightRep > 0) || rejectsDoubleKneeRep) {
       _doubleKneeRejects++;
       resultIssues.feedback['Result'] = 'Không tính rep';
       resultIssues.feedback['ROM'] = 'Luân phiên từng gối';
@@ -221,6 +232,9 @@ class MountainClimber extends ExerciseBase {
           'high_plank_base', 'ROM', 'Kéo từng gối một, không co cả hai gối');
       trunkMetric.resetAndCountFault();
       romMetric.reset();
+      _leftCounter.reset();
+      _rightCounter.reset();
+      _doubleKneeActive = false;
     } else if (leftRep > 0) {
       _onRepCompleted(ctx, KneeSide.left);
     } else if (rightRep > 0) {
@@ -241,6 +255,7 @@ class MountainClimber extends ExerciseBase {
       'R_dist': _rightCounter.smoothedDist.toStringAsFixed(2),
       'L_inZone': _leftCounter.isInZone,
       'R_inZone': _rightCounter.isInZone,
+      'doubleKneeActive': _doubleKneeActive,
       'L_threshold': _leftCounter.zoneThreshold.toStringAsFixed(2),
       'R_threshold': _rightCounter.zoneThreshold.toStringAsFixed(2),
       'scaleFactor': scaleFactor.toStringAsFixed(1),
@@ -323,6 +338,8 @@ class MountainClimber extends ExerciseBase {
         lm[useRight ? PoseLandmarkType.rightHip : PoseLandmarkType.leftHip];
     final PoseLandmark? ankle =
         lm[useRight ? PoseLandmarkType.rightAnkle : PoseLandmarkType.leftAnkle];
+    final PoseLandmark? leftAnkle = lm[PoseLandmarkType.leftAnkle];
+    final PoseLandmark? rightAnkle = lm[PoseLandmarkType.rightAnkle];
     final PoseLandmark? leftKnee = lm[PoseLandmarkType.leftKnee];
     final PoseLandmark? rightKnee = lm[PoseLandmarkType.rightKnee];
 
@@ -331,12 +348,23 @@ class MountainClimber extends ExerciseBase {
         wrist == null ||
         hip == null ||
         ankle == null ||
+        leftAnkle == null ||
+        rightAnkle == null ||
         leftKnee == null ||
         rightKnee == null) {
       return null;
     }
-    if (![shoulder, elbow, wrist, hip, ankle, leftKnee, rightKnee]
-        .every(ExerciseBase.isLandmarkConfident)) {
+    if (![
+      shoulder,
+      elbow,
+      wrist,
+      hip,
+      ankle,
+      leftAnkle,
+      rightAnkle,
+      leftKnee,
+      rightKnee
+    ].every(ExerciseBase.isLandmarkConfident)) {
       return null;
     }
 
@@ -346,6 +374,8 @@ class MountainClimber extends ExerciseBase {
       wrist: wrist,
       hip: hip,
       ankle: ankle,
+      leftAnkle: leftAnkle,
+      rightAnkle: rightAnkle,
       leftKnee: leftKnee,
       rightKnee: rightKnee,
     );
@@ -377,6 +407,7 @@ class MountainClimber extends ExerciseBase {
     _exerciseStartTimeMs = null;
     _isTimeout = false;
     _doubleKneeRejects = 0;
+    _doubleKneeActive = false;
   }
 }
 
@@ -391,6 +422,8 @@ class _LandmarkSet {
     required this.wrist,
     required this.hip,
     required this.ankle,
+    required this.leftAnkle,
+    required this.rightAnkle,
     required this.leftKnee,
     required this.rightKnee,
   });
@@ -400,6 +433,8 @@ class _LandmarkSet {
   final PoseLandmark wrist;
   final PoseLandmark hip;
   final PoseLandmark ankle;
+  final PoseLandmark leftAnkle;
+  final PoseLandmark rightAnkle;
   final PoseLandmark leftKnee;
   final PoseLandmark rightKnee;
 }

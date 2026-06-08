@@ -24,8 +24,9 @@ class ClearTapMetric extends PlankTapMetricBase {
 
   @override
   void update(RepContext ctx) {
-    _debugData['wristShoulderDist'] =
+    _debugData['tap_wristShoulderDist'] =
         ctx.activeWristShoulderDistNorm.toStringAsFixed(2);
+    _debugData['tap_wristLift'] = ctx.wristLiftNorm.toStringAsFixed(2);
 
     if (ctx.state == PlankTapState.tap) {
       ctx.resultIssues.feedback['Tap'] = 'Chạm dứt khoát!';
@@ -38,14 +39,18 @@ class ClearTapMetric extends PlankTapMetricBase {
   void evaluateRepEnd(RepContext ctx) {
     if (!_reachedTapThisRep) {
       _faults.add(FaultRecord(
-          phase: 'LIFTING',
-          type: 'MissedTap',
-          message: 'Không chạm tới vai',
-          affectsForm: true,
-          priority: PlankTapVoicePriority.clearTap,
-          voiceMessage: 'Chạm tay dứt khoát lên vai đối diện!'));
-      ctx.resultIssues
-          .addInstruction('base', 'Tap', 'Nhịp trước chạm chưa tới vai.');
+        phase: 'LIFTING',
+        type: 'MissedTap',
+        message: 'Không chạm tới vai',
+        affectsForm: true,
+        priority: PlankTapVoicePriority.clearTap,
+        voiceMessage: 'Chạm tay dứt khoát lên vai.',
+      ));
+      ctx.resultIssues.addInstruction(
+        'base',
+        'Tap',
+        'Nhịp trước chạm chưa tới vai.',
+      );
     }
   }
 

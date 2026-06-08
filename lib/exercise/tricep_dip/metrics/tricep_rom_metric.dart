@@ -19,6 +19,9 @@ class TricepRomMetric extends TricepMetricBase {
   @override
   void onStateTransition(
       TricepDipState oldState, TricepDipState newState, int timestampMs) {
+    if (newState == TricepDipState.descending) {
+      _reachedDepth = false;
+    }
     if (newState == TricepDipState.ascending &&
         oldState == TricepDipState.bottom) {
       if (!_reachedDepth) {

@@ -349,6 +349,7 @@ class BirdDog extends ExerciseBase {
       activeArmHorizontalAngle: armHoriz,
       activeLegHorizontalAngle: legHoriz,
       hipY: hip.y,
+      activeAnkleY: ankle.y,
       earY: ear.y,
       shoulderY: shoulder.y,
       scaleFactor: scaleFactor,

@@ -40,6 +40,7 @@ class FootStationaryMetric extends WallPushUpMetricBase {
   double? _baselineX;
   double? _baselineY;
   double? _baselineBodyFootAngle;
+  double? _baselineScaleFactor;
   bool _instructionSet = false;
 
   @override
@@ -60,10 +61,14 @@ class FootStationaryMetric extends WallPushUpMetricBase {
     if (value != null) _baselineBodyFootAngle = value;
   }
 
+  void captureScaleBaseline(double? value) {
+    if (value != null && value > 1e-6) _baselineScaleFactor = value;
+  }
+
   @override
   void update(RepContext ctx) {
     final x = ctx.footAnchorX;
-    final scale = ctx.scaleFactor;
+    final scale = _baselineScaleFactor ?? ctx.scaleFactor;
     if (x == null || scale == null || scale <= 0 || _baselineX == null) {
       return;
     }

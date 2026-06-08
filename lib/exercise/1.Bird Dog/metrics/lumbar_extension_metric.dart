@@ -23,17 +23,22 @@ class LumbarExtensionMetric extends BirdDogMetricBase {
 
     final legAboveTrunk =
         ctx.activeLegHorizontalAngle - ctx.trunkHorizontalAngle;
+    final ankleAboveHip = ctx.activeAnkleY < ctx.hipY;
+
     _debugData['shaAngle'] = ctx.shoulderHipAnkleAngle.toStringAsFixed(1);
     _debugData['legAboveTrunk'] = legAboveTrunk.toStringAsFixed(1);
+    _debugData['ankleAboveHip'] = ankleAboveHip;
 
-    if (_faultDebouncer.update(legAboveTrunk > _maxLegAboveTrunkDegrees)) {
+    final isHyperextending =
+        ankleAboveHip && legAboveTrunk > _maxLegAboveTrunkDegrees;
+    if (_faultDebouncer.update(isHyperextending)) {
       ctx.resultIssues.feedback['Spine'] = 'Lưng bị võng!';
       if (!_faults.any((f) => f.type == 'Lumbar')) {
         _faults.add(FaultRecord(
           phase: ctx.state.name,
           type: 'Lumbar',
           message: 'Đưa chân quá cao gây võng lưng',
-          voiceMessage: 'Hạ thấp chân xuống một chút',
+          voiceMessage: 'Hạ chân xuống ngang thân.',
           affectsForm: true,
           priority: BirdDogFaultPriority.lumbarExtension,
         ));

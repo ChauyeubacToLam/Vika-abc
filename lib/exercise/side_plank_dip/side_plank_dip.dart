@@ -16,6 +16,8 @@ class SidePlankConfig {
   static const double STRAIGHT_BODY_ANGLE = 175.0;
   static const double BOTTOM_BODY_ANGLE = 160.0;
   static const double MOVEMENT_THRESHOLD = 3.0; // Y-axis delta (pixels/cm)
+  static const double MOVEMENT_THRESHOLD_NORM = 0.025;
+  static const double BOTTOM_STILLNESS_NORM = 0.02;
   static const int REP_COOLDOWN_MS = 500; // 0.5s
   static const int REP_TIMEOUT_MS = 4000; // 4s
 }
@@ -81,6 +83,27 @@ class SidePlankDip extends ExerciseBase {
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+    if (cameraFacing != CameraFacing.left &&
+        cameraFacing != CameraFacing.right) {
+      return 'Quay ngang người với camera để đo side plank chính xác.';
+    }
+
+    final required = [
+      PoseLandmarkType.leftShoulder,
+      PoseLandmarkType.rightShoulder,
+      PoseLandmarkType.leftHip,
+      PoseLandmarkType.rightHip,
+      PoseLandmarkType.leftElbow,
+      PoseLandmarkType.rightElbow,
+      PoseLandmarkType.leftAnkle,
+      PoseLandmarkType.rightAnkle,
+    ];
+    for (final type in required) {
+      final landmark = landmarks[type];
+      if (landmark == null || !ExerciseBase.isLandmarkConfident(landmark)) {
+        return 'Giữ vai, khuỷu tay, hông và cổ chân rõ trong khung hình.';
+      }
+    }
     // Note: Gate y khoa rách chóp xoay cần làm ở UI trước khi mở cam.
     return null; // Không ép góc quay cứng, nhưng yêu cầu chính diện.
   }
@@ -96,6 +119,8 @@ class SidePlankDip extends ExerciseBase {
         rightShoulder == null ||
         leftHip == null ||
         rightHip == null) return false;
+    if (![leftShoulder, rightShoulder, leftHip, rightHip]
+        .every(ExerciseBase.isLandmarkConfident)) return false;
 
     // Tư thế chuẩn bị giống hệt bài plank (thân người nằm ngang)
     double trunkClockAngle =
@@ -152,6 +177,19 @@ class SidePlankDip extends ExerciseBase {
         rShoulder == null ||
         lHip == null ||
         rHip == null) return;
+    if (![
+      supportShoulder,
+      supportHip,
+      supportAnkle,
+      supportElbow,
+      lShoulder,
+      rShoulder,
+      lHip,
+      rHip,
+    ].every(ExerciseBase.isLandmarkConfident)) return;
+
+    scaleFactor = calculateDistance(supportShoulder, supportHip);
+    if (!scaleFactor.isFinite || scaleFactor <= 1e-6) return;
 
     // 1. Tính toán Hình học
     double bodyAngle = calculateAngle(
@@ -184,7 +222,8 @@ class SidePlankDip extends ExerciseBase {
     debugData['Offset'] = shoulderElbowOffsetX.toStringAsFixed(1);
 
     // 2. State Machine Update
-    _updateState(lowerHipY, bodyAngle, shoulderWidthY, shoulderWidthX, now);
+    _updateState(
+        lowerHipY, bodyAngle, shoulderWidthY, shoulderWidthX, scaleFactor, now);
     _previousHipY = lowerHipY;
 
     // 3. Update Metrics
@@ -223,7 +262,7 @@ class SidePlankDip extends ExerciseBase {
   }
 
   void _updateState(double currentHipY, double bodyAngle, double shoulderWidthY,
-      double shoulderWidthX, int timestampMs) {
+      double shoulderWidthX, double scale, int timestampMs) {
     if (_previousHipY == null) return;
 
     _stateEnterTime ??= timestampMs;
@@ -238,6 +277,7 @@ class SidePlankDip extends ExerciseBase {
 
     double deltaY =
         currentHipY - _previousHipY!; // Y tăng -> đi xuống, Y giảm -> đi lên
+    final deltaYNorm = deltaY / scale;
     bool isTwisting =
         shoulderWidthX > shoulderWidthY; // Xoay người (ngực úp xuống sàn)
 
@@ -250,7 +290,7 @@ class SidePlankDip extends ExerciseBase {
       bool cooldownOk = _lastRepTime == null ||
           (timestampMs - _lastRepTime! > SidePlankConfig.REP_COOLDOWN_MS);
       if (cooldownOk &&
-          deltaY > SidePlankConfig.MOVEMENT_THRESHOLD &&
+          deltaYNorm > SidePlankConfig.MOVEMENT_THRESHOLD_NORM &&
           !isTwisting) {
         _transitionState(SidePlankState.descending, timestampMs);
       } else if (isTwisting) {
@@ -258,13 +298,15 @@ class SidePlankDip extends ExerciseBase {
       }
     } else if (plankState == SidePlankState.descending) {
       if (bodyAngle < SidePlankConfig.BOTTOM_BODY_ANGLE &&
-          _bottomDebouncer.update(deltaY.abs() < 2.0)) {
+          _bottomDebouncer.update(
+              deltaYNorm.abs() < SidePlankConfig.BOTTOM_STILLNESS_NORM)) {
         _transitionState(SidePlankState.bottom, timestampMs);
       } else if (isTwisting) {
         _transitionState(SidePlankState.setupPlank, timestampMs);
       }
     } else if (plankState == SidePlankState.bottom) {
-      if (deltaY < -SidePlankConfig.MOVEMENT_THRESHOLD && !isTwisting) {
+      if (deltaYNorm < -SidePlankConfig.MOVEMENT_THRESHOLD_NORM &&
+          !isTwisting) {
         _transitionState(SidePlankState.ascending, timestampMs);
       } else if (isTwisting) {
         _transitionState(SidePlankState.setupPlank, timestampMs);

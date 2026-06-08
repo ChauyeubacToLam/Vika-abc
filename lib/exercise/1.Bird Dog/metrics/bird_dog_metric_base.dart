@@ -16,6 +16,7 @@ class BirdDogRepContext {
   final double activeArmHorizontalAngle;
   final double activeLegHorizontalAngle;
   final double hipY;
+  final double activeAnkleY;
   final double earY; // Thêm để check cúi đầu
   final double shoulderY; // Thêm để check cúi đầu
   final double? scaleFactor;
@@ -35,6 +36,7 @@ class BirdDogRepContext {
     required this.activeArmHorizontalAngle,
     required this.activeLegHorizontalAngle,
     required this.hipY,
+    required this.activeAnkleY,
     required this.earY,
     required this.shoulderY,
     required this.scaleFactor,

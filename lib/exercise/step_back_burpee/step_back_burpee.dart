@@ -109,8 +109,8 @@ class StepBackBurpee extends ExerciseBase {
         wrist.likelihood < 0.5 ||
         knee.likelihood < 0.5) return false;
 
-    double bodyAngle =
-        calculateAngle(firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
+    double bodyAngle = calculateAngleNormalized(
+        firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
 
     if (bodyAngle < BurpeeConfig.STANDING_BODY_ANGLE) return false;
     return true;
@@ -176,16 +176,16 @@ class StepBackBurpee extends ExerciseBase {
         ankle == null) return;
 
     // 1. Tính toán Hình học
-    double kneeAngle =
-        calculateAngle(firstPoint: hip, midPoint: knee, lastPoint: ankle);
-    double bodyAlignmentAngle =
-        calculateAngle(firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
-    double hipAngle =
-        calculateAngle(firstPoint: shoulder, midPoint: hip, lastPoint: knee);
-    double elbowAngle =
-        calculateAngle(firstPoint: shoulder, midPoint: elbow, lastPoint: wrist);
-    double shoulderToArmAngle =
-        calculateAngle(firstPoint: hip, midPoint: shoulder, lastPoint: wrist);
+    double kneeAngle = calculateAngleNormalized(
+        firstPoint: hip, midPoint: knee, lastPoint: ankle);
+    double bodyAlignmentAngle = calculateAngleNormalized(
+        firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
+    double hipAngle = calculateAngleNormalized(
+        firstPoint: shoulder, midPoint: hip, lastPoint: knee);
+    double elbowAngle = calculateAngleNormalized(
+        firstPoint: shoulder, midPoint: elbow, lastPoint: wrist);
+    double shoulderToArmAngle = calculateAngleNormalized(
+        firstPoint: hip, midPoint: shoulder, lastPoint: wrist);
 
     double localScaleFactor = scaleFactor;
     if (localScaleFactor <= 0) {

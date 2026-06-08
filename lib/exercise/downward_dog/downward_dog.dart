@@ -89,6 +89,9 @@ class DownwardDogConfig {
 
   /// Minimum wrist-shoulder-hip angle to confirm starting position.
   static const double START_POSITION_LINE_ANGLE = 115.0;
+
+  /// Sustained broken shape frames before aborting an active hold.
+  static const int HOLD_BREAK_FRAMES = 6;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -197,6 +200,7 @@ class DownwardDog extends ExerciseBase {
   int _stillFrameCount = 0;
   double? _lastHipY;
   bool _startPositionConfirmed = false;
+  int _brokenHoldFrames = 0;
 
   // --- Metrics ---
   late final SpineRoundMetric _spineMetric;
@@ -358,6 +362,20 @@ class DownwardDog extends ExerciseBase {
       frameTimestamp: timestampMs,
       resultIssues: resultIssues,
     );
+
+    final stillDownwardDogShape =
+        spineAngle >= DownwardDogConfig.START_POSITION_LINE_ANGLE &&
+            apexAngle <= DownwardDogConfig.APEX_TOO_LOW + 10.0;
+    if (stillDownwardDogShape) {
+      _brokenHoldFrames = 0;
+    } else {
+      _brokenHoldFrames++;
+      debugData['brokenHoldFrames'] = _brokenHoldFrames;
+      if (_brokenHoldFrames >= DownwardDogConfig.HOLD_BREAK_FRAMES) {
+        _abortHold('Vào lại hình chữ V rồi giữ tiếp nhé.');
+        return;
+      }
+    }
 
     // Run all metrics.
     for (final m in _metrics) {
@@ -618,6 +636,7 @@ class DownwardDog extends ExerciseBase {
 
   void _abortHold(String message) {
     _state = DownwardDogState.entry;
+    _brokenHoldFrames = 0;
     _holdStartMs = null;
     _stillFrameCount = 0;
     _lastHipY = null;

@@ -18,10 +18,12 @@ class HipCollapseMetric extends AshtangaMetricBase {
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
 
-  final StickyDebouncer _warningDebouncer = StickyDebouncer(requiredFrames: 6);
-  final StickyDebouncer _errorDebouncer = StickyDebouncer(requiredFrames: 6);
+  final StickyDebouncer _warningDebouncer =
+      StickyDebouncer(requiredFrames: 6, currentState: false);
+  final StickyDebouncer _errorDebouncer =
+      StickyDebouncer(requiredFrames: 6, currentState: false);
   final StickyDebouncer _stickyErrorDebouncer =
-      StickyDebouncer(requiredFrames: 15);
+      StickyDebouncer(requiredFrames: 15, currentState: false);
 
   @override
   List<FaultRecord> get faults => _faults;

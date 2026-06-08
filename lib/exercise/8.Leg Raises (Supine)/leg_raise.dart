@@ -72,8 +72,43 @@ class LegRaise extends ExerciseBase {
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
-    // NOTE: Implement safety check for Leg Raises (e.g. check if user has pre-existing lower back pain history before starting).
-    return null; // No specific safety check for this exercise yet.
+    if (cameraFacing != CameraFacing.left &&
+        cameraFacing != CameraFacing.right) {
+      return 'Hãy đặt camera ngang bên hông để theo dõi Leg Raises.';
+    }
+
+    bool sideVisible(
+      PoseLandmarkType shoulder,
+      PoseLandmarkType hip,
+      PoseLandmarkType knee,
+      PoseLandmarkType ankle,
+    ) {
+      final landmarks = [
+        smoothedLandmarks[shoulder],
+        smoothedLandmarks[hip],
+        smoothedLandmarks[knee],
+        smoothedLandmarks[ankle],
+      ];
+      return landmarks
+          .every((lm) => lm != null && ExerciseBase.isLandmarkConfident(lm));
+    }
+
+    final hasLeft = sideVisible(
+      PoseLandmarkType.leftShoulder,
+      PoseLandmarkType.leftHip,
+      PoseLandmarkType.leftKnee,
+      PoseLandmarkType.leftAnkle,
+    );
+    final hasRight = sideVisible(
+      PoseLandmarkType.rightShoulder,
+      PoseLandmarkType.rightHip,
+      PoseLandmarkType.rightKnee,
+      PoseLandmarkType.rightAnkle,
+    );
+    if (!hasLeft && !hasRight) {
+      return 'Giữ vai, hông, gối và cổ chân rõ trong khung hình.';
+    }
+    return null;
   }
 
   // NOTE UI: Cần hiển thị Pop-up Safety Gate "Có tiền sử đau thắt lưng không?" trước.
@@ -92,8 +127,14 @@ class LegRaise extends ExerciseBase {
         landmarks.containsKey(PoseLandmarkType.leftHip) &&
         landmarks.containsKey(PoseLandmarkType.leftKnee) &&
         landmarks.containsKey(PoseLandmarkType.leftAnkle) &&
-        landmarks[PoseLandmarkType.leftKnee]!.likelihood > 0.4 &&
-        landmarks[PoseLandmarkType.leftAnkle]!.likelihood > 0.4) {
+        ExerciseBase.isLandmarkConfident(
+            landmarks[PoseLandmarkType.leftShoulder]!) &&
+        ExerciseBase.isLandmarkConfident(
+            landmarks[PoseLandmarkType.leftHip]!) &&
+        ExerciseBase.isLandmarkConfident(
+            landmarks[PoseLandmarkType.leftKnee]!) &&
+        ExerciseBase.isLandmarkConfident(
+            landmarks[PoseLandmarkType.leftAnkle]!)) {
       leftHipFlexion = calculateAngleNormalized(
           firstPoint: landmarks[PoseLandmarkType.leftShoulder]!,
           midPoint: landmarks[PoseLandmarkType.leftHip]!,
@@ -118,8 +159,14 @@ class LegRaise extends ExerciseBase {
         landmarks.containsKey(PoseLandmarkType.rightHip) &&
         landmarks.containsKey(PoseLandmarkType.rightKnee) &&
         landmarks.containsKey(PoseLandmarkType.rightAnkle) &&
-        landmarks[PoseLandmarkType.rightKnee]!.likelihood > 0.4 &&
-        landmarks[PoseLandmarkType.rightAnkle]!.likelihood > 0.4) {
+        ExerciseBase.isLandmarkConfident(
+            landmarks[PoseLandmarkType.rightShoulder]!) &&
+        ExerciseBase.isLandmarkConfident(
+            landmarks[PoseLandmarkType.rightHip]!) &&
+        ExerciseBase.isLandmarkConfident(
+            landmarks[PoseLandmarkType.rightKnee]!) &&
+        ExerciseBase.isLandmarkConfident(
+            landmarks[PoseLandmarkType.rightAnkle]!)) {
       rightHipFlexion = calculateAngleNormalized(
           firstPoint: landmarks[PoseLandmarkType.rightShoulder]!,
           midPoint: landmarks[PoseLandmarkType.rightHip]!,

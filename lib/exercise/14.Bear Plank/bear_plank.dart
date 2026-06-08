@@ -123,7 +123,6 @@ class BearPlank extends ExerciseBase {
     if (now - _exerciseStartTimeMs! > BearConfig.MAX_SESSION_MS ||
         _totalHoverTimeMs >= BearConfig.TARGET_HOVER_MS) {
       _isTimeout = (now - _exerciseStartTimeMs! > BearConfig.MAX_SESSION_MS);
-      requestStop();
       return;
     }
 
@@ -259,6 +258,8 @@ class BearPlank extends ExerciseBase {
   void _transitionState(BearState newState, int now) {
     previousBearState = bearState;
     bearState = newState;
+    _hoverDebouncer.reset();
+    _fatigueDebouncer.reset();
     for (var metric in _metrics) {
       metric.onStateTransition(previousBearState, newState, now);
     }

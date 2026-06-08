@@ -237,7 +237,8 @@ class GluteBridge extends ExerciseBase {
   String? checkSafety(
     Map<PoseLandmarkType, PoseLandmark> landmarks,
   ) {
-    if (cameraFacing == CameraFacing.front) {
+    if (cameraFacing != CameraFacing.left &&
+        cameraFacing != CameraFacing.right) {
       return "⚠️ Xin hãy quay nghiêng để theo dõi tư thế Glute Bridge";
     }
 

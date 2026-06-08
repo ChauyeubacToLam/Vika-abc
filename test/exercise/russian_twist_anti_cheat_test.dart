@@ -59,7 +59,7 @@ void _pump(
 
 RussianTwist _activatedRussianTwist() {
   return RussianTwist(maxRep: 4)
-    ..cameraFacing = CameraFacing.angled
+    ..cameraFacing = CameraFacing.right
     ..exerciseState = ExerciseState.activated;
 }
 
@@ -122,21 +122,21 @@ void _completeArmOnlyBackwardHalf(RussianTwist exercise, int startMs) {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('safety requires angled camera instead of front or strict side', () {
+  test('safety requires side camera instead of front or angled', () {
     final exercise = RussianTwist();
 
     exercise.cameraFacing = CameraFacing.front;
     expect(exercise.checkSafety(_russianPose()), isNotNull);
 
     exercise.cameraFacing = CameraFacing.right;
-    expect(exercise.checkSafety(_russianPose()), isNotNull);
+    expect(exercise.checkSafety(_russianPose()), isNull);
 
     exercise.cameraFacing = CameraFacing.angled;
-    expect(exercise.checkSafety(_russianPose()), isNull);
+    expect(exercise.checkSafety(_russianPose()), isNotNull);
   });
 
   test('start position requires lean-back torso and centered hands', () {
-    final exercise = RussianTwist()..cameraFacing = CameraFacing.angled;
+    final exercise = RussianTwist()..cameraFacing = CameraFacing.right;
 
     expect(exercise.isInStartPosition(_russianPose()), isTrue);
     expect(

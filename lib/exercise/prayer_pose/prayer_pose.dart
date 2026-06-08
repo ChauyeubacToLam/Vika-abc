@@ -22,6 +22,7 @@ class PrayerPoseConfig {
   static const double HOLD_HIP_VELOCITY_MAX = 0.06;
   static const double BREAK_HIP_VELOCITY_MIN = 0.18;
   static const double SHOULDER_EASE_RATIO_MIN = 0.70;
+  static const double HOLD_TRUNK_DRIFT_MAX = 18.0;
 }
 
 enum PrayerPoseState { entry, holding, exit }
@@ -44,8 +45,9 @@ class PrayerPose extends ExerciseBase {
   final Debouncer _holdStillDebouncer =
       Debouncer(requiredFrames: PrayerPoseConfig.SETUP_STILL_FRAMES);
   final Debouncer _breakPositionDebouncer = Debouncer(requiredFrames: 8);
+  final Debouncer _trunkBreakDebouncer = Debouncer(requiredFrames: 8);
   final StickyDebouncer _shoulderEaseDebouncer =
-      StickyDebouncer(requiredFrames: 10);
+      StickyDebouncer(requiredFrames: 10, currentState: false);
 
   final _postureStackMetric = PostureStackMetric();
 
@@ -225,6 +227,7 @@ class PrayerPose extends ExerciseBase {
 
     _updatePrayerPoseState(
       hipVelocity: hipVelocity,
+      trunkClockAngle: trunkClockAngle,
       timestampMs: frameTimestampMs,
     );
 
@@ -318,6 +321,7 @@ class PrayerPose extends ExerciseBase {
 
   void _updatePrayerPoseState({
     required double hipVelocity,
+    required double trunkClockAngle,
     required int timestampMs,
   }) {
     final stillEnough =
@@ -326,6 +330,13 @@ class PrayerPose extends ExerciseBase {
     final brokePosition = _breakPositionDebouncer.update(
       hipVelocity.abs() >= PrayerPoseConfig.BREAK_HIP_VELOCITY_MIN,
     );
+    final trunkDrift = _trunkBaseline == null
+        ? 0.0
+        : (clockAngleDeviation(trunkClockAngle, 0.0) - _trunkBaseline!).abs();
+    final brokeTrunk = _trunkBreakDebouncer.update(
+      trunkDrift >= PrayerPoseConfig.HOLD_TRUNK_DRIFT_MAX,
+    );
+    debugData['trunkDrift'] = trunkDrift.toStringAsFixed(1);
 
     switch (prayerPoseState) {
       case PrayerPoseState.entry:
@@ -338,7 +349,7 @@ class PrayerPose extends ExerciseBase {
           _exitShouldCount = true;
           _exitRejectReason = null;
           _transitionState(PrayerPoseState.exit, timestampMs);
-        } else if (brokePosition) {
+        } else if (brokePosition || brokeTrunk) {
           _exitShouldCount = false;
           _exitRejectReason =
               'Rời tư thế quá sớm - giữ Cầu nguyện đủ thời gian trước khi thả lỏng.';
@@ -444,7 +455,9 @@ class PrayerPose extends ExerciseBase {
     _exitRejectReason = null;
     _holdStillDebouncer.reset();
     _breakPositionDebouncer.reset();
+    _trunkBreakDebouncer.reset();
     _shoulderEaseDebouncer.reset();
+    _shoulderEaseDebouncer.currentState = false;
   }
 
   double _currentHoldSeconds() {

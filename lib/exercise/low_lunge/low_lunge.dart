@@ -98,7 +98,7 @@ class LowLunge extends ExerciseBase {
     final backKneeGrounded =
         (lunge.backKnee.y - lunge.backAnkle.y).abs() / scale <=
             LowLungeConfig.BACK_KNEE_GROUNDED_MAX;
-    final frontKneeAngle = calculateAngle(
+    final frontKneeAngle = calculateAngleNormalized(
       firstPoint: lunge.frontHip,
       midPoint: lunge.frontKnee,
       lastPoint: lunge.frontAnkle,
@@ -134,7 +134,7 @@ class LowLunge extends ExerciseBase {
     );
     if (ear != null && ear.likelihood >= 0.5) {
       _calibrationCervicalSamples.add(
-        calculateAngle(
+        calculateAngleNormalized(
           firstPoint: ear,
           midPoint: lunge.frontShoulder,
           lastPoint: lunge.frontHip,
@@ -225,7 +225,7 @@ class LowLunge extends ExerciseBase {
       leftType: PoseLandmarkType.leftEar,
     );
 
-    final frontKneeAngle = calculateAngle(
+    final frontKneeAngle = calculateAngleNormalized(
       firstPoint: lunge.frontHip,
       midPoint: lunge.frontKnee,
       lastPoint: lunge.frontAnkle,

@@ -20,7 +20,9 @@ class HipRotationMetric extends PlankMetricBase {
     if (_maxHipY == null || ctx.hipY > _maxHipY!) _maxHipY = ctx.hipY;
     if (_minHipY == null || ctx.hipY < _minHipY!) _minHipY = ctx.hipY;
 
-    double variance = (_maxHipY! - _minHipY!).abs() / (ctx.scaleFactor ?? 1.0);
+    final scale = ctx.scaleFactor;
+    if (scale == null || scale <= 1e-6) return;
+    double variance = (_maxHipY! - _minHipY!).abs() / scale;
     _debugData['Hip_Variance'] = variance.toStringAsFixed(2);
 
     if (variance > PlankConfig.HIP_Y_ROTATION_TOLERANCE) {

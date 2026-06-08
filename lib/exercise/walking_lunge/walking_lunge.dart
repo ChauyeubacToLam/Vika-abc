@@ -142,7 +142,8 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    if (cameraFacing == CameraFacing.front) {
+    if (cameraFacing != CameraFacing.left &&
+        cameraFacing != CameraFacing.right) {
       return "⚠️ Bài tập này yêu cầu quay mặt ngang hông (Side Camera).";
     }
     final req = getSideTrackedLandmarks(landmarks);
@@ -152,7 +153,10 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
 
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    if (cameraFacing == CameraFacing.front) return false;
+    if (cameraFacing != CameraFacing.left &&
+        cameraFacing != CameraFacing.right) {
+      return false;
+    }
     final req = getSideTrackedLandmarks(landmarks);
     if (req == null) return false;
 
@@ -298,6 +302,7 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
         convertClockAngleToTrunkLean(torsoClockAngle, cameraFacing).abs();
 
     double thighLength = calculateDistance(frontHip, frontKnee);
+    if (!thighLength.isFinite || thighLength <= 1e-6) return;
     double stepLengthX = (frontAnkle.x - rearAnkle.x).abs();
 
     int now = frameTimestampMs;
@@ -418,7 +423,7 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
             ctx.resultIssues.addInstruction(
               'descending',
               'Depth',
-              'Ha sau hon, dau goi sau gan san roi moi len.',
+              'Hạ sâu hơn, đầu gối sau gần sàn rồi mới lên.',
             );
           }
         } else {

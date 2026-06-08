@@ -33,6 +33,8 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
 
   TricepDipState tricepState = TricepDipState.setup_top;
   TricepDipState previousTricepState = TricepDipState.setup_top;
+  double _minElbowAngleThisRep = 180.0;
+  bool _hasStartedAscending = false;
 
   // Metrics
   final HipThrustMetric hipThrustMetric = HipThrustMetric();
@@ -225,24 +227,39 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
 
     if (tricepState == TricepDipState.setup_top) {
       if (elbowAngle < TricepDipConfig.DESCENDING_ELBOW_ANGLE) {
+        _minElbowAngleThisRep = elbowAngle;
+        _hasStartedAscending = false;
         _transitionState(TricepDipState.descending, now);
       }
     } else if (tricepState == TricepDipState.descending) {
-      if (hipYChange == ChangeState.increasing) {
+      _minElbowAngleThisRep = elbowAngle < _minElbowAngleThisRep
+          ? elbowAngle
+          : _minElbowAngleThisRep;
+      if (elbowAngle <= TricepRomMetric.MIN_DEPTH_ANGLE &&
+          (hipYChange == ChangeState.decreasing ||
+              elbowAngleChange == ChangeState.increasing)) {
         _transitionState(TricepDipState.bottom, now);
       }
     } else if (tricepState == TricepDipState.bottom) {
-      if (hipYChange == ChangeState.decreasing || elbowAngle > 120) {
+      if (hipYChange == ChangeState.decreasing ||
+          elbowAngleChange == ChangeState.increasing) {
+        _hasStartedAscending = true;
         _transitionState(TricepDipState.ascending, now);
       }
     } else if (tricepState == TricepDipState.ascending) {
-      if (elbowAngle > TricepDipConfig.ASCENDING_ELBOW_ANGLE) {
+      if (elbowAngleChange == ChangeState.increasing) {
+        _hasStartedAscending = true;
+      }
+      if (_hasStartedAscending &&
+          elbowAngle > TricepDipConfig.ASCENDING_ELBOW_ANGLE) {
         _transitionState(TricepDipState.setup_top, now);
       } else if (elbowAngleChange == ChangeState.decreasing &&
           elbowAngle < TricepDipConfig.ASCENDING_ELBOW_ANGLE - 10) {
-        // They started descending again without reaching full extension
+        // Started another descent before finishing the rep: reject this attempt.
         _transitionState(TricepDipState.descending, now);
-        _completeRep(); // Count it as a rep (it will likely have the 'no_full_extension' fault)
+        for (final metric in _metrics) {
+          metric.resetAndCountFault();
+        }
       }
     }
   }

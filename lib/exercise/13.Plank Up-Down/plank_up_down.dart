@@ -96,7 +96,8 @@ class PlankUpDown extends ExerciseBase {
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    if (cameraFacing == CameraFacing.front) {
+    if (cameraFacing != CameraFacing.left &&
+        cameraFacing != CameraFacing.right) {
       return "⚠️ Vui lòng quay góc ngang (Side) để đo trục lưng.";
     }
     return null;
@@ -425,14 +426,14 @@ class PlankUpDown extends ExerciseBase {
 
     switch (plankState) {
       case PlankState.forearm_plank:
-        resultIssues.addInstruction(plankState.name, 'Status', 'Ready to push');
+        resultIssues.addInstruction(plankState.name, 'Status', 'Sẵn sàng đẩy');
         break;
       case PlankState.pushing_up:
-        resultIssues.addInstruction(plankState.name, 'Status', 'Pushing up');
+        resultIssues.addInstruction(plankState.name, 'Status', 'Đang đẩy lên');
         break;
       case PlankState.high_plank:
         resultIssues.addInstruction(
-            plankState.name, 'Status', 'Lower with control');
+            plankState.name, 'Status', 'Hạ xuống có kiểm soát');
         break;
       case PlankState.lowering:
         resultIssues.addInstruction(plankState.name, 'Status', 'Going Down...');

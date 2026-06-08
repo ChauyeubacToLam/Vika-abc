@@ -2,42 +2,45 @@ import 'russian_metric_base.dart';
 import '../russian_twist.dart';
 
 class ThoracicRotationMetric extends RussianMetricBase {
-  static const double SHOULDER_MOVEMENT_MIN =
-      0.10; // Shoulder must move at least 10% of hip-to-knee distance.
+  static const double SHOULDER_MOVEMENT_MIN = 0.10;
 
   double? _setupShoulderHipDx;
 
   @override
   void update(RussianRepContext ctx) {
+    if (ctx.kneeHipDx <= 1e-6) return;
+
     if (ctx.state == RussianTwistState.center_setup) {
-      // Record the baseline shoulder-to-hip X distance
       _setupShoulderHipDx = ctx.shoulderHipDx;
     }
 
-    if (ctx.state == RussianTwistState.max_point) {
-      if (_setupShoulderHipDx != null) {
-        double currentShoulderHipDx = ctx.shoulderHipDx;
-        double shoulderMovement =
-            (currentShoulderHipDx - _setupShoulderHipDx!).abs();
+    if (ctx.state == RussianTwistState.max_point &&
+        _setupShoulderHipDx != null) {
+      final signedMovement = ctx.shoulderHipDx - _setupShoulderHipDx!;
+      final expectedDirection = ctx.direction == TwistDirection.forward
+          ? 1.0
+          : ctx.direction == TwistDirection.backward
+              ? -1.0
+              : 0.0;
+      final movementRatio = signedMovement.abs() / ctx.kneeHipDx;
+      final movesWithHand =
+          expectedDirection == 0.0 || signedMovement * expectedDirection > 0;
 
-        // Normalize by kneeHipDx to be scale invariant
-        double movementRatio = shoulderMovement / ctx.kneeHipDx;
-        debugData['shoulderMovementRatio'] = movementRatio;
+      debugData['shoulderMovementRatio'] = movementRatio.toStringAsFixed(2);
+      debugData['shoulderMovesWithHand'] = movesWithHand;
 
-        // If shoulder didn't move much, they are just swinging arms
-        if (movementRatio < SHOULDER_MOVEMENT_MIN) {
-          addFault(
-            FaultRecord(
-              type: 'arm_swinging',
-              message:
-                  'Đừng chỉ vung vẩy tay! Hãy vặn cả bờ vai và ngực của bạn!',
-              affectsForm: true, // Critical error
-              phase: ctx.direction.name,
-              priority: 1,
-              voiceMessage: 'Vặn cả vai đi!',
-            ),
-          );
-        }
+      if (movementRatio < SHOULDER_MOVEMENT_MIN || !movesWithHand) {
+        addFault(
+          FaultRecord(
+            type: 'arm_swinging',
+            message:
+                'Đừng chỉ vung tay, hãy xoay cả vai và ngực theo hướng tay.',
+            affectsForm: true,
+            phase: ctx.direction.name,
+            priority: 1,
+            voiceMessage: 'Xoay cả vai theo tay.',
+          ),
+        );
       }
     }
   }

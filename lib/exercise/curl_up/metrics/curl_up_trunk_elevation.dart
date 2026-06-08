@@ -54,6 +54,8 @@ class TrunkElevationConfig {
 
   /// Lower bound of the safe range. Below = "too shallow" warning.
   static const double WARNING_LOW = 5.0;
+
+  static const double RESTING_BASELINE_REFRESH_MAX_DELTA = 1.0;
 }
 
 enum _HighFaultLevel { warning, error }
@@ -104,7 +106,11 @@ class TrunkElevationMetric extends CurlUpMetricBase {
   /// replacement is fine — resting trunk angle is stable signal.
   @override
   void onRestingFrame(RepContext ctx) {
-    _baselineTrunkAngle = ctx.trunkAngle;
+    if (_baselineTrunkAngle == null ||
+        (ctx.trunkAngle - _baselineTrunkAngle!).abs() <=
+            TrunkElevationConfig.RESTING_BASELINE_REFRESH_MAX_DELTA) {
+      _baselineTrunkAngle = ctx.trunkAngle;
+    }
     _debugData['trunkBase'] = _baselineTrunkAngle;
   }
 

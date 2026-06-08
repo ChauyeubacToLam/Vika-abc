@@ -10,6 +10,7 @@ class HipRotationMetric extends PlankTapMetricBase {
   final Debouncer _rotationDebouncer = Debouncer(requiredFrames: 3);
 
   double? _baselineHipY;
+  double? _baselineHipWidthXNorm;
 
   @override
   List<FaultRecord> get faults => _faults;
@@ -21,36 +22,50 @@ class HipRotationMetric extends PlankTapMetricBase {
       PlankTapState from, PlankTapState to, int timestampMs) {
     if (to == PlankTapState.base) {
       _baselineHipY = null;
+      _baselineHipWidthXNorm = null;
     }
   }
 
   @override
   void update(RepContext ctx) {
+    if (ctx.scaleFactor <= 1e-6) return;
+
     if (ctx.state == PlankTapState.base) {
-      // Sửa lỗi baseline drift: Chỉ học vị trí hông 1 lần đầu tiên ở tư thế base
       _baselineHipY ??= ctx.hipY;
+      _baselineHipWidthXNorm ??= ctx.hipWidthXNorm;
       ctx.resultIssues.feedback['Anti-Rotation'] = 'Hông ổn định';
       return;
     }
 
     if (_baselineHipY == null) return;
 
-    double hipVarianceNorm = (ctx.hipY - _baselineHipY!).abs() /
-        (ctx.scaleFactor == 0 ? 1 : ctx.scaleFactor);
-    _debugData['hipVarianceNorm'] = hipVarianceNorm.toStringAsFixed(2);
+    final hipYVarianceNorm =
+        (ctx.hipY - _baselineHipY!).abs() / ctx.scaleFactor;
+    var hipWidthVarianceNorm = 0.0;
+    if (ctx.hipWidthXNorm != null && _baselineHipWidthXNorm != null) {
+      hipWidthVarianceNorm =
+          (ctx.hipWidthXNorm! - _baselineHipWidthXNorm!).abs();
+    }
 
-    bool isRotating = hipVarianceNorm > PlankTapConfig.HIP_ROTATION_TOLERANCE;
+    _debugData['hipYVarianceNorm'] = hipYVarianceNorm.toStringAsFixed(2);
+    _debugData['hipWidthVarianceNorm'] =
+        hipWidthVarianceNorm.toStringAsFixed(2);
+
+    final isRotating =
+        hipYVarianceNorm > PlankTapConfig.HIP_ROTATION_TOLERANCE ||
+            hipWidthVarianceNorm > PlankTapConfig.HIP_WIDTH_DRIFT_TOLERANCE;
 
     if (_rotationDebouncer.update(isRotating)) {
       ctx.resultIssues.feedback['Anti-Rotation'] = 'Lắc hông! Siết bụng lại';
       if (!_faults.any((f) => f.type == 'HipRotation')) {
         _faults.add(FaultRecord(
-            phase: ctx.state.name.toUpperCase(),
-            type: 'HipRotation',
-            message: 'Hông bị vặn xoắn/rớt',
-            affectsForm: true,
-            priority: PlankTapVoicePriority.hipRotation,
-            voiceMessage: 'Giữ hông cố định, không vặn mình khi nhấc tay!'));
+          phase: ctx.state.name.toUpperCase(),
+          type: 'HipRotation',
+          message: 'Hông bị vặn xoắn hoặc rớt xuống',
+          affectsForm: true,
+          priority: PlankTapVoicePriority.hipRotation,
+          voiceMessage: 'Giữ hông cố định khi nhấc tay.',
+        ));
       }
     } else {
       ctx.resultIssues.feedback['Anti-Rotation'] = 'Giữ tốt!';

@@ -218,7 +218,7 @@ class HighPlank extends ExerciseBase {
       torso: torso,
     )) {
       resultIssues.feedback['System'] =
-          'Hay chong tay tren san, khong tap plank tren tuong.';
+          'Hãy chống tay trên sàn, không tập plank trên tường.';
       return false;
     }
 
@@ -329,7 +329,7 @@ class HighPlank extends ExerciseBase {
       torso: scaleFactor == 0 ? 1 : scaleFactor,
     )) {
       resultIssues.feedback['System'] =
-          'Hay chong tay tren san, khong tap plank tren tuong.';
+          'Hãy chống tay trên sàn, không tập plank trên tường.';
       if (state == HighPlankState.holding) {
         _transitionState(HighPlankState.dropping, now);
       }
