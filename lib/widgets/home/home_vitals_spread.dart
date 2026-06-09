@@ -35,7 +35,7 @@ class HomeVitalsSpread extends StatelessWidget {
     required this.sessionsDone,
     required this.sessionsTotal,
     required this.statusLine,
-    required this.streakDays,
+    required this.streakLabel,
     required this.formPercent,
     required this.formDelta,
     required this.formWeek,
@@ -52,7 +52,10 @@ class HomeVitalsSpread extends StatelessWidget {
   /// a standfirst — e.g. 'Tuần đang đi đúng nhịp.' Soft-color italic.
   final String statusLine;
 
-  final int streakDays;
+  /// Streak duration label (e.g. '1 tháng'), already resolved via
+  /// [streakTierLabel]. Empty string = no streak (0 active weeks) — the block
+  /// shows a muted placeholder instead of a count.
+  final String streakLabel;
 
   /// Mean form % over the current 7 days. Null = no sessions this week
   /// (cold start) — the block shows a muted placeholder instead of a numeral.
@@ -90,7 +93,7 @@ class HomeVitalsSpread extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(child: _StreakBlock(days: streakDays)),
+                Expanded(child: _StreakBlock(label: streakLabel)),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 22),
                   child: Container(width: 1, color: c.border),
@@ -309,12 +312,15 @@ class _SessionDots extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════
 
 class _StreakBlock extends StatelessWidget {
-  const _StreakBlock({required this.days});
-  final int days;
+  const _StreakBlock({required this.label});
+
+  /// Streak duration label (e.g. '1 tháng'); empty = no streak.
+  final String label;
 
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
+    final hasStreak = label.isNotEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -330,36 +336,26 @@ class _StreakBlock extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 10),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              '$days',
+        // The tier label is the whole readout — no raw count. FittedBox keeps
+        // the longest labels ('nửa năm', '2 tháng') inside the half-width block.
+        SizedBox(
+          height: 40,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              hasStreak ? label : '—',
               style: TextStyle(
                 fontFamily: 'BeVietnamPro',
-                fontSize: 44,
+                fontSize: 40,
                 fontWeight: FontWeight.w800,
                 fontStyle: FontStyle.italic,
-                letterSpacing: -2.4,
+                letterSpacing: -2.0,
                 height: 0.9,
-                color: c.ink,
-                fontFeatures: VikaIvoryMain.tabularFigures,
+                color: hasStreak ? c.ink : c.inkFaint,
               ),
             ),
-            const SizedBox(width: 6),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 7),
-              child: Text(
-                'ngày',
-                style: TextStyle(
-                  fontFamily: 'BeVietnamPro',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: c.inkSoft,
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ],
     );

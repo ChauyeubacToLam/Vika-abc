@@ -62,7 +62,8 @@ const String homeMockWeekLabel = 'TUẦN 03';
 const String homeMockPhaseLabel = 'NỀN TẢNG';
 const int homeMockSessionsDone = 3;
 const int homeMockSessionsTotal = 4;
-const int homeMockStreakDays = 12;
+// Consecutive active weeks (preview only) → '1 quý' via streakTierLabel.
+const int homeMockStreakWeeks = 12;
 // Form 7-day vitals are wired to real data via SessionPersistence
 // .homeFormSummary(); see HomeVitalsSpread.formPercent/formDelta/formWeek.
 

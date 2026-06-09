@@ -1,15 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vika/services/session_persistence.dart';
-import 'package:vika/services/session_trophy_picker.dart';
 
 // Pure aggregations behind the Progress tab sections wired off mock data:
 //   • weeklySummary       (TUẦN NÀY MỘT NHÌN)
 //   • personalRecords     (KỶ LỤC CÁ NHÂN)
-//   • streakBars          (CHUỖI LIÊN TIẾP)
-//   • nextStreakMilestone (streak card footer)
+//   • nextStreakMilestone (streak tier thresholds, in consecutive active weeks)
 //
-// Anchored to a fixed `now` so the rolling windows + day buckets are
-// deterministic:
+// Anchored to a fixed `now` so the rolling windows are deterministic:
 //   now      = 2026-06-10 12:00
 //   current  = [2026-06-03 12:00, 2026-06-10 12:00]
 //   prior    = [2026-05-27 12:00, 2026-06-03 12:00)
@@ -148,73 +145,19 @@ void main() {
     });
   });
 
-  group('streakBars', () {
-    test('empty history -> all false, length dayCount, last = today', () {
-      final bars = SessionPersistence.deriveStreakBarsForTest(
-        const [],
-        dayCount: 14,
-        now: now,
-      );
-
-      expect(bars.length, 14);
-      expect(bars.every((b) => !b), isTrue);
+  group('nextStreakMilestone (consecutive active weeks)', () {
+    test('returns the smallest tier threshold above the streak', () {
+      expect(SessionPersistence.nextStreakMilestone(0), 1);
+      expect(SessionPersistence.nextStreakMilestone(1), 2);
+      expect(SessionPersistence.nextStreakMilestone(3), 4);
+      expect(SessionPersistence.nextStreakMilestone(10), 12);
+      expect(SessionPersistence.nextStreakMilestone(26), 52);
     });
 
-    test('marks the local day of each completion; last entry is today', () {
-      final bars = SessionPersistence.deriveStreakBarsForTest(
-        [
-          DateTime(2026, 6, 10, 8), // today
-          DateTime(2026, 6, 8, 18), // 2 days ago
-        ],
-        dayCount: 14,
-        now: now,
-      );
-
-      expect(bars.last, isTrue); // today
-      expect(bars[bars.length - 3], isTrue); // 2 days ago
-      expect(bars[bars.length - 2], isFalse); // yesterday
-    });
-
-    test('two completions on the same local day collapse to one bar', () {
-      final bars = SessionPersistence.deriveStreakBarsForTest(
-        [
-          DateTime(2026, 6, 9, 8),
-          DateTime(2026, 6, 9, 20),
-        ],
-        dayCount: 7,
-        now: now,
-      );
-
-      expect(bars.where((b) => b).length, 1);
-      expect(bars[bars.length - 2], isTrue); // yesterday
-    });
-
-    test('completions older than the window are dropped', () {
-      final bars = SessionPersistence.deriveStreakBarsForTest(
-        [DateTime(2026, 5, 1, 8)],
-        dayCount: 14,
-        now: now,
-      );
-
-      expect(bars.every((b) => !b), isTrue);
-    });
-  });
-
-  group('nextStreakMilestone', () {
-    test('returns the smallest canonical milestone above the streak', () {
-      expect(SessionPersistence.nextStreakMilestone(0), 3);
-      expect(SessionPersistence.nextStreakMilestone(3), 7);
-      expect(SessionPersistence.nextStreakMilestone(10), 14);
-      expect(SessionPersistence.nextStreakMilestone(14), 30);
-    });
-
-    test('null once past the final milestone', () {
-      expect(SessionPersistence.nextStreakMilestone(30), isNull);
-      expect(SessionPersistence.nextStreakMilestone(45), isNull);
-    });
-
-    test('milestones stay in lockstep with the trophy picker set', () {
-      expect(SessionTrophyPicker.streakMilestones, {3, 7, 14, 30});
+    test('past the final fixed tier it returns the next whole year', () {
+      expect(SessionPersistence.nextStreakMilestone(52), 104);
+      expect(SessionPersistence.nextStreakMilestone(60), 104);
+      expect(SessionPersistence.nextStreakMilestone(104), 156);
     });
   });
 }

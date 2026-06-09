@@ -131,7 +131,7 @@ Future<void> _pumpSummary(
   final trophy = SessionTrophyPicker.pick(
     reports: reports,
     sessionRawFormScore: summary.rawFormScore,
-    streakDays: streakDays,
+    streakWeeks: streakDays,
     priorSessionForms: const [],
     priorExerciseForms: const {},
   );

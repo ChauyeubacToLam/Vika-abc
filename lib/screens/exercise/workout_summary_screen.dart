@@ -30,6 +30,7 @@ import 'package:flutter/services.dart';
 
 import '../../models/workout_session_report.dart';
 import '../../services/session_summary_builder.dart';
+import '../../services/streak_tier.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/vf_theme.dart';
 import '../../widgets/exercise/previous_exercise_rating_dialog.dart';
@@ -342,7 +343,7 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
                   child: _Marquee(
                     sessionFormScore: summary.sessionFormScore,
                     streakBonus: summary.streakBonus,
-                    streakDays: summary.streakDays,
+                    streakWeeks: summary.streakWeeks,
                     exerciseCount: widget.reports.length,
                     totalDuration: widget.totalDuration,
                     climb: _heroClimb,
@@ -447,7 +448,7 @@ class _Marquee extends StatelessWidget {
   const _Marquee({
     required this.sessionFormScore,
     required this.streakBonus,
-    required this.streakDays,
+    required this.streakWeeks,
     required this.exerciseCount,
     required this.totalDuration,
     required this.climb,
@@ -456,7 +457,7 @@ class _Marquee extends StatelessWidget {
 
   final int sessionFormScore;
   final int streakBonus;
-  final int streakDays;
+  final int streakWeeks;
   final int exerciseCount;
   final Duration totalDuration;
   final Animation<double> climb;
@@ -658,7 +659,7 @@ class _Marquee extends StatelessWidget {
                         ),
                         const SizedBox(width: 10),
                         Text(
-                          '+$streakBonus chuỗi · $streakDays ngày',
+                          '+$streakBonus chuỗi · ${streakTierLabel(streakWeeks)}',
                           style: TextStyle(
                             fontFamily: 'BeVietnamPro',
                             fontSize: 11.5,

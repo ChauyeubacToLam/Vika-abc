@@ -63,7 +63,8 @@ class ProfileStageHero extends StatelessWidget {
   final String? phaseLabel;
 
   /// Single italic line under the phase pill, e.g.
-  /// "Thành viên từ 27 / 4 · 12 ngày liên tiếp".
+  /// "Thành viên từ 27 / 4 · chuỗi 1 tháng" (the streak clause is dropped when
+  /// there's no active-week streak).
   final String memberSinceLine;
 
   /// 0..100. Used by the avatar arc.

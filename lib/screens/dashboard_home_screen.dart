@@ -41,6 +41,7 @@ import '../screens/exercise/exercise_launch_args.dart';
 import '../services/recommendation/recommendation_service.dart';
 import '../services/recommendation/weekly_check_in_service.dart';
 import '../services/session_persistence.dart';
+import '../services/streak_tier.dart';
 import '../services/user_program_service.dart';
 import '../services/user_profile_service.dart';
 import '../services/workout_launch_service.dart';
@@ -204,9 +205,11 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
                             sessionsTotal:
                                 state?.sessionsThisWeek ?? homeMockSessionsTotal,
                             statusLine: homeMockVitalsStandfirst,
-                            streakDays: streakSnapshot.data ??
-                                widget.userProfile?.streakDays ??
-                                homeMockStreakDays,
+                            streakLabel: streakTierLabel(
+                              streakSnapshot.data ??
+                                  widget.userProfile?.streakWeeks ??
+                                  homeMockStreakWeeks,
+                            ),
                             formPercent: form?.percent,
                             formDelta: form?.delta,
                             formWeek: form?.week ?? const <int>[],

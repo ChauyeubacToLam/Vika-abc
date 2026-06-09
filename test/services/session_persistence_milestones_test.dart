@@ -56,32 +56,44 @@ void main() {
       expect(rung(ms, MilestoneCategory.form, 100).unlocked, isFalse);
     });
 
-    test('streak uses the longest consecutive-day run; dates the crossing', () {
+    test('streak uses the longest consecutive active-WEEK run; dates crossing',
+        () {
+      // Four consecutive Mondays (Jun 8 2026 is a Monday): weeks May 18, May
+      // 25, Jun 1, Jun 8 — a 4-week run.
       final ms = SessionPersistence.deriveUnlockedMilestonesForTest(
         [
-          for (var d = 1; d <= 7; d++) s(DateTime(2026, 6, d)),
+          s(DateTime(2026, 5, 18)),
+          s(DateTime(2026, 5, 25)),
+          s(DateTime(2026, 6, 1)),
+          s(DateTime(2026, 6, 8)),
         ],
         scheduledPerWeek: 99,
       );
 
-      expect(rung(ms, MilestoneCategory.streak, 3).unlocked, isTrue);
-      expect(rung(ms, MilestoneCategory.streak, 3).unlockedOn, '3/6');
-      expect(rung(ms, MilestoneCategory.streak, 7).unlocked, isTrue);
-      expect(rung(ms, MilestoneCategory.streak, 14).unlocked, isFalse);
+      // Crossing date = the Monday of the week that pushed the run to each
+      // threshold.
+      expect(rung(ms, MilestoneCategory.streak, 1).unlocked, isTrue);
+      expect(rung(ms, MilestoneCategory.streak, 1).unlockedOn, '18/5');
+      expect(rung(ms, MilestoneCategory.streak, 2).unlocked, isTrue);
+      expect(rung(ms, MilestoneCategory.streak, 2).unlockedOn, '25/5');
+      expect(rung(ms, MilestoneCategory.streak, 4).unlocked, isTrue);
+      expect(rung(ms, MilestoneCategory.streak, 4).unlockedOn, '8/6');
+      expect(rung(ms, MilestoneCategory.streak, 8).unlocked, isFalse);
     });
 
-    test('two completions on one day do not advance the streak', () {
+    test('multiple sessions in one week count as a single active week', () {
       final ms = SessionPersistence.deriveUnlockedMilestonesForTest(
         [
-          s(DateTime(2026, 6, 1, 8)),
-          s(DateTime(2026, 6, 1, 20)),
-          s(DateTime(2026, 6, 2)),
+          s(DateTime(2026, 6, 1, 8)), // week of Jun 1
+          s(DateTime(2026, 6, 3, 20)), // same week
+          s(DateTime(2026, 6, 8)), // week of Jun 8
         ],
         scheduledPerWeek: 99,
       );
 
-      // Longest run is 2 days -> the 3-day rung stays locked.
-      expect(rung(ms, MilestoneCategory.streak, 3).unlocked, isFalse);
+      // Longest run is 2 WEEKS -> the 2-week rung opens, the 4-week stays shut.
+      expect(rung(ms, MilestoneCategory.streak, 2).unlocked, isTrue);
+      expect(rung(ms, MilestoneCategory.streak, 4).unlocked, isFalse);
     });
 
     test('Tuần trọn vẹn unlocks when a Mon–Sun week meets the schedule', () {
@@ -154,7 +166,7 @@ void main() {
       ]);
       expect(rail.every((m) => !m.unlocked), isTrue);
       // The chase target is the smallest threshold in each category.
-      expect(rung(rail, MilestoneCategory.streak, 3).threshold, 3);
+      expect(rung(rail, MilestoneCategory.streak, 1).threshold, 1);
       expect(rung(rail, MilestoneCategory.sessions, 1).threshold, 1);
     });
   });

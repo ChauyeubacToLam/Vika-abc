@@ -220,25 +220,13 @@ const List<ExerciseInsightMock> progressMockInsights = [
   ),
 ];
 
-const int progressMockStreakDays = 12;
-const String progressMockStreakSummary =
-    'Tập đều từ 27/4. Hơn 3 trên 4 ngày trong tuần.';
-// 14-day completion array, last entry = today.
-const List<bool> progressMockStreakBars = [
-  true,
-  false,
-  true,
-  true,
-  false,
-  true,
-  true,
-  true,
-  false,
-  true,
-  true,
-  false,
-  true,
-  true,
+// Consecutive active weeks (preview only) → '1 quý' via streakTierLabel.
+const int progressMockStreakWeeks = 12;
+// 12-week activity strip (preview only), oldest-first, last = current week.
+// Trailing filled run = 12, coherent with progressMockStreakWeeks above.
+const List<bool> progressMockStreakWeekBars = [
+  true, true, true, true, true, true,
+  true, true, true, true, true, true,
 ];
 
 // ═══════════════════════════════════════════════════════════════

@@ -30,14 +30,15 @@ class Milestone {
 
   final MilestoneCategory category;
 
-  /// Numeric bar for streak/sessions/form (days / count / raw form score).
-  /// For [MilestoneCategory.consistency] this is a span sentinel — 1 = a
-  /// Mon–Sun week, 2 = a calendar month — used only for stable ordering.
+  /// Numeric bar for streak/sessions/form (consecutive active weeks / count /
+  /// raw form score). For [MilestoneCategory.consistency] this is a span
+  /// sentinel — 1 = a Mon–Sun week, 2 = a calendar month — used only for
+  /// stable ordering.
   final int threshold;
 
   final MilestoneTier tier;
 
-  /// Short VN label, e.g. "Chuỗi 7 ngày", "10 buổi", "Form 90".
+  /// Short VN label, e.g. "Chuỗi 1 tháng", "10 buổi", "Form 90".
   final String label;
 
   final bool unlocked;
@@ -62,37 +63,44 @@ const int kConsistencyMonth = 2;
 
 /// The complete ladder. All rungs defined now; tier follows magnitude.
 const List<Milestone> milestoneCatalog = [
-  // ─── Streak (consecutive local days with a completed session) ───
+  // ─── Streak (consecutive ACTIVE WEEKS — a week with >= 1 session) ───
+  // Thresholds + labels mirror the tier ladder in streak_tier.dart
+  // (kStreakTierThresholds). Copy is fixed.
   Milestone(
       category: MilestoneCategory.streak,
-      threshold: 3,
+      threshold: 1,
       tier: MilestoneTier.silver,
-      label: 'Chuỗi 3 ngày'),
+      label: 'Chuỗi 1 tuần'),
   Milestone(
       category: MilestoneCategory.streak,
-      threshold: 7,
+      threshold: 2,
       tier: MilestoneTier.silver,
-      label: 'Chuỗi 7 ngày'),
+      label: 'Chuỗi 2 tuần'),
   Milestone(
       category: MilestoneCategory.streak,
-      threshold: 14,
+      threshold: 4,
+      tier: MilestoneTier.silver,
+      label: 'Chuỗi 1 tháng'),
+  Milestone(
+      category: MilestoneCategory.streak,
+      threshold: 8,
       tier: MilestoneTier.gold,
-      label: 'Chuỗi 14 ngày'),
+      label: 'Chuỗi 2 tháng'),
   Milestone(
       category: MilestoneCategory.streak,
-      threshold: 30,
+      threshold: 12,
       tier: MilestoneTier.gold,
-      label: 'Chuỗi 30 ngày'),
+      label: 'Chuỗi 1 quý'),
   Milestone(
       category: MilestoneCategory.streak,
-      threshold: 60,
+      threshold: 26,
       tier: MilestoneTier.platinum,
-      label: 'Chuỗi 60 ngày'),
+      label: 'Chuỗi nửa năm'),
   Milestone(
       category: MilestoneCategory.streak,
-      threshold: 100,
+      threshold: 52,
       tier: MilestoneTier.platinum,
-      label: 'Chuỗi 100 ngày'),
+      label: 'Chuỗi 1 năm'),
 
   // ─── Sessions (count of completed workout sessions) ───
   Milestone(

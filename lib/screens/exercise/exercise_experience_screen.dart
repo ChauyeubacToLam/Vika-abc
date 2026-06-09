@@ -606,14 +606,14 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       // below MUST NOT close over `this.context` (which becomes invalid
       // after dispose) — instead, the summary screen's own BuildContext
       // is used to pop.
-      final streakDays = await SessionPersistence().currentStreak(
+      final streakWeeks = await SessionPersistence().currentStreak(
         assumeTodayComplete: true,
       );
       if (!mounted) return;
 
       final sessionSummary = SessionSummaryBuilder.build(
         accumulated,
-        streakDays,
+        streakWeeks,
       );
 
       // These reads exclude the current workout_session_id and return
@@ -651,7 +651,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       var trophy = SessionTrophyPicker.pick(
         reports: accumulated,
         sessionRawFormScore: sessionSummary.rawFormScore,
-        streakDays: streakDays,
+        streakWeeks: streakWeeks,
         priorSessionForms: priorSessionForms,
         priorExerciseForms: priorExerciseForms,
       );

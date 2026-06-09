@@ -8,7 +8,7 @@ import '../data/program_mock.dart';
 import '../exercise/report_builder_registry.dart';
 import '../widgets/progress/period_tabs.dart' show PeriodTab;
 import 'recommendation/progression_service.dart';
-import 'session_trophy_picker.dart';
+import 'streak_tier.dart';
 
 /// Summary of a completed exercise session, loaded from Supabase.
 class PreviousSessionSummary {
@@ -489,6 +489,11 @@ class SessionPersistence {
 
   // ─── User-level derived stats ──────────────────────────────────────
 
+  /// Current streak as consecutive ACTIVE WEEKS — weeks (ISO, local tz) with
+  /// >= 1 completed workout session, counting back from this week (or last
+  /// week if this one is still empty). [assumeTodayComplete] marks THIS WEEK
+  /// active (used at save time, when the just-finished session may not be
+  /// persisted yet). Surfaces render the result via [streakTierLabel].
   Future<int> currentStreak({bool assumeTodayComplete = false}) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return 0;
@@ -521,6 +526,11 @@ class SessionPersistence {
     }
   }
 
+  /// Consecutive active WEEKS up to now. Each completion is bucketed by the
+  /// Monday of its LOCAL ISO week; the run is anchored at this week if active,
+  /// else last week, else 0. [assumeTodayComplete] marks THIS WEEK active.
+  /// A week with even one session keeps the run alive (a single rest day — or
+  /// rest days — never breaks it); a fully empty week ends it.
   @visibleForTesting
   static int deriveCurrentStreakForTest(
     Iterable<DateTime> completedAtValues, {
@@ -528,33 +538,100 @@ class SessionPersistence {
     DateTime? now,
   }) {
     final localNow = (now ?? DateTime.now()).toLocal();
-    final today = _LocalDate(localNow.year, localNow.month, localNow.day);
-    final completedDates = <_LocalDate>{
+    final thisWeek = _mondayOf(
+      _LocalDate(localNow.year, localNow.month, localNow.day),
+    );
+    final activeWeeks = <_LocalDate>{
       for (final completedAt in completedAtValues)
-        _LocalDate.fromDateTime(completedAt.toLocal()),
+        _mondayOf(_LocalDate.fromDateTime(completedAt.toLocal())),
     };
 
     if (assumeTodayComplete) {
-      completedDates.add(today);
+      activeWeeks.add(thisWeek);
     }
 
-    final yesterday = today.previous;
+    final lastWeek = thisWeek.previousWeek;
     _LocalDate anchor;
-    if (completedDates.contains(today)) {
-      anchor = today;
-    } else if (completedDates.contains(yesterday)) {
-      anchor = yesterday;
+    if (activeWeeks.contains(thisWeek)) {
+      anchor = thisWeek;
+    } else if (activeWeeks.contains(lastWeek)) {
+      anchor = lastWeek;
     } else {
       return 0;
     }
 
     var count = 0;
     var cursor = anchor;
-    while (completedDates.contains(cursor)) {
+    while (activeWeeks.contains(cursor)) {
       count += 1;
-      cursor = cursor.previous;
+      cursor = cursor.previousWeek;
     }
     return count;
+  }
+
+  /// Weekly activity over the last [weekCount] weeks for the Progress "Chuỗi"
+  /// strip: one bool per week, oldest-first, last entry = the current week. A
+  /// week is true when it has >= 1 completed session. Single round trip; the
+  /// week bucketing lives in [deriveStreakWeekBarsForTest].
+  ///
+  /// Shares the SAME active-week definition + ISO-week bucketing as
+  /// [currentStreak], so the trailing run of filled cells equals the current
+  /// streak (when this week is active — the same one-week grace [currentStreak]
+  /// allows for an as-yet-empty current week is the only divergence).
+  Future<List<bool>> streakWeekBars({int weekCount = 12}) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return List<bool>.filled(weekCount, false);
+
+    try {
+      final rows = await _client
+          .from('workout_sessions')
+          .select('completed_at')
+          .eq('user_id', userId)
+          .not('completed_at', 'is', null)
+          .order('completed_at', ascending: false)
+          .limit(400);
+
+      final completedAtValues = <DateTime>[];
+      for (final raw in rows as List) {
+        final row = (raw as Map).cast<String, dynamic>();
+        final completedAt = _dateTimeOrNull(row['completed_at']);
+        if (completedAt != null) completedAtValues.add(completedAt);
+      }
+      return deriveStreakWeekBarsForTest(completedAtValues, weekCount: weekCount);
+    } catch (e) {
+      debugPrint('[Vika] streakWeekBars failed: $e');
+      return List<bool>.filled(weekCount, false);
+    }
+  }
+
+  /// Pure week-bucketing for [streakWeekBars]. Buckets each completion by its
+  /// local ISO-week Monday (the SAME [_mondayOf] / [_LocalDate] math
+  /// [deriveCurrentStreakForTest] uses — not duplicated), then emits one bool
+  /// per week for the last [weekCount] weeks, oldest-first (last = current
+  /// week). `now` is injectable for deterministic tests.
+  @visibleForTesting
+  static List<bool> deriveStreakWeekBarsForTest(
+    Iterable<DateTime> completedAtValues, {
+    int weekCount = 12,
+    DateTime? now,
+  }) {
+    final localNow = (now ?? DateTime.now()).toLocal();
+    final activeWeeks = <_LocalDate>{
+      for (final completedAt in completedAtValues)
+        _mondayOf(_LocalDate.fromDateTime(completedAt.toLocal())),
+    };
+
+    // Walk the current week back (weekCount-1) weeks, then reverse to
+    // oldest-first (last = current week).
+    final bars = <bool>[];
+    var cursor = _mondayOf(
+      _LocalDate(localNow.year, localNow.month, localNow.day),
+    );
+    for (var i = 0; i < weekCount; i++) {
+      bars.add(activeWeeks.contains(cursor));
+      cursor = cursor.previousWeek;
+    }
+    return bars.reversed.toList();
   }
 
   /// Profile "Hành trình tính đến hôm nay" lifetime aggregate, computed
@@ -1395,72 +1472,12 @@ class SessionPersistence {
     return hash;
   }
 
-  // ─── Progress tab: streak card daily bars (CHUỖI LIÊN TIẾP) ─────────
+  // ─── Streak milestones (consecutive active weeks) ───────────────────
 
-  /// Daily workout completion over the last [dayCount] days for the streak
-  /// card's bar chart, oldest-first (last entry = today). Single round trip;
-  /// the day bucketing lives in [deriveStreakBarsForTest].
-  Future<List<bool>> streakBars({int dayCount = 14}) async {
-    final userId = _client.auth.currentUser?.id;
-    if (userId == null) return List<bool>.filled(dayCount, false);
-
-    try {
-      final since = DateTime.now().subtract(Duration(days: dayCount + 1));
-      final rows = await _client
-          .from('workout_sessions')
-          .select('completed_at')
-          .eq('user_id', userId)
-          .not('completed_at', 'is', null)
-          .gte('completed_at', since.toUtc().toIso8601String());
-
-      final completedAtValues = <DateTime>[];
-      for (final raw in rows as List) {
-        final row = (raw as Map).cast<String, dynamic>();
-        final completedAt = _dateTimeOrNull(row['completed_at']);
-        if (completedAt != null) completedAtValues.add(completedAt);
-      }
-      return deriveStreakBarsForTest(completedAtValues, dayCount: dayCount);
-    } catch (e) {
-      debugPrint('[Vika] streakBars failed: $e');
-      return List<bool>.filled(dayCount, false);
-    }
-  }
-
-  /// Pure day-bucketing for [streakBars]. Buckets each completion by its LOCAL
-  /// calendar day, then emits one bool per day for the last [dayCount] days,
-  /// oldest-first (last = today). `now` is injectable for deterministic tests.
-  @visibleForTesting
-  static List<bool> deriveStreakBarsForTest(
-    Iterable<DateTime> completedAtValues, {
-    int dayCount = 14,
-    DateTime? now,
-  }) {
-    final localNow = (now ?? DateTime.now()).toLocal();
-    final completedDates = <_LocalDate>{
-      for (final at in completedAtValues)
-        _LocalDate.fromDateTime(at.toLocal()),
-    };
-
-    // Build today..(dayCount-1 days ago), then reverse to oldest-first.
-    final bars = <bool>[];
-    var cursor = _LocalDate(localNow.year, localNow.month, localNow.day);
-    for (var i = 0; i < dayCount; i++) {
-      bars.add(completedDates.contains(cursor));
-      cursor = cursor.previous;
-    }
-    return bars.reversed.toList();
-  }
-
-  /// Smallest canonical streak milestone strictly greater than [days], or null
-  /// when the streak is past the final milestone. Reuses the one set of
-  /// milestones the summary trophy picker already recognises.
-  static int? nextStreakMilestone(int days) {
-    final sorted = SessionTrophyPicker.streakMilestones.toList()..sort();
-    for (final m in sorted) {
-      if (m > days) return m;
-    }
-    return null;
-  }
+  /// Smallest streak-tier milestone strictly greater than [weeks] (in
+  /// consecutive active weeks). Always defined — past the final fixed tier it
+  /// returns the next whole year. Delegates to the shared streak ladder.
+  static int nextStreakMilestone(int weeks) => nextStreakMilestoneWeek(weeks);
 
   // ─── Progress tab: trajectory fact (score gauge) ────────────────────
 
@@ -1567,7 +1584,8 @@ class SessionPersistence {
   /// count (0 disables the consistency rungs). `now` is accepted for symmetry
   /// with the other derivers (unused here — every rung is all-time).
   ///
-  ///   Streak     — all-time LONGEST run of consecutive local days.
+  ///   Streak     — all-time LONGEST run of consecutive ACTIVE WEEKS (a week
+  ///                with >= 1 session), measured in weeks.
   ///   Sessions   — count of completed sessions.
   ///   Form       — any session's raw_form_score.
   ///   Tuần       — a Mon–Sun week with >= [scheduledPerWeek] sessions.
@@ -1606,20 +1624,28 @@ class SessionPersistence {
       return null;
     }
 
-    // Streak: walk unique local days ascending, tracking the current run; the
-    // day a run first reaches [threshold] is when it was crossed.
-    final uniqueDays = <_LocalDate>[];
-    final seen = <_LocalDate>{};
+    // Streak: bucket completions by their local ISO-week Monday, walk the
+    // unique weeks ascending tracking the current run; the week a run first
+    // reaches [threshold] (in weeks) is when it was crossed. `local` is already
+    // sorted ascending, so the week Mondays come out ascending too.
+    final uniqueWeeks = <_LocalDate>[];
+    final seenWeeks = <_LocalDate>{};
     for (final s in local) {
-      if (seen.add(s.date)) uniqueDays.add(s.date);
+      final monday = _mondayOf(s.date);
+      if (seenWeeks.add(monday)) uniqueWeeks.add(monday);
     }
     DateTime? streakReachDate(int threshold) {
       var run = 0;
       _LocalDate? prev;
-      for (final d in uniqueDays) {
-        run = (prev != null && d == prev.next) ? run + 1 : 1;
-        if (run >= threshold) return DateTime(d.year, d.month, d.day);
-        prev = d;
+      for (final w in uniqueWeeks) {
+        final adjacent = prev != null &&
+            DateTime(w.year, w.month, w.day)
+                    .difference(DateTime(prev.year, prev.month, prev.day))
+                    .inDays ==
+                7;
+        run = adjacent ? run + 1 : 1;
+        if (run >= threshold) return DateTime(w.year, w.month, w.day);
+        prev = w;
       }
       return null;
     }
@@ -1959,6 +1985,13 @@ class _LocalDate {
 
   _LocalDate get next {
     final value = DateTime(year, month, day + 1);
+    return _LocalDate(value.year, value.month, value.day);
+  }
+
+  /// Same weekday one week earlier — used to walk week buckets (callers pass
+  /// the Monday of a week, so this steps to the previous week's Monday).
+  _LocalDate get previousWeek {
+    final value = DateTime(year, month, day - 7);
     return _LocalDate(value.year, value.month, value.day);
   }
 

@@ -24,6 +24,7 @@ import '../data/progress_mock.dart';
 import '../models/exercise_lookup.dart';
 import '../services/recommendation/recommendation_service.dart';
 import '../services/session_persistence.dart';
+import '../services/streak_tier.dart';
 import '../services/user_profile_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/vf_theme.dart';
@@ -32,10 +33,10 @@ import '../widgets/progress/body_heat_map.dart';
 import '../widgets/progress/milestone_rail.dart';
 import '../widgets/progress/period_tabs.dart';
 import '../widgets/progress/progress_stage_hero.dart';
-import '../widgets/progress/progress_streak_card.dart';
 import '../widgets/progress/exercise_insight_grid.dart';
 import '../widgets/progress/score_gauge_card.dart';
 import '../widgets/progress/score_trend_chart.dart';
+import '../widgets/progress/streak_week_strip.dart';
 import '../widgets/progress/weekly_summary_band.dart';
 
 class ProgressScreen extends StatefulWidget {
@@ -105,9 +106,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
   /// = loading. Never empty — locked rungs render as targets to chase.
   List<Milestone>? _milestones;
 
-  /// Real CHUỖI LIÊN TIẾP daily completion bars (last 14 days, oldest-first).
-  /// Null = loading.
-  List<bool>? _streakBars;
+  /// Real last-12-weeks activity for the "Chuỗi" strip, oldest-first (last =
+  /// current week). Null = loading.
+  List<bool>? _streakWeekBars;
 
   /// Active pain self-reports keyed by body_region. Null = loading
   /// (show the silhouette placeholder); empty map = nothing reported yet.
@@ -144,7 +145,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     unawaited(_loadPhaseLabel());
     unawaited(_loadWeekly());
     unawaited(_loadMilestones());
-    unawaited(_loadStreakBars());
+    unawaited(_loadStreakWeekBars());
     unawaited(_loadPainReports());
     unawaited(_loadGender());
   }
@@ -176,7 +177,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     unawaited(_loadPhaseLabel());
     unawaited(_loadWeekly());
     unawaited(_loadMilestones());
-    unawaited(_loadStreakBars());
+    unawaited(_loadStreakWeekBars());
     unawaited(_loadPainReports());
     unawaited(_loadGender());
   }
@@ -333,16 +334,16 @@ class _ProgressScreenState extends State<ProgressScreen> {
     setState(() => _milestones = milestones);
   }
 
-  Future<void> _loadStreakBars() async {
+  Future<void> _loadStreakWeekBars() async {
     if (_previewWithMock) {
       await null; // defer past initState before setState
       if (!mounted) return;
-      setState(() => _streakBars = progressMockStreakBars);
+      setState(() => _streakWeekBars = progressMockStreakWeekBars);
       return;
     }
-    final bars = await _sessions.streakBars();
+    final bars = await _sessions.streakWeekBars();
     if (!mounted) return;
-    setState(() => _streakBars = bars);
+    setState(() => _streakWeekBars = bars);
   }
 
   // ── Mock preview builders (only used while [_previewWithMock] is on) ──
@@ -514,8 +515,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
     final hasTrend = formSummary != null && formSummary.trend.length >= 3;
     final profile = _profile ?? widget.userProfile;
     final userInitial = profile?.initial ?? 'N';
-    final streakDays =
-        _previewWithMock ? progressMockStreakDays : (profile?.streakDays ?? 0);
+    final streakWeeks = _previewWithMock
+        ? progressMockStreakWeeks
+        : (profile?.streakWeeks ?? 0);
     final phaseLabel = !_planResolved
         ? 'ĐANG TẢI…'
         : (_phaseLabel ?? 'CHƯA CÓ LỘ TRÌNH');
@@ -571,7 +573,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   const SizedBox(height: 40),
 
                   // 2. TUẦN NÀY MỘT NHÌN — weekly summary band (real data).
-                  _buildWeeklySection(c, streakDays),
+                  _buildWeeklySection(c),
                   const SizedBox(height: 40),
 
                   // 3. ĐƯỜNG TIẾN BỘ — score trend chart (wired to real data).
@@ -615,6 +617,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
                         ? const _PainPlaceholder()
                         : BodyPainReporter(
                             reports: _painReports!,
+                            // Intended mapping: female silhouette ONLY for
+                            // 'female'. 'male', 'other', and 'prefer_not_to_say'
+                            // (and null/unknown) all render the male body map.
                             gender: _gender == 'female'
                                 ? BodyGender.female
                                 : BodyGender.male,
@@ -664,19 +669,18 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   _buildMilestonesSection(c),
                   const SizedBox(height: 40),
 
-                  // 7. CHUỖI LIÊN TIẾP — streak card (real completion history;
-                  // streak day count is already live).
+                  // 7. CHUỖI — weekly streak tier + 12-week activity strip. The
+                  // trailing filled run IS the streak, so it lives here under
+                  // the same "Chuỗi" the duration label names.
                   _SectionHeader(
-                    eyebrow: 'CHUỖI LIÊN TIẾP',
-                    meta: '$streakDays NGÀY',
-                    intro:
-                        'Mỗi cột là một ngày. Cột vàng đậm là buổi đã ghi nhận.',
+                    eyebrow: 'CHUỖI',
+                    intro: 'Chuỗi tuần hoạt động liên tiếp của bạn.',
                   ),
                   const SizedBox(height: 14),
-                  _buildStreakSection(c, streakDays),
+                  _buildStreakStripSection(c, streakWeeks),
                   const SizedBox(height: 40),
 
-                  // 8. Closer with back-to-top
+                  // Closer with back-to-top
                   _Closer(onBackToTop: _onStickyBarTap),
                   const SizedBox(height: 24),
                 ],
@@ -716,7 +720,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   // ── Section builders (real data + progressive reveal / guided empties) ──
 
-  Widget _buildWeeklySection(VikaColors c, int streakDays) {
+  Widget _buildWeeklySection(VikaColors c) {
     final weekly = _weekly;
     if (weekly == null) {
       return const _BandPlaceholder(loading: true);
@@ -746,12 +750,76 @@ class _ProgressScreenState extends State<ProgressScreen> {
             : null,
         deltaPositive: (weekly.avgFormDelta ?? 0) >= 0,
       ),
-      WeeklyStat(
-        value: '$streakDays',
-        label: 'Ngày liên tiếp',
-      ),
     ];
     return WeeklySummaryBand(stats: stats, kicker: 'TUẦN NÀY MỘT NHÌN');
+  }
+
+  /// CHUỖI section body: the duration tier label over a 12-week activity strip.
+  /// The strip's trailing filled run equals [streakWeeks] (shared active-week
+  /// definition), so it reads honestly as the streak with no relabel. A
+  /// brand-new user (no streak, no active weeks in the window) gets the guided
+  /// empty rather than 12 dead cells.
+  Widget _buildStreakStripSection(VikaColors c, int streakWeeks) {
+    final bars = _streakWeekBars;
+    if (bars == null) {
+      return const _SectionEmpty(message: 'Đang tải chuỗi tuần…');
+    }
+    if (streakWeeks == 0 && !bars.any((active) => active)) {
+      return const _SectionEmpty(
+        message: 'Chưa có tuần nào hoạt động. Tập một buổi để bắt đầu '
+            'chuỗi của bạn.',
+      );
+    }
+    final label = streakTierLabel(streakWeeks);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(22, 20, 22, 18),
+        decoration: BoxDecoration(
+          color: c.bgRaised,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: c.border),
+          boxShadow: [
+            BoxShadow(
+              color: c.ink.withValues(alpha: 0.05),
+              blurRadius: 20,
+              offset: const Offset(0, 12),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Duration tier label — the streak named as a span, not a count.
+            Text(
+              label.isEmpty ? '—' : label,
+              style: TextStyle(
+                fontFamily: 'BeVietnamPro',
+                fontSize: 34,
+                fontWeight: FontWeight.w800,
+                fontStyle: FontStyle.italic,
+                letterSpacing: -1.4,
+                height: 1.0,
+                color: c.ink,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Mỗi ô là một tuần · ô đậm là tuần đã tập.',
+              style: TextStyle(
+                fontFamily: 'BeVietnamPro',
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                height: 1.4,
+                color: c.inkSoft,
+              ),
+            ),
+            const SizedBox(height: 18),
+            StreakWeekStrip(weeks: bars),
+          ],
+        ),
+      ),
+    );
   }
 
   /// '{n} BÀI' once insights load with something to rank, else null (loading
@@ -850,35 +918,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
     return MilestoneRail(milestones: milestones);
   }
 
-  Widget _buildStreakSection(VikaColors c, int streakDays) {
-    final bars = _streakBars;
-    if (bars == null) {
-      return const _SectionEmpty(message: 'Đang tải chuỗi ngày tập…');
-    }
-    final completedRecently = bars.where((b) => b).length;
-    if (streakDays == 0 && completedRecently == 0) {
-      return const _SectionEmpty(
-        message: 'Chưa có buổi nào trong 14 ngày qua. Tập một buổi '
-            'để bắt đầu chuỗi của bạn.',
-      );
-    }
-    // Last 7 of the 14 bars = this week's completed days.
-    final last7 = bars.length >= 7 ? bars.sublist(bars.length - 7) : bars;
-    final weeklyCompleted = last7.where((b) => b).length;
-    final next = SessionPersistence.nextStreakMilestone(streakDays);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: ProgressStreakCard(
-        days: streakDays,
-        bars: bars,
-        summary: 'Đã tập $completedRecently ngày trong 14 ngày qua.',
-        weeklyCompleted: weeklyCompleted,
-        weeklyTotal: 7,
-        // No further milestone → pass the current count so the footer hides.
-        nextMilestone: next ?? streakDays,
-      ),
-    );
-  }
 }
 
 // ═══════════════════════════════════════════════════════════════

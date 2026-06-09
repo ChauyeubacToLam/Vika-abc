@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../../../utils/bmi.dart';
 import '../../onboarding_data.dart';
 import '../v5_primitives.dart';
 import '../v5_theme.dart';
@@ -106,13 +107,17 @@ class _S11BodyInfoState extends State<S11BodyInfo>
     _bmiController.forward(from: 0);
   }
 
+  // Label + band come from the shared [bmiCategory] helper so onboarding and
+  // Profile can't drift; only the V5 color mapping lives here.
   _BmiZone _zone(double bmi) {
-    if (bmi < 18.5) {
-      return const _BmiZone('Hơi gầy', Color(0xFF7DA3D9));
-    }
-    if (bmi < 23) return const _BmiZone('Cân đối', V5.yellow);
-    if (bmi < 25) return const _BmiZone('Hơi tròn', Color(0xFFE89A4B));
-    return const _BmiZone('Cần chú ý', Color(0xFFD67B3E));
+    final band = bmiCategory(bmi);
+    final color = switch (band.zone) {
+      BmiZone.low => const Color(0xFF7DA3D9),
+      BmiZone.good => V5.yellow,
+      BmiZone.warn => const Color(0xFFE89A4B),
+      BmiZone.high => const Color(0xFFD67B3E),
+    };
+    return _BmiZone(band.label, color);
   }
 
   @override
@@ -164,6 +169,14 @@ class _S11BodyInfoState extends State<S11BodyInfo>
                       bmi: _animatedBmi,
                       zone: zone,
                     ),
+                  ),
+                ),
+                const SizedBox(height: V5.space6),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: Text(
+                    bmiCaveat,
+                    style: V5.caption(context, color: V5.inkFaint),
                   ),
                 ),
                 const SizedBox(height: V5.space12),
@@ -241,12 +254,24 @@ class _S11BodyInfoState extends State<S11BodyInfo>
                 style: V5.eyebrow(context, color: V5.inkSoft),
               ),
               SizedBox(height: veryCompact ? V5.space6 : V5.space8),
-              Row(
-                children: [
-                  _genderChip('male', 'Nam', Icons.male_rounded),
-                  const SizedBox(width: V5.space10),
-                  _genderChip('female', 'Nữ', Icons.female_rounded),
-                ],
+              // Cap each chip to the line width so the long 'Không muốn trả
+              // lời' option can't overflow on the narrowest screens; the four
+              // still reflow (it drops to its own run).
+              LayoutBuilder(
+                builder: (context, constraints) => Wrap(
+                  spacing: V5.space10,
+                  runSpacing: V5.space8,
+                  children: [
+                    _genderChip('male', 'Nam', Icons.male_rounded,
+                        constraints.maxWidth),
+                    _genderChip('female', 'Nữ', Icons.female_rounded,
+                        constraints.maxWidth),
+                    _genderChip('other', 'Khác', Icons.transgender_rounded,
+                        constraints.maxWidth),
+                    _genderChip('prefer_not_to_say', 'Không muốn trả lời', null,
+                        constraints.maxWidth),
+                  ],
+                ),
               ),
             ],
           ),
@@ -255,9 +280,14 @@ class _S11BodyInfoState extends State<S11BodyInfo>
     );
   }
 
-  Widget _genderChip(String id, String label, IconData icon) {
+  // Sizes to content so the four options reflow inside the Wrap; the wide
+  // 'Không muốn trả lời' chip drops to its own run on narrow screens.
+  // [maxWidth] is the Wrap's line width — capping the chip to it (and letting
+  // the label shrink) keeps the long option from overflowing on small phones.
+  Widget _genderChip(String id, String label, IconData? icon, double maxWidth) {
     final selected = widget.data.gender == id;
-    return Expanded(
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: maxWidth),
       child: V5Card(
         onTap: () => setState(() => widget.data.gender = id),
         selected: selected,
@@ -265,19 +295,26 @@ class _S11BodyInfoState extends State<S11BodyInfo>
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         borderRadius: V5.radiusMd,
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              size: 18,
-              color: selected ? V5.yellow : V5.inkSoft,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: V5.titleSm(
-                context,
-                color: selected ? V5.invInk : V5.ink,
+            if (icon != null) ...[
+              Icon(
+                icon,
+                size: 18,
+                color: selected ? V5.yellow : V5.inkSoft,
+              ),
+              const SizedBox(width: 8),
+            ],
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: V5.titleSm(
+                  context,
+                  color: selected ? V5.invInk : V5.ink,
+                ),
               ),
             ),
           ],

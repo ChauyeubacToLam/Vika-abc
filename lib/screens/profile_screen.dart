@@ -28,6 +28,7 @@ import '../data/profile_mock.dart';
 import '../services/data_export_service.dart';
 import '../services/recommendation/recommendation_service.dart';
 import '../services/session_persistence.dart';
+import '../services/streak_tier.dart';
 import '../services/user_profile_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/vf_theme.dart';
@@ -212,14 +213,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   /// Compact uppercase hero strip. Empty for a brand-new user (0 sessions) so
-  /// the strip is hidden rather than showing "0 NGÀY".
+  /// the strip is hidden rather than showing a placeholder. The streak chip is
+  /// the tier duration label (e.g. 'CHUỖI 1 THÁNG'), dropped when there's no
+  /// streak — never a raw count.
   List<String> _buildInlineStats() {
     final lt = _lifetime;
     if (lt == null || lt.sessionCount == 0) return const [];
-    final stats = <String>[
-      '${_profile?.streakDays ?? 0} NGÀY',
-      '${lt.sessionCount} BUỔI',
-    ];
+    final stats = <String>[];
+    final streakLabel = streakTierLabel(_profile?.streakWeeks ?? 0);
+    if (streakLabel.isNotEmpty) stats.add('CHUỖI ${streakLabel.toUpperCase()}');
+    stats.add('${lt.sessionCount} BUỔI');
     if (lt.avgForm != null) stats.add('${lt.avgForm}% FORM');
     return stats;
   }
@@ -572,10 +575,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final displayName = profile?.displayName ?? profileMockName;
     final userInitial = profile?.initial ?? profileMockInitial;
     final avatarUrl = profile?.avatarUrl;
-    final streakDays = profile?.streakDays ?? 0;
+    final streakLabel = streakTierLabel(profile?.streakWeeks ?? 0);
     final memberSince = profile?.memberSinceLabel ?? profileMockMemberSince;
-    final memberSinceLine =
-        'Thành viên từ $memberSince · $streakDays ngày liên tiếp';
+    final memberSinceLine = streakLabel.isEmpty
+        ? 'Thành viên từ $memberSince'
+        : 'Thành viên từ $memberSince · chuỗi $streakLabel';
     // Body stats stay null when unknown — BodyCard renders "—", never a fake
     // number.
     final height = profile?.heightCm;
@@ -1076,6 +1080,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     text: widget.current?.email ?? '',
   );
   File? _selectedAvatar;
+  late String? _gender = widget.current?.gender;
   bool _saving = false;
 
   @override
@@ -1130,6 +1135,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
         displayName: _nameController.text,
         avatarFile: _selectedAvatar,
         email: emailChanged ? newEmail : null,
+        gender: _gender,
       );
       if (!mounted) return;
       Navigator.of(context).pop(
@@ -1364,6 +1370,16 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 16),
+                _GenderSelectField(
+                  selected: _gender,
+                  accent: accent,
+                  fieldFill: fieldFill,
+                  onSelect: (id) {
+                    HapticFeedback.selectionClick();
+                    setState(() => _gender = id);
+                  },
+                ),
                 const SizedBox(height: 18),
                 SizedBox(
                   height: 50,
@@ -1417,6 +1433,171 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GENDER SELECT — segmented pills, accent-themed to the identity sheet
+// ═══════════════════════════════════════════════════════════════
+
+/// Premium gender picker for the identity editor. Four options as soft pills
+/// that reflow (the wide 'Không muốn trả lời' drops to its own run, capped to
+/// the line width so it can't overflow). Selected = warm-ink fill with an
+/// accent hairline, a reserved-yellow glyph, and a soft lift — matching the
+/// sheet's field rhythm without shouting.
+class _GenderSelectField extends StatelessWidget {
+  const _GenderSelectField({
+    required this.selected,
+    required this.onSelect,
+    required this.accent,
+    required this.fieldFill,
+  });
+
+  final String? selected;
+  final ValueChanged<String> onSelect;
+  final Color accent;
+  final Color fieldFill;
+
+  static const _options = <({String id, String label, IconData icon})>[
+    (id: 'male', label: 'Nam', icon: Icons.male_rounded),
+    (id: 'female', label: 'Nữ', icon: Icons.female_rounded),
+    (id: 'other', label: 'Khác', icon: Icons.transgender_rounded),
+    (
+      id: 'prefer_not_to_say',
+      label: 'Không muốn trả lời',
+      icon: Icons.visibility_off_rounded,
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 2, bottom: 10),
+          child: Row(
+            children: [
+              Icon(Icons.wc_rounded, size: 18, color: accent),
+              const SizedBox(width: 8),
+              Text(
+                'Giới tính',
+                style: TextStyle(
+                  fontFamily: 'BeVietnamPro',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: c.inkSoft,
+                ),
+              ),
+            ],
+          ),
+        ),
+        LayoutBuilder(
+          builder: (context, constraints) => Wrap(
+            spacing: 9,
+            runSpacing: 9,
+            children: [
+              for (final o in _options)
+                _GenderPill(
+                  label: o.label,
+                  icon: o.icon,
+                  selected: selected == o.id,
+                  maxWidth: constraints.maxWidth,
+                  accent: accent,
+                  fieldFill: fieldFill,
+                  onTap: () => onSelect(o.id),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _GenderPill extends StatelessWidget {
+  const _GenderPill({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.maxWidth,
+    required this.accent,
+    required this.fieldFill,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final double maxWidth;
+  final Color accent;
+  final Color fieldFill;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+          decoration: BoxDecoration(
+            gradient: selected
+                ? LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [c.ink, Color.lerp(c.ink, accent, 0.22)!],
+                  )
+                : null,
+            color: selected ? null : fieldFill,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected ? accent.withValues(alpha: 0.55) : c.border,
+              width: selected ? 1.4 : 1,
+            ),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: c.ink.withValues(alpha: c.isDark ? 0.40 : 0.20),
+                      blurRadius: 16,
+                      offset: const Offset(0, 8),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 17,
+                color: selected ? c.yellow : c.inkSoft,
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'BeVietnamPro',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: selected ? c.invInk : c.ink,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
