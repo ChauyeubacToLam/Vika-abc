@@ -480,14 +480,23 @@ class _Marquee extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(7),
+              child: Image.asset(
+                'assets/branding/Logo.jpeg',
+                width: 26,
+                height: 26,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(width: 8),
             Text(
               'VIKA',
               style: TextStyle(
                 fontFamily: 'BeVietnamPro',
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
-                fontStyle: FontStyle.italic,
-                letterSpacing: -1,
+                letterSpacing: 1,
                 color: c.invInk,
               ),
             ),

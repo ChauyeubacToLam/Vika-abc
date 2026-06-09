@@ -36,6 +36,7 @@ dependencies:
   url_launcher: ^6.3.0
   image_picker: ^1.1.2
   share_plus: ^10.1.4
+  flutter_svg: ^2.3.0
 
 dev_dependencies:
   flutter_test:
@@ -47,9 +48,10 @@ flutter:
   uses-material-design: true
   assets:
     - assets/audio/
+    - assets/brands/
     - assets/audio/squat/
+    - assets/branding/
     - assets/images/
-    - assets/images/onboarding/
     - .env
 
   # ─── Fonts ───

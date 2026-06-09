@@ -7,11 +7,13 @@
 // Faint X-axis tick labels at the start, middle, and end.
 
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
 import '../../theme/vf_theme.dart';
+import 'ledger_frame.dart';
 
 class ScoreTrendChart extends StatelessWidget {
   const ScoreTrendChart({
@@ -39,20 +41,9 @@ class ScoreTrendChart extends StatelessWidget {
     final c = VikaColors.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
+      child: LedgerFrame(
+        grainSeed: 29,
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-        decoration: BoxDecoration(
-          color: c.bgRaised,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: c.border),
-          boxShadow: [
-            BoxShadow(
-              color: c.ink.withValues(alpha: 0.04),
-              blurRadius: 14,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -314,14 +305,32 @@ class _TrendPainter extends CustomPainter {
     for (var i = 1; i < pts.length; i++) {
       linePath.lineTo(pts[i].dx, pts[i].dy);
     }
+    // Soft warm glow beneath the line — gives the ink a printed-emboss lift
+    // off the cream rather than a flat plotted stroke.
     canvas.drawPath(
       linePath,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.4
+        ..strokeWidth = 6
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round
-        ..color = lineColor,
+        ..color = lineColor.withValues(alpha: 0.16)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
+    );
+    // Ink stroke, brightening toward the terminal "today" point so the eye is
+    // pulled left→right along the climb.
+    canvas.drawPath(
+      linePath,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.6
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..shader = ui.Gradient.linear(
+          pts.first,
+          pts.last,
+          [Color.lerp(lineColor, labelColor, 0.35)!, lineColor],
+        ),
     );
 
     // Faint start dot (anchor).

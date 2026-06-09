@@ -278,16 +278,31 @@ class _LoginTopBar extends StatelessWidget {
             ),
           ),
         ),
-        Text(
-          'vika',
-          style: V5.text(
-            context,
-            size: 20,
-            weight: FontWeight.w800,
-            color: V5.ink,
-            letterSpacing: -1,
-            height: 1,
-          ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(7),
+              child: Image.asset(
+                'assets/branding/Logo.jpeg',
+                width: 26,
+                height: 26,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'VIKA',
+              style: V5.text(
+                context,
+                size: 20,
+                weight: FontWeight.w800,
+                color: V5.ink,
+                letterSpacing: 1,
+                height: 1,
+              ),
+            ),
+          ],
         ),
       ],
     );

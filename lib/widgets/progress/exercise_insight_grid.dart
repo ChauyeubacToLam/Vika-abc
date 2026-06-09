@@ -349,14 +349,31 @@ class _BarChart extends StatelessWidget {
     final full = _minBar + g.clamp(0.0, 1.0) * (_height - 9 - _minBar);
     final isToday = i == n - 1;
 
+    // Warm metal, not cold ink: past sessions are aged-bronze ingots that
+    // climb in warmth toward the lit-gold "today" bar — the same molten-gold
+    // language as the streak tray, so the two sections read as one family.
+    final goldHi = Color.lerp(c.yellow, Colors.white, 0.45)!;
+    final goldDeep = Color.lerp(c.yellow, c.ink, 0.5)!;
+    final bronzeAlpha = 0.5 + g * 0.3;
+
     return Align(
       alignment: Alignment.bottomCenter,
       child: Container(
         height: full * t,
         decoration: BoxDecoration(
-          color: isToday
-              ? c.yellow
-              : c.ink.withValues(alpha: 0.10 + g * 0.16),
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: isToday
+                ? [goldHi, c.yellow, goldDeep]
+                : [
+                    Color.lerp(c.yellow, c.ink, 0.4)!
+                        .withValues(alpha: bronzeAlpha),
+                    Color.lerp(c.yellow, c.ink, 0.62)!
+                        .withValues(alpha: bronzeAlpha),
+                  ],
+            stops: isToday ? const [0.0, 0.42, 1.0] : const [0.0, 1.0],
+          ),
           borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
           boxShadow: isToday
               ? [

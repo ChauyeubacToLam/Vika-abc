@@ -189,34 +189,47 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
                 future: _launchStateFuture,
                 builder: (context, snapshot) {
                   final state = snapshot.data;
-                  return FutureBuilder<int>(
-                    future: _streakFuture,
-                    builder: (context, streakSnapshot) {
-                      return FutureBuilder<
-                          ({int? percent, int? delta, List<int> week})>(
-                        future: _formSummaryFuture,
-                        builder: (context, formSnapshot) {
-                          final form = formSnapshot.data;
-                          return HomeVitalsSpread(
-                            weekLabel: homeMockWeekLabel,
-                            phaseLabel: homeMockPhaseLabel,
-                            sessionsDone: state?.completedSessionsThisWeek ??
-                                homeMockSessionsDone,
-                            sessionsTotal:
-                                state?.sessionsThisWeek ?? homeMockSessionsTotal,
-                            statusLine: homeMockVitalsStandfirst,
-                            streakLabel: streakTierLabel(
-                              streakSnapshot.data ??
-                                  widget.userProfile?.streakWeeks ??
-                                  homeMockStreakWeeks,
-                            ),
-                            formPercent: form?.percent,
-                            formDelta: form?.delta,
-                            formWeek: form?.week ?? const <int>[],
-                          );
-                        },
-                      );
-                    },
+                  // While the structural session data is in flight, shimmer
+                  // the vitals spread rather than seeding it with mock counts.
+                  final Widget vitals = snapshot.connectionState ==
+                          ConnectionState.waiting
+                      ? const HomeVitalsSkeleton(key: ValueKey('vitals-skeleton'))
+                      : KeyedSubtree(
+                          key: const ValueKey('vitals-real'),
+                          child: FutureBuilder<int>(
+                            future: _streakFuture,
+                            builder: (context, streakSnapshot) {
+                              return FutureBuilder<
+                                  ({int? percent, int? delta, List<int> week})>(
+                                future: _formSummaryFuture,
+                                builder: (context, formSnapshot) {
+                                  final form = formSnapshot.data;
+                                  return HomeVitalsSpread(
+                                    weekLabel: homeMockWeekLabel,
+                                    phaseLabel: homeMockPhaseLabel,
+                                    sessionsDone:
+                                        state?.completedSessionsThisWeek ??
+                                            homeMockSessionsDone,
+                                    sessionsTotal: state?.sessionsThisWeek ??
+                                        homeMockSessionsTotal,
+                                    statusLine: homeMockVitalsStandfirst,
+                                    streakLabel: streakTierLabel(
+                                      streakSnapshot.data ??
+                                          widget.userProfile?.streakWeeks ??
+                                          homeMockStreakWeeks,
+                                    ),
+                                    formPercent: form?.percent,
+                                    formDelta: form?.delta,
+                                    formWeek: form?.week ?? const <int>[],
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                        );
+                  return AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    child: vitals,
                   );
                 },
               ),
@@ -302,26 +315,20 @@ class _HomeHeroFromTarget extends StatelessWidget {
     final currentTarget = target;
     final userInitial = profile?.initial ?? homeMockUser.initial;
     final avatarUrl = profile?.avatarUrl;
+
+    final Widget hero;
     if (loading) {
-      return HomeStageHero(
-        eyebrow: 'ĐANG TẢI KẾ HOẠCH',
-        titleLine1: 'Vika',
-        titleLine2: 'đang chuẩn bị.',
-        duration: homeMockToday.duration,
-        totalCount: homeMockToday.totalCount,
-        aiCount: homeMockToday.aiCount,
-        exercises: homeMockToday.exercises,
-        coachQuote: homeMockCoachQuote,
-        coachAttribution: homeMockCoachAttribution,
-        ctaLabel: '',
-        onCta: null,
+      // While today's session resolves, show the shimmering stage skeleton
+      // instead of mock data that would visibly change once the real plan
+      // lands.
+      hero = HomeStageHeroSkeleton(
+        key: const ValueKey('home-hero-skeleton'),
         userInitial: userInitial,
         avatarUrl: avatarUrl,
       );
-    }
-
-    if (currentTarget == null || !currentTarget.hasLaunchableSlots) {
-      return HomeStageHero(
+    } else if (currentTarget == null || !currentTarget.hasLaunchableSlots) {
+      hero = HomeStageHero(
+        key: const ValueKey('home-hero-rest'),
         eyebrow: 'CHƯA CÓ BUỔI TẬP',
         titleLine1: 'Nghỉ',
         titleLine2: 'hôm nay.',
@@ -337,23 +344,32 @@ class _HomeHeroFromTarget extends StatelessWidget {
         userInitial: userInitial,
         avatarUrl: avatarUrl,
       );
+    } else {
+      hero = HomeStageHero(
+        key: const ValueKey('home-hero-active'),
+        eyebrow:
+            'HÔM NAY · BUỔI ${(currentTarget.session.sessionIndex + 1).toString().padLeft(2, '0')}',
+        titleLine1: homeMockToday.titleLine1,
+        titleLine2: homeMockToday.titleLine2,
+        duration: _durationFor(currentTarget),
+        totalCount: currentTarget.sequence.length,
+        aiCount: currentTarget.sequence.length,
+        exercises: _exerciseRows(currentTarget),
+        coachQuote: homeMockCoachQuote,
+        coachAttribution: homeMockCoachAttribution,
+        ctaLabel: homeMockToday.cta,
+        onCta: onStart,
+        userInitial: userInitial,
+        avatarUrl: avatarUrl,
+      );
     }
 
-    return HomeStageHero(
-      eyebrow:
-          'HÔM NAY · BUỔI ${(currentTarget.session.sessionIndex + 1).toString().padLeft(2, '0')}',
-      titleLine1: homeMockToday.titleLine1,
-      titleLine2: homeMockToday.titleLine2,
-      duration: _durationFor(currentTarget),
-      totalCount: currentTarget.sequence.length,
-      aiCount: currentTarget.sequence.length,
-      exercises: _exerciseRows(currentTarget),
-      coachQuote: homeMockCoachQuote,
-      coachAttribution: homeMockCoachAttribution,
-      ctaLabel: homeMockToday.cta,
-      onCta: onStart,
-      userInitial: userInitial,
-      avatarUrl: avatarUrl,
+    // Cross-fade the skeleton → real content so the swap doesn't jump.
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      switchInCurve: Curves.easeOut,
+      switchOutCurve: Curves.easeIn,
+      child: hero,
     );
   }
 

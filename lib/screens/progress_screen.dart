@@ -24,11 +24,11 @@ import '../data/progress_mock.dart';
 import '../models/exercise_lookup.dart';
 import '../services/recommendation/recommendation_service.dart';
 import '../services/session_persistence.dart';
-import '../services/streak_tier.dart';
 import '../services/user_profile_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/vf_theme.dart';
 import '../utils/orientation_lock.dart';
+import '../widgets/ivory/skeleton.dart';
 import '../widgets/progress/body_heat_map.dart';
 import '../widgets/progress/milestone_rail.dart';
 import '../widgets/progress/period_tabs.dart';
@@ -106,8 +106,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
   /// = loading. Never empty — locked rungs render as targets to chase.
   List<Milestone>? _milestones;
 
-  /// Real last-12-weeks activity for the "Chuỗi" strip, oldest-first (last =
-  /// current week). Null = loading.
+  /// Real weekly activity for the "Chuỗi" strip — anchored at the user's first
+  /// active week, growing forward, capped at 12 (oldest-first, last = current
+  /// week). Null = loading; empty = no activity yet.
   List<bool>? _streakWeekBars;
 
   /// Active pain self-reports keyed by body_region. Null = loading
@@ -580,6 +581,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   // Gated on 3+ sessions (a trend needs enough points to read).
                   if (hasTrend) ...[
                     _SectionHeader(
+                      index: '01',
                       eyebrow: 'ĐƯỜNG TIẾN BỘ',
                       meta: _trendMeta(formSummary.trend),
                       intro:
@@ -603,6 +605,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
                   // 4. CƠ THỂ — tappable pain self-report (capture-only).
                   _SectionHeader(
+                    index: '02',
                     eyebrow: 'CƠ THỂ',
                     meta: (_painReports == null || _painReports!.isEmpty)
                         ? null
@@ -650,6 +653,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   // 5. BÀI TẬP NỔI BẬT — 2-up visual ranking cards, wired to the
                   // real per-exercise ranker (SessionPersistence.rankedInsights).
                   _SectionHeader(
+                    index: '03',
                     eyebrow: 'BÀI TẬP NỔI BẬT',
                     meta: _insightsMeta(),
                     intro: 'Những bài tiến nhanh nhất trong giai đoạn.',
@@ -660,6 +664,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
                   // 6. CỘT MỐC — tiered milestone rail (real unlock state).
                   _SectionHeader(
+                    index: '04',
                     eyebrow: 'CỘT MỐC',
                     meta: _milestoneMeta(),
                     intro:
@@ -673,6 +678,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   // trailing filled run IS the streak, so it lives here under
                   // the same "Chuỗi" the duration label names.
                   _SectionHeader(
+                    index: '05',
                     eyebrow: 'CHUỖI',
                     intro: 'Chuỗi tuần hoạt động liên tiếp của bạn.',
                   ),
@@ -754,11 +760,11 @@ class _ProgressScreenState extends State<ProgressScreen> {
     return WeeklySummaryBand(stats: stats, kicker: 'TUẦN NÀY MỘT NHÌN');
   }
 
-  /// CHUỖI section body: the duration tier label over a 12-week activity strip.
-  /// The strip's trailing filled run equals [streakWeeks] (shared active-week
+  /// CHUỖI section body: the "Streak Reel" — a warm-dark lit panel holding the
+  /// glowing golden timeline ribbon (anchored at the first active week, capped
+  /// at 12). The bright trailing run equals [streakWeeks] (shared active-week
   /// definition), so it reads honestly as the streak with no relabel. A
-  /// brand-new user (no streak, no active weeks in the window) gets the guided
-  /// empty rather than 12 dead cells.
+  /// brand-new user (no activity) gets the guided empty rather than dead cells.
   Widget _buildStreakStripSection(VikaColors c, int streakWeeks) {
     final bars = _streakWeekBars;
     if (bars == null) {
@@ -770,55 +776,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
             'chuỗi của bạn.',
       );
     }
-    final label = streakTierLabel(streakWeeks);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(22, 20, 22, 18),
-        decoration: BoxDecoration(
-          color: c.bgRaised,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: c.border),
-          boxShadow: [
-            BoxShadow(
-              color: c.ink.withValues(alpha: 0.05),
-              blurRadius: 20,
-              offset: const Offset(0, 12),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Duration tier label — the streak named as a span, not a count.
-            Text(
-              label.isEmpty ? '—' : label,
-              style: TextStyle(
-                fontFamily: 'BeVietnamPro',
-                fontSize: 34,
-                fontWeight: FontWeight.w800,
-                fontStyle: FontStyle.italic,
-                letterSpacing: -1.4,
-                height: 1.0,
-                color: c.ink,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Mỗi ô là một tuần · ô đậm là tuần đã tập.',
-              style: TextStyle(
-                fontFamily: 'BeVietnamPro',
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                height: 1.4,
-                color: c.inkSoft,
-              ),
-            ),
-            const SizedBox(height: 18),
-            StreakWeekStrip(weeks: bars),
-          ],
-        ),
-      ),
+      child: StreakWeekStrip(weeks: bars, streakWeeks: streakWeeks),
     );
   }
 
@@ -934,6 +894,30 @@ class _GaugePlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
+    if (loading) {
+      // Shimmer a stand-in gauge while the form summary loads.
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+        decoration: BoxDecoration(
+          color: c.bgRaised,
+          borderRadius: BorderRadius.circular(32),
+          border: Border.all(color: c.border),
+        ),
+        child: const Shimmer(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SkeletonCircle(size: 128),
+              SizedBox(height: 22),
+              SkeletonBox(width: 150, height: 12),
+              SizedBox(height: 10),
+              SkeletonBox(width: 96, height: 12),
+            ],
+          ),
+        ),
+      );
+    }
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 56, horizontal: 24),
@@ -944,9 +928,7 @@ class _GaugePlaceholder extends StatelessWidget {
       ),
       alignment: Alignment.center,
       child: Text(
-        loading
-            ? 'Đang tải điểm form…'
-            : 'Chưa có dữ liệu cho giai đoạn này',
+        'Chưa có dữ liệu cho giai đoạn này',
         textAlign: TextAlign.center,
         style: TextStyle(
           fontFamily: 'BeVietnamPro',
@@ -973,10 +955,10 @@ class _PainPlaceholder extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
     // Dark stage that previews the loaded instrument, so loading → loaded
-    // doesn't flash cream-to-dark.
+    // doesn't flash cream-to-dark. Inverted shimmer over a silhouette block.
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 88, horizontal: 24),
+      padding: const EdgeInsets.symmetric(vertical: 44, horizontal: 24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: const Alignment(-0.6, -1),
@@ -993,16 +975,15 @@ class _PainPlaceholder extends StatelessWidget {
         ],
       ),
       alignment: Alignment.center,
-      child: Text(
-        'Đang tải vùng cơ thể…',
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          fontFamily: 'BeVietnamPro',
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          fontStyle: FontStyle.italic,
-          letterSpacing: -0.1,
-          color: c.invInkSoft,
+      child: const Shimmer(
+        inverted: true,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SkeletonBox(width: 104, height: 208, radius: 52, inverted: true),
+            SizedBox(height: 22),
+            SkeletonBox(width: 150, height: 12, inverted: true),
+          ],
         ),
       ),
     );
@@ -1022,6 +1003,30 @@ class _BandPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
+    if (loading) {
+      // Shimmer three metric stand-ins inside the band's hairline frame.
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+        decoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(color: c.border),
+            bottom: BorderSide(color: c.border),
+          ),
+        ),
+        child: const Shimmer(
+          child: Row(
+            children: [
+              Expanded(child: _BandMetricSkeleton()),
+              SizedBox(width: 18),
+              Expanded(child: _BandMetricSkeleton()),
+              SizedBox(width: 18),
+              Expanded(child: _BandMetricSkeleton()),
+            ],
+          ),
+        ),
+      );
+    }
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
@@ -1033,10 +1038,8 @@ class _BandPlaceholder extends StatelessWidget {
       ),
       alignment: Alignment.center,
       child: Text(
-        loading
-            ? 'Đang tải tổng kết tuần…'
-            : 'Chưa có buổi nào tuần này. Tập một buổi để Vika '
-                'tổng kết tuần cho bạn.',
+        'Chưa có buổi nào tuần này. Tập một buổi để Vika '
+            'tổng kết tuần cho bạn.',
         textAlign: TextAlign.center,
         style: TextStyle(
           fontFamily: 'BeVietnamPro',
@@ -1048,6 +1051,24 @@ class _BandPlaceholder extends StatelessWidget {
           color: c.inkSoft,
         ),
       ),
+    );
+  }
+}
+
+/// A label + numeral pair used inside the loading weekly band.
+class _BandMetricSkeleton extends StatelessWidget {
+  const _BandMetricSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SkeletonBox(width: 52, height: 10),
+        SizedBox(height: 12),
+        SkeletonBox(width: 64, height: 24, radius: 8),
+      ],
     );
   }
 }
@@ -1065,24 +1086,40 @@ class _RailPlaceholder extends StatelessWidget {
     final c = VikaColors.of(context);
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 24),
+      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 24),
       decoration: BoxDecoration(
         color: c.bgRaised,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: c.border),
       ),
-      alignment: Alignment.center,
-      child: Text(
-        'Đang tải cột mốc…',
-        style: TextStyle(
-          fontFamily: 'BeVietnamPro',
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          fontStyle: FontStyle.italic,
-          letterSpacing: -0.1,
-          color: c.inkSoft,
+      child: const Shimmer(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _RailRungSkeleton(),
+            _RailRungSkeleton(),
+            _RailRungSkeleton(),
+            _RailRungSkeleton(),
+          ],
         ),
       ),
+    );
+  }
+}
+
+/// A single milestone-rung stand-in: medallion + short label.
+class _RailRungSkeleton extends StatelessWidget {
+  const _RailRungSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SkeletonCircle(size: 46),
+        SizedBox(height: 12),
+        SkeletonBox(width: 44, height: 9),
+      ],
     );
   }
 }
@@ -1135,11 +1172,18 @@ class _SectionEmpty extends StatelessWidget {
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({
     required this.eyebrow,
+    this.index,
     this.meta,
     this.intro,
   });
 
   final String eyebrow;
+
+  /// Running chapter folio, e.g. '01'. A drop-folio italic numeral seated on a
+  /// gold tick, echoing the insight-card ghost numerals and hero watermark —
+  /// the editorial spine that threads the page into one bound volume. Null
+  /// falls back to a plain gold accent bar.
+  final String? index;
   final String? meta;
   final String? intro;
 
@@ -1148,70 +1192,124 @@ class _SectionHeader extends StatelessWidget {
     final c = VikaColors.of(context);
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 0, 20, intro == null ? 0 : 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Row(
-            children: [
-              Container(
-                width: 5,
-                height: 22,
-                decoration: BoxDecoration(
-                  color: c.yellow,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                eyebrow,
-                style: TextStyle(
-                  fontFamily: 'BeVietnamPro',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.8,
-                  color: c.ink,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(child: Container(height: 1, color: c.border)),
-              if (meta != null) ...[
-                const SizedBox(width: 14),
-                Text(
-                  meta!.toUpperCase(),
-                  style: TextStyle(
-                    fontFamily: 'BeVietnamPro',
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.4,
-                    color: c.inkFaint,
-                    fontFeatures: VikaIvoryMain.tabularFigures,
-                  ),
-                ),
-              ],
-            ],
-          ),
-          if (intro != null) ...[
-            const SizedBox(height: 10),
-            Padding(
-              padding: const EdgeInsets.only(left: 17),
-              child: Text(
-                intro!,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontFamily: 'BeVietnamPro',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  fontStyle: FontStyle.italic,
-                  height: 1.45,
-                  color: c.inkSoft,
-                  letterSpacing: -0.1,
-                ),
+          if (index != null)
+            _ChapterFolio(index: index!)
+          else
+            Container(
+              width: 5,
+              height: 22,
+              decoration: BoxDecoration(
+                color: c.yellow,
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
-          ],
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      eyebrow,
+                      style: TextStyle(
+                        fontFamily: 'BeVietnamPro',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.8,
+                        color: c.ink,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(child: Container(height: 1, color: c.border)),
+                    if (meta != null) ...[
+                      const SizedBox(width: 14),
+                      Text(
+                        meta!.toUpperCase(),
+                        style: TextStyle(
+                          fontFamily: 'BeVietnamPro',
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.4,
+                          color: c.inkFaint,
+                          fontFeatures: VikaIvoryMain.tabularFigures,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                if (intro != null) ...[
+                  const SizedBox(height: 9),
+                  Text(
+                    intro!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: 'BeVietnamPro',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      fontStyle: FontStyle.italic,
+                      height: 1.45,
+                      color: c.inkSoft,
+                      letterSpacing: -0.1,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ],
       ),
+    );
+  }
+}
+
+/// Drop-folio chapter index — a tabular italic numeral over a short gold tick.
+/// Sits where the old 5px accent bar was, giving each chapter a numbered plate.
+class _ChapterFolio extends StatelessWidget {
+  const _ChapterFolio({required this.index});
+  final String index;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text(
+          index,
+          style: TextStyle(
+            fontFamily: 'BeVietnamPro',
+            fontSize: 25,
+            fontWeight: FontWeight.w800,
+            fontStyle: FontStyle.italic,
+            letterSpacing: -1.6,
+            height: 1.0,
+            color: c.ink,
+            fontFeatures: VikaIvoryMain.tabularFigures,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Container(
+          width: 16,
+          height: 2,
+          decoration: BoxDecoration(
+            color: c.yellow,
+            borderRadius: BorderRadius.circular(1),
+            boxShadow: [
+              BoxShadow(
+                color: c.yellow.withValues(alpha: 0.45),
+                blurRadius: 5,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1383,8 +1481,8 @@ class _StickyPillBar extends StatelessWidget {
                     Container(
                       width: 34,
                       height: 34,
+                      clipBehavior: Clip.antiAlias,
                       decoration: BoxDecoration(
-                        color: c.yellow,
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
@@ -1394,18 +1492,9 @@ class _StickyPillBar extends StatelessWidget {
                           ),
                         ],
                       ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        'V',
-                        style: TextStyle(
-                          fontFamily: 'BeVietnamPro',
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          fontStyle: FontStyle.italic,
-                          letterSpacing: -1,
-                          color: c.yellowInk,
-                          height: 1,
-                        ),
+                      child: Image.asset(
+                        'assets/branding/Logo.jpeg',
+                        fit: BoxFit.cover,
                       ),
                     ),
                     const SizedBox(width: 12),

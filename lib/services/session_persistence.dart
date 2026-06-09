@@ -569,10 +569,11 @@ class SessionPersistence {
     return count;
   }
 
-  /// Weekly activity over the last [weekCount] weeks for the Progress "Chuỗi"
-  /// strip: one bool per week, oldest-first, last entry = the current week. A
-  /// week is true when it has >= 1 completed session. Single round trip; the
-  /// week bucketing lives in [deriveStreakWeekBarsForTest].
+  /// Weekly activity from the user's FIRST active week up to the current week
+  /// (capped at [weekCount]) for the Progress "Chuỗi" strip: one bool per week,
+  /// oldest-first, last entry = the current week. A week is true when it has
+  /// >= 1 completed session. Empty (`[]`) when there is no activity yet. Single
+  /// round trip; the windowing lives in [deriveStreakWeekBarsForTest].
   ///
   /// Shares the SAME active-week definition + ISO-week bucketing as
   /// [currentStreak], so the trailing run of filled cells equals the current
@@ -580,7 +581,7 @@ class SessionPersistence {
   /// allows for an as-yet-empty current week is the only divergence).
   Future<List<bool>> streakWeekBars({int weekCount = 12}) async {
     final userId = _client.auth.currentUser?.id;
-    if (userId == null) return List<bool>.filled(weekCount, false);
+    if (userId == null) return const <bool>[];
 
     try {
       final rows = await _client
@@ -600,15 +601,25 @@ class SessionPersistence {
       return deriveStreakWeekBarsForTest(completedAtValues, weekCount: weekCount);
     } catch (e) {
       debugPrint('[Vika] streakWeekBars failed: $e');
-      return List<bool>.filled(weekCount, false);
+      return const <bool>[];
     }
   }
 
   /// Pure week-bucketing for [streakWeekBars]. Buckets each completion by its
   /// local ISO-week Monday (the SAME [_mondayOf] / [_LocalDate] math
   /// [deriveCurrentStreakForTest] uses — not duplicated), then emits one bool
-  /// per week for the last [weekCount] weeks, oldest-first (last = current
-  /// week). `now` is injectable for deterministic tests.
+  /// per week from the user's FIRST active week up to the current week,
+  /// oldest-first (last = current week). `now` is injectable for tests.
+  ///
+  /// The window is ANCHORED at the first active week and grows forward, capped
+  /// at [weekCount]: the leading edge is max(firstActiveWeek, currentWeek -
+  /// (weekCount-1)). A brand-new user gets a short, honest strip (1..weekCount
+  /// cells) instead of a wall of dead pre-join cells; a veteran gets a rolling
+  /// last-[weekCount]-weeks window. Empty cells only ever represent rest weeks
+  /// the user actually lived through. Returns `[]` when there is no activity.
+  ///
+  /// This is the gold-standard convention (Strava / Duolingo / Apple Fitness):
+  /// anchor at first activity, never pad before the user joined.
   @visibleForTesting
   static List<bool> deriveStreakWeekBarsForTest(
     Iterable<DateTime> completedAtValues, {
@@ -620,8 +631,19 @@ class SessionPersistence {
       for (final completedAt in completedAtValues)
         _mondayOf(_LocalDate.fromDateTime(completedAt.toLocal())),
     };
+    if (activeWeeks.isEmpty) return const <bool>[];
 
-    // Walk the current week back (weekCount-1) weeks, then reverse to
+    // Earliest active week — the anchor we stop walking back at.
+    var firstWeek = activeWeeks.first;
+    for (final w in activeWeeks) {
+      if (DateTime(w.year, w.month, w.day)
+          .isBefore(DateTime(firstWeek.year, firstWeek.month, firstWeek.day))) {
+        firstWeek = w;
+      }
+    }
+
+    // Walk back from the current week, stopping once we include the first
+    // active week (anchor) or hit the [weekCount] cap, then reverse to
     // oldest-first (last = current week).
     final bars = <bool>[];
     var cursor = _mondayOf(
@@ -629,6 +651,7 @@ class SessionPersistence {
     );
     for (var i = 0; i < weekCount; i++) {
       bars.add(activeWeeks.contains(cursor));
+      if (cursor == firstWeek) break; // reached the anchor — earlier = pre-join
       cursor = cursor.previousWeek;
     }
     return bars.reversed.toList();

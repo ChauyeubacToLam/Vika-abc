@@ -1,3 +1,5 @@
+
+
 // Streak model: the unit is consecutive ACTIVE WEEKS (an ISO week, local tz,
 // with >= 1 completed workout session). It surfaces everywhere as a scaling
 // DURATION label — never a raw day or week count.
@@ -26,7 +28,7 @@ String streakTierLabel(int weeks) {
   if (weeks >= 4) return '1 tháng';
   if (weeks >= 2) return '2 tuần';
   return '1 tuần'; // weeks >= 1
-}
+} 
 
 /// True when [weeks] is a milestone threshold: one of the fixed tiers, or a
 /// whole number of years past the first ({1,2,4,8,12,26,52,104,156,…}).

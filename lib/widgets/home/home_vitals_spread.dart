@@ -26,6 +26,7 @@ import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
 import '../../theme/vf_theme.dart';
+import '../ivory/skeleton.dart';
 
 class HomeVitalsSpread extends StatelessWidget {
   const HomeVitalsSpread({
@@ -109,6 +110,123 @@ class HomeVitalsSpread extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LOADING SKELETON — mirrors the vitals spread with shimmer blocks
+// ═══════════════════════════════════════════════════════════════
+
+class HomeVitalsSkeleton extends StatelessWidget {
+  const HomeVitalsSkeleton({
+    super.key,
+    this.padding = const EdgeInsets.fromLTRB(24, 36, 24, 0),
+  });
+
+  final EdgeInsets padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    return Padding(
+      padding: padding,
+      child: Shimmer(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header rail
+            const Row(
+              children: [
+                SkeletonBox(width: 4, height: 18, radius: 2),
+                SizedBox(width: 11),
+                SkeletonBox(width: 64, height: 11),
+                SizedBox(width: 14),
+                Expanded(child: SkeletonBox(height: 2, radius: 1)),
+                SizedBox(width: 14),
+                SkeletonBox(width: 70, height: 11),
+              ],
+            ),
+            const SizedBox(height: 28),
+            // Sessions hero — drop-cap numeral + dots, label column right
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SkeletonBox(width: 96, height: 76, radius: 12),
+                    SizedBox(height: 12),
+                    Row(
+                      children: [
+                        SkeletonCircle(size: 8),
+                        SizedBox(width: 6),
+                        SkeletonCircle(size: 8),
+                        SizedBox(width: 6),
+                        SkeletonCircle(size: 8),
+                        SizedBox(width: 6),
+                        SkeletonCircle(size: 8),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 18),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        SkeletonBox(width: 110, height: 11),
+                        SizedBox(height: 12),
+                        SkeletonBox(width: 24, height: 2, radius: 1),
+                        SizedBox(height: 14),
+                        SkeletonBox(height: 12),
+                        SizedBox(height: 8),
+                        SkeletonBox(width: 130, height: 12),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 28),
+            Container(height: 1, color: c.border),
+            const SizedBox(height: 24),
+            // Supporting metrics — streak + form
+            const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SkeletonBox(width: 56, height: 10),
+                      SizedBox(height: 14),
+                      SkeletonBox(width: 90, height: 36, radius: 9),
+                    ],
+                  ),
+                ),
+                SizedBox(width: 45),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SkeletonBox(width: 70, height: 10),
+                      SizedBox(height: 14),
+                      SkeletonBox(width: 80, height: 36, radius: 9),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

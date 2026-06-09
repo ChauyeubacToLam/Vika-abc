@@ -1,16 +1,18 @@
-// WeeklySummaryBand — the "vital strip": a raised cream card holding four
-// editorial stats for the week. Each stat is a big italic numeral over a tiny
-// uppercase label, with the old wordy delta sentence ("+1 vs tuần trước")
-// distilled into a single compact trend chip — a caret + the bare delta. Less
-// reading, more glanceable signal.
+// WeeklySummaryBand — the "vital strip": the week distilled into a few
+// editorial figures, set as a leaf of the page's private ledger (see
+// LedgerFrame). Each stat is a big italic numeral seated on a short gold
+// underline (the reserved-yellow "stat" use), over a tracked label, with the
+// old wordy delta sentence distilled into one compact caret chip. Columns are
+// parted by engraved hairlines that fade at their ends like a printed rule.
 //
-// Generic — pass any list of [WeeklyStat] and the strip lays them out, divided
-// by hairlines. Premium Ivory tokens only.
+// Generic — pass any list of [WeeklyStat] and the strip lays them out.
+// Premium Ivory tokens only.
 
 import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
 import '../../theme/vf_theme.dart';
+import 'ledger_frame.dart';
 
 @immutable
 class WeeklyStat {
@@ -49,28 +51,14 @@ class WeeklySummaryBand extends StatelessWidget {
     final c = VikaColors.of(context);
     return Padding(
       padding: padding,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(22, 18, 22, 20),
-        decoration: BoxDecoration(
-          color: c.bgRaised,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: c.border),
-          boxShadow: [
-            BoxShadow(
-              color: c.ink.withValues(alpha: 0.05),
-              blurRadius: 20,
-              offset: const Offset(0, 12),
-            ),
-            BoxShadow(
-              color: c.ink.withValues(alpha: 0.03),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
+      child: LedgerFrame(
+        grainSeed: 53,
+        padding: const EdgeInsets.fromLTRB(24, 18, 24, 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Kicker — spark dot + tracked label + a thin gold rule that
+            // trails off, like a ledger column heading.
             Row(
               children: [
                 Container(
@@ -98,25 +86,67 @@ class WeeklySummaryBand extends StatelessWidget {
                     color: c.inkSoft,
                   ),
                 ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Container(
+                    height: 1.5,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          c.yellow.withValues(alpha: 0.45),
+                          c.yellow.withValues(alpha: 0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 22),
             IntrinsicHeight(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   for (var i = 0; i < stats.length; i++) ...[
                     Expanded(child: _StatColumn(stat: stats[i])),
-                    if (i < stats.length - 1)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2),
-                        child: Container(width: 1, color: c.border),
-                      ),
+                    if (i < stats.length - 1) const _EngravedDivider(),
                   ],
                 ],
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A 1px vertical rule that fades to nothing at both ends — reads as a printed
+/// engraving rather than a hard box border.
+class _EngravedDivider extends StatelessWidget {
+  const _EngravedDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: SizedBox(
+        width: 1,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                c.borderHi.withValues(alpha: 0),
+                c.borderHi,
+                c.borderHi,
+                c.borderHi.withValues(alpha: 0),
+              ],
+              stops: const [0.0, 0.22, 0.78, 1.0],
+            ),
+          ),
         ),
       ),
     );
@@ -137,7 +167,7 @@ class _StatColumn extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // FittedBox scales the italic numeral down on narrow cells so long
-          // values ("24/28", "9h48'") never collide with the hairline.
+          // values ("24/28", "9h48'") never collide with the rule.
           SizedBox(
             height: 34,
             child: FittedBox(
@@ -160,7 +190,24 @@ class _StatColumn extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 11),
+          const SizedBox(height: 9),
+          // Short gold underline — the figure's printed base (reserved-yellow
+          // "underline" use), with a faint bloom.
+          Container(
+            width: 18,
+            height: 2,
+            decoration: BoxDecoration(
+              color: c.yellow,
+              borderRadius: BorderRadius.circular(1),
+              boxShadow: [
+                BoxShadow(
+                  color: c.yellow.withValues(alpha: 0.4),
+                  blurRadius: 5,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
           Text(
             stat.label.toUpperCase(),
             textAlign: TextAlign.center,
@@ -179,7 +226,8 @@ class _StatColumn extends StatelessWidget {
             // Scale down on very narrow cells so the chip never overflows.
             FittedBox(
               fit: BoxFit.scaleDown,
-              child: _TrendChip(label: stat.deltaNote!, positive: stat.deltaPositive),
+              child: _TrendChip(
+                  label: stat.deltaNote!, positive: stat.deltaPositive),
             ),
           ],
         ],

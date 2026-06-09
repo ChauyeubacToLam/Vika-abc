@@ -480,7 +480,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final c = VikaColors.of(sheetContext);
         return _InfoSheet(
           eyebrow: 'VỀ VIKA',
-          title: 'Vika',
+          title: 'VIKA',
           body:
               'Người bạn đồng hành tập luyện thông minh. Cảm ơn bạn đã tin Vika '
               'trên hành trình khoẻ mạnh hơn mỗi ngày.',
@@ -1922,21 +1922,11 @@ class _Closer extends StatelessWidget {
               Expanded(child: Container(height: 1, color: c.border)),
               const SizedBox(width: 14),
               Container(
-                width: 18,
-                height: 18,
+                width: 5,
+                height: 5,
                 decoration: BoxDecoration(
                   color: c.yellow,
-                  borderRadius: BorderRadius.circular(5),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  'V',
-                  style: TextStyle(
-                    fontFamily: 'BeVietnamPro',
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: c.ink,
-                  ),
+                  shape: BoxShape.circle,
                 ),
               ),
               const SizedBox(width: 10),
@@ -2164,9 +2154,10 @@ class _ScrollDownFab extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// CONFIRM DIALOG — Premium Ivory replacement for the stock
-// AlertDialog on destructive account actions. Gradient card +
-// accent medallion + italic display title + stacked actions.
+// CONFIRM DIALOG — Premium Ivory replacement for the stock AlertDialog on
+// account actions. Built as a compact dark "stage hero": warm-dark gradient
+// + ambient accent glow + medallion + italic display title + halo CTA. The
+// accent is brand gold for normal actions, warm amber for destructive ones.
 // ═══════════════════════════════════════════════════════════════
 
 class _ConfirmDialog extends StatelessWidget {
@@ -2189,158 +2180,275 @@ class _ConfirmDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    // Brand gold drives the whole card — gold-tinted surface, gold accent bar,
-    // gold CTA — so the dialog reads as part of the Premium Ivory UI. For a
-    // destructive action the medallion icon shifts to the warm amber alarm
-    // (which harmonises with the gold) to still signal "this is serious".
-    final sheetTint = Color.lerp(c.bgRaised, c.yellow, c.isDark ? 0.10 : 0.07)!;
-    final outline = Color.lerp(c.border, c.yellow, c.isDark ? 0.32 : 0.42)!;
-    final iconInk = destructive ? c.attention : c.ink;
+    // The dialog echoes the app's signature dark "stage hero": warm-dark
+    // gradient, an ambient accent glow, italic display title, and the halo
+    // CTA. Normal actions ride the brand gold; a destructive action swaps the
+    // accent to the warm amber alarm — same composition, clearly graver.
+    final accent = destructive ? c.attention : c.yellow;
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 28),
+        padding: const EdgeInsets.symmetric(horizontal: 30),
         child: Material(
           color: Colors.transparent,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: Container(
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [c.bgRaised, sheetTint],
+            constraints: const BoxConstraints(maxWidth: 380),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(30),
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: const Alignment(-0.7, -1),
+                    end: const Alignment(0.7, 1),
+                    colors: [c.bgInverse, c.bgInverseHi],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: accent.withValues(alpha: 0.22),
+                      blurRadius: 44,
+                      offset: const Offset(0, 18),
+                    ),
+                    BoxShadow(
+                      color: c.ink.withValues(alpha: 0.5),
+                      blurRadius: 54,
+                      offset: const Offset(0, 28),
+                    ),
+                  ],
                 ),
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(color: outline),
-                boxShadow: [
-                  BoxShadow(
-                    color: c.yellow.withValues(alpha: c.isDark ? 0.18 : 0.22),
-                    blurRadius: 34,
-                    offset: const Offset(0, 16),
-                  ),
-                  BoxShadow(
-                    color: c.ink.withValues(alpha: c.isDark ? 0.42 : 0.16),
-                    blurRadius: 48,
-                    offset: const Offset(0, 26),
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 26, 24, 20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                child: Stack(
                   children: [
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: c.yellow.withValues(
-                            alpha: c.isDark ? 0.20 : 0.16,
-                          ),
-                          borderRadius: BorderRadius.circular(17),
-                          border: Border.all(
-                            color: c.yellow.withValues(alpha: 0.42),
-                          ),
-                        ),
-                        child: Icon(icon, size: 24, color: iconInk),
+                    // Ambient accent glow, top-right shoulder.
+                    Positioned(
+                      top: -80,
+                      right: -70,
+                      child: IgnorePointer(
+                        child: _DialogGlow(color: accent, opacity: 0.24),
                       ),
                     ),
-                    const SizedBox(height: 18),
-                    Row(
-                      children: [
-                        Container(
-                          width: 5,
-                          height: 16,
-                          decoration: BoxDecoration(
-                            color: c.yellow,
-                            borderRadius: BorderRadius.circular(2),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(26, 28, 26, 22),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Accent medallion with a soft glow.
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Container(
+                              width: 54,
+                              height: 54,
+                              decoration: BoxDecoration(
+                                color: accent.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(
+                                  color: accent.withValues(alpha: 0.5),
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: accent.withValues(alpha: 0.32),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                ],
+                              ),
+                              child: Icon(icon, size: 25, color: accent),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 9),
-                        Text(
-                          eyebrow,
-                          style: TextStyle(
-                            fontFamily: 'BeVietnamPro',
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.6,
-                            color: c.inkSoft,
+                          const SizedBox(height: 20),
+                          // Eyebrow with accent tick.
+                          Row(
+                            children: [
+                              Container(
+                                width: 5,
+                                height: 16,
+                                decoration: BoxDecoration(
+                                  color: accent,
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                              const SizedBox(width: 9),
+                              Text(
+                                eyebrow,
+                                style: TextStyle(
+                                  fontFamily: 'BeVietnamPro',
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1.8,
+                                  color: c.invInkSoft,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontFamily: 'BeVietnamPro',
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        fontStyle: FontStyle.italic,
-                        letterSpacing: -0.7,
-                        color: c.ink,
-                        height: 1.05,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      body,
-                      style: TextStyle(
-                        fontFamily: 'BeVietnamPro',
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w500,
-                        height: 1.5,
-                        color: c.inkSoft,
-                      ),
-                    ),
-                    const SizedBox(height: 22),
-                    SizedBox(
-                      height: 52,
-                      child: FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: c.yellow,
-                          foregroundColor: c.yellowInk,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                          const SizedBox(height: 12),
+                          Text(
+                            title,
+                            style: TextStyle(
+                              fontFamily: 'BeVietnamPro',
+                              fontSize: 26,
+                              fontWeight: FontWeight.w800,
+                              fontStyle: FontStyle.italic,
+                              letterSpacing: -0.8,
+                              color: c.invInk,
+                              height: 1.02,
+                            ),
                           ),
-                          textStyle: const TextStyle(
-                            fontFamily: 'BeVietnamPro',
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
+                          const SizedBox(height: 11),
+                          Text(
+                            body,
+                            style: TextStyle(
+                              fontFamily: 'BeVietnamPro',
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w500,
+                              height: 1.55,
+                              color: c.invInkSoft,
+                            ),
                           ),
-                        ),
-                        onPressed: () => Navigator.of(context).pop(true),
-                        child: Text(confirmLabel),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    SizedBox(
-                      height: 46,
-                      child: TextButton(
-                        style: TextButton.styleFrom(
-                          foregroundColor: c.inkSoft,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                          const SizedBox(height: 24),
+                          _DialogConfirmButton(
+                            label: confirmLabel,
+                            accent: accent,
+                            onTap: () => Navigator.of(context).pop(true),
                           ),
-                          textStyle: const TextStyle(
-                            fontFamily: 'BeVietnamPro',
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w800,
+                          const SizedBox(height: 6),
+                          SizedBox(
+                            height: 46,
+                            child: TextButton(
+                              style: TextButton.styleFrom(
+                                foregroundColor: c.invInkSoft,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                textStyle: const TextStyle(
+                                  fontFamily: 'BeVietnamPro',
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              onPressed: () => Navigator.of(context).pop(false),
+                              child: const Text('Ở lại'),
+                            ),
                           ),
-                        ),
-                        onPressed: () => Navigator.of(context).pop(false),
-                        child: const Text('Ở lại'),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Soft radial accent glow painted behind the confirm-dialog content.
+class _DialogGlow extends StatelessWidget {
+  const _DialogGlow({required this.color, required this.opacity});
+
+  final Color color;
+  final double opacity;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 240,
+      height: 240,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: RadialGradient(
+            colors: [
+              color.withValues(alpha: opacity),
+              color.withValues(alpha: 0),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Halo CTA pill with a press-scale and an arrow knob — mirrors the home
+/// hero's start button so the confirm action feels first-class.
+class _DialogConfirmButton extends StatefulWidget {
+  const _DialogConfirmButton({
+    required this.label,
+    required this.accent,
+    required this.onTap,
+  });
+
+  final String label;
+  final Color accent;
+  final VoidCallback onTap;
+
+  @override
+  State<_DialogConfirmButton> createState() => _DialogConfirmButtonState();
+}
+
+class _DialogConfirmButtonState extends State<_DialogConfirmButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    return GestureDetector(
+      onTap: widget.onTap,
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedScale(
+        scale: _pressed ? 0.98 : 1.0,
+        duration: const Duration(milliseconds: 140),
+        curve: Curves.easeOut,
+        child: Container(
+          height: 54,
+          padding: const EdgeInsets.fromLTRB(22, 0, 6, 0),
+          decoration: BoxDecoration(
+            color: widget.accent,
+            borderRadius: BorderRadius.circular(999),
+            boxShadow: [
+              BoxShadow(
+                color: widget.accent.withValues(alpha: 0.36),
+                blurRadius: 32,
+                offset: const Offset(0, 12),
+              ),
+              BoxShadow(
+                color: widget.accent.withValues(alpha: 0.18),
+                blurRadius: 60,
+                offset: const Offset(0, 26),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  widget.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'BeVietnamPro',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                    color: c.yellowInk,
+                  ),
+                ),
+              ),
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: c.ink,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 18,
+                  color: widget.accent,
+                ),
+              ),
+            ],
           ),
         ),
       ),

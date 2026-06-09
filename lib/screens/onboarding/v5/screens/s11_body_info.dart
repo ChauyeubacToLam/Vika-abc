@@ -254,25 +254,29 @@ class _S11BodyInfoState extends State<S11BodyInfo>
                 style: V5.eyebrow(context, color: V5.inkSoft),
               ),
               SizedBox(height: veryCompact ? V5.space6 : V5.space8),
-              // Cap each chip to the line width so the long 'Không muốn trả
-              // lời' option can't overflow on the narrowest screens; the four
-              // still reflow (it drops to its own run).
-              LayoutBuilder(
-                builder: (context, constraints) => Wrap(
-                  spacing: V5.space10,
-                  runSpacing: V5.space8,
-                  children: [
-                    _genderChip('male', 'Nam', Icons.male_rounded,
-                        constraints.maxWidth),
-                    _genderChip('female', 'Nữ', Icons.female_rounded,
-                        constraints.maxWidth),
-                    _genderChip('other', 'Khác', Icons.transgender_rounded,
-                        constraints.maxWidth),
-                    _genderChip('prefer_not_to_say', 'Không muốn trả lời', null,
-                        constraints.maxWidth),
-                  ],
-                ),
+              // One compact row of the three identities, then a single quiet
+              // opt-out line — far shorter and calmer than stacked tiles, so
+              // the whole screen fits without scrolling.
+              Row(
+                children: [
+                  Expanded(
+                    child: _genderChip(
+                        'male', 'Nam', Icons.male_rounded, veryCompact),
+                  ),
+                  const SizedBox(width: V5.space8),
+                  Expanded(
+                    child: _genderChip(
+                        'female', 'Nữ', Icons.female_rounded, veryCompact),
+                  ),
+                  const SizedBox(width: V5.space8),
+                  Expanded(
+                    child: _genderChip('other', 'Khác',
+                        Icons.transgender_rounded, veryCompact),
+                  ),
+                ],
               ),
+              SizedBox(height: veryCompact ? V5.space6 : V5.space8),
+              _genderDeclineLink('prefer_not_to_say', 'Không muốn trả lời'),
             ],
           ),
         ),
@@ -280,42 +284,57 @@ class _S11BodyInfoState extends State<S11BodyInfo>
     );
   }
 
-  // Sizes to content so the four options reflow inside the Wrap; the wide
-  // 'Không muốn trả lời' chip drops to its own run on narrow screens.
-  // [maxWidth] is the Wrap's line width — capping the chip to it (and letting
-  // the label shrink) keeps the long option from overflowing on small phones.
-  Widget _genderChip(String id, String label, IconData? icon, double maxWidth) {
+  // One compact identity chip: a horizontal icon + label that fills its
+  // column. The three sit in a single even row.
+  Widget _genderChip(String id, String label, IconData icon, bool compact) {
     final selected = widget.data.gender == id;
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxWidth: maxWidth),
-      child: V5Card(
-        onTap: () => setState(() => widget.data.gender = id),
-        selected: selected,
-        tint: selected ? V5CardTint.ink : V5CardTint.cream,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        borderRadius: V5.radiusMd,
+    return V5Card(
+      onTap: () => setState(() => widget.data.gender = id),
+      selected: selected,
+      tint: selected ? V5CardTint.ink : V5CardTint.cream,
+      padding: EdgeInsets.symmetric(
+          horizontal: 10, vertical: compact ? 11 : 13),
+      borderRadius: V5.radiusMd,
+      child: Row(
+        mainAxisSize: MainAxisSize.max,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 17, color: selected ? V5.yellow : V5.inkSoft),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: V5.titleSm(context, color: selected ? V5.invInk : V5.ink),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // The "prefer not to say" option — a single low-emphasis opt-out line under
+  // the three chips, using the shared check indicator. Minimal height, no
+  // second card row.
+  Widget _genderDeclineLink(String id, String label) {
+    final selected = widget.data.gender == id;
+    return GestureDetector(
+      onTap: () => setState(() => widget.data.gender = id),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
         child: Row(
           mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (icon != null) ...[
-              Icon(
-                icon,
-                size: 18,
-                color: selected ? V5.yellow : V5.inkSoft,
-              ),
-              const SizedBox(width: 8),
-            ],
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: V5.titleSm(
-                  context,
-                  color: selected ? V5.invInk : V5.ink,
-                ),
-              ),
+            V5CheckCircle(selected: selected, size: 18),
+            const SizedBox(width: 10),
+            Text(
+              label,
+              style: V5.bodySm(
+                context,
+                color: selected ? V5.ink : V5.inkSoft,
+              ).copyWith(fontWeight: FontWeight.w600),
             ),
           ],
         ),

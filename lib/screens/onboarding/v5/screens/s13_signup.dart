@@ -323,12 +323,7 @@ class _S13SignupState extends State<S13Signup> {
           ),
           const SizedBox(height: V5.space8),
           if (_notice != null)
-            _NoticeBanner(message: _notice!)
-          else
-            _SkipSignupButton(
-              enabled: !_busy,
-              onTap: widget.onNext,
-            ),
+            _NoticeBanner(message: _notice!),
         ],
       ),
     );
@@ -540,54 +535,6 @@ class _NoticeBanner extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _SkipSignupButton extends StatelessWidget {
-  const _SkipSignupButton({
-    required this.enabled,
-    required this.onTap,
-  });
-
-  final bool enabled;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final dense = MediaQuery.sizeOf(context).height < 640;
-    return GestureDetector(
-      onTap: enabled ? onTap : null,
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 180),
-        opacity: enabled ? 1 : 0.45,
-        child: Container(
-          width: double.infinity,
-          padding: EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: dense ? 10 : 13,
-          ),
-          decoration: BoxDecoration(
-            color: V5.ink.withValues(alpha: 0.04),
-            borderRadius: BorderRadius.circular(V5.radiusFull),
-            border: Border.all(color: V5.borderHi),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            'Để sau, xem lộ trình',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: V5.text(
-              context,
-              size: 13,
-              weight: FontWeight.w700,
-              color: V5.inkSoft,
-              letterSpacing: -0.1,
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -815,15 +762,18 @@ class _ProviderRail extends StatelessWidget {
     final dense = MediaQuery.sizeOf(context).height < 640;
     return SizedBox(
       height: dense ? 58 : 68,
+      // Uniform light tiles with the authentic brand logos — matches the
+      // standalone LoginScreen rail so the two sign-in surfaces read identically.
       child: Row(
         children: [
           Expanded(
             child: _ProviderTile(
               label: 'Apple',
-              background: Colors.black,
-              foreground: Colors.white,
+              background: V5.surface,
+              foreground: V5.ink,
               icon: const V5AppleMark(size: 18),
               onTap: busy ? null : onApple,
+              border: V5.borderHi,
             ),
           ),
           const SizedBox(width: V5.space8),
@@ -841,10 +791,11 @@ class _ProviderRail extends StatelessWidget {
           Expanded(
             child: _ProviderTile(
               label: 'Facebook',
-              background: const Color(0xFF1877F2),
-              foreground: Colors.white,
-              icon: const V5FacebookMark(size: 17),
+              background: V5.surface,
+              foreground: V5.ink,
+              icon: const V5FacebookMark(size: 18),
               onTap: busy ? null : onFacebook,
+              border: V5.borderHi,
             ),
           ),
         ],
