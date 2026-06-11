@@ -355,13 +355,13 @@ class _StickyPillBar extends StatelessWidget {
                   child: Row(
                     children: [
                       const SizedBox(width: 8),
-                      // Brand mark — italic V medallion so the bar is
+                      // Brand mark — VIKA logo medallion so the bar is
                       // never anonymous.
                       Container(
                         width: 34,
                         height: 34,
+                        clipBehavior: Clip.antiAlias,
                         decoration: BoxDecoration(
-                          color: c.yellow,
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
@@ -371,18 +371,9 @@ class _StickyPillBar extends StatelessWidget {
                             ),
                           ],
                         ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          'V',
-                          style: TextStyle(
-                            fontFamily: 'BeVietnamPro',
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            fontStyle: FontStyle.italic,
-                            letterSpacing: -1,
-                            color: c.yellowInk,
-                            height: 1,
-                          ),
+                        child: Image.asset(
+                          'assets/branding/Logo.jpeg',
+                          fit: BoxFit.cover,
                         ),
                       ),
                       const SizedBox(width: 12),

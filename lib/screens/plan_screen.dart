@@ -37,9 +37,11 @@ import '../services/workout_launch_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/responsive.dart';
 import '../utils/orientation_lock.dart';
+import '../widgets/ivory/skeleton.dart';
 import '../widgets/plan/editorial_closer.dart';
 import '../widgets/plan/program/program_session_ledger.dart';
 import '../widgets/plan/program/program_stage_hero.dart';
+import '../widgets/plan/wordmark_header.dart';
 import 'exercise/exercise_launch_args.dart';
 
 class PlanScreen extends StatefulWidget {
@@ -243,13 +245,10 @@ class _PlanScreenState extends State<PlanScreen> {
 
     final program = _program;
 
-    // Loading: snapshot/catalog fetch in flight.
+    // Loading: snapshot/catalog fetch in flight — shimmer a stand-in plan
+    // (hero + ledger) instead of a bare spinner.
     if (program == null) {
-      return Container(
-        color: c.bg,
-        alignment: Alignment.center,
-        child: CircularProgressIndicator(color: c.yellow, strokeWidth: 2.4),
-      );
+      return _PlanSkeleton(bottomPadding: widget.bottomPadding);
     }
 
     // No active plan (e.g. onboarding not finished). Graceful, never crashes
@@ -311,6 +310,203 @@ class _PlanScreenState extends State<PlanScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LOADING SKELETON — mirrors the program hero + session ledger so the
+// swap to the real plan lands without a layout jump.
+// ═══════════════════════════════════════════════════════════════
+
+class _PlanSkeleton extends StatelessWidget {
+  const _PlanSkeleton({required this.bottomPadding});
+
+  final double bottomPadding;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    final topInset = MediaQuery.viewPaddingOf(context).top;
+    return Container(
+      color: c.bg,
+      child: MediaQuery.removePadding(
+        context: context,
+        removeTop: true,
+        child: SingleChildScrollView(
+          physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.only(bottom: bottomPadding),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Dark stage hero
+              ClipRRect(
+                borderRadius:
+                    const BorderRadius.vertical(bottom: Radius.circular(36)),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: const Alignment(-0.7, -1),
+                      end: const Alignment(0.7, 1),
+                      colors: [c.bgInverse, c.bgInverseHi],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: c.ink.withValues(alpha: 0.22),
+                        blurRadius: 48,
+                        offset: const Offset(0, 14),
+                      ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.only(top: topInset),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: const [
+                        WordmarkHeader(
+                          inverted: true,
+                          userInitial: 'N',
+                          trailingIcon: Icons.menu_book_rounded,
+                          trailingTooltip: 'Sổ tập',
+                        ),
+                        SizedBox(height: 22),
+                        Padding(
+                          padding: EdgeInsets.fromLTRB(24, 0, 24, 28),
+                          child: Shimmer(
+                            inverted: true,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Eyebrow
+                                SkeletonBox(
+                                    width: 130, height: 12, inverted: true),
+                                SizedBox(height: 20),
+                                // Headline — two lines
+                                SkeletonBox(
+                                    width: 240,
+                                    height: 38,
+                                    radius: 9,
+                                    inverted: true),
+                                SizedBox(height: 11),
+                                SkeletonBox(
+                                    width: 170,
+                                    height: 38,
+                                    radius: 9,
+                                    inverted: true),
+                                SizedBox(height: 24),
+                                // Completion bezel — block selector chips
+                                Row(
+                                  children: [
+                                    Expanded(
+                                        child: SkeletonBox(
+                                            height: 56,
+                                            radius: 16,
+                                            inverted: true)),
+                                    SizedBox(width: 8),
+                                    Expanded(
+                                        child: SkeletonBox(
+                                            height: 56,
+                                            radius: 16,
+                                            inverted: true)),
+                                    SizedBox(width: 8),
+                                    Expanded(
+                                        child: SkeletonBox(
+                                            height: 56,
+                                            radius: 16,
+                                            inverted: true)),
+                                    SizedBox(width: 8),
+                                    Expanded(
+                                        child: SkeletonBox(
+                                            height: 56,
+                                            radius: 16,
+                                            inverted: true)),
+                                  ],
+                                ),
+                                SizedBox(height: 22),
+                                // Stat row
+                                Row(
+                                  children: [
+                                    SkeletonBox(
+                                        width: 78, height: 12, inverted: true),
+                                    SizedBox(width: 14),
+                                    SkeletonBox(
+                                        width: 58, height: 12, inverted: true),
+                                    SizedBox(width: 14),
+                                    SkeletonBox(
+                                        width: 68, height: 12, inverted: true),
+                                  ],
+                                ),
+                                SizedBox(height: 20),
+                                // CTA pill
+                                SkeletonBox(
+                                    height: 54, radius: 999, inverted: true),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 34),
+              // Session ledger
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: Shimmer(
+                  child: Column(
+                    children: [
+                      _LedgerRowSkeleton(),
+                      SizedBox(height: 12),
+                      _LedgerRowSkeleton(),
+                      SizedBox(height: 12),
+                      _LedgerRowSkeleton(),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A single session-ledger row stand-in: index medallion + title/meta + a
+/// trailing chevron block.
+class _LedgerRowSkeleton extends StatelessWidget {
+  const _LedgerRowSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      decoration: BoxDecoration(
+        color: c.bgRaised,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: c.border),
+      ),
+      child: const Row(
+        children: [
+          SkeletonCircle(size: 38),
+          SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SkeletonBox(width: 150, height: 13),
+                SizedBox(height: 9),
+                SkeletonBox(width: 90, height: 11),
+              ],
+            ),
+          ),
+          SizedBox(width: 12),
+          SkeletonBox(width: 18, height: 18, radius: 5),
+        ],
       ),
     );
   }

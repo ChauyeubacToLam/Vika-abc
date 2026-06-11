@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 
 import '../../theme/app_colors.dart';
 import '../../theme/vf_theme.dart';
+import '../../utils/bmi.dart';
 
 class BodyCard extends StatelessWidget {
   const BodyCard({
@@ -210,6 +211,18 @@ class BodyCard extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          // Encouraging footnote — BMI can't tell muscle from fat. Not an alert.
+          Text(
+            bmiCaveat,
+            style: TextStyle(
+              fontFamily: 'BeVietnamPro',
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              height: 1.3,
+              color: c.inkFaint,
             ),
           ),
         ],

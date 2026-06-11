@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../utils/bmi.dart' as bmi;
 import 'session_persistence.dart';
 
 class AppUserProfile {
@@ -10,7 +11,7 @@ class AppUserProfile {
     required this.id,
     required this.displayName,
     required this.initial,
-    required this.streakDays,
+    required this.streakWeeks,
     this.email,
     this.avatarUrl,
     this.createdAt,
@@ -18,6 +19,7 @@ class AppUserProfile {
     this.heightCm,
     this.weightKg,
     this.age,
+    this.gender,
     this.fitnessLevel,
     this.goal,
   });
@@ -27,12 +29,20 @@ class AppUserProfile {
   final String initial;
   final String? email;
   final String? avatarUrl;
-  final int streakDays;
+  /// Consecutive active weeks (see [SessionPersistence.currentStreak]); shown
+  /// as a duration via [streakTierLabel], never as a raw count.
+  final int streakWeeks;
   final DateTime? createdAt;
   final DateTime? lastWorkoutAt;
   final int? heightCm;
   final int? weightKg;
   final int? age;
+
+  /// Raw `profiles.gender`: 'male' / 'female' / 'other' / 'prefer_not_to_say',
+  /// or null when never set. The pain-map silhouette renders female only for
+  /// 'female'; everything else (incl. 'other' / 'prefer_not_to_say') uses the
+  /// male body map — see [BodyPainReporter] in progress_screen.dart.
+  final String? gender;
   final String? fitnessLevel;
   final String? goal;
 
@@ -59,12 +69,10 @@ class AppUserProfile {
   }
 
   String get bmiCategory {
-    final bmi = bmiValue;
-    if (bmi == null) return 'Chưa đủ dữ liệu';
-    if (bmi < 18.5) return 'Hơi nhẹ';
-    if (bmi < 23) return 'Cân đối';
-    if (bmi < 25) return 'Hơi cao';
-    return 'Cần theo dõi';
+    final value = bmiValue;
+    if (value == null) return 'Chưa đủ dữ liệu';
+    // Shared with onboarding via the bmi helper so the bands can't drift.
+    return bmi.bmiCategory(value).label;
   }
 
   AppUserProfile copyWith({
@@ -72,12 +80,13 @@ class AppUserProfile {
     String? initial,
     String? email,
     String? avatarUrl,
-    int? streakDays,
+    int? streakWeeks,
     DateTime? createdAt,
     DateTime? lastWorkoutAt,
     int? heightCm,
     int? weightKg,
     int? age,
+    String? gender,
     String? fitnessLevel,
     String? goal,
   }) {
@@ -87,12 +96,13 @@ class AppUserProfile {
       initial: initial ?? this.initial,
       email: email ?? this.email,
       avatarUrl: avatarUrl ?? this.avatarUrl,
-      streakDays: streakDays ?? this.streakDays,
+      streakWeeks: streakWeeks ?? this.streakWeeks,
       createdAt: createdAt ?? this.createdAt,
       lastWorkoutAt: lastWorkoutAt ?? this.lastWorkoutAt,
       heightCm: heightCm ?? this.heightCm,
       weightKg: weightKg ?? this.weightKg,
       age: age ?? this.age,
+      gender: gender ?? this.gender,
       fitnessLevel: fitnessLevel ?? this.fitnessLevel,
       goal: goal ?? this.goal,
     );
@@ -128,7 +138,8 @@ class UserProfileService {
           .from('profiles')
           .select(
             'id, display_name, avatar_url, created_at, updated_at, '
-            'last_workout_at, height_cm, weight_kg, age, fitness_level, goals',
+            'last_workout_at, height_cm, weight_kg, age, gender, '
+            'fitness_level, goals',
           )
           .eq('id', user.id)
           .maybeSingle();
@@ -140,7 +151,7 @@ class UserProfileService {
         _firstString([row?['display_name'], oauthName]) ?? 'Bạn';
     final avatarUrl = _firstString([row?['avatar_url'], oauthAvatar]);
     final goalsList = (row?['goals'] as List?)?.cast<String>();
-    final streakDays =
+    final streakWeeks =
         await SessionPersistence(client: _client).currentStreak();
     final profile = AppUserProfile(
       id: user.id,
@@ -148,13 +159,14 @@ class UserProfileService {
       initial: _initialFor(displayName),
       email: user.email,
       avatarUrl: avatarUrl,
-      streakDays: streakDays,
+      streakWeeks: streakWeeks,
       createdAt: _dateTimeOrNull(row?['created_at']) ??
           _dateTimeOrNull(user.createdAt),
       lastWorkoutAt: _dateTimeOrNull(row?['last_workout_at']),
       heightCm: (row?['height_cm'] as num?)?.round(),
       weightKg: (row?['weight_kg'] as num?)?.round(),
       age: (row?['age'] as num?)?.toInt(),
+      gender: row?['gender'] as String?,
       fitnessLevel: row?['fitness_level'] as String?,
       goal: (goalsList != null && goalsList.isNotEmpty) ? goalsList.first : null,
     );
@@ -168,14 +180,16 @@ class UserProfileService {
     return profile;
   }
 
-  /// Saves display name + avatar, and optionally requests an auth email
-  /// change. [email] should be non-null only when it actually differs from
-  /// the current address; Supabase then sends a confirmation link and the
-  /// new address only takes effect once the user confirms it.
+  /// Saves display name + avatar + [gender], and optionally requests an auth
+  /// email change. [email] should be non-null only when it actually differs
+  /// from the current address; Supabase then sends a confirmation link and the
+  /// new address only takes effect once the user confirms it. [gender] is
+  /// upserted only when set (one of 'male'/'female'/'other'/'prefer_not_to_say').
   Future<AppUserProfile?> saveCurrentProfile({
     required String displayName,
     File? avatarFile,
     String? email,
+    String? gender,
   }) async {
     final user = _client.auth.currentUser;
     if (user == null) return null;
@@ -192,6 +206,7 @@ class UserProfileService {
       'display_name': cleanName,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
       if (avatarUrl != null) 'avatar_url': avatarUrl,
+      if (gender != null) 'gender': gender,
     };
 
     await _client.from('profiles').upsert(payload, onConflict: 'id');
@@ -217,6 +232,7 @@ class UserProfileService {
     int? heightCm,
     int? weightKg,
     int? age,
+    String? gender,
     String? goal,
   }) async {
     final user = _client.auth.currentUser;
@@ -228,6 +244,7 @@ class UserProfileService {
       if (heightCm != null) 'height_cm': heightCm,
       if (weightKg != null) 'weight_kg': weightKg,
       if (age != null) 'age': age,
+      if (gender != null) 'gender': gender,
       if (goal != null) 'goals': [goal],
     };
 

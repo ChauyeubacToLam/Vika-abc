@@ -375,7 +375,7 @@ class _Headline extends StatelessWidget {
         ),
         Text(
           line2,
-          style: beVietnamPro(
+          style: frauncesItalic(
             size: r.sp(46),
             weight: FontWeight.w800,
             letterSpacing: -2.6,

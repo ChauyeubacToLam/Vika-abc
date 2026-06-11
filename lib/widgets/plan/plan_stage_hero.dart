@@ -735,6 +735,7 @@ class _Headline extends StatelessWidget {
             fontFamily: 'BeVietnamPro',
             fontSize: 48,
             fontWeight: FontWeight.w800,
+            fontStyle: FontStyle.italic,
             letterSpacing: -2.8,
             height: 0.92,
             color: c.invInk,

@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 
 import '../../theme/app_colors.dart';
 import '../../theme/vf_theme.dart';
+import '../../utils/bmi.dart' as bmi;
 import 'edit_sheet_chrome.dart';
 import 'ruler_picker.dart';
 
@@ -155,11 +156,18 @@ class _BmiZone {
   final Color color;
 }
 
-_BmiZone _zoneFor(double bmi, VikaColors c) {
-  if (bmi < 18.5) return _BmiZone('Hơi gầy', c.bmiLow);
-  if (bmi < 23) return _BmiZone('Cân đối', c.bmiGood);
-  if (bmi < 25) return _BmiZone('Hơi tròn', c.bmiWarn);
-  return _BmiZone('Cần chú ý', c.bmiHigh);
+// Label + band come from the shared [bmi.bmiCategory] helper so the editor,
+// onboarding, and Profile card can't drift; only the Ivory color mapping is
+// local.
+_BmiZone _zoneFor(double bmiValue, VikaColors c) {
+  final band = bmi.bmiCategory(bmiValue);
+  final color = switch (band.zone) {
+    bmi.BmiZone.low => c.bmiLow,
+    bmi.BmiZone.good => c.bmiGood,
+    bmi.BmiZone.warn => c.bmiWarn,
+    bmi.BmiZone.high => c.bmiHigh,
+  };
+  return _BmiZone(band.label, color);
 }
 
 // ─── Live BMI hero (dark) ────────────────────────────────────────────────

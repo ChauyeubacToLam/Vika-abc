@@ -6,6 +6,7 @@ import 'package:vika/services/session_persistence.dart';
 //   now          = 2026-06-10 12:00
 //   current      = [2026-06-03 12:00, 2026-06-10 12:00]
 //   prior        = [2026-05-27 12:00, 2026-06-03 12:00)
+// A delta only reveals once the prior window holds >= 3 sessions.
 ({DateTime completedAt, int formScore}) sample(DateTime at, int score) =>
     (completedAt: at, formScore: score);
 
@@ -49,9 +50,10 @@ void main() {
     expect(r.week, [70, 80]);
   });
 
-  test('three current, two prior -> percent + positive delta + week', () {
+  test('three current, three prior -> percent + positive delta + week', () {
     final r = SessionPersistence.deriveHomeFormSummaryForTest(
       [
+        sample(DateTime(2026, 5, 28, 9), 80),
         sample(DateTime(2026, 5, 29, 9), 60),
         sample(DateTime(2026, 5, 31, 9), 70),
         sample(DateTime(2026, 6, 4, 9), 70),
@@ -62,7 +64,7 @@ void main() {
     );
 
     expect(r.percent, 80); // mean(70, 80, 90)
-    expect(r.delta, 15); // 80 - mean(60, 70) = 80 - 65
+    expect(r.delta, 10); // 80 - mean(80, 60, 70) = 80 - 70
     expect(r.week, [70, 80, 90]);
   });
 
@@ -70,7 +72,8 @@ void main() {
     final r = SessionPersistence.deriveHomeFormSummaryForTest(
       [
         sample(DateTime(2026, 5, 28, 9), 80),
-        sample(DateTime(2026, 5, 30, 9), 90),
+        sample(DateTime(2026, 5, 29, 9), 90),
+        sample(DateTime(2026, 5, 30, 9), 100),
         sample(DateTime(2026, 6, 8, 9), 50),
         sample(DateTime(2026, 6, 9, 9), 60),
       ],
@@ -78,7 +81,21 @@ void main() {
     );
 
     expect(r.percent, 55);
-    expect(r.delta, -30); // 55 - mean(80, 90) = 55 - 85
+    expect(r.delta, -35); // 55 - mean(80, 90, 100) = 55 - 90
+  });
+
+  test('prior with two sessions is not enough -> delta null', () {
+    final r = SessionPersistence.deriveHomeFormSummaryForTest(
+      [
+        sample(DateTime(2026, 5, 29, 9), 60),
+        sample(DateTime(2026, 5, 31, 9), 70),
+        sample(DateTime(2026, 6, 9, 9), 80),
+      ],
+      now: now,
+    );
+
+    expect(r.percent, 80);
+    expect(r.delta, isNull);
   });
 
   test('prior with a single session is not a baseline -> delta null', () {
@@ -97,6 +114,7 @@ void main() {
   test('genuine zero delta is rendered, not collapsed to null', () {
     final r = SessionPersistence.deriveHomeFormSummaryForTest(
       [
+        sample(DateTime(2026, 5, 28, 9), 80),
         sample(DateTime(2026, 5, 29, 9), 80),
         sample(DateTime(2026, 5, 31, 9), 80),
         sample(DateTime(2026, 6, 8, 9), 80),
@@ -140,6 +158,7 @@ void main() {
       [
         sample(DateTime(2026, 6, 3, 12), 100), // exactly now-7d -> current
         sample(DateTime(2026, 6, 3, 11), 50), // just before -> prior
+        sample(DateTime(2026, 5, 30, 9), 30), // mid prior window -> prior
         sample(DateTime(2026, 5, 27, 12), 40), // exactly now-14d -> prior
         sample(DateTime(2026, 5, 27, 11), 999), // before window -> excluded
       ],
@@ -148,6 +167,6 @@ void main() {
 
     expect(r.week, [100]);
     expect(r.percent, 100);
-    expect(r.delta, 55); // 100 - mean(50, 40) = 100 - 45
+    expect(r.delta, 60); // 100 - mean(50, 30, 40) = 100 - 40
   });
 }

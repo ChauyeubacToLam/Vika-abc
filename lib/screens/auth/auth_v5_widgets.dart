@@ -24,15 +24,20 @@ class AuthProviderRail extends StatelessWidget {
     final dense = MediaQuery.sizeOf(context).height < 640;
     return SizedBox(
       height: dense ? 58 : 68,
+      // Uniform light tiles — the authentic brand logos (colourful Google G,
+      // blue Facebook f, ink Apple) are drawn for a light surface, and the even
+      // rail reads cleaner and more premium than three differently-coloured
+      // buttons.
       child: Row(
         children: [
           Expanded(
             child: _AuthProviderTile(
               label: 'Apple',
-              background: Colors.black,
-              foreground: Colors.white,
+              background: V5.surface,
+              foreground: V5.ink,
               icon: const V5AppleMark(size: 18),
               onTap: busy ? null : onApple,
+              border: V5.borderHi,
             ),
           ),
           const SizedBox(width: V5.space8),
@@ -50,10 +55,11 @@ class AuthProviderRail extends StatelessWidget {
           Expanded(
             child: _AuthProviderTile(
               label: 'Facebook',
-              background: const Color(0xFF1877F2),
-              foreground: Colors.white,
-              icon: const V5FacebookMark(size: 17),
+              background: V5.surface,
+              foreground: V5.ink,
+              icon: const V5FacebookMark(size: 18),
               onTap: busy ? null : onFacebook,
+              border: V5.borderHi,
             ),
           ),
         ],

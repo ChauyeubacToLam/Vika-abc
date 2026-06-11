@@ -12,7 +12,7 @@ void main() {
         _report(name: 'Squat', formScore: 72, totalReps: 10),
       ],
       sessionRawFormScore: 84,
-      streakDays: 0,
+      streakWeeks: 0,
       priorSessionForms: const [68, 76, 80],
       priorExerciseForms: const {},
     );
@@ -30,7 +30,7 @@ void main() {
         _report(name: 'Squat', formScore: 90, totalReps: 10),
       ],
       sessionRawFormScore: 74,
-      streakDays: 0,
+      streakWeeks: 0,
       priorSessionForms: const [70],
       priorExerciseForms: const {
         'squat': [75, 82],
@@ -57,7 +57,7 @@ void main() {
         ),
       ],
       sessionRawFormScore: 75,
-      streakDays: 0,
+      streakWeeks: 0,
       priorSessionForms: const [100],
       priorExerciseForms: const {
         'mcgill_curlup': [68],
@@ -75,7 +75,7 @@ void main() {
         _report(name: 'Squat', formScore: 50, totalReps: 10),
       ],
       sessionRawFormScore: 78,
-      streakDays: 0,
+      streakWeeks: 0,
       priorSessionForms: const [95, 70, 72, 73, 74, 75],
       priorExerciseForms: const {},
     );
@@ -87,44 +87,28 @@ void main() {
     expect(trophy.exerciseName, isNull);
   });
 
-  test('streak milestone fires exactly at 7 but not at 5 or 6', () {
-    final milestone = SessionTrophyPicker.pick(
-      reports: [
-        _report(name: 'Squat', formScore: 40, totalReps: 10),
-      ],
-      sessionRawFormScore: 40,
-      streakDays: 7,
-      priorSessionForms: const [],
-      priorExerciseForms: const {},
-    );
+  test('streak milestone fires at a tier week (4) but not between (3 or 5)', () {
+    Trophy pickAt(int weeks) => SessionTrophyPicker.pick(
+          reports: [
+            _report(name: 'Squat', formScore: 40, totalReps: 10),
+          ],
+          sessionRawFormScore: 40,
+          streakWeeks: weeks,
+          priorSessionForms: const [],
+          priorExerciseForms: const {},
+        );
 
-    final fiveDays = SessionTrophyPicker.pick(
-      reports: [
-        _report(name: 'Squat', formScore: 40, totalReps: 10),
-      ],
-      sessionRawFormScore: 40,
-      streakDays: 5,
-      priorSessionForms: const [],
-      priorExerciseForms: const {},
-    );
-
-    final sixDays = SessionTrophyPicker.pick(
-      reports: [
-        _report(name: 'Squat', formScore: 40, totalReps: 10),
-      ],
-      sessionRawFormScore: 40,
-      streakDays: 6,
-      priorSessionForms: const [],
-      priorExerciseForms: const {},
-    );
+    final milestone = pickAt(4); // 4 weeks → '1 tháng'
+    final threeWeeks = pickAt(3);
+    final fiveWeeks = pickAt(5);
 
     expect(milestone.tier, TrophyTier.streakMilestone);
-    expect(milestone.value, '7');
-    expect(milestone.label, '7 ngày liên tiếp');
+    expect(milestone.value, '1 tháng');
+    expect(milestone.label, 'Chuỗi 1 tháng!');
     expect(milestone.tag, 'CHUỖI');
 
-    expect(fiveDays.tier, isNot(TrophyTier.streakMilestone));
-    expect(sixDays.tier, isNot(TrophyTier.streakMilestone));
+    expect(threeWeeks.tier, isNot(TrophyTier.streakMilestone));
+    expect(fiveWeeks.tier, isNot(TrophyTier.streakMilestone));
   });
 
   test('week-1 no-history falls through to within-session tier', () {
@@ -133,7 +117,7 @@ void main() {
         _report(name: 'Squat', formScore: 90, totalReps: 10),
       ],
       sessionRawFormScore: 90,
-      streakDays: 0,
+      streakWeeks: 0,
       priorSessionForms: const [],
       priorExerciseForms: const {},
     );
@@ -150,7 +134,7 @@ void main() {
         _report(name: 'Push Up', formScore: 90, totalReps: 10),
       ],
       sessionRawFormScore: 88,
-      streakDays: 0,
+      streakWeeks: 0,
       priorSessionForms: const [],
       priorExerciseForms: const {},
     );
@@ -161,7 +145,7 @@ void main() {
         _report(name: 'Push Up', formScore: 86, totalReps: 10),
       ],
       sessionRawFormScore: 84,
-      streakDays: 0,
+      streakWeeks: 0,
       priorSessionForms: const [],
       priorExerciseForms: const {},
     );
@@ -185,7 +169,7 @@ void main() {
         _report(name: 'Squat', formScore: 40, totalReps: 40, goodReps: 29),
       ],
       sessionRawFormScore: 40,
-      streakDays: 0,
+      streakWeeks: 0,
       priorSessionForms: const [],
       priorExerciseForms: const {},
     );
@@ -195,7 +179,7 @@ void main() {
         _report(name: 'Squat', formScore: 40, totalReps: 40, goodReps: 30),
       ],
       sessionRawFormScore: 40,
-      streakDays: 0,
+      streakWeeks: 0,
       priorSessionForms: const [],
       priorExerciseForms: const {},
     );
@@ -211,7 +195,7 @@ void main() {
     final trophy = SessionTrophyPicker.pick(
       reports: const [],
       sessionRawFormScore: 0,
-      streakDays: 0,
+      streakWeeks: 0,
       priorSessionForms: const [],
       priorExerciseForms: const {},
     );

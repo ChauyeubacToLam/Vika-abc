@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../../../utils/bmi.dart';
 import '../../onboarding_data.dart';
 import '../v5_primitives.dart';
 import '../v5_theme.dart';
@@ -106,13 +107,17 @@ class _S11BodyInfoState extends State<S11BodyInfo>
     _bmiController.forward(from: 0);
   }
 
+  // Label + band come from the shared [bmiCategory] helper so onboarding and
+  // Profile can't drift; only the V5 color mapping lives here.
   _BmiZone _zone(double bmi) {
-    if (bmi < 18.5) {
-      return const _BmiZone('Hơi gầy', Color(0xFF7DA3D9));
-    }
-    if (bmi < 23) return const _BmiZone('Cân đối', V5.yellow);
-    if (bmi < 25) return const _BmiZone('Hơi tròn', Color(0xFFE89A4B));
-    return const _BmiZone('Cần chú ý', Color(0xFFD67B3E));
+    final band = bmiCategory(bmi);
+    final color = switch (band.zone) {
+      BmiZone.low => const Color(0xFF7DA3D9),
+      BmiZone.good => V5.yellow,
+      BmiZone.warn => const Color(0xFFE89A4B),
+      BmiZone.high => const Color(0xFFD67B3E),
+    };
+    return _BmiZone(band.label, color);
   }
 
   @override
@@ -164,6 +169,14 @@ class _S11BodyInfoState extends State<S11BodyInfo>
                       bmi: _animatedBmi,
                       zone: zone,
                     ),
+                  ),
+                ),
+                const SizedBox(height: V5.space6),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: Text(
+                    bmiCaveat,
+                    style: V5.caption(context, color: V5.inkFaint),
                   ),
                 ),
                 const SizedBox(height: V5.space12),
@@ -241,13 +254,29 @@ class _S11BodyInfoState extends State<S11BodyInfo>
                 style: V5.eyebrow(context, color: V5.inkSoft),
               ),
               SizedBox(height: veryCompact ? V5.space6 : V5.space8),
+              // One compact row of the three identities, then a single quiet
+              // opt-out line — far shorter and calmer than stacked tiles, so
+              // the whole screen fits without scrolling.
               Row(
                 children: [
-                  _genderChip('male', 'Nam', Icons.male_rounded),
-                  const SizedBox(width: V5.space10),
-                  _genderChip('female', 'Nữ', Icons.female_rounded),
+                  Expanded(
+                    child: _genderChip(
+                        'male', 'Nam', Icons.male_rounded, veryCompact),
+                  ),
+                  const SizedBox(width: V5.space8),
+                  Expanded(
+                    child: _genderChip(
+                        'female', 'Nữ', Icons.female_rounded, veryCompact),
+                  ),
+                  const SizedBox(width: V5.space8),
+                  Expanded(
+                    child: _genderChip('other', 'Khác',
+                        Icons.transgender_rounded, veryCompact),
+                  ),
                 ],
               ),
+              SizedBox(height: veryCompact ? V5.space6 : V5.space8),
+              _genderDeclineLink('prefer_not_to_say', 'Không muốn trả lời'),
             ],
           ),
         ),
@@ -255,30 +284,57 @@ class _S11BodyInfoState extends State<S11BodyInfo>
     );
   }
 
-  Widget _genderChip(String id, String label, IconData icon) {
+  // One compact identity chip: a horizontal icon + label that fills its
+  // column. The three sit in a single even row.
+  Widget _genderChip(String id, String label, IconData icon, bool compact) {
     final selected = widget.data.gender == id;
-    return Expanded(
-      child: V5Card(
-        onTap: () => setState(() => widget.data.gender = id),
-        selected: selected,
-        tint: selected ? V5CardTint.ink : V5CardTint.cream,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        borderRadius: V5.radiusMd,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 18,
-              color: selected ? V5.yellow : V5.inkSoft,
+    return V5Card(
+      onTap: () => setState(() => widget.data.gender = id),
+      selected: selected,
+      tint: selected ? V5CardTint.ink : V5CardTint.cream,
+      padding: EdgeInsets.symmetric(
+          horizontal: 10, vertical: compact ? 11 : 13),
+      borderRadius: V5.radiusMd,
+      child: Row(
+        mainAxisSize: MainAxisSize.max,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 17, color: selected ? V5.yellow : V5.inkSoft),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: V5.titleSm(context, color: selected ? V5.invInk : V5.ink),
             ),
-            const SizedBox(width: 8),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // The "prefer not to say" option — a single low-emphasis opt-out line under
+  // the three chips, using the shared check indicator. Minimal height, no
+  // second card row.
+  Widget _genderDeclineLink(String id, String label) {
+    final selected = widget.data.gender == id;
+    return GestureDetector(
+      onTap: () => setState(() => widget.data.gender = id),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            V5CheckCircle(selected: selected, size: 18),
+            const SizedBox(width: 10),
             Text(
               label,
-              style: V5.titleSm(
+              style: V5.bodySm(
                 context,
-                color: selected ? V5.invInk : V5.ink,
-              ),
+                color: selected ? V5.ink : V5.inkSoft,
+              ).copyWith(fontWeight: FontWeight.w600),
             ),
           ],
         ),

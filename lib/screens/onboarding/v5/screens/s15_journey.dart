@@ -96,12 +96,14 @@ class _S15JourneyState extends State<S15Journey> {
                   child: V5FadeIn(
                     delay: Duration(milliseconds: index * 70),
                     slideY: 8,
-                    child: _WeekCard(
-                      week: weeks[index],
-                      level: p.level,
-                      first: index == 0,
-                      loading: loading,
-                    ),
+                    child: loading
+                        ? _WeekCardSkeleton(first: index == 0)
+                        : _WeekCard(
+                            week: weeks[index],
+                            level: p.level,
+                            first: index == 0,
+                            loading: loading,
+                          ),
                   ),
                 );
               },
@@ -724,6 +726,234 @@ class _WeekCard extends StatelessWidget {
       },
     );
   }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Loading skeleton — shimmering stand-in week card (V5-local, so the
+// onboarding stays self-contained from the main-app theme). Mirrors the
+// real _WeekCard so the swap to the loaded plan doesn't jump.
+// ─────────────────────────────────────────────────────────────
+
+class _WeekCardSkeleton extends StatelessWidget {
+  const _WeekCardSkeleton({required this.first});
+
+  final bool first;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = first;
+    final divider = dark ? V5.heroBorderHi : V5.border;
+    return Container(
+      width: 280,
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
+      decoration: BoxDecoration(
+        gradient: dark ? V5.heroGradient : null,
+        color: dark ? null : V5.surface,
+        borderRadius: BorderRadius.circular(V5.radiusLg),
+        border: Border.all(color: dark ? V5.heroBorder : V5.border),
+        boxShadow: dark ? V5.elevation2 : V5.elevation1,
+      ),
+      child: _V5Shimmer(
+        dark: dark,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Badge + title
+            Row(
+              children: [
+                _V5SkeletonCircle(size: 46, dark: dark),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _V5SkeletonBox(width: 70, height: 9, dark: dark),
+                      const SizedBox(height: 8),
+                      _V5SkeletonBox(width: 120, height: 14, dark: dark),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Headline — two lines
+            _V5SkeletonBox(height: 13, dark: dark),
+            const SizedBox(height: 7),
+            _V5SkeletonBox(width: 150, height: 13, dark: dark),
+            const SizedBox(height: 14),
+            Container(height: 1, color: divider),
+            const SizedBox(height: 14),
+            // "BÀI TẬP TUẦN NÀY" rail header
+            Row(
+              children: [
+                _V5SkeletonBox(width: 110, height: 9, dark: dark),
+                const Spacer(),
+                _V5SkeletonBox(width: 48, height: 9, dark: dark),
+              ],
+            ),
+            const SizedBox(height: 10),
+            // Exercise pills
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const NeverScrollableScrollPhysics(),
+                child: Column(
+                  children: [
+                    for (var i = 0; i < 3; i++) ...[
+                      if (i > 0) const SizedBox(height: 5),
+                      _V5SkeletonBox(
+                        height: 32,
+                        radius: V5.radiusSm,
+                        dark: dark,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            Container(height: 1, color: divider),
+            const SizedBox(height: 12),
+            // Footer — sessions + duration
+            Row(
+              children: [
+                _V5SkeletonBox(width: 58, height: 12, dark: dark),
+                const Spacer(),
+                _V5SkeletonBox(width: 32, height: 12, dark: dark),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Base + highlight tones for the V5 onboarding skeletons.
+({Color base, Color highlight}) _v5Tones(bool dark) {
+  if (dark) {
+    return (
+      base: Color.lerp(V5.ink, Colors.white, 0.16)!,
+      highlight: Color.lerp(V5.ink, Colors.white, 0.30)!,
+    );
+  }
+  return (
+    base: Color.lerp(V5.surface, V5.ink, 0.09)!,
+    highlight: Color.lerp(V5.surface, V5.ink, 0.035)!,
+  );
+}
+
+class _V5SkeletonBox extends StatelessWidget {
+  const _V5SkeletonBox({
+    this.width,
+    this.height = 12,
+    this.radius = 7,
+    this.dark = false,
+  });
+
+  final double? width;
+  final double height;
+  final double radius;
+  final bool dark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: _v5Tones(dark).base,
+        borderRadius: BorderRadius.circular(radius),
+      ),
+    );
+  }
+}
+
+class _V5SkeletonCircle extends StatelessWidget {
+  const _V5SkeletonCircle({required this.size, this.dark = false});
+
+  final double size;
+  final bool dark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: _v5Tones(dark).base,
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+}
+
+/// Sweeps a soft highlight band across a subtree of [_V5SkeletonBox]es on a
+/// gentle ~1.5s loop. Honors the platform reduce-motion setting.
+class _V5Shimmer extends StatefulWidget {
+  const _V5Shimmer({required this.child, this.dark = false});
+
+  final Widget child;
+  final bool dark;
+
+  @override
+  State<_V5Shimmer> createState() => _V5ShimmerState();
+}
+
+class _V5ShimmerState extends State<_V5Shimmer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.disableAnimationsOf(context)) {
+      return widget.child;
+    }
+    final tones = _v5Tones(widget.dark);
+    return AnimatedBuilder(
+      animation: _ctrl,
+      child: widget.child,
+      builder: (context, child) {
+        final slide = -1.0 + _ctrl.value * 3.0;
+        return ShaderMask(
+          blendMode: BlendMode.srcATop,
+          shaderCallback: (bounds) => LinearGradient(
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+            colors: [tones.base, tones.highlight, tones.base],
+            stops: const [0.35, 0.5, 0.65],
+            transform: GradientTranslation(bounds.width * slide),
+          ).createShader(bounds),
+          child: child,
+        );
+      },
+    );
+  }
+}
+
+/// Horizontal translate transform for the shimmer band.
+class GradientTranslation extends GradientTransform {
+  const GradientTranslation(this.dx);
+
+  final double dx;
+
+  @override
+  Matrix4? transform(Rect bounds, {TextDirection? textDirection}) =>
+      Matrix4.translationValues(dx, 0, 0);
 }
 
 String _formatVolume(VolumePrescription volume) {

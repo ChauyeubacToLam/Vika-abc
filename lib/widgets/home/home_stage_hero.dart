@@ -31,6 +31,7 @@ import 'package:flutter/services.dart';
 
 import '../../theme/app_colors.dart';
 import '../../theme/vf_theme.dart';
+import '../ivory/skeleton.dart';
 import '../plan/wordmark_header.dart';
 
 /// One exercise row in the timeline.
@@ -272,6 +273,200 @@ class HomeStageHero extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// LOADING SKELETON — same dark stage, shimmering placeholders
+// ═══════════════════════════════════════════════════════════════
+//
+// Shown while today's session resolves. Mirrors the real hero's layout
+// (eyebrow → headline → stat row → session brief → CTA) so the swap to
+// real content lands without a layout jump. The brand wordmark stays real
+// — it's identity, not data — and sits outside the Shimmer.
+
+class HomeStageHeroSkeleton extends StatelessWidget {
+  const HomeStageHeroSkeleton({
+    super.key,
+    required this.userInitial,
+    this.avatarUrl,
+    this.onAvatarTap,
+    this.onNotificationsTap,
+  });
+
+  final String userInitial;
+  final String? avatarUrl;
+  final VoidCallback? onAvatarTap;
+  final VoidCallback? onNotificationsTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    final topInset = MediaQuery.viewPaddingOf(context).top;
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(36)),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: const Alignment(-0.7, -1),
+            end: const Alignment(0.7, 1),
+            colors: [c.bgInverse, c.bgInverseHi],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: c.ink.withValues(alpha: 0.22),
+              blurRadius: 48,
+              offset: const Offset(0, 14),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              top: -130,
+              right: -110,
+              child: IgnorePointer(
+                child: _AmbientGlow(
+                  size: const Size(420, 420),
+                  color: c.yellow,
+                  opacity: 0.16,
+                ),
+              ),
+            ),
+            const Positioned.fill(
+              child: IgnorePointer(child: _GrainTexture(opacity: 0.05)),
+            ),
+            Padding(
+              padding: EdgeInsets.only(top: topInset),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const _LightStatusBar(),
+                  WordmarkHeader(
+                    inverted: true,
+                    userInitial: userInitial,
+                    avatarUrl: avatarUrl,
+                    trailingIcon: Icons.notifications_none_rounded,
+                    trailingTooltip: 'Thông báo',
+                    onTrailingTap: onNotificationsTap,
+                    onAvatarTap: onAvatarTap,
+                  ),
+                  const SizedBox(height: 22),
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(24, 0, 24, 24),
+                    child: Shimmer(
+                      inverted: true,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Eyebrow
+                          SkeletonBox(width: 150, height: 12, inverted: true),
+                          SizedBox(height: 20),
+                          // Headline — two lines
+                          SkeletonBox(
+                              width: 240,
+                              height: 36,
+                              radius: 9,
+                              inverted: true),
+                          SizedBox(height: 11),
+                          SkeletonBox(
+                              width: 168,
+                              height: 36,
+                              radius: 9,
+                              inverted: true),
+                          SizedBox(height: 20),
+                          // Stat row
+                          Row(
+                            children: [
+                              SkeletonBox(width: 70, height: 12, inverted: true),
+                              SizedBox(width: 14),
+                              SkeletonBox(width: 52, height: 12, inverted: true),
+                              SizedBox(width: 14),
+                              SkeletonBox(width: 62, height: 12, inverted: true),
+                            ],
+                          ),
+                          SizedBox(height: 18),
+                          // Session brief card
+                          _BriefSkeleton(),
+                          SizedBox(height: 18),
+                          // CTA pill
+                          SkeletonBox(
+                            height: 54,
+                            radius: 999,
+                            inverted: true,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Placeholder mirroring the session-brief card: a few timeline rows + a
+/// hairline + a coach-voice line.
+class _BriefSkeleton extends StatelessWidget {
+  const _BriefSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.16),
+          width: 1.4,
+        ),
+      ),
+      child: Column(
+        children: [
+          for (var i = 0; i < 4; i++) ...[
+            if (i > 0) const SizedBox(height: 14),
+            Row(
+              children: [
+                const SkeletonCircle(size: 13, inverted: true),
+                const SizedBox(width: 14),
+                SkeletonBox(
+                  width: 120.0 + (i.isEven ? 40 : 0),
+                  height: 13,
+                  inverted: true,
+                ),
+                const Spacer(),
+                const SkeletonBox(width: 38, height: 11, inverted: true),
+              ],
+            ),
+          ],
+          const SizedBox(height: 14),
+          Container(height: 1, color: Colors.white.withValues(alpha: 0.08)),
+          const SizedBox(height: 14),
+          const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SkeletonCircle(size: 16, inverted: true),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SkeletonBox(height: 12, inverted: true),
+                    SizedBox(height: 8),
+                    SkeletonBox(width: 160, height: 12, inverted: true),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // EYEBROW + HEADLINE
 // ═══════════════════════════════════════════════════════════════
 
@@ -331,6 +526,7 @@ class _Headline extends StatelessWidget {
             fontFamily: 'BeVietnamPro',
             fontSize: 44,
             fontWeight: FontWeight.w800,
+            fontStyle: FontStyle.italic,
             letterSpacing: -2.4,
             height: 0.94,
             color: c.invInk,

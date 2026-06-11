@@ -18,7 +18,7 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 600));
 
-    expect(find.text('vika'), findsOneWidget);
+    expect(find.text('VIKA'), findsOneWidget);
     expect(find.text('Bắt đầu hành trình'), findsOneWidget);
     expect(
       find.text('CAMERA AI  ·  PHÂN TÍCH FORM THỜI GIAN THỰC'),

@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import 'v5_theme.dart';
 
@@ -1872,7 +1873,11 @@ class _BodyDiagramPainter extends CustomPainter {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// BRAND MARKS — Google / Apple / Facebook for social signin
+// BRAND MARKS — Google / Apple / Facebook for social signin.
+//
+// All three load their authentic brand logos from the SVG assets in
+// assets/brands/. Apple is a single monochrome path tinted to ink; Google
+// and Facebook keep their native brand colors.
 // ═══════════════════════════════════════════════════════════════
 
 class V5GoogleMark extends StatelessWidget {
@@ -1880,49 +1885,11 @@ class V5GoogleMark extends StatelessWidget {
   final double size;
 
   @override
-  Widget build(BuildContext context) {
-    return SizedBox.square(
-      dimension: size,
-      child: CustomPaint(painter: _GooglePainter()),
-    );
-  }
-}
-
-class _GooglePainter extends CustomPainter {
-  static const _blue = Color(0xFF4285F4);
-  static const _green = Color(0xFF34A853);
-  static const _yellow = Color(0xFFFBBC05);
-  static const _red = Color(0xFFEA4335);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final cx = w / 2;
-    final cy = w / 2;
-    final stroke = w * 0.18;
-    final r = (w - stroke) / 2;
-    final rect = Rect.fromCircle(center: Offset(cx, cy), radius: r);
-    Paint arc(Color c) => Paint()
-      ..color = c
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..strokeCap = StrokeCap.butt;
-    canvas.drawArc(rect, _rad(-160), _rad(140), false, arc(_red));
-    canvas.drawArc(rect, _rad(-20), _rad(80), false, arc(_blue));
-    canvas.drawArc(rect, _rad(60), _rad(100), false, arc(_green));
-    canvas.drawArc(rect, _rad(160), _rad(40), false, arc(_yellow));
-    final tabPaint = Paint()
-      ..color = _blue
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..strokeCap = StrokeCap.butt;
-    canvas.drawLine(Offset(cx, cy), Offset(rect.right, cy), tabPaint);
-  }
-
-  double _rad(double deg) => deg * math.pi / 180;
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  Widget build(BuildContext context) => SvgPicture.asset(
+        'assets/brands/google.svg',
+        width: size,
+        height: size,
+      );
 }
 
 class V5FacebookMark extends StatelessWidget {
@@ -1930,51 +1897,24 @@ class V5FacebookMark extends StatelessWidget {
   final double size;
 
   @override
-  Widget build(BuildContext context) {
-    return SizedBox.square(
-      dimension: size,
-      child: CustomPaint(painter: _FacebookPainter()),
-    );
-  }
-}
-
-class _FacebookPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final paint = Paint()..color = Colors.white;
-    final stem = Rect.fromLTRB(w * 0.50, h * 0.18, w * 0.62, h * 0.96);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(stem, Radius.circular(w * 0.04)),
-      paint,
-    );
-    final hook = Path()
-      ..moveTo(w * 0.62, h * 0.18)
-      ..quadraticBezierTo(w * 0.62, h * 0.04, w * 0.78, h * 0.04)
-      ..lineTo(w * 0.84, h * 0.04)
-      ..lineTo(w * 0.84, h * 0.20)
-      ..lineTo(w * 0.78, h * 0.20)
-      ..quadraticBezierTo(w * 0.74, h * 0.20, w * 0.74, h * 0.28)
-      ..lineTo(w * 0.74, h * 0.40)
-      ..lineTo(w * 0.50, h * 0.40)
-      ..close();
-    canvas.drawPath(hook, paint);
-    final bar = Rect.fromLTRB(w * 0.36, h * 0.40, w * 0.84, h * 0.52);
-    canvas.drawRect(bar, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  Widget build(BuildContext context) => SvgPicture.asset(
+        'assets/brands/facebook.svg',
+        width: size,
+        height: size,
+      );
 }
 
 class V5AppleMark extends StatelessWidget {
-  const V5AppleMark({super.key, this.size = 18, this.color = Colors.white});
+  const V5AppleMark({super.key, this.size = 18, this.color = V5.ink});
   final double size;
   final Color color;
 
   @override
-  Widget build(BuildContext context) {
-    return Icon(Icons.apple, size: size + 4, color: color);
-  }
+  Widget build(BuildContext context) => SvgPicture.asset(
+        'assets/brands/apple.svg',
+        // The Apple glyph is portrait; size by height and let width follow.
+        height: size + 2,
+        colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+      );
 }
+

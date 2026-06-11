@@ -14,13 +14,23 @@ void main() {
     expect(r.trend, isEmpty);
   });
 
-  test('single session -> to == from, delta 0, single-point trend', () {
+  test('single session -> to shows, from/delta hidden (no baseline)', () {
     final r = SessionPersistence.deriveProgressFormSummaryForTest(const [72]);
 
     expect(r.to, 72);
-    expect(r.from, 72);
-    expect(r.delta, 0);
+    expect(r.from, isNull);
+    expect(r.delta, isNull);
     expect(r.trend, [72]);
+  });
+
+  test('two sessions -> to shows, from/delta still hidden (< 3 baseline)', () {
+    final r =
+        SessionPersistence.deriveProgressFormSummaryForTest(const [70, 78]);
+
+    expect(r.to, 78);
+    expect(r.from, isNull);
+    expect(r.delta, isNull);
+    expect(r.trend, [70, 78]);
   });
 
   test('rising series -> to=last, from=first, positive delta', () {

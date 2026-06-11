@@ -15,8 +15,8 @@ class HeadlineForPeriod {
     required this.label,
     required this.coach,
   });
-  final String delta; // '+14'
-  final int from;
+  final String? delta; // '+14', or null below the 3-session baseline
+  final int? from; // null below the 3-session baseline
   final int to;
   final String label; // 'CẢ LỘ TRÌNH · 4 TUẦN'
   final String coach; // multi-sentence coach quote
@@ -106,8 +106,10 @@ class ExerciseInsightMock {
     required this.improvement,
     required this.from,
     required this.to,
-    required this.coach,
     required this.chart,
+    this.stat,
+    this.lowerIsBetter = false,
+    this.coach,
   });
   final String idx;
   final String name;
@@ -126,90 +128,105 @@ class ExerciseInsightMock {
 
   final String from;
   final String to;
-  final String coach;
 
-  /// Retained for potential future use; the current insight card
-  /// renders a before/after timeline bar rather than a sparkline.
+  /// Per-session metric series, oldest-first → the card's bar chart. The
+  /// dominant visualization; raw values, [lowerIsBetter] orients them.
   final List<int> chart;
+
+  /// Compact magnitude shown as the card's hero stat, e.g. "12°", "10s",
+  /// "14%". Falls back to [improvement] when null.
+  final String? stat;
+
+  /// When true a FALLING value is the improvement (fault rate, asymmetry,
+  /// depth angle). The chart inverts so progress always reads as a climb.
+  final bool lowerIsBetter;
+
+  /// Optional editorial coach quote. Null on real, data-derived insights —
+  /// the card simply hides the footer rather than fabricating prose.
+  final String? coach;
 }
 
+// Mock ranking for the BÀI TẬP NỔI BẬT 2-up visual cards. Restored as a design
+// preview; the real ranker lives in SessionPersistence.rankedInsights and can
+// be re-mapped onto these cards once headlines carry their fitted series.
 const List<ExerciseInsightMock> progressMockInsights = [
   ExerciseInsightMock(
     idx: '01',
     name: 'Squat',
-    metric: 'Độ sâu khi xuống',
-    directionHint: 'Càng thấp = càng sâu',
+    metric: 'Độ sâu',
+    directionHint: 'Càng thấp càng sâu',
     improvement: 'Sâu hơn 12°',
+    stat: '12°',
+    lowerIsBetter: true,
     from: '118°',
     to: '106°',
-    coach: 'Bốn tuần đẩy. Hông mở dần — đó là chìa khoá.',
-    chart: [118, 115, 113, 111, 109, 108, 106],
+    chart: [118, 116, 113, 111, 109, 108, 106],
   ),
   ExerciseInsightMock(
     idx: '02',
-    name: 'Wall Push-up',
-    metric: 'Lệch giữa hai vai',
-    directionHint: 'Càng thấp = càng đều',
-    improvement: 'Đều hơn 8°',
-    from: '32°',
-    to: '24°',
-    coach: 'Vai đứng yên hơn rồi. Lệch trái-phải giảm đi.',
-    chart: [32, 30, 28, 27, 26, 25, 24],
-  ),
-  ExerciseInsightMock(
-    idx: '03',
     name: 'Plank',
-    metric: 'Thời gian giữ thẳng',
-    directionHint: 'Càng lâu = càng khoẻ',
+    metric: 'Thời gian giữ',
+    directionHint: 'Càng lâu càng khoẻ',
     improvement: 'Lâu hơn 10 giây',
+    stat: '10s',
     from: '18s',
     to: '28s',
-    coach: 'Cốt lõi cuối cùng cũng đến. 28 giây là đỉnh tuần.',
     chart: [18, 19, 22, 23, 25, 27, 28],
   ),
   ExerciseInsightMock(
-    idx: '04',
+    idx: '03',
     name: 'Glute Bridge',
-    metric: 'Kích hoạt cơ mông',
-    directionHint: 'Càng cao = càng mạnh',
+    metric: 'Kích hoạt mông',
+    directionHint: 'Càng cao càng mạnh',
     improvement: 'Mạnh hơn 14%',
+    stat: '14%',
     from: '64%',
     to: '78%',
-    coach: 'Mông kích hoạt rõ — không còn đẩy bằng lưng dưới.',
     chart: [64, 66, 68, 71, 74, 76, 78],
+  ),
+  ExerciseInsightMock(
+    idx: '04',
+    name: 'Wall Push-up',
+    metric: 'Cân hai vai',
+    directionHint: 'Càng thấp càng đều',
+    improvement: 'Đều hơn 8°',
+    stat: '8°',
+    lowerIsBetter: true,
+    from: '32°',
+    to: '24°',
+    chart: [32, 30, 29, 27, 26, 25, 24],
   ),
   ExerciseInsightMock(
     idx: '05',
     name: 'Curl-Up',
     metric: 'Kích hoạt cốt lõi',
-    directionHint: 'Càng cao = càng mạnh',
+    directionHint: 'Càng cao càng mạnh',
     improvement: 'Mạnh hơn 14%',
+    stat: '14%',
     from: '52%',
     to: '66%',
-    coach: 'Cốt lõi đang lên đều. Hai tuần nữa là chuẩn.',
     chart: [52, 55, 58, 60, 62, 64, 66],
+  ),
+  ExerciseInsightMock(
+    idx: '06',
+    name: 'Lunge',
+    metric: 'Giữ thăng bằng',
+    directionHint: 'Càng cao càng vững',
+    improvement: 'Vững hơn 28%',
+    stat: '28%',
+    from: '40%',
+    to: '68%',
+    chart: [40, 44, 49, 53, 58, 63, 68],
   ),
 ];
 
-const int progressMockStreakDays = 12;
-const String progressMockStreakSummary =
-    'Tập đều từ 27/4. Hơn 3 trên 4 ngày trong tuần.';
-// 14-day completion array, last entry = today.
-const List<bool> progressMockStreakBars = [
-  true,
-  false,
-  true,
-  true,
-  false,
-  true,
-  true,
-  true,
-  false,
-  true,
-  true,
-  false,
-  true,
-  true,
+// Consecutive active weeks (preview only) → '1 quý' via streakTierLabel.
+const int progressMockStreakWeeks = 12;
+// 12-week activity strip (preview only), oldest-first, last = current week.
+// Trailing filled run = 12, coherent with progressMockStreakWeeks above.
+const List<bool> progressMockStreakWeekBars = [
+  true, true, true, true, true, true,
+  true, true, true, true, true, true,
 ];
 
 // ═══════════════════════════════════════════════════════════════

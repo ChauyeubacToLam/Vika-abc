@@ -3,9 +3,6 @@
 // Architecture (top to bottom):
 //   ▲ Stage hero — dark, full-bleed, italic name, edit/share pills
 //   1. Mục tiêu — goal card with progress meter
-//   2. Hành trình tính đến hôm nay — lifetime stats card + coach
-//   3. Thành tựu — achievements rail (editorial medallions)
-//   4. Hành trình — journey timeline with TODAY anchor
 //   5. Vóc dáng — refined body card + BMI chip
 //   6. Mời bạn dùng Vika — referral card
 //   7. Kết nối — connected services
@@ -31,6 +28,7 @@ import '../data/profile_mock.dart';
 import '../services/data_export_service.dart';
 import '../services/recommendation/recommendation_service.dart';
 import '../services/session_persistence.dart';
+import '../services/streak_tier.dart';
 import '../services/user_profile_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/vf_theme.dart';
@@ -39,7 +37,6 @@ import '../widgets/profile/body_card.dart';
 import '../widgets/profile/body_edit_sheet.dart';
 import '../widgets/profile/goal_card.dart';
 import '../widgets/profile/goal_edit_sheet.dart';
-import '../widgets/profile/lifetime_hero.dart';
 import '../widgets/profile/profile_stage_hero.dart';
 import '../widgets/profile/settings_group.dart';
 
@@ -216,57 +213,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   /// Compact uppercase hero strip. Empty for a brand-new user (0 sessions) so
-  /// the strip is hidden rather than showing "0 NGÀY".
+  /// the strip is hidden rather than showing a placeholder. The streak chip is
+  /// the tier duration label (e.g. 'CHUỖI 1 THÁNG'), dropped when there's no
+  /// streak — never a raw count.
   List<String> _buildInlineStats() {
     final lt = _lifetime;
     if (lt == null || lt.sessionCount == 0) return const [];
-    final stats = <String>[
-      '${_profile?.streakDays ?? 0} NGÀY',
-      '${lt.sessionCount} BUỔI',
-    ];
+    final stats = <String>[];
+    final streakLabel = streakTierLabel(_profile?.streakWeeks ?? 0);
+    if (streakLabel.isNotEmpty) stats.add('CHUỖI ${streakLabel.toUpperCase()}');
+    stats.add('${lt.sessionCount} BUỔI');
     if (lt.avgForm != null) stats.add('${lt.avgForm}% FORM');
     return stats;
-  }
-
-  /// Lifetime stats trio for the LifetimeHero. Deltas only appear once there's
-  /// enough history (3+ sessions); see [SessionPersistence.lifetimeStats].
-  List<ProfileLifetimeStat> _buildLifetimeStats() {
-    final lt = _lifetime;
-    // Null (pre-load) or zero sessions → the empty state is shown instead, so
-    // the trio is never rendered; return an empty list rather than fake zeros.
-    if (lt == null || lt.sessionCount == 0) return const [];
-    final showDeltas = lt.sessionCount >= 3;
-
-    // Total time reads as minutes under an hour, hours above — never a fake
-    // decimal like "0.2 giờ".
-    final (timeValue, timeUnit) = lt.totalSeconds < 3600
-        ? ('${(lt.totalSeconds / 60).round()}', 'phút')
-        : ((lt.totalSeconds / 3600).toStringAsFixed(1), 'giờ');
-
-    final delta = lt.formDeltaFromStart;
-    return [
-      ProfileLifetimeStat(
-        value: '${lt.sessionCount}',
-        unit: 'buổi',
-        label: 'ĐÃ TẬP',
-        delta: (showDeltas && lt.sessionsThisWeek > 0)
-            ? '+${lt.sessionsThisWeek} tuần này'
-            : null,
-      ),
-      ProfileLifetimeStat(
-        value: timeValue,
-        unit: timeUnit,
-        label: 'TỔNG CỘNG',
-      ),
-      ProfileLifetimeStat(
-        value: lt.avgForm != null ? '${lt.avgForm}' : '—',
-        unit: '%',
-        label: 'FORM TB',
-        delta: (showDeltas && delta != null)
-            ? '${delta >= 0 ? '+' : ''}$delta từ đầu'
-            : null,
-      ),
-    ];
   }
 
   Future<void> _openEditProfileSheet() async {
@@ -522,7 +480,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final c = VikaColors.of(sheetContext);
         return _InfoSheet(
           eyebrow: 'VỀ VIKA',
-          title: 'Vika',
+          title: 'VIKA',
           body:
               'Người bạn đồng hành tập luyện thông minh. Cảm ơn bạn đã tin Vika '
               'trên hành trình khoẻ mạnh hơn mỗi ngày.',
@@ -617,10 +575,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final displayName = profile?.displayName ?? profileMockName;
     final userInitial = profile?.initial ?? profileMockInitial;
     final avatarUrl = profile?.avatarUrl;
-    final streakDays = profile?.streakDays ?? 0;
+    final streakLabel = streakTierLabel(profile?.streakWeeks ?? 0);
     final memberSince = profile?.memberSinceLabel ?? profileMockMemberSince;
-    final memberSinceLine =
-        'Thành viên từ $memberSince · $streakDays ngày liên tiếp';
+    final memberSinceLine = streakLabel.isEmpty
+        ? 'Thành viên từ $memberSince'
+        : 'Thành viên từ $memberSince · chuỗi $streakLabel';
     // Body stats stay null when unknown — BodyCard renders "—", never a fake
     // number.
     final height = profile?.heightCm;
@@ -628,8 +587,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final age = profile?.age;
     final bmi = profile?.bmiValue != null ? profile!.bmiLabel : null;
     final bmiCategory = profile?.bmiCategory ?? 'Chưa đủ dữ liệu';
-    final lifetimeStats = _buildLifetimeStats();
-    final hasSessions = (_lifetime?.sessionCount ?? 0) > 0;
 
     return Container(
       color: c.bg,
@@ -667,24 +624,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       progress: _goalProgress,
                       daysLeft: _weeksLeftLabel,
                       onEdit: _openGoalEditSheet,
-                    ),
-                  ),
-                  const SizedBox(height: 40),
-
-                  // 2. Hành trình tính đến hôm nay — lifetime stats.
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: LifetimeHero(
-                      stats: lifetimeStats,
-                      emptyLine: hasSessions
-                          ? null
-                          : 'Hành trình của bạn bắt đầu từ buổi tập đầu tiên.',
-                      // While history is too thin for a trend, set the
-                      // expectation instead of faking deltas.
-                      footnote: (hasSessions &&
-                              (_lifetime?.sessionCount ?? 0) < 3)
-                          ? 'Thêm vài buổi nữa để thấy xu hướng form của bạn.'
-                          : null,
                     ),
                   ),
                   const SizedBox(height: 40),
@@ -1141,6 +1080,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     text: widget.current?.email ?? '',
   );
   File? _selectedAvatar;
+  late String? _gender = widget.current?.gender;
   bool _saving = false;
 
   @override
@@ -1195,6 +1135,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
         displayName: _nameController.text,
         avatarFile: _selectedAvatar,
         email: emailChanged ? newEmail : null,
+        gender: _gender,
       );
       if (!mounted) return;
       Navigator.of(context).pop(
@@ -1429,6 +1370,16 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 16),
+                _GenderSelectField(
+                  selected: _gender,
+                  accent: accent,
+                  fieldFill: fieldFill,
+                  onSelect: (id) {
+                    HapticFeedback.selectionClick();
+                    setState(() => _gender = id);
+                  },
+                ),
                 const SizedBox(height: 18),
                 SizedBox(
                   height: 50,
@@ -1482,6 +1433,171 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GENDER SELECT — segmented pills, accent-themed to the identity sheet
+// ═══════════════════════════════════════════════════════════════
+
+/// Premium gender picker for the identity editor. Four options as soft pills
+/// that reflow (the wide 'Không muốn trả lời' drops to its own run, capped to
+/// the line width so it can't overflow). Selected = warm-ink fill with an
+/// accent hairline, a reserved-yellow glyph, and a soft lift — matching the
+/// sheet's field rhythm without shouting.
+class _GenderSelectField extends StatelessWidget {
+  const _GenderSelectField({
+    required this.selected,
+    required this.onSelect,
+    required this.accent,
+    required this.fieldFill,
+  });
+
+  final String? selected;
+  final ValueChanged<String> onSelect;
+  final Color accent;
+  final Color fieldFill;
+
+  static const _options = <({String id, String label, IconData icon})>[
+    (id: 'male', label: 'Nam', icon: Icons.male_rounded),
+    (id: 'female', label: 'Nữ', icon: Icons.female_rounded),
+    (id: 'other', label: 'Khác', icon: Icons.transgender_rounded),
+    (
+      id: 'prefer_not_to_say',
+      label: 'Không muốn trả lời',
+      icon: Icons.visibility_off_rounded,
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 2, bottom: 10),
+          child: Row(
+            children: [
+              Icon(Icons.wc_rounded, size: 18, color: accent),
+              const SizedBox(width: 8),
+              Text(
+                'Giới tính',
+                style: TextStyle(
+                  fontFamily: 'BeVietnamPro',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: c.inkSoft,
+                ),
+              ),
+            ],
+          ),
+        ),
+        LayoutBuilder(
+          builder: (context, constraints) => Wrap(
+            spacing: 9,
+            runSpacing: 9,
+            children: [
+              for (final o in _options)
+                _GenderPill(
+                  label: o.label,
+                  icon: o.icon,
+                  selected: selected == o.id,
+                  maxWidth: constraints.maxWidth,
+                  accent: accent,
+                  fieldFill: fieldFill,
+                  onTap: () => onSelect(o.id),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _GenderPill extends StatelessWidget {
+  const _GenderPill({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.maxWidth,
+    required this.accent,
+    required this.fieldFill,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final double maxWidth;
+  final Color accent;
+  final Color fieldFill;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+          decoration: BoxDecoration(
+            gradient: selected
+                ? LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [c.ink, Color.lerp(c.ink, accent, 0.22)!],
+                  )
+                : null,
+            color: selected ? null : fieldFill,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected ? accent.withValues(alpha: 0.55) : c.border,
+              width: selected ? 1.4 : 1,
+            ),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: c.ink.withValues(alpha: c.isDark ? 0.40 : 0.20),
+                      blurRadius: 16,
+                      offset: const Offset(0, 8),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 17,
+                color: selected ? c.yellow : c.inkSoft,
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'BeVietnamPro',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: selected ? c.invInk : c.ink,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -1806,21 +1922,11 @@ class _Closer extends StatelessWidget {
               Expanded(child: Container(height: 1, color: c.border)),
               const SizedBox(width: 14),
               Container(
-                width: 18,
-                height: 18,
+                width: 5,
+                height: 5,
                 decoration: BoxDecoration(
                   color: c.yellow,
-                  borderRadius: BorderRadius.circular(5),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  'V',
-                  style: TextStyle(
-                    fontFamily: 'BeVietnamPro',
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: c.ink,
-                  ),
+                  shape: BoxShape.circle,
                 ),
               ),
               const SizedBox(width: 10),
@@ -2048,9 +2154,10 @@ class _ScrollDownFab extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// CONFIRM DIALOG — Premium Ivory replacement for the stock
-// AlertDialog on destructive account actions. Gradient card +
-// accent medallion + italic display title + stacked actions.
+// CONFIRM DIALOG — Premium Ivory replacement for the stock AlertDialog on
+// account actions. Built as a compact dark "stage hero": warm-dark gradient
+// + ambient accent glow + medallion + italic display title + halo CTA. The
+// accent is brand gold for normal actions, warm amber for destructive ones.
 // ═══════════════════════════════════════════════════════════════
 
 class _ConfirmDialog extends StatelessWidget {
@@ -2073,158 +2180,275 @@ class _ConfirmDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    // Brand gold drives the whole card — gold-tinted surface, gold accent bar,
-    // gold CTA — so the dialog reads as part of the Premium Ivory UI. For a
-    // destructive action the medallion icon shifts to the warm amber alarm
-    // (which harmonises with the gold) to still signal "this is serious".
-    final sheetTint = Color.lerp(c.bgRaised, c.yellow, c.isDark ? 0.10 : 0.07)!;
-    final outline = Color.lerp(c.border, c.yellow, c.isDark ? 0.32 : 0.42)!;
-    final iconInk = destructive ? c.attention : c.ink;
+    // The dialog echoes the app's signature dark "stage hero": warm-dark
+    // gradient, an ambient accent glow, italic display title, and the halo
+    // CTA. Normal actions ride the brand gold; a destructive action swaps the
+    // accent to the warm amber alarm — same composition, clearly graver.
+    final accent = destructive ? c.attention : c.yellow;
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 28),
+        padding: const EdgeInsets.symmetric(horizontal: 30),
         child: Material(
           color: Colors.transparent,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: Container(
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [c.bgRaised, sheetTint],
+            constraints: const BoxConstraints(maxWidth: 380),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(30),
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: const Alignment(-0.7, -1),
+                    end: const Alignment(0.7, 1),
+                    colors: [c.bgInverse, c.bgInverseHi],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: accent.withValues(alpha: 0.22),
+                      blurRadius: 44,
+                      offset: const Offset(0, 18),
+                    ),
+                    BoxShadow(
+                      color: c.ink.withValues(alpha: 0.5),
+                      blurRadius: 54,
+                      offset: const Offset(0, 28),
+                    ),
+                  ],
                 ),
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(color: outline),
-                boxShadow: [
-                  BoxShadow(
-                    color: c.yellow.withValues(alpha: c.isDark ? 0.18 : 0.22),
-                    blurRadius: 34,
-                    offset: const Offset(0, 16),
-                  ),
-                  BoxShadow(
-                    color: c.ink.withValues(alpha: c.isDark ? 0.42 : 0.16),
-                    blurRadius: 48,
-                    offset: const Offset(0, 26),
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 26, 24, 20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                child: Stack(
                   children: [
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: c.yellow.withValues(
-                            alpha: c.isDark ? 0.20 : 0.16,
-                          ),
-                          borderRadius: BorderRadius.circular(17),
-                          border: Border.all(
-                            color: c.yellow.withValues(alpha: 0.42),
-                          ),
-                        ),
-                        child: Icon(icon, size: 24, color: iconInk),
+                    // Ambient accent glow, top-right shoulder.
+                    Positioned(
+                      top: -80,
+                      right: -70,
+                      child: IgnorePointer(
+                        child: _DialogGlow(color: accent, opacity: 0.24),
                       ),
                     ),
-                    const SizedBox(height: 18),
-                    Row(
-                      children: [
-                        Container(
-                          width: 5,
-                          height: 16,
-                          decoration: BoxDecoration(
-                            color: c.yellow,
-                            borderRadius: BorderRadius.circular(2),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(26, 28, 26, 22),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Accent medallion with a soft glow.
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Container(
+                              width: 54,
+                              height: 54,
+                              decoration: BoxDecoration(
+                                color: accent.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(
+                                  color: accent.withValues(alpha: 0.5),
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: accent.withValues(alpha: 0.32),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                ],
+                              ),
+                              child: Icon(icon, size: 25, color: accent),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 9),
-                        Text(
-                          eyebrow,
-                          style: TextStyle(
-                            fontFamily: 'BeVietnamPro',
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.6,
-                            color: c.inkSoft,
+                          const SizedBox(height: 20),
+                          // Eyebrow with accent tick.
+                          Row(
+                            children: [
+                              Container(
+                                width: 5,
+                                height: 16,
+                                decoration: BoxDecoration(
+                                  color: accent,
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                              const SizedBox(width: 9),
+                              Text(
+                                eyebrow,
+                                style: TextStyle(
+                                  fontFamily: 'BeVietnamPro',
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1.8,
+                                  color: c.invInkSoft,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontFamily: 'BeVietnamPro',
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        fontStyle: FontStyle.italic,
-                        letterSpacing: -0.7,
-                        color: c.ink,
-                        height: 1.05,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      body,
-                      style: TextStyle(
-                        fontFamily: 'BeVietnamPro',
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w500,
-                        height: 1.5,
-                        color: c.inkSoft,
-                      ),
-                    ),
-                    const SizedBox(height: 22),
-                    SizedBox(
-                      height: 52,
-                      child: FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: c.yellow,
-                          foregroundColor: c.yellowInk,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                          const SizedBox(height: 12),
+                          Text(
+                            title,
+                            style: TextStyle(
+                              fontFamily: 'BeVietnamPro',
+                              fontSize: 26,
+                              fontWeight: FontWeight.w800,
+                              fontStyle: FontStyle.italic,
+                              letterSpacing: -0.8,
+                              color: c.invInk,
+                              height: 1.02,
+                            ),
                           ),
-                          textStyle: const TextStyle(
-                            fontFamily: 'BeVietnamPro',
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
+                          const SizedBox(height: 11),
+                          Text(
+                            body,
+                            style: TextStyle(
+                              fontFamily: 'BeVietnamPro',
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w500,
+                              height: 1.55,
+                              color: c.invInkSoft,
+                            ),
                           ),
-                        ),
-                        onPressed: () => Navigator.of(context).pop(true),
-                        child: Text(confirmLabel),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    SizedBox(
-                      height: 46,
-                      child: TextButton(
-                        style: TextButton.styleFrom(
-                          foregroundColor: c.inkSoft,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                          const SizedBox(height: 24),
+                          _DialogConfirmButton(
+                            label: confirmLabel,
+                            accent: accent,
+                            onTap: () => Navigator.of(context).pop(true),
                           ),
-                          textStyle: const TextStyle(
-                            fontFamily: 'BeVietnamPro',
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w800,
+                          const SizedBox(height: 6),
+                          SizedBox(
+                            height: 46,
+                            child: TextButton(
+                              style: TextButton.styleFrom(
+                                foregroundColor: c.invInkSoft,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                textStyle: const TextStyle(
+                                  fontFamily: 'BeVietnamPro',
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              onPressed: () => Navigator.of(context).pop(false),
+                              child: const Text('Ở lại'),
+                            ),
                           ),
-                        ),
-                        onPressed: () => Navigator.of(context).pop(false),
-                        child: const Text('Ở lại'),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Soft radial accent glow painted behind the confirm-dialog content.
+class _DialogGlow extends StatelessWidget {
+  const _DialogGlow({required this.color, required this.opacity});
+
+  final Color color;
+  final double opacity;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 240,
+      height: 240,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: RadialGradient(
+            colors: [
+              color.withValues(alpha: opacity),
+              color.withValues(alpha: 0),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Halo CTA pill with a press-scale and an arrow knob — mirrors the home
+/// hero's start button so the confirm action feels first-class.
+class _DialogConfirmButton extends StatefulWidget {
+  const _DialogConfirmButton({
+    required this.label,
+    required this.accent,
+    required this.onTap,
+  });
+
+  final String label;
+  final Color accent;
+  final VoidCallback onTap;
+
+  @override
+  State<_DialogConfirmButton> createState() => _DialogConfirmButtonState();
+}
+
+class _DialogConfirmButtonState extends State<_DialogConfirmButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    return GestureDetector(
+      onTap: widget.onTap,
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedScale(
+        scale: _pressed ? 0.98 : 1.0,
+        duration: const Duration(milliseconds: 140),
+        curve: Curves.easeOut,
+        child: Container(
+          height: 54,
+          padding: const EdgeInsets.fromLTRB(22, 0, 6, 0),
+          decoration: BoxDecoration(
+            color: widget.accent,
+            borderRadius: BorderRadius.circular(999),
+            boxShadow: [
+              BoxShadow(
+                color: widget.accent.withValues(alpha: 0.36),
+                blurRadius: 32,
+                offset: const Offset(0, 12),
+              ),
+              BoxShadow(
+                color: widget.accent.withValues(alpha: 0.18),
+                blurRadius: 60,
+                offset: const Offset(0, 26),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  widget.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'BeVietnamPro',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                    color: c.yellowInk,
+                  ),
+                ),
+              ),
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: c.ink,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 18,
+                  color: widget.accent,
+                ),
+              ),
+            ],
           ),
         ),
       ),

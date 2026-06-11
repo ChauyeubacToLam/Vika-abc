@@ -1,5 +1,5 @@
-// WordmarkHeader — the top of every main-app screen: thin yellow accent bar
-// + italic 32pt "vika" wordmark on the left, trailing icon button + avatar
+// WordmarkHeader — the top of every main-app screen: the rounded VIKA logo
+// mark + italic "VIKA" wordmark on the left, trailing icon button + avatar
 // on the right.
 //
 // Accessibility:
@@ -101,27 +101,19 @@ class _WordmarkHeaderState extends State<WordmarkHeader> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Container(
-            width: 5,
-            height: 28,
-            decoration: BoxDecoration(
-              color: c.yellow,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(width: 12),
+          const _LogoMark(),
+          const SizedBox(width: 9),
           Semantics(
             header: true,
             label: 'Vika',
             child: ExcludeSemantics(
               child: Text(
-                'vika',
+                'VIKA',
                 style: TextStyle(
                   fontFamily: 'BeVietnamPro',
-                  fontSize: 32,
+                  fontSize: 20,
                   fontWeight: FontWeight.w800,
-                  fontStyle: FontStyle.italic,
-                  letterSpacing: -2,
+                  letterSpacing: 1,
                   height: 1,
                   color: wordmarkColor,
                 ),
@@ -157,6 +149,36 @@ class _WordmarkHeaderState extends State<WordmarkHeader> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The rounded VIKA logo mark. A subtle shadow lifts the warm tile off the
+/// surface so it reads as a placed mark, not a flat sticker — and grounds it
+/// the same way on cream and over the dark hero.
+class _LogoMark extends StatelessWidget {
+  const _LogoMark();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 30,
+      height: 30,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1F1812).withValues(alpha: 0.16),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Image.asset(
+        'assets/branding/Logo.jpeg',
+        fit: BoxFit.cover,
       ),
     );
   }

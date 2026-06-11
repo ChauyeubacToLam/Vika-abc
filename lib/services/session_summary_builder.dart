@@ -7,14 +7,17 @@ class SessionSummary {
     required this.rawFormScore,
     required this.sessionFormScore,
     required this.streakBonus,
-    required this.streakDays,
+    required this.streakWeeks,
     required this.exercises,
   });
 
   final int rawFormScore;
   final int sessionFormScore;
   final int streakBonus;
-  final int streakDays;
+
+  /// Consecutive active weeks at save time (assume-this-week-complete). Drives
+  /// the streak bonus below; displayed only as a tier label, never raw.
+  final int streakWeeks;
   final List<SessionExerciseSummary> exercises;
 }
 
@@ -43,7 +46,7 @@ class SessionSummaryBuilder {
 
   static SessionSummary build(
     List<ExerciseSessionReport> reports,
-    int streakDays,
+    int streakWeeks,
   ) {
     final exercises = reports.map(_exerciseSummary).toList(growable: false);
     final scoreInputs = reports.map(_scoreInput).toList(growable: false);
@@ -71,8 +74,8 @@ class SessionSummaryBuilder {
       rawFormScore = 0;
     }
 
-    final normalizedStreakDays = math.max(streakDays, 0);
-    final potentialBonus = math.min(normalizedStreakDays, 5);
+    final normalizedStreakWeeks = math.max(streakWeeks, 0);
+    final potentialBonus = math.min(normalizedStreakWeeks, 5);
     final sessionFormScore =
         hasScoreableWork ? _clampInt(rawFormScore + potentialBonus, 0, 105) : 0;
 
@@ -80,7 +83,7 @@ class SessionSummaryBuilder {
       rawFormScore: rawFormScore,
       sessionFormScore: sessionFormScore,
       streakBonus: sessionFormScore - rawFormScore,
-      streakDays: normalizedStreakDays,
+      streakWeeks: normalizedStreakWeeks,
       exercises: exercises,
     );
   }

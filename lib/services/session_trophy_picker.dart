@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import '../models/workout_session_report.dart';
+import 'streak_tier.dart';
 
 enum TrophyTier {
   allTimePb,
@@ -39,7 +40,6 @@ class SessionTrophyPicker {
 
   static const int _pbMargin = 3;
   static const int _pbFloor = 60;
-  static const Set<int> _streakMilestones = {3, 7, 14, 30};
   static const int _rollingWindow = 5;
   static const int _cleanCut = 85;
   static const int _volumeFloor = 30;
@@ -50,7 +50,7 @@ class SessionTrophyPicker {
   static Trophy pick({
     required List<ExerciseSessionReport> reports,
     required int sessionRawFormScore,
-    required int streakDays,
+    required int streakWeeks,
     required List<int> priorSessionForms,
     required Map<String, List<int>> priorExerciseForms,
   }) {
@@ -62,11 +62,12 @@ class SessionTrophyPicker {
     );
     if (allTimePb != null) return allTimePb;
 
-    if (_streakMilestones.contains(streakDays)) {
+    if (isStreakMilestoneWeek(streakWeeks)) {
+      final label = streakTierLabel(streakWeeks);
       return Trophy(
         tier: TrophyTier.streakMilestone,
-        value: '$streakDays',
-        label: '$streakDays ngày liên tiếp',
+        value: label,
+        label: 'Chuỗi $label!',
         tag: 'CHUỖI',
       );
     }

@@ -195,32 +195,24 @@ class _WelcomeBrand extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                gradient: V5.accentGradient,
                 borderRadius: BorderRadius.circular(10),
                 boxShadow: V5.yellowGlow(0.28),
               ),
-              alignment: Alignment.center,
-              child: Text(
-                'V',
-                style: V5.text(
-                  context,
-                  size: 18,
-                  weight: FontWeight.w900,
-                  color: V5.yellowInk,
-                  letterSpacing: -0.6,
-                  height: 1,
-                ),
+              clipBehavior: Clip.antiAlias,
+              child: Image.asset(
+                'assets/branding/Logo.jpeg',
+                fit: BoxFit.cover,
               ),
             ),
             const SizedBox(width: V5.space10),
             Text(
-              'vika',
+              'VIKA',
               style: V5.text(
                 context,
                 size: 26,
                 weight: FontWeight.w800,
                 color: V5.invInk,
-                letterSpacing: -1.1,
+                letterSpacing: 0.8,
                 height: 1,
               ),
             ),
