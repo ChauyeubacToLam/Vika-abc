@@ -27,6 +27,9 @@ class ReverseCrunchConfig {
       20.0; // Biên độ dao động tối đa của góc gối (tránh vung chân lấy đà)
   static const double ECCENTRIC_MIN_TIME =
       1.5; // Giây: Thời gian hạ hông có kiểm soát
+  // Arm position: elbows straight, wrists kept beside the hips.
+  static const double ARM_ELBOW_STRAIGHT_MIN = 150.0;
+  static const double ARM_WRIST_HIP_MAX_RATIO = 0.75;
 }
 
 class CrunchVoicePriority {
@@ -49,6 +52,10 @@ class RepContext {
   final double
       trunkKneeVelocity; // Vận tốc góc cuộn (Âm = đang gập vào, Dương = đang duỗi ra)
 
+  final bool armsVisible;
+  final double? armStraightnessAngle;
+  final double? wristHipDistanceRatio;
+
   final ResultIssues resultIssues;
 
   RepContext({
@@ -59,6 +66,9 @@ class RepContext {
     required this.kneeAngle,
     required this.hipY,
     required this.trunkKneeVelocity,
+    required this.armsVisible,
+    required this.armStraightnessAngle,
+    required this.wristHipDistanceRatio,
     required this.resultIssues,
   });
 }

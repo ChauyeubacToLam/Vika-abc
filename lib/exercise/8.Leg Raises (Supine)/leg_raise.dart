@@ -11,6 +11,7 @@ import 'metrics/pelvic_stability_metric.dart';
 import 'metrics/rom_metric.dart';
 import 'metrics/knee_straightness_metric.dart';
 import 'metrics/tempo_metric.dart';
+import 'metrics/arm_position_metric.dart';
 
 class LegRaise extends ExerciseBase {
   @override
@@ -35,12 +36,14 @@ class LegRaise extends ExerciseBase {
   final RomMetric romMetric = RomMetric();
   final KneeStraightnessMetric kneeMetric = KneeStraightnessMetric();
   final TempoMetric tempoMetric = TempoMetric();
+  final ArmPositionMetric armMetric = ArmPositionMetric();
 
   late final List<LegRaiseMetricBase> _metrics = [
     pelvicMetric,
     romMetric,
     kneeMetric,
-    tempoMetric
+    tempoMetric,
+    armMetric
   ];
 
   final Debouncer _raisingDebouncer = Debouncer(requiredFrames: 2);
@@ -216,6 +219,80 @@ class LegRaise extends ExerciseBase {
     );
   }
 
+  ({
+    bool isVisible,
+    bool isCorrect,
+    double? minElbowAngle,
+    double? maxWristHipDistanceRatio,
+  }) _calculateArmPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+    final samples = <({double elbowAngle, double wristHipDistanceRatio})>[];
+
+    void collectArm(
+      PoseLandmarkType shoulderType,
+      PoseLandmarkType hipType,
+      PoseLandmarkType elbowType,
+      PoseLandmarkType wristType,
+    ) {
+      final shoulder = landmarks[shoulderType];
+      final hip = landmarks[hipType];
+      final elbow = landmarks[elbowType];
+      final wrist = landmarks[wristType];
+      if (shoulder == null || hip == null || elbow == null || wrist == null) {
+        return;
+      }
+      if (![shoulder, hip, elbow, wrist]
+          .every(ExerciseBase.isLandmarkConfident)) {
+        return;
+      }
+
+      final scale = calculateDistance(shoulder, hip);
+      if (scale <= 1e-6) return;
+
+      samples.add((
+        elbowAngle: calculateAngleNormalized(
+            firstPoint: shoulder, midPoint: elbow, lastPoint: wrist),
+        wristHipDistanceRatio: calculateDistance(wrist, hip) / scale,
+      ));
+    }
+
+    collectArm(
+      PoseLandmarkType.leftShoulder,
+      PoseLandmarkType.leftHip,
+      PoseLandmarkType.leftElbow,
+      PoseLandmarkType.leftWrist,
+    );
+    collectArm(
+      PoseLandmarkType.rightShoulder,
+      PoseLandmarkType.rightHip,
+      PoseLandmarkType.rightElbow,
+      PoseLandmarkType.rightWrist,
+    );
+
+    if (samples.isEmpty) {
+      return (
+        isVisible: false,
+        isCorrect: false,
+        minElbowAngle: null,
+        maxWristHipDistanceRatio: null,
+      );
+    }
+
+    var minElbow = samples.first.elbowAngle;
+    var maxWristHip = samples.first.wristHipDistanceRatio;
+    for (final sample in samples.skip(1)) {
+      minElbow = math.min(minElbow, sample.elbowAngle);
+      maxWristHip = math.max(maxWristHip, sample.wristHipDistanceRatio);
+    }
+
+    return (
+      isVisible: true,
+      isCorrect: minElbow >= LegRaiseConfig.ARM_ELBOW_STRAIGHT_MIN &&
+          maxWristHip <= LegRaiseConfig.ARM_WRIST_HIP_MAX_RATIO,
+      minElbowAngle: minElbow,
+      maxWristHipDistanceRatio: maxWristHip,
+    );
+  }
+
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     final angles = _calculateStrictAngles(landmarks);
@@ -227,6 +304,17 @@ class LegRaise extends ExerciseBase {
     if (angles.kneeStraight < LegRaiseConfig.START_KNEE_STRAIGHT_MIN)
       return false;
     if (angles.trunkHorizontal > LegRaiseConfig.MAX_TRUNK_ANGLE) return false;
+
+    final armPosition = _calculateArmPosition(landmarks);
+    if (!armPosition.isVisible) {
+      resultIssues.feedback['Arms'] =
+          'Giữ hai tay thẳng sát hông trong khung hình.';
+      return false;
+    }
+    if (!armPosition.isCorrect) {
+      resultIssues.feedback['Arms'] = 'Duỗi thẳng hai tay và khép sát hông.';
+      return false;
+    }
 
     return true;
   }
@@ -240,6 +328,7 @@ class LegRaise extends ExerciseBase {
     logger.pushKey("rom_fails_count", romMetric.faultsCount);
     logger.pushKey("knee_fails_count", kneeMetric.faultsCount);
     logger.pushKey("tempo_fails_count", tempoMetric.faultsCount);
+    logger.pushKey("arm_position_fails_count", armMetric.faultsCount);
     logger.pushGoodRepCount();
 
     StringBuffer dump = StringBuffer();
@@ -288,6 +377,7 @@ class LegRaise extends ExerciseBase {
     double hipFlexion = angles.hipFlexion;
     double kneeStraight = angles.kneeStraight;
     double trunkHorizontal = angles.trunkHorizontal;
+    final armPosition = _calculateArmPosition(landmarks);
 
     final ctx = LegRaiseRepContext(
       hipFlexionAngle: hipFlexion,
@@ -296,6 +386,9 @@ class LegRaise extends ExerciseBase {
       hipY: hip.y,
       ankleY: ankle.y,
       scaleFactor: scaleFactor,
+      armsVisible: armPosition.isVisible,
+      armStraightnessAngle: armPosition.minElbowAngle,
+      wristHipDistanceRatio: armPosition.maxWristHipDistanceRatio,
       state: state,
       frameTimestampMs: now,
       resultIssues: resultIssues,
@@ -380,11 +473,12 @@ class LegRaise extends ExerciseBase {
 
     if (!correctForm) resultIssues.feedback['Result'] = 'Fix Form';
 
-    bool hasBentKnee = allFaults.any((f) => f.type == 'BentKnee');
-    if (!hasBentKnee) {
+    bool hasBlockingFormFault =
+        allFaults.any((f) => f.type == 'BentKnee' || f.type == 'ArmPosition');
+    if (!hasBlockingFormFault) {
       repCount++;
     } else {
-      ctx.resultIssues.feedback['Error'] = 'Không tính rep';
+      ctx.resultIssues.feedback['Result'] = 'Không tính rep';
     }
 
     logger

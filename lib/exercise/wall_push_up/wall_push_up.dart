@@ -60,6 +60,7 @@ class WallPushUpConfig {
   static const double START_TRUNK_INCLINATION_MIN = 45.0;
   static const double ACTIVE_TRUNK_INCLINATION_MIN = 40.0;
   static const double HAND_PLACEMENT_MAX_OFFSET_RATIO = 0.25;
+  static const double HEEL_RAISE_MIN_RATIO = 0.06;
   static const String WALL_DISTANCE_SETUP =
       'Đứng cách tường một cánh tay + 30-40 cm, đặt tay lên tường.';
   // NOTE: normalized angle caps at 180°, so the spec's 195° upper bound
@@ -122,6 +123,7 @@ class RepContext {
 
   /// Angle HIP→ANKLE→FOOT_INDEX captured at setup for stance diagnostics.
   final double? bodyFootAngle;
+  final double? heelRaiseRatio;
 
   /// Full side-line angle: SHOULDER→HIP→FOOT_ANCHOR.
   /// 180° means shoulder, hip and foot are aligned in one straight line.
@@ -152,6 +154,7 @@ class RepContext {
     required this.footAnchorX,
     required this.footAnchorY,
     required this.bodyFootAngle,
+    required this.heelRaiseRatio,
     required this.shoulderHipFootLineAngle,
     required this.trunkInclinationAngle,
     required this.scaleFactor,
@@ -505,6 +508,19 @@ class WallPushUp extends ExerciseBase {
         firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
     if (bodyLine < WallPushUpConfig.START_BODYLINE_MIN) return false;
 
+    final heelRaiseRatio =
+        _calculateHeelRaiseRatio(heel, footIndex, shoulderToHip);
+    if (heelRaiseRatio == null) {
+      resultIssues.feedback['Feet'] =
+          'Giữ gót và mũi chân rõ trong khung hình.';
+      return false;
+    }
+    if (heelRaiseRatio < WallPushUpConfig.HEEL_RAISE_MIN_RATIO) {
+      resultIssues.feedback['Feet'] =
+          'Kiễng gót chân lên, dồn lực vào mũi chân.';
+      return false;
+    }
+
     // --- Capture hold-still baselines (last held frame wins) ---
     final ear = getSideLandmark(
       landmarks: landmarks,
@@ -689,6 +705,8 @@ class WallPushUp extends ExerciseBase {
         ? null
         : calculateAngleNormalized(
             firstPoint: hip, midPoint: ankle, lastPoint: footIndex);
+    final double? heelRaiseRatio =
+        _calculateHeelRaiseRatio(heel, footIndex, shoulderToHip);
     final double? shoulderHipFootLineAngle = footAnchor == null
         ? null
         : _calculateAngleFromCoordinates(
@@ -730,6 +748,7 @@ class WallPushUp extends ExerciseBase {
       footAnchorX: footAnchor?.x,
       footAnchorY: footAnchor?.y,
       bodyFootAngle: bodyFootAngle,
+      heelRaiseRatio: heelRaiseRatio,
       shoulderHipFootLineAngle: shoulderHipFootLineAngle,
       trunkInclinationAngle: trunkInclinationAngle,
       scaleFactor: shoulderToHip > 0 ? shoulderToHip : scaleFactor,
@@ -748,6 +767,7 @@ class WallPushUp extends ExerciseBase {
         trunkInclinationAngle?.toStringAsFixed(1) ?? 'N/A';
     debugData['flareAngle'] = elbowFlareAngle.toStringAsFixed(1);
     debugData['bodyFootAngle'] = bodyFootAngle?.toStringAsFixed(1) ?? 'N/A';
+    debugData['heelRaiseRatio'] = heelRaiseRatio?.toStringAsFixed(2) ?? 'N/A';
     debugData['correctForm'] = correctForm.toString();
 
     // 5. Update state machine before checking completion so the frame that
@@ -1010,6 +1030,22 @@ class WallPushUp extends ExerciseBase {
     for (final metric in _metrics) {
       metric.onStateTransition(previousWallPushUpState, newState, timestampMs);
     }
+  }
+
+  double? _calculateHeelRaiseRatio(
+    PoseLandmark? heel,
+    PoseLandmark? footIndex,
+    double? scale,
+  ) {
+    if (heel == null || footIndex == null || scale == null || scale <= 0) {
+      return null;
+    }
+    if (!ExerciseBase.isLandmarkConfident(heel) ||
+        !ExerciseBase.isLandmarkConfident(footIndex)) {
+      return null;
+    }
+
+    return (footIndex.y - heel.y) / scale;
   }
 
   _Point? _averagePoint(List<PoseLandmark?> points) {

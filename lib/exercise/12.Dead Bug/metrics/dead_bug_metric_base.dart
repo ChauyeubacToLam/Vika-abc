@@ -50,7 +50,8 @@ class DeadBugFaultPriority {
   static const int antiExtension = 0; // Võng lưng (Critical)
   static const int coordination = 1; // Đi cùng bên (High)
   static const int stableLimbs = 2; // Chi trụ bị xê dịch (Medium)
-  static const int tempo = 3; // Thả rơi nhanh (Medium)
+  static const int floorContact = 3; // Tay/chân chạm sàn (Medium)
+  static const int tempo = 4; // Thả rơi nhanh (Medium)
 }
 
 abstract class DeadBugMetricBase implements DebugMetricSource {

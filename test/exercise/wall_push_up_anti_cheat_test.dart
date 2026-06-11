@@ -30,6 +30,8 @@ Map<PoseLandmarkType, PoseLandmark> _wallPose({
   double wristY = 200,
   double footX = 150,
   double footY = 500,
+  double? heelY,
+  double? footIndexY,
 }) {
   return {
     PoseLandmarkType.rightShoulder: _landmark(
@@ -60,12 +62,12 @@ Map<PoseLandmarkType, PoseLandmark> _wallPose({
     PoseLandmarkType.rightHeel: _landmark(
       PoseLandmarkType.rightHeel,
       footX,
-      footY,
+      heelY ?? footY - 20,
     ),
     PoseLandmarkType.rightFootIndex: _landmark(
       PoseLandmarkType.rightFootIndex,
       footX,
-      footY,
+      footIndexY ?? footY,
     ),
   };
 }
@@ -118,6 +120,21 @@ void main() {
 
     expect(wallPushUp.isInStartPosition(top), isTrue);
     expect(wallPushUp.isInStartPosition(_floorLikePose()), isFalse);
+    expect(
+      wallPushUp.isInStartPosition(
+        _wallPose(
+          shoulderX: 300,
+          shoulderY: 200,
+          hipX: 250,
+          hipY: 300,
+          elbowX: 360,
+          elbowY: 200,
+          heelY: 500,
+          footIndexY: 500,
+        ),
+      ),
+      isFalse,
+    );
   });
 
   test('counts only after a full bottom-to-standing wall push-up', () {

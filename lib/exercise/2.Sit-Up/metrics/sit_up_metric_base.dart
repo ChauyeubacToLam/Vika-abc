@@ -12,6 +12,7 @@ class SitUpRepContext {
   final double hipKneeAnkleAngle;
   final double kneeHipShoulderAngle;
   final double shoulderY;
+  final double ankleX;
   final double ankleY;
   final double? scaleFactor;
   final SitUpState state;
@@ -23,6 +24,7 @@ class SitUpRepContext {
     required this.hipKneeAnkleAngle,
     required this.kneeHipShoulderAngle,
     required this.shoulderY,
+    required this.ankleX,
     required this.ankleY,
     required this.scaleFactor,
     required this.state,

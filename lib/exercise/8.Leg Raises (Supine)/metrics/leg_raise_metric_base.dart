@@ -22,6 +22,10 @@ class LegRaiseConfig {
 
   // Trunk Angle Limit
   static const double MAX_TRUNK_ANGLE = 45.0;
+
+  // Arm position: elbows straight, wrists kept beside the hips.
+  static const double ARM_ELBOW_STRAIGHT_MIN = 150.0;
+  static const double ARM_WRIST_HIP_MAX_RATIO = 0.75;
 }
 
 enum LegRaiseState { lying, raising, top, lowering }
@@ -36,6 +40,10 @@ class LegRaiseRepContext {
   final double ankleY; // Dùng để đo vận tốc khi ở pha TOP
   final double scaleFactor; // Khoảng cách Shoulder-Hip (chuẩn hóa kích thước)
 
+  final bool armsVisible;
+  final double? armStraightnessAngle;
+  final double? wristHipDistanceRatio;
+
   final LegRaiseState state;
   final int frameTimestampMs;
   final ResultIssues resultIssues;
@@ -47,6 +55,9 @@ class LegRaiseRepContext {
     required this.hipY,
     required this.ankleY,
     required this.scaleFactor,
+    required this.armsVisible,
+    required this.armStraightnessAngle,
+    required this.wristHipDistanceRatio,
     required this.state,
     required this.frameTimestampMs,
     required this.resultIssues,

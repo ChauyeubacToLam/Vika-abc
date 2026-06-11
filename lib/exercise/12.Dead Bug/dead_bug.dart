@@ -11,6 +11,7 @@ import 'metrics/anti_extension_metric.dart';
 import 'metrics/coordination_metric.dart';
 import 'metrics/stable_limbs_metric.dart';
 import 'metrics/tempo_metric.dart';
+import 'metrics/floor_contact_metric.dart';
 
 class DeadBugConfig {
   static const int MAX_REP = 20; // 10 rep mỗi bên
@@ -51,12 +52,14 @@ class DeadBug extends ExerciseBase {
   final CoordinationMetric coordinationMetric = CoordinationMetric();
   final StableLimbsMetric stableLimbsMetric = StableLimbsMetric();
   final TempoMetric tempoMetric = TempoMetric();
+  final FloorContactMetric floorContactMetric = FloorContactMetric();
 
   late final List<DeadBugMetricBase> _metrics = [
     antiExtensionMetric,
     coordinationMetric,
     stableLimbsMetric,
-    tempoMetric
+    tempoMetric,
+    floorContactMetric
   ];
   late final List<TrackedMetric> _trackedMetrics =
       _metrics.map(TrackedMetric.new).toList();
@@ -175,6 +178,7 @@ class DeadBug extends ExerciseBase {
         "anti_extension_fails_count", antiExtensionMetric.faultsCount);
     logger.pushKey("coordination_fails_count", coordinationMetric.faultsCount);
     logger.pushKey("stable_limbs_fails_count", stableLimbsMetric.faultsCount);
+    logger.pushKey("floor_contact_fails_count", floorContactMetric.faultsCount);
     logger.pushKey("tempo_fails_count", tempoMetric.faultsCount);
     logger.pushGoodRepCount();
 
@@ -187,6 +191,68 @@ class DeadBug extends ExerciseBase {
           "${log['time']} | ${log['state']} | ${log['max'].toStringAsFixed(0)} | ${log['la'].toStringAsFixed(0)} | ${log['ra'].toStringAsFixed(0)} | ${log['lh'].toStringAsFixed(0)} | ${log['rh'].toStringAsFixed(0)} | ${log['hipY'].toStringAsFixed(1)}");
     }
     logger.pushKey("diagnostic_dump", dump.toString());
+  }
+
+  ({
+    double pairAngle,
+    bool physicalLeftArm,
+    bool physicalLeftLeg,
+  }) _selectActivePair({
+    required double leftArmAngle,
+    required double rightArmAngle,
+    required double leftLegAngle,
+    required double rightLegAngle,
+  }) {
+    final candidates = <({
+      double armAngle,
+      double legAngle,
+      bool armIsLeft,
+      bool legIsLeft,
+    })>[
+      (
+        armAngle: leftArmAngle,
+        legAngle: rightLegAngle,
+        armIsLeft: true,
+        legIsLeft: false,
+      ),
+      (
+        armAngle: rightArmAngle,
+        legAngle: leftLegAngle,
+        armIsLeft: false,
+        legIsLeft: true,
+      ),
+      (
+        armAngle: leftArmAngle,
+        legAngle: leftLegAngle,
+        armIsLeft: true,
+        legIsLeft: true,
+      ),
+      (
+        armAngle: rightArmAngle,
+        legAngle: rightLegAngle,
+        armIsLeft: false,
+        legIsLeft: false,
+      ),
+    ];
+
+    var best = candidates.first;
+    var bestPairAngle =
+        best.armAngle < best.legAngle ? best.armAngle : best.legAngle;
+    for (final candidate in candidates.skip(1)) {
+      final pairAngle = candidate.armAngle < candidate.legAngle
+          ? candidate.armAngle
+          : candidate.legAngle;
+      if (pairAngle > bestPairAngle) {
+        best = candidate;
+        bestPairAngle = pairAngle;
+      }
+    }
+
+    return (
+      pairAngle: bestPairAngle,
+      physicalLeftArm: best.armIsLeft,
+      physicalLeftLeg: best.legIsLeft,
+    );
   }
 
   @override
@@ -249,14 +315,15 @@ class DeadBug extends ExerciseBase {
     double rHipAng = calculateAngleNormalized(
         firstPoint: rShoulder, midPoint: rHip, lastPoint: rKnee);
 
-    final activeArmAngle = lArmAng > rArmAng ? lArmAng : rArmAng;
-    final activeLegAngle = lHipAng > rHipAng ? lHipAng : rHipAng;
-    final activePairAngle =
-        activeArmAngle < activeLegAngle ? activeArmAngle : activeLegAngle;
-
-    // Pick the arm and leg with the larger opening angle for this frame.
-    final physicalLeftArm = lArmAng >= rArmAng;
-    final physicalLeftLeg = lHipAng >= rHipAng;
+    final activePair = _selectActivePair(
+      leftArmAngle: lArmAng,
+      rightArmAngle: rArmAng,
+      leftLegAngle: lHipAng,
+      rightLegAngle: rHipAng,
+    );
+    final activePairAngle = activePair.pairAngle;
+    final physicalLeftArm = activePair.physicalLeftArm;
+    final physicalLeftLeg = activePair.physicalLeftLeg;
 
     if ((state == DeadBugState.extending || state == DeadBugState.hold) &&
         activePairAngle >= _peakPairAngle) {
@@ -355,11 +422,9 @@ class DeadBug extends ExerciseBase {
 
   void _completeRep(DeadBugRepContext ctx) {
     previousState = DeadBugState.setup;
-    final blockingFault = _blockingFaultFor(ctx);
-    if (blockingFault != null) {
-      _publishBlockingFault(blockingFault);
-      _resetRepState();
-      return;
+    final coordinationFault = _blockingFaultFor(ctx);
+    if (coordinationFault != null) {
+      _publishBlockingFault(coordinationFault);
     }
 
     repCount++;
@@ -367,6 +432,10 @@ class DeadBug extends ExerciseBase {
 
     final allFaults = <FaultRecord>[];
     for (var metric in _metrics) allFaults.addAll(metric.faults);
+    if (coordinationFault != null &&
+        !allFaults.any((f) => f.type == coordinationFault.type)) {
+      allFaults.add(coordinationFault);
+    }
     correctForm = !allFaults.any((f) => f.affectsForm);
 
     if (!correctForm) resultIssues.feedback['Result'] = 'Fix Form';
@@ -413,7 +482,7 @@ class DeadBug extends ExerciseBase {
   }
 
   void _publishBlockingFault(FaultRecord fault) {
-    resultIssues.feedback['Result'] = 'Không tính rep';
+    resultIssues.feedback['Result'] = 'Fix Form';
     resultIssues.feedback['Error'] = fault.message;
     resultIssues.addInstruction(
       currentPhaseKey,

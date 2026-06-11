@@ -213,6 +213,7 @@ class SitUp extends ExerciseBase with SideTrackedExerciseMixin {
       hipKneeAnkleAngle: kneeAngle,
       kneeHipShoulderAngle: khsAngle,
       shoulderY: shoulder.y,
+      ankleX: ankle.x,
       ankleY: ankle.y,
       scaleFactor: scaleFactor,
       state: state,

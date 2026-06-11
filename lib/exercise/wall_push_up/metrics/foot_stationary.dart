@@ -36,6 +36,7 @@ class FootStationaryMetric extends WallPushUpMetricBase {
 
   final Debouncer _warningDebouncer = Debouncer(requiredFrames: 8);
   final Debouncer _errorDebouncer = Debouncer(requiredFrames: 10);
+  final Debouncer _heelRaiseDebouncer = Debouncer(requiredFrames: 6);
 
   double? _baselineX;
   double? _baselineY;
@@ -90,6 +91,9 @@ class FootStationaryMetric extends WallPushUpMetricBase {
     if (ctx.bodyFootAngle != null) {
       _debugData['bodyFootAngle'] = ctx.bodyFootAngle!.toStringAsFixed(1);
     }
+    if (ctx.heelRaiseRatio != null) {
+      _debugData['heelRaiseRatio'] = ctx.heelRaiseRatio!.toStringAsFixed(2);
+    }
 
     final bool isError = movement > FootStationaryConfig.ERROR_MOVE;
     final bool isWarning = movement > FootStationaryConfig.WARNING_MOVE &&
@@ -120,6 +124,29 @@ class FootStationaryMetric extends WallPushUpMetricBase {
       ctx.resultIssues.feedback['Feet'] = 'Chân giữ cố định tốt!';
     }
 
+    final heelDownConfirmed = _heelRaiseDebouncer.update(
+      ctx.heelRaiseRatio != null &&
+          ctx.heelRaiseRatio! < WallPushUpConfig.HEEL_RAISE_MIN_RATIO,
+    );
+    if (heelDownConfirmed) {
+      ctx.resultIssues.feedback['Feet'] =
+          'Kiễng gót chân lên, dồn lực vào mũi chân.';
+      if (!_instructionSet) {
+        ctx.resultIssues.addInstruction(
+          'standing',
+          'Feet',
+          'Kiễng gót chân lên và giữ mũi chân cố định trên sàn.',
+        );
+        _instructionSet = true;
+      }
+      _logFault(
+        phase,
+        'Gót chân chưa kiễng',
+        voiceMessage: 'Kiễng gót chân lên',
+        affectsForm: true,
+      );
+    }
+
     _debugData['footStatus'] =
         _faults.isNotEmpty ? '⚠️ ${_faults.last.message}' : '✅';
   }
@@ -143,6 +170,7 @@ class FootStationaryMetric extends WallPushUpMetricBase {
     _debugData.clear();
     _warningDebouncer.reset();
     _errorDebouncer.reset();
+    _heelRaiseDebouncer.reset();
     _instructionSet = false;
     // Baselines intentionally persist across reps.
   }

@@ -175,16 +175,16 @@ void main() {
   test('counts two reps when opposite arm and leg alternate each rep', () {
     final exercise = _activatedDeadBug();
     final leftArmRightLegTop = _deadBugPose(
-      leftArmAngle: 170,
-      rightLegAngle: 170,
+      leftArmAngle: 155,
+      rightLegAngle: 155,
     );
     final leftArmRightLegReturn = _deadBugPose(
       leftArmAngle: 120,
       rightLegAngle: 120,
     );
     final rightArmLeftLegTop = _deadBugPose(
-      rightArmAngle: 170,
-      leftLegAngle: 170,
+      rightArmAngle: 155,
+      leftLegAngle: 155,
     );
     final rightArmLeftLegReturn = _deadBugPose(
       rightArmAngle: 120,
@@ -217,11 +217,11 @@ void main() {
         everyElement(isTrue));
   });
 
-  test('does not count a repeated side as the next rep', () {
+  test('counts a repeated side but marks the rep as form correction', () {
     final exercise = _activatedDeadBug();
     final repeatedTop = _deadBugPose(
-      leftArmAngle: 170,
-      rightLegAngle: 170,
+      leftArmAngle: 155,
+      rightLegAngle: 155,
     );
     final repeatedReturn = _deadBugPose(
       leftArmAngle: 120,
@@ -241,7 +241,38 @@ void main() {
       startMs: 3000,
     );
 
+    expect(exercise.repCount, 2);
+    expect(exercise.logger.repLogs, hasLength(2));
+    expect(exercise.logger.repLogs.last.correctForm, isFalse);
+    expect(
+      exercise.logger.repLogs.last.data['fault_types'],
+      contains('NotAlternating'),
+    );
+  });
+
+  test('counts floor contact but marks the rep as form correction', () {
+    final exercise = _activatedDeadBug();
+    final floorContactTop = _deadBugPose(
+      leftArmAngle: 170,
+      rightLegAngle: 170,
+    );
+    final returningPose = _deadBugPose(
+      leftArmAngle: 120,
+      rightLegAngle: 120,
+    );
+
+    _completeDeadBugRep(
+      exercise: exercise,
+      topPose: floorContactTop,
+      returningPose: returningPose,
+      startMs: 100,
+    );
+
     expect(exercise.repCount, 1);
-    expect(exercise.logger.repLogs, hasLength(1));
+    expect(exercise.logger.repLogs.single.correctForm, isFalse);
+    expect(
+      exercise.logger.repLogs.single.data['fault_types'],
+      contains('FloorContact'),
+    );
   });
 }

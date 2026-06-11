@@ -8,6 +8,7 @@ import 'metrics/reverse_crunch_metric_base.dart';
 import 'metrics/swinging_momentum_metric.dart';
 import 'metrics/pelvic_curl_metric.dart';
 import 'metrics/eccentric_tempo_metric.dart';
+import 'metrics/arm_position_metric.dart';
 import '../../utils/exercise_logger.dart';
 import '../../utils/debouncer.dart';
 
@@ -58,11 +59,13 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
   final SwingingMomentumMetric momentumMetric = SwingingMomentumMetric();
   final PelvicCurlMetric curlMetric = PelvicCurlMetric();
   final EccentricTempoMetric tempoMetric = EccentricTempoMetric();
+  final ArmPositionMetric armMetric = ArmPositionMetric();
 
   late final List<ReverseCrunchMetricBase> _metrics = [
     momentumMetric,
     curlMetric,
-    tempoMetric
+    tempoMetric,
+    armMetric
   ];
 
   // =========================================================================
@@ -101,6 +104,78 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
   }
   // =========================================================================
 
+  ({
+    bool isVisible,
+    bool isCorrect,
+    double? minElbowAngle,
+    double? maxWristHipDistanceRatio,
+  }) _calculateArmPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+    double? minElbow;
+    double? maxWristHip;
+
+    void collectArm(
+      PoseLandmarkType shoulderType,
+      PoseLandmarkType hipType,
+      PoseLandmarkType elbowType,
+      PoseLandmarkType wristType,
+    ) {
+      final shoulder = landmarks[shoulderType];
+      final hip = landmarks[hipType];
+      final elbow = landmarks[elbowType];
+      final wrist = landmarks[wristType];
+      if (shoulder == null || hip == null || elbow == null || wrist == null) {
+        return;
+      }
+      if (![shoulder, hip, elbow, wrist]
+          .every(ExerciseBase.isLandmarkConfident)) {
+        return;
+      }
+
+      final scale = calculateDistance(shoulder, hip);
+      if (scale <= 1e-6) return;
+
+      final elbowAngle = calculateAngleNormalized(
+          firstPoint: shoulder, midPoint: elbow, lastPoint: wrist);
+      final wristHipDistanceRatio = calculateDistance(wrist, hip) / scale;
+
+      minElbow =
+          minElbow == null || elbowAngle < minElbow! ? elbowAngle : minElbow;
+      maxWristHip = maxWristHip == null || wristHipDistanceRatio > maxWristHip!
+          ? wristHipDistanceRatio
+          : maxWristHip;
+    }
+
+    collectArm(
+      PoseLandmarkType.leftShoulder,
+      PoseLandmarkType.leftHip,
+      PoseLandmarkType.leftElbow,
+      PoseLandmarkType.leftWrist,
+    );
+    collectArm(
+      PoseLandmarkType.rightShoulder,
+      PoseLandmarkType.rightHip,
+      PoseLandmarkType.rightElbow,
+      PoseLandmarkType.rightWrist,
+    );
+
+    if (minElbow == null || maxWristHip == null) {
+      return (
+        isVisible: false,
+        isCorrect: false,
+        minElbowAngle: null,
+        maxWristHipDistanceRatio: null,
+      );
+    }
+
+    return (
+      isVisible: true,
+      isCorrect: minElbow! >= ReverseCrunchConfig.ARM_ELBOW_STRAIGHT_MIN &&
+          maxWristHip! <= ReverseCrunchConfig.ARM_WRIST_HIP_MAX_RATIO,
+      minElbowAngle: minElbow,
+      maxWristHipDistanceRatio: maxWristHip,
+    );
+  }
+
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     final lm = _getLandmarks(landmarks);
@@ -124,6 +199,18 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
     if (kneeAngle < ReverseCrunchConfig.SETUP_KNEE_ANGLE_RANGE[0] ||
         kneeAngle > ReverseCrunchConfig.SETUP_KNEE_ANGLE_RANGE[1]) return false;
     if (trunkHorizontalAngle > 35.0) return false;
+
+    final armPosition = _calculateArmPosition(landmarks);
+    if (!armPosition.isVisible) {
+      resultIssues.feedback['Arms'] =
+          'Giữ hai tay thẳng sát hông trong khung hình.';
+      return false;
+    }
+    if (!armPosition.isCorrect) {
+      resultIssues.feedback['Arms'] = 'Duỗi thẳng hai tay và khép sát hông.';
+      return false;
+    }
+
     return true;
   }
 
@@ -172,6 +259,7 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
       'TrunkKneeVel': trunkKneeVelocity.toStringAsFixed(2),
       'Hip_Y': lm['hip']!.y.toStringAsFixed(1),
     };
+    final armPosition = _calculateArmPosition(landmarks);
 
     final ctx = RepContext(
       state: crunchState,
@@ -181,6 +269,9 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
       kneeAngle: kneeAngle,
       hipY: lm['hip']!.y,
       trunkKneeVelocity: trunkKneeVelocity,
+      armsVisible: armPosition.isVisible,
+      armStraightnessAngle: armPosition.minElbowAngle,
+      wristHipDistanceRatio: armPosition.maxWristHipDistanceRatio,
       resultIssues: resultIssues,
     );
 
@@ -295,6 +386,7 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
     logger.pushKey("momentum_fails", momentumMetric.faultsCount);
     logger.pushKey("curl_fails", curlMetric.faultsCount);
     logger.pushKey("tempo_fails", tempoMetric.faultsCount);
+    logger.pushKey("arm_position_fails", armMetric.faultsCount);
     logger.pushKey("rejected_attempts_count", _rejectedAttempts);
     logger.pushGoodRepCount();
   }
