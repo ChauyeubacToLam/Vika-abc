@@ -56,7 +56,6 @@ flutter:
     - assets/branding/
     - assets/images/
 #    - assets/images/onboarding/
-    - .env
 
   # ─── Fonts ───
   # Vika uses Be Vietnam Pro as a single family for the whole main app
