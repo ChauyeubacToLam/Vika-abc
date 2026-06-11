@@ -30,6 +30,7 @@ class PoseOverlayPainter extends CustomPainter {
     this.fit = BoxFit.cover,
     this.mirrorHorizontally,
     this.debugData = const {},
+    this.debugLabelsEnabled = false,
     this.style = SkeletonStyle.constellation,
   });
 
@@ -61,6 +62,7 @@ class PoseOverlayPainter extends CustomPainter {
   final BoxFit fit;
   final bool? mirrorHorizontally;
   final Map<String, dynamic> debugData;
+  final bool debugLabelsEnabled;
   final SkeletonStyle style;
 
   final Paint _classicLinePaint = Paint()..strokeCap = StrokeCap.round;
@@ -423,7 +425,7 @@ class PoseOverlayPainter extends CustomPainter {
         break;
     }
 
-    if (style != SkeletonStyle.vikaCream) {
+    if (debugLabelsEnabled && style != SkeletonStyle.vikaCream) {
       _drawMetricLabels(canvas, projectedPoints);
     }
   }
@@ -1080,6 +1082,8 @@ class PoseOverlayPainter extends CustomPainter {
         oldDelegate.fit != fit ||
         oldDelegate.mirrorHorizontally != mirrorHorizontally ||
         oldDelegate.style != style ||
-        !mapEquals(oldDelegate.debugData, debugData);
+        oldDelegate.debugLabelsEnabled != debugLabelsEnabled ||
+        ((oldDelegate.debugLabelsEnabled || debugLabelsEnabled) &&
+            !mapEquals(oldDelegate.debugData, debugData));
   }
 }

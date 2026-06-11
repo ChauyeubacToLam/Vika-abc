@@ -368,6 +368,7 @@ class GluteBridge extends ExerciseBase {
       resultIssues: resultIssues,
     );
 
+    final debugEnabled = isDebugModeActive;
     // ---------- 4. Populate Debug Data ----------
 
     debugData['gluteState'] = gluteState.toString().split('.').last;
@@ -400,8 +401,10 @@ class GluteBridge extends ExerciseBase {
     }
 
     // Merge metric debug data.
-    for (final metric in _metrics) {
-      debugData.addAll(metric.debugData);
+    if (debugEnabled) {
+      for (final metric in _metrics) {
+        debugData.addAll(metric.debugData);
+      }
     }
 
     // ---------- 7. Status Coaching ----------
@@ -589,8 +592,10 @@ class GluteBridge extends ExerciseBase {
     setFeedback.add({correctForm: faultMap});
 
     // Merge metric debug data BEFORE reset.
-    for (final metric in _metrics) {
-      debugData.addAll(metric.debugData);
+    if (isDebugModeActive) {
+      for (final metric in _metrics) {
+        debugData.addAll(metric.debugData);
+      }
     }
 
     // Reset for next rep.

@@ -357,6 +357,7 @@ class WarriorOne extends ExerciseBase {
       resultIssues: resultIssues,
     );
 
+    final debugEnabled = isDebugModeActive;
     // 7. Debug.
     debugData['holdState'] = holdState.name;
     debugData['frontLeg'] = (_isLeftLegFront ?? true) ? 'Left' : 'Right';
@@ -412,8 +413,10 @@ class WarriorOne extends ExerciseBase {
     }
 
     // 10. Merge metric debug.
-    for (final metric in _metrics) {
-      debugData.addAll(metric.debugData);
+    if (debugEnabled) {
+      for (final metric in _metrics) {
+        debugData.addAll(metric.debugData);
+      }
     }
   }
 

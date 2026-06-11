@@ -355,6 +355,7 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
     final knee = lm['knee']!;
     final ankle = lm['ankle']; // Optional
 
+    final debugEnabled = isDebugModeActive;
     debugData["shoulderY"] = shoulder.y;
     final ankleVisible =
         ankle != null && ExerciseBase.isLandmarkConfident(ankle);
@@ -454,17 +455,23 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
     if (curlUpState == CurlUpState.resting) {
       for (var i = 0; i < _metrics.length; i++) {
         _metrics[i].onRestingFrame(ctx);
-        _trackedMetrics[i].onTick(now);
+        if (debugEnabled) {
+          _trackedMetrics[i].onTick(now);
+        }
       }
     } else {
       for (var i = 0; i < _metrics.length; i++) {
         _metrics[i].update(ctx);
-        _trackedMetrics[i].onTick(now);
+        if (debugEnabled) {
+          _trackedMetrics[i].onTick(now);
+        }
       }
     }
 
-    for (final metric in _metrics) {
-      debugData.addAll(metric.debugData);
+    if (debugEnabled) {
+      for (final metric in _metrics) {
+        debugData.addAll(metric.debugData);
+      }
     }
 
     // 10. Phase-specific UI instructions
@@ -477,8 +484,10 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
     repCount += 1;
 
     trunkElevationMetric.checkRepCompletion(ctx);
-    for (final trackedMetric in _trackedMetrics) {
-      trackedMetric.onTick(ctx.frameTimestamp);
+    if (isDebugModeActive) {
+      for (final trackedMetric in _trackedMetrics) {
+        trackedMetric.onTick(ctx.frameTimestamp);
+      }
     }
 
     final allFaults = <FaultRecord>[];
@@ -503,8 +512,10 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
 
     setFeedback.add({correctForm: faultMap});
 
-    for (final metric in _metrics) {
-      debugData.addAll(metric.debugData);
+    if (isDebugModeActive) {
+      for (final metric in _metrics) {
+        debugData.addAll(metric.debugData);
+      }
     }
 
 // Peak elevation now from trunkAngle (max during rep) — knee-invariant.

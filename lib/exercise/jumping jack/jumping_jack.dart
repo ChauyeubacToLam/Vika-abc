@@ -266,6 +266,7 @@ class JumpingJack extends ExerciseBase {
       resultIssues: resultIssues,
     );
 
+    final debugEnabled = isDebugModeActive;
     // 4. Debug data
     debugData['jjState'] = jjState.toString().split('.').last;
     debugData['ankleSpread'] = ankleSpreadNorm.toStringAsFixed(2);
@@ -300,8 +301,10 @@ class JumpingJack extends ExerciseBase {
       }
       setFeedback.add({correctForm: faultMap});
 
-      for (final metric in _metrics) {
-        debugData.addAll(metric.debugData);
+      if (debugEnabled) {
+        for (final metric in _metrics) {
+          debugData.addAll(metric.debugData);
+        }
       }
 
       if (tempoMetric.lastRepDuration != null) {
@@ -326,8 +329,10 @@ class JumpingJack extends ExerciseBase {
     }
 
     // 8. Merge metric debug data
-    for (final metric in _metrics) {
-      debugData.addAll(metric.debugData);
+    if (debugEnabled) {
+      for (final metric in _metrics) {
+        debugData.addAll(metric.debugData);
+      }
     }
 
     if (jjState == JJState.closed) {
