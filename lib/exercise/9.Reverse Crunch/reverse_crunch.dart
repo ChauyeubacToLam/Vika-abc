@@ -13,6 +13,10 @@ import '../../utils/exercise_logger.dart';
 import '../../utils/debouncer.dart';
 
 class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
+  ReverseCrunch({this.maxRep = ReverseCrunchConfig.MAX_REP});
+
+  final int maxRep;
+
   @override
   Map<String, SideLandmarkPair> get requiredSideLandmarks => const {
         'shoulder': (
@@ -222,7 +226,7 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
       _isTimeout = true;
       return true;
     }
-    return repCount >= ReverseCrunchConfig.MAX_REP;
+    return repCount >= maxRep;
   }
 
   @override
@@ -381,8 +385,8 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
   @override
   void onSetComplete() {
     logger.pushKey("timeout", _isTimeout);
-    logger.pushKey("target_rep", ReverseCrunchConfig.MAX_REP);
-    logger.pushKey("max_rep", repCount);
+    logger.pushKey("target_rep", maxRep);
+    logger.pushKey("max_rep", maxRep);
     logger.pushKey("momentum_fails", momentumMetric.faultsCount);
     logger.pushKey("curl_fails", curlMetric.faultsCount);
     logger.pushKey("tempo_fails", tempoMetric.faultsCount);

@@ -17,6 +17,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/exercise_definition.dart';
+import '../services/recommendation/recommendation_service.dart';
 import '../services/user_program_service.dart';
 import '../services/user_profile_service.dart';
 import '../theme/app_colors.dart';
@@ -24,6 +25,7 @@ import '../theme/responsive.dart';
 import '../utils/orientation_lock.dart';
 import '../widgets/ivory/bottom_nav.dart';
 import 'dashboard_home_screen.dart';
+import 'exercise/exercise_launch_args.dart';
 import 'library_screen.dart';
 import 'plan_screen.dart';
 import 'profile_screen.dart';
@@ -42,6 +44,7 @@ class _MainShellState extends State<MainShell> {
   final ValueNotifier<int> _progressRefreshNudge = ValueNotifier<int>(0);
   UserProgramData? _program;
   AppUserProfile? _profile;
+  final RecommendationService _recommendations = RecommendationService();
 
   @override
   void initState() {
@@ -78,7 +81,25 @@ class _MainShellState extends State<MainShell> {
   }
 
   void _openExerciseFromLibrary(ExerciseDefinition definition) {
-    Navigator.of(context).pushNamed('/exercise', arguments: definition);
+    unawaited(_openExerciseFromLibraryWithCatalog(definition));
+  }
+
+  Future<void> _openExerciseFromLibraryWithCatalog(
+    ExerciseDefinition definition,
+  ) async {
+    final catalogInfoById =
+        await _recommendations.fetchLaunchCatalogInfoForExerciseIds(
+      [definition.id],
+    );
+    if (!mounted) return;
+    Navigator.of(context).pushNamed(
+      '/exercise',
+      arguments: ExerciseLaunchArgs(
+        definition: definition,
+        catalogExerciseId: definition.id,
+        catalogInfo: catalogInfoById[definition.id],
+      ),
+    );
   }
 
   @override

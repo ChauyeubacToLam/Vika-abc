@@ -6,6 +6,7 @@ import '../../utils/pose_math_helpers.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
 import '../exercise_base.dart';
+import '../../utils/exercise_logger.dart';
 import 'metrics/glute_bridge_metric_base.dart';
 import 'metrics/glute_bridge_hip_extension.dart';
 import 'metrics/glute_bridge_knee_angle.dart';
@@ -228,7 +229,20 @@ class GluteBridge extends ExerciseBase {
   }
 
   @override
-  void onSetComplete() {}
+  void onSetComplete() {
+    logger.pushKey("hip_extension_fails_count", hipExtensionMetric.faultsCount);
+    logger.pushKey("knee_angle_fails_count", kneeAngleMetric.faultsCount);
+    logger.pushKey("speed_control_fails_count", speedControlMetric.faultsCount);
+    logger.pushKey("neck_head_fails_count", neckHeadMetric.faultsCount);
+
+    logger.pushMax("peak_hip_extension_angle", "max_hip_extension_angle");
+    logger.pushMax(
+        "peak_normalized_hip_deviation", "max_normalized_hip_deviation");
+    logger.pushMin("peak_knee_angle", "min_peak_knee_angle");
+
+    logger.pushGoodRepCount();
+    logger.pushKey("max_rep", maxRep);
+  }
 
   /* -----------------------------------------------------------------------
      SAFETY CHECKS
@@ -605,6 +619,17 @@ class GluteBridge extends ExerciseBase {
       }
     }
 
+    logger.addRepLog(RepLog(
+      correctForm: correctForm,
+      repNumber: repCount,
+      data: {
+        "peak_hip_extension_angle": _peakShoulderHipKneeAngle ?? 0.0,
+        "peak_normalized_hip_deviation": _peakNormalizedDeviation ?? 0.0,
+        "peak_knee_angle": _peakKneeAngle ?? 0.0,
+        "fault_types": allFaults.map((f) => f.type).toSet().toList(),
+      },
+    ));
+
     // Reset for next rep.
     correctForm = true;
     _peakHipY = null;
@@ -612,7 +637,7 @@ class GluteBridge extends ExerciseBase {
     _peakNormalizedDeviation = null;
     _peakKneeAngle = null;
     for (final metric in _metrics) {
-      metric.reset();
+      metric.resetAndCountFault();
     }
   }
 

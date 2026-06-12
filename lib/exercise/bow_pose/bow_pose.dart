@@ -2,6 +2,7 @@
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/debouncer.dart';
+import '../../utils/exercise_logger.dart';
 import '../exercise_base.dart';
 import 'metrics/bow_pose_metric_base.dart';
 import 'metrics/connection_metric.dart';
@@ -124,7 +125,16 @@ class BowPose extends ExerciseBase {
   bool requestStop() => repCount >= maxRep;
 
   @override
-  void onSetComplete() {}
+  void onSetComplete() {
+    logger.pushKey("connection_fails_count", connectionMetric.faultsCount);
+    logger.pushKey("lift_form_fails_count", liftFormMetric.faultsCount);
+    logger.pushKey("hold_duration_fails_count", holdDurationMetric.faultsCount);
+    logger.pushKey("stability_fails_count", stabilityMetric.faultsCount);
+
+    logger.pushMax("hold_time", "max_hold_time");
+    logger.pushGoodRepCount();
+    logger.pushKey("max_rep", maxRep);
+  }
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
@@ -221,7 +231,16 @@ class BowPose extends ExerciseBase {
       }
       setFeedback.add({correctForm: faultMap});
 
-      for (final metric in _metrics) metric.reset();
+      logger.addRepLog(RepLog(
+        correctForm: correctForm,
+        repNumber: repCount,
+        data: {
+          "hold_time": holdDurationMetric.currentHoldSeconds,
+          "fault_types": allFaults.map((f) => f.type).toSet().toList(),
+        },
+      ));
+
+      for (final metric in _metrics) metric.resetAndCountFault();
       _stateDebouncer.reset();
       previousState = bowPoseState;
       return;

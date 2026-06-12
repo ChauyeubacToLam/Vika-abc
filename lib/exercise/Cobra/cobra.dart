@@ -189,6 +189,14 @@ class Cobra extends ExerciseBase {
 
   @override
   void onSetComplete() {
+    logger.pushKey("elbow_flexion_fails_count", _elbowMetric.faultsCount);
+    logger.pushKey(
+        "hand_placement_fails_count", _handPlacementMetric.faultsCount);
+    logger.pushKey(
+        "cervical_neutrality_fails_count", _cervicalMetric.faultsCount);
+    logger.pushKey("pelvic_grounding_fails_count", _pelvicMetric.faultsCount);
+    logger.pushKey(
+        "hold_stability_fails_count", _holdStabilityMetric.faultsCount);
     logger.pushGoodRepCount();
     logger.pushKey("max_rep", maxRep);
   }
@@ -415,7 +423,6 @@ class Cobra extends ExerciseBase {
 
       case CobraState.resting:
         _restStartMs = timestampMs;
-        _onHoldComplete();
         break;
 
       case CobraState.setup:
@@ -425,6 +432,10 @@ class Cobra extends ExerciseBase {
 
     for (final metric in _metrics) {
       metric.onStateTransition(previousCobraState, newState, timestampMs);
+    }
+
+    if (newState == CobraState.resting) {
+      _onHoldComplete();
     }
   }
 

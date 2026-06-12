@@ -186,7 +186,7 @@ class BirdDog extends ExerciseBase {
   @override
   void onSetComplete() {
     logger.pushKey("target_rep", maxRep);
-    logger.pushKey("max_rep", repCount);
+    logger.pushKey("max_rep", maxRep);
     logger.pushKey("lumbar_fails_count", lumbarMetric.faultsCount);
     logger.pushKey("alignment_fails_count", alignmentMetric.faultsCount);
     logger.pushKey("trunk_fails_count", trunkMetric.faultsCount);

@@ -1,6 +1,7 @@
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/exercise_logger.dart';
+import '../../utils/debouncer.dart';
 import '../exercise_base.dart';
 import 'metrics/seated_forward_metric_base.dart';
 import 'metrics/knee_extension_metric.dart';
@@ -9,6 +10,14 @@ import 'metrics/hold_tempo_metric.dart';
 import 'metrics/ankle_dorsiflexion_metric.dart';
 
 class SeatedForwardFold extends ExerciseBase {
+  SeatedForwardFold({
+    this.maxSeconds = SeatedForwardConfig.At_Min_Hold_Time,
+  }) : tempoMetric = HoldTempoMetric(minHoldSeconds: maxSeconds);
+
+  static const int _GOOD_HOLD_MAX_FRAME_DELTA_MS = 250;
+
+  final int maxSeconds;
+
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
       const <VikaImageOrientation>{
@@ -28,10 +37,14 @@ class SeatedForwardFold extends ExerciseBase {
   int _lastTimestampMs = -1;
   double _currentVelocity = 0.0;
   int? _stableStartTimeMs;
+  int? _lastGoodHoldFrameTimeMs;
+  double _goodHoldSeconds = 0.0;
+  final Debouncer _goodHoldKneeFaultDebouncer = Debouncer(requiredFrames: 3);
+  final Debouncer _goodHoldSpineFaultDebouncer = Debouncer(requiredFrames: 4);
 
   final KneeExtensionMetric kneeMetric = KneeExtensionMetric();
   final SpinalAlignmentMetric spineMetric = SpinalAlignmentMetric();
-  final HoldTempoMetric tempoMetric = HoldTempoMetric();
+  final HoldTempoMetric tempoMetric;
   final AnkleDorsiflexionMetric ankleMetric = AnkleDorsiflexionMetric();
 
   late final List<SeatedForwardMetricBase> _metrics = [
@@ -93,15 +106,28 @@ class SeatedForwardFold extends ExerciseBase {
 
   @override
   void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
-    if (!_updateTrackedSide()) return;
+    if (!_updateTrackedSide()) {
+      _lastGoodHoldFrameTimeMs = null;
+      _resetGoodHoldFaultDebouncers();
+      return;
+    }
     final body = _body(smoothedLandmarks);
-    if (body == null) return;
+    if (body == null) {
+      _lastGoodHoldFrameTimeMs = null;
+      _resetGoodHoldFaultDebouncers();
+      return;
+    }
 
     final ah = calculateAngleNormalized(
       firstPoint: body.shoulder,
       midPoint: body.hip,
       lastPoint: body.knee,
     );
+    final now = frameTimestampMs;
+    final dtMs =
+        _lastGoodHoldFrameTimeMs == null ? 0 : now - _lastGoodHoldFrameTimeMs!;
+    _lastGoodHoldFrameTimeMs = now;
+    final wasHolding = state == SeatedForwardState.isometricHold;
 
     if (_lastHipAngle >= 0 && _lastTimestampMs > 0) {
       final dt = (frameTimestampMs - _lastTimestampMs) / 1000.0;
@@ -111,7 +137,11 @@ class SeatedForwardFold extends ExerciseBase {
     _lastTimestampMs = frameTimestampMs;
 
     final scale = calculateDistance(body.shoulder, body.hip);
-    if (scale <= 1e-6) return;
+    if (scale <= 1e-6) {
+      _lastGoodHoldFrameTimeMs = null;
+      _resetGoodHoldFaultDebouncers();
+      return;
+    }
 
     final ctx = SeatedForwardContext(
       kneeAngle: calculateAngleNormalized(
@@ -155,6 +185,12 @@ class SeatedForwardFold extends ExerciseBase {
         debugData.addAll(m.debugData);
       }
     }
+
+    _accumulateGoodHoldSeconds(
+      ctx: ctx,
+      dtMs: dtMs,
+      wasHolding: wasHolding,
+    );
   }
 
   void _updateStateBuffer(SeatedForwardContext ctx) {
@@ -283,14 +319,51 @@ class SeatedForwardFold extends ExerciseBase {
       : null;
 
   @override
-  double? get liveHoldTargetSeconds =>
-      SeatedForwardConfig.At_Min_Hold_Time.toDouble();
+  double? get liveHoldTargetSeconds => maxSeconds.toDouble();
+
+  void _accumulateGoodHoldSeconds({
+    required SeatedForwardContext ctx,
+    required int dtMs,
+    required bool wasHolding,
+  }) {
+    if (!wasHolding || state != SeatedForwardState.isometricHold || dtMs <= 0) {
+      _resetGoodHoldFaultDebouncers();
+      return;
+    }
+    if (dtMs > _GOOD_HOLD_MAX_FRAME_DELTA_MS) {
+      _resetGoodHoldFaultDebouncers();
+      return;
+    }
+    if (!_hasActiveFormFault(ctx)) {
+      _goodHoldSeconds += dtMs / 1000.0;
+    }
+  }
+
+  bool _hasActiveFormFault(SeatedForwardContext ctx) {
+    final kneeFault = _goodHoldKneeFaultDebouncer.update(
+      ctx.kneeAngle < SeatedForwardConfig.Ak_Fault_Knee_Angle,
+    );
+    final spineFault = _goodHoldSpineFaultDebouncer.update(
+      ctx.spineAngle < SeatedForwardConfig.As_Fault_Spine_Angle,
+    );
+    return kneeFault || spineFault;
+  }
+
+  void _resetGoodHoldFaultDebouncers() {
+    _goodHoldKneeFaultDebouncer.reset();
+    _goodHoldSpineFaultDebouncer.reset();
+  }
 
   @override
   void onSetComplete() {
     logger.pushKey('knee_bent_fails_count', kneeMetric.faultsCount);
     logger.pushKey('spine_round_fails_count', spineMetric.faultsCount);
     logger.pushKey('tempo_fails_count', tempoMetric.faultsCount);
+    logger.pushKey('total_seconds', maxSeconds.toDouble());
+    logger.pushKey(
+      'good_seconds',
+      _goodHoldSeconds.clamp(0.0, maxSeconds),
+    );
   }
 
   bool _updateTrackedSide() {

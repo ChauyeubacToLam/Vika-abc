@@ -438,6 +438,7 @@ class VikaApp extends StatelessWidget {
                 workoutSessionId: launchArgs.workoutSessionId,
                 definition: launchArgs.definition,
                 catalogExerciseId: launchArgs.catalogExerciseId,
+                catalogInfo: launchArgs.catalogInfo,
                 prescription: launchArgs.prescription,
                 recommendationId: launchArgs.recommendationId,
                 weekNumber: launchArgs.weekNumber,

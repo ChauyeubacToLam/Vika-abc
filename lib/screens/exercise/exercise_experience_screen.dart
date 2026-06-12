@@ -57,6 +57,7 @@ import '../../models/post_exercise_data.dart';
 import '../../models/workout_session_report.dart';
 import '../../services/recommendation/models/plan.dart';
 import '../../services/recommendation/progression_service.dart';
+import '../../services/recommendation/recommendation_service.dart';
 import '../../services/session_summary_builder.dart';
 import '../../services/session_trophy_picker.dart';
 import '../../utils/exercise_logger.dart';
@@ -77,6 +78,7 @@ class ExerciseExperienceScreen extends StatefulWidget {
     required this.definition,
     this.workoutSessionId,
     this.catalogExerciseId,
+    this.catalogInfo,
     this.prescription,
     this.recommendationId,
     this.weekNumber,
@@ -90,6 +92,7 @@ class ExerciseExperienceScreen extends StatefulWidget {
   final ExerciseDefinition definition;
   final String? workoutSessionId;
   final String? catalogExerciseId;
+  final ExerciseLaunchCatalogInfo? catalogInfo;
   final VolumePrescription? prescription;
   final String? recommendationId;
   final int? weekNumber;
@@ -158,6 +161,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     final base = ExerciseLaunchArgs(
       definition: widget.definition,
       catalogExerciseId: widget.catalogExerciseId,
+      catalogInfo: widget.catalogInfo,
       prescription: widget.prescription,
       recommendationId: widget.recommendationId,
       weekNumber: widget.weekNumber,
@@ -203,6 +207,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     _spec = _ExerciseExperienceSpec.fromDefinition(
       widget.definition,
       prescription: widget.prescription,
+      catalogInfo: widget.catalogInfo,
     );
     _currentRepsTarget = _spec.repsPerSet;
     _loadCoachNote();
@@ -818,6 +823,32 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
 
 enum _WorkoutFlowPhase { intro, active, rest, transition }
 
+@visibleForTesting
+({
+  int sets,
+  int targetPerSet,
+  String targetLabel,
+  double secondsPerUnit,
+  ExerciseBase exercise,
+}) debugBuildExerciseExperienceSpec(
+  ExerciseDefinition definition, {
+  VolumePrescription? prescription,
+  ExerciseLaunchCatalogInfo? catalogInfo,
+}) {
+  final spec = _ExerciseExperienceSpec.fromDefinition(
+    definition,
+    prescription: prescription,
+    catalogInfo: catalogInfo,
+  );
+  return (
+    sets: spec.sets,
+    targetPerSet: spec.repsPerSet,
+    targetLabel: spec.targetLabel,
+    secondsPerUnit: spec.secondsPerUnit,
+    exercise: spec.createExercise(spec.repsPerSet),
+  );
+}
+
 class _ExerciseExperienceSpec {
   const _ExerciseExperienceSpec({
     required this.sets,
@@ -850,10 +881,14 @@ class _ExerciseExperienceSpec {
   factory _ExerciseExperienceSpec.fromDefinition(
     ExerciseDefinition definition, {
     VolumePrescription? prescription,
+    ExerciseLaunchCatalogInfo? catalogInfo,
   }) {
     final overrideSets = prescription?.sets;
     final overrideReps = prescription?.reps;
+    final overrideSeconds = prescription?.seconds;
     final overrideRest = prescription?.restSeconds;
+    final catalogReps = catalogInfo?.baseReps;
+    final catalogSeconds = catalogInfo?.baseSeconds;
 
     switch (definition.id) {
       case 'squat_assessment':
@@ -1031,13 +1066,23 @@ class _ExerciseExperienceSpec {
           createExercise: (repsPerSet) => CurlUp(maxRep: repsPerSet),
         );
       default:
+        final isHold = overrideSeconds != null ||
+            (catalogSeconds != null && overrideReps == null);
+        final target = isHold
+            ? (overrideSeconds ?? catalogSeconds)
+            : (overrideReps ?? catalogReps);
         return _generic(
           definition: definition,
           sets: overrideSets ?? 3,
-          repsPerSet: overrideReps ?? 8,
+          repsPerSet: target ?? 0,
           restSeconds: overrideRest,
           videoDuration: '1:30',
-          createExercise: (_) => definition.createExercise(),
+          targetLabel: isHold ? 'GIÂY/HIỆP' : 'REP/HIỆP',
+          secondsPerUnit: isHold ? 1 : 4,
+          createExercise: (targetPerSet) => definition.createExercise(
+            reps: isHold || target == null ? null : targetPerSet,
+            seconds: isHold && target != null ? targetPerSet : null,
+          ),
         );
     }
   }
@@ -1048,6 +1093,8 @@ class _ExerciseExperienceSpec {
     required int repsPerSet,
     int? restSeconds,
     required String videoDuration,
+    String targetLabel = 'REP/HIỆP',
+    double secondsPerUnit = 4,
     required ExerciseBase Function(int repsPerSet) createExercise,
   }) {
     return _ExerciseExperienceSpec(
@@ -1055,8 +1102,8 @@ class _ExerciseExperienceSpec {
       repsPerSet: repsPerSet,
       videoDuration: videoDuration,
       restSeconds: restSeconds ?? 45,
-      targetLabel: 'REP/HIỆP',
-      secondsPerUnit: 4,
+      targetLabel: targetLabel,
+      secondsPerUnit: secondsPerUnit,
       posture: SkeletonPosture.standing,
       muscles: definition.targetMuscles,
       tips: definition.setupTips,

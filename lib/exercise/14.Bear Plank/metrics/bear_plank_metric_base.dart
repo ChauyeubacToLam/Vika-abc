@@ -76,6 +76,12 @@ abstract class BearMetricBase implements DebugMetricSource {
 
   void addFault(FaultRecord fault) => _faults.add(fault);
 
+  void reset() {
+    faultsCount = 0;
+    _faults.clear();
+    debugData.clear();
+  }
+
   void resetAndCountFault() {
     if (_faults.isNotEmpty) faultsCount++;
     _faults.clear();

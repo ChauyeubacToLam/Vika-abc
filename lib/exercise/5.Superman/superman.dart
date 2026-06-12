@@ -12,6 +12,10 @@ import 'metrics/hold_time_metric.dart';
 import 'metrics/lumbar_extension_metric.dart';
 
 class Superman extends ExerciseBase {
+  Superman({this.maxRep = SupermanConfig.MAX_REP});
+
+  final int maxRep;
+
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
       const <VikaImageOrientation>{
@@ -233,7 +237,7 @@ class Superman extends ExerciseBase {
       _isTimeout = true;
       return true;
     }
-    return repCount >= SupermanConfig.MAX_REP;
+    return repCount >= maxRep;
   }
 
   @override
@@ -401,8 +405,8 @@ class Superman extends ExerciseBase {
 
   @override
   void onSetComplete() {
-    logger.pushKey("target_rep", SupermanConfig.MAX_REP);
-    logger.pushKey("max_rep", repCount);
+    logger.pushKey("target_rep", maxRep);
+    logger.pushKey("max_rep", maxRep);
     logger.pushKey("timeout", _isTimeout);
     logger.pushKey("elevation_fails", elevationMetric.faultsCount);
     logger.pushKey("hip_fails", hipMetric.faultsCount);

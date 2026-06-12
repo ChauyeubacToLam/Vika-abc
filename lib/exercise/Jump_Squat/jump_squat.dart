@@ -157,7 +157,7 @@ class JumpSquat extends ExerciseBase {
   @override
   void onSetComplete() {
     logger.pushKey('target_rep', maxRep);
-    logger.pushKey('max_rep', repCount);
+    logger.pushKey('max_rep', maxRep);
     logger.pushGoodRepCount();
   }
 

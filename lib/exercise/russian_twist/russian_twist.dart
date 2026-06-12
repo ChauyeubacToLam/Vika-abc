@@ -126,7 +126,7 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
     logger.pushKey("rom_fails", twistRomMetric.faultsCount);
     logger.pushKey("rejected_attempts_count", _rejectedHalfTwists);
     logger.pushGoodRepCount();
-    logger.pushKey("max_rep", repCount);
+    logger.pushKey("max_rep", maxRep);
     logger.pushKey("target_rep", maxRep);
   }
 

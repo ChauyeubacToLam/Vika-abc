@@ -2,6 +2,7 @@
 import 'dart:math';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
+import '../../utils/exercise_logger.dart';
 import '../exercise_base.dart';
 import 'metrics/plank_shoulder_tap_metric_base.dart';
 import 'metrics/hip_rotation_metric.dart';
@@ -12,6 +13,10 @@ import 'metrics/tap_tempo_metric.dart';
 enum TappingSide { none, leftHandToRight, rightHandToLeft }
 
 class PlankShoulderTap extends ExerciseBase {
+  PlankShoulderTap({this.maxRep = PlankTapConfig.MAX_REP});
+
+  final int maxRep;
+
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
       const <VikaImageOrientation>{
@@ -144,7 +149,7 @@ class PlankShoulderTap extends ExerciseBase {
       _isTimeout = true;
       return true;
     }
-    return repCount >= PlankTapConfig.MAX_REP;
+    return repCount >= maxRep;
   }
 
   @override
@@ -274,6 +279,13 @@ class PlankShoulderTap extends ExerciseBase {
       repCount++;
       correctForm = !allFaults.any((f) => f.affectsForm);
       lastTappedSide = currentTappingSide;
+      logger.addRepLog(RepLog(
+        correctForm: correctForm,
+        repNumber: repCount,
+        data: {
+          "fault_types": allFaults.map((f) => f.type).toSet().toList(),
+        },
+      ));
     } else {
       _rejectedTapAttempts++;
       correctForm = false;
@@ -369,5 +381,6 @@ class PlankShoulderTap extends ExerciseBase {
     logger.pushKey("tempo_fails", tempoMetric.faultsCount);
     logger.pushKey("rejected_tap_attempts", _rejectedTapAttempts);
     logger.pushGoodRepCount();
+    logger.pushKey("max_rep", maxRep);
   }
 }

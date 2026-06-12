@@ -53,7 +53,13 @@ class TimerMetric extends HighPlankMetricBase {
   }
 
   @override
-  void reset() {}
+  void reset() {
+    faultsCount = 0;
+    _faults.clear();
+    _debugData.clear();
+    totalHoldingTimeMs = 0;
+    _lastTickMs = null;
+  }
 
   void pause() {
     _lastTickMs = null;

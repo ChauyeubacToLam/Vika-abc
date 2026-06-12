@@ -173,7 +173,7 @@ class DeadBug extends ExerciseBase {
   @override
   void onSetComplete() {
     logger.pushKey("target_rep", maxRep);
-    logger.pushKey("max_rep", repCount);
+    logger.pushKey("max_rep", maxRep);
     logger.pushKey(
         "anti_extension_fails_count", antiExtensionMetric.faultsCount);
     logger.pushKey("coordination_fails_count", coordinationMetric.faultsCount);

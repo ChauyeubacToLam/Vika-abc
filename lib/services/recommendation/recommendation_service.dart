@@ -163,7 +163,10 @@ class RecommendationService {
     try {
       final rows = await _client
           .from('exercise_catalog')
-          .select('id, english_name, class_key, is_form_checked')
+          .select(
+            'id, vietnamese_name, english_name, class_key, is_form_checked, '
+            'base_reps, base_seconds',
+          )
           .inFilter('id', ids);
 
       return {
@@ -171,9 +174,12 @@ class RecommendationService {
           if ((raw as Map)['id'] is String)
             raw['id'] as String: ExerciseLaunchCatalogInfo(
               id: raw['id'] as String,
+              vietnameseName: cleanString(raw['vietnamese_name']),
               englishName: cleanString(raw['english_name']),
               classKey: cleanString(raw['class_key']),
               isFormChecked: raw['is_form_checked'] == true,
+              baseReps: (raw['base_reps'] as num?)?.toInt(),
+              baseSeconds: (raw['base_seconds'] as num?)?.toInt(),
             ),
       };
     } catch (e) {
@@ -456,6 +462,8 @@ class ExerciseLaunchCatalogInfo {
     this.vietnameseName,
     this.englishName,
     this.classKey,
+    this.baseReps,
+    this.baseSeconds,
   });
 
   final String id;
@@ -463,6 +471,8 @@ class ExerciseLaunchCatalogInfo {
   final String? englishName;
   final String? vietnameseName;
   final String? classKey;
+  final int? baseReps;
+  final int? baseSeconds;
 
   Iterable<String> get lookupKeys sync* {
     final keys = [classKey, id, englishName];

@@ -22,6 +22,12 @@ class ButterflyConfig {
 }
 
 class ButterflyStretch extends ExerciseBase {
+  ButterflyStretch({
+    this.maxSeconds = ButterflyConfig.TARGET_HOLD_SECONDS,
+  });
+
+  final int maxSeconds;
+
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
       const <VikaImageOrientation>{
@@ -87,8 +93,7 @@ class ButterflyStretch extends ExerciseBase {
           : null;
 
   @override
-  double? get liveHoldTargetSeconds =>
-      ButterflyConfig.TARGET_HOLD_SECONDS.toDouble();
+  double? get liveHoldTargetSeconds => maxSeconds.toDouble();
 
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
@@ -168,7 +173,7 @@ class ButterflyStretch extends ExerciseBase {
   }
 
   @override
-  bool requestStop() => _elapsedSeconds >= ButterflyConfig.TARGET_HOLD_SECONDS;
+  bool requestStop() => _elapsedSeconds >= maxSeconds;
 
   @override
   void onSetComplete() {
@@ -177,11 +182,12 @@ class ButterflyStretch extends ExerciseBase {
       ...postureMetric.faults,
       ...footPlacementMetric.faults,
     ];
-    final holdCorrect =
-        _validHoldTimeMs >= ButterflyConfig.TARGET_HOLD_SECONDS * 1000 &&
-            !allFaults.any((f) => f.affectsForm);
+    final holdCorrect = _validHoldTimeMs >= maxSeconds * 1000 &&
+        !allFaults.any((f) => f.affectsForm);
 
     logger.pushKey("max_rep", 1);
+    logger.pushKey("total_seconds", maxSeconds.toDouble());
+    logger.pushKey("good_seconds", _elapsedSeconds.clamp(0.0, maxSeconds));
     logger.pushKey("total_hold_time", _elapsedSeconds);
     logger.pushKey("max_knee_separation", kneeMetric.maxSeparation);
     logger.pushKey("knee_fails_count", kneeMetric.faults.length);
@@ -410,7 +416,7 @@ class ButterflyStretch extends ExerciseBase {
   void _updateHoldDisplay(int now) {
     final displayed = _elapsedSeconds;
     resultIssues.feedback['Thời gian'] =
-        '${displayed.toStringAsFixed(1)}s / ${ButterflyConfig.TARGET_HOLD_SECONDS}s';
+        '${displayed.toStringAsFixed(1)}s / ${maxSeconds}s';
     debugData['total_hold'] = displayed.toStringAsFixed(1);
   }
 

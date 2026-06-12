@@ -1,6 +1,12 @@
 import 'seated_forward_metric_base.dart';
 
 class HoldTempoMetric extends SeatedForwardMetricBase {
+  HoldTempoMetric({
+    this.minHoldSeconds = SeatedForwardConfig.At_Min_Hold_Time,
+  });
+
+  final int minHoldSeconds;
+
   @override
   String get name => 'HoldTempo';
 
@@ -33,7 +39,7 @@ class HoldTempoMetric extends SeatedForwardMetricBase {
       final double currentHold =
           (ctx.frameTimestampMs - _holdStartMs!) / 1000.0;
       ctx.resultIssues.feedback['Time'] =
-          '${(activeHoldSeconds + currentHold).toStringAsFixed(1)}s / ${SeatedForwardConfig.At_Min_Hold_Time}s';
+          '${(activeHoldSeconds + currentHold).toStringAsFixed(1)}s / ${minHoldSeconds}s';
     }
   }
 
@@ -52,7 +58,7 @@ class HoldTempoMetric extends SeatedForwardMetricBase {
   }
 
   void _validateHoldTime() {
-    if (activeHoldSeconds < SeatedForwardConfig.At_Min_Hold_Time) {
+    if (activeHoldSeconds < minHoldSeconds) {
       if (!_faults.any((f) => f.type == 'TempoShort')) {
         _faults.add(FaultRecord(
           phase: SeatedForwardState.isometricHold.name,

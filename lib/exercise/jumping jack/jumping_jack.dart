@@ -6,6 +6,7 @@ import 'package:vika/utils/debouncer.dart';
 
 import '../../utils/pose_math_helpers.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import '../../utils/exercise_logger.dart';
 
 import '../exercise_base.dart';
 import 'metrics/jumping_jack_metric_base.dart';
@@ -155,7 +156,15 @@ class JumpingJack extends ExerciseBase {
   bool requestStop() => repCount >= maxRep;
 
   @override
-  void onSetComplete() {}
+  void onSetComplete() {
+    logger.pushKey("arm_fails_count", armExtensionMetric.faultsCount);
+    logger.pushKey("leg_fails_count", legSpreadMetric.faultsCount);
+    logger.pushKey("tempo_fails_count", tempoMetric.faultsCount);
+
+    logger.pushAverage("rep_duration", "avg_rep_duration");
+    logger.pushGoodRepCount();
+    logger.pushKey("max_rep", maxRep);
+  }
 
   // --- Safety Checks (requires front view) ---
 
@@ -318,9 +327,18 @@ class JumpingJack extends ExerciseBase {
             '${tempoMetric.lastRepDuration!.toStringAsFixed(1)}s';
       }
 
+      logger.addRepLog(RepLog(
+        correctForm: correctForm,
+        repNumber: repCount,
+        data: {
+          "rep_duration": tempoMetric.lastRepDuration ?? 0.0,
+          "fault_types": allFaults.map((f) => f.type).toSet().toList(),
+        },
+      ));
+
       correctForm = true;
       for (final metric in _metrics) {
-        metric.reset();
+        metric.resetAndCountFault();
       }
       return;
     }

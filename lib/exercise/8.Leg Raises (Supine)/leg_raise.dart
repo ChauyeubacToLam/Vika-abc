@@ -330,6 +330,7 @@ class LegRaise extends ExerciseBase {
     logger.pushKey("tempo_fails_count", tempoMetric.faultsCount);
     logger.pushKey("arm_position_fails_count", armMetric.faultsCount);
     logger.pushGoodRepCount();
+    logger.pushKey("max_rep", maxRep);
 
     StringBuffer dump = StringBuffer();
     dump.writeln("=== DIAGNOSTIC LOG (LEG RAISE) ===");

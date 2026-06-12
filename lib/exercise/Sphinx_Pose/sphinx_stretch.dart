@@ -9,6 +9,12 @@ import 'metrics/elbow_angle_metric.dart';
 import 'metrics/neck_shoulder_metric.dart';
 
 class SphinxStretch extends ExerciseBase {
+  SphinxStretch({
+    this.maxSeconds = SphinxConfig.Ae_Min_Hold_Time,
+  });
+
+  final int maxSeconds;
+
   SphinxState state = SphinxState.proneSetup;
   SphinxState prevState = SphinxState.proneSetup;
   bool isLeftTracked = true;
@@ -48,7 +54,7 @@ class SphinxStretch extends ExerciseBase {
       : null;
 
   @override
-  double? get liveHoldTargetSeconds => SphinxConfig.Ae_Min_Hold_Time.toDouble();
+  double? get liveHoldTargetSeconds => maxSeconds.toDouble();
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
@@ -233,7 +239,7 @@ class SphinxStretch extends ExerciseBase {
           neckMetric.faults.isEmpty;
 
       // Nếu form chuẩn VÀ giữ đủ X giây
-      if (isFormOkay && liveHold >= SphinxConfig.Ae_Min_Hold_Time) {
+      if (isFormOkay && liveHold >= maxSeconds) {
         // Chốt 1 rep ngay lập tức
         _completeRep(ctx);
 
@@ -343,13 +349,10 @@ class SphinxStretch extends ExerciseBase {
     logger.pushKey("shrug_neck_fails_count", neckMetric.faultsCount);
     logger.pushKey("active_hold_time", _lastHoldTime);
     logger.pushKey("stability_score", _lastStabilityScore);
-    logger.pushKey("total_seconds", SphinxConfig.Ae_Min_Hold_Time.toDouble());
-    logger.pushKey(
-        "good_seconds",
-        repCount > 0
-            ? _lastHoldTime.clamp(0.0, SphinxConfig.Ae_Min_Hold_Time.toDouble())
-            : 0.0);
-    logger.pushKey("max_rep", repCount);
+    logger.pushKey("total_seconds", maxSeconds.toDouble());
+    logger.pushKey("good_seconds",
+        repCount > 0 ? _lastHoldTime.clamp(0.0, maxSeconds) : 0.0);
+    logger.pushKey("max_rep", SphinxConfig.Af_Max_Reps);
     logger.pushKey("target_rep", SphinxConfig.Af_Max_Reps);
     logger.pushGoodRepCount();
   }

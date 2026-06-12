@@ -8,9 +8,12 @@ import 'metrics/trunk_stability_metric.dart';
 import 'metrics/knee_drive_rom_metric.dart';
 
 class MountainClimber extends ExerciseBase {
+  MountainClimber({this.maxRep = ClimberConfig.MAX_REP});
+
   // ---------------------------------------------------------------------------
   // Config
   // ---------------------------------------------------------------------------
+  final int maxRep;
 
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
@@ -152,7 +155,7 @@ class MountainClimber extends ExerciseBase {
       _isTimeout = true;
       return true;
     }
-    return repCount >= ClimberConfig.MAX_REP;
+    return repCount >= maxRep;
   }
 
   // ---------------------------------------------------------------------------
@@ -388,8 +391,8 @@ class MountainClimber extends ExerciseBase {
   @override
   void onSetComplete() {
     logger.pushKey('timeout_triggered', _isTimeout);
-    logger.pushKey('target_rep', ClimberConfig.MAX_REP);
-    logger.pushKey('max_rep', repCount);
+    logger.pushKey('target_rep', maxRep);
+    logger.pushKey('max_rep', maxRep);
     logger.pushKey('trunk_fails_count', trunkMetric.faultsCount);
     logger.pushKey('rom_fails_count', romMetric.faultsCount);
     logger.pushKey('double_knee_rejects_count', _doubleKneeRejects);

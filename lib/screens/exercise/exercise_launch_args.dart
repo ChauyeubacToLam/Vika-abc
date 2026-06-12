@@ -1,11 +1,13 @@
 import '../../models/exercise_definition.dart';
 import '../../models/workout_session_report.dart';
 import '../../services/recommendation/models/plan.dart';
+import '../../services/recommendation/recommendation_service.dart';
 
 class ExerciseSequenceItem {
   const ExerciseSequenceItem({
     required this.definition,
     this.catalogExerciseId,
+    this.catalogInfo,
     this.prescription,
     this.recommendationId,
     this.weekNumber,
@@ -15,6 +17,7 @@ class ExerciseSequenceItem {
 
   final ExerciseDefinition definition;
   final String? catalogExerciseId;
+  final ExerciseLaunchCatalogInfo? catalogInfo;
   final VolumePrescription? prescription;
   final String? recommendationId;
   final int? weekNumber;
@@ -27,6 +30,7 @@ class ExerciseLaunchArgs {
     required this.definition,
     this.workoutSessionId,
     this.catalogExerciseId,
+    this.catalogInfo,
     this.prescription,
     this.recommendationId,
     this.weekNumber,
@@ -40,6 +44,7 @@ class ExerciseLaunchArgs {
   final ExerciseDefinition definition;
   final String? workoutSessionId;
   final String? catalogExerciseId;
+  final ExerciseLaunchCatalogInfo? catalogInfo;
   final VolumePrescription? prescription;
   final String? recommendationId;
   final int? weekNumber;
@@ -63,6 +68,7 @@ class ExerciseLaunchArgs {
       definition: next.definition,
       workoutSessionId: workoutSessionId,
       catalogExerciseId: next.catalogExerciseId,
+      catalogInfo: next.catalogInfo,
       prescription: next.prescription,
       recommendationId: next.recommendationId,
       weekNumber: next.weekNumber,

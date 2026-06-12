@@ -97,6 +97,16 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
   double? _baselineWristY;
   double? _baselineHeelY;
   double? _repStartKneeY;
+  double? _repMinElbowAngle;
+  double _repMaxAbsTrunkDeviation = 0.0;
+  double _repMaxWristYDrift = 0.0;
+  double _repMaxHeelYDrift = 0.0;
+  double? _repMinKneeY;
+  double? _repMaxKneeY;
+  double? _repMinShoulderY;
+  double? _repMaxShoulderY;
+  double? _repMinHipY;
+  double? _repMaxHipY;
 
   final Debouncer _bottomDebouncer = Debouncer(requiredFrames: 2);
   final Debouncer _plankDebouncer = Debouncer(requiredFrames: 2);
@@ -305,6 +315,11 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
       _updateActiveGuard(geometry);
     }
 
+    final stateBeforeUpdate = pushUpState;
+    if (stateBeforeUpdate != PushUpState.plank) {
+      _updateRepTelemetry(geometry);
+    }
+
     // 5. Update state machine before checking completion.
     _updatePushUpState(geometry, now);
     _appendDebugTrace(geometry, now);
@@ -388,9 +403,7 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
       }
     }
 
-    final minElbow =
-        _numFromSnapshot(frameBuffer.getPeakMin("elbowAngle"), "elbowAngle") ??
-            ctx.elbowAngle;
+    final minElbow = _repMinElbowAngle ?? ctx.elbowAngle;
     final topElbow = _topElbowAngle;
     final elbowRom = (topElbow - minElbow).clamp(0.0, 180.0).toDouble();
 
@@ -400,14 +413,12 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
       data: {
         "min_elbow_angle": minElbow,
         "elbow_rom": elbowRom,
-        "max_abs_trunk_deviation": frameBuffer.getMaxAbs("trunkDeviation"),
-        "max_wrist_y_drift":
-            frameBuffer.getMaxAbsFromBaseline("wristY", _baselineWristY),
-        "max_heel_y_drift":
-            frameBuffer.getMaxAbsFromBaseline("heelY", _baselineHeelY),
-        "knee_y_travel": frameBuffer.getTravel("kneeY"),
-        "shoulder_y_travel": frameBuffer.getTravel("shoulderY"),
-        "hip_y_travel": frameBuffer.getTravel("hipY"),
+        "max_abs_trunk_deviation": _repMaxAbsTrunkDeviation,
+        "max_wrist_y_drift": _repMaxWristYDrift,
+        "max_heel_y_drift": _repMaxHeelYDrift,
+        "knee_y_travel": _travel(_repMinKneeY, _repMaxKneeY),
+        "shoulder_y_travel": _travel(_repMinShoulderY, _repMaxShoulderY),
+        "hip_y_travel": _travel(_repMinHipY, _repMaxHipY),
         "ascending_time": tempoMetric.ascentDuration ?? 0.0,
         "descending_time": tempoMetric.descentDuration ?? 0.0,
         "fault_types": allFaults.map((f) => f.type).toSet().toList(),
@@ -415,6 +426,45 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
     ));
 
     _resetRepCycle(countMetricFaults: true);
+  }
+
+  void _updateRepTelemetry(_PushUpGeometry geometry) {
+    if (_repMinElbowAngle == null || geometry.elbowAngle < _repMinElbowAngle!) {
+      _repMinElbowAngle = geometry.elbowAngle;
+    }
+    _repMaxAbsTrunkDeviation =
+        math.max(_repMaxAbsTrunkDeviation, geometry.trunkDeviation.abs());
+    if (_baselineWristY != null) {
+      _repMaxWristYDrift = math.max(
+          _repMaxWristYDrift, (geometry.wristY - _baselineWristY!).abs());
+    }
+    if (_baselineHeelY != null) {
+      _repMaxHeelYDrift =
+          math.max(_repMaxHeelYDrift, (geometry.heelY - _baselineHeelY!).abs());
+    }
+    final kneeRange =
+        _rangeWithValue(_repMinKneeY, _repMaxKneeY, geometry.kneeY);
+    _repMinKneeY = kneeRange.$1;
+    _repMaxKneeY = kneeRange.$2;
+    final shoulderRange =
+        _rangeWithValue(_repMinShoulderY, _repMaxShoulderY, geometry.shoulderY);
+    _repMinShoulderY = shoulderRange.$1;
+    _repMaxShoulderY = shoulderRange.$2;
+    final hipRange = _rangeWithValue(_repMinHipY, _repMaxHipY, geometry.hipY);
+    _repMinHipY = hipRange.$1;
+    _repMaxHipY = hipRange.$2;
+  }
+
+  (double, double) _rangeWithValue(
+      double? minValue, double? maxValue, double value) {
+    final nextMin = minValue == null ? value : math.min(minValue, value);
+    final nextMax = maxValue == null ? value : math.max(maxValue, value);
+    return (nextMin, nextMax);
+  }
+
+  double _travel(double? minValue, double? maxValue) {
+    if (minValue == null || maxValue == null) return 0.0;
+    return (maxValue - minValue).abs();
   }
 
   // --- State Machine ---
@@ -496,6 +546,7 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
       _repRejectType = null;
       _kneeMovedThisRep = false;
       _lastRejectType = 'none';
+      _resetRepTelemetry();
       _resetGuardDebouncers();
       resultIssues.instructions.clear();
     } else if (newState == PushUpState.bottom) {
@@ -629,6 +680,7 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
     _repRejectType = null;
     _kneeMovedThisRep = false;
     _repStartKneeY = null;
+    _resetRepTelemetry();
     _bottomDebouncer.reset();
     _plankDebouncer.reset();
     directionDetection.reset();
@@ -647,6 +699,19 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
     _wristDriftDebouncer.reset();
     _heelDriftDebouncer.reset();
     _elbowOnlyDebouncer.reset();
+  }
+
+  void _resetRepTelemetry() {
+    _repMinElbowAngle = null;
+    _repMaxAbsTrunkDeviation = 0.0;
+    _repMaxWristYDrift = 0.0;
+    _repMaxHeelYDrift = 0.0;
+    _repMinKneeY = null;
+    _repMaxKneeY = null;
+    _repMinShoulderY = null;
+    _repMaxShoulderY = null;
+    _repMinHipY = null;
+    _repMaxHipY = null;
   }
 
   void _captureStartBaselines(_PushUpGeometry geometry) {
@@ -786,17 +851,10 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
         PushUpConfig.HEEL_Y_DRIFT_MIN_PIXELS,
       );
 
-  double? _numFromSnapshot(FrameSnapshot? snapshot, String key) {
-    final value = snapshot?.log[key];
-    return value?.toDouble();
-  }
-
   String _debugBool(bool value) => value ? 'yes' : 'no';
 
   String _debugMinElbowLabel() {
-    return _numFromSnapshot(frameBuffer.getPeakMin("elbowAngle"), "elbowAngle")
-            ?.toStringAsFixed(1) ??
-        'n/a';
+    return _repMinElbowAngle?.toStringAsFixed(1) ?? 'n/a';
   }
 
   void _publishCompactDebug(_PushUpGeometry geometry) {

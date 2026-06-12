@@ -42,6 +42,24 @@ import '../exercise/low_lunge/low_lunge.dart';
 import '../exercise/prayer_pose/prayer_pose.dart';
 import '../exercise/raised_arms/raised_arms.dart';
 
+typedef ExerciseFactory = ExerciseBase Function({int? reps, int? seconds});
+
+ExerciseBase _withReps(
+  int? reps,
+  ExerciseBase Function(int reps) createWithTarget,
+  ExerciseBase Function() createDefault,
+) {
+  return reps == null ? createDefault() : createWithTarget(reps);
+}
+
+ExerciseBase _withSeconds(
+  int? seconds,
+  ExerciseBase Function(int seconds) createWithTarget,
+  ExerciseBase Function() createDefault,
+) {
+  return seconds == null ? createDefault() : createWithTarget(seconds);
+}
+
 /* =========================================================================
    ExerciseDefinition — Metadata + factory for each exercise type.
 
@@ -65,7 +83,7 @@ class ExerciseDefinition {
   final String cameraHint;
   final String framingHint;
   final List<String> setupTips;
-  final ExerciseBase Function() createExercise;
+  final ExerciseFactory createExercise;
 
   /// Optional safety warning shown prominently before exercise starts.
   final String? safetyWarning;
@@ -117,7 +135,7 @@ final squatAssessmentDefinition = ExerciseDefinition(
     'Quay nghiêng 90° để AI thấy rõ độ sâu và thân người.',
     'Giữ đủ ánh sáng ở chân và thân trên trước khi bắt đầu.',
   ],
-  createExercise: () => Squat(maxRep: 5),
+  createExercise: ({int? reps, int? seconds}) => Squat(maxRep: reps ?? 5),
   phaseColors: {
     'standing': const Color(0xFF00E676),
     'descending': const Color(0xFFFFD600),
@@ -145,7 +163,7 @@ final wallPushupAssessmentDefinition = ExerciseDefinition(
     'Quay nghiêng 90° để AI thấy rõ độ sâu và thân người.',
     'Giữ đủ ánh sáng ở chân và thân trên trước khi bắt đầu.',
   ],
-  createExercise: () => WallPushUp(maxRep: 5),
+  createExercise: ({int? reps, int? seconds}) => WallPushUp(maxRep: reps ?? 5),
   phaseColors: {
     'standing': const Color(0xFF00E676),
     'descending': const Color(0xFFFFD600),
@@ -173,7 +191,8 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Quay nghiêng 90° để AI thấy rõ độ sâu và thân người.',
       'Giữ đủ ánh sáng ở chân và thân trên trước khi bắt đầu.',
     ],
-    createExercise: () => Squat(),
+    createExercise: ({int? reps, int? seconds}) =>
+        _withReps(reps, (target) => Squat(maxRep: target), () => Squat()),
     phaseColors: {
       'standing': const Color(0xFF00E676),
       'descending': const Color(0xFFFFD600),
@@ -200,7 +219,8 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ phần thân trên sáng và không che khuất vai/hông.',
       'Nếu không đủ chỗ, vẫn cố gắng giữ đầu gối và mông trọn khung.',
     ],
-    createExercise: () => Plank(),
+    createExercise: ({int? reps, int? seconds}) =>
+        _withReps(reps, (target) => Plank(maxRep: target), () => Plank()),
     phaseColors: {
       'setup': const Color(0xFFFF9800),
       'holding': const Color(0xFF00E676),
@@ -226,7 +246,8 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Quay nghiêng 90° để AI thấy rõ độ sâu đầu gối.',
       'Giữ đủ ánh sáng ở chân và thân trên trước khi bắt đầu.',
     ],
-    createExercise: () => Lunge(),
+    createExercise: ({int? reps, int? seconds}) =>
+        _withReps(reps, (target) => Lunge(maxRep: target), () => Lunge()),
     phaseColors: {
       'standing': const Color(0xFF00E676),
       'descending': const Color(0xFFFFD600),
@@ -253,7 +274,8 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đầu, cổ tay và mắt cá luôn nhìn thấy rõ.',
       'Chừa khoảng trống phía trên đầu vì tay sẽ vươn cao qua đầu.',
     ],
-    createExercise: () => JumpingJack(),
+    createExercise: ({int? reps, int? seconds}) => _withReps(
+        reps, (target) => JumpingJack(maxRep: target), () => JumpingJack()),
     phaseColors: {
       'closed': const Color(0xFF00E676),
       'open': const Color(0xFFFFD600),
@@ -278,7 +300,8 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ thân trên và khuỷu tay đủ sáng trước khi bắt đầu.',
       'Lùi camera thêm nếu cổ tay hoặc đầu dễ bị cắt khung.',
     ],
-    createExercise: () => PushUp(),
+    createExercise: ({int? reps, int? seconds}) =>
+        _withReps(reps, (target) => PushUp(maxRep: target), () => PushUp()),
     phaseColors: {
       'plank': const Color(0xFF00E676),
       'descending': const Color(0xFFFFD600),
@@ -305,7 +328,8 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Quay nghiêng 90° để AI thấy rõ chuyển động hông.',
       'Đảm bảo đủ ánh sáng dọc theo thân người trước khi bắt đầu.',
     ],
-    createExercise: () => GluteBridge(),
+    createExercise: ({int? reps, int? seconds}) => _withReps(
+        reps, (target) => GluteBridge(maxRep: target), () => GluteBridge()),
     phaseColors: {
       'bottom': const Color(0xFF00E676),
       'ascending': const Color(0xFFFFD600),
@@ -332,7 +356,8 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giu dau, vai va dau goi du sang truoc khi bat dau.',
       'Nam ngang tren san, gap mot dau goi theo dung tu the McGill.',
     ],
-    createExercise: () => CurlUp(maxRep: 12),
+    createExercise: ({int? reps, int? seconds}) =>
+        _withReps(reps, (target) => CurlUp(maxRep: target), () => CurlUp()),
     phaseColors: {
       'resting': const Color(0xFF00E676),
       'ascending': const Color(0xFFFFD600),
@@ -360,7 +385,8 @@ final List<ExerciseDefinition> exerciseDefinitions = [
     ],
     safetyWarning:
         'Giữ thân người thẳng, không gập lưng quá mức. Dừng lại nếu thấy đau lưng dưới hoặc đầu gối.',
-    createExercise: () => WarriorOne(),
+    createExercise: ({int? reps, int? seconds}) => _withReps(
+        reps, (target) => WarriorOne(maxHolds: target), () => WarriorOne()),
     phaseColors: {
       'entry': const Color(0xFFFFB300),
       'hold': const Color(0xFF00E676),
@@ -370,265 +396,346 @@ final List<ExerciseDefinition> exerciseDefinitions = [
   ExerciseDefinition(
     id: 'bird__dog',
     name: 'Bird Dog',
-    subtitle: 'Chưa có mô tả',
-    description: 'Bản xem trước của bài tập Bird Dog.',
+    subtitle: 'Giữ thăng bằng tay chân đối nghịch',
+    description:
+        'AI theo dõi bài Bird Dog theo thời gian thực.\nTay và chân đối nghịch duỗi thẳng hàng, lưng và hông giữ ổn định.',
     icon: Icons.fitness_center,
     primaryColor: const Color(0xFF00E5FF),
     secondaryColor: const Color(0xFF0091EA),
     difficulty: 'Trung bình',
-    targetMuscles: ['Toàn thân'],
-    duration: 'Tùy chọn',
-    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
-    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    targetMuscles: ['Core', 'Lưng dưới', 'Mông'],
+    duration: '8 reps',
+    cameraHint: 'Quay nghiêng người so với camera.',
+    framingHint: 'Giữ vai, hông, tay và chân duỗi luôn trong khung hình.',
     setupTips: [
-      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
-      'Bắt đầu khi sẵn sàng.'
+      'Đặt camera thấp ngang thân (khoảng 30–50 cm so với mặt sàn).',
+      'Quay nghiêng 90° để AI thấy rõ tay và chân duỗi thẳng hàng.',
+      'Chống tay và gối xuống sàn, giữ lưng phẳng trước khi bắt đầu.',
     ],
-    createExercise: () => BirdDog(),
+    createExercise: ({int? reps, int? seconds}) =>
+        _withReps(reps, (target) => BirdDog(maxRep: target), () => BirdDog()),
     phaseColors: {
-      'default': const Color(0xFF00E676),
+      'neutral': const Color(0xFF00E676),
+      'extending': const Color(0xFFFFD600),
+      'hold_extended': const Color(0xFFFF6D00),
+      'returning': const Color(0xFF00B0FF),
     },
   ),
   ExerciseDefinition(
     id: 'v__up',
-    name: 'V-Up',
-    subtitle: 'Chưa có mô tả',
-    description: 'Bản xem trước của bài tập V-Up.',
+    name: 'Gập bụng chữ V',
+    subtitle: 'Tay và chân gặp nhau thành chữ V',
+    description:
+        'AI phân tích bài gập bụng chữ V theo thời gian thực.\nTheo dõi tay vươn chạm chân, thân tạo chữ V và nhịp lên xuống.',
     icon: Icons.fitness_center,
     primaryColor: const Color(0xFF00E5FF),
     secondaryColor: const Color(0xFF0091EA),
     difficulty: 'Trung bình',
-    targetMuscles: ['Toàn thân'],
-    duration: 'Tùy chọn',
-    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
-    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    targetMuscles: ['Bụng', 'Cơ gập hông'],
+    duration: '6 reps',
+    cameraHint: 'Quay nghiêng người so với camera.',
+    framingHint: 'Giữ tay, vai, hông và bàn chân luôn trong khung hình.',
     setupTips: [
-      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
-      'Bắt đầu khi sẵn sàng.'
+      'Đặt camera thấp ngang thân (khoảng 30–50 cm so với mặt sàn).',
+      'Quay nghiêng 90° để AI thấy rõ tay và chân khép thành chữ V.',
+      'Nằm ngửa trên sàn, duỗi thẳng tay và chân trước khi bắt đầu.',
     ],
-    createExercise: () => VUp(),
+    createExercise: ({int? reps, int? seconds}) =>
+        _withReps(reps, (target) => VUp(maxRep: target), () => VUp()),
     phaseColors: {
-      'default': const Color(0xFF00E676),
+      'lying': const Color(0xFF00E676),
+      'rising': const Color(0xFFFFD600),
+      'v_position': const Color(0xFFFF6D00),
+      'lowering': const Color(0xFF00B0FF),
     },
   ),
   ExerciseDefinition(
     id: 'dead__bug',
     name: 'Dead Bug',
-    subtitle: 'Chưa có mô tả',
-    description: 'Bản xem trước của bài tập Dead Bug.',
+    subtitle: 'Tay chân đối nghịch, lưng giữ phẳng',
+    description:
+        'AI theo dõi bài Dead Bug theo thời gian thực.\nTay và chân đối nghịch duỗi ra, lưng dưới giữ phẳng và kiểm soát.',
     icon: Icons.fitness_center,
     primaryColor: const Color(0xFF00E5FF),
     secondaryColor: const Color(0xFF0091EA),
     difficulty: 'Trung bình',
-    targetMuscles: ['Toàn thân'],
-    duration: 'Tùy chọn',
-    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
-    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    targetMuscles: ['Core', 'Bụng sâu'],
+    duration: '8 reps',
+    cameraHint: 'Quay nghiêng người so với camera.',
+    framingHint: 'Giữ vai, hông, tay và chân luôn trong khung hình.',
     setupTips: [
-      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
-      'Bắt đầu khi sẵn sàng.'
+      'Đặt camera thấp ngang thân (khoảng 30–50 cm so với mặt sàn).',
+      'Quay nghiêng 90° để AI thấy rõ tay và chân duỗi ra.',
+      'Nằm ngửa, tay vươn lên và gối gập vuông trước khi bắt đầu.',
     ],
-    createExercise: () => DeadBug(),
+    createExercise: ({int? reps, int? seconds}) =>
+        _withReps(reps, (target) => DeadBug(maxRep: target), () => DeadBug()),
     phaseColors: {
-      'default': const Color(0xFF00E676),
+      'setup': const Color(0xFF00E676),
+      'extending': const Color(0xFFFFD600),
+      'hold': const Color(0xFFFF6D00),
+      'returning': const Color(0xFF00B0FF),
     },
   ),
   ExerciseDefinition(
     id: 'plank__up__down',
-    name: 'Plank Up-Down',
-    subtitle: 'Chưa có mô tả',
-    description: 'Bản xem trước của bài tập Plank Up-Down.',
+    name: 'Plank lên xuống',
+    subtitle: 'Đổi tay khuỷu, thân giữ thẳng',
+    description:
+        'AI phân tích bài plank lên xuống theo thời gian thực.\nTheo dõi chuyển từ khuỷu lên bàn tay, thân giữ thẳng và nhịp độ.',
     icon: Icons.fitness_center,
     primaryColor: const Color(0xFF00E5FF),
     secondaryColor: const Color(0xFF0091EA),
     difficulty: 'Trung bình',
-    targetMuscles: ['Toàn thân'],
-    duration: 'Tùy chọn',
-    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
-    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    targetMuscles: ['Core', 'Vai', 'Tay sau'],
+    duration: '8 reps',
+    cameraHint: 'Quay nghiêng người so với camera.',
+    framingHint: 'Giữ vai, hông, khuỷu tay và cổ tay luôn trong khung hình.',
     setupTips: [
-      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
-      'Bắt đầu khi sẵn sàng.'
+      'Đặt camera thấp ngang thân (khoảng 30–50 cm so với mặt sàn).',
+      'Quay nghiêng 90° để AI thấy rõ chuyển động lên xuống của tay.',
+      'Vào tư thế plank, giữ thân thẳng từ vai đến gót trước khi bắt đầu.',
     ],
-    createExercise: () => PlankUpDown(),
+    safetyWarning:
+        'Dồn lực đều lên bàn tay, giữ cổ tay thẳng. Dừng lại nếu cổ tay đau.',
+    createExercise: ({int? reps, int? seconds}) => _withReps(
+        reps, (target) => PlankUpDown(maxRep: target), () => PlankUpDown()),
     phaseColors: {
-      'default': const Color(0xFF00E676),
+      'forearm_plank': const Color(0xFF00E676),
+      'pushing_up': const Color(0xFFFFD600),
+      'high_plank': const Color(0xFFFF6D00),
+      'lowering': const Color(0xFF00B0FF),
     },
   ),
   ExerciseDefinition(
     id: 'bear__plank',
-    name: 'Bear Plank',
-    subtitle: 'Chưa có mô tả',
-    description: 'Bản xem trước của bài tập Bear Plank.',
+    name: 'Plank gấu',
+    subtitle: 'Lưng phẳng, gối lơ lửng sát sàn',
+    description:
+        '3 lần giữ × 15 giây mỗi lần.\nAI theo dõi lưng giữ phẳng, hông ổn định và đầu gối lơ lửng sát sàn.',
     icon: Icons.fitness_center,
     primaryColor: const Color(0xFF00E5FF),
     secondaryColor: const Color(0xFF0091EA),
     difficulty: 'Trung bình',
-    targetMuscles: ['Toàn thân'],
-    duration: 'Tùy chọn',
-    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
-    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    targetMuscles: ['Core', 'Vai'],
+    duration: '3 × 15s',
+    cameraHint: 'Quay nghiêng người so với camera.',
+    framingHint: 'Giữ vai, hông, đầu gối và cổ tay luôn trong khung hình.',
     setupTips: [
-      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
-      'Bắt đầu khi sẵn sàng.'
+      'Đặt camera thấp ngang thân (khoảng 30–50 cm so với mặt sàn).',
+      'Quay nghiêng 90° để AI thấy rõ đường lưng và đầu gối.',
+      'Chống tay và mũi chân, nhấc gối cao vài phân trước khi bắt đầu.',
     ],
-    createExercise: () => BearPlank(),
+    safetyWarning:
+        'Dồn lực đều lên bàn tay, giữ cổ tay thẳng. Dừng lại nếu cổ tay đau.',
+    createExercise: ({int? reps, int? seconds}) => _withSeconds(
+        seconds, (target) => BearPlank(maxSeconds: target), () => BearPlank()),
     phaseColors: {
-      'default': const Color(0xFF00E676),
+      'setup': const Color(0xFFFF6D00),
+      'hovering': const Color(0xFF00E676),
+      'fatiguing': const Color(0xFF00B0FF),
     },
   ),
   ExerciseDefinition(
     id: 'sit__up',
-    name: 'Sit Up',
-    subtitle: 'Chưa có mô tả',
-    description: 'Bản xem trước của bài tập Sit Up.',
+    name: 'Gập bụng',
+    subtitle: 'Theo dõi góc gập thân và nhịp độ',
+    description:
+        'AI phân tích bài gập bụng theo thời gian thực.\nTheo dõi góc gập thân, độ kiểm soát và nhịp lên xuống.',
     icon: Icons.fitness_center,
     primaryColor: const Color(0xFF00E5FF),
     secondaryColor: const Color(0xFF0091EA),
     difficulty: 'Trung bình',
-    targetMuscles: ['Toàn thân'],
-    duration: 'Tùy chọn',
-    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
-    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    targetMuscles: ['Bụng', 'Cơ gập hông'],
+    duration: '10 reps',
+    cameraHint: 'Quay nghiêng người so với camera.',
+    framingHint: 'Giữ vai, hông, đầu gối và bàn chân luôn trong khung hình.',
     setupTips: [
-      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
-      'Bắt đầu khi sẵn sàng.'
+      'Đặt camera thấp ngang thân (khoảng 30–50 cm so với mặt sàn).',
+      'Quay nghiêng 90° để AI thấy rõ góc gập thân.',
+      'Nằm ngửa, gập gối và đặt bàn chân chạm sàn trước khi bắt đầu.',
     ],
-    createExercise: () => SitUp(),
+    createExercise: ({int? reps, int? seconds}) =>
+        _withReps(reps, (target) => SitUp(maxRep: target), () => SitUp()),
     phaseColors: {
-      'default': const Color(0xFF00E676),
+      'lying': const Color(0xFF00E676),
+      'rising': const Color(0xFFFFD600),
+      'upright': const Color(0xFFFF6D00),
+      'lowering': const Color(0xFF00B0FF),
     },
   ),
   ExerciseDefinition(
     id: 'high__plank',
-    name: 'High Plank',
-    subtitle: 'Chưa có mô tả',
-    description: 'Bản xem trước của bài tập High Plank.',
+    name: 'Plank cao',
+    subtitle: 'Thân thẳng, vai vững trên cổ tay',
+    description:
+        '3 lần giữ × 20 giây mỗi lần.\nAI theo dõi đường vai, hông và gót thẳng hàng, vai vững trên cổ tay.',
     icon: Icons.fitness_center,
     primaryColor: const Color(0xFF00E5FF),
     secondaryColor: const Color(0xFF0091EA),
     difficulty: 'Trung bình',
-    targetMuscles: ['Toàn thân'],
-    duration: 'Tùy chọn',
-    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
-    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    targetMuscles: ['Core', 'Vai'],
+    duration: '3 × 20s',
+    cameraHint: 'Quay nghiêng người so với camera.',
+    framingHint: 'Giữ vai, hông, đầu gối và cổ tay luôn trong khung hình.',
     setupTips: [
-      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
-      'Bắt đầu khi sẵn sàng.'
+      'Đặt camera thấp ngang thân (khoảng 30–50 cm so với mặt sàn).',
+      'Quay nghiêng 90° để AI thấy rõ đường vai đến gót.',
+      'Chống thẳng tay, xếp vai trên cổ tay trước khi bắt đầu.',
     ],
-    createExercise: () => HighPlank(),
+    safetyWarning:
+        'Dồn lực đều lên bàn tay, giữ cổ tay thẳng. Dừng lại nếu cổ tay đau.',
+    createExercise: ({int? reps, int? seconds}) => _withSeconds(
+        seconds, (target) => HighPlank(maxSeconds: target), () => HighPlank()),
     phaseColors: {
-      'default': const Color(0xFF00E676),
+      'setup': const Color(0xFFFF6D00),
+      'holding': const Color(0xFF00E676),
+      'dropping': const Color(0xFF00B0FF),
     },
   ),
   ExerciseDefinition(
     id: 'mountain__climber',
-    name: 'Mountain Climber',
-    subtitle: 'Chưa có mô tả',
-    description: 'Bản xem trước của bài tập Mountain Climber.',
+    name: 'Leo núi',
+    subtitle: 'Đầu gối kéo về ngực, thân giữ thẳng',
+    description:
+        'AI phân tích bài leo núi theo thời gian thực.\nTheo dõi đầu gối kéo về ngực, thân giữ thẳng và nhịp độ.',
     icon: Icons.fitness_center,
     primaryColor: const Color(0xFF00E5FF),
     secondaryColor: const Color(0xFF0091EA),
     difficulty: 'Trung bình',
-    targetMuscles: ['Toàn thân'],
-    duration: 'Tùy chọn',
-    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
-    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    targetMuscles: ['Bụng', 'Cơ gập hông', 'Vai'],
+    duration: '16 reps',
+    cameraHint: 'Quay nghiêng người so với camera.',
+    framingHint: 'Giữ vai, hông, đầu gối và cổ tay luôn trong khung hình.',
     setupTips: [
-      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
-      'Bắt đầu khi sẵn sàng.'
+      'Đặt camera thấp ngang thân (khoảng 30–50 cm so với mặt sàn).',
+      'Quay nghiêng 90° để AI thấy rõ đầu gối kéo lên.',
+      'Vào tư thế plank cao, vai trên cổ tay trước khi bắt đầu.',
     ],
-    createExercise: () => MountainClimber(),
+    safetyWarning:
+        'Dồn lực đều lên bàn tay, giữ cổ tay thẳng. Dừng lại nếu cổ tay đau.',
+    createExercise: ({int? reps, int? seconds}) => _withReps(reps,
+        (target) => MountainClimber(maxRep: target), () => MountainClimber()),
     phaseColors: {
-      'default': const Color(0xFF00E676),
+      'high_plank_base': const Color(0xFF00E676),
+      'knee_driving_in': const Color(0xFFFFD600),
+      'max_flexion': const Color(0xFFFF6D00),
     },
   ),
   ExerciseDefinition(
     id: 'superman',
     name: 'Superman',
-    subtitle: 'Chưa có mô tả',
-    description: 'Bản xem trước của bài tập Superman.',
+    subtitle: 'Nâng tay chân, siết lưng và mông',
+    description:
+        '3 lần giữ × 15 giây mỗi lần.\nAI theo dõi tay và chân nâng khỏi sàn, lưng dưới và cơ mông siết đều.',
     icon: Icons.fitness_center,
     primaryColor: const Color(0xFF00E5FF),
     secondaryColor: const Color(0xFF0091EA),
     difficulty: 'Trung bình',
-    targetMuscles: ['Toàn thân'],
-    duration: 'Tùy chọn',
-    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
-    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    targetMuscles: ['Lưng dưới', 'Cơ dựng sống', 'Mông'],
+    duration: '10 reps',
+    cameraHint: 'Quay nghiêng người so với camera.',
+    framingHint: 'Giữ vai, hông, tay và chân luôn trong khung hình.',
     setupTips: [
-      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
-      'Bắt đầu khi sẵn sàng.'
+      'Đặt camera thấp ngang thân (khoảng 30–50 cm so với mặt sàn).',
+      'Quay nghiêng 90° để AI thấy rõ tay và chân nâng lên.',
+      'Nằm sấp, duỗi thẳng tay về trước trước khi bắt đầu.',
     ],
-    createExercise: () => Superman(),
+    safetyWarning:
+        'Nâng người vừa sức, không ưỡn lưng quá mức. Dừng lại nếu thấy đau lưng dưới hoặc cổ.',
+    createExercise: ({int? reps, int? seconds}) =>
+        _withReps(reps, (target) => Superman(maxRep: target), () => Superman()),
     phaseColors: {
-      'default': const Color(0xFF00E676),
+      'setup': const Color(0xFF00E676),
+      'lifting': const Color(0xFFFFD600),
+      'hold': const Color(0xFFFF6D00),
+      'lowering': const Color(0xFF00B0FF),
     },
   ),
   ExerciseDefinition(
     id: 'plank__shoulder__tap',
-    name: 'Plank Shoulder Tap',
-    subtitle: 'Chưa có mô tả',
-    description: 'Bản xem trước của bài tập Plank Shoulder Tap.',
+    name: 'Plank chạm vai',
+    subtitle: 'Chạm vai đối diện, hông không lắc',
+    description:
+        'AI phân tích bài plank chạm vai theo thời gian thực.\nTheo dõi tay chạm vai đối diện, hông giữ vững không lắc và nhịp độ.',
     icon: Icons.fitness_center,
     primaryColor: const Color(0xFF00E5FF),
     secondaryColor: const Color(0xFF0091EA),
     difficulty: 'Trung bình',
-    targetMuscles: ['Toàn thân'],
-    duration: 'Tùy chọn',
-    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
-    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    targetMuscles: ['Core', 'Cơ liên sườn', 'Vai'],
+    duration: '16 reps',
+    cameraHint: 'Quay nghiêng người so với camera.',
+    framingHint: 'Giữ vai, hông, khuỷu tay và cổ tay luôn trong khung hình.',
     setupTips: [
-      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
-      'Bắt đầu khi sẵn sàng.'
+      'Đặt camera thấp ngang thân (khoảng 30–50 cm so với mặt sàn).',
+      'Quay nghiêng 90° để AI thấy rõ tay nhấc lên chạm vai.',
+      'Vào tư thế plank cao, mở rộng hai chân để giữ vững trước khi bắt đầu.',
     ],
-    createExercise: () => PlankShoulderTap(),
+    safetyWarning:
+        'Dồn lực đều lên bàn tay, giữ cổ tay thẳng. Dừng lại nếu cổ tay đau.',
+    createExercise: ({int? reps, int? seconds}) => _withReps(reps,
+        (target) => PlankShoulderTap(maxRep: target), () => PlankShoulderTap()),
     phaseColors: {
-      'default': const Color(0xFF00E676),
+      'base': const Color(0xFF00E676),
+      'lifting': const Color(0xFFFFD600),
+      'tap': const Color(0xFFFF6D00),
+      'returning': const Color(0xFF00B0FF),
     },
   ),
   ExerciseDefinition(
     id: 'leg__raises',
-    name: 'Leg Raises',
-    subtitle: 'Chưa có mô tả',
-    description: 'Bản xem trước của bài tập Leg Raises.',
+    name: 'Nâng chân',
+    subtitle: 'Chân nâng thẳng, lưng giữ ổn định',
+    description:
+        'AI phân tích bài nâng chân theo thời gian thực.\nTheo dõi chân nâng thẳng, bụng dưới siết và lưng giữ ổn định.',
     icon: Icons.fitness_center,
     primaryColor: const Color(0xFF00E5FF),
     secondaryColor: const Color(0xFF0091EA),
     difficulty: 'Trung bình',
-    targetMuscles: ['Toàn thân'],
-    duration: 'Tùy chọn',
-    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
-    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    targetMuscles: ['Bụng dưới', 'Cơ gập hông'],
+    duration: '10 reps',
+    cameraHint: 'Quay nghiêng người so với camera.',
+    framingHint: 'Giữ vai, hông, đầu gối và bàn chân luôn trong khung hình.',
     setupTips: [
-      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
-      'Bắt đầu khi sẵn sàng.'
+      'Đặt camera thấp ngang thân (khoảng 30–50 cm so với mặt sàn).',
+      'Quay nghiêng 90° để AI thấy rõ chân nâng lên và hạ xuống.',
+      'Nằm ngửa, duỗi thẳng hai chân và ép lưng sát sàn trước khi bắt đầu.',
     ],
-    createExercise: () => LegRaise(),
+    createExercise: ({int? reps, int? seconds}) =>
+        _withReps(reps, (target) => LegRaise(maxRep: target), () => LegRaise()),
     phaseColors: {
-      'default': const Color(0xFF00E676),
+      'lying': const Color(0xFF00E676),
+      'raising': const Color(0xFFFFD600),
+      'top': const Color(0xFFFF6D00),
+      'lowering': const Color(0xFF00B0FF),
     },
   ),
   ExerciseDefinition(
     id: 'reverse__crunch',
-    name: 'Reverse Crunch',
-    subtitle: 'Chưa có mô tả',
-    description: 'Bản xem trước của bài tập Reverse Crunch.',
+    name: 'Gập bụng ngược',
+    subtitle: 'Cuộn hông lên có kiểm soát',
+    description:
+        'AI phân tích bài gập bụng ngược theo thời gian thực.\nTheo dõi hông cuộn lên, bụng dưới siết và nhịp hạ chậm.',
     icon: Icons.fitness_center,
     primaryColor: const Color(0xFF00E5FF),
     secondaryColor: const Color(0xFF0091EA),
     difficulty: 'Trung bình',
-    targetMuscles: ['Toàn thân'],
-    duration: 'Tùy chọn',
-    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
-    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    targetMuscles: ['Bụng dưới'],
+    duration: '10 reps',
+    cameraHint: 'Quay nghiêng người so với camera.',
+    framingHint: 'Giữ vai, hông, đầu gối và bàn chân luôn trong khung hình.',
     setupTips: [
-      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
-      'Bắt đầu khi sẵn sàng.'
+      'Đặt camera thấp ngang thân (khoảng 30–50 cm so với mặt sàn).',
+      'Quay nghiêng 90° để AI thấy rõ hông cuộn lên.',
+      'Nằm ngửa, gập gối và nâng nhẹ chân trước khi bắt đầu.',
     ],
-    createExercise: () => ReverseCrunch(),
+    createExercise: ({int? reps, int? seconds}) => _withReps(
+        reps, (target) => ReverseCrunch(maxRep: target), () => ReverseCrunch()),
     phaseColors: {
-      'default': const Color(0xFF00E676),
+      'lying': const Color(0xFF00E676),
+      'curling': const Color(0xFFFFD600),
+      'top': const Color(0xFFFF6D00),
+      'lowering': const Color(0xFF00B0FF),
     },
   ),
   ExerciseDefinition(
@@ -648,7 +755,8 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
       'Bắt đầu khi sẵn sàng.'
     ],
-    createExercise: () => BowPose(),
+    createExercise: ({int? reps, int? seconds}) =>
+        _withReps(reps, (target) => BowPose(maxRep: target), () => BowPose()),
     phaseColors: {
       'default': const Color(0xFF00E676),
     },
@@ -670,7 +778,10 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
       'Bắt đầu khi sẵn sàng.'
     ],
-    createExercise: () => ButterflyStretch(),
+    createExercise: ({int? reps, int? seconds}) => _withSeconds(
+        seconds,
+        (target) => ButterflyStretch(maxSeconds: target),
+        () => ButterflyStretch()),
     phaseColors: {
       'default': const Color(0xFF00E676),
     },
@@ -692,7 +803,8 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
       'Bắt đầu khi sẵn sàng.'
     ],
-    createExercise: () => Cobra(),
+    createExercise: ({int? reps, int? seconds}) =>
+        _withReps(reps, (target) => Cobra(maxRep: target), () => Cobra()),
     phaseColors: {
       'default': const Color(0xFF00E676),
     },
@@ -714,7 +826,8 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
       'Bắt đầu khi sẵn sàng.'
     ],
-    createExercise: () => CossackSquat(),
+    createExercise: ({int? reps, int? seconds}) => _withReps(
+        reps, (target) => CossackSquat(maxRep: target), () => CossackSquat()),
     phaseColors: {
       'default': const Color(0xFF00E676),
     },
@@ -736,7 +849,8 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
       'Bắt đầu khi sẵn sàng.'
     ],
-    createExercise: () => JumpSquat(),
+    createExercise: ({int? reps, int? seconds}) => _withReps(
+        reps, (target) => JumpSquat(maxRep: target), () => JumpSquat()),
     phaseColors: {
       'default': const Color(0xFF00E676),
     },
@@ -758,7 +872,8 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
       'Bắt đầu khi sẵn sàng.'
     ],
-    createExercise: () => RussianTwist(),
+    createExercise: ({int? reps, int? seconds}) => _withReps(
+        reps, (target) => RussianTwist(maxRep: target), () => RussianTwist()),
     phaseColors: {
       'default': const Color(0xFF00E676),
     },
@@ -780,7 +895,10 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
       'Bắt đầu khi sẵn sàng.'
     ],
-    createExercise: () => SeatedForwardFold(),
+    createExercise: ({int? reps, int? seconds}) => _withSeconds(
+        seconds,
+        (target) => SeatedForwardFold(maxSeconds: target),
+        () => SeatedForwardFold()),
     phaseColors: {
       'default': const Color(0xFF00E676),
     },
@@ -802,7 +920,8 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
       'Bắt đầu khi sẵn sàng.'
     ],
-    createExercise: () => SidePlankDip(),
+    createExercise: ({int? reps, int? seconds}) => _withReps(
+        reps, (target) => SidePlankDip(maxRep: target), () => SidePlankDip()),
     phaseColors: {
       'default': const Color(0xFF00E676),
     },
@@ -824,7 +943,8 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
       'Bắt đầu khi sẵn sàng.'
     ],
-    createExercise: () => SphinxStretch(),
+    createExercise: ({int? reps, int? seconds}) => _withSeconds(seconds,
+        (target) => SphinxStretch(maxSeconds: target), () => SphinxStretch()),
     phaseColors: {
       'default': const Color(0xFF00E676),
     },
@@ -846,7 +966,10 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
       'Bắt đầu khi sẵn sàng.'
     ],
-    createExercise: () => StandingKneeToElbow(),
+    createExercise: ({int? reps, int? seconds}) => _withReps(
+        reps,
+        (target) => StandingKneeToElbow(maxRep: target),
+        () => StandingKneeToElbow()),
     phaseColors: {
       'default': const Color(0xFF00E676),
     },
@@ -868,7 +991,8 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
       'Bắt đầu khi sẵn sàng.'
     ],
-    createExercise: () => StepBackBurpee(),
+    createExercise: ({int? reps, int? seconds}) => _withReps(reps,
+        (target) => StepBackBurpee(maxRep: target), () => StepBackBurpee()),
     phaseColors: {
       'default': const Color(0xFF00E676),
     },
@@ -890,7 +1014,8 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
       'Bắt đầu khi sẵn sàng.'
     ],
-    createExercise: () => TricepDip(),
+    createExercise: ({int? reps, int? seconds}) => _withReps(
+        reps, (target) => TricepDip(maxRep: target), () => TricepDip()),
     phaseColors: {
       'default': const Color(0xFF00E676),
     },
@@ -912,7 +1037,8 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
       'Bắt đầu khi sẵn sàng.'
     ],
-    createExercise: () => WalkingLunge(),
+    createExercise: ({int? reps, int? seconds}) => _withReps(
+        reps, (target) => WalkingLunge(maxRep: target), () => WalkingLunge()),
     phaseColors: {
       'default': const Color(0xFF00E676),
     },
@@ -934,7 +1060,10 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
       'Bắt đầu khi sẵn sàng.'
     ],
-    createExercise: () => SuryaNamaskarExercise(),
+    createExercise: ({int? reps, int? seconds}) => _withReps(
+        reps,
+        (target) => SuryaNamaskarExercise(maxRounds: target),
+        () => SuryaNamaskarExercise()),
     phaseColors: {
       'default': const Color(0xFF00E676),
     },
@@ -956,7 +1085,8 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
       'Bắt đầu khi sẵn sàng.'
     ],
-    createExercise: () => WallPushUp(),
+    createExercise: ({int? reps, int? seconds}) => _withReps(
+        reps, (target) => WallPushUp(maxRep: target), () => WallPushUp()),
     phaseColors: {
       'default': const Color(0xFF00E676),
     },
@@ -978,7 +1108,8 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
       'Bắt đầu khi sẵn sàng.'
     ],
-    createExercise: () => DownwardDog(),
+    createExercise: ({int? reps, int? seconds}) => _withReps(
+        reps, (target) => DownwardDog(maxHolds: target), () => DownwardDog()),
     phaseColors: {
       'default': const Color(0xFF00E676),
     },
@@ -1000,7 +1131,10 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
       'Bắt đầu khi sẵn sàng.'
     ],
-    createExercise: () => AshtangaNamaskara(),
+    createExercise: ({int? reps, int? seconds}) => _withReps(
+        reps,
+        (target) => AshtangaNamaskara(maxRep: target),
+        () => AshtangaNamaskara()),
     phaseColors: {
       'default': const Color(0xFF00E676),
     },
@@ -1022,7 +1156,8 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
       'Bắt đầu khi sẵn sàng.'
     ],
-    createExercise: () => LowLunge(),
+    createExercise: ({int? reps, int? seconds}) =>
+        _withReps(reps, (target) => LowLunge(maxRep: target), () => LowLunge()),
     phaseColors: {
       'default': const Color(0xFF00E676),
     },
@@ -1044,7 +1179,8 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
       'Bắt đầu khi sẵn sàng.'
     ],
-    createExercise: () => PrayerPose(),
+    createExercise: ({int? reps, int? seconds}) => _withReps(
+        reps, (target) => PrayerPose(maxRep: target), () => PrayerPose()),
     phaseColors: {
       'default': const Color(0xFF00E676),
     },
@@ -1066,7 +1202,8 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
       'Bắt đầu khi sẵn sàng.'
     ],
-    createExercise: () => RaisedArms(),
+    createExercise: ({int? reps, int? seconds}) => _withReps(
+        reps, (target) => RaisedArms(maxRep: target), () => RaisedArms()),
     phaseColors: {
       'default': const Color(0xFF00E676),
     },

@@ -249,5 +249,82 @@ void main() {
 
     expect(wallPushUp.repCount, 0);
     expect(wallPushUp.getSetFeedback(), isNotEmpty);
+
+    wallPushUp.onSetComplete();
+
+    expect(wallPushUp.logger.setLogs['wall_contact_fails_count'], 0);
+    expect(wallPushUp.logger.setLogs['body_line_fails_count'], 0);
+    expect(
+        wallPushUp.logger.setLogs.keys, contains('shoulder_shrug_fails_count'));
+    expect(
+        wallPushUp.logger.setLogs.keys, contains('forward_head_fails_count'));
+    expect(wallPushUp.logger.setLogs.keys, contains('elbow_flare_fails_count'));
+    expect(
+      wallPushUp.logger.setLogs.keys,
+      contains('cervical_extension_fails_count'),
+    );
+    expect(
+      wallPushUp.logger.setLogs.keys,
+      contains('foot_stationary_fails_count'),
+    );
+    expect(wallPushUp.logger.setLogs.keys, contains('tempo_fails_count'));
+  });
+
+  test('does not log body-line fail count when a bent-body rep is rejected',
+      () {
+    final wallPushUp = WallPushUp()
+      ..cameraFacing = CameraFacing.right
+      ..exerciseState = ExerciseState.activated;
+
+    final top = _wallPose(
+      shoulderX: 300,
+      shoulderY: 200,
+      hipX: 250,
+      hipY: 300,
+      elbowX: 360,
+      elbowY: 200,
+    );
+    final down1 = _wallPose(
+      shoulderX: 320,
+      shoulderY: 220,
+      hipX: 263.3,
+      hipY: 313.3,
+      elbowX: 360,
+      elbowY: 230,
+    );
+    final down2 = _wallPose(
+      shoulderX: 345,
+      shoulderY: 245,
+      hipX: 280,
+      hipY: 330,
+      elbowX: 380,
+      elbowY: 240,
+    );
+    final bodyLineFault = _wallPose(
+      shoulderX: 360,
+      shoulderY: 260,
+      hipX: 220,
+      hipY: 260,
+      elbowX: 400,
+      elbowY: 260,
+    );
+
+    _activate(wallPushUp, top);
+
+    _pump(wallPushUp, top, 0);
+    _pump(wallPushUp, down1, 100);
+    _pump(wallPushUp, down2, 200);
+    for (var i = 0; i < 10; i += 1) {
+      _pump(wallPushUp, bodyLineFault, 500 + i * 100);
+    }
+    _pump(wallPushUp, down2, 1700);
+    _pump(wallPushUp, top, 2200);
+
+    expect(wallPushUp.repCount, 0);
+
+    wallPushUp.onSetComplete();
+
+    expect(wallPushUp.logger.setLogs['body_line_fails_count'], 0);
+    expect(wallPushUp.logger.setLogs['wall_contact_fails_count'], 0);
   });
 }
