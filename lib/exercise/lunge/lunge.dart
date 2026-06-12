@@ -313,6 +313,7 @@ class Lunge extends ExerciseBase {
       resultIssues: resultIssues,
     );
 
+    final debugEnabled = isDebugModeActive;
     // 5. Debug data
     debugData['lungeState'] = lungeState.toString().split('.').last;
     debugData['reachedBottomThisRep'] = _reachedBottomThisRep;
@@ -365,8 +366,10 @@ class Lunge extends ExerciseBase {
       }
       setFeedback.add({correctForm: faultMap});
 
-      for (final metric in _metrics) {
-        debugData.addAll(metric.debugData);
+      if (debugEnabled) {
+        for (final metric in _metrics) {
+          debugData.addAll(metric.debugData);
+        }
       }
 
       correctForm = true;
@@ -387,8 +390,10 @@ class Lunge extends ExerciseBase {
       }
     }
 
-    for (final metric in _metrics) {
-      debugData.addAll(metric.debugData);
+    if (debugEnabled) {
+      for (final metric in _metrics) {
+        debugData.addAll(metric.debugData);
+      }
     }
 
     if (lungeState == LungeState.descending) {

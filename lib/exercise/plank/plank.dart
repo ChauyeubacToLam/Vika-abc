@@ -208,6 +208,7 @@ class Plank extends ExerciseBase {
       resultIssues: resultIssues,
     );
 
+    final debugEnabled = isDebugModeActive;
     // 4. Debug data
     debugData['plankState'] = plankState.toString().split('.').last;
     debugData['trunkClock'] = geometry.trunkClockAngle.toStringAsFixed(1);
@@ -264,8 +265,10 @@ class Plank extends ExerciseBase {
     }
 
     // 8. Merge metric debug data
-    for (final metric in _metrics) {
-      debugData.addAll(metric.debugData);
+    if (debugEnabled) {
+      for (final metric in _metrics) {
+        debugData.addAll(metric.debugData);
+      }
     }
   }
 
@@ -381,8 +384,10 @@ class Plank extends ExerciseBase {
       metric.resetAndCountFault();
     }
 
-    for (final metric in _metrics) {
-      debugData.addAll(metric.debugData);
+    if (isDebugModeActive) {
+      for (final metric in _metrics) {
+        debugData.addAll(metric.debugData);
+      }
     }
     correctForm = true;
   }

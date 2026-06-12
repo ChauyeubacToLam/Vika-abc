@@ -143,6 +143,7 @@ abstract class ExerciseBase {
 
   ExerciseState exerciseState = ExerciseState.notActivated;
   CameraFacing cameraFacing = CameraFacing.front;
+  DebugMode debugMode = DebugMode.off;
   bool correctForm = true;
   double frontFacingRatio = 1.0;
 
@@ -152,6 +153,8 @@ abstract class ExerciseBase {
 
   List<TrackedMetric> get trackedDebugMetrics =>
       List<TrackedMetric>.unmodifiable([_exerciseDebugTracker]);
+
+  bool get isDebugModeActive => debugMode != DebugMode.off;
 
   // Orientation debouncer
   StickyDebouncer leftRightDebouncer = StickyDebouncer(requiredFrames: 5);
@@ -268,7 +271,9 @@ abstract class ExerciseBase {
       final stableFor = _personSeenSince == null
           ? 0
           : frameTimestamp.difference(_personSeenSince!).inMilliseconds;
-      debugData['personStableMs'] = stableFor;
+      if (isDebugModeActive) {
+        debugData['personStableMs'] = stableFor;
+      }
 
       if (!_personConfirmed) {
         resultIssues.feedback["System"] =
@@ -456,6 +461,7 @@ abstract class ExerciseBase {
   }
 
   void _trackDebugFrame() {
+    if (!isDebugModeActive) return;
     _exerciseDebugTracker.onTick(frameTimestampMs);
   }
 
