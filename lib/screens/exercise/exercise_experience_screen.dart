@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vika/services/session_coach_builder.dart';
 
+import '../../exercise/1.Bird Dog/bird_dog.dart';
 import '../../exercise/exercise_base.dart';
 import '../../exercise/calorie_estimator_registry.dart';
 import '../../exercise/curl_up/curl_up.dart';
@@ -1029,6 +1030,15 @@ class _ExerciseExperienceSpec {
           restSeconds: overrideRest,
           videoDuration: '1:34',
           createExercise: (repsPerSet) => CurlUp(maxRep: repsPerSet),
+        );
+      case 'bird__dog':
+        return _generic(
+          definition: definition,
+          sets: overrideSets ?? 3,
+          repsPerSet: overrideReps ?? 8,
+          restSeconds: overrideRest,
+          videoDuration: '1:30',
+          createExercise: (repsPerSet) => BirdDog(maxRep: repsPerSet),
         );
       default:
         return _generic(

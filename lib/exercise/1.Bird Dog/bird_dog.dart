@@ -2,6 +2,8 @@
 import 'package:vika/utils/debouncer.dart';
 import 'package:vika/debug/tracked_metric.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import '../../services/bird_dog_voice_assets.dart';
+import '../../services/queued_asset_voice_player.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/exercise_logger.dart';
 import '../exercise_base.dart';
@@ -548,15 +550,73 @@ class BirdDog extends ExerciseBase {
   }
 }
 
+abstract class BirdDogVoicePlayer {
+  Future<void> speak(String text);
+  void clearQueue();
+  void clearPendingButKeepCurrent();
+  void dispose() {}
+}
+
+class _BirdDogAssetVoicePlayer implements BirdDogVoicePlayer {
+  _BirdDogAssetVoicePlayer({QueuedAssetVoicePlayer? player})
+      : _player = player ??
+            QueuedAssetVoicePlayer(
+              assetMap: BirdDogVoiceAssets.files,
+              assetSourcePrefix: BirdDogVoiceAssets.assetSourcePrefix,
+              assetBundlePrefix: BirdDogVoiceAssets.assetBundlePrefix,
+              logTag: 'BirdDogVoice',
+            );
+
+  final QueuedAssetVoicePlayer _player;
+
+  @override
+  Future<void> speak(String text) => _player.speak(text);
+
+  @override
+  void clearQueue() => _player.clearQueue();
+
+  @override
+  void clearPendingButKeepCurrent() => _player.clearPendingButKeepCurrent();
+
+  @override
+  void dispose() => _player.dispose();
+}
+
 class BirdDogVoiceCoach implements ExerciseVoiceCoach {
+  BirdDogVoiceCoach({BirdDogVoicePlayer? voicePlayer})
+      : _voicePlayer = voicePlayer ?? _BirdDogAssetVoicePlayer();
+
   static const int _setupCueGapMs = 9000;
   static const int _phaseCueGapMs = 1400;
   static const int _faultCueGapMs = 4500;
   static const int _sameFaultGapMs = 9000;
   static const int _maxReminderReps = 3;
 
+  static const String _setupIntro =
+      'Đặt điện thoại hơi chéo để thấy toàn thân trên thảm.';
+  static const String _setupPosition =
+      'Chống hai tay và hai gối. Tay dưới vai, gối dưới hông, lưng phẳng.';
+  static const String _activeIntro =
+      'Giơ tay và chân đối diện. Vươn dài. Giữ 5 giây rồi đổi bên.';
+  static const String _setNextSetup =
+      'Hiệp này chống lại bốn điểm. Lưng phẳng, tay dưới vai.';
+  static const String _keepFullBody = 'Giữ cả người trong khung hình.';
+  static const String _holdStill = 'Giữ yên 3 giây để bắt đầu.';
+  static const String _ready = 'Sẵn sàng.';
+  static const String _complete = 'Hoàn thành bài tập.';
+  static const String _goodClean = 'Tốt, hông giữ cân bằng.';
+
+  static const String _faultOppositeSide = 'Giơ tay và chân đối diện.';
+  static const String _faultAlternate = 'Đổi sang bên còn lại.';
+  static const String _faultAlignment = 'Vươn dài tay và chân.';
+  static const String _faultHead = 'Nâng đầu nhẹ, mắt nhìn xuống thảm.';
+  static const String _faultLumbar = 'Hạ chân xuống ngang thân.';
+  static const String _faultHold = 'Giữ 5 giây ở điểm cao nhất.';
+  static const String _faultTrunk = 'Siết bụng, giữ hông cân bằng.';
+
   static final Map<String, int> _previousSetFaultCounts = {};
 
+  final BirdDogVoicePlayer _voicePlayer;
   final Map<String, int> _activeReminders = {};
   final Map<String, int> _spokenFaultAtMs = {};
   final Map<String, int> _setFaultCounts = {};
@@ -583,7 +643,7 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
     final nowMs = DateTime.now().millisecondsSinceEpoch;
 
     if (exercise.exerciseState == ExerciseState.completed) {
-      _handleSetComplete(exercise);
+      _handleSetComplete();
       _lastRepCount = repCount;
       return;
     }
@@ -603,20 +663,13 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
     }
 
     if (!_didSpeakReady) {
-      exercise.ttsService.clearQueue();
-      exercise.ttsService.speak('Bắt đầu');
-      exercise.ttsService.speak('Giơ tay và chân đối diện');
+      _voicePlayer.clearQueue();
+      _voicePlayer.speak(_ready);
+      _voicePlayer.speak(_activeIntro);
       _didSpeakReady = true;
     }
 
-    if (!_didSpeakPreviousSetAdvice && _previousSetFaultCounts.isNotEmpty) {
-      final advice = _topPreviousSetAdvice();
-      if (advice != null) {
-        exercise.ttsService.speak('Set này chú ý');
-        exercise.ttsService.speak(advice);
-      }
-      _didSpeakPreviousSetAdvice = true;
-    }
+    _speakPreviousSetAdviceIfNeeded();
 
     final repIncreased = repCount > _lastRepCount;
     if (repIncreased) {
@@ -628,7 +681,7 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
 
     final liveFault = _liveFaultCue(exercise, feedback);
     if (liveFault != null && _canSpeakFault(liveFault, nowMs)) {
-      exercise.ttsService.speak(liveFault);
+      _voicePlayer.speak(liveFault);
       _spokenFaultAtMs[liveFault] = nowMs;
       _lastFaultCueAtMs = nowMs;
       return;
@@ -646,43 +699,45 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
     if (nowMs - _lastSetupCueAtMs < _setupCueGapMs) return;
 
     if (!_didSpeakSetupIntro) {
-      exercise.ttsService.speak(
-        'Vào tư thế bò bốn điểm, vai trên cổ tay, hông trên gối',
-      );
-      exercise.ttsService.speak('Quay ngang người với camera');
+      _voicePlayer.speak(_setupIntro);
+      _voicePlayer.speak(_setupPosition);
+      _speakPreviousSetAdviceIfNeeded();
       _didSpeakSetupIntro = true;
       _lastSetupCueAtMs = nowMs;
       return;
     }
 
     if (!hasPose) {
-      exercise.ttsService.speak('Giữ toàn thân trong khung hình');
+      _voicePlayer.speak(_keepFullBody);
     } else if (exercise.activationProgress != null) {
-      exercise.ttsService.speak('Giữ yên để bắt đầu');
+      _voicePlayer.speak(_holdStill);
     } else {
-      exercise.ttsService.speak('Đặt lưng phẳng, hai tay dưới vai');
+      _voicePlayer.speak(_setupPosition);
     }
     _lastSetupCueAtMs = nowMs;
   }
 
   void _handleRepComplete(BirdDog exercise, int repCount) {
-    exercise.ttsService.clearPendingButKeepCurrent();
-    exercise.ttsService.speak('$repCount');
+    _voicePlayer.clearPendingButKeepCurrent();
+    _voicePlayer.speak('$repCount');
 
     if (exercise.lastRepWasClean) {
-      exercise.ttsService.speak('tốt');
+      _voicePlayer.speak(_goodClean);
       _activeReminders.clear();
       return;
     }
 
-    for (final message in exercise.lastRepFaultVoiceMessages.take(2)) {
-      _setFaultCounts[message] = (_setFaultCounts[message] ?? 0) + 1;
-      _activeReminders[message] = _maxReminderReps;
+    for (final rawMessage in exercise.lastRepFaultVoiceMessages.take(2)) {
+      final voice = _immediateVoiceForRaw(rawMessage);
+      final faultId = _faultIdForVoice(voice);
+      if (voice == null || faultId == null) continue;
+      _setFaultCounts[faultId] = (_setFaultCounts[faultId] ?? 0) + 1;
+      _activeReminders[voice] = _maxReminderReps;
     }
 
-    final topAdvice = exercise.lastRepTopVoiceMessage;
-    if (topAdvice != null && topAdvice.trim().isNotEmpty) {
-      exercise.ttsService.speak(topAdvice);
+    final topAdvice = _immediateVoiceForRaw(exercise.lastRepTopVoiceMessage);
+    if (topAdvice != null) {
+      _voicePlayer.speak(topAdvice);
       _activeReminders[topAdvice] = _maxReminderReps;
     }
   }
@@ -694,12 +749,13 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
 
     final cue = switch (exercise.state) {
       BirdDogState.neutral => _nextNeutralCue(),
-      BirdDogState.extending => 'Vươn dài tay và chân đối diện',
-      BirdDogState.hold_extended => 'Giữ lưng phẳng, siết bụng',
-      BirdDogState.returning => 'Thu tay chân về chậm',
+      BirdDogState.extending => _faultAlignment,
+      BirdDogState.hold_extended => _faultHold,
+      BirdDogState.returning => null,
     };
+    if (cue == null) return;
 
-    exercise.ttsService.speak(cue);
+    _voicePlayer.speak(cue);
     _lastPhaseKey = phaseKey;
     _lastPhaseCueAtMs = nowMs;
   }
@@ -707,7 +763,7 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
   String _nextNeutralCue() {
     final reminder = _nextReminder();
     if (reminder != null) return reminder;
-    return 'Đổi bên, giơ tay và chân đối diện';
+    return _faultAlternate;
   }
 
   String? _nextReminder() {
@@ -730,26 +786,26 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
         exercise.resultIssues.instructions[exercise.currentPhaseKey];
     final instructionError = phaseInstruction?['Error'];
     if (instructionError != null && instructionError.trim().isNotEmpty) {
-      return instructionError.trim();
+      return _immediateVoiceForRaw(instructionError);
     }
 
     final feedbackError = feedback['Error'];
     if (feedbackError != null) {
       if (feedbackError.contains('cùng tay') ||
           feedbackError.contains('cùng chân')) {
-        return 'Giơ tay và chân đối diện';
+        return _faultOppositeSide;
       }
       if (feedbackError.contains('luân phiên')) {
-        return 'Đổi sang tay và chân còn lại';
+        return _faultAlternate;
       }
       if (feedbackError.contains('Plank')) {
-        return 'Hạ hai gối xuống sàn';
+        return _setupPosition;
       }
     }
 
     final spine = feedback['Spine'];
     if (spine != null && spine.contains('võng')) {
-      return 'Hạ thấp chân xuống một chút';
+      return _faultLumbar;
     }
 
     return null;
@@ -761,11 +817,11 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
     return nowMs - lastSameFaultAt >= _sameFaultGapMs;
   }
 
-  void _handleSetComplete(BirdDog exercise) {
+  void _handleSetComplete() {
     if (_didSpeakSetComplete) return;
 
-    exercise.ttsService.clearPendingButKeepCurrent();
-    exercise.ttsService.speak('Hoàn thành bài tập');
+    _voicePlayer.clearPendingButKeepCurrent();
+    _voicePlayer.speak(_complete);
 
     _previousSetFaultCounts
       ..clear()
@@ -778,11 +834,80 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
     if (_previousSetFaultCounts.isEmpty) return null;
     final sorted = _previousSetFaultCounts.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
-    return sorted.first.key;
+    return _setNextVoiceForId(sorted.first.key);
+  }
+
+  void _speakPreviousSetAdviceIfNeeded() {
+    if (_didSpeakPreviousSetAdvice || _previousSetFaultCounts.isEmpty) return;
+
+    final advice = _topPreviousSetAdvice();
+    _voicePlayer.speak(_setNextSetup);
+    if (advice != null) {
+      _voicePlayer.speak(advice);
+    }
+    _didSpeakPreviousSetAdvice = true;
+  }
+
+  String? _immediateVoiceForRaw(String? raw) {
+    final value = raw?.trim();
+    if (value == null || value.isEmpty) return null;
+
+    if (value.contains('đối diện') ||
+        value.contains('cùng tay') ||
+        value.contains('cùng chân')) {
+      return _faultOppositeSide;
+    }
+    if (value.contains('còn lại') || value.contains('luân phiên')) {
+      return _faultAlternate;
+    }
+    if (value.contains('Vươn dài') || value.contains('duỗi')) {
+      return _faultAlignment;
+    }
+    if (value.contains('Nâng đầu') || value.contains('cúi đầu')) {
+      return _faultHead;
+    }
+    if (value.contains('Hạ chân') ||
+        value.contains('Hạ thấp chân') ||
+        value.contains('võng')) {
+      return _faultLumbar;
+    }
+    if (value.contains('5 giây') || value.contains('5s')) {
+      return _faultHold;
+    }
+    if (value.contains('bụng') || value.contains('hông')) {
+      return _faultTrunk;
+    }
+    return null;
+  }
+
+  String? _faultIdForVoice(String? voice) {
+    if (voice == _faultOppositeSide) return 'opposite_side';
+    if (voice == _faultAlternate) return 'alternate';
+    if (voice == _faultAlignment) return 'alignment';
+    if (voice == _faultHead) return 'head';
+    if (voice == _faultLumbar) return 'lumbar';
+    if (voice == _faultHold) return 'hold';
+    if (voice == _faultTrunk) return 'trunk';
+    return null;
+  }
+
+  String? _setNextVoiceForId(String faultId) {
+    return switch (faultId) {
+      'opposite_side' => 'Hiệp này đừng giơ cùng bên.',
+      'alternate' => 'Hiệp này đổi bên sau mỗi lần.',
+      'alignment' => 'Hiệp này giữ tay chân thẳng hơn.',
+      'head' => 'Hiệp này đừng cúi đầu quá thấp.',
+      'lumbar' => 'Hiệp này đừng đá chân quá cao.',
+      'hold' => 'Hiệp này giữ đủ lâu rồi mới hạ.',
+      'trunk' => 'Hiệp này đừng để hông lệch.',
+      _ => null,
+    };
   }
 
   @override
   void dispose() {
+    _voicePlayer.clearQueue();
+    _voicePlayer.dispose();
     _activeReminders.clear();
     _spokenFaultAtMs.clear();
     _setFaultCounts.clear();
