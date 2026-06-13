@@ -229,12 +229,17 @@ class BirdDog extends ExerciseBase {
     if (requiredLandmarks.any((landmark) =>
         landmark == null || !ExerciseBase.isLandmarkConfident(landmark))) {
       if (state != BirdDogState.neutral) {
-        _transitionState(BirdDogState.neutral, now);
-        _resetRepState();
-        resultIssues.feedback['Result'] = 'Không tính rep';
-        resultIssues.feedback['Error'] = 'Mất mốc cơ thể';
-        resultIssues.addInstruction(
-            'BLOCK', 'Error', 'Giữ toàn thân trong khung hình');
+        _rejectAttempt(
+          FaultRecord(
+            phase: state.name,
+            type: 'MissingBody',
+            message: 'Mất mốc cơ thể',
+            voiceMessage: 'Giữ cả người trong khung hình.',
+            affectsForm: true,
+            priority: BirdDogFaultPriority.alignment,
+          ),
+          transitionToNeutralAtMs: now,
+        );
       }
       return;
     }
@@ -306,11 +311,18 @@ class BirdDog extends ExerciseBase {
     // Không còn bắt lỗi Push-up (Plank) quá gắt vì góc chéo 45 độ làm biến dạng hình chiếu 2D của chân trụ
     // Vẫn giữ lại safety catch nếu cần nhưng nới lỏng
     if (nonActiveKneeAngle > 150 && state != BirdDogState.neutral) {
-      _transitionState(BirdDogState.neutral, now);
-      _peakLeftLeg = null;
-      _peakLeftArm = null;
-      resultIssues.feedback['Error'] = 'Sai tư thế (Đang Plank)';
-      resultIssues.addInstruction('BLOCK', 'Error', 'Hạ hai gối xuống sàn!');
+      _rejectAttempt(
+        FaultRecord(
+          phase: state.name,
+          type: 'Plank',
+          message: 'Sai tư thế, đang chuyển sang plank',
+          voiceMessage:
+              'Chống hai tay và hai gối. Tay dưới vai, gối dưới hông, lưng phẳng.',
+          affectsForm: true,
+          priority: BirdDogFaultPriority.alignment,
+        ),
+        transitionToNeutralAtMs: now,
+      );
       return;
     }
 
@@ -416,7 +428,17 @@ class BirdDog extends ExerciseBase {
       _peakLeftArm = null;
     } else if (_returningDebouncer.update(state == BirdDogState.hold_extended &&
         kneeAngle < BirdDogConfig.RETURNING_KNEE_THRESHOLD)) {
-      _transitionState(BirdDogState.returning, now);
+      final holdSeconds = tempoMetric.holdStartMs == null
+          ? 0.0
+          : (now - tempoMetric.holdStartMs!) / 1000.0;
+      if (holdSeconds < BirdDogConfig.HOLD_TARGET_SECONDS) {
+        _rejectAttempt(
+          _shortHoldFault(holdSeconds),
+          transitionToNeutralAtMs: now,
+        );
+      } else {
+        _transitionState(BirdDogState.returning, now);
+      }
     } else if (_neutralDebouncer.update(state == BirdDogState.returning &&
         kneeAngle < BirdDogConfig.NEUTRAL_KNEE_THRESHOLD)) {
       _transitionState(BirdDogState.neutral, now);
@@ -434,21 +456,24 @@ class BirdDog extends ExerciseBase {
   void _completeRep(BirdDogRepContext ctx) {
     final blockingFault = _blockingFaultFor(ctx);
     if (blockingFault != null) {
-      lastRepFaultVoiceMessages = [
-        blockingFault.voiceMessage ?? blockingFault.message
-      ];
-      lastRepTopVoiceMessage =
-          blockingFault.voiceMessage ?? blockingFault.message;
-      lastRepTopVoicePriority = blockingFault.priority;
-      lastRepWasClean = false;
-      invalidAttemptCount++;
-      _publishBlockingFault(blockingFault);
-      _resetRepState();
+      _rejectAttempt(blockingFault);
+      return;
+    }
+
+    tempoMetric.evaluateRep(ctx);
+    FaultRecord? tempoFault;
+    for (final fault in tempoMetric.faults) {
+      if (fault.type == 'Tempo') {
+        tempoFault = fault;
+        break;
+      }
+    }
+    if (tempoFault != null) {
+      _rejectAttempt(tempoFault);
       return;
     }
 
     repCount++;
-    tempoMetric.evaluateRep(ctx);
 
     final allFaults = <FaultRecord>[];
     for (var metric in _metrics) allFaults.addAll(metric.faults);
@@ -501,13 +526,41 @@ class BirdDog extends ExerciseBase {
     return messages;
   }
 
+  FaultRecord _shortHoldFault(double holdSeconds) {
+    return FaultRecord(
+      phase: state.name,
+      type: 'Tempo',
+      message: 'Giữ chưa đủ 5s (${holdSeconds.toStringAsFixed(1)}s)',
+      voiceMessage: 'Giữ 5 giây ở điểm cao nhất.',
+      affectsForm: true,
+      priority: BirdDogFaultPriority.tempo,
+    );
+  }
+
+  void _rejectAttempt(
+    FaultRecord fault, {
+    int? transitionToNeutralAtMs,
+  }) {
+    lastRepFaultVoiceMessages = [fault.voiceMessage ?? fault.message];
+    lastRepTopVoiceMessage = fault.voiceMessage ?? fault.message;
+    lastRepTopVoicePriority = fault.priority;
+    lastRepWasClean = false;
+    invalidAttemptCount++;
+    _publishBlockingFault(fault);
+    if (transitionToNeutralAtMs != null && state != BirdDogState.neutral) {
+      _transitionState(BirdDogState.neutral, transitionToNeutralAtMs);
+      previousState = BirdDogState.neutral;
+    }
+    _resetRepState();
+  }
+
   FaultRecord? _blockingFaultFor(BirdDogRepContext ctx) {
     if (ctx.isSameSide) {
       return FaultRecord(
         phase: ctx.state.name,
         type: 'SameSide',
         message: 'Không cùng tay cùng chân',
-        voiceMessage: 'Giơ tay và chân đối diện',
+        voiceMessage: 'Giơ tay và chân đối diện.',
         affectsForm: true,
         priority: BirdDogFaultPriority.alignment,
       );
@@ -524,7 +577,7 @@ class BirdDog extends ExerciseBase {
         phase: ctx.state.name,
         type: 'NotAlternating',
         message: 'Chưa luân phiên tay và chân',
-        voiceMessage: 'Đổi sang tay và chân còn lại',
+        voiceMessage: 'Đổi sang bên còn lại.',
         affectsForm: true,
         priority: BirdDogFaultPriority.alignment,
       );
@@ -776,6 +829,7 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
   String? _immediateVoiceForRaw(String? raw) {
     final value = raw?.trim();
     if (value == null || value.isEmpty) return null;
+    if (BirdDogVoiceAssets.files.containsKey(value)) return value;
 
     if (value.contains('đối diện') ||
         value.contains('cùng tay') ||

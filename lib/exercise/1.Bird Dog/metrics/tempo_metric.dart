@@ -36,7 +36,7 @@ class TempoMetric extends BirdDogMetricBase {
         phase: 'REP_COMPLETE',
         type: 'Tempo',
         message: 'Giữ chưa đủ 5s (${holdDuration!.toStringAsFixed(1)}s)',
-        voiceMessage: 'Giữ lại 5 giây ở điểm cao nhất nhé',
+        voiceMessage: 'Giữ 5 giây ở điểm cao nhất.',
         affectsForm: true,
         priority: BirdDogFaultPriority.tempo,
       ));

@@ -39,7 +39,7 @@ class TrunkStabilityMetric extends BirdDogMetricBase {
             phase: ctx.state.name,
             type: 'Trunk',
             message: 'Hông bị lệch/sụt',
-            voiceMessage: 'Gồng chặt cơ bụng, giữ hông cân bằng',
+            voiceMessage: 'Siết bụng, giữ hông cân bằng.',
             affectsForm: true,
             priority: BirdDogFaultPriority.trunkStability,
           ));

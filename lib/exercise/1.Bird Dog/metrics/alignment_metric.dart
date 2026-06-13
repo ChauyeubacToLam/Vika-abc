@@ -25,7 +25,7 @@ class AlignmentMetric extends BirdDogMetricBase {
           phase: ctx.state.name,
           type: 'Alignment_Limb',
           message: 'Tay/Chân duỗi chưa thẳng với mặt đất',
-          voiceMessage: 'Vươn dài tay và chân ra',
+          voiceMessage: 'Vươn dài tay và chân.',
           affectsForm: true,
           priority: BirdDogFaultPriority.alignment,
         ));
@@ -41,7 +41,7 @@ class AlignmentMetric extends BirdDogMetricBase {
             phase: ctx.state.name,
             type: 'Alignment_Head',
             message: 'Đầu cúi quá thấp',
-            voiceMessage: 'Nâng đầu lên, mắt nhìn xuống thảm',
+            voiceMessage: 'Nâng đầu nhẹ, mắt nhìn xuống thảm.',
             affectsForm: true,
             priority: BirdDogFaultPriority.alignment,
           ));
