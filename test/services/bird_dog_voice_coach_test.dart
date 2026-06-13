@@ -31,6 +31,55 @@ class _FakeBirdDogVoicePlayer implements BirdDogVoicePlayer {
 }
 
 void main() {
+  test('speaks setup instructions only once before activation', () {
+    final player = _FakeBirdDogVoicePlayer();
+    final coach = BirdDogVoiceCoach(voicePlayer: player);
+    final exercise = BirdDog()..exerciseState = ExerciseState.notActivated;
+
+    coach.processFrame(
+      exercise: exercise,
+      repCount: 0,
+      hasPose: false,
+      feedback: const {},
+    );
+    coach.processFrame(
+      exercise: exercise,
+      repCount: 0,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    expect(
+      player.spoken,
+      [
+        'Đặt điện thoại hơi chéo để thấy toàn thân trên thảm.',
+        'Chống hai tay và hai gối. Tay dưới vai, gối dưới hông, lưng phẳng.',
+        'Giơ tay và chân đối diện. Vươn dài. Giữ 5 giây rồi đổi bên.',
+      ],
+    );
+  });
+
+  test('does not speak live frame faults before a rep attempt finishes', () {
+    final player = _FakeBirdDogVoicePlayer();
+    final coach = BirdDogVoiceCoach(voicePlayer: player);
+    final exercise = BirdDog()..exerciseState = ExerciseState.activated;
+
+    coach.processFrame(
+      exercise: exercise,
+      repCount: 0,
+      hasPose: true,
+      feedback: const {'Error': 'Không cùng tay cùng chân'},
+    );
+    coach.processFrame(
+      exercise: exercise,
+      repCount: 0,
+      hasPose: true,
+      feedback: const {'Error': 'Không cùng tay cùng chân'},
+    );
+
+    expect(player.spoken, ['Sẵn sàng.']);
+  });
+
   test('speaks no-count and correction when a bird dog attempt is rejected',
       () {
     final player = _FakeBirdDogVoicePlayer();

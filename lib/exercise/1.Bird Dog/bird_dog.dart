@@ -588,12 +588,6 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
   BirdDogVoiceCoach({BirdDogVoicePlayer? voicePlayer})
       : _voicePlayer = voicePlayer ?? _BirdDogAssetVoicePlayer();
 
-  static const int _setupCueGapMs = 9000;
-  static const int _phaseCueGapMs = 1400;
-  static const int _faultCueGapMs = 4500;
-  static const int _sameFaultGapMs = 9000;
-  static const int _maxReminderReps = 3;
-
   static const String _setupIntro =
       'Đặt điện thoại hơi chéo để thấy toàn thân trên thảm.';
   static const String _setupPosition =
@@ -602,8 +596,6 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
       'Giơ tay và chân đối diện. Vươn dài. Giữ 5 giây rồi đổi bên.';
   static const String _setNextSetup =
       'Hiệp này chống lại bốn điểm. Lưng phẳng, tay dưới vai.';
-  static const String _keepFullBody = 'Giữ cả người trong khung hình.';
-  static const String _holdStill = 'Giữ yên 3 giây để bắt đầu.';
   static const String _noCount = 'Lần này chưa tính.';
   static const String _ready = 'Sẵn sàng.';
   static const String _complete = 'Hoàn thành bài tập.';
@@ -620,14 +612,8 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
   static final Map<String, int> _previousSetFaultCounts = {};
 
   final BirdDogVoicePlayer _voicePlayer;
-  final Map<String, int> _activeReminders = {};
-  final Map<String, int> _spokenFaultAtMs = {};
   final Map<String, int> _setFaultCounts = {};
 
-  String? _lastPhaseKey;
-  int _lastSetupCueAtMs = 0;
-  int _lastPhaseCueAtMs = 0;
-  int _lastFaultCueAtMs = 0;
   int _lastRepCount = 0;
   int _lastInvalidAttemptCount = 0;
   bool _didSpeakSetupIntro = false;
@@ -644,7 +630,6 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
   }) {
     if (exercise is! BirdDog) return;
 
-    final nowMs = DateTime.now().millisecondsSinceEpoch;
     final repIncreased = repCount > _lastRepCount;
     final invalidAttemptIncreased =
         exercise.invalidAttemptCount > _lastInvalidAttemptCount;
@@ -665,7 +650,7 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
     }
 
     if (exercise.exerciseState == ExerciseState.notActivated) {
-      _handleSetup(exercise, hasPose: hasPose, nowMs: nowMs);
+      _handleSetup();
       _lastRepCount = repCount;
       _lastInvalidAttemptCount = exercise.invalidAttemptCount;
       return;
@@ -674,16 +659,13 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
     if (exercise.exerciseState != ExerciseState.activated ||
         exercise.isPaused ||
         !hasPose) {
-      _lastPhaseKey = null;
       _lastRepCount = repCount;
       _lastInvalidAttemptCount = exercise.invalidAttemptCount;
       return;
     }
 
     if (!_didSpeakReady) {
-      _voicePlayer.clearQueue();
       _voicePlayer.speak(_ready);
-      _voicePlayer.speak(_activeIntro);
       _didSpeakReady = true;
     }
 
@@ -693,7 +675,6 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
       _handleRepComplete(exercise, repCount);
       _lastRepCount = repCount;
       _lastInvalidAttemptCount = exercise.invalidAttemptCount;
-      _lastPhaseKey = null;
       return;
     }
 
@@ -701,47 +682,21 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
       _handleInvalidAttempt(exercise);
       _lastRepCount = repCount;
       _lastInvalidAttemptCount = exercise.invalidAttemptCount;
-      _lastPhaseKey = null;
       return;
     }
 
-    final liveFault = _liveFaultCue(exercise, feedback);
-    if (liveFault != null && _canSpeakFault(liveFault, nowMs)) {
-      _voicePlayer.speak(liveFault);
-      _spokenFaultAtMs[liveFault] = nowMs;
-      _lastFaultCueAtMs = nowMs;
-      return;
-    }
-
-    _handlePhaseCue(exercise, nowMs);
     _lastRepCount = repCount;
     _lastInvalidAttemptCount = exercise.invalidAttemptCount;
   }
 
-  void _handleSetup(
-    BirdDog exercise, {
-    required bool hasPose,
-    required int nowMs,
-  }) {
-    if (nowMs - _lastSetupCueAtMs < _setupCueGapMs) return;
-
+  void _handleSetup() {
     if (!_didSpeakSetupIntro) {
       _voicePlayer.speak(_setupIntro);
       _voicePlayer.speak(_setupPosition);
+      _voicePlayer.speak(_activeIntro);
       _speakPreviousSetAdviceIfNeeded();
       _didSpeakSetupIntro = true;
-      _lastSetupCueAtMs = nowMs;
-      return;
     }
-
-    if (!hasPose) {
-      _voicePlayer.speak(_keepFullBody);
-    } else if (exercise.activationProgress != null) {
-      _voicePlayer.speak(_holdStill);
-    } else {
-      _voicePlayer.speak(_setupPosition);
-    }
-    _lastSetupCueAtMs = nowMs;
   }
 
   void _handleRepComplete(BirdDog exercise, int repCount) {
@@ -754,7 +709,6 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
 
     if (exercise.lastRepWasClean) {
       _voicePlayer.speak(_goodClean);
-      _activeReminders.clear();
       return;
     }
 
@@ -763,13 +717,11 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
       final faultId = _faultIdForVoice(voice);
       if (voice == null || faultId == null) continue;
       _setFaultCounts[faultId] = (_setFaultCounts[faultId] ?? 0) + 1;
-      _activeReminders[voice] = _maxReminderReps;
     }
 
     final topAdvice = _immediateVoiceForRaw(exercise.lastRepTopVoiceMessage);
     if (topAdvice != null) {
       _voicePlayer.speak(topAdvice);
-      _activeReminders[topAdvice] = _maxReminderReps;
     }
   }
 
@@ -787,84 +739,8 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
       if (faultId != null) {
         _setFaultCounts[faultId] = (_setFaultCounts[faultId] ?? 0) + 1;
       }
-      _activeReminders[topAdvice] = _maxReminderReps;
       _voicePlayer.speak(topAdvice);
     }
-  }
-
-  void _handlePhaseCue(BirdDog exercise, int nowMs) {
-    final phaseKey = exercise.currentPhaseKey;
-    if (phaseKey == _lastPhaseKey) return;
-    if (nowMs - _lastPhaseCueAtMs < _phaseCueGapMs) return;
-
-    final cue = switch (exercise.state) {
-      BirdDogState.neutral => _nextNeutralCue(),
-      BirdDogState.extending => _faultAlignment,
-      BirdDogState.hold_extended => _faultHold,
-      BirdDogState.returning => null,
-    };
-    if (cue == null) return;
-
-    _voicePlayer.speak(cue);
-    _lastPhaseKey = phaseKey;
-    _lastPhaseCueAtMs = nowMs;
-  }
-
-  String _nextNeutralCue() {
-    final reminder = _nextReminder();
-    if (reminder != null) return reminder;
-    return _faultAlternate;
-  }
-
-  String? _nextReminder() {
-    if (_activeReminders.isEmpty) return null;
-
-    final sorted = _activeReminders.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-    final selected = sorted.first.key;
-    final remaining = sorted.first.value - 1;
-    if (remaining <= 0) {
-      _activeReminders.remove(selected);
-    } else {
-      _activeReminders[selected] = remaining;
-    }
-    return selected;
-  }
-
-  String? _liveFaultCue(BirdDog exercise, Map<String, String> feedback) {
-    final phaseInstruction =
-        exercise.resultIssues.instructions[exercise.currentPhaseKey];
-    final instructionError = phaseInstruction?['Error'];
-    if (instructionError != null && instructionError.trim().isNotEmpty) {
-      return _immediateVoiceForRaw(instructionError);
-    }
-
-    final feedbackError = feedback['Error'];
-    if (feedbackError != null) {
-      if (feedbackError.contains('cùng tay') ||
-          feedbackError.contains('cùng chân')) {
-        return _faultOppositeSide;
-      }
-      if (feedbackError.contains('luân phiên')) {
-        return _faultAlternate;
-      }
-      if (feedbackError.contains('Plank')) {
-        return _setupPosition;
-      }
-    }
-
-    final spine = feedback['Spine'];
-    if (spine != null && spine.contains('võng')) {
-      return _faultLumbar;
-    }
-
-    return null;
-  }
-
-  bool _canSpeakFault(String message, int nowMs) {
-    if (nowMs - _lastFaultCueAtMs < _faultCueGapMs) return false;
-    final lastSameFaultAt = _spokenFaultAtMs[message] ?? 0;
-    return nowMs - lastSameFaultAt >= _sameFaultGapMs;
   }
 
   void _handleSetComplete() {
@@ -957,8 +833,6 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
   void dispose() {
     _voicePlayer.clearQueue();
     _voicePlayer.dispose();
-    _activeReminders.clear();
-    _spokenFaultAtMs.clear();
     _setFaultCounts.clear();
   }
 }
