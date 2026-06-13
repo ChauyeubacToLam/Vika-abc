@@ -31,6 +31,7 @@ class BirdDogVoiceAssets {
     'Bắt đầu.': 'common/start.mp3',
     'Giữ cả người trong khung hình.': 'common/keep_full_body.mp3',
     'Giữ yên 3 giây để bắt đầu.': 'common/hold_still.mp3',
+    'Lần này chưa tính.': 'common/no_count.mp3',
     'Hoàn thành bài tập.': 'common/exercise_complete.mp3',
     'Đặt điện thoại hơi chéo để thấy toàn thân trên thảm.':
         'bird_dog/bird_dog.setup_intro.mp3',

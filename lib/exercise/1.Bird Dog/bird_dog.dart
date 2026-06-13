@@ -71,6 +71,7 @@ class BirdDog extends ExerciseBase {
   String? lastRepTopVoiceMessage;
   int? lastRepTopVoicePriority;
   bool lastRepWasClean = true;
+  int invalidAttemptCount = 0;
 
   // Biến Snapshot: Chỉ lưu tay/chân đang thao tác ở đúng đỉnh của rep
   bool? _peakLeftLeg;
@@ -440,6 +441,7 @@ class BirdDog extends ExerciseBase {
           blockingFault.voiceMessage ?? blockingFault.message;
       lastRepTopVoicePriority = blockingFault.priority;
       lastRepWasClean = false;
+      invalidAttemptCount++;
       _publishBlockingFault(blockingFault);
       _resetRepState();
       return;
@@ -602,6 +604,7 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
       'Hiệp này chống lại bốn điểm. Lưng phẳng, tay dưới vai.';
   static const String _keepFullBody = 'Giữ cả người trong khung hình.';
   static const String _holdStill = 'Giữ yên 3 giây để bắt đầu.';
+  static const String _noCount = 'Lần này chưa tính.';
   static const String _ready = 'Sẵn sàng.';
   static const String _complete = 'Hoàn thành bài tập.';
   static const String _goodClean = 'Tốt, hông giữ cân bằng.';
@@ -626,6 +629,7 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
   int _lastPhaseCueAtMs = 0;
   int _lastFaultCueAtMs = 0;
   int _lastRepCount = 0;
+  int _lastInvalidAttemptCount = 0;
   bool _didSpeakSetupIntro = false;
   bool _didSpeakReady = false;
   bool _didSpeakPreviousSetAdvice = false;
@@ -641,16 +645,29 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
     if (exercise is! BirdDog) return;
 
     final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final repIncreased = repCount > _lastRepCount;
+    final invalidAttemptIncreased =
+        exercise.invalidAttemptCount > _lastInvalidAttemptCount;
 
     if (exercise.exerciseState == ExerciseState.completed) {
+      if (!_didSpeakSetComplete) {
+        _voicePlayer.clearPendingButKeepCurrent();
+        if (repIncreased) {
+          _speakRepOutcome(exercise, repCount);
+        } else if (invalidAttemptIncreased) {
+          _speakInvalidAttemptOutcome(exercise);
+        }
+      }
       _handleSetComplete();
       _lastRepCount = repCount;
+      _lastInvalidAttemptCount = exercise.invalidAttemptCount;
       return;
     }
 
     if (exercise.exerciseState == ExerciseState.notActivated) {
       _handleSetup(exercise, hasPose: hasPose, nowMs: nowMs);
       _lastRepCount = repCount;
+      _lastInvalidAttemptCount = exercise.invalidAttemptCount;
       return;
     }
 
@@ -659,6 +676,7 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
         !hasPose) {
       _lastPhaseKey = null;
       _lastRepCount = repCount;
+      _lastInvalidAttemptCount = exercise.invalidAttemptCount;
       return;
     }
 
@@ -671,10 +689,18 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
 
     _speakPreviousSetAdviceIfNeeded();
 
-    final repIncreased = repCount > _lastRepCount;
     if (repIncreased) {
       _handleRepComplete(exercise, repCount);
       _lastRepCount = repCount;
+      _lastInvalidAttemptCount = exercise.invalidAttemptCount;
+      _lastPhaseKey = null;
+      return;
+    }
+
+    if (invalidAttemptIncreased) {
+      _handleInvalidAttempt(exercise);
+      _lastRepCount = repCount;
+      _lastInvalidAttemptCount = exercise.invalidAttemptCount;
       _lastPhaseKey = null;
       return;
     }
@@ -689,6 +715,7 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
 
     _handlePhaseCue(exercise, nowMs);
     _lastRepCount = repCount;
+    _lastInvalidAttemptCount = exercise.invalidAttemptCount;
   }
 
   void _handleSetup(
@@ -719,6 +746,10 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
 
   void _handleRepComplete(BirdDog exercise, int repCount) {
     _voicePlayer.clearPendingButKeepCurrent();
+    _speakRepOutcome(exercise, repCount);
+  }
+
+  void _speakRepOutcome(BirdDog exercise, int repCount) {
     _voicePlayer.speak('$repCount');
 
     if (exercise.lastRepWasClean) {
@@ -739,6 +770,25 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
     if (topAdvice != null) {
       _voicePlayer.speak(topAdvice);
       _activeReminders[topAdvice] = _maxReminderReps;
+    }
+  }
+
+  void _handleInvalidAttempt(BirdDog exercise) {
+    _voicePlayer.clearPendingButKeepCurrent();
+    _speakInvalidAttemptOutcome(exercise);
+  }
+
+  void _speakInvalidAttemptOutcome(BirdDog exercise) {
+    _voicePlayer.speak(_noCount);
+
+    final topAdvice = _immediateVoiceForRaw(exercise.lastRepTopVoiceMessage);
+    if (topAdvice != null) {
+      final faultId = _faultIdForVoice(topAdvice);
+      if (faultId != null) {
+        _setFaultCounts[faultId] = (_setFaultCounts[faultId] ?? 0) + 1;
+      }
+      _activeReminders[topAdvice] = _maxReminderReps;
+      _voicePlayer.speak(topAdvice);
     }
   }
 
@@ -820,7 +870,6 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
   void _handleSetComplete() {
     if (_didSpeakSetComplete) return;
 
-    _voicePlayer.clearPendingButKeepCurrent();
     _voicePlayer.speak(_complete);
 
     _previousSetFaultCounts
