@@ -376,12 +376,26 @@ class BirdDog extends ExerciseBase {
       resultIssues: resultIssues,
     );
 
-    final blockingFault = _blockingFaultFor(ctx);
-    if (blockingFault != null && state != BirdDogState.neutral) {
-      _publishBlockingFault(blockingFault);
-    }
+    debugData['birdDogState'] = state.name;
+    debugData['previousBirdDogState'] = previousState.name;
+    debugData['activeKneeAngle'] = activeKneeAngle;
+    debugData['activeArmAngle'] = activeArmAngle;
+    debugData['nonActiveKneeAngle'] = nonActiveKneeAngle;
+    debugData['trunkHorizontalAngle'] = trunkHoriz;
+    debugData['activeArmHorizontalAngle'] = armHoriz;
+    debugData['activeLegHorizontalAngle'] = legHoriz;
+    debugData['shoulderHipAnkleAngle'] = shaAngle;
+    debugData['isSameSide'] = isSameSide;
+    debugData['evalLeftLeg'] = evalLeftLeg;
+    debugData['evalLeftArm'] = evalLeftArm;
+    debugData['peakLeftLeg'] = _peakLeftLeg;
+    debugData['peakLeftArm'] = _peakLeftArm;
+    debugData['lastPeakLeftLeg'] = _lastPeakLeftLeg;
+    debugData['lastPeakLeftArm'] = _lastPeakLeftArm;
 
     _updateStateMachine(activeKneeAngle, activeArmAngle, now);
+    debugData['birdDogState'] = state.name;
+    debugData['previousBirdDogState'] = previousState.name;
 
     // --- HIỆN ĐỒNG HỒ ĐẾM NGƯỢC 5S CHO UI ---
     if (state == BirdDogState.hold_extended &&
@@ -408,7 +422,13 @@ class BirdDog extends ExerciseBase {
     }
 
     if (state != BirdDogState.neutral) {
-      for (final metric in _metrics) metric.update(ctx);
+      for (var i = 0; i < _metrics.length; i++) {
+        _metrics[i].update(ctx);
+        _trackedMetrics[i].onTick(now);
+      }
+      for (final metric in _metrics) {
+        debugData.addAll(metric.debugData);
+      }
     }
   }
 
@@ -474,6 +494,10 @@ class BirdDog extends ExerciseBase {
     }
 
     repCount++;
+
+    for (final trackedMetric in _trackedMetrics) {
+      trackedMetric.onTick(ctx.frameTimestamp);
+    }
 
     final allFaults = <FaultRecord>[];
     for (var metric in _metrics) allFaults.addAll(metric.faults);

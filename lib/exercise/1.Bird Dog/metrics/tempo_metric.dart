@@ -9,6 +9,7 @@ class TempoMetric extends BirdDogMetricBase {
 
   int? _holdStartMs;
   double? holdDuration;
+  double? _liveHoldSeconds;
 
   int? get holdStartMs => _holdStartMs;
 
@@ -17,6 +18,18 @@ class TempoMetric extends BirdDogMetricBase {
 
   @override
   Map<String, dynamic> get debugData => _debugData;
+  @override
+  double? get value => _liveHoldSeconds ?? holdDuration;
+  @override
+  ThresholdBand? get threshold => const ThresholdBand(
+        warningBelow: 5.0,
+      );
+  @override
+  MetricStatus get status {
+    final seconds = value;
+    if (seconds == null) return MetricStatus.pass;
+    return seconds < 5.0 ? MetricStatus.near : MetricStatus.pass;
+  }
 
   @override
   void onStateTransition(BirdDogState from, BirdDogState to, int timestampMs) {
@@ -28,7 +41,13 @@ class TempoMetric extends BirdDogMetricBase {
   }
 
   @override
-  void update(BirdDogRepContext ctx) {}
+  void update(BirdDogRepContext ctx) {
+    if (ctx.state == BirdDogState.hold_extended && _holdStartMs != null) {
+      _liveHoldSeconds = (ctx.frameTimestamp - _holdStartMs!) / 1000.0;
+      _debugData['holdSeconds'] = _liveHoldSeconds;
+      _debugData['holdTarget'] = 5.0;
+    }
+  }
 
   void evaluateRep(BirdDogRepContext ctx) {
     if (holdDuration != null && holdDuration! < 5.0) {
@@ -48,5 +67,7 @@ class TempoMetric extends BirdDogMetricBase {
     _faults.clear();
     _holdStartMs = null;
     holdDuration = null;
+    _liveHoldSeconds = null;
+    _debugData.clear();
   }
 }
