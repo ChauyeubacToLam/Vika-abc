@@ -24,8 +24,8 @@ class BirdDogReportBuilder extends ExerciseReportBuilder {
           next: 'Đừng gập cổ, vươn dài tay chân.',
         ),
         'tempo_fails_count': (
-          watch: 'Kiểm soát: Giữ đủ 5s trên đỉnh.',
-          next: 'Kiểm soát: Giữ đủ 5s trên đỉnh.',
+          watch: 'Kiểm soát: Giữ đủ 2s trên đỉnh.',
+          next: 'Kiểm soát: Giữ đủ 2s trên đỉnh.',
         ),
       };
 
@@ -33,7 +33,7 @@ class BirdDogReportBuilder extends ExerciseReportBuilder {
   Map<String, String Function(int count, int total)> praiseSentenceMap() => {
         'Lưng thẳng': (c, t) => 'Lưng giữ thẳng $c/$t rep - Cực an toàn!',
         'Ổn định': (c, t) => 'Cứng cáp $c/$t rep!',
-        'Nhịp nhàng': (c, t) => 'Giữ form đủ 5s trong $c/$t rep!',
+        'Nhịp nhàng': (c, t) => 'Giữ form đủ 2s trong $c/$t rep!',
       };
 
   @override
@@ -82,7 +82,7 @@ class BirdDogReportBuilder extends ExerciseReportBuilder {
       DetailCard(
         label: 'Thời gian Hold TB',
         value: '${avgTempo.toStringAsFixed(1)}s',
-        subLabel: 'Mục tiêu: >5.0s', // Cập nhật text hiển thị
+        subLabel: 'Mục tiêu: >2.0s',
         color: 'amber',
       ),
       DetailCard(

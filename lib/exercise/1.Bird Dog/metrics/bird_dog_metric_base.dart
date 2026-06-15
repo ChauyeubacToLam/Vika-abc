@@ -7,6 +7,12 @@ export '../../fault_record.dart';
 
 enum BirdDogState { neutral, extending, hold_extended, returning }
 
+class BirdDogTiming {
+  static const double holdTargetSeconds = 2.0;
+  static const String holdTargetShortLabel = '2s';
+  static const String holdTargetVoiceLabel = '2 giây';
+}
+
 class BirdDogRepContext {
   final double activeKneeAngle;
   final double nonActiveKneeAngle; // Thêm để chặn lỗi Push-up

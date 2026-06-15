@@ -28,7 +28,7 @@ class BirdDogConfig {
   static const double HOLD_ARM_THRESHOLD = 150;
   static const double RETURNING_KNEE_THRESHOLD = 150;
   static const double NEUTRAL_KNEE_THRESHOLD = 110;
-  static const double HOLD_TARGET_SECONDS = 5.0;
+  static const double HOLD_TARGET_SECONDS = BirdDogTiming.holdTargetSeconds;
 }
 
 class BirdDog extends ExerciseBase {
@@ -105,7 +105,7 @@ class BirdDog extends ExerciseBase {
       case BirdDogState.extending:
         return 'Đang duỗi';
       case BirdDogState.hold_extended:
-        return 'Giữ 5s!';
+        return 'Giữ ${BirdDogTiming.holdTargetShortLabel}!';
       case BirdDogState.returning:
         return 'Thu về';
     }
@@ -401,7 +401,8 @@ class BirdDog extends ExerciseBase {
     if (state == BirdDogState.hold_extended &&
         tempoMetric.holdStartMs != null) {
       double elapsed = (now - tempoMetric.holdStartMs!) / 1000.0;
-      double progress = (elapsed / 5.0).clamp(0.0, 1.0);
+      double progress =
+          (elapsed / BirdDogConfig.HOLD_TARGET_SECONDS).clamp(0.0, 1.0);
       resultIssues.feedback['progress'] = progress.toStringAsFixed(2);
 
       if (progress < 1.0) {
@@ -421,14 +422,12 @@ class BirdDog extends ExerciseBase {
       return;
     }
 
-    if (state != BirdDogState.neutral) {
-      for (var i = 0; i < _metrics.length; i++) {
-        _metrics[i].update(ctx);
-        _trackedMetrics[i].onTick(now);
-      }
-      for (final metric in _metrics) {
-        debugData.addAll(metric.debugData);
-      }
+    for (var i = 0; i < _metrics.length; i++) {
+      _metrics[i].update(ctx);
+      _trackedMetrics[i].onTick(now);
+    }
+    for (final metric in _metrics) {
+      debugData.addAll(metric.debugData);
     }
   }
 
@@ -554,8 +553,10 @@ class BirdDog extends ExerciseBase {
     return FaultRecord(
       phase: state.name,
       type: 'Tempo',
-      message: 'Giữ chưa đủ 5s (${holdSeconds.toStringAsFixed(1)}s)',
-      voiceMessage: 'Giữ 5 giây ở điểm cao nhất.',
+      message:
+          'Giữ chưa đủ ${BirdDogTiming.holdTargetShortLabel} (${holdSeconds.toStringAsFixed(1)}s)',
+      voiceMessage:
+          'Giữ ${BirdDogTiming.holdTargetVoiceLabel} ở điểm cao nhất.',
       affectsForm: true,
       priority: BirdDogFaultPriority.tempo,
     );
@@ -670,7 +671,7 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
   static const String _setupPosition =
       'Chống hai tay và hai gối. Tay dưới vai, gối dưới hông, lưng phẳng.';
   static const String _activeIntro =
-      'Giơ tay và chân đối diện. Vươn dài. Giữ 5 giây rồi đổi bên.';
+      'Giơ tay và chân đối diện. Vươn dài. Giữ 2 giây rồi đổi bên.';
   static const String _setNextSetup =
       'Hiệp này chống lại bốn điểm. Lưng phẳng, tay dưới vai.';
   static const String _noCount = 'Lần này chưa tính.';
@@ -683,7 +684,7 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
   static const String _faultAlignment = 'Vươn dài tay và chân.';
   static const String _faultHead = 'Nâng đầu nhẹ, mắt nhìn xuống thảm.';
   static const String _faultLumbar = 'Hạ chân xuống ngang thân.';
-  static const String _faultHold = 'Giữ 5 giây ở điểm cao nhất.';
+  static const String _faultHold = 'Giữ 2 giây ở điểm cao nhất.';
   static const String _faultTrunk = 'Siết bụng, giữ hông cân bằng.';
 
   static final Map<String, int> _previousSetFaultCounts = {};
@@ -874,7 +875,10 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
         value.contains('võng')) {
       return _faultLumbar;
     }
-    if (value.contains('5 giây') || value.contains('5s')) {
+    if (value.contains('2 giây') ||
+        value.contains('2s') ||
+        value.contains('5 giây') ||
+        value.contains('5s')) {
       return _faultHold;
     }
     if (value.contains('bụng') || value.contains('hông')) {

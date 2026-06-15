@@ -215,7 +215,7 @@ Nguyên tắc viết câu:
 |---|---|
 | bird_dog.setup_intro | Đặt điện thoại hơi chéo để thấy toàn thân trên thảm. |
 | bird_dog.setup_position | Chống hai tay và hai gối. Tay dưới vai, gối dưới hông, lưng phẳng. |
-| bird_dog.active_intro | Giơ tay và chân đối diện. Vươn dài. Giữ 5 giây rồi đổi bên. |
+| bird_dog.active_intro | Giơ tay và chân đối diện. Vươn dài. Giữ 2 giây rồi đổi bên. |
 | bird_dog.good_clean | Tốt, hông giữ cân bằng. |
 | bird_dog.set_next_setup | Hiệp này chống lại bốn điểm. Lưng phẳng, tay dưới vai. |
 
@@ -226,7 +226,7 @@ Nguyên tắc viết câu:
 | alignment | Vươn dài tay và chân. | Hiệp này giữ tay chân thẳng hơn. |
 | head | Nâng đầu nhẹ, mắt nhìn xuống thảm. | Hiệp này đừng cúi đầu quá thấp. |
 | lumbar | Hạ chân xuống ngang thân. | Hiệp này đừng đá chân quá cao. |
-| hold | Giữ 5 giây ở điểm cao nhất. | Hiệp này giữ đủ lâu rồi mới hạ. |
+| hold | Giữ 2 giây ở điểm cao nhất. | Hiệp này giữ đủ lâu rồi mới hạ. |
 | trunk | Siết bụng, giữ hông cân bằng. | Hiệp này đừng để hông lệch. |
 
 ## V-Up - Gập người chữ V

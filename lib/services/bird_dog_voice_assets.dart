@@ -37,7 +37,7 @@ class BirdDogVoiceAssets {
         'bird_dog/bird_dog.setup_intro.mp3',
     'Chống hai tay và hai gối. Tay dưới vai, gối dưới hông, lưng phẳng.':
         'bird_dog/bird_dog.setup_position.mp3',
-    'Giơ tay và chân đối diện. Vươn dài. Giữ 5 giây rồi đổi bên.':
+    'Giơ tay và chân đối diện. Vươn dài. Giữ 2 giây rồi đổi bên.':
         'bird_dog/bird_dog.active_intro.mp3',
     'Tốt, hông giữ cân bằng.': 'bird_dog/bird_dog.good_clean.mp3',
     'Hiệp này chống lại bốn điểm. Lưng phẳng, tay dưới vai.':
@@ -47,7 +47,7 @@ class BirdDogVoiceAssets {
     'Vươn dài tay và chân.': 'bird_dog/alignment.mp3',
     'Nâng đầu nhẹ, mắt nhìn xuống thảm.': 'bird_dog/head.mp3',
     'Hạ chân xuống ngang thân.': 'bird_dog/lumbar.mp3',
-    'Giữ 5 giây ở điểm cao nhất.': 'bird_dog/hold.mp3',
+    'Giữ 2 giây ở điểm cao nhất.': 'bird_dog/hold.mp3',
     'Siết bụng, giữ hông cân bằng.': 'bird_dog/trunk.mp3',
     'Hiệp này đừng giơ cùng bên.': 'bird_dog/set_next_opposite_side.mp3',
     'Hiệp này đổi bên sau mỗi lần.': 'bird_dog/set_next_alternate.mp3',

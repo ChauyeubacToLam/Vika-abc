@@ -22,13 +22,15 @@ class TempoMetric extends BirdDogMetricBase {
   double? get value => _liveHoldSeconds ?? holdDuration;
   @override
   ThresholdBand? get threshold => const ThresholdBand(
-        warningBelow: 5.0,
+        warningBelow: BirdDogTiming.holdTargetSeconds,
       );
   @override
   MetricStatus get status {
     final seconds = value;
     if (seconds == null) return MetricStatus.pass;
-    return seconds < 5.0 ? MetricStatus.near : MetricStatus.pass;
+    return seconds < BirdDogTiming.holdTargetSeconds
+        ? MetricStatus.near
+        : MetricStatus.pass;
   }
 
   @override
@@ -45,17 +47,20 @@ class TempoMetric extends BirdDogMetricBase {
     if (ctx.state == BirdDogState.hold_extended && _holdStartMs != null) {
       _liveHoldSeconds = (ctx.frameTimestamp - _holdStartMs!) / 1000.0;
       _debugData['holdSeconds'] = _liveHoldSeconds;
-      _debugData['holdTarget'] = 5.0;
+      _debugData['holdTarget'] = BirdDogTiming.holdTargetSeconds;
     }
   }
 
   void evaluateRep(BirdDogRepContext ctx) {
-    if (holdDuration != null && holdDuration! < 5.0) {
+    if (holdDuration != null &&
+        holdDuration! < BirdDogTiming.holdTargetSeconds) {
       _faults.add(FaultRecord(
         phase: 'REP_COMPLETE',
         type: 'Tempo',
-        message: 'Giữ chưa đủ 5s (${holdDuration!.toStringAsFixed(1)}s)',
-        voiceMessage: 'Giữ 5 giây ở điểm cao nhất.',
+        message:
+            'Giữ chưa đủ ${BirdDogTiming.holdTargetShortLabel} (${holdDuration!.toStringAsFixed(1)}s)',
+        voiceMessage:
+            'Giữ ${BirdDogTiming.holdTargetVoiceLabel} ở điểm cao nhất.',
         affectsForm: true,
         priority: BirdDogFaultPriority.tempo,
       ));
