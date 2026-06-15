@@ -9,6 +9,12 @@ import 'metrics/elbow_angle_metric.dart';
 import 'metrics/neck_shoulder_metric.dart';
 
 class SphinxStretch extends ExerciseBase {
+  SphinxStretch({
+    this.maxSeconds = SphinxConfig.Ae_Min_Hold_Time,
+  });
+
+  final int maxSeconds;
+
   SphinxState state = SphinxState.proneSetup;
   SphinxState prevState = SphinxState.proneSetup;
   bool isLeftTracked = true;
@@ -16,6 +22,11 @@ class SphinxStretch extends ExerciseBase {
   // Cache thông số rep cuối
   double _lastHoldTime = 0.0;
   double _lastStabilityScore = 0.0;
+  final HoldSecondsAccumulator _holdSeconds = HoldSecondsAccumulator(const [
+    'hip_seconds',
+    'straight_arm_seconds',
+    'shrug_neck_seconds',
+  ]);
 
   final HipGroundMetric hipMetric = HipGroundMetric();
   final HoldTempoMetric tempoMetric = HoldTempoMetric();
@@ -43,12 +54,18 @@ class SphinxStretch extends ExerciseBase {
   bool requestStop() => repCount >= SphinxConfig.Af_Max_Reps;
 
   @override
+  void onExerciseActivated() {
+    super.onExerciseActivated();
+    _holdSeconds.reset();
+  }
+
+  @override
   double? get liveHoldSeconds => state == SphinxState.isometricHold
       ? tempoMetric.getLiveHoldTime(frameTimestampMs)
       : null;
 
   @override
-  double? get liveHoldTargetSeconds => SphinxConfig.Ae_Min_Hold_Time.toDouble();
+  double? get liveHoldTargetSeconds => maxSeconds.toDouble();
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
@@ -105,7 +122,10 @@ class SphinxStretch extends ExerciseBase {
 
   @override
   void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
-    if (!_selectTrackedSide(smoothedLandmarks)) return;
+    if (!_selectTrackedSide(smoothedLandmarks)) {
+      _holdSeconds.resetTick();
+      return;
+    }
 
     final shoulder = isLeftTracked
         ? smoothedLandmarks[PoseLandmarkType.leftShoulder]
@@ -136,6 +156,7 @@ class SphinxStretch extends ExerciseBase {
         wrist == null ||
         knee == null ||
         ear == null) {
+      _holdSeconds.resetTick();
       return;
     }
 
@@ -170,6 +191,19 @@ class SphinxStretch extends ExerciseBase {
         m.update(ctx);
         debugData.addAll(m.debugData);
       }
+    }
+
+    if (state == SphinxState.isometricHold) {
+      _holdSeconds.accumulate(
+        elapsedMs: elapsedMs,
+        faultingByKey: {
+          'hip_seconds': hipMetric.isFaultingNow,
+          'straight_arm_seconds': elbowMetric.isFaultingNow,
+          'shrug_neck_seconds': neckMetric.isFaultingNow,
+        },
+      );
+    } else {
+      _holdSeconds.resetTick();
     }
   }
 
@@ -216,9 +250,12 @@ class SphinxStretch extends ExerciseBase {
 
       if (oldState == SphinxState.ascending &&
           newState == SphinxState.isometricHold) {
+        _holdSeconds.resetTick();
         hipMetric.reset();
         elbowMetric.reset();
         neckMetric.reset();
+      } else if (oldState == SphinxState.isometricHold) {
+        _holdSeconds.resetTick();
       }
     }
 
@@ -233,7 +270,7 @@ class SphinxStretch extends ExerciseBase {
           neckMetric.faults.isEmpty;
 
       // Nếu form chuẩn VÀ giữ đủ X giây
-      if (isFormOkay && liveHold >= SphinxConfig.Ae_Min_Hold_Time) {
+      if (isFormOkay && liveHold >= maxSeconds) {
         // Chốt 1 rep ngay lập tức
         _completeRep(ctx);
 
@@ -246,6 +283,7 @@ class SphinxStretch extends ExerciseBase {
           m.onStateTransition(SphinxState.isometricHold, SphinxState.proneSetup,
               ctx.frameTimestampMs);
         }
+        _holdSeconds.resetTick();
       }
     }
   }
@@ -279,6 +317,7 @@ class SphinxStretch extends ExerciseBase {
     for (final m in _metrics) {
       m.resetAndCountFault();
     }
+    _holdSeconds.resetTick();
   }
 
   bool _selectTrackedSide(Map<PoseLandmarkType, PoseLandmark> landmarks) {
@@ -338,19 +377,17 @@ class SphinxStretch extends ExerciseBase {
     if (state == SphinxState.isometricHold) {
       tempoMetric.flushCurrentSegment(frameTimestampMs);
     }
-    logger.pushKey("hip_fails_count", hipMetric.faultsCount);
-    logger.pushKey("straight_arm_fails_count", elbowMetric.faultsCount);
-    logger.pushKey("shrug_neck_fails_count", neckMetric.faultsCount);
     logger.pushKey("active_hold_time", _lastHoldTime);
     logger.pushKey("stability_score", _lastStabilityScore);
-    logger.pushKey("total_seconds", SphinxConfig.Ae_Min_Hold_Time.toDouble());
+    logger.pushKey("total_seconds", maxSeconds.toDouble());
     logger.pushKey(
-        "good_seconds",
-        repCount > 0
-            ? _lastHoldTime.clamp(0.0, SphinxConfig.Ae_Min_Hold_Time.toDouble())
-            : 0.0);
-    logger.pushKey("max_rep", repCount);
-    logger.pushKey("target_rep", SphinxConfig.Af_Max_Reps);
+        "good_seconds", _holdSeconds.goodSeconds.clamp(0.0, maxSeconds));
+    logger.pushKey("hip_seconds", _holdSeconds.faultSecondsFor('hip_seconds'));
+    logger.pushKey("straight_arm_seconds",
+        _holdSeconds.faultSecondsFor('straight_arm_seconds'));
+    logger.pushKey("shrug_neck_seconds",
+        _holdSeconds.faultSecondsFor('shrug_neck_seconds'));
+    logger.pushKey("max_rep", SphinxConfig.Af_Max_Reps);
     logger.pushGoodRepCount();
   }
 }

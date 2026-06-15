@@ -10,6 +10,7 @@ class SeatedForwardConfig {
 
   static const double Av_Stable_Velocity = 5.0;
   static const int At_Min_Hold_Time = 15;
+  static const int At_Num_Holds = 3;
 
   static const double Ad_Fault_Ankle_Angle = 115.0;
   static const double Ascending_Threshold = 5.0;
@@ -57,6 +58,7 @@ abstract class SeatedForwardMetricBase {
 
   void update(SeatedForwardContext ctx);
   List<FaultRecord> get faults;
+  bool get isFaultingNow => false;
   Map<String, dynamic> get debugData;
 
   void reset() {

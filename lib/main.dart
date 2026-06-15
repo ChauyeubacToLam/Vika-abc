@@ -14,6 +14,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'debug/debug_types.dart';
 import 'exercise/exercise_base.dart';
 import 'models/exercise_definition.dart';
 import 'screens/auth/login_screen.dart';
@@ -437,6 +438,7 @@ class VikaApp extends StatelessWidget {
                 workoutSessionId: launchArgs.workoutSessionId,
                 definition: launchArgs.definition,
                 catalogExerciseId: launchArgs.catalogExerciseId,
+                catalogInfo: launchArgs.catalogInfo,
                 prescription: launchArgs.prescription,
                 recommendationId: launchArgs.recommendationId,
                 weekNumber: launchArgs.weekNumber,
@@ -1109,7 +1111,9 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         setState(() {});
       }
     } catch (e) {
-      debugPrint('[Vika] Detection error: $e');
+      if (kDebugMode) {
+        debugPrint('[Vika] Detection error: $e');
+      }
     }
   }
 
@@ -1127,20 +1131,31 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     });
   }
 
+  void _setShowDebug(bool value) {
+    setState(() {
+      _showDebug = value;
+      _exercise.debugMode = value ? DebugMode.dev : DebugMode.off;
+    });
+  }
+
   /* -----------------------------------------------------------------------
      LOGGING (UI debug panel only)
      ----------------------------------------------------------------------- */
   void _logStateChanges() {
     final exState = _exercise.exerciseState.toString().split('.').last;
     final phaseState = _exercise.currentPhaseKey;
-    if (exState != _lastLoggedState) {
+    if (_showDebug && exState != _lastLoggedState) {
       debugPrint('[Vika][State] Exercise: $_lastLoggedState -> $exState');
+    }
+    if (exState != _lastLoggedState) {
       _lastLoggedState = exState;
     }
-    if (phaseState != _lastLoggedPhaseState) {
+    if (_showDebug && phaseState != _lastLoggedPhaseState) {
       debugPrint(
         '[Vika][State] ${_exercise.exerciseName}: $_lastLoggedPhaseState -> $phaseState',
       );
+    }
+    if (phaseState != _lastLoggedPhaseState) {
       _lastLoggedPhaseState = phaseState;
     }
   }
@@ -1192,10 +1207,12 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     );
     _repLogs.add(log);
 
-    debugPrint('[Vika][Rep] $log');
-    debugPrint(
-      '[Vika][Feedback] ${_feedback.entries.map((e) => '${e.key}: ${e.value}').join(' | ')}',
-    );
+    if (_showDebug) {
+      debugPrint('[Vika][Rep] $log');
+      debugPrint(
+        '[Vika][Feedback] ${_feedback.entries.map((e) => '${e.key}: ${e.value}').join(' | ')}',
+      );
+    }
 
     _repBannerGood = log.correctForm;
     final parts = <String>[];
@@ -1209,25 +1226,27 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     if (_repLogs.isEmpty) return;
     final goodReps = _repLogs.where((r) => r.correctForm).length;
     final badReps = _repLogs.where((r) => !r.correctForm).length;
-    debugPrint('');
-    debugPrint('============================================');
-    debugPrint(
-      '[Vika][SET COMPLETE] ${_exercise.exerciseName} — $_repCount reps total',
-    );
-    debugPrint('[Vika][SET] Good: $goodReps | Bad: $badReps');
-    debugPrint('--------------------------------------------');
-    for (final log in _repLogs) {
-      final status = log.correctForm ? 'OK' : 'BAD';
-      final faultStr = log.allFaultMessages.isEmpty
-          ? 'No issues'
-          : log.allFaultMessages.join(', ');
+    if (_showDebug) {
+      debugPrint('');
+      debugPrint('============================================');
       debugPrint(
-        '[Vika][SET] Rep ${log.repNumber} [$status] '
-        'Tempo: ${log.tempo ?? "N/A"} | $faultStr',
+        '[Vika][SET COMPLETE] ${_exercise.exerciseName} — $_repCount reps total',
       );
+      debugPrint('[Vika][SET] Good: $goodReps | Bad: $badReps');
+      debugPrint('--------------------------------------------');
+      for (final log in _repLogs) {
+        final status = log.correctForm ? 'OK' : 'BAD';
+        final faultStr = log.allFaultMessages.isEmpty
+            ? 'No issues'
+            : log.allFaultMessages.join(', ');
+        debugPrint(
+          '[Vika][SET] Rep ${log.repNumber} [$status] '
+          'Tempo: ${log.tempo ?? "N/A"} | $faultStr',
+        );
+      }
+      debugPrint('============================================');
+      debugPrint('');
     }
-    debugPrint('============================================');
-    debugPrint('');
   }
 
   Future<void> _showSetupSheet({bool force = false}) async {
@@ -1871,6 +1890,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
                     rotation: _imageRotation,
                     lensDirection: controller.description.lensDirection,
                     debugData: _exercise.debugData,
+                    debugLabelsEnabled: _showDebug,
                   ),
                 ),
               ),
@@ -2413,7 +2433,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
             icon: Icons.bug_report_outlined,
             label: 'Debug',
             isActive: _showDebug,
-            onTap: () => setState(() => _showDebug = !_showDebug),
+            onTap: () => _setShowDebug(!_showDebug),
           ),
         ],
       ),
@@ -2849,6 +2869,7 @@ class PosePainter extends CustomPainter {
   final InputImageRotation rotation;
   final CameraLensDirection lensDirection;
   final Map<String, dynamic> debugData;
+  final bool debugLabelsEnabled;
 
   PosePainter({
     required this.pose,
@@ -2857,6 +2878,7 @@ class PosePainter extends CustomPainter {
     required this.rotation,
     required this.lensDirection,
     this.debugData = const {},
+    this.debugLabelsEnabled = false,
   });
 
   static const List<List<PoseLandmarkType>> _bodyConnections = [
@@ -3020,7 +3042,9 @@ class PosePainter extends CustomPainter {
       );
     }
 
-    _drawAngleLabels(canvas, landmarks, transformPoint);
+    if (debugLabelsEnabled) {
+      _drawAngleLabels(canvas, landmarks, transformPoint);
+    }
   }
 
   void _drawAngleLabels(
@@ -3119,6 +3143,8 @@ class PosePainter extends CustomPainter {
         oldDelegate.widgetSize != widgetSize ||
         oldDelegate.rotation != rotation ||
         oldDelegate.lensDirection != lensDirection ||
-        !mapEquals(oldDelegate.debugData, debugData);
+        oldDelegate.debugLabelsEnabled != debugLabelsEnabled ||
+        ((oldDelegate.debugLabelsEnabled || debugLabelsEnabled) &&
+            !mapEquals(oldDelegate.debugData, debugData));
   }
 }

@@ -1,7 +1,10 @@
+import 'dart:math' as math;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:vika/exercise/exercise_base.dart';
 import 'package:vika/exercise/push up/push_up.dart';
+import 'package:vika/utils/pose_math_helpers.dart';
 
 PoseLandmark _landmark(
   PoseLandmarkType type,
@@ -91,6 +94,33 @@ void _pump(
   exercise.checkingPose(pose);
 }
 
+double _elbowAngle(Map<PoseLandmarkType, PoseLandmark> pose) {
+  return calculateAngleNormalized(
+    firstPoint: pose[PoseLandmarkType.rightShoulder]!,
+    midPoint: pose[PoseLandmarkType.rightElbow]!,
+    lastPoint: pose[PoseLandmarkType.rightWrist]!,
+  );
+}
+
+double _trunkDeviation(Map<PoseLandmarkType, PoseLandmark> pose) {
+  final trunkClockAngle = calculateVerticalAngle(
+    pivot: pose[PoseLandmarkType.rightHip]!,
+    point: pose[PoseLandmarkType.rightShoulder]!,
+  );
+  return clockAngleDeviation(
+    trunkClockAngle,
+    PushUpConfig.HORIZONTAL_CLOCK_LEFT,
+  );
+}
+
+double _travel(
+  Iterable<Map<PoseLandmarkType, PoseLandmark>> poses,
+  PoseLandmarkType type,
+) {
+  final values = poses.map((pose) => pose[type]!.y).toList();
+  return values.reduce(math.max) - values.reduce(math.min);
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -133,6 +163,7 @@ void main() {
     final down2 = _pushUpPose(bodyY: 245, elbowX: 412, elbowY: 278);
     final bottom = _pushUpPose(bodyY: 270, elbowX: 415, elbowY: 285);
     final up1 = _pushUpPose(bodyY: 245, elbowX: 412, elbowY: 278);
+    final activeFrames = [bottom, bottom, up1, top, top];
 
     expect(pushUp.isInStartPosition(top), isTrue);
 
@@ -146,7 +177,44 @@ void main() {
     _pump(pushUp, top, 2600);
 
     expect(pushUp.repCount, 1);
-    expect(pushUp.logger.repLogs.single.correctForm, isTrue);
+    final repLog = pushUp.logger.repLogs.single;
+    expect(repLog.correctForm, isTrue);
+
+    final data = repLog.data;
+    final manualMinElbow = activeFrames.map(_elbowAngle).reduce(math.min);
+    final topElbow =
+        math.max(_elbowAngle(top), PushUpConfig.PLANK_ANGLE_THRESHOLD);
+    expect(
+      data['min_elbow_angle'] as num,
+      closeTo(manualMinElbow, 1e-9),
+    );
+    expect(
+      data['elbow_rom'] as num,
+      closeTo((topElbow - manualMinElbow).clamp(0.0, 180.0), 1e-9),
+    );
+    expect(
+      data['max_abs_trunk_deviation'] as num,
+      closeTo(
+        activeFrames
+            .map((pose) => _trunkDeviation(pose).abs())
+            .reduce(math.max),
+        1e-9,
+      ),
+    );
+    expect(data['max_wrist_y_drift'] as num, 0.0);
+    expect(data['max_heel_y_drift'] as num, 0.0);
+    expect(
+      data['knee_y_travel'] as num,
+      closeTo(_travel(activeFrames, PoseLandmarkType.rightKnee), 1e-9),
+    );
+    expect(
+      data['shoulder_y_travel'] as num,
+      closeTo(_travel(activeFrames, PoseLandmarkType.rightShoulder), 1e-9),
+    );
+    expect(
+      data['hip_y_travel'] as num,
+      closeTo(_travel(activeFrames, PoseLandmarkType.rightHip), 1e-9),
+    );
   });
 
   test('rejects elbow-only motion while body stays pinned', () {

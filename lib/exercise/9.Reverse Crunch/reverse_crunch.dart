@@ -13,6 +13,10 @@ import '../../utils/exercise_logger.dart';
 import '../../utils/debouncer.dart';
 
 class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
+  ReverseCrunch({this.maxRep = ReverseCrunchConfig.MAX_REP});
+
+  final int maxRep;
+
   @override
   Map<String, SideLandmarkPair> get requiredSideLandmarks => const {
         'shoulder': (
@@ -222,7 +226,7 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
       _isTimeout = true;
       return true;
     }
-    return repCount >= ReverseCrunchConfig.MAX_REP;
+    return repCount >= maxRep;
   }
 
   @override
@@ -332,12 +336,14 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
 
   void _completeRep(RepContext ctx) {
     for (final metric in _metrics) metric.evaluateRepEnd(ctx);
-
     final allFaults = <FaultRecord>[];
     for (final metric in _metrics) allFaults.addAll(metric.faults);
 
+    // Anti-cheat ONLY: swinging momentum means the rep wasn't driven by the abs.
+    final isAntiCheatReject = momentumMetric.faults.isNotEmpty;
     correctForm = !allFaults.any((f) => f.affectsForm);
-    if (!correctForm) {
+
+    if (isAntiCheatReject) {
       _rejectedAttempts++;
       resultIssues.feedback['Result'] = 'Không tính rep';
       final faultMap = <String, Map<String, String>>{};
@@ -347,12 +353,12 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
       }
       setFeedback.add({false: faultMap});
       _transitionState(ReverseCrunchState.lying, ctx.frameTimestamp);
-      for (final metric in _metrics) metric.resetAndCountFault();
+      for (final metric in _metrics) metric.reset();
       return;
     }
 
     repCount++;
-
+    if (!correctForm) resultIssues.feedback['Result'] = 'Fix Form';
     logger.addRepLog(RepLog(
       correctForm: correctForm,
       repNumber: repCount,
@@ -381,12 +387,11 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
   @override
   void onSetComplete() {
     logger.pushKey("timeout", _isTimeout);
-    logger.pushKey("target_rep", ReverseCrunchConfig.MAX_REP);
-    logger.pushKey("max_rep", repCount);
-    logger.pushKey("momentum_fails", momentumMetric.faultsCount);
-    logger.pushKey("curl_fails", curlMetric.faultsCount);
-    logger.pushKey("tempo_fails", tempoMetric.faultsCount);
-    logger.pushKey("arm_position_fails", armMetric.faultsCount);
+    logger.pushKey("max_rep", maxRep);
+    logger.pushKey("momentum_fails_count", momentumMetric.faultsCount);
+    logger.pushKey("curl_fails_count", curlMetric.faultsCount);
+    logger.pushKey("tempo_fails_count", tempoMetric.faultsCount);
+    logger.pushKey("arm_position_fails_count", armMetric.faultsCount);
     logger.pushKey("rejected_attempts_count", _rejectedAttempts);
     logger.pushGoodRepCount();
   }

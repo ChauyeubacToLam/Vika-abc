@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/milestones.dart';
 import '../data/program_mock.dart';
 import '../exercise/report_builder_registry.dart';
+import '../models/pain_regions.dart';
 import '../widgets/progress/period_tabs.dart' show PeriodTab;
 import 'recommendation/progression_service.dart';
 import 'streak_tier.dart';
@@ -598,7 +599,8 @@ class SessionPersistence {
         final completedAt = _dateTimeOrNull(row['completed_at']);
         if (completedAt != null) completedAtValues.add(completedAt);
       }
-      return deriveStreakWeekBarsForTest(completedAtValues, weekCount: weekCount);
+      return deriveStreakWeekBarsForTest(completedAtValues,
+          weekCount: weekCount);
     } catch (e) {
       debugPrint('[Vika] streakWeekBars failed: $e');
       return const <bool>[];
@@ -1070,14 +1072,13 @@ class SessionPersistence {
   /// exercise_sessions, highest-first. Name resolution to a display label is
   /// the caller's job (via the exercise catalog) — this stays DB-only.
   Future<
-          List<
-              ({
-                String exerciseId,
-                int bestScore,
-                int? previousBest,
-                DateTime achievedAt,
-              })>>
-      personalRecords() async {
+      List<
+          ({
+            String exerciseId,
+            int bestScore,
+            int? previousBest,
+            DateTime achievedAt,
+          })>> personalRecords() async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return const [];
 
@@ -1089,7 +1090,8 @@ class SessionPersistence {
           .not('form_score', 'is', null)
           .not('completed_at', 'is', null);
 
-      final sessions = <({String exerciseId, int formScore, DateTime completedAt})>[];
+      final sessions =
+          <({String exerciseId, int formScore, DateTime completedAt})>[];
       for (final raw in rows as List) {
         final row = (raw as Map).cast<String, dynamic>();
         final id = (row['exercise_id'] as String?)?.trim();
@@ -1098,7 +1100,8 @@ class SessionPersistence {
         if (id == null || id.isEmpty || score == null || completedAt == null) {
           continue;
         }
-        sessions.add((exerciseId: id, formScore: score, completedAt: completedAt));
+        sessions
+            .add((exerciseId: id, formScore: score, completedAt: completedAt));
       }
       return derivePersonalRecordsForTest(sessions);
     } catch (e) {
@@ -1211,7 +1214,8 @@ class SessionPersistence {
 
       var query = _client
           .from('exercise_sessions')
-          .select('exercise_id, form_score, fault_counts, total_reps, completed_at')
+          .select(
+              'exercise_id, form_score, fault_counts, total_reps, completed_at')
           .eq('user_id', userId)
           .not('form_score', 'is', null)
           .not('total_reps', 'is', null)
@@ -1245,7 +1249,7 @@ class SessionPersistence {
       // exercises fall back to GenericReportBuilder (empty maps) → form-only.
       final metaByExercise = <String, RankInsightMeta>{};
       for (final id in sessions.map((s) => s.exerciseId).toSet()) {
-        final builder = reportBuilders[id]?.builder ?? GenericReportBuilder();
+        final builder = resolveReportBuilder(id).builder;
         metaByExercise[id] = (
           painToFaultMap: builder.painToFaultMap(),
           praiseMetricNames: builder.praiseMetricNames(),
@@ -1785,16 +1789,20 @@ class SessionPersistence {
     int intensity, {
     String? notes,
   }) async {
+    final canonicalRegion = canonicalPainRegion(region);
+    if (canonicalRegion == null) return;
+
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return;
 
     try {
+      final clampedIntensity = intensity.clamp(1, 5).toInt();
       final now = DateTime.now().toIso8601String();
       final existing = await _client
           .from('user_pain_areas')
           .select('id, flag_count')
           .eq('user_id', userId)
-          .eq('body_region', region)
+          .eq('body_region', canonicalRegion)
           .eq('status', 'active')
           .maybeSingle();
 
@@ -1804,22 +1812,24 @@ class SessionPersistence {
         // is on purpose — do not downgrade a 'confirmed' row.
         final newCount = ((existing['flag_count'] as num?)?.toInt() ?? 1) + 1;
         await _client.from('user_pain_areas').update({
-          'intensity': intensity,
+          'intensity': clampedIntensity,
           'last_reaffirmed_at': now,
           'flag_count': newCount,
-          if (region == 'other' && notes != null) 'notes': notes,
+          if (canonicalRegion == kOtherPainRegion && notes != null)
+            'notes': notes,
         }).eq('id', existing['id']);
       } else {
         await _client.from('user_pain_areas').insert({
           'user_id': userId,
-          'body_region': region,
+          'body_region': canonicalRegion,
           'source': 'self_reported',
           'status': 'active',
-          'intensity': intensity,
+          'intensity': clampedIntensity,
           'first_flagged_at': now,
           'last_reaffirmed_at': now,
           'flag_count': 1,
-          if (region == 'other' && notes != null) 'notes': notes,
+          if (canonicalRegion == kOtherPainRegion && notes != null)
+            'notes': notes,
         });
       }
     } catch (e) {

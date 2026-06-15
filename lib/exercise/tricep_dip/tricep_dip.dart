@@ -107,10 +107,10 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
 
   @override
   void onSetComplete() {
-    logger.pushKey("hip_thrust_fails", hipThrustMetric.faultsCount);
-    logger.pushKey("rom_fails", tricepRomMetric.faultsCount);
-    logger.pushKey("extension_fails", fullExtensionMetric.faultsCount);
-    logger.pushKey("shrugging_fails", scapularElevationMetric.faultsCount);
+    logger.pushKey("hip_thrust_fails_count", hipThrustMetric.faultsCount);
+    logger.pushKey("rom_fails_count", tricepRomMetric.faultsCount);
+    logger.pushKey("extension_fails_count", fullExtensionMetric.faultsCount);
+    logger.pushKey("shrugging_fails_count", scapularElevationMetric.faultsCount);
     logger.pushGoodRepCount();
     logger.pushKey("max_rep", maxRep);
   }
@@ -258,7 +258,7 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
         // Started another descent before finishing the rep: reject this attempt.
         _transitionState(TricepDipState.descending, now);
         for (final metric in _metrics) {
-          metric.resetAndCountFault();
+          metric.reset();
         }
       }
     }

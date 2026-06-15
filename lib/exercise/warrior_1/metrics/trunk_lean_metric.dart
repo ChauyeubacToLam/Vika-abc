@@ -56,15 +56,19 @@ class TrunkLeanMetric extends WarriorOneMetricBase {
 
   double? maxLean; // peak forward lean this hold (debug / post-hold)
   bool _instructionSet = false;
+  bool _isFaultingNow = false;
 
   @override
   List<FaultRecord> get faults => _faults;
+  @override
+  bool get isFaultingNow => _isFaultingNow;
 
   @override
   Map<String, dynamic> get debugData => _debugData;
 
   @override
   void update(HoldContext ctx) {
+    _isFaultingNow = false;
     if (ctx.holdState != WarriorOneState.hold) return;
 
     final double lean = ctx.trunkLean;
@@ -80,6 +84,7 @@ class TrunkLeanMetric extends WarriorOneMetricBase {
     final bool isError =
         _errorDebouncer.update(lean > TrunkLeanConfig.ERROR_THRESHOLD);
     if (isError) {
+      _isFaultingNow = true;
       ctx.resultIssues.feedback['trunk_lean'] =
           'Cẩn thận lưng! Đứng thẳng hơn, đừng gập quá nhiều.';
       if (!_instructionSet) {
@@ -134,5 +139,6 @@ class TrunkLeanMetric extends WarriorOneMetricBase {
     _errorDebouncer.reset();
     maxLean = null;
     _instructionSet = false;
+    _isFaultingNow = false;
   }
 }

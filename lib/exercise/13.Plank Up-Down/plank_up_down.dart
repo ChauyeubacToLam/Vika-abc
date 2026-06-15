@@ -247,23 +247,25 @@ class PlankUpDown extends ExerciseBase {
                 firstPoint: lShoulder, midPoint: lElbow, lastPoint: lWrist)
             : 90.0);
 
-    // GHI LOG TELEMETRY
-    _telemetryLog.add({
-      'timestamp': now,
-      'time_elapsed': now - _exerciseStartTimeMs!,
-      'state': plankState.name,
-      'bodyAngle': double.parse(bodyAngle.toStringAsFixed(1)),
-      'leftElbowAngle': double.parse(leftElbowAngle.toStringAsFixed(1)),
-      'rightElbowAngle': double.parse(rightElbowAngle.toStringAsFixed(1)),
-      'kneeAngle': double.parse(kneeAngle.toStringAsFixed(1)),
-      'hipY': double.parse(hip.y.toStringAsFixed(1)),
-      'visibility': (useLeft
-                  ? [lShoulder, lHip, lKnee, lAnkle, lElbow, lWrist]
-                  : [rShoulder, rHip, rKnee, rAnkle, rElbow, rWrist])
-              .map((l) => l!.likelihood)
-              .reduce((a, b) => a + b) /
-          6, // Avg confidence
-    });
+    if (isDebugModeActive) {
+      // GHI LOG TELEMETRY
+      _telemetryLog.add({
+        'timestamp': now,
+        'time_elapsed': now - _exerciseStartTimeMs!,
+        'state': plankState.name,
+        'bodyAngle': double.parse(bodyAngle.toStringAsFixed(1)),
+        'leftElbowAngle': double.parse(leftElbowAngle.toStringAsFixed(1)),
+        'rightElbowAngle': double.parse(rightElbowAngle.toStringAsFixed(1)),
+        'kneeAngle': double.parse(kneeAngle.toStringAsFixed(1)),
+        'hipY': double.parse(hip.y.toStringAsFixed(1)),
+        'visibility': (useLeft
+                    ? [lShoulder, lHip, lKnee, lAnkle, lElbow, lWrist]
+                    : [rShoulder, rHip, rKnee, rAnkle, rElbow, rWrist])
+                .map((l) => l!.likelihood)
+                .reduce((a, b) => a + b) /
+            6, // Avg confidence
+      });
+    }
 
     final ctx = PlankRepContext(
       bodyAngle: bodyAngle,
@@ -467,8 +469,8 @@ class PlankUpDown extends ExerciseBase {
     }
   }
 
-  void _completeRep() {
-    repCount++;
+  void _completeRep({bool countRep = true}) {
+    if (countRep) repCount++;
     bool isRepGood = true;
     final allFaults = <FaultRecord>[];
 
@@ -479,19 +481,28 @@ class PlankUpDown extends ExerciseBase {
 
     correctForm = isRepGood;
 
-    logger.addRepLog(RepLog(
-      correctForm: correctForm,
-      repNumber: repCount,
-      data: {
-        "lead_arm": leadArmMetric.currentLeadArm ?? 'None',
-        "fault_types": allFaults.map((e) => e.type).toSet().toList(),
-      },
-    ));
+    if (countRep) {
+      logger.addRepLog(RepLog(
+        correctForm: correctForm,
+        repNumber: repCount,
+        data: {
+          "lead_arm": leadArmMetric.currentLeadArm ?? 'None',
+          "fault_types": allFaults.map((e) => e.type).toSet().toList(),
+        },
+      ));
 
-    logger.pushGoodRepCount();
+      logger.pushGoodRepCount();
+    } else {
+      correctForm = false;
+      resultIssues.feedback['Result'] = 'Không tính';
+    }
 
     for (var metric in _metrics) {
-      metric.resetAndCountFault();
+      if (countRep) {
+        metric.resetAndCountFault();
+      } else {
+        metric.reset();
+      }
     }
   }
 
@@ -500,13 +511,15 @@ class PlankUpDown extends ExerciseBase {
 
   @override
   void onSetComplete() {
-    logger.pushKey("max_rep", maxRep);
+    logger.pushKey("max_rep", _isTimeout ? repCount : maxRep);
     logger.pushKey("timeout_triggered", _isTimeout);
-    logger.pushKey("trunk_sagging_fails", trunkMetric.faultsCount);
-    logger.pushKey("hip_rotation_fails", hipRotationMetric.faultsCount);
-    logger.pushKey("arm_extension_fails", armExtensionMetric.faultsCount);
+    logger.pushKey("trunk_sagging_fails_count", trunkMetric.faultsCount);
+    logger.pushKey("hip_rotation_fails_count", hipRotationMetric.faultsCount);
+    logger.pushKey("arm_extension_fails_count", armExtensionMetric.faultsCount);
     logger.pushKey("left_lead_count", leadArmMetric.leftLeadCount);
     logger.pushKey("right_lead_count", leadArmMetric.rightLeadCount);
-    logger.pushKey("telemetry_data", _telemetryLog);
+    if (isDebugModeActive) {
+      logger.pushKey("telemetry_data", _telemetryLog);
+    }
   }
 }

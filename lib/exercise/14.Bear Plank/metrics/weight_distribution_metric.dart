@@ -5,9 +5,11 @@ class WeightDistributionMetric extends BearMetricBase {
   void update(BearRepContext ctx) {
     debugData['shoulder_wrist_x'] = ctx.shoulderWristXOffset.toStringAsFixed(3);
 
+    isFaultingNow = false;
     if (ctx.currentState != BearState.hovering) return;
 
     if (ctx.shoulderWristXOffset > BearConfig.WEIGHT_SHIFT_THRESHOLD) {
+      isFaultingNow = true;
       if (!faults.any((f) => f.type == 'WeightForward')) {
         addFault(FaultRecord(
           phase: ctx.currentState.name,

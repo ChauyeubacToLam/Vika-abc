@@ -9,6 +9,14 @@ import 'metrics/hold_tempo_metric.dart';
 import 'metrics/ankle_dorsiflexion_metric.dart';
 
 class SeatedForwardFold extends ExerciseBase {
+  SeatedForwardFold({
+    this.maxSeconds = SeatedForwardConfig.At_Min_Hold_Time,
+    this.maxHolds = SeatedForwardConfig.At_Num_Holds,
+  }) : tempoMetric = HoldTempoMetric(minHoldSeconds: maxSeconds);
+
+  final int maxSeconds;
+  final int maxHolds;
+
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
       const <VikaImageOrientation>{
@@ -28,10 +36,14 @@ class SeatedForwardFold extends ExerciseBase {
   int _lastTimestampMs = -1;
   double _currentVelocity = 0.0;
   int? _stableStartTimeMs;
+  final HoldSecondsAccumulator _holdSeconds = HoldSecondsAccumulator(const [
+    'knee_bent_seconds',
+    'spine_round_seconds',
+  ]);
 
   final KneeExtensionMetric kneeMetric = KneeExtensionMetric();
   final SpinalAlignmentMetric spineMetric = SpinalAlignmentMetric();
-  final HoldTempoMetric tempoMetric = HoldTempoMetric();
+  final HoldTempoMetric tempoMetric;
   final AnkleDorsiflexionMetric ankleMetric = AnkleDorsiflexionMetric();
 
   late final List<SeatedForwardMetricBase> _metrics = [
@@ -45,7 +57,13 @@ class SeatedForwardFold extends ExerciseBase {
   String get exerciseName => 'Seated Forward Fold';
 
   @override
-  bool requestStop() => repCount >= 3;
+  bool requestStop() => repCount >= maxHolds;
+
+  @override
+  void onExerciseActivated() {
+    super.onExerciseActivated();
+    _holdSeconds.reset();
+  }
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
@@ -93,16 +111,21 @@ class SeatedForwardFold extends ExerciseBase {
 
   @override
   void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
-    if (!_updateTrackedSide()) return;
+    if (!_updateTrackedSide()) {
+      _holdSeconds.resetTick();
+      return;
+    }
     final body = _body(smoothedLandmarks);
-    if (body == null) return;
+    if (body == null) {
+      _holdSeconds.resetTick();
+      return;
+    }
 
     final ah = calculateAngleNormalized(
       firstPoint: body.shoulder,
       midPoint: body.hip,
       lastPoint: body.knee,
     );
-
     if (_lastHipAngle >= 0 && _lastTimestampMs > 0) {
       final dt = (frameTimestampMs - _lastTimestampMs) / 1000.0;
       if (dt > 0) _currentVelocity = (ah - _lastHipAngle) / dt;
@@ -111,7 +134,10 @@ class SeatedForwardFold extends ExerciseBase {
     _lastTimestampMs = frameTimestampMs;
 
     final scale = calculateDistance(body.shoulder, body.hip);
-    if (scale <= 1e-6) return;
+    if (scale <= 1e-6) {
+      _holdSeconds.resetTick();
+      return;
+    }
 
     final ctx = SeatedForwardContext(
       kneeAngle: calculateAngleNormalized(
@@ -154,6 +180,18 @@ class SeatedForwardFold extends ExerciseBase {
         m.update(ctx);
         debugData.addAll(m.debugData);
       }
+    }
+
+    if (state == SeatedForwardState.isometricHold) {
+      _holdSeconds.accumulate(
+        elapsedMs: elapsedMs,
+        faultingByKey: {
+          'knee_bent_seconds': kneeMetric.isFaultingNow,
+          'spine_round_seconds': spineMetric.isFaultingNow,
+        },
+      );
+    } else {
+      _holdSeconds.resetTick();
     }
   }
 
@@ -283,14 +321,20 @@ class SeatedForwardFold extends ExerciseBase {
       : null;
 
   @override
-  double? get liveHoldTargetSeconds =>
-      SeatedForwardConfig.At_Min_Hold_Time.toDouble();
+  double? get liveHoldTargetSeconds => maxSeconds.toDouble();
 
   @override
   void onSetComplete() {
-    logger.pushKey('knee_bent_fails_count', kneeMetric.faultsCount);
-    logger.pushKey('spine_round_fails_count', spineMetric.faultsCount);
-    logger.pushKey('tempo_fails_count', tempoMetric.faultsCount);
+    final targetSeconds = (maxHolds * maxSeconds).toDouble();
+    logger.pushKey('total_seconds', targetSeconds);
+    logger.pushKey(
+      'good_seconds',
+      _holdSeconds.goodSeconds.clamp(0.0, targetSeconds),
+    );
+    logger.pushKey(
+        'knee_bent_seconds', _holdSeconds.faultSecondsFor('knee_bent_seconds'));
+    logger.pushKey('spine_round_seconds',
+        _holdSeconds.faultSecondsFor('spine_round_seconds'));
   }
 
   bool _updateTrackedSide() {

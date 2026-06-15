@@ -24,15 +24,19 @@ class CobraHandPlacementMetric extends CobraMetricBase {
   final StickyDebouncer _tooFarDebouncer = StickyDebouncer(requiredFrames: 12);
   final StickyDebouncer _tooCloseDebouncer =
       StickyDebouncer(requiredFrames: 12);
+  bool _isFaultingNow = false;
 
   @override
   List<FaultRecord> get faults => _faults;
+  @override
+  bool get isFaultingNow => _isFaultingNow;
 
   @override
   Map<String, dynamic> get debugData => _debugData;
 
   @override
   void update(RepContext ctx) {
+    _isFaultingNow = false;
     // Check primarily in setup, but also drift during hold
     if (ctx.shoulder == null || ctx.wrist == null || ctx.hip == null) return;
 
@@ -47,6 +51,7 @@ class CobraHandPlacementMetric extends CobraMetricBase {
 
     // Error: extremely far forward
     if (_tooFarDebouncer.update(handOffset >= _errorTooFar)) {
+      _isFaultingNow = true;
       ctx.resultIssues.feedback['Hands'] = '⚠️ Tay đặt quá xa!';
       ctx.resultIssues.addInstruction(
         'setup',
@@ -86,5 +91,6 @@ class CobraHandPlacementMetric extends CobraMetricBase {
     _debugData.clear();
     _tooFarDebouncer.reset();
     _tooCloseDebouncer.reset();
+    _isFaultingNow = false;
   }
 }

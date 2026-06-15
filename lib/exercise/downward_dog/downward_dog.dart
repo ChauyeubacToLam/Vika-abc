@@ -167,25 +167,34 @@ class DownwardDog extends ExerciseBase {
 
   @override
   void onSetComplete() {
-    logger.pushKey('target_holds', maxHolds);
-    logger.pushKey('max_rep', repCount);
+    logger.pushKey('max_rep', maxHolds);
+    final targetSeconds = maxHolds * DownwardDogConfig.HOLD_DURATION_SEC;
+    logger.pushKey('total_seconds', targetSeconds);
     logger.pushKey(
-        'total_seconds', maxHolds * DownwardDogConfig.HOLD_DURATION_SEC);
-    logger.pushKey('good_seconds', _goodHoldSeconds);
-    logger.pushKey('spine_round_fails_count', _spineMetric.faultsCount);
-    logger.pushKey('shoulder_shrug_fails_count', _shoulderMetric.faultsCount);
-    logger.pushKey('leg_straightness_fails_count', _legMetric.faultsCount);
+        'good_seconds', _holdSeconds.goodSeconds.clamp(0.0, targetSeconds));
+    logger.pushKey('spine_round_seconds',
+        _holdSeconds.faultSecondsFor('spine_round_seconds'));
+    logger.pushKey('shoulder_shrug_seconds',
+        _holdSeconds.faultSecondsFor('shoulder_shrug_seconds'));
+    logger.pushKey('leg_straightness_seconds',
+        _holdSeconds.faultSecondsFor('leg_straightness_seconds'));
     logger.pushGoodRepCount();
   }
 
   @override
   void onExerciseActivated() {
+    super.onExerciseActivated();
+    _holdSeconds.reset();
     activateHold(frameTimestampMs);
   }
 
   // --- Hold timer ---
   int? _holdStartMs;
-  double _goodHoldSeconds = 0.0;
+  final HoldSecondsAccumulator _holdSeconds = HoldSecondsAccumulator(const [
+    'spine_round_seconds',
+    'shoulder_shrug_seconds',
+    'leg_straightness_seconds',
+  ]);
 
   bool get holdComplete =>
       _currentHoldSeconds() >= DownwardDogConfig.HOLD_DURATION_SEC;
@@ -216,7 +225,10 @@ class DownwardDog extends ExerciseBase {
   void checkingPose(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     final side = _resolveSideLandmarks(landmarks);
 
-    if (side == null) return;
+    if (side == null) {
+      _holdSeconds.resetTick();
+      return;
+    }
 
     final spineAngle = calculateAngleNormalized(
       firstPoint: side.wrist,
@@ -347,7 +359,10 @@ class DownwardDog extends ExerciseBase {
     // Clear per-frame feedback.
     resultIssues.feedback.clear();
 
-    if (_state != DownwardDogState.hold) return;
+    if (_state != DownwardDogState.hold) {
+      _holdSeconds.resetTick();
+      return;
+    }
 
     final ctx = HoldContext(
       spineAngle: spineAngle,
@@ -387,6 +402,16 @@ class DownwardDog extends ExerciseBase {
 
     // --- Embedded Check 4: Arm-Torso Line (coaching) ---
     _checkArmTorsoLine(ctx);
+
+    _holdSeconds.accumulate(
+      elapsedMs: elapsedMs,
+      faultingByKey: {
+        'spine_round_seconds': _spineMetric.isFaultingNow,
+        'shoulder_shrug_seconds': _shoulderMetric.isFaultingNow,
+        'leg_straightness_seconds': _legMetric.isFaultingNow,
+      },
+      goodBlockingKeys: const ['spine_round_seconds'],
+    );
 
     // --- Auto-EXIT: safety ceiling — spine rounding sustained ---
     if (_spineMetric.status == MetricStatus.fault) {
@@ -487,10 +512,6 @@ class DownwardDog extends ExerciseBase {
     }
     setFeedback.add({correctForm: faultMap});
 
-    if (correctForm) {
-      _goodHoldSeconds += DownwardDogConfig.HOLD_DURATION_SEC;
-    }
-
     logger.addRepLog(
       RepLog(
         correctForm: correctForm,
@@ -518,9 +539,12 @@ class DownwardDog extends ExerciseBase {
     _state = next;
 
     if (next == DownwardDogState.hold) {
+      _holdSeconds.resetTick();
       _holdStartMs = timestampMs;
       // Clear per-hold instructions when new hold begins.
       resultIssues.instructions.clear();
+    } else if (prev == DownwardDogState.hold) {
+      _holdSeconds.resetTick();
     }
 
     for (final m in _metrics) {
@@ -619,6 +643,7 @@ class DownwardDog extends ExerciseBase {
     _earShoulderBaseline = null;
     resultIssues.feedback.clear();
     debugData.clear();
+    _holdSeconds.reset();
   }
 
   @override
@@ -638,6 +663,7 @@ class DownwardDog extends ExerciseBase {
     _state = DownwardDogState.entry;
     _brokenHoldFrames = 0;
     _holdStartMs = null;
+    _holdSeconds.resetTick();
     _stillFrameCount = 0;
     _lastHipY = null;
     _startPositionConfirmed = false;

@@ -156,9 +156,11 @@ class JumpSquat extends ExerciseBase {
 
   @override
   void onSetComplete() {
-    logger.pushKey('target_rep', maxRep);
-    logger.pushKey('max_rep', repCount);
+    logger.pushKey("stiff_landing_fails_count", landingFlexionMetric.faultsCount);
+    logger.pushKey("shallow_dip_fails_count", takeOffDepthMetric.faultsCount);
+    logger.pushKey("trunk_lean_fails_count", landingTrunkMetric.faultsCount);
     logger.pushGoodRepCount();
+    logger.pushKey('max_rep', maxRep);
   }
 
   @override
@@ -261,53 +263,41 @@ class JumpSquat extends ExerciseBase {
       for (final metric in _metrics) {
         allFaults.addAll(metric.faults);
       }
-      if (_isRepTooFast(now)) {
-        allFaults.add(FaultRecord(
-          phase: 'REP_COMPLETE',
-          type: 'Tempo',
-          message: 'Chuyển động quá nhanh, AI không xác nhận được rep.',
-          voiceMessage: 'Làm chậm lại và nhảy rõ hơn',
-          affectsForm: true,
-        ));
-      }
 
-      final blockingFaults = allFaults.where((f) => f.affectsForm).toList();
-      bool hasBlockingFault = blockingFaults.isNotEmpty;
+      final isAntiCheatReject = _isRepTooFast(now);
+      correctForm = !allFaults.any((f) => f.affectsForm);
 
-      if (!hasBlockingFault) {
+      if (!isAntiCheatReject) {
         repCount += 1;
         logger.addRepLog(RepLog(
-          correctForm: !allFaults.any((f) => f.affectsForm),
+          correctForm: correctForm,
           repNumber: repCount,
           data: {
             'fault_types': allFaults.map((e) => e.type).toSet().toList(),
           },
         ));
-      } else {
-        final voiceMsg = blockingFaults.first.voiceMessage;
-        if (voiceMsg != null && voiceMsg.isNotEmpty) {
-          resultIssues.addInstruction(currentPhaseKey, 'Error', voiceMsg);
-        }
-      }
 
-      correctForm = !allFaults.any((f) => f.affectsForm);
-      if (hasBlockingFault) {
-        resultIssues.feedback['Result'] = 'Không tính rep';
-        resultIssues.feedback['Error'] = blockingFaults.first.message;
-      } else {
         resultIssues.feedback['Result'] =
             correctForm ? 'Hoàn hảo! 🔥' : 'Cần chú ý an toàn!';
-      }
 
-      final faultMap = <String, Map<String, String>>{};
-      for (final fault in allFaults) {
-        if (!faultMap.containsKey(fault.phase)) faultMap[fault.phase] = {};
-        faultMap[fault.phase]![fault.type] = fault.message;
+        final faultMap = <String, Map<String, String>>{};
+        for (final fault in allFaults) {
+          if (!faultMap.containsKey(fault.phase)) faultMap[fault.phase] = {};
+          faultMap[fault.phase]![fault.type] = fault.message;
+        }
+        setFeedback.add({correctForm: faultMap});
+
+        for (final metric in _metrics) metric.resetAndCountFault();
+      } else {
+        resultIssues.feedback['Result'] = 'Không tính rep';
+        resultIssues.feedback['Error'] =
+            'Chuyển động quá nhanh, AI không xác nhận được rep.';
+        resultIssues.addInstruction(
+            currentPhaseKey, 'Error', 'Làm chậm lại và nhảy rõ hơn');
+        for (final metric in _metrics) metric.reset();
       }
-      setFeedback.add({correctForm: faultMap});
 
       correctForm = true;
-      for (final metric in _metrics) metric.reset();
       _repStartedAtMs = null;
       _resetDebouncers();
 

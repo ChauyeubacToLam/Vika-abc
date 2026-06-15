@@ -12,6 +12,10 @@ import 'metrics/hold_time_metric.dart';
 import 'metrics/lumbar_extension_metric.dart';
 
 class Superman extends ExerciseBase {
+  Superman({this.maxRep = SupermanConfig.MAX_REP});
+
+  final int maxRep;
+
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
       const <VikaImageOrientation>{
@@ -233,7 +237,7 @@ class Superman extends ExerciseBase {
       _isTimeout = true;
       return true;
     }
-    return repCount >= SupermanConfig.MAX_REP;
+    return repCount >= maxRep;
   }
 
   @override
@@ -374,16 +378,11 @@ class Superman extends ExerciseBase {
     for (final m in _metrics) faults.addAll(m.faults);
     correctForm = !faults.any((f) => f.affectsForm);
 
-    if (!correctForm) {
-      _rejectedAttempts++;
-      resultIssues.feedback['Result'] = 'Không tính rep';
-      _transition(SupermanState.setup, ctx.frameTimestampMs);
-      for (final m in _metrics) m.resetAndCountFault();
-      correctForm = true;
-      return;
-    }
-
+    // Validity is enforced upstream (prone/side cheat checks + ROM/hold state
+    // gates), so every rep that reaches here is real. Form faults lower the
+    // score; they do not void the rep.
     repCount++;
+    if (!correctForm) resultIssues.feedback['Result'] = 'Fix Form';
 
     logger.addRepLog(RepLog(
       correctForm: correctForm,
@@ -401,13 +400,12 @@ class Superman extends ExerciseBase {
 
   @override
   void onSetComplete() {
-    logger.pushKey("target_rep", SupermanConfig.MAX_REP);
-    logger.pushKey("max_rep", repCount);
+    logger.pushKey("max_rep", maxRep);
     logger.pushKey("timeout", _isTimeout);
-    logger.pushKey("elevation_fails", elevationMetric.faultsCount);
-    logger.pushKey("hip_fails", hipMetric.faultsCount);
-    logger.pushKey("hold_fails", holdMetric.faultsCount);
-    logger.pushKey("lumbar_fails", lumbarMetric.faultsCount);
+    logger.pushKey("elevation_fails_count", elevationMetric.faultsCount);
+    logger.pushKey("hip_fails_count", hipMetric.faultsCount);
+    logger.pushKey("hold_fails_count", holdMetric.faultsCount);
+    logger.pushKey("lumbar_fails_count", lumbarMetric.faultsCount);
     logger.pushKey("rejected_attempts_count", _rejectedAttempts);
     logger.pushGoodRepCount();
     _rejectedAttempts = 0;

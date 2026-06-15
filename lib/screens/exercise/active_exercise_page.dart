@@ -112,10 +112,15 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   DateTime? _lastPersonDetectionAt;
   bool _personDetectionInFlight = false;
   bool _orientationPauseActive = false;
+  bool _isLifecyclePaused = false;
+  bool _resumeInitRequested = false;
   VikaImageOrientation _currentOrientation = VikaImageOrientation.portrait;
   VikaImageOrientation? _lastSentOrientation;
   bool? _lastSentOrientationFrontCamera;
   Future<void>? _pipelineShutdownFuture;
+  Future<void>? _lifecyclePauseFuture;
+  int _cameraInitGeneration = 0;
+  int? _activeCameraInitGeneration;
   static const Duration _personDetectionInterval = Duration(milliseconds: 450);
 
   @override
@@ -169,6 +174,122 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     // does not fire after rotation.
     if (!ExerciseBase.kLandscapeRotationEnabled || _isDisposed) return;
     unawaited(_handleMetricsChange());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _handleLifecycleResumed();
+        break;
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+        _handleLifecyclePaused();
+        break;
+      case AppLifecycleState.detached:
+        break;
+    }
+  }
+
+  bool get _setTeardownOwnsPipeline =>
+      _isDisposed || _isCompletingSet || _didComplete;
+
+  bool get _hasCameraPipelineWork =>
+      _isInitializing ||
+      _isCameraReady ||
+      _textureId != null ||
+      _cameraController != null ||
+      _landmarkSubscription != null;
+
+  bool get _pipelineReady =>
+      _isCameraReady &&
+      ((_runtime == _PoseRuntime.nativeMediaPipe && _textureId != null) ||
+          (_runtime == _PoseRuntime.mlKitFallback &&
+              _cameraController != null));
+
+  bool _shouldAbortCameraInit(int generation) {
+    return !mounted ||
+        _setTeardownOwnsPipeline ||
+        _isLifecyclePaused ||
+        generation != _cameraInitGeneration;
+  }
+
+  void _handleLifecyclePaused() {
+    if (_setTeardownOwnsPipeline) return;
+
+    _isLifecyclePaused = true;
+    _resumeInitRequested = false;
+    _cameraInitGeneration++;
+    _pipelineShutdownFuture = null;
+
+    if (!_hasCameraPipelineWork && _lifecyclePauseFuture == null) {
+      return;
+    }
+
+    final pauseFuture = _lifecyclePauseFuture ??= _pausePipelinesForLifecycle();
+    unawaited(pauseFuture.whenComplete(() {
+      if (identical(_lifecyclePauseFuture, pauseFuture)) {
+        _lifecyclePauseFuture = null;
+      }
+    }));
+  }
+
+  void _handleLifecycleResumed() {
+    if (_setTeardownOwnsPipeline) return;
+
+    _isLifecyclePaused = false;
+    unawaited(_resumePipelinesAfterLifecycle());
+  }
+
+  Future<void> _resumePipelinesAfterLifecycle() async {
+    final pauseFuture = _lifecyclePauseFuture;
+    if (pauseFuture != null) {
+      await pauseFuture;
+    }
+
+    if (!mounted || _setTeardownOwnsPipeline || _isLifecyclePaused) {
+      return;
+    }
+    if (_pipelineReady) {
+      return;
+    }
+    if (_isInitializing) {
+      _resumeInitRequested = true;
+      return;
+    }
+
+    await _initCamera();
+  }
+
+  Future<void> _pausePipelinesForLifecycle() async {
+    try {
+      final landmarkSubscription = _landmarkSubscription;
+      _landmarkSubscription = null;
+      try {
+        await landmarkSubscription?.cancel();
+      } catch (_) {}
+
+      await _stopAndDisposePoseChannel();
+      await _disposeFallbackCamera();
+    } finally {
+      _pipelineShutdownFuture = null;
+      _lastSentOrientation = null;
+      _lastSentOrientationFrontCamera = null;
+      _isProcessingFrame = false;
+
+      if (!_isDisposed) {
+        if (mounted) {
+          setState(() {
+            _isCameraReady = false;
+            _textureId = null;
+          });
+        } else {
+          _isCameraReady = false;
+          _textureId = null;
+        }
+      }
+    }
   }
 
   Future<void> _handleMetricsChange() async {
@@ -233,6 +354,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     if (!mounted) return;
     _isStaffUser = isStaff;
     final resolved = _resolveDebugMode(mode);
+    widget.exercise.debugMode = resolved;
     setState(() {
       _settingsDebugMode = mode;
       _isStaffUser = isStaff;
@@ -469,6 +591,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     await DebugPreferences.saveMode(mode);
     if (!mounted) return;
     final resolved = _resolveDebugMode(mode);
+    widget.exercise.debugMode = resolved;
     setState(() {
       _settingsDebugMode = mode;
       _debugPanelOpen = resolved != DebugMode.off;
@@ -600,12 +723,15 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   Future<void> _initCamera() async {
-    if (_isDisposed) return;
-    await _refreshCurrentOrientation();
-    if (_isDisposed) return;
-    _syncOrientationGate();
-    await _disposeFallbackCamera();
-    if (!_isDisposed && mounted) {
+    if (_setTeardownOwnsPipeline || _isLifecyclePaused || _isInitializing) {
+      return;
+    }
+
+    final initGeneration = _cameraInitGeneration;
+    _activeCameraInitGeneration = initGeneration;
+    _resumeInitRequested = false;
+    _isInitializing = true;
+    if (mounted) {
       setState(() {
         _isInitializing = true;
         _isCameraReady = false;
@@ -614,118 +740,148 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       });
     }
 
-    final status = await Permission.camera.request();
-    if (_isDisposed || !mounted) return;
-    _permissionStatus = status;
-    if (!status.isGranted) {
-      if (!_isDisposed && mounted) {
-        setState(() {
-          _isInitializing = false;
-          _isCameraReady = false;
-          _cameraErrorMessage = status.isPermanentlyDenied
-              ? 'Quyền camera đang bị chặn. Hãy mở lại trong cài đặt.'
-              : 'Cần quyền camera để AI theo dõi bài tập.';
-        });
-      }
-      return;
-    }
-
     try {
-      _ensureLandmarkSubscription();
-      // Hard-timeout the native init so a hung PoseLandmarkerService
-      // (completion handler never called, deadlocked Swift queue)
-      // doesn't strand the UI on "Đang chuẩn bị camera" forever. After
-      // 8 seconds we throw and surface a real error with a Retry button.
-      //
-      // ML Kit fallback intentionally NOT triggered here on real devices
-      // (iPhone/Android). It's for simulator/emulator only — see
-      // _shouldUseMlKitFallback() which gates on specific error strings
-      // ("x86_64", "native library", etc.) emitted by emulator builds.
-      final textureId = await _poseChannel
-          .initialize(
-            useFrontCamera: _isFrontCamera,
-            initialOrientation: _isCurrentOrientationSupported
-                ? _sessionOrientation
-                : VikaImageOrientation.portrait,
-            isFrontCamera: _isFrontCamera,
-          )
-          .timeout(const Duration(seconds: 8));
-      if (_isDisposed || !mounted) {
-        await _stopAndDisposePoseChannel();
-        return;
-      }
-      await _poseChannel.startDetection().timeout(const Duration(seconds: 4));
-      if (_isDisposed || !mounted) {
-        await _stopAndDisposePoseChannel();
+      await _refreshCurrentOrientation();
+      if (_shouldAbortCameraInit(initGeneration)) return;
+      _syncOrientationGate();
+      await _disposeFallbackCamera();
+      if (_shouldAbortCameraInit(initGeneration)) return;
+
+      final status = await Permission.camera.request();
+      if (_shouldAbortCameraInit(initGeneration)) return;
+      _permissionStatus = status;
+      if (!status.isGranted) {
+        if (!_isDisposed && mounted) {
+          setState(() {
+            _isInitializing = false;
+            _isCameraReady = false;
+            _cameraErrorMessage = status.isPermanentlyDenied
+                ? 'Quyền camera đang bị chặn. Hãy mở lại trong cài đặt.'
+                : 'Cần quyền camera để AI theo dõi bài tập.';
+          });
+        }
         return;
       }
 
-      setState(() {
-        _runtime = _PoseRuntime.nativeMediaPipe;
-        _textureId = textureId;
-        _isCameraReady = true;
-        _isInitializing = false;
-      });
-    } on TimeoutException catch (_) {
-      // Native side never responded. Surface an error so the user can
-      // retry — don't auto-fallback to ML Kit on real device.
-      if (_isDisposed || !mounted) return;
-      debugPrint('[Vika] Native pose init timed out after 8s.');
       try {
-        await _poseChannel.dispose();
-      } catch (_) {}
-      if (!_isDisposed && mounted) {
+        _ensureLandmarkSubscription();
+        // Hard-timeout the native init so a hung PoseLandmarkerService
+        // (completion handler never called, deadlocked Swift queue)
+        // doesn't strand the UI on "Đang chuẩn bị camera" forever. After
+        // 8 seconds we throw and surface a real error with a Retry button.
+        //
+        // ML Kit fallback intentionally NOT triggered here on real devices
+        // (iPhone/Android). It's for simulator/emulator only — see
+        // _shouldUseMlKitFallback() which gates on specific error strings
+        // ("x86_64", "native library", etc.) emitted by emulator builds.
+        final textureId = await _poseChannel
+            .initialize(
+              useFrontCamera: _isFrontCamera,
+              initialOrientation: _isCurrentOrientationSupported
+                  ? _sessionOrientation
+                  : VikaImageOrientation.portrait,
+              isFrontCamera: _isFrontCamera,
+            )
+            .timeout(const Duration(seconds: 8));
+        if (_shouldAbortCameraInit(initGeneration)) {
+          await _stopAndDisposePoseChannel();
+          return;
+        }
+        await _poseChannel.startDetection().timeout(const Duration(seconds: 4));
+        if (_shouldAbortCameraInit(initGeneration)) {
+          await _stopAndDisposePoseChannel();
+          return;
+        }
+
         setState(() {
+          _runtime = _PoseRuntime.nativeMediaPipe;
+          _textureId = textureId;
+          _isCameraReady = true;
           _isInitializing = false;
-          _isCameraReady = false;
-          _textureId = null;
-          _cameraErrorMessage = 'Camera khoi dong qua lau. Hay thu lai.';
         });
+      } on TimeoutException catch (_) {
+        // Native side never responded. Surface an error so the user can
+        // retry — don't auto-fallback to ML Kit on real device.
+        if (_shouldAbortCameraInit(initGeneration)) return;
+        debugPrint('[Vika] Native pose init timed out after 8s.');
+        try {
+          await _poseChannel.dispose();
+        } catch (_) {}
+        if (!_isDisposed && mounted) {
+          setState(() {
+            _isInitializing = false;
+            _isCameraReady = false;
+            _textureId = null;
+            _cameraErrorMessage = 'Camera khoi dong qua lau. Hay thu lai.';
+          });
+        }
+      } on PlatformException catch (error) {
+        if (_shouldAbortCameraInit(initGeneration)) return;
+        if (_shouldUseMlKitFallback(error)) {
+          // Emulator-only path. _shouldUseMlKitFallback gates on error
+          // strings emitted by simulator builds where the native MediaPipe
+          // dylib isn't shipped (x86_64, missing native library).
+          await _startMlKitFallback(error.message);
+          return;
+        }
+        if (!_isDisposed && mounted) {
+          setState(() {
+            _isInitializing = false;
+            _isCameraReady = false;
+            _textureId = null;
+            _cameraErrorMessage = error.message ??
+                'Khong the khoi dong MediaPipe tren thiet bi nay.';
+          });
+        }
+      } on MissingPluginException catch (_) {
+        // Native MediaPipe channel not implemented for this build target
+        // (typically simulator without native pods). Use ML Kit fallback —
+        // emulator path only.
+        if (_shouldAbortCameraInit(initGeneration)) return;
+        await _startMlKitFallback('Native pose landmarker not registered');
+      } catch (_) {
+        // Any other error — surface to the user with retry instead of
+        // silently swapping engines on a real device.
+        if (_shouldAbortCameraInit(initGeneration)) return;
+        try {
+          await _poseChannel.dispose();
+        } catch (_) {}
+        if (!_isDisposed && mounted) {
+          setState(() {
+            _isInitializing = false;
+            _isCameraReady = false;
+            _textureId = null;
+            _cameraErrorMessage = 'Loi khi khoi dong camera. Hay thu lai.';
+          });
+        }
       }
-    } on PlatformException catch (error) {
-      if (_isDisposed || !mounted) return;
-      if (_shouldUseMlKitFallback(error)) {
-        // Emulator-only path. _shouldUseMlKitFallback gates on error
-        // strings emitted by simulator builds where the native MediaPipe
-        // dylib isn't shipped (x86_64, missing native library).
-        await _startMlKitFallback(error.message);
-        return;
+    } finally {
+      if (_activeCameraInitGeneration == initGeneration) {
+        _activeCameraInitGeneration = null;
+        if (_isInitializing) {
+          if (!_isDisposed && mounted) {
+            setState(() {
+              _isInitializing = false;
+            });
+          } else {
+            _isInitializing = false;
+          }
+        }
       }
-      if (!_isDisposed && mounted) {
-        setState(() {
-          _isInitializing = false;
-          _isCameraReady = false;
-          _textureId = null;
-          _cameraErrorMessage = error.message ??
-              'Khong the khoi dong MediaPipe tren thiet bi nay.';
-        });
-      }
-    } on MissingPluginException catch (_) {
-      // Native MediaPipe channel not implemented for this build target
-      // (typically simulator without native pods). Use ML Kit fallback —
-      // emulator path only.
-      if (_isDisposed || !mounted) return;
-      await _startMlKitFallback('Native pose landmarker not registered');
-    } catch (_) {
-      // Any other error — surface to the user with retry instead of
-      // silently swapping engines on a real device.
-      if (_isDisposed || !mounted) return;
-      try {
-        await _poseChannel.dispose();
-      } catch (_) {}
-      if (!_isDisposed && mounted) {
-        setState(() {
-          _isInitializing = false;
-          _isCameraReady = false;
-          _textureId = null;
-          _cameraErrorMessage = 'Loi khi khoi dong camera. Hay thu lai.';
-        });
+
+      if (_resumeInitRequested &&
+          !_isInitializing &&
+          !_isLifecyclePaused &&
+          !_setTeardownOwnsPipeline &&
+          mounted) {
+        _resumeInitRequested = false;
+        unawaited(_initCamera());
       }
     }
   }
 
   Future<void> _toggleCamera() async {
-    if (_isDisposed || _isCompletingSet) return;
+    if (_setTeardownOwnsPipeline || _isLifecyclePaused) return;
     final nextLens = _currentLens == CameraLensDirection.back
         ? CameraLensDirection.front
         : CameraLensDirection.back;
@@ -780,6 +936,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     if (_isDisposed ||
         _isCompletingSet ||
         _didComplete ||
+        _isLifecyclePaused ||
         (_isProcessingFrame && !ExerciseBase.kDiagnosticMode)) {
       return;
     }
@@ -789,7 +946,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     }
 
     try {
-      if (_isDisposed) return;
+      if (_isDisposed || _isLifecyclePaused) return;
       _schedulePersonDetection();
 
       _currentLens = PoseLandmarkerAdapter.lensDirectionFromChannelData(data);
@@ -885,7 +1042,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   void _handleLandmarkStreamError(Object error) {
-    if (_isDisposed || !mounted) {
+    if (_setTeardownOwnsPipeline || _isLifecyclePaused || !mounted) {
       return;
     }
 
@@ -897,14 +1054,14 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   Future<void> _startMlKitFallback(String? nativeErrorMessage) async {
-    if (_isDisposed) return;
+    if (_setTeardownOwnsPipeline || _isLifecyclePaused) return;
     debugPrint(
       '[Vika] Falling back to Flutter camera + ML Kit: ${nativeErrorMessage ?? "unknown native init error"}',
     );
     try {
       await _poseChannel.dispose();
     } catch (_) {}
-    if (_isDisposed || !mounted) return;
+    if (_setTeardownOwnsPipeline || _isLifecyclePaused || !mounted) return;
     await _initMlKitCamera();
   }
 
@@ -926,12 +1083,12 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   Future<void> _initMlKitCamera() async {
-    if (_isDisposed) return;
+    if (_setTeardownOwnsPipeline || _isLifecyclePaused) return;
     await _disposeFallbackCamera();
-    if (_isDisposed || !mounted) return;
+    if (_setTeardownOwnsPipeline || _isLifecyclePaused || !mounted) return;
 
     final cameras = await availableCameras();
-    if (_isDisposed || !mounted) return;
+    if (_setTeardownOwnsPipeline || _isLifecyclePaused || !mounted) return;
     if (cameras.isEmpty) {
       setState(() {
         _runtime = _PoseRuntime.mlKitFallback;
@@ -974,12 +1131,12 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
       try {
         await controller.initialize().timeout(const Duration(seconds: 6));
-        if (_isDisposed || !mounted) {
+        if (_setTeardownOwnsPipeline || _isLifecyclePaused || !mounted) {
           await controller.dispose();
           return;
         }
         await controller.startImageStream(_processFallbackCameraImage);
-        if (_isDisposed || !mounted) {
+        if (_setTeardownOwnsPipeline || _isLifecyclePaused || !mounted) {
           await controller.dispose();
           return;
         }
@@ -1004,7 +1161,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       }
     }
 
-    if (_isDisposed || !mounted) return;
+    if (_setTeardownOwnsPipeline || _isLifecyclePaused || !mounted) return;
     setState(() {
       _runtime = _PoseRuntime.mlKitFallback;
       _isInitializing = false;
@@ -1014,11 +1171,11 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   Future<void> _switchMlKitCamera(CameraLensDirection nextLens) async {
-    if (_isDisposed) return;
+    if (_setTeardownOwnsPipeline || _isLifecyclePaused) return;
     if (_availableCameras.isEmpty) {
       _availableCameras = await availableCameras();
     }
-    if (_isDisposed || !mounted) return;
+    if (_setTeardownOwnsPipeline || _isLifecyclePaused || !mounted) return;
     final newIndex = _availableCameras.indexWhere(
       (camera) => camera.lensDirection == nextLens,
     );
@@ -1038,12 +1195,12 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
           : ImageFormatGroup.bgra8888,
     );
     await controller.initialize();
-    if (_isDisposed || !mounted) {
+    if (_setTeardownOwnsPipeline || _isLifecyclePaused || !mounted) {
       await controller.dispose();
       return;
     }
     await controller.startImageStream(_processFallbackCameraImage);
-    if (_isDisposed || !mounted) {
+    if (_setTeardownOwnsPipeline || _isLifecyclePaused || !mounted) {
       await controller.dispose();
       return;
     }
@@ -1076,6 +1233,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     if (_isDisposed ||
         _isCompletingSet ||
         _didComplete ||
+        _isLifecyclePaused ||
         (_isProcessingFrame && !ExerciseBase.kDiagnosticMode)) {
       return;
     }
@@ -1090,7 +1248,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   Future<void> _detectPoseFromFallback(CameraImage cameraImage) async {
-    if (_isDisposed || _isCompletingSet) return;
+    if (_setTeardownOwnsPipeline || _isLifecyclePaused) return;
     try {
       final inputImage = _buildInputImage(cameraImage);
       if (inputImage == null) {
@@ -1099,7 +1257,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
       _schedulePersonDetection(inputImage);
       final poses = await _poseDetector.processImage(inputImage);
-      if (_isDisposed || _isCompletingSet || !mounted) return;
+      if (_setTeardownOwnsPipeline || _isLifecyclePaused || !mounted) return;
 
       if (_syncOrientationGate()) {
         _detectedPose = poses.isNotEmpty ? poses.first : null;
@@ -1113,17 +1271,17 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       if (poses.isNotEmpty) {
         _handlePose(poses.first);
       } else {
-        if (_isDisposed) return;
+        if (_isDisposed || _isLifecyclePaused) return;
         _detectedPose = null;
         _feedback = widget.exercise.processNoPoseFrame();
         _processVoiceFrame(hasPose: false);
       }
 
-      if (!_isDisposed && mounted) {
+      if (!_isDisposed && !_isLifecyclePaused && mounted) {
         setState(() {});
       }
     } catch (_) {
-      if (_isDisposed || !mounted) return;
+      if (_setTeardownOwnsPipeline || _isLifecyclePaused || !mounted) return;
       setState(() {
         _isCameraReady = false;
         _cameraErrorMessage = 'Khong the nhan du lieu pose. Hay thu lai.';
@@ -1132,7 +1290,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   void _handlePose(Pose pose) {
-    if (_isDisposed) {
+    if (_isDisposed || _isLifecyclePaused) {
       return;
     }
 
@@ -1181,6 +1339,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     if (_isDisposed ||
         _isCompletingSet ||
         _personDetectionInFlight ||
+        _isLifecyclePaused ||
         widget.exercise.exerciseState == ExerciseState.completed) {
       return;
     }
@@ -1205,7 +1364,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   void _processVoiceFrame({required bool hasPose}) {
-    if (_isDisposed) {
+    if (_isDisposed || _isLifecyclePaused) {
       return;
     }
 
@@ -1461,6 +1620,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         ? DebugMode.off
         : _resolveDebugMode(_settingsDebugMode);
     final debugEnabled = debugMode != DebugMode.off;
+    widget.exercise.debugMode = debugMode;
     final showDebugEntryBadge =
         trackedMetrics.isNotEmpty && (debugEnabled || _isStaffUser);
     final showDebugPanel = debugEnabled && _debugPanelOpen;
@@ -1545,6 +1705,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                               _runtime == _PoseRuntime.mlKitFallback &&
                                   _currentLens == CameraLensDirection.front,
                           debugData: widget.exercise.debugData,
+                          debugLabelsEnabled: debugEnabled,
                           style: SkeletonStyle.vikaCream),
                     );
                   },

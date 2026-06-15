@@ -32,6 +32,7 @@ class WorkoutLaunchTarget {
     return ExerciseLaunchArgs(
       definition: first.definition,
       catalogExerciseId: first.catalogExerciseId,
+      catalogInfo: first.catalogInfo,
       prescription: first.prescription,
       recommendationId: first.recommendationId,
       weekNumber: first.weekNumber,
@@ -157,16 +158,13 @@ class WorkoutLaunchService {
     WeekPlan week,
     SessionPlan session,
   ) async {
-    final unresolvedCatalogIds = <String>{};
-    for (final slot in session.slots) {
-      if (lookupExerciseDefinition(slot.exerciseId) == null) {
-        unresolvedCatalogIds.add(slot.exerciseId);
-      }
-    }
-    final catalogInfoById = unresolvedCatalogIds.isEmpty
+    final catalogIds = <String>{
+      for (final slot in session.slots) slot.exerciseId,
+    };
+    final catalogInfoById = catalogIds.isEmpty
         ? const <String, ExerciseLaunchCatalogInfo>{}
         : await _recommendations.fetchLaunchCatalogInfoForExerciseIds(
-            unresolvedCatalogIds,
+            catalogIds,
           );
 
     final items = <ExerciseSequenceItem>[];
@@ -184,6 +182,7 @@ class WorkoutLaunchService {
         ExerciseSequenceItem(
           definition: definition,
           catalogExerciseId: slot.exerciseId,
+          catalogInfo: catalogInfoById[slot.exerciseId],
           prescription: slot.volume,
           recommendationId: recommendationId,
           weekNumber: week.weekNumber,

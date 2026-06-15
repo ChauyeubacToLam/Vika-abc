@@ -21,15 +21,19 @@ class CobraElbowMetric extends CobraMetricBase {
 
   final StickyDebouncer _lockoutDebouncer = StickyDebouncer(requiredFrames: 8);
   final StickyDebouncer _warningDebouncer = StickyDebouncer(requiredFrames: 6);
+  bool _isFaultingNow = false;
 
   @override
   List<FaultRecord> get faults => _faults;
+  @override
+  bool get isFaultingNow => _isFaultingNow;
 
   @override
   Map<String, dynamic> get debugData => _debugData;
 
   @override
   void update(RepContext ctx) {
+    _isFaultingNow = false;
     if (ctx.state == CobraState.setup) return;
     if (ctx.shoulder == null || ctx.elbow == null || ctx.wrist == null) return;
 
@@ -45,6 +49,7 @@ class CobraElbowMetric extends CobraMetricBase {
 
     // Error: locked out (>170°)
     if (_lockoutDebouncer.update(angle >= _errorMin)) {
+      _isFaultingNow = true;
       ctx.resultIssues.feedback['Elbow'] = '⚠️ Khuỷu tay duỗi quá thẳng!';
       ctx.resultIssues.addInstruction(
         'holding',
@@ -80,5 +85,6 @@ class CobraElbowMetric extends CobraMetricBase {
     _debugData.clear();
     _lockoutDebouncer.reset();
     _warningDebouncer.reset();
+    _isFaultingNow = false;
   }
 }

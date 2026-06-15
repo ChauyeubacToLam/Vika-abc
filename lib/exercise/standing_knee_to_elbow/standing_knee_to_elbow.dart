@@ -75,10 +75,10 @@ class StandingKneeToElbow extends ExerciseBase {
 
   @override
   void onSetComplete() {
-    logger.pushKey("knee_valgus_fails", kneeValgusMetric.faultsCount);
-    logger.pushKey("core_drive_fails", coreDriveMetric.faultsCount);
-    logger.pushKey("cross_rom_fails", crossRomMetric.faultsCount);
-    logger.pushKey("pelvic_drop_fails", pelvicDropMetric.faultsCount);
+    logger.pushKey("knee_valgus_fails_count", kneeValgusMetric.faultsCount);
+    logger.pushKey("core_drive_fails_count", coreDriveMetric.faultsCount);
+    logger.pushKey("cross_rom_fails_count", crossRomMetric.faultsCount);
+    logger.pushKey("pelvic_drop_fails_count", pelvicDropMetric.faultsCount);
     logger.pushGoodRepCount();
     logger.pushKey("max_rep", maxRep);
   }

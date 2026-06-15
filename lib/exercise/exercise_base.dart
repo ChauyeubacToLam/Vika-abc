@@ -137,12 +137,15 @@ abstract class ExerciseBase {
   // Centralized per-frame timestamp (set once at the start of each frame)
   DateTime frameTimestamp = DateTime.now();
   int get frameTimestampMs => frameTimestamp.millisecondsSinceEpoch;
+  final Stopwatch _sessionStopwatch = Stopwatch();
+  int get elapsedMs => _sessionStopwatch.elapsedMilliseconds;
 
   List<Map<bool, Map<String, Map<String, String>>>> setFeedback = [];
   ResultIssues resultIssues = ResultIssues();
 
   ExerciseState exerciseState = ExerciseState.notActivated;
   CameraFacing cameraFacing = CameraFacing.front;
+  DebugMode debugMode = DebugMode.off;
   bool correctForm = true;
   double frontFacingRatio = 1.0;
 
@@ -152,6 +155,8 @@ abstract class ExerciseBase {
 
   List<TrackedMetric> get trackedDebugMetrics =>
       List<TrackedMetric>.unmodifiable([_exerciseDebugTracker]);
+
+  bool get isDebugModeActive => debugMode != DebugMode.off;
 
   // Orientation debouncer
   StickyDebouncer leftRightDebouncer = StickyDebouncer(requiredFrames: 5);
@@ -268,7 +273,9 @@ abstract class ExerciseBase {
       final stableFor = _personSeenSince == null
           ? 0
           : frameTimestamp.difference(_personSeenSince!).inMilliseconds;
-      debugData['personStableMs'] = stableFor;
+      if (isDebugModeActive) {
+        debugData['personStableMs'] = stableFor;
+      }
 
       if (!_personConfirmed) {
         resultIssues.feedback["System"] =
@@ -456,6 +463,7 @@ abstract class ExerciseBase {
   }
 
   void _trackDebugFrame() {
+    if (!isDebugModeActive) return;
     _exerciseDebugTracker.onTick(frameTimestampMs);
   }
 
@@ -733,7 +741,11 @@ abstract class ExerciseBase {
         ABSTRACT METHODS & LIFECYCLE HOOKS
         ----------------------------------------------------------------------- */
 
-  void onExerciseActivated() {}
+  void onExerciseActivated() {
+    _sessionStopwatch
+      ..reset()
+      ..start();
+  }
 
   bool requestStop();
 
@@ -760,6 +772,71 @@ abstract class ExerciseBase {
 
   /// Optional target used by the shared hold timer UI.
   double? get liveHoldTargetSeconds => null;
+}
+
+class HoldSecondsAccumulator {
+  HoldSecondsAccumulator(Iterable<String> faultKeys) {
+    for (final key in faultKeys) {
+      _faultSeconds[key] = 0.0;
+    }
+  }
+
+  static const int minFrameDeltaMs = 10;
+  static const int maxFrameDeltaMs = 250;
+
+  final Map<String, double> _faultSeconds = {};
+  double _goodSeconds = 0.0;
+  int? _lastHoldTickMs;
+
+  double get goodSeconds => _goodSeconds;
+
+  double faultSecondsFor(String key) => _faultSeconds[key] ?? 0.0;
+
+  void reset() {
+    _goodSeconds = 0.0;
+    for (final key in _faultSeconds.keys) {
+      _faultSeconds[key] = 0.0;
+    }
+    _lastHoldTickMs = null;
+  }
+
+  void resetTick() {
+    _lastHoldTickMs = null;
+  }
+
+  void accumulate({
+    required int elapsedMs,
+    required Map<String, bool> faultingByKey,
+    Iterable<String>? goodBlockingKeys,
+  }) {
+    for (final key in faultingByKey.keys) {
+      _faultSeconds.putIfAbsent(key, () => 0.0);
+    }
+
+    final previous = _lastHoldTickMs;
+    _lastHoldTickMs = elapsedMs;
+    if (previous == null) return;
+
+    final dtMs = elapsedMs - previous;
+    if (dtMs < minFrameDeltaMs || dtMs > maxFrameDeltaMs) return;
+
+    final seconds = dtMs / 1000.0;
+    var hasFault = false;
+    final goodBlockingSet = goodBlockingKeys?.toSet();
+    var hasGoodBlockingFault = false;
+    for (final entry in faultingByKey.entries) {
+      if (!entry.value) continue;
+      hasFault = true;
+      if (goodBlockingSet == null || goodBlockingSet.contains(entry.key)) {
+        hasGoodBlockingFault = true;
+      }
+      _faultSeconds[entry.key] = (_faultSeconds[entry.key] ?? 0.0) + seconds;
+    }
+
+    if (!hasFault || !hasGoodBlockingFault) {
+      _goodSeconds += seconds;
+    }
+  }
 }
 
 class _ExerciseDebugMetricSource implements DebugMetricSource {

@@ -37,9 +37,7 @@ enum SquatState { standing, descending, bottom, ascending }
 // --- Squat ---
 // DATA LOGGING PIPELINE:
 // 1. frameBuffer (Per-Frame):
-//    - kneeAngle: used for state transitions and finding the peak_knee_angle
-//    - trunkLean: used for finding trunk_lean_at_bottom
-//    - heelDistance: used for finding peak_heel_distance
+//    - kneeAngle: used for state transitions
 // 2. RepLog (Per-Rep):
 //    - peak_heel_distance: the max heelDistance reached in the rep
 //    - peak_knee_angle: the min kneeAngle reached in the rep (deepest point)
@@ -77,6 +75,9 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
   int? lastRepTopVoicePriority;
   bool lastRepWasClean = true;
   bool _reachedBottomThisRep = false;
+  double? _repMinKneeAngle;
+  double? _repTrunkLeanAtBottom;
+  double? _repMaxHeelDistance;
 
   Squat({this.maxRep = SquatConfig.MAX_REP});
 
@@ -366,6 +367,7 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
       resultIssues: resultIssues,
     );
 
+    final debugEnabled = isDebugModeActive;
     // 4. Debug overlay
     debugData['squatState'] = squatState.name;
     debugData['previousSquatState'] = previousSquatState.name;
@@ -398,14 +400,19 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
 
     // 7. Run all metrics (skip standing phase)
     if (squatState != SquatState.standing) {
+      _updateRepPeaks(ctx);
       for (var i = 0; i < _metrics.length; i++) {
         _metrics[i].update(ctx);
-        _trackedMetrics[i].onTick(now);
+        if (debugEnabled) {
+          _trackedMetrics[i].onTick(now);
+        }
       }
     }
 
-    for (final metric in _metrics) {
-      debugData.addAll(metric.debugData);
+    if (debugEnabled) {
+      for (final metric in _metrics) {
+        debugData.addAll(metric.debugData);
+      }
     }
 
     // 8. Phase-specific UI instructions
@@ -428,8 +435,10 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
         ctx: ctx,
       );
       tempoMetric.evaluateRep(ctx);
-      for (final trackedMetric in _trackedMetrics) {
-        trackedMetric.onTick(ctx.frameTimestamp);
+      if (isDebugModeActive) {
+        for (final trackedMetric in _trackedMetrics) {
+          trackedMetric.onTick(ctx.frameTimestamp);
+        }
       }
 
       // Collect faults from all metrics
@@ -458,8 +467,10 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
       setFeedback.add({correctForm: faultMap});
 
       // Update debug data with metric outputs
-      for (final metric in _metrics) {
-        debugData.addAll(metric.debugData);
+      if (isDebugModeActive) {
+        for (final metric in _metrics) {
+          debugData.addAll(metric.debugData);
+        }
       }
 
       // Tempo feedback for UI
@@ -473,13 +484,11 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
       }
 
       // Log per-rep data
-      final peakKneeSnapshot = frameBuffer.getPeakMin("kneeAngle");
       logger.addRepLog(
           RepLog(correctForm: correctForm, repNumber: repCount, data: {
-        "peak_heel_distance":
-            frameBuffer.getPeakMax("heelDistance")?.log["heelDistance"] ?? 0,
-        "peak_knee_angle": peakKneeSnapshot?.log["kneeAngle"] ?? 0,
-        "trunk_lean_at_bottom": peakKneeSnapshot?.log["trunkLean"] ?? 0,
+        "peak_heel_distance": _repMaxHeelDistance ?? 0,
+        "peak_knee_angle": _repMinKneeAngle ?? 0,
+        "trunk_lean_at_bottom": _repTrunkLeanAtBottom ?? 0,
         "ascending_time": tempoMetric.ascentDuration ?? 0.0,
         "descending_time": tempoMetric.descentDuration ?? 0.0,
         "fault_types": allFaults.map((f) => f.type).toSet().toList(),
@@ -497,7 +506,27 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
     // Reset for next rep
     correctForm = true;
     _reachedBottomThisRep = false;
+    _resetRepPeaks();
     previousSquatState = SquatState.standing;
+  }
+
+  void _updateRepPeaks(RepContext ctx) {
+    // Correlated capture: trunk lean must stay paired with the deepest knee frame.
+    if (_repMinKneeAngle == null || ctx.kneeAngle < _repMinKneeAngle!) {
+      _repMinKneeAngle = ctx.kneeAngle;
+      _repTrunkLeanAtBottom = ctx.trunkLean;
+    }
+
+    if (_repMaxHeelDistance == null ||
+        ctx.heelDistance > _repMaxHeelDistance!) {
+      _repMaxHeelDistance = ctx.heelDistance;
+    }
+  }
+
+  void _resetRepPeaks() {
+    _repMinKneeAngle = null;
+    _repTrunkLeanAtBottom = null;
+    _repMaxHeelDistance = null;
   }
 
   // --- Phase Instructions ---

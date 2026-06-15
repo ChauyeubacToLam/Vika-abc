@@ -50,15 +50,19 @@ class ArmPositionMetric extends WarriorOneMetricBase {
 
   bool _lowInstructionSet = false;
   bool _elbowInstructionSet = false;
+  bool _isFaultingNow = false;
 
   @override
   List<FaultRecord> get faults => _faults;
+  @override
+  bool get isFaultingNow => _isFaultingNow;
 
   @override
   Map<String, dynamic> get debugData => _debugData;
 
   @override
   void update(HoldContext ctx) {
+    _isFaultingNow = false;
     if (ctx.holdState != WarriorOneState.hold) return;
 
     final double armV = ctx.armVerticalAngle;
@@ -73,6 +77,7 @@ class ArmPositionMetric extends WarriorOneMetricBase {
     final bool tooLow =
         _tooLowDebouncer.update(armV > ArmPositionConfig.TOO_LOW);
     if (tooLow) {
+      _isFaultingNow = true;
       ctx.resultIssues.feedback['arms'] = 'Vươn tay cao hơn nhé!';
       if (!_lowInstructionSet) {
         ctx.resultIssues.addInstruction(
@@ -94,6 +99,7 @@ class ArmPositionMetric extends WarriorOneMetricBase {
     final bool elbowBent =
         _elbowDebouncer.update(elbow < ArmPositionConfig.ELBOW_TOO_BENT);
     if (elbowBent) {
+      _isFaultingNow = true;
       ctx.resultIssues.feedback['arms'] = 'Duỗi thẳng khuỷu tay nhé!';
       if (!_elbowInstructionSet) {
         ctx.resultIssues
@@ -126,5 +132,6 @@ class ArmPositionMetric extends WarriorOneMetricBase {
     _elbowDebouncer.reset();
     _lowInstructionSet = false;
     _elbowInstructionSet = false;
+    _isFaultingNow = false;
   }
 }

@@ -22,6 +22,7 @@ import 'package:flutter/services.dart';
 import '../data/milestones.dart';
 import '../data/progress_mock.dart';
 import '../models/exercise_lookup.dart';
+import '../models/pain_regions.dart';
 import '../services/recommendation/recommendation_service.dart';
 import '../services/session_persistence.dart';
 import '../services/user_profile_service.dart';

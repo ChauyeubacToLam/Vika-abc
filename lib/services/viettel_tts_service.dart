@@ -37,11 +37,11 @@ class ViettelTTSService {
             stayAwake: false,
             contentType: AndroidContentType.speech,
             usageType: AndroidUsageType.media,
-            audioFocus: AndroidAudioFocus.gain,
+            audioFocus: AndroidAudioFocus.gainTransientMayDuck,
           ),
           iOS: AudioContextIOS(
-            category: AVAudioSessionCategory.playAndRecord,
-            options: {AVAudioSessionOptions.defaultToSpeaker},
+            category: AVAudioSessionCategory.playback,
+            options: {AVAudioSessionOptions.duckOthers},
           ),
         ),
       );

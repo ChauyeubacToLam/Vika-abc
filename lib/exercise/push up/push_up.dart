@@ -97,6 +97,16 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
   double? _baselineWristY;
   double? _baselineHeelY;
   double? _repStartKneeY;
+  double? _repMinElbowAngle;
+  double _repMaxAbsTrunkDeviation = 0.0;
+  double _repMaxWristYDrift = 0.0;
+  double _repMaxHeelYDrift = 0.0;
+  double? _repMinKneeY;
+  double? _repMaxKneeY;
+  double? _repMinShoulderY;
+  double? _repMaxShoulderY;
+  double? _repMinHipY;
+  double? _repMaxHipY;
 
   final Debouncer _bottomDebouncer = Debouncer(requiredFrames: 2);
   final Debouncer _plankDebouncer = Debouncer(requiredFrames: 2);
@@ -287,7 +297,9 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
       "shoulderHipKneeAngle": geometry.shoulderHipKneeAngle,
       "hipKneeAnkleAngle": geometry.hipKneeAnkleAngle,
     }, timeStamp: now));
-    debugData['minElbow'] = _debugMinElbowLabel();
+    if (isDebugModeActive) {
+      debugData['minElbow'] = _debugMinElbowLabel();
+    }
 
     final plankStatus = _evaluatePlankGeometry(geometry);
     if (pushUpState == PushUpState.plank && plankStatus.valid) {
@@ -301,6 +313,11 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
 
     if (pushUpState != PushUpState.plank) {
       _updateActiveGuard(geometry);
+    }
+
+    final stateBeforeUpdate = pushUpState;
+    if (stateBeforeUpdate != PushUpState.plank) {
+      _updateRepTelemetry(geometry);
     }
 
     // 5. Update state machine before checking completion.
@@ -331,7 +348,9 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
       _rejectedRepCount += 1;
       _lastNoCountReason = 'rejected:${_repRejectType ?? _lastRejectType}';
       _lastPushUpEvent = 'no-count rejected';
-      debugData['fail'] = _lastNoCountReason;
+      if (isDebugModeActive) {
+        debugData['fail'] = _lastNoCountReason;
+      }
       resultIssues.feedback['Result'] = 'Lần này chưa tính nhé';
       resultIssues.feedback['Form'] =
           _repRejectReason ?? 'Giữ đúng tư thế push-up đầy đủ';
@@ -340,9 +359,13 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
     }
 
     if (!_reachedBottomThisRep) {
-      _lastNoCountReason = 'no bottom: min elbow ${_debugMinElbowLabel()}';
+      _lastNoCountReason = isDebugModeActive
+          ? 'no bottom: min elbow ${_debugMinElbowLabel()}'
+          : 'no bottom';
       _lastPushUpEvent = 'no-count no-bottom';
-      debugData['fail'] = _lastNoCountReason;
+      if (isDebugModeActive) {
+        debugData['fail'] = _lastNoCountReason;
+      }
       resultIssues.feedback['Status'] = 'Xuống thấp hơn nhé';
       _resetRepCycle(countMetricFaults: false);
       return;
@@ -380,9 +403,7 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
       }
     }
 
-    final minElbow =
-        _numFromSnapshot(frameBuffer.getPeakMin("elbowAngle"), "elbowAngle") ??
-            ctx.elbowAngle;
+    final minElbow = _repMinElbowAngle ?? ctx.elbowAngle;
     final topElbow = _topElbowAngle;
     final elbowRom = (topElbow - minElbow).clamp(0.0, 180.0).toDouble();
 
@@ -392,14 +413,12 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
       data: {
         "min_elbow_angle": minElbow,
         "elbow_rom": elbowRom,
-        "max_abs_trunk_deviation": frameBuffer.getMaxAbs("trunkDeviation"),
-        "max_wrist_y_drift":
-            frameBuffer.getMaxAbsFromBaseline("wristY", _baselineWristY),
-        "max_heel_y_drift":
-            frameBuffer.getMaxAbsFromBaseline("heelY", _baselineHeelY),
-        "knee_y_travel": frameBuffer.getTravel("kneeY"),
-        "shoulder_y_travel": frameBuffer.getTravel("shoulderY"),
-        "hip_y_travel": frameBuffer.getTravel("hipY"),
+        "max_abs_trunk_deviation": _repMaxAbsTrunkDeviation,
+        "max_wrist_y_drift": _repMaxWristYDrift,
+        "max_heel_y_drift": _repMaxHeelYDrift,
+        "knee_y_travel": _travel(_repMinKneeY, _repMaxKneeY),
+        "shoulder_y_travel": _travel(_repMinShoulderY, _repMaxShoulderY),
+        "hip_y_travel": _travel(_repMinHipY, _repMaxHipY),
         "ascending_time": tempoMetric.ascentDuration ?? 0.0,
         "descending_time": tempoMetric.descentDuration ?? 0.0,
         "fault_types": allFaults.map((f) => f.type).toSet().toList(),
@@ -407,6 +426,45 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
     ));
 
     _resetRepCycle(countMetricFaults: true);
+  }
+
+  void _updateRepTelemetry(_PushUpGeometry geometry) {
+    if (_repMinElbowAngle == null || geometry.elbowAngle < _repMinElbowAngle!) {
+      _repMinElbowAngle = geometry.elbowAngle;
+    }
+    _repMaxAbsTrunkDeviation =
+        math.max(_repMaxAbsTrunkDeviation, geometry.trunkDeviation.abs());
+    if (_baselineWristY != null) {
+      _repMaxWristYDrift = math.max(
+          _repMaxWristYDrift, (geometry.wristY - _baselineWristY!).abs());
+    }
+    if (_baselineHeelY != null) {
+      _repMaxHeelYDrift =
+          math.max(_repMaxHeelYDrift, (geometry.heelY - _baselineHeelY!).abs());
+    }
+    final kneeRange =
+        _rangeWithValue(_repMinKneeY, _repMaxKneeY, geometry.kneeY);
+    _repMinKneeY = kneeRange.$1;
+    _repMaxKneeY = kneeRange.$2;
+    final shoulderRange =
+        _rangeWithValue(_repMinShoulderY, _repMaxShoulderY, geometry.shoulderY);
+    _repMinShoulderY = shoulderRange.$1;
+    _repMaxShoulderY = shoulderRange.$2;
+    final hipRange = _rangeWithValue(_repMinHipY, _repMaxHipY, geometry.hipY);
+    _repMinHipY = hipRange.$1;
+    _repMaxHipY = hipRange.$2;
+  }
+
+  (double, double) _rangeWithValue(
+      double? minValue, double? maxValue, double value) {
+    final nextMin = minValue == null ? value : math.min(minValue, value);
+    final nextMax = maxValue == null ? value : math.max(maxValue, value);
+    return (nextMin, nextMax);
+  }
+
+  double _travel(double? minValue, double? maxValue) {
+    if (minValue == null || maxValue == null) return 0.0;
+    return (maxValue - minValue).abs();
   }
 
   // --- State Machine ---
@@ -432,12 +490,14 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
                 pushUpState == PushUpState.descending) &&
             !isBendingFrame;
 
-    debugData['gates'] =
-        'E:${_debugBool(entryReady)} B:${_debugBool(bottomGate)} R:${_debugBool(plankReturnGate)}';
-    _traceElbowChange = angleChange.name;
-    _traceEntryReady = _debugBool(entryReady);
-    _traceBottomGate = _debugBool(bottomGate);
-    _traceReturnGate = _debugBool(plankReturnGate);
+    if (isDebugModeActive) {
+      debugData['gates'] =
+          'E:${_debugBool(entryReady)} B:${_debugBool(bottomGate)} R:${_debugBool(plankReturnGate)}';
+      _traceElbowChange = angleChange.name;
+      _traceEntryReady = _debugBool(entryReady);
+      _traceBottomGate = _debugBool(bottomGate);
+      _traceReturnGate = _debugBool(plankReturnGate);
+    }
 
     if (angleChange != ChangeState.stable) {
       final isExtending = directionDetection.update(isExtendingFrame);
@@ -474,7 +534,9 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
     pushUpState = newState;
     _lastPushUpEvent =
         '${previousPushUpState.toString().split('.').last}->${newState.toString().split('.').last}';
-    debugData['event'] = _lastPushUpEvent;
+    if (isDebugModeActive) {
+      debugData['event'] = _lastPushUpEvent;
+    }
 
     if (newState == PushUpState.descending &&
         previousPushUpState == PushUpState.plank) {
@@ -484,6 +546,7 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
       _repRejectType = null;
       _kneeMovedThisRep = false;
       _lastRejectType = 'none';
+      _resetRepTelemetry();
       _resetGuardDebouncers();
       resultIssues.instructions.clear();
     } else if (newState == PushUpState.bottom) {
@@ -527,12 +590,16 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
     if (kneeChange != ChangeState.stable || kneeMovedFromStart) {
       _kneeMovedThisRep = true;
     }
-    _traceKneeChange = kneeChange.name;
-    _traceKneeMoveFromStart = _debugBool(kneeMovedFromStart);
+    if (isDebugModeActive) {
+      _traceKneeChange = kneeChange.name;
+      _traceKneeMoveFromStart = _debugBool(kneeMovedFromStart);
+    }
 
     final activeStatus = _evaluateActiveGeometry(geometry);
-    debugData['guard'] = activeStatus.valid ? 'ok' : activeStatus.type;
-    _traceActiveGuard = activeStatus.valid ? 'ok' : activeStatus.type;
+    if (isDebugModeActive) {
+      debugData['guard'] = activeStatus.valid ? 'ok' : activeStatus.type;
+      _traceActiveGuard = activeStatus.valid ? 'ok' : activeStatus.type;
+    }
     if (_activeBodyLineDebouncer.update(!activeStatus.valid)) {
       _rejectCurrentCycle(activeStatus);
     }
@@ -541,7 +608,9 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
     if (wristBase != null) {
       final wristDrift = (geometry.wristY - wristBase).abs();
       final threshold = _wristDriftThreshold(geometry.torsoLen);
-      _traceWristDrift = wristDrift.toStringAsFixed(2);
+      if (isDebugModeActive) {
+        _traceWristDrift = wristDrift.toStringAsFixed(2);
+      }
       if (_wristDriftDebouncer.update(wristDrift > threshold)) {
         _rejectCurrentCycle(_PushUpGuardStatus.invalid(
           type: 'Wrist',
@@ -554,7 +623,9 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
     if (heelBase != null) {
       final heelDrift = (geometry.heelY - heelBase).abs();
       final threshold = _heelDriftThreshold(geometry.torsoLen);
-      _traceHeelDrift = heelDrift.toStringAsFixed(2);
+      if (isDebugModeActive) {
+        _traceHeelDrift = heelDrift.toStringAsFixed(2);
+      }
       if (_heelDriftDebouncer.update(heelDrift > threshold)) {
         _rejectCurrentCycle(_PushUpGuardStatus.invalid(
           type: 'Heel',
@@ -567,7 +638,9 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
     final elbowOnlyFrame = elbowBendFromTop > PushUpConfig.ROM_GATE &&
         pushUpState == PushUpState.descending &&
         kneeChange == ChangeState.stable;
-    _traceElbowOnlyFrame = _debugBool(elbowOnlyFrame);
+    if (isDebugModeActive) {
+      _traceElbowOnlyFrame = _debugBool(elbowOnlyFrame);
+    }
     if (_elbowOnlyDebouncer.update(elbowOnlyFrame)) {
       _rejectCurrentCycle(_PushUpGuardStatus.invalid(
         type: 'KneeMotion',
@@ -584,8 +657,10 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
       _lastRejectType = status.type;
       _lastRejectReason = status.reason ?? 'none';
       _lastPushUpEvent = 'reject ${status.type}';
-      debugData['event'] = _lastPushUpEvent;
-      debugData['reject'] = _repRejectType ?? _lastRejectType;
+      if (isDebugModeActive) {
+        debugData['event'] = _lastPushUpEvent;
+        debugData['reject'] = _repRejectType ?? _lastRejectType;
+      }
       resultIssues.feedback['Form'] = status.reason ?? 'Giữ đúng tư thế';
       resultIssues.addInstruction(
         currentPhaseKey,
@@ -605,6 +680,7 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
     _repRejectType = null;
     _kneeMovedThisRep = false;
     _repStartKneeY = null;
+    _resetRepTelemetry();
     _bottomDebouncer.reset();
     _plankDebouncer.reset();
     directionDetection.reset();
@@ -623,6 +699,19 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
     _wristDriftDebouncer.reset();
     _heelDriftDebouncer.reset();
     _elbowOnlyDebouncer.reset();
+  }
+
+  void _resetRepTelemetry() {
+    _repMinElbowAngle = null;
+    _repMaxAbsTrunkDeviation = 0.0;
+    _repMaxWristYDrift = 0.0;
+    _repMaxHeelYDrift = 0.0;
+    _repMinKneeY = null;
+    _repMaxKneeY = null;
+    _repMinShoulderY = null;
+    _repMaxShoulderY = null;
+    _repMinHipY = null;
+    _repMaxHipY = null;
   }
 
   void _captureStartBaselines(_PushUpGeometry geometry) {
@@ -762,17 +851,10 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
         PushUpConfig.HEEL_Y_DRIFT_MIN_PIXELS,
       );
 
-  double? _numFromSnapshot(FrameSnapshot? snapshot, String key) {
-    final value = snapshot?.log[key];
-    return value?.toDouble();
-  }
-
   String _debugBool(bool value) => value ? 'yes' : 'no';
 
   String _debugMinElbowLabel() {
-    return _numFromSnapshot(frameBuffer.getPeakMin("elbowAngle"), "elbowAngle")
-            ?.toStringAsFixed(1) ??
-        'n/a';
+    return _repMinElbowAngle?.toStringAsFixed(1) ?? 'n/a';
   }
 
   void _publishCompactDebug(_PushUpGeometry geometry) {
@@ -784,13 +866,17 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
       ..['reject'] = _repRejectType ?? _lastRejectType
       ..['rejectReason'] = _lastRejectReason
       ..['elbow'] = geometry.elbowAngle.toStringAsFixed(1)
-      ..['minElbow'] = _debugMinElbowLabel()
       ..['rom'] = (_topElbowAngle - geometry.elbowAngle).toStringAsFixed(1)
-      ..['bottom'] = _debugBool(_reachedBottomThisRep)
-      ..['tracePath'] = _debugTraceFile?.path ?? 'pending';
+      ..['bottom'] = _debugBool(_reachedBottomThisRep);
+    if (isDebugModeActive) {
+      debugData
+        ..['minElbow'] = _debugMinElbowLabel()
+        ..['tracePath'] = _debugTraceFile?.path ?? 'pending';
+    }
   }
 
   void _appendDebugTrace(_PushUpGeometry geometry, int timestampMs) {
+    if (!isDebugModeActive) return;
     if (timestampMs - _debugTraceLastWriteMs < 80) return;
     _debugTraceLastWriteMs = timestampMs;
 

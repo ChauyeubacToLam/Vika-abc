@@ -150,7 +150,7 @@ void main() {
     expect(exercise.logger.repLogs.single.correctForm, isTrue);
   });
 
-  test('does not count a jump launched from a shallow dip', () {
+  test('counts and faults a jump launched from a shallow dip', () {
     final exercise = _activatedJumpSquat();
     final standing = _jumpSquatPose(kneeAngle: 175, hipY: 200);
     final shallowDip = _jumpSquatPose(kneeAngle: 140, hipY: 225);
@@ -179,8 +179,18 @@ void main() {
     _pump(exercise, standing, 1200);
     _pump(exercise, standing, 1300);
 
-    expect(exercise.repCount, 0);
-    expect(exercise.logger.repLogs, isEmpty);
-    expect(exercise.resultIssues.feedback['Error'], isNotNull);
+    // Count-vs-reject for shallow-dip is intentionally deferred
+    // (keep-counted decision, 2026-06-14); revisit if we add a real
+    // anti-cheat later.
+    expect(exercise.repCount, 1);
+    expect(exercise.logger.repLogs, hasLength(1));
+    expect(exercise.logger.repLogs.single.correctForm, isFalse);
+    expect(
+      exercise.logger.repLogs.single.data['fault_types'],
+      contains('Power'),
+    );
+
+    exercise.onSetComplete();
+    expect(exercise.logger.setLogs['shallow_dip_fails_count'], 1);
   });
 }

@@ -9,15 +9,19 @@ class AnkleDorsiflexionMetric extends SeatedForwardMetricBase {
   final Map<String, dynamic> _debugData = {};
   final Debouncer _ankleDebouncer = Debouncer(requiredFrames: 4);
   bool _instructionSet = false;
+  bool _isFaultingNow = false;
 
   @override
   List<FaultRecord> get faults => _faults;
+  @override
+  bool get isFaultingNow => _isFaultingNow;
 
   @override
   Map<String, dynamic> get debugData => _debugData;
 
   @override
   void update(SeatedForwardContext ctx) {
+    _isFaultingNow = false;
     if (ctx.state == SeatedForwardState.setup) return;
 
     _debugData['ankleAngle'] = ctx.ankleAngle.toStringAsFixed(1);
@@ -26,6 +30,7 @@ class AnkleDorsiflexionMetric extends SeatedForwardMetricBase {
         ctx.ankleAngle > SeatedForwardConfig.Ad_Fault_Ankle_Angle;
 
     if (_ankleDebouncer.update(isPlantarFlexion)) {
+      _isFaultingNow = true;
       ctx.resultIssues.feedback['Ankle'] = 'Bẻ gập mũi chân!';
       if (!_instructionSet) {
         ctx.resultIssues.addInstruction(
@@ -59,5 +64,6 @@ class AnkleDorsiflexionMetric extends SeatedForwardMetricBase {
     super.reset();
     _instructionSet = false;
     _ankleDebouncer.reset();
+    _isFaultingNow = false;
   }
 }

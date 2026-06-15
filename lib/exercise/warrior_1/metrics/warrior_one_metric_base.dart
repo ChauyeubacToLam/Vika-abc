@@ -96,6 +96,7 @@ abstract class WarriorOneMetricBase {
 
   /// Faults accumulated this hold. WarriorOne reads these at hold completion.
   List<FaultRecord> get faults;
+  bool get isFaultingNow => false;
 
   /// Debug data for the overlay. Keys should be metric-specific.
   Map<String, dynamic> get debugData;

@@ -6,32 +6,38 @@ class DeadBugReportBuilder extends ExerciseReportBuilder {
   @override
   Map<String, List<String>> painToFaultMap() => {
         'lower_back': ['anti_extension_fails_count'],
-        'shoulder': ['stable_limbs_fails_count'],
+        'shoulder_neck': ['stable_limbs_fails_count'],
       };
 
   @override
   Map<String, FaultTipCopy> faultToTipMap() => {
         'anti_extension_fails_count': (
           watch:
-              'Lưng hở khỏi sàn là dấu hiệu cơ bụng đã ngừng làm việc. Hãy hít sâu và ép chặt thắt lưng xuống thảm.',
+              'Trong Dead Bug: lưng dưới có lúc hở khỏi sàn khi tay chân vươn ra.',
           next:
               'Lưng hở khỏi sàn là dấu hiệu cơ bụng đã ngừng làm việc. Hãy hít sâu và ép chặt thắt lưng xuống thảm.',
         ),
         'coordination_fails_count': (
           watch:
-              'Việc chuyển động cùng bên sẽ làm mất đi khả năng rèn luyện dây thần kinh cơ chéo của bài tập.',
+              'Trong Dead Bug: tay và chân có lúc di chuyển cùng bên thay vì chéo bên.',
           next:
               'Việc chuyển động cùng bên sẽ làm mất đi khả năng rèn luyện dây thần kinh cơ chéo của bài tập.',
         ),
         'stable_limbs_fails_count': (
           watch:
-              'Chỉ di chuyển 2 chi, 2 chi còn lại phải "đóng băng". Sự cô lập này là chìa khóa của sức mạnh cốt lõi.',
+              'Trong Dead Bug: các chi trụ có lúc di chuyển theo thay vì giữ ổn định.',
           next:
               'Chỉ di chuyển 2 chi, 2 chi còn lại phải "đóng băng". Sự cô lập này là chìa khóa của sức mạnh cốt lõi.',
         ),
+        'floor_contact_fails_count': (
+          watch:
+              'Tay hoặc chân có lúc rơi xuống sàn, làm core mất nhiệm vụ giữ thăng bằng.',
+          next:
+              'Vươn tay chân ra xa chậm hơn và giữ chúng lơ lửng nhẹ, như đang đặt trên mặt nước.',
+        ),
         'tempo_fails_count': (
           watch:
-              'Bạn đang tập luyện hệ thần kinh chứ không phải chạy đua. Càng chậm càng tốt.',
+              'Trong Dead Bug: nhịp vươn tay chân có lúc nhanh hơn mức kiểm soát.',
           next:
               'Bạn đang tập luyện hệ thần kinh chứ không phải chạy đua. Càng chậm càng tốt.',
         ),
@@ -42,6 +48,8 @@ class DeadBugReportBuilder extends ExerciseReportBuilder {
         'Khóa lưng': (c, t) => 'Không hề võng lưng $c/$t rep - Core thép!',
         'Não bộ': (c, t) => 'Phối hợp chéo chính xác $c/$t rep!',
         'Cô lập': (c, t) => 'Chi trụ bất động tuyệt đối $c/$t rep!',
+        'Không chạm sàn': (c, t) =>
+            'Tay chân giữ lơ lửng $c/$t rep - core kiểm soát rất tốt.',
       };
 
   @override
@@ -49,6 +57,7 @@ class DeadBugReportBuilder extends ExerciseReportBuilder {
         'anti_extension_fails_count': 'Khóa lưng',
         'coordination_fails_count': 'Não bộ',
         'stable_limbs_fails_count': 'Cô lập',
+        'floor_contact_fails_count': 'Không chạm sàn',
       };
 
   @override

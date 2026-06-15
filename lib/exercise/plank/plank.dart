@@ -65,7 +65,11 @@ class Plank extends ExerciseBase {
   bool _ankleAvailable = true;
   bool _spoken10 = false;
   bool _spoken5 = false;
-  double _goodHoldSeconds = 0.0;
+  final HoldSecondsAccumulator _holdSeconds = HoldSecondsAccumulator(const [
+    'trunk_seconds',
+    'neck_seconds',
+    'knee_seconds',
+  ]);
 
   final Debouncer _positionDebouncer = Debouncer(requiredFrames: 2);
 
@@ -120,14 +124,25 @@ class Plank extends ExerciseBase {
   bool requestStop() => repCount >= maxRep;
 
   @override
+  void onExerciseActivated() {
+    super.onExerciseActivated();
+    _holdSeconds.reset();
+  }
+
+  @override
   void onSetComplete() {
-    logger.pushKey("max_rep", repCount);
-    logger.pushKey("target_rep", maxRep);
+    logger.pushKey("max_rep", maxRep);
     logger.pushKey("total_seconds", maxRep * PlankConfig.HOLD_DURATION);
-    logger.pushKey("good_seconds", _goodHoldSeconds);
-    logger.pushKey("trunk_fails_count", trunkAlignmentMetric.faultsCount);
-    logger.pushKey("neck_fails_count", headNeckMetric.faultsCount);
-    logger.pushKey("knee_fails_count", kneeExtensionMetric.faultsCount);
+    logger.pushKey(
+      "good_seconds",
+      _holdSeconds.goodSeconds.clamp(0.0, maxRep * PlankConfig.HOLD_DURATION),
+    );
+    logger.pushKey(
+        "trunk_seconds", _holdSeconds.faultSecondsFor('trunk_seconds'));
+    logger.pushKey(
+        "neck_seconds", _holdSeconds.faultSecondsFor('neck_seconds'));
+    logger.pushKey(
+        "knee_seconds", _holdSeconds.faultSecondsFor('knee_seconds'));
     logger.pushGoodRepCount();
   }
 
@@ -192,6 +207,7 @@ class Plank extends ExerciseBase {
       if (plankState == PlankState.holding) {
         _transitionState(PlankState.setup, frameTimestampMs);
       }
+      _holdSeconds.resetTick();
       return;
     }
     _ankleAvailable = true;
@@ -208,6 +224,7 @@ class Plank extends ExerciseBase {
       resultIssues: resultIssues,
     );
 
+    final debugEnabled = isDebugModeActive;
     // 4. Debug data
     debugData['plankState'] = plankState.toString().split('.').last;
     debugData['trunkClock'] = geometry.trunkClockAngle.toStringAsFixed(1);
@@ -246,6 +263,15 @@ class Plank extends ExerciseBase {
         metric.update(ctx);
       }
 
+      _holdSeconds.accumulate(
+        elapsedMs: elapsedMs,
+        faultingByKey: {
+          'trunk_seconds': trunkAlignmentMetric.isFaultingNow,
+          'neck_seconds': headNeckMetric.isFaultingNow,
+          'knee_seconds': _ankleAvailable && kneeExtensionMetric.isFaultingNow,
+        },
+      );
+
       final holdSecs = _currentHoldSeconds();
       final remaining = (PlankConfig.HOLD_DURATION - holdSecs)
           .clamp(0.0, PlankConfig.HOLD_DURATION);
@@ -261,11 +287,15 @@ class Plank extends ExerciseBase {
           'holding', 'Status', 'Giữ! ${remaining.toStringAsFixed(1)}s');
       debugData['holdProgress'] =
           (holdSecs / PlankConfig.HOLD_DURATION).clamp(0.0, 1.0);
+    } else {
+      _holdSeconds.resetTick();
     }
 
     // 8. Merge metric debug data
-    for (final metric in _metrics) {
-      debugData.addAll(metric.debugData);
+    if (debugEnabled) {
+      for (final metric in _metrics) {
+        debugData.addAll(metric.debugData);
+      }
     }
   }
 
@@ -319,6 +349,7 @@ class Plank extends ExerciseBase {
 
     switch (newState) {
       case PlankState.holding:
+        _holdSeconds.resetTick();
         _holdStartMs = timestampMs;
         _restStartMs = null;
         resultIssues.instructions.clear();
@@ -327,11 +358,13 @@ class Plank extends ExerciseBase {
         break;
 
       case PlankState.resting:
+        _holdSeconds.resetTick();
         _restStartMs = timestampMs;
         _onHoldComplete();
         break;
 
       case PlankState.setup:
+        _holdSeconds.resetTick();
         _holdStartMs = null;
         break;
     }
@@ -352,7 +385,6 @@ class Plank extends ExerciseBase {
 
     if (correctForm) {
       resultIssues.feedback['Result'] = 'Tốt lắm!';
-      _goodHoldSeconds += PlankConfig.HOLD_DURATION;
     } else {
       final summary = allFaults
           .where((f) => f.affectsForm)
@@ -381,8 +413,10 @@ class Plank extends ExerciseBase {
       metric.resetAndCountFault();
     }
 
-    for (final metric in _metrics) {
-      debugData.addAll(metric.debugData);
+    if (isDebugModeActive) {
+      for (final metric in _metrics) {
+        debugData.addAll(metric.debugData);
+      }
     }
     correctForm = true;
   }
@@ -392,6 +426,7 @@ class Plank extends ExerciseBase {
     if (plankState == PlankState.holding) {
       _transitionState(PlankState.setup, frameTimestampMs);
     }
+    _holdSeconds.resetTick();
     return super.processNoPoseFrame();
   }
 

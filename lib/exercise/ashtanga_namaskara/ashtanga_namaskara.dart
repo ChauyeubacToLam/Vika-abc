@@ -143,7 +143,6 @@ class AshtangaNamaskara extends ExerciseBase {
   @override
   void onSetComplete() {
     logger.pushGoodRepCount();
-    logger.pushKey('target_reps', maxRep);
     logger.pushKey('max_rep', maxRep);
     logger.pushKey('mode', mode.name);
     logger.pushKey('hip_collapse_fails_count', _hipCollapseMetric.faultsCount);

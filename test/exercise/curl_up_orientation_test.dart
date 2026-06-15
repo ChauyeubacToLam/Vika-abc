@@ -1,8 +1,11 @@
+import 'dart:math' as math;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:vika/exercise/curl_up/curl_up.dart';
 import 'package:vika/exercise/exercise_base.dart';
+import 'package:vika/utils/pose_math_helpers.dart';
 
 PoseLandmark _landmark(
   PoseLandmarkType type,
@@ -51,6 +54,40 @@ Map<PoseLandmarkType, PoseLandmark> _curlUpLandmarks({
       kneeY,
     ),
   };
+}
+
+void _pumpCurlUp(
+  CurlUp exercise,
+  Map<PoseLandmarkType, PoseLandmark> pose,
+  int timestampMs,
+) {
+  exercise.frameTimestamp = DateTime.fromMillisecondsSinceEpoch(timestampMs);
+  exercise.checkingPose(pose);
+}
+
+double _trunkAngle(Map<PoseLandmarkType, PoseLandmark> pose) {
+  final shoulder = pose[PoseLandmarkType.rightShoulder]!;
+  final hip = pose[PoseLandmarkType.rightHip]!;
+  final dy = (hip.y - shoulder.y).abs();
+  final dx = (shoulder.x - hip.x).abs();
+  if (dx == 0 && dy == 0) return 0.0;
+  return (math.atan2(dy, dx) * (180.0 / math.pi)).clamp(0.0, 90.0).toDouble();
+}
+
+double _earShoulderHipAngle(Map<PoseLandmarkType, PoseLandmark> pose) {
+  return calculateAngleNormalized(
+    firstPoint: pose[PoseLandmarkType.rightEar]!,
+    midPoint: pose[PoseLandmarkType.rightShoulder]!,
+    lastPoint: pose[PoseLandmarkType.rightHip]!,
+  );
+}
+
+double _hipKneeAnkleAngle(Map<PoseLandmarkType, PoseLandmark> pose) {
+  return calculateAngleNormalized(
+    firstPoint: pose[PoseLandmarkType.rightHip]!,
+    midPoint: pose[PoseLandmarkType.rightKnee]!,
+    lastPoint: pose[PoseLandmarkType.rightAnkle]!,
+  );
 }
 
 void main() {
@@ -178,6 +215,68 @@ void main() {
         _curlUpLandmarks(shoulderY: 120, kneeY: 50),
       );
       expect(shoulderMovesDown.currentPhaseKey, 'ascending');
+    });
+
+    test('fixed rep logs peak telemetry from running scalars', () {
+      final curlUp = CurlUp()
+        ..cameraFacing = CameraFacing.right
+        ..exerciseState = ExerciseState.activated;
+
+      final startPose = _curlUpLandmarks(shoulderY: 100, kneeY: 50);
+      final up1 = _curlUpLandmarks(shoulderY: 90, kneeY: 50);
+      final up2 = _curlUpLandmarks(shoulderY: 80, kneeY: 50);
+      final down1 = _curlUpLandmarks(shoulderY: 90, kneeY: 50);
+      final down2 = _curlUpLandmarks(shoulderY: 100, kneeY: 50);
+      final down3 = _curlUpLandmarks(shoulderY: 100, kneeY: 50);
+
+      expect(curlUp.isInStartPosition(startPose), isTrue);
+
+      final activeFrames = [up1, up2, down1, down2];
+      var timestamp = 100;
+      for (final frame in activeFrames) {
+        curlUp
+          ..curlUpState = CurlUpState.ascending
+          ..previousCurlUpState = CurlUpState.resting;
+        _pumpCurlUp(curlUp, frame, timestamp);
+        timestamp += 100;
+      }
+
+      curlUp
+        ..curlUpState = CurlUpState.resting
+        ..previousCurlUpState = CurlUpState.descending;
+      _pumpCurlUp(curlUp, down3, timestamp);
+
+      expect(curlUp.repCount, 1);
+      final data = curlUp.logger.repLogs.single.data;
+      final baseTrunk = _trunkAngle(startPose);
+      final baseNeck = _earShoulderHipAngle(startPose);
+      expect(
+        data['peak_trunk_elevation'] as num,
+        closeTo(
+          (activeFrames.map(_trunkAngle).reduce((a, b) => a > b ? a : b) -
+                  baseTrunk)
+              .clamp(0.0, 90.0),
+          1e-9,
+        ),
+      );
+      expect(
+        data['peak_neck_deviation'] as num,
+        closeTo(
+          (baseNeck -
+                  activeFrames
+                      .map(_earShoulderHipAngle)
+                      .reduce((a, b) => a < b ? a : b))
+              .clamp(0.0, 90.0),
+          1e-9,
+        ),
+      );
+      expect(
+        data['max_knee_angle'] as num,
+        closeTo(
+          activeFrames.map(_hipKneeAnkleAngle).reduce((a, b) => a > b ? a : b),
+          1e-9,
+        ),
+      );
     });
   });
 }

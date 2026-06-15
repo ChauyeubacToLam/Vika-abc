@@ -3,6 +3,7 @@
 import 'package:vika/exercise/exercise_base.dart';
 import '../../utils/pose_math_helpers.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import '../../utils/exercise_logger.dart';
 import 'metrics/lunge_metric_base.dart';
 import 'metrics/lunge_depth_metric.dart';
 import 'metrics/lunge_trunk_lean_metric.dart';
@@ -145,7 +146,19 @@ class Lunge extends ExerciseBase {
   bool requestStop() => repCount >= maxRep;
 
   @override
-  void onSetComplete() {}
+  void onSetComplete() {
+    logger.pushKey("depth_fails_count", depthMetric.faultsCount);
+    logger.pushKey("trunk_lean_fails_count", trunkLeanMetric.faultsCount);
+    logger.pushKey("heel_lift_fails_count", heelLiftMetric.faultsCount);
+    logger.pushKey("lumbar_proxy_fails_count", lumbarProxyMetric.faultsCount);
+    logger.pushKey("rejected_shallow_attempts_count", _rejectedShallowAttempts);
+
+    logger.pushMin("min_lead_knee_angle", "min_lead_knee_angle");
+    logger.pushMax("max_trunk_lean", "max_trunk_lean");
+
+    logger.pushGoodRepCount();
+    logger.pushKey("max_rep", maxRep);
+  }
 
   // --- Safety Checks ---
 
@@ -313,6 +326,7 @@ class Lunge extends ExerciseBase {
       resultIssues: resultIssues,
     );
 
+    final debugEnabled = isDebugModeActive;
     // 5. Debug data
     debugData['lungeState'] = lungeState.toString().split('.').last;
     debugData['reachedBottomThisRep'] = _reachedBottomThisRep;
@@ -365,13 +379,25 @@ class Lunge extends ExerciseBase {
       }
       setFeedback.add({correctForm: faultMap});
 
-      for (final metric in _metrics) {
-        debugData.addAll(metric.debugData);
+      if (debugEnabled) {
+        for (final metric in _metrics) {
+          debugData.addAll(metric.debugData);
+        }
       }
+
+      logger.addRepLog(RepLog(
+        correctForm: correctForm,
+        repNumber: repCount,
+        data: {
+          "min_lead_knee_angle": depthMetric.minKneeAngle ?? leadKneeAngle,
+          "max_trunk_lean": trunkLeanMetric.maxTrunkLean ?? trunkLean,
+          "fault_types": allFaults.map((f) => f.type).toSet().toList(),
+        },
+      ));
 
       correctForm = true;
       for (final metric in _metrics) {
-        metric.reset();
+        metric.resetAndCountFault();
       }
       _reachedBottomThisRep = false;
       return;
@@ -387,8 +413,10 @@ class Lunge extends ExerciseBase {
       }
     }
 
-    for (final metric in _metrics) {
-      debugData.addAll(metric.debugData);
+    if (debugEnabled) {
+      for (final metric in _metrics) {
+        debugData.addAll(metric.debugData);
+      }
     }
 
     if (lungeState == LungeState.descending) {

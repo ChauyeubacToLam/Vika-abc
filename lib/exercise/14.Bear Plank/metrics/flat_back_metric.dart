@@ -5,10 +5,12 @@ class FlatBackMetric extends BearMetricBase {
   void update(BearRepContext ctx) {
     debugData['back_y_offset'] = ctx.backYOffset.toStringAsFixed(3);
 
+    isFaultingNow = false;
     if (ctx.currentState != BearState.hovering) return;
 
     // Võng lưng (Sagging): shoulder.y > hip.y → backYOffset dương lớn
     if (ctx.backYOffset > BearConfig.BACK_SAG_THRESHOLD) {
+      isFaultingNow = true;
       if (!faults.any((f) => f.type == 'BackSagging')) {
         addFault(FaultRecord(
           phase: ctx.currentState.name,
@@ -22,6 +24,7 @@ class FlatBackMetric extends BearMetricBase {
     }
     // Gù lưng (Arching): hip.y > shoulder.y → backYOffset âm lớn
     else if (ctx.backYOffset < -BearConfig.BACK_ARCH_THRESHOLD) {
+      isFaultingNow = true;
       if (!faults.any((f) => f.type == 'BackArching')) {
         addFault(FaultRecord(
           phase: ctx.currentState.name,

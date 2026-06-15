@@ -5,30 +5,49 @@ import 'package:vika/utils/exercise_logger.dart';
 class TricepDipReportBuilder extends ExerciseReportBuilder {
   @override
   Map<String, String> praiseMetricNames() => {
-        'hip_thrust_fails': 'Cô lập tay sau',
-        'rom_fails': 'Biên độ gập',
-        'extension_fails': 'Duỗi thẳng tay',
-        'shrugging_fails': 'Vai ổn định',
+        'hip_thrust_fails_count': 'Cô lập tay sau',
+        'rom_fails_count': 'Biên độ gập',
+        'extension_fails_count': 'Duỗi thẳng tay',
+        'shrugging_fails_count': 'Vai ổn định',
+      };
+
+  @override
+  Map<String, List<String>> painToFaultMap() => {
+        'shoulder_neck': ['shrugging_fails_count'],
+        'lower_back': ['hip_thrust_fails_count'],
       };
 
   @override
   Map<String, FaultTipCopy> faultToTipMap() => {
-        'hip_thrust_fails': (
-          watch: 'Gập khuỷu tay lại thay vì đẩy hông lên xuống',
+        'hip_thrust_fails_count': (
+          watch:
+              'Trong Tricep Dip: hông có lúc đẩy lên xuống thay cho chuyển động khuỷu tay.',
           next: 'Gập khuỷu tay lại thay vì đẩy hông lên xuống',
         ),
-        'rom_fails': (
-          watch: 'Hạ người sâu hơn cho đến khi mông gần chạm sàn',
+        'rom_fails_count': (
+          watch: 'Trong Tricep Dip: biên độ hạ người có lúc chưa đủ sâu.',
           next: 'Hạ người sâu hơn cho đến khi mông gần chạm sàn',
         ),
-        'extension_fails': (
-          watch: 'Đẩy thẳng tay hoàn toàn ở đỉnh để siết cơ',
+        'extension_fails_count': (
+          watch: 'Trong Tricep Dip: khuỷu tay có lúc chưa duỗi hết ở đỉnh rep.',
           next: 'Đẩy thẳng tay hoàn toàn ở đỉnh để siết cơ',
         ),
-        'shrugging_fails': (
-          watch: 'Hạ vai xuống, cách xa mang tai',
+        'shrugging_fails_count': (
+          watch: 'Trong Tricep Dip: vai có lúc nhô lên gần tai khi chống đẩy.',
           next: 'Hạ vai xuống, cách xa mang tai',
         ),
+      };
+
+  @override
+  Map<String, String Function(int count, int total)> praiseSentenceMap() => {
+        'Cô lập tay sau': (c, t) =>
+            'Tay sau làm việc rõ $c/$t rep - hông giữ rất gọn.',
+        'Biên độ gập': (c, t) =>
+            'Biên độ gập tốt $c/$t rep - lực vào tay sau đều hơn.',
+        'Duỗi thẳng tay': (c, t) =>
+            'Đỉnh rep duỗi chắc $c/$t rep - kết thúc rất sạch.',
+        'Vai ổn định': (c, t) =>
+            'Vai giữ xa tai $c/$t rep - cổ và vai nhẹ hơn.',
       };
 
   @override
@@ -48,12 +67,12 @@ class TricepDipReportBuilder extends ExerciseReportBuilder {
     int shruggingFails = 0;
     for (final logger in setLoggers) {
       hipThrustFails +=
-          (logger.setLogs['hip_thrust_fails'] as num?)?.toInt() ?? 0;
-      romFails += (logger.setLogs['rom_fails'] as num?)?.toInt() ?? 0;
+          (logger.setLogs['hip_thrust_fails_count'] as num?)?.toInt() ?? 0;
+      romFails += (logger.setLogs['rom_fails_count'] as num?)?.toInt() ?? 0;
       extensionFails +=
-          (logger.setLogs['extension_fails'] as num?)?.toInt() ?? 0;
+          (logger.setLogs['extension_fails_count'] as num?)?.toInt() ?? 0;
       shruggingFails +=
-          (logger.setLogs['shrugging_fails'] as num?)?.toInt() ?? 0;
+          (logger.setLogs['shrugging_fails_count'] as num?)?.toInt() ?? 0;
     }
 
     final isolationScore =

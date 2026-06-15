@@ -42,10 +42,16 @@ class RepContext {
    ========================================================================= */
 abstract class JumpSquatMetricBase {
   String get name;
+  int faultsCount = 0;
   void update(RepContext ctx);
   List<FaultRecord> get faults;
   Map<String, dynamic> get debugData;
   void reset();
+  void resetAndCountFault() {
+    if (faults.isNotEmpty) faultsCount++;
+    reset();
+  }
+
   void onStateTransition(
       JumpSquatState from, JumpSquatState to, int timestampMs) {}
 }

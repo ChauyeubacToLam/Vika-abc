@@ -62,12 +62,15 @@ class SpineRoundMetric extends DownwardDogMetricBase {
 
   double? _spineAngle;
   MetricStatus _status = MetricStatus.pass;
+  bool _isFaultingNow = false;
 
   /// Prevent instruction spam — coaching set once per hold.
   bool _instructionSet = false;
 
   @override
   List<FaultRecord> get faults => _faults;
+  @override
+  bool get isFaultingNow => _isFaultingNow;
 
   @override
   Map<String, dynamic> get debugData => _debugData;
@@ -86,6 +89,7 @@ class SpineRoundMetric extends DownwardDogMetricBase {
 
   @override
   void update(HoldContext ctx) {
+    _isFaultingNow = false;
     if (ctx.holdState != DownwardDogState.hold) {
       _status = MetricStatus.pass;
       return;
@@ -102,6 +106,7 @@ class SpineRoundMetric extends DownwardDogMetricBase {
     final bool warningConfirmed = _warningDebouncer.update(isWarning);
 
     if (errorConfirmed) {
+      _isFaultingNow = true;
       _status = MetricStatus.fault;
       ctx.resultIssues.feedback['spine_round'] =
           'Cong gối nhiều hơn nhé! Giữ lưng dài, đừng gù lưng. Chân thẳng không quan trọng bằng lưng thẳng.';
@@ -147,5 +152,6 @@ class SpineRoundMetric extends DownwardDogMetricBase {
     _spineAngle = null;
     _status = MetricStatus.pass;
     _instructionSet = false;
+    _isFaultingNow = false;
   }
 }

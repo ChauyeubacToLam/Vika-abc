@@ -83,6 +83,8 @@ class RepContext {
    GluteBridgeMetricBase — Interface every glute-bridge metric implements.
    ========================================================================= */
 abstract class GluteBridgeMetricBase {
+  int faultsCount = 0;
+
   String get name;
 
   /// Called every frame while state == bottom (setup coaching).
@@ -99,6 +101,11 @@ abstract class GluteBridgeMetricBase {
 
   /// Reset all internal state for the next rep.
   void reset();
+
+  void resetAndCountFault() {
+    if (faults.isNotEmpty) faultsCount++;
+    reset();
+  }
 
   /// Called on every glute-bridge state transition.
   void onStateTransition(

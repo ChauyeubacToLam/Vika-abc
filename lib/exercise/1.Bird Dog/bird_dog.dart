@@ -188,8 +188,7 @@ class BirdDog extends ExerciseBase {
 
   @override
   void onSetComplete() {
-    logger.pushKey("target_rep", maxRep);
-    logger.pushKey("max_rep", repCount);
+    logger.pushKey("max_rep", maxRep);
     logger.pushKey("lumbar_fails_count", lumbarMetric.faultsCount);
     logger.pushKey("alignment_fails_count", alignmentMetric.faultsCount);
     logger.pushKey("trunk_fails_count", trunkMetric.faultsCount);
@@ -621,9 +620,15 @@ class BirdDog extends ExerciseBase {
     );
   }
 
-  void _resetRepState() {
+  void _resetRepState({bool countFaults = true}) {
     correctForm = true;
-    for (var metric in _metrics) metric.resetAndCountFault();
+    for (var metric in _metrics) {
+      if (countFaults) {
+        metric.resetAndCountFault();
+      } else {
+        metric.reset();
+      }
+    }
     // Xóa snapshot để chu trình sau nhận diện lại từ đầu
     _peakLeftLeg = null;
     _peakLeftArm = null;

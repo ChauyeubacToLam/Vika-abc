@@ -21,15 +21,19 @@ class CobraPelvicMetric extends CobraMetricBase {
 
   final StickyDebouncer _hipLiftDebouncer = StickyDebouncer(requiredFrames: 10);
   final StickyDebouncer _errorDebouncer = StickyDebouncer(requiredFrames: 15);
+  bool _isFaultingNow = false;
 
   @override
   List<FaultRecord> get faults => _faults;
+  @override
+  bool get isFaultingNow => _isFaultingNow;
 
   @override
   Map<String, dynamic> get debugData => _debugData;
 
   @override
   void update(RepContext ctx) {
+    _isFaultingNow = false;
     if (ctx.state == CobraState.setup) return;
     if (ctx.hip == null) return;
 
@@ -59,6 +63,7 @@ class CobraPelvicMetric extends CobraMetricBase {
 
     // Error: significant lift (>=0.18)
     if (_errorDebouncer.update(hipLiftNorm >= _errorMin)) {
+      _isFaultingNow = true;
       ctx.resultIssues.feedback['Hips'] = '⚠️ Hông nâng quá cao!';
       ctx.resultIssues.addInstruction(
         'holding',
@@ -94,5 +99,6 @@ class CobraPelvicMetric extends CobraMetricBase {
     _debugData.clear();
     _hipLiftDebouncer.reset();
     _errorDebouncer.reset();
+    _isFaultingNow = false;
   }
 }

@@ -20,13 +20,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../models/pain_regions.dart';
 import '../../theme/app_colors.dart';
-
-enum BodyGender { male, female }
-
-/// Free-text 'other' region id — reported via a footer tile + notes, not a
-/// body location.
-const String kOtherPainRegion = 'other';
 
 /// One reported pain area, shaped for display. [intensity] is 1..5 (null on
 /// legacy rows); [confirmed] lights an interpreter-confirmed origin
@@ -84,45 +79,6 @@ Color _intensityColor(int? i) {
   return scale[(i.clamp(1, 5)) - 1];
 }
 
-// ─── Body geometry ─────────────────────────────────────────────────
-
-class _BodyRegion {
-  const _BodyRegion({
-    required this.region,
-    required this.label,
-    required this.fx,
-    required this.fy,
-  });
-
-  final String region; // body_region enum value
-  final String label; // VN
-  final double fx; // 0..1 across figure width
-  final double fy; // 0..1 down figure height
-}
-
-// Anatomical tap points as fractions of the (aspect-correct) figure box.
-// Front-facing silhouette: head ~0–12%, shoulders ~16%, waist ~42%, hands at
-// the sides ~54%, knees ~73%, ankles ~95%. Ordered top-to-bottom so callout
-// numbers and the ledger read down the body.
-const List<_BodyRegion> _bodyRegions = [
-  _BodyRegion(region: 'shoulder_neck', label: 'Cổ / vai', fx: 0.50, fy: 0.15),
-  _BodyRegion(region: 'back', label: 'Lưng trên', fx: 0.50, fy: 0.28),
-  _BodyRegion(region: 'lower_back', label: 'Lưng dưới', fx: 0.50, fy: 0.41),
-  _BodyRegion(region: 'hip', label: 'Hông', fx: 0.50, fy: 0.50),
-  _BodyRegion(region: 'wrist', label: 'Cổ tay', fx: 0.16, fy: 0.55),
-  _BodyRegion(region: 'knee', label: 'Đầu gối', fx: 0.41, fy: 0.73),
-  _BodyRegion(region: 'ankle', label: 'Cổ chân', fx: 0.41, fy: 0.95),
-];
-
-/// Human label for any region id (body + 'other').
-String painRegionLabel(String region) {
-  if (region == kOtherPainRegion) return 'Khác';
-  for (final r in _bodyRegions) {
-    if (r.region == region) return r.label;
-  }
-  return region;
-}
-
 // ═══════════════════════════════════════════════════════════════════
 // THE STAGE
 // ═══════════════════════════════════════════════════════════════════
@@ -134,6 +90,7 @@ class BodyPainReporter extends StatefulWidget {
     required this.gender,
     required this.onReport,
     required this.onResolve,
+    this.figureHeight = 308,
   });
 
   /// region id → reported mark. Absent = not reported.
@@ -141,6 +98,7 @@ class BodyPainReporter extends StatefulWidget {
   final BodyGender gender;
   final PainReportCallback onReport;
   final PainResolveCallback onResolve;
+  final double figureHeight;
 
   @override
   State<BodyPainReporter> createState() => _BodyPainReporterState();
@@ -196,11 +154,11 @@ class _BodyPainReporterState extends State<BodyPainReporter>
 
     // Active body reports, top-to-bottom, with stable callout ordinals.
     final activeBody = [
-      for (final r in _bodyRegions)
-        if (reports.containsKey(r.region)) r,
+      for (final r in painRegions)
+        if (reports.containsKey(r.id)) r,
     ];
     final ordinals = <String, int>{
-      for (var i = 0; i < activeBody.length; i++) activeBody[i].region: i + 1,
+      for (var i = 0; i < activeBody.length; i++) activeBody[i].id: i + 1,
     };
     final other = reports[kOtherPainRegion];
     final isEmpty = reports.isEmpty;
@@ -260,13 +218,13 @@ class _BodyPainReporterState extends State<BodyPainReporter>
                       animation: _ambient,
                       builder: (context, _) => _LuminousFigure(
                         gender: widget.gender,
-                        height: 308,
+                        height: widget.figureHeight,
                         reports: reports,
                         ordinals: ordinals,
                         t: _ambient.value,
                         onTapRegion: (r) => _openPicker(
-                          region: r.region,
-                          label: r.label,
+                          region: r.id,
+                          label: r.vnLabel,
                           isOther: false,
                         ),
                       ),
@@ -281,12 +239,12 @@ class _BodyPainReporterState extends State<BodyPainReporter>
                     const SizedBox(height: 14),
                     for (final r in activeBody)
                       _LedgerRow(
-                        ordinal: ordinals[r.region]!,
-                        label: r.label,
-                        mark: reports[r.region]!,
+                        ordinal: ordinals[r.id]!,
+                        label: r.vnLabel,
+                        mark: reports[r.id]!,
                         onTap: () => _openPicker(
-                          region: r.region,
-                          label: r.label,
+                          region: r.id,
+                          label: r.vnLabel,
                           isOther: false,
                         ),
                       ),
@@ -389,7 +347,7 @@ class _LuminousFigure extends StatelessWidget {
   final Map<String, PainMark> reports;
   final Map<String, int> ordinals;
   final double t; // 0..1 ambient phase
-  final void Function(_BodyRegion region) onTapRegion;
+  final void Function(PainRegion region) onTapRegion;
 
   // Real silhouette aspect ratios: male 78×245, female 86×245.
   static double _ratio(BodyGender g) =>
@@ -440,15 +398,15 @@ class _LuminousFigure extends StatelessWidget {
 
           // Outer halos: warm light leaking out around lit regions, BEHIND
           // the body so it reads as emanation.
-          for (final r in _bodyRegions)
-            if (reports[r.region] != null)
+          for (final r in painRegions)
+            if (reports[r.id] != null)
               Positioned(
-                left: r.fx * w - _haloSize(reports[r.region]!) / 2,
-                top: r.fy * height - _haloSize(reports[r.region]!) / 2,
+                left: r.fx * w - _haloSize(reports[r.id]!) / 2,
+                top: r.fy * height - _haloSize(reports[r.id]!) / 2,
                 child: IgnorePointer(
                   child: _AmbientGlow(
-                    size: Size.square(_haloSize(reports[r.region]!)),
-                    color: _intensityColor(reports[r.region]!.intensity),
+                    size: Size.square(_haloSize(reports[r.id]!)),
+                    color: _intensityColor(reports[r.id]!.intensity),
                     opacity: 0.22,
                   ),
                 ),
@@ -495,14 +453,14 @@ class _LuminousFigure extends StatelessWidget {
                     ),
                   ),
                   // In-body glow — one masked, recolored body per lit region.
-                  for (final r in _bodyRegions)
-                    if (reports[r.region] != null)
+                  for (final r in painRegions)
+                    if (reports[r.id] != null)
                       Positioned.fill(
                         child: IgnorePointer(
                           child: _InBodyGlow(
                             asset: asset,
                             region: r,
-                            intensity: reports[r.region]!.intensity,
+                            intensity: reports[r.id]!.intensity,
                           ),
                         ),
                       ),
@@ -512,12 +470,12 @@ class _LuminousFigure extends StatelessWidget {
           ),
 
           // Callout nodes (not scaled, so taps stay precise + crisp).
-          for (final r in _bodyRegions)
+          for (final r in painRegions)
             _ZoneNode(
               left: r.fx * w,
               top: r.fy * height,
-              mark: reports[r.region],
-              ordinal: ordinals[r.region],
+              mark: reports[r.id],
+              ordinal: ordinals[r.id],
               pulseRing: pulseRing,
               onTap: () => onTapRegion(r),
             ),
@@ -526,7 +484,8 @@ class _LuminousFigure extends StatelessWidget {
     );
   }
 
-  static double _haloSize(PainMark m) => 96 + ((m.intensity ?? 3).toDouble()) * 14;
+  static double _haloSize(PainMark m) =>
+      96 + ((m.intensity ?? 3).toDouble()) * 14;
 }
 
 /// The recolored, radial-masked body copy that makes a region glow from
@@ -540,7 +499,7 @@ class _InBodyGlow extends StatelessWidget {
   });
 
   final String asset;
-  final _BodyRegion region;
+  final PainRegion region;
   final int? intensity;
 
   @override
@@ -1027,7 +986,8 @@ class _IntensitySheetState extends State<_IntensitySheet> {
     final accent = _intensityColor(_intensity);
 
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: ClipRRect(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
         child: Container(
@@ -1129,7 +1089,8 @@ class _IntensitySheetState extends State<_IntensitySheet> {
                                 child: _LevelBar(
                                   level: i,
                                   height: 34.0 + (i - 1) * 12.0,
-                                  active: _intensity != null && i <= _intensity!,
+                                  active:
+                                      _intensity != null && i <= _intensity!,
                                   isSelected: _intensity == i,
                                   onTap: () => _select(i),
                                 ),
@@ -1276,7 +1237,10 @@ class _LevelBar extends StatelessWidget {
                 width: 1.2,
               ),
               boxShadow: isSelected
-                  ? [BoxShadow(color: accent.withValues(alpha: 0.5), blurRadius: 14)]
+                  ? [
+                      BoxShadow(
+                          color: accent.withValues(alpha: 0.5), blurRadius: 14)
+                    ]
                   : null,
             ),
             alignment: Alignment.center,

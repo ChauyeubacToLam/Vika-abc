@@ -9,15 +9,19 @@ class SpinalAlignmentMetric extends SeatedForwardMetricBase {
   final Map<String, dynamic> _debugData = {};
   final Debouncer _spineRoundDebouncer = Debouncer(requiredFrames: 4);
   bool _instructionSet = false;
+  bool _isFaultingNow = false;
 
   @override
   List<FaultRecord> get faults => _faults;
+  @override
+  bool get isFaultingNow => _isFaultingNow;
 
   @override
   Map<String, dynamic> get debugData => _debugData;
 
   @override
   void update(SeatedForwardContext ctx) {
+    _isFaultingNow = false;
     if (ctx.state == SeatedForwardState.setup) return;
 
     _debugData['spineAngle'] = ctx.spineAngle.toStringAsFixed(1);
@@ -25,6 +29,7 @@ class SpinalAlignmentMetric extends SeatedForwardMetricBase {
     bool isRounding = ctx.spineAngle < SeatedForwardConfig.As_Fault_Spine_Angle;
 
     if (_spineRoundDebouncer.update(isRounding)) {
+      _isFaultingNow = true;
       ctx.resultIssues.feedback['Spine'] = 'Thẳng lưng lên!';
       if (!_instructionSet) {
         ctx.resultIssues.addInstruction(
@@ -58,5 +63,6 @@ class SpinalAlignmentMetric extends SeatedForwardMetricBase {
     super.reset();
     _instructionSet = false;
     _spineRoundDebouncer.reset();
+    _isFaultingNow = false;
   }
 }

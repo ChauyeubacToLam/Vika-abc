@@ -330,15 +330,18 @@ class LegRaise extends ExerciseBase {
     logger.pushKey("tempo_fails_count", tempoMetric.faultsCount);
     logger.pushKey("arm_position_fails_count", armMetric.faultsCount);
     logger.pushGoodRepCount();
+    logger.pushKey("max_rep", _timeoutReached ? repCount : maxRep);
 
-    StringBuffer dump = StringBuffer();
-    dump.writeln("=== DIAGNOSTIC LOG (LEG RAISE) ===");
-    dump.writeln("Time(s) | State | HipFlex | KneeAng | HipY");
-    for (var log in _diagnosticLog) {
-      dump.writeln(
-          "${log['time']} | ${log['state']} | ${log['hipFlex'].toStringAsFixed(1)} | ${log['knee'].toStringAsFixed(1)} | ${log['hipY'].toStringAsFixed(1)}");
+    if (isDebugModeActive) {
+      StringBuffer dump = StringBuffer();
+      dump.writeln("=== DIAGNOSTIC LOG (LEG RAISE) ===");
+      dump.writeln("Time(s) | State | HipFlex | KneeAng | HipY");
+      for (var log in _diagnosticLog) {
+        dump.writeln(
+            "${log['time']} | ${log['state']} | ${log['hipFlex'].toStringAsFixed(1)} | ${log['knee'].toStringAsFixed(1)} | ${log['hipY'].toStringAsFixed(1)}");
+      }
+      logger.pushKey("diagnostic_dump", dump.toString());
     }
-    logger.pushKey("diagnostic_dump", dump.toString());
   }
 
   @override
@@ -394,7 +397,8 @@ class LegRaise extends ExerciseBase {
       resultIssues: resultIssues,
     );
 
-    if (now - _lastDiagnosticTime > 500 || state != previousState) {
+    if (isDebugModeActive &&
+        (now - _lastDiagnosticTime > 500 || state != previousState)) {
       _diagnosticLog.add({
         'time': ((now - _exerciseStartTimeMs!) / 1000).toStringAsFixed(1),
         'state': state.name,
@@ -481,14 +485,22 @@ class LegRaise extends ExerciseBase {
       ctx.resultIssues.feedback['Result'] = 'Không tính rep';
     }
 
-    logger
-        .addRepLog(RepLog(correctForm: correctForm, repNumber: repCount, data: {
-      "min_hip_flexion": romMetric.minHipFlexion ?? 180.0,
-      "lowering_time": tempoMetric.loweringDuration ?? 0.0,
-      "fault_types": allFaults.map((e) => e.type).toSet().toList()
-    }));
+    if (!hasBlockingFormFault) {
+      logger.addRepLog(
+          RepLog(correctForm: correctForm, repNumber: repCount, data: {
+        "min_hip_flexion": romMetric.minHipFlexion ?? 180.0,
+        "lowering_time": tempoMetric.loweringDuration ?? 0.0,
+        "fault_types": allFaults.map((e) => e.type).toSet().toList()
+      }));
+    }
 
     correctForm = true;
-    for (var metric in _metrics) metric.resetAndCountFault();
+    for (var metric in _metrics) {
+      if (hasBlockingFormFault) {
+        metric.reset();
+      } else {
+        metric.resetAndCountFault();
+      }
+    }
   }
 }

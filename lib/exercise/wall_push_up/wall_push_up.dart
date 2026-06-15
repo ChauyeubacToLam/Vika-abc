@@ -170,6 +170,8 @@ class RepContext {
    metrics that personalize against a hold-still resting snapshot.
    ========================================================================= */
 abstract class WallPushUpMetricBase {
+  int faultsCount = 0;
+
   /// Human-readable name for debug/logging.
   String get name;
 
@@ -184,6 +186,11 @@ abstract class WallPushUpMetricBase {
 
   /// Reset per-rep state for the next rep. MUST keep the baseline.
   void reset();
+
+  void resetAndCountFault() {
+    if (faults.isNotEmpty) faultsCount++;
+    reset();
+  }
 
   /// Push the hold-still baseline value into the metric (once, at activation).
   /// Default no-op for metrics that use absolute thresholds.
@@ -579,6 +586,17 @@ class WallPushUp extends ExerciseBase {
 
   @override
   void onSetComplete() {
+    logger.pushKey('body_line_fails_count', bodyLineMetric.faultsCount);
+    logger.pushKey(
+        'shoulder_shrug_fails_count', shoulderShrugMetric.faultsCount);
+    logger.pushKey('forward_head_fails_count', forwardHeadMetric.faultsCount);
+    logger.pushKey('elbow_flare_fails_count', elbowFlareMetric.faultsCount);
+    logger.pushKey(
+        'cervical_extension_fails_count', cervicalExtensionMetric.faultsCount);
+    logger.pushKey(
+        'foot_stationary_fails_count', footStationaryMetric.faultsCount);
+    logger.pushKey('wall_contact_fails_count', wallContactMetric.faultsCount);
+    logger.pushKey('tempo_fails_count', tempoMetric.faultsCount);
     logger.pushGoodRepCount();
     logger.pushKey('max_rep', maxRep);
     logger.pushKey('completed_reps', repCount);
@@ -816,7 +834,7 @@ class WallPushUp extends ExerciseBase {
         faultMap['REP_COMPLETE']!['NoCount'] = countRejectReason;
         setFeedback.add({false: faultMap});
 
-        _resetRepCycle();
+        _resetRepCycle(countMetricFaults: false);
         return;
       }
 
@@ -864,7 +882,7 @@ class WallPushUp extends ExerciseBase {
         debugData.addAll(metric.debugData);
       }
 
-      _resetRepCycle();
+      _resetRepCycle(countMetricFaults: true);
       return;
     }
 
@@ -980,14 +998,18 @@ class WallPushUp extends ExerciseBase {
     return null;
   }
 
-  void _resetRepCycle() {
+  void _resetRepCycle({required bool countMetricFaults}) {
     // Reset for next rep. Baselines stay inside metrics by design.
     correctForm = true;
     wallPushUpState = WallPushUpState.standing;
     previousWallPushUpState = WallPushUpState.standing;
     _entryDebouncer.reset();
     for (final metric in _metrics) {
-      metric.reset();
+      if (countMetricFaults) {
+        metric.resetAndCountFault();
+      } else {
+        metric.reset();
+      }
     }
     _repMinElbow = null;
     _repMaxElbow = null;

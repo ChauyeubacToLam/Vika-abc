@@ -35,11 +35,19 @@ class RepContext {
 }
 
 abstract class BowPoseMetricBase {
+  int faultsCount = 0;
+
   String get name;
   void update(RepContext ctx);
   List<FaultRecord> get faults;
+  bool get isFaultingNow => false;
   Map<String, dynamic> get debugData;
   void reset();
+  void resetAndCountFault() {
+    if (faults.isNotEmpty) faultsCount++;
+    reset();
+  }
+
   void onStateTransition(BowPoseState from, BowPoseState to, int timestampMs) {}
   void evaluateRep(RepContext ctx) {}
 }

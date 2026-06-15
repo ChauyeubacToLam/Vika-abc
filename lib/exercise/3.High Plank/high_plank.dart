@@ -39,11 +39,23 @@ class HighPlankConfig {
 }
 
 class HighPlank extends ExerciseBase {
+  HighPlank({
+    this.maxSeconds = HighPlankConfig.TARGET_TIME_MS ~/ 1000,
+  });
+
+  final int maxSeconds;
+
   HighPlankState state = HighPlankState.setup;
   HighPlankState previousState = HighPlankState.setup;
 
   int? _exerciseStartTimeMs;
   bool _timeoutReached = false;
+  bool _setCompletionLogged = false;
+  final HoldSecondsAccumulator _holdSeconds = HoldSecondsAccumulator(const [
+    'sagging_seconds',
+    'piked_seconds',
+    'elbow_seconds',
+  ]);
 
   // DIAGNOSTIC LOG
   final List<Map<String, dynamic>> _diagnosticLog = [];
@@ -107,7 +119,7 @@ class HighPlank extends ExerciseBase {
           : null;
 
   @override
-  double? get liveHoldTargetSeconds => HighPlankConfig.TARGET_TIME_MS / 1000.0;
+  double? get liveHoldTargetSeconds => maxSeconds.toDouble();
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
@@ -245,13 +257,19 @@ class HighPlank extends ExerciseBase {
 
   @override
   bool requestStop() =>
-      _timeoutReached ||
-      timerMetric.totalHoldingTimeMs >= HighPlankConfig.TARGET_TIME_MS;
+      _timeoutReached || timerMetric.totalHoldingTimeMs >= _targetTimeMs;
 
   @override
   Map<String, String> processNoPoseFrame() {
     timerMetric.pause();
+    _holdSeconds.resetTick();
     return super.processNoPoseFrame();
+  }
+
+  @override
+  void onExerciseActivated() {
+    super.onExerciseActivated();
+    _resetSetState();
   }
 
   @override
@@ -263,31 +281,40 @@ class HighPlank extends ExerciseBase {
     ];
     final holdCorrect = !formFaults.any((f) => f.affectsForm);
 
-    final goodSeconds = timerMetric.totalHoldingTimeMs / 1000.0;
-    final targetSeconds = HighPlankConfig.TARGET_TIME_MS / 1000.0;
+    final targetSeconds = maxSeconds.toDouble();
+    // Target denominator for scoring, not elapsed hold time.
     logger.pushKey("total_seconds", targetSeconds);
-    logger.pushKey("good_seconds", goodSeconds.clamp(0.0, targetSeconds));
+    logger.pushKey(
+        "good_seconds", _holdSeconds.goodSeconds.clamp(0.0, targetSeconds));
     logger.pushKey("max_rep", 1);
-    logger.pushKey("sagging_fails_count", saggingMetric.faults.length);
-    logger.pushKey("piked_fails_count", pikedHipMetric.faults.length);
-    logger.pushKey("elbow_fails_count", elbowMetric.faults.length);
+    logger.pushKey(
+        "sagging_seconds", _holdSeconds.faultSecondsFor('sagging_seconds'));
+    logger.pushKey(
+        "piked_seconds", _holdSeconds.faultSecondsFor('piked_seconds'));
+    logger.pushKey(
+        "elbow_seconds", _holdSeconds.faultSecondsFor('elbow_seconds'));
     logger.pushKey("total_perfect_time_ms", timerMetric.totalHoldingTimeMs);
 
-    logger.addRepLog(RepLog(correctForm: holdCorrect, repNumber: 1, data: {
-      "perfect_hold_time": timerMetric.totalHoldingTimeMs / 1000.0,
-      "fault_types": formFaults.map((e) => e.type).toSet().toList(),
-    }));
+    if (!_setCompletionLogged) {
+      logger.addRepLog(RepLog(correctForm: holdCorrect, repNumber: 1, data: {
+        "perfect_hold_time": timerMetric.totalHoldingTimeMs / 1000.0,
+        "fault_types": formFaults.map((e) => e.type).toSet().toList(),
+      }));
+      _setCompletionLogged = true;
+    }
 
     logger.pushGoodRepCount();
 
-    StringBuffer dump = StringBuffer();
-    dump.writeln("=== DIAGNOSTIC LOG (HIGH PLANK) ===");
-    dump.writeln("Time(s) | State | S-H-A | S-E-W | HipDev");
-    for (var log in _diagnosticLog) {
-      dump.writeln(
-          "${log['time']} | ${log['state']} | ${log['body'].toStringAsFixed(1)} | ${log['arm'].toStringAsFixed(1)} | ${log['dev'].toStringAsFixed(2)}");
+    if (isDebugModeActive) {
+      StringBuffer dump = StringBuffer();
+      dump.writeln("=== DIAGNOSTIC LOG (HIGH PLANK) ===");
+      dump.writeln("Time(s) | State | S-H-A | S-E-W | HipDev");
+      for (var log in _diagnosticLog) {
+        dump.writeln(
+            "${log['time']} | ${log['state']} | ${log['body'].toStringAsFixed(1)} | ${log['arm'].toStringAsFixed(1)} | ${log['dev'].toStringAsFixed(2)}");
+      }
+      logger.pushKey("diagnostic_dump", dump.toString());
     }
-    logger.pushKey("diagnostic_dump", dump.toString());
   }
 
   @override
@@ -303,6 +330,7 @@ class HighPlank extends ExerciseBase {
     final lm = _getLandmarks(landmarks);
     if (lm == null) {
       timerMetric.pause();
+      _holdSeconds.resetTick();
       return;
     }
 
@@ -317,6 +345,7 @@ class HighPlank extends ExerciseBase {
     if (![shoulder, elbow, wrist, hip, knee, ankle]
         .every(ExerciseBase.isLandmarkConfident)) {
       timerMetric.pause();
+      _holdSeconds.resetTick();
       return;
     }
 
@@ -334,6 +363,7 @@ class HighPlank extends ExerciseBase {
         _transitionState(HighPlankState.dropping, now);
       }
       timerMetric.pause();
+      _holdSeconds.resetTick();
       return;
     }
     double bodyAngle = calculateAngleNormalized(
@@ -346,8 +376,10 @@ class HighPlank extends ExerciseBase {
     double expectedHipY = _interpolateY(shoulder, ankle, hip.x);
     double rawDeviation = hip.y - expectedHipY;
     double hipDeviation = scaleFactor > 0 ? rawDeviation / scaleFactor : 0;
+    final wasHolding = state == HighPlankState.holding;
 
-    if (now - _lastDiagnosticTime > 500 || state != previousState) {
+    if (isDebugModeActive &&
+        (now - _lastDiagnosticTime > 500 || state != previousState)) {
       _diagnosticLog.add({
         'time': ((now - _exerciseStartTimeMs!) / 1000).toStringAsFixed(1),
         'state': state.name,
@@ -359,7 +391,6 @@ class HighPlank extends ExerciseBase {
     }
 
     _updateStateMachine(bodyAngle, armAngle, hipDeviation, kneeAngle, now);
-
     final ctx = HighPlankRepContext(
       shoulderHipAnkleAngle: bodyAngle,
       shoulderElbowWristAngle: armAngle,
@@ -372,9 +403,46 @@ class HighPlank extends ExerciseBase {
 
     for (final metric in _metrics) metric.update(ctx);
 
+    if (state == HighPlankState.holding) {
+      _holdSeconds.accumulate(
+        elapsedMs: elapsedMs,
+        faultingByKey: {
+          'sagging_seconds': saggingMetric.isFaultingNow,
+          'piked_seconds': pikedHipMetric.isFaultingNow,
+          'elbow_seconds': elbowMetric.isFaultingNow,
+        },
+      );
+    } else if (wasHolding) {
+      _holdSeconds.resetTick();
+    }
+
     repCount = timerMetric.totalHoldingTimeMs ~/ 1000;
 
     resultIssues.addInstruction(state.name, 'Status', currentPhaseLabel);
+  }
+
+  int get _targetTimeMs => maxSeconds * 1000;
+
+  void _resetSetState() {
+    state = HighPlankState.setup;
+    previousState = HighPlankState.setup;
+    _exerciseStartTimeMs = null;
+    _timeoutReached = false;
+    _setCompletionLogged = false;
+    _holdSeconds.reset();
+    _diagnosticLog.clear();
+    _lastDiagnosticTime = 0;
+    repCount = 0;
+    correctForm = true;
+    logger.clear();
+    timerMetric.reset();
+    _holdingDebouncer.reset();
+    _droppingDebouncer.reset();
+    for (final metric in _metrics) {
+      if (!identical(metric, timerMetric)) {
+        metric.reset();
+      }
+    }
   }
 
   void _updateStateMachine(double bodyAngle, double armAngle, double hipDev,

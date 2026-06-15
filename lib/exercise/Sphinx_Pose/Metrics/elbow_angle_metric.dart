@@ -12,15 +12,19 @@ class ElbowAngleMetric extends SphinxMetricBase {
   final Debouncer _forearmDebouncer = Debouncer(requiredFrames: 4);
   final Debouncer _upperArmDebouncer = Debouncer(requiredFrames: 4);
   bool _instructionSet = false;
+  bool _isFaultingNow = false;
 
   @override
   List<FaultRecord> get faults => _faults;
+  @override
+  bool get isFaultingNow => _isFaultingNow;
 
   @override
   Map<String, dynamic> get debugData => _debugData;
 
   @override
   void update(SphinxContext ctx) {
+    _isFaultingNow = false;
     if (ctx.state != SphinxState.isometricHold &&
         ctx.state != SphinxState.ascending) {
       return;
@@ -37,6 +41,7 @@ class ElbowAngleMetric extends SphinxMetricBase {
 
     // Phase isometricHold: Bắt lỗi đẩy thẳng tay
     if (_straightArmDebouncer.update(ctx.elbowAngle > 120)) {
+      _isFaultingNow = true;
       ctx.resultIssues.feedback['Arm'] = 'Gập khuỷu tay lại!';
       if (!_instructionSet) {
         ctx.resultIssues.addInstruction('isometricHold', 'Arm',
@@ -46,11 +51,13 @@ class ElbowAngleMetric extends SphinxMetricBase {
       _logFault(ctx.state.name, 'Lỗi đẩy thẳng tay', 'Gập cùi chỏ lại');
     } else if (_forearmDebouncer
         .update(ctx.forearmAngle > SphinxConfig.Aj_Forearm_Horiz_Tol)) {
+      _isFaultingNow = true;
       ctx.resultIssues.feedback['Arm'] = 'Hạ cẳng tay xuống sàn!';
       _logFault(ctx.state.name, 'Cẳng tay không song song sàn',
           'Hạ cẳng tay xuống sàn');
     } else if (_upperArmDebouncer
         .update(ctx.upperArmAngle < SphinxConfig.Ak_UpperArm_Vert_Tol)) {
+      _isFaultingNow = true;
       ctx.resultIssues.feedback['Arm'] = 'Cánh tay phải vuông góc!';
       _logFault(ctx.state.name, 'Cánh tay không vuông góc sàn',
           'Chống tay vuông góc với sàn');
@@ -82,5 +89,6 @@ class ElbowAngleMetric extends SphinxMetricBase {
     _straightArmDebouncer.reset();
     _forearmDebouncer.reset();
     _upperArmDebouncer.reset();
+    _isFaultingNow = false;
   }
 }

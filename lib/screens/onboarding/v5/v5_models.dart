@@ -143,21 +143,6 @@ const durationOptions = [
   V5DurationOption(id: '1y+', label: '1 năm+', sub: 'Đã lâu'),
 ];
 
-class PainAreaOption {
-  const PainAreaOption({required this.id, required this.label});
-  final String id;
-  final String label;
-}
-
-const painAreaOptions = [
-  PainAreaOption(id: 'back', label: 'Lưng dưới'),
-  PainAreaOption(id: 'neck', label: 'Cổ · Vai · Gáy'),
-  PainAreaOption(id: 'knee', label: 'Đầu gối'),
-  PainAreaOption(id: 'hip', label: 'Hông'),
-  PainAreaOption(id: 'wrist', label: 'Cổ tay'),
-  PainAreaOption(id: 'other', label: 'Khác'),
-];
-
 class ForkChoice {
   const ForkChoice({
     required this.id,
@@ -527,7 +512,7 @@ PlanPersonalization derivePlanPersonalization(OnboardingData data) {
               : 3;
   final painAreas = data.painAreas;
   final hasBackPain = painAreas.any(
-    (p) => p.toLowerCase().contains('lưng') || p == 'low_back' || p == 'back',
+    (p) => p.toLowerCase().contains('lưng') || p == 'lower_back' || p == 'back',
   );
   final isYoga = data.fork == 'yoga';
   return PlanPersonalization(

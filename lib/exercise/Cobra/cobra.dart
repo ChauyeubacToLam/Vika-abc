@@ -52,6 +52,12 @@ class Cobra extends ExerciseBase {
 
   int? _holdStartMs;
   int? _restStartMs;
+  final HoldSecondsAccumulator _holdSeconds = HoldSecondsAccumulator(const [
+    'elbow_flexion_seconds',
+    'hand_placement_seconds',
+    'cervical_neutrality_seconds',
+    'pelvic_grounding_seconds',
+  ]);
 
   final Debouncer _positionDebouncer = Debouncer(requiredFrames: 2);
   final Debouncer _exitPositionDebouncer = Debouncer(requiredFrames: 3);
@@ -188,7 +194,26 @@ class Cobra extends ExerciseBase {
   bool requestStop() => repCount >= maxRep;
 
   @override
+  void onExerciseActivated() {
+    super.onExerciseActivated();
+    _holdSeconds.reset();
+  }
+
+  @override
   void onSetComplete() {
+    logger.pushKey("total_seconds", maxRep * CobraConfig.HOLD_DURATION);
+    logger.pushKey(
+      "good_seconds",
+      _holdSeconds.goodSeconds.clamp(0.0, maxRep * CobraConfig.HOLD_DURATION),
+    );
+    logger.pushKey("elbow_flexion_seconds",
+        _holdSeconds.faultSecondsFor('elbow_flexion_seconds'));
+    logger.pushKey("hand_placement_seconds",
+        _holdSeconds.faultSecondsFor('hand_placement_seconds'));
+    logger.pushKey("cervical_neutrality_seconds",
+        _holdSeconds.faultSecondsFor('cervical_neutrality_seconds'));
+    logger.pushKey("pelvic_grounding_seconds",
+        _holdSeconds.faultSecondsFor('pelvic_grounding_seconds'));
     logger.pushGoodRepCount();
     logger.pushKey("max_rep", maxRep);
   }
@@ -233,7 +258,10 @@ class Cobra extends ExerciseBase {
         rightType: PoseLandmarkType.rightHip,
         leftType: PoseLandmarkType.leftHip);
 
-    if (shoulder == null || hip == null) return;
+    if (shoulder == null || hip == null) {
+      _holdSeconds.resetTick();
+      return;
+    }
 
     PoseLandmark? elbow = getSideLandmark(
         landmarks: smoothedLandmarks,
@@ -269,7 +297,10 @@ class Cobra extends ExerciseBase {
     PoseLandmark? heel = smoothedLandmarks[PoseLandmarkType.leftHeel] ??
         smoothedLandmarks[PoseLandmarkType.rightHeel];
 
-    if (!scaleFactor.isFinite || scaleFactor <= 1e-6) return;
+    if (!scaleFactor.isFinite || scaleFactor <= 1e-6) {
+      _holdSeconds.resetTick();
+      return;
+    }
     double floorY = foot?.y ?? heel?.y ?? knee?.y ?? hip.y;
     double hipToFloor = (floorY - hip.y).abs() / scaleFactor;
     bool isStanding = hipToFloor > CobraConfig.STANDING_HIP_FLOOR_THRESHOLD;
@@ -312,6 +343,20 @@ class Cobra extends ExerciseBase {
           metric.update(ctx);
         }
       }
+    }
+
+    if (cobraState == CobraState.holding) {
+      _holdSeconds.accumulate(
+        elapsedMs: elapsedMs,
+        faultingByKey: {
+          'elbow_flexion_seconds': _elbowMetric.isFaultingNow,
+          'hand_placement_seconds': _handPlacementMetric.isFaultingNow,
+          'cervical_neutrality_seconds': _cervicalMetric.isFaultingNow,
+          'pelvic_grounding_seconds': _pelvicMetric.isFaultingNow,
+        },
+      );
+    } else {
+      _holdSeconds.resetTick();
     }
 
     _updatePhaseInstructions(now);
@@ -408,23 +453,29 @@ class Cobra extends ExerciseBase {
 
     switch (newState) {
       case CobraState.holding:
+        _holdSeconds.resetTick();
         _holdStartMs = timestampMs;
         _restStartMs = null;
         resultIssues.instructions.clear();
         break;
 
       case CobraState.resting:
+        _holdSeconds.resetTick();
         _restStartMs = timestampMs;
-        _onHoldComplete();
         break;
 
       case CobraState.setup:
+        _holdSeconds.resetTick();
         _holdStartMs = null;
         break;
     }
 
     for (final metric in _metrics) {
       metric.onStateTransition(previousCobraState, newState, timestampMs);
+    }
+
+    if (newState == CobraState.resting) {
+      _onHoldComplete();
     }
   }
 
@@ -438,7 +489,6 @@ class Cobra extends ExerciseBase {
 
     correctForm = !allFaults.any((f) => f.affectsForm);
     resultIssues.feedback['Result'] = correctForm ? 'Tốt lắm!' : 'Chỉnh tư thế';
-
     final faultMap = <String, Map<String, String>>{};
     setFeedback.add({correctForm: faultMap});
 

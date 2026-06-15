@@ -59,6 +59,7 @@ abstract class ButterflyMetricBase implements DebugMetricSource {
   int faultsCount = 0;
   void update(StretchContext ctx);
   List<FaultRecord> get faults;
+  bool get isFaultingNow => false;
   @override
   Map<String, dynamic> get debugData;
   @override

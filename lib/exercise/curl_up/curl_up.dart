@@ -112,6 +112,9 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
   /// True when current knee displacement from baseline exceeds threshold.
   /// Smoothed via StickyDebouncer. Gates state machine transitions.
   bool _kneeIsDisplaced = false;
+  double? _repPeakTrunkAngle;
+  double? _repMinEarShoulderHipAngle;
+  double? _repMaxHipKneeAnkleAngle;
 
   CurlUp({this.maxRep = CurlUpConfig.MAX_REP});
 
@@ -354,6 +357,7 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
     final knee = lm['knee']!;
     final ankle = lm['ankle']; // Optional
 
+    final debugEnabled = isDebugModeActive;
     debugData["shoulderY"] = shoulder.y;
     final ankleVisible =
         ankle != null && ExerciseBase.isLandmarkConfident(ankle);
@@ -439,6 +443,11 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
     debugData['trunkAngle'] = trunkAngle;
     debugData['trunkBaseline'] = _baselineTrunkAngle ?? 'n/a';
 
+    final stateBeforeUpdate = curlUpState;
+    if (stateBeforeUpdate != CurlUpState.resting) {
+      _updateRepPeaks(ctx);
+    }
+
     // 7. State machine.
     _updateStateBuffer(trunkAngle, now);
 
@@ -453,17 +462,23 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
     if (curlUpState == CurlUpState.resting) {
       for (var i = 0; i < _metrics.length; i++) {
         _metrics[i].onRestingFrame(ctx);
-        _trackedMetrics[i].onTick(now);
+        if (debugEnabled) {
+          _trackedMetrics[i].onTick(now);
+        }
       }
     } else {
       for (var i = 0; i < _metrics.length; i++) {
         _metrics[i].update(ctx);
-        _trackedMetrics[i].onTick(now);
+        if (debugEnabled) {
+          _trackedMetrics[i].onTick(now);
+        }
       }
     }
 
-    for (final metric in _metrics) {
-      debugData.addAll(metric.debugData);
+    if (debugEnabled) {
+      for (final metric in _metrics) {
+        debugData.addAll(metric.debugData);
+      }
     }
 
     // 10. Phase-specific UI instructions
@@ -476,8 +491,10 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
     repCount += 1;
 
     trunkElevationMetric.checkRepCompletion(ctx);
-    for (final trackedMetric in _trackedMetrics) {
-      trackedMetric.onTick(ctx.frameTimestamp);
+    if (isDebugModeActive) {
+      for (final trackedMetric in _trackedMetrics) {
+        trackedMetric.onTick(ctx.frameTimestamp);
+      }
     }
 
     final allFaults = <FaultRecord>[];
@@ -502,26 +519,22 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
 
     setFeedback.add({correctForm: faultMap});
 
-    for (final metric in _metrics) {
-      debugData.addAll(metric.debugData);
+    if (isDebugModeActive) {
+      for (final metric in _metrics) {
+        debugData.addAll(metric.debugData);
+      }
     }
 
-// Peak elevation now from trunkAngle (max during rep) — knee-invariant.
-// Neck deviation still on ear-shoulder-hip (separate signal, no knee).
-    final peakTrunkSnap = frameBuffer.getPeakMax("trunkAngle");
-    final peakESHSnap = frameBuffer.getPeakMin("earShoulderHipAngle");
-    final peakKneeSnap = frameBuffer.getPeakMax("hipKneeAnkleAngle");
-
+    // Peak elevation now from trunkAngle (max during rep) — knee-invariant.
+    // Neck deviation still on ear-shoulder-hip (separate signal, no knee).
     final baseTrunk = _baselineTrunkAngle;
     final baseESH = _holdStillEarShoulderHip;
 
-    final peakTrunkElev = (baseTrunk != null && peakTrunkSnap != null)
-        ? ((peakTrunkSnap.log["trunkAngle"] as double) - baseTrunk)
-            .clamp(0.0, 90.0)
+    final peakTrunkElev = (baseTrunk != null && _repPeakTrunkAngle != null)
+        ? (_repPeakTrunkAngle! - baseTrunk).clamp(0.0, 90.0)
         : 0.0;
-    final peakNeckDev = (baseESH != null && peakESHSnap != null)
-        ? (baseESH - (peakESHSnap.log["earShoulderHipAngle"] as double))
-            .clamp(0.0, 90.0)
+    final peakNeckDev = (baseESH != null && _repMinEarShoulderHipAngle != null)
+        ? (baseESH - _repMinEarShoulderHipAngle!).clamp(0.0, 90.0)
         : 0.0;
 
     logger.addRepLog(RepLog(
@@ -530,7 +543,7 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
       data: {
         "peak_trunk_elevation": peakTrunkElev,
         "peak_neck_deviation": peakNeckDev,
-        "max_knee_angle": peakKneeSnap?.log["hipKneeAnkleAngle"] ?? 0.0,
+        "max_knee_angle": _repMaxHipKneeAnkleAngle ?? 0.0,
         "fault_types": allFaults.map((f) => f.type).toSet().toList(),
       },
     ));
@@ -541,6 +554,29 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
       metric.resetAndCountFault();
     }
     frameBuffer.clear();
+    _resetRepPeaks();
+  }
+
+  void _updateRepPeaks(RepContext ctx) {
+    if (_repPeakTrunkAngle == null || ctx.trunkAngle > _repPeakTrunkAngle!) {
+      _repPeakTrunkAngle = ctx.trunkAngle;
+    }
+    if (_repMinEarShoulderHipAngle == null ||
+        ctx.earShoulderHipAngle < _repMinEarShoulderHipAngle!) {
+      _repMinEarShoulderHipAngle = ctx.earShoulderHipAngle;
+    }
+    final kneeAngle = ctx.hipKneeAnkleAngle;
+    if (kneeAngle != null &&
+        (_repMaxHipKneeAnkleAngle == null ||
+            kneeAngle > _repMaxHipKneeAnkleAngle!)) {
+      _repMaxHipKneeAnkleAngle = kneeAngle;
+    }
+  }
+
+  void _resetRepPeaks() {
+    _repPeakTrunkAngle = null;
+    _repMinEarShoulderHipAngle = null;
+    _repMaxHipKneeAnkleAngle = null;
   }
 
   // --- Phase Instructions ---
@@ -626,6 +662,7 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
     if (newState == CurlUpState.ascending &&
         previousCurlUpState == CurlUpState.resting) {
       resultIssues.instructions.clear();
+      _resetRepPeaks();
     }
 
     for (final metric in _metrics) {

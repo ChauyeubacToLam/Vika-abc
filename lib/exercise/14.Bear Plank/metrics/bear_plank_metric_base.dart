@@ -53,6 +53,7 @@ class BearRepContext {
 // ─── Metric Base ─────────────────────────────────────────────────────────────
 abstract class BearMetricBase implements DebugMetricSource {
   int faultsCount = 0;
+  bool isFaultingNow = false;
   final List<FaultRecord> _faults = [];
   @override
   final Map<String, dynamic> debugData = {};
@@ -76,8 +77,16 @@ abstract class BearMetricBase implements DebugMetricSource {
 
   void addFault(FaultRecord fault) => _faults.add(fault);
 
+  void reset() {
+    faultsCount = 0;
+    isFaultingNow = false;
+    _faults.clear();
+    debugData.clear();
+  }
+
   void resetAndCountFault() {
     if (_faults.isNotEmpty) faultsCount++;
+    isFaultingNow = false;
     _faults.clear();
   }
 }

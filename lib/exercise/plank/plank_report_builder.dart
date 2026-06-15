@@ -8,22 +8,22 @@ class PlankReportBuilder extends ExerciseReportBuilder {
 
   @override
   Map<String, List<String>> painToFaultMap() => {
-        'lower_back': ['trunk_fails_count'],
-        'neck': ['neck_fails_count'],
-        'knee': ['knee_fails_count'],
+        'lower_back': ['trunk_seconds'],
+        'shoulder_neck': ['neck_seconds'],
+        'knee': ['knee_seconds'],
       };
 
   @override
   Map<String, FaultTipCopy> faultToTipMap() => {
-        'trunk_fails_count': (
+        'trunk_seconds': (
           watch: 'Giữ hông nằm trên một đường thẳng với vai và cổ chân.',
           next: 'Ép nhẹ khuỷu tay xuống sàn và siết bụng trước khi giữ.',
         ),
-        'neck_fails_count': (
+        'neck_seconds': (
           watch: 'Đầu và cổ cần đi cùng đường với thân người.',
           next: 'Nhìn xuống sàn, giữ gáy dài thay vì ngẩng hoặc cúi đầu.',
         ),
-        'knee_fails_count': (
+        'knee_seconds': (
           watch: 'Gối gập làm bài plank nhẹ đi và giảm hiệu quả cơ lõi.',
           next: 'Đẩy gót ra sau để khóa gối và giữ thân người dài.',
         ),
@@ -31,9 +31,9 @@ class PlankReportBuilder extends ExerciseReportBuilder {
 
   @override
   Map<String, String> praiseMetricNames() => {
-        'trunk_fails_count': 'Trục thân',
-        'neck_fails_count': 'Cổ vai',
-        'knee_fails_count': 'Gối',
+        'trunk_seconds': 'Trục thân',
+        'neck_seconds': 'Cổ vai',
+        'knee_seconds': 'Gối',
       };
 
   @override
@@ -61,10 +61,10 @@ class PlankReportBuilder extends ExerciseReportBuilder {
     );
     final cleanRatio =
         totalSeconds > 0 ? (goodSeconds / totalSeconds * 100) : 0.0;
-    final trunkFails = setLoggers.fold<int>(
+    final trunkSeconds = setLoggers.fold<double>(
       0,
       (sum, logger) =>
-          sum + ((logger.setLogs['trunk_fails_count'] as num?)?.toInt() ?? 0),
+          sum + ((logger.setLogs['trunk_seconds'] as num?)?.toDouble() ?? 0),
     );
 
     return [
@@ -78,9 +78,9 @@ class PlankReportBuilder extends ExerciseReportBuilder {
       ),
       DetailCard(
         label: 'Lỗi trục thân',
-        value: '$trunkFails lần',
+        value: '${trunkSeconds.toStringAsFixed(1)}s',
         subLabel: 'Võng hoặc chổng hông',
-        color: trunkFails == 0 ? 'jade' : 'ruby',
+        color: trunkSeconds == 0 ? 'jade' : 'ruby',
       ),
     ];
   }

@@ -162,7 +162,6 @@ class LowLunge extends ExerciseBase {
 
   @override
   void onSetComplete() {
-    logger.pushKey('target_holds', maxRep);
     logger.pushGoodRepCount();
     logger.pushKey('max_rep', maxRep);
     logger.pushKey('knee_travel_fails_count', _kneeTravelMetric.faultsCount);

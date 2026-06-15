@@ -8,22 +8,21 @@ class SphinxReportBuilder extends ExerciseReportBuilder {
 
   @override
   Map<String, List<String>> painToFaultMap() => {
-        'lower_back': ['hip_fails_count'],
-        'shoulder': ['straight_arm_fails_count', 'shrug_neck_fails_count'],
-        'neck': ['shrug_neck_fails_count'],
+        'lower_back': ['hip_seconds'],
+        'shoulder_neck': ['straight_arm_seconds', 'shrug_neck_seconds'],
       };
 
   @override
   Map<String, FaultTipCopy> faultToTipMap() => {
-        'hip_fails_count': (
+        'hip_seconds': (
           watch: 'Hông nhấc khỏi sàn làm mất mục tiêu mở nhẹ cột sống.',
           next: 'Ấn xương chậu xuống sàn trước khi nâng ngực.',
         ),
-        'straight_arm_fails_count': (
+        'straight_arm_seconds': (
           watch: 'Duỗi thẳng tay biến Sphinx thành Cobra và tăng tải lưng.',
           next: 'Đặt khuỷu dưới vai, để cẳng tay đỡ lực.',
         ),
-        'shrug_neck_fails_count': (
+        'shrug_neck_seconds': (
           watch: 'Rụt vai hoặc ngửa cổ làm vùng gáy căng quá mức.',
           next: 'Hạ vai xa tai và nhìn chéo xuống thảm.',
         ),
@@ -38,9 +37,9 @@ class SphinxReportBuilder extends ExerciseReportBuilder {
 
   @override
   Map<String, String> praiseMetricNames() => {
-        'hip_fails_count': 'Hông',
-        'straight_arm_fails_count': 'Tay',
-        'shrug_neck_fails_count': 'Cổ vai',
+        'hip_seconds': 'Hông',
+        'straight_arm_seconds': 'Tay',
+        'shrug_neck_seconds': 'Cổ vai',
       };
 
   @override
@@ -56,8 +55,9 @@ class SphinxReportBuilder extends ExerciseReportBuilder {
     final holdTime = latestSet.setLogs['active_hold_time'] as double? ?? 0.0;
     final stability = latestSet.setLogs['stability_score'] as double? ?? 0.0;
 
-    final armFails = latestSet.setLogs['straight_arm_fails_count'] as int? ?? 0;
-    final armAccuracy = (100.0 - (armFails * 20)).clamp(0.0, 100.0);
+    final armSeconds =
+        (latestSet.setLogs['straight_arm_seconds'] as num?)?.toDouble() ?? 0.0;
+    final armAccuracy = (100.0 - (armSeconds * 20)).clamp(0.0, 100.0);
 
     return [
       DetailCard(

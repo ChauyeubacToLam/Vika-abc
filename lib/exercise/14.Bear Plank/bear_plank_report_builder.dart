@@ -7,29 +7,45 @@ class BearPlankReportBuilder extends ExerciseReportBuilder {
   bool get isSecondBased => true;
 
   @override
+  Map<String, String> praiseMetricNames() => {
+        'back_seconds': 'Lưng phẳng',
+        'knee_seconds': 'Gối sát sàn',
+        'weight_seconds': 'Vai trên cổ tay',
+      };
+
+  @override
+  Map<String, String Function(int count, int total)> praiseSentenceMap() => {
+        'Lưng phẳng': (c, t) =>
+            'Lưng giữ phẳng $c/$t giây - cột sống được bảo vệ tốt.',
+        'Gối sát sàn': (c, t) =>
+            'Gối hover sát sàn $c/$t giây - core gánh đúng phần việc.',
+        'Vai trên cổ tay': (c, t) =>
+            'Vai giữ trên cổ tay $c/$t giây - cổ tay nhẹ hơn nhiều.',
+      };
+
+  @override
   Map<String, List<String>> painToFaultMap() => {
-        'lower_back': ['back_fails'],
-        'wrist': ['weight_fails'],
-        'knee': ['knee_fails'],
+        'lower_back': ['back_seconds'],
+        'wrist': ['weight_seconds'],
+        'knee': ['knee_seconds'],
       };
 
   @override
   Map<String, FaultTipCopy> faultToTipMap() => {
-        'knee_fails': (
+        'knee_seconds': (
           watch:
-              'Khi nhấc gối cao quá 10cm, đùi trước sẽ gánh lực thay vì nhóm cơ Core. Hãy giữ gối sát mặt đất.',
+              'Trong Bear Plank: đầu gối có lúc nhấc cao hơn vùng hover mục tiêu.',
           next:
               'Khi nhấc gối cao quá 10cm, đùi trước sẽ gánh lực thay vì nhóm cơ Core. Hãy giữ gối sát mặt đất.',
         ),
-        'back_fails': (
-          watch:
-              'Võng lưng gây nén đĩa đệm thắt lưng. Hãy cuộn xương chậu và tưởng tượng bạn đang giữ một ly nước trên lưng.',
+        'back_seconds': (
+          watch: 'Trong Bear Plank: lưng có lúc võng hoặc cong khi giữ hover.',
           next:
               'Võng lưng gây nén đĩa đệm thắt lưng. Hãy cuộn xương chậu và tưởng tượng bạn đang giữ một ly nước trên lưng.',
         ),
-        'weight_fails': (
+        'weight_seconds': (
           watch:
-              'Lỗi rướn người về trước gây đau cổ tay. Vai phải luôn nằm trên một đường thẳng đứng với cổ tay.',
+              'Trong Bear Plank: vai có xu hướng trôi quá xa về trước so với cổ tay.',
           next:
               'Lỗi rướn người về trước gây đau cổ tay. Vai phải luôn nằm trên một đường thẳng đứng với cổ tay.',
         ),
@@ -50,26 +66,28 @@ class BearPlankReportBuilder extends ExerciseReportBuilder {
     final isTimeout =
         setLoggers.any((l) => l.setLogs['timeout_triggered'] == true);
 
-    // ── Card 2: Chỉ số kiểm soát đầu gối (Knee Control Index) ──────────────
-    // % số frame hovering KHÔNG bị fault đầu gối
-    final totalHoverFrames = setLoggers.fold(
-        0, (sum, l) => sum + (l.setLogs['total_hover_frames'] as int? ?? 0));
-    final kneeFaultFrames = setLoggers.fold(
-        0, (sum, l) => sum + (l.setLogs['knee_fault_frames'] as int? ?? 0));
-    final kneeScore = totalHoverFrames > 0
-        ? ((totalHoverFrames - kneeFaultFrames.clamp(0, totalHoverFrames)) /
-                totalHoverFrames *
+    final totalSeconds = setLoggers.fold<double>(
+      0,
+      (sum, l) => sum + ((l.setLogs['total_seconds'] as num?)?.toDouble() ?? 0),
+    );
+    final kneeSeconds = setLoggers.fold<double>(
+      0,
+      (sum, l) => sum + ((l.setLogs['knee_seconds'] as num?)?.toDouble() ?? 0),
+    );
+    final weightSeconds = setLoggers.fold<double>(
+      0,
+      (sum, l) =>
+          sum + ((l.setLogs['weight_seconds'] as num?)?.toDouble() ?? 0),
+    );
+    final kneeScore = totalSeconds > 0
+        ? ((totalSeconds - kneeSeconds.clamp(0, totalSeconds)) /
+                totalSeconds *
                 100)
             .roundToDouble()
         : 100.0;
-
-    // ── Card 3: Điểm cân bằng (Balance Score) ───────────────────────────────
-    // % số frame hovering KHÔNG bị chúi vai
-    final weightFaultFrames = setLoggers.fold(
-        0, (sum, l) => sum + (l.setLogs['weight_fault_frames'] as int? ?? 0));
-    final balanceScore = totalHoverFrames > 0
-        ? ((totalHoverFrames - weightFaultFrames.clamp(0, totalHoverFrames)) /
-                totalHoverFrames *
+    final balanceScore = totalSeconds > 0
+        ? ((totalSeconds - weightSeconds.clamp(0, totalSeconds)) /
+                totalSeconds *
                 100)
             .roundToDouble()
         : 100.0;

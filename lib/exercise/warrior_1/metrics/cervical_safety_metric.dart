@@ -66,15 +66,19 @@ class CervicalSafetyMetric extends WarriorOneMetricBase {
   final Queue<double> _medianBuf = Queue<double>();
 
   bool _instructionSet = false;
+  bool _isFaultingNow = false;
 
   @override
   List<FaultRecord> get faults => _faults;
+  @override
+  bool get isFaultingNow => _isFaultingNow;
 
   @override
   Map<String, dynamic> get debugData => _debugData;
 
   @override
   void update(HoldContext ctx) {
+    _isFaultingNow = false;
     if (ctx.holdState != WarriorOneState.hold) return;
 
     // 1) light 1D One-Euro on the angle, 2) 7-frame rolling median.
@@ -90,6 +94,7 @@ class CervicalSafetyMetric extends WarriorOneMetricBase {
         _dangerDebouncer.update(angle < CervicalSafetyConfig.GOOD_THRESHOLD);
 
     if (danger) {
+      _isFaultingNow = true;
       ctx.resultIssues.feedback['cervical_danger'] =
           'Cẩn thận cổ nhé! Nhìn thẳng hoặc hơi lên thôi. Không ngửa đầu ra sau.';
       if (!_instructionSet) {
@@ -136,6 +141,7 @@ class CervicalSafetyMetric extends WarriorOneMetricBase {
     _euro.reset();
     _medianBuf.clear();
     _instructionSet = false;
+    _isFaultingNow = false;
   }
 }
 

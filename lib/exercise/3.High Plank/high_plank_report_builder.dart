@@ -8,27 +8,25 @@ class HighPlankReportBuilder extends ExerciseReportBuilder {
 
   @override
   Map<String, List<String>> painToFaultMap() => {
-        'lower_back': ['sagging_fails_count'],
-        'shoulder': ['piked_fails_count', 'elbow_fails_count'],
+        'lower_back': ['sagging_seconds'],
+        'shoulder_neck': ['piked_seconds', 'elbow_seconds'],
       };
 
   @override
   Map<String, FaultTipCopy> faultToTipMap() => {
-        'sagging_fails_count': (
-          watch:
-              'Lỗi võng lưng rất nguy hiểm. Hãy tưởng tượng bạn đang rút rốn về phía cột sống.',
+        'sagging_seconds': (
+          watch: 'Trong High Plank: hông có lúc hạ xuống làm lưng dưới võng.',
           next:
               'Lỗi võng lưng rất nguy hiểm. Hãy tưởng tượng bạn đang rút rốn về phía cột sống.',
         ),
-        'piked_fails_count': (
+        'piked_seconds': (
           watch:
-              'Chổng mông làm bài tập trở nên quá dễ và mất tác dụng vào cơ Core.',
+              'Trong High Plank: hông có lúc đẩy lên cao hơn đường thân người.',
           next:
               'Chổng mông làm bài tập trở nên quá dễ và mất tác dụng vào cơ Core.',
         ),
-        'elbow_fails_count': (
-          watch:
-              'Đừng gập tay, xương cánh tay thẳng đứng sẽ giúp khóa khớp và tiết kiệm sức.',
+        'elbow_seconds': (
+          watch: 'Trong High Plank: khuỷu tay có lúc gập khi đang chống giữ.',
           next:
               'Đừng gập tay, xương cánh tay thẳng đứng sẽ giúp khóa khớp và tiết kiệm sức.',
         ),
@@ -42,8 +40,8 @@ class HighPlankReportBuilder extends ExerciseReportBuilder {
 
   @override
   Map<String, String> praiseMetricNames() => {
-        'sagging_fails_count': 'Cột sống phẳng',
-        'piked_fails_count': 'Form chuẩn',
+        'sagging_seconds': 'Cột sống phẳng',
+        'piked_seconds': 'Form chuẩn',
       };
 
   @override
@@ -61,19 +59,18 @@ class HighPlankReportBuilder extends ExerciseReportBuilder {
         .reduce((a, b) => a + b);
     double perfectSeconds = totalPerfectTimeMs / 1000.0;
 
-    // Tính Sagging Penalty (Số lần trigger lỗi võng lưng / giả định 1 lỗi làm mất 2s đánh giá)
-    int sagFails = setLoggers
-        .map((l) => l.setLogs['sagging_fails_count'] as int? ?? 0)
+    final sagSeconds = setLoggers
+        .map((l) => (l.setLogs['sagging_seconds'] as num?)?.toDouble() ?? 0.0)
         .reduce((a, b) => a + b);
 
     // Độ ổn định Hông: Càng ít lỗi chổng/võng thì điểm càng cao
-    int totalFails = sagFails +
+    final totalFaultSeconds = sagSeconds +
         setLoggers
-            .map((l) => l.setLogs['piked_fails_count'] as int? ?? 0)
+            .map((l) => (l.setLogs['piked_seconds'] as num?)?.toDouble() ?? 0.0)
             .reduce((a, b) => a + b);
-    double stabilityScore = totalFails == 0
+    double stabilityScore = totalFaultSeconds == 0
         ? 100
-        : (100 - (totalFails * 5)).clamp(0, 100).toDouble();
+        : (100 - (totalFaultSeconds * 5)).clamp(0, 100).toDouble();
 
     return [
       DetailCard(
@@ -92,9 +89,9 @@ class HighPlankReportBuilder extends ExerciseReportBuilder {
       ),
       DetailCard(
         label: 'Báo động Võng Lưng',
-        value: '$sagFails lần',
+        value: '${sagSeconds.toStringAsFixed(1)}s',
         subLabel: 'Rủi ro thắt lưng',
-        color: sagFails == 0 ? 'jade' : 'ruby',
+        color: sagSeconds == 0 ? 'jade' : 'ruby',
       ),
     ];
   }
