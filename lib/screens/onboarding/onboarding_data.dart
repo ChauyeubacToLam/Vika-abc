@@ -14,8 +14,8 @@ class OnboardingData {
   List<String> problemResonance = [];
 
   // Step 4: Pain check
-  List<String> painAreas =
-      []; // 'none', 'lower_back', 'knee', 'shoulder_neck', 'hip', 'other'
+  List<String> painAreas = []; // shared pain_region ids + 'other'
+  Map<String, int> painIntensities = {}; // region id -> 1..5
   bool noPain = false;
   String? painOtherText; // free text when 'other' selected (optional)
 

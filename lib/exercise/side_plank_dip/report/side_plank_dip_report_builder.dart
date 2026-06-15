@@ -4,6 +4,9 @@
 
 import '../metrics/side_plank_dip_metric_base.dart';
 
+// DEAD LEGACY: bespoke score builder kept only for historical reference.
+// Live reports use SidePlankDipReportBuilderV2 via report_builder_registry.dart.
+
 class SidePlankSetReport {
   final int totalReps;
   final double shoulderSafetyScore;

@@ -45,11 +45,14 @@ class KneeExtensionMetric extends PlankMetricBase {
   // Fault time tracking
   int _totalFrames = 0;
   int _faultFrames = 0;
+  bool _isFaultingNow = false;
 
   bool _instructionSet = false;
 
   @override
   List<FaultRecord> get faults => _faults;
+  @override
+  bool get isFaultingNow => _isFaultingNow;
 
   @override
   Map<String, dynamic> get debugData => _debugData;
@@ -59,6 +62,7 @@ class KneeExtensionMetric extends PlankMetricBase {
 
   @override
   void update(RepContext ctx) {
+    _isFaultingNow = false;
     if (ctx.kneeAngle == null) return; // Ankle not visible, skip
     _totalFrames++;
 
@@ -96,6 +100,7 @@ class KneeExtensionMetric extends PlankMetricBase {
     }
 
     if (isFault) _faultFrames++;
+    _isFaultingNow = isFault;
 
     _debugData['kneeStatus'] = isFault ? 'FAULT' : 'GOOD';
   }
@@ -137,6 +142,7 @@ class KneeExtensionMetric extends PlankMetricBase {
     _kneeDebouncer.reset();
     _totalFrames = 0;
     _faultFrames = 0;
+    _isFaultingNow = false;
     _instructionSet = false;
   }
 }

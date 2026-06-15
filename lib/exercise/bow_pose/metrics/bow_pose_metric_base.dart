@@ -40,6 +40,7 @@ abstract class BowPoseMetricBase {
   String get name;
   void update(RepContext ctx);
   List<FaultRecord> get faults;
+  bool get isFaultingNow => false;
   Map<String, dynamic> get debugData;
   void reset();
   void resetAndCountFault() {

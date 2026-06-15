@@ -99,7 +99,13 @@ class WarriorOne extends ExerciseBase {
   final StickyDebouncer _stillDebouncer = StickyDebouncer(
       requiredFrames: WarriorOneConfig.STILL_FRAMES, currentState: false);
   double? _prevHipY;
-  double _goodHoldSeconds = 0.0;
+  final HoldSecondsAccumulator _holdSeconds = HoldSecondsAccumulator(const [
+    'trunk_lean_seconds',
+    'cervical_seconds',
+    'arm_seconds',
+    'back_knee_seconds',
+    'back_straight_seconds',
+  ]);
 
   // --- Baselines (captured at ENTRY → HOLD) ---
   double? _trunkBaseline;
@@ -190,16 +196,27 @@ class WarriorOne extends ExerciseBase {
   bool requestStop() => repCount >= maxHolds;
 
   @override
+  void onExerciseActivated() {
+    super.onExerciseActivated();
+    _holdSeconds.reset();
+  }
+
+  @override
   void onSetComplete() {
-    logger.pushKey('target_holds', maxHolds);
-    logger.pushKey('max_rep', repCount);
-    logger.pushKey('total_seconds', maxHolds * WarriorOneConfig.HOLD_DURATION);
-    logger.pushKey('good_seconds', _goodHoldSeconds);
-    logger.pushKey('trunk_lean_fails_count', trunkLeanMetric.faultsCount);
-    logger.pushKey('cervical_fails_count', cervicalMetric.faultsCount);
-    logger.pushKey('arm_fails_count', armMetric.faultsCount);
-    logger.pushKey('back_knee_fails_count', backKneeMetric.faultsCount);
-    logger.pushKey('back_straight_fails_count', backStraightMetric.faultsCount);
+    logger.pushKey('max_rep', maxHolds);
+    final targetSeconds = maxHolds * WarriorOneConfig.HOLD_DURATION;
+    logger.pushKey('total_seconds', targetSeconds);
+    logger.pushKey(
+        'good_seconds', _holdSeconds.goodSeconds.clamp(0.0, targetSeconds));
+    logger.pushKey('trunk_lean_seconds',
+        _holdSeconds.faultSecondsFor('trunk_lean_seconds'));
+    logger.pushKey(
+        'cervical_seconds', _holdSeconds.faultSecondsFor('cervical_seconds'));
+    logger.pushKey('arm_seconds', _holdSeconds.faultSecondsFor('arm_seconds'));
+    logger.pushKey(
+        'back_knee_seconds', _holdSeconds.faultSecondsFor('back_knee_seconds'));
+    logger.pushKey('back_straight_seconds',
+        _holdSeconds.faultSecondsFor('back_straight_seconds'));
     logger.pushGoodRepCount();
   }
 
@@ -401,6 +418,7 @@ class WarriorOne extends ExerciseBase {
     // 9. Phase-specific work.
     switch (holdState) {
       case WarriorOneState.entry:
+        _holdSeconds.resetTick();
         _runEntry(stance);
         break;
 
@@ -419,6 +437,18 @@ class WarriorOne extends ExerciseBase {
           metric.update(ctx);
         }
 
+        _holdSeconds.accumulate(
+          elapsedMs: elapsedMs,
+          faultingByKey: {
+            'trunk_lean_seconds': trunkLeanMetric.isFaultingNow,
+            'cervical_seconds': cervicalMetric.isFaultingNow,
+            'arm_seconds': armMetric.isFaultingNow,
+            'back_knee_seconds': backKneeMetric.isFaultingNow,
+            'back_straight_seconds': backStraightMetric.isFaultingNow,
+          },
+          goodBlockingKeys: const ['trunk_lean_seconds'],
+        );
+
         final remaining =
             (WarriorOneConfig.HOLD_DURATION - _currentHoldSeconds())
                 .clamp(0.0, WarriorOneConfig.HOLD_DURATION);
@@ -430,6 +460,7 @@ class WarriorOne extends ExerciseBase {
         break;
 
       case WarriorOneState.exit:
+        _holdSeconds.resetTick();
         break;
     }
 
@@ -495,9 +526,6 @@ class WarriorOne extends ExerciseBase {
       faultMap[fault.phase]![fault.type] = fault.message;
     }
     setFeedback.add({correctForm: faultMap});
-    if (correctForm) {
-      _goodHoldSeconds += WarriorOneConfig.HOLD_DURATION;
-    }
     logger.addRepLog(RepLog(
       correctForm: correctForm,
       repNumber: repCount,
@@ -552,11 +580,14 @@ class WarriorOne extends ExerciseBase {
 
     // Lock the front leg for the duration of the hold.
     if (newState == WarriorOneState.hold) {
+      _holdSeconds.resetTick();
       _frontLegLocked = true;
       resultIssues.instructions.clear();
     } else if (newState == WarriorOneState.exit) {
+      _holdSeconds.resetTick();
       _onHoldComplete();
     } else if (newState == WarriorOneState.entry) {
+      _holdSeconds.resetTick();
       _frontLegLocked = false;
     }
 
@@ -567,6 +598,7 @@ class WarriorOne extends ExerciseBase {
 
   void _resetForNextSide() {
     _holdStartMs = null;
+    _holdSeconds.resetTick();
     _prevHipY = null;
     _stillDebouncer.reset();
     _trunkBaseline = null;
@@ -584,6 +616,7 @@ class WarriorOne extends ExerciseBase {
   @override
   Map<String, String> processNoPoseFrame() {
     if (holdState == WarriorOneState.hold) {
+      _holdSeconds.resetTick();
       _resetForNextSide();
       previousHoldState = holdState;
       holdState = WarriorOneState.entry;

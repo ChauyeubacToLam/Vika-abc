@@ -62,12 +62,15 @@ class ShoulderShrugMetric extends DownwardDogMetricBase {
 
   double? _normalizedDist;
   MetricStatus _status = MetricStatus.pass;
+  bool _isFaultingNow = false;
 
   /// Prevent instruction spam — coaching set once per hold.
   bool _instructionSet = false;
 
   @override
   List<FaultRecord> get faults => _faults;
+  @override
+  bool get isFaultingNow => _isFaultingNow;
 
   @override
   Map<String, dynamic> get debugData => _debugData;
@@ -87,6 +90,7 @@ class ShoulderShrugMetric extends DownwardDogMetricBase {
 
   @override
   void update(HoldContext ctx) {
+    _isFaultingNow = false;
     if (ctx.holdState != DownwardDogState.hold) {
       _status = MetricStatus.pass;
       return;
@@ -124,6 +128,7 @@ class ShoulderShrugMetric extends DownwardDogMetricBase {
     final bool isShrug = ratio < ShoulderShrugConfig.ERROR_RATIO;
 
     if (_shrugDebouncer.update(isShrug)) {
+      _isFaultingNow = true;
       _status = MetricStatus.fault;
       ctx.resultIssues.feedback['shoulder_shrug'] =
           'Đẩy vai ra xa tai nhé, thả lỏng cổ.';
@@ -176,5 +181,6 @@ class ShoulderShrugMetric extends DownwardDogMetricBase {
     _normalizedDist = null;
     _status = MetricStatus.pass;
     _instructionSet = false;
+    _isFaultingNow = false;
   }
 }

@@ -76,6 +76,7 @@ abstract class PlankMetricBase {
 
   /// Faults accumulated this hold.
   List<FaultRecord> get faults;
+  bool get isFaultingNow => false;
 
   /// Debug data for the overlay.
   Map<String, dynamic> get debugData;

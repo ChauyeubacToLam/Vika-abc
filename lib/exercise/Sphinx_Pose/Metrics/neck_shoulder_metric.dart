@@ -20,15 +20,20 @@ class NeckShoulderMetric extends SphinxMetricBase {
 
   // Biến lưu trạng thái ngửa cổ để dùng chung giữa các hàm
   bool _isHyper = false;
+  bool _isShrug = false;
 
   @override
   List<FaultRecord> get faults => _faults;
+  @override
+  bool get isFaultingNow => _isHyper || _isShrug;
 
   @override
   Map<String, dynamic> get debugData => _debugData;
 
   @override
   void update(SphinxContext ctx) {
+    _isHyper = false;
+    _isShrug = false;
     if (ctx.state != SphinxState.isometricHold &&
         ctx.state != SphinxState.ascending) {
       return;
@@ -45,8 +50,10 @@ class NeckShoulderMetric extends SphinxMetricBase {
         ctx.earShoulderDist / (ctx.scaleFactor <= 0 ? 1 : ctx.scaleFactor);
     _debugData['neckDistNorm'] = normalizedDist.toStringAsFixed(3);
 
-    if (_shrugDebouncer
-        .update(normalizedDist < SphinxConfig.Ag_Neck_Shrug_Tol)) {
+    _isShrug =
+        _shrugDebouncer.update(normalizedDist < SphinxConfig.Ag_Neck_Shrug_Tol);
+
+    if (_isShrug) {
       ctx.resultIssues.feedback['Neck'] = 'Thẳng vai!';
       if (!_shrugInstructionSet) {
         ctx.resultIssues.addInstruction(
@@ -118,6 +125,7 @@ class NeckShoulderMetric extends SphinxMetricBase {
     _shrugInstructionSet = false;
     _hyperInstructionSet = false;
     _isHyper = false; // Reset lại trạng thái
+    _isShrug = false;
     _shrugDebouncer.reset();
     _hyperDebouncer.reset();
   }

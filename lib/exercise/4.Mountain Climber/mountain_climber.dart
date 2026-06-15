@@ -233,7 +233,7 @@ class MountainClimber extends ExerciseBase {
       resultIssues.feedback['ROM'] = 'Luân phiên từng gối';
       resultIssues.addInstruction(
           'high_plank_base', 'ROM', 'Kéo từng gối một, không co cả hai gối');
-      trunkMetric.resetAndCountFault();
+      trunkMetric.reset();
       romMetric.reset();
       _leftCounter.reset();
       _rightCounter.reset();
@@ -391,7 +391,6 @@ class MountainClimber extends ExerciseBase {
   @override
   void onSetComplete() {
     logger.pushKey('timeout_triggered', _isTimeout);
-    logger.pushKey('target_rep', maxRep);
     logger.pushKey('max_rep', maxRep);
     logger.pushKey('trunk_fails_count', trunkMetric.faultsCount);
     logger.pushKey('rom_fails_count', romMetric.faultsCount);

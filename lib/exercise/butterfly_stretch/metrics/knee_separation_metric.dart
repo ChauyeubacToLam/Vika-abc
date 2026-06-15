@@ -19,15 +19,19 @@ class KneeSeparationMetric extends ButterflyMetricBase {
 
   double maxSeparation = 0.0;
   bool _instructionSet = false;
+  bool _isFaultingNow = false;
 
   @override
   List<FaultRecord> get faults => _faults;
+  @override
+  bool get isFaultingNow => _isFaultingNow;
 
   @override
   Map<String, dynamic> get debugData => _debugData;
 
   @override
   void update(StretchContext ctx) {
+    _isFaultingNow = false;
     // 1. Cập nhật biên độ lớn nhất
     if (ctx.kneeSeparation > maxSeparation) {
       maxSeparation = ctx.kneeSeparation;
@@ -47,6 +51,7 @@ class KneeSeparationMetric extends ButterflyMetricBase {
 
     if (_asymmetryDebouncer
         .update(normalizedDiff > KneeSeparationConfig.ASYMMETRY_THRESHOLD)) {
+      _isFaultingNow = true;
       ctx.resultIssues.feedback['Knee'] = 'Lệch gối!';
 
       if (!_instructionSet) {
@@ -80,5 +85,6 @@ class KneeSeparationMetric extends ButterflyMetricBase {
     _debugData.clear();
     _asymmetryDebouncer.reset();
     _instructionSet = false;
+    _isFaultingNow = false;
   }
 }

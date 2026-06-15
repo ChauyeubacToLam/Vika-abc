@@ -588,6 +588,7 @@ class SuryaNamaskarExercise extends ExerciseBase {
   void onSetComplete() {
     logger.pushGoodRepCount();
     logger.pushKey('max_rounds', maxRounds);
+    logger.pushKey('max_rep', maxRounds);
     logger.pushKey('total_safety_triggers', _setSafetyTriggers);
     logger.pushAverage('recognized_poses', 'avg_recognized_poses');
     logger.pushAverage('missed_poses', 'avg_missed_poses');

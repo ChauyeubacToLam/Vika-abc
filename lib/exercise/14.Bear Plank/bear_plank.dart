@@ -34,14 +34,11 @@ class BearPlank extends ExerciseBase {
   bool _isTimeout = false;
   bool _setCompletionLogged = false;
 
-  // Fault frame counters — đếm số frame bị lỗi trong khi hovering
-  int _totalHoverFrames = 0;
-  int _kneeFaultFrames = 0;
-  int _backFaultFrames = 0;
-  int _weightFaultFrames = 0;
-  double _kneeFaultSeconds = 0.0;
-  double _backFaultSeconds = 0.0;
-  double _weightFaultSeconds = 0.0;
+  final HoldSecondsAccumulator _holdSeconds = HoldSecondsAccumulator(const [
+    'knee_seconds',
+    'back_seconds',
+    'weight_seconds',
+  ]);
 
   // Telemetry Log
   final List<Map<String, dynamic>> _telemetryLog = [];
@@ -139,6 +136,7 @@ class BearPlank extends ExerciseBase {
     final lm = _getLandmarks(smoothedLandmarks);
     if (lm == null) {
       _lastFrameTimeMs = null;
+      _holdSeconds.resetTick();
       return;
     }
 
@@ -152,6 +150,7 @@ class BearPlank extends ExerciseBase {
     scaleFactor = calculateDistance(shoulder, hip);
     if (!scaleFactor.isFinite || scaleFactor <= 1e-6) {
       _lastFrameTimeMs = null;
+      _holdSeconds.resetTick();
       return;
     }
 
@@ -178,16 +177,18 @@ class BearPlank extends ExerciseBase {
     // Chuẩn hóa knee height
     final normKneeHeight = kneeHeightOffset / scaleFactor;
 
-    // GHI LOG TELEMETRY
-    _telemetryLog.add({
-      'timestamp': now,
-      'state': bearState.name,
-      'normKneeHeight': double.parse(normKneeHeight.toStringAsFixed(3)),
-      'kneeAngle': double.parse(kneeAngle.toStringAsFixed(1)),
-      'backYOffset': double.parse(backYOffset.toStringAsFixed(3)),
-      'shoulderWristXOffset':
-          double.parse(shoulderWristXOffset.toStringAsFixed(3)),
-    });
+    if (isDebugModeActive) {
+      // GHI LOG TELEMETRY
+      _telemetryLog.add({
+        'timestamp': now,
+        'state': bearState.name,
+        'normKneeHeight': double.parse(normKneeHeight.toStringAsFixed(3)),
+        'kneeAngle': double.parse(kneeAngle.toStringAsFixed(1)),
+        'backYOffset': double.parse(backYOffset.toStringAsFixed(3)),
+        'shoulderWristXOffset':
+            double.parse(shoulderWristXOffset.toStringAsFixed(3)),
+      });
+    }
 
     final ctx = BearRepContext(
       kneeHeightOffset: normKneeHeight,
@@ -211,12 +212,17 @@ class BearPlank extends ExerciseBase {
       debugData.addAll(metric.debugData);
     }
 
-    // Đếm fault frames khi đang hovering
     if (bearState == BearState.hovering) {
-      _totalHoverFrames++;
-      if (kneeMetric.faults.isNotEmpty) _kneeFaultFrames++;
-      if (backMetric.faults.isNotEmpty) _backFaultFrames++;
-      if (weightMetric.faults.isNotEmpty) _weightFaultFrames++;
+      _holdSeconds.accumulate(
+        elapsedMs: elapsedMs,
+        faultingByKey: {
+          'knee_seconds': kneeMetric.isFaultingNow,
+          'back_seconds': backMetric.isFaultingNow,
+          'weight_seconds': weightMetric.isFaultingNow,
+        },
+      );
+    } else {
+      _holdSeconds.resetTick();
     }
 
     // UI Data
@@ -248,12 +254,6 @@ class BearPlank extends ExerciseBase {
         if (isFullyCleanHold) {
           _totalHoverTimeMs += dt;
         }
-        _accumulateFaultSeconds(
-          dtMs: dt,
-          kneeFault: !isHoveringForm,
-          backFault: !hasCleanBack,
-          weightFault: !hasCleanWeight,
-        );
 
         if (_fatigueDebouncer.update(isFatiguedForm)) {
           // Reset metrics khi kết thúc hold cycle
@@ -287,11 +287,13 @@ class BearPlank extends ExerciseBase {
   @override
   Map<String, String> processNoPoseFrame() {
     _lastFrameTimeMs = null;
+    _holdSeconds.resetTick();
     return super.processNoPoseFrame();
   }
 
   @override
   void onExerciseActivated() {
+    super.onExerciseActivated();
     _resetSetState();
   }
 
@@ -307,27 +309,23 @@ class BearPlank extends ExerciseBase {
 
     // Đẩy dữ liệu tổng kết
     final targetSeconds = maxSeconds.toDouble();
-    final goodSeconds = (_totalHoverTimeMs / 1000.0).clamp(0.0, targetSeconds);
+    final goodSeconds = _holdSeconds.goodSeconds.clamp(0.0, targetSeconds);
     // Target denominator for scoring, not elapsed hold time.
     logger.pushKey("total_seconds", targetSeconds);
     logger.pushKey("good_seconds", goodSeconds);
     logger.pushKey("max_rep", 1);
     logger.pushKey("total_hover_time_ms", _totalHoverTimeMs);
     logger.pushKey("timeout_triggered", _isTimeout);
-    logger.pushKey("knee_fails", kneeMetric.faultsCount);
-    logger.pushKey("back_fails", backMetric.faultsCount);
-    logger.pushKey("weight_fails", weightMetric.faultsCount);
+    logger.pushKey(
+        "knee_seconds", _holdSeconds.faultSecondsFor('knee_seconds'));
+    logger.pushKey(
+        "back_seconds", _holdSeconds.faultSecondsFor('back_seconds'));
+    logger.pushKey(
+        "weight_seconds", _holdSeconds.faultSecondsFor('weight_seconds'));
 
-    // Fault frame counts — cho report builder tính % chính xác
-    logger.pushKey("total_hover_frames", _totalHoverFrames);
-    logger.pushKey("knee_fault_frames", _kneeFaultFrames);
-    logger.pushKey("back_fault_frames", _backFaultFrames);
-    logger.pushKey("weight_fault_frames", _weightFaultFrames);
-    logger.pushKey("knee_fault_seconds", _kneeFaultSeconds);
-    logger.pushKey("back_fault_seconds", _backFaultSeconds);
-    logger.pushKey("weight_fault_seconds", _weightFaultSeconds);
-
-    logger.pushKey("telemetry_data", _telemetryLog); // Chìa khóa debug
+    if (isDebugModeActive) {
+      logger.pushKey("telemetry_data", _telemetryLog); // Chìa khóa debug
+    }
 
     // Set kết quả (Form tốt nếu giữ trên 80% thời gian mục tiêu)
     if (!_setCompletionLogged) {
@@ -356,13 +354,7 @@ class BearPlank extends ExerciseBase {
     _lastFrameTimeMs = null;
     _isTimeout = false;
     _setCompletionLogged = false;
-    _totalHoverFrames = 0;
-    _kneeFaultFrames = 0;
-    _backFaultFrames = 0;
-    _weightFaultFrames = 0;
-    _kneeFaultSeconds = 0.0;
-    _backFaultSeconds = 0.0;
-    _weightFaultSeconds = 0.0;
+    _holdSeconds.reset();
     _telemetryLog.clear();
     repCount = 0;
     correctForm = true;
@@ -372,21 +364,6 @@ class BearPlank extends ExerciseBase {
     for (final metric in _metrics) {
       metric.reset();
     }
-  }
-
-  void _accumulateFaultSeconds({
-    required int dtMs,
-    required bool kneeFault,
-    required bool backFault,
-    required bool weightFault,
-  }) {
-    if (dtMs <= 0) return;
-    final seconds = dtMs / 1000.0;
-    // Fault-second buckets are independent: overlapping faults each receive
-    // the same frame delta, so these are relative indicators, not elapsed time.
-    if (kneeFault) _kneeFaultSeconds += seconds;
-    if (backFault) _backFaultSeconds += seconds;
-    if (weightFault) _weightFaultSeconds += seconds;
   }
 
   Map<String, PoseLandmark>? _getLandmarks(

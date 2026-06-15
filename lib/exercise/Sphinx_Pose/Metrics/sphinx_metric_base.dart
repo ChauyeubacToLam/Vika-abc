@@ -67,6 +67,7 @@ abstract class SphinxMetricBase {
   int faultsCount = 0;
   void update(SphinxContext ctx);
   List<FaultRecord> get faults;
+  bool get isFaultingNow => false;
   Map<String, dynamic> get debugData;
 
   void reset() {

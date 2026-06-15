@@ -172,7 +172,6 @@ class DeadBug extends ExerciseBase {
 
   @override
   void onSetComplete() {
-    logger.pushKey("target_rep", maxRep);
     logger.pushKey("max_rep", maxRep);
     logger.pushKey(
         "anti_extension_fails_count", antiExtensionMetric.faultsCount);
@@ -182,15 +181,17 @@ class DeadBug extends ExerciseBase {
     logger.pushKey("tempo_fails_count", tempoMetric.faultsCount);
     logger.pushGoodRepCount();
 
-    StringBuffer dump = StringBuffer();
-    dump.writeln("=== DIAGNOSTIC LOG (DEAD BUG) ===");
-    dump.writeln(
-        "Time | State | MaxExt | L_Arm | R_Arm | L_Hip | R_Hip | HipY");
-    for (var log in _diagnosticLog) {
+    if (isDebugModeActive) {
+      StringBuffer dump = StringBuffer();
+      dump.writeln("=== DIAGNOSTIC LOG (DEAD BUG) ===");
       dump.writeln(
-          "${log['time']} | ${log['state']} | ${log['max'].toStringAsFixed(0)} | ${log['la'].toStringAsFixed(0)} | ${log['ra'].toStringAsFixed(0)} | ${log['lh'].toStringAsFixed(0)} | ${log['rh'].toStringAsFixed(0)} | ${log['hipY'].toStringAsFixed(1)}");
+          "Time | State | MaxExt | L_Arm | R_Arm | L_Hip | R_Hip | HipY");
+      for (var log in _diagnosticLog) {
+        dump.writeln(
+            "${log['time']} | ${log['state']} | ${log['max'].toStringAsFixed(0)} | ${log['la'].toStringAsFixed(0)} | ${log['ra'].toStringAsFixed(0)} | ${log['lh'].toStringAsFixed(0)} | ${log['rh'].toStringAsFixed(0)} | ${log['hipY'].toStringAsFixed(1)}");
+      }
+      logger.pushKey("diagnostic_dump", dump.toString());
     }
-    logger.pushKey("diagnostic_dump", dump.toString());
   }
 
   ({
@@ -342,7 +343,8 @@ class DeadBug extends ExerciseBase {
             ? _peakPhysicalLeftLeg!
             : physicalLeftLeg;
 
-    if (now - _lastDiagnosticTime > 500 || state != previousState) {
+    if (isDebugModeActive &&
+        (now - _lastDiagnosticTime > 500 || state != previousState)) {
       _diagnosticLog.add({
         'time': ((now - _exerciseStartTimeMs!) / 1000).toStringAsFixed(1),
         'state': state.name,

@@ -5,6 +5,9 @@
 
 import 'metrics/jump_squat_metric_base.dart';
 
+// DEAD LEGACY: bespoke score builder kept only for historical reference.
+// Live reports use JumpSquatReportBuilderV2 via report_builder_registry.dart.
+
 // Model chứa dữ liệu tổng hợp của 1 Set tập để đẩy lên UI (Detail Cards)
 class JumpSquatSetReport {
   final int totalReps;

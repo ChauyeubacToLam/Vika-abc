@@ -40,6 +40,11 @@ class ButterflyStretch extends ExerciseBase {
 
   int? _lastFrameTimeMs;
   int _validHoldTimeMs = 0;
+  final HoldSecondsAccumulator _holdSeconds = HoldSecondsAccumulator(const [
+    'knee_seconds',
+    'posture_seconds',
+    'foot_placement_seconds',
+  ]);
 
   final KneeSeparationMetric kneeMetric = KneeSeparationMetric();
   final PostureMetric postureMetric = PostureMetric();
@@ -176,6 +181,14 @@ class ButterflyStretch extends ExerciseBase {
   bool requestStop() => _elapsedSeconds >= maxSeconds;
 
   @override
+  void onExerciseActivated() {
+    super.onExerciseActivated();
+    _holdSeconds.reset();
+    _lastFrameTimeMs = null;
+    _validHoldTimeMs = 0;
+  }
+
+  @override
   void onSetComplete() {
     final allFaults = [
       ...kneeMetric.faults,
@@ -187,13 +200,16 @@ class ButterflyStretch extends ExerciseBase {
 
     logger.pushKey("max_rep", 1);
     logger.pushKey("total_seconds", maxSeconds.toDouble());
-    logger.pushKey("good_seconds", _elapsedSeconds.clamp(0.0, maxSeconds));
+    logger.pushKey(
+        "good_seconds", _holdSeconds.goodSeconds.clamp(0.0, maxSeconds));
     logger.pushKey("total_hold_time", _elapsedSeconds);
     logger.pushKey("max_knee_separation", kneeMetric.maxSeparation);
-    logger.pushKey("knee_fails_count", kneeMetric.faults.length);
-    logger.pushKey("posture_fails_count", postureMetric.faults.length);
     logger.pushKey(
-        "foot_placement_fails_count", footPlacementMetric.faults.length);
+        "knee_seconds", _holdSeconds.faultSecondsFor('knee_seconds'));
+    logger.pushKey(
+        "posture_seconds", _holdSeconds.faultSecondsFor('posture_seconds'));
+    logger.pushKey("foot_placement_seconds",
+        _holdSeconds.faultSecondsFor('foot_placement_seconds'));
     logger.addRepLog(RepLog(
       correctForm: holdCorrect,
       repNumber: 1,
@@ -260,6 +276,7 @@ class ButterflyStretch extends ExerciseBase {
         rHip == null ||
         lHeel == null ||
         rHeel == null) {
+      _holdSeconds.resetTick();
       return;
     }
     if (![
@@ -274,6 +291,7 @@ class ButterflyStretch extends ExerciseBase {
       lHeel,
       rHeel,
     ].every(ExerciseBase.isLandmarkConfident)) {
+      _holdSeconds.resetTick();
       return;
     }
 
@@ -328,6 +346,19 @@ class ButterflyStretch extends ExerciseBase {
         metric.update(ctx);
         debugData.addAll(metric.debugData);
       }
+    }
+
+    if (stretchState == ButterflyState.isometric_hold) {
+      _holdSeconds.accumulate(
+        elapsedMs: elapsedMs,
+        faultingByKey: {
+          'knee_seconds': kneeMetric.isFaultingNow,
+          'posture_seconds': postureMetric.isFaultingNow,
+          'foot_placement_seconds': footPlacementMetric.isFaultingNow,
+        },
+      );
+    } else {
+      _holdSeconds.resetTick();
     }
 
     final normalizedKneeDiff =
@@ -409,6 +440,7 @@ class ButterflyStretch extends ExerciseBase {
 
   String _safetyError(String message) {
     _lastFrameTimeMs = frameTimestampMs;
+    _holdSeconds.resetTick();
     return message;
   }
 

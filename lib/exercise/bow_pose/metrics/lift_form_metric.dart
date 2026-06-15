@@ -18,15 +18,19 @@ class LiftFormMetric extends BowPoseMetricBase {
 
   double _maxChestLift = 0.0;
   double _maxThighLift = 0.0;
+  bool _isFaultingNow = false;
 
   @override
   List<FaultRecord> get faults => _faults;
+  @override
+  bool get isFaultingNow => _isFaultingNow;
 
   @override
   Map<String, dynamic> get debugData => _debugData;
 
   @override
   void update(RepContext ctx) {
+    _isFaultingNow = false;
     final chest = ctx.chestLift;
     final thigh = ctx.thighLiftRelative;
 
@@ -41,6 +45,7 @@ class LiftFormMetric extends BowPoseMetricBase {
       bool thighLow = thigh < LiftConfig.THIGH_GOOD_MIN;
 
       if (_thighDebouncer.update(thighLow)) {
+        _isFaultingNow = true;
         ctx.resultIssues.feedback['Thigh'] = 'Kéo đùi lên cao!';
         _logFault('HOLD', 'Đùi chạm sàn', 'Nâng cao đùi');
       } else {
@@ -48,6 +53,7 @@ class LiftFormMetric extends BowPoseMetricBase {
       }
 
       if (_chestDebouncer.update(chestLow)) {
+        _isFaultingNow = true;
         ctx.resultIssues.feedback['Chest'] = 'Mở căng lồng ngực!';
         _logFault('HOLD', 'Ngực chưa mở', 'Ưỡn ngực lên');
       } else {
@@ -82,5 +88,6 @@ class LiftFormMetric extends BowPoseMetricBase {
     _chestDebouncer.reset();
     _maxChestLift = 0.0;
     _maxThighLift = 0.0;
+    _isFaultingNow = false;
   }
 }

@@ -5,106 +5,54 @@ import 'package:vika/utils/exercise_logger.dart';
 class PlankShoulderTapReportBuilder extends ExerciseReportBuilder {
   @override
   Map<String, List<String>> painToFaultMap() => {
-        'lower_back': [
-          'rotation_fails',
-          'alignment_fails'
-        ], // Vặn hông/Võng lưng dồn áp lực đĩa đệm
-        'wrist': ['tempo_fails'], // Tập quá nhanh/giật cục đập cổ tay xuống sàn
-        'shoulder': ['rotation_fails'],
+        'lower_back': ['rotation_fails_count', 'alignment_fails_count'],
+        'hip': ['rotation_fails_count'],
+        'shoulder_neck': ['tap_fails_count', 'tempo_fails_count'],
+        'wrist': ['tempo_fails_count'],
       };
 
   @override
   Map<String, FaultTipCopy> faultToTipMap() => {
-        'rotation_fails': (
-          watch:
-              'Mở rộng hai chân hơn vai để tăng chân đế (Base of support). Siết chặt bụng, không để hông lắc lư khi nhấc tay.',
+        'rotation_fails_count': (
+          watch: 'Trong Plank Shoulder Tap: hông có lúc xoay khi nhấc tay.',
           next:
-              'Mở rộng hai chân hơn vai để tăng chân đế (Base of support). Siết chặt bụng, không để hông lắc lư khi nhấc tay.',
+              'Mở chân rộng hơn vai, đẩy sàn ra xa và giữ hông đứng yên trước khi chạm vai.',
         ),
-        'alignment_fails': (
-          watch:
-              'Không chổng mông hay võng lưng. Cơ thể phải là một đường thẳng căng cứng.',
+        'alignment_fails_count': (
+          watch: 'Trong Plank Shoulder Tap: thân người có lúc mất đường thẳng.',
           next:
-              'Không chổng mông hay võng lưng. Cơ thể phải là một đường thẳng căng cứng.',
+              'Kéo rốn lên khỏi sàn, siết mông nhẹ và giữ vai-hông-gót trên một đường.',
         ),
-        'tap_fails': (
-          watch:
-              'Chạm tay dứt khoát lên vai đối diện để kiểm soát trọng tâm tốt hơn.',
+        'tap_fails_count': (
+          watch: 'Trong Plank Shoulder Tap: có nhịp chạm vai chưa rõ.',
           next:
-              'Chạm tay dứt khoát lên vai đối diện để kiểm soát trọng tâm tốt hơn.',
+              'Chạm tay dứt khoát vào vai đối diện như bấm một nút nhỏ rồi trả tay về sàn.',
         ),
-      };
-
-  @override
-  Map<String, String Function(int count, int total)> praiseSentenceMap() => {
-        'AntiRot': (c, t) => 'Hông đóng băng, chống xoay cực tốt $c/$t rep!',
-        'Alignment': (c, t) => 'Trục lưng thẳng tắp $c/$t rep!',
+        'tempo_fails_count': (
+          watch: 'Trong Plank Shoulder Tap: nhịp chạm có lúc quá nhanh.',
+          next: 'Nâng tay như đi qua mật ong, chạm vai rồi đặt tay xuống êm.',
+        ),
       };
 
   @override
   Map<String, String> praiseMetricNames() => {
-        'rotation_fails': 'AntiRot',
-        'alignment_fails': 'Alignment',
+        'rotation_fails_count': 'Chống xoay',
+        'alignment_fails_count': 'Trục thân',
+        'tap_fails_count': 'Chạm vai',
+        'tempo_fails_count': 'Nhịp chạm',
       };
 
   @override
-  List<DetailCard> buildDetailCards(List<ExerciseLogger> setLoggers) {
-    final allReps = setLoggers.expand((l) => l.repLogs).toList();
-    final totalReps = allReps.length;
-
-    if (totalReps == 0) return [];
-
-    // Điểm Chống Xoay (Anti-Rotation Score)
-    int totalRotFails = setLoggers.fold(
-        0, (sum, log) => sum + (log.setLogs['rotation_fails'] as int? ?? 0));
-    double rotScore = ((totalReps - totalRotFails) / totalReps * 100)
-        .clamp(0, 100)
-        .roundToDouble();
-
-    // Điểm Ổn định cốt lõi (Core Alignment)
-    int totalAlignFails = setLoggers.fold(
-        0, (sum, log) => sum + (log.setLogs['alignment_fails'] as int? ?? 0));
-    double alignScore = ((totalReps - totalAlignFails) / totalReps * 100)
-        .clamp(0, 100)
-        .roundToDouble();
-
-    // Tỷ lệ chạm vai hoàn hảo (Clear Tap Rate)
-    int totalTapFails = setLoggers.fold(
-        0, (sum, log) => sum + (log.setLogs['tap_fails'] as int? ?? 0));
-    double tapScore = ((totalReps - totalTapFails) / totalReps * 100)
-        .clamp(0, 100)
-        .roundToDouble();
-
-    return [
-      DetailCard(
-        label: 'Điểm Chống Xoay',
-        value: '${rotScore.round()}%',
-        subLabel: 'Hông đóng băng',
-        useRadial: true,
-        radialValue: rotScore,
-        color: 'amber',
-      ),
-      DetailCard(
-        label: 'Độ Ổn Định Lõi',
-        value: '${alignScore.round()}%',
-        subLabel: 'Lưng thẳng tắp',
-        useRadial: true,
-        radialValue: alignScore,
-        color: 'jade',
-      ),
-      DetailCard(
-        label: 'Chạm Hoàn Hảo',
-        value: '${tapScore.round()}%',
-        subLabel: 'Biên độ chuẩn',
-        useRadial: true,
-        radialValue: tapScore,
-        color: 'blue',
-      ),
-    ];
-  }
+  Map<String, String Function(int count, int total)> praiseSentenceMap() => {
+        'Chống xoay': (c, t) =>
+            'Hông chống xoay $c/$t rep - nền plank rất chắc.',
+        'Trục thân': (c, t) => 'Trục thân thẳng $c/$t rep - core giữ tốt.',
+        'Chạm vai': (c, t) =>
+            'Chạm vai rõ $c/$t rep - kiểm soát trọng tâm đẹp.',
+        'Nhịp chạm': (c, t) =>
+            'Nhịp chạm êm $c/$t rep - cổ tay được đặt xuống nhẹ.',
+      };
 
   @override
-  DetectedEvidence? detectIssue(List<ExerciseLogger> setLoggers) {
-    return null;
-  }
+  DetectedEvidence? detectIssue(List<ExerciseLogger> setLoggers) => null;
 }

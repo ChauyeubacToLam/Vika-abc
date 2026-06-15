@@ -48,6 +48,7 @@ class LegStraightnessMetric extends DownwardDogMetricBase {
   /// Track whether the spine was long throughout the hold so we decide
   /// whether to surface the leg-straightness nudge post-hold.
   bool _spineLongDuringHold = true;
+  bool _isFaultingNow = false;
 
   // Status is always pass — this metric NEVER faults the hold.
   @override
@@ -55,6 +56,8 @@ class LegStraightnessMetric extends DownwardDogMetricBase {
 
   @override
   List<FaultRecord> get faults => _faults;
+  @override
+  bool get isFaultingNow => _isFaultingNow;
 
   @override
   Map<String, dynamic> get debugData => _debugData;
@@ -69,6 +72,7 @@ class LegStraightnessMetric extends DownwardDogMetricBase {
 
   @override
   void update(HoldContext ctx) {
+    _isFaultingNow = false;
     if (ctx.holdState != DownwardDogState.hold) return;
 
     _kneeAngle = ctx.kneeAngle;
@@ -91,6 +95,7 @@ class LegStraightnessMetric extends DownwardDogMetricBase {
 
     // Live feedback: always "Gập gối nếu cần" (no fault path for this metric).
     if (ctx.kneeAngle < LegStraightnessConfig.STRAIGHT_THRESHOLD) {
+      _isFaultingNow = _spineLongDuringHold;
       ctx.resultIssues.feedback['leg_straight'] =
           'Gập gối là được — giữ lưng thẳng!';
     } else {
@@ -145,5 +150,6 @@ class LegStraightnessMetric extends DownwardDogMetricBase {
     _kneeAngle = null;
     _minKneeAngle = null;
     _spineLongDuringHold = true;
+    _isFaultingNow = false;
   }
 }

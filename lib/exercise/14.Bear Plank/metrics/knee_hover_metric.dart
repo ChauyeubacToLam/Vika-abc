@@ -5,9 +5,11 @@ class KneeHoverMetric extends BearMetricBase {
   void update(BearRepContext ctx) {
     debugData['knee_hover_height'] = ctx.kneeHeightOffset.toStringAsFixed(3);
 
+    isFaultingNow = false;
     if (ctx.currentState != BearState.hovering) return;
 
     if (ctx.kneeHeightOffset < BearConfig.KNEE_HOVER_MIN) {
+      isFaultingNow = true;
       if (!faults.any((f) => f.type == 'KneeTouchingFloor')) {
         addFault(FaultRecord(
           phase: ctx.currentState.name,
@@ -19,6 +21,7 @@ class KneeHoverMetric extends BearMetricBase {
         ));
       }
     } else if (ctx.kneeHeightOffset > BearConfig.KNEE_HOVER_MAX) {
+      isFaultingNow = true;
       if (!faults.any((f) => f.type == 'ButtTooHigh')) {
         addFault(FaultRecord(
           phase: ctx.currentState.name,

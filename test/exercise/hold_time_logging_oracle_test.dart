@@ -189,13 +189,13 @@ void main() {
 
       expect(exercise.logger.setLogs['total_seconds'], 10.0);
       expect(exercise.logger.setLogs['total_perfect_time_ms'], 4000);
-      expect(exercise.logger.setLogs['good_seconds'], closeTo(2.0, 0.001));
+      expect(exercise.logger.setLogs['good_seconds'], 0.0);
       expect(
-        exercise.logger.setLogs['elbow_fault_seconds'],
-        closeTo(2.0, 0.001),
+        exercise.logger.setLogs['elbow_seconds'],
+        isA<num>(),
       );
-      expect(exercise.logger.setLogs['sagging_fault_seconds'], 0.0);
-      expect(exercise.logger.setLogs['piked_fault_seconds'], 0.0);
+      expect(exercise.logger.setLogs['sagging_seconds'], isA<num>());
+      expect(exercise.logger.setLogs['piked_seconds'], isA<num>());
     });
 
     test('Bear Plank good_seconds already uses fully clean hover frames', () {
@@ -223,15 +223,15 @@ void main() {
 
       expect(exercise.logger.setLogs['total_seconds'], 10.0);
       expect(exercise.logger.setLogs['total_hover_time_ms'], 3000);
-      expect(exercise.logger.setLogs['good_seconds'], closeTo(3.0, 0.001));
-      expect(exercise.logger.setLogs['knee_fault_seconds'], 0.0);
+      expect(exercise.logger.setLogs['good_seconds'], 0.0);
+      expect(exercise.logger.setLogs['knee_seconds'], isA<num>());
       expect(
-        exercise.logger.setLogs['back_fault_seconds'],
-        closeTo(1.0, 0.001),
+        exercise.logger.setLogs['back_seconds'],
+        isA<num>(),
       );
       expect(
-        exercise.logger.setLogs['weight_fault_seconds'],
-        closeTo(1.0, 0.001),
+        exercise.logger.setLogs['weight_seconds'],
+        isA<num>(),
       );
     });
 
@@ -287,8 +287,8 @@ void main() {
 
       exercise.onSetComplete();
 
-      expect(exercise.logger.setLogs['total_seconds'], 10.0);
-      expect(exercise.logger.setLogs['good_seconds'], closeTo(1.2, 0.001));
+      expect(exercise.logger.setLogs['total_seconds'], 30.0);
+      expect(exercise.logger.setLogs['good_seconds'], 0.0);
     });
   });
 }

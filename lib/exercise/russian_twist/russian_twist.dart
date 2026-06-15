@@ -121,13 +121,12 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
 
   @override
   void onSetComplete() {
-    logger.pushKey("thoracic_fails", thoracicMetric.faultsCount);
-    logger.pushKey("knee_wobble_fails", kneeMetric.faultsCount);
-    logger.pushKey("rom_fails", twistRomMetric.faultsCount);
+    logger.pushKey("thoracic_fails_count", thoracicMetric.faultsCount);
+    logger.pushKey("knee_wobble_fails_count", kneeMetric.faultsCount);
+    logger.pushKey("rom_fails_count", twistRomMetric.faultsCount);
     logger.pushKey("rejected_attempts_count", _rejectedHalfTwists);
     logger.pushGoodRepCount();
     logger.pushKey("max_rep", maxRep);
-    logger.pushKey("target_rep", maxRep);
   }
 
   @override
@@ -360,6 +359,7 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
     for (final metric in _metrics) {
       allFaults.addAll(metric.faults);
     }
+    var countMetricFaults = false;
 
     final hasBlockingFault =
         allFaults.any((f) => _blockingFaultTypes.contains(f.type));
@@ -380,6 +380,7 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
 
         if (_halfRepCount % 2 == 0) {
           repCount++;
+          countMetricFaults = true;
           correctForm = !_pendingFullRepFaults.any((f) => f.affectsForm);
           resultIssues.feedback['Result'] =
               correctForm ? 'Tốt lắm!' : 'Chỉnh tư thế';
@@ -415,7 +416,11 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
     }
 
     for (final metric in _metrics) {
-      metric.resetAndCountFault();
+      if (countMetricFaults) {
+        metric.resetAndCountFault();
+      } else {
+        metric.reset();
+      }
     }
 
     currentDirection = TwistDirection.none;

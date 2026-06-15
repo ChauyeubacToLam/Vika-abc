@@ -115,6 +115,7 @@ abstract class DownwardDogMetricBase implements DebugMetricSource {
 
   /// Faults accumulated this hold. DownwardDog reads these when hold ends.
   List<FaultRecord> get faults;
+  bool get isFaultingNow => false;
 
   /// Debug data for the overlay. Keys should be metric-specific.
   @override

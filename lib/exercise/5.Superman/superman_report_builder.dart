@@ -5,31 +5,31 @@ import 'package:vika/utils/exercise_logger.dart';
 class SupermanReportBuilder extends ExerciseReportBuilder {
   @override
   Map<String, List<String>> painToFaultMap() => {
-        'lower_back': ['lumbar_fails', 'hip_fails'],
-        'shoulder': ['elevation_fails'],
+        'lower_back': ['lumbar_fails_count', 'hip_fails_count'],
+        'shoulder_neck': ['elevation_fails_count'],
       };
 
   @override
   Map<String, FaultTipCopy> faultToTipMap() => {
-        'elevation_fails': (
+        'elevation_fails_count': (
           watch:
-              'Nâng đồng thời cả tay và chân, không để một bên rơi xuống khi giữ.',
+              'Trong Superman: tay và chân có lúc nâng không đều khi giữ đỉnh.',
           next:
               'Nâng đồng thời cả tay và chân, không để một bên rơi xuống khi giữ.',
         ),
-        'hip_fails': (
-          watch:
-              'Giữ hông làm điểm tựa, tránh nhấc hông lên khỏi sàn khi vào tư thế.',
+        'hip_fails_count': (
+          watch: 'Trong Superman: hông có lúc nhấc khỏi sàn khi vào tư thế.',
           next:
               'Giữ hông làm điểm tựa, tránh nhấc hông lên khỏi sàn khi vào tư thế.',
         ),
-        'hold_fails': (
-          watch: 'Giữ ở điểm cao nhất đủ lâu hơn, lên chậm và không giật cục.',
+        'hold_fails_count': (
+          watch:
+              'Trong Superman: thời gian giữ ở điểm cao nhất có lúc chưa đủ lâu.',
           next: 'Giữ ở điểm cao nhất đủ lâu hơn, lên chậm và không giật cục.',
         ),
-        'lumbar_fails': (
+        'lumbar_fails_count': (
           watch:
-              'Giảm độ nâng tay chân một chút để cột sống thắt lưng không bị uốn quá gắt.',
+              'Trong Superman: lưng dưới có lúc uốn quá gắt khi nâng tay chân.',
           next:
               'Giảm độ nâng tay chân một chút để cột sống thắt lưng không bị uốn quá gắt.',
         ),
@@ -37,9 +37,19 @@ class SupermanReportBuilder extends ExerciseReportBuilder {
 
   @override
   Map<String, String> praiseMetricNames() => {
-        'elevation_fails': 'Độ nâng tay chân',
-        'hold_fails': 'Thời gian giữ',
-        'lumbar_fails': 'An toàn lưng',
+        'elevation_fails_count': 'Độ nâng tay chân',
+        'hold_fails_count': 'Thời gian giữ',
+        'lumbar_fails_count': 'An toàn lưng',
+      };
+
+  @override
+  Map<String, String Function(int count, int total)> praiseSentenceMap() => {
+        'Độ nâng tay chân': (c, t) =>
+            'Tay chân nâng đều $c/$t rep - đường bay rất gọn.',
+        'Thời gian giữ': (c, t) =>
+            'Giữ đỉnh chắc $c/$t rep - kiểm soát tốt hơn hẳn.',
+        'An toàn lưng': (c, t) =>
+            'Lưng dưới an toàn $c/$t rep - độ nâng vừa đủ và sạch.',
       };
 
   @override
@@ -65,7 +75,7 @@ class SupermanReportBuilder extends ExerciseReportBuilder {
     final lumbarFails = setLoggers.fold<int>(
       0,
       (sum, logger) =>
-          sum + ((logger.setLogs['lumbar_fails'] as num?)?.toInt() ?? 0),
+          sum + ((logger.setLogs['lumbar_fails_count'] as num?)?.toInt() ?? 0),
     );
 
     return [

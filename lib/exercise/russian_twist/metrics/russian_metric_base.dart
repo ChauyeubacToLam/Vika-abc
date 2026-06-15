@@ -64,11 +64,15 @@ abstract class RussianMetricBase {
     }
   }
 
+  void reset() {
+    _faults.clear();
+    debugData.clear();
+  }
+
   void resetAndCountFault() {
     if (_faults.isNotEmpty) {
       _faultsCount++;
     }
-    _faults.clear();
-    debugData.clear();
+    reset();
   }
 }

@@ -97,7 +97,7 @@ void main() {
 
     expect(exercise.correctForm, isTrue);
     expect(exercise.logger.repLogs.single.correctForm, isTrue);
-    expect(exercise.logger.setLogs['foot_placement_fails_count'], 0);
+    expect(exercise.logger.setLogs['foot_placement_seconds'], 0.0);
   });
 
   test('feet too far from hips freeze hold progress and fail form', () {
@@ -115,7 +115,7 @@ void main() {
     exercise.onSetComplete();
 
     expect(exercise.correctForm, isFalse);
-    expect(exercise.logger.setLogs['foot_placement_fails_count'], 1);
+    expect(exercise.logger.setLogs['foot_placement_seconds'], 0.0);
     expect(
       exercise.logger.repLogs.single.data['fault_types'],
       contains('FootPlacement'),
@@ -136,7 +136,7 @@ void main() {
     exercise.onSetComplete();
 
     expect(exercise.correctForm, isFalse);
-    expect(exercise.logger.setLogs['posture_fails_count'], 1);
+    expect(exercise.logger.setLogs['posture_seconds'], 0.0);
     expect(
       exercise.logger.repLogs.single.data['fault_types'],
       contains('PostureCollapse'),

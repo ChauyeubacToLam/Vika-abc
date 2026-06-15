@@ -35,6 +35,10 @@ class BowPose extends ExerciseBase {
   BowPoseState previousState = BowPoseState.prone;
 
   double _baselineShoulderY = 0.0;
+  final HoldSecondsAccumulator _holdSeconds = HoldSecondsAccumulator(const [
+    'connection_seconds',
+    'lift_form_seconds',
+  ]);
 
   final Debouncer _stateDebouncer = Debouncer(requiredFrames: 3);
 
@@ -125,12 +129,21 @@ class BowPose extends ExerciseBase {
   bool requestStop() => repCount >= maxRep;
 
   @override
-  void onSetComplete() {
-    logger.pushKey("connection_fails_count", connectionMetric.faultsCount);
-    logger.pushKey("lift_form_fails_count", liftFormMetric.faultsCount);
-    logger.pushKey("hold_duration_fails_count", holdDurationMetric.faultsCount);
-    logger.pushKey("stability_fails_count", stabilityMetric.faultsCount);
+  void onExerciseActivated() {
+    super.onExerciseActivated();
+    _holdSeconds.reset();
+  }
 
+  @override
+  void onSetComplete() {
+    final targetSeconds = maxRep * BowPoseConfig.HOLD_TARGET_SECONDS;
+    logger.pushKey("total_seconds", targetSeconds);
+    logger.pushKey(
+        "good_seconds", _holdSeconds.goodSeconds.clamp(0.0, targetSeconds));
+    logger.pushKey("connection_seconds",
+        _holdSeconds.faultSecondsFor('connection_seconds'));
+    logger.pushKey(
+        "lift_form_seconds", _holdSeconds.faultSecondsFor('lift_form_seconds'));
     logger.pushMax("hold_time", "max_hold_time");
     logger.pushGoodRepCount();
     logger.pushKey("max_rep", maxRep);
@@ -172,12 +185,18 @@ class BowPose extends ExerciseBase {
         hip == null ||
         knee == null ||
         ankle == null ||
-        wrist == null) return;
+        wrist == null) {
+      _holdSeconds.resetTick();
+      return;
+    }
     if (shoulder.likelihood < 0.5 ||
         hip.likelihood < 0.5 ||
         knee.likelihood < 0.5 ||
         ankle.likelihood < 0.5 ||
-        !ExerciseBase.isLandmarkConfident(wrist)) return;
+        !ExerciseBase.isLandmarkConfident(wrist)) {
+      _holdSeconds.resetTick();
+      return;
+    }
 
     double refLen = calculateDistance(shoulder, hip);
     if (refLen < 10) refLen = 10;
@@ -241,6 +260,7 @@ class BowPose extends ExerciseBase {
       ));
 
       for (final metric in _metrics) metric.resetAndCountFault();
+      _holdSeconds.resetTick();
       _stateDebouncer.reset();
       previousState = bowPoseState;
       return;
@@ -248,6 +268,17 @@ class BowPose extends ExerciseBase {
 
     if (bowPoseState != BowPoseState.prone) {
       for (final metric in _metrics) metric.update(ctx);
+    }
+    if (bowPoseState == BowPoseState.hold) {
+      _holdSeconds.accumulate(
+        elapsedMs: elapsedMs,
+        faultingByKey: {
+          'connection_seconds': connectionMetric.isFaultingNow,
+          'lift_form_seconds': liftFormMetric.isFaultingNow,
+        },
+      );
+    } else {
+      _holdSeconds.resetTick();
     }
     for (final metric in _metrics) debugData.addAll(metric.debugData);
 
@@ -305,6 +336,9 @@ class BowPose extends ExerciseBase {
     bowPoseState = newState;
 
     if (newState == BowPoseState.setup) resultIssues.instructions.clear();
+    if (newState == BowPoseState.hold || previousState == BowPoseState.hold) {
+      _holdSeconds.resetTick();
+    }
 
     for (final metric in _metrics) {
       metric.onStateTransition(previousState, newState, timestampMs);

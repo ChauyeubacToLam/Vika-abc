@@ -1,6 +1,7 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, non_constant_identifier_names
 
 import 'package:vika/utils/debouncer.dart';
+import '../../utils/exercise_logger.dart';
 import '../../utils/pose_math_helpers.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
@@ -8,7 +9,6 @@ import '../exercise_base.dart';
 import 'metrics/step_back_burpee_metric_base.dart';
 import 'metrics/squat_hinge_metric.dart';
 import 'metrics/plank_form_metric.dart';
-import 'report/step_back_burpee_report_builder.dart';
 
 class BurpeeConfig {
   static const int MAX_REP = 15;
@@ -32,17 +32,12 @@ class StepBackBurpee extends ExerciseBase {
   BurpeeState burpeeState = BurpeeState.standing;
   BurpeeState previousBurpeeState = BurpeeState.standing;
 
-  // Lưu thời điểm bắt đầu set để tính Pace (Tốc độ)
-  int? _setStartTime;
-
   final Debouncer _plankDebouncer = Debouncer(requiredFrames: 3);
   final Debouncer _standingDebouncer = Debouncer(requiredFrames: 3);
 
   // Metrics & Report
   final SquatHingeMetric squatHingeMetric = SquatHingeMetric();
   final PlankFormMetric plankFormMetric = PlankFormMetric();
-  final StepBackBurpeeReportBuilder reportBuilder =
-      StepBackBurpeeReportBuilder();
 
   late final List<StepBackBurpeeMetricBase> _metrics = [
     squatHingeMetric,
@@ -121,14 +116,10 @@ class StepBackBurpee extends ExerciseBase {
 
   @override
   void onSetComplete() {
-    final report = reportBuilder.buildReport(
-        _setStartTime ?? DateTime.now().millisecondsSinceEpoch,
-        DateTime.now().millisecondsSinceEpoch);
-
-    // Đẩy data lên UI (Giả lập console log)
-    logger.pushKey("Spine Safety", report.spineSafetyScore);
-    logger.pushKey("Plank Extension", report.plankExtensionScore);
-    logger.pushKey("Pace", report.repsPerMinute);
+    logger.pushKey("spine_fails_count", squatHingeMetric.faultsCount);
+    logger.pushKey("plank_form_fails_count", plankFormMetric.faultsCount);
+    logger.pushGoodRepCount();
+    logger.pushKey('max_rep', maxRep);
   }
 
   @override
@@ -141,8 +132,6 @@ class StepBackBurpee extends ExerciseBase {
 
   @override
   void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
-    _setStartTime ??= frameTimestampMs;
-
     PoseLandmark? shoulder = getSideLandmark(
         landmarks: smoothedLandmarks,
         rightType: PoseLandmarkType.rightShoulder,
@@ -238,8 +227,6 @@ class StepBackBurpee extends ExerciseBase {
       final allFaults = <FaultRecord>[];
       for (final metric in _metrics) allFaults.addAll(metric.faults);
 
-      reportBuilder.recordRep(allFaults, now);
-
       correctForm = !allFaults.any((f) => f.affectsForm);
       resultIssues.feedback['Result'] = correctForm ? 'Tốt!' : 'Sửa form nhé!';
 
@@ -250,8 +237,17 @@ class StepBackBurpee extends ExerciseBase {
       }
       setFeedback.add({correctForm: faultMap});
 
+      logger.addRepLog(RepLog(
+        correctForm: correctForm,
+        repNumber: repCount,
+        data: {
+          'fault_types': allFaults.map((f) => f.type).toSet().toList(),
+        },
+      ));
+
+      for (final metric in _metrics) metric.resetAndCountFault();
+
       correctForm = true;
-      for (final metric in _metrics) metric.reset();
       previousBurpeeState = BurpeeState.standing;
     }
   }

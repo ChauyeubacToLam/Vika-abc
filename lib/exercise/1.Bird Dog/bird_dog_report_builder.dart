@@ -6,26 +6,32 @@ class BirdDogReportBuilder extends ExerciseReportBuilder {
   @override
   Map<String, List<String>> painToFaultMap() => {
         'lower_back': ['lumbar_fails_count', 'trunk_fails_count'],
-        'shoulder': ['alignment_fails_count'],
+        'shoulder_neck': ['alignment_fails_count'],
       };
 
   @override
   Map<String, FaultTipCopy> faultToTipMap() => {
         'lumbar_fails_count': (
-          watch: 'Đưa chân quá cao, chú ý chỉnh.',
-          next: 'Đưa chân quá cao, chú ý chỉnh.',
+          watch:
+              'Trong Bird Dog: chân có xu hướng nâng quá cao làm lưng dưới mất trung tính.',
+          next:
+              'Nâng chân chỉ tới ngang thân người, siết bụng giữ lưng phẳng như mặt bàn.',
         ),
         'trunk_fails_count': (
-          watch: 'Hông cứng cáp như chuông không lắc.',
-          next: 'Hông cứng cáp như chuông không lắc.',
+          watch:
+              'Trong Bird Dog: hông có xu hướng lắc khi tay và chân rời sàn.',
+          next:
+              'Mở rộng điểm tựa và siết hông, tưởng tượng giữ một ly nước trên lưng không để sánh.',
         ),
         'alignment_fails_count': (
-          watch: 'Đừng gập cổ, vươn dài tay chân.',
-          next: 'Đừng gập cổ, vươn dài tay chân.',
+          watch: 'Trong Bird Dog: cổ hoặc tay chân có lúc mất đường vươn dài.',
+          next:
+              'Vươn tay về trước và gót về sau như kéo dài cơ thể, giữ gáy dài và nhìn xuống sàn.',
         ),
         'tempo_fails_count': (
-          watch: 'Kiểm soát: Giữ đủ 5s trên đỉnh.',
-          next: 'Kiểm soát: Giữ đủ 5s trên đỉnh.',
+          watch:
+              'Trong Bird Dog: thời gian giữ ở đỉnh có lúc ngắn hơn mục tiêu.',
+          next: 'Giữ yên ở đỉnh trọn 5 giây rồi mới đổi bên, đừng vội.',
         ),
       };
 

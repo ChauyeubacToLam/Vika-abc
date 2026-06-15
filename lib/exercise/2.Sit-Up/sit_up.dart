@@ -163,20 +163,22 @@ class SitUp extends ExerciseBase with SideTrackedExerciseMixin {
 
   @override
   void onSetComplete() {
-    logger.pushKey("max_rep", maxRep);
+    logger.pushKey("max_rep", _timeoutReached ? repCount : maxRep);
     logger.pushKey("rom_fails_count", romMetric.faultsCount);
     logger.pushKey("jerking_fails_count", jerkingMetric.faultsCount);
     logger.pushKey("stability_fails_count", stabilityMetric.faultsCount);
     logger.pushKey("tempo_fails_count", tempoMetric.faultsCount);
     logger.pushGoodRepCount();
 
-    StringBuffer dump = StringBuffer();
-    dump.writeln("=== DIAGNOSTIC LOG (SIT-UP) ===");
-    for (var log in _diagnosticLog) {
-      dump.writeln(
-          "${log['time']} | ${log['state']} | ${log['trunk'].toStringAsFixed(1)} | ${log['khs'].toStringAsFixed(1)} | ${log['ankleY'].toStringAsFixed(1)}");
+    if (isDebugModeActive) {
+      StringBuffer dump = StringBuffer();
+      dump.writeln("=== DIAGNOSTIC LOG (SIT-UP) ===");
+      for (var log in _diagnosticLog) {
+        dump.writeln(
+            "${log['time']} | ${log['state']} | ${log['trunk'].toStringAsFixed(1)} | ${log['khs'].toStringAsFixed(1)} | ${log['ankleY'].toStringAsFixed(1)}");
+      }
+      logger.pushKey("diagnostic_dump", dump.toString());
     }
-    logger.pushKey("diagnostic_dump", dump.toString());
   }
 
   @override
@@ -221,7 +223,8 @@ class SitUp extends ExerciseBase with SideTrackedExerciseMixin {
       resultIssues: resultIssues,
     );
 
-    if (now - _lastDiagnosticTime > 500 || state != previousState) {
+    if (isDebugModeActive &&
+        (now - _lastDiagnosticTime > 500 || state != previousState)) {
       _diagnosticLog.add({
         'time': ((now - _exerciseStartTimeMs!) / 1000).toStringAsFixed(1),
         'state': state.name,
@@ -293,19 +296,29 @@ class SitUp extends ExerciseBase with SideTrackedExerciseMixin {
 
     correctForm = !allFaults.any((f) => f.affectsForm);
 
-    if (!correctForm)
-      resultIssues.feedback['Result'] =
-          isLegLifted ? 'Không tính rep' : 'Fix Form';
+    if (isLegLifted) {
+      resultIssues.feedback['Result'] = 'Không tính rep';
+    } else if (!correctForm) {
+      resultIssues.feedback['Result'] = 'Fix Form';
+    }
 
-    logger
-        .addRepLog(RepLog(correctForm: correctForm, repNumber: repCount, data: {
-      "min_khs_angle": romMetric.minKneeHipShoulder ?? 180.0,
-      "lowering_time": tempoMetric.loweringDuration ?? 0.0,
-      "fault_types": allFaults.map((e) => e.type).toSet().toList()
-    }));
+    if (!isLegLifted) {
+      logger.addRepLog(
+          RepLog(correctForm: correctForm, repNumber: repCount, data: {
+        "min_khs_angle": romMetric.minKneeHipShoulder ?? 180.0,
+        "lowering_time": tempoMetric.loweringDuration ?? 0.0,
+        "fault_types": allFaults.map((e) => e.type).toSet().toList()
+      }));
+    }
 
     correctForm = true;
-    for (var metric in _metrics) metric.resetAndCountFault();
+    for (var metric in _metrics) {
+      if (isLegLifted) {
+        metric.reset();
+      } else {
+        metric.resetAndCountFault();
+      }
+    }
   }
 
   // FIX: Dùng atan2 thay vì (dy/dx * 180/π) — công thức cũ trả về tan(θ)×(180/π), không phải góc thật

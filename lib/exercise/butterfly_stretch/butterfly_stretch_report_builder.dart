@@ -5,6 +5,47 @@ import 'butterfly_stretch.dart'; // Import để dùng ButterflyConfig.TARGET_HO
 
 class ButterflyReportBuilder extends ExerciseReportBuilder {
   @override
+  bool get isSecondBased => true;
+
+  @override
+  Map<String, List<String>> painToFaultMap() => {
+        'hip': ['knee_seconds', 'foot_placement_seconds'],
+        'lower_back': ['posture_seconds'],
+        'knee': ['knee_seconds'],
+      };
+
+  @override
+  Map<String, String> praiseMetricNames() => {
+        'knee_seconds': 'Mở gối',
+        'posture_seconds': 'Lưng thẳng',
+        'foot_placement_seconds': 'Vị trí chân',
+      };
+
+  @override
+  Map<String, FaultTipCopy> faultToTipMap() => {
+        'knee_seconds': (
+          watch: 'Trong Butterfly: hai gối chưa mở đều hoặc còn cao.',
+          next: 'Thả lỏng để hai gối rơi đều về phía sàn, đừng ép bằng tay.',
+        ),
+        'posture_seconds': (
+          watch: 'Trong Butterfly: lưng có lúc bị gù xuống.',
+          next: 'Ngồi cao như có sợi dây kéo đỉnh đầu lên, mở ngực.',
+        ),
+        'foot_placement_seconds': (
+          watch: 'Trong Butterfly: gót chân để hơi xa hông.',
+          next: 'Kéo hai gót chân lại gần hông để tăng độ giãn ở háng.',
+        ),
+      };
+
+  @override
+  Map<String, String Function(int count, int total)> praiseSentenceMap() => {
+        'Mở gối': (c, t) =>
+            'Hai gối mở đều xuống sàn - háng linh hoạt hơn rồi!',
+        'Lưng thẳng': (c, t) => 'Lưng giữ thẳng suốt bài - tư thế rất đẹp!',
+        'Vị trí chân': (c, t) => 'Gót chân đặt sát hông - độ giãn đạt tối đa!',
+      };
+
+  @override
   List<DetailCard> buildDetailCards(List<ExerciseLogger> setLoggers) {
     if (setLoggers.isEmpty) return [];
 
@@ -35,36 +76,6 @@ class ButterflyReportBuilder extends ExerciseReportBuilder {
         color: 'amber',
       ),
     ];
-  }
-
-  (String, String, String?) pickInsight(ExerciseLogger logger,
-      ExerciseLogger? prevLogger, int setScore, int? prevScore) {
-    final postureFails =
-        (logger.setLogs["posture_fails_count"] as num?)?.toInt() ?? 0;
-    final footPlacementFails =
-        (logger.setLogs["foot_placement_fails_count"] as num?)?.toInt() ?? 0;
-
-    if (footPlacementFails > 0) {
-      return (
-        'Cảnh báo: Gót chân quá xa hông',
-        'Kéo hai gót chân lại gần hông trước khi giữ tư thế để bài giãn cơ hiệu quả hơn.',
-        null,
-      );
-    }
-
-    if (postureFails > 0) {
-      return (
-        'Cảnh báo: Lệch vai/Gù lưng',
-        'Cố gắng giữ lưng thẳng khi ép gối, không cố quá sức.',
-        null,
-      );
-    }
-
-    return (
-      'Kéo giãn tốt',
-      'Giữ đều nhịp thở ở bài tập này.',
-      null,
-    );
   }
 
   @override

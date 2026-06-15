@@ -6,28 +6,30 @@ class VUpReportBuilder extends ExerciseReportBuilder {
   @override
   Map<String, List<String>> painToFaultMap() => {
         'lower_back': ['sync_fails_count', 'jerking_fails_count'],
-        'hamstring': ['knee_fails_count'],
+        'knee': ['knee_fails_count'],
       };
 
   @override
   Map<String, FaultTipCopy> faultToTipMap() => {
         'sync_fails_count': (
-          watch:
-              'Nâng tay lên trước sẽ tạo áp lực bẻ cong thắt lưng. Hãy tưởng tượng tay và chân bạn được nối bằng một sợi dây.',
+          watch: 'Trong V-Up: tay và chân có lúc không nâng lên cùng nhịp.',
           next:
               'Nâng tay lên trước sẽ tạo áp lực bẻ cong thắt lưng. Hãy tưởng tượng tay và chân bạn được nối bằng một sợi dây.',
         ),
         'jerking_fails_count': (
-          watch:
-              'Lực giật là kẻ thù của đĩa đệm. Hãy lên bằng sức căng của cơ bụng.',
+          watch: 'Trong V-Up: thân người có lúc bật lên bằng quán tính.',
           next:
               'Lực giật là kẻ thù của đĩa đệm. Hãy lên bằng sức căng của cơ bụng.',
         ),
         'rom_fails_count': (
-          watch:
-              'Bạn chưa gập thành hình chữ V. Cố ép bụng vào đùi sâu hơn nữa.',
+          watch: 'Trong V-Up: biên độ gập có lúc chưa tạo được hình chữ V rõ.',
           next:
               'Bạn chưa gập thành hình chữ V. Cố ép bụng vào đùi sâu hơn nữa.',
+        ),
+        'tempo_fails_count': (
+          watch: 'Trong V-Up: pha hạ người có lúc xuống quá nhanh.',
+          next:
+              'Hạ người chậm và có kiểm soát (2-3 giây) để cơ bụng chịu tải lâu hơn.',
         ),
       };
 
@@ -36,6 +38,7 @@ class VUpReportBuilder extends ExerciseReportBuilder {
         'Hiệp đồng': (c, t) => 'Đồng bộ tay chân $c/$t rep - Cực kỳ hoàn hảo!',
         'Biên độ': (c, t) => 'Chữ V cực gắt $c/$t rep!',
         'Trơn tru': (c, t) => 'Lên không một chút quán tính $c/$t rep!',
+        'Kiểm soát': (c, t) => 'Hạ người chậm rãi, kiểm soát tốt $c/$t rep!',
       };
 
   @override
@@ -43,6 +46,7 @@ class VUpReportBuilder extends ExerciseReportBuilder {
         'sync_fails_count': 'Hiệp đồng',
         'rom_fails_count': 'Biên độ',
         'jerking_fails_count': 'Trơn tru',
+        'tempo_fails_count': 'Kiểm soát',
       };
 
   @override

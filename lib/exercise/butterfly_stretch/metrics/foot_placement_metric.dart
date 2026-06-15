@@ -16,9 +16,12 @@ class FootPlacementMetric extends ButterflyMetricBase {
   bool _instructionSet = false;
   double? _currentValue;
   MetricStatus _status = MetricStatus.pass;
+  bool _isFaultingNow = false;
 
   @override
   List<FaultRecord> get faults => _faults;
+  @override
+  bool get isFaultingNow => _isFaultingNow;
 
   @override
   Map<String, dynamic> get debugData => _debugData;
@@ -39,6 +42,7 @@ class FootPlacementMetric extends ButterflyMetricBase {
 
   @override
   void update(StretchContext ctx) {
+    _isFaultingNow = false;
     _currentValue = ctx.footToHipDistanceNorm;
     _debugData['foot_to_hip_norm'] =
         ctx.footToHipDistanceNorm.toStringAsFixed(3);
@@ -51,6 +55,7 @@ class FootPlacementMetric extends ButterflyMetricBase {
     _status = tooFar ? MetricStatus.fault : MetricStatus.pass;
 
     if (tooFar) {
+      _isFaultingNow = true;
       ctx.resultIssues.feedback['Foot'] = 'Kéo gót chân lại gần hông!';
       if (!_instructionSet) {
         ctx.resultIssues.addInstruction(
@@ -85,5 +90,6 @@ class FootPlacementMetric extends ButterflyMetricBase {
     _instructionSet = false;
     _currentValue = null;
     _status = MetricStatus.pass;
+    _isFaultingNow = false;
   }
 }

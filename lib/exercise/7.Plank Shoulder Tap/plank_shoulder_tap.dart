@@ -295,7 +295,13 @@ class PlankShoulderTap extends ExerciseBase {
     _transitionState(PlankTapState.base, ctx.frameTimestamp);
     currentTappingSide = TappingSide.none;
     _baselineWristY = null;
-    for (final metric in _metrics) metric.resetAndCountFault();
+    for (final metric in _metrics) {
+      if (countRep) {
+        metric.resetAndCountFault();
+      } else {
+        metric.reset();
+      }
+    }
   }
 
   Map<String, PoseLandmark>? _getLandmarks(
@@ -375,12 +381,12 @@ class PlankShoulderTap extends ExerciseBase {
   @override
   void onSetComplete() {
     logger.pushKey("timeout", _isTimeout);
-    logger.pushKey("rotation_fails", rotationMetric.faultsCount);
-    logger.pushKey("alignment_fails", trunkMetric.faultsCount);
-    logger.pushKey("tap_fails", tapMetric.faultsCount);
-    logger.pushKey("tempo_fails", tempoMetric.faultsCount);
+    logger.pushKey("rotation_fails_count", rotationMetric.faultsCount);
+    logger.pushKey("alignment_fails_count", trunkMetric.faultsCount);
+    logger.pushKey("tap_fails_count", tapMetric.faultsCount);
+    logger.pushKey("tempo_fails_count", tempoMetric.faultsCount);
     logger.pushKey("rejected_tap_attempts", _rejectedTapAttempts);
     logger.pushGoodRepCount();
-    logger.pushKey("max_rep", maxRep);
+    logger.pushKey("max_rep", _isTimeout ? repCount : maxRep);
   }
 }

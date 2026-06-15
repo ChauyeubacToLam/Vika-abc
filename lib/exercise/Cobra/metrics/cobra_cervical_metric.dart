@@ -24,15 +24,19 @@ class CobraCervicalMetric extends CobraMetricBase {
   final StickyDebouncer _hyperextensionDebouncer =
       StickyDebouncer(requiredFrames: 8);
   final StickyDebouncer _warningDebouncer = StickyDebouncer(requiredFrames: 8);
+  bool _isFaultingNow = false;
 
   @override
   List<FaultRecord> get faults => _faults;
+  @override
+  bool get isFaultingNow => _isFaultingNow;
 
   @override
   Map<String, dynamic> get debugData => _debugData;
 
   @override
   void update(RepContext ctx) {
+    _isFaultingNow = false;
     if (ctx.state == CobraState.setup) return;
     if (ctx.ear == null || ctx.shoulder == null || ctx.hip == null) return;
 
@@ -60,6 +64,7 @@ class CobraCervicalMetric extends CobraMetricBase {
 
     // Error: severe hyperextension (>45°)
     if (_hyperextensionDebouncer.update(cervicalAngle > _errorHyperextension)) {
+      _isFaultingNow = true;
       ctx.resultIssues.feedback['Neck'] = '⚠️ Đầu ngửa quá nhiều!';
       ctx.resultIssues.addInstruction(
         'holding',
@@ -100,5 +105,6 @@ class CobraCervicalMetric extends CobraMetricBase {
     _debugData.clear();
     _hyperextensionDebouncer.reset();
     _warningDebouncer.reset();
+    _isFaultingNow = false;
   }
 }

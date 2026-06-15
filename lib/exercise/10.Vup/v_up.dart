@@ -151,7 +151,7 @@ class VUp extends ExerciseBase with SideTrackedExerciseMixin {
 
   @override
   void onSetComplete() {
-    logger.pushKey("max_rep", maxRep);
+    logger.pushKey("max_rep", _timeoutReached ? repCount : maxRep);
     logger.pushKey("sync_fails_count", syncMetric.faultsCount);
     logger.pushKey("rom_fails_count", romMetric.faultsCount);
     logger.pushKey("jerking_fails_count", jerkingMetric.faultsCount);
@@ -159,14 +159,16 @@ class VUp extends ExerciseBase with SideTrackedExerciseMixin {
     logger.pushKey("tempo_fails_count", tempoMetric.faultsCount);
     logger.pushGoodRepCount();
 
-    final dump = StringBuffer();
-    dump.writeln("=== DIAGNOSTIC LOG (V-UP) ===");
-    dump.writeln("Time(s) | State | V-Angle | Knee | Trunk | Leg | Ready");
-    for (final log in _diagnosticLog) {
-      dump.writeln(
-          "${log['time']} | ${log['state']} | ${log['vAngle'].toStringAsFixed(1)} | ${log['knee'].toStringAsFixed(1)} | ${log['trunk'].toStringAsFixed(1)} | ${log['leg'].toStringAsFixed(1)} | ${log['ready']}");
+    if (isDebugModeActive) {
+      final dump = StringBuffer();
+      dump.writeln("=== DIAGNOSTIC LOG (V-UP) ===");
+      dump.writeln("Time(s) | State | V-Angle | Knee | Trunk | Leg | Ready");
+      for (final log in _diagnosticLog) {
+        dump.writeln(
+            "${log['time']} | ${log['state']} | ${log['vAngle'].toStringAsFixed(1)} | ${log['knee'].toStringAsFixed(1)} | ${log['trunk'].toStringAsFixed(1)} | ${log['leg'].toStringAsFixed(1)} | ${log['ready']}");
+      }
+      logger.pushKey("diagnostic_dump", dump.toString());
     }
-    logger.pushKey("diagnostic_dump", dump.toString());
   }
 
   @override
@@ -215,7 +217,8 @@ class VUp extends ExerciseBase with SideTrackedExerciseMixin {
       resultIssues: resultIssues,
     );
 
-    if (now - _lastDiagnosticTime > 500 || state != previousState) {
+    if (isDebugModeActive &&
+        (now - _lastDiagnosticTime > 500 || state != previousState)) {
       _diagnosticLog.add({
         'time': ((now - _exerciseStartTimeMs!) / 1000).toStringAsFixed(1),
         'state': state.name,
@@ -475,7 +478,13 @@ class VUp extends ExerciseBase with SideTrackedExerciseMixin {
 
     correctForm = true;
     _resetRepAttempt(clearBaseline: true);
-    for (final metric in _metrics) metric.resetAndCountFault();
+    for (final metric in _metrics) {
+      if (hasDisqualifyingFault) {
+        metric.reset();
+      } else {
+        metric.resetAndCountFault();
+      }
+    }
   }
 
   _VUpPoseProfile? _calculatePoseProfile(

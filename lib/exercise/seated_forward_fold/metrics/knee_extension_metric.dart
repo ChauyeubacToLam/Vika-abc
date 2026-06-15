@@ -9,15 +9,19 @@ class KneeExtensionMetric extends SeatedForwardMetricBase {
   final Map<String, dynamic> _debugData = {};
   final Debouncer _kneeBendDebouncer = Debouncer(requiredFrames: 3);
   bool _instructionSet = false;
+  bool _isFaultingNow = false;
 
   @override
   List<FaultRecord> get faults => _faults;
+  @override
+  bool get isFaultingNow => _isFaultingNow;
 
   @override
   Map<String, dynamic> get debugData => _debugData;
 
   @override
   void update(SeatedForwardContext ctx) {
+    _isFaultingNow = false;
     if (ctx.state == SeatedForwardState.setup ||
         ctx.state == SeatedForwardState.ascending) {
       return;
@@ -28,6 +32,7 @@ class KneeExtensionMetric extends SeatedForwardMetricBase {
     bool isKneeBent = ctx.kneeAngle < SeatedForwardConfig.Ak_Fault_Knee_Angle;
 
     if (_kneeBendDebouncer.update(isKneeBent)) {
+      _isFaultingNow = true;
       ctx.resultIssues.feedback['Knee'] = 'Thẳng gối ra!';
       if (!_instructionSet) {
         ctx.resultIssues.addInstruction(
@@ -61,5 +66,6 @@ class KneeExtensionMetric extends SeatedForwardMetricBase {
     super.reset();
     _instructionSet = false;
     _kneeBendDebouncer.reset();
+    _isFaultingNow = false;
   }
 }

@@ -99,7 +99,7 @@ void main() {
 
       final sphinx = SphinxStretch()..onSetComplete();
       expect(sphinx.repCount, 0);
-      expect(sphinx.logger.setLogs['target_rep'], SphinxConfig.Af_Max_Reps);
+      expect(sphinx.logger.setLogs.containsKey('target_rep'), isFalse);
       expect(sphinx.logger.setLogs['max_rep'], SphinxConfig.Af_Max_Reps);
     });
 
@@ -111,9 +111,9 @@ void main() {
 
       expect(highPlank.logger.setLogs['total_seconds'], 30.0);
       expect(highPlank.logger.setLogs['good_seconds'], 0.0);
-      expect(highPlank.logger.setLogs['sagging_fault_seconds'], 0.0);
-      expect(highPlank.logger.setLogs['piked_fault_seconds'], 0.0);
-      expect(highPlank.logger.setLogs['elbow_fault_seconds'], 0.0);
+      expect(highPlank.logger.setLogs['sagging_seconds'], 0.0);
+      expect(highPlank.logger.setLogs['piked_seconds'], 0.0);
+      expect(highPlank.logger.setLogs['elbow_seconds'], 0.0);
       expect(highPlank.logger.repLogs, hasLength(1));
 
       final bearPlank = BearPlank();
@@ -122,11 +122,11 @@ void main() {
 
       expect(bearPlank.logger.setLogs['total_seconds'], 30.0);
       expect(bearPlank.logger.setLogs['good_seconds'], 0.0);
-      expect(bearPlank.logger.setLogs.containsKey('knee_fails'), isTrue);
+      expect(bearPlank.logger.setLogs.containsKey('knee_fails'), isFalse);
       expect(bearPlank.logger.setLogs.containsKey('knee_fails_count'), isFalse);
-      expect(bearPlank.logger.setLogs['knee_fault_seconds'], 0.0);
-      expect(bearPlank.logger.setLogs['back_fault_seconds'], 0.0);
-      expect(bearPlank.logger.setLogs['weight_fault_seconds'], 0.0);
+      expect(bearPlank.logger.setLogs['knee_seconds'], 0.0);
+      expect(bearPlank.logger.setLogs['back_seconds'], 0.0);
+      expect(bearPlank.logger.setLogs['weight_seconds'], 0.0);
       expect(bearPlank.logger.repLogs, hasLength(1));
     });
   });

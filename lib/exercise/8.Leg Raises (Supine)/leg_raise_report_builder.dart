@@ -12,22 +12,32 @@ class LegRaiseReportBuilder extends ExerciseReportBuilder {
   @override
   Map<String, FaultTipCopy> faultToTipMap() => {
         'pelvic_fails_count': (
-          watch:
-              'Võng lưng báo hiệu hông bạn đã mỏi. Đừng ráng hạ chân sát mặt đất nếu lưng bạn bị hổng lên.',
+          watch: 'Trong Leg Raise: lưng dưới có lúc hở khỏi sàn khi hạ chân.',
           next:
               'Võng lưng báo hiệu hông bạn đã mỏi. Đừng ráng hạ chân sát mặt đất nếu lưng bạn bị hổng lên.',
         ),
         'tempo_fails_count': (
           watch:
-              'Lực kéo quán tính của chân rơi tự do sẽ giật mạnh vào cột sống thắt lưng. Hãy kìm chân lại.',
+              'Trong Leg Raise: chân có lúc hạ xuống quá nhanh ở pha đi xuống.',
           next:
               'Lực kéo quán tính của chân rơi tự do sẽ giật mạnh vào cột sống thắt lưng. Hãy kìm chân lại.',
         ),
-        'knee_fails_count': (
+        'rom_fails_count': (
           watch:
-              'Cơ đùi sau (Hamstring) của bạn có vẻ bị căng cứng nên không thể duỗi thẳng. Tập giãn cơ thêm nhé.',
+              'Chân có lúc chưa đi hết biên độ, nên bụng dưới chưa nhận đủ lực kiểm soát.',
+          next:
+              'Kéo gót chân đi theo một cung dài và nâng chân rõ ràng trước khi hạ xuống.',
+        ),
+        'knee_fails_count': (
+          watch: 'Trong Leg Raise: gối có lúc gập khi chân đang nâng hoặc hạ.',
           next:
               'Cơ đùi sau (Hamstring) của bạn có vẻ bị căng cứng nên không thể duỗi thẳng. Tập giãn cơ thêm nhé.',
+        ),
+        'arm_position_fails_count': (
+          watch:
+              'Tay rời khỏi sàn làm thân người mất điểm neo, chân sẽ dễ kéo lưng theo.',
+          next:
+              'Ấn nhẹ hai tay xuống thảm như neo cơ thể lại, rồi để chân di chuyển chậm.',
         ),
       };
 
@@ -36,14 +46,20 @@ class LegRaiseReportBuilder extends ExerciseReportBuilder {
         'Khóa chậu': (c, t) =>
             'Không nhấp nhô hông $c/$t rep - Cột sống an toàn tuyệt đối!',
         'Nhả cơ': (c, t) => 'Kiểm soát nhịp độ thả chân xuất sắc $c/$t rep!',
+        'Biên độ nâng': (c, t) =>
+            'Biên độ nâng rõ $c/$t rep - bụng dưới làm việc tốt.',
         'Đôi chân': (c, t) => 'Duỗi thẳng gối hoàn hảo $c/$t rep!',
+        'Tay neo sàn': (c, t) =>
+            'Hai tay neo sàn ổn định $c/$t rep - thân người rất chắc.',
       };
 
   @override
   Map<String, String> praiseMetricNames() => {
         'pelvic_fails_count': 'Khóa chậu',
         'tempo_fails_count': 'Nhả cơ',
+        'rom_fails_count': 'Biên độ nâng',
         'knee_fails_count': 'Đôi chân',
+        'arm_position_fails_count': 'Tay neo sàn',
       };
 
   @override

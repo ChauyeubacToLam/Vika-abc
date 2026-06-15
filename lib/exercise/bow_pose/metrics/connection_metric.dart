@@ -15,15 +15,19 @@ class ConnectionMetric extends BowPoseMetricBase {
   final Debouncer _dropDebouncer = Debouncer(requiredFrames: 3);
 
   bool _instructionSet = false;
+  bool _isFaultingNow = false;
 
   @override
   List<FaultRecord> get faults => _faults;
+  @override
+  bool get isFaultingNow => _isFaultingNow;
 
   @override
   Map<String, dynamic> get debugData => _debugData;
 
   @override
   void update(RepContext ctx) {
+    _isFaultingNow = false;
     _debugData['wristAnkleDist'] = ctx.wristAnkleDist.toStringAsFixed(3);
 
     if (ctx.bowPoseState == BowPoseState.ascending ||
@@ -31,6 +35,7 @@ class ConnectionMetric extends BowPoseMetricBase {
       bool isDropped = ctx.wristAnkleDist > ConnectionConfig.DROP_THRESHOLD;
 
       if (_dropDebouncer.update(isDropped)) {
+        _isFaultingNow = true;
         ctx.resultIssues.feedback['Connection'] = 'Tuột tay rồi!';
         if (!_instructionSet) {
           _faults.add(FaultRecord(
@@ -58,5 +63,6 @@ class ConnectionMetric extends BowPoseMetricBase {
     _debugData.clear();
     _dropDebouncer.reset();
     _instructionSet = false;
+    _isFaultingNow = false;
   }
 }

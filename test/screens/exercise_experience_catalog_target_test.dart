@@ -3,6 +3,16 @@ import 'package:vika/exercise/12.Dead Bug/dead_bug.dart';
 import 'package:vika/exercise/14.Bear Plank/bear_plank.dart';
 import 'package:vika/exercise/3.High Plank/high_plank.dart';
 import 'package:vika/exercise/4.Mountain Climber/mountain_climber.dart';
+import 'package:vika/exercise/curl_up/curl_up.dart';
+import 'package:vika/exercise/glute bridge/glute_bridge.dart';
+import 'package:vika/exercise/jumping jack/jumping_jack.dart';
+import 'package:vika/exercise/lunge/lunge.dart';
+import 'package:vika/exercise/plank/plank.dart';
+import 'package:vika/exercise/push up/push_up.dart';
+import 'package:vika/exercise/squat/squat.dart';
+import 'package:vika/exercise/wall_push_up/wall_push_up.dart';
+import 'package:vika/exercise/warrior_1/warrior_one.dart';
+import 'package:vika/models/exercise_definition.dart';
 import 'package:vika/models/exercise_lookup.dart';
 import 'package:vika/screens/exercise/exercise_experience_screen.dart';
 import 'package:vika/services/recommendation/models/plan.dart';
@@ -92,5 +102,142 @@ void main() {
     expect(spec.secondsPerUnit, 1);
     expect(spec.exercise, isA<BearPlank>());
     expect((spec.exercise as BearPlank).maxSeconds, 24);
+  });
+
+  test('hand-cased exercises prefer prescription, then catalog reps', () {
+    final cases = <({
+      String id,
+      int literal,
+      int catalog,
+      int prescription,
+      int Function(Object exercise) targetOf,
+    })>[
+      (
+        id: 'squat',
+        literal: 8,
+        catalog: 10,
+        prescription: 12,
+        targetOf: (exercise) => (exercise as Squat).maxRep,
+      ),
+      (
+        id: 'lunge',
+        literal: 8,
+        catalog: 10,
+        prescription: 12,
+        targetOf: (exercise) => (exercise as Lunge).maxRep,
+      ),
+      (
+        id: 'push_up',
+        literal: 6,
+        catalog: 9,
+        prescription: 11,
+        targetOf: (exercise) => (exercise as PushUp).maxRep,
+      ),
+      (
+        id: 'plank',
+        literal: 3,
+        catalog: 4,
+        prescription: 5,
+        targetOf: (exercise) => (exercise as Plank).maxRep,
+      ),
+      (
+        id: 'jumping_jack',
+        literal: 15,
+        catalog: 18,
+        prescription: 20,
+        targetOf: (exercise) => (exercise as JumpingJack).maxRep,
+      ),
+      (
+        id: 'warrior_one',
+        literal: 2,
+        catalog: 4,
+        prescription: 6,
+        targetOf: (exercise) => (exercise as WarriorOne).maxHolds,
+      ),
+      (
+        id: 'glute_bridge',
+        literal: 15,
+        catalog: 18,
+        prescription: 20,
+        targetOf: (exercise) => (exercise as GluteBridge).maxRep,
+      ),
+      (
+        id: 'curl_up',
+        literal: 12,
+        catalog: 14,
+        prescription: 16,
+        targetOf: (exercise) => (exercise as CurlUp).maxRep,
+      ),
+    ];
+
+    for (final entry in cases) {
+      final definition = lookupExerciseDefinition(entry.id)!;
+      final info = catalogInfo(
+        id: entry.id,
+        baseReps: entry.catalog,
+        baseSeconds: 99,
+      );
+
+      final prescribed = debugBuildExerciseExperienceSpec(
+        definition,
+        prescription: VolumePrescription(
+          sets: 3,
+          restSeconds: 45,
+          reps: entry.prescription,
+        ),
+        catalogInfo: info,
+      );
+      expect(
+        prescribed.targetPerSet,
+        entry.prescription,
+        reason: '${entry.id} should prefer prescription reps',
+      );
+      expect(entry.targetOf(prescribed.exercise), entry.prescription);
+
+      final catalogBacked = debugBuildExerciseExperienceSpec(
+        definition,
+        catalogInfo: info,
+      );
+      expect(
+        catalogBacked.targetPerSet,
+        entry.catalog,
+        reason: '${entry.id} should fall back to catalog baseReps',
+      );
+      expect(entry.targetOf(catalogBacked.exercise), entry.catalog);
+
+      final literalBacked = debugBuildExerciseExperienceSpec(definition);
+      expect(
+        literalBacked.targetPerSet,
+        entry.literal,
+        reason: '${entry.id} should retain its literal fallback',
+      );
+      expect(entry.targetOf(literalBacked.exercise), entry.literal);
+    }
+  });
+
+  test('assessment exercises stay fixed at five reps', () {
+    final squatSpec = debugBuildExerciseExperienceSpec(
+      squatAssessmentDefinition,
+      prescription: const VolumePrescription(
+        sets: 2,
+        reps: 12,
+        restSeconds: 45,
+      ),
+      catalogInfo: catalogInfo(id: 'squat_assessment', baseReps: 99),
+    );
+    expect(squatSpec.targetPerSet, 5);
+    expect((squatSpec.exercise as Squat).maxRep, 5);
+
+    final wallPushupSpec = debugBuildExerciseExperienceSpec(
+      wallPushupAssessmentDefinition,
+      prescription: const VolumePrescription(
+        sets: 2,
+        reps: 12,
+        restSeconds: 45,
+      ),
+      catalogInfo: catalogInfo(id: 'wall_pushup_assessment', baseReps: 99),
+    );
+    expect(wallPushupSpec.targetPerSet, 5);
+    expect((wallPushupSpec.exercise as WallPushUp).maxRep, 5);
   });
 }

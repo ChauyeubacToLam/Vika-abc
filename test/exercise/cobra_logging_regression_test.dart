@@ -1,7 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:vika/exercise/Cobra/cobra.dart';
+import 'package:vika/exercise/Cobra/cobra_report_builder.dart';
 import 'package:vika/exercise/exercise_base.dart';
+import 'package:vika/utils/exercise_logger.dart';
 
 PoseLandmark _landmark(
   PoseLandmarkType type,
@@ -123,7 +125,7 @@ void _pump(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('Cobra pushes per-metric fail counts after metric faults', () {
+  test('Cobra publishes seconds keys after metric faults', () {
     final cobra = Cobra(maxRep: 2)
       ..cameraFacing = CameraFacing.right
       ..scaleFactor = 100;
@@ -149,17 +151,19 @@ void main() {
     cobra.onSetComplete();
 
     expect(cobra.logger.setLogs['max_rep'], 2);
-    expect(cobra.logger.setLogs['elbow_flexion_fails_count'], 1);
-    expect(cobra.logger.setLogs['hand_placement_fails_count'], 1);
-    expect(cobra.logger.setLogs['cervical_neutrality_fails_count'], 1);
-    expect(cobra.logger.setLogs['pelvic_grounding_fails_count'], 1);
+    expect(cobra.logger.setLogs['total_seconds'], 30.0);
+    expect(cobra.logger.setLogs['good_seconds'], 0.0);
+    expect(cobra.logger.setLogs['elbow_flexion_seconds'], 0.0);
+    expect(cobra.logger.setLogs['hand_placement_seconds'], 0.0);
+    expect(cobra.logger.setLogs['cervical_neutrality_seconds'], 0.0);
+    expect(cobra.logger.setLogs['pelvic_grounding_seconds'], 0.0);
     expect(
       cobra.logger.setLogs.containsKey('descent_velocity_fails_count'),
       isFalse,
     );
     expect(
-      cobra.logger.setLogs.keys,
-      contains('hold_stability_fails_count'),
+      cobra.logger.setLogs.containsKey('hold_stability_fails_count'),
+      isFalse,
     );
   });
 
@@ -188,6 +192,35 @@ void main() {
 
     cobra.onSetComplete();
 
-    expect(cobra.logger.setLogs['hold_stability_fails_count'], 1);
+    expect(
+      cobra.logger.setLogs.containsKey('hold_stability_fails_count'),
+      isFalse,
+    );
+  });
+
+  test('Cobra report builder scores timed holds from seconds', () {
+    final logger = ExerciseLogger()
+      ..pushKey('total_seconds', 45.0)
+      ..pushKey('good_seconds', 30.0)
+      ..pushKey('max_rep', 3)
+      ..pushKey('good_rep_count', 2)
+      ..pushKey('elbow_flexion_seconds', 0)
+      ..pushKey('hand_placement_seconds', 0)
+      ..pushKey('cervical_neutrality_seconds', 1)
+      ..pushKey('pelvic_grounding_seconds', 0);
+
+    final report = CobraReportBuilder().buildReport(
+      setLoggers: [logger],
+      exerciseName: 'Cobra Pose',
+      metValue: 2.5,
+    );
+
+    expect(report.isSecondBased, isTrue);
+    expect(report.formScore, 67);
+    expect(report.sets.single.score, 67);
+    expect(report.totalReps, isNull);
+    expect(report.totalGoodReps, isNull);
+    expect(report.totalSeconds, 45.0);
+    expect(report.goodSeconds, 30.0);
   });
 }

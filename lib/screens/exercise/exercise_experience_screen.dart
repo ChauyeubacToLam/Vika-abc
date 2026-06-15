@@ -312,8 +312,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
   }
 
   ({ExerciseReportBuilder builder, double met}) _resolveReportEntry() {
-    return resolveReportBuilder(widget.definition.id) ??
-        (builder: GenericReportBuilder(), met: 3.5);
+    return resolveReportBuilder(widget.definition.id);
   }
 
   PostExerciseData _buildReport() {
@@ -640,8 +639,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       var lowestFormScore = accumulated.first.formScore;
       for (final r in accumulated) {
         lowestFormScore = min(r.formScore, lowestFormScore);
-        final builder = resolveReportBuilder(r.definition.id)?.builder ??
-            GenericReportBuilder();
+        final builder = resolveReportBuilder(r.definition.id).builder;
         candidates.addAll(
           builder.buildFaultCandidates(
             exerciseId: r.exerciseKey,
@@ -954,7 +952,7 @@ class _ExerciseExperienceSpec {
       case 'squat':
         return _ExerciseExperienceSpec(
           sets: overrideSets ?? 3,
-          repsPerSet: overrideReps ?? 8,
+          repsPerSet: overrideReps ?? catalogReps ?? 8,
           videoDuration: '2:15',
           restSeconds: overrideRest ?? 45,
           targetLabel: 'REP/HIỆP',
@@ -1006,7 +1004,7 @@ class _ExerciseExperienceSpec {
         return _lungeSpec(
           definition: definition,
           sets: overrideSets ?? 3,
-          repsPerSet: overrideReps ?? 8,
+          repsPerSet: overrideReps ?? catalogReps ?? 8,
           restSeconds: overrideRest,
           videoDuration: '1:58',
           createExercise: (repsPerSet) => Lunge(maxRep: repsPerSet),
@@ -1015,7 +1013,7 @@ class _ExerciseExperienceSpec {
         return _pushUpSpec(
           definition: definition,
           sets: overrideSets ?? 3,
-          repsPerSet: overrideReps ?? 6,
+          repsPerSet: overrideReps ?? catalogReps ?? 6,
           restSeconds: overrideRest,
           videoDuration: '1:42',
           createExercise: (repsPerSet) => PushUp(maxRep: repsPerSet),
@@ -1024,7 +1022,7 @@ class _ExerciseExperienceSpec {
         return _plankSpec(
           definition: definition,
           sets: overrideSets ?? 3,
-          repsPerSet: overrideReps ?? 3,
+          repsPerSet: overrideReps ?? catalogReps ?? 3,
           restSeconds: overrideRest,
           videoDuration: '1:28',
           createExercise: (repsPerSet) => Plank(maxRep: repsPerSet),
@@ -1033,7 +1031,7 @@ class _ExerciseExperienceSpec {
         return _jumpingJackSpec(
           definition: definition,
           sets: overrideSets ?? 3,
-          repsPerSet: overrideReps ?? 15,
+          repsPerSet: overrideReps ?? catalogReps ?? 15,
           restSeconds: overrideRest,
           videoDuration: '1:10',
           createExercise: (repsPerSet) => JumpingJack(maxRep: repsPerSet),
@@ -1042,7 +1040,7 @@ class _ExerciseExperienceSpec {
         return _generic(
           definition: definition,
           sets: overrideSets ?? 1,
-          repsPerSet: overrideReps ?? 2, // 2 lần giữ = 2 bên
+          repsPerSet: overrideReps ?? catalogReps ?? 2, // 2 lần giữ = 2 bên
           restSeconds: overrideRest,
           videoDuration: '1:20',
           createExercise: (repsPerSet) => WarriorOne(maxHolds: repsPerSet),
@@ -1051,7 +1049,7 @@ class _ExerciseExperienceSpec {
         return _gluteBridgeSpec(
           definition: definition,
           sets: overrideSets ?? 3,
-          repsPerSet: overrideReps ?? 15,
+          repsPerSet: overrideReps ?? catalogReps ?? 15,
           restSeconds: overrideRest,
           videoDuration: '1:36',
           createExercise: (repsPerSet) => GluteBridge(maxRep: repsPerSet),
@@ -1060,7 +1058,7 @@ class _ExerciseExperienceSpec {
         return _curlUpSpec(
           definition: definition,
           sets: overrideSets ?? 3,
-          repsPerSet: overrideReps ?? 12,
+          repsPerSet: overrideReps ?? catalogReps ?? 12,
           restSeconds: overrideRest,
           videoDuration: '1:34',
           createExercise: (repsPerSet) => CurlUp(maxRep: repsPerSet),

@@ -81,11 +81,11 @@ class CossackSquat extends ExerciseBase {
 
   @override
   void onSetComplete() {
-    logger.pushKey("knee_valgus_fails", kneeValgusMetric.faultsCount);
-    logger.pushKey("heel_lift_fails", heelLiftMetric.faultsCount);
-    logger.pushKey("depth_fails", depthMetric.faultsCount);
-    logger.pushKey("straight_leg_fails", straightLegMetric.faultsCount);
-    logger.pushKey("torso_lean_fails", torsoMetric.faultsCount);
+    logger.pushKey("knee_valgus_fails_count", kneeValgusMetric.faultsCount);
+    logger.pushKey("heel_lift_fails_count", heelLiftMetric.faultsCount);
+    logger.pushKey("depth_fails_count", depthMetric.faultsCount);
+    logger.pushKey("straight_leg_fails_count", straightLegMetric.faultsCount);
+    logger.pushKey("torso_lean_fails_count", torsoMetric.faultsCount);
     logger.pushGoodRepCount();
     logger.pushKey("max_rep", maxRep);
   }
@@ -252,7 +252,7 @@ class CossackSquat extends ExerciseBase {
         currentWorkingLeg = WorkingLeg.none;
         _reachedBottomThisRep = false;
         for (final metric in _metrics) {
-          metric.resetAndCountFault();
+          metric.reset();
         }
         return;
       }

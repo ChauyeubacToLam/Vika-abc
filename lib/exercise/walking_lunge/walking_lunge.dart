@@ -132,10 +132,10 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
 
   @override
   void onSetComplete() {
-    logger.pushKey("step_consistency_fails", stepLengthMetric.faultsCount);
-    logger.pushKey("front_knee_fails", frontKneeControlMetric.faultsCount);
-    logger.pushKey("rear_depth_fails", rearKneeDepthMetric.faultsCount);
-    logger.pushKey("torso_lean_fails", torsoMetric.faultsCount);
+    logger.pushKey("step_consistency_fails_count", stepLengthMetric.faultsCount);
+    logger.pushKey("front_knee_fails_count", frontKneeControlMetric.faultsCount);
+    logger.pushKey("rear_depth_fails_count", rearKneeDepthMetric.faultsCount);
+    logger.pushKey("torso_lean_fails_count", torsoMetric.faultsCount);
     logger.pushGoodRepCount();
     logger.pushKey("max_rep", maxRep);
   }

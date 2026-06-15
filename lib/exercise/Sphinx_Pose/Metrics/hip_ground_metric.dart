@@ -10,15 +10,19 @@ class HipGroundMetric extends SphinxMetricBase {
 
   final Debouncer _hipLiftDebouncer = Debouncer(requiredFrames: 3);
   bool _instructionSet = false;
+  bool _isFaultingNow = false;
 
   @override
   List<FaultRecord> get faults => _faults;
+  @override
+  bool get isFaultingNow => _isFaultingNow;
 
   @override
   Map<String, dynamic> get debugData => _debugData;
 
   @override
   void update(SphinxContext ctx) {
+    _isFaultingNow = false;
     if (ctx.state != SphinxState.isometricHold &&
         ctx.state != SphinxState.ascending) {
       return;
@@ -33,6 +37,7 @@ class HipGroundMetric extends SphinxMetricBase {
     bool isLifting = normalizedLift > SphinxConfig.Ad_Hip_Ground_Tol;
 
     if (_hipLiftDebouncer.update(isLifting)) {
+      _isFaultingNow = true;
       ctx.resultIssues.feedback['Hip'] = 'Ấn hông sát sàn!';
       if (!_instructionSet) {
         ctx.resultIssues.addInstruction('isometricHold', 'Hip',
@@ -64,5 +69,6 @@ class HipGroundMetric extends SphinxMetricBase {
     super.reset();
     _instructionSet = false;
     _hipLiftDebouncer.reset();
+    _isFaultingNow = false;
   }
 }

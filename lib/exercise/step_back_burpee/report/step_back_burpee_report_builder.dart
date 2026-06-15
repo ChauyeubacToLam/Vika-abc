@@ -4,6 +4,9 @@
 
 import '../metrics/step_back_burpee_metric_base.dart';
 
+// DEAD LEGACY: bespoke score builder kept only for historical reference.
+// Live reports use StepBackBurpeeReportBuilderV2 via report_builder_registry.dart.
+
 class BurpeeSetReport {
   final int totalReps;
   final double spineSafetyScore;

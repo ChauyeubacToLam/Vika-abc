@@ -85,10 +85,12 @@ double _scorePain(List<String> painAreas) {
   if (painAreas.isEmpty) return 0.0;
 
   const painScores = {
-    'back': 0.8,
-    'neck': 0.7,
+    'lower_back': 0.8,
+    'shoulder_neck': 0.7,
+    'back': 0.6,
     'hip': 0.5,
     'knee': 0.3,
+    'ankle': 0.2,
     'other': 0.1,
     'wrist': -0.5,
   };
@@ -196,7 +198,16 @@ String _reasonFromGoal(String? goal) {
 String _reasonFromPain(List<String> painAreas, String fork) {
   if (painAreas.isEmpty) return 'Dựa trên lựa chọn của bạn';
 
-  const dominantOrder = ['back', 'neck', 'hip', 'wrist', 'knee', 'other'];
+  const dominantOrder = [
+    'lower_back',
+    'shoulder_neck',
+    'back',
+    'hip',
+    'wrist',
+    'knee',
+    'ankle',
+    'other',
+  ];
   String? dominant;
   for (final candidate in dominantOrder) {
     if (painAreas.contains(candidate)) {
@@ -206,14 +217,18 @@ String _reasonFromPain(List<String> painAreas, String fork) {
   }
 
   switch (dominant) {
-    case 'back':
+    case 'lower_back':
       return 'Yoga có bằng chứng mạnh nhất cho giảm đau lưng';
-    case 'neck':
+    case 'shoulder_neck':
       return 'Yoga giúp giảm đau cổ vai do ngồi nhiều';
+    case 'back':
+      return 'Yoga giúp lưng trên thư giãn và kiểm soát tư thế tốt hơn';
     case 'hip':
       return 'Yoga cải thiện linh hoạt khớp hông';
     case 'knee':
       return 'Yoga có lực tác động nhẹ, an toàn cho đầu gối';
+    case 'ankle':
+      return 'Yoga giữ nhịp nhẹ để cổ chân thích nghi an toàn';
     case 'wrist':
       return 'Tại nhà ít chịu lực cổ tay hơn yoga';
     case 'other':

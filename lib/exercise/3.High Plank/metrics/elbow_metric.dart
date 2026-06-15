@@ -12,6 +12,8 @@ class ElbowMetric extends HighPlankMetricBase {
   @override
   List<FaultRecord> get faults => _faults;
   @override
+  bool get isFaultingNow => _isFaulting;
+  @override
   Map<String, dynamic> get debugData => _debugData;
 
   @override

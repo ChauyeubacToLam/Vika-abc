@@ -4,26 +4,54 @@ import 'package:vika/utils/exercise_logger.dart';
 
 class CossackSquatReportBuilder extends ExerciseReportBuilder {
   @override
+  Map<String, List<String>> painToFaultMap() => {
+        'knee': ['knee_valgus_fails_count', 'depth_fails_count'],
+        'ankle': ['heel_lift_fails_count'],
+        'hip': ['straight_leg_fails_count'],
+        'lower_back': ['torso_lean_fails_count'],
+      };
+
+  @override
   Map<String, String> praiseMetricNames() => {
-        'knee_valgus_fails': 'Ổn định gối',
-        'heel_lift_fails': 'Gót chân',
-        'depth_fails': 'Độ sâu',
+        'knee_valgus_fails_count': 'Ổn định gối',
+        'heel_lift_fails_count': 'Gót chân',
+        'depth_fails_count': 'Độ sâu',
+        'straight_leg_fails_count': 'Chân duỗi',
+        'torso_lean_fails_count': 'Lưng thẳng',
       };
 
   @override
   Map<String, FaultTipCopy> faultToTipMap() => {
-        'knee_valgus_fails': (
-          watch: 'Mở đầu gối ra ngoài khi ngồi xuống',
+        'knee_valgus_fails_count': (
+          watch: 'Trong Cossack: đầu gối có lúc đổ vào trong khi hạ xuống.',
           next: 'Mở đầu gối ra ngoài khi ngồi xuống',
         ),
-        'heel_lift_fails': (
-          watch: 'Giữ gót chân chạm sàn trong suốt bài tập',
+        'heel_lift_fails_count': (
+          watch: 'Trong Cossack: gót chân có lúc nhấc khỏi sàn.',
           next: 'Giữ gót chân chạm sàn trong suốt bài tập',
         ),
-        'depth_fails': (
-          watch: 'Cố gắng ngồi sâu hơn nữa, mông sát gót',
+        'depth_fails_count': (
+          watch: 'Trong Cossack: độ sâu chưa đạt ở một số rep.',
           next: 'Cố gắng ngồi sâu hơn nữa, mông sát gót',
         ),
+        'straight_leg_fails_count': (
+          watch: 'Trong Cossack: chân duỗi có lúc bị chùng gối.',
+          next: 'Giữ chân duỗi thẳng hết cỡ, mũi chân hướng lên trần.',
+        ),
+        'torso_lean_fails_count': (
+          watch: 'Trong Cossack: thân trên có lúc đổ về trước.',
+          next: 'Ưỡn ngực và giữ lưng thẳng đứng khi hạ người xuống.',
+        ),
+      };
+
+  @override
+  Map<String, String Function(int count, int total)> praiseSentenceMap() => {
+        'Ổn định gối': (c, t) => 'Gối ổn định $c/$t rep - không đổ vào trong!',
+        'Gót chân': (c, t) => 'Gót chân chạm sàn $c/$t rep - chắc chắn!',
+        'Độ sâu': (c, t) => 'Ngồi sâu $c/$t rep - biên độ tốt!',
+        'Chân duỗi': (c, t) => 'Chân duỗi thẳng $c/$t rep - mở háng rất tốt!',
+        'Lưng thẳng': (c, t) =>
+            'Lưng giữ thẳng $c/$t rep - thân trên rất vững!',
       };
 
   @override
@@ -43,8 +71,8 @@ class CossackSquatReportBuilder extends ExerciseReportBuilder {
     int depthFails = 0;
     for (final logger in setLoggers) {
       kneeValgusFails +=
-          (logger.setLogs['knee_valgus_fails'] as num?)?.toInt() ?? 0;
-      depthFails += (logger.setLogs['depth_fails'] as num?)?.toInt() ?? 0;
+          (logger.setLogs['knee_valgus_fails_count'] as num?)?.toInt() ?? 0;
+      depthFails += (logger.setLogs['depth_fails_count'] as num?)?.toInt() ?? 0;
     }
 
     final kneeScore =

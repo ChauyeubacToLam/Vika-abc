@@ -1,6 +1,7 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, non_constant_identifier_names
 
 import 'package:vika/utils/debouncer.dart';
+import '../../utils/exercise_logger.dart';
 import '../../utils/pose_math_helpers.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
@@ -9,7 +10,6 @@ import 'metrics/side_plank_dip_metric_base.dart';
 import 'metrics/shoulder_alignment_metric.dart';
 import 'metrics/anti_rotation_metric.dart';
 import 'metrics/hip_amplitude_metric.dart';
-import 'report/side_plank_dip_report_builder.dart';
 
 class SidePlankConfig {
   static const int MAX_REP = 12;
@@ -37,7 +37,6 @@ class SidePlankDip extends ExerciseBase {
   SidePlankState plankState = SidePlankState.setupPlank;
   SidePlankState previousPlankState = SidePlankState.setupPlank;
 
-  int? _setStartTime;
   double? _previousHipY;
   int? _lastRepTime;
   int? _stateEnterTime;
@@ -49,7 +48,6 @@ class SidePlankDip extends ExerciseBase {
       ShoulderAlignmentMetric();
   final AntiRotationMetric antiRotationMetric = AntiRotationMetric();
   final HipAmplitudeMetric hipAmplitudeMetric = HipAmplitudeMetric();
-  final SidePlankDipReportBuilder reportBuilder = SidePlankDipReportBuilder();
 
   late final List<SidePlankDipMetricBase> _metrics = [
     shoulderAlignmentMetric,
@@ -137,18 +135,15 @@ class SidePlankDip extends ExerciseBase {
 
   @override
   void onSetComplete() {
-    final report = reportBuilder.buildReport(
-        _setStartTime ?? DateTime.now().millisecondsSinceEpoch,
-        DateTime.now().millisecondsSinceEpoch);
-    logger.pushKey("Shoulder Safety", report.shoulderSafetyScore);
-    logger.pushKey("Anti-Rotation", report.antiRotationScore);
-    logger.pushKey("Dip Depth", report.dipDepthScore);
+    logger.pushKey("shoulder_align_fails_count", shoulderAlignmentMetric.faultsCount);
+    logger.pushKey("rotation_fails_count", antiRotationMetric.faultsCount);
+    logger.pushKey("dip_depth_fails_count", hipAmplitudeMetric.faultsCount);
+    logger.pushGoodRepCount();
+    logger.pushKey('max_rep', maxRep);
   }
 
   @override
   void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
-    _setStartTime ??= frameTimestampMs;
-
     final leftElbow = smoothedLandmarks[PoseLandmarkType.leftElbow];
     final rightElbow = smoothedLandmarks[PoseLandmarkType.rightElbow];
     if (leftElbow == null || rightElbow == null) return;
@@ -241,8 +236,6 @@ class SidePlankDip extends ExerciseBase {
       final allFaults = <FaultRecord>[];
       for (final metric in _metrics) allFaults.addAll(metric.faults);
 
-      reportBuilder.recordRep(allFaults);
-
       correctForm = !allFaults.any((f) => f.affectsForm);
       resultIssues.feedback['Result'] =
           correctForm ? 'Hoàn hảo!' : 'Sửa form nhé';
@@ -254,8 +247,17 @@ class SidePlankDip extends ExerciseBase {
       }
       setFeedback.add({correctForm: faultMap});
 
+      logger.addRepLog(RepLog(
+        correctForm: correctForm,
+        repNumber: repCount,
+        data: {
+          'fault_types': allFaults.map((f) => f.type).toSet().toList(),
+        },
+      ));
+
+      for (final metric in _metrics) metric.resetAndCountFault();
+
       correctForm = true;
-      for (final metric in _metrics) metric.reset();
 
       _transitionState(SidePlankState.basePlank, now);
     }
