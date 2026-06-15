@@ -19,6 +19,8 @@ import "../utils/frame_buffer.dart";
 import "../utils/exercise_logger.dart";
 import '../debug/debug_types.dart';
 import '../debug/tracked_metric.dart';
+import '../services/generic_exercise_voice_assets.dart';
+import '../services/queued_asset_voice_player.dart';
 import '../services/viettel_tts_service.dart';
 import '../pose/presence_anomaly_detector.dart';
 import 'dart:math' as math;
@@ -152,9 +154,15 @@ abstract class ExerciseBase {
   Map<String, dynamic> debugData = {};
   late final TrackedMetric _exerciseDebugTracker =
       TrackedMetric(_ExerciseDebugMetricSource(this));
+  final Map<String, TrackedMetric> _debugDataTrackers = {};
 
   List<TrackedMetric> get trackedDebugMetrics =>
-      List<TrackedMetric>.unmodifiable([_exerciseDebugTracker]);
+      List<TrackedMetric>.unmodifiable(
+        [
+          _exerciseDebugTracker,
+          ..._currentDebugDataTrackers(),
+        ],
+      );
 
   bool get isDebugModeActive => debugMode != DebugMode.off;
 
@@ -454,7 +462,7 @@ abstract class ExerciseBase {
     await _personDetector.close();
   }
 
-  ExerciseVoiceCoach? createVoiceCoach() => _PhaseInstructionVoiceCoach();
+  ExerciseVoiceCoach? createVoiceCoach() => _GenericExerciseVoiceCoach();
 
   void _populateBaseDebugData() {
     // debugData['exerciseState'] = exerciseState.toString().split('.').last;
@@ -464,7 +472,39 @@ abstract class ExerciseBase {
 
   void _trackDebugFrame() {
     if (!isDebugModeActive) return;
-    _exerciseDebugTracker.onTick(frameTimestampMs);
+
+    final seen = <TrackedMetric>{};
+    for (final trackedMetric in trackedDebugMetrics) {
+      if (seen.add(trackedMetric)) {
+        trackedMetric.onTick(frameTimestampMs);
+      }
+    }
+  }
+
+  List<TrackedMetric> _currentDebugDataTrackers() {
+    final activeKeys = <String>{};
+    for (final entry in debugData.entries) {
+      if (_debugDataMetricValue(entry.value) == null) continue;
+
+      final key = entry.key;
+      activeKeys.add(key);
+      _debugDataTrackers.putIfAbsent(
+        key,
+        () => TrackedMetric(_DebugDataMetricSource(this, key)),
+      );
+    }
+
+    _debugDataTrackers.removeWhere((key, _) => !activeKeys.contains(key));
+    return _debugDataTrackers.values.toList(growable: false);
+  }
+
+  static double? _debugDataMetricValue(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value is! String) return null;
+
+    final match = RegExp(r'[-+]?\d+(?:\.\d+)?').firstMatch(value);
+    if (match == null) return null;
+    return double.tryParse(match.group(0)!);
   }
 
   void _syncPresenceState({required bool hasPose}) {
@@ -727,7 +767,6 @@ abstract class ExerciseBase {
       case ExerciseState.activated:
         if (requestStop()) {
           exerciseState = ExerciseState.completed;
-          ttsService.speak("Hoàn thành bài tập");
           onSetComplete();
         }
         break;
@@ -871,6 +910,36 @@ class _ExerciseDebugMetricSource implements DebugMetricSource {
   bool get devOnly => false;
 }
 
+class _DebugDataMetricSource implements DebugMetricSource {
+  const _DebugDataMetricSource(this.exercise, this.key);
+
+  final ExerciseBase exercise;
+  final String key;
+
+  @override
+  String get name => 'debug.$key';
+
+  @override
+  String? get nameVi => null;
+
+  @override
+  Map<String, dynamic> get debugData => {key: exercise.debugData[key]};
+
+  @override
+  double? get value =>
+      ExerciseBase._debugDataMetricValue(exercise.debugData[key]);
+
+  @override
+  ThresholdBand? get threshold => null;
+
+  @override
+  MetricStatus get status => MetricStatus.pass;
+
+  @override
+  bool get devOnly => true;
+}
+
+// ignore: unused_element
 class _PhaseInstructionVoiceCoach implements ExerciseVoiceCoach {
   static const int _phaseCueMinGapMs = 450;
 
@@ -968,5 +1037,316 @@ class _PhaseInstructionVoiceCoach implements ExerciseVoiceCoach {
   @override
   void dispose() {
     _lastPhasePhrase = null;
+  }
+}
+
+class _GenericAssetVoicePlayer {
+  _GenericAssetVoicePlayer()
+      : _player = QueuedAssetVoicePlayer(
+          assetMap: GenericExerciseVoiceAssets.commonFiles,
+          assetSourcePrefix: GenericExerciseVoiceAssets.assetSourcePrefix,
+          assetBundlePrefix: GenericExerciseVoiceAssets.assetBundlePrefix,
+          assetResolver: GenericExerciseVoiceAssets.resolveAsset,
+          logTag: 'GenericExerciseVoice',
+        );
+
+  final QueuedAssetVoicePlayer _player;
+
+  Future<void> speak(String text) => _player.speak(text);
+  void clearQueue() => _player.clearQueue();
+  void clearPendingButKeepCurrent() => _player.clearPendingButKeepCurrent();
+  void dispose() => _player.dispose();
+}
+
+class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
+  static final Map<String, Map<String, int>> _previousSetFaultsBySlug = {};
+
+  final _GenericAssetVoicePlayer _voicePlayer = _GenericAssetVoicePlayer();
+  final Map<String, int> _setFaultCounts = {};
+  final Set<String> _currentRepFaultIds = {};
+  final Set<String> _liveFaultsSpokenThisRep = {};
+
+  int _lastRepCount = 0;
+  bool _didAnnounceReady = false;
+  bool _didSpeakSetup = false;
+  bool _didSpeakPreviousSetAdvice = false;
+  bool _didAnnounceSetComplete = false;
+
+  @override
+  void processFrame({
+    required ExerciseBase exercise,
+    required int repCount,
+    required bool hasPose,
+    required Map<String, String> feedback,
+  }) {
+    final script =
+        GenericExerciseVoiceAssets.scriptForExerciseName(exercise.exerciseName);
+    final repIncreased = repCount > _lastRepCount;
+
+    if (exercise.exerciseState == ExerciseState.completed) {
+      if (!_didAnnounceSetComplete) {
+        _voicePlayer.clearPendingButKeepCurrent();
+        if (repIncreased) {
+          _speakRepOutcome(script, repCount);
+        }
+        _voicePlayer.speak('common.exercise_complete');
+        _previousSetFaultsBySlug[script.slug] = Map.of(_setFaultCounts);
+        _didAnnounceSetComplete = true;
+      }
+      _lastRepCount = repCount;
+      return;
+    }
+
+    if (exercise.exerciseState == ExerciseState.notActivated) {
+      _speakSetup(script);
+      _lastRepCount = repCount;
+      return;
+    }
+
+    if (exercise.exerciseState != ExerciseState.activated ||
+        exercise.isPaused ||
+        !hasPose) {
+      _lastRepCount = repCount;
+      return;
+    }
+
+    if (!_didAnnounceReady) {
+      _voicePlayer.clearQueue();
+      _voicePlayer.speak('common.ready');
+      _didAnnounceReady = true;
+      _speakPreviousSetAdviceIfNeeded(script);
+    }
+
+    final liveFaultId = _faultIdForFeedback(script, feedback);
+    if (liveFaultId != null) {
+      _currentRepFaultIds.add(liveFaultId);
+    }
+
+    if (repIncreased) {
+      _voicePlayer.clearPendingButKeepCurrent();
+      _speakRepOutcome(script, repCount);
+      _lastRepCount = repCount;
+      _currentRepFaultIds.clear();
+      _liveFaultsSpokenThisRep.clear();
+      return;
+    }
+
+    if (liveFaultId != null &&
+        !_liveFaultsSpokenThisRep.contains(liveFaultId) &&
+        _shouldSpeakLiveFault(feedback)) {
+      _liveFaultsSpokenThisRep.add(liveFaultId);
+      _setFaultCounts[liveFaultId] = (_setFaultCounts[liveFaultId] ?? 0) + 1;
+      _voicePlayer.speak(script.faultKey(liveFaultId));
+    }
+
+    _lastRepCount = repCount;
+  }
+
+  void _speakSetup(GenericExerciseVoiceScript script) {
+    if (_didSpeakSetup) return;
+    _voicePlayer.speak(script.cueKey('setup_intro'));
+    _voicePlayer.speak(script.cueKey('setup_position'));
+    _voicePlayer.speak(script.cueKey('active_intro'));
+    _speakPreviousSetAdviceIfNeeded(script);
+    _didSpeakSetup = true;
+  }
+
+  void _speakRepOutcome(GenericExerciseVoiceScript script, int repCount) {
+    _voicePlayer.speak('$repCount');
+
+    if (_currentRepFaultIds.isEmpty) {
+      _voicePlayer.speak(script.cueKey(script.cleanCueId));
+      return;
+    }
+
+    final faultId = _currentRepFaultIds.first;
+    _setFaultCounts[faultId] = (_setFaultCounts[faultId] ?? 0) + 1;
+    _voicePlayer.speak(script.faultKey(faultId));
+  }
+
+  void _speakPreviousSetAdviceIfNeeded(GenericExerciseVoiceScript script) {
+    if (_didSpeakPreviousSetAdvice) return;
+
+    final previous = _previousSetFaultsBySlug[script.slug];
+    if (previous == null || previous.isEmpty) return;
+
+    final sorted = previous.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    _voicePlayer.speak(script.cueKey('set_next_setup'));
+    for (final entry in sorted.take(2)) {
+      _voicePlayer.speak(script.setNextFaultKey(entry.key));
+    }
+    _didSpeakPreviousSetAdvice = true;
+  }
+
+  String? _faultIdForFeedback(
+    GenericExerciseVoiceScript script,
+    Map<String, String> feedback,
+  ) {
+    if (feedback.isEmpty || script.faultIds.isEmpty) return null;
+
+    final text = feedback.entries
+        .where((entry) =>
+            entry.key != 'System' &&
+            entry.key != 'Result' &&
+            entry.key != 'progress')
+        .map((entry) => '${entry.key} ${entry.value}')
+        .join(' ')
+        .toLowerCase();
+    if (text.isEmpty) return null;
+
+    final result = (feedback['Result'] ?? '').toLowerCase();
+    if (!_looksLikeFaultText(text) &&
+        !result.contains('sai') &&
+        !result.contains('fix')) {
+      return null;
+    }
+
+    for (final candidate in _candidateFaultIds(text)) {
+      if (script.hasFault(candidate)) return candidate;
+    }
+    return script.faultIds.first;
+  }
+
+  bool _looksLikeFaultText(String text) {
+    const markers = [
+      'fault',
+      'error',
+      'warning',
+      'bad',
+      'fix',
+      'too ',
+      'don',
+      'not ',
+      'miss',
+      'low',
+      'high',
+      'lower',
+      'higher',
+      'raise',
+      'drop',
+      'slow',
+      'fast',
+      'lift',
+      'collapse',
+      'sag',
+      'pike',
+      'lean',
+      'bend',
+      'straighten',
+      'unstable',
+      'shallow',
+    ];
+
+    return markers.any(text.contains);
+  }
+
+  Iterable<String> _candidateFaultIds(String text) sync* {
+    if (text.contains('tempo') ||
+        text.contains('speed') ||
+        text.contains('fast') ||
+        text.contains('slow') ||
+        text.contains('cham')) {
+      yield 'tempo';
+      yield 'speed';
+      yield 'tempo_fast';
+      yield 'tempo_slow';
+      yield 'too_fast';
+    }
+    if (text.contains('depth') ||
+        text.contains('rom') ||
+        text.contains('low')) {
+      yield 'depth';
+      yield 'rom';
+      yield 'depth_shallow';
+      yield 'takeoff_depth';
+      yield 'landing_depth';
+      yield 'rear_depth';
+    }
+    if (text.contains('heel')) yield 'heel';
+    if (text.contains('knee')) {
+      yield 'knee';
+      yield 'knee_valgus';
+      yield 'knee_angle';
+      yield 'knee_extension';
+      yield 'knee_hover';
+      yield 'front_knee';
+      yield 'back_knee';
+    }
+    if (text.contains('arm') || text.contains('wrist')) {
+      yield 'arms';
+      yield 'arm_extension';
+      yield 'extension';
+      yield 'straight_arm';
+    }
+    if (text.contains('leg') || text.contains('ankle')) {
+      yield 'legs';
+      yield 'leg';
+      yield 'straight_leg';
+      yield 'stable_limbs';
+      yield 'elevation_leg';
+    }
+    if (text.contains('hip') || text.contains('pelvic')) {
+      yield 'hip';
+      yield 'hip_extension';
+      yield 'hip_rotation';
+      yield 'hip_high';
+      yield 'hip_thrust';
+      yield 'pelvic';
+      yield 'pelvic_drop';
+    }
+    if (text.contains('back') ||
+        text.contains('trunk') ||
+        text.contains('spine') ||
+        text.contains('lumbar')) {
+      yield 'trunk';
+      yield 'trunk_sag';
+      yield 'trunk_pike';
+      yield 'back_sag';
+      yield 'back_arch';
+      yield 'spine';
+      yield 'lumbar';
+      yield 'body_line';
+      yield 'torso';
+    }
+    if (text.contains('neck') ||
+        text.contains('head') ||
+        text.contains('ear')) {
+      yield 'neck';
+      yield 'head';
+      yield 'cervical';
+      yield 'neck_pull';
+    }
+    if (text.contains('shoulder')) {
+      yield 'shoulder';
+      yield 'shrug';
+    }
+    if (text.contains('elbow')) yield 'elbow';
+    if (text.contains('hand')) yield 'hand';
+    if (text.contains('alternate')) {
+      yield 'alternate';
+      yield 'alternating';
+    }
+    if (text.contains('same') || text.contains('opposite')) {
+      yield 'opposite_side';
+    }
+    if (text.contains('still') || text.contains('stable')) {
+      yield 'stability';
+      yield 'drift';
+    }
+  }
+
+  bool _shouldSpeakLiveFault(Map<String, String> feedback) {
+    final result = (feedback['Result'] ?? '').toLowerCase();
+    return result.contains('sai') || result.contains('fix');
+  }
+
+  @override
+  void dispose() {
+    _currentRepFaultIds.clear();
+    _liveFaultsSpokenThisRep.clear();
+    _setFaultCounts.clear();
+    _voicePlayer.clearQueue();
+    _voicePlayer.dispose();
   }
 }

@@ -9,6 +9,7 @@ class QueuedAssetVoicePlayer {
     required Map<String, String> assetMap,
     required this.assetSourcePrefix,
     required this.assetBundlePrefix,
+    this.assetResolver,
     this.logTag = 'AssetVoice',
   }) : _assetMap = Map.unmodifiable(assetMap) {
     _configFuture = _configurePlayer();
@@ -28,6 +29,7 @@ class QueuedAssetVoicePlayer {
   final Map<String, String> _assetMap;
   final String assetSourcePrefix;
   final String assetBundlePrefix;
+  final String? Function(String text)? assetResolver;
   final String logTag;
   final AudioPlayer _audioPlayer = AudioPlayer();
   final List<String> _queue = [];
@@ -148,7 +150,7 @@ class QueuedAssetVoicePlayer {
       return false;
     }
 
-    final filename = _assetMap[text];
+    final filename = _assetMap[text] ?? assetResolver?.call(text);
     if (filename == null) {
       debugPrint('[$logTag] missing asset mapping for "$text"');
       return false;

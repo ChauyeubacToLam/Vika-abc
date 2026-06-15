@@ -244,9 +244,6 @@ class SuryaNamaskarExercise extends ExerciseBase {
   }
 
   @override
-  ExerciseVoiceCoach? createVoiceCoach() => _SuryaFlowVoiceCoach();
-
-  @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     final visibility = _strictStartVisibilityGate(landmarks);
     debugData.addAll(visibility.debugData);
@@ -830,6 +827,7 @@ class SuryaNamaskarExercise extends ExerciseBase {
   }
 }
 
+// ignore: unused_element
 class _SuryaFlowVoiceCoach implements ExerciseVoiceCoach {
   @override
   void processFrame({

@@ -27,7 +27,6 @@ class PushUpConfig {
   // Like Squat's stand-angle baseline, push-up entry/return uses the user's
   // own plank lockout angle instead of a fixed descent threshold.
   static const double PLANK_ANGLE_THRESHOLD = 160.0;
-  static const double START_ELBOW_MIN = 154.0;
   static const List<double> BOTTOM_ANGLE_RANGE = [80.0, 100.0];
 
   // Trunk horizontal targets per facing direction (clock angle from vertical)
@@ -42,10 +41,12 @@ class PushUpConfig {
   static const double POSITION_STABLE_GATE_MIN_PIXELS = 1.5;
 
   // High-plank setup gates.
-  static const double START_TRUNK_TOLERANCE = 20.0;
-  static const double START_BODY_LINE_MIN = 160.0;
-  static const double START_SHOULDER_ABOVE_WRIST_RATIO = 0.25;
-  static const double START_KNEE_SUPPORT_CLEARANCE_RATIO = 0.12;
+  static const double START_ARM_MIN = 150.0;
+  static const double START_BODY_MIN = 160.0;
+  static const double START_KNEE_MIN = 145.0;
+  static const double FLOOR_CONTACT_Y_TOLERANCE = 0.45;
+  static const double WRIST_BELOW_SHOULDER_MIN = 0.45;
+  static const double ANKLE_BELOW_HIP_MIN = 0.10;
 
   // Active anti-cheat gates. These are intentionally looser than setup so
   // normal fatigue wobble is coached by metrics instead of rejected.
@@ -153,6 +154,10 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
           right: PoseLandmarkType.rightAnkle,
           left: PoseLandmarkType.leftAnkle,
         ),
+      };
+
+  @override
+  Map<String, SideLandmarkPair> get optionalSideLandmarks => const {
         'heel': (
           right: PoseLandmarkType.rightHeel,
           left: PoseLandmarkType.leftHeel,
@@ -200,7 +205,7 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
     if (lm == null) return false;
 
     final geometry = _calculateGeometry(lm);
-    final status = _evaluatePlankGeometry(geometry);
+    final status = _evaluateHighPlankSetup(geometry);
     if (!status.valid) return false;
 
     // Capture once during the 3s hold-still activation window. Wrist baseline
@@ -245,7 +250,7 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
 
     final lm = getSideTrackedLandmarks(landmarks);
     if (lm == null) {
-      return "⚠️ Đảm bảo vai, tay, hông, gối và bàn chân đều trong khung hình";
+      return "⚠️ Đảm bảo vai, tay, hông, gối và cổ chân đều trong khung hình";
     }
 
     final allConfident = lm.values
@@ -301,8 +306,10 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
       debugData['minElbow'] = _debugMinElbowLabel();
     }
 
-    final plankStatus = _evaluatePlankGeometry(geometry);
-    if (pushUpState == PushUpState.plank && plankStatus.valid) {
+    final plankStatus = _evaluateHighPlankSetup(geometry);
+    if (pushUpState == PushUpState.plank &&
+        plankStatus.valid &&
+        geometry.elbowAngle >= PushUpConfig.PLANK_ANGLE_THRESHOLD) {
       // Refresh only the elbow top baseline while in a clean plank. This keeps
       // ROM counting personalized like Squat's baseline, without moving the
       // wrist anti-cheat anchor captured at activation.
@@ -735,8 +742,8 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
     final hip = lm['hip']!;
     final knee = lm['knee']!;
     final ankle = lm['ankle']!;
-    final heel = lm['heel']!;
-    final foot = lm['foot']!;
+    final heel = lm['heel'] ?? ankle;
+    final foot = lm['foot'] ?? ankle;
 
     final torsoLen = math.max(calculateDistance(shoulder, hip), 1.0);
     final elbowAngle = calculateAngleNormalized(
@@ -762,6 +769,11 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
       midPoint: knee,
       lastPoint: ankle,
     );
+    final armBodyAngle = calculateAngleNormalized(
+      firstPoint: hip,
+      midPoint: shoulder,
+      lastPoint: wrist,
+    );
     final supportY = math.min(wrist.y, math.min(heel.y, foot.y));
 
     return _PushUpGeometry(
@@ -771,57 +783,75 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
       trunkDeviation: trunkDeviation,
       shoulderHipKneeAngle: shoulderHipKneeAngle,
       hipKneeAnkleAngle: hipKneeAnkleAngle,
+      armBodyAngle: armBodyAngle,
+      isHorizontal:
+          (shoulder.x - ankle.x).abs() > (shoulder.y - ankle.y).abs() * 1.2,
       wristY: wrist.y,
       shoulderY: shoulder.y,
       hipY: hip.y,
       kneeY: knee.y,
       ankleY: ankle.y,
       heelY: heel.y,
+      supportY: supportY,
       kneeSupportClearance: supportY - knee.y,
       hipSupportClearance: supportY - hip.y,
       shoulderAboveWrist: wrist.y - shoulder.y,
     );
   }
 
-  _PushUpGuardStatus _evaluatePlankGeometry(_PushUpGeometry geometry) {
-    if (geometry.elbowAngle < PushUpConfig.START_ELBOW_MIN) {
+  _PushUpGuardStatus _evaluateHighPlankSetup(_PushUpGeometry geometry) {
+    if (!geometry.isHorizontal) {
+      return _PushUpGuardStatus.invalid(
+        type: 'Setup',
+        reason: 'Đặt người nằm ngang theo tư thế plank cao',
+      );
+    }
+
+    if (!_hasFloorSupport(geometry)) {
+      return _PushUpGuardStatus.invalid(
+        type: 'Setup',
+        reason: 'Hãy chống tay trên sàn, không tập plank trên tường',
+      );
+    }
+
+    if (geometry.elbowAngle < PushUpConfig.START_ARM_MIN) {
       return _PushUpGuardStatus.invalid(
         type: 'Setup',
         reason: 'Duỗi tay lên tư thế plank cao',
       );
     }
-    final torsoLen = geometry.torsoLen;
-    if (geometry.trunkDeviation.abs() > PushUpConfig.START_TRUNK_TOLERANCE) {
+    if (geometry.shoulderHipKneeAngle < PushUpConfig.START_BODY_MIN) {
       return _PushUpGuardStatus.invalid(
         type: 'Setup',
-        reason: 'Giữ thân người ngang như plank',
+        reason: 'Giữ vai, hông và gối thành một đường thẳng',
       );
     }
-    if (geometry.shoulderAboveWrist <
-        torsoLen * PushUpConfig.START_SHOULDER_ABOVE_WRIST_RATIO) {
+    if (geometry.hipKneeAnkleAngle < PushUpConfig.START_KNEE_MIN) {
       return _PushUpGuardStatus.invalid(
         type: 'Setup',
-        reason: 'Vai cần ở trên cổ tay, không nằm sát sàn',
+        reason: 'Duỗi gối thẳng như tư thế high plank',
       );
     }
-    if (geometry.kneeSupportClearance <
-            torsoLen * PushUpConfig.START_KNEE_SUPPORT_CLEARANCE_RATIO ||
-        geometry.hipSupportClearance <
-            torsoLen * PushUpConfig.START_KNEE_SUPPORT_CLEARANCE_RATIO) {
+    if (geometry.armBodyAngle < 40.0 || geometry.armBodyAngle > 140.0) {
       return _PushUpGuardStatus.invalid(
         type: 'Setup',
-        reason: 'Nâng gối và hông khỏi sàn',
-      );
-    }
-    if (geometry.shoulderHipKneeAngle < PushUpConfig.START_BODY_LINE_MIN ||
-        geometry.hipKneeAnkleAngle < PushUpConfig.START_BODY_LINE_MIN) {
-      return _PushUpGuardStatus.invalid(
-        type: 'Setup',
-        reason: 'Giữ vai, hông, gối, cổ chân thành một đường thẳng',
+        reason: 'Chống tay dưới vai, không nằm duỗi sát sàn',
       );
     }
 
     return const _PushUpGuardStatus.valid();
+  }
+
+  bool _hasFloorSupport(_PushUpGeometry geometry) {
+    final safeTorso = geometry.torsoLen <= 0 ? 1.0 : geometry.torsoLen;
+    final wristSupportYGap =
+        (geometry.wristY - geometry.supportY).abs() / safeTorso;
+    final wristBelowShoulder = geometry.shoulderAboveWrist / safeTorso;
+    final supportBelowHip = (geometry.supportY - geometry.hipY) / safeTorso;
+
+    return wristSupportYGap <= PushUpConfig.FLOOR_CONTACT_Y_TOLERANCE &&
+        wristBelowShoulder >= PushUpConfig.WRIST_BELOW_SHOULDER_MIN &&
+        supportBelowHip >= PushUpConfig.ANKLE_BELOW_HIP_MIN;
   }
 
   _PushUpGuardStatus _evaluateActiveGeometry(_PushUpGeometry geometry) {
@@ -977,12 +1007,15 @@ class _PushUpGeometry {
     required this.trunkDeviation,
     required this.shoulderHipKneeAngle,
     required this.hipKneeAnkleAngle,
+    required this.armBodyAngle,
+    required this.isHorizontal,
     required this.wristY,
     required this.shoulderY,
     required this.hipY,
     required this.kneeY,
     required this.ankleY,
     required this.heelY,
+    required this.supportY,
     required this.kneeSupportClearance,
     required this.hipSupportClearance,
     required this.shoulderAboveWrist,
@@ -994,12 +1027,15 @@ class _PushUpGeometry {
   final double trunkDeviation;
   final double shoulderHipKneeAngle;
   final double hipKneeAnkleAngle;
+  final double armBodyAngle;
+  final bool isHorizontal;
   final double wristY;
   final double shoulderY;
   final double hipY;
   final double kneeY;
   final double ankleY;
   final double heelY;
+  final double supportY;
   final double kneeSupportClearance;
   final double hipSupportClearance;
   final double shoulderAboveWrist;

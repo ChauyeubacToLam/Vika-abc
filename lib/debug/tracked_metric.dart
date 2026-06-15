@@ -10,6 +10,7 @@ class TrackedMetric {
   final List<StatusTransition> _transitions = [];
   final Map<String, List<num>> _keyHistories = {};
   MetricStatus _lastStatus = MetricStatus.pass;
+  int? _lastTickFrameTimestampMs;
 
   TrackedMetric(this.metric);
 
@@ -29,6 +30,9 @@ class TrackedMetric {
       .length;
 
   void onTick(int frameTimestampMs) {
+    if (_lastTickFrameTimestampMs == frameTimestampMs) return;
+    _lastTickFrameTimestampMs = frameTimestampMs;
+
     final v = metric.value;
     final st = metric.status;
 
@@ -67,5 +71,6 @@ class TrackedMetric {
     _transitions.clear();
     _keyHistories.clear();
     _lastStatus = MetricStatus.pass;
+    _lastTickFrameTimestampMs = null;
   }
 }
