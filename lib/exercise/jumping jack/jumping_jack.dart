@@ -7,6 +7,7 @@ import 'package:vika/utils/debouncer.dart';
 import '../../utils/pose_math_helpers.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/exercise_logger.dart';
+import '../../services/jumping_jack_voice_coach.dart';
 
 import '../exercise_base.dart';
 import 'metrics/jumping_jack_metric_base.dart';
@@ -43,6 +44,8 @@ class JumpingJack extends ExerciseBase {
 
   JJState jjState = JJState.closed;
   JJState previousJJState = JJState.closed;
+  bool lastRepWasClean = true;
+  String? lastRepTopVoiceMessage;
 
   final ArmExtensionMetric armExtensionMetric = ArmExtensionMetric();
   final LegSpreadMetric legSpreadMetric = LegSpreadMetric();
@@ -64,6 +67,9 @@ class JumpingJack extends ExerciseBase {
 
   @override
   String get exerciseName => 'Nhảy Dạng';
+
+  @override
+  ExerciseVoiceCoach? createVoiceCoach() => JumpingJackVoiceCoach();
 
   @override
   String get currentPhaseKey => jjState.toString().split('.').last;
@@ -305,6 +311,8 @@ class JumpingJack extends ExerciseBase {
       }
 
       correctForm = !allFaults.any((f) => f.affectsForm);
+      lastRepWasClean = correctForm;
+      lastRepTopVoiceMessage = _topVoiceMessage(allFaults);
       resultIssues.feedback['Result'] = correctForm ? 'Tốt lắm!' : 'Sửa tư thế';
 
       final faultMap = <String, Map<String, String>>{};
@@ -387,6 +395,30 @@ class JumpingJack extends ExerciseBase {
     } else if (debouncedClosed && jjState == JJState.open) {
       _transitionState(JJState.closed, timestampMs);
     }
+  }
+
+  String? _topVoiceMessage(List<FaultRecord> faults) {
+    if (faults.any((fault) => fault.type == 'Arms')) {
+      return 'Vươn tay cao hơn';
+    }
+    if (faults.any((fault) => fault.type == 'Legs')) {
+      return 'Mở chân rộng hơn';
+    }
+
+    String? tempoFault;
+    for (final fault in faults) {
+      if (fault.type == 'Tempo') {
+        tempoFault = fault.message;
+        break;
+      }
+    }
+    if (tempoFault == null) {
+      return null;
+    }
+    if (tempoFault.contains('Quá nhanh')) {
+      return 'Chậm lại, giữ tư thế';
+    }
+    return 'Nhanh hơn một chút';
   }
 
   void _transitionState(JJState newState, int timestampMs) {

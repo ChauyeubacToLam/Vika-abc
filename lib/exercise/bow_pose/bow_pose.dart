@@ -3,6 +3,7 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/debouncer.dart';
 import '../../utils/exercise_logger.dart';
+import '../../services/bow_pose_voice_coach.dart';
 import '../exercise_base.dart';
 import 'metrics/bow_pose_metric_base.dart';
 import 'metrics/connection_metric.dart';
@@ -47,6 +48,9 @@ class BowPose extends ExerciseBase {
   final HoldDurationMetric holdDurationMetric = HoldDurationMetric();
   final StabilityMetric stabilityMetric = StabilityMetric();
 
+  bool lastRepWasClean = true;
+  String? lastRepTopVoiceMessage;
+
   late final List<BowPoseMetricBase> _metrics = [
     connectionMetric,
     liftFormMetric,
@@ -56,6 +60,9 @@ class BowPose extends ExerciseBase {
 
   @override
   String get exerciseName => 'Bow Pose';
+
+  @override
+  ExerciseVoiceCoach? createVoiceCoach() => BowPoseVoiceCoach();
 
   @override
   String get currentPhaseKey => bowPoseState.toString().split('.').last;
@@ -240,6 +247,8 @@ class BowPose extends ExerciseBase {
       for (final metric in _metrics) allFaults.addAll(metric.faults);
 
       correctForm = !allFaults.any((f) => f.affectsForm);
+      lastRepWasClean = correctForm;
+      lastRepTopVoiceMessage = _topVoiceMessage(allFaults);
 
       final faultMap = <String, Map<String, String>>{};
       for (final fault in allFaults) {
@@ -343,5 +352,29 @@ class BowPose extends ExerciseBase {
     for (final metric in _metrics) {
       metric.onStateTransition(previousState, newState, timestampMs);
     }
+  }
+
+  String? _topVoiceMessage(List<FaultRecord> faults) {
+    final types = faults.map((fault) => fault.type).toSet();
+    final messages = faults.map((fault) => fault.message).join(' ');
+    final voices = faults.map((fault) => fault.voiceMessage ?? '').join(' ');
+
+    if (types.contains('Connection') || voices.contains('cổ chân')) {
+      return 'Nắm chân chắc hơn';
+    }
+    if (types.contains('HoldDuration') || messages.contains('Giữ quá ngắn')) {
+      return 'Giữ lâu hơn một chút';
+    }
+    if (messages.contains('Ngực') || voices.contains('Ưỡn ngực')) {
+      return 'Mở ngực thêm một chút';
+    }
+    if (messages.contains('Đùi') || voices.contains('đùi')) {
+      return 'Nâng đùi cao hơn nếu lưng vẫn thoải mái';
+    }
+    if (types.contains('Stability')) {
+      return 'Giữ người yên hơn';
+    }
+
+    return null;
   }
 }

@@ -194,7 +194,7 @@ void main() {
     expect(wallPushUp.repCount, 1);
   });
 
-  test('rejects a rep when the wall hand drifts by body-scale ratio', () {
+  test('counts a rep but records coaching when the wall hand drifts', () {
     final wallPushUp = WallPushUp()
       ..cameraFacing = CameraFacing.right
       ..exerciseState = ExerciseState.activated;
@@ -247,12 +247,12 @@ void main() {
     _pump(wallPushUp, top, 1900);
     _pump(wallPushUp, top, 2300);
 
-    expect(wallPushUp.repCount, 0);
+    expect(wallPushUp.repCount, 1);
     expect(wallPushUp.getSetFeedback(), isNotEmpty);
 
     wallPushUp.onSetComplete();
 
-    expect(wallPushUp.logger.setLogs['wall_contact_fails_count'], 0);
+    expect(wallPushUp.logger.setLogs['wall_contact_fails_count'], 1);
     expect(wallPushUp.logger.setLogs['body_line_fails_count'], 0);
     expect(
         wallPushUp.logger.setLogs.keys, contains('shoulder_shrug_fails_count'));
@@ -270,8 +270,7 @@ void main() {
     expect(wallPushUp.logger.setLogs.keys, contains('tempo_fails_count'));
   });
 
-  test('does not log body-line fail count when a bent-body rep is rejected',
-      () {
+  test('counts a rep when body line bends', () {
     final wallPushUp = WallPushUp()
       ..cameraFacing = CameraFacing.right
       ..exerciseState = ExerciseState.activated;
@@ -320,7 +319,7 @@ void main() {
     _pump(wallPushUp, down2, 1700);
     _pump(wallPushUp, top, 2200);
 
-    expect(wallPushUp.repCount, 0);
+    expect(wallPushUp.repCount, 1);
 
     wallPushUp.onSetComplete();
 

@@ -4,6 +4,7 @@ import 'package:vika/debug/tracked_metric.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/exercise_logger.dart';
+import '../../services/high_plank_voice_coach.dart';
 import '../exercise_base.dart';
 import 'metrics/high_plank_metric_base.dart';
 import 'metrics/sagging_metric.dart';
@@ -47,6 +48,7 @@ class HighPlank extends ExerciseBase {
 
   HighPlankState state = HighPlankState.setup;
   HighPlankState previousState = HighPlankState.setup;
+  String? lastHoldFaultVoiceMessage;
 
   int? _exerciseStartTimeMs;
   bool _timeoutReached = false;
@@ -96,6 +98,9 @@ class HighPlank extends ExerciseBase {
 
   @override
   String get exerciseName => 'High Plank';
+
+  @override
+  ExerciseVoiceCoach? createVoiceCoach() => HighPlankVoiceCoach();
 
   @override
   String get currentPhaseKey => state.toString().split('.').last;
@@ -434,6 +439,7 @@ class HighPlank extends ExerciseBase {
     _lastDiagnosticTime = 0;
     repCount = 0;
     correctForm = true;
+    lastHoldFaultVoiceMessage = null;
     logger.clear();
     timerMetric.reset();
     _holdingDebouncer.reset();
@@ -460,13 +466,41 @@ class HighPlank extends ExerciseBase {
 
     if (state == HighPlankState.setup || state == HighPlankState.dropping) {
       if (_holdingDebouncer.update(isFormGoodToHold)) {
+        lastHoldFaultVoiceMessage = null;
         _transitionState(HighPlankState.holding, now);
       }
     } else if (state == HighPlankState.holding) {
       if (_droppingDebouncer.update(isFormBadToDrop)) {
+        lastHoldFaultVoiceMessage = _voiceForHoldBreak(
+          bodyAngle: bodyAngle,
+          armAngle: armAngle,
+          hipDev: hipDev,
+          kneeAngle: kneeAngle,
+        );
         _transitionState(HighPlankState.dropping, now);
       }
     }
+  }
+
+  String _voiceForHoldBreak({
+    required double bodyAngle,
+    required double armAngle,
+    required double hipDev,
+    required double kneeAngle,
+  }) {
+    if (hipDev >= HighPlankConfig.DROPPING_SAG_DEVIATION) {
+      return 'Siết chặt bụng, nâng hông lên một chút';
+    }
+    if (armAngle < HighPlankConfig.DROPPING_ARM_ANGLE) {
+      return 'Duỗi thẳng cánh tay ra';
+    }
+    if (bodyAngle < HighPlankConfig.DROPPING_PIKE_ANGLE || hipDev < -0.05) {
+      return 'Hạ thấp mông xuống bằng với vai';
+    }
+    if (kneeAngle < HighPlankConfig.DROPPING_KNEE_ANGLE) {
+      return 'Duỗi thẳng cánh tay ra';
+    }
+    return 'Giữ người thẳng trên sàn';
   }
 
   void _transitionState(HighPlankState newState, int now) {

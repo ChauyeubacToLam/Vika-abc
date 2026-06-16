@@ -4,6 +4,7 @@ import 'package:vika/utils/debouncer.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/exercise_logger.dart';
+import '../../services/leg_raise_voice_coach.dart';
 import '../exercise_base.dart';
 
 import 'metrics/leg_raise_metric_base.dart';
@@ -24,6 +25,9 @@ class LegRaise extends ExerciseBase {
   final int maxRep;
   LegRaiseState state = LegRaiseState.lying;
   LegRaiseState previousState = LegRaiseState.lying;
+  int invalidAttemptCount = 0;
+  bool lastRepWasClean = true;
+  String? lastRepTopVoiceMessage;
 
   int? _exerciseStartTimeMs;
   bool _timeoutReached = false;
@@ -55,6 +59,9 @@ class LegRaise extends ExerciseBase {
 
   @override
   String get exerciseName => 'Leg Raises';
+
+  @override
+  ExerciseVoiceCoach? createVoiceCoach() => LegRaiseVoiceCoach();
 
   @override
   String get currentPhaseKey => state.toString().split('.').last;
@@ -474,6 +481,8 @@ class LegRaise extends ExerciseBase {
     final allFaults = <FaultRecord>[];
     for (var metric in _metrics) allFaults.addAll(metric.faults);
     correctForm = !allFaults.any((f) => f.affectsForm);
+    lastRepWasClean = correctForm;
+    lastRepTopVoiceMessage = _topVoiceMessage(allFaults);
 
     if (!correctForm) resultIssues.feedback['Result'] = 'Fix Form';
 
@@ -482,6 +491,7 @@ class LegRaise extends ExerciseBase {
     if (!hasBlockingFormFault) {
       repCount++;
     } else {
+      invalidAttemptCount++;
       ctx.resultIssues.feedback['Result'] = 'Không tính rep';
     }
 
@@ -502,5 +512,39 @@ class LegRaise extends ExerciseBase {
         metric.resetAndCountFault();
       }
     }
+  }
+
+  String? _topVoiceMessage(List<FaultRecord> faults) {
+    final voicedFaults = faults
+        .where((fault) =>
+            fault.voiceMessage != null && fault.voiceMessage!.isNotEmpty)
+        .toList()
+      ..sort((a, b) {
+        final priorityCompare = a.priority.compareTo(b.priority);
+        if (priorityCompare != 0) return priorityCompare;
+        return a.type.compareTo(b.type);
+      });
+    final rawVoice = voicedFaults.isEmpty ? null : voicedFaults.first.voiceMessage;
+    return _voiceScriptMessage(rawVoice);
+  }
+
+  String? _voiceScriptMessage(String? rawVoice) {
+    if (rawVoice == null || rawVoice.isEmpty) return null;
+    if (rawVoice.contains('Võng lưng') || rawVoice.contains('lưng sát sàn')) {
+      return 'Ép lưng dưới xuống sàn';
+    }
+    if (rawVoice.contains('vuông góc') || rawVoice.contains('Nâng chân')) {
+      return 'Nâng và hạ chân rõ hơn';
+    }
+    if (rawVoice.contains('gối')) {
+      return 'Duỗi thẳng đầu gối';
+    }
+    if (rawVoice.contains('Hạ chân') || rawVoice.contains('Từ từ')) {
+      return 'Hạ chân chậm lại';
+    }
+    if (rawVoice.contains('tay') || rawVoice.contains('hông')) {
+      return 'Duỗi tay sát hông';
+    }
+    return rawVoice;
   }
 }

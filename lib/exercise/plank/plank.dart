@@ -5,6 +5,7 @@ import 'package:vika/utils/debouncer.dart';
 import 'package:vika/utils/exercise_logger.dart';
 
 import '../../utils/pose_math_helpers.dart';
+import '../../services/plank_voice_coach.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'metrics/plank_metric_base.dart';
 import 'metrics/trunk_alignment_metric.dart';
@@ -59,6 +60,7 @@ class Plank extends ExerciseBase {
 
   PlankState plankState = PlankState.setup;
   PlankState previousPlankState = PlankState.setup;
+  String? lastHoldFaultVoiceMessage;
 
   int? _holdStartMs;
   int? _restStartMs;
@@ -87,6 +89,9 @@ class Plank extends ExerciseBase {
 
   @override
   String get exerciseName => 'Plank';
+
+  @override
+  ExerciseVoiceCoach? createVoiceCoach() => PlankVoiceCoach();
 
   @override
   String get currentPhaseKey => plankState.toString().split('.').last;
@@ -127,6 +132,7 @@ class Plank extends ExerciseBase {
   void onExerciseActivated() {
     super.onExerciseActivated();
     _holdSeconds.reset();
+    lastHoldFaultVoiceMessage = null;
   }
 
   @override
@@ -320,14 +326,17 @@ class Plank extends ExerciseBase {
     switch (plankState) {
       case PlankState.setup:
         if (confirmedPlank) {
+          lastHoldFaultVoiceMessage = null;
           _transitionState(PlankState.holding, timestampMs);
         }
         break;
 
       case PlankState.holding:
         if (!isPlankPosition) {
+          lastHoldFaultVoiceMessage = _voiceForHoldBreak(geometry);
           _transitionState(PlankState.setup, timestampMs);
         } else if (_currentHoldSeconds() >= PlankConfig.HOLD_DURATION) {
+          lastHoldFaultVoiceMessage = null;
           _transitionState(PlankState.resting, timestampMs);
         }
         break;
@@ -368,6 +377,31 @@ class Plank extends ExerciseBase {
         _holdStartMs = null;
         break;
     }
+  }
+
+  String _voiceForHoldBreak(_ForearmPlankGeometry geometry) {
+    if (!geometry.isForearmPlank) {
+      return 'Chống bằng cẳng tay';
+    }
+    if (!geometry.isKneeExtended) {
+      return 'Thẳng đầu gối ra';
+    }
+    if (!geometry.isBodyAlignedForHold) {
+      if (geometry.trunkDeviation < 0) {
+        return 'Hạ hông xuống, giữ thân thẳng';
+      }
+      return 'Gồng cơ bụng, nâng hông lên';
+    }
+    if (!geometry.isTrunkHorizontal) {
+      if (geometry.trunkDeviation < 0) {
+        return 'Hạ hông xuống, giữ thân thẳng';
+      }
+      return 'Gồng cơ bụng, nâng hông lên';
+    }
+    if (geometry.isStanding) {
+      return 'Chống bằng cẳng tay';
+    }
+    return 'Giữ thân người thẳng';
   }
 
   // --- Hold Complete ---
@@ -424,6 +458,7 @@ class Plank extends ExerciseBase {
   @override
   Map<String, String> processNoPoseFrame() {
     if (plankState == PlankState.holding) {
+      lastHoldFaultVoiceMessage = 'Giữ cả người trong khung hình';
       _transitionState(PlankState.setup, frameTimestampMs);
     }
     _holdSeconds.resetTick();

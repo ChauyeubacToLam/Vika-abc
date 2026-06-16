@@ -48,19 +48,19 @@ class WallPushUpConfig {
 
   // State machine — driven by elbow angle β (shoulder→elbow→wrist), normalized.
   // ~175° = arms straight (standing/lockout). ~90° = elbows bent (bottom).
-  static const double STANDING_ANGLE_THRESHOLD = 155.0; // > this → standing
+  static const double STANDING_ANGLE_THRESHOLD = 145.0; // > this → standing
   static const double DESCEND_ANGLE_THRESHOLD =
-      150.0; // < this → entering descent
-  static const double BOTTOM_ANGLE_MAX = 110.0; // ≤ this → bottom
-  static const double BOTTOM_EXIT = 115.0; // > this from bottom → ascending
+      140.0; // < this → entering descent
+  static const double BOTTOM_ANGLE_MAX = 125.0; // ≤ this → bottom
+  static const double BOTTOM_EXIT = 130.0; // > this from bottom → ascending
 
   // Start position gates (hold-still).
-  static const double START_ELBOW_MIN = 155.0; // arms extended
-  static const double START_BODYLINE_MIN = 155.0; // body roughly straight
-  static const double START_TRUNK_INCLINATION_MIN = 45.0;
-  static const double ACTIVE_TRUNK_INCLINATION_MIN = 40.0;
-  static const double HAND_PLACEMENT_MAX_OFFSET_RATIO = 0.25;
-  static const double HEEL_RAISE_MIN_RATIO = 0.06;
+  static const double START_ELBOW_MIN = 145.0; // arms extended enough
+  static const double START_BODYLINE_MIN = 140.0; // body roughly straight
+  static const double START_TRUNK_INCLINATION_MIN = 35.0;
+  static const double ACTIVE_TRUNK_INCLINATION_MIN = 30.0;
+  static const double HAND_PLACEMENT_MAX_OFFSET_RATIO = 0.40;
+  static const double HEEL_RAISE_MIN_RATIO = 0.02;
   static const String WALL_DISTANCE_SETUP =
       'Đứng cách tường một cánh tay + 30-40 cm, đặt tay lên tường.';
   // NOTE: normalized angle caps at 180°, so the spec's 195° upper bound
@@ -974,16 +974,6 @@ class WallPushUp extends ExerciseBase {
 
     if (_trunkInclinationInvalidThisRep) {
       return 'Đây chưa giống Wall Push Up — hãy đứng nghiêng người vào tường.';
-    }
-
-    final bodyInvalid = faults.any((f) => f.type == 'Body' && f.affectsForm);
-    if (bodyInvalid) {
-      return 'Vai, hông và chân chưa thẳng hàng.';
-    }
-
-    final wristInvalid = faults.any((f) => f.type == 'Wall' && f.affectsForm);
-    if (wristInvalid) {
-      return 'Tay bị di chuyển — giữ tay cố định trên tường.';
     }
 
     return null;
