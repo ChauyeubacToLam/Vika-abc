@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'package:vika/utils/exercise_logger.dart';
+
 import '../onboarding_assessment_thresholds.dart';
 import '../onboarding_data.dart';
 
@@ -138,9 +140,9 @@ class V5DurationOption {
 }
 
 const durationOptions = [
-  V5DurationOption(id: '<3m', label: '< 3 tháng', sub: 'Mới bắt đầu'),
-  V5DurationOption(id: '3-11m', label: '3–11 tháng', sub: 'Đang quen'),
-  V5DurationOption(id: '1y+', label: '1 năm+', sub: 'Đã lâu'),
+  V5DurationOption(id: '<6m', label: '< 6 tháng', sub: 'Mới bắt đầu'),
+  V5DurationOption(id: '6m-2y', label: '6 tháng – 2 năm', sub: 'Đang quen'),
+  V5DurationOption(id: '2y+', label: '2 năm+', sub: 'Đã lâu'),
 ];
 
 class ForkChoice {
@@ -264,6 +266,16 @@ class AssessmentResultData {
   final int? chartFloor;
 }
 
+const _wallPushUpDepthTarget = 110;
+const _wallPushUpChartFloor = 80;
+const _wallPushUpCandidates = [
+  ResultCandidate(id: 'shoulder_pain', label: 'Đau vai khi đẩy'),
+  ResultCandidate(id: 'wrist_discomfort', label: 'Cổ tay khó chịu'),
+  ResultCandidate(id: 'shoulder_fatigue', label: 'Vai mỏi nhanh'),
+  ResultCandidate(id: 'chest_tight', label: 'Cứng ngực/vai trước'),
+  ResultCandidate(id: 'none', label: 'Không, ổn cả'),
+];
+
 // NOTE(LOGIC-REFINEMENT-#3): S08 Phase1 — issue candidate generation is hardcoded NASM-mapped candidates per exercise.
 // Currently using v1 placeholder from JSX prototype. Real logic deferred to Phase 2.
 // See Notion: Vika State > Onboarding Logic Refinement block for full context.
@@ -319,13 +331,7 @@ const homeResultsMock = [
     detectedPattern: 'ROM giảm dần ở vai',
     questionTitle: 'Bạn cảm thấy gì?',
     questionSub: 'Vika dùng để xác định nguyên nhân chính',
-    candidates: [
-      ResultCandidate(id: 'shoulder_pain', label: 'Đau vai khi đẩy'),
-      ResultCandidate(id: 'wrist_discomfort', label: 'Cổ tay khó chịu'),
-      ResultCandidate(id: 'shoulder_fatigue', label: 'Vai mỏi nhanh'),
-      ResultCandidate(id: 'chest_tight', label: 'Cứng ngực/vai trước'),
-      ResultCandidate(id: 'none', label: 'Không, ổn cả'),
-    ],
+    candidates: _wallPushUpCandidates,
   ),
 ];
 
@@ -457,6 +463,109 @@ AssessmentResultData squatResultFromData(OnboardingData data) {
     candidates: homeResultsMock.first.candidates,
     lowerIsBetter: true,
     chartFloor: 60,
+  );
+}
+
+AssessmentResultData wallPushUpResultFromData(OnboardingData data) {
+  final logger = data.hasWallPushUpAssessment ? data.wallPushUpLogger : null;
+  final totalReps = logger?.repLogs.length ?? 0;
+  final completedReps =
+      (logger?.setLogs['completed_reps'] as int?) ?? totalReps;
+  final goodReps = (logger?.setLogs['good_rep_count'] as int?) ??
+      logger?.repLogs.where((r) => r.correctForm).length ??
+      0;
+  final chart = logger?.repLogs
+          .map((r) => (r.data['min_elbow_angle'] as num?)?.round())
+          .whereType<int>()
+          .toList() ??
+      const <int>[];
+  final safeChart = chart.isEmpty ? const [_wallPushUpDepthTarget] : chart;
+  final avgDepth = chart.isEmpty
+      ? _wallPushUpDepthTarget.toDouble()
+      : chart.reduce((a, b) => a + b) / math.max(1, chart.length);
+  final qualityLabel = completedReps == 0
+      ? 'Chưa đủ dữ liệu camera'
+      : '$goodReps/$completedReps reps đạt form';
+
+  return AssessmentResultData(
+    id: 'wall_push_up',
+    name: 'Wall Push-Up',
+    score: avgDepth.round(),
+    scoreUnit: '°',
+    metric: 'Độ gập khuỷu trung bình',
+    metricLabel: qualityLabel,
+    chartTitle: 'Độ gập khuỷu qua $totalReps reps',
+    chartData: safeChart,
+    chartTarget: _wallPushUpDepthTarget,
+    chartUnit: '°',
+    coachTitle: 'Vika ghi nhận',
+    coachBody:
+        'Bài Wall Push-Up đã có dữ liệu camera. Hiện chưa có bộ diễn giải lỗi cho bài này, nên Vika dùng câu trả lời của bạn ở dưới làm tín hiệu tự báo cáo.',
+    detectedPattern: 'Dữ liệu Wall Push-Up',
+    questionTitle: 'Bạn cảm thấy gì?',
+    questionSub: 'Vika dùng để xác định nguyên nhân chính',
+    candidates: _wallPushUpCandidates,
+    lowerIsBetter: true,
+    chartFloor: _wallPushUpChartFloor,
+  );
+}
+
+// NOTE(LOGIC-REFINEMENT-#5): Warrior I / Forward Fold are single static holds, so
+// the loggers carry aggregate clean-hold seconds (good_seconds / total_seconds)
+// but no per-second stability series. The headline score below is real; the
+// stability chart + NASM question chips stay illustrative from the mock until a
+// per-second logger exists. Mirrors `wallPushUpResultFromData`.
+AssessmentResultData _yogaHoldResultFromData({
+  required AssessmentResultData mock,
+  required bool hasAssessment,
+  required ExerciseLogger? logger,
+}) {
+  if (!hasAssessment || logger == null) return mock;
+
+  final totalSeconds =
+      (logger.setLogs['total_seconds'] as num?)?.toDouble() ?? 0.0;
+  final goodSeconds =
+      (logger.setLogs['good_seconds'] as num?)?.toDouble() ?? 0.0;
+  final cleanPct =
+      totalSeconds > 0 ? (goodSeconds / totalSeconds * 100).round() : 0;
+
+  return AssessmentResultData(
+    id: mock.id,
+    name: mock.name,
+    score: goodSeconds.round(),
+    scoreUnit: 's',
+    metric: 'Thời gian giữ sạch',
+    metricLabel: totalSeconds > 0
+        ? 'Giữ đúng form ${goodSeconds.round()}/${totalSeconds.round()}s ($cleanPct%)'
+        : 'Chưa đủ dữ liệu camera',
+    chartTitle: mock.chartTitle,
+    chartData: mock.chartData,
+    chartTarget: mock.chartTarget,
+    chartUnit: mock.chartUnit,
+    coachTitle: mock.coachTitle,
+    coachBody: mock.coachBody,
+    detectedPattern: mock.detectedPattern,
+    questionTitle: mock.questionTitle,
+    questionSub: mock.questionSub,
+    candidates: mock.candidates,
+    lowerIsBetter: mock.lowerIsBetter,
+    chartFloor: mock.chartFloor,
+  );
+}
+
+AssessmentResultData warriorOneResultFromData(OnboardingData data) {
+  return _yogaHoldResultFromData(
+    mock: yogaResultsMock[0],
+    hasAssessment: data.hasWarriorAssessment,
+    logger: data.hasWarriorAssessment ? data.warriorLogger : null,
+  );
+}
+
+AssessmentResultData seatedForwardFoldResultFromData(OnboardingData data) {
+  return _yogaHoldResultFromData(
+    mock: yogaResultsMock[1],
+    hasAssessment: data.hasForwardFoldAssessment,
+    logger: data.hasForwardFoldAssessment ? data.forwardFoldLogger : null,
   );
 }
 

@@ -10,12 +10,16 @@
 // The screen renders by dispatching on the sealed [LibrarySection]
 // subclass via Dart 3 switch expressions.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data/library_mock.dart';
 import '../models/exercise_definition.dart';
 import '../models/exercise_lookup.dart';
+import '../screens/exercise/exercise_launch_args.dart';
+import '../services/workout_launch_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/vf_theme.dart';
 import '../widgets/library/library_album_rail.dart';
@@ -48,6 +52,7 @@ class LibraryScreen extends StatefulWidget {
 class _LibraryScreenState extends State<LibraryScreen> {
   String _selectedFilter = 'all';
   final ScrollController _scrollController = ScrollController();
+  final _launches = WorkoutLaunchService();
   bool _showStickyBar = false;
 
   /// Scroll offset (in logical px) past which the compact pill bar
@@ -90,14 +95,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
       );
 
   int get _totalLibraryCount =>
-      libraryProgramCards.length +
-      libraryAlbumCards.length +
-      libraryCollectionCards.length +
-      libraryAiExerciseCards.length +
-      libraryWhatsNewCards.length +
-      libraryMockAllExercises.length;
+      libraryAlbumCards.length + libraryMockAllExercises.length;
 
   void _onSelectCard(LibraryCardData card) {
+    final sequenceIds = card.sequenceExerciseIds;
+    if (sequenceIds != null && sequenceIds.isNotEmpty) {
+      unawaited(_launchCatalogSequence(sequenceIds));
+      return;
+    }
+
     if (card.exerciseName == null) {
       debugPrint(
           '[Library] Card "${card.title}" has no exerciseName; tap stubbed.');
@@ -119,12 +125,61 @@ class _LibraryScreenState extends State<LibraryScreen> {
     widget.onSelectExercise(def);
   }
 
+  Future<void> _launchCatalogSequence(List<String> catalogIds) async {
+    final sequence = await _launches.buildSequenceFromCatalogIds(catalogIds);
+    if (!mounted) return;
+    if (sequence.isEmpty) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(
+          content: Text('Bộ tập này chưa có bài camera phù hợp.'),
+        ));
+      return;
+    }
+
+    final firstItem = sequence.first;
+    final first = ExerciseLaunchArgs(
+      definition: firstItem.definition,
+      workoutSessionId: null,
+      catalogExerciseId: firstItem.catalogExerciseId,
+      catalogInfo: firstItem.catalogInfo,
+      prescription: firstItem.prescription,
+      recommendationId: firstItem.recommendationId,
+      weekNumber: firstItem.weekNumber,
+      sessionIndex: firstItem.sessionIndex,
+      slotName: firstItem.slotName,
+      sequence: sequence,
+      sequenceIndex: 0,
+    );
+    await _runWorkoutSequence(first);
+  }
+
+  Future<bool> _runWorkoutSequence(ExerciseLaunchArgs first) async {
+    ExerciseLaunchArgs? next = first;
+    var completedFinalSlot = false;
+    while (mounted && next != null) {
+      final result = await Navigator.of(context).pushNamed(
+        '/exercise',
+        arguments: next,
+      );
+      if (!mounted) return false;
+      if (result is Map && result['next'] is ExerciseLaunchArgs) {
+        next = result['next'] as ExerciseLaunchArgs;
+      } else {
+        completedFinalSlot = result is Map && result['completed'] == true;
+        next = null;
+      }
+    }
+    return completedFinalSlot;
+  }
+
   void _openBrowseTile(BrowseTileData tile) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => LibraryBrowseScreen(
           tile: tile,
           onSelectExercise: widget.onSelectExercise,
+          onSelectCard: _onSelectCard,
         ),
       ),
     );
@@ -385,7 +440,7 @@ class _StickyPillBar extends StatelessWidget {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Tìm bài, album, lộ trình…',
+                          'Tìm bài tập, bộ tập…',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -525,7 +580,7 @@ class _Closer extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '100 bài · Cập nhật mới nhất 22 / 05',
+                      '${libraryMockAllExercises.length} bài · ${libraryAlbumCards.length} bộ tập',
                       style: TextStyle(
                         fontFamily: 'BeVietnamPro',
                         fontSize: 10.5,

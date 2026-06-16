@@ -45,4 +45,47 @@ class BowPoseReportBuilder extends ExerciseReportBuilder {
 
   @override
   DetectedEvidence? detectIssue(List<ExerciseLogger> setLoggers) => null;
+
+  @override
+  List<DetailCard> buildDetailCards(List<ExerciseLogger> setLoggers) {
+    if (setLoggers.isEmpty) return const [];
+
+    final totalSeconds = _sumDouble(setLoggers, 'total_seconds');
+    final goodSeconds = _sumDouble(setLoggers, 'good_seconds');
+    final cleanRatio =
+        totalSeconds > 0 ? (goodSeconds / totalSeconds * 100) : 0.0;
+    final maxHoldTime = _sumDouble(setLoggers, 'max_hold_time');
+    final connectionLiftSeconds = _sumDouble(setLoggers, 'connection_seconds') +
+        _sumDouble(setLoggers, 'lift_form_seconds');
+
+    return [
+      DetailCard(
+        label: 'Giữ sạch',
+        value: '${goodSeconds.toStringAsFixed(1)}s',
+        subLabel: 'Mục tiêu ${totalSeconds.toStringAsFixed(0)}s',
+        useRadial: true,
+        radialValue: cleanRatio,
+        color: cleanRatio >= 80 ? 'jade' : 'amber',
+      ),
+      DetailCard(
+        label: 'Giữ lâu nhất',
+        value: '${maxHoldTime.toStringAsFixed(1)}s',
+        subLabel: 'Lần giữ dài nhất',
+        color: 'jade',
+      ),
+      DetailCard(
+        label: 'Kết nối & nâng',
+        value: '${connectionLiftSeconds.toStringAsFixed(1)}s',
+        subLabel: 'Tay-chân và độ nâng',
+        color: connectionLiftSeconds == 0 ? 'jade' : 'amber',
+      ),
+    ];
+  }
+
+  double _sumDouble(List<ExerciseLogger> setLoggers, String key) {
+    return setLoggers.fold<double>(
+      0,
+      (sum, logger) => sum + ((logger.setLogs[key] as num?)?.toDouble() ?? 0.0),
+    );
+  }
 }

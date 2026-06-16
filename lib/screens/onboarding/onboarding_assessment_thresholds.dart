@@ -56,16 +56,14 @@ class OnboardingAssessmentThresholds {
   }
 
   static String computeLevel({
-    required double? avgDepth,
-    required double goodRatio,
     required String? trainingDuration,
-    required double kneeAngleCv,
+    double? squatCleanRatio,
+    double? wallPushUpCleanRatio,
   }) {
     return FitnessTestScorer.scoreHomeFiveRepAssessment(
-      avgDepth: avgDepth,
-      goodRatio: goodRatio,
       trainingDuration: trainingDuration,
-      kneeAngleCv: kneeAngleCv,
+      squatCleanRatio: squatCleanRatio,
+      wallPushUpCleanRatio: wallPushUpCleanRatio,
     );
   }
 

@@ -186,25 +186,63 @@ class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
     }
   }
 
-  /// S07 CTA: launch the real squat assessment for the home-workout fork,
-  /// then advance to S08. For the yoga fork the squat path doesn't apply yet
-  /// (Warrior I + Forward Fold interpreters aren't built), so we just advance
-  /// and S09 Phase1 falls back to the yoga mock.
-  Future<void> _launchSquatAssessment() async {
+  /// S07 CTA: launch the real assessment legs for the chosen fork, then advance
+  /// to S08. Home runs squat + wall push-up; yoga runs Warrior I + Seated
+  /// Forward Fold. Each leg feeds its logger into [OnboardingData] so S09/S10
+  /// render and score off real data.
+  Future<void> _launchAssessment() async {
     if (_data.fork == 'yoga') {
+      final warriorLogger = await _launchExerciseAssessment(
+        warriorOneAssessmentDefinition,
+      );
+      if (!mounted) return;
+      if (warriorLogger != null) {
+        _data.onWarriorOneComplete(warriorLogger);
+      }
+
+      final forwardFoldLogger = await _launchExerciseAssessment(
+        seatedForwardFoldAssessmentDefinition,
+      );
+      if (!mounted) return;
+      if (forwardFoldLogger != null) {
+        _data.onForwardFoldComplete(forwardFoldLogger);
+      }
+
       _next();
       return;
     }
 
+    final squatLogger = await _launchExerciseAssessment(
+      squatAssessmentDefinition,
+    );
+    if (!mounted) return;
+    if (squatLogger != null) {
+      _data.onSquatComplete(squatLogger);
+    }
+
+    final wallPushUpLogger = await _launchExerciseAssessment(
+      wallPushupAssessmentDefinition,
+    );
+    if (!mounted) return;
+    if (wallPushUpLogger != null) {
+      _data.onWallPushUpComplete(wallPushUpLogger);
+    }
+
+    _next();
+  }
+
+  Future<ExerciseLogger?> _launchExerciseAssessment(
+    ExerciseDefinition definition,
+  ) async {
     final result = await Navigator.of(context).pushNamed(
       '/exercise',
-      arguments: squatAssessmentDefinition,
+      arguments: definition,
     ) as Map<String, dynamic>?;
 
     if (result != null && result['logger'] is ExerciseLogger) {
-      _data.onSquatComplete(result['logger'] as ExerciseLogger);
+      return result['logger'] as ExerciseLogger;
     }
-    if (mounted) _next();
+    return null;
   }
 
   /// S16 CTA. Persists everything OnboardingData carries to SharedPreferences +
@@ -332,7 +370,7 @@ class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
         S06Trust(onNext: _next, onBack: _back),
         S07AssessmentIntro(
           data: _data,
-          onNext: _launchSquatAssessment,
+          onNext: _launchAssessment,
           onBack: _back,
         ),
         S08Analyzing(

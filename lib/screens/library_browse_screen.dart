@@ -28,10 +28,12 @@ class LibraryBrowseScreen extends StatefulWidget {
     super.key,
     required this.tile,
     required this.onSelectExercise,
+    required this.onSelectCard,
   });
 
   final BrowseTileData tile;
   final void Function(ExerciseDefinition) onSelectExercise;
+  final ValueChanged<LibraryCardData> onSelectCard;
 
   @override
   State<LibraryBrowseScreen> createState() => _LibraryBrowseScreenState();
@@ -41,8 +43,7 @@ class _LibraryBrowseScreenState extends State<LibraryBrowseScreen> {
   String _kindFilter = 'all';
 
   void _selectCard(LibraryCardData card) {
-    if (card.exerciseName == null) return;
-    _selectByName(card.exerciseName);
+    widget.onSelectCard(card);
   }
 
   void _selectByName(String? name) {
@@ -87,7 +88,7 @@ class _LibraryBrowseScreenState extends State<LibraryBrowseScreen> {
           if (filteredCards.isNotEmpty) ...[
             SliverToBoxAdapter(
               child: _SectionHeader(
-                eyebrow: 'LỘ TRÌNH & BỘ SƯU TẬP',
+                eyebrow: 'BỘ TẬP',
                 meta: '${filteredCards.length}',
               ),
             ),
@@ -149,9 +150,7 @@ class _LibraryBrowseScreenState extends State<LibraryBrowseScreen> {
       ({List<LibraryCardData> cards, List<AllExerciseRowMock> rows}) c) {
     final m = <String, int>{
       'all': c.cards.length + c.rows.length,
-      'program': c.cards.where((x) => x.kind == LibraryCardKind.program).length,
-      'collection':
-          c.cards.where((x) => x.kind == LibraryCardKind.collection).length,
+      'album': c.cards.where((x) => x.kind == LibraryCardKind.album).length,
       'exercise': c.rows.length +
           c.cards
               .where((x) =>
@@ -164,8 +163,7 @@ class _LibraryBrowseScreenState extends State<LibraryBrowseScreen> {
 
   bool _matchesKindFilter(LibraryCardData card, String filter) {
     return switch (filter) {
-      'program' => card.kind == LibraryCardKind.program,
-      'collection' => card.kind == LibraryCardKind.collection,
+      'album' => card.kind == LibraryCardKind.album,
       'exercise' => card.kind == LibraryCardKind.exercise ||
           card.kind == LibraryCardKind.workout,
       _ => true,
@@ -184,83 +182,63 @@ class _LibraryBrowseScreenState extends State<LibraryBrowseScreen> {
   switch (tileId) {
     case 'lower':
       return (
-        cards: [
-          libraryProgramCards[0], // Khởi đầu
-          libraryAiExerciseCards[0], // Squat
-          libraryAiExerciseCards[3], // Lunge
-          libraryAiExerciseCards[4], // Glute Bridge
-        ],
-        rows: [
-          libraryMockAllExercises[0], // Squat
-          libraryMockAllExercises[3], // Lunge
-          libraryMockAllExercises[4], // Glute Bridge
-        ],
+        cards: [_albumCardById('legs')],
+        rows: _rowsInGroup('CHÂN · MÔNG'),
       );
     case 'core':
       return (
-        cards: [
-          libraryAiExerciseCards[2], // Plank
-        ],
-        rows: [
-          libraryMockAllExercises[2], // Plank
-          libraryMockAllExercises[5], // McGill Curl-up
-        ],
+        cards: [_albumCardById('core')],
+        rows: _rowsInGroup('CỐT LÕI'),
       );
     case 'back':
       return (
-        cards: [
-          libraryProgramCards[1], // Khoẻ lưng
-          libraryCollectionCards[3], // Vai cổ thư giãn
-        ],
-        rows: const [],
+        cards: [_albumCardById('back')],
+        rows: _rowsByIds(const [
+          'bird_dog',
+          'dead_bug',
+          'glute_bridge',
+          'superman',
+          'sphinx',
+          'cobra',
+          'bow_pose',
+        ]),
       );
     case 'yoga':
       return (
-        cards: [
-          libraryProgramCards[2], // Yoga sáng
-          libraryCollectionCards[2], // Tối yên
-        ],
-        rows: [
-          libraryMockAllExercises[7],
-          libraryMockAllExercises[8],
-          libraryMockAllExercises[9],
-          libraryMockAllExercises[10],
-        ],
+        cards: [_albumCardById('evening'), _albumCardById('mobility')],
+        rows: libraryMockAllExercises.where((row) => row.yoga).toList(),
       );
     case 'ai':
       return (
-        cards: [
-          ...libraryAiExerciseCards,
-          ...libraryCollectionCards.where((c) => c.hasAi),
-        ],
+        cards: libraryAlbumCards,
         rows: libraryMockAllExercises.where((r) => r.ai).toList(),
       );
     case 'short':
       return (
         cards: [
-          ...libraryCollectionCards, // all collections ≤ 12 phút
+          _albumCardById('wake'),
+          _albumCardById('desk'),
+          _albumCardById('energy'),
         ],
-        rows: libraryMockAllExercises
-            .where((r) =>
-                r.cat.contains('reps') ||
-                r.cat.contains('s ') ||
-                r.cat.contains('phút'))
-            .toList(),
-      );
-    case 'beginner':
-      return (
-        cards: [
-          libraryProgramCards[0], // Khởi đầu
-          libraryProgramCards[2], // Yoga sáng
-          libraryCollectionCards[0], // Khởi động sáng
-          libraryCollectionCards[2], // Tối yên
-        ],
-        rows: libraryMockAllExercises
-            .where((r) => r.diff.contains('Dễ') || r.diff.contains('mới'))
-            .toList(),
+        rows: const [],
       );
   }
   return (cards: const [], rows: const []);
+}
+
+LibraryCardData _albumCardById(String id) {
+  return libraryAlbumCards.firstWhere((card) => card.albumId == id);
+}
+
+List<AllExerciseRowMock> _rowsInGroup(String group) {
+  return libraryMockAllExercises.where((row) => row.group == group).toList();
+}
+
+List<AllExerciseRowMock> _rowsByIds(List<String> ids) {
+  return [
+    for (final id in ids)
+      libraryMockAllExercises.firstWhere((row) => row.definitionName == id),
+  ];
 }
 
 String? _descriptionFor(LibraryCardData card) {
@@ -274,7 +252,8 @@ String? _descriptionFor(LibraryCardData card) {
       'Bài tập riêng lẻ với camera AI hỗ trợ chỉnh form.',
     LibraryCardKind.workout => 'Buổi tập trọn vẹn.',
     LibraryCardKind.yoga => 'Tư thế yoga cho linh hoạt và thư giãn.',
-    LibraryCardKind.album => 'Bộ nhiều bài có liên kết. Tập theo thứ tự.',
+    LibraryCardKind.album =>
+      'Bộ tập có camera AI. Vika chạy từng bài theo thứ tự.',
   };
 }
 
@@ -411,7 +390,7 @@ class _BrowseHero extends StatelessWidget {
                               const SizedBox(width: 12),
                               Flexible(
                                 child: Text(
-                                  '$totalCount mục · lộ trình, album, bộ sưu tập, bài.',
+                                  '$totalCount mục · album và bài tập có camera AI.',
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
@@ -541,8 +520,7 @@ class _KindChips extends StatelessWidget {
 
   static const _items = [
     ('all', 'Tất cả'),
-    ('program', 'Lộ trình'),
-    ('collection', 'Bộ sưu tập'),
+    ('album', 'Bộ tập'),
     ('exercise', 'Bài tập'),
   ];
 

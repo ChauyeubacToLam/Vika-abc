@@ -949,6 +949,27 @@ class _ExerciseExperienceSpec {
           videoDuration: '1:12',
           createExercise: (repsPerSet) => WallPushUp(maxRep: repsPerSet),
         );
+      case 'warrior_one_assessment':
+        return _generic(
+          definition: definition,
+          sets: 1,
+          repsPerSet: 1, // một lần giữ để đánh giá
+          restSeconds: overrideRest,
+          videoDuration: '1:20',
+          createExercise: (repsPerSet) => WarriorOne(maxHolds: repsPerSet),
+        );
+      case 'seated_forward_fold_assessment':
+        return _generic(
+          definition: definition,
+          sets: 1,
+          repsPerSet: 30, // giữ 30 giây để đánh giá
+          restSeconds: overrideRest,
+          videoDuration: '1:10',
+          targetLabel: 'GIÂY/HIỆP',
+          secondsPerUnit: 1,
+          createExercise: (repsPerSet) =>
+              definition.createExercise(seconds: repsPerSet),
+        );
       case 'squat':
         return _ExerciseExperienceSpec(
           sets: overrideSets ?? 3,

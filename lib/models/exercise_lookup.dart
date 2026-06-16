@@ -56,6 +56,11 @@ String _exerciseAlias(String value) {
     'warriori' => 'warrior_one',
     'warriorone' => 'warrior_one',
     'warrior1' => 'warrior_one',
+    // Catalog-id -> Dart def-id bridges (resolve by ID, not display name).
+    'butterfly' => 'butterfly__stretch',
+    'tricepdip' => 'tricep__dip_(_floor)',
+    'sideplankdip' => 'side__plank_with__hip__dip',
+    'bowpose' => 'bow_',
     _ => value,
   };
 }

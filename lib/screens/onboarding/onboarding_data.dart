@@ -23,7 +23,7 @@ class OnboardingData {
   String? goal;
 
   // Step 3: Frequency
-  String? duration; // '<3m', '3-11m', '1y+'
+  String? duration; // '<6m', '6m-2y', '2y+'
 
   String? get trainingDuration => duration;
   set trainingDuration(String? value) => duration = value;
@@ -34,16 +34,26 @@ class OnboardingData {
   // Step 5-7: Assessment
   List<String> detectedIssues = [];
   ExerciseLogger? _squatLogger;
-  ExerciseLogger? pushUpLogger;
+  ExerciseLogger? _wallPushUpLogger;
+  ExerciseLogger? _warriorLogger;
+  ExerciseLogger? _forwardFoldLogger;
   SquatInterpreter? _squatInterpreter;
   Map<String, List<String>> feedbackByExercise = {};
 
   ForkRecommendation? forkRec;
   bool get hasSquatAssessment =>
       _squatLogger != null && _squatInterpreter != null;
+  bool get hasWallPushUpAssessment => _wallPushUpLogger != null;
+  bool get hasWarriorAssessment => _warriorLogger != null;
+  bool get hasForwardFoldAssessment => _forwardFoldLogger != null;
+  bool get hasYogaAssessment =>
+      _warriorLogger != null || _forwardFoldLogger != null;
 
   // Non-null getters preserve analyzer compatibility for older unused pages.
   ExerciseLogger get squatLogger => _squatLogger!;
+  ExerciseLogger get wallPushUpLogger => _wallPushUpLogger!;
+  ExerciseLogger get warriorLogger => _warriorLogger!;
+  ExerciseLogger get forwardFoldLogger => _forwardFoldLogger!;
   SquatInterpreter get squatInterpreter => _squatInterpreter!;
   SquatInterpreter? get squatInterpreterOrNull => _squatInterpreter;
 
@@ -54,6 +64,18 @@ class OnboardingData {
     detectedIssues
       ..clear()
       ..addAll(_squatInterpreter!.detectedIssues);
+  }
+
+  void onWallPushUpComplete(ExerciseLogger logger) {
+    _wallPushUpLogger = logger;
+  }
+
+  void onWarriorOneComplete(ExerciseLogger logger) {
+    _warriorLogger = logger;
+  }
+
+  void onForwardFoldComplete(ExerciseLogger logger) {
+    _forwardFoldLogger = logger;
   }
 
   String? level;

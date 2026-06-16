@@ -33,10 +33,15 @@ class _S09Phase1State extends State<S09Phase1>
   bool _showBars = false;
 
   List<AssessmentResultData> get _results {
-    if (widget.data.fork == 'yoga') return yogaResultsMock;
+    if (widget.data.fork == 'yoga') {
+      return [
+        warriorOneResultFromData(widget.data),
+        seatedForwardFoldResultFromData(widget.data),
+      ];
+    }
     return [
       squatResultFromData(widget.data),
-      homeResultsMock[1],
+      wallPushUpResultFromData(widget.data),
     ];
   }
 

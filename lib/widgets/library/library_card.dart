@@ -104,6 +104,8 @@ class LibraryCardData {
     this.tag,
     this.icon,
     this.exerciseName,
+    this.albumId,
+    this.sequenceExerciseIds,
     this.episodeCount,
     this.episodeMeta,
   });
@@ -128,9 +130,15 @@ class LibraryCardData {
   /// arrive, an icon over a gradient stands in.
   final IconData? icon;
 
-  /// Maps to a real `ExerciseDefinition.name`. When set, tapping the
-  /// card resolves and pushes /exercise.
+  /// Maps to a real `ExerciseDefinition` lookup key. In the Library this is
+  /// normally the catalog id (`squat`, `mcgill_curlup`, ...).
   final String? exerciseName;
+
+  /// Album-specific: stable curated album id (`wake`, `desk`, ...).
+  final String? albumId;
+
+  /// Album-specific: ordered catalog ids to launch back-to-back.
+  final List<String>? sequenceExerciseIds;
 
   /// Album-specific: number of episodes in this series. Surfaced as a
   /// badge on [LibraryAlbumCard] / [LibrarySectionAlbumRail].

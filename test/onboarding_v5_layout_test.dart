@@ -77,7 +77,7 @@ List<Widget> _screens() {
   final data = OnboardingData()
     ..problemResonance = ['form_uncertainty']
     ..goal = 'health'
-    ..duration = '<3m'
+    ..duration = '<6m'
     ..painAreas = ['back']
     ..fork = 'yoga'
     ..level = 'beginner'

@@ -125,11 +125,11 @@ double _scoreWhy(String? why) {
 
 double _scoreDuration(String? duration) {
   switch (duration) {
-    case '<3m':
+    case '<6m':
       return 0.15;
-    case '3-11m':
+    case '6m-2y':
       return 0.0;
-    case '1y+':
+    case '2y+':
       return 0.0;
     default:
       return 0.0;

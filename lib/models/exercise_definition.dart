@@ -171,6 +171,64 @@ final wallPushupAssessmentDefinition = ExerciseDefinition(
     'ascending': const Color(0xFF00B0FF),
   },
 );
+
+/// Warrior I — one short hold for the yoga onboarding assessment.
+final warriorOneAssessmentDefinition = ExerciseDefinition(
+  id: 'warrior_one_assessment',
+  name: 'Warrior I Assessment',
+  subtitle: 'Kiểm tra tư thế Chiến Binh I',
+  description: 'Giữ Chiến Binh I một bên để AI đánh giá thể lực của bạn.',
+  icon: Icons.self_improvement,
+  primaryColor: const Color(0xFF00E5FF),
+  secondaryColor: const Color(0xFF0091EA),
+  difficulty: 'Dễ',
+  targetMuscles: ['Đùi', 'Mông', 'Hông'],
+  duration: '30s',
+  cameraHint: 'Quay nghiêng người so với camera.',
+  framingHint: 'Giữ vai, hông, tai, hai tay và cả hai chân trong khung hình.',
+  setupTips: [
+    'Đặt camera ngang hông, cách bạn khoảng 2–3 mét.',
+    'Quay nghiêng 90° để AI thấy rõ chân trước, chân sau và thân người.',
+    'Chừa khoảng trống phía trên đầu vì hai tay sẽ vươn cao.',
+  ],
+  safetyWarning:
+      'Giữ thân người thẳng, không gập lưng quá mức. Dừng lại nếu thấy đau lưng dưới hoặc đầu gối.',
+  createExercise: ({int? reps, int? seconds}) =>
+      WarriorOne(maxHolds: reps ?? 1),
+  phaseColors: {
+    'entry': const Color(0xFFFFB300),
+    'hold': const Color(0xFF00E676),
+    'exit': const Color(0xFF29B6F6),
+  },
+);
+
+/// Seated Forward Fold — one short hold for the yoga onboarding assessment.
+final seatedForwardFoldAssessmentDefinition = ExerciseDefinition(
+  id: 'seated_forward_fold_assessment',
+  name: 'Seated Forward Fold Assessment',
+  subtitle: 'Kiểm tra tư thế Gập Người',
+  description: 'Gập người về trước và giữ 30 giây để AI đánh giá thể lực.',
+  icon: Icons.self_improvement,
+  primaryColor: const Color(0xFF00E5FF),
+  secondaryColor: const Color(0xFF0091EA),
+  difficulty: 'Dễ',
+  targetMuscles: ['Gân kheo', 'Lưng dưới', 'Hông'],
+  duration: '30s',
+  cameraHint: 'Quay nghiêng người so với camera.',
+  framingHint: 'Đặt điện thoại nằm ngang, thấy rõ vai, hông, gối và bàn chân.',
+  setupTips: [
+    'Ngồi duỗi thẳng hai chân, đặt camera quay ngang hông.',
+    'Gập người từ khớp hông, đẩy ngực về phía mũi chân.',
+    'Ưu tiên giữ gối thẳng, đừng cố gập sâu nếu phải co gối.',
+  ],
+  safetyWarning:
+      'Gập từ từ theo hơi thở, đừng giật mạnh. Dừng nếu căng đau ở lưng dưới.',
+  createExercise: ({int? reps, int? seconds}) =>
+      SeatedForwardFold(maxSeconds: seconds ?? 30, maxHolds: 1),
+  phaseColors: {
+    'default': const Color(0xFF00E676),
+  },
+);
 final List<ExerciseDefinition> exerciseDefinitions = [
   ExerciseDefinition(
     id: 'squat',
@@ -741,20 +799,24 @@ final List<ExerciseDefinition> exerciseDefinitions = [
   ExerciseDefinition(
     id: 'bow_',
     name: 'Bow Pose',
-    subtitle: 'Chưa có mô tả',
-    description: 'Bản xem trước của bài tập Bow Pose.',
+    subtitle: 'Nâng ngực và đùi thành hình cánh cung',
+    description:
+        '3 lần giữ × 15 giây. AI theo dõi kết nối tay-chân và độ nâng đồng đều của ngực và đùi theo thời gian thực.',
     icon: Icons.fitness_center,
     primaryColor: const Color(0xFF00E5FF),
     secondaryColor: const Color(0xFF0091EA),
     difficulty: 'Trung bình',
-    targetMuscles: ['Toàn thân'],
-    duration: 'Tùy chọn',
-    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
-    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    targetMuscles: ['Lưng dưới', 'Cơ dựng sống', 'Đùi trước'],
+    duration: '3 × 15s',
+    cameraHint: 'Quay nghiêng người so với camera.',
+    framingHint: 'Giữ vai, hông, gối và cổ chân trong khung hình.',
     setupTips: [
-      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
-      'Bắt đầu khi sẵn sàng.'
+      'Nằm sấp, đặt camera thấp ngang thân, quay nghiêng 90°.',
+      'Gập gối, đưa tay ra sau nắm lấy cổ chân.',
+      'Hít vào, nâng ngực và đùi lên cùng lúc như một khối.',
     ],
+    safetyWarning:
+        'Nâng vừa sức, mắt nhìn xuống mép trước thảm. Dừng nếu đau lưng dưới hoặc cổ.',
     createExercise: ({int? reps, int? seconds}) =>
         _withReps(reps, (target) => BowPose(maxRep: target), () => BowPose()),
     phaseColors: {
@@ -764,20 +826,23 @@ final List<ExerciseDefinition> exerciseDefinitions = [
   ExerciseDefinition(
     id: 'butterfly__stretch',
     name: 'Butterfly Stretch',
-    subtitle: 'Chưa có mô tả',
-    description: 'Bản xem trước của bài tập Butterfly Stretch.',
+    subtitle: 'Mở háng, giãn cơ khép đùi',
+    description:
+        'Giữ tư thế bướm 30 giây. AI theo dõi độ mở của hai gối, lưng thẳng và vị trí bàn chân theo thời gian thực.',
     icon: Icons.fitness_center,
     primaryColor: const Color(0xFF00E5FF),
     secondaryColor: const Color(0xFF0091EA),
-    difficulty: 'Trung bình',
-    targetMuscles: ['Toàn thân'],
-    duration: 'Tùy chọn',
-    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
-    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    difficulty: 'Người mới',
+    targetMuscles: ['Cơ khép đùi', 'Háng', 'Hông'],
+    duration: '30s',
+    cameraHint: 'Đặt camera chính diện (camera trước).',
+    framingHint: 'Ngồi trọn trong khung hình, thấy rõ hai gối và vai.',
     setupTips: [
-      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
-      'Bắt đầu khi sẵn sàng.'
+      'Ngồi đối diện camera, đặt điện thoại nằm ngang ngay trước mặt.',
+      'Chụm hai lòng bàn chân, kéo gót về gần hông.',
+      'Giữ lưng thẳng, thả lỏng để hai gối rơi đều xuống sàn.',
     ],
+    safetyWarning: 'Đừng dùng tay ép gối xuống. Để gối tự rơi theo nhịp thở.',
     createExercise: ({int? reps, int? seconds}) => _withSeconds(
         seconds,
         (target) => ButterflyStretch(maxSeconds: target),
@@ -789,20 +854,24 @@ final List<ExerciseDefinition> exerciseDefinitions = [
   ExerciseDefinition(
     id: 'cobra_',
     name: 'Cobra Pose',
-    subtitle: 'Chưa có mô tả',
-    description: 'Bản xem trước của bài tập Cobra Pose.',
+    subtitle: 'Mở ngực, giãn nhẹ cột sống',
+    description:
+        '3 lần giữ × 15 giây. AI theo dõi độ nâng ngực, khuỷu tay, cổ và hông neo sàn theo thời gian thực.',
     icon: Icons.fitness_center,
     primaryColor: const Color(0xFF00E5FF),
     secondaryColor: const Color(0xFF0091EA),
-    difficulty: 'Trung bình',
-    targetMuscles: ['Toàn thân'],
-    duration: 'Tùy chọn',
-    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
-    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    difficulty: 'Dễ – Trung bình',
+    targetMuscles: ['Lưng dưới', 'Cơ dựng sống', 'Ngực'],
+    duration: '3 × 15s',
+    cameraHint: 'Quay nghiêng người so với camera.',
+    framingHint: 'Giữ vai, khuỷu tay, hông và cổ trong khung hình.',
     setupTips: [
-      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
-      'Bắt đầu khi sẵn sàng.'
+      'Nằm sấp, đặt camera thấp ngang thân (30–50 cm so với sàn).',
+      'Quay nghiêng 90° để AI thấy rõ độ cong lưng.',
+      'Đặt hai tay dưới vai, khuỷu tay sát thân trước khi nâng ngực.',
     ],
+    safetyWarning:
+        'Nâng ngực vừa sức, đừng ép lưng dưới quá mức. Dừng lại nếu thấy đau lưng hoặc cổ.',
     createExercise: ({int? reps, int? seconds}) =>
         _withReps(reps, (target) => Cobra(maxRep: target), () => Cobra()),
     phaseColors: {
@@ -881,20 +950,25 @@ final List<ExerciseDefinition> exerciseDefinitions = [
   ExerciseDefinition(
     id: 'seated__forward__fold',
     name: 'Seated Forward Fold',
-    subtitle: 'Chưa có mô tả',
-    description: 'Bản xem trước của bài tập Seated Forward Fold.',
+    subtitle: 'Giãn gân kheo và lưng dưới',
+    description:
+        'Gập người về trước và giữ tĩnh 30 giây. AI theo dõi độ thẳng của gối và đường cong cột sống theo thời gian thực.',
     icon: Icons.fitness_center,
     primaryColor: const Color(0xFF00E5FF),
     secondaryColor: const Color(0xFF0091EA),
-    difficulty: 'Trung bình',
-    targetMuscles: ['Toàn thân'],
-    duration: 'Tùy chọn',
-    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
-    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    difficulty: 'Người mới',
+    targetMuscles: ['Gân kheo', 'Lưng dưới', 'Hông'],
+    duration: '30s',
+    cameraHint: 'Quay nghiêng người so với camera.',
+    framingHint:
+        'Đặt điện thoại nằm ngang, thấy rõ vai, hông, gối và bàn chân.',
     setupTips: [
-      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
-      'Bắt đầu khi sẵn sàng.'
+      'Ngồi duỗi thẳng hai chân, đặt camera quay ngang hông.',
+      'Gập người từ khớp hông, đẩy ngực về phía mũi chân.',
+      'Ưu tiên giữ gối thẳng, đừng cố gập sâu nếu phải co gối.',
     ],
+    safetyWarning:
+        'Gập từ từ theo hơi thở, đừng giật mạnh. Dừng nếu căng đau ở lưng dưới.',
     createExercise: ({int? reps, int? seconds}) => _withSeconds(
         seconds,
         (target) => SeatedForwardFold(maxSeconds: target),
@@ -929,20 +1003,24 @@ final List<ExerciseDefinition> exerciseDefinitions = [
   ExerciseDefinition(
     id: 'sphinx_',
     name: 'Sphinx Pose',
-    subtitle: 'Chưa có mô tả',
-    description: 'Bản xem trước của bài tập Sphinx Pose.',
+    subtitle: 'Mở nhẹ cột sống trên cẳng tay',
+    description:
+        'Chống cẳng tay, nâng ngực và giữ tĩnh 30 giây. AI theo dõi hông neo sàn, góc khuỷu tay và cổ vai theo thời gian thực.',
     icon: Icons.fitness_center,
     primaryColor: const Color(0xFF00E5FF),
     secondaryColor: const Color(0xFF0091EA),
-    difficulty: 'Trung bình',
-    targetMuscles: ['Toàn thân'],
-    duration: 'Tùy chọn',
-    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
-    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    difficulty: 'Người mới',
+    targetMuscles: ['Lưng dưới', 'Cơ dựng sống'],
+    duration: '30s',
+    cameraHint: 'Quay nghiêng người so với camera.',
+    framingHint: 'Đặt điện thoại nằm ngang, thấy rõ vai, khuỷu tay và hông.',
     setupTips: [
-      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
-      'Bắt đầu khi sẵn sàng.'
+      'Nằm sấp, chống hai cẳng tay xuống sàn, khuỷu ngay dưới vai.',
+      'Đặt camera thấp ngang thân, quay nghiêng 90°.',
+      'Ấn hông xuống sàn và kéo dài cổ trước khi nâng ngực.',
     ],
+    safetyWarning:
+        'Giữ cẳng tay đỡ lực — đừng duỗi thẳng tay thành Cobra. Dừng nếu đau lưng dưới.',
     createExercise: ({int? reps, int? seconds}) => _withSeconds(seconds,
         (target) => SphinxStretch(maxSeconds: target), () => SphinxStretch()),
     phaseColors: {

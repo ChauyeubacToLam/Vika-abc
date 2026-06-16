@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../../../../services/recommendation/fitness_test_scoring.dart';
 import '../../onboarding_data.dart';
-import '../v5_models.dart';
 import '../v5_primitives.dart';
 import '../v5_theme.dart';
 
@@ -94,26 +93,15 @@ class _S10LevelIssueState extends State<S10LevelIssue>
 
   String _recommendedLevel() {
     if (widget.data.fork == 'yoga') {
-      final results = yogaResultsMock;
-      final allValues = results.expand((r) => r.chartData).toList();
-      final totalCandidates = results.fold<int>(
-        0,
-        (sum, r) => sum + r.candidates.where((c) => c.id != 'none').length,
-      );
-      final confirmedIssues = widget.data.feedbackByExercise.values.fold<int>(
-        0,
-        (sum, items) => sum + items.where((id) => id != 'none').length,
-      );
       return FitnessTestScorer.score(
-        FitnessTestScoringInput(
-          fork: widget.data.fork,
+        FitnessTestScoringInput.fromYogaLoggers(
+          warriorLogger: widget.data.hasWarriorAssessment
+              ? widget.data.warriorLogger
+              : null,
+          forwardFoldLogger: widget.data.hasForwardFoldAssessment
+              ? widget.data.forwardFoldLogger
+              : null,
           trainingDuration: widget.data.duration,
-          yogaAssessment: YogaMobilityAssessment(
-            chartValues: allValues,
-            chartTarget: results.first.chartTarget,
-            totalIssueCandidates: totalCandidates,
-            confirmedIssueCount: confirmedIssues,
-          ),
         ),
       ).suggestedLevel;
     }
@@ -121,6 +109,9 @@ class _S10LevelIssueState extends State<S10LevelIssue>
     return FitnessTestScorer.score(
       FitnessTestScoringInput.fromSquatLogger(
         logger: widget.data.hasSquatAssessment ? widget.data.squatLogger : null,
+        wallPushUpLogger: widget.data.hasWallPushUpAssessment
+            ? widget.data.wallPushUpLogger
+            : null,
         trainingDuration: widget.data.duration,
       ),
     ).suggestedLevel;
