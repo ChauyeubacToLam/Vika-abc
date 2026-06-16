@@ -9,11 +9,17 @@ class S07AssessmentIntro extends StatelessWidget {
     super.key,
     required this.data,
     required this.onNext,
+    required this.onSkip,
     required this.onBack,
   });
 
   final OnboardingData data;
   final VoidCallback onNext;
+
+  /// Secondary action: opt out of the live assessment. The level picker still
+  /// suggests a level from the user's stated history. Guarded by a confirm
+  /// sheet so it can't be skipped by accident.
+  final VoidCallback onSkip;
   final VoidCallback onBack;
 
   @override
@@ -54,10 +60,34 @@ class S07AssessmentIntro extends StatelessWidget {
           ];
     final r = V5Responsive.of(context);
     final tight = r.size.height < 700;
+    final bottomInset = r.viewPadding.bottom;
+    // Skip link tucks just under a raised primary pill. V5PillCTA is a
+    // self-positioning Positioned, so the cluster lives in a fills-the-screen
+    // Stack and both children anchor to the bottom edge.
+    final linkBottom = bottomInset + 18;
+    final pillBottom = linkBottom + 48;
     return V5Page(
       index: 9,
       onBack: onBack,
-      cta: V5PillCTA(label: 'Bắt đầu đánh giá', onTap: onNext),
+      bottomPaddingOverride: pillBottom + 60 + 20,
+      cta: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          V5PillCTA(
+            label: 'Bắt đầu đánh giá',
+            onTap: onNext,
+            bottom: pillBottom,
+          ),
+          Positioned(
+            left: V5.gutter,
+            right: V5.gutter,
+            bottom: linkBottom,
+            child: Center(
+              child: _SkipAssessmentLink(onTap: () => _confirmSkip(context)),
+            ),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -106,6 +136,163 @@ class S07AssessmentIntro extends StatelessWidget {
             );
           }),
         ],
+      ),
+    );
+  }
+
+  Future<void> _confirmSkip(BuildContext context) async {
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: V5.ink.withValues(alpha: 0.46),
+      builder: (_) => const _SkipConfirmSheet(),
+    );
+    if (confirmed == true) onSkip();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Skip affordance — quiet link + confirm sheet
+// ─────────────────────────────────────────────────────────────
+
+class _SkipAssessmentLink extends StatelessWidget {
+  const _SkipAssessmentLink({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        child: Text(
+          'Bỏ qua · gợi ý theo kinh nghiệm',
+          style: V5.bodySm(context, color: V5.inkSoft).copyWith(
+            fontWeight: FontWeight.w600,
+            decoration: TextDecoration.underline,
+            decorationColor: V5.inkFaint,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SkipConfirmSheet extends StatelessWidget {
+  const _SkipConfirmSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewPadding.bottom;
+    return Container(
+      decoration: const BoxDecoration(
+        color: V5.surface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(V5.radius2xl)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+        V5.gutter,
+        V5.space12,
+        V5.gutter,
+        bottomInset + V5.space20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: V5.inkDim,
+                borderRadius: BorderRadius.circular(V5.radiusFull),
+              ),
+            ),
+          ),
+          const SizedBox(height: V5.space20),
+          Row(
+            children: [
+              const V5Sparkle(size: 13),
+              const SizedBox(width: V5.space8),
+              Text(
+                'TỰ CHỌN MỨC TẬP',
+                style: V5.eyebrow(context, color: V5.yellowDeep),
+              ),
+            ],
+          ),
+          const SizedBox(height: V5.space10),
+          Text('Bỏ qua đánh giá?', style: V5.titleLg(context)),
+          const SizedBox(height: V5.space8),
+          Text(
+            'Không sao — Vika vẫn gợi ý mức tập dựa trên kinh nghiệm bạn đã '
+            'chia sẻ. Bạn có thể làm bài đánh giá bất cứ lúc nào trong Hồ sơ.',
+            style: V5.body(context, color: V5.inkSoft),
+          ),
+          const SizedBox(height: V5.space24),
+          _SheetPrimaryButton(
+            label: 'Bỏ qua, gợi ý theo kinh nghiệm',
+            onTap: () => Navigator.of(context).pop(true),
+          ),
+          const SizedBox(height: V5.space6),
+          _SheetSecondaryButton(
+            label: 'Quay lại, tôi sẽ đánh giá',
+            onTap: () => Navigator.of(context).pop(false),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SheetPrimaryButton extends StatelessWidget {
+  const _SheetPrimaryButton({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        height: 54,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: V5.ink,
+          borderRadius: BorderRadius.circular(V5.radiusFull),
+          boxShadow: V5.elevation2,
+        ),
+        child: Text(
+          label,
+          style: V5.titleSm(context, color: V5.invInk),
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetSecondaryButton extends StatelessWidget {
+  const _SheetSecondaryButton({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        height: 52,
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: V5.titleSm(context, color: V5.inkSoft),
+        ),
       ),
     );
   }

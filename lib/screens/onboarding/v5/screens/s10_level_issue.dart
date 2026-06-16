@@ -92,8 +92,9 @@ class _S10LevelIssueState extends State<S10LevelIssue>
   }
 
   String _recommendedLevel() {
+    final FitnessTestScoringResult result;
     if (widget.data.fork == 'yoga') {
-      return FitnessTestScorer.score(
+      result = FitnessTestScorer.score(
         FitnessTestScoringInput.fromYogaLoggers(
           warriorLogger: widget.data.hasWarriorAssessment
               ? widget.data.warriorLogger
@@ -103,18 +104,21 @@ class _S10LevelIssueState extends State<S10LevelIssue>
               : null,
           trainingDuration: widget.data.duration,
         ),
-      ).suggestedLevel;
+      );
+    } else {
+      result = FitnessTestScorer.score(
+        FitnessTestScoringInput.fromSquatLogger(
+          logger:
+              widget.data.hasSquatAssessment ? widget.data.squatLogger : null,
+          wallPushUpLogger: widget.data.hasWallPushUpAssessment
+              ? widget.data.wallPushUpLogger
+              : null,
+          trainingDuration: widget.data.duration,
+        ),
+      );
     }
-
-    return FitnessTestScorer.score(
-      FitnessTestScoringInput.fromSquatLogger(
-        logger: widget.data.hasSquatAssessment ? widget.data.squatLogger : null,
-        wallPushUpLogger: widget.data.hasWallPushUpAssessment
-            ? widget.data.wallPushUpLogger
-            : null,
-        trainingDuration: widget.data.duration,
-      ),
-    ).suggestedLevel;
+    widget.data.levelAssessment = result;
+    return result.suggestedLevel;
   }
 
   void _pick(String id) => setState(() => widget.data.level = id);
@@ -123,6 +127,13 @@ class _S10LevelIssueState extends State<S10LevelIssue>
       .expand((items) => items)
       .where((id) => id != 'none')
       .length;
+
+  /// Whether any live assessment leg was captured. When false (the user skipped
+  /// from S07), the suggestion comes purely from their stated training history,
+  /// so the copy reflects that instead of naming a "bài đánh giá" they never did.
+  bool get _assessmentDone => widget.data.fork == 'yoga'
+      ? widget.data.hasWarriorAssessment || widget.data.hasForwardFoldAssessment
+      : widget.data.hasSquatAssessment || widget.data.hasWallPushUpAssessment;
 
   @override
   Widget build(BuildContext context) {
@@ -175,9 +186,11 @@ class _S10LevelIssueState extends State<S10LevelIssue>
             delay: const Duration(milliseconds: 120),
             slideY: 8,
             child: Text(
-              _issueCount == 0
-                  ? 'Plan sẽ tăng nhịp từ từ dựa trên bài đánh giá.'
-                  : 'Plan sẽ ưu tiên $_issueCount điểm cần luyện từ bài đánh giá.',
+              !_assessmentDone
+                  ? 'Dựa trên kinh nghiệm bạn đã chia sẻ — có thể đánh giá lại bất cứ lúc nào để tinh chỉnh.'
+                  : _issueCount == 0
+                      ? 'Plan sẽ tăng nhịp từ từ dựa trên bài đánh giá.'
+                      : 'Plan sẽ ưu tiên $_issueCount điểm cần luyện từ bài đánh giá.',
               style: V5.body(context, color: V5.inkSoft),
               maxLines: 2,
             ),

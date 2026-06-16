@@ -73,7 +73,13 @@ class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
   // Page indices used for special-case logic.
   static const _idxAssessmentIntro = 8; // S07
   static const _idxAnalyzing = 9; // S08
+  static const _idxLevel = 11; // S10
   static const _idxSignup = 14; // S13
+
+  // True when the user skipped the live assessment from S07. Drives the
+  // back gesture on the level picker (S10) so it returns to the intro over
+  // the bypassed Analyzing + Phase1 screens.
+  bool _assessmentSkipped = false;
 
   // Screens with dark/inverted backgrounds — drives the status bar overlay.
   static const _darkPages = <int>{0, 9, 16}; // S01, S08, S16
@@ -169,6 +175,13 @@ class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
 
   void _back() {
     if (!_pc.hasClients) return;
+    // Reached the level picker by skipping the assessment — back returns to
+    // the assessment intro, over the bypassed Analyzing + Phase1 screens.
+    if (_page == _idxLevel && _assessmentSkipped) {
+      _assessmentSkipped = false;
+      _pc.jumpToPage(_idxAssessmentIntro);
+      return;
+    }
     // Skip back across S08 Analyzing — it's a transition screen, not a stop.
     if (_page == _idxAnalyzing) {
       _pc.animateToPage(
@@ -186,49 +199,65 @@ class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
     }
   }
 
-  /// S07 CTA: launch the real assessment legs for the chosen fork, then advance
-  /// to S08. Home runs squat + wall push-up; yoga runs Warrior I + Seated
-  /// Forward Fold. Each leg feeds its logger into [OnboardingData] so S09/S10
-  /// render and score off real data.
+  /// S07 CTA: run the live assessment legs for the chosen fork, then advance to
+  /// S08 — but only once **every** leg is captured. Home runs squat + wall
+  /// push-up; yoga runs Warrior I + Seated Forward Fold.
+  ///
+  /// Each leg is launched only if it isn't already done, and a leg the user
+  /// backs out of (the `/exercise` route pops null instead of a logger) aborts
+  /// the run *without* advancing — so the user lands back on S07 with finished
+  /// legs kept. Re-tapping the CTA resumes at the first unfinished leg. This is
+  /// the gate: Analyzing (S08) is unreachable until both legs exist.
   Future<void> _launchAssessment() async {
     if (_data.fork == 'yoga') {
-      final warriorLogger = await _launchExerciseAssessment(
-        warriorOneAssessmentDefinition,
-      );
-      if (!mounted) return;
-      if (warriorLogger != null) {
-        _data.onWarriorOneComplete(warriorLogger);
+      if (!_data.hasWarriorAssessment) {
+        final logger = await _launchExerciseAssessment(
+          warriorOneAssessmentDefinition,
+        );
+        if (!mounted) return;
+        if (logger == null) return; // backed out → stay on S07, keep prior legs
+        _data.onWarriorOneComplete(logger);
       }
-
-      final forwardFoldLogger = await _launchExerciseAssessment(
-        seatedForwardFoldAssessmentDefinition,
-      );
-      if (!mounted) return;
-      if (forwardFoldLogger != null) {
-        _data.onForwardFoldComplete(forwardFoldLogger);
+      if (!_data.hasForwardFoldAssessment) {
+        final logger = await _launchExerciseAssessment(
+          seatedForwardFoldAssessmentDefinition,
+        );
+        if (!mounted) return;
+        if (logger == null) return; // backed out → stay on S07, keep prior legs
+        _data.onForwardFoldComplete(logger);
       }
-
       _next();
       return;
     }
 
-    final squatLogger = await _launchExerciseAssessment(
-      squatAssessmentDefinition,
-    );
-    if (!mounted) return;
-    if (squatLogger != null) {
-      _data.onSquatComplete(squatLogger);
+    if (!_data.hasSquatAssessment) {
+      final logger = await _launchExerciseAssessment(
+        squatAssessmentDefinition,
+      );
+      if (!mounted) return;
+      if (logger == null) return; // backed out → stay on S07, keep prior legs
+      _data.onSquatComplete(logger);
     }
-
-    final wallPushUpLogger = await _launchExerciseAssessment(
-      wallPushupAssessmentDefinition,
-    );
-    if (!mounted) return;
-    if (wallPushUpLogger != null) {
-      _data.onWallPushUpComplete(wallPushUpLogger);
+    if (!_data.hasWallPushUpAssessment) {
+      final logger = await _launchExerciseAssessment(
+        wallPushupAssessmentDefinition,
+      );
+      if (!mounted) return;
+      if (logger == null) return; // backed out → stay on S07, squat kept
+      _data.onWallPushUpComplete(logger);
     }
-
     _next();
+  }
+
+  /// S07 secondary action: skip the live assessment. The level picker (S10)
+  /// still suggests a level — [FitnessTestScorer] falls back to the
+  /// training-history band when no loggers exist. Jump straight there,
+  /// bypassing S08 Analyzing + S09 Phase1 (both presuppose captured data);
+  /// jumpToPage (not animate) so S08's `active` timer never fires in transit.
+  void _skipAssessment() {
+    if (!_pc.hasClients) return;
+    _assessmentSkipped = true;
+    _pc.jumpToPage(_idxLevel);
   }
 
   Future<ExerciseLogger?> _launchExerciseAssessment(
@@ -371,6 +400,7 @@ class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
         S07AssessmentIntro(
           data: _data,
           onNext: _launchAssessment,
+          onSkip: _skipAssessment,
           onBack: _back,
         ),
         S08Analyzing(

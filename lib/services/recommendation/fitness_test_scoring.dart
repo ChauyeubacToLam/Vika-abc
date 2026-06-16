@@ -13,31 +13,93 @@ class FitnessTestScorer {
   const FitnessTestScorer._();
 
   static FitnessTestScoringResult score(FitnessTestScoringInput input) {
-    final suggestedLevel =
-        input.fork == 'yoga' ? _scoreYoga(input) : _scoreHome(input);
-    return FitnessTestScoringResult(suggestedLevel: suggestedLevel);
+    return input.fork == 'yoga' ? _scoreYoga(input) : _scoreHome(input);
   }
 
-  static String _scoreHome(FitnessTestScoringInput input) {
-    return scoreHomeFiveRepAssessment(
+  static FitnessTestScoringResult _scoreHome(FitnessTestScoringInput input) {
+    final squat = input.squatAssessment;
+    final wallPushUp = input.wallPushUpAssessment;
+    return _evaluateHome(
       trainingDuration: input.trainingDuration,
-      squatCleanRatio: input.squatAssessment?.cleanRatio,
-      wallPushUpCleanRatio: input.wallPushUpAssessment?.cleanRatio,
+      squatCleanRatio: squat?.cleanRatio,
+      wallPushUpCleanRatio: wallPushUp?.cleanRatio,
+      assessmentA: squat == null
+          ? null
+          : AssessmentScore(
+              exercise: 'squat',
+              cleanRatio: squat.cleanRatio,
+              good: squat.goodReps.toDouble(),
+              total: squat.totalReps.toDouble(),
+            ),
+      assessmentB: wallPushUp == null
+          ? null
+          : AssessmentScore(
+              exercise: 'wall_pushup',
+              cleanRatio: wallPushUp.cleanRatio,
+              good: wallPushUp.goodReps.toDouble(),
+              total: wallPushUp.totalReps.toDouble(),
+            ),
     );
   }
 
-  static String _scoreYoga(FitnessTestScoringInput input) {
-    return scoreYogaHoldAssessment(
+  static FitnessTestScoringResult _scoreYoga(FitnessTestScoringInput input) {
+    final warrior = input.warriorAssessment;
+    final forwardFold = input.forwardFoldAssessment;
+    return _evaluateYoga(
       trainingDuration: input.trainingDuration,
-      warriorCleanRatio: input.warriorAssessment?.cleanRatio,
-      forwardFoldCleanRatio: input.forwardFoldAssessment?.cleanRatio,
+      warriorCleanRatio: warrior?.cleanRatio,
+      forwardFoldCleanRatio: forwardFold?.cleanRatio,
+      assessmentA: warrior == null
+          ? null
+          : AssessmentScore(
+              exercise: 'warrior_one',
+              cleanRatio: warrior.cleanRatio,
+              good: warrior.goodSeconds,
+              total: warrior.totalSeconds,
+            ),
+      assessmentB: forwardFold == null
+          ? null
+          : AssessmentScore(
+              exercise: 'seated_forward_fold',
+              cleanRatio: forwardFold.cleanRatio,
+              good: forwardFold.goodSeconds,
+              total: forwardFold.totalSeconds,
+            ),
     );
   }
 
+  /// Thin string wrapper over [_evaluateHome] — preserved for callers that
+  /// only need the level. The band + degrade logic lives in [_evaluateHome].
   static String scoreHomeFiveRepAssessment({
     required String? trainingDuration,
     double? squatCleanRatio,
     double? wallPushUpCleanRatio,
+  }) =>
+      _evaluateHome(
+        trainingDuration: trainingDuration,
+        squatCleanRatio: squatCleanRatio,
+        wallPushUpCleanRatio: wallPushUpCleanRatio,
+      ).suggestedLevel;
+
+  /// Thin string wrapper over [_evaluateYoga] — preserved for callers that
+  /// only need the level. The band + degrade logic lives in [_evaluateYoga].
+  static String scoreYogaHoldAssessment({
+    required String? trainingDuration,
+    double? warriorCleanRatio,
+    double? forwardFoldCleanRatio,
+  }) =>
+      _evaluateYoga(
+        trainingDuration: trainingDuration,
+        warriorCleanRatio: warriorCleanRatio,
+        forwardFoldCleanRatio: forwardFoldCleanRatio,
+      ).suggestedLevel;
+
+  static FitnessTestScoringResult _evaluateHome({
+    required String? trainingDuration,
+    double? squatCleanRatio,
+    double? wallPushUpCleanRatio,
+    AssessmentScore? assessmentA,
+    AssessmentScore? assessmentB,
   }) {
     final durationBand = _homeBandFromDuration(trainingDuration);
     final cleanRatios = [
@@ -45,25 +107,41 @@ class FitnessTestScorer {
       if (wallPushUpCleanRatio != null) _clampedRatio(wallPushUpCleanRatio),
     ];
 
-    if (cleanRatios.isEmpty) return durationBand;
+    if (cleanRatios.isEmpty) {
+      return FitnessTestScoringResult(
+        suggestedLevel: durationBand,
+        durationBand: durationBand,
+        degraded: false,
+        degradeThreshold: _homeCleanDegradeThreshold,
+        assessmentA: assessmentA,
+        assessmentB: assessmentB,
+      );
+    }
 
     final averageCleanRatio =
         cleanRatios.reduce((a, b) => a + b) / cleanRatios.length;
-    if (averageCleanRatio < _homeCleanDegradeThreshold) {
-      return _degradeHomeBand(durationBand);
-    }
-    return durationBand;
+    final degraded = averageCleanRatio < _homeCleanDegradeThreshold;
+    return FitnessTestScoringResult(
+      suggestedLevel: degraded ? _degradeHomeBand(durationBand) : durationBand,
+      durationBand: durationBand,
+      degraded: degraded,
+      degradeThreshold: _homeCleanDegradeThreshold,
+      assessmentA: assessmentA,
+      assessmentB: assessmentB,
+    );
   }
 
-  /// Yoga mirror of [scoreHomeFiveRepAssessment]: the same duration band and
-  /// degrade-only model, but reads clean-hold-seconds ratios (good_seconds /
-  /// total_seconds) instead of clean-rep ratios. Reuses the fork-agnostic band
-  /// helpers; only the degrade threshold differs ([_yogaCleanDegradeThreshold]),
-  /// because hold-% and rep-% scale differently.
-  static String scoreYogaHoldAssessment({
+  /// Yoga mirror of [_evaluateHome]: the same duration band and degrade-only
+  /// model, but reads clean-hold-seconds ratios (good_seconds / total_seconds)
+  /// instead of clean-rep ratios. Reuses the fork-agnostic band helpers; only
+  /// the degrade threshold differs ([_yogaCleanDegradeThreshold]), because
+  /// hold-% and rep-% scale differently.
+  static FitnessTestScoringResult _evaluateYoga({
     required String? trainingDuration,
     double? warriorCleanRatio,
     double? forwardFoldCleanRatio,
+    AssessmentScore? assessmentA,
+    AssessmentScore? assessmentB,
   }) {
     final durationBand = _homeBandFromDuration(trainingDuration);
     final cleanRatios = [
@@ -71,14 +149,28 @@ class FitnessTestScorer {
       if (forwardFoldCleanRatio != null) _clampedRatio(forwardFoldCleanRatio),
     ];
 
-    if (cleanRatios.isEmpty) return durationBand;
+    if (cleanRatios.isEmpty) {
+      return FitnessTestScoringResult(
+        suggestedLevel: durationBand,
+        durationBand: durationBand,
+        degraded: false,
+        degradeThreshold: _yogaCleanDegradeThreshold,
+        assessmentA: assessmentA,
+        assessmentB: assessmentB,
+      );
+    }
 
     final averageCleanRatio =
         cleanRatios.reduce((a, b) => a + b) / cleanRatios.length;
-    if (averageCleanRatio < _yogaCleanDegradeThreshold) {
-      return _degradeHomeBand(durationBand);
-    }
-    return durationBand;
+    final degraded = averageCleanRatio < _yogaCleanDegradeThreshold;
+    return FitnessTestScoringResult(
+      suggestedLevel: degraded ? _degradeHomeBand(durationBand) : durationBand,
+      durationBand: durationBand,
+      degraded: degraded,
+      degradeThreshold: _yogaCleanDegradeThreshold,
+      assessmentA: assessmentA,
+      assessmentB: assessmentB,
+    );
   }
 
   static int trainingDurationScore(String? trainingDuration) {
@@ -190,9 +282,47 @@ class FitnessTestScoringInput {
 }
 
 class FitnessTestScoringResult {
-  const FitnessTestScoringResult({required this.suggestedLevel});
+  const FitnessTestScoringResult({
+    required this.suggestedLevel,
+    required this.durationBand,
+    required this.degraded,
+    this.degradeThreshold,
+    this.assessmentA,
+    this.assessmentB,
+  });
 
+  /// The final scored level (duration band, possibly degraded). The string
+  /// wrappers return exactly this value.
   final String suggestedLevel;
+
+  /// The level implied by training duration alone, before any degrade.
+  final String durationBand;
+
+  /// True when the average clean ratio fell below [degradeThreshold] — true
+  /// even when the band was already 'beginner' (so the level is unchanged).
+  final bool degraded;
+
+  /// The avg-clean-ratio threshold used for this fork (0.40 home / 0.50 yoga).
+  final double? degradeThreshold;
+
+  final AssessmentScore? assessmentA;
+  final AssessmentScore? assessmentB;
+}
+
+/// One assessment exercise's contribution to the score. For the home fork
+/// `good`/`total` are reps; for the yoga fork they are seconds.
+class AssessmentScore {
+  const AssessmentScore({
+    required this.exercise,
+    this.cleanRatio,
+    this.good,
+    this.total,
+  });
+
+  final String exercise;
+  final double? cleanRatio;
+  final double? good;
+  final double? total;
 }
 
 class FiveRepAssessment {

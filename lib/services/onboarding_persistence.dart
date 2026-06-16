@@ -49,6 +49,7 @@ class OnboardingPersistence {
 
     await _writePainAreas(user.id, data);
     await _writeForkDecision(user.id, data);
+    await _writeLevelAssessment(user.id, data);
 
     // Camera-detected from squat assessment. Future interpreters
     // (push-up, warrior, fold) plug in here as they exist.
@@ -217,6 +218,53 @@ class OnboardingPersistence {
       });
     } catch (e) {
       debugPrint('[OnboardingPersistence] fork_decision insert failed: $e');
+    }
+  }
+
+  // ─── level_assessments (S10) ──────────────────────────────────────
+  //
+  // The scorer's full breakdown captured at S10: the two clean ratios, the
+  // degrade flag, the AI-recommended level and the level the user ended up
+  // with (which they may have overridden by tapping an alternate tile).
+  Future<void> _writeLevelAssessment(
+    String userId,
+    OnboardingData data,
+  ) async {
+    final result = data.levelAssessment;
+    if (result == null) {
+      debugPrint(
+          '[OnboardingPersistence] no levelAssessment, skipping level_assessments');
+      return;
+    }
+
+    final recommended = result.suggestedLevel;
+    final finalLevel = data.level ?? recommended;
+    final a = result.assessmentA;
+    final b = result.assessmentB;
+
+    try {
+      await _client.from('level_assessments').insert({
+        'user_id': userId,
+        'fork': data.fork,
+        'training_duration': data.trainingDuration,
+        'duration_band': result.durationBand,
+        'recommended_level': recommended,
+        'final_level': finalLevel,
+        'override': recommended != finalLevel,
+        'degraded': result.degraded,
+        'degrade_threshold': result.degradeThreshold,
+        'assessment_a_exercise': a?.exercise,
+        'assessment_a_clean_ratio': a?.cleanRatio,
+        'assessment_a_good': a?.good,
+        'assessment_a_total': a?.total,
+        'assessment_b_exercise': b?.exercise,
+        'assessment_b_clean_ratio': b?.cleanRatio,
+        'assessment_b_good': b?.good,
+        'assessment_b_total': b?.total,
+        'algorithm_version': 'v1.0',
+      });
+    } catch (e) {
+      debugPrint('[OnboardingPersistence] level_assessment insert failed: $e');
     }
   }
 }

@@ -1,6 +1,7 @@
 import 'package:vika/interpreter/squat_interpreter.dart';
 import 'package:vika/utils/exercise_logger.dart';
 import 'package:vika/screens/onboarding/v5/fork_recommendation.dart';
+import 'package:vika/services/recommendation/fitness_test_scoring.dart';
 import 'onboarding_assessment_thresholds.dart';
 
 class OnboardingData {
@@ -81,6 +82,10 @@ class OnboardingData {
   String? level;
   String? get confirmedLevel => level;
   set confirmedLevel(String? value) => level = value;
+
+  // Full scorer breakdown captured at S10 (band, degrade, clean ratios,
+  // recommended level). `level` stays the final/confirmed value.
+  FitnessTestScoringResult? levelAssessment;
 
   String? issueAnswer;
   bool medicalClear = false;
