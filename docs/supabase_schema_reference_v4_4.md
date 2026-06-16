@@ -54,7 +54,7 @@ Foreign key: `id -> auth.users.id`
 - `height_cm numeric null` between 100 and 250
 - `weight_kg numeric null` between 25 and 250
 - `age integer null` between 16 and 100
-- `training_duration text null` in `<3m` / `3-11m` / `1y+`
+- `training_duration text null` in `<6m` / `6m-2y` / `2y+`
 - `fork text null` in `home` / `yoga`
 - `schedule_sessions text[] null`
 - `problem_resonance text[] default {}`

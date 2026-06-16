@@ -47,4 +47,46 @@ class SeatedForwardReportBuilder extends ExerciseReportBuilder {
   DetectedEvidence? detectIssue(List<ExerciseLogger> setLoggers) {
     return null;
   }
+
+  @override
+  List<DetailCard> buildDetailCards(List<ExerciseLogger> setLoggers) {
+    if (setLoggers.isEmpty) return const [];
+
+    final totalSeconds = _sumDouble(setLoggers, 'total_seconds');
+    final goodSeconds = _sumDouble(setLoggers, 'good_seconds');
+    final cleanRatio =
+        totalSeconds > 0 ? (goodSeconds / totalSeconds * 100) : 0.0;
+    final kneeSeconds = _sumDouble(setLoggers, 'knee_bent_seconds');
+    final spineSeconds = _sumDouble(setLoggers, 'spine_round_seconds');
+
+    return [
+      DetailCard(
+        label: 'Giữ sạch',
+        value: '${goodSeconds.toStringAsFixed(1)}s',
+        subLabel: 'Mục tiêu ${totalSeconds.toStringAsFixed(0)}s',
+        useRadial: true,
+        radialValue: cleanRatio,
+        color: cleanRatio >= 80 ? 'jade' : 'amber',
+      ),
+      DetailCard(
+        label: 'Gối co',
+        value: '${kneeSeconds.toStringAsFixed(1)}s',
+        subLabel: 'Thời gian co gối',
+        color: kneeSeconds == 0 ? 'jade' : 'amber',
+      ),
+      DetailCard(
+        label: 'Lưng tròn',
+        value: '${spineSeconds.toStringAsFixed(1)}s',
+        subLabel: 'Thời gian bo tròn lưng',
+        color: spineSeconds == 0 ? 'jade' : 'ruby',
+      ),
+    ];
+  }
+
+  double _sumDouble(List<ExerciseLogger> setLoggers, String key) {
+    return setLoggers.fold<double>(
+      0,
+      (sum, logger) => sum + ((logger.setLogs[key] as num?)?.toDouble() ?? 0.0),
+    );
+  }
 }

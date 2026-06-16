@@ -67,4 +67,48 @@ class CobraReportBuilder extends ExerciseReportBuilder {
 
   @override
   DetectedEvidence? detectIssue(List<ExerciseLogger> setLoggers) => null;
+
+  @override
+  List<DetailCard> buildDetailCards(List<ExerciseLogger> setLoggers) {
+    if (setLoggers.isEmpty) return const [];
+
+    final totalSeconds = _sumDouble(setLoggers, 'total_seconds');
+    final goodSeconds = _sumDouble(setLoggers, 'good_seconds');
+    final cleanRatio =
+        totalSeconds > 0 ? (goodSeconds / totalSeconds * 100) : 0.0;
+    final armSeconds = _sumDouble(setLoggers, 'elbow_flexion_seconds') +
+        _sumDouble(setLoggers, 'hand_placement_seconds');
+    final hipNeckSeconds = _sumDouble(setLoggers, 'pelvic_grounding_seconds') +
+        _sumDouble(setLoggers, 'cervical_neutrality_seconds');
+
+    return [
+      DetailCard(
+        label: 'Giữ sạch',
+        value: '${goodSeconds.toStringAsFixed(1)}s',
+        subLabel: 'Mục tiêu ${totalSeconds.toStringAsFixed(0)}s',
+        useRadial: true,
+        radialValue: cleanRatio,
+        color: cleanRatio >= 80 ? 'jade' : 'amber',
+      ),
+      DetailCard(
+        label: 'Tay & khuỷu',
+        value: '${armSeconds.toStringAsFixed(1)}s',
+        subLabel: 'Khoá khuỷu hoặc đặt tay sai',
+        color: armSeconds == 0 ? 'jade' : 'amber',
+      ),
+      DetailCard(
+        label: 'Hông & cổ',
+        value: '${hipNeckSeconds.toStringAsFixed(1)}s',
+        subLabel: 'Hông rời sàn hoặc ngửa cổ',
+        color: hipNeckSeconds == 0 ? 'jade' : 'ruby',
+      ),
+    ];
+  }
+
+  double _sumDouble(List<ExerciseLogger> setLoggers, String key) {
+    return setLoggers.fold<double>(
+      0,
+      (sum, logger) => sum + ((logger.setLogs[key] as num?)?.toDouble() ?? 0.0),
+    );
+  }
 }

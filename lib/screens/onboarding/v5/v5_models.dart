@@ -1,5 +1,8 @@
 import 'dart:math' as math;
 
+import 'package:vika/services/recommendation/fitness_test_scoring.dart';
+import 'package:vika/utils/exercise_logger.dart';
+
 import '../onboarding_assessment_thresholds.dart';
 import '../onboarding_data.dart';
 
@@ -138,9 +141,9 @@ class V5DurationOption {
 }
 
 const durationOptions = [
-  V5DurationOption(id: '<3m', label: '< 3 tháng', sub: 'Mới bắt đầu'),
-  V5DurationOption(id: '3-11m', label: '3–11 tháng', sub: 'Đang quen'),
-  V5DurationOption(id: '1y+', label: '1 năm+', sub: 'Đã lâu'),
+  V5DurationOption(id: '<6m', label: '< 6 tháng', sub: 'Mới bắt đầu'),
+  V5DurationOption(id: '6m-2y', label: '6 tháng – 2 năm', sub: 'Đang quen'),
+  V5DurationOption(id: '2y+', label: '2 năm+', sub: 'Đã lâu'),
 ];
 
 class ForkChoice {
@@ -214,6 +217,24 @@ class ResultCandidate {
   final String label;
 }
 
+/// Real single-hold metrics for the yoga assessment cards (Warrior I / Forward
+/// Fold). A static hold has no per-rep series — its only real signal is the
+/// clean-hold ratio. These are read from the SAME good_seconds / total_seconds
+/// the scorer reads (via [YogaHoldAssessment]), so the gauge %, the headline,
+/// and the suggested level always trace to one ratio and can never disagree.
+class YogaHoldViz {
+  const YogaHoldViz({
+    required this.cleanHoldRatio,
+    required this.goodSeconds,
+    required this.targetSeconds,
+  });
+
+  /// good_seconds / total_seconds, clamped to [0, 1].
+  final double cleanHoldRatio;
+  final double goodSeconds;
+  final double targetSeconds;
+}
+
 class AssessmentResultData {
   const AssessmentResultData({
     required this.id,
@@ -234,6 +255,7 @@ class AssessmentResultData {
     required this.candidates,
     this.lowerIsBetter = false,
     this.chartFloor,
+    this.holdViz,
   });
 
   final String id;
@@ -262,7 +284,23 @@ class AssessmentResultData {
   /// `lowerIsBetter` is true. Defaults to ~10° below the smallest chart
   /// data point if null.
   final int? chartFloor;
+
+  /// Real single-hold gauge data for the yoga cards. Non-null only when a hold
+  /// was actually measured — drives the radial clean-hold gauge instead of the
+  /// per-rep bar chart; null renders the empty state. Home (rep) cards leave
+  /// this null and keep using [chartData].
+  final YogaHoldViz? holdViz;
 }
+
+const _wallPushUpDepthTarget = 110;
+const _wallPushUpChartFloor = 80;
+const _wallPushUpCandidates = [
+  ResultCandidate(id: 'shoulder_pain', label: 'Đau vai khi đẩy'),
+  ResultCandidate(id: 'wrist_discomfort', label: 'Cổ tay khó chịu'),
+  ResultCandidate(id: 'shoulder_fatigue', label: 'Vai mỏi nhanh'),
+  ResultCandidate(id: 'chest_tight', label: 'Cứng ngực/vai trước'),
+  ResultCandidate(id: 'none', label: 'Không, ổn cả'),
+];
 
 // NOTE(LOGIC-REFINEMENT-#3): S08 Phase1 — issue candidate generation is hardcoded NASM-mapped candidates per exercise.
 // Currently using v1 placeholder from JSX prototype. Real logic deferred to Phase 2.
@@ -319,13 +357,7 @@ const homeResultsMock = [
     detectedPattern: 'ROM giảm dần ở vai',
     questionTitle: 'Bạn cảm thấy gì?',
     questionSub: 'Vika dùng để xác định nguyên nhân chính',
-    candidates: [
-      ResultCandidate(id: 'shoulder_pain', label: 'Đau vai khi đẩy'),
-      ResultCandidate(id: 'wrist_discomfort', label: 'Cổ tay khó chịu'),
-      ResultCandidate(id: 'shoulder_fatigue', label: 'Vai mỏi nhanh'),
-      ResultCandidate(id: 'chest_tight', label: 'Cứng ngực/vai trước'),
-      ResultCandidate(id: 'none', label: 'Không, ổn cả'),
-    ],
+    candidates: _wallPushUpCandidates,
   ),
 ];
 
@@ -457,6 +489,133 @@ AssessmentResultData squatResultFromData(OnboardingData data) {
     candidates: homeResultsMock.first.candidates,
     lowerIsBetter: true,
     chartFloor: 60,
+  );
+}
+
+AssessmentResultData wallPushUpResultFromData(OnboardingData data) {
+  final logger = data.hasWallPushUpAssessment ? data.wallPushUpLogger : null;
+  final totalReps = logger?.repLogs.length ?? 0;
+  final completedReps =
+      (logger?.setLogs['completed_reps'] as int?) ?? totalReps;
+  final goodReps = (logger?.setLogs['good_rep_count'] as int?) ??
+      logger?.repLogs.where((r) => r.correctForm).length ??
+      0;
+  final chart = logger?.repLogs
+          .map((r) => (r.data['min_elbow_angle'] as num?)?.round())
+          .whereType<int>()
+          .toList() ??
+      const <int>[];
+  final safeChart = chart.isEmpty ? const [_wallPushUpDepthTarget] : chart;
+  final avgDepth = chart.isEmpty
+      ? _wallPushUpDepthTarget.toDouble()
+      : chart.reduce((a, b) => a + b) / math.max(1, chart.length);
+  final qualityLabel = completedReps == 0
+      ? 'Chưa đủ dữ liệu camera'
+      : '$goodReps/$completedReps reps đạt form';
+
+  return AssessmentResultData(
+    id: 'wall_push_up',
+    name: 'Wall Push-Up',
+    score: avgDepth.round(),
+    scoreUnit: '°',
+    metric: 'Độ gập khuỷu trung bình',
+    metricLabel: qualityLabel,
+    chartTitle: 'Độ gập khuỷu qua $totalReps reps',
+    chartData: safeChart,
+    chartTarget: _wallPushUpDepthTarget,
+    chartUnit: '°',
+    coachTitle: 'Vika ghi nhận',
+    coachBody:
+        'Bài Wall Push-Up đã có dữ liệu camera. Hiện chưa có bộ diễn giải lỗi cho bài này, nên Vika dùng câu trả lời của bạn ở dưới làm tín hiệu tự báo cáo.',
+    detectedPattern: 'Dữ liệu Wall Push-Up',
+    questionTitle: 'Bạn cảm thấy gì?',
+    questionSub: 'Vika dùng để xác định nguyên nhân chính',
+    candidates: _wallPushUpCandidates,
+    lowerIsBetter: true,
+    chartFloor: _wallPushUpChartFloor,
+  );
+}
+
+// Warrior I / Forward Fold are single static holds: the only real per-pose
+// signal is the clean-hold ratio good_seconds / total_seconds. We read it via
+// the SAME [YogaHoldAssessment] the scorer uses, so the gauge, the headline, and
+// the suggested level all trace to one ratio. `yogaResultsMock` is consulted
+// ONLY for the real NASM self-report chips (candidates) — never for any
+// chart/score/numeric value. A missing logger yields holdViz == null → the card
+// renders a real empty state, never mock bars.
+AssessmentResultData _yogaHoldResultFromData({
+  required String id,
+  required String name,
+  required String questionTitle,
+  required String questionSub,
+  required List<ResultCandidate> candidates,
+  required bool hasAssessment,
+  required ExerciseLogger? logger,
+}) {
+  final assessment = (hasAssessment && logger != null)
+      ? YogaHoldAssessment.fromLogger(logger)
+      : null;
+  final ratio = assessment?.cleanRatio; // null when no hold time was recorded
+  final viz = (assessment != null && ratio != null)
+      ? YogaHoldViz(
+          cleanHoldRatio: ratio,
+          goodSeconds: assessment.goodSeconds,
+          targetSeconds: assessment.totalSeconds,
+        )
+      : null;
+
+  return AssessmentResultData(
+    id: id,
+    name: name,
+    score: viz == null ? 0 : viz.goodSeconds.round(),
+    scoreUnit: 's',
+    metric: 'Thời gian giữ sạch',
+    metricLabel: viz == null
+        ? 'Chưa đo được'
+        : 'Giữ đúng form ${viz.goodSeconds.round()}/${viz.targetSeconds.round()}s',
+    chartTitle: 'Tỉ lệ giữ sạch',
+    chartData: const <int>[],
+    chartTarget: 0,
+    chartUnit: '%',
+    coachTitle: 'Vika thấy gì?',
+    coachBody: viz == null
+        ? 'Chưa có dữ liệu camera cho bài này. Bạn vẫn có thể trả lời câu hỏi bên dưới để Vika cá nhân hoá lộ trình.'
+        : 'Vika đo bạn giữ đúng form ${(viz.cleanHoldRatio * 100).round()}% thời gian (${viz.goodSeconds.round()}/${viz.targetSeconds.round()}s). Trả lời câu hỏi bên dưới để Vika xác định nguyên nhân.',
+    detectedPattern: viz == null
+        ? 'Chưa đo được'
+        : viz.cleanHoldRatio >= 0.80
+            ? 'Giữ tư thế ổn định'
+            : viz.cleanHoldRatio >= 0.50
+                ? 'Form dao động khi giữ'
+                : 'Cần giữ form đều hơn',
+    questionTitle: questionTitle,
+    questionSub: questionSub,
+    candidates: candidates,
+    holdViz: viz,
+  );
+}
+
+AssessmentResultData warriorOneResultFromData(OnboardingData data) {
+  return _yogaHoldResultFromData(
+    id: 'warrior',
+    name: 'Warrior I',
+    questionTitle: 'Cảm giác nào đúng với bạn?',
+    questionSub: 'Vika dùng để xác định nguyên nhân chính',
+    candidates: yogaResultsMock[0].candidates,
+    hasAssessment: data.hasWarriorAssessment,
+    logger: data.hasWarriorAssessment ? data.warriorLogger : null,
+  );
+}
+
+AssessmentResultData seatedForwardFoldResultFromData(OnboardingData data) {
+  return _yogaHoldResultFromData(
+    id: 'fold',
+    name: 'Forward Fold',
+    questionTitle: 'Bạn cảm thấy căng ở đâu?',
+    questionSub: 'Vika dùng để xác định nguyên nhân chính',
+    candidates: yogaResultsMock[1].candidates,
+    hasAssessment: data.hasForwardFoldAssessment,
+    logger: data.hasForwardFoldAssessment ? data.forwardFoldLogger : null,
   );
 }
 
