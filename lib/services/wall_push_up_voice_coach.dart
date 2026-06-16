@@ -42,7 +42,6 @@ class WallPushUpVoiceCoach implements ExerciseVoiceCoach {
   static const int _phaseCueMinGapMs = 350;
   static const int _faultCueCooldownMs = 3000;
   static const int _postRepCueCooldownReps = 2;
-  static const int _postRepRepeatSuppressMs = 1500;
 
   static const List<String> _readyCountdown = ['Sẵn sàng'];
   static const String _cleanRepCue = 'wall_push_up.good_clean';
@@ -71,7 +70,7 @@ class WallPushUpVoiceCoach implements ExerciseVoiceCoach {
 
     if (exercise.exerciseState == ExerciseState.completed) {
       if (!_didAnnounceSetComplete) {
-        _ttsService.clearPendingButKeepCurrent();
+        _ttsService.clearQueue();
         if (repIncreased) {
           _speakRepOutcome(
             exercise: exercise,
@@ -133,7 +132,7 @@ class WallPushUpVoiceCoach implements ExerciseVoiceCoach {
         _canSpeakLiveFaultVoice(liveFaultVoice, nowMs);
 
     if (repIncreased) {
-      _ttsService.clearPendingButKeepCurrent();
+      _ttsService.clearQueue();
       _speakRepOutcome(
         exercise: exercise,
         repCount: repCount,
@@ -314,11 +313,6 @@ class WallPushUpVoiceCoach implements ExerciseVoiceCoach {
 
     final lastPostRepRep = _lastPostRepVoiceRep[voice] ?? -99;
     if (repCount - lastPostRepRep < _postRepCueCooldownReps) {
-      return;
-    }
-
-    final lastLiveVoiceAt = _lastFaultVoiceAtMs[rawVoice] ?? 0;
-    if (nowMs - lastLiveVoiceAt < _postRepRepeatSuppressMs) {
       return;
     }
 

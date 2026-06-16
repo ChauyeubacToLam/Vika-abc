@@ -76,4 +76,65 @@ void main() {
 
     expect(player.spoken, contains('Ép khuỷu tay vào'));
   });
+
+  test('speaks rep count and clean cue after a good rep', () {
+    final player = _FakeWallPushUpVoicePlayer();
+    final coach = WallPushUpVoiceCoach(ttsService: player);
+    final exercise = WallPushUp()
+      ..exerciseState = ExerciseState.activated
+      ..lastRepWasClean = true;
+
+    coach.processFrame(
+      exercise: exercise,
+      repCount: 1,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    expect(player.spoken.take(2), ['1', 'wall_push_up.good_clean']);
+  });
+
+  test('speaks rep count and correction after a faulty rep', () {
+    final player = _FakeWallPushUpVoicePlayer();
+    final coach = WallPushUpVoiceCoach(ttsService: player);
+    final exercise = WallPushUp()
+      ..exerciseState = ExerciseState.activated
+      ..lastRepWasClean = false
+      ..lastRepTopVoiceMessage = 'Ép khuỷu tay vào';
+
+    coach.processFrame(
+      exercise: exercise,
+      repCount: 0,
+      hasPose: true,
+      feedback: const {'Arms': 'Ép khuỷu tay sát người hơn!'},
+    );
+    coach.processFrame(
+      exercise: exercise,
+      repCount: 1,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    expect(player.spoken.take(2), ['1', 'Ép khuỷu tay vào']);
+  });
+
+  test('speaks final rep count, clean cue, and completion', () {
+    final player = _FakeWallPushUpVoicePlayer();
+    final coach = WallPushUpVoiceCoach(ttsService: player);
+    final exercise = WallPushUp(maxRep: 1)
+      ..exerciseState = ExerciseState.completed
+      ..lastRepWasClean = true;
+
+    coach.processFrame(
+      exercise: exercise,
+      repCount: 1,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    expect(
+      player.spoken,
+      ['1', 'wall_push_up.good_clean', 'Hoàn thành bài tập'],
+    );
+  });
 }
