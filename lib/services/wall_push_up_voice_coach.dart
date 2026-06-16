@@ -45,7 +45,7 @@ class WallPushUpVoiceCoach implements ExerciseVoiceCoach {
   static const int _postRepRepeatSuppressMs = 1500;
 
   static const List<String> _readyCountdown = ['Sẵn sàng'];
-  static const String _cleanRepCue = 'tốt';
+  static const String _cleanRepCue = 'wall_push_up.good_clean';
 
   final WallPushUpVoicePlayer _ttsService;
 
@@ -54,6 +54,7 @@ class WallPushUpVoiceCoach implements ExerciseVoiceCoach {
   int _lastPhaseCueAtMs = 0;
   bool _didAnnounceSetComplete = false;
   bool _didAnnounceReady = false;
+  bool _didSpeakSetup = false;
   final Map<String, int> _lastFaultVoiceAtMs = {};
   final Map<String, int> _lastPostRepVoiceRep = {};
   final Set<String> _liveFaultVoicesSpokenThisRep = {};
@@ -87,6 +88,14 @@ class WallPushUpVoiceCoach implements ExerciseVoiceCoach {
       }
       _lastPhasePhrase = null;
       _liveFaultVoicesSpokenThisRep.clear();
+      _lastRepCount = repCount;
+      return;
+    }
+
+    if (exercise.exerciseState == ExerciseState.notActivated) {
+      _speakSetup();
+      _liveFaultVoicesSpokenThisRep.clear();
+      _lastPhasePhrase = null;
       _lastRepCount = repCount;
       return;
     }
@@ -164,6 +173,16 @@ class WallPushUpVoiceCoach implements ExerciseVoiceCoach {
     _ttsService.dispose();
   }
 
+  void _speakSetup() {
+    if (_didSpeakSetup) {
+      return;
+    }
+    _ttsService.speak('wall_push_up.setup_intro');
+    _ttsService.speak('wall_push_up.setup_position');
+    _ttsService.speak('wall_push_up.active_intro');
+    _didSpeakSetup = true;
+  }
+
   String? _phasePhrase(ExerciseBase exercise) {
     if (exercise is! WallPushUp) {
       return null;
@@ -201,10 +220,16 @@ class WallPushUpVoiceCoach implements ExerciseVoiceCoach {
     if (form.contains('Vai, hông') || form.contains('thẳng hàng')) {
       return 'Giữ thân thẳng';
     }
+    if (form.contains('Wall Push Up')) return 'Đứng nghiêng vào tường';
 
     final body = feedback['Body'] ?? '';
     if (body.contains('Giữ vai') || body.contains('lệch')) {
       return 'Giữ thân thẳng';
+    }
+
+    final arms = feedback['Arms'] ?? '';
+    if (arms.contains('Ép khuỷu') || arms.contains('Khuỷu tay')) {
+      return 'Ép khuỷu tay vào';
     }
 
     final shoulders = feedback['Shoulders'] ?? '';
@@ -212,9 +237,35 @@ class WallPushUpVoiceCoach implements ExerciseVoiceCoach {
       return 'Hạ vai xuống';
     }
 
+    final neck = feedback['Neck'] ?? '';
+    if (neck.contains('Giữ cổ') || neck.contains('ngửa')) {
+      return 'Giữ cổ thẳng';
+    }
+
     final head = feedback['Head'] ?? '';
     if (head.contains('Kéo cằm') || head.contains('Đầu')) {
       return 'Kéo cằm về';
+    }
+
+    final feet = feedback['Feet'] ?? '';
+    if (feet.contains('Kiễng gót')) return 'Kiễng gót chân lên';
+    if (feet.contains('Giữ chân') || feet.contains('Chân hơi')) {
+      return 'Giữ chân cố định';
+    }
+
+    final wall = feedback['Wall'] ?? '';
+    if (wall.contains('Tay bị') || wall.contains('giữ tay')) {
+      return 'Chống tay vào tường';
+    }
+
+    final tempo = feedback['Tempo'] ?? '';
+    if (tempo.contains('Hạ chậm')) return 'Chậm lại';
+
+    final setup = feedback['Setup'] ?? '';
+    if (setup.contains('tay ngang vai') ||
+        setup.contains('tường') ||
+        setup.contains('nghiêng người')) {
+      return 'Đứng nghiêng vào tường';
     }
 
     return null;
@@ -277,9 +328,17 @@ class WallPushUpVoiceCoach implements ExerciseVoiceCoach {
 
   String? _postRepVoice(String rawVoice) {
     return switch (rawVoice.trim()) {
-      'Giữ thân thẳng' => 'nhớ giữ thân thẳng',
-      'Ép khuỷu tay vào' => 'nhớ ép khuỷu tay',
-      'Chậm lại' => 'nhớ chậm lại',
+      'Giữ thân thẳng' => 'Giữ thân thẳng',
+      'Ép khuỷu tay vào' => 'Ép khuỷu tay vào',
+      'Chậm lại' => 'Chậm lại',
+      'Hạ vai xuống' => 'Hạ vai xuống',
+      'Kéo cằm về' => 'Kéo cằm về',
+      'Xuống thấp hơn' => 'Xuống thấp hơn',
+      'Giữ cổ thẳng' => 'Giữ cổ thẳng',
+      'Giữ chân cố định' => 'Giữ chân cố định',
+      'Kiễng gót chân lên' => 'Kiễng gót chân lên',
+      'Chống tay vào tường' => 'Chống tay vào tường',
+      'Đứng nghiêng vào tường' => 'Đứng nghiêng vào tường',
       _ => null,
     };
   }
