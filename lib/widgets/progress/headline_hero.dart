@@ -56,7 +56,7 @@ class HeadlineHero extends StatelessWidget {
               Row(
                 children: [
                   PlanEyebrow(
-                    'FORM CHUẨN TRUNG BÌNH',
+                    'FORM TRUNG BÌNH',
                     size: 9,
                     letterSpacing: 2,
                     color: c.yellow,
@@ -135,7 +135,7 @@ class HeadlineHero extends StatelessWidget {
                         const CoachMark(small: true),
                         const SizedBox(width: 8),
                         PlanEyebrow(
-                          'HUẤN LUYỆN VIÊN GHI',
+                          'Lời nhắn từ HLV',
                           size: 9,
                           letterSpacing: 1.6,
                           dark: true,

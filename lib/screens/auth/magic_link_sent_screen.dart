@@ -65,7 +65,7 @@ class MagicLinkSentScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: V5.space12),
                         Text(
-                          'Link đăng nhập đã được gửi đến $email.',
+                          'Đã gửi link đăng nhập đến $email.',
                           textAlign: TextAlign.center,
                           style: V5.body(context, color: V5.inkSoft),
                         ),

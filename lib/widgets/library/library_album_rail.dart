@@ -420,7 +420,7 @@ class _EpisodeBadge extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           Text(
-            '$count TẬP',
+            '$count BÀI',
             style: const TextStyle(
               fontFamily: 'BeVietnamPro',
               fontSize: 9,

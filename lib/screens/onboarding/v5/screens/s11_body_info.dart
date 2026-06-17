@@ -38,9 +38,9 @@ class _S11BodyInfoState extends State<S11BodyInfo>
   bool get _ageEligible => _age >= 16;
   bool get _canContinue => widget.data.gender != null && _ageEligible;
   String get _disabledLabel {
-    if (!_ageEligible) return 'Vika chỉ dành cho 16+';
-    if (widget.data.gender == null) return 'Chọn giới tính';
-    return 'Chọn để tiếp';
+    if (!_ageEligible) return 'Chỉ dành cho 16 tuổi trở lên';
+    if (widget.data.gender == null) return 'Chọn giới tính của bạn';
+    return 'Chọn trước khi tiếp tục';
   }
 
   @override
@@ -150,8 +150,8 @@ class _S11BodyInfoState extends State<S11BodyInfo>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               V5ScreenHeader(
-                eyebrow: 'Vóc dáng',
-                title: 'Vài thông số\nvề cơ thể.',
+                eyebrow: 'Thông số cơ thể',
+                title: 'Một vài số liệu\nvề cơ thể bạn.',
                 size: (r.isNarrow || veryCompact)
                     ? V5HeaderSize.medium
                     : V5HeaderSize.large,
@@ -623,13 +623,13 @@ class _Under16Dialog extends StatelessWidget {
               ),
               const SizedBox(height: V5.space12),
               Text(
-                'Vika chỉ dành cho người từ 16 tuổi',
+                'Chỉ dành cho người từ 16 tuổi trở lên',
                 style: V5.title(context).copyWith(height: 1.2),
               ),
               const SizedBox(height: V5.space6),
               Text(
-                'Bạn cần đủ 16 tuổi trở lên để dùng Vika. '
-                'Hãy chỉnh lại tuổi để tiếp tục.',
+                'Vika dành cho người từ 16 tuổi trở lên. '
+                'Vui lòng điền đúng độ tuổi để tiếp tục.',
                 style:
                     V5.bodySm(context, color: V5.inkSoft).copyWith(height: 1.4),
               ),

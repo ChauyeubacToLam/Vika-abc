@@ -98,7 +98,7 @@ class WeekFocusCard extends StatelessWidget {
                             const CoachMark(small: true),
                             const SizedBox(width: 8),
                             PlanEyebrow(
-                              'HUẤN LUYỆN VIÊN GHI',
+                              'Lời nhắn từ HLV',
                               size: 9,
                               letterSpacing: 1.6,
                               dark: true,

@@ -86,8 +86,8 @@ class _S04PainCheckState extends State<S04PainCheck> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           V5ScreenHeader(
-            eyebrow: 'An toàn cho bạn',
-            title: 'Bạn đang đau\nở đâu?',
+            eyebrow: 'Để tập an toàn',
+            title: 'Bạn có đang\nđau ở đâu không?',
             size: r.isVeryShort ? V5HeaderSize.medium : V5HeaderSize.large,
           ),
           SizedBox(height: r.pick(cozy: V5.space12, short: V5.space8)),
@@ -151,7 +151,7 @@ class _NoPainChip extends StatelessWidget {
               const SizedBox(width: 12),
               Flexible(
                 child: Text(
-                  'Không đau ở đâu cả',
+                  'Tôi không đau ở đâu cả',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: V5.titleSm(

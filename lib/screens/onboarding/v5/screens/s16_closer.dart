@@ -174,7 +174,7 @@ class _S16CloserState extends State<S16Closer>
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 12),
                             child: Text(
-                              'Mỗi buổi tập là một lá phiếu cho con người bạn muốn trở thành.',
+                              'Mỗi buổi tập là một bước tới sưc khoẻ mà bạn muốn có được.',
                               textAlign: TextAlign.center,
                               maxLines: 3,
                               style: V5.body(context, color: V5.invInkSoft),
@@ -204,7 +204,7 @@ class _S16CloserState extends State<S16Closer>
 
         V5PillCTA(
           label:
-              (_busy || widget.busy) ? 'Đang lưu...' : 'Vào buổi tập đầu tiên',
+              (_busy || widget.busy) ? 'Đang lưu…' : 'Vào buổi tập đầu tiên',
           enabled: !_busy && !widget.busy,
           onTap: _handleComplete,
           yellow: true,
@@ -288,7 +288,7 @@ class _CommitmentCard extends StatelessWidget {
                 intervalStart: 0.44,
                 intervalEnd: 0.72,
                 spans: [
-                  const TextSpan(text: 'Đi qua '),
+                  const TextSpan(text: 'Hoàn thành '),
                   const TextSpan(
                     text: '4 tuần',
                     style: TextStyle(color: V5.yellow),
@@ -362,7 +362,7 @@ class _CommitmentCard extends StatelessWidget {
                         ),
                         const SizedBox(height: V5.space2),
                         Text(
-                          'Vika · HLV cá nhân hoá',
+                          'Vika · HLV cá nhân',
                           style: V5.titleSm(context, color: V5.invInk),
                         ),
                       ],

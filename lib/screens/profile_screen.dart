@@ -246,7 +246,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         SnackBar(
           content: Text(
             result.emailChangePending
-                ? 'Đã lưu. Kiểm tra hộp thư email mới để xác nhận thay đổi.'
+                ? 'Đã lưu. Kiểm tra hộp thư email mới để xác nhận.'
                 : 'Đã cập nhật hồ sơ.',
           ),
         ),
@@ -304,8 +304,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       icon: Icons.logout_rounded,
       eyebrow: 'TÀI KHOẢN',
       title: 'Đăng xuất?',
-      body: 'Bạn sẽ quay về màn hình đăng nhập. Tiến trình của bạn vẫn '
-          'được giữ khi đăng nhập lại.',
+      body: 'Bạn sẽ quay về màn hình đăng nhập. Dữ liệu của bạn vẫn được lưu.',
       confirmLabel: 'Đăng xuất',
     );
     if (!confirmed || !mounted) return;
@@ -324,7 +323,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          SnackBar(content: Text('Chưa đăng xuất được: $e')),
+          SnackBar(content: Text('Đăng xuất không thành công. Vui lòng thử lại.')),
         );
     }
   }
@@ -337,8 +336,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       icon: Icons.delete_outline_rounded,
       eyebrow: 'XÓA TÀI KHOẢN',
       title: 'Xóa tài khoản?',
-      body: 'Toàn bộ dữ liệu của bạn sẽ bị xóa vĩnh viễn và không thể '
-          'khôi phục.',
+      body: 'Toàn bộ dữ liệu sẽ bị xóa vĩnh viễn, không thể khôi phục.',
       confirmLabel: 'Xóa vĩnh viễn',
       destructive: true,
     );
@@ -362,7 +360,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       messenger
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(content: Text('Chưa xóa được tài khoản, thử lại sau.')),
+          const SnackBar(content: Text('Chưa xóa được tài khoản. Vui lòng thử lại sau.')),
         );
       return;
     }
@@ -390,7 +388,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // ─── Data export (Tải dữ liệu của bạn) ────────────────────────────────
+  // ─── Data export (Xuất dữ liệu của bạn) ────────────────────────────────
   Future<void> _exportData() async {
     if (_exporting) return;
     setState(() => _exporting = true);
@@ -403,7 +401,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         messenger
           ..hideCurrentSnackBar()
           ..showSnackBar(
-            const SnackBar(content: Text('Hãy đăng nhập để tải dữ liệu.')),
+            const SnackBar(content: Text('Vui lòng đăng nhập để xuất dữ liệu.')),
           );
         return;
       }
@@ -433,7 +431,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       messenger
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(content: Text('Chưa tải được dữ liệu, thử lại sau.')),
+          const SnackBar(content: Text('Chưa xuất được dữ liệu. Vui lòng thử lại sau.')),
         );
     } finally {
       if (mounted) setState(() => _exporting = false);
@@ -453,7 +451,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ..hideCurrentSnackBar()
         ..showSnackBar(
           SnackBar(
-            content: Text('Hãy gửi phản hồi tới $_supportEmail'),
+            content: Text('Vui lòng gửi phản hồi đến $_supportEmail'),
           ),
         );
     }
@@ -466,7 +464,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(content: Text('Chưa mở được liên kết, thử lại sau.')),
+          const SnackBar(content: Text('Chưa mở được liên kết. Vui lòng thử lại sau.')),
         );
     }
   }
@@ -482,8 +480,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           eyebrow: 'VỀ VIKA',
           title: 'VIKA',
           body:
-              'Người bạn đồng hành tập luyện thông minh. Cảm ơn bạn đã tin Vika '
-              'trên hành trình khoẻ mạnh hơn mỗi ngày.',
+              'HLV Cá nhân tập luyện thông minh. Cảm ơn bạn đã tin tưởng Vika trên hành trình sống khoẻ hơn.',
           version: profileMockVersion,
           actions: [
             _InfoSheetAction(
@@ -518,8 +515,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final c = VikaColors.of(sheetContext);
         return _InfoSheet(
           eyebrow: 'QUYỀN RIÊNG TƯ',
-          title: 'Camera xử lý trong máy',
-          body: 'Hình ảnh xử lý ngay trên máy, không gửi đi đâu cả.',
+          title: 'Camera xử lý ngay trên máy',
+          body: 'Video luôn ở trong điện thoại của bạn',
           accent: c.phase4,
         );
       },
@@ -631,7 +628,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   // 5. Vóc dáng — body card.
                   _SectionHeader(
                     eyebrow: 'VÓC DÁNG',
-                    intro: 'Số đo hiện tại. Sửa khi cần.',
+                    intro: 'Thông tin về của bạn. Sửa bất cứ lúc nào.',
                   ),
                   const SizedBox(height: 14),
                   Padding(
@@ -650,7 +647,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   // 8. Cài đặt — settings groups.
                   _SectionHeader(
                     eyebrow: 'CÀI ĐẶT',
-                    intro: 'Tuỳ chỉnh trải nghiệm Vika theo cách của bạn.',
+                    intro: 'Tuỳ chỉnh Vika theo cách của bạn.',
                   ),
                   const SizedBox(height: 14),
                   Padding(
@@ -664,15 +661,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           rows: [
                             SettingRow(
                               icon: Icons.shield_outlined,
-                              label: 'Camera xử lý trong máy',
-                              sub: 'Hình ảnh không rời thiết bị',
+                              label: 'Camera xử lý ngay trên điện thoại bạn',
+                              sub: 'Video luôn ở trong điện thoại của bạn',
                               accentColor: c.phase4,
                               onTap: _showCameraInfoSheet,
                             ),
                             SettingRow(
                               icon: Icons.download_rounded,
-                              label: 'Tải dữ liệu của bạn',
-                              sub: _exporting ? 'Đang chuẩn bị...' : null,
+                              label: 'Xuất dữ liệu của bạn',
+                              sub: _exporting ? 'Đang chuẩn bị…' : null,
                               accentColor: c.phase4,
                               onTap: _exporting ? null : _exportData,
                             ),
@@ -1106,7 +1103,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          SnackBar(content: Text('Không chọn được ảnh: $e')),
+          SnackBar(content: Text('Chưa chọn được ảnh. Thử lại nhé.')),
         );
     }
   }
@@ -1124,7 +1121,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(content: Text('Email chưa hợp lệ.')),
+          const SnackBar(content: Text('Email không đúng định dạng.')),
         );
       return;
     }
@@ -1152,7 +1149,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          SnackBar(content: Text('Chưa lưu được hồ sơ: $e')),
+          SnackBar(content: Text('Chưa lưu được hồ sơ. Vui lòng thử lại.')),
         );
     }
   }
@@ -1339,7 +1336,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                   ),
                   decoration: InputDecoration(
                     labelText: 'Email',
-                    helperText: 'Đổi email cần xác nhận qua hộp thư mới.',
+                    helperText: 'Đổi email sẽ cần xác nhận qua hộp thư mới.',
                     helperStyle: TextStyle(
                       fontFamily: 'BeVietnamPro',
                       fontSize: 10.5,
@@ -1953,7 +1950,7 @@ class _Closer extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Cảm ơn vì đã tin Vika.',
+                      'Cảm ơn vì đã tin tưởng Vika.',
                       style: TextStyle(
                         fontFamily: 'BeVietnamPro',
                         fontSize: 13,
@@ -1961,18 +1958,6 @@ class _Closer extends StatelessWidget {
                         fontStyle: FontStyle.italic,
                         letterSpacing: -0.3,
                         color: c.ink,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      'Mỗi tuần Vika thêm bài mới · $version',
-                      style: TextStyle(
-                        fontFamily: 'BeVietnamPro',
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w600,
-                        color: c.inkFaint,
-                        letterSpacing: -0.1,
-                        fontFeatures: VikaIvoryMain.tabularFigures,
                       ),
                     ),
                   ],

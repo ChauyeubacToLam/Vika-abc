@@ -32,7 +32,7 @@ const whyOptions = [
   ),
   V5WhyOption(
     id: 'pain',
-    label: 'Giảm đau, tư thế tốt',
+    label: 'Giảm đau, tư thế chuẩn',
     sub: 'Lưng, cổ, vai, gối',
     stat: '47%',
     statLabel: 'Giảm đau lưng sau 4 tuần',
@@ -40,7 +40,7 @@ const whyOptions = [
   V5WhyOption(
     id: 'energy',
     label: 'Năng lượng cho cả ngày',
-    sub: 'Hết kiệt sức sau giờ làm',
+    sub: 'Không còn cảm thấy kiệt sức sau giờ làm',
     stat: '+20%',
     statLabel: 'Năng lượng & tinh thần',
   ),
@@ -61,23 +61,23 @@ const whyFollowups = {
     'Tự tin mặc đồ mình thích',
   ],
   'pain': [
-    'Đau lưng do ngồi văn phòng cả ngày',
-    'Vai/cổ căng cứng sau giờ làm',
-    'Đầu gối khó chịu khi đứng lên xuống',
-    'Tư thế xấu, gù lưng / đầu cúi',
+    'Đau lưng vì ngồi làm việc cả ngày',
+    'Vai và cổ căng cứng sau giờ làm',
+    'Đầu gối khó chịu khi đứng lên ngồi xuống',
+    'Tư thế xấu, gù lưng hoặc đầu cúi về trước',
     'Hồi phục sau chấn thương cũ',
   ],
   'energy': [
-    'Đi làm về vẫn còn năng lượng cho cuộc sống',
+    'Đi làm về vẫn còn năng lượng cho cả buổi tối',
     'Ngủ ngon hơn, dậy tỉnh táo hơn',
     'Phòng bệnh, khoẻ lâu dài',
-    'Giảm căng thẳng, tinh thần ổn định',
+    'Giảm căng thẳng, tinh thần ổn định hơn',
   ],
   'strength': [
-    'Tăng sức bền cho công việc bận',
-    'Tăng cơ chắc, khoẻ hơn',
-    'Theo đuổi môn thể thao tôi thích (đá bóng, chạy bộ, ...)',
-    'Tự tin với cơ thể mình hơn',
+    'Tăng sức bền để xử lý công việc trong cả ngày dài,',
+    'Tăng cơ, người chắc khoẻ hơn',
+    'Chơi tốt hơn môn tôi thích (bóng đá, chạy bộ…)',
+    'Tự tin hơn với cơ thể của mình',
   ],
 };
 
@@ -100,29 +100,29 @@ class V5GoalOption {
 const goalOptions = [
   V5GoalOption(
     id: 'health',
-    title: 'Sức khỏe',
-    sub: 'Dẻo dai, ít đau mỏi',
+    title: 'Sức khoẻ',
+    sub: 'Dẻo dai, ít đau nhức',
     stat: '8h',
-    unit: 'Giấc ngủ sâu',
+    unit: 'Giấc ngủ sâu hơn',
   ),
   V5GoalOption(
     id: 'body',
     title: 'Vóc dáng',
-    sub: 'Săn chắc, gọn người',
+    sub: 'Săn chắc, gọn dáng',
     stat: '-3.5kg',
-    unit: 'Mỡ thừa',
+    unit: 'Giảm mỡ',
   ),
   V5GoalOption(
     id: 'strength',
     title: 'Sức mạnh',
-    sub: 'Cơ bắp, sức bền',
+    sub: 'Cơ bắp và sức bền',
     stat: '+15kg',
-    unit: 'Tổng nâng',
+    unit: 'Sức nâng tối đa',
   ),
   V5GoalOption(
     id: 'flexible',
     title: 'Linh hoạt',
-    sub: 'Mềm dẻo, an toàn',
+    sub: 'Mềm dẻo và ít chấn thương',
     stat: '+10cm',
     unit: 'Biên độ khớp',
   ),
@@ -141,9 +141,9 @@ class V5DurationOption {
 }
 
 const durationOptions = [
-  V5DurationOption(id: '<6m', label: '< 6 tháng', sub: 'Mới bắt đầu'),
+  V5DurationOption(id: '<6m', label: 'Dưới 6 tháng', sub: 'Mới bắt đầu'),
   V5DurationOption(id: '6m-2y', label: '6 tháng – 2 năm', sub: 'Đang quen'),
-  V5DurationOption(id: '2y+', label: '2 năm+', sub: 'Đã lâu'),
+  V5DurationOption(id: '2y+', label: 'Trên 2 năm', sub: 'Đã lâu'),
 ];
 
 class ForkChoice {
@@ -164,13 +164,13 @@ class ForkChoice {
   final String stat;
   final String statLabel;
 
-  /// "Phù hợp khi bạn muốn" — positive-fit bullets.
+  /// "Phù hợp nếu bạn muốn" — positive-fit bullets.
   final List<String> highlights;
 
-  /// "Chưa lý tưởng nếu" — honest caveats so the user can self-select.
+  /// "Có thể chưa phù hợp nếu" — honest caveats so the user can self-select.
   final List<String> caveats;
 
-  /// Equipment line shown in the footer chip strip (e.g. "Cần thảm").
+  /// Equipment line shown in the footer chip strip (e.g. "Cần thảm tập").
   final String equipment;
 }
 
@@ -182,8 +182,8 @@ const forkChoices = {
     stat: '30+',
     statLabel: 'bài tập',
     highlights: [
-      'Tăng sức mạnh và săn chắc',
-      'Giữ nhịp tim, đốt năng lượng',
+      'Tăng sức mạnh, người săn chắc hơn',
+      'Tăng nhịp tim, đốt mỡ hiệu quả',
       'Không cần thiết bị phức tạp',
     ],
     caveats: [
@@ -207,7 +207,7 @@ const forkChoices = {
       'Tăng cơ bắp rõ rệt',
       'Đốt mỡ nhanh, tập cường độ cao',
     ],
-    equipment: 'Cần thảm',
+    equipment: 'Cần thảm tập',
   ),
 };
 

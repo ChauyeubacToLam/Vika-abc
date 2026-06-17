@@ -387,7 +387,7 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
 
   void _stub(String label) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$label sẽ được bật ở bản sau.')),
+      SnackBar(content: Text('$label sẽ có ở phiên bản sau.')),
     );
   }
 }
@@ -467,7 +467,7 @@ class _Marquee extends StatelessWidget {
       ? 'Form đỉnh.'
       : sessionFormScore >= 60
           ? 'Form chắc.'
-          : 'Buổi đặt nền.';
+          : 'Buổi tập nền.';
 
   @override
   Widget build(BuildContext context) {
@@ -1353,7 +1353,7 @@ class _CoachNote extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Đánh giá cuối buổi',
+                  'Đánh giá buổi tập',
                   style: TextStyle(
                     fontFamily: 'BeVietnamPro',
                     fontSize: 13.5,
@@ -1389,7 +1389,7 @@ class _CoachNote extends StatelessWidget {
         ),
         const SizedBox(height: 18),
         _CoachRow(
-          label: 'ĐỂ Ý',
+          label: 'CẦN CHÚ Ý',
           body: watchBody,
           glyph: watchIcon,
           glyphColor: watchAccent,
@@ -1833,7 +1833,7 @@ class _LightsUpClose extends StatelessWidget {
                 children: [
                   Flexible(
                     child: _ShareLink(
-                        label: 'Chỉnh ảnh & chia sẻ', onTap: onShare),
+                        label: 'Chỉnh sửa & chia sẻ', onTap: onShare),
                   ),
                   Container(
                     width: 1,
@@ -1850,7 +1850,7 @@ class _LightsUpClose extends StatelessWidget {
             const SizedBox(height: 12),
             Center(
               child: Text(
-                'Hẹn bạn ở buổi sau.',
+                'Hẹn gặp lại buổi sau! 👋',
                 style: TextStyle(
                   fontFamily: 'BeVietnamPro',
                   fontSize: 11.5,

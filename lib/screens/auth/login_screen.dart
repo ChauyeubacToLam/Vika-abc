@@ -67,7 +67,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (error) {
       _showError(_friendlyError(
         error,
-        fallback: 'Không thể đăng nhập lúc này. Vui lòng thử lại.',
+        fallback: 'Đăng nhập không thành công. Vui lòng thử lại.',
       ));
     } finally {
       if (mounted) {
@@ -78,7 +78,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _signInWithApple() async {
     if (!Platform.isIOS) {
-      _showError('Đăng nhập Apple chỉ hỗ trợ trên iPhone.');
+      _showError('Đăng nhập Apple chỉ khả dụng trên iPhone.');
       return;
     }
     await _runAuth(() async {
@@ -115,7 +115,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (error) {
       _showError(_friendlyError(
         error,
-        fallback: 'Không thể gửi link đăng nhập lúc này. Vui lòng thử lại.',
+        fallback: 'Không gửi được link. Vui lòng thử lại.',
       ));
     } finally {
       if (mounted) {
@@ -176,7 +176,7 @@ class _LoginScreenState extends State<LoginScreen> {
       footer: AnimatedBuilder(
         animation: _emailController,
         builder: (context, _) => _MagicLinkCta(
-          label: _busy ? 'Đang xử lý...' : 'Gửi link đăng nhập',
+          label: _busy ? 'Đang xử lý…' : 'Gửi link đăng nhập',
           disabledLabel: 'Nhập email để nhận link',
           enabled: _validEmail && !_busy,
           onTap: _sendMagicLink,

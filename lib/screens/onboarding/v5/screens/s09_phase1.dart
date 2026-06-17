@@ -259,7 +259,7 @@ class _SwipeHint extends StatelessWidget {
             const SizedBox(width: 7),
             Expanded(
               child: Text(
-                'Vuốt ngang để xem bài khác',
+                'Vuốt sang để xem bài tiếp',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: V5.caption(context, color: V5.inkSoft),
@@ -984,7 +984,7 @@ class _YogaHoldCard extends StatelessWidget {
             ),
             const SizedBox(height: 2),
             Text(
-              'GIỮ SẠCH',
+              'Tập CHUẨN',
               style: V5
                   .eyebrow(context, color: V5.invInkSoft)
                   .copyWith(letterSpacing: 1.4),
@@ -1173,7 +1173,7 @@ class _AnalysisCard extends StatelessWidget {
                 const SizedBox(width: 7),
                 Expanded(
                   child: Text(
-                    'VIKA PHÁT HIỆN · ${ex.detectedPattern}'.toUpperCase(),
+                    'VIKA GHI NHẬN · ${ex.detectedPattern}'.toUpperCase(),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: V5

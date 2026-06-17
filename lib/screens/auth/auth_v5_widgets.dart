@@ -5,6 +5,12 @@ import 'package:flutter/material.dart';
 import '../onboarding/v5/v5_primitives.dart';
 import '../onboarding/v5/v5_theme.dart';
 
+// FB_LOGIN_PRELAUNCH_HIDE: Facebook app pending Meta verification, not Live, so
+// a Facebook login fails for non-app-roles. Flip to true to restore the Facebook
+// sign-in tile post-verification. (Top-level so the dead `if` branch below isn't
+// flagged as dead_code while the flag is false; OAuth wiring stays intact.)
+bool _showFacebookTile = false;
+
 class AuthProviderRail extends StatelessWidget {
   const AuthProviderRail({
     super.key,
@@ -51,17 +57,19 @@ class AuthProviderRail extends StatelessWidget {
               border: V5.borderHi,
             ),
           ),
-          const SizedBox(width: V5.space8),
-          Expanded(
-            child: _AuthProviderTile(
-              label: 'Facebook',
-              background: V5.surface,
-              foreground: V5.ink,
-              icon: const V5FacebookMark(size: 18),
-              onTap: busy ? null : onFacebook,
-              border: V5.borderHi,
+          if (_showFacebookTile) ...[
+            const SizedBox(width: V5.space8),
+            Expanded(
+              child: _AuthProviderTile(
+                label: 'Facebook',
+                background: V5.surface,
+                foreground: V5.ink,
+                icon: const V5FacebookMark(size: 18),
+                onTap: busy ? null : onFacebook,
+                border: V5.borderHi,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

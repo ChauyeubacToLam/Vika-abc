@@ -102,7 +102,7 @@ class TodayCard extends StatelessWidget {
                 const SizedBox(height: 14),
                 PlanH1(day.title, size: 34, dark: true, letterSpacing: -2),
                 const SizedBox(height: 14),
-                // Stat row: 15 phút | 4 bài | 3 có camera AI
+                // Stat row: 15 phút | 4 bài | 3 bài có camera AI
                 Row(
                   children: [
                     _Stat(
@@ -137,7 +137,7 @@ class TodayCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      '3 có camera AI',
+                      '3 bài có camera AI',
                       style: TextStyle(
                         fontFamily: 'BeVietnamPro',
                         fontSize: 11,

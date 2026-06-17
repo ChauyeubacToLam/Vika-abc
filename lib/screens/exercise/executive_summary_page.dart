@@ -123,7 +123,7 @@ class _ExecutiveSummaryPageState extends State<ExecutiveSummaryPage>
 
   void _showShareStub(String label) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$label sẽ được bật ở bản sau.')),
+      SnackBar(content: Text('$label sẽ có ở phiên bản sau.')),
     );
   }
 
@@ -153,7 +153,7 @@ class _ExecutiveSummaryPageState extends State<ExecutiveSummaryPage>
                   comparison: widget.comparison,
                   streakDays: widget.streakDays,
                   isFinalWorkoutSlot: widget.isFinalWorkoutSlot,
-                  onShare: () => _showShareStub('Chỉnh ảnh & chia sẻ'),
+                  onShare: () => _showShareStub('Chỉnh sửa & chia sẻ'),
                   onShareToZalo: () => _showShareStub('Chia sẻ qua Zalo'),
                 ),
               ),
@@ -303,14 +303,14 @@ class _HeroPhotoCard extends StatelessWidget {
     final s = VFTheme.scale(context);
     final accent = _accent(report.formScore);
     final headline =
-        isFinalWorkoutSlot ? _scoreHeadline(report.formScore) : 'Bài này xong';
+        isFinalWorkoutSlot ? _scoreHeadline(report.formScore) : 'Bài này đã xong';
     final subtitle = isFinalWorkoutSlot
         ? _heroSubtitle(
             score: report.formScore,
             comparison: comparison,
             isFirstSession: isFirstSession,
           )
-        : 'Nghỉ ngắn rồi chuyển sang bài tiếp theo.';
+        : 'Nghỉ một chút rồi bắt đầu bài tiếp nhé.';
 
     return Container(
       height: 420 * s,
@@ -546,7 +546,7 @@ class _HeroPhotoCard extends StatelessWidget {
                             Expanded(
                               child: _HeroActionButton(
                                 onTap: onShare,
-                                label: 'Chỉnh ảnh & chia sẻ',
+                                label: 'Chỉnh sửa & chia sẻ',
                                 icon: Icons.edit_outlined,
                                 fillColor: Colors.white.withValues(alpha: 0.1),
                                 borderColor:
@@ -871,7 +871,7 @@ class _PainLinkedChip extends StatelessWidget {
           Icon(Icons.center_focus_strong_rounded, size: 10 * s, color: color),
           SizedBox(width: 4 * s),
           Text(
-            'Vùng bạn tập trung',
+            'Vùng cơ nhắm tới',
             style: VFTheme.textStyle(
               context,
               size: 9,
@@ -917,7 +917,7 @@ class _FormTerrainSection extends StatelessWidget {
               ),
             ),
             Text(
-              '${setScores.length} set · $durationMinutes phút',
+              '${setScores.length} hiệp · $durationMinutes phút',
               style: VFTheme.textStyle(
                 context,
                 size: 11,
@@ -1111,7 +1111,7 @@ class _FormTerrainPainter extends CustomPainter {
         _paintLabel(
           canvas,
           bounds: size,
-          text: 'Tốt nhất',
+          text: 'Kỷ lục cá nhân',
           offset: Offset(point.dx, point.dy + bestLabelGap),
           style: GoogleFonts.dmSans(
             fontSize: bestLabelFontSize,
@@ -1706,7 +1706,7 @@ class _DoneSection extends StatelessWidget {
         ),
         SizedBox(height: 10 * s),
         Text(
-          disabled ? 'Chọn cảm giác buổi tập để tiếp tục' : 'Hẹn buổi sau! 👋',
+          disabled ? 'Đánh giá buổi tập để tiếp tục' : 'Hẹn gặp lại buổi sau! 👋',
           style: VFTheme.textStyle(
             context,
             size: 11,
@@ -1717,8 +1717,8 @@ class _DoneSection extends StatelessWidget {
         if (DateTime.now().millisecondsSinceEpoch < 0)
           Text(
             disabled
-                ? 'Chọn cảm giác buổi tập để tiếp tục'
-                : 'Hẹn buổi sau! 👋',
+                ? 'Đánh giá buổi tập để tiếp tục'
+                : 'Hẹn gặp lại buổi sau! 👋',
             style: VFTheme.textStyle(
               context,
               size: 11,
@@ -1728,7 +1728,7 @@ class _DoneSection extends StatelessWidget {
           ),
         if (DateTime.now().millisecondsSinceEpoch < 0)
           Text(
-            'Hẹn buổi sau! 👋',
+            'Hẹn gặp lại buổi sau! 👋',
             style: VFTheme.textStyle(
               context,
               size: 11,
@@ -2068,40 +2068,40 @@ String _heroSubtitle({
   if (comparison != null) {
     switch (comparison.type) {
       case ComparisonType.personalBestFormScore:
-        return 'Kỷ lục form mới cho riêng bạn';
+        return 'Kỷ lục form mới của bạn!';
       case ComparisonType.personalBestFault:
         return comparison.isPainLinked
-            ? 'Buổi tốt nhất ở vùng bạn đang tập trung'
-            : 'Bạn vừa chạm mức tốt nhất ở chỉ số đang theo dõi';
+            ? 'Buổi đỉnh nhất ở vùng bạn đang tập trung'
+            : 'Bạn vừa đạt mức cao nhất ở chỉ số đang theo dõi';
       case ComparisonType.improvementStreak:
         return comparison.isPainLinked
-            ? 'Chuỗi tiến bộ ở vùng bạn tập trung vẫn tiếp tục'
-            : 'Chuỗi tiến bộ của bạn vẫn đang tiếp tục';
+            ? 'Chuỗi tiến bộ ở vùng bạn tập trung..'
+            : 'Chuỗi tiến bộ của bạn vẫn đang dài hơn';
       case ComparisonType.aboveAverage:
         return comparison.secondaryLine ??
-            'Bạn đang vượt mức trung bình gần đây';
+            'Bạn đang vượt mức trung bình của mình';
       case ComparisonType.deltaPositive:
         return comparison.primaryLine;
       case ComparisonType.formSolid:
-        return 'Form hôm nay ổn, giữ nhịp này nhé';
+        return 'Form hôm nay ổn đó, cứ giữ nhịp này nhé';
       case ComparisonType.consistencyStreak:
         return 'Đều đặn quan trọng hơn hoàn hảo';
       case ComparisonType.sessionComplete:
-        return 'Buổi tập đã xong, hẹn bạn lần sau';
+        return 'Buổi tập xong rồi, hẹn gặp buổi sau nhé';
       case ComparisonType.none:
         break;
     }
   }
 
   if (isFirstSession) {
-    if (score >= 80) return 'Buổi đầu rất chắc, baseline này quá ổn';
-    if (score >= 50) return 'Buổi đầu ổn rồi, mình đã có baseline tốt';
-    return 'Buổi đầu đã xong, từ đây mình cải thiện từng buổi';
+    if (score >= 80) return 'Buổi đầu rất chắc , bạn thực sự có nền tảng tốt!';
+    if (score >= 50) return 'Buổi đầu ổn rồi, mình đã có điểm khởi đầu tốt.';
+    return 'Buổi đầu xong rồi, từ đây mình cải thiện theo từng buổi nhé.';
   }
 
-  if (score >= 80) return 'Form hôm nay rất chắc, giữ nhịp này nhé';
-  if (score >= 50) return 'Nền form ổn, buổi sau mình đẩy thêm một chút';
-  return 'Cần cải thiện thêm, nhưng mình đã có hướng để sửa';
+  if (score >= 80) return 'Form hôm nay chắc lắm, cứ giữ nhịp này nhé.';
+  if (score >= 50) return 'Form ổn rồi, buổi sau mình cố thêm một chút nhé.';
+  return 'Còn điểm cần cải thiện, nhưng mình đã biết hướng để sửa rồi.';
 }
 
 String _heroStreakValue(int streakDays) {
@@ -2110,13 +2110,13 @@ String _heroStreakValue(int streakDays) {
 }
 
 String _issueObservation(DetectedEvidence issue) => switch (issue.issueId) {
-      'ankle_mobility' => 'AI thấy gót chân nhấc lên ở khá nhiều rep.',
+      'ankle_mobility' => 'AI nhận thấy gót chân nhấc khỏi sàn ở nhiều rep.',
       'ankle_mobility_restriction' =>
-        'AI thấy cổ chân và thân trên cùng mất ổn định khi xuống sâu.',
+        'AI nhận thấy cả cổ chân và thân trên mất ổn định khi xuống sâu.',
       'hip_flexor_overactivity' =>
-        'AI thấy thân trên đổ về trước khá nhiều khi xuống squat.',
-      'limited_mobility' => 'AI thấy độ sâu hiện tại vẫn còn bị giới hạn.',
-      _ => 'AI thấy một điểm cần cải thiện trong buổi tập.',
+        'AI nhận thấy thân trên đổ về phía trước khi xuống sâu.',
+      'limited_mobility' => 'AI nhận thấy độ sâu chưa đạt ngưỡng chuẩn.',
+      _ => 'AI nhận thấy một điểm cần cải thiện.',
     };
 
 String _formatHeroDate(DateTime date) {

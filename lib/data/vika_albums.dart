@@ -43,7 +43,7 @@ const List<VikaAlbum> vikaAlbums = [
   VikaAlbum(
     id: 'wake',
     vietnameseTitle: 'Tỉnh dậy cùng cơ thể',
-    vietnameseSubtitle: 'Đánh thức cơ thể cho ngày mới.',
+    vietnameseSubtitle: 'Đánh thức năng lượng cho một ngày mới.',
     level: 'Dễ',
     minutes: 6,
     icon: Icons.wb_twilight_rounded,
@@ -56,7 +56,7 @@ const List<VikaAlbum> vikaAlbums = [
   ),
   VikaAlbum(
     id: 'desk',
-    vietnameseTitle: 'Reset bàn làm việc',
+    vietnameseTitle: 'Nghỉ ngắn, tập luyên ngay tại bàn làm việc',
     vietnameseSubtitle: 'Nhanh giữa giờ, không cần thay đồ.',
     level: 'Dễ–TB',
     minutes: 5,
@@ -71,7 +71,7 @@ const List<VikaAlbum> vikaAlbums = [
   VikaAlbum(
     id: 'evening',
     vietnameseTitle: 'Buông một ngày',
-    vietnameseSubtitle: 'Giãn nhẹ để dễ vào giấc ngủ.',
+    vietnameseSubtitle: 'Giãn cơ nhẹ để dễ ngủ hơn.',
     level: 'Người mới',
     minutes: 8,
     icon: Icons.nightlight_round,
@@ -85,7 +85,7 @@ const List<VikaAlbum> vikaAlbums = [
   VikaAlbum(
     id: 'core',
     vietnameseTitle: 'Cốt lõi vững',
-    vietnameseSubtitle: 'Core kiểu McGill, an toàn cho lưng.',
+    vietnameseSubtitle: 'Phương pháp McGill, bảo vệ lưng.',
     level: 'TB',
     minutes: 7,
     icon: Icons.center_focus_strong_rounded,
@@ -98,8 +98,8 @@ const List<VikaAlbum> vikaAlbums = [
   ),
   VikaAlbum(
     id: 'legs',
-    vietnameseTitle: 'Chân khỏe mông săn',
-    vietnameseSubtitle: 'Nền tảng cho thân dưới.',
+    vietnameseTitle: 'Chân khỏe, mông săn chắc',
+    vietnameseSubtitle: 'Nền tảng cho phần thân dưới.',
     level: 'TB',
     minutes: 8,
     icon: Icons.directions_walk_rounded,
@@ -113,7 +113,7 @@ const List<VikaAlbum> vikaAlbums = [
   VikaAlbum(
     id: 'upper',
     vietnameseTitle: 'Thân trên chắc',
-    vietnameseSubtitle: 'Ngực, vai, tay sau.',
+    vietnameseSubtitle: 'Ngực, vai và tay sau.',
     level: 'TB',
     minutes: 7,
     icon: Icons.fitness_center_rounded,
@@ -126,8 +126,8 @@ const List<VikaAlbum> vikaAlbums = [
   ),
   VikaAlbum(
     id: 'energy',
-    vietnameseTitle: 'Đốt năng lượng',
-    vietnameseSubtitle: 'Tăng nhịp tim, đổ mồ hôi nhanh.',
+    vietnameseTitle: 'Đốt calo thần tốc',
+    vietnameseSubtitle: 'Tăng nhịp tim, đốt calo.',
     level: 'TB–Khó',
     minutes: 6,
     icon: Icons.bolt_rounded,
@@ -141,7 +141,7 @@ const List<VikaAlbum> vikaAlbums = [
   VikaAlbum(
     id: 'back',
     vietnameseTitle: 'Lưng khỏe mỗi ngày',
-    vietnameseSubtitle: 'Cho lưng sau giờ ngồi lâu.',
+    vietnameseSubtitle: 'Giãn cơ lưng, sau nhiều giờ làm việc',
     level: 'Dễ–TB',
     minutes: 8,
     icon: Icons.healing_rounded,
@@ -155,8 +155,8 @@ const List<VikaAlbum> vikaAlbums = [
   ),
   VikaAlbum(
     id: 'beginner',
-    vietnameseTitle: 'Người mới bắt đầu',
-    vietnameseSubtitle: 'Cơ bản, nhịp chậm, form đúng trước.',
+    vietnameseTitle: 'Dành cho người mới bắt đầu',
+    vietnameseSubtitle: 'Cơ bản, nhịp chậm, tập chuẩn xác.',
     level: 'Dễ',
     minutes: 6,
     icon: Icons.flag_rounded,
@@ -170,8 +170,8 @@ const List<VikaAlbum> vikaAlbums = [
   ),
   VikaAlbum(
     id: 'mobility',
-    vietnameseTitle: 'Linh hoạt & giãn cơ',
-    vietnameseSubtitle: 'Mở hông, giãn gân kheo, thả cột sống.',
+    vietnameseTitle: 'Tăng độ linh hoạt và giãn cơ',
+    vietnameseSubtitle: 'Mở hông, giãn đùi sau, và thả lỏng cột sống.',
     level: 'Người mới–TB',
     minutes: 9,
     icon: Icons.self_improvement_rounded,

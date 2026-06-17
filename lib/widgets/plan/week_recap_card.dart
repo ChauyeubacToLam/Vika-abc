@@ -106,7 +106,7 @@ class WeekRecapCard extends StatelessWidget {
                           const CoachMark(),
                           const SizedBox(width: 8),
                           PlanEyebrow(
-                            'Huấn luyện viên ghi',
+                            'Lời nhắn từ HLV',
                             size: 9,
                             letterSpacing: 1.6,
                             color: c.yellow,

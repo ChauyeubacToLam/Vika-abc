@@ -29,7 +29,7 @@ class S03Barrier extends StatelessWidget {
             title: 'Một buổi:\n400.000 – 2.000.000 ₫',
             subtitle: r.isShort
                 ? null
-                : 'Khảo sát mức giá tại các chuỗi gym lớn ở TP.HCM & Hà Nội, 2024.',
+                : 'Theo khảo sát giá tại các chuỗi gym lớn ở TP.HCM & Hà Nội, 2024.',
           ),
           SizedBox(height: r.pick(cozy: V5.space20, short: V5.space14)),
           Expanded(
@@ -85,7 +85,7 @@ class _CostComparisonHero extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '3 buổi/tuần × 52 tuần, tính theo mức giá phổ biến.',
+                      '3 buổi/tuần × 52 tuần, tính theo giá phổ biến ở các chuỗi gym.',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: V5.caption(context, color: V5.invInkSoft),
@@ -128,14 +128,14 @@ class _CostComparisonHero extends StatelessWidget {
                         children: const [
                           TextSpan(text: 'Tiết kiệm đến '),
                           TextSpan(
-                            text: '59tr',
+                            text: '59 triệu',
                             style: TextStyle(
                               fontWeight: FontWeight.w800,
                               color: V5.yellow,
                             ),
                           ),
                           TextSpan(
-                            text: ' cho giải pháp của cùng một vấn đề.',
+                            text: ' cho cùng một giải pháp.',
                           ),
                         ],
                       ),

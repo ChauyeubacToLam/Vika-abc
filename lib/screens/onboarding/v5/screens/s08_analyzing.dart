@@ -43,14 +43,14 @@ class _S08AnalyzingState extends State<S08Analyzing>
 
   List<String> get _steps => widget.data.fork == 'yoga'
       ? const [
-          'Đo thăng bằng & độ giữ tư thế',
-          'Đối chiếu chuẩn động tác',
-          'Tính level & điểm cần luyện',
+          'Đánh giá mức độ thăng bằng',
+          'So sánh với  động tác chuẩn',
+          'Xác định level & điểm cần cải thiện',
         ]
       : const [
-          'Đo chiều sâu & form',
-          'Đối chiếu chuẩn động tác',
-          'Tính level & điểm cần luyện',
+          'Đánh giá độ sâu & form',
+          'So sánh với  động tác chuẩn',
+          'Xác định level & điểm cần cải thiện',
         ];
 
   @override
@@ -447,7 +447,7 @@ class _ContinueHint extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              'Chạm để tiếp tục',
+              'Chạm để bỏ qua',
               style: V5.bodySm(context, color: V5.invInkFaint),
             ),
             const SizedBox(width: 6),
