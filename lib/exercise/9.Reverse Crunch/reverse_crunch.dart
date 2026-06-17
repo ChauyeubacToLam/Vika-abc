@@ -52,7 +52,13 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
   int? _exerciseStartTimeMs;
   bool _isTimeout = false;
   double? _baselineTrunkKneeAngle;
+  double? _baselineHipY;
   double? _minTrunkKneeAngleThisRep;
+  bool _sawContractionThisRep = false;
+  bool _sawLegThrustThisRep = false;
+  double _maxHipLiftThisRep = 0;
+  double _maxLegAngleThisRep = 0;
+  double _maxKneeAngleThisRep = 0;
   int _rejectedAttempts = 0;
 
   final Debouncer _curlingDebouncer = Debouncer(requiredFrames: 2);
@@ -90,6 +96,15 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
       case ReverseCrunchState.lowering:
         return 'Hạ xuống';
     }
+  }
+
+  @override
+  void onExerciseActivated() {
+    super.onExerciseActivated();
+    crunchState = ReverseCrunchState.lying;
+    previousState = ReverseCrunchState.lying;
+    _resetRepAttempt(clearBaseline: true);
+    for (final metric in _metrics) metric.reset();
   }
 
   @override
@@ -185,34 +200,24 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
     final lm = _getLandmarks(landmarks);
     if (lm == null) return false;
 
-    double kneeAngle = calculateAngleNormalized(
-        firstPoint: lm['hip']!, midPoint: lm['knee']!, lastPoint: lm['ankle']!);
-    // Đánh giá góc người so với mặt sàn. (Mặt sàn ~ phương ngang)
-    double trunkHorizontalAngle = calculateAbsoluteHorizontalAngle(
-        point1: lm['shoulder']!, point2: lm['hip']!);
+    final profile = _calculatePoseProfile(lm);
 
     debugData['Setup_Diagnostic'] = {
-      'kneeAngle': kneeAngle.toStringAsFixed(1),
-      'trunkHorizontal': trunkHorizontalAngle.toStringAsFixed(1),
-      'isKneeLocked':
-          kneeAngle >= ReverseCrunchConfig.SETUP_KNEE_ANGLE_RANGE[0] &&
-              kneeAngle <= ReverseCrunchConfig.SETUP_KNEE_ANGLE_RANGE[1],
-      'isLyingFlat': trunkHorizontalAngle < 35.0,
+      'kneeAngle': profile.kneeAngle.toStringAsFixed(1),
+      'trunkHorizontal': profile.trunkHorizontalAngle.toStringAsFixed(1),
+      'thighHorizontal': profile.thighHorizontalAngle.toStringAsFixed(1),
+      'shinHorizontal': profile.shinHorizontalAngle.toStringAsFixed(1),
+      'isGuideStart': profile.isSetupPosition,
     };
 
-    if (kneeAngle < ReverseCrunchConfig.SETUP_KNEE_ANGLE_RANGE[0] ||
-        kneeAngle > ReverseCrunchConfig.SETUP_KNEE_ANGLE_RANGE[1]) return false;
-    if (trunkHorizontalAngle > 35.0) return false;
+    if (!profile.isSetupPosition) return false;
 
     final armPosition = _calculateArmPosition(landmarks);
-    if (!armPosition.isVisible) {
-      resultIssues.feedback['Arms'] =
-          'Giữ hai tay thẳng sát hông trong khung hình.';
-      return false;
-    }
-    if (!armPosition.isCorrect) {
+    if (armPosition.isVisible && !armPosition.isCorrect) {
       resultIssues.feedback['Arms'] = 'Duỗi thẳng hai tay và khép sát hông.';
-      return false;
+    } else if (!armPosition.isVisible) {
+      resultIssues.feedback['Arms'] =
+          'Nếu thấy được tay, hãy duỗi sát bên hông.';
     }
 
     return true;
@@ -239,27 +244,24 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
     scaleFactor = calculateDistance(lm['shoulder']!, lm['hip']!);
     if (!scaleFactor.isFinite || scaleFactor <= 1e-6) return;
 
-    double trunkKneeAngle = calculateAngleNormalized(
-        firstPoint: lm['shoulder']!,
-        midPoint: lm['hip']!,
-        lastPoint: lm['knee']!);
-    double kneeAngle = calculateAngleNormalized(
-        firstPoint: lm['hip']!, midPoint: lm['knee']!, lastPoint: lm['ankle']!);
+    final profile = _calculatePoseProfile(lm);
 
-    if (crunchState == ReverseCrunchState.lying) {
-      _baselineTrunkKneeAngle ??= trunkKneeAngle;
+    if (crunchState == ReverseCrunchState.lying && profile.isSetupPosition) {
+      _captureBaseline(profile);
     }
 
     // Dùng FrameBuffer để tính vận tốc cuộn (TrunkKneeAngle)
-    frameBuffer.addFrame(
-        FrameSnapshot(log: {"trunkKneeAngle": trunkKneeAngle}, timeStamp: now));
+    frameBuffer.addFrame(FrameSnapshot(
+        log: {"trunkKneeAngle": profile.trunkKneeAngle}, timeStamp: now));
     double trunkKneeVelocity = _calculateVelocityFromBuffer("trunkKneeAngle");
 
     debugData['Diagnostic_Table'] = {
       'State': crunchState.name,
       'Time_s': ((now - _exerciseStartTimeMs!) / 1000).toStringAsFixed(1),
-      'TrunkKneeAngle': trunkKneeAngle.toStringAsFixed(1),
-      'KneeAngle': kneeAngle.toStringAsFixed(1),
+      'TrunkKneeAngle': profile.trunkKneeAngle.toStringAsFixed(1),
+      'KneeAngle': profile.kneeAngle.toStringAsFixed(1),
+      'LegAngle': profile.legHorizontalAngle.toStringAsFixed(1),
+      'HipLift': profile.hipLiftNormalized.toStringAsFixed(2),
       'TrunkKneeVel': trunkKneeVelocity.toStringAsFixed(2),
       'Hip_Y': lm['hip']!.y.toStringAsFixed(1),
     };
@@ -269,10 +271,17 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
       state: crunchState,
       frameTimestamp: now,
       scaleFactor: scaleFactor,
-      trunkKneeAngle: trunkKneeAngle,
-      kneeAngle: kneeAngle,
-      hipY: lm['hip']!.y,
+      trunkKneeAngle: profile.trunkKneeAngle,
+      kneeAngle: profile.kneeAngle,
+      thighHorizontalAngle: profile.thighHorizontalAngle,
+      shinHorizontalAngle: profile.shinHorizontalAngle,
+      legHorizontalAngle: profile.legHorizontalAngle,
+      hipY: profile.hipY,
+      hipLiftNormalized: profile.hipLiftNormalized,
       trunkKneeVelocity: trunkKneeVelocity,
+      isSetupPosition: profile.isSetupPosition,
+      isContractionPosition: profile.isContractionPosition,
+      isLegThrustPeak: profile.isLegThrustPeak,
       armsVisible: armPosition.isVisible,
       armStraightnessAngle: armPosition.minElbowAngle,
       wristHipDistanceRatio: armPosition.maxWristHipDistanceRatio,
@@ -280,8 +289,9 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
     );
 
     _updateStateMachine(ctx);
+    final metricCtx = ctx.copyWith(state: crunchState);
     for (final metric in _metrics) {
-      metric.update(ctx);
+      metric.update(metricCtx);
       debugData.addAll(metric.debugData);
     }
   }
@@ -291,32 +301,47 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
 
     if (crunchState == ReverseCrunchState.curling ||
         crunchState == ReverseCrunchState.top) {
-      if (_minTrunkKneeAngleThisRep == null ||
-          ctx.trunkKneeAngle < _minTrunkKneeAngleThisRep!) {
-        _minTrunkKneeAngleThisRep = ctx.trunkKneeAngle;
-      }
+      _trackRepPeak(ctx);
+      if (ctx.isContractionPosition) _sawContractionThisRep = true;
+      if (ctx.isLegThrustPeak) _sawLegThrustThisRep = true;
     }
 
-    if (_curlingDebouncer.update(crunchState == ReverseCrunchState.lying &&
-        ctx.trunkKneeAngle <
+    final startedCurl = ctx.trunkKneeAngle <=
             _baselineTrunkKneeAngle! -
-                ReverseCrunchConfig.LIFT_START_ANGLE_DROP)) {
+                ReverseCrunchConfig.LIFT_START_ANGLE_DROP ||
+        ctx.hipLiftNormalized >=
+            ReverseCrunchConfig.LIFT_START_HIP_LIFT_NORMALIZED;
+
+    if (_curlingDebouncer.update(crunchState == ReverseCrunchState.lying &&
+        !ctx.isSetupPosition &&
+        startedCurl)) {
       _transitionState(ReverseCrunchState.curling, ctx.frameTimestamp);
       _minTrunkKneeAngleThisRep = ctx.trunkKneeAngle;
-    } else if (_topDebouncer.update(crunchState == ReverseCrunchState.curling &&
-        ctx.trunkKneeAngle <=
-            _baselineTrunkKneeAngle! -
-                ReverseCrunchConfig.PELVIC_CURL_ANGLE_MIN_DROP)) {
+      _trackRepPeak(ctx);
+      if (ctx.isContractionPosition) _sawContractionThisRep = true;
+    } else if (_topDebouncer.update(
+        crunchState == ReverseCrunchState.curling &&
+            _sawContractionThisRep &&
+            ctx.isLegThrustPeak)) {
+      _sawLegThrustThisRep = true;
+      _trackRepPeak(ctx);
       _transitionState(ReverseCrunchState.top, ctx.frameTimestamp);
     } else if (_loweringDebouncer.update(
-        (crunchState == ReverseCrunchState.top ||
-                crunchState == ReverseCrunchState.curling) &&
-            _minTrunkKneeAngleThisRep != null &&
-            ctx.trunkKneeAngle > _minTrunkKneeAngleThisRep! + 5.0)) {
+        crunchState == ReverseCrunchState.top &&
+            (ctx.legHorizontalAngle <
+                    ReverseCrunchConfig.PEAK_EXIT_LEG_VERTICAL_MIN ||
+                ctx.kneeAngle <
+                    ReverseCrunchConfig.PEAK_EXIT_KNEE_EXTENSION_MIN ||
+                ctx.hipLiftNormalized <
+                    _maxHipLiftThisRep -
+                        ReverseCrunchConfig.HIP_LIFT_MIN_NORMALIZED))) {
       _transitionState(ReverseCrunchState.lowering, ctx.frameTimestamp);
+    } else if (_lyingDebouncer.update(crunchState == ReverseCrunchState.curling &&
+        ctx.isSetupPosition)) {
+      _rejectRepAttempt(
+          ctx, 'Chưa duỗi chân lên ở đỉnh nên rep này chưa được tính.');
     } else if (_lyingDebouncer.update(
-        crunchState == ReverseCrunchState.lowering &&
-            ctx.trunkKneeAngle >= _baselineTrunkKneeAngle! - 5.0)) {
+        crunchState == ReverseCrunchState.lowering && ctx.isSetupPosition)) {
       _completeRep(ctx);
       _minTrunkKneeAngleThisRep = null;
     }
@@ -327,14 +352,72 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
     previousState = crunchState;
     crunchState = newState;
     if (newState == ReverseCrunchState.lying) {
-      _baselineTrunkKneeAngle = null;
-      _minTrunkKneeAngleThisRep = null;
+      _resetRepAttempt(clearBaseline: true);
     }
     for (final metric in _metrics)
       metric.onStateTransition(previousState, newState, timestampMs);
   }
 
+  void _captureBaseline(_ReverseCrunchPoseProfile profile) {
+    _baselineTrunkKneeAngle = profile.trunkKneeAngle;
+    _baselineHipY = profile.hipY;
+  }
+
+  void _trackRepPeak(RepContext ctx) {
+    if (_minTrunkKneeAngleThisRep == null ||
+        ctx.trunkKneeAngle < _minTrunkKneeAngleThisRep!) {
+      _minTrunkKneeAngleThisRep = ctx.trunkKneeAngle;
+    }
+    if (ctx.hipLiftNormalized > _maxHipLiftThisRep) {
+      _maxHipLiftThisRep = ctx.hipLiftNormalized;
+    }
+    if (ctx.legHorizontalAngle > _maxLegAngleThisRep) {
+      _maxLegAngleThisRep = ctx.legHorizontalAngle;
+    }
+    if (ctx.kneeAngle > _maxKneeAngleThisRep) {
+      _maxKneeAngleThisRep = ctx.kneeAngle;
+    }
+  }
+
+  bool get _isRepCountable =>
+      _sawContractionThisRep &&
+      _sawLegThrustThisRep &&
+      _maxHipLiftThisRep >= ReverseCrunchConfig.HIP_LIFT_MIN_NORMALIZED &&
+      _maxLegAngleThisRep >= ReverseCrunchConfig.PEAK_LEG_VERTICAL_MIN &&
+      _maxKneeAngleThisRep >= ReverseCrunchConfig.PEAK_KNEE_EXTENSION_MIN;
+
+  void _rejectRepAttempt(RepContext ctx, String message) {
+    _rejectedAttempts++;
+    resultIssues.feedback['Result'] = 'Không tính rep';
+    resultIssues.addInstruction('lying', 'ReverseCrunch', message);
+    _transitionState(ReverseCrunchState.lying, ctx.frameTimestamp);
+    for (final metric in _metrics) metric.reset();
+  }
+
+  void _resetRepAttempt({required bool clearBaseline}) {
+    _minTrunkKneeAngleThisRep = null;
+    _sawContractionThisRep = false;
+    _sawLegThrustThisRep = false;
+    _maxHipLiftThisRep = 0;
+    _maxLegAngleThisRep = 0;
+    _maxKneeAngleThisRep = 0;
+    _curlingDebouncer.reset();
+    _topDebouncer.reset();
+    _loweringDebouncer.reset();
+    _lyingDebouncer.reset();
+    if (clearBaseline) {
+      _baselineTrunkKneeAngle = null;
+      _baselineHipY = null;
+    }
+  }
+
   void _completeRep(RepContext ctx) {
+    if (!_isRepCountable) {
+      _rejectRepAttempt(
+          ctx, 'Hãy cuộn gối về ngực rồi duỗi chân thẳng lên ở đỉnh.');
+      return;
+    }
+
     for (final metric in _metrics) metric.evaluateRepEnd(ctx);
     final allFaults = <FaultRecord>[];
     for (final metric in _metrics) allFaults.addAll(metric.faults);
@@ -379,6 +462,68 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
     return dt == 0 ? 0 : dAngle / dt; // degrees per second
   }
 
+  _ReverseCrunchPoseProfile _calculatePoseProfile(
+      Map<String, PoseLandmark> lm) {
+    final shoulder = lm['shoulder']!;
+    final hip = lm['hip']!;
+    final knee = lm['knee']!;
+    final ankle = lm['ankle']!;
+    final scale = calculateDistance(shoulder, hip);
+
+    final trunkKneeAngle = calculateAngleNormalized(
+        firstPoint: shoulder, midPoint: hip, lastPoint: knee);
+    final kneeAngle = calculateAngleNormalized(
+        firstPoint: hip, midPoint: knee, lastPoint: ankle);
+    final trunkHorizontalAngle =
+        calculateAbsoluteHorizontalAngle(point1: shoulder, point2: hip);
+    final thighHorizontalAngle =
+        calculateAbsoluteHorizontalAngle(point1: hip, point2: knee);
+    final shinHorizontalAngle =
+        calculateAbsoluteHorizontalAngle(point1: knee, point2: ankle);
+    final legHorizontalAngle =
+        calculateAbsoluteHorizontalAngle(point1: hip, point2: ankle);
+    final hipLiftNormalized =
+        scale <= 1e-6 ? 0.0 : ((_baselineHipY ?? hip.y) - hip.y) / scale;
+    final trunkKneeDrop = _baselineTrunkKneeAngle == null
+        ? 0.0
+        : _baselineTrunkKneeAngle! - trunkKneeAngle;
+
+    final isSetupPosition =
+        kneeAngle >= ReverseCrunchConfig.SETUP_KNEE_ANGLE_RANGE[0] &&
+            kneeAngle <= ReverseCrunchConfig.SETUP_KNEE_ANGLE_RANGE[1] &&
+            trunkHorizontalAngle <=
+                ReverseCrunchConfig.SETUP_TRUNK_HORIZONTAL_MAX &&
+            thighHorizontalAngle >=
+                ReverseCrunchConfig.SETUP_THIGH_VERTICAL_MIN &&
+            shinHorizontalAngle <=
+                ReverseCrunchConfig.SETUP_SHIN_HORIZONTAL_MAX;
+
+    final isContractionPosition =
+        trunkKneeDrop >= ReverseCrunchConfig.PELVIC_CURL_ANGLE_MIN_DROP &&
+            hipLiftNormalized >=
+                ReverseCrunchConfig.HIP_LIFT_MIN_NORMALIZED;
+
+    final isLegThrustPeak =
+        kneeAngle >= ReverseCrunchConfig.PEAK_KNEE_EXTENSION_MIN &&
+            legHorizontalAngle >= ReverseCrunchConfig.PEAK_LEG_VERTICAL_MIN &&
+            hipLiftNormalized >=
+                ReverseCrunchConfig.HIP_LIFT_MIN_NORMALIZED;
+
+    return _ReverseCrunchPoseProfile(
+      trunkKneeAngle: trunkKneeAngle,
+      kneeAngle: kneeAngle,
+      trunkHorizontalAngle: trunkHorizontalAngle,
+      thighHorizontalAngle: thighHorizontalAngle,
+      shinHorizontalAngle: shinHorizontalAngle,
+      legHorizontalAngle: legHorizontalAngle,
+      hipY: hip.y,
+      hipLiftNormalized: hipLiftNormalized,
+      isSetupPosition: isSetupPosition,
+      isContractionPosition: isContractionPosition,
+      isLegThrustPeak: isLegThrustPeak,
+    );
+  }
+
   Map<String, PoseLandmark>? _getLandmarks(
       Map<PoseLandmarkType, PoseLandmark> lm) {
     return getSideTrackedLandmarks(lm);
@@ -395,4 +540,32 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
     logger.pushKey("rejected_attempts_count", _rejectedAttempts);
     logger.pushGoodRepCount();
   }
+}
+
+class _ReverseCrunchPoseProfile {
+  const _ReverseCrunchPoseProfile({
+    required this.trunkKneeAngle,
+    required this.kneeAngle,
+    required this.trunkHorizontalAngle,
+    required this.thighHorizontalAngle,
+    required this.shinHorizontalAngle,
+    required this.legHorizontalAngle,
+    required this.hipY,
+    required this.hipLiftNormalized,
+    required this.isSetupPosition,
+    required this.isContractionPosition,
+    required this.isLegThrustPeak,
+  });
+
+  final double trunkKneeAngle;
+  final double kneeAngle;
+  final double trunkHorizontalAngle;
+  final double thighHorizontalAngle;
+  final double shinHorizontalAngle;
+  final double legHorizontalAngle;
+  final double hipY;
+  final double hipLiftNormalized;
+  final bool isSetupPosition;
+  final bool isContractionPosition;
+  final bool isLegThrustPeak;
 }

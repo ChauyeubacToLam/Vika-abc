@@ -22,8 +22,8 @@ class VUpConfig {
   static const int REP_READY_FRAMES = 3;
   static const double RISING_ANGLE = 155.0;
   static const double RISING_MIN_LIFT = 0.10;
-  static const double V_POSITION_THRESHOLD = 85.0;
-  static const double ROM_TARGET_ANGLE = 60.0;
+  static const double V_POSITION_THRESHOLD = 100.0;
+  static const double ROM_TARGET_ANGLE = 100.0;
   static const double TOP_TRUNK_HORIZ_MIN = 25.0;
   static const double TOP_LEG_HORIZ_MIN = 25.0;
   static const double TOP_MIN_LIFT = 0.25;

@@ -37,6 +37,7 @@ dependencies:
   image_picker: ^1.1.2
   share_plus: ^10.1.4
   flutter_svg: ^2.3.0
+  video_player: ^2.9.5
 
 dev_dependencies:
   flutter_test:
@@ -95,6 +96,7 @@ flutter:
     - assets/audio/squat/
     - assets/branding/
     - assets/images/
+    - assets/video/
 #    - assets/images/onboarding/
 
   # ─── Fonts ───

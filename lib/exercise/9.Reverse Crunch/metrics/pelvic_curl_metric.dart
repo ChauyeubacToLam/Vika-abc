@@ -7,10 +7,9 @@ class PelvicCurlMetric extends ReverseCrunchMetricBase {
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
 
-  double? _baselineHipY;
   double? _baselineTrunkKneeAngle;
   double _minTrunkKneeAngle = 180.0;
-  double _minHipY = 9999.0; // Y nhỏ nhất = Hông nâng cao nhất
+  double _maxHipLift = 0.0;
 
   @override
   List<FaultRecord> get faults => _faults;
@@ -20,7 +19,6 @@ class PelvicCurlMetric extends ReverseCrunchMetricBase {
   @override
   void update(RepContext ctx) {
     if (ctx.state == ReverseCrunchState.lying) {
-      _baselineHipY ??= ctx.hipY;
       _baselineTrunkKneeAngle ??= ctx.trunkKneeAngle;
       ctx.resultIssues.feedback['Curl'] = 'Sẵn sàng cuộn';
       return;
@@ -29,51 +27,49 @@ class PelvicCurlMetric extends ReverseCrunchMetricBase {
     if (ctx.trunkKneeAngle < _minTrunkKneeAngle) {
       _minTrunkKneeAngle = ctx.trunkKneeAngle;
     }
-    if (ctx.hipY < _minHipY) {
-      _minHipY = ctx.hipY;
+    if (ctx.hipLiftNormalized > _maxHipLift) {
+      _maxHipLift = ctx.hipLiftNormalized;
     }
 
-    if (_baselineHipY != null && _baselineTrunkKneeAngle != null) {
-      if (ctx.scaleFactor <= 1e-6) return;
-      double angleDrop = _baselineTrunkKneeAngle! - ctx.trunkKneeAngle;
-      double hipLiftNorm = (_baselineHipY! - ctx.hipY) / ctx.scaleFactor;
+    final angleDrop = _baselineTrunkKneeAngle == null
+        ? 0.0
+        : _baselineTrunkKneeAngle! - ctx.trunkKneeAngle;
 
-      _debugData['angleDrop'] = angleDrop.toStringAsFixed(1);
-      _debugData['hipLiftNorm'] = hipLiftNorm.toStringAsFixed(2);
+    _debugData['angleDrop'] = angleDrop.toStringAsFixed(1);
+    _debugData['hipLiftNorm'] = ctx.hipLiftNormalized.toStringAsFixed(2);
+    _debugData['maxHipLift'] = _maxHipLift.toStringAsFixed(2);
 
-      if (ctx.state == ReverseCrunchState.top) {
-        if (angleDrop >= ReverseCrunchConfig.PELVIC_CURL_ANGLE_MIN_DROP &&
-            hipLiftNorm >= ReverseCrunchConfig.HIP_LIFT_MIN_NORMALIZED) {
-          ctx.resultIssues.feedback['Curl'] = 'Cuộn rất sâu!';
-        } else {
-          ctx.resultIssues.feedback['Curl'] = 'Cuộn mông cao lên!';
-        }
-      } else if (ctx.state == ReverseCrunchState.curling) {
-        ctx.resultIssues.feedback['Curl'] = 'Cuộn hông lên...';
-      }
+    if (ctx.state == ReverseCrunchState.top) {
+      ctx.resultIssues.feedback['Curl'] =
+          ctx.isLegThrustPeak ? 'Leg thrust tốt!' : 'Duỗi chân lên cao hơn';
+    } else if (ctx.state == ReverseCrunchState.curling) {
+      ctx.resultIssues.feedback['Curl'] = 'Cuộn gối về ngực';
+    } else if (ctx.state == ReverseCrunchState.lowering) {
+      ctx.resultIssues.feedback['Curl'] = 'Hạ về góc 90 độ';
     }
   }
 
   @override
   void evaluateRepEnd(RepContext ctx) {
-    if (_baselineHipY == null || _baselineTrunkKneeAngle == null) return;
-    if (ctx.scaleFactor <= 1e-6) return;
+    if (_baselineTrunkKneeAngle == null) return;
 
-    double maxAngleDrop = _baselineTrunkKneeAngle! - _minTrunkKneeAngle;
-    double maxHipLift = (_baselineHipY! - _minHipY) / ctx.scaleFactor;
+    final maxAngleDrop = _baselineTrunkKneeAngle! - _minTrunkKneeAngle;
 
     if (maxAngleDrop < ReverseCrunchConfig.PELVIC_CURL_ANGLE_MIN_DROP ||
-        maxHipLift < ReverseCrunchConfig.HIP_LIFT_MIN_NORMALIZED) {
+        _maxHipLift < ReverseCrunchConfig.HIP_LIFT_MIN_NORMALIZED) {
       _faults.add(FaultRecord(
-          phase: 'TOP',
-          type: 'NoPelvicTilt',
-          message: 'Hông không rời sàn',
-          affectsForm: true,
-          priority: CrunchVoicePriority.pelvicCurl,
-          voiceMessage:
-              'Bài tập vô nghĩa nếu hông không rời sàn. Hãy cuộn mông nhấc lên khỏi mặt đất!'));
+        phase: 'TOP',
+        type: 'NoPelvicTilt',
+        message: 'Hông chưa nhấc khỏi sàn',
+        affectsForm: true,
+        priority: CrunchVoicePriority.pelvicCurl,
+        voiceMessage: 'Co gối về ngực và cuộn hông nhấc lên khỏi thảm.',
+      ));
       ctx.resultIssues.addInstruction(
-          'lying', 'Curl', 'Cố gắng nhấc thắt lưng rời khỏi sàn nhé.');
+        'lying',
+        'Curl',
+        'Co gối về ngực trước, cuộn xương chậu lên rồi mới duỗi chân.',
+      );
     }
   }
 
@@ -82,8 +78,7 @@ class PelvicCurlMetric extends ReverseCrunchMetricBase {
     _faults.clear();
     _debugData.clear();
     _minTrunkKneeAngle = 180.0;
-    _minHipY = 9999.0;
-    _baselineHipY = null;
+    _maxHipLift = 0.0;
     _baselineTrunkKneeAngle = null;
   }
 }

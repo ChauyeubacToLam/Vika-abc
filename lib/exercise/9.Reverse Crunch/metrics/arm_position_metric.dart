@@ -28,17 +28,18 @@ class ArmPositionMetric extends ReverseCrunchMetricBase {
         armStraightness?.toStringAsFixed(1) ?? 'N/A';
     _debugData['wristHipRatio'] = wristHipDistance?.toStringAsFixed(2) ?? 'N/A';
 
-    final armsBent = armsVisible &&
+    if (!armsVisible) {
+      ctx.resultIssues.feedback['Arms'] = 'Giữ tay sát hông';
+      return;
+    }
+
+    final armsBent =
         armStraightness < ReverseCrunchConfig.ARM_ELBOW_STRAIGHT_MIN;
-    final armsAway = armsVisible &&
+    final armsAway =
         wristHipDistance > ReverseCrunchConfig.ARM_WRIST_HIP_MAX_RATIO;
 
-    if (_faultDebouncer.update(!armsVisible || armsBent || armsAway)) {
-      final message = !armsVisible
-          ? 'Không thấy rõ tay'
-          : armsBent
-              ? 'Khuỷu tay đang gập'
-              : 'Tay rời xa hông';
+    if (_faultDebouncer.update(armsBent || armsAway)) {
+      final message = armsBent ? 'Khuỷu tay đang gập' : 'Tay rời xa hông';
       ctx.resultIssues.feedback['Arms'] = 'Duỗi thẳng hai tay, khép sát hông.';
       if (!_instructionSet) {
         ctx.resultIssues.addInstruction(

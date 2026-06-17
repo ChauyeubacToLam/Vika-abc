@@ -28,6 +28,7 @@ import '../../interpreter/interpreter_base.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/vf_theme.dart';
 import '../../widgets/exercise/auto_start_countdown.dart';
+import '../../widgets/exercise/looping_asset_video.dart';
 import '../../widgets/exercise/previous_exercise_rating_dialog.dart';
 import 'widgets/metric_diagrams.dart';
 import 'widgets/skeleton_annotation.dart';
@@ -58,6 +59,7 @@ class ExerciseIntroPage extends StatefulWidget {
     required this.coachNote,
     required this.onStart,
     required this.onBack,
+    this.videoAsset,
     this.restSeconds = 45,
     this.subtitle,
     this.posture = SkeletonPosture.standing,
@@ -87,6 +89,7 @@ class ExerciseIntroPage extends StatefulWidget {
 
   /// Anatomical metrics — anchored to body positions.
   final List<SkeletonCallout> callouts;
+  final String? videoAsset;
 
   /// Retained for backward compat. Not rendered in v3 — the page is
   /// for specs, not selling.
@@ -364,6 +367,7 @@ class _ExerciseIntroPageState extends State<ExerciseIntroPage> {
                       difficulty: widget.difficulty,
                       difficultyDots: _difficultyDots,
                       videoDuration: widget.videoDuration,
+                      videoAsset: widget.videoAsset,
                       saved: _saved,
                       sessionProgressLabel: widget.sessionProgressLabel,
                       onBack: widget.onBack,
@@ -624,6 +628,7 @@ class _StageHero extends StatelessWidget {
     required this.videoDuration,
     required this.saved,
     required this.onBack,
+    this.videoAsset,
     this.sessionProgressLabel,
     this.onWatchVideo,
     this.onSaveTap,
@@ -643,6 +648,7 @@ class _StageHero extends StatelessWidget {
   final String difficulty;
   final int difficultyDots;
   final String videoDuration;
+  final String? videoAsset;
   final bool saved;
   final VoidCallback onBack;
   final String? sessionProgressLabel;
@@ -820,6 +826,7 @@ class _StageHero extends StatelessWidget {
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
                       child: _VideoCard(
                         duration: videoDuration,
+                        asset: videoAsset,
                         onTap: onWatchVideo,
                       ),
                     ),
@@ -1057,8 +1064,9 @@ class _DifficultyMeter extends StatelessWidget {
 }
 
 class _VideoCard extends StatefulWidget {
-  const _VideoCard({required this.duration, this.onTap});
+  const _VideoCard({required this.duration, this.asset, this.onTap});
   final String duration;
+  final String? asset;
   final VoidCallback? onTap;
 
   @override
@@ -1112,49 +1120,58 @@ class _VideoCardState extends State<_VideoCard> {
             ),
             child: Stack(
               children: [
-                Positioned(
-                  left: -40,
-                  top: -30,
-                  child: Container(
-                    width: 180,
-                    height: 180,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          c.yellow.withValues(alpha: 0.18),
-                          c.yellow.withValues(alpha: 0),
+                if (widget.asset != null)
+                  Positioned.fill(
+                    child: LoopingAssetVideo(
+                      asset: widget.asset!,
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                else ...[
+                  Positioned(
+                    left: -40,
+                    top: -30,
+                    child: Container(
+                      width: 180,
+                      height: 180,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            c.yellow.withValues(alpha: 0.18),
+                            c.yellow.withValues(alpha: 0),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Center(
+                    child: Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: c.yellow,
+                        boxShadow: [
+                          BoxShadow(
+                            color: c.yellow.withValues(alpha: 0.5),
+                            blurRadius: 22,
+                            offset: const Offset(0, 8),
+                          ),
                         ],
                       ),
-                    ),
-                  ),
-                ),
-                Center(
-                  child: Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: c.yellow,
-                      boxShadow: [
-                        BoxShadow(
-                          color: c.yellow.withValues(alpha: 0.5),
-                          blurRadius: 22,
-                          offset: const Offset(0, 8),
+                      alignment: Alignment.center,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 4),
+                        child: Icon(
+                          Icons.play_arrow_rounded,
+                          size: 32,
+                          color: c.yellowInk,
                         ),
-                      ],
-                    ),
-                    alignment: Alignment.center,
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 4),
-                      child: Icon(
-                        Icons.play_arrow_rounded,
-                        size: 32,
-                        color: c.yellowInk,
                       ),
                     ),
                   ),
-                ),
+                ],
                 Positioned(
                   left: 16,
                   bottom: 14,

@@ -29,8 +29,7 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
       const <VikaImageOrientation>{
-        VikaImageOrientation.landscapeLeft,
-        VikaImageOrientation.landscapeRight,
+        VikaImageOrientation.portrait,
       };
 
   final int maxRep;

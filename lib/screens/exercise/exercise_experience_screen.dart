@@ -762,6 +762,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
           totalSets: _spec.sets,
           repsPerSet: _spec.repsPerSet,
           videoDuration: _spec.videoDuration,
+          videoAsset: widget.definition.videoAsset,
           targetLabel: _spec.targetLabel,
           secondsPerUnit: _spec.secondsPerUnit,
           muscles: _spec.muscles,

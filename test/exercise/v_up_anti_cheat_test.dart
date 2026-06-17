@@ -98,6 +98,21 @@ Map<PoseLandmarkType, PoseLandmark> _strictTopPose() {
   );
 }
 
+Map<PoseLandmarkType, PoseLandmark> _moderateTopPose() {
+  return _vUpPose(
+    shoulderX: 230,
+    shoulderY: 210,
+    wristX: 350,
+    wristY: 205,
+    hipX: 300,
+    hipY: 300,
+    kneeX: 365,
+    kneeY: 255,
+    ankleX: 430,
+    ankleY: 210,
+  );
+}
+
 Map<PoseLandmarkType, PoseLandmark> _sitUpToeTouchPose() {
   return _vUpPose(
     shoulderX: 430,
@@ -211,6 +226,29 @@ void main() {
     final flat = _flatStartPose();
     final rising = _risingPose();
     final top = _strictTopPose();
+
+    _pump(vUp, flat, 0);
+    _pump(vUp, flat, 100);
+    _pump(vUp, flat, 200);
+    _pump(vUp, rising, 400);
+    _pump(vUp, rising, 500);
+    _pump(vUp, top, 900);
+    _pump(vUp, top, 1000);
+    _pump(vUp, rising, 1300);
+    _pump(vUp, rising, 1400);
+    _pump(vUp, flat, 2600);
+    _pump(vUp, flat, 2700);
+
+    expect(vUp.repCount, 1);
+    expect(vUp.logger.repLogs.single.correctForm, isTrue);
+  });
+
+  test('counts a moderate V-up without requiring an extreme toe-touch angle',
+      () {
+    final vUp = _activatedVUp();
+    final flat = _flatStartPose();
+    final rising = _risingPose();
+    final top = _moderateTopPose();
 
     _pump(vUp, flat, 0);
     _pump(vUp, flat, 100);

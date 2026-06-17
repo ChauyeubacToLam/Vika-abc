@@ -1,6 +1,8 @@
 import 'sit_up_metric_base.dart';
 
 class RomMetric extends SitUpMetricBase {
+  static const double minCountableKneeHipShoulder = 130.0;
+
   @override
   String get name => 'ROM';
 
@@ -26,7 +28,8 @@ class RomMetric extends SitUpMetricBase {
 
   // FIX: Bỏ param ctx — hàm chỉ dùng minKneeHipShoulder đã được tích lũy qua update()
   void evaluateRep() {
-    if (minKneeHipShoulder != null && minKneeHipShoulder! > 100.0) {
+    if (minKneeHipShoulder != null &&
+        minKneeHipShoulder! > minCountableKneeHipShoulder) {
       _faults.add(FaultRecord(
         phase: 'REP_COMPLETE',
         type: 'ROM',

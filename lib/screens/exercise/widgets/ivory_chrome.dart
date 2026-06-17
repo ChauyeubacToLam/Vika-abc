@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../../../theme/vf_theme.dart';
+import '../../../widgets/exercise/looping_asset_video.dart';
 import 'ivory_painters.dart';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -229,7 +230,9 @@ class IvoryTopChromeRight extends StatelessWidget {
 // ─── PT Reference Loop (80×108 placeholder) ───
 
 class IvoryPTReferenceLoop extends StatelessWidget {
-  const IvoryPTReferenceLoop({super.key});
+  const IvoryPTReferenceLoop({super.key, this.videoAsset});
+
+  final String? videoAsset;
 
   @override
   Widget build(BuildContext context) {
@@ -240,6 +243,7 @@ class IvoryPTReferenceLoop extends StatelessWidget {
         Container(
           width: 80,
           height: 108,
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             gradient: const LinearGradient(
@@ -258,10 +262,19 @@ class IvoryPTReferenceLoop extends StatelessWidget {
                   offset: const Offset(0, 8)),
             ],
           ),
-          child: Center(
-            child: Icon(Icons.play_circle_outline_rounded,
-                color: VikaIvory.invInkDim, size: 28),
-          ),
+          child: videoAsset == null
+              ? Center(
+                  child: Icon(Icons.play_circle_outline_rounded,
+                      color: VikaIvory.invInkDim, size: 28),
+                )
+              : LoopingAssetVideo(
+                  asset: videoAsset!,
+                  fit: BoxFit.cover,
+                  fallback: Center(
+                    child: Icon(Icons.play_circle_outline_rounded,
+                        color: VikaIvory.invInkDim, size: 28),
+                  ),
+                ),
         ),
         const SizedBox(height: 6),
         Padding(

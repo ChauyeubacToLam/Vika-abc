@@ -83,6 +83,7 @@ class ExerciseDefinition {
   final String cameraHint;
   final String framingHint;
   final List<String> setupTips;
+  final String? videoAsset;
   final ExerciseFactory createExercise;
 
   /// Optional safety warning shown prominently before exercise starts.
@@ -105,6 +106,7 @@ class ExerciseDefinition {
     required this.cameraHint,
     required this.framingHint,
     required this.setupTips,
+    this.videoAsset,
     required this.createExercise,
     this.safetyWarning,
     required this.phaseColors,
@@ -135,6 +137,7 @@ final squatAssessmentDefinition = ExerciseDefinition(
     'Quay nghiêng 90° để AI thấy rõ độ sâu và thân người.',
     'Giữ đủ ánh sáng ở chân và thân trên trước khi bắt đầu.',
   ],
+  videoAsset: 'assets/video/squat.MOV',
   createExercise: ({int? reps, int? seconds}) => Squat(maxRep: reps ?? 5),
   phaseColors: {
     'standing': const Color(0xFF00E676),
@@ -249,6 +252,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Quay nghiêng 90° để AI thấy rõ độ sâu và thân người.',
       'Giữ đủ ánh sáng ở chân và thân trên trước khi bắt đầu.',
     ],
+    videoAsset: 'assets/video/squat.MOV',
     createExercise: ({int? reps, int? seconds}) =>
         _withReps(reps, (target) => Squat(maxRep: target), () => Squat()),
     phaseColors: {
@@ -277,6 +281,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ phần thân trên sáng và không che khuất vai/hông.',
       'Nếu không đủ chỗ, vẫn cố gắng giữ đầu gối và mông trọn khung.',
     ],
+    videoAsset: 'assets/video/plank.MOV',
     createExercise: ({int? reps, int? seconds}) =>
         _withReps(reps, (target) => Plank(maxRep: target), () => Plank()),
     phaseColors: {
@@ -304,6 +309,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Quay nghiêng 90° để AI thấy rõ độ sâu đầu gối.',
       'Giữ đủ ánh sáng ở chân và thân trên trước khi bắt đầu.',
     ],
+    videoAsset: 'assets/video/lunge.MOV',
     createExercise: ({int? reps, int? seconds}) =>
         _withReps(reps, (target) => Lunge(maxRep: target), () => Lunge()),
     phaseColors: {
@@ -332,6 +338,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đầu, cổ tay và mắt cá luôn nhìn thấy rõ.',
       'Chừa khoảng trống phía trên đầu vì tay sẽ vươn cao qua đầu.',
     ],
+    videoAsset: 'assets/video/jumping_jack.MOV',
     createExercise: ({int? reps, int? seconds}) => _withReps(
         reps, (target) => JumpingJack(maxRep: target), () => JumpingJack()),
     phaseColors: {
@@ -470,6 +477,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Quay nghiêng 90° để AI thấy rõ tay và chân duỗi thẳng hàng.',
       'Chống tay và gối xuống sàn, giữ lưng phẳng trước khi bắt đầu.',
     ],
+    videoAsset: 'assets/video/bird dog.MOV',
     createExercise: ({int? reps, int? seconds}) =>
         _withReps(reps, (target) => BirdDog(maxRep: target), () => BirdDog()),
     phaseColors: {

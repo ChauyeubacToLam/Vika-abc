@@ -1829,7 +1829,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
             Positioned(
               top: media.padding.top + 56,
               left: 16,
-              child: const IvoryPTReferenceLoop(),
+              child: IvoryPTReferenceLoop(
+                videoAsset: widget.definition.videoAsset,
+              ),
             ),
 
           // ── Layer 8: Coach caption (center lower-third) ──
