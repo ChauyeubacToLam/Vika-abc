@@ -48,6 +48,56 @@ class PoseGlyph extends StatelessWidget {
   }
 }
 
+class ExerciseThumbnail extends StatelessWidget {
+  const ExerciseThumbnail({
+    super.key,
+    required this.glyph,
+    this.asset,
+    this.yoga = false,
+    this.size = 36,
+    this.radius = 9,
+  });
+
+  final PoseGlyphType glyph;
+  final String? asset;
+  final bool yoga;
+  final double size;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    final assetPath = asset;
+    final cacheSize = (size * MediaQuery.devicePixelRatioOf(context)).round();
+
+    return Container(
+      width: size,
+      height: size,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: assetPath == null ? (yoga ? c.powder : c.bgInverse) : c.bgRaised,
+        borderRadius: BorderRadius.circular(radius),
+      ),
+      alignment: Alignment.center,
+      child: assetPath == null
+          ? PoseGlyph(type: glyph, size: 22, dark: !yoga)
+          : Image.asset(
+              assetPath,
+              fit: BoxFit.cover,
+              alignment: Alignment.center,
+              width: size,
+              height: size,
+              cacheWidth: cacheSize,
+              cacheHeight: cacheSize,
+              filterQuality: FilterQuality.medium,
+              excludeFromSemantics: true,
+              errorBuilder: (_, __, ___) =>
+                  PoseGlyph(type: glyph, size: 22, dark: !yoga),
+            ),
+    );
+  }
+}
+
 class _PoseGlyphPainter extends CustomPainter {
   _PoseGlyphPainter({
     required this.type,

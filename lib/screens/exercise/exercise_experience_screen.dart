@@ -761,7 +761,6 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
           difficulty: widget.definition.difficulty,
           totalSets: _spec.sets,
           repsPerSet: _spec.repsPerSet,
-          videoDuration: _spec.videoDuration,
           videoAsset: widget.definition.videoAsset,
           targetLabel: _spec.targetLabel,
           secondsPerUnit: _spec.secondsPerUnit,
@@ -853,7 +852,6 @@ class _ExerciseExperienceSpec {
   const _ExerciseExperienceSpec({
     required this.sets,
     required this.repsPerSet,
-    required this.videoDuration,
     required this.restSeconds,
     required this.targetLabel,
     required this.secondsPerUnit,
@@ -867,7 +865,6 @@ class _ExerciseExperienceSpec {
 
   final int sets;
   final int repsPerSet;
-  final String videoDuration;
   final int restSeconds;
   final String targetLabel;
   final double secondsPerUnit;
@@ -895,7 +892,6 @@ class _ExerciseExperienceSpec {
         return _ExerciseExperienceSpec(
           sets: 1,
           repsPerSet: 5,
-          videoDuration: '1:18',
           restSeconds: overrideRest ?? 45,
           targetLabel: 'REP/HIỆP',
           secondsPerUnit: 4,
@@ -948,7 +944,6 @@ class _ExerciseExperienceSpec {
           sets: 1,
           repsPerSet: 5,
           restSeconds: overrideRest,
-          videoDuration: '1:12',
           createExercise: (repsPerSet) => WallPushUp(maxRep: repsPerSet),
         );
       case 'warrior_one_assessment':
@@ -957,7 +952,6 @@ class _ExerciseExperienceSpec {
           sets: 1,
           repsPerSet: 1, // một lần giữ để đánh giá
           restSeconds: overrideRest,
-          videoDuration: '1:20',
           createExercise: (repsPerSet) => WarriorOne(maxHolds: repsPerSet),
         );
       case 'seated_forward_fold_assessment':
@@ -966,7 +960,6 @@ class _ExerciseExperienceSpec {
           sets: 1,
           repsPerSet: 30, // giữ 30 giây để đánh giá
           restSeconds: overrideRest,
-          videoDuration: '1:10',
           targetLabel: 'GIÂY/HIỆP',
           secondsPerUnit: 1,
           createExercise: (repsPerSet) =>
@@ -976,7 +969,6 @@ class _ExerciseExperienceSpec {
         return _ExerciseExperienceSpec(
           sets: overrideSets ?? 3,
           repsPerSet: overrideReps ?? catalogReps ?? 8,
-          videoDuration: '2:15',
           restSeconds: overrideRest ?? 45,
           targetLabel: 'REP/HIỆP',
           secondsPerUnit: 4,
@@ -1029,7 +1021,6 @@ class _ExerciseExperienceSpec {
           sets: overrideSets ?? 3,
           repsPerSet: overrideReps ?? catalogReps ?? 8,
           restSeconds: overrideRest,
-          videoDuration: '1:58',
           createExercise: (repsPerSet) => Lunge(maxRep: repsPerSet),
         );
       case 'push_up':
@@ -1038,7 +1029,6 @@ class _ExerciseExperienceSpec {
           sets: overrideSets ?? 3,
           repsPerSet: overrideReps ?? catalogReps ?? 6,
           restSeconds: overrideRest,
-          videoDuration: '1:42',
           createExercise: (repsPerSet) => PushUp(maxRep: repsPerSet),
         );
       case 'plank':
@@ -1047,7 +1037,6 @@ class _ExerciseExperienceSpec {
           sets: overrideSets ?? 3,
           repsPerSet: overrideReps ?? catalogReps ?? 3,
           restSeconds: overrideRest,
-          videoDuration: '1:28',
           createExercise: (repsPerSet) => Plank(maxRep: repsPerSet),
         );
       case 'jumping_jack':
@@ -1056,7 +1045,6 @@ class _ExerciseExperienceSpec {
           sets: overrideSets ?? 3,
           repsPerSet: overrideReps ?? catalogReps ?? 15,
           restSeconds: overrideRest,
-          videoDuration: '1:10',
           createExercise: (repsPerSet) => JumpingJack(maxRep: repsPerSet),
         );
       case 'warrior_one':
@@ -1065,7 +1053,6 @@ class _ExerciseExperienceSpec {
           sets: overrideSets ?? 1,
           repsPerSet: overrideReps ?? catalogReps ?? 2, // 2 lần giữ = 2 bên
           restSeconds: overrideRest,
-          videoDuration: '1:20',
           createExercise: (repsPerSet) => WarriorOne(maxHolds: repsPerSet),
         );
       case 'glute_bridge':
@@ -1074,7 +1061,6 @@ class _ExerciseExperienceSpec {
           sets: overrideSets ?? 3,
           repsPerSet: overrideReps ?? catalogReps ?? 15,
           restSeconds: overrideRest,
-          videoDuration: '1:36',
           createExercise: (repsPerSet) => GluteBridge(maxRep: repsPerSet),
         );
       case 'curl_up':
@@ -1083,7 +1069,6 @@ class _ExerciseExperienceSpec {
           sets: overrideSets ?? 3,
           repsPerSet: overrideReps ?? catalogReps ?? 12,
           restSeconds: overrideRest,
-          videoDuration: '1:34',
           createExercise: (repsPerSet) => CurlUp(maxRep: repsPerSet),
         );
       case 'bird__dog':
@@ -1092,7 +1077,6 @@ class _ExerciseExperienceSpec {
           sets: overrideSets ?? 3,
           repsPerSet: overrideReps ?? 8,
           restSeconds: overrideRest,
-          videoDuration: '1:30',
           createExercise: (repsPerSet) => BirdDog(maxRep: repsPerSet),
         );
       default:
@@ -1106,7 +1090,6 @@ class _ExerciseExperienceSpec {
           sets: overrideSets ?? 3,
           repsPerSet: target ?? 0,
           restSeconds: overrideRest,
-          videoDuration: '1:30',
           targetLabel: isHold ? 'GIÂY/HIỆP' : 'REP/HIỆP',
           secondsPerUnit: isHold ? 1 : 4,
           createExercise: (targetPerSet) => definition.createExercise(
@@ -1122,7 +1105,6 @@ class _ExerciseExperienceSpec {
     int sets = 3,
     required int repsPerSet,
     int? restSeconds,
-    required String videoDuration,
     String targetLabel = 'REP/HIỆP',
     double secondsPerUnit = 4,
     required ExerciseBase Function(int repsPerSet) createExercise,
@@ -1130,7 +1112,6 @@ class _ExerciseExperienceSpec {
     return _ExerciseExperienceSpec(
       sets: sets,
       repsPerSet: repsPerSet,
-      videoDuration: videoDuration,
       restSeconds: restSeconds ?? 45,
       targetLabel: targetLabel,
       secondsPerUnit: secondsPerUnit,
@@ -1181,13 +1162,11 @@ class _ExerciseExperienceSpec {
     required int sets,
     required int repsPerSet,
     int? restSeconds,
-    required String videoDuration,
     required ExerciseBase Function(int repsPerSet) createExercise,
   }) {
     return _ExerciseExperienceSpec(
       sets: sets,
       repsPerSet: repsPerSet,
-      videoDuration: videoDuration,
       restSeconds: restSeconds ?? 45,
       targetLabel: 'REP/HIỆP',
       secondsPerUnit: 4,
@@ -1238,13 +1217,11 @@ class _ExerciseExperienceSpec {
     required int sets,
     required int repsPerSet,
     int? restSeconds,
-    required String videoDuration,
     required ExerciseBase Function(int repsPerSet) createExercise,
   }) {
     return _ExerciseExperienceSpec(
       sets: sets,
       repsPerSet: repsPerSet,
-      videoDuration: videoDuration,
       restSeconds: restSeconds ?? 45,
       targetLabel: 'REP/HIỆP',
       secondsPerUnit: 4,
@@ -1292,13 +1269,11 @@ class _ExerciseExperienceSpec {
     required int sets,
     required int repsPerSet,
     int? restSeconds,
-    required String videoDuration,
     required ExerciseBase Function(int repsPerSet) createExercise,
   }) {
     return _ExerciseExperienceSpec(
       sets: sets,
       repsPerSet: repsPerSet,
-      videoDuration: videoDuration,
       restSeconds: restSeconds ?? PlankConfig.REST_DURATION.round(),
       targetLabel: 'LẦN GIỮ/HIỆP',
       secondsPerUnit: PlankConfig.HOLD_DURATION,
@@ -1346,13 +1321,11 @@ class _ExerciseExperienceSpec {
     required int sets,
     required int repsPerSet,
     int? restSeconds,
-    required String videoDuration,
     required ExerciseBase Function(int repsPerSet) createExercise,
   }) {
     return _ExerciseExperienceSpec(
       sets: sets,
       repsPerSet: repsPerSet,
-      videoDuration: videoDuration,
       restSeconds: restSeconds ?? 35,
       targetLabel: 'REP/HIỆP',
       secondsPerUnit: 1.2,
@@ -1400,13 +1373,11 @@ class _ExerciseExperienceSpec {
     required int sets,
     required int repsPerSet,
     int? restSeconds,
-    required String videoDuration,
     required ExerciseBase Function(int repsPerSet) createExercise,
   }) {
     return _ExerciseExperienceSpec(
       sets: sets,
       repsPerSet: repsPerSet,
-      videoDuration: videoDuration,
       restSeconds: restSeconds ?? 45,
       targetLabel: 'REP/HIỆP',
       secondsPerUnit: 4,
@@ -1456,13 +1427,11 @@ class _ExerciseExperienceSpec {
     required int sets,
     required int repsPerSet,
     int? restSeconds,
-    required String videoDuration,
     required ExerciseBase Function(int repsPerSet) createExercise,
   }) {
     return _ExerciseExperienceSpec(
       sets: sets,
       repsPerSet: repsPerSet,
-      videoDuration: videoDuration,
       restSeconds: restSeconds ?? 45,
       targetLabel: 'REP/HIỆP',
       secondsPerUnit: 4,

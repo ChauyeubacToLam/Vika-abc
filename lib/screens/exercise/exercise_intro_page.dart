@@ -51,7 +51,6 @@ class ExerciseIntroPage extends StatefulWidget {
     required this.difficulty,
     required this.totalSets,
     required this.repsPerSet,
-    required this.videoDuration,
     required this.muscles,
     required this.tips,
     required this.badges,
@@ -80,7 +79,6 @@ class ExerciseIntroPage extends StatefulWidget {
   final String difficulty;
   final int totalSets;
   final int repsPerSet;
-  final String videoDuration;
   final List<String> muscles;
   final List<String> tips;
 
@@ -366,7 +364,6 @@ class _ExerciseIntroPageState extends State<ExerciseIntroPage> {
                       muscles: widget.muscles,
                       difficulty: widget.difficulty,
                       difficultyDots: _difficultyDots,
-                      videoDuration: widget.videoDuration,
                       videoAsset: widget.videoAsset,
                       saved: _saved,
                       sessionProgressLabel: widget.sessionProgressLabel,
@@ -625,7 +622,6 @@ class _StageHero extends StatelessWidget {
     required this.muscles,
     required this.difficulty,
     required this.difficultyDots,
-    required this.videoDuration,
     required this.saved,
     required this.onBack,
     this.videoAsset,
@@ -647,7 +643,6 @@ class _StageHero extends StatelessWidget {
   final List<String> muscles;
   final String difficulty;
   final int difficultyDots;
-  final String videoDuration;
   final String? videoAsset;
   final bool saved;
   final VoidCallback onBack;
@@ -825,7 +820,6 @@ class _StageHero extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
                       child: _VideoCard(
-                        duration: videoDuration,
                         asset: videoAsset,
                         onTap: onWatchVideo,
                       ),
@@ -1064,8 +1058,7 @@ class _DifficultyMeter extends StatelessWidget {
 }
 
 class _VideoCard extends StatefulWidget {
-  const _VideoCard({required this.duration, this.asset, this.onTap});
-  final String duration;
+  const _VideoCard({this.asset, this.onTap});
   final String? asset;
   final VoidCallback? onTap;
 
@@ -1124,7 +1117,7 @@ class _VideoCardState extends State<_VideoCard> {
                   Positioned.fill(
                     child: LoopingAssetVideo(
                       asset: widget.asset!,
-                      fit: BoxFit.cover,
+                      fit: BoxFit.contain,
                     ),
                   )
                 else ...[
@@ -1197,30 +1190,6 @@ class _VideoCardState extends State<_VideoCard> {
                         ),
                       ),
                     ],
-                  ),
-                ),
-                Positioned(
-                  right: 12,
-                  bottom: 12,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: c.ink.withValues(alpha: 0.72),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      widget.duration,
-                      style: TextStyle(
-                        fontFamily: 'BeVietnamPro',
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        fontStyle: FontStyle.italic,
-                        letterSpacing: -0.2,
-                        color: c.invInk,
-                        fontFeatures: VikaIvoryMain.tabularFigures,
-                      ),
-                    ),
                   ),
                 ),
               ],

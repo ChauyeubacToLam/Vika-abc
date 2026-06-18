@@ -34,17 +34,21 @@ class ClimberConfig {
   // --- Peak detection ---
   /// Khi dist_chuẩn_hóa < ngưỡng này → coi là gối đã vào zone (co đủ sâu).
   /// Được hiệu chỉnh lại trong Setup: = restDist * ZONE_RATIO
-  static const double ZONE_RATIO = 0.60;
-  static const double ZONE_RATIO_DEFAULT = 0.50; // fallback nếu chưa calibrate
+  static const double ZONE_RATIO = 0.72;
+  static const double ZONE_RATIO_DEFAULT = 1.15; // fallback nếu chưa calibrate
 
   /// Hysteresis: phải ra ngoài (threshold + margin) mới tính exit
-  static const double ZONE_HYSTERESIS = 0.08;
+  static const double ZONE_HYSTERESIS = 0.12;
 
   /// Cooldown tối thiểu giữa 2 rep liên tiếp (ms). 250 ms = tối đa 4 rep/s
-  static const int REP_COOLDOWN_MS = 250;
+  static const int REP_COOLDOWN_MS = 180;
 
   /// EMA smoothing factor cho knee distance (0 < α ≤ 1, nhỏ = mượt hơn)
-  static const double EMA_ALPHA = 0.35;
+  static const double EMA_ALPHA = 0.62;
+  static const double KNEE_FLEXION_ENTER_ANGLE = 138.0;
+  static const double KNEE_EXTENSION_EXIT_ANGLE = 150.0;
+  static const double GOOD_ROM_RATIO_OF_COUNT_ZONE = 0.88;
+  static const int DOUBLE_KNEE_REQUIRED_FRAMES = 3;
 }
 
 class ClimberVoicePriority {
@@ -72,8 +76,10 @@ class RepContext {
   final double hipX;
 
   // Cả 2 đầu gối để track độc lập
-  final double leftKneeX;
-  final double rightKneeX;
+  final double leftKneeDistNorm;
+  final double rightKneeDistNorm;
+  final double leftKneeAngle;
+  final double rightKneeAngle;
 
   final ResultIssues resultIssues;
 
@@ -86,8 +92,10 @@ class RepContext {
     required this.hipY,
     required this.shoulderX,
     required this.hipX,
-    required this.leftKneeX,
-    required this.rightKneeX,
+    required this.leftKneeDistNorm,
+    required this.rightKneeDistNorm,
+    required this.leftKneeAngle,
+    required this.rightKneeAngle,
     required this.resultIssues,
   });
 }
@@ -108,55 +116,79 @@ class KneePeakRepCounter {
 
   // --- Internal state ---
   double _smoothedDist = 1.0; // EMA-filtered distance
+  double _rawDist = 1.0;
+  double _kneeAngle = 180.0;
   bool _isInZone = false;
   int _lastRepTimeMs = 0;
   double _minDistInZone = 1.0; // Gần nhất trong lần co hiện tại
+  double _minAngleInZone = 180.0;
   double? _lastCompletedPeakDist;
+  double? _lastCompletedPeakAngle;
 
   // --- Debug ---
   double get smoothedDist => _smoothedDist;
+  double get rawDist => _rawDist;
+  double get kneeAngle => _kneeAngle;
   double get minDistInZone => _minDistInZone;
+  double get minAngleInZone => _minAngleInZone;
   double? get lastCompletedPeakDist => _lastCompletedPeakDist;
+  double? get lastCompletedPeakAngle => _lastCompletedPeakAngle;
   bool get isInZone => _isInZone;
+  bool get isDeepTuck =>
+      _isInZone &&
+      (_rawDist <= zoneThreshold * ClimberConfig.GOOD_ROM_RATIO_OF_COUNT_ZONE ||
+          _kneeAngle <= ClimberConfig.KNEE_FLEXION_ENTER_ANGLE - 18.0);
 
   /// Gọi mỗi frame. Trả về số rep được tính trong frame này (0 hoặc 1).
   int update({
-    required double kneeX,
-    required double shoulderX,
-    required double scaleFactor,
+    required double kneeShoulderDistNorm,
+    required double kneeAngle,
     required int nowMs,
   }) {
-    // 1. Tính raw dist chuẩn hóa
-    final double scale = scaleFactor == 0 ? 1.0 : scaleFactor;
-    final double rawDist = (kneeX - shoulderX).abs() / scale;
+    _rawDist = kneeShoulderDistNorm.isFinite ? kneeShoulderDistNorm : _rawDist;
+    _kneeAngle = kneeAngle.isFinite ? kneeAngle : _kneeAngle;
 
-    // 2. EMA smoothing — giảm nhiễu landmark
-    _smoothedDist = ClimberConfig.EMA_ALPHA * rawDist +
+    // 1. EMA smoothing: quick enough for fast reps, still dampens jitter.
+    _smoothedDist = ClimberConfig.EMA_ALPHA * _rawDist +
         (1.0 - ClimberConfig.EMA_ALPHA) * _smoothedDist;
 
-    // 3. Vào zone
-    if (!_isInZone && _smoothedDist < zoneThreshold) {
+    final bool enterZone = _rawDist <= zoneThreshold ||
+        _smoothedDist <= zoneThreshold ||
+        _kneeAngle <= ClimberConfig.KNEE_FLEXION_ENTER_ANGLE;
+    final bool exitZone =
+        (_rawDist >= zoneThreshold + ClimberConfig.ZONE_HYSTERESIS &&
+                _smoothedDist >= zoneThreshold) ||
+            (_kneeAngle >= ClimberConfig.KNEE_EXTENSION_EXIT_ANGLE &&
+                _rawDist >= zoneThreshold);
+
+    // 2. Vào zone
+    if (!_isInZone && enterZone) {
       _isInZone = true;
       _minDistInZone = _smoothedDist;
+      _minAngleInZone = _kneeAngle;
     }
 
-    // 4. Đang trong zone → track điểm gần nhất
+    // 3. Đang trong zone → track điểm gần nhất
     if (_isInZone) {
       if (_smoothedDist < _minDistInZone) _minDistInZone = _smoothedDist;
+      if (_rawDist < _minDistInZone) _minDistInZone = _rawDist;
+      if (_kneeAngle < _minAngleInZone) _minAngleInZone = _kneeAngle;
     }
 
-    // 5. Ra khỏi zone (hysteresis) → đếm rep
-    if (_isInZone &&
-        _smoothedDist > zoneThreshold + ClimberConfig.ZONE_HYSTERESIS) {
+    // 4. Ra khỏi zone (hysteresis) → đếm rep
+    if (_isInZone && exitZone) {
       _isInZone = false;
       final int elapsed = nowMs - _lastRepTimeMs;
       if (elapsed >= ClimberConfig.REP_COOLDOWN_MS) {
         _lastRepTimeMs = nowMs;
         _lastCompletedPeakDist = _minDistInZone;
+        _lastCompletedPeakAngle = _minAngleInZone;
         _minDistInZone = 1.0;
+        _minAngleInZone = 180.0;
         return 1;
       }
       _minDistInZone = 1.0;
+      _minAngleInZone = 180.0;
     }
 
     return 0;
@@ -164,14 +196,21 @@ class KneePeakRepCounter {
 
   /// Hiệu chỉnh ngưỡng zone dựa trên khoảng cách nghỉ thực tế của người dùng.
   void calibrate(double restDistNormalized) {
+    if (!restDistNormalized.isFinite || restDistNormalized <= 0) return;
     zoneThreshold = restDistNormalized * ClimberConfig.ZONE_RATIO;
+    _smoothedDist = restDistNormalized;
+    _rawDist = restDistNormalized;
   }
 
   void reset() {
     _smoothedDist = 1.0;
+    _rawDist = 1.0;
+    _kneeAngle = 180.0;
     _isInZone = false;
     _minDistInZone = 1.0;
+    _minAngleInZone = 180.0;
     _lastCompletedPeakDist = null;
+    _lastCompletedPeakAngle = null;
     // _lastRepTimeMs giữ nguyên để cooldown vẫn hoạt động xuyên rep
   }
 }

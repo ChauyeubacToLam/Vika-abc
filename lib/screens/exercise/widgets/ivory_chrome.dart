@@ -270,6 +270,7 @@ class IvoryPTReferenceLoop extends StatelessWidget {
               : LoopingAssetVideo(
                   asset: videoAsset!,
                   fit: BoxFit.cover,
+                  alignment: Alignment.center,
                   fallback: Center(
                     child: Icon(Icons.play_circle_outline_rounded,
                         color: VikaIvory.invInkDim, size: 28),

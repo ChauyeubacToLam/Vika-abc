@@ -112,6 +112,7 @@ class AllExerciseRowMock {
   final bool ai;
   final bool yoga;
   final String? definitionName;
+  String? get thumbnailAsset => libraryExerciseThumbnailAssets[definitionName];
 
   /// Group label used by the grouped catalog. e.g. 'CHÂN · MÔNG',
   /// 'CỐT LÕI', 'YOGA'. Curators can mint new groups freely — the
@@ -129,6 +130,21 @@ const List<String> libraryCatalogGroupOrder = [
   'CARDIO',
   'YOGA',
 ];
+
+const Map<String, String> libraryExerciseThumbnailAssets = {
+  'squat': 'assets/habt/squat.png',
+  'lunge': 'assets/habt/lunge.png',
+  'glute_bridge': 'assets/habt/glute_bridge.png',
+  'walking_lunge': 'assets/habt/walking_lunge.png',
+  'cossack_squat': 'assets/habt/cossack_squat.png',
+  'jump_squat': 'assets/habt/jump_squat.png',
+  'bird_dog': 'assets/habt/bird_ dog.png',
+  'dead_bug': 'assets/habt/dead_bug.png',
+  'mcgill_curlup': 'assets/habt/mcgill_curlup.png',
+  'plank': 'assets/habt/plank.png',
+  'high_plank': 'assets/habt/high_plank.png',
+  'bear_plank': 'assets/habt/bear_plank.png',
+};
 
 const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(

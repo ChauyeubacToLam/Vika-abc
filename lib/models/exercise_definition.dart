@@ -166,6 +166,7 @@ final wallPushupAssessmentDefinition = ExerciseDefinition(
     'Quay nghiêng 90° để AI thấy rõ độ sâu và thân người.',
     'Giữ đủ ánh sáng ở chân và thân trên trước khi bắt đầu.',
   ],
+  videoAsset: 'assets/video/wall_pushup.MOV',
   createExercise: ({int? reps, int? seconds}) => WallPushUp(maxRep: reps ?? 5),
   phaseColors: {
     'standing': const Color(0xFF00E676),
@@ -196,6 +197,7 @@ final warriorOneAssessmentDefinition = ExerciseDefinition(
   ],
   safetyWarning:
       'Giữ thân người thẳng, không gập lưng quá mức. Dừng lại nếu thấy đau lưng dưới hoặc đầu gối.',
+  videoAsset: 'assets/video/warior_I.MOV',
   createExercise: ({int? reps, int? seconds}) =>
       WarriorOne(maxHolds: reps ?? 1),
   phaseColors: {
@@ -365,6 +367,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ thân trên và khuỷu tay đủ sáng trước khi bắt đầu.',
       'Lùi camera thêm nếu cổ tay hoặc đầu dễ bị cắt khung.',
     ],
+    videoAsset: 'assets/video/push_up.MOV',
     createExercise: ({int? reps, int? seconds}) =>
         _withReps(reps, (target) => PushUp(maxRep: target), () => PushUp()),
     phaseColors: {
@@ -393,6 +396,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Quay nghiêng 90° để AI thấy rõ chuyển động hông.',
       'Đảm bảo đủ ánh sáng dọc theo thân người trước khi bắt đầu.',
     ],
+    videoAsset: 'assets/video/glute_bridge.MOV',
     createExercise: ({int? reps, int? seconds}) => _withReps(
         reps, (target) => GluteBridge(maxRep: target), () => GluteBridge()),
     phaseColors: {
@@ -421,6 +425,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giu dau, vai va dau goi du sang truoc khi bat dau.',
       'Nam ngang tren san, gap mot dau goi theo dung tu the McGill.',
     ],
+    videoAsset: 'assets/video/curl_up.MOV',
     createExercise: ({int? reps, int? seconds}) =>
         _withReps(reps, (target) => CurlUp(maxRep: target), () => CurlUp()),
     phaseColors: {
@@ -450,6 +455,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
     ],
     safetyWarning:
         'Giữ thân người thẳng, không gập lưng quá mức. Dừng lại nếu thấy đau lưng dưới hoặc đầu gối.',
+    videoAsset: 'assets/video/warior_I.MOV',
     createExercise: ({int? reps, int? seconds}) => _withReps(
         reps, (target) => WarriorOne(maxHolds: target), () => WarriorOne()),
     phaseColors: {
@@ -477,7 +483,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Quay nghiêng 90° để AI thấy rõ tay và chân duỗi thẳng hàng.',
       'Chống tay và gối xuống sàn, giữ lưng phẳng trước khi bắt đầu.',
     ],
-    videoAsset: 'assets/video/bird dog.MOV',
+    videoAsset: 'assets/video/bird_dog.MOV',
     createExercise: ({int? reps, int? seconds}) =>
         _withReps(reps, (target) => BirdDog(maxRep: target), () => BirdDog()),
     phaseColors: {
@@ -534,6 +540,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Quay nghiêng 90° để AI thấy rõ tay và chân duỗi ra.',
       'Nằm ngửa, tay vươn lên và gối gập vuông trước khi bắt đầu.',
     ],
+    videoAsset: 'assets/video/dead_bug.MOV',
     createExercise: ({int? reps, int? seconds}) =>
         _withReps(reps, (target) => DeadBug(maxRep: target), () => DeadBug()),
     phaseColors: {
@@ -564,6 +571,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
     ],
     safetyWarning:
         'Dồn lực đều lên bàn tay, giữ cổ tay thẳng. Dừng lại nếu cổ tay đau.',
+    videoAsset: 'assets/video/plank_up_down.MOV',
     createExercise: ({int? reps, int? seconds}) => _withReps(
         reps, (target) => PlankUpDown(maxRep: target), () => PlankUpDown()),
     phaseColors: {
@@ -594,6 +602,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
     ],
     safetyWarning:
         'Dồn lực đều lên bàn tay, giữ cổ tay thẳng. Dừng lại nếu cổ tay đau.',
+    videoAsset: 'assets/video/bear_plank.MOV',
     createExercise: ({int? reps, int? seconds}) => _withSeconds(
         seconds, (target) => BearPlank(maxSeconds: target), () => BearPlank()),
     phaseColors: {
@@ -621,6 +630,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Quay nghiêng 90° để AI thấy rõ góc gập thân.',
       'Nằm ngửa, gập gối và đặt bàn chân chạm sàn trước khi bắt đầu.',
     ],
+    videoAsset: 'assets/video/sit_up.MOV',
     createExercise: ({int? reps, int? seconds}) =>
         _withReps(reps, (target) => SitUp(maxRep: target), () => SitUp()),
     phaseColors: {
@@ -651,6 +661,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
     ],
     safetyWarning:
         'Dồn lực đều lên bàn tay, giữ cổ tay thẳng. Dừng lại nếu cổ tay đau.',
+    videoAsset: 'assets/video/high_plank.MOV',
     createExercise: ({int? reps, int? seconds}) => _withSeconds(
         seconds, (target) => HighPlank(maxSeconds: target), () => HighPlank()),
     phaseColors: {
@@ -680,6 +691,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
     ],
     safetyWarning:
         'Dồn lực đều lên bàn tay, giữ cổ tay thẳng. Dừng lại nếu cổ tay đau.',
+    videoAsset: 'assets/video/moutain_climber.MOV',
     createExercise: ({int? reps, int? seconds}) => _withReps(reps,
         (target) => MountainClimber(maxRep: target), () => MountainClimber()),
     phaseColors: {
@@ -709,6 +721,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
     ],
     safetyWarning:
         'Nâng người vừa sức, không ưỡn lưng quá mức. Dừng lại nếu thấy đau lưng dưới hoặc cổ.',
+    videoAsset: 'assets/video/superman.MOV',
     createExercise: ({int? reps, int? seconds}) =>
         _withReps(reps, (target) => Superman(maxRep: target), () => Superman()),
     phaseColors: {
@@ -739,6 +752,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
     ],
     safetyWarning:
         'Dồn lực đều lên bàn tay, giữ cổ tay thẳng. Dừng lại nếu cổ tay đau.',
+    videoAsset: 'assets/video/plank_shoulder_tap.MOV',
     createExercise: ({int? reps, int? seconds}) => _withReps(reps,
         (target) => PlankShoulderTap(maxRep: target), () => PlankShoulderTap()),
     phaseColors: {
@@ -767,6 +781,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Quay nghiêng 90° để AI thấy rõ chân nâng lên và hạ xuống.',
       'Nằm ngửa, duỗi thẳng hai chân và ép lưng sát sàn trước khi bắt đầu.',
     ],
+    videoAsset: 'assets/video/leg_raises.MOV',
     createExercise: ({int? reps, int? seconds}) =>
         _withReps(reps, (target) => LegRaise(maxRep: target), () => LegRaise()),
     phaseColors: {
@@ -795,6 +810,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Quay nghiêng 90° để AI thấy rõ hông cuộn lên.',
       'Nằm ngửa, gập gối và nâng nhẹ chân trước khi bắt đầu.',
     ],
+    videoAsset: 'assets/video/reverse_crunch.MOV',
     createExercise: ({int? reps, int? seconds}) => _withReps(
         reps, (target) => ReverseCrunch(maxRep: target), () => ReverseCrunch()),
     phaseColors: {
@@ -880,6 +896,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
     ],
     safetyWarning:
         'Nâng ngực vừa sức, đừng ép lưng dưới quá mức. Dừng lại nếu thấy đau lưng hoặc cổ.',
+    videoAsset: 'assets/video/cobra.MOV',
     createExercise: ({int? reps, int? seconds}) =>
         _withReps(reps, (target) => Cobra(maxRep: target), () => Cobra()),
     phaseColors: {
@@ -903,6 +920,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
       'Bắt đầu khi sẵn sàng.'
     ],
+    videoAsset: 'assets/video/cossack_squat.MOV',
     createExercise: ({int? reps, int? seconds}) => _withReps(
         reps, (target) => CossackSquat(maxRep: target), () => CossackSquat()),
     phaseColors: {
@@ -926,6 +944,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
       'Bắt đầu khi sẵn sàng.'
     ],
+    videoAsset: 'assets/video/jump_squat.MOV',
     createExercise: ({int? reps, int? seconds}) => _withReps(
         reps, (target) => JumpSquat(maxRep: target), () => JumpSquat()),
     phaseColors: {
@@ -1002,6 +1021,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
       'Bắt đầu khi sẵn sàng.'
     ],
+    videoAsset: 'assets/video/side_plank.MOV',
     createExercise: ({int? reps, int? seconds}) => _withReps(
         reps, (target) => SidePlankDip(maxRep: target), () => SidePlankDip()),
     phaseColors: {
@@ -1029,6 +1049,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
     ],
     safetyWarning:
         'Giữ cẳng tay đỡ lực — đừng duỗi thẳng tay thành Cobra. Dừng nếu đau lưng dưới.',
+    videoAsset: 'assets/video/sphinx_pose.MOV',
     createExercise: ({int? reps, int? seconds}) => _withSeconds(seconds,
         (target) => SphinxStretch(maxSeconds: target), () => SphinxStretch()),
     phaseColors: {
@@ -1052,6 +1073,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
       'Bắt đầu khi sẵn sàng.'
     ],
+    videoAsset: 'assets/video/standing_knee_to_elbow.MOV',
     createExercise: ({int? reps, int? seconds}) => _withReps(
         reps,
         (target) => StandingKneeToElbow(maxRep: target),
@@ -1077,6 +1099,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
       'Bắt đầu khi sẵn sàng.'
     ],
+    videoAsset: 'assets/video/step_back_burpee.MOV',
     createExercise: ({int? reps, int? seconds}) => _withReps(reps,
         (target) => StepBackBurpee(maxRep: target), () => StepBackBurpee()),
     phaseColors: {
@@ -1100,6 +1123,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
       'Bắt đầu khi sẵn sàng.'
     ],
+    videoAsset: 'assets/video/trace_dip.MOV',
     createExercise: ({int? reps, int? seconds}) => _withReps(
         reps, (target) => TricepDip(maxRep: target), () => TricepDip()),
     phaseColors: {
@@ -1123,6 +1147,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
       'Bắt đầu khi sẵn sàng.'
     ],
+    videoAsset: 'assets/video/walking lunge.MOV',
     createExercise: ({int? reps, int? seconds}) => _withReps(
         reps, (target) => WalkingLunge(maxRep: target), () => WalkingLunge()),
     phaseColors: {
@@ -1171,6 +1196,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
       'Bắt đầu khi sẵn sàng.'
     ],
+    videoAsset: 'assets/video/wall_pushup.MOV',
     createExercise: ({int? reps, int? seconds}) => _withReps(
         reps, (target) => WallPushUp(maxRep: target), () => WallPushUp()),
     phaseColors: {

@@ -1,5 +1,6 @@
 // ignore_for_file: curly_braces_in_flow_control_structures
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:vika/pose/vika_pose_landmark.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/exercise_logger.dart';
 import '../exercise_base.dart';
@@ -9,6 +10,9 @@ import 'metrics/knee_drive_rom_metric.dart';
 
 class MountainClimber extends ExerciseBase {
   MountainClimber({this.maxRep = ClimberConfig.MAX_REP});
+
+  static const double _movingLegPresenceMin = 0.25;
+  static const double _movingLegVisibilityMin = 0.05;
 
   // ---------------------------------------------------------------------------
   // Config
@@ -68,7 +72,7 @@ class MountainClimber extends ExerciseBase {
   int? _exerciseStartTimeMs;
   bool _isTimeout = false;
   int _doubleKneeRejects = 0;
-  bool _doubleKneeActive = false;
+  int _doubleKneeFrames = 0;
 
   // ---------------------------------------------------------------------------
   // Safety check
@@ -101,10 +105,23 @@ class MountainClimber extends ExerciseBase {
       midPoint: lm.elbow,
       lastPoint: lm.wrist,
     );
-    final leftKneeDist = (lm.leftKnee.x - lm.shoulder.x).abs() / scaleFactor;
-    final rightKneeDist = (lm.rightKnee.x - lm.shoulder.x).abs() / scaleFactor;
+    final double scale = calculateDistance(lm.shoulder, lm.hip);
+    if (!scale.isFinite || scale <= 1e-6) return false;
+
+    final leftKneeDist = calculateDistance(lm.leftKnee, lm.shoulder) / scale;
+    final rightKneeDist = calculateDistance(lm.rightKnee, lm.shoulder) / scale;
     final supportAnkle =
         leftKneeDist > rightKneeDist ? lm.leftAnkle : lm.rightAnkle;
+    final leftKneeAngle = calculateAngleNormalized(
+      firstPoint: lm.leftHip,
+      midPoint: lm.leftKnee,
+      lastPoint: lm.leftAnkle,
+    );
+    final rightKneeAngle = calculateAngleNormalized(
+      firstPoint: lm.rightHip,
+      midPoint: lm.rightKnee,
+      lastPoint: lm.rightAnkle,
+    );
 
     final double trunkAngle = calculateAngleNormalized(
       firstPoint: lm.shoulder,
@@ -118,6 +135,8 @@ class MountainClimber extends ExerciseBase {
       'armOk': armAngle > ClimberConfig.ARM_STRAIGHT_THRESHOLD,
       'trunkOk': trunkAngle >= ClimberConfig.TRUNK_STRAIGHT_RANGE[0] &&
           trunkAngle <= ClimberConfig.TRUNK_STRAIGHT_RANGE[1],
+      'leftKneeAngle': leftKneeAngle.toStringAsFixed(1),
+      'rightKneeAngle': rightKneeAngle.toStringAsFixed(1),
     };
 
     if (armAngle <= ClimberConfig.ARM_STRAIGHT_THRESHOLD) return false;
@@ -125,14 +144,10 @@ class MountainClimber extends ExerciseBase {
         trunkAngle > ClimberConfig.TRUNK_STRAIGHT_RANGE[1]) return false;
 
     // --- Calibrate ngưỡng zone theo tư thế thực tế của người dùng ---
-    final double scale = calculateDistance(lm.shoulder, lm.hip);
     if (scale > 0) {
-      final double distL = (lm.leftKnee.x - lm.shoulder.x).abs() / scale;
-      final double distR = (lm.rightKnee.x - lm.shoulder.x).abs() / scale;
-
       // Lấy trung bình 3 frame để ổn định (đơn giản: gán thẳng khi form đạt)
-      _leftCounter.calibrate(distL);
-      _rightCounter.calibrate(distR);
+      _leftCounter.calibrate(leftKneeDist);
+      _rightCounter.calibrate(rightKneeDist);
 
       debugData['Setup']['calibratedThresholdL'] =
           _leftCounter.zoneThreshold.toStringAsFixed(2);
@@ -183,6 +198,20 @@ class MountainClimber extends ExerciseBase {
       midPoint: lm.hip,
       lastPoint: lm.ankle,
     );
+    final leftKneeDistNorm =
+        calculateDistance(lm.leftKnee, lm.shoulder) / scaleFactor;
+    final rightKneeDistNorm =
+        calculateDistance(lm.rightKnee, lm.shoulder) / scaleFactor;
+    final leftKneeAngle = calculateAngleNormalized(
+      firstPoint: lm.leftHip,
+      midPoint: lm.leftKnee,
+      lastPoint: lm.leftAnkle,
+    );
+    final rightKneeAngle = calculateAngleNormalized(
+      firstPoint: lm.rightHip,
+      midPoint: lm.rightKnee,
+      lastPoint: lm.rightAnkle,
+    );
 
     // --- Build context ---
     final ctx = RepContext(
@@ -194,8 +223,10 @@ class MountainClimber extends ExerciseBase {
       hipY: lm.hip.y,
       shoulderX: lm.shoulder.x,
       hipX: lm.hip.x,
-      leftKneeX: lm.leftKnee.x,
-      rightKneeX: lm.rightKnee.x,
+      leftKneeDistNorm: leftKneeDistNorm,
+      rightKneeDistNorm: rightKneeDistNorm,
+      leftKneeAngle: leftKneeAngle,
+      rightKneeAngle: rightKneeAngle,
       resultIssues: resultIssues,
     );
 
@@ -209,25 +240,23 @@ class MountainClimber extends ExerciseBase {
 
     // --- Peak counter trái ---
     final int leftRep = _leftCounter.update(
-      kneeX: lm.leftKnee.x,
-      shoulderX: lm.shoulder.x,
-      scaleFactor: scaleFactor,
+      kneeShoulderDistNorm: leftKneeDistNorm,
+      kneeAngle: leftKneeAngle,
       nowMs: now,
     );
 
     // --- Peak counter phải ---
     final int rightRep = _rightCounter.update(
-      kneeX: lm.rightKnee.x,
-      shoulderX: lm.shoulder.x,
-      scaleFactor: scaleFactor,
+      kneeShoulderDistNorm: rightKneeDistNorm,
+      kneeAngle: rightKneeAngle,
       nowMs: now,
     );
-    final bothKneesInZone = _leftCounter.isInZone && _rightCounter.isInZone;
-    _doubleKneeActive = _doubleKneeActive || bothKneesInZone;
+    final bothKneesDeep = _leftCounter.isDeepTuck && _rightCounter.isDeepTuck;
+    _doubleKneeFrames = bothKneesDeep ? _doubleKneeFrames + 1 : 0;
     final rejectsDoubleKneeRep =
-        _doubleKneeActive && (leftRep > 0 || rightRep > 0 || bothKneesInZone);
+        _doubleKneeFrames >= ClimberConfig.DOUBLE_KNEE_REQUIRED_FRAMES;
 
-    if ((leftRep > 0 && rightRep > 0) || rejectsDoubleKneeRep) {
+    if (rejectsDoubleKneeRep) {
       _doubleKneeRejects++;
       resultIssues.feedback['Result'] = 'Không tính rep';
       resultIssues.feedback['ROM'] = 'Luân phiên từng gối';
@@ -237,7 +266,16 @@ class MountainClimber extends ExerciseBase {
       romMetric.reset();
       _leftCounter.reset();
       _rightCounter.reset();
-      _doubleKneeActive = false;
+      _doubleKneeFrames = 0;
+    } else if (leftRep > 0 && rightRep > 0) {
+      final leftPeak =
+          _leftCounter.lastCompletedPeakDist ?? _leftCounter.minDistInZone;
+      final rightPeak =
+          _rightCounter.lastCompletedPeakDist ?? _rightCounter.minDistInZone;
+      _onRepCompleted(
+        ctx,
+        leftPeak <= rightPeak ? KneeSide.left : KneeSide.right,
+      );
     } else if (leftRep > 0) {
       _onRepCompleted(ctx, KneeSide.left);
     } else if (rightRep > 0) {
@@ -256,9 +294,13 @@ class MountainClimber extends ExerciseBase {
       'trunkAngle': trunkAngle.toStringAsFixed(1),
       'L_dist': _leftCounter.smoothedDist.toStringAsFixed(2),
       'R_dist': _rightCounter.smoothedDist.toStringAsFixed(2),
+      'L_rawDist': _leftCounter.rawDist.toStringAsFixed(2),
+      'R_rawDist': _rightCounter.rawDist.toStringAsFixed(2),
+      'L_kneeAngle': leftKneeAngle.toStringAsFixed(1),
+      'R_kneeAngle': rightKneeAngle.toStringAsFixed(1),
       'L_inZone': _leftCounter.isInZone,
       'R_inZone': _rightCounter.isInZone,
-      'doubleKneeActive': _doubleKneeActive,
+      'doubleKneeFrames': _doubleKneeFrames,
       'L_threshold': _leftCounter.zoneThreshold.toStringAsFixed(2),
       'R_threshold': _rightCounter.zoneThreshold.toStringAsFixed(2),
       'scaleFactor': scaleFactor.toStringAsFixed(1),
@@ -278,6 +320,9 @@ class MountainClimber extends ExerciseBase {
     final double threshold = side == KneeSide.left
         ? _leftCounter.zoneThreshold
         : _rightCounter.zoneThreshold;
+    final double? peakAngle = side == KneeSide.left
+        ? _leftCounter.lastCompletedPeakAngle
+        : _rightCounter.lastCompletedPeakAngle;
 
     romMetric.evaluateRepEnd(ctx, side, peakDist, threshold);
 
@@ -295,6 +340,7 @@ class MountainClimber extends ExerciseBase {
       data: {
         'side': side.name,
         'peak_dist': peakDist,
+        'peak_knee_angle': peakAngle,
         'zone_threshold': threshold,
         'fault_types': allFaults.map((f) => f.type).toSet().toList(),
       },
@@ -310,13 +356,9 @@ class MountainClimber extends ExerciseBase {
     if (anyInZone) {
       // Đơn giản: nếu đang trong zone thì hiển thị knee_driving_in hoặc max_flexion
       // Dùng dist để phân biệt: đang tiến vào hay đã qua đỉnh
-      final double dist = _leftCounter.isInZone
-          ? _leftCounter.smoothedDist
-          : _rightCounter.smoothedDist;
-      final double threshold = _leftCounter.isInZone
-          ? _leftCounter.zoneThreshold
-          : _rightCounter.zoneThreshold;
-      _displayState = dist < threshold * 0.7
+      final activeCounter =
+          _leftCounter.isInZone ? _leftCounter : _rightCounter;
+      _displayState = activeCounter.isDeepTuck
           ? ClimberState.max_flexion
           : ClimberState.knee_driving_in;
     } else {
@@ -341,6 +383,8 @@ class MountainClimber extends ExerciseBase {
         lm[useRight ? PoseLandmarkType.rightHip : PoseLandmarkType.leftHip];
     final PoseLandmark? ankle =
         lm[useRight ? PoseLandmarkType.rightAnkle : PoseLandmarkType.leftAnkle];
+    final PoseLandmark? leftHip = lm[PoseLandmarkType.leftHip];
+    final PoseLandmark? rightHip = lm[PoseLandmarkType.rightHip];
     final PoseLandmark? leftAnkle = lm[PoseLandmarkType.leftAnkle];
     final PoseLandmark? rightAnkle = lm[PoseLandmarkType.rightAnkle];
     final PoseLandmark? leftKnee = lm[PoseLandmarkType.leftKnee];
@@ -351,23 +395,20 @@ class MountainClimber extends ExerciseBase {
         wrist == null ||
         hip == null ||
         ankle == null ||
+        leftHip == null ||
+        rightHip == null ||
         leftAnkle == null ||
         rightAnkle == null ||
         leftKnee == null ||
         rightKnee == null) {
       return null;
     }
-    if (![
-      shoulder,
-      elbow,
-      wrist,
-      hip,
-      ankle,
-      leftAnkle,
-      rightAnkle,
-      leftKnee,
-      rightKnee
-    ].every(ExerciseBase.isLandmarkConfident)) {
+    if (![shoulder, elbow, wrist, hip, ankle]
+        .every(ExerciseBase.isLandmarkConfident)) {
+      return null;
+    }
+    if (![leftHip, rightHip, leftAnkle, rightAnkle, leftKnee, rightKnee]
+        .every(_isMovingLegUsable)) {
       return null;
     }
 
@@ -377,11 +418,18 @@ class MountainClimber extends ExerciseBase {
       wrist: wrist,
       hip: hip,
       ankle: ankle,
+      leftHip: leftHip,
+      rightHip: rightHip,
       leftAnkle: leftAnkle,
       rightAnkle: rightAnkle,
       leftKnee: leftKnee,
       rightKnee: rightKnee,
     );
+  }
+
+  static bool _isMovingLegUsable(PoseLandmark landmark) {
+    return landmark.presence >= _movingLegPresenceMin &&
+        landmark.visibility >= _movingLegVisibilityMin;
   }
 
   // ---------------------------------------------------------------------------
@@ -409,7 +457,7 @@ class MountainClimber extends ExerciseBase {
     _exerciseStartTimeMs = null;
     _isTimeout = false;
     _doubleKneeRejects = 0;
-    _doubleKneeActive = false;
+    _doubleKneeFrames = 0;
   }
 }
 
@@ -424,6 +472,8 @@ class _LandmarkSet {
     required this.wrist,
     required this.hip,
     required this.ankle,
+    required this.leftHip,
+    required this.rightHip,
     required this.leftAnkle,
     required this.rightAnkle,
     required this.leftKnee,
@@ -435,6 +485,8 @@ class _LandmarkSet {
   final PoseLandmark wrist;
   final PoseLandmark hip;
   final PoseLandmark ankle;
+  final PoseLandmark leftHip;
+  final PoseLandmark rightHip;
   final PoseLandmark leftAnkle;
   final PoseLandmark rightAnkle;
   final PoseLandmark leftKnee;

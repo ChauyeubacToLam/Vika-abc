@@ -21,8 +21,6 @@ class KneeDriveRomMetric extends ClimberMetricBase {
   int get goodRomCount => _goodRomCount;
   int get shortRomCount => _shortRomCount;
 
-  static const double _goodRomRatioOfCountZone = 0.85;
-
   @override
   List<FaultRecord> get faults => _faults;
 
@@ -31,10 +29,8 @@ class KneeDriveRomMetric extends ClimberMetricBase {
 
   @override
   void update(RepContext ctx) {
-    final double scale = ctx.scaleFactor == 0 ? 1.0 : ctx.scaleFactor;
-
-    final double distLeft = (ctx.leftKneeX - ctx.shoulderX).abs() / scale;
-    final double distRight = (ctx.rightKneeX - ctx.shoulderX).abs() / scale;
+    final double distLeft = ctx.leftKneeDistNorm;
+    final double distRight = ctx.rightKneeDistNorm;
 
     // Cập nhật min cho từng chân
     if (_minDistLeft == null || distLeft < _minDistLeft!) {
@@ -46,6 +42,8 @@ class KneeDriveRomMetric extends ClimberMetricBase {
 
     _debugData['ROM_distLeftNorm'] = distLeft.toStringAsFixed(2);
     _debugData['ROM_distRightNorm'] = distRight.toStringAsFixed(2);
+    _debugData['ROM_leftKneeAngle'] = ctx.leftKneeAngle.toStringAsFixed(1);
+    _debugData['ROM_rightKneeAngle'] = ctx.rightKneeAngle.toStringAsFixed(1);
     _debugData['ROM_minLeft'] = _minDistLeft?.toStringAsFixed(2) ?? '-';
     _debugData['ROM_minRight'] = _minDistRight?.toStringAsFixed(2) ?? '-';
     _debugData['ROM_goodCount'] = _goodRomCount;
@@ -61,7 +59,8 @@ class KneeDriveRomMetric extends ClimberMetricBase {
     double peakDist,
     double zoneThreshold,
   ) {
-    final qualityThreshold = zoneThreshold * _goodRomRatioOfCountZone;
+    final qualityThreshold =
+        zoneThreshold * ClimberConfig.GOOD_ROM_RATIO_OF_COUNT_ZONE;
     final bool isShort = peakDist > qualityThreshold;
 
     if (isShort) {

@@ -706,15 +706,10 @@ class _BrowseRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: row.yoga ? c.powder : c.bgInverse,
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                alignment: Alignment.center,
-                child: PoseGlyph(type: row.glyph, size: 22, dark: !row.yoga),
+              ExerciseThumbnail(
+                glyph: row.glyph,
+                asset: row.thumbnailAsset,
+                yoga: row.yoga,
               ),
               const SizedBox(width: 12),
               Expanded(
