@@ -18,7 +18,7 @@
 //   │           8 / 10 reps chuẩn form            │  ← italic display
 //   │        ●●●●●●●●○○                            │  ← rep dots
 //   │                                             │
-//   │      ✦ "Đẹp lắm — giữ form sạch như thế."   │  ← praise
+//   │      ✦ "Tốt lắm! Cứ giữ form đẹp như vậy."   │  ← praise
 //   │                                             │
 //   │      ◆  GỢI Ý CHO SET SAU                   │
 //   │      Dồn lực qua gót, giữ bàn chân          │  ← coach tip
@@ -27,7 +27,7 @@
 //   │      Cần cải thiện (2)  ▾                   │  ← faults
 //   │                                             │
 //   ├ ─────────────────────────────────────── ──┤
-//   │       SET NÀY THẾ NÀO?                     │
+//   │       SET NÀY CẢM THẤY THẾ NÀO?                     │
 //   │   [ Nhẹ ]  [ Vừa ]  [ Nặng ]               │  ← italic pills
 //   │       Set sau tăng 2 reps                  │  ← adjustment
 //   │                                             │
@@ -182,7 +182,7 @@ class _RestScreenState extends State<RestScreen> with TickerProviderStateMixin {
     return switch (_selectedDifficulty!) {
       'light' => 'Set sau tăng 2 reps',
       'medium' => 'Set sau giữ ${widget.currentReps} reps',
-      'heavy' => '+15s nghỉ · Set sau giảm 1 rep',
+      'heavy' => '+15 giây nghỉ · Set sau giảm 1 rep',
       _ => null,
     };
   }
@@ -737,7 +737,7 @@ class _ScoreLine extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          'REPS CHUẨN FORM',
+          'REP chuẩn',
           style: TextStyle(
             fontFamily: 'BeVietnamPro',
             fontSize: 9.5,
@@ -1028,7 +1028,7 @@ class _FaultsToggle extends StatelessWidget {
           ),
           const SizedBox(width: 4),
           Text(
-            'Cần cải thiện ($count)',
+            'Cần chú ý ($count)',
             style: TextStyle(
               fontFamily: 'BeVietnamPro',
               fontSize: 11.5,
@@ -1154,7 +1154,7 @@ class _BottomSection extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                'SET NÀY THẾ NÀO?',
+                'SET NÀY CẢM THẤY THẾ NÀO?',
                 style: TextStyle(
                   fontFamily: 'BeVietnamPro',
                   fontSize: 10,
@@ -1450,28 +1450,28 @@ List<_FaultObservation> _groupFaultObservations(ExerciseLogger? logger) {
 ({String title, String tip}) _faultMeta(String type) {
   return switch (type) {
     'Back' => (
-        title: 'Lưng nghiêng',
-        tip: 'Giữ ngực mở và hông lùi nhẹ để thân trên ổn định nhé.',
+        title: 'đổ thân trên',
+        tip: 'Ép ngực ra và đẩy hông ra sau nhẹ để thân trên thẳng hơn nhé.',
       ),
     'Feet' => (
         title: 'Gót chân nhấc',
-        tip: 'Dồn lực qua gót và giữ bàn chân bám sàn chắc hơn nhé.',
+        tip: 'Ép gót xuống sàn và cảm nhận bàn chân bám chắc hơn nhé.',
       ),
     'Depth' => (
-        title: 'Độ sâu chưa đủ',
-        tip: 'Hạ hông thêm một chút nếu vẫn còn kiểm soát tốt nhé.',
+        title: 'Chưa xuống đủ sâu',
+        tip: 'Thử hạ hông thêm một chút nếu vẫn kiểm soát được nhé.',
       ),
     'Tempo' => (
         title: 'Nhịp chưa đều',
-        tip: 'Xuống chậm hơn và giữ đáy thêm một nhịp nhé.',
+        tip: 'Xuống chậm hơn, giữ ở đáy thêm một nhịp nhé.',
       ),
     'HipShoulderSync' => (
-        title: 'Hông lên trước vai',
-        tip: 'Đứng lên cùng lúc bằng hông và ngực để form chắc hơn nhé.',
+        title: 'Hông và vai lên không đều',
+        tip: 'Lúc lên, kéo hông và ngực đồng thời nhé, form sẽ chắc hơn.',
       ),
     _ => (
         title: type.replaceAll('_', ' ').toLowerCase(),
-        tip: 'Giữ nhịp đều và kiểm soát chuyển động thêm một chút nhé.',
+        tip: 'Giữ nhịp đều, chú ý kiểm soát chuyển động nhé.',
       ),
   };
 }

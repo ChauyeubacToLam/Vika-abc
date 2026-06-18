@@ -418,7 +418,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     // /private/var/Managed Preferences/mobile/com.apple.CoreMotion.plist.
     // On some iPhones that read can stall (managed-prefs sandbox check)
     // and never returns. Without the timeout, _initCamera() never
-    // proceeds and the user sits forever on "Đang chuẩn bị camera".
+    // proceeds and the user sits forever on "Đang khởi động camera".
     try {
       final nativeOrientation = await _orientationCommunicator
           .orientation(useSensor: true)
@@ -756,8 +756,8 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
             _isInitializing = false;
             _isCameraReady = false;
             _cameraErrorMessage = status.isPermanentlyDenied
-                ? 'Quyền camera đang bị chặn. Hãy mở lại trong cài đặt.'
-                : 'Cần quyền camera để AI theo dõi bài tập.';
+                ? 'Quyền camera chưa được bật. Hãy mở lại trong cài đặt.'
+                : 'AI cần camera để theo dõi bài tập.';
           });
         }
         return;
@@ -767,7 +767,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         _ensureLandmarkSubscription();
         // Hard-timeout the native init so a hung PoseLandmarkerService
         // (completion handler never called, deadlocked Swift queue)
-        // doesn't strand the UI on "Đang chuẩn bị camera" forever. After
+        // doesn't strand the UI on "Đang khởi động camera" forever. After
         // 8 seconds we throw and surface a real error with a Retry button.
         //
         // ML Kit fallback intentionally NOT triggered here on real devices
@@ -1481,11 +1481,11 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     if (!permissionGranted) {
       inner = _buildCameraFallback(
         icon: Icons.camera_alt_outlined,
-        title: 'Cần quyền camera',
+        title: 'Cần quyền truy cập camera',
         subtitle: _cameraErrorMessage ??
-            'Hãy cấp quyền camera để AI theo dõi bài tập của bạn.',
+            'Cấp quyền camera để AI có thể theo dõi form.',
         actionLabel: _permissionStatus?.isPermanentlyDenied == true
-            ? 'Mở cài đặt'
+            ? 'Mở Cài đặt'
             : 'Cấp quyền',
         onAction: _permissionStatus?.isPermanentlyDenied == true
             ? openAppSettings
@@ -1506,12 +1506,12 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
               ? Icons.videocam_outlined
               : Icons.videocam_off_outlined,
           title: _cameraErrorMessage == null
-              ? 'Đang chuẩn bị camera'
+              ? 'Đang khởi động camera'
               : 'Camera chưa sẵn sàng',
           subtitle: _cameraErrorMessage ??
               (_isInitializing || waitingForFallback
-                  ? 'AI đang kết nối camera và chuẩn bị theo dõi form của bạn.'
-                  : 'Đang chờ camera sẵn sàng...'),
+                  ? 'AI đang kết nối camera để theo dõi form của bạn.'
+                  : 'Đang chờ camera khởi động…'),
           actionLabel: _cameraErrorMessage == null ? null : 'Thử lại',
           onAction: _cameraErrorMessage == null ? null : _initCamera,
         );
@@ -1635,13 +1635,13 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     switch (phaseKey) {
       case 'descending':
         phaseVerb = 'XUỐNG';
-        phaseHint = 'Hạ chậm, kiểm soát';
+        phaseHint = 'Hạ chậm, giữ kiểm soát';
       case 'bottom':
         phaseVerb = 'GIỮ';
-        phaseHint = 'Giữ đáy, ổn định';
+        phaseHint = 'Giữ ở đáy, ổn định';
       case 'ascending':
         phaseVerb = 'LÊN';
-        phaseHint = 'Đẩy sàn xuống';
+        phaseHint = 'Đẩy mạnh lên';
       default: // 'standing' or any other
         phaseVerb = 'XUỐNG';
         phaseHint = 'Bắt đầu hạ người';
@@ -2034,23 +2034,23 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     final normalized = message.toLowerCase();
     final rawNormalized = rawMessage.toLowerCase();
 
-    if (normalized.contains('giữ yên')) {
+    if (normalized.contains('đứng yên')) {
       return null;
     }
 
     if (rawNormalized.contains('wrong_orientation_landscape')) {
       return const _GuidanceCopy(
         icon: Icons.screen_rotation_alt_rounded,
-        title: 'Quay điện thoại nằm ngang',
-        body: 'Bài tập này cần điện thoại nằm ngang để AI thấy rõ toàn thân.',
+        title: 'Xoay ngang điện thoại',
+        body: 'Bài này cần điẹn thoại nằm ngang để AI thấy rõ toàn thân bạn.',
         mode: SystemBannerMode.warn,
       );
     }
     if (rawNormalized.contains('wrong_orientation_portrait')) {
       return const _GuidanceCopy(
         icon: Icons.screen_rotation_alt_rounded,
-        title: 'Quay điện thoại đứng',
-        body: 'Bài tập này cần điện thoại đứng dọc.',
+        title: 'Xoay dọc điện thoại',
+        body: 'Bài này cần màn hình dọc.',
         mode: SystemBannerMode.warn,
       );
     }
@@ -2060,17 +2060,17 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         normalized.contains('quay sang bên')) {
       return const _GuidanceCopy(
         icon: Icons.screen_rotation_alt_rounded,
-        title: 'Quay ngang người',
+        title: 'Đứng nghiêng người với camera',
         body:
-            'Đứng ngang với camera để AI thấy vai, hông, gối và cổ chân rõ hơn.',
+            'Đứng nghiêng người với camera để AI thấy rõ vai, hông, gối và mắt cá.',
         mode: SystemBannerMode.warn,
       );
     }
     if (normalized.contains('quay mặt')) {
       return const _GuidanceCopy(
         icon: Icons.center_focus_strong_rounded,
-        title: 'Quay mặt về camera',
-        body: 'Đứng đối diện camera để AI thấy hai bên cơ thể rõ hơn.',
+        title: 'Hướng mặt về phía camera',
+        body: 'Đứng đối diện camera để AI thấy cả hai bên người rõ hơn.',
         mode: SystemBannerMode.warn,
       );
     }
@@ -2080,9 +2080,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         normalized.contains('hình ảnh không rõ')) {
       return const _GuidanceCopy(
         icon: Icons.light_mode_rounded,
-        title: 'Tăng ánh sáng',
+        title: 'Các điểm cần nhận diện đang không thấy rõ.',
         body:
-            'Đứng nơi sáng hơn hoặc tránh ngược sáng để AI nhận landmark ổn định.',
+            'Đứng chỗ sáng hơn hoặc tránh ngược sáng để AI nhận diện ổn định hơn.',
         mode: SystemBannerMode.warn,
       );
     }
@@ -2090,7 +2090,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       return const _GuidanceCopy(
         icon: Icons.person_search_rounded,
         title: 'Đang tìm người',
-        body: 'Đứng trong khung hình để bắt đầu theo dõi.',
+        body: 'Đứng trong khung hình để bắt đầu.',
         mode: SystemBannerMode.scan,
       );
     }
@@ -2099,15 +2099,15 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       return const _GuidanceCopy(
         icon: Icons.pause_circle_filled_rounded,
         title: 'Tạm dừng',
-        body: 'Quay lại khung hình để AI tiếp tục theo dõi.',
+        body: 'Đứng trong khung hình để tiếp tục.',
         mode: SystemBannerMode.pause,
       );
     }
     if (normalized.contains('phần trên cơ thể')) {
       return const _GuidanceCopy(
         icon: Icons.fit_screen_rounded,
-        title: 'Đưa thân trên vào khung',
-        body: 'Lùi lại một chút để thấy rõ vai, khuỷu tay, cổ tay và hông.',
+        title: 'Lùi lại để thấy thân trên',
+        body: 'Lùi lại một chút để thấy rõ vai, khuỷu tay và hông.',
         mode: SystemBannerMode.warn,
       );
     }
@@ -2115,9 +2115,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         normalized.contains('toàn thân')) {
       return const _GuidanceCopy(
         icon: Icons.fit_screen_rounded,
-        title: 'Đưa toàn thân vào khung',
+        title: 'Lùi lại để thấy toàn thân',
         body:
-            'Lùi lại một chút hoặc hạ máy để thấy vai, hông, gối, cổ chân và bàn chân.',
+            'Lùi lại hoặc hạ điện thoại để thấy từ vai đến bàn chân.',
         mode: SystemBannerMode.warn,
       );
     }
@@ -2126,8 +2126,8 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         normalized.contains('vai, hông và gối')) {
       return const _GuidanceCopy(
         icon: Icons.fit_screen_rounded,
-        title: 'Đưa cơ thể vào khung',
-        body: 'Lùi lại hoặc chỉnh góc máy để các mốc cần theo dõi hiện rõ.',
+        title: 'Điều chỉnh để cơ thể vào khung hình',
+        body: 'Lùi lại hoặc chỉnh góc điện thoại để AI nhìn rõ hơn.',
         mode: SystemBannerMode.warn,
       );
     }
@@ -2136,7 +2136,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         normalized.contains('bắt đầu')) {
       return _GuidanceCopy(
         icon: Icons.accessibility_new_rounded,
-        title: 'Vào tư thế bắt đầu',
+        title: 'Vào vị trí bắt đầu',
         body: message,
         mode: SystemBannerMode.info,
       );
@@ -2147,16 +2147,16 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
   String _translateSystemMessage(String raw) {
     if (raw.contains('Please turn to the side')) {
-      return 'Quay ngang người để AI theo dõi tốt hơn';
+      return 'Quay ngang người với camera để AI theo dõi tốt hơn';
     }
     if (raw.contains('Body not fully visible')) {
-      return 'Giữ toàn thân trong khung hình';
+      return 'Lùi lại, giữ toàn thân vào khung';
     }
     if (raw.contains('Adjust lighting/position')) {
-      return 'Điều chỉnh ánh sáng hoặc vị trí để AI nhận rõ hơn';
+      return 'Di chuyển ra chỗ sáng hơn để AI nhận diện tốt hơn';
     }
     if (raw.contains('⏸') || raw.contains('⚸')) {
-      return 'Tạm dừng. Quay lại khung hình để tiếp tục';
+      return 'Tạm dừng. đứng trong  khung ảnh để tiếp tục';
     }
     return raw.replaceAll('⚠️ ', '').replaceAll('⏸ ', '').replaceAll('⚸ ', '');
   }
@@ -2229,7 +2229,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     if (result != null && result.isNotEmpty) {
       return _translateResult(result);
     }
-    return 'Giữ nhịp đều và kiểm soát toàn bộ chuyển động.';
+    return 'Giữ nhịp đều, kiểm soát chuyển động.';
   }
 
   double? _readDebugNumber(dynamic value) {
@@ -2243,25 +2243,25 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
   String _translateInstruction(String value) {
     if (value.contains('Keep chest up')) {
-      return 'Mở ngực hơn ở rep tới để giữ thân trên vững.';
+      return 'Rep tiếp theo, mở ngực ra để thân trên thẳng hơn.';
     }
     if (value.contains('Heels lifting')) {
-      return 'Ấn gót xuống sàn để squat chắc hơn.';
+      return 'Ép gót chân xuống sàn để đứng chắc hơn.';
     }
     if (value.contains('Dropped too fast')) {
-      return 'Hạ chậm hơn để AI bắt trọn chuyển động.';
+      return 'Hạ chậm hơn một chút để AI theo dõi tốt hơn.';
     }
     if (value.contains('pause')) {
-      return 'Giữ đáy thêm một nhịp rồi mới đứng lên.';
+      return 'Giữ ở đáy thêm một nhịp rồi đứng lên.';
     }
     if (value == 'Going Down...') {
-      return 'Hạ người chậm và kiểm soát.';
+      return 'Hạ người xuống thật chậm.';
     }
     if (value == 'Đứng lên') {
       return 'Đứng lên dứt khoát.';
     }
     if (value == 'Push Up!') {
-      return 'Đứng lên mạnh nhưng vẫn giữ thân chắc.';
+      return 'Đứng mạnh lên, giữ người thẳng.';
     }
     return value
         .replaceAll('Going Down...', 'Hạ người chậm xuống.')
@@ -2271,10 +2271,10 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
   String _translateResult(String value) {
     if (value == 'Good Rep!' || value == 'Tốt lắm!') {
-      return 'Rep đẹp. Giữ nhịp này.';
+      return 'Tập chuẩn lắm. Giữ nhịp này.';
     }
     if (value == 'Fix Form') {
-      return 'Điều chỉnh lại form ở rep tiếp theo.';
+      return 'Rep tiếp theo chú ý form hơn nhé.';
     }
     return value;
   }
@@ -2283,17 +2283,17 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     final seconds = _extractDurationSeconds(value);
     if (_isHoldStatus(value)) {
       return seconds == null
-          ? 'Giữ đáy rồi đẩy lên.'
-          : 'Giữ đáy ${seconds.toStringAsFixed(1)} giây rồi đẩy lên.';
+          ? 'Giữ ở đáy, rồi đẩy lên.'
+          : 'Giữ ở đáy ${seconds.toStringAsFixed(1)} giây, rồi đẩy lên.';
     }
     if (_isReleaseStatus(value)) {
-      return 'Đẩy lên ngay.';
+      return 'Đẩy lên luôn.';
     }
     if (value.contains('Push Up!')) {
       return 'Đứng lên dứt khoát.';
     }
     if (value.contains('Going Down...')) {
-      return 'Hạ người xuống có kiểm soát.';
+      return 'Hạ người xuống chậm có kiểm soát.';
     }
     return _translateInstruction(value);
   }
@@ -2784,7 +2784,7 @@ class _CenterOverlay extends StatelessWidget {
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                isReadyToStart ? 'Bắt đầu tập' : 'Giữ yên',
+                                isReadyToStart ? 'Bắt đầu' : 'Giữ yên',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(

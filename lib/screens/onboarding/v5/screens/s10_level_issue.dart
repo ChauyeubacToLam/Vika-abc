@@ -34,14 +34,14 @@ class _S10LevelIssueState extends State<S10LevelIssue>
   static const _levels = <_LevelSpec>[
     _LevelSpec(
       id: 'beginner',
-      title: 'Người mới',
+      title: 'Người mới bắt đầu',
       stat: '15–25',
       sub: 'Đang xây nền tảng',
       desc:
-          'Tập trung vào nền tảng & form chuẩn. Ít reps, nhiều thời gian học cơ.',
+          'Tập trung vào nền tảng và form chuẩn. Ít rep hơn, chú trọng kỹ thuật.',
       bullets: [
-        'Bài tập cơ bản, lặp lại',
-        'Form chuẩn ưu tiên hơn tốc độ',
+        'Bài tập nền tảng, lặp lại',
+        'Tập đúng trước, tăng nhịp sau',
         'Tăng nhẹ mỗi tuần',
       ],
       intensity: 0.35,
@@ -50,12 +50,12 @@ class _S10LevelIssueState extends State<S10LevelIssue>
       id: 'intermediate',
       title: 'Trung cấp',
       stat: '25–40',
-      sub: 'Đã có kinh nghiệm',
-      desc: 'Cường độ vừa phải. Bài tập đa dạng & thử thách hơn.',
+      sub: 'Đã có nền tảng',
+      desc: 'Cường độ vừa phải. Bài tập đa dạng và thử thách hơn.',
       bullets: [
-        'Tổ hợp đa dạng, ít lặp lại',
-        'Thử thách form ở các góc khó',
-        'Phục hồi & tiến độ song hành',
+        'Tổ hợp đa dạng, ít lặp đi lặp lại',
+        'Thử thách tập  ở mức độ khó hơn',
+        'Tập và phục hồi song song',
       ],
       intensity: 0.65,
     ),
@@ -63,12 +63,12 @@ class _S10LevelIssueState extends State<S10LevelIssue>
       id: 'advanced',
       title: 'Nâng cao',
       stat: '40+',
-      sub: 'Tập đều 1+ năm',
-      desc: 'Cường độ cao + tổ hợp bài. Yêu cầu thực hiện chuẩn xác.',
+      sub: 'Tập đều trên 1 năm',
+      desc: 'Cường độ cao, tổ hợp bài phức tạp. Yêu cầu kỹ thuật chắc.',
       bullets: [
-        'Tổ hợp dài, cường độ cao',
-        'Yêu cầu form chuẩn xác',
-        'Tối ưu hiệu suất theo từng tuần',
+        'Chuỗi bài dài, cường độ cao',
+        'Form yêu cầu độ chuẩn xác cao',
+        'Tối ưu hiệu suất từng tuần',
       ],
       intensity: 0.95,
     ),
@@ -171,7 +171,7 @@ class _S10LevelIssueState extends State<S10LevelIssue>
               text: TextSpan(
                 style: r.isShort ? V5.titleLg(context) : V5.headline(context),
                 children: [
-                  const TextSpan(text: 'Vika gợi ý mức\n'),
+                  const TextSpan(text: 'Vika gợi ý level:\n'),
                   TextSpan(
                     text: rec.title,
                     style: TextStyle(color: V5.yellowDeep),
@@ -187,10 +187,10 @@ class _S10LevelIssueState extends State<S10LevelIssue>
             slideY: 8,
             child: Text(
               !_assessmentDone
-                  ? 'Dựa trên kinh nghiệm bạn đã chia sẻ — có thể đánh giá lại bất cứ lúc nào để tinh chỉnh.'
+                  ? 'Dựa trên kinh nghiệm bạn chia sẻ,  có thể kiểm tra lại bất cứ lúc nào để điều chỉnh.'
                   : _issueCount == 0
-                      ? 'Plan sẽ tăng nhịp từ từ dựa trên bài đánh giá.'
-                      : 'Plan sẽ ưu tiên $_issueCount điểm cần luyện từ bài đánh giá.',
+                      ? 'Lộ trình sẽ tăng dần mức độ dựa trên bài đánh giá.'
+                      : 'Lộ trình sẽ ưu tiên $_issueCount điểm cần cải thiện từ kết quả đánh giá.',
               style: V5.body(context, color: V5.inkSoft),
               maxLines: 2,
             ),
@@ -473,7 +473,7 @@ class _MinutesBlock extends StatelessWidget {
         ),
         const SizedBox(height: V5.space4),
         Text(
-          'PHÚT / BUỔI',
+          'PHÚT/BUỔI',
           style: V5
               .eyebrow(context, color: V5.invInkSoft)
               .copyWith(letterSpacing: 1.4),

@@ -758,7 +758,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
         deltaPositive: (weekly.avgFormDelta ?? 0) >= 0,
       ),
     ];
-    return WeeklySummaryBand(stats: stats, kicker: 'TUẦN NÀY MỘT NHÌN');
+    return WeeklySummaryBand(stats: stats, kicker: 'TỔNG QUAN TUẦN NÀY');
   }
 
   /// CHUỖI section body: the "Streak Reel" — a warm-dark lit panel holding the

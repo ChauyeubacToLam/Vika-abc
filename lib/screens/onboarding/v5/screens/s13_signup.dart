@@ -78,7 +78,7 @@ class _S13SignupState extends State<S13Signup> {
     _advancing = false;
     setState(() => _busy = false);
     _showError(
-      'Link đăng nhập đã hết hạn hoặc không hợp lệ. Vui lòng gửi lại email.',
+      'Link đã hết hạn hoặc không hợp lệ. Hãy thử gửi lại.',
     );
   }
 
@@ -90,7 +90,7 @@ class _S13SignupState extends State<S13Signup> {
         .catchError((error) {
       _showError(_friendlyError(
         error,
-        fallback: 'Không thể hoàn tất đăng nhập lúc này. Vui lòng thử lại.',
+        fallback: 'Đăng nhập chưa thành công. Vui lòng thử lại.',
       ));
     }));
   }
@@ -140,7 +140,7 @@ class _S13SignupState extends State<S13Signup> {
     _acceptAuthEvents = false;
     setState(() {
       _busy = true;
-      _notice = 'Đang tạo lộ trình cá nhân của bạn...';
+      _notice = 'Đang tạo lộ trình cho bạn…';
     });
     widget.data.email = user.email ?? widget.data.email;
     try {
@@ -173,7 +173,7 @@ class _S13SignupState extends State<S13Signup> {
     } catch (e) {
       _showError(_friendlyError(e,
           fallback:
-              'Không thể đăng nhập bằng Google lúc này. Vui lòng thử lại.'));
+              'Đăng nhập bằng Google không thành công. Vui lòng thử lại.'));
     } finally {
       _endAuthAttempt();
     }
@@ -190,7 +190,7 @@ class _S13SignupState extends State<S13Signup> {
     } catch (e) {
       _showError(_friendlyError(e,
           fallback:
-              'Không thể đăng nhập bằng Facebook lúc này. Vui lòng thử lại.'));
+              'Đăng nhập bằng Facebook không thành công. Vui lòng thử lại.'));
     } finally {
       _endAuthAttempt();
     }
@@ -199,7 +199,7 @@ class _S13SignupState extends State<S13Signup> {
   Future<void> _signInWithApple() async {
     if (_busy) return;
     if (!Platform.isIOS) {
-      _showError('Đăng nhập Apple chỉ hỗ trợ trên iPhone.');
+      _showError('Đăng nhập bằng Apple chỉ khả dụng trên iPhone.');
       return;
     }
     _beginAuthAttempt('apple');
@@ -211,7 +211,7 @@ class _S13SignupState extends State<S13Signup> {
     } catch (e) {
       _showError(_friendlyError(e,
           fallback:
-              'Không thể đăng nhập bằng Apple lúc này. Vui lòng thử lại.'));
+              'Đăng nhập bằng Apple không thành công. Vui lòng thử lại.'));
     } finally {
       _endAuthAttempt();
     }
@@ -225,11 +225,11 @@ class _S13SignupState extends State<S13Signup> {
       widget.data.email = email;
       await _authService.signInWithMagicLink(email);
       if (mounted) {
-        setState(() => _notice = 'Link đăng nhập đã được gửi đến $email');
+        setState(() => _notice = 'Đã gửi link đăng nhập đến $email');
       }
     } catch (e) {
       _showError(_friendlyError(e,
-          fallback: 'Không thể gửi link đăng nhập lúc này. Vui lòng thử lại.'));
+          fallback: 'Chưa gửi được link. Vui lòng thử lại.'));
       _acceptAuthEvents = false;
       _pendingProvider = null;
     } finally {
@@ -270,7 +270,7 @@ class _S13SignupState extends State<S13Signup> {
     return V5KeyboardForm(
       footer: _InlineMagicLinkCta(
         label: _busy ? 'Đang xử lý...' : 'Gửi link đăng nhập',
-        disabledLabel: 'Nhập email hoặc chọn tài khoản',
+        disabledLabel: 'Nhập email hoặc liên kết tài khoản',
         enabled: _validEmail && !_busy,
         onTap: _magicLink,
       ),
@@ -351,7 +351,7 @@ class _S13SignupState extends State<S13Signup> {
                 ),
                 const SizedBox(height: V5.space16),
                 Text(
-                  'Đang tạo lộ trình cá nhân của bạn...',
+                  'Đang tạo lộ trình cho bạn…',
                   style: V5.bodySm(context, color: V5.inkSoft),
                 ),
               ],
@@ -743,6 +743,12 @@ class _PlanChip extends StatelessWidget {
   }
 }
 
+// FB_LOGIN_PRELAUNCH_HIDE: Facebook app pending Meta verification, not Live, so
+// a Facebook login fails for non-app-roles. Flip to true to restore the Facebook
+// sign-in tile post-verification. (Top-level so the dead `if` branch below isn't
+// flagged as dead_code while the flag is false; OAuth wiring stays intact.)
+bool _showFacebookTile = false;
+
 class _ProviderRail extends StatelessWidget {
   const _ProviderRail({
     required this.busy,
@@ -786,17 +792,19 @@ class _ProviderRail extends StatelessWidget {
               border: V5.borderHi,
             ),
           ),
-          const SizedBox(width: V5.space8),
-          Expanded(
-            child: _ProviderTile(
-              label: 'Facebook',
-              background: V5.surface,
-              foreground: V5.ink,
-              icon: const V5FacebookMark(size: 18),
-              onTap: busy ? null : onFacebook,
-              border: V5.borderHi,
+          if (_showFacebookTile) ...[
+            const SizedBox(width: V5.space8),
+            Expanded(
+              child: _ProviderTile(
+                label: 'Facebook',
+                background: V5.surface,
+                foreground: V5.ink,
+                icon: const V5FacebookMark(size: 18),
+                onTap: busy ? null : onFacebook,
+                border: V5.borderHi,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -810,7 +818,7 @@ class _AccountValueStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     const items = [
       (Icons.calendar_month_rounded, 'Lịch tập'),
-      (Icons.insights_rounded, 'Báo cáo'),
+      (Icons.insights_rounded, 'Phân tích form'),
       (Icons.history_rounded, 'Tiến bộ'),
     ];
     return Container(

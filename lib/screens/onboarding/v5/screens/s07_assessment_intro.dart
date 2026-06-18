@@ -32,14 +32,14 @@ class S07AssessmentIntro extends StatelessWidget {
               vi: 'Tư thế chiến binh',
               hold: '20–30 giây',
               icon: Icons.self_improvement_rounded,
-              focus: 'thăng bằng, hông, thân người',
+              focus: 'thăng bằng, hông, thân trên',
             ),
             (
               name: 'Forward Fold',
-              vi: 'Cúi gập chậm',
+              vi: 'Cúi người về trước',
               hold: '1 lần chậm',
               icon: Icons.airline_seat_legroom_extra_rounded,
-              focus: 'gân kheo, lưng, hông',
+              focus: 'đùi sau, lưng dưới, hông',
             ),
           ]
         : const [
@@ -48,14 +48,14 @@ class S07AssessmentIntro extends StatelessWidget {
               vi: 'Ngồi xuống / đứng lên',
               hold: '5 lần chậm',
               icon: Icons.fitness_center_rounded,
-              focus: 'gối, hông, lưng',
+              focus: 'gối, hông, lưng dưới',
             ),
             (
               name: 'Wall Push-Up',
               vi: 'Đẩy tường',
               hold: '5 lần chậm',
               icon: Icons.accessibility_new_rounded,
-              focus: 'vai, khuỷu tay, thân người',
+              focus: 'vai, khuỷu tay, thân trên',
             ),
           ];
     final r = V5Responsive.of(context);
@@ -92,8 +92,8 @@ class S07AssessmentIntro extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           V5ScreenHeader(
-            eyebrow: 'Đánh giá ban đầu',
-            title: 'Làm 2 động tác.\nNhận level & plan.',
+            eyebrow: 'Đánh giá thể lực.',
+            title: '2 động tác.\nVika sẽ xem và xây dựng lộ trình phù hợp.',
             size: tight ? V5HeaderSize.medium : V5HeaderSize.large,
           ),
           SizedBox(height: r.pick(cozy: V5.space16, short: V5.space10)),
@@ -169,7 +169,7 @@ class _SkipAssessmentLink extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
         child: Text(
-          'Bỏ qua · gợi ý theo kinh nghiệm',
+          'Bỏ qua · đánh giá theo thời gian tập luyện của tôi.',
           style: V5.bodySm(context, color: V5.inkSoft).copyWith(
             fontWeight: FontWeight.w600,
             decoration: TextDecoration.underline,
@@ -227,18 +227,17 @@ class _SkipConfirmSheet extends StatelessWidget {
           Text('Bỏ qua đánh giá?', style: V5.titleLg(context)),
           const SizedBox(height: V5.space8),
           Text(
-            'Không sao — Vika vẫn gợi ý mức tập dựa trên kinh nghiệm bạn đã '
-            'chia sẻ. Bạn có thể làm bài đánh giá bất cứ lúc nào trong Hồ sơ.',
+            'Không sao, Vika vẫn gợi ý mức phù hợp dựa trên thời gian luyện tập bạn đã chia sẻ. Bạn có thể làm kiểm tra bất cứ lúc nào từ màn hình Hồ sơ.',
             style: V5.body(context, color: V5.inkSoft),
           ),
           const SizedBox(height: V5.space24),
           _SheetPrimaryButton(
-            label: 'Bỏ qua, gợi ý theo kinh nghiệm',
+            label: 'Bỏ qua, gợi ý theo thời gian bạn đã luyện tập',
             onTap: () => Navigator.of(context).pop(true),
           ),
           const SizedBox(height: V5.space6),
           _SheetSecondaryButton(
-            label: 'Quay lại, tôi sẽ đánh giá',
+            label: 'Quay lại, tôi muốn tham gia đánh giá',
             onTap: () => Navigator.of(context).pop(false),
           ),
         ],
@@ -358,8 +357,8 @@ class _AssessmentHero extends StatelessWidget {
                 const Spacer(),
                 Text(
                   isYoga
-                      ? 'Thực hiện 2 tư thế sau.'
-                      : 'Thực hiện 2 động tác sau.',
+                      ? 'Thực hiện 2 tư thế dưới đây.'
+                      : 'Thực hiện 2 động tác dưới đây.',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: (tight
@@ -371,7 +370,7 @@ class _AssessmentHero extends StatelessWidget {
                 ),
                 SizedBox(height: tight ? V5.space4 : V5.space8),
                 Text(
-                  'Vika xem form để gợi ý level, điểm cần cải thiện và plan.',
+                  'Vika theo dõi để gợi ý level phù hợp và những điểm cần cải thiện.',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: V5.bodySm(context, color: V5.invInkSoft),
@@ -380,11 +379,11 @@ class _AssessmentHero extends StatelessWidget {
                   const Spacer(),
                   Row(
                     children: const [
-                      Expanded(child: _FlowStep(label: 'Đo form')),
+                      Expanded(child: _FlowStep(label: 'Đánh giá form')),
                       SizedBox(width: V5.space8),
                       Expanded(child: _FlowStep(label: 'Gợi ý level')),
                       SizedBox(width: V5.space8),
-                      Expanded(child: _FlowStep(label: 'Lập plan')),
+                      Expanded(child: _FlowStep(label: 'Xây dựng lộ trình')),
                     ],
                   ),
                 ],

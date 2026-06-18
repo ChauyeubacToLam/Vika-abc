@@ -34,9 +34,9 @@ class SessionCoachBuilder {
   static const String _perfectWatch =
       'Buổi tập hoàn hảo, chuẩn không cần chỉnh';
   static const String _perfectNext =
-      'Giữ nguyên mức này, buổi sau sẽ mượt hơn nữa.';
-  static const String _faultQuoteTail = 'Tinh chỉnh chút xíu nữa là chuẩn.';
-  static const String _perfectQuoteTail = 'Giữ vững nhé!';
+      'Giữ đà này, buổi sau sẽ còn mượt hơn.';
+  static const String _faultQuoteTail = 'Điều chỉnh thêm một chút nữa là chuẩn.';
+  static const String _perfectQuoteTail = 'Cứ giữ vững như này nhé!';
 
   static SessionCoach build({
     required List<FaultCandidate> candidates,
@@ -47,11 +47,11 @@ class SessionCoachBuilder {
     if (chosen == null) {
       if (lowestFormScore <= SessionTrophyPicker.solidFloor) {
         return SessionCoach(
-            quote: 'Buổi nay chưa vào form lắm, nhưng bạn đã tập xong rồi đó.',
+            quote: 'Buổi này form chưa vào lắm, nhưng bạn đã tập xong - điều đó mới quan trọng.',
             watch:
-                'Nhiều rep chưa vào đúng form, nhưng chuyện đó bình thường thôi.',
+                'Hôm nay nhiều rep chưa chuẩn form, nhưng đó là chuyện bình thường khi mới bắt đầu.',
             next:
-                'Buổi sau mình thử chậm lại, ít rep thôi nhưng chắc từng cái nhé.',
+                'Buổi sau thử giảm rep, tập chậm hơn và chắc từng cái nhé.',
             kind: CoachWatchKind.lowForm);
       }
       return SessionCoach(
@@ -123,15 +123,15 @@ class SessionCoachBuilder {
   static String _positiveLead(Trophy trophy) {
     switch (trophy.tier) {
       case TrophyTier.streakMilestone:
-        return 'Chuỗi ${trophy.value} ngày, quá đỉnh!';
+        return '${trophy.value} ngày liên tiếp rồi, quá đỉnh!';
       case TrophyTier.allTimePb:
       case TrophyTier.recentPb:
-        return 'Phong độ lên rõ rồi đó!';
+        return 'Phong độ đang lên rõ rồi đó!';
       case TrophyTier.cleanSession:
-        return 'Buổi tập sạch form thật sự!';
+        return 'Buổi này form chuẩn thật sự!';
       case TrophyTier.volume:
       case TrophyTier.showedUp:
-        return 'Buổi nay làm tốt lắm!';
+        return 'Buổi này làm tốt lắm!';
     }
   }
 }

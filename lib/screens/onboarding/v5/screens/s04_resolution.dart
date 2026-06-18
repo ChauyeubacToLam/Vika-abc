@@ -19,14 +19,14 @@ class S04Resolution extends StatelessWidget {
     return V5Page(
       index: 4,
       onBack: onBack,
-      cta: V5PillCTA(label: 'Tôi sẵn sàng', onTap: onNext),
+      cta: V5PillCTA(label: 'Tôi đã sẵn sàng', onTap: onNext),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           V5ScreenHeader(
             eyebrow: 'Giờ thì khác rồi',
             eyebrowSparkle: true,
-            title: 'Feedback hiện lên\nngay trong buổi tập.',
+            title: 'Phản hồi hiện lên\nngay khi bạn tập.',
             size: r.isShort ? V5HeaderSize.medium : V5HeaderSize.large,
           ),
           SizedBox(height: r.pick(cozy: V5.space16, short: V5.space10)),
