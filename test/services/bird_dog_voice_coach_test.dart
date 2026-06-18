@@ -1,4 +1,4 @@
-import 'package:flutter_test/flutter_test.dart';
+﻿import 'package:flutter_test/flutter_test.dart';
 import 'package:vika/exercise/1.Bird Dog/bird_dog.dart';
 import 'package:vika/exercise/exercise_base.dart';
 
@@ -31,6 +31,8 @@ class _FakeBirdDogVoicePlayer implements BirdDogVoicePlayer {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('speaks setup instructions only once before activation', () {
     final player = _FakeBirdDogVoicePlayer();
     final coach = BirdDogVoiceCoach(voicePlayer: player);
@@ -54,7 +56,7 @@ void main() {
       [
         'Đặt điện thoại hơi chéo để thấy toàn thân trên thảm.',
         'Chống hai tay và hai gối. Tay dưới vai, gối dưới hông, lưng phẳng.',
-        'Giơ tay và chân đối diện. Vươn dài. Giữ 5 giây rồi đổi bên.',
+        'Giơ tay và chân đối diện. Vươn dài. Giữ 2 giây rồi đổi bên.',
       ],
     );
   });

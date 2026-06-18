@@ -1,4 +1,4 @@
-// This is a basic Flutter widget test.
+﻿// This is a basic Flutter widget test.
 //
 // To perform an interaction with a widget in your test, use the WidgetTester
 // utility in the flutter_test package. For example, you can send tap and scroll
@@ -21,7 +21,7 @@ void main() {
     expect(find.text('VIKA'), findsOneWidget);
     expect(find.text('Bắt đầu hành trình'), findsOneWidget);
     expect(
-      find.text('CAMERA AI  ·  PHÂN TÍCH FORM THỜI GIAN THỰC'),
+      find.text('CAMERA AI  ·  Theo dõi form trong THỜI GIAN THỰC'),
       findsOneWidget,
     );
   });

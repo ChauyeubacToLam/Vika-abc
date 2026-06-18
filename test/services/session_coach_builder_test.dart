@@ -1,4 +1,4 @@
-import 'package:flutter_test/flutter_test.dart';
+﻿import 'package:flutter_test/flutter_test.dart';
 import 'package:vika/models/fault_candidate.dart';
 import 'package:vika/services/session_coach_builder.dart';
 import 'package:vika/services/session_trophy_picker.dart';
@@ -163,9 +163,9 @@ void main() {
       easyCoach.watch,
       'Buổi tập hoàn hảo, chuẩn không cần chỉnh',
     );
-    expect(easyCoach.next, 'Giữ nguyên mức này, buổi sau sẽ mượt hơn nữa.');
-    expect(moderateCoach.next, 'Giữ nguyên mức này, buổi sau sẽ mượt hơn nữa.');
-    expect(hardCoach.next, 'Giữ nguyên mức này, buổi sau sẽ mượt hơn nữa.');
+    expect(easyCoach.next, 'Giữ đà này, buổi sau sẽ còn mượt hơn.');
+    expect(moderateCoach.next, 'Giữ đà này, buổi sau sẽ còn mượt hơn.');
+    expect(hardCoach.next, 'Giữ đà này, buổi sau sẽ còn mượt hơn.');
   });
 
   test('quote composes win and the path-specific tail', () {
@@ -185,11 +185,11 @@ void main() {
 
     expect(
       faultCoach.quote,
-      'Chuỗi 7 ngày, quá đỉnh! Tinh chỉnh chút xíu nữa là chuẩn.',
+      '7 ngày liên tiếp rồi, quá đỉnh! Điều chỉnh thêm một chút nữa là chuẩn.',
     );
     expect(
       perfectCoach.quote,
-      'Buổi tập sạch form thật sự! Giữ vững nhé!',
+      'Buổi này form chuẩn thật sự! Cứ giữ vững như này nhé!',
     );
   });
 
