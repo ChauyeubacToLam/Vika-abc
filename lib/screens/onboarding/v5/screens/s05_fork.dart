@@ -533,7 +533,7 @@ List<String> _panelHighlights(String id, {required bool tiny}) {
       ? const [
           'Mở khớp, giảm căng',
           'Thở chậm, thả lỏng',
-          'Thư gian cuối ngày',
+          'Thư giãn cuối ngày',
         ]
       : const [
           'Tăng sức mạnh',

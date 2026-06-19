@@ -74,7 +74,7 @@ const whyFollowups = {
     'Giảm căng thẳng, tinh thần ổn định hơn',
   ],
   'strength': [
-    'Tăng sức bền để xử lý công việc trong cả ngày dài,',
+    'Tăng sức bền để làm việc cả ngày dài không mệt',
     'Tăng cơ, người chắc khoẻ hơn',
     'Chơi tốt hơn môn tôi thích (bóng đá, chạy bộ…)',
     'Tự tin hơn với cơ thể của mình',

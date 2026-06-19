@@ -54,7 +54,7 @@ class _S10LevelIssueState extends State<S10LevelIssue>
       desc: 'Cường độ vừa phải. Bài tập đa dạng và thử thách hơn.',
       bullets: [
         'Tổ hợp đa dạng, ít lặp đi lặp lại',
-        'Thử thách tập  ở mức độ khó hơn',
+        'Thử thách ở mức độ khó hơn',
         'Tập và phục hồi song song',
       ],
       intensity: 0.65,
@@ -187,7 +187,7 @@ class _S10LevelIssueState extends State<S10LevelIssue>
             slideY: 8,
             child: Text(
               !_assessmentDone
-                  ? 'Dựa trên kinh nghiệm bạn chia sẻ,  có thể kiểm tra lại bất cứ lúc nào để điều chỉnh.'
+                  ? 'Dựa trên kinh nghiệm bạn chia sẻ, bạn có thể kiểm tra lại bất cứ lúc nào để điều chỉnh.'
                   : _issueCount == 0
                       ? 'Lộ trình sẽ tăng dần mức độ dựa trên bài đánh giá.'
                       : 'Lộ trình sẽ ưu tiên $_issueCount điểm cần cải thiện từ kết quả đánh giá.',

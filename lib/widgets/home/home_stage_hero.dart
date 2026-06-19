@@ -31,15 +31,18 @@ import 'package:flutter/services.dart';
 
 import '../../theme/app_colors.dart';
 import '../../theme/vf_theme.dart';
+import '../ivory/atoms.dart';
 import '../ivory/skeleton.dart';
+import '../plan/plan_typography.dart';
 import '../plan/wordmark_header.dart';
 
-/// One exercise row in the timeline.
+/// One exercise row in the session brief.
 class HomeStageExercise {
   const HomeStageExercise({
     required this.name,
     required this.detail,
     this.hasAi = false,
+    this.thumbnailAsset,
   });
 
   /// e.g. 'Squat'.
@@ -49,8 +52,11 @@ class HomeStageExercise {
   final String detail;
 
   /// True when the camera-AI form coach is wired for this slot. Drives the
-  /// timeline dot fill — yellow filled (AI) vs hairline outline (manual).
+  /// gold AI pip on the thumbnail.
   final bool hasAi;
+
+  /// Real exercise render (rounded-square thumbnail). Null → glyph fallback.
+  final String? thumbnailAsset;
 }
 
 class HomeStageHero extends StatelessWidget {
@@ -413,31 +419,38 @@ class _BriefSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.16),
-          width: 1.4,
-        ),
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
       child: Column(
         children: [
           for (var i = 0; i < 4; i++) ...[
-            if (i > 0) const SizedBox(height: 14),
-            Row(
-              children: [
-                const SkeletonCircle(size: 13, inverted: true),
-                const SizedBox(width: 14),
-                SkeletonBox(
-                  width: 120.0 + (i.isEven ? 40 : 0),
-                  height: 13,
-                  inverted: true,
-                ),
-                const Spacer(),
-                const SkeletonBox(width: 38, height: 11, inverted: true),
-              ],
+            if (i > 0) const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.07),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                children: [
+                  const SkeletonBox(
+                      width: 52, height: 52, radius: 13, inverted: true),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SkeletonBox(
+                      width: 120.0 + (i.isEven ? 40 : 0),
+                      height: 13,
+                      inverted: true,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  const SkeletonBox(width: 46, height: 26, radius: 10, inverted: true),
+                ],
+              ),
             ),
           ],
           const SizedBox(height: 14),
@@ -697,201 +710,141 @@ class _SessionBrief extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A contained glass panel — the dark-register sibling of the Plan tab's
+    // session panel (same structure: a bordered container holding distinct
+    // exercise chips + the coach voice). Keeps the two tabs reading as one app.
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(14),
-        // Heavier, more visible scaffolding — athletic substance vs the
-        // prior 1pt soft hairline that read as "premium editorial".
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.16),
-          width: 1.4,
-        ),
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Eyebrow header dropped — the stat row above already says
-          // '15 phút · 4 bài · ● 3 AI', so a second eyebrow inside the
-          // card was redundant cruft.
-          for (var i = 0; i < items.length; i++)
-            _TimelineRow(
-              item: items[i],
-              isFirst: i == 0,
-              isLast: i == items.length - 1,
-            ),
-          const SizedBox(height: 10),
-          // Hairline separates the workout list from the coach voice —
-          // both grounded in the same surface, both with their own
-          // breathing room.
-          Container(
-            height: 1,
-            color: Colors.white.withValues(alpha: 0.08),
-          ),
+          // Gold-dot header — mirrors the Plan session panel's opening label
+          // so both tabs' session blocks read as one family.
+          const _BriefHeader(label: 'BÀI TẬP'),
           const SizedBox(height: 12),
-          _CoachVoice(
-            quote: coachQuote,
-            attribution: coachAttribution,
-          ),
+          for (var i = 0; i < items.length; i++) ...[
+            if (i > 0) const SizedBox(height: 8),
+            _BriefChip(item: items[i]),
+          ],
+          const SizedBox(height: 14),
+          // Hairline separates the workout list from the coach voice.
+          Container(height: 1, color: Colors.white.withValues(alpha: 0.08)),
+          const SizedBox(height: 12),
+          _CoachVoice(quote: coachQuote, attribution: coachAttribution),
         ],
       ),
     );
   }
 }
 
-class _TimelineRow extends StatelessWidget {
-  const _TimelineRow({
-    required this.item,
-    required this.isFirst,
-    required this.isLast,
-  });
-
-  final HomeStageExercise item;
-  final bool isFirst;
-  final bool isLast;
+/// Gold-dot + tracked label that opens the session panel — the dark-register
+/// twin of the Plan panel's `_EntryHeader`, so both tabs' blocks open alike.
+class _BriefHeader extends StatelessWidget {
+  const _BriefHeader({required this.label});
+  final String label;
 
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    // The AI signal: the exercise NAME itself is yellow when the
-    // camera-AI coach is wired for that slot. Pairs with the
-    // 'X có AI' yellow live-dot in the stat row above — the user
-    // connects "3 có AI" → "3 names in gold". No inline 'AI' text
-    // chip needed, no filled-vs-outlined dot pattern that read as
-    // inconsistency before.
-    final nameColor = item.hasAi ? c.yellow : c.invInk;
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            width: 22,
-            child: CustomPaint(
-              painter: _TimelinePainter(
-                isFirst: isFirst,
-                isLast: isLast,
-                lineColor: Colors.white.withValues(alpha: 0.18),
-                dotColor: c.yellow,
-              ),
-              child: const SizedBox.expand(),
-            ),
+    return Row(
+      children: [
+        Container(
+          width: 9,
+          height: 9,
+          decoration: BoxDecoration(
+            color: c.yellow,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(color: c.yellow.withValues(alpha: 0.5), blurRadius: 7),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 7),
-              // Single-line row: name on the left (ellipsizes if long),
-              // detail right-anchored. Drops ~18pt per row vs the prior
-              // stacked-2-line layout — major savings across 4 rows
-              // without losing rep-count context.
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: Text(
-                      item.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontFamily: 'BeVietnamPro',
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.3,
-                        color: nameColor,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    item.detail,
-                    style: TextStyle(
-                      fontFamily: 'BeVietnamPro',
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                      color: c.invInkFaint,
-                      fontFeatures: VikaIvoryMain.tabularFigures,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'BeVietnamPro',
+            fontSize: 10.5,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.6,
+            color: c.yellow,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
 
-class _TimelinePainter extends CustomPainter {
-  _TimelinePainter({
-    required this.isFirst,
-    required this.isLast,
-    required this.lineColor,
-    required this.dotColor,
-  });
+/// One exercise as a distinct dark chip — thumbnail + name + a glass volume
+/// pill, mirroring the Plan tab's powder exercise chips in the dark register.
+class _BriefChip extends StatelessWidget {
+  const _BriefChip({required this.item});
 
-  final bool isFirst;
-  final bool isLast;
-  final Color lineColor;
-  final Color dotColor;
+  final HomeStageExercise item;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final cx = size.width / 2;
-    final cy = size.height / 2;
-    const dotRadius = 6.5;
-    const gap = 2.5;
-
-    // Vertical connector lines — break above + below the dot. Heavier
-    // stroke than the prior 1.2pt for stronger scaffolding presence.
-    final linePaint = Paint()
-      ..color = lineColor
-      ..strokeWidth = 1.6
-      ..strokeCap = StrokeCap.round;
-    if (!isFirst) {
-      canvas.drawLine(
-        Offset(cx, 0),
-        Offset(cx, cy - dotRadius - gap),
-        linePaint,
-      );
-    }
-    if (!isLast) {
-      canvas.drawLine(
-        Offset(cx, cy + dotRadius + gap),
-        Offset(cx, size.height),
-        linePaint,
-      );
-    }
-
-    // Soft halo behind the dot — more substantial than before.
-    canvas.drawCircle(
-      Offset(cx, cy),
-      dotRadius + 3.5,
-      Paint()
-        ..color = dotColor.withValues(alpha: 0.28)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
-    );
-    // The dot itself — uniform yellow across all rows.
-    canvas.drawCircle(Offset(cx, cy), dotRadius, Paint()..color = dotColor);
-    // Thin ink ring carved out of the center — makes the dot feel more
-    // like a "node" / "checkpoint" than a sticker.
-    canvas.drawCircle(
-      Offset(cx, cy),
-      dotRadius,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.2
-        ..color = Colors.black.withValues(alpha: 0.18),
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          SessionExerciseThumb(
+            asset: item.thumbnailAsset,
+            size: 52,
+            radius: 13,
+            inverted: true,
+            showAi: item.hasAi,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              item.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: 'BeVietnamPro',
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.3,
+                color: c.invInk,
+              ),
+            ),
+          ),
+          if (item.detail.isNotEmpty) ...[
+            const SizedBox(width: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                item.detail,
+                style: TextStyle(
+                  fontFamily: 'BeVietnamPro',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.1,
+                  color: c.invInkSoft,
+                  fontFeatures: VikaIvoryMain.tabularFigures,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
-
-  @override
-  bool shouldRepaint(covariant _TimelinePainter old) =>
-      old.isFirst != isFirst ||
-      old.isLast != isLast ||
-      old.lineColor != lineColor ||
-      old.dotColor != dotColor;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -907,22 +860,22 @@ class _CoachVoice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
+    // Same CoachMark + italic line the Plan's ProgramCoachNote uses, so the
+    // coaching voice reads identically across tabs (here with attribution).
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 2),
-          child: _CoachMark(yellow: c.yellow, ink: c.ink),
+        const Padding(
+          padding: EdgeInsets.only(top: 1),
+          child: CoachMark(small: true),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 10),
         Expanded(
           child: RichText(
             text: TextSpan(
-              style: TextStyle(
-                fontFamily: 'BeVietnamPro',
-                fontSize: 13.5,
-                fontWeight: FontWeight.w600,
-                fontStyle: FontStyle.italic,
+              style: frauncesItalic(
+                size: 13.5,
+                weight: FontWeight.w600,
                 letterSpacing: -0.15,
                 height: 1.5,
                 color: c.invInk,
@@ -932,6 +885,7 @@ class _CoachVoice extends StatelessWidget {
                 TextSpan(
                   text: '   — $attribution',
                   style: TextStyle(
+                    fontFamily: 'BeVietnamPro',
                     fontStyle: FontStyle.normal,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.4,
@@ -946,58 +900,6 @@ class _CoachVoice extends StatelessWidget {
       ],
     );
   }
-}
-
-class _CoachMark extends StatelessWidget {
-  const _CoachMark({required this.yellow, required this.ink});
-  final Color yellow;
-  final Color ink;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 16,
-      height: 16,
-      child: CustomPaint(painter: _CoachPainter(yellow: yellow, ink: ink)),
-    );
-  }
-}
-
-class _CoachPainter extends CustomPainter {
-  const _CoachPainter({required this.yellow, required this.ink});
-  final Color yellow;
-  final Color ink;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final scale = size.width / 18;
-    Offset p(double x, double y) => Offset(x * scale, y * scale);
-
-    canvas.drawCircle(p(9, 9), 8.5 * scale, Paint()..color = yellow);
-    canvas.drawCircle(
-      p(9, 9),
-      8.5 * scale,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.8 * scale
-        ..color = ink,
-    );
-
-    final inkPaint = Paint()
-      ..color = ink
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.9 * scale
-      ..strokeCap = StrokeCap.round;
-    canvas.drawCircle(p(9, 5.5), 1.1 * scale, Paint()..color = ink);
-    canvas.drawLine(p(9, 6.6), p(9, 10), inkPaint);
-    canvas.drawLine(p(6.5, 8), p(11.5, 8), inkPaint);
-    canvas.drawLine(p(9, 10), p(7.5, 13), inkPaint);
-    canvas.drawLine(p(9, 10), p(10.5, 13), inkPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _CoachPainter old) =>
-      old.yellow != yellow || old.ink != ink;
 }
 
 // ═══════════════════════════════════════════════════════════════

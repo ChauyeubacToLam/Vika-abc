@@ -44,12 +44,12 @@ class _S08AnalyzingState extends State<S08Analyzing>
   List<String> get _steps => widget.data.fork == 'yoga'
       ? const [
           'Đánh giá mức độ thăng bằng',
-          'So sánh với  động tác chuẩn',
+          'So sánh với động tác chuẩn',
           'Xác định level & điểm cần cải thiện',
         ]
       : const [
           'Đánh giá độ sâu & form',
-          'So sánh với  động tác chuẩn',
+          'So sánh với động tác chuẩn',
           'Xác định level & điểm cần cải thiện',
         ];
 

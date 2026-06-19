@@ -37,6 +37,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data/home_mock.dart';
+import '../data/library_mock.dart';
 import '../screens/exercise/exercise_launch_args.dart';
 import '../services/recommendation/recommendation_service.dart';
 import '../services/recommendation/weekly_check_in_service.dart';
@@ -336,8 +337,7 @@ class _HomeHeroFromTarget extends StatelessWidget {
         totalCount: 0,
         aiCount: 0,
         exercises: [],
-        coachQuote:
-            'Vika chưa tìm thấy buổi tập camera phù hợp trong lộ trình hiện tại.',
+        coachQuote: 'Nghỉ ngơi nhé — để cơ thể hồi lại cho buổi tới.',
         coachAttribution: homeMockCoachAttribution,
         ctaLabel: '',
         onCta: null,
@@ -387,6 +387,7 @@ class _HomeHeroFromTarget extends StatelessWidget {
                 ? ''
                 : workoutVolumeLabel(item.prescription!),
             hasAi: true,
+            thumbnailAsset: exerciseThumbnailForId(item.definition.id),
           ),
         )
         .toList(growable: false);

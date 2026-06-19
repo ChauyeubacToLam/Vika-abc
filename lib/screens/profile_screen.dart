@@ -628,7 +628,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   // 5. Vóc dáng — body card.
                   _SectionHeader(
                     eyebrow: 'VÓC DÁNG',
-                    intro: 'Thông tin về của bạn. Sửa bất cứ lúc nào.',
+                    intro: 'Thông tin cơ thể của bạn. Sửa bất cứ lúc nào.',
                   ),
                   const SizedBox(height: 14),
                   Padding(

@@ -292,7 +292,7 @@ class _RecommendationStrip extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'LỊCH Tập CỦA BẠN theo tuần',
+                      'LỊCH TẬP CỦA BẠN THEO TUẦN',
                       style: V5.eyebrow(context, color: V5.invInkFaint),
                     ),
                     const SizedBox(height: 8),

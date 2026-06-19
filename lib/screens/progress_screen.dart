@@ -612,7 +612,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                         ? null
                         : '${_painReports!.length} VÙNG',
                     intro:
-                        'Chạm vào vùng đang đau để Vika ghi lại. Bạn cập nhật bất cứ lúc nào.',
+                        'Chạm vào vùng đang đau để Vika ghi lại. Cập nhật bất cứ lúc nào.',
                   ),
                   const SizedBox(height: 14),
                   Padding(
@@ -681,7 +681,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   _SectionHeader(
                     index: '05',
                     eyebrow: 'CHUỖI',
-                    intro: 'Chuỗi tuần hoạt động liên tiếp của bạn.',
+                    intro: 'Số tuần bạn hoạt động liên tiếp.',
                   ),
                   const SizedBox(height: 14),
                   _buildStreakStripSection(c, streakWeeks),

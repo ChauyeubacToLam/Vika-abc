@@ -131,6 +131,112 @@ const List<String> libraryCatalogGroupOrder = [
   'YOGA',
 ];
 
+/// Returns the catalog's muscle groups present in [rows], ordered by
+/// [libraryCatalogGroupOrder] first, then any unrecognized groups in
+/// first-seen order. Shared by the inline entry and the dedicated
+/// catalog screen so both agree on tab/chip order.
+List<String> orderedCatalogGroups(List<AllExerciseRowMock> rows) {
+  final seen = <String>{};
+  final ordered = <String>[];
+  for (final g in libraryCatalogGroupOrder) {
+    if (rows.any((r) => r.group == g)) {
+      ordered.add(g);
+      seen.add(g);
+    }
+  }
+  for (final r in rows) {
+    if (!seen.contains(r.group)) {
+      ordered.add(r.group);
+      seen.add(r.group);
+    }
+  }
+  return ordered;
+}
+
+/// Editorial masthead copy per catalog group. This is the scale seam: adding a
+/// new group = add rows (with that `group`) + one entry here. The catalog
+/// renders every group with the same `ExerciseGallerySection` — no widget
+/// changes. Unknown groups fall back to the raw group string + empty subtitle.
+class LibraryGroupEditorial {
+  const LibraryGroupEditorial({
+    required this.eyebrow,
+    required this.title,
+    required this.subtitle,
+  });
+  final String eyebrow;
+  final String title;
+  final String subtitle;
+}
+
+const Map<String, LibraryGroupEditorial> libraryGroupEditorial = {
+  'CHÂN · MÔNG': LibraryGroupEditorial(
+    eyebrow: 'NHÓM CƠ',
+    title: 'Chân & Mông',
+    subtitle: 'Gốc rễ của mọi chuyển động mạnh mẽ.',
+  ),
+  'CỐT LÕI': LibraryGroupEditorial(
+    eyebrow: 'NHÓM CƠ',
+    title: 'Cốt lõi',
+    subtitle: 'Trung tâm giữ thăng bằng và truyền lực.',
+  ),
+  'NGỰC · VAI': LibraryGroupEditorial(
+    eyebrow: 'NHÓM CƠ',
+    title: 'Ngực & Vai',
+    subtitle: 'Thân trên săn chắc, tư thế vững vàng.',
+  ),
+  'CARDIO': LibraryGroupEditorial(
+    eyebrow: 'TIM MẠCH',
+    title: 'Cardio',
+    subtitle: 'Nhịp tim lên, sức bền theo sau.',
+  ),
+  'YOGA': LibraryGroupEditorial(
+    eyebrow: 'YOGA & PHỤC HỒI',
+    title: 'Yoga',
+    subtitle: 'Dẻo dai, tĩnh tại và phục hồi.',
+  ),
+};
+
+/// Maps an engine/catalog exercise id (as used by the Plan ledger and the
+/// recommendation engine, e.g. 'squat_bw') onto a catalog thumbnail key (the
+/// keys of [libraryExerciseThumbnailAssets], e.g. 'squat'). Only ids that
+/// differ from the catalog key need an entry; matching ids resolve directly.
+const Map<String, String> _exerciseThumbnailAliases = {
+  // Plan / engine catalog ids.
+  'squat_bw': 'squat',
+  'glute_bridge_bw': 'glute_bridge',
+  'mcgill_curl_up': 'mcgill_curlup',
+  'warrior_i': 'warrior_one',
+  // ExerciseDefinition ids whose (normalized) name differs from the art key.
+  'curl_up': 'mcgill_curlup',
+  'wall_push_up': 'wall_pushup',
+  'v_up': 'vup',
+  'sit_up': 'situp',
+  'bow': 'bow_pose',
+  'butterfly_stretch': 'butterfly',
+  'side_plank_with_hip_dip': 'side_plank_dip',
+};
+
+/// Resolves a thumbnail asset for an exercise id coming from any source: the
+/// Library catalog (`definitionName`), the Plan/engine catalog (`exerciseId`),
+/// or an [ExerciseDefinition.id] (which can carry stray double/trailing
+/// underscores, e.g. `cobra_`, `bird__dog`). Returns null when no art exists —
+/// callers show a glyph/icon fallback.
+String? exerciseThumbnailForId(String? id) {
+  if (id == null || id.isEmpty) return null;
+  String? hit(String key) =>
+      libraryExerciseThumbnailAssets[key] ??
+      libraryExerciseThumbnailAssets[_exerciseThumbnailAliases[key] ?? ''];
+
+  final direct = hit(id);
+  if (direct != null) return direct;
+
+  // Normalize: collapse repeated underscores + trim a trailing/leading one,
+  // then retry (handles 'cobra_' → 'cobra', 'bird__dog' → 'bird_dog', …).
+  final norm =
+      id.replaceAll(RegExp(r'_+'), '_').replaceAll(RegExp(r'^_|_$'), '');
+  return norm == id ? null : hit(norm);
+}
+
 const Map<String, String> libraryExerciseThumbnailAssets = {
   'squat': 'assets/habt/squat.png',
   'lunge': 'assets/habt/lunge.png',
@@ -917,7 +1023,7 @@ final List<LibrarySection> librarySections = [
     eyebrow: 'BỘ TẬP',
     meta: '${libraryAlbumCards.length} BỘ',
     intro:
-        'Tuyển tập tập liền mạch. Chạm một lần, Vika chạy từng bài theo thứ tự.',
+        'Tuyển tập các bài tập liền mạch. Chạm một lần, Vika chạy từng bài theo thứ tự.',
     cards: libraryAlbumCards,
     filterKinds: const ['album'],
   ),
@@ -931,15 +1037,6 @@ final List<LibrarySection> librarySections = [
       LibraryStat(value: '${libraryAlbumCards.length}', label: 'Bộ tập'),
     ],
     filterKinds: const ['all'],
-  ),
-  LibrarySectionRail(
-    eyebrow: 'CÓ CAMERA AI',
-    meta: '${libraryAiExerciseCards.length} bài',
-    intro:
-        'Vika nhìn dáng, đếm rep, sửa form theo thời gian thực — như có HLV bên cạnh.',
-    cards: libraryAiExerciseCards,
-    showIndices: true,
-    filterKinds: const ['ai', 'exercise'],
   ),
   LibrarySectionCatalog(
     eyebrow: 'KHO BÀI TẬP',
