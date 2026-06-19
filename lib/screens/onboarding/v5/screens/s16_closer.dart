@@ -174,7 +174,7 @@ class _S16CloserState extends State<S16Closer>
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 12),
                             child: Text(
-                              'Mỗi buổi tập là một bước tới sưc khoẻ mà bạn muốn có được.',
+                              'Mỗi buổi tập là một bước tới sức khoẻ bạn mong muốn.',
                               textAlign: TextAlign.center,
                               maxLines: 3,
                               style: V5.body(context, color: V5.invInkSoft),

@@ -140,7 +140,7 @@ Future<_AppConfig> _loadAppConfig() async {
   if (supabaseUrl == null || supabaseAnonKey == null) {
     throw StateError(
       'Missing Supabase config. Provide SUPABASE_URL and '
-      'SUPABASE_ANON_KEY with --dart-define.',
+      'SUPABASE_ANON_KEY with --dart-define or bundled .env.',
     );
   }
 
@@ -246,7 +246,7 @@ class _VikaStartupErrorApp extends StatelessWidget {
                       const Text(
                         'Ứng dụng đang thiếu cấu hình máy chủ. Hãy thêm '
                         'SUPABASE_URL và SUPABASE_ANON_KEY bằng --dart-define '
-                        'hoặc biến bảo mật trên Codemagic.',
+                        'hoặc file .env được đóng gói trong build.',
                         style: TextStyle(
                           color: muted,
                           fontSize: 15,

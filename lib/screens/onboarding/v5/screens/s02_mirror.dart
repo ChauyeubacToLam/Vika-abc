@@ -37,13 +37,13 @@ class _S02MirrorState extends State<S02Mirror> {
     _PainStory(
       id: 'generic_apps',
       eyebrow: 'App tập đại trà',
-      quote: 'Bạn không có một lộ trình cá nhân hoá cho riêng mình để tập luyện hiệu quả.',
+      quote: 'Tập theo app đại trà, không có lộ trình riêng cho mình.',
       visual: _PainVisualKind.generic,
     ),
     _PainStory(
       id: 'pt_expensive',
       eyebrow: 'PT 1-1',
-      quote: 'Mong muốn có người hướng dẫn mình tập cho đúng, nhưng giá thành PT lại quá coa.',
+      quote: 'Mong có người hướng dẫn tập cho đúng, nhưng chi phí PT lại quá cao.',
       visual: _PainVisualKind.cost,
     ),
     _PainStory(
@@ -140,7 +140,7 @@ class _S02MirrorState extends State<S02Mirror> {
                 ),
                 SizedBox(height: r.pick(cozy: V5.space8, short: V5.space6)),
                 Text(
-                  'Chạm để chọn. Vuốt sàng để xem thêm.',
+                  'Chạm để chọn. Vuốt sang để xem thêm.',
                   style: V5.bodySm(context, color: V5.inkSoft),
                 ),
               ],

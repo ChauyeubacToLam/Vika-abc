@@ -259,7 +259,7 @@ class _PlanScreenState extends State<PlanScreen> {
         alignment: Alignment.center,
         padding: const EdgeInsets.symmetric(horizontal: 32),
         child: Text(
-          'Chưa có lộ trình. Hoàn tất phần thiết lập để Vika dựng kế hoạch cho bạn nhé.',
+          'Chưa có lộ trình. Hoàn tất thiết lập để Vika lên kế hoạch cho bạn nhé.',
           textAlign: TextAlign.center,
           style: TextStyle(color: c.inkSoft, height: 1.5),
         ),

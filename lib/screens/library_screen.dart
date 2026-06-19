@@ -24,7 +24,8 @@ import '../theme/app_colors.dart';
 import '../theme/vf_theme.dart';
 import '../widgets/library/library_album_rail.dart';
 import '../widgets/library/library_card.dart';
-import '../widgets/library/library_catalog_grouped.dart';
+import '../widgets/library/library_catalog_entry.dart';
+import 'library_catalog_screen.dart';
 import '../widgets/library/library_featured.dart';
 import '../widgets/library/library_featured_carousel.dart';
 import '../widgets/library/library_filter_chips.dart';
@@ -324,13 +325,26 @@ class _CatalogSection extends StatelessWidget {
   final List<AllExerciseRowMock> rows;
   final void Function(String?) onSelectByName;
 
+  void _openCatalog(BuildContext context, String? initialGroup) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => LibraryCatalogScreen(
+          rows: rows,
+          onSelectByName: onSelectByName,
+          initialGroup: initialGroup,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return LibraryCatalogGrouped(
+    return LibraryCatalogEntry(
       eyebrow: eyebrow,
       meta: meta,
       rows: rows,
       onSelectByName: onSelectByName,
+      onOpenCatalog: (group) => _openCatalog(context, group),
     );
   }
 }

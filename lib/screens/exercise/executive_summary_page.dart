@@ -1599,7 +1599,7 @@ class _DoneSection extends StatelessWidget {
                   padding: EdgeInsets.symmetric(vertical: 16 * s),
                   child: Center(
                     child: Text(
-                      'HoÃ n táº¥t',
+                      'Hoàn tất',
                       style: VFTheme.textStyle(
                         context,
                         size: 15,
@@ -2075,7 +2075,7 @@ String _heroSubtitle({
             : 'Bạn vừa đạt mức cao nhất ở chỉ số đang theo dõi';
       case ComparisonType.improvementStreak:
         return comparison.isPainLinked
-            ? 'Chuỗi tiến bộ ở vùng bạn tập trung..'
+            ? 'Chuỗi tiến bộ ở vùng bạn đang tập trung.'
             : 'Chuỗi tiến bộ của bạn vẫn đang dài hơn';
       case ComparisonType.aboveAverage:
         return comparison.secondaryLine ??
@@ -2094,7 +2094,7 @@ String _heroSubtitle({
   }
 
   if (isFirstSession) {
-    if (score >= 80) return 'Buổi đầu rất chắc , bạn thực sự có nền tảng tốt!';
+    if (score >= 80) return 'Buổi đầu rất chắc, mình thực sự có nền tảng tốt!';
     if (score >= 50) return 'Buổi đầu ổn rồi, mình đã có điểm khởi đầu tốt.';
     return 'Buổi đầu xong rồi, từ đây mình cải thiện theo từng buổi nhé.';
   }
