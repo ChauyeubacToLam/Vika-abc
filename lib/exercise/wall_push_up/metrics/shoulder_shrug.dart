@@ -19,56 +19,56 @@
    Baseline is essential — if it was never captured (ear hidden at
    hold-still) the metric stays inactive.
    ========================================================================= */
- 
+
 import '../wall_push_up.dart';
 import 'package:vika/utils/debouncer.dart';
- 
+
 class ShoulderShrugConfig {
-  static const double WARNING_SHRINK = 0.12; // 12% gap decrease
-  static const double ERROR_SHRINK = 0.18; // 18% gap decrease
+  static const double WARNING_SHRINK = 0.18; // 12% gap decrease
+  static const double ERROR_SHRINK = 0.28; // 18% gap decrease
 }
- 
+
 class ShoulderShrugMetric extends WallPushUpMetricBase {
   @override
   String get name => 'ShoulderShrug';
- 
+
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
- 
+
   final Debouncer _warningDebouncer = Debouncer(requiredFrames: 10);
   final Debouncer _errorDebouncer = Debouncer(requiredFrames: 12);
- 
+
   /// Resting ratio captured at hold-still. Persists for the whole set.
   double? _baseline;
   bool _instructionSet = false;
- 
+
   @override
   List<FaultRecord> get faults => _faults;
- 
+
   @override
   Map<String, dynamic> get debugData => _debugData;
- 
+
   @override
   void captureBaseline(double? value) {
     if (value != null && value > 0) _baseline = value;
   }
- 
+
   @override
   void update(RepContext ctx) {
     final ratio = ctx.shrugRatio;
     if (ratio == null || _baseline == null) return;
- 
+
     final shrink = (_baseline! - ratio) / _baseline!; // + = shrugging
     final phase = ctx.state.toString().split('.').last.toUpperCase();
     _debugData['shrugShrink'] = '${(shrink * 100).toStringAsFixed(0)}%';
- 
+
     final bool isError = shrink > ShoulderShrugConfig.ERROR_SHRINK;
     final bool isWarning = shrink > ShoulderShrugConfig.WARNING_SHRINK &&
         shrink <= ShoulderShrugConfig.ERROR_SHRINK;
- 
+
     final bool errorConfirmed = _errorDebouncer.update(isError);
     final bool warningConfirmed = _warningDebouncer.update(isWarning);
- 
+
     if (errorConfirmed) {
       ctx.resultIssues.feedback['Shoulders'] = 'Hạ vai xuống, đừng nhún vai!';
       if (!_instructionSet) {
@@ -90,11 +90,11 @@ class ShoulderShrugMetric extends WallPushUpMetricBase {
     } else {
       ctx.resultIssues.feedback['Shoulders'] = 'Vai thả lỏng tốt!';
     }
- 
+
     _debugData['shrugStatus'] =
         _faults.isNotEmpty ? '⚠️ ${_faults.last.message}' : '✅';
   }
- 
+
   void _logFault(String phase, String message,
       {String? voiceMessage, required bool affectsForm}) {
     if (!_faults.any((f) => f.phase == phase && f.message == message)) {
@@ -107,7 +107,7 @@ class ShoulderShrugMetric extends WallPushUpMetricBase {
       ));
     }
   }
- 
+
   @override
   void reset() {
     _faults.clear();

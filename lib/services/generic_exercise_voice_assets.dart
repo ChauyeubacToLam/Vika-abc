@@ -3,6 +3,8 @@ class GenericExerciseVoiceAssets {
   static const String assetBundlePrefix = 'assets/audio';
 
   static const Map<String, String> commonFiles = {
+    'common.ngang_intro': 'common/ngang_intro.mp3',
+    'common.thang_intro': 'common/th\u1eb3ng_intro.mp3',
     'common.ready': 'common/ready.mp3',
     'common.start': 'common/start.mp3',
     'common.keep_full_body': 'common/keep_full_body.mp3',
@@ -69,6 +71,7 @@ class GenericExerciseVoiceAssets {
     ),
     'Jumping Jack': GenericExerciseVoiceScript(
       slug: 'jumping_jack',
+      setupIntroCueId: 'common.thang_intro',
       faultIds: ['arms', 'legs', 'tempo_fast', 'tempo_slow'],
     ),
     'Push Up': GenericExerciseVoiceScript(
@@ -166,6 +169,7 @@ class GenericExerciseVoiceAssets {
     ),
     'Butterfly Stretch': GenericExerciseVoiceScript(
       slug: 'butterfly_stretch',
+      setupIntroCueId: 'common.thang_intro',
       cleanCueId: 'hold_good',
       faultIds: ['foot', 'knee', 'posture', 'shoulder'],
     ),
@@ -176,6 +180,7 @@ class GenericExerciseVoiceAssets {
     ),
     'Cossack Squat': GenericExerciseVoiceScript(
       slug: 'cossack_squat',
+      setupIntroCueId: 'common.thang_intro',
       faultIds: [
         'heel',
         'knee_valgus',
@@ -187,6 +192,7 @@ class GenericExerciseVoiceAssets {
     ),
     'Jump Squat': GenericExerciseVoiceScript(
       slug: 'jump_squat',
+      setupIntroCueId: 'common.thang_intro',
       faultIds: [
         'too_fast',
         'landing_stiff',
@@ -197,6 +203,7 @@ class GenericExerciseVoiceAssets {
     ),
     'Russian Twist': GenericExerciseVoiceScript(
       slug: 'russian_twist',
+      setupIntroCueId: 'common.thang_intro',
       faultIds: ['knee', 'too_upright', 'too_low', 'spine', 'thoracic', 'rom'],
     ),
     'Seated Forward Fold': GenericExerciseVoiceScript(
@@ -206,6 +213,7 @@ class GenericExerciseVoiceAssets {
     ),
     'Side Plank with Hip Dip': GenericExerciseVoiceScript(
       slug: 'side_plank_dip',
+      setupIntroCueId: 'common.thang_intro',
       faultIds: ['shoulder', 'rotation', 'amplitude'],
     ),
     'Sphinx Pose': GenericExerciseVoiceScript(
@@ -222,6 +230,7 @@ class GenericExerciseVoiceAssets {
     ),
     'Standing Knee-to-Elbow': GenericExerciseVoiceScript(
       slug: 'standing_kte',
+      setupIntroCueId: 'common.thang_intro',
       faultIds: [
         'core_drive',
         'cross_rom',
@@ -232,6 +241,7 @@ class GenericExerciseVoiceAssets {
     ),
     'Step-Back Burpee': GenericExerciseVoiceScript(
       slug: 'step_back_burpee',
+      setupIntroCueId: 'common.thang_intro',
       faultIds: ['squat_hinge', 'squat_depth', 'plank_sag', 'plank_extension'],
     ),
     'Tricep Dip (Floor)': GenericExerciseVoiceScript(
@@ -240,6 +250,7 @@ class GenericExerciseVoiceAssets {
     ),
     'Walking Lunge': GenericExerciseVoiceScript(
       slug: 'walking_lunge',
+      setupIntroCueId: 'common.thang_intro',
       faultIds: [
         'front_knee',
         'rear_depth',
@@ -305,6 +316,12 @@ class GenericExerciseVoiceAssets {
         GenericExerciseVoiceScript(slug: _fallbackSlug(exerciseName));
   }
 
+  static String setupIntroKeyForExerciseName(String exerciseName) {
+    final script = scriptForExerciseName(exerciseName);
+    if (script.slug == 'jumping_jack') return 'common.thang_intro';
+    return script.setupIntroKey;
+  }
+
   static String? resolveAsset(String key) {
     final value = key.trim();
     if (value.isEmpty || value.startsWith('common.')) return null;
@@ -314,17 +331,54 @@ class GenericExerciseVoiceAssets {
 
     final slug = value.substring(0, dotIndex);
     final id = value.substring(dotIndex + 1);
-    if (id == 'setup_intro' ||
-        id == 'setup_position' ||
+    final dir = _assetDirectoryForSlug(slug);
+    final specialCue = _specialCueFilename('$slug.$id');
+    if (specialCue != null) {
+      return '$dir/$specialCue';
+    }
+
+    if (id == 'setup_position' ||
         id == 'active_intro' ||
         id == 'good_clean' ||
         id == 'hold_good' ||
         id == 'set_next_setup') {
-      return '$slug/$slug.$id.mp3';
+      final filename =
+          _usesPlainCueFilenames(slug) ? '$id.mp3' : '$slug.$id.mp3';
+      return '$dir/$filename';
     }
 
-    if (id.startsWith('set_next_')) return '$slug/$id.mp3';
-    return '$slug/$id.mp3';
+    if (id.startsWith('set_next_')) return '$dir/$id.mp3';
+    return '$dir/$id.mp3';
+  }
+
+  static String _assetDirectoryForSlug(String slug) {
+    if (slug == 'curl_up') return 'mc_gill_curl_up';
+    return slug;
+  }
+
+  static bool _usesPlainCueFilenames(String slug) {
+    const plainCueSlugs = {
+      'cobra',
+      'cossack_squat',
+      'jump_squat',
+      'russian_twist',
+      'seated_forward_fold',
+      'side_plank_dip',
+      'sphinx',
+      'standing_kte',
+      'step_back_burpee',
+      'tricep_dip',
+      'walking_lunge',
+    };
+    return plainCueSlugs.contains(slug);
+  }
+
+  static String? _specialCueFilename(String key) {
+    const specialCueFiles = {
+      'jump_squat.setup_position': 'set_up position.mp3',
+      'seated_forward_fold.setup_position': 'set_up position.mp3',
+    };
+    return specialCueFiles[key];
   }
 
   static String _fallbackSlug(String value) {
@@ -348,13 +402,20 @@ class GenericExerciseVoiceAssets {
 class GenericExerciseVoiceScript {
   const GenericExerciseVoiceScript({
     required this.slug,
+    this.setupIntroCueId = 'common.ngang_intro',
     this.cleanCueId = 'good_clean',
     this.faultIds = const [],
   });
 
   final String slug;
+  final String setupIntroCueId;
   final String cleanCueId;
   final List<String> faultIds;
+
+  String get setupIntroKey {
+    if (slug == 'jumping_jack') return 'common.thang_intro';
+    return cueKey(setupIntroCueId);
+  }
 
   String cueKey(String id) {
     if (id.startsWith('common.')) return id;

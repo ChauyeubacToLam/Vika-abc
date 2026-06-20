@@ -3,8 +3,8 @@ import '../../../utils/debouncer.dart';
 
 class PostureConfig {
   // Nếu vai nghiêng > 10% so với chiều dài lưng
-  static const double TILT_THRESHOLD = 0.10;
-  static const double COLLAPSE_THRESHOLD = 0.60;
+  static const double TILT_THRESHOLD = 0.18;
+  static const double COLLAPSE_THRESHOLD = 0.48;
 }
 
 class PostureMetric extends ButterflyMetricBase {
@@ -13,8 +13,8 @@ class PostureMetric extends ButterflyMetricBase {
 
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
-  final Debouncer _tiltDebouncer = Debouncer(requiredFrames: 5);
-  final Debouncer _collapseDebouncer = Debouncer(requiredFrames: 5);
+  final Debouncer _tiltDebouncer = Debouncer(requiredFrames: 7);
+  final Debouncer _collapseDebouncer = Debouncer(requiredFrames: 7);
 
   bool _tiltInstructionSet = false;
   bool _collapseInstructionSet = false;

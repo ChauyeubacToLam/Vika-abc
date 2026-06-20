@@ -2,6 +2,7 @@
 
 import 'dart:math' as math;
 
+import 'package:vika/debug/tracked_metric.dart';
 import 'package:vika/utils/debouncer.dart';
 
 import '../../utils/pose_math_helpers.dart';
@@ -21,10 +22,10 @@ class JumpingJackConfig {
   static const int MAX_REP = 30;
 
   // All normalized to shoulder width for body-size independence
-  static const double OPEN_ANKLE_SPREAD_THRESHOLD = 1.2;
-  static const double CLOSED_ANKLE_SPREAD_THRESHOLD = 0.5;
-  static const double OPEN_ARM_ELEVATION_MIN = 105.0;
-  static const double CLOSED_ARM_ELEVATION_MAX = 100.0;
+  static const double OPEN_ANKLE_SPREAD_THRESHOLD = 1.0;
+  static const double CLOSED_ANKLE_SPREAD_THRESHOLD = 0.65;
+  static const double OPEN_ARM_ELEVATION_MIN = 90.0;
+  static const double CLOSED_ARM_ELEVATION_MAX = 110.0;
 }
 
 enum JJState { closed, open }
@@ -59,6 +60,17 @@ class JumpingJack extends ExerciseBase {
     legSpreadMetric,
     tempoMetric,
   ];
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
 
   // Shoulder width as scale factor for front view
   double? _shoulderWidth;

@@ -7,7 +7,7 @@ class AnkleDorsiflexionMetric extends SeatedForwardMetricBase {
 
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
-  final Debouncer _ankleDebouncer = Debouncer(requiredFrames: 4);
+  final Debouncer _ankleDebouncer = Debouncer(requiredFrames: 6);
   bool _instructionSet = false;
   bool _isFaultingNow = false;
 

@@ -1,5 +1,6 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, non_constant_identifier_names
 
+import 'package:vika/debug/tracked_metric.dart';
 import 'package:vika/utils/debouncer.dart';
 import '../../utils/exercise_logger.dart';
 import '../../utils/pose_math_helpers.dart';
@@ -12,10 +13,10 @@ import 'metrics/plank_form_metric.dart';
 
 class BurpeeConfig {
   static const int MAX_REP = 15;
-  static const double STANDING_BODY_ANGLE = 165.0; // Góc đứng thẳng
+  static const double STANDING_BODY_ANGLE = 155.0; // Góc đứng thẳng
 
   // Ngưỡng khoảng cách ngang (X) để xác định Plank (đơn vị tương đối)
-  static const double PLANK_MIN_DIST_X = 0.65; // normalized by torso length
+  static const double PLANK_MIN_DIST_X = 0.55; // normalized by torso length
 }
 
 class StepBackBurpee extends ExerciseBase {
@@ -43,6 +44,17 @@ class StepBackBurpee extends ExerciseBase {
     squatHingeMetric,
     plankFormMetric,
   ];
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
 
   @override
   String get exerciseName => 'Step-Back Burpee';

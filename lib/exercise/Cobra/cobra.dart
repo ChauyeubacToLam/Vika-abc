@@ -1,6 +1,7 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, non_constant_identifier_names, constant_identifier_names
 
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:vika/debug/tracked_metric.dart';
 import 'package:vika/exercise/exercise_base.dart';
 import 'package:vika/utils/debouncer.dart';
 import 'package:vika/utils/pose_math_helpers.dart';
@@ -28,16 +29,16 @@ class CobraConfig {
   static const double HORIZONTAL_CLOCK_RIGHT = 90.0;
 
   // In prone position, trunk is roughly horizontal
-  static const double PRONE_TOLERANCE = 25.0;
+  static const double PRONE_TOLERANCE = 35.0;
 
   // For Cobra holding, trunk must be elevated by at least 25 degrees from horizontal
-  static const double COBRA_MIN_ELEVATION = 25.0;
+  static const double COBRA_MIN_ELEVATION = 18.0;
 
   // Calibration: frames to average for baseline
   static const int CALIBRATION_FRAMES = 20;
 
-  static const double COBRA_OVEREXTENSION_MAX = 65.0;
-  static const double COBRA_ELBOW_LOCKOUT_MIN = 179.0;
+  static const double COBRA_OVEREXTENSION_MAX = 78.0;
+  static const double COBRA_ELBOW_LOCKOUT_MIN = 170.0;
 }
 
 enum CobraState { setup, holding, resting }
@@ -78,6 +79,17 @@ class Cobra extends ExerciseBase {
     _pelvicMetric, // MET-5: IMPORTANT (safety)
     _holdStabilityMetric, // MET-6: NICE-TO-HAVE
   ];
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
 
   // --- MET-7: Calibration Baselines ---
   final List<double> _calibrationHipYSamples = [];

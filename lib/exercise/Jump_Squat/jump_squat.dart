@@ -2,6 +2,7 @@
 
 import 'dart:math' as math;
 
+import 'package:vika/debug/tracked_metric.dart';
 import '../../utils/debouncer.dart';
 import '../../utils/exercise_logger.dart';
 import '../../utils/pose_math_helpers.dart';
@@ -18,16 +19,16 @@ class JumpSquatConfig {
   static const int MAX_REP = 12; // Advanced plyometric mức thấp để giữ form
 
   // Góc chuyển trạng thái cơ bản
-  static const double STANDING_KNEE_THRESHOLD = 160.0;
-  static const double SQUATTING_KNEE_THRESHOLD = 150.0;
+  static const double STANDING_KNEE_THRESHOLD = 150.0;
+  static const double SQUATTING_KNEE_THRESHOLD = 140.0;
 
   // Khoảng cách lơ lửng (Airborne): Tọa độ Y nhỏ hơn mức sàn bao nhiêu thì tính là bay
   // Tùy thuộc vào độ phân giải, tạm dùng mức chênh lệch tương đối
-  static const double AIRBORNE_FOOT_LIFT_LOWER_LEG_RATIO = 0.10;
-  static const double AIRBORNE_FOOT_LIFT_TORSO_RATIO = 0.06;
-  static const double AIRBORNE_HIP_LIFT_TORSO_RATIO = 0.08;
-  static const double GROUND_CONTACT_LIFT_RATIO = 0.45;
-  static const int MIN_REP_DURATION_MS = 450;
+  static const double AIRBORNE_FOOT_LIFT_LOWER_LEG_RATIO = 0.07;
+  static const double AIRBORNE_FOOT_LIFT_TORSO_RATIO = 0.04;
+  static const double AIRBORNE_HIP_LIFT_TORSO_RATIO = 0.05;
+  static const double GROUND_CONTACT_LIFT_RATIO = 0.55;
+  static const int MIN_REP_DURATION_MS = 350;
 }
 
 // --- Jump Squat ---
@@ -68,6 +69,17 @@ class JumpSquat extends ExerciseBase {
     takeOffDepthMetric,
     landingTrunkMetric,
   ];
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
 
   @override
   String get exerciseName => 'Jump Squat';
@@ -156,7 +168,8 @@ class JumpSquat extends ExerciseBase {
 
   @override
   void onSetComplete() {
-    logger.pushKey("stiff_landing_fails_count", landingFlexionMetric.faultsCount);
+    logger.pushKey(
+        "stiff_landing_fails_count", landingFlexionMetric.faultsCount);
     logger.pushKey("shallow_dip_fails_count", takeOffDepthMetric.faultsCount);
     logger.pushKey("trunk_lean_fails_count", landingTrunkMetric.faultsCount);
     logger.pushGoodRepCount();

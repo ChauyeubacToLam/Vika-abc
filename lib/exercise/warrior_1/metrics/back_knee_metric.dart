@@ -25,8 +25,8 @@ import '../warrior_one.dart';
 import '../../../utils/debouncer.dart';
 
 class BackKneeConfig {
-  static const double GOOD_THRESHOLD = 160.0;
-  static const double WARN_THRESHOLD = 150.0; // 150–160 = warning
+  static const double GOOD_THRESHOLD = 145.0;
+  static const double WARN_THRESHOLD = 130.0; // 150–160 = warning
   // < 150 = coaching fault
 }
 

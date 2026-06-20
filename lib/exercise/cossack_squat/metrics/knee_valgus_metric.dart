@@ -2,7 +2,7 @@ import 'cossack_metric_base.dart';
 import '../cossack_squat.dart';
 
 class CossackKneeValgusMetric extends CossackMetricBase {
-  static const double _valgusNormThreshold = 0.08;
+  static const double _valgusNormThreshold = 0.14;
 
   @override
   void update(CossackRepContext ctx) {

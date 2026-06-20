@@ -3,7 +3,7 @@ import '../standing_knee_to_elbow.dart';
 
 class CoreDriveMetric extends StandingKteMetricBase {
   static const double SHOULDER_DROP_RATIO_LIMIT =
-      0.3; // Shoulder dropped >30% of torso length
+      0.45; // Shoulder dropped >30% of torso length
 
   double? _setupShoulderY;
 

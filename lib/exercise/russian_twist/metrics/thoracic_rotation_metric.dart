@@ -2,7 +2,7 @@ import 'russian_metric_base.dart';
 import '../russian_twist.dart';
 
 class ThoracicRotationMetric extends RussianMetricBase {
-  static const double SHOULDER_MOVEMENT_MIN = 0.10;
+  static const double SHOULDER_MOVEMENT_MIN = 0.06;
 
   double? _setupShoulderHipDx;
 

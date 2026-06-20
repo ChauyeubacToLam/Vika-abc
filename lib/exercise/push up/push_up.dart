@@ -3,6 +3,7 @@
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:vika/debug/tracked_metric.dart';
 import 'package:vika/utils/debouncer.dart';
 import 'package:vika/utils/frame_buffer.dart';
 
@@ -41,22 +42,22 @@ class PushUpConfig {
   static const double POSITION_STABLE_GATE_MIN_PIXELS = 1.5;
 
   // High-plank setup gates.
-  static const double START_ARM_MIN = 150.0;
+  static const double START_ARM_MIN = 155.0;
   static const double START_BODY_MIN = 160.0;
-  static const double START_KNEE_MIN = 145.0;
-  static const double FLOOR_CONTACT_Y_TOLERANCE = 0.45;
-  static const double WRIST_BELOW_SHOULDER_MIN = 0.45;
+  static const double START_KNEE_MIN = 150.0;
+  static const double FLOOR_CONTACT_Y_TOLERANCE = 0.40;
+  static const double WRIST_BELOW_SHOULDER_MIN = 0.50;
   static const double ANKLE_BELOW_HIP_MIN = 0.10;
 
   // Active anti-cheat gates. These are intentionally looser than setup so
   // normal fatigue wobble is coached by metrics instead of rejected.
   static const double ACTIVE_BODY_LINE_MIN = 150.0;
-  static const double ACTIVE_SHOULDER_ABOVE_WRIST_RATIO = 0.05;
-  static const double ACTIVE_KNEE_SUPPORT_CLEARANCE_RATIO = 0.05;
+  static const double ACTIVE_SHOULDER_ABOVE_WRIST_RATIO = 0.10;
+  static const double ACTIVE_KNEE_SUPPORT_CLEARANCE_RATIO = 0.08;
   static const double WRIST_Y_DRIFT_MAX_RATIO = 0.22;
-  static const double WRIST_Y_DRIFT_MIN_PIXELS = 24.0;
+  static const double WRIST_Y_DRIFT_MIN_PIXELS = 18.0;
   static const double HEEL_Y_DRIFT_MAX_RATIO = 0.28;
-  static const double HEEL_Y_DRIFT_MIN_PIXELS = 30.0;
+  static const double HEEL_Y_DRIFT_MIN_PIXELS = 24.0;
 }
 
 enum PushUpState { plank, descending, bottom, ascending }
@@ -127,6 +128,17 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
     depthMetric,
     tempoMetric,
   ];
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
 
   @override
   Map<String, SideLandmarkPair> get requiredSideLandmarks => const {

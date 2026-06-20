@@ -1,6 +1,7 @@
 import '../exercise/bow_pose/bow_pose.dart';
 import '../exercise/exercise_base.dart';
 import 'bow_pose_voice_assets.dart';
+import 'generic_exercise_voice_assets.dart';
 import 'queued_asset_voice_player.dart';
 
 abstract class BowPoseVoicePlayer {
@@ -14,9 +15,13 @@ class _BowPoseAssetVoicePlayer implements BowPoseVoicePlayer {
   _BowPoseAssetVoicePlayer({QueuedAssetVoicePlayer? player})
       : _player = player ??
             QueuedAssetVoicePlayer(
-              assetMap: BowPoseVoiceAssets.files,
+              assetMap: {
+                ...GenericExerciseVoiceAssets.commonFiles,
+                ...BowPoseVoiceAssets.files,
+              },
               assetSourcePrefix: BowPoseVoiceAssets.assetSourcePrefix,
               assetBundlePrefix: BowPoseVoiceAssets.assetBundlePrefix,
+              assetResolver: GenericExerciseVoiceAssets.resolveAsset,
               logTag: 'BowPoseVoice',
             );
 
@@ -63,7 +68,7 @@ class BowPoseVoiceCoach implements ExerciseVoiceCoach {
     final repIncreased = repCount > _lastRepCount;
 
     if (exercise.exerciseState == ExerciseState.notActivated) {
-      _speakSetup();
+      _speakSetup(exercise);
       _lastRepCount = repCount;
       return;
     }
@@ -115,12 +120,14 @@ class BowPoseVoiceCoach implements ExerciseVoiceCoach {
     _lastRepCount = repCount;
   }
 
-  void _speakSetup() {
+  void _speakSetup(ExerciseBase exercise) {
     if (_didSpeakSetup) return;
 
-    _voicePlayer.speak('bow_pose.setup_intro');
-    _voicePlayer.speak('bow_pose.setup_position');
-    _voicePlayer.speak('bow_pose.active_intro');
+    final script =
+        GenericExerciseVoiceAssets.scriptForExerciseName(exercise.exerciseName);
+    _voicePlayer.speak(script.setupIntroKey);
+    _voicePlayer.speak(script.cueKey('setup_position'));
+    _voicePlayer.speak(script.cueKey('active_intro'));
     _didSpeakSetup = true;
   }
 

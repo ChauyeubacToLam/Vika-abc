@@ -20,55 +20,55 @@
      Error:   > 25°       (10-frame debounce)
      affectsForm = false  (coaching only)
    ========================================================================= */
- 
+
 import '../wall_push_up.dart';
 import 'package:vika/utils/debouncer.dart';
- 
+
 class CervicalExtensionConfig {
-  static const double WARNING_DEVIATION = 15.0;
-  static const double ERROR_DEVIATION = 25.0;
+  static const double WARNING_DEVIATION = 22.0;
+  static const double ERROR_DEVIATION = 35.0;
 }
- 
+
 class CervicalExtensionMetric extends WallPushUpMetricBase {
   @override
   String get name => 'CervicalExtension';
- 
+
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
- 
+
   final Debouncer _debouncer = Debouncer(requiredFrames: 10);
- 
+
   double? _baseline;
   bool _instructionSet = false;
- 
+
   @override
   List<FaultRecord> get faults => _faults;
- 
+
   @override
   Map<String, dynamic> get debugData => _debugData;
- 
+
   @override
   void captureBaseline(double? value) {
     if (value != null) _baseline = value;
   }
- 
+
   @override
   void update(RepContext ctx) {
     // Phase gate: descending/bottom only.
     final inPhase = ctx.state == WallPushUpState.descending ||
         ctx.state == WallPushUpState.bottom;
     if (!inPhase) return;
- 
+
     final angle = ctx.neckTiltAngle;
     if (angle == null || _baseline == null) return;
- 
+
     final deviation = _baseline! - angle; // + = tilting back / looking up
     final phase = ctx.state.toString().split('.').last.toUpperCase();
     _debugData['neckDev'] = '${deviation.toStringAsFixed(0)}°';
- 
+
     final bool isOff = deviation > CervicalExtensionConfig.WARNING_DEVIATION;
     final bool confirmed = _debouncer.update(isOff);
- 
+
     if (confirmed) {
       if (deviation > CervicalExtensionConfig.ERROR_DEVIATION) {
         ctx.resultIssues.feedback['Neck'] = 'Giữ cổ thẳng, nhìn về phía trước.';
@@ -90,11 +90,11 @@ class CervicalExtensionMetric extends WallPushUpMetricBase {
     } else {
       ctx.resultIssues.feedback['Neck'] = 'Cổ giữ thẳng tốt!';
     }
- 
+
     _debugData['neckStatus'] =
         _faults.isNotEmpty ? '⚠️ ${_faults.last.message}' : '✅';
   }
- 
+
   void _logFault(String phase, String message, {String? voiceMessage}) {
     if (!_faults.any((f) => f.phase == phase && f.message == message)) {
       _faults.add(FaultRecord(
@@ -106,7 +106,7 @@ class CervicalExtensionMetric extends WallPushUpMetricBase {
       ));
     }
   }
- 
+
   @override
   void reset() {
     _faults.clear();
@@ -116,4 +116,3 @@ class CervicalExtensionMetric extends WallPushUpMetricBase {
     // NOTE: _baseline intentionally preserved across reps.
   }
 }
- 

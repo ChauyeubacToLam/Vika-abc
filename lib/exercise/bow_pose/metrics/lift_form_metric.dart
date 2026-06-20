@@ -2,8 +2,8 @@ import 'bow_pose_metric_base.dart';
 import '../../../../utils/debouncer.dart';
 
 class LiftConfig {
-  static const double CHEST_GOOD_MIN = 0.06;
-  static const double THIGH_GOOD_MIN = 0.02;
+  static const double CHEST_GOOD_MIN = 0.04;
+  static const double THIGH_GOOD_MIN = 0.012;
 }
 
 class LiftFormMetric extends BowPoseMetricBase {
@@ -13,8 +13,8 @@ class LiftFormMetric extends BowPoseMetricBase {
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
 
-  final Debouncer _thighDebouncer = Debouncer(requiredFrames: 4);
-  final Debouncer _chestDebouncer = Debouncer(requiredFrames: 4);
+  final Debouncer _thighDebouncer = Debouncer(requiredFrames: 6);
+  final Debouncer _chestDebouncer = Debouncer(requiredFrames: 6);
 
   double _maxChestLift = 0.0;
   double _maxThighLift = 0.0;

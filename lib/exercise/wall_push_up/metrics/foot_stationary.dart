@@ -23,8 +23,8 @@ import '../wall_push_up.dart';
 import 'package:vika/utils/debouncer.dart';
 
 class FootStationaryConfig {
-  static const double WARNING_MOVE = 0.20;
-  static const double ERROR_MOVE = 0.30;
+  static const double WARNING_MOVE = 0.30;
+  static const double ERROR_MOVE = 0.45;
 }
 
 class FootStationaryMetric extends WallPushUpMetricBase {

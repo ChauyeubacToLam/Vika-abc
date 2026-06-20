@@ -28,8 +28,8 @@ import '../wall_push_up.dart';
 import 'package:vika/utils/debouncer.dart';
 
 class BodyLineConfig {
-  static const double GOOD_MIN = 165.0;
-  static const double ERROR_MAX = 155.0; // < this = error
+  static const double GOOD_MIN = 150.0;
+  static const double ERROR_MAX = 140.0; // < this = error
 }
 
 class BodyLineMetric extends WallPushUpMetricBase {

@@ -17,7 +17,7 @@ import '../wall_push_up.dart';
 import 'package:vika/utils/debouncer.dart';
 
 class WallContactConfig {
-  static const double MAX_HAND_DRIFT_RATIO = 0.08;
+  static const double MAX_HAND_DRIFT_RATIO = 0.14;
 }
 
 class WallContactMetric extends WallPushUpMetricBase {

@@ -24,17 +24,17 @@ import '../../../utils/debouncer.dart';
 
 class ArmPositionConfig {
   /// Sub-A: arms considered "raised enough" to bother checking the elbow.
-  static const double RAISED_GATE = 30.0;
+  static const double RAISED_GATE = 45.0;
 
   /// Sub-A: above this from vertical = arms too low.
-  static const double TOO_LOW = 40.0;
+  static const double TOO_LOW = 55.0;
 
   /// Sub-A good band.
   static const double GOOD_MIN = 0.0;
-  static const double GOOD_MAX = 40.0;
+  static const double GOOD_MAX = 55.0;
 
   /// Sub-B: below this = elbow too bent.
-  static const double ELBOW_TOO_BENT = 150.0;
+  static const double ELBOW_TOO_BENT = 135.0;
 }
 
 class ArmPositionMetric extends WarriorOneMetricBase {

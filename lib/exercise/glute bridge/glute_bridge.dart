@@ -1,5 +1,6 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, non_constant_identifier_names, constant_identifier_names
 
+import 'package:vika/debug/tracked_metric.dart';
 import 'package:vika/utils/debouncer.dart';
 
 import '../../utils/pose_math_helpers.dart';
@@ -23,20 +24,20 @@ class GluteBridgeConfig {
   // Screen coords: y increases downward.
   //   Hip RISING  → velocity NEGATIVE
   //   Hip FALLING → velocity POSITIVE
-  static const double ASCENDING_VELOCITY_THRESHOLD = -2.5;
-  static const double DESCENDING_VELOCITY_THRESHOLD = 2.5;
-  static const double REST_VELOCITY_THRESHOLD = 1.5;
+  static const double ASCENDING_VELOCITY_THRESHOLD = -1.8;
+  static const double DESCENDING_VELOCITY_THRESHOLD = 1.8;
+  static const double REST_VELOCITY_THRESHOLD = 2.0;
 
   // --- Hip elevation thresholds (fraction of scaleFactor) ---
   /// Minimum rise to be counted as elevated (TOP_HOLD detection).
-  static const double HIP_ELEVATED_RATIO = 0.10;
+  static const double HIP_ELEVATED_RATIO = 0.07;
 
   /// Pixel fallback when scaleFactor is unavailable.
-  static const double HIP_ELEVATED_PIXELS = 15.0;
+  static const double HIP_ELEVATED_PIXELS = 10.0;
 
   /// Hip must return within this fraction of scaleFactor to baseline.
-  static const double BOTTOM_TOLERANCE_RATIO = 0.08;
-  static const double BOTTOM_TOLERANCE_PIXELS = 12.0;
+  static const double BOTTOM_TOLERANCE_RATIO = 0.12;
+  static const double BOTTOM_TOLERANCE_PIXELS = 18.0;
 
   // --- Start-position geometry ---
   /// Trunk clock-angle target (degrees from vertical, clockwise).
@@ -45,15 +46,15 @@ class GluteBridgeConfig {
   static const double HORIZONTAL_CLOCK_RIGHT = 90.0;
 
   /// Tolerance around horizontal target (degrees).
-  static const double HORIZONTAL_TOLERANCE = 30.0;
+  static const double HORIZONTAL_TOLERANCE = 40.0;
 
   /// Acceptable knee flexion range for starting posture (hip–knee–ankle).
-  static const double KNEE_ANGLE_MIN = 70.0;
-  static const double KNEE_ANGLE_MAX = 150.0;
+  static const double KNEE_ANGLE_MIN = 60.0;
+  static const double KNEE_ANGLE_MAX = 160.0;
 
   /// Max hip-to-shoulder vertical offset for flat-lying check.
-  static const double HIP_SHOULDER_RATIO = 0.25; // fraction of scaleFactor
-  static const double HIP_SHOULDER_PIXELS = 40.0;
+  static const double HIP_SHOULDER_RATIO = 0.35; // fraction of scaleFactor
+  static const double HIP_SHOULDER_PIXELS = 55.0;
 }
 
 /* =========================================================================
@@ -113,6 +114,17 @@ class GluteBridge extends ExerciseBase {
     speedControlMetric,
     neckHeadMetric,
   ];
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
 
   @override
   double? get liveHoldSeconds =>

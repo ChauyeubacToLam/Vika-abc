@@ -12,11 +12,11 @@ class CobraHandPlacementMetric extends CobraMetricBase {
   String get name => 'HandPlacement';
 
   // Beginner thresholds (normalized by shoulder-hip distance)
-  static const double _goodMin = 0.10;
-  static const double _goodMax = 0.40;
-  static const double _warningTooFar = 0.40;
-  static const double _warningTooClose = 0.08;
-  static const double _errorTooFar = 0.45;
+  static const double _goodMin = 0.06;
+  static const double _goodMax = 0.50;
+  static const double _warningTooFar = 0.50;
+  static const double _warningTooClose = 0.04;
+  static const double _errorTooFar = 0.60;
 
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};

@@ -1,3 +1,5 @@
+// ignore_for_file: annotate_overrides
+
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../exercise_base.dart';
 import 'package:vika/exercise/side_tracked_exercise_mixin.dart';
@@ -41,11 +43,13 @@ class StandingKteRepContext {
   });
 }
 
-abstract class StandingKteMetricBase {
+abstract class StandingKteMetricBase with FaultMetricDebugSource {
   int _faultsCount = 0;
   final List<FaultRecord> _faults = [];
   Map<String, dynamic> debugData = {};
 
+  @override
+  String get name => runtimeType.toString();
   int get faultsCount => _faultsCount;
   List<FaultRecord> get faults => List.unmodifiable(_faults);
 

@@ -15,6 +15,16 @@ class TempoMetric extends DeadBugMetricBase {
   Map<String, dynamic> get debugData => _debugData;
 
   @override
+  double? get value {
+    final liveDuration = _debugData['extendingSeconds'];
+    return extendingDuration ??
+        (liveDuration is num ? liveDuration.toDouble() : null);
+  }
+
+  @override
+  ThresholdBand? get threshold => const ThresholdBand(faultBelow: 1.5);
+
+  @override
   void onStateTransition(DeadBugState from, DeadBugState to, int timestampMs) {
     if (to == DeadBugState.extending) {
       _extendingStartMs = timestampMs;
@@ -24,7 +34,14 @@ class TempoMetric extends DeadBugMetricBase {
   }
 
   @override
-  void update(DeadBugRepContext ctx) {}
+  void update(DeadBugRepContext ctx) {
+    if (_extendingStartMs != null &&
+        (ctx.state == DeadBugState.extending ||
+            ctx.state == DeadBugState.hold)) {
+      _debugData['extendingSeconds'] =
+          (ctx.frameTimestampMs - _extendingStartMs!) / 1000.0;
+    }
+  }
 
   void evaluateRep(DeadBugRepContext ctx) {
     // Không được thả tay chân rơi rầm xuống (< 1.5s là quá nhanh)
@@ -45,6 +62,7 @@ class TempoMetric extends DeadBugMetricBase {
   @override
   void reset() {
     _faults.clear();
+    _debugData.clear();
     _extendingStartMs = null;
     extendingDuration = null;
   }

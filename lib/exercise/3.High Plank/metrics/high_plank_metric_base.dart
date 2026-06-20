@@ -49,7 +49,14 @@ abstract class HighPlankMetricBase implements DebugMetricSource {
   @override
   ThresholdBand? get threshold => null;
   @override
-  MetricStatus get status => MetricStatus.pass;
+  MetricStatus get status {
+    if (faults.any((fault) => fault.affectsForm)) {
+      return MetricStatus.fault;
+    }
+    if (faults.isNotEmpty) return MetricStatus.near;
+    return MetricStatus.pass;
+  }
+
   @override
   String? get nameVi => null;
   @override

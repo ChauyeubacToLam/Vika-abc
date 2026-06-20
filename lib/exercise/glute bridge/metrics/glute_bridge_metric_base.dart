@@ -1,3 +1,5 @@
+// ignore_for_file: annotate_overrides
+
 /* =========================================================================
    GluteBridgeMetricBase — Abstract base for all glute-bridge form metrics.
 
@@ -82,7 +84,7 @@ class RepContext {
 /* =========================================================================
    GluteBridgeMetricBase — Interface every glute-bridge metric implements.
    ========================================================================= */
-abstract class GluteBridgeMetricBase {
+abstract class GluteBridgeMetricBase with FaultMetricDebugSource {
   int faultsCount = 0;
 
   String get name;

@@ -4,7 +4,7 @@ import 'russian_metric_base.dart';
 import '../russian_twist.dart';
 
 class KneeAnchoringMetric extends RussianMetricBase {
-  static const double KNEE_WOBBLE_RATIO_LIMIT = 0.20;
+  static const double KNEE_WOBBLE_RATIO_LIMIT = 0.32;
 
   double? _setupKneeX;
   double? _setupKneeY;

@@ -1,4 +1,4 @@
-// ignore_for_file: constant_identifier_names, non_constant_identifier_names
+// ignore_for_file: constant_identifier_names, non_constant_identifier_names, annotate_overrides
 
 /* =========================================================================
    LungeMetricBase — Abstract base for all lunge form metrics.
@@ -50,7 +50,7 @@ class LungeRepContext {
 /* =========================================================================
    LungeMetricBase — Interface every lunge metric implements.
    ========================================================================= */
-abstract class LungeMetricBase {
+abstract class LungeMetricBase with FaultMetricDebugSource {
   int faultsCount = 0;
 
   /// Human-readable name for debug/logging.

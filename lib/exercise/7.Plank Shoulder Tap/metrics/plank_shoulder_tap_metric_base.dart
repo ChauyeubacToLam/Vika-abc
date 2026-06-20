@@ -1,4 +1,4 @@
-// ignore_for_file: constant_identifier_names
+// ignore_for_file: constant_identifier_names, annotate_overrides
 import '../../exercise_base.dart';
 import '../../fault_record.dart';
 export '../../fault_record.dart';
@@ -10,18 +10,18 @@ class PlankTapConfig {
   static const int MAX_DURATION_MS = 90000;
 
   // Body line: shoulder-hip-ankle should stay nearly straight.
-  static const List<double> TRUNK_STRAIGHT_RANGE = [170.0, 180.0];
+  static const List<double> TRUNK_STRAIGHT_RANGE = [160.0, 180.0];
 
   // State machine thresholds normalized by shoulder-hip distance.
-  static const double LIFT_START_THRESHOLD = 0.85;
-  static const double TAP_DISTANCE_THRESHOLD = 0.70;
-  static const double WRIST_LIFT_START_THRESHOLD = 0.10;
-  static const double WRIST_RETURN_THRESHOLD = 0.04;
+  static const double LIFT_START_THRESHOLD = 0.78;
+  static const double TAP_DISTANCE_THRESHOLD = 0.62;
+  static const double WRIST_LIFT_START_THRESHOLD = 0.08;
+  static const double WRIST_RETURN_THRESHOLD = 0.06;
 
-  static const double HIP_ROTATION_TOLERANCE = 0.15;
-  static const double HIP_WIDTH_DRIFT_TOLERANCE = 0.10;
-  static const double TRUNK_SAG_THRESHOLD = 160.0;
-  static const double MIN_TAP_TIME = 0.5;
+  static const double HIP_ROTATION_TOLERANCE = 0.22;
+  static const double HIP_WIDTH_DRIFT_TOLERANCE = 0.16;
+  static const double TRUNK_SAG_THRESHOLD = 150.0;
+  static const double MIN_TAP_TIME = 0.35;
 }
 
 class PlankTapVoicePriority {
@@ -55,7 +55,7 @@ class RepContext {
   });
 }
 
-abstract class PlankTapMetricBase {
+abstract class PlankTapMetricBase with FaultMetricDebugSource {
   String get name;
   int faultsCount = 0;
 

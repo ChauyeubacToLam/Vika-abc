@@ -19,13 +19,22 @@ class FloorContactMetric extends DeadBugMetricBase {
   Map<String, dynamic> get debugData => _debugData;
 
   @override
+  double? get value => _debugData['maxExtensionAngle'] is num
+      ? (_debugData['maxExtensionAngle'] as num).toDouble()
+      : double.tryParse('${_debugData['maxExtensionAngle'] ?? ''}');
+
+  @override
+  ThresholdBand? get threshold =>
+      const ThresholdBand(warningAbove: 155.0, faultAbove: _floorContactAngle);
+
+  @override
   void update(DeadBugRepContext ctx) {
     if (ctx.state != DeadBugState.extending && ctx.state != DeadBugState.hold) {
       return;
     }
 
     final maxAngle = ctx.maxExtensionAngle;
-    _debugData['maxExtensionAngle'] = maxAngle.toStringAsFixed(1);
+    _debugData['maxExtensionAngle'] = maxAngle;
 
     if (_faultDebouncer.update(maxAngle >= _floorContactAngle)) {
       ctx.resultIssues.feedback['Floor'] = 'Đừng để tay hoặc chân chạm sàn.';

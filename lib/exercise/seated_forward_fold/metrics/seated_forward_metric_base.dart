@@ -1,22 +1,24 @@
+// ignore_for_file: annotate_overrides
+
 import '../../exercise_base.dart';
 import '../../fault_record.dart';
 export '../../fault_record.dart';
 
 class SeatedForwardConfig {
-  static const List<double> Ah_Start_Hip_Angle = [80.0, 110.0];
-  static const double Ak_Start_Knee_Angle = 170.0;
-  static const double Ak_Fault_Knee_Angle = 165.0;
-  static const double As_Fault_Spine_Angle = 140.0;
+  static const List<double> Ah_Start_Hip_Angle = [65.0, 125.0];
+  static const double Ak_Start_Knee_Angle = 155.0;
+  static const double Ak_Fault_Knee_Angle = 145.0;
+  static const double As_Fault_Spine_Angle = 125.0;
 
   static const double Av_Stable_Velocity = 5.0;
   static const int At_Min_Hold_Time = 15;
   static const int At_Num_Holds = 3;
 
-  static const double Ad_Fault_Ankle_Angle = 115.0;
-  static const double Ascending_Threshold = 5.0;
+  static const double Ad_Fault_Ankle_Angle = 100.0;
+  static const double Ascending_Threshold = 8.0;
 
   // Ngưỡng góc hông tối thiểu để được phép bắt đầu đếm Hold (Safety Floor)
-  static const double Ah_Hold_Safety_Floor = 70.0;
+  static const double Ah_Hold_Safety_Floor = 55.0;
 }
 
 enum SeatedForwardState { setup, descending, isometricHold, ascending }
@@ -52,7 +54,7 @@ class SeatedForwardFaultVoicePriority {
   static const int holdTempo = 3;
 }
 
-abstract class SeatedForwardMetricBase {
+abstract class SeatedForwardMetricBase with FaultMetricDebugSource {
   String get name;
   int faultsCount = 0;
 

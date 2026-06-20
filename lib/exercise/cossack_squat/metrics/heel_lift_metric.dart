@@ -2,10 +2,20 @@ import 'cossack_metric_base.dart';
 import '../cossack_squat.dart';
 
 class CossackHeelLiftMetric extends CossackMetricBase {
-  static const double HEEL_LIFT_THRESHOLD = 0.04; // Normalized distance
+  static const double HEEL_LIFT_THRESHOLD = 0.08; // Normalized distance
+
+  @override
+  double? get value => debugData['workingHeelDistance'] as double?;
+
+  @override
+  ThresholdBand? get threshold =>
+      const ThresholdBand(warningAbove: 0.06, faultAbove: HEEL_LIFT_THRESHOLD);
 
   @override
   void update(CossackRepContext ctx) {
+    debugData['workingHeelDistance'] = ctx.workingHeelDistance;
+    debugData['workingLeg'] = ctx.workingLeg.name;
+
     if (ctx.state == CossackState.standing ||
         ctx.workingLeg == WorkingLeg.none) {
       return;

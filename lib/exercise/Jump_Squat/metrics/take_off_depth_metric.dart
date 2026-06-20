@@ -9,9 +9,9 @@
 import 'jump_squat_metric_base.dart';
 
 class TakeOffConfig {
-  static const double GOOD_DEPTH_MIN = 70.0;
-  static const double GOOD_DEPTH_MAX = 90.0;
-  static const double SHALLOW_WARNING = 100.0;
+  static const double GOOD_DEPTH_MIN = 60.0;
+  static const double GOOD_DEPTH_MAX = 110.0;
+  static const double SHALLOW_WARNING = 125.0;
 }
 
 class TakeOffDepthMetric extends JumpSquatMetricBase {

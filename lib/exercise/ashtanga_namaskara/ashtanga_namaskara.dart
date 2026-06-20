@@ -1,6 +1,7 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, non_constant_identifier_names, constant_identifier_names
 
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:vika/debug/tracked_metric.dart';
 import 'package:vika/exercise/exercise_base.dart';
 import 'package:vika/utils/debouncer.dart';
 import 'package:vika/utils/pose_math_helpers.dart';
@@ -16,15 +17,15 @@ enum AshtangaState { entry, recognized, holding, exit }
 
 class AshtangaConfig {
   static const int MAX_REP = 1;
-  static const double MICRO_HOLD_DURATION = 4.0;
+  static const double MICRO_HOLD_DURATION = 3.0;
   static const double EXIT_DURATION = 2.0;
   static const int RECOGNITION_WINDOW_MS = 500;
-  static const int SETUP_STILL_FRAMES = 6;
+  static const int SETUP_STILL_FRAMES = 4;
   static const int CALIBRATION_FRAMES = 12;
 
-  static const double START_HIP_RATIO_MIN = 0.12;
-  static const double START_KNEE_ANKLE_MAX = 1.0;
-  static const double START_CHEST_LOW_MIN = 0.05;
+  static const double START_HIP_RATIO_MIN = 0.08;
+  static const double START_KNEE_ANKLE_MAX = 1.2;
+  static const double START_CHEST_LOW_MIN = 0.035;
   static const double HOLD_VELOCITY_MAX = 0.08;
   static const double BREAK_VELOCITY_MIN = 0.22;
 }
@@ -60,6 +61,17 @@ class AshtangaNamaskara extends ExerciseBase {
     _hipCollapseMetric,
     _cervicalSafetyMetric,
   ];
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
 
   final List<double> _calibrationScaleSamples = [];
   final List<double> _calibrationCervicalSamples = [];

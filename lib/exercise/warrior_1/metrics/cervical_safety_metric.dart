@@ -37,7 +37,7 @@ import '../../../utils/debouncer.dart';
 
 class CervicalSafetyConfig {
   /// At/above this the neck is fine.
-  static const double GOOD_THRESHOLD = 140.0;
+  static const double GOOD_THRESHOLD = 125.0;
 
   /// Rolling median window over the computed angle.
   static const int MEDIAN_WINDOW = 7;

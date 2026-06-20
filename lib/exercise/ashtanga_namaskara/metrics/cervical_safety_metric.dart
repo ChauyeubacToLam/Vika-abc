@@ -13,8 +13,8 @@ class CervicalSafetyMetric extends AshtangaMetricBase {
   @override
   String get name => 'CervicalSafety';
 
-  static const double _goodMin = 130.0;
-  static const double _errorMax = 115.0;
+  static const double _goodMin = 118.0;
+  static const double _errorMax = 100.0;
   static const int _medianWindow = 7;
   static const double _minEarConfidence = 0.5;
 

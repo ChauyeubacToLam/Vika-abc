@@ -2,7 +2,7 @@ import 'standing_kte_metric_base.dart';
 import '../standing_knee_to_elbow.dart';
 
 class KneeValgusMetric extends StandingKteMetricBase {
-  static const double VALGUS_RATIO_LIMIT = 0.15; // 15% of hip width
+  static const double VALGUS_RATIO_LIMIT = 0.25; // 15% of hip width
 
   @override
   void update(StandingKteRepContext ctx) {

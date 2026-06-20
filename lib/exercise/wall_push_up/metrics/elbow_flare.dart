@@ -25,11 +25,11 @@ import '../wall_push_up.dart';
 import 'package:vika/utils/debouncer.dart';
 
 class ElbowFlareConfig {
-  static const double GOOD_MAX = 55.0;
-  static const double ERROR_MIN = 70.0; // > this = error
+  static const double GOOD_MAX = 65.0;
+  static const double ERROR_MIN = 82.0; // > this = error
 
   /// Only check flare when the arm is actually bending into the rep.
-  static const double PHASE_GATE_ELBOW = 150.0;
+  static const double PHASE_GATE_ELBOW = 140.0;
 }
 
 class ElbowFlareMetric extends WallPushUpMetricBase {

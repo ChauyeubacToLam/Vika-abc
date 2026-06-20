@@ -11,27 +11,27 @@ class VUpConfig {
   static const int TIMEOUT_MS = 90000;
 
   // Start position must be a real flat, extended V-up baseline.
-  static const double START_BODY_MIN = 170.0;
-  static const double START_KNEE_MIN = 165.0;
-  static const double START_TRUNK_HORIZ_MAX = 12.0;
-  static const double START_LEG_HORIZ_MAX = 12.0;
-  static const double START_Y_SPREAD_MAX = 0.22;
-  static const double START_WRIST_ANKLE_DIST_MIN = 2.2;
+  static const double START_BODY_MIN = 162.0;
+  static const double START_KNEE_MIN = 155.0;
+  static const double START_TRUNK_HORIZ_MAX = 18.0;
+  static const double START_LEG_HORIZ_MAX = 18.0;
+  static const double START_Y_SPREAD_MAX = 0.30;
+  static const double START_WRIST_ANKLE_DIST_MIN = 1.9;
 
   // Rep gating.
   static const int REP_READY_FRAMES = 3;
-  static const double RISING_ANGLE = 155.0;
-  static const double RISING_MIN_LIFT = 0.10;
-  static const double V_POSITION_THRESHOLD = 100.0;
-  static const double ROM_TARGET_ANGLE = 100.0;
-  static const double TOP_TRUNK_HORIZ_MIN = 25.0;
-  static const double TOP_LEG_HORIZ_MIN = 25.0;
-  static const double TOP_MIN_LIFT = 0.25;
-  static const double TOP_WRIST_ANKLE_DIST_MAX = 1.35;
-  static const double TOP_WRIST_ANKLE_CLOSURE_MIN = 1.1;
-  static const double ACTIVE_KNEE_MIN = 160.0;
-  static const double LOWERING_THRESHOLD_DIFF = 8.0;
-  static const double LYING_ANGLE = 165.0;
+  static const double RISING_ANGLE = 160.0;
+  static const double RISING_MIN_LIFT = 0.08;
+  static const double V_POSITION_THRESHOLD = 112.0;
+  static const double ROM_TARGET_ANGLE = 112.0;
+  static const double TOP_TRUNK_HORIZ_MIN = 18.0;
+  static const double TOP_LEG_HORIZ_MIN = 18.0;
+  static const double TOP_MIN_LIFT = 0.18;
+  static const double TOP_WRIST_ANKLE_DIST_MAX = 1.55;
+  static const double TOP_WRIST_ANKLE_CLOSURE_MIN = 0.85;
+  static const double ACTIVE_KNEE_MIN = 148.0;
+  static const double LOWERING_THRESHOLD_DIFF = 6.0;
+  static const double LYING_ANGLE = 158.0;
 }
 
 class VUpRepContext {
@@ -129,7 +129,14 @@ abstract class VUpMetricBase implements DebugMetricSource {
   @override
   ThresholdBand? get threshold => null;
   @override
-  MetricStatus get status => MetricStatus.pass;
+  MetricStatus get status {
+    if (faults.any((fault) => fault.affectsForm)) {
+      return MetricStatus.fault;
+    }
+    if (faults.isNotEmpty) return MetricStatus.near;
+    return MetricStatus.pass;
+  }
+
   @override
   String? get nameVi => null;
   @override

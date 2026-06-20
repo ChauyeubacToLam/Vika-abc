@@ -28,16 +28,16 @@ import 'curl_up_metric_base.dart';
 
 class KneeExtensionConfig {
   /// Knee angle at or above which the leg is locked — fault, fail rep.
-  static const double ERROR_THRESHOLD = 175.0;
+  static const double ERROR_THRESHOLD = 168.0;
 
   /// Warning band: drifting toward straight but not yet locked.
-  static const double WARNING_THRESHOLD = 165.0;
+  static const double WARNING_THRESHOLD = 155.0;
 
   /// Baseline-relative deviation that triggers a live nudge chip.
   /// Activation guarantees baseline is ~90° (≤ 100° max), so 15° drift
   /// means the user has crept up to ~110°. Visible signal but not a
   /// fault — they can self-correct.
-  static const double DEVIATION_WARNING = 15.0;
+  static const double DEVIATION_WARNING = 25.0;
 }
 
 /// Tracks the highest fault level reached so far this rep (absolute check).

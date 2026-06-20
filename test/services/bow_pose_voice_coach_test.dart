@@ -55,7 +55,7 @@ void main() {
     expect(
       player.spoken,
       [
-        'bow_pose.setup_intro',
+        'common.ngang_intro',
         'bow_pose.setup_position',
         'bow_pose.active_intro',
       ],

@@ -3,10 +3,19 @@ import '../cossack_squat.dart';
 
 class CossackStraightLegMetric extends CossackMetricBase {
   static const double STRAIGHT_LEG_MIN_ANGLE =
-      160.0; // Lenient threshold for straight leg
+      145.0; // Lenient threshold for straight leg
+
+  @override
+  double? get value => debugData['straightKneeAngle'] as double?;
+
+  @override
+  ThresholdBand? get threshold => const ThresholdBand(
+      warningBelow: 155.0, faultBelow: STRAIGHT_LEG_MIN_ANGLE);
 
   @override
   void update(CossackRepContext ctx) {
+    debugData['straightKneeAngle'] = ctx.straightKneeAngle;
+
     if (ctx.state == CossackState.standing ||
         ctx.workingLeg == WorkingLeg.none) {
       return;

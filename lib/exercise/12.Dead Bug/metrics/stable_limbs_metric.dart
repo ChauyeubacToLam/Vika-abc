@@ -15,6 +15,12 @@ class StableLimbsMetric extends DeadBugMetricBase {
   Map<String, dynamic> get debugData => _debugData;
 
   @override
+  double? get value => _debugData['supportMaxAngle'] as double?;
+
+  @override
+  ThresholdBand? get threshold => const ThresholdBand(faultAbove: 115.0);
+
+  @override
   void update(DeadBugRepContext ctx) {
     if (ctx.state == DeadBugState.extending || ctx.state == DeadBugState.hold) {
       // Tìm chi ĐANG DUỖI (>125)
@@ -31,6 +37,15 @@ class StableLimbsMetric extends DeadBugMetricBase {
       bool rArmUnstable = !rArmExt && ctx.rightArmAngle > 115.0;
       bool lHipUnstable = !lHipExt && ctx.leftHipAngle > 115.0;
       bool rHipUnstable = !rHipExt && ctx.rightHipAngle > 115.0;
+      final supportAngles = <double>[
+        if (!lArmExt) ctx.leftArmAngle,
+        if (!rArmExt) ctx.rightArmAngle,
+        if (!lHipExt) ctx.leftHipAngle,
+        if (!rHipExt) ctx.rightHipAngle,
+      ];
+      _debugData['supportMaxAngle'] = supportAngles.isEmpty
+          ? 0.0
+          : supportAngles.reduce((a, b) => a > b ? a : b);
 
       if (_faultDebouncer.update(
           lArmUnstable || rArmUnstable || lHipUnstable || rHipUnstable)) {
@@ -51,6 +66,7 @@ class StableLimbsMetric extends DeadBugMetricBase {
   @override
   void reset() {
     _faults.clear();
+    _debugData.clear();
     _faultDebouncer.reset();
   }
 }

@@ -2,14 +2,28 @@ import 'cossack_metric_base.dart';
 import '../cossack_squat.dart';
 
 class CossackWorkingDepthMetric extends CossackMetricBase {
-  static const double MIN_DEPTH_ANGLE = 60.0;
+  static const double MIN_DEPTH_ANGLE = 50.0;
   static const double MAX_DEPTH_ANGLE =
-      95.0; // Allow a bit more than 90 for leniency
+      115.0; // Allow a bit more than 90 for leniency
 
   bool _reachedDepth = false;
 
   @override
+  double? get value => debugData['workingKneeAngle'] as double?;
+
+  @override
+  ThresholdBand? get threshold => const ThresholdBand(
+        warningAbove: MAX_DEPTH_ANGLE + 10.0,
+        faultAbove: MAX_DEPTH_ANGLE + 20.0,
+        warningBelow: MIN_DEPTH_ANGLE + 5.0,
+        faultBelow: MIN_DEPTH_ANGLE,
+      );
+
+  @override
   void update(CossackRepContext ctx) {
+    debugData['workingKneeAngle'] = ctx.workingKneeAngle;
+    debugData['reachedDepth'] = _reachedDepth ? 1 : 0;
+
     if (ctx.state == CossackState.standing) return;
 
     if (ctx.workingKneeAngle <= MAX_DEPTH_ANGLE) {

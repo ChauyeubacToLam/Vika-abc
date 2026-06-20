@@ -8,11 +8,11 @@
 import 'step_back_burpee_metric_base.dart';
 
 class PlankConfig {
-  static const double SAG_WARNING = 160.0;
-  static const double SAG_DANGER = 150.0; // Góc trục thân (võng)
+  static const double SAG_WARNING = 150.0;
+  static const double SAG_DANGER = 140.0; // Góc trục thân (võng)
 
-  static const double SHORT_STEP_WARNING = 160.0; // Góc hông mở (bear plank)
-  static const double ARM_BENT_WARNING = 150.0; // Góc khuỷu tay
+  static const double SHORT_STEP_WARNING = 145.0; // Góc hông mở (bear plank)
+  static const double ARM_BENT_WARNING = 135.0; // Góc khuỷu tay
 }
 
 class PlankFormMetric extends StepBackBurpeeMetricBase {

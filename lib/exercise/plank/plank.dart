@@ -1,6 +1,7 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, non_constant_identifier_names, constant_identifier_names
 
 import 'package:vika/exercise/exercise_base.dart';
+import 'package:vika/debug/tracked_metric.dart';
 import 'package:vika/utils/debouncer.dart';
 import 'package:vika/utils/exercise_logger.dart';
 
@@ -27,19 +28,19 @@ class PlankConfig {
   static const double HORIZONTAL_CLOCK_RIGHT = 90.0;
 
   // Max deviation from horizontal to count as valid plank (degrees)
-  static const double PLANK_POSITION_TOLERANCE = 25.0;
+  static const double PLANK_POSITION_TOLERANCE = 35.0;
 
   // Forearm plank gates copied from Plank Up-Down.
-  static const double BODY_ALIGNMENT_START_MIN = 170.0;
-  static const double BODY_ALIGNMENT_HOLD_MIN = 160.0;
-  static const double KNEE_EXTENSION_MIN = 150.0;
-  static const double ELBOW_FOREARM_MAX = 110.0;
+  static const double BODY_ALIGNMENT_START_MIN = 160.0;
+  static const double BODY_ALIGNMENT_HOLD_MIN = 150.0;
+  static const double KNEE_EXTENSION_MIN = 140.0;
+  static const double ELBOW_FOREARM_MAX = 125.0;
 
   // Trunk deviation thresholds for form assessment
-  static const double SAG_GOOD_MAX = 4.5;
-  static const double SAG_WARNING_MAX = 5.5;
-  static const double PIKE_GOOD_MAX = 1.5;
-  static const double PIKE_WARNING_MAX = 3.0;
+  static const double SAG_GOOD_MAX = 8.0;
+  static const double SAG_WARNING_MAX = 12.0;
+  static const double PIKE_GOOD_MAX = 4.0;
+  static const double PIKE_WARNING_MAX = 8.0;
 }
 
 enum PlankState { setup, holding, resting }
@@ -84,6 +85,17 @@ class Plank extends ExerciseBase {
     headNeckMetric,
     kneeExtensionMetric,
   ];
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
 
   // --- UI Bridge ---
 

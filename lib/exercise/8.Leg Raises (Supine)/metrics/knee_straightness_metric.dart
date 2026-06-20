@@ -6,6 +6,7 @@ class KneeStraightnessMetric extends LegRaiseMetricBase {
   String get name => 'KneeStraightness';
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
+  double? _kneeStraightnessAngle;
 
   final Debouncer _faultDebouncer = Debouncer(requiredFrames: 3);
 
@@ -15,10 +16,22 @@ class KneeStraightnessMetric extends LegRaiseMetricBase {
   Map<String, dynamic> get debugData => _debugData;
 
   @override
+  double? get value => _kneeStraightnessAngle;
+
+  @override
+  ThresholdBand? get threshold => const ThresholdBand(
+        warningBelow: LegRaiseConfig.START_KNEE_STRAIGHT_MIN + 10.0,
+        faultBelow: LegRaiseConfig.START_KNEE_STRAIGHT_MIN,
+      );
+
+  @override
   void update(LegRaiseRepContext ctx) {
     if (ctx.state == LegRaiseState.lying) return; // Không bắt lúc đang nằm thở
 
     // Yêu cầu góc gối >= 160 độ trong suốt quá trình rep
+    _kneeStraightnessAngle = ctx.kneeStraightnessAngle;
+    _debugData['kneeStraightnessAngle'] = ctx.kneeStraightnessAngle;
+
     if (_faultDebouncer.update(
         ctx.kneeStraightnessAngle < LegRaiseConfig.START_KNEE_STRAIGHT_MIN)) {
       if (!_faults.any((f) => f.type == 'BentKnee')) {
@@ -37,6 +50,8 @@ class KneeStraightnessMetric extends LegRaiseMetricBase {
   @override
   void reset() {
     _faults.clear();
+    _debugData.clear();
+    _kneeStraightnessAngle = null;
     _faultDebouncer.reset();
   }
 }

@@ -1,5 +1,6 @@
 // ignore_for_file: curly_braces_in_flow_control_structures
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:vika/debug/tracked_metric.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/frame_snapshot.dart';
 import '../exercise_base.dart';
@@ -77,6 +78,17 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
     tempoMetric,
     armMetric
   ];
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
 
   // =========================================================================
   // FIX: THÊM CÁC OVERRIDE BẮT BUỘC TỪ ExerciseBase
@@ -319,25 +331,23 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
       _minTrunkKneeAngleThisRep = ctx.trunkKneeAngle;
       _trackRepPeak(ctx);
       if (ctx.isContractionPosition) _sawContractionThisRep = true;
-    } else if (_topDebouncer.update(
-        crunchState == ReverseCrunchState.curling &&
-            _sawContractionThisRep &&
-            ctx.isLegThrustPeak)) {
+    } else if (_topDebouncer.update(crunchState == ReverseCrunchState.curling &&
+        _sawContractionThisRep &&
+        ctx.isLegThrustPeak)) {
       _sawLegThrustThisRep = true;
       _trackRepPeak(ctx);
       _transitionState(ReverseCrunchState.top, ctx.frameTimestamp);
-    } else if (_loweringDebouncer.update(
-        crunchState == ReverseCrunchState.top &&
-            (ctx.legHorizontalAngle <
-                    ReverseCrunchConfig.PEAK_EXIT_LEG_VERTICAL_MIN ||
-                ctx.kneeAngle <
-                    ReverseCrunchConfig.PEAK_EXIT_KNEE_EXTENSION_MIN ||
-                ctx.hipLiftNormalized <
-                    _maxHipLiftThisRep -
-                        ReverseCrunchConfig.HIP_LIFT_MIN_NORMALIZED))) {
+    } else if (_loweringDebouncer.update(crunchState ==
+            ReverseCrunchState.top &&
+        (ctx.legHorizontalAngle <
+                ReverseCrunchConfig.PEAK_EXIT_LEG_VERTICAL_MIN ||
+            ctx.kneeAngle < ReverseCrunchConfig.PEAK_EXIT_KNEE_EXTENSION_MIN ||
+            ctx.hipLiftNormalized <
+                _maxHipLiftThisRep -
+                    ReverseCrunchConfig.HIP_LIFT_MIN_NORMALIZED))) {
       _transitionState(ReverseCrunchState.lowering, ctx.frameTimestamp);
-    } else if (_lyingDebouncer.update(crunchState == ReverseCrunchState.curling &&
-        ctx.isSetupPosition)) {
+    } else if (_lyingDebouncer.update(
+        crunchState == ReverseCrunchState.curling && ctx.isSetupPosition)) {
       _rejectRepAttempt(
           ctx, 'Chưa duỗi chân lên ở đỉnh nên rep này chưa được tính.');
     } else if (_lyingDebouncer.update(
@@ -488,26 +498,22 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
         ? 0.0
         : _baselineTrunkKneeAngle! - trunkKneeAngle;
 
-    final isSetupPosition =
-        kneeAngle >= ReverseCrunchConfig.SETUP_KNEE_ANGLE_RANGE[0] &&
-            kneeAngle <= ReverseCrunchConfig.SETUP_KNEE_ANGLE_RANGE[1] &&
-            trunkHorizontalAngle <=
-                ReverseCrunchConfig.SETUP_TRUNK_HORIZONTAL_MAX &&
-            thighHorizontalAngle >=
-                ReverseCrunchConfig.SETUP_THIGH_VERTICAL_MIN &&
-            shinHorizontalAngle <=
-                ReverseCrunchConfig.SETUP_SHIN_HORIZONTAL_MAX;
+    final isSetupPosition = kneeAngle >=
+            ReverseCrunchConfig.SETUP_KNEE_ANGLE_RANGE[0] &&
+        kneeAngle <= ReverseCrunchConfig.SETUP_KNEE_ANGLE_RANGE[1] &&
+        trunkHorizontalAngle <=
+            ReverseCrunchConfig.SETUP_TRUNK_HORIZONTAL_MAX &&
+        thighHorizontalAngle >= ReverseCrunchConfig.SETUP_THIGH_VERTICAL_MIN &&
+        shinHorizontalAngle <= ReverseCrunchConfig.SETUP_SHIN_HORIZONTAL_MAX;
 
     final isContractionPosition =
         trunkKneeDrop >= ReverseCrunchConfig.PELVIC_CURL_ANGLE_MIN_DROP &&
-            hipLiftNormalized >=
-                ReverseCrunchConfig.HIP_LIFT_MIN_NORMALIZED;
+            hipLiftNormalized >= ReverseCrunchConfig.HIP_LIFT_MIN_NORMALIZED;
 
     final isLegThrustPeak =
         kneeAngle >= ReverseCrunchConfig.PEAK_KNEE_EXTENSION_MIN &&
             legHorizontalAngle >= ReverseCrunchConfig.PEAK_LEG_VERTICAL_MIN &&
-            hipLiftNormalized >=
-                ReverseCrunchConfig.HIP_LIFT_MIN_NORMALIZED;
+            hipLiftNormalized >= ReverseCrunchConfig.HIP_LIFT_MIN_NORMALIZED;
 
     return _ReverseCrunchPoseProfile(
       trunkKneeAngle: trunkKneeAngle,

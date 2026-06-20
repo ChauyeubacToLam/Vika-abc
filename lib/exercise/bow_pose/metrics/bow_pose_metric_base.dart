@@ -1,4 +1,4 @@
-// ignore_for_file: constant_identifier_names
+// ignore_for_file: constant_identifier_names, annotate_overrides
 import '../../exercise_base.dart';
 import '../../fault_record.dart';
 
@@ -34,7 +34,7 @@ class RepContext {
   });
 }
 
-abstract class BowPoseMetricBase {
+abstract class BowPoseMetricBase with FaultMetricDebugSource {
   int faultsCount = 0;
 
   String get name;

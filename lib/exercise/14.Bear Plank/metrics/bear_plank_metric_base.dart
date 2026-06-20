@@ -9,14 +9,14 @@ enum BearState { setup, hovering, fatiguing }
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 class BearConfig {
-  static const double KNEE_HOVER_MIN = 0.05;
-  static const double KNEE_HOVER_MAX = 0.40;
-  static const double KNEE_ANGLE_SETUP_MIN = 60.0;
-  static const double KNEE_ANGLE_SETUP_MAX = 120.0;
-  static const double KNEE_ANGLE_BUTT_UP = 145.0;
-  static const double BACK_SAG_THRESHOLD = 0.15;
-  static const double BACK_ARCH_THRESHOLD = 0.20;
-  static const double WEIGHT_SHIFT_THRESHOLD = 0.25;
+  static const double KNEE_HOVER_MIN = 0.035;
+  static const double KNEE_HOVER_MAX = 0.50;
+  static const double KNEE_ANGLE_SETUP_MIN = 50.0;
+  static const double KNEE_ANGLE_SETUP_MAX = 135.0;
+  static const double KNEE_ANGLE_BUTT_UP = 155.0;
+  static const double BACK_SAG_THRESHOLD = 0.20;
+  static const double BACK_ARCH_THRESHOLD = 0.26;
+  static const double WEIGHT_SHIFT_THRESHOLD = 0.32;
   static const int TARGET_HOVER_MS = 30000;
   static const int MAX_SESSION_MS = 60000;
 }
@@ -66,7 +66,14 @@ abstract class BearMetricBase implements DebugMetricSource {
   @override
   ThresholdBand? get threshold => null;
   @override
-  MetricStatus get status => MetricStatus.pass;
+  MetricStatus get status {
+    if (faults.any((fault) => fault.affectsForm)) {
+      return MetricStatus.fault;
+    }
+    if (faults.isNotEmpty) return MetricStatus.near;
+    return MetricStatus.pass;
+  }
+
   @override
   String? get nameVi => null;
   @override

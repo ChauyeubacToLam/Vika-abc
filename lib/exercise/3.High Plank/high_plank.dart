@@ -17,26 +17,26 @@ class HighPlankConfig {
   static const int TIMEOUT_MS = 90000; // 90s timeout
 
   // Start Position (Tay duỗi, lưng thẳng, gối thẳng)
-  static const double START_ARM_MIN = 150.0;
-  static const double START_BODY_MIN = 160.0;
-  static const double START_KNEE_MIN = 145.0;
-  static const double FLOOR_CONTACT_Y_TOLERANCE = 0.45;
-  static const double WRIST_BELOW_SHOULDER_MIN = 0.45;
-  static const double ANKLE_BELOW_HIP_MIN = 0.10;
+  static const double START_ARM_MIN = 140.0;
+  static const double START_BODY_MIN = 150.0;
+  static const double START_KNEE_MIN = 135.0;
+  static const double FLOOR_CONTACT_Y_TOLERANCE = 0.55;
+  static const double WRIST_BELOW_SHOULDER_MIN = 0.35;
+  static const double ANKLE_BELOW_HIP_MIN = 0.06;
 
   // State Transition Thresholds
   // SETUP/DROPPING -> HOLDING (ngưỡng vào, chuẩn)
-  static const double HOLDING_BODY_THRESHOLD = 160.0;
-  static const double HOLDING_ARM_THRESHOLD = 150.0;
-  static const double HOLDING_KNEE_THRESHOLD = 145.0;
-  static const double HOLDING_SAG_DEVIATION = 0.08;
+  static const double HOLDING_BODY_THRESHOLD = 150.0;
+  static const double HOLDING_ARM_THRESHOLD = 140.0;
+  static const double HOLDING_KNEE_THRESHOLD = 135.0;
+  static const double HOLDING_SAG_DEVIATION = 0.12;
 
   // State Transition Thresholds
   // HOLDING -> DROPPING (ngưỡng ra, lỏng hơn = tạo hysteresis band)
-  static const double DROPPING_PIKE_ANGLE = 150.0;
-  static const double DROPPING_ARM_ANGLE = 140.0;
-  static const double DROPPING_KNEE_ANGLE = 135.0; // Gối cong quá
-  static const double DROPPING_SAG_DEVIATION = 0.12; // Sụp hông > 12% chiều dài
+  static const double DROPPING_PIKE_ANGLE = 140.0;
+  static const double DROPPING_ARM_ANGLE = 130.0;
+  static const double DROPPING_KNEE_ANGLE = 125.0; // Gối cong quá
+  static const double DROPPING_SAG_DEVIATION = 0.18; // Sụp hông > 12% chiều dài
 }
 
 class HighPlank extends ExerciseBase {

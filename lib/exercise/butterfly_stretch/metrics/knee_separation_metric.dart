@@ -4,7 +4,7 @@ import '../../../utils/debouncer.dart';
 class KneeSeparationConfig {
   // Ngưỡng chênh lệch Y giữa 2 gối (tính theo tỷ lệ % so với chiều dài lưng)
   // Nếu lưng dài 100px, gối lệch nhau > 15px sẽ báo lỗi.
-  static const double ASYMMETRY_THRESHOLD = 0.15;
+  static const double ASYMMETRY_THRESHOLD = 0.25;
 }
 
 class KneeSeparationMetric extends ButterflyMetricBase {
@@ -15,7 +15,7 @@ class KneeSeparationMetric extends ButterflyMetricBase {
   final Map<String, dynamic> _debugData = {};
 
   // Dùng debouncer 5 frames để tránh nhiễu do rung camera hoặc cử động nhỏ
-  final Debouncer _asymmetryDebouncer = Debouncer(requiredFrames: 5);
+  final Debouncer _asymmetryDebouncer = Debouncer(requiredFrames: 7);
 
   double maxSeparation = 0.0;
   bool _instructionSet = false;

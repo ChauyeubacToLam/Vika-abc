@@ -1,5 +1,6 @@
 import '../exercise/exercise_base.dart';
 import '../exercise/squat/squat.dart';
+import 'generic_exercise_voice_assets.dart';
 import 'queued_asset_voice_player.dart';
 import 'squat_voice_assets.dart';
 
@@ -14,9 +15,14 @@ class _SquatAssetVoicePlayer implements SquatVoicePlayer {
   _SquatAssetVoicePlayer({QueuedAssetVoicePlayer? player})
       : _player = player ??
             QueuedAssetVoicePlayer(
-              assetMap: SquatVoiceAssets.files,
-              assetSourcePrefix: SquatVoiceAssets.assetSourcePrefix,
-              assetBundlePrefix: SquatVoiceAssets.assetBundlePrefix,
+              assetMap: {
+                ...GenericExerciseVoiceAssets.commonFiles,
+                for (final entry in SquatVoiceAssets.files.entries)
+                  entry.key: 'squat/${entry.value}',
+              },
+              assetSourcePrefix: GenericExerciseVoiceAssets.assetSourcePrefix,
+              assetBundlePrefix: GenericExerciseVoiceAssets.assetBundlePrefix,
+              assetResolver: GenericExerciseVoiceAssets.resolveAsset,
               logTag: 'SquatVoice',
             );
 
@@ -55,6 +61,7 @@ class SquatVoiceCoach implements ExerciseVoiceCoach {
   int _lastPhaseCueAtMs = 0;
   bool _didAnnounceSetComplete = false;
   bool _didAnnounceReady = false;
+  bool _didSpeakSetup = false;
   bool _wasTrunkFaultActive = false;
   final Map<String, int> _lastFaultVoiceAtMs = {};
   final Map<String, int> _lastPostRepVoiceRep = {};
@@ -87,6 +94,15 @@ class SquatVoiceCoach implements ExerciseVoiceCoach {
         _didAnnounceSetComplete = true;
       }
 
+      _lastPhasePhrase = null;
+      _wasTrunkFaultActive = false;
+      _liveFaultVoicesSpokenThisRep.clear();
+      _lastRepCount = repCount;
+      return;
+    }
+
+    if (currentExerciseState == ExerciseState.notActivated) {
+      _speakSetup(exercise);
       _lastPhasePhrase = null;
       _wasTrunkFaultActive = false;
       _liveFaultVoicesSpokenThisRep.clear();
@@ -198,6 +214,17 @@ class SquatVoiceCoach implements ExerciseVoiceCoach {
   void dispose() {
     _ttsService.clearQueue();
     _ttsService.dispose();
+  }
+
+  void _speakSetup(ExerciseBase exercise) {
+    if (_didSpeakSetup) return;
+
+    final script =
+        GenericExerciseVoiceAssets.scriptForExerciseName(exercise.exerciseName);
+    _ttsService.speak(script.setupIntroKey);
+    _ttsService.speak(script.cueKey('setup_position'));
+    _ttsService.speak(script.cueKey('active_intro'));
+    _didSpeakSetup = true;
   }
 
   String? _effectivePhasePhrase(

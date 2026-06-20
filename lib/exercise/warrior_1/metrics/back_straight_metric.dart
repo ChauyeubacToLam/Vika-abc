@@ -15,10 +15,10 @@ import '../../../utils/debouncer.dart';
 
 class BackStraightConfig {
   /// Lưng thẳng đẹp
-  static const double GOOD_THRESHOLD = 160.0;
+  static const double GOOD_THRESHOLD = 148.0;
 
   /// Dưới mức này bị đánh giá là gù lưng / rụt cổ chồm về trước
-  static const double HUNCHED_ERROR = 145.0;
+  static const double HUNCHED_ERROR = 130.0;
 }
 
 class BackStraightMetric extends WarriorOneMetricBase {

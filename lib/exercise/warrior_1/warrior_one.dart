@@ -20,6 +20,7 @@
 import 'dart:math' as math;
 
 import 'package:vika/exercise/exercise_base.dart';
+import 'package:vika/debug/tracked_metric.dart';
 import 'package:vika/utils/exercise_logger.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
@@ -39,32 +40,32 @@ class WarriorOneConfig {
   static const int MAX_HOLDS = 2;
 
   /// Seconds to hold each side.
-  static const double HOLD_DURATION = 30.0;
+  static const double HOLD_DURATION = 20.0;
 
   /// Hip Y-velocity (normalized units / sec) below which the user is "still".
   /// ESTIMATE — tune on device. BlazePose y is normalized [0,1].
   static const double STILL_VELOCITY_THRESHOLD = 2.5;
 
   /// Frames the user must be still to enter HOLD (~500ms at 30fps).
-  static const int STILL_FRAMES = 15;
+  static const int STILL_FRAMES = 10;
 
   /// isInStartPosition: trunk must be within this many degrees of vertical.
-  static const double START_TRUNK_TOLERANCE = 30.0;
+  static const double START_TRUNK_TOLERANCE = 40.0;
 
   /// isInStartPosition / Check 4: minimum stance ratio to count as "feet apart".
-  static const double START_STANCE_MIN = 0.8;
+  static const double START_STANCE_MIN = 0.65;
 
   // --- Check 3: front-knee depth (coaching only) ---
-  static const double DEPTH_GOOD_MIN = 100.0; // desk-worker band
-  static const double DEPTH_GOOD_MAX = 155.0;
-  static const double DEPTH_SHALLOW = 155.0; // > this = shallow
-  static const double DEPTH_DECAY_LIMIT = 10.0; // angle creep during hold
+  static const double DEPTH_GOOD_MIN = 85.0; // desk-worker band
+  static const double DEPTH_GOOD_MAX = 165.0;
+  static const double DEPTH_SHALLOW = 170.0; // > this = shallow
+  static const double DEPTH_DECAY_LIMIT = 18.0; // angle creep during hold
 
   // --- Check 4: stance length (coaching only), normalized by scaleFactor ---
-  static const double STANCE_GOOD_MIN = 1.2;
-  static const double STANCE_GOOD_MAX = 2.0;
-  static const double STANCE_TOO_SHORT = 1.0;
-  static const double STANCE_TOO_LONG = 2.2;
+  static const double STANCE_GOOD_MIN = 0.9;
+  static const double STANCE_GOOD_MAX = 2.4;
+  static const double STANCE_TOO_SHORT = 0.75;
+  static const double STANCE_TOO_LONG = 2.7;
 }
 
 enum WarriorOneState { entry, hold, exit }
@@ -93,6 +94,17 @@ class WarriorOne extends ExerciseBase {
     backKneeMetric,
     backStraightMetric,
   ];
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
 
   // --- Hold timing ---
   int? _holdStartMs;

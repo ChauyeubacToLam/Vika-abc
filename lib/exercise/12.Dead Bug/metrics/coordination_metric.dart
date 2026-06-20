@@ -15,10 +15,19 @@ class CoordinationMetric extends DeadBugMetricBase {
   Map<String, dynamic> get debugData => _debugData;
 
   @override
+  double? get value => _debugData['sameSide'] as double?;
+
+  @override
+  ThresholdBand? get threshold => const ThresholdBand(faultAbove: 0.5);
+
+  @override
   void update(DeadBugRepContext ctx) {
     if (ctx.state == DeadBugState.hold && !_evaluatedThisRep) {
       bool sameSide =
           ctx.physicalLeftArmExtending == ctx.physicalLeftLegExtending;
+      _debugData['sameSide'] = sameSide ? 1.0 : 0.0;
+      _debugData['physicalLeftArm'] = ctx.physicalLeftArmExtending ? 1.0 : 0.0;
+      _debugData['physicalLeftLeg'] = ctx.physicalLeftLegExtending ? 1.0 : 0.0;
 
       if (sameSide) {
         _faults.add(FaultRecord(
@@ -52,6 +61,7 @@ class CoordinationMetric extends DeadBugMetricBase {
   @override
   void reset() {
     _faults.clear();
+    _debugData.clear();
     _evaluatedThisRep = false;
   }
 }

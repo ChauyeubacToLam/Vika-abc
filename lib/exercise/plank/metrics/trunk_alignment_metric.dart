@@ -32,7 +32,7 @@ class TrunkAlignmentConfig {
   static const double PIKE_WARNING_MAX = PlankConfig.PIKE_WARNING_MAX;
 
   /// Fault percentage threshold
-  static const double FAULT_PERCENT_THRESHOLD = 0.30;
+  static const double FAULT_PERCENT_THRESHOLD = 0.45;
 }
 
 class TrunkAlignmentMetric extends PlankMetricBase {

@@ -7,9 +7,9 @@ class LumbarExtensionMetric extends BirdDogMetricBase {
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
 
-  final Debouncer _faultDebouncer = Debouncer(requiredFrames: 3);
+  final Debouncer _faultDebouncer = Debouncer(requiredFrames: 5);
 
-  static const double _maxLegAboveTrunkDegrees = 25.0;
+  static const double _maxLegAboveTrunkDegrees = 35.0;
   double? _legAboveTrunk;
   MetricStatus _status = MetricStatus.pass;
 

@@ -3,7 +3,7 @@ import 'standing_kte_metric_base.dart';
 import '../standing_knee_to_elbow.dart';
 
 class PelvicDropMetric extends StandingKteMetricBase {
-  static const double MAX_PELVIC_TILT_DEGREES = 15.0;
+  static const double MAX_PELVIC_TILT_DEGREES = 25.0;
 
   @override
   void update(StandingKteRepContext ctx) {

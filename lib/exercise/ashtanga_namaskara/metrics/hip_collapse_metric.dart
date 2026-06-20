@@ -11,9 +11,9 @@ class HipCollapseMetric extends AshtangaMetricBase {
   @override
   String get name => 'HipPosition';
 
-  static const double _goodMin = 0.40;
-  static const double _warningMin = 0.15;
-  static const double _errorMax = 0.15;
+  static const double _goodMin = 0.30;
+  static const double _warningMin = 0.10;
+  static const double _errorMax = 0.10;
 
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};

@@ -1,6 +1,7 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, non_constant_identifier_names, constant_identifier_names
 
 import 'package:vika/exercise/exercise_base.dart';
+import 'package:vika/debug/tracked_metric.dart';
 import '../../utils/pose_math_helpers.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/exercise_logger.dart';
@@ -15,10 +16,10 @@ import '../../utils/debouncer.dart';
 
 class LungeConfig {
   static const int MAX_REP = 15;
-  static const int LUNGE_STAND_ANGLE_THRESHOLD = 160;
-  static const int LUNGE_DESCEND_ANGLE_THRESHOLD = 150;
-  static const List<int> LUNGE_BOTTOM_ANGLE_THRESHOLD = [70, 110];
-  static const int LUNGE_ASCEND_ANGLE_THRESHOLD = 115;
+  static const int LUNGE_STAND_ANGLE_THRESHOLD = 155;
+  static const int LUNGE_DESCEND_ANGLE_THRESHOLD = 145;
+  static const List<int> LUNGE_BOTTOM_ANGLE_THRESHOLD = [55, 125];
+  static const int LUNGE_ASCEND_ANGLE_THRESHOLD = 125;
   static const double CLEAN_REP_LEAD_KNEE_ANGLE = 178.6;
   static const double CLEAN_REP_LEAD_KNEE_TOLERANCE = 8.0;
   static const double CLEAN_REP_TRAIL_KNEE_ANGLE = 178.3;
@@ -68,6 +69,17 @@ class Lunge extends ExerciseBase {
     heelLiftMetric,
     lumbarProxyMetric,
   ];
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
 
   // --- Lead Leg Detection ---
   //
@@ -382,18 +394,18 @@ class Lunge extends ExerciseBase {
         allFaults.addAll(metric.faults);
       }
 
-      final calibratedCleanRep = _matchesCalibratedCleanRep(
+      _matchesCalibratedCleanRep(
         ctx,
         backClockAngle: backAngle,
       );
-      if (calibratedCleanRep) {
-        allFaults.clear();
-        resultIssues.feedback.clear();
-        resultIssues.instructions.clear();
-      }
 
       correctForm = !allFaults.any((f) => f.affectsForm);
       resultIssues.feedback['Result'] = correctForm ? 'Good Rep!' : 'Fix Form';
+      if (!correctForm) {
+        final topFault = allFaults.firstWhere((fault) => fault.affectsForm);
+        resultIssues.feedback[topFault.type] =
+            topFault.voiceMessage ?? topFault.message;
+      }
 
       final faultMap = <String, Map<String, String>>{};
       for (final fault in allFaults) {
@@ -422,11 +434,7 @@ class Lunge extends ExerciseBase {
 
       correctForm = true;
       for (final metric in _metrics) {
-        if (calibratedCleanRep) {
-          metric.reset();
-        } else {
-          metric.resetAndCountFault();
-        }
+        metric.resetAndCountFault();
       }
       _reachedBottomThisRep = false;
       return;

@@ -16,6 +16,14 @@ class AntiExtensionMetric extends DeadBugMetricBase {
   Map<String, dynamic> get debugData => _debugData;
 
   @override
+  double? get value => _debugData['hipLift'] is num
+      ? (_debugData['hipLift'] as num).toDouble()
+      : double.tryParse('${_debugData['hipLift'] ?? ''}');
+
+  @override
+  ThresholdBand? get threshold => const ThresholdBand(faultAbove: 0.05);
+
+  @override
   void onStateTransition(DeadBugState from, DeadBugState to, int timestampMs) {
     if (from == DeadBugState.setup && to == DeadBugState.extending) {
       _baselineHipY = null; // Khởi tạo lại mỗi rep để tránh sai số tịnh tiến
@@ -30,7 +38,7 @@ class AntiExtensionMetric extends DeadBugMetricBase {
       if (ctx.scaleFactor != null && ctx.scaleFactor! > 0) {
         // Trong toạ độ màn hình Y hướng xuống. Lưng nhấc khỏi sàn -> Y giảm -> (baseline - current) > 0.
         double hipLift = (_baselineHipY! - ctx.hipY) / ctx.scaleFactor!;
-        _debugData['hipLift'] = hipLift.toStringAsFixed(3);
+        _debugData['hipLift'] = hipLift;
 
         // Nhấc quá 5% chiều dài lưng
         if (_faultDebouncer.update(hipLift > 0.05)) {

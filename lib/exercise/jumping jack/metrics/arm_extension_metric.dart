@@ -30,22 +30,22 @@ class ArmExtensionConfig {
   // -- Elevation thresholds (degrees from horizontal) --
   /// Good: arms clearly overhead
   // ignore: constant_identifier_names
-  static const double ELEVATION_GOOD = 60.0;
+  static const double ELEVATION_GOOD = 45.0;
 
   /// Warning: arms reach shoulder height but not overhead
   // ignore: constant_identifier_names
-  static const double ELEVATION_WARNING = 30.0;
+  static const double ELEVATION_WARNING = 20.0;
 
   // Below ELEVATION_WARNING = error
 
   // -- Elbow straightness thresholds (shoulder→elbow→wrist angle) --
   /// Good: arms nearly straight
   // ignore: constant_identifier_names
-  static const double ELBOW_GOOD = 150.0;
+  static const double ELBOW_GOOD = 135.0;
 
   /// Warning: noticeably bent
   // ignore: constant_identifier_names
-  static const double ELBOW_WARNING = 120.0;
+  static const double ELBOW_WARNING = 105.0;
 
   // Below ELBOW_WARNING = error
 }
@@ -58,8 +58,8 @@ class ArmExtensionMetric extends JJMetricBase {
   final Map<String, dynamic> _debugData = {};
 
   // Fast movement → low debounce frames
-  final Debouncer _elevationDebouncer = Debouncer(requiredFrames: 2);
-  final Debouncer _elbowDebouncer = Debouncer(requiredFrames: 2);
+  final Debouncer _elevationDebouncer = Debouncer(requiredFrames: 3);
+  final Debouncer _elbowDebouncer = Debouncer(requiredFrames: 3);
 
   /// Track peak elevation this rep (for post-rep analysis)
   double _peakLeftElevation = 0.0;

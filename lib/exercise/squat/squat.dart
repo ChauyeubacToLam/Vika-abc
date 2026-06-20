@@ -23,22 +23,22 @@ import '../../services/squat_voice_coach.dart';
 class SquatConfig {
   static const double ERROR_ALLOW = 2;
   static const int MAX_REP = 15;
-  static const double SQUAT_STAND_ANGLE_THRESHOLD = 160;
-  static const List<int> SQUAT_BOTTOM_ANGLE_THRESHOLD = [80, 100];
+  static const double SQUAT_STAND_ANGLE_THRESHOLD = 155;
+  static const List<int> SQUAT_BOTTOM_ANGLE_THRESHOLD = [70, 115];
   static const double BOTTOM_RELEASE_READY_TOLERANCE_SECONDS = 0.05;
   static const double CLEAN_REP_KNEE_ANGLE = 171.2;
-  static const double CLEAN_REP_KNEE_TOLERANCE = 8.0;
+  static const double CLEAN_REP_KNEE_TOLERANCE = 12.0;
   static const double CLEAN_REP_BACK_ANGLE = 17.43;
-  static const double CLEAN_REP_BACK_TOLERANCE = 8.0;
+  static const double CLEAN_REP_BACK_TOLERANCE = 12.0;
   static const double CLEAN_REP_TRUNK_LEAN = 17.43;
-  static const double CLEAN_REP_TRUNK_LEAN_TOLERANCE = 8.0;
+  static const double CLEAN_REP_TRUNK_LEAN_TOLERANCE = 12.0;
   static const double CLEAN_REP_HEEL_LIFT_PCT = 3.081;
-  static const double CLEAN_REP_HEEL_LIFT_PCT_TOLERANCE = 5.0;
-  static const double CLEAN_REP_BOTTOM_HOLD_PROGRESS_MIN = 0.95;
+  static const double CLEAN_REP_HEEL_LIFT_PCT_TOLERANCE = 8.0;
+  static const double CLEAN_REP_BOTTOM_HOLD_PROGRESS_MIN = 0.80;
   static const double ANGLE_STABLE_GATE =
       2; // degrees, for FrameBuffer angle change detection
   static const double ROM_GATE =
-      36; // degrees, minimum angle change to confirm direction switch from descending to ascending
+      28; // degrees, minimum angle change to confirm direction switch from descending to ascending
 }
 
 enum SquatState { standing, descending, bottom, ascending }

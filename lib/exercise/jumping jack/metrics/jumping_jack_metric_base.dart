@@ -1,3 +1,5 @@
+// ignore_for_file: annotate_overrides
+
 /* =========================================================================
    JJMetricBase — Abstract base for all jumping jack form metrics.
    
@@ -88,7 +90,7 @@ class RepContext {
 /* =========================================================================
    JJMetricBase — Interface every jumping jack metric implements.
    ========================================================================= */
-abstract class JJMetricBase {
+abstract class JJMetricBase with FaultMetricDebugSource {
   int faultsCount = 0;
 
   /// Human-readable name for debug/logging.

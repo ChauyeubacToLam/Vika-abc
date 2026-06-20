@@ -67,7 +67,9 @@ abstract class DeadBugMetricBase implements DebugMetricSource {
   @override
   ThresholdBand? get threshold => null;
   @override
-  MetricStatus get status => MetricStatus.pass;
+  MetricStatus get status => faults.any((fault) => fault.affectsForm)
+      ? MetricStatus.fault
+      : MetricStatus.pass;
   @override
   String? get nameVi => null;
   @override

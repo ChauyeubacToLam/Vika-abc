@@ -9,12 +9,22 @@ class ArmPositionMetric extends LegRaiseMetricBase {
   final Map<String, dynamic> _debugData = {};
   final Debouncer _faultDebouncer = Debouncer(requiredFrames: 3);
   bool _instructionSet = false;
+  double? _armStraightness;
 
   @override
   List<FaultRecord> get faults => _faults;
 
   @override
   Map<String, dynamic> get debugData => _debugData;
+
+  @override
+  double? get value => _armStraightness;
+
+  @override
+  ThresholdBand? get threshold => const ThresholdBand(
+        warningBelow: LegRaiseConfig.ARM_ELBOW_STRAIGHT_MIN + 10.0,
+        faultBelow: LegRaiseConfig.ARM_ELBOW_STRAIGHT_MIN,
+      );
 
   @override
   void update(LegRaiseRepContext ctx) {
@@ -25,10 +35,10 @@ class ArmPositionMetric extends LegRaiseMetricBase {
     final armsVisible =
         ctx.armsVisible && armStraightness != null && wristHipDistance != null;
 
-    _debugData['armsVisible'] = armsVisible;
-    _debugData['armStraightness'] =
-        armStraightness?.toStringAsFixed(1) ?? 'N/A';
-    _debugData['wristHipRatio'] = wristHipDistance?.toStringAsFixed(2) ?? 'N/A';
+    _armStraightness = armStraightness;
+    _debugData['armsVisible'] = armsVisible ? 1.0 : 0.0;
+    _debugData['armStraightness'] = armStraightness;
+    _debugData['wristHipRatio'] = wristHipDistance;
 
     final armsBent =
         armsVisible && armStraightness < LegRaiseConfig.ARM_ELBOW_STRAIGHT_MIN;
@@ -72,6 +82,7 @@ class ArmPositionMetric extends LegRaiseMetricBase {
   void reset() {
     _faults.clear();
     _debugData.clear();
+    _armStraightness = null;
     _faultDebouncer.reset();
     _instructionSet = false;
   }

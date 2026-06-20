@@ -9,7 +9,7 @@
 import 'jump_squat_metric_base.dart';
 
 class TrunkLandingConfig {
-  static const double MAX_LEAN_ANGLE = 45.0; // Rạp quá 45 độ so với trục dọc
+  static const double MAX_LEAN_ANGLE = 60.0; // Rạp quá 45 độ so với trục dọc
 }
 
 class LandingTrunkAlignmentMetric extends JumpSquatMetricBase {

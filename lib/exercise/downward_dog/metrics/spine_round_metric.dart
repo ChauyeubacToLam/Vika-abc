@@ -29,14 +29,14 @@ import '../../../utils/debouncer.dart';
 
 class SpineRoundConfig {
   /// Angle at or above which the spine is considered long and safe.
-  static const double GOOD_ANGLE = 160.0;
+  static const double GOOD_ANGLE = 148.0;
 
   /// Warning band: spine starting to round but not yet a safety fault.
-  static const double WARNING_ANGLE = 145.0;
+  static const double WARNING_ANGLE = 132.0;
 
   // Real-time path: shorter debounce so the alert fires while the user
   // is still in the bad position.
-  static const int REALTIME_CONFIRM_FRAMES = 8;
+  static const int REALTIME_CONFIRM_FRAMES = 10;
 
   // Sticky hold: once confirmed, keep the cue until the user corrects.
   static const int STICKY_CONFIRM_FRAMES = 20;

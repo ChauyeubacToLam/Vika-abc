@@ -33,17 +33,17 @@ import '../../../../utils/debouncer.dart';
 
 class HipExtensionConfig {
   // Shoulder-hip-knee angle thresholds (Vietnamese adjusted)
-  static const double GOOD_MIN_ANGLE = 160.0;
-  static const double WARNING_MIN_ANGLE = 150.0;
+  static const double GOOD_MIN_ANGLE = 148.0;
+  static const double WARNING_MIN_ANGLE = 138.0;
   // Below WARNING_MIN_ANGLE → affectsForm = true (error)
   // Between WARNING_MIN_ANGLE and GOOD_MIN_ANGLE → affectsForm = false (warning)
 
   // Normalized perpendicular deviation from the shoulder-knee line.
   // Positive = hip above the line = lumbar hyperextension risk.
-  static const double HYPEREXT_THRESHOLD = 0.03;
+  static const double HYPEREXT_THRESHOLD = 0.05;
 
   // Require this many consecutive frames before flagging live hyperextension.
-  static const int HYPEREXT_DEBOUNCE_FRAMES = 4;
+  static const int HYPEREXT_DEBOUNCE_FRAMES = 6;
 }
 
 class HipExtensionMetric extends GluteBridgeMetricBase {

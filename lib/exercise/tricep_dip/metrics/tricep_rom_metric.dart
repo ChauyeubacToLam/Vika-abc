@@ -3,12 +3,26 @@ import '../tricep_dip.dart';
 
 class TricepRomMetric extends TricepMetricBase {
   static const double MIN_DEPTH_ANGLE =
-      130.0; // If angle > 130 at bottom, it's too shallow
+      145.0; // If angle > 130 at bottom, it's too shallow
 
   bool _reachedDepth = false;
+  double? _currentElbowAngle;
+
+  @override
+  double? get value => _currentElbowAngle;
+
+  @override
+  ThresholdBand? get threshold => const ThresholdBand(
+        warningAbove: MIN_DEPTH_ANGLE + 8.0,
+        faultAbove: MIN_DEPTH_ANGLE + 16.0,
+      );
 
   @override
   void update(TricepRepContext ctx) {
+    _currentElbowAngle = ctx.elbowAngle;
+    debugData['elbowAngle'] = ctx.elbowAngle;
+    debugData['reachedDepth'] = _reachedDepth ? 1 : 0;
+
     if (ctx.state == TricepDipState.setup_top) return;
 
     if (ctx.elbowAngle <= MIN_DEPTH_ANGLE) {

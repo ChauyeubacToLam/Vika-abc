@@ -1,6 +1,7 @@
 import '../exercise/3.High Plank/high_plank.dart';
 import '../exercise/3.High Plank/metrics/high_plank_metric_base.dart';
 import '../exercise/exercise_base.dart';
+import 'generic_exercise_voice_assets.dart';
 import 'high_plank_voice_assets.dart';
 import 'queued_asset_voice_player.dart';
 
@@ -15,9 +16,13 @@ class _HighPlankAssetVoicePlayer implements HighPlankVoicePlayer {
   _HighPlankAssetVoicePlayer({QueuedAssetVoicePlayer? player})
       : _player = player ??
             QueuedAssetVoicePlayer(
-              assetMap: HighPlankVoiceAssets.files,
+              assetMap: {
+                ...GenericExerciseVoiceAssets.commonFiles,
+                ...HighPlankVoiceAssets.files,
+              },
               assetSourcePrefix: HighPlankVoiceAssets.assetSourcePrefix,
               assetBundlePrefix: HighPlankVoiceAssets.assetBundlePrefix,
+              assetResolver: GenericExerciseVoiceAssets.resolveAsset,
               logTag: 'HighPlankVoice',
             );
 
@@ -62,7 +67,7 @@ class HighPlankVoiceCoach implements ExerciseVoiceCoach {
     final nowMs = DateTime.now().millisecondsSinceEpoch;
 
     if (exercise.exerciseState == ExerciseState.notActivated) {
-      _speakSetup();
+      _speakSetup(exercise);
       _lastRepCount = repCount;
       return;
     }
@@ -113,12 +118,14 @@ class HighPlankVoiceCoach implements ExerciseVoiceCoach {
     _lastRepCount = repCount;
   }
 
-  void _speakSetup() {
+  void _speakSetup(ExerciseBase exercise) {
     if (_didSpeakSetup) return;
 
-    _voicePlayer.speak('high_plank.setup_intro');
-    _voicePlayer.speak('high_plank.setup_position');
-    _voicePlayer.speak('high_plank.active_intro');
+    final script =
+        GenericExerciseVoiceAssets.scriptForExerciseName(exercise.exerciseName);
+    _voicePlayer.speak(script.setupIntroKey);
+    _voicePlayer.speak(script.cueKey('setup_position'));
+    _voicePlayer.speak(script.cueKey('active_intro'));
     _didSpeakSetup = true;
   }
 

@@ -7,7 +7,7 @@ class KneeExtensionMetric extends SeatedForwardMetricBase {
 
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
-  final Debouncer _kneeBendDebouncer = Debouncer(requiredFrames: 3);
+  final Debouncer _kneeBendDebouncer = Debouncer(requiredFrames: 5);
   bool _instructionSet = false;
   bool _isFaultingNow = false;
 

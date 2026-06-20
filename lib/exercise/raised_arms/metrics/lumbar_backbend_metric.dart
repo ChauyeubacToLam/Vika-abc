@@ -9,9 +9,9 @@ class LumbarBackbendMetric extends RaisedArmsMetricBase {
   @override
   String get name => 'LumbarBackbend';
 
-  static const double _goodMax = 10.0;
-  static const double _warningMin = 10.0;
-  static const double _errorMin = 15.0;
+  static const double _goodMax = 18.0;
+  static const double _warningMin = 18.0;
+  static const double _errorMin = 28.0;
 
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};

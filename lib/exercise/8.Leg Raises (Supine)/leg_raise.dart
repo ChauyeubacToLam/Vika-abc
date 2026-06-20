@@ -1,5 +1,6 @@
 // ignore_for_file: non_constant_identifier_names, curly_braces_in_flow_control_structures
 import 'dart:math' as math;
+import 'package:vika/debug/tracked_metric.dart';
 import 'package:vika/utils/debouncer.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
@@ -49,6 +50,17 @@ class LegRaise extends ExerciseBase {
     tempoMetric,
     armMetric
   ];
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
 
   final Debouncer _raisingDebouncer = Debouncer(requiredFrames: 2);
   final Debouncer _topDebouncer = Debouncer(requiredFrames: 2);
@@ -389,6 +401,18 @@ class LegRaise extends ExerciseBase {
     double trunkHorizontal = angles.trunkHorizontal;
     final armPosition = _calculateArmPosition(landmarks);
 
+    debugData['legRaiseState'] = state.name;
+    debugData['previousLegRaiseState'] = previousState.name;
+    debugData['hipFlexionAngle'] = hipFlexion;
+    debugData['kneeStraightnessAngle'] = kneeStraight;
+    debugData['trunkHorizontalAngle'] = trunkHorizontal;
+    debugData['hipY'] = hip.y;
+    debugData['ankleY'] = ankle.y;
+    debugData['armsVisible'] = armPosition.isVisible ? 1 : 0;
+    debugData['armStraightnessAngle'] = armPosition.minElbowAngle;
+    debugData['wristHipDistanceRatio'] = armPosition.maxWristHipDistanceRatio;
+    debugData['invalidAttemptCount'] = invalidAttemptCount;
+
     final ctx = LegRaiseRepContext(
       hipFlexionAngle: hipFlexion,
       kneeStraightnessAngle: kneeStraight,
@@ -420,6 +444,9 @@ class LegRaise extends ExerciseBase {
 
     if (state != LegRaiseState.lying) {
       for (final metric in _metrics) metric.update(ctx);
+    }
+    for (final metric in _metrics) {
+      debugData.addAll(metric.debugData);
     }
 
     resultIssues.addInstruction(state.name, 'Status', currentPhaseLabel);
@@ -524,7 +551,8 @@ class LegRaise extends ExerciseBase {
         if (priorityCompare != 0) return priorityCompare;
         return a.type.compareTo(b.type);
       });
-    final rawVoice = voicedFaults.isEmpty ? null : voicedFaults.first.voiceMessage;
+    final rawVoice =
+        voicedFaults.isEmpty ? null : voicedFaults.first.voiceMessage;
     return _voiceScriptMessage(rawVoice);
   }
 

@@ -1,4 +1,4 @@
-// ignore_for_file: constant_identifier_names
+// ignore_for_file: constant_identifier_names, annotate_overrides
 import '../../exercise_base.dart';
 import '../../fault_record.dart';
 export '../../fault_record.dart';
@@ -52,7 +52,7 @@ class RepContext {
   });
 }
 
-abstract class StepBackBurpeeMetricBase {
+abstract class StepBackBurpeeMetricBase with FaultMetricDebugSource {
   String get name;
   int faultsCount = 0;
   void update(RepContext ctx);

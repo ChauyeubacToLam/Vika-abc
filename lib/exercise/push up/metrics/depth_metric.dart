@@ -25,7 +25,7 @@ class DepthConfig {
       PushUpConfig.BOTTOM_ANGLE_RANGE[1]; // 100.0
 
   /// Warning: 100°-110° — almost deep enough
-  static const double SHALLOW_WARNING_MAX = 110.0;
+  static const double SHALLOW_WARNING_MAX = 125.0;
 
   /// Error: > 110° — way too shallow, barely bending
   // (anything above SHALLOW_WARNING_MAX is error)

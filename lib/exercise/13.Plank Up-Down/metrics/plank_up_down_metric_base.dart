@@ -15,21 +15,21 @@ class PlankConfig {
   static const double HOLD_DURATION_SECONDS = HOLD_DURATION_MS / 1000;
 
   // Góc cơ thể (Shoulder-Hip-Ankle)
-  static const double BODY_ALIGNMENT_START_MIN = 170.0;
-  static const double BODY_ALIGNMENT_SAG_THRESHOLD = 160.0; // Sụt hông
+  static const double BODY_ALIGNMENT_START_MIN = 160.0;
+  static const double BODY_ALIGNMENT_SAG_THRESHOLD = 150.0; // Sụt hông
 
   // Góc gối (Hip-Knee-Ankle)
   static const double KNEE_EXTENSION_MIN =
-      150.0; // Yêu cầu thẳng chân, dưới mức này coi như co gối
+      140.0; // Yêu cầu thẳng chân, dưới mức này coi như co gối
 
   // Góc tay (Shoulder-Elbow-Wrist)
-  static const double ELBOW_FOREARM_MAX = 110.0; // ~90 độ
-  static const double ELBOW_PUSHING_THRESHOLD = 100.0;
-  static const double ELBOW_HIGH_PLANK_MIN = 160.0; // ~180 độ
-  static const double ELBOW_LOWERING_THRESHOLD = 150.0;
+  static const double ELBOW_FOREARM_MAX = 120.0; // ~90 độ
+  static const double ELBOW_PUSHING_THRESHOLD = 95.0;
+  static const double ELBOW_HIGH_PLANK_MIN = 150.0; // ~180 độ
+  static const double ELBOW_LOWERING_THRESHOLD = 145.0;
 
   // Cố định hông (pixel, sẽ chuẩn hóa theo chiều dài lưng)
-  static const double HIP_Y_ROTATION_TOLERANCE = 0.15; // 15% chiều dài lưng
+  static const double HIP_Y_ROTATION_TOLERANCE = 0.22; // 15% chiều dài lưng
 }
 
 class PlankFaultVoicePriority {
@@ -76,7 +76,14 @@ abstract class PlankMetricBase implements DebugMetricSource {
   @override
   ThresholdBand? get threshold => null;
   @override
-  MetricStatus get status => MetricStatus.pass;
+  MetricStatus get status {
+    if (faults.any((fault) => fault.affectsForm)) {
+      return MetricStatus.fault;
+    }
+    if (faults.isNotEmpty) return MetricStatus.near;
+    return MetricStatus.pass;
+  }
+
   @override
   String? get nameVi => null;
   @override

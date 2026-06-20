@@ -482,12 +482,12 @@ void main() {
   test('Squat does not count a new rep after the set is completed', () {
     final player = _FakeSquatVoicePlayer();
     final coach = SquatVoiceCoach(ttsService: player);
-    final squat = Squat();
+    final squat = Squat()..exerciseState = ExerciseState.activated;
 
     coach.processFrame(
       exercise: squat,
       repCount: 5,
-      hasPose: true,
+      hasPose: false,
       feedback: const {},
     );
 

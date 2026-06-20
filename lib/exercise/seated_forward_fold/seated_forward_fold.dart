@@ -1,4 +1,5 @@
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:vika/debug/tracked_metric.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/exercise_logger.dart';
 import '../exercise_base.dart';
@@ -52,6 +53,17 @@ class SeatedForwardFold extends ExerciseBase {
     tempoMetric,
     ankleMetric,
   ];
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
 
   @override
   String get exerciseName => 'Seated Forward Fold';

@@ -8,9 +8,9 @@ export '../../fault_record.dart';
 enum BirdDogState { neutral, extending, hold_extended, returning }
 
 class BirdDogTiming {
-  static const double holdTargetSeconds = 2.0;
-  static const String holdTargetShortLabel = '2s';
-  static const String holdTargetVoiceLabel = '2 giây';
+  static const double holdTargetSeconds = 1.5;
+  static const String holdTargetShortLabel = '1.5s';
+  static const String holdTargetVoiceLabel = '1 phẩy 5 giây';
 }
 
 class BirdDogRepContext {
@@ -80,7 +80,13 @@ abstract class BirdDogMetricBase implements DebugMetricSource {
   ThresholdBand? get threshold => null;
 
   @override
-  MetricStatus get status => MetricStatus.pass;
+  MetricStatus get status {
+    if (faults.any((fault) => fault.affectsForm)) {
+      return MetricStatus.fault;
+    }
+    if (faults.isNotEmpty) return MetricStatus.near;
+    return MetricStatus.pass;
+  }
 
   @override
   String? get nameVi => null;

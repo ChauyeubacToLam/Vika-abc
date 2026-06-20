@@ -56,7 +56,7 @@ void main() {
     expect(
       player.spoken,
       [
-        'jumping_jack.setup_intro',
+        'common.thang_intro',
         'jumping_jack.setup_position',
         'jumping_jack.active_intro',
       ],

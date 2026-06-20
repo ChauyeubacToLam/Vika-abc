@@ -12,8 +12,8 @@ class CobraPelvicMetric extends CobraMetricBase {
   String get name => 'PelvicGrounding';
 
   // Beginner thresholds (normalized)
-  static const double _goodMax = 0.12;
-  static const double _errorMin = 0.18;
+  static const double _goodMax = 0.18;
+  static const double _errorMin = 0.28;
   static const double _minHipConfidence = 0.4;
 
   final List<FaultRecord> _faults = [];

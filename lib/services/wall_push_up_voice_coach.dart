@@ -1,5 +1,6 @@
 import '../exercise/exercise_base.dart';
 import '../exercise/wall_push_up/wall_push_up.dart';
+import 'generic_exercise_voice_assets.dart';
 import 'queued_asset_voice_player.dart';
 import 'wall_push_up_voice_assets.dart';
 
@@ -14,9 +15,13 @@ class _WallPushUpAssetVoicePlayer implements WallPushUpVoicePlayer {
   _WallPushUpAssetVoicePlayer({QueuedAssetVoicePlayer? player})
       : _player = player ??
             QueuedAssetVoicePlayer(
-              assetMap: WallPushUpVoiceAssets.files,
+              assetMap: {
+                ...GenericExerciseVoiceAssets.commonFiles,
+                ...WallPushUpVoiceAssets.files,
+              },
               assetSourcePrefix: WallPushUpVoiceAssets.assetSourcePrefix,
               assetBundlePrefix: WallPushUpVoiceAssets.assetBundlePrefix,
+              assetResolver: GenericExerciseVoiceAssets.resolveAsset,
               logTag: 'WallPushUpVoice',
             );
 
@@ -92,7 +97,7 @@ class WallPushUpVoiceCoach implements ExerciseVoiceCoach {
     }
 
     if (exercise.exerciseState == ExerciseState.notActivated) {
-      _speakSetup();
+      _speakSetup(exercise);
       _liveFaultVoicesSpokenThisRep.clear();
       _lastPhasePhrase = null;
       _lastRepCount = repCount;
@@ -172,13 +177,15 @@ class WallPushUpVoiceCoach implements ExerciseVoiceCoach {
     _ttsService.dispose();
   }
 
-  void _speakSetup() {
+  void _speakSetup(ExerciseBase exercise) {
     if (_didSpeakSetup) {
       return;
     }
-    _ttsService.speak('wall_push_up.setup_intro');
-    _ttsService.speak('wall_push_up.setup_position');
-    _ttsService.speak('wall_push_up.active_intro');
+    final script =
+        GenericExerciseVoiceAssets.scriptForExerciseName(exercise.exerciseName);
+    _ttsService.speak(script.setupIntroKey);
+    _ttsService.speak(script.cueKey('setup_position'));
+    _ttsService.speak(script.cueKey('active_intro'));
     _didSpeakSetup = true;
   }
 

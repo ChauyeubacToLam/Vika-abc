@@ -13,9 +13,9 @@ class CobraCervicalMetric extends CobraMetricBase {
   String get name => 'CervicalNeutrality';
 
   // Beginner thresholds (degrees, relative to trunk)
-  static const double _goodMin = -20.0;
-  static const double _goodMax = 35.0;
-  static const double _errorHyperextension = 45.0;
+  static const double _goodMin = -30.0;
+  static const double _goodMax = 45.0;
+  static const double _errorHyperextension = 60.0;
   static const double _minEarConfidence = 0.5;
 
   final List<FaultRecord> _faults = [];

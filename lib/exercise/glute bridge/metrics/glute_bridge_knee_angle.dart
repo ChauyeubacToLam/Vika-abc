@@ -31,14 +31,14 @@ import 'glute_bridge_metric_base.dart';
 import '../glute_bridge.dart';
 
 class KneeAngleConfig {
-  static const double GOOD_MIN = 90.0;
-  static const double GOOD_MAX = 130.0;
+  static const double GOOD_MIN = 80.0;
+  static const double GOOD_MAX = 140.0;
 
-  static const double ACCEPTABLE_LOWER_MIN = 80.0; // 80–90 range
+  static const double ACCEPTABLE_LOWER_MIN = 70.0; // 80–90 range
   // lower bound for "acceptable upper" = GOOD_MAX (130), upper bound = 140
-  static const double ACCEPTABLE_UPPER_MAX = 140.0;
+  static const double ACCEPTABLE_UPPER_MAX = 150.0;
 
-  static const double WARNING_MIN = 60.0; // 60–80 range
+  static const double WARNING_MIN = 50.0; // 60–80 range
   // Below WARNING_MIN → affectsForm = true (error)
 }
 

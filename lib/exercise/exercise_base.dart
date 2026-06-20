@@ -1144,7 +1144,7 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
 
   void _speakSetup(GenericExerciseVoiceScript script) {
     if (_didSpeakSetup) return;
-    _voicePlayer.speak(script.cueKey('setup_intro'));
+    _voicePlayer.speak(script.setupIntroKey);
     _voicePlayer.speak(script.cueKey('setup_position'));
     _voicePlayer.speak(script.cueKey('active_intro'));
     _speakPreviousSetAdviceIfNeeded(script);

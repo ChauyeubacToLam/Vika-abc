@@ -9,9 +9,9 @@ class KneeTravelMetric extends LowLungeMetricBase {
   @override
   String get name => 'KneeTravel';
 
-  static const double _goodMax = 0.5;
-  static const double _warningMin = 0.5;
-  static const double _errorMin = 0.8;
+  static const double _goodMax = 0.7;
+  static const double _warningMin = 0.7;
+  static const double _errorMin = 1.05;
   static const double _minConfidence = 0.45;
 
   final List<FaultRecord> _faults = [];

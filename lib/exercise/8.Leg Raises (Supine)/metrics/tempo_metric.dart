@@ -15,6 +15,19 @@ class TempoMetric extends LegRaiseMetricBase {
   Map<String, dynamic> get debugData => _debugData;
 
   @override
+  double? get value {
+    final liveDuration = _debugData['loweringSeconds'];
+    return loweringDuration ??
+        (liveDuration is num ? liveDuration.toDouble() : null);
+  }
+
+  @override
+  ThresholdBand? get threshold => const ThresholdBand(
+        warningBelow: LegRaiseConfig.TEMPO_TARGET_THRESHOLD,
+        faultBelow: LegRaiseConfig.TEMPO_FAULT_THRESHOLD,
+      );
+
+  @override
   void onStateTransition(
       LegRaiseState from, LegRaiseState to, int timestampMs) {
     if (to == LegRaiseState.lowering) {
@@ -25,7 +38,14 @@ class TempoMetric extends LegRaiseMetricBase {
   }
 
   @override
-  void update(LegRaiseRepContext ctx) {}
+  void update(LegRaiseRepContext ctx) {
+    if (_loweringStartMs != null &&
+        (ctx.state == LegRaiseState.lowering ||
+            ctx.state == LegRaiseState.lying)) {
+      _debugData['loweringSeconds'] =
+          (ctx.frameTimestampMs - _loweringStartMs!) / 1000.0;
+    }
+  }
 
   void evaluateRep(LegRaiseRepContext ctx) {
     // Nếu rớt tự do < TEMPO_FAULT_THRESHOLD (ví dụ < 2.0s)
@@ -47,6 +67,7 @@ class TempoMetric extends LegRaiseMetricBase {
   @override
   void reset() {
     _faults.clear();
+    _debugData.clear();
     _loweringStartMs = null;
     loweringDuration = null;
   }

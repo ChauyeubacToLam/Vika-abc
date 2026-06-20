@@ -9,12 +9,12 @@ enum SupermanState { setup, lifting, hold, lowering }
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 class SupermanConfig {
-  static const double LIFT_THRESHOLD = 0.04;
-  static const double ROM_THRESHOLD = 0.06;
-  static const double LOWERED_THRESHOLD = 0.025;
-  static const double HOLD_MIN_MS = 1500.0;
-  static const double SPINE_NEUTRAL_RANGE = 15.0;
-  static const double LUMBAR_EXTENSION_DANGER = 25.0;
+  static const double LIFT_THRESHOLD = 0.03;
+  static const double ROM_THRESHOLD = 0.045;
+  static const double LOWERED_THRESHOLD = 0.035;
+  static const double HOLD_MIN_MS = 1000.0;
+  static const double SPINE_NEUTRAL_RANGE = 22.0;
+  static const double LUMBAR_EXTENSION_DANGER = 35.0;
   static const int MAX_REP = 12;
   static const int MAX_DURATION_MS = 120000;
 }
@@ -67,7 +67,14 @@ abstract class SupermanMetricBase implements DebugMetricSource {
   @override
   ThresholdBand? get threshold => null;
   @override
-  MetricStatus get status => MetricStatus.pass;
+  MetricStatus get status {
+    if (faults.any((fault) => fault.affectsForm)) {
+      return MetricStatus.fault;
+    }
+    if (faults.isNotEmpty) return MetricStatus.near;
+    return MetricStatus.pass;
+  }
+
   @override
   String? get nameVi => null;
   @override

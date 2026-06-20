@@ -51,10 +51,10 @@ import 'curl_up_metric_base.dart';
 
 class NeckPullingConfig {
   /// Deviation from personal baseline that triggers a warning.
-  static const double WARNING_DEVIATION = 12.0;
+  static const double WARNING_DEVIATION = 18.0;
 
   /// Deviation from personal baseline that triggers an error.
-  static const double ERROR_DEVIATION = 15.0;
+  static const double ERROR_DEVIATION = 24.0;
 
   /// Number of resting frames averaged when hold-still snapshot is missing.
   static const int BASELINE_SAMPLE_COUNT = 5;

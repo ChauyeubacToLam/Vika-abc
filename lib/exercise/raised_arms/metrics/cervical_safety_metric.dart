@@ -7,7 +7,7 @@ import '../raised_arms.dart';
 import '../../../utils/debouncer.dart';
 
 class CervicalSafetyConfig {
-  static const double GOOD_THRESHOLD = 140.0;
+  static const double GOOD_THRESHOLD = 125.0;
   static const int MEDIAN_WINDOW = 7;
   static const double ONE_EURO_MIN_CUTOFF = 0.6;
   static const double ONE_EURO_BETA = 0.01;

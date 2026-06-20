@@ -12,8 +12,8 @@ class NeckShoulderMetric extends SphinxMetricBase {
   final Map<String, dynamic> _debugData = {};
 
   // Debouncer riêng cho từng loại lỗi để tránh conflict
-  final Debouncer _shrugDebouncer = Debouncer(requiredFrames: 4);
-  final Debouncer _hyperDebouncer = Debouncer(requiredFrames: 4);
+  final Debouncer _shrugDebouncer = Debouncer(requiredFrames: 6);
+  final Debouncer _hyperDebouncer = Debouncer(requiredFrames: 6);
 
   bool _shrugInstructionSet = false;
   bool _hyperInstructionSet = false;

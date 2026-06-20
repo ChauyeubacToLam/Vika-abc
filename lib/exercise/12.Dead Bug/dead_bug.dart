@@ -18,14 +18,14 @@ class DeadBugConfig {
   static const int TIMEOUT_MS = 90000; // 90s timeout
 
   // Start Position (Tay chân dựng thẳng vuông góc sàn)
-  static const double START_ANGLE_MIN = 50.0;
-  static const double START_ANGLE_MAX = 130.0;
+  static const double START_ANGLE_MIN = 40.0;
+  static const double START_ANGLE_MAX = 140.0;
 
   // State Transition Thresholds (Dựa vào góc mở của chi đang hạ xuống)
-  static const double EXTENDING_THRESHOLD = 115.0;
-  static const double HOLD_THRESHOLD = 145.0;
-  static const double RETURNING_THRESHOLD = 135.0;
-  static const double SETUP_THRESHOLD = 115.0;
+  static const double EXTENDING_THRESHOLD = 108.0;
+  static const double HOLD_THRESHOLD = 138.0;
+  static const double RETURNING_THRESHOLD = 128.0;
+  static const double SETUP_THRESHOLD = 108.0;
 }
 
 class DeadBug extends ExerciseBase {
@@ -343,6 +343,24 @@ class DeadBug extends ExerciseBase {
             ? _peakPhysicalLeftLeg!
             : physicalLeftLeg;
 
+    debugData['deadBugState'] = state.name;
+    debugData['previousDeadBugState'] = previousState.name;
+    debugData['leftArmAngle'] = lArmAng;
+    debugData['rightArmAngle'] = rArmAng;
+    debugData['leftHipAngle'] = lHipAng;
+    debugData['rightHipAngle'] = rHipAng;
+    debugData['activePairAngle'] = activePairAngle;
+    debugData['peakPairAngle'] = _peakPairAngle;
+    debugData['physicalLeftArm'] = physicalLeftArm ? 1 : 0;
+    debugData['physicalLeftLeg'] = physicalLeftLeg ? 1 : 0;
+    debugData['evalPhysicalLeftArm'] = evalPhysicalLeftArm ? 1 : 0;
+    debugData['evalPhysicalLeftLeg'] = evalPhysicalLeftLeg ? 1 : 0;
+    debugData['lastPhysicalLeftArm'] =
+        _lastPhysicalLeftArm == null ? null : (_lastPhysicalLeftArm! ? 1 : 0);
+    debugData['lastPhysicalLeftLeg'] =
+        _lastPhysicalLeftLeg == null ? null : (_lastPhysicalLeftLeg! ? 1 : 0);
+    debugData['holdSeconds'] = liveHoldSeconds ?? 0.0;
+
     if (isDebugModeActive &&
         (now - _lastDiagnosticTime > 500 || state != previousState)) {
       _diagnosticLog.add({
@@ -388,6 +406,9 @@ class DeadBug extends ExerciseBase {
 
     if (state != DeadBugState.setup) {
       for (final metric in _metrics) metric.update(ctx);
+    }
+    for (final metric in _metrics) {
+      debugData.addAll(metric.debugData);
     }
 
     resultIssues.addInstruction(state.name, 'Status', currentPhaseLabel);

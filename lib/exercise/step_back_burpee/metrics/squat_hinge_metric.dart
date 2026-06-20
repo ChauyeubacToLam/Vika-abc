@@ -10,8 +10,8 @@
 import 'step_back_burpee_metric_base.dart';
 
 class SquatHingeConfig {
-  static const double SAFE_KNEE_FLEXION = 100.0; // Gối gập sâu, an toàn
-  static const double STIFF_LEG_DANGER = 150.0; // Chân đơ thẳng, nguy hiểm
+  static const double SAFE_KNEE_FLEXION = 115.0; // Gối gập sâu, an toàn
+  static const double STIFF_LEG_DANGER = 160.0; // Chân đơ thẳng, nguy hiểm
 }
 
 class SquatHingeMetric extends StepBackBurpeeMetricBase {

@@ -1,4 +1,5 @@
 import 'package:vika/exercise/exercise_base.dart';
+import 'package:vika/debug/tracked_metric.dart';
 import 'package:vika/utils/exercise_logger.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/frame_buffer.dart';
@@ -15,9 +16,9 @@ enum TricepDipState { setup_top, descending, bottom, ascending }
 
 class TricepDipConfig {
   static const int MAX_REP = 15;
-  static const double DESCENDING_ELBOW_ANGLE = 155.0;
-  static const double BOTTOM_ELBOW_ANGLE = 110.0;
-  static const double ASCENDING_ELBOW_ANGLE = 160.0;
+  static const double DESCENDING_ELBOW_ANGLE = 145.0;
+  static const double BOTTOM_ELBOW_ANGLE = 125.0;
+  static const double ASCENDING_ELBOW_ANGLE = 150.0;
 }
 
 class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
@@ -49,6 +50,17 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
     fullExtensionMetric,
     scapularElevationMetric,
   ];
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
 
   @override
   Map<String, SideLandmarkPair> get requiredSideLandmarks => const {
@@ -110,7 +122,8 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
     logger.pushKey("hip_thrust_fails_count", hipThrustMetric.faultsCount);
     logger.pushKey("rom_fails_count", tricepRomMetric.faultsCount);
     logger.pushKey("extension_fails_count", fullExtensionMetric.faultsCount);
-    logger.pushKey("shrugging_fails_count", scapularElevationMetric.faultsCount);
+    logger.pushKey(
+        "shrugging_fails_count", scapularElevationMetric.faultsCount);
     logger.pushGoodRepCount();
     logger.pushKey("max_rep", maxRep);
   }

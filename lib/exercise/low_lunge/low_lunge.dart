@@ -1,6 +1,7 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, non_constant_identifier_names, constant_identifier_names
 
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:vika/debug/tracked_metric.dart';
 import 'package:vika/exercise/exercise_base.dart';
 import 'package:vika/utils/debouncer.dart';
 import 'package:vika/utils/pose_math_helpers.dart';
@@ -12,23 +13,23 @@ import 'metrics/cervical_safety_metric.dart';
 
 class LowLungeConfig {
   static const int MAX_REP = 2;
-  static const double HOLD_DURATION = 30.0;
+  static const double HOLD_DURATION = 20.0;
   static const double EXIT_DURATION = 4.0;
 
-  static const int SETUP_STILL_FRAMES = 6;
+  static const int SETUP_STILL_FRAMES = 4;
   static const int CALIBRATION_FRAMES = 20;
 
-  static const double MIN_STANCE_RATIO = 0.55;
-  static const double BACK_KNEE_GROUNDED_MAX = 0.80;
-  static const double FRONT_KNEE_SETUP_MAX = 165.0;
+  static const double MIN_STANCE_RATIO = 0.42;
+  static const double BACK_KNEE_GROUNDED_MAX = 0.95;
+  static const double FRONT_KNEE_SETUP_MAX = 175.0;
 
   static const double HOLD_HIP_VELOCITY_MAX = 0.06;
   static const double BREAK_HIP_VELOCITY_MIN = 0.18;
 
-  static const double FRONT_KNEE_GOOD_MIN = 85.0;
-  static const double FRONT_KNEE_GOOD_MAX = 120.0;
-  static const double FRONT_KNEE_SHALLOW = 130.0;
-  static const double CHEST_LIFT_MIN = 35.0;
+  static const double FRONT_KNEE_GOOD_MIN = 70.0;
+  static const double FRONT_KNEE_GOOD_MAX = 135.0;
+  static const double FRONT_KNEE_SHALLOW = 145.0;
+  static const double CHEST_LIFT_MIN = 25.0;
 }
 
 enum LowLungeState { entry, holding, exit }
@@ -59,6 +60,17 @@ class LowLunge extends ExerciseBase {
     _kneeTravelMetric,
     _cervicalSafetyMetric,
   ];
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
 
   final List<double> _calibrationScaleSamples = [];
   final List<double> _calibrationCervicalSamples = [];

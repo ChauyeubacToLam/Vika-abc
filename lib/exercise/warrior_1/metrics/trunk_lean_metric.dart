@@ -27,14 +27,14 @@ import '../../../utils/debouncer.dart';
 
 class TrunkLeanConfig {
   /// Good forward-lean band.
-  static const double GOOD_MIN = 10.0;
-  static const double GOOD_MAX = 25.0;
+  static const double GOOD_MIN = 0.0;
+  static const double GOOD_MAX = 35.0;
 
   /// Below this = too upright (lumbar compression risk for tight hip flexors).
-  static const double UPRIGHT_WARN = 5.0;
+  static const double UPRIGHT_WARN = -5.0;
 
   /// Forward warning band upper bound.
-  static const double FORWARD_WARN_MAX = 30.0;
+  static const double FORWARD_WARN_MAX = 45.0;
 
   /// Above this, sustained = safety error.
   static const double ERROR_THRESHOLD = 30.0;

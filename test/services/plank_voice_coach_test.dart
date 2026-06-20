@@ -55,7 +55,7 @@ void main() {
     expect(
       player.spoken,
       [
-        'plank.setup_intro',
+        'common.ngang_intro',
         'plank.setup_position',
         'plank.active_intro',
       ],

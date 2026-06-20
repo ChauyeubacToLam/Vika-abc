@@ -2,11 +2,23 @@ import 'tricep_metric_base.dart';
 import '../tricep_dip.dart';
 
 class FullExtensionMetric extends TricepMetricBase {
-  static const double FULL_EXTENSION_ANGLE = 160.0;
+  static const double FULL_EXTENSION_ANGLE = 150.0;
+  double? _lastElbowAngle;
+
+  @override
+  double? get value => _lastElbowAngle;
+
+  @override
+  ThresholdBand? get threshold => const ThresholdBand(
+        warningBelow: FULL_EXTENSION_ANGLE + 5.0,
+        faultBelow: FULL_EXTENSION_ANGLE,
+      );
 
   @override
   void update(TricepRepContext ctx) {
-    // Only check at the transition back to setup_top
+    _lastElbowAngle = ctx.elbowAngle;
+    debugData['elbowAngle'] = ctx.elbowAngle;
+    debugData['fullExtensionTarget'] = FULL_EXTENSION_ANGLE;
   }
 
   @override

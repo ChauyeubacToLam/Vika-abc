@@ -10,8 +10,8 @@ class CervicalSafetyMetric extends LowLungeMetricBase {
   @override
   String get name => 'CervicalSafety';
 
-  static const double _goodMin = 140.0;
-  static const double _errorMax = 140.0;
+  static const double _goodMin = 125.0;
+  static const double _errorMax = 125.0;
   static const double _minEarConfidence = 0.5;
 
   final List<FaultRecord> _faults = [];

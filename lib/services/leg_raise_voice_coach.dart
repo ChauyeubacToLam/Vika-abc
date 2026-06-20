@@ -1,5 +1,6 @@
 import '../exercise/8.Leg Raises (Supine)/leg_raise.dart';
 import '../exercise/exercise_base.dart';
+import 'generic_exercise_voice_assets.dart';
 import 'leg_raise_voice_assets.dart';
 import 'queued_asset_voice_player.dart';
 
@@ -14,9 +15,13 @@ class _LegRaiseAssetVoicePlayer implements LegRaiseVoicePlayer {
   _LegRaiseAssetVoicePlayer({QueuedAssetVoicePlayer? player})
       : _player = player ??
             QueuedAssetVoicePlayer(
-              assetMap: LegRaiseVoiceAssets.files,
+              assetMap: {
+                ...GenericExerciseVoiceAssets.commonFiles,
+                ...LegRaiseVoiceAssets.files,
+              },
               assetSourcePrefix: LegRaiseVoiceAssets.assetSourcePrefix,
               assetBundlePrefix: LegRaiseVoiceAssets.assetBundlePrefix,
+              assetResolver: GenericExerciseVoiceAssets.resolveAsset,
               logTag: 'LegRaiseVoice',
             );
 
@@ -66,7 +71,7 @@ class LegRaiseVoiceCoach implements ExerciseVoiceCoach {
         exercise.invalidAttemptCount > _lastInvalidAttemptCount;
 
     if (exercise.exerciseState == ExerciseState.notActivated) {
-      _speakSetup();
+      _speakSetup(exercise);
       _syncCounters(exercise, repCount);
       return;
     }
@@ -127,12 +132,14 @@ class LegRaiseVoiceCoach implements ExerciseVoiceCoach {
     _syncCounters(exercise, repCount);
   }
 
-  void _speakSetup() {
+  void _speakSetup(ExerciseBase exercise) {
     if (_didSpeakSetup) return;
 
-    _voicePlayer.speak('leg_raises.setup_intro');
-    _voicePlayer.speak('leg_raises.setup_position');
-    _voicePlayer.speak('leg_raises.active_intro');
+    final script =
+        GenericExerciseVoiceAssets.scriptForExerciseName(exercise.exerciseName);
+    _voicePlayer.speak(script.setupIntroKey);
+    _voicePlayer.speak(script.cueKey('setup_position'));
+    _voicePlayer.speak(script.cueKey('active_intro'));
     _didSpeakSetup = true;
   }
 

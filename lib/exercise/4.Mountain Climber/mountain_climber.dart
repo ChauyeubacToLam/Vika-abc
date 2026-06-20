@@ -1,5 +1,6 @@
 // ignore_for_file: curly_braces_in_flow_control_structures
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:vika/debug/tracked_metric.dart';
 import 'package:vika/pose/vika_pose_landmark.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/exercise_logger.dart';
@@ -64,6 +65,21 @@ class MountainClimber extends ExerciseBase {
 
   final TrunkStabilityMetric trunkMetric = TrunkStabilityMetric();
   final KneeDriveRomMetric romMetric = KneeDriveRomMetric();
+  late final List<ClimberMetricBase> _metrics = [
+    trunkMetric,
+    romMetric,
+  ];
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
 
   // ---------------------------------------------------------------------------
   // Session state

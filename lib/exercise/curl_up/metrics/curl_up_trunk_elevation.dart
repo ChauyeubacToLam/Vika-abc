@@ -47,15 +47,15 @@ import 'curl_up_metric_base.dart';
 
 class TrunkElevationConfig {
   /// Peak elevation above which the rep is a full sit-up — fail the rep.
-  static const double ERROR_HIGH = 20.0;
+  static const double ERROR_HIGH = 26.0;
 
   /// Upper bound of the safe range. Above = "too high" warning.
-  static const double WARNING_HIGH = 13.0;
+  static const double WARNING_HIGH = 18.0;
 
   /// Lower bound of the safe range. Below = "too shallow" warning.
-  static const double WARNING_LOW = 5.0;
+  static const double WARNING_LOW = 3.0;
 
-  static const double RESTING_BASELINE_REFRESH_MAX_DELTA = 1.0;
+  static const double RESTING_BASELINE_REFRESH_MAX_DELTA = 2.0;
 }
 
 enum _HighFaultLevel { warning, error }

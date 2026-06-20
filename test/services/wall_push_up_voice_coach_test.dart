@@ -34,7 +34,8 @@ class _FakeWallPushUpVoicePlayer implements WallPushUpVoicePlayer {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('speaks wall push up setup instructions only once before activation', () {
+  test('speaks wall push up setup instructions only once before activation',
+      () {
     final player = _FakeWallPushUpVoicePlayer();
     final coach = WallPushUpVoiceCoach(ttsService: player);
     final exercise = WallPushUp()..exerciseState = ExerciseState.notActivated;
@@ -55,7 +56,7 @@ void main() {
     expect(
       player.spoken,
       [
-        'wall_push_up.setup_intro',
+        'common.ngang_intro',
         'wall_push_up.setup_position',
         'wall_push_up.active_intro',
       ],

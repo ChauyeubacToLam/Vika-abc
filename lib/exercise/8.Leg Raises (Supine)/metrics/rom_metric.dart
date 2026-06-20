@@ -7,6 +7,7 @@ class RomMetric extends LegRaiseMetricBase {
   final Map<String, dynamic> _debugData = {};
 
   double? minHipFlexion;
+  double? _currentHipFlexion;
 
   @override
   List<FaultRecord> get faults => _faults;
@@ -14,12 +15,22 @@ class RomMetric extends LegRaiseMetricBase {
   Map<String, dynamic> get debugData => _debugData;
 
   @override
+  double? get value => minHipFlexion ?? _currentHipFlexion;
+
+  @override
+  ThresholdBand? get threshold =>
+      const ThresholdBand(warningAbove: 115.0, faultAbove: 100.0);
+
+  @override
   void update(LegRaiseRepContext ctx) {
+    _currentHipFlexion = ctx.hipFlexionAngle;
+    _debugData['hipFlexionAngle'] = ctx.hipFlexionAngle;
     if (ctx.state == LegRaiseState.raising || ctx.state == LegRaiseState.top) {
       if (minHipFlexion == null || ctx.hipFlexionAngle < minHipFlexion!) {
         minHipFlexion = ctx.hipFlexionAngle;
       }
     }
+    _debugData['minHipFlexion'] = minHipFlexion ?? ctx.hipFlexionAngle;
   }
 
   void evaluateRep(LegRaiseRepContext ctx) {
@@ -41,6 +52,8 @@ class RomMetric extends LegRaiseMetricBase {
   @override
   void reset() {
     _faults.clear();
+    _debugData.clear();
     minHipFlexion = null;
+    _currentHipFlexion = null;
   }
 }

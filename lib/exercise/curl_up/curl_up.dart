@@ -48,18 +48,18 @@ class CurlUpConfig {
   /// the tolerance for declaring rep complete. Both in degrees.
   /// Real curl-ups produce 10-25° trunk lift, so 4° entry is generous
   /// and 3° rest tolerance lets minor jitter clear the gate.
-  static const double ASCEND_DELTA_THRESHOLD = 4.0;
-  static const double REST_TOLERANCE = 3.0;
+  static const double ASCEND_DELTA_THRESHOLD = 3.0;
+  static const double REST_TOLERANCE = 5.0;
 
   /// Bent knee elevation gate at activation (fraction of torso length).
-  static const double BENT_KNEE_ELEVATION = 0.15;
+  static const double BENT_KNEE_ELEVATION = 0.10;
 
   /// Strict knee gate at activation: interior angle ≤ 100° required.
-  static const double KNEE_MAX_AT_START = 100.0;
+  static const double KNEE_MAX_AT_START = 115.0;
 
   /// Max ear-to-hip vertical separation, normalized by torso length.
   /// Confirms whole body is supine, not just shoulder-hip segment.
-  static const double EAR_HIP_VERTICAL_MAX = 0.3;
+  static const double EAR_HIP_VERTICAL_MAX = 0.42;
 
   /// Required stable frames at baseline to call rep complete.
   static const int RESTING_DEBOUNCE_FRAMES = 2;
@@ -67,10 +67,10 @@ class CurlUpConfig {
   /// Max allowed knee displacement from baseline before knee is flagged
   /// "out of position." Used to gate state machine entry and exit.
   /// Smoothed by 10-frame StickyDebouncer to filter ML Kit landmark noise.
-  static const double KNEE_DISPLACEMENT_MAX = 15.0;
+  static const double KNEE_DISPLACEMENT_MAX = 25.0;
 
   // Angle gate for detecting stable vs changing angle in FrameBuffer.
-  static const double ANGLE_STABLE_GATE = 0.5; // degrees
+  static const double ANGLE_STABLE_GATE = 0.8; // degrees
 }
 
 enum CurlUpState { resting, ascending, descending }

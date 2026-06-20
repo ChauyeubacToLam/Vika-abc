@@ -1,4 +1,5 @@
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:vika/debug/debug_types.dart';
 import 'package:vika/exercise/exercise_base.dart';
 import '../cobra.dart';
 
@@ -61,7 +62,8 @@ class FaultRecord {
   });
 }
 
-abstract class CobraMetricBase {
+abstract class CobraMetricBase implements DebugMetricSource {
+  @override
   String get name;
   int faultsCount = 0;
 
@@ -69,7 +71,20 @@ abstract class CobraMetricBase {
 
   List<FaultRecord> get faults;
   bool get isFaultingNow => false;
+  @override
   Map<String, dynamic> get debugData;
+  @override
+  double? get value => null;
+  @override
+  ThresholdBand? get threshold => null;
+  @override
+  MetricStatus get status => faults.any((fault) => fault.affectsForm)
+      ? MetricStatus.fault
+      : MetricStatus.pass;
+  @override
+  String? get nameVi => null;
+  @override
+  bool get devOnly => false;
 
   void reset();
 

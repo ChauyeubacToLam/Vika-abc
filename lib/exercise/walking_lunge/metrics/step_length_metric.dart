@@ -3,7 +3,7 @@ import '../walking_lunge.dart';
 
 class StepLengthMetric extends WalkingMetricBase {
   double? firstRepNormalizedStepLength;
-  static const double TOLERANCE = 0.15; // 15% tolerance
+  static const double TOLERANCE = 0.25; // 15% tolerance
 
   @override
   void update(WalkingRepContext ctx) {

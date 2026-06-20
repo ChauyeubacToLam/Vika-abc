@@ -1,4 +1,5 @@
 import 'package:vika/exercise/exercise_base.dart';
+import 'package:vika/debug/tracked_metric.dart';
 import '../../utils/pose_math_helpers.dart';
 import 'package:vika/utils/exercise_logger.dart';
 import 'package:vika/exercise/side_tracked_exercise_mixin.dart';
@@ -15,9 +16,9 @@ enum KteState { standing_base, approaching, touch, returning }
 
 class StandingKneeToElbowConfig {
   static const int MAX_REP = 30; // 15 per side
-  static const double KNEE_LIFT_START_RATIO = 0.10;
-  static const double TOUCH_DISTANCE_RATIO = 0.55;
-  static const double TOUCH_EXIT_DISTANCE_RATIO = 0.80;
+  static const double KNEE_LIFT_START_RATIO = 0.07;
+  static const double TOUCH_DISTANCE_RATIO = 0.70;
+  static const double TOUCH_EXIT_DISTANCE_RATIO = 0.90;
 }
 
 class StandingKneeToElbow extends ExerciseBase {
@@ -49,6 +50,17 @@ class StandingKneeToElbow extends ExerciseBase {
     crossRomMetric,
     pelvicDropMetric,
   ];
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
 
   @override
   String get exerciseName => 'Standing Knee-to-Elbow';

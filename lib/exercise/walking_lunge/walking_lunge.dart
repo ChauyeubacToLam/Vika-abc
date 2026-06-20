@@ -17,20 +17,20 @@ enum WalkingState { standing, stepping, descending, bottom, pulling_through }
 
 class WalkingLungeConfig {
   static const int MAX_REP = 20; // 10 per leg
-  static const double STEP_START_NORM = 0.55;
-  static const double STEP_CLOSE_NORM = 0.35;
+  static const double STEP_START_NORM = 0.45;
+  static const double STEP_CLOSE_NORM = 0.42;
   static const double FRAME_EDGE_MARGIN_RATIO = 0.04;
-  static const double FRONT_BOTTOM_ANGLE_MAX = 125.0;
-  static const double REAR_BOTTOM_ANGLE_MAX = 135.0;
-  static const int MIN_BOTTOM_CONFIRM_MS = 650;
+  static const double FRONT_BOTTOM_ANGLE_MAX = 140.0;
+  static const double REAR_BOTTOM_ANGLE_MAX = 150.0;
+  static const int MIN_BOTTOM_CONFIRM_MS = 450;
   static const double CLEAN_REP_STEP_LENGTH = 25.16;
-  static const double CLEAN_REP_STEP_LENGTH_TOLERANCE = 12.0;
+  static const double CLEAN_REP_STEP_LENGTH_TOLERANCE = 18.0;
   static const double CLEAN_REP_FRONT_KNEE_ANGLE = 94.50;
-  static const double CLEAN_REP_FRONT_KNEE_TOLERANCE = 12.0;
+  static const double CLEAN_REP_FRONT_KNEE_TOLERANCE = 18.0;
   static const double CLEAN_REP_NORMALIZED_STEP = 0.111;
-  static const double CLEAN_REP_NORMALIZED_STEP_TOLERANCE = 0.08;
+  static const double CLEAN_REP_NORMALIZED_STEP_TOLERANCE = 0.12;
   static const double CLEAN_REP_KNEE_OVER_TOE_X = -2.810;
-  static const double CLEAN_REP_KNEE_OVER_TOE_X_TOLERANCE = 0.9;
+  static const double CLEAN_REP_KNEE_OVER_TOE_X_TOLERANCE = 1.2;
 }
 
 class _WalkingCleanRepSnapshot {

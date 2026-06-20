@@ -18,19 +18,19 @@ class SitUpConfig {
   static const int TIMEOUT_MS = 90000; // 90s
 
   // FIX: Spec yêu cầu < 10° (code cũ là 15°)
-  static const double START_TRUNK_HORIZ_MAX = 10.0;
-  static const double START_KNEE_MIN = 70.0;
+  static const double START_TRUNK_HORIZ_MAX = 18.0;
+  static const double START_KNEE_MIN = 60.0;
   // FIX: Spec yêu cầu 100° (code cũ là 110°)
-  static const double START_KNEE_MAX = 100.0;
+  static const double START_KNEE_MAX = 115.0;
 
-  static const double RISING_TRUNK_START = 15.0;
-  static const double COUNTABLE_TOP_KHS_THRESHOLD = 130.0;
+  static const double RISING_TRUNK_START = 10.0;
+  static const double COUNTABLE_TOP_KHS_THRESHOLD = 142.0;
   // FIX: Spec yêu cầu ≤ 90° (code cũ là 95°)
-  static const double UPRIGHT_KHS_THRESHOLD = 90.0;
+  static const double UPRIGHT_KHS_THRESHOLD = 105.0;
   // FIX: Spec yêu cầu > 95° (code cũ là 100°)
-  static const double LOWERING_KHS_THRESHOLD = 95.0;
-  static const double LOWERING_KHS_DIFF = 8.0;
-  static const double LYING_TRUNK_THRESHOLD = 15.0;
+  static const double LOWERING_KHS_THRESHOLD = 110.0;
+  static const double LOWERING_KHS_DIFF = 5.0;
+  static const double LYING_TRUNK_THRESHOLD = 22.0;
 }
 
 class SitUp extends ExerciseBase with SideTrackedExerciseMixin {

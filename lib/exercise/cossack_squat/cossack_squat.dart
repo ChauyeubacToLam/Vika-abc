@@ -1,4 +1,5 @@
 import 'package:vika/exercise/exercise_base.dart';
+import 'package:vika/debug/tracked_metric.dart';
 import 'package:vika/utils/exercise_logger.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/frame_buffer.dart';
@@ -19,16 +20,16 @@ class CossackConfig {
   static const int MAX_REP = 16; // 8 per side
   static const double STANDING_HIP_VELOCITY_Y_THRESHOLD = 0.01;
   static const double BOTTOM_KNEE_ANGLE_THRESHOLD =
-      95.0; // Angle to consider bottom
-  static const double STANDING_KNEE_ANGLE_THRESHOLD = 160.0;
+      110.0; // Angle to consider bottom
+  static const double STANDING_KNEE_ANGLE_THRESHOLD = 150.0;
   static const double CLEAN_REP_LEFT_KNEE_ANGLE = 172.1;
-  static const double CLEAN_REP_LEFT_KNEE_TOLERANCE = 8.0;
+  static const double CLEAN_REP_LEFT_KNEE_TOLERANCE = 12.0;
   static const double CLEAN_REP_RIGHT_KNEE_ANGLE = 179.6;
-  static const double CLEAN_REP_RIGHT_KNEE_TOLERANCE = 8.0;
+  static const double CLEAN_REP_RIGHT_KNEE_TOLERANCE = 12.0;
   static const double CLEAN_REP_TORSO_ANGLE = 329.3;
-  static const double CLEAN_REP_TORSO_TOLERANCE = 12.0;
+  static const double CLEAN_REP_TORSO_TOLERANCE = 18.0;
   static const double CLEAN_REP_KNEE_VALGUS_NORM = 0.160;
-  static const double CLEAN_REP_KNEE_VALGUS_NORM_TOLERANCE = 0.08;
+  static const double CLEAN_REP_KNEE_VALGUS_NORM_TOLERANCE = 0.12;
 }
 
 class CossackSquat extends ExerciseBase {
@@ -63,6 +64,17 @@ class CossackSquat extends ExerciseBase {
     straightLegMetric,
     torsoMetric,
   ];
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
 
   @override
   String get exerciseName => 'Cossack Squat';

@@ -29,7 +29,7 @@ import 'spine_round_metric.dart';
 class LegStraightnessConfig {
   /// Knee angle at or above which we consider legs "straight enough".
   /// Below this is fine — surface only as a gentle post-hold nudge.
-  static const double STRAIGHT_THRESHOLD = 150.0;
+  static const double STRAIGHT_THRESHOLD = 135.0;
 }
 
 class LegStraightnessMetric extends DownwardDogMetricBase {

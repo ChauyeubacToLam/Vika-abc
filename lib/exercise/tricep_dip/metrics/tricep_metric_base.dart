@@ -1,7 +1,10 @@
+// ignore_for_file: annotate_overrides
+
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../exercise_base.dart';
 import '../tricep_dip.dart';
 import '../../fault_record.dart';
+export '../../../debug/debug_types.dart';
 export '../../fault_record.dart';
 
 class TricepRepContext {
@@ -31,11 +34,13 @@ class TricepRepContext {
   });
 }
 
-abstract class TricepMetricBase {
+abstract class TricepMetricBase with FaultMetricDebugSource {
   int _faultsCount = 0;
   final List<FaultRecord> _faults = [];
   Map<String, dynamic> debugData = {};
 
+  @override
+  String get name => runtimeType.toString();
   int get faultsCount => _faultsCount;
   List<FaultRecord> get faults => List.unmodifiable(_faults);
 

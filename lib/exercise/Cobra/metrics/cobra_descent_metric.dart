@@ -10,9 +10,9 @@ class CobraDescentMetric extends CobraMetricBase {
   String get name => 'DescentVelocity';
 
   // Thresholds (body-lengths/second)
-  static const double _controlledMax = 1.5;
-  static const double _crashMin = 2.0;
-  static const int _crashFramesRequired = 3;
+  static const double _controlledMax = 1.0;
+  static const double _crashMin = 2.8;
+  static const int _crashFramesRequired = 5;
 
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};

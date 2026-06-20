@@ -9,11 +9,11 @@ class ArmPositionMetric extends RaisedArmsMetricBase {
   @override
   String get name => 'ArmPosition';
 
-  static const double _raisedGate = 30.0;
-  static const double _tooLow = 50.0;
+  static const double _raisedGate = 45.0;
+  static const double _tooLow = 65.0;
   static const double _goodMin = 0.0;
-  static const double _goodMax = 30.0;
-  static const double _elbowTooBent = 140.0;
+  static const double _goodMax = 45.0;
+  static const double _elbowTooBent = 125.0;
 
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};

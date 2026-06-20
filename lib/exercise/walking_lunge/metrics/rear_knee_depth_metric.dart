@@ -2,7 +2,17 @@ import 'walking_metric_base.dart';
 import '../walking_lunge.dart';
 
 class RearKneeDepthMetric extends WalkingMetricBase {
-  static const double DEPTH_TOLERANCE = 0.15; // normalized distance from floor
+  static const double DEPTH_TOLERANCE = 0.25; // normalized distance from floor
+  double? _normalizedDistanceToFloor;
+
+  @override
+  double? get value => _normalizedDistanceToFloor;
+
+  @override
+  ThresholdBand? get threshold => const ThresholdBand(
+        warningAbove: DEPTH_TOLERANCE * 0.75,
+        faultAbove: DEPTH_TOLERANCE,
+      );
 
   @override
   void update(WalkingRepContext ctx) {
@@ -18,10 +28,13 @@ class RearKneeDepthMetric extends WalkingMetricBase {
     // Wait, simple check: if at BOTTOM phase, check if it's deep enough.
 
     if (ctx.state == WalkingState.bottom) {
-      double distanceToFloor = (ctx.frontFoot.y - ctx.rearKnee.y)
+      final distanceToFloor = (ctx.frontFoot.y - ctx.rearKnee.y)
           .abs(); // approx using front foot as floor level
-      double normalizedDist =
+      final normalizedDist =
           distanceToFloor / (ctx.thighLength == 0 ? 1 : ctx.thighLength);
+      _normalizedDistanceToFloor = normalizedDist;
+      debugData['rearKneeFloorDistance'] = normalizedDist;
+      debugData['rearKneeAngle'] = ctx.rearKneeAngle;
 
       if (normalizedDist > DEPTH_TOLERANCE) {
         addFault(

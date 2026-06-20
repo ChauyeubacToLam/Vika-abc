@@ -3,10 +3,19 @@ import '../cossack_squat.dart';
 
 class CossackTorsoVerticalityMetric extends CossackMetricBase {
   static const double MAX_TORSO_FORWARD_LEAN =
-      50.0; // Allowed degrees of forward lean
+      65.0; // Allowed degrees of forward lean
+
+  @override
+  double? get value => debugData['torsoAngle'] as double?;
+
+  @override
+  ThresholdBand? get threshold => const ThresholdBand(
+      warningAbove: 55.0, faultAbove: MAX_TORSO_FORWARD_LEAN);
 
   @override
   void update(CossackRepContext ctx) {
+    debugData['torsoAngle'] = ctx.torsoAngle;
+
     if (ctx.state == CossackState.standing) return;
 
     if (ctx.torsoAngle > MAX_TORSO_FORWARD_LEAN) {

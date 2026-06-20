@@ -35,11 +35,11 @@ class HeadNeckConfig {
   static const double NEUTRAL = 180.0;
 
   /// Deviation thresholds from neutral
-  static const double WARNING_DEVIATION = 10.0;
-  static const double ERROR_DEVIATION = 20.0;
+  static const double WARNING_DEVIATION = 16.0;
+  static const double ERROR_DEVIATION = 30.0;
 
   /// Fault percentage threshold
-  static const double FAULT_PERCENT_THRESHOLD = 0.30;
+  static const double FAULT_PERCENT_THRESHOLD = 0.45;
 }
 
 class HeadNeckMetric extends PlankMetricBase {

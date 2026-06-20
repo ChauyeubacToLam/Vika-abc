@@ -16,6 +16,14 @@ class PelvicStabilityMetric extends LegRaiseMetricBase {
   Map<String, dynamic> get debugData => _debugData;
 
   @override
+  double? get value => _debugData['hipUpwardShift'] is num
+      ? (_debugData['hipUpwardShift'] as num).toDouble()
+      : null;
+
+  @override
+  ThresholdBand? get threshold => const ThresholdBand(faultAbove: 0.05);
+
+  @override
   void onStateTransition(
       LegRaiseState from, LegRaiseState to, int timestampMs) {
     // Cập nhật điểm gốc khi chuẩn bị nâng lên (Lúc này lưng đang áp sát sàn nhất)
@@ -35,7 +43,7 @@ class PelvicStabilityMetric extends LegRaiseMetricBase {
       double upwardShift = _baselineHipY! - ctx.hipY;
       double normalizedShift = upwardShift / ctx.scaleFactor;
 
-      _debugData['hipUpwardShift'] = normalizedShift.toStringAsFixed(3);
+      _debugData['hipUpwardShift'] = normalizedShift;
 
       // Nếu hông bị giật lên > 5% chiều dài thân (khoảng 2-3cm là rất nghiêm trọng ở khung chậu)
       if (_faultDebouncer.update(normalizedShift > 0.05)) {
@@ -57,6 +65,7 @@ class PelvicStabilityMetric extends LegRaiseMetricBase {
   @override
   void reset() {
     _faults.clear();
+    _debugData.clear();
     _faultDebouncer.reset();
     _baselineHipY = null; // Clear baseline on reset/new set
   }

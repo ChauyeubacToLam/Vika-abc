@@ -1,4 +1,4 @@
-// ignore_for_file: constant_identifier_names
+// ignore_for_file: constant_identifier_names, annotate_overrides
 import '../../exercise_base.dart';
 import '../../fault_record.dart';
 export '../../fault_record.dart';
@@ -11,34 +11,34 @@ class ReverseCrunchConfig {
 
   // Setup thresholds
   static const List<double> SETUP_KNEE_ANGLE_RANGE = [
-    70.0,
-    115.0
+    60.0,
+    130.0
   ]; // Mở rộng góc gối để dễ setup
-  static const double SETUP_TRUNK_HORIZONTAL_MAX = 20.0;
-  static const double SETUP_THIGH_VERTICAL_MIN = 60.0;
-  static const double SETUP_SHIN_HORIZONTAL_MAX = 30.0;
+  static const double SETUP_TRUNK_HORIZONTAL_MAX = 28.0;
+  static const double SETUP_THIGH_VERTICAL_MIN = 50.0;
+  static const double SETUP_SHIN_HORIZONTAL_MAX = 40.0;
   static const double LIFT_START_ANGLE_DROP =
-      8.0; // Góc Vai-Hông-Gối giảm 5 độ -> Bắt đầu cuộn
-  static const double LIFT_START_HIP_LIFT_NORMALIZED = 0.04;
+      6.0; // Góc Vai-Hông-Gối giảm 5 độ -> Bắt đầu cuộn
+  static const double LIFT_START_HIP_LIFT_NORMALIZED = 0.03;
 
   // Y Khoa (McGill & Sarti) thresholds
   static const double PELVIC_CURL_ANGLE_MIN_DROP =
-      15.0; // Ở Top, góc Vai-Hông-Gối phải giảm > 15 độ
+      10.0; // Ở Top, góc Vai-Hông-Gối phải giảm > 15 độ
   static const double HIP_LIFT_MIN_NORMALIZED =
-      0.05; // Hông phải rời mặt sàn tối thiểu
-  static const double PEAK_KNEE_EXTENSION_MIN = 150.0;
-  static const double PEAK_LEG_VERTICAL_MIN = 65.0;
-  static const double PEAK_EXIT_LEG_VERTICAL_MIN = 55.0;
-  static const double PEAK_EXIT_KNEE_EXTENSION_MIN = 140.0;
-  static const double EARLY_KICK_KNEE_EXTENSION_MIN = 145.0;
+      0.035; // Hông phải rời mặt sàn tối thiểu
+  static const double PEAK_KNEE_EXTENSION_MIN = 138.0;
+  static const double PEAK_LEG_VERTICAL_MIN = 55.0;
+  static const double PEAK_EXIT_LEG_VERTICAL_MIN = 45.0;
+  static const double PEAK_EXIT_KNEE_EXTENSION_MIN = 130.0;
+  static const double EARLY_KICK_KNEE_EXTENSION_MIN = 135.0;
 
   static const double KNEE_SWING_TOLERANCE =
-      20.0; // Biên độ dao động tối đa của góc gối (tránh vung chân lấy đà)
+      28.0; // Biên độ dao động tối đa của góc gối (tránh vung chân lấy đà)
   static const double ECCENTRIC_MIN_TIME =
-      1.5; // Giây: Thời gian hạ hông có kiểm soát
+      1.0; // Giây: Thời gian hạ hông có kiểm soát
   // Arm position: elbows straight, wrists kept beside the hips.
-  static const double ARM_ELBOW_STRAIGHT_MIN = 150.0;
-  static const double ARM_WRIST_HIP_MAX_RATIO = 0.75;
+  static const double ARM_ELBOW_STRAIGHT_MIN = 135.0;
+  static const double ARM_WRIST_HIP_MAX_RATIO = 0.95;
 }
 
 class CrunchVoicePriority {
@@ -119,7 +119,7 @@ class RepContext {
   }
 }
 
-abstract class ReverseCrunchMetricBase {
+abstract class ReverseCrunchMetricBase with FaultMetricDebugSource {
   String get name;
   int faultsCount = 0;
   void update(RepContext ctx);

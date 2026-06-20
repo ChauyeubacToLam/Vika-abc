@@ -32,10 +32,10 @@ import '../../../utils/debouncer.dart';
 
 class ShoulderShrugConfig {
   /// Shrug threshold as a fraction of the personal ear-shoulder baseline.
-  static const double ERROR_RATIO = 0.6;
+  static const double ERROR_RATIO = 0.48;
 
   /// Good threshold — still OK if slightly lower than baseline.
-  static const double GOOD_RATIO = 0.8;
+  static const double GOOD_RATIO = 0.68;
 
   /// Rolling median window for the noisy ear landmark.
   static const int MEDIAN_WINDOW = 7;

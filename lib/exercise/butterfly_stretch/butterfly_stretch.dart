@@ -12,12 +12,12 @@ import 'metrics/knee_separation_metric.dart';
 import 'metrics/posture_metric.dart';
 
 class ButterflyConfig {
-  static const int TARGET_HOLD_SECONDS = 30;
-  static const double MAX_ANKLE_SEPARATION_NORM = 0.2;
-  static const double HOLD_STABILITY_THRESHOLD = 0.025;
-  static const double STRETCH_THRESHOLD = 0.02;
-  static const double RELEASE_THRESHOLD = -0.025;
-  static const double MIN_KNEE_SEPARATION_NORM = 0.85;
+  static const int TARGET_HOLD_SECONDS = 20;
+  static const double MAX_ANKLE_SEPARATION_NORM = 0.20;
+  static const double HOLD_STABILITY_THRESHOLD = 0.04;
+  static const double STRETCH_THRESHOLD = 0.015;
+  static const double RELEASE_THRESHOLD = -0.04;
+  static const double MIN_KNEE_SEPARATION_NORM = 0.70;
   static const int MAX_BUFFER_FRAMES = 45;
 }
 

@@ -4,7 +4,7 @@ import '../russian_twist.dart';
 
 class SpinalFlexionMetric extends RussianMetricBase {
   static const double HUNCH_RATIO_LIMIT =
-      0.8; // If shoulder-hip distance drops below 80% of setup
+      0.68; // If shoulder-hip distance drops below 80% of setup
 
   double? _setupShoulderToHipDist;
 

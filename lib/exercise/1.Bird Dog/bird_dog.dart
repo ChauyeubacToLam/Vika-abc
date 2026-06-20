@@ -3,6 +3,7 @@ import 'package:vika/utils/debouncer.dart';
 import 'package:vika/debug/tracked_metric.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../services/bird_dog_voice_assets.dart';
+import '../../services/generic_exercise_voice_assets.dart';
 import '../../services/queued_asset_voice_player.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/exercise_logger.dart';
@@ -17,17 +18,17 @@ class BirdDogConfig {
   static const int MAX_REP = 24;
   static const int TIMEOUT_MS = 90000;
 
-  static const double START_KNEE_MIN = 40;
-  static const double START_KNEE_MAX = 140;
-  static const double START_ARM_MIN = 40;
-  static const double START_ARM_MAX = 140;
-  static const double START_TRUNK_HORIZ_MAX = 20;
+  static const double START_KNEE_MIN = 30;
+  static const double START_KNEE_MAX = 150;
+  static const double START_ARM_MIN = 30;
+  static const double START_ARM_MAX = 150;
+  static const double START_TRUNK_HORIZ_MAX = 30;
 
-  static const double EXTENDING_KNEE_START = 120;
-  static const double HOLD_KNEE_THRESHOLD = 160;
-  static const double HOLD_ARM_THRESHOLD = 150;
-  static const double RETURNING_KNEE_THRESHOLD = 150;
-  static const double NEUTRAL_KNEE_THRESHOLD = 110;
+  static const double EXTENDING_KNEE_START = 110;
+  static const double HOLD_KNEE_THRESHOLD = 145;
+  static const double HOLD_ARM_THRESHOLD = 135;
+  static const double RETURNING_KNEE_THRESHOLD = 138;
+  static const double NEUTRAL_KNEE_THRESHOLD = 120;
   static const double HOLD_TARGET_SECONDS = BirdDogTiming.holdTargetSeconds;
 }
 
@@ -646,9 +647,13 @@ class _BirdDogAssetVoicePlayer implements BirdDogVoicePlayer {
   _BirdDogAssetVoicePlayer({QueuedAssetVoicePlayer? player})
       : _player = player ??
             QueuedAssetVoicePlayer(
-              assetMap: BirdDogVoiceAssets.files,
+              assetMap: {
+                ...GenericExerciseVoiceAssets.commonFiles,
+                ...BirdDogVoiceAssets.files,
+              },
               assetSourcePrefix: BirdDogVoiceAssets.assetSourcePrefix,
               assetBundlePrefix: BirdDogVoiceAssets.assetBundlePrefix,
+              assetResolver: GenericExerciseVoiceAssets.resolveAsset,
               logTag: 'BirdDogVoice',
             );
 
@@ -671,6 +676,7 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
   BirdDogVoiceCoach({BirdDogVoicePlayer? voicePlayer})
       : _voicePlayer = voicePlayer ?? _BirdDogAssetVoicePlayer();
 
+  // ignore: unused_field
   static const String _setupIntro =
       'Đặt điện thoại hơi chéo để thấy toàn thân trên thảm.';
   static const String _setupPosition =
@@ -733,7 +739,7 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
     }
 
     if (exercise.exerciseState == ExerciseState.notActivated) {
-      _handleSetup();
+      _handleSetup(exercise);
       _lastRepCount = repCount;
       _lastInvalidAttemptCount = exercise.invalidAttemptCount;
       return;
@@ -772,9 +778,13 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
     _lastInvalidAttemptCount = exercise.invalidAttemptCount;
   }
 
-  void _handleSetup() {
+  void _handleSetup(BirdDog exercise) {
     if (!_didSpeakSetupIntro) {
-      _voicePlayer.speak(_setupIntro);
+      _voicePlayer.speak(
+        GenericExerciseVoiceAssets.setupIntroKeyForExerciseName(
+          exercise.exerciseName,
+        ),
+      );
       _voicePlayer.speak(_setupPosition);
       _voicePlayer.speak(_activeIntro);
       _speakPreviousSetAdviceIfNeeded();

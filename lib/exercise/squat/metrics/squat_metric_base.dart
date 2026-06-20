@@ -106,7 +106,13 @@ abstract class SquatMetricBase implements DebugMetricSource {
 
   /// Current metric decision. Override when a metric has a primary value.
   @override
-  MetricStatus get status => MetricStatus.pass;
+  MetricStatus get status {
+    if (faults.any((fault) => fault.affectsForm)) {
+      return MetricStatus.fault;
+    }
+    if (faults.isNotEmpty) return MetricStatus.near;
+    return MetricStatus.pass;
+  }
 
   /// Friendly Vietnamese label for user-facing debug mode.
   @override

@@ -14,8 +14,8 @@ class PostureStackMetric extends PrayerPoseMetricBase {
   @override
   String get name => 'PostureStack';
 
-  static const double _goodMax = 0.4;
-  static const double _coachingMin = 0.6;
+  static const double _goodMax = 0.55;
+  static const double _coachingMin = 0.75;
   static const int _medianWindow = 7;
   static const double _minEarConfidence = 0.5;
 

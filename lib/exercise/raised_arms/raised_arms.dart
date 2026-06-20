@@ -1,6 +1,7 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, non_constant_identifier_names, constant_identifier_names
 
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:vika/debug/tracked_metric.dart';
 import 'package:vika/exercise/exercise_base.dart';
 import 'package:vika/utils/debouncer.dart';
 import 'package:vika/utils/pose_math_helpers.dart';
@@ -13,16 +14,16 @@ import 'metrics/arm_position_metric.dart';
 
 class RaisedArmsConfig {
   static const int MAX_REP = 1;
-  static const double HOLD_DURATION = 20.0;
+  static const double HOLD_DURATION = 12.0;
   static const double EXIT_DURATION = 4.0;
 
-  static const int SETUP_STILL_FRAMES = 15;
+  static const int SETUP_STILL_FRAMES = 10;
   static const int CALIBRATION_FRAMES = 20;
 
-  static const double ENTRY_TRUNK_TOLERANCE = 20.0;
+  static const double ENTRY_TRUNK_TOLERANCE = 35.0;
   static const double HOLD_HIP_VELOCITY_MAX = 0.025;
   static const double BREAK_HIP_VELOCITY_MIN = 0.09;
-  static const double LUMBAR_EXIT_BACK_LEAN = 15.0;
+  static const double LUMBAR_EXIT_BACK_LEAN = 25.0;
 }
 
 enum RaisedArmsState { entry, holding, exit }
@@ -57,6 +58,17 @@ class RaisedArms extends ExerciseBase {
     _cervicalSafetyMetric,
     _armPositionMetric,
   ];
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
 
   final List<double> _calibrationScaleSamples = [];
   final List<double> _calibrationTrunkSamples = [];

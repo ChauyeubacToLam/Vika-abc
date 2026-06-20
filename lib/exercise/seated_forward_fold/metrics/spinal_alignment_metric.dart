@@ -7,7 +7,7 @@ class SpinalAlignmentMetric extends SeatedForwardMetricBase {
 
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
-  final Debouncer _spineRoundDebouncer = Debouncer(requiredFrames: 4);
+  final Debouncer _spineRoundDebouncer = Debouncer(requiredFrames: 6);
   bool _instructionSet = false;
   bool _isFaultingNow = false;
 

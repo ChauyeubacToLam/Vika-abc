@@ -55,7 +55,7 @@ void main() {
     expect(
       player.spoken,
       [
-        'leg_raises.setup_intro',
+        'common.ngang_intro',
         'leg_raises.setup_position',
         'leg_raises.active_intro',
       ],

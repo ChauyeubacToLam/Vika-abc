@@ -1,3 +1,5 @@
+// ignore_for_file: annotate_overrides
+
 import '../../exercise_base.dart';
 import '../russian_twist.dart';
 import '../../fault_record.dart';
@@ -45,11 +47,13 @@ class RussianRepContext {
   });
 }
 
-abstract class RussianMetricBase {
+abstract class RussianMetricBase with FaultMetricDebugSource {
   int _faultsCount = 0;
   final List<FaultRecord> _faults = [];
   Map<String, dynamic> debugData = {};
 
+  @override
+  String get name => runtimeType.toString();
   int get faultsCount => _faultsCount;
   List<FaultRecord> get faults => List.unmodifiable(_faults);
 

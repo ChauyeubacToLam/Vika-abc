@@ -1,4 +1,4 @@
-// ignore_for_file: curly_braces_in_flow_control_structures, non_constant_identifier_names, constant_identifier_names
+// ignore_for_file: curly_braces_in_flow_control_structures, non_constant_identifier_names, constant_identifier_names, annotate_overrides
 
 /* =========================================================================
    WALL PUSH-UP — Main exercise class.
@@ -24,6 +24,7 @@
 import 'dart:math' as math;
 
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:vika/debug/tracked_metric.dart';
 import 'package:vika/utils/debouncer.dart';
 import 'package:vika/utils/exercise_logger.dart';
 
@@ -48,19 +49,19 @@ class WallPushUpConfig {
 
   // State machine — driven by elbow angle β (shoulder→elbow→wrist), normalized.
   // ~175° = arms straight (standing/lockout). ~90° = elbows bent (bottom).
-  static const double STANDING_ANGLE_THRESHOLD = 145.0; // > this → standing
+  static const double STANDING_ANGLE_THRESHOLD = 138.0; // > this → standing
   static const double DESCEND_ANGLE_THRESHOLD =
-      140.0; // < this → entering descent
-  static const double BOTTOM_ANGLE_MAX = 125.0; // ≤ this → bottom
-  static const double BOTTOM_EXIT = 130.0; // > this from bottom → ascending
+      135.0; // < this → entering descent
+  static const double BOTTOM_ANGLE_MAX = 132.0; // ≤ this → bottom
+  static const double BOTTOM_EXIT = 136.0; // > this from bottom → ascending
 
   // Start position gates (hold-still).
-  static const double START_ELBOW_MIN = 145.0; // arms extended enough
-  static const double START_BODYLINE_MIN = 140.0; // body roughly straight
-  static const double START_TRUNK_INCLINATION_MIN = 35.0;
-  static const double ACTIVE_TRUNK_INCLINATION_MIN = 30.0;
-  static const double HAND_PLACEMENT_MAX_OFFSET_RATIO = 0.40;
-  static const double HEEL_RAISE_MIN_RATIO = 0.02;
+  static const double START_ELBOW_MIN = 135.0; // arms extended enough
+  static const double START_BODYLINE_MIN = 128.0; // body roughly straight
+  static const double START_TRUNK_INCLINATION_MIN = 25.0;
+  static const double ACTIVE_TRUNK_INCLINATION_MIN = 20.0;
+  static const double HAND_PLACEMENT_MAX_OFFSET_RATIO = 0.55;
+  static const double HEEL_RAISE_MIN_RATIO = 0.01;
   static const String WALL_DISTANCE_SETUP =
       'Đứng cách tường một cánh tay + 30-40 cm, đặt tay lên tường.';
   // NOTE: normalized angle caps at 180°, so the spec's 195° upper bound
@@ -68,14 +69,14 @@ class WallPushUpConfig {
 
   // --- Effectiveness Check 6: Depth (min elbow angle at bottom) ---
   // Week 1-4 thresholds. affectsForm = false (coach, don't punish).
-  static const double DEPTH_GOOD_MAX = 110.0; // ≤110° = good depth
-  static const double DEPTH_SHALLOW_MAX = 130.0; // 110-130° = shallow warning
+  static const double DEPTH_GOOD_MAX = 122.0; // ≤110° = good depth
+  static const double DEPTH_SHALLOW_MAX = 142.0; // 110-130° = shallow warning
   // > DEPTH_SHALLOW_MAX = too shallow (wasted rep) coaching
 
   // --- Effectiveness Check 8: Full lockout (peak elbow angle at top) ---
   // Week 1-4 thresholds. affectsForm = false.
-  static const double LOCKOUT_GOOD_MIN = 160.0; // ≥160° = good lockout
-  static const double LOCKOUT_WARN_MIN = 150.0; // 150-160° = partial warning
+  static const double LOCKOUT_GOOD_MIN = 140.0; // relaxed beginner lockout
+  static const double LOCKOUT_WARN_MIN = 135.0; // 150-160° = partial warning
 }
 
 enum WallPushUpState { standing, descending, bottom, ascending }
@@ -169,7 +170,7 @@ class RepContext {
    Identical to PushUpMetricBase plus a captureBaseline() hook for the
    metrics that personalize against a hold-still resting snapshot.
    ========================================================================= */
-abstract class WallPushUpMetricBase {
+abstract class WallPushUpMetricBase with FaultMetricDebugSource {
   int faultsCount = 0;
 
   /// Human-readable name for debug/logging.
@@ -216,7 +217,7 @@ abstract class WallPushUpMetricBase {
    ========================================================================= */
 class TempoConfig {
   /// Week 1-4: descent faster than this (seconds) = uncontrolled drop.
-  static const double DESCENT_FAST_ERROR = 0.5;
+  static const double DESCENT_FAST_ERROR = 0.3;
 }
 
 class TempoMetric extends WallPushUpMetricBase {
@@ -349,6 +350,17 @@ class WallPushUp extends ExerciseBase {
     wallContactMetric,
     tempoMetric,
   ];
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
 
   static List<FaultRecord> orderedVoicedFaults(Iterable<FaultRecord> faults) {
     final voicedFaults = faults

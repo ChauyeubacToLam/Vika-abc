@@ -2,7 +2,7 @@ import 'walking_metric_base.dart';
 import '../walking_lunge.dart';
 
 class FrontKneeControlMetric extends WalkingMetricBase {
-  static const double MAX_KNEE_OVER_TOE_X = 0.05; // allow small margin
+  static const double MAX_KNEE_OVER_TOE_X = 0.12; // allow small margin
 
   @override
   void update(WalkingRepContext ctx) {

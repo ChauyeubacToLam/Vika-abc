@@ -1,7 +1,7 @@
 import 'sit_up_metric_base.dart';
 
 class RomMetric extends SitUpMetricBase {
-  static const double minCountableKneeHipShoulder = 130.0;
+  static const double minCountableKneeHipShoulder = 142.0;
 
   @override
   String get name => 'ROM';

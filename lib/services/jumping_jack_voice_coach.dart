@@ -1,5 +1,6 @@
 import '../exercise/exercise_base.dart';
 import '../exercise/jumping jack/jumping_jack.dart';
+import 'generic_exercise_voice_assets.dart';
 import 'jumping_jack_voice_assets.dart';
 import 'queued_asset_voice_player.dart';
 
@@ -14,9 +15,13 @@ class _JumpingJackAssetVoicePlayer implements JumpingJackVoicePlayer {
   _JumpingJackAssetVoicePlayer({QueuedAssetVoicePlayer? player})
       : _player = player ??
             QueuedAssetVoicePlayer(
-              assetMap: JumpingJackVoiceAssets.files,
+              assetMap: {
+                ...GenericExerciseVoiceAssets.commonFiles,
+                ...JumpingJackVoiceAssets.files,
+              },
               assetSourcePrefix: JumpingJackVoiceAssets.assetSourcePrefix,
               assetBundlePrefix: JumpingJackVoiceAssets.assetBundlePrefix,
+              assetResolver: GenericExerciseVoiceAssets.resolveAsset,
               logTag: 'JumpingJackVoice',
             );
 
@@ -63,7 +68,7 @@ class JumpingJackVoiceCoach implements ExerciseVoiceCoach {
     final repIncreased = repCount > _lastRepCount;
 
     if (exercise.exerciseState == ExerciseState.notActivated) {
-      _speakSetup();
+      _speakSetup(exercise);
       _lastRepCount = repCount;
       return;
     }
@@ -115,12 +120,14 @@ class JumpingJackVoiceCoach implements ExerciseVoiceCoach {
     _lastRepCount = repCount;
   }
 
-  void _speakSetup() {
+  void _speakSetup(ExerciseBase exercise) {
     if (_didSpeakSetup) return;
 
-    _voicePlayer.speak('jumping_jack.setup_intro');
-    _voicePlayer.speak('jumping_jack.setup_position');
-    _voicePlayer.speak('jumping_jack.active_intro');
+    final script =
+        GenericExerciseVoiceAssets.scriptForExerciseName(exercise.exerciseName);
+    _voicePlayer.speak(script.setupIntroKey);
+    _voicePlayer.speak(script.cueKey('setup_position'));
+    _voicePlayer.speak(script.cueKey('active_intro'));
     _didSpeakSetup = true;
   }
 

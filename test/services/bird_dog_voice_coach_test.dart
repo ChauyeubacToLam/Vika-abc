@@ -1,4 +1,4 @@
-﻿import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:vika/exercise/1.Bird Dog/bird_dog.dart';
 import 'package:vika/exercise/exercise_base.dart';
 
@@ -54,7 +54,7 @@ void main() {
     expect(
       player.spoken,
       [
-        'Đặt điện thoại hơi chéo để thấy toàn thân trên thảm.',
+        'common.ngang_intro',
         'Chống hai tay và hai gối. Tay dưới vai, gối dưới hông, lưng phẳng.',
         'Giơ tay và chân đối diện. Vươn dài. Giữ 2 giây rồi đổi bên.',
       ],

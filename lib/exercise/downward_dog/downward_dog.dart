@@ -28,6 +28,7 @@
    ========================================================================= */
 
 import 'package:vika/exercise/exercise_base.dart';
+import 'package:vika/debug/tracked_metric.dart';
 import 'package:vika/utils/exercise_logger.dart';
 import '../../utils/pose_math_helpers.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
@@ -61,34 +62,34 @@ class DownwardDogConfig {
   static const int MAX_HOLDS = 1;
 
   /// Default hold target (seconds).
-  static const double HOLD_DURATION_SEC = 30.0;
+  static const double HOLD_DURATION_SEC = 20.0;
 
   /// Hip Y-velocity threshold (px/frame) below which we consider the pose static.
   static const double HIP_VELOCITY_STILL_THRESHOLD = 6.0;
 
   /// Consecutive frames of stillness required to transition ENTRY → HOLD.
-  static const int STILL_FRAMES_REQUIRED = 6;
+  static const int STILL_FRAMES_REQUIRED = 4;
 
   /// Consecutive frames of still required during isInStartPosition check (3s).
-  static const int START_POSITION_FRAMES = 8;
+  static const int START_POSITION_FRAMES = 5;
 
   // --- Embedded Check 3: Hip Height / V Apex (shoulder–hip–ankle) ---
 
   /// Good V-apex range: desk workers typically land in 70°–100°.
-  static const double APEX_GOOD_MIN = 70.0;
-  static const double APEX_GOOD_MAX = 100.0;
+  static const double APEX_GOOD_MIN = 55.0;
+  static const double APEX_GOOD_MAX = 115.0;
 
   /// Above this: hips are dropping toward a plank.
-  static const double APEX_TOO_LOW = 120.0;
+  static const double APEX_TOO_LOW = 135.0;
 
   // --- Embedded Check 4: Arm-Torso Line ---
   // Reads the same wrist-shoulder-hip angle as SpineRoundMetric.
   // Fires as a coaching cue (not safety) when arm-torso line breaks
   // despite the spine being otherwise long.
-  static const double ARM_TORSO_COACHING_ANGLE = 150.0;
+  static const double ARM_TORSO_COACHING_ANGLE = 135.0;
 
   /// Minimum wrist-shoulder-hip angle to confirm starting position.
-  static const double START_POSITION_LINE_ANGLE = 115.0;
+  static const double START_POSITION_LINE_ANGLE = 100.0;
 
   /// Sustained broken shape frames before aborting an active hold.
   static const int HOLD_BREAK_FRAMES = 6;
@@ -105,6 +106,7 @@ class DownwardDog extends ExerciseBase {
     _legMetric = LegStraightnessMetric();
 
     _metrics = [_spineMetric, _shoulderMetric, _legMetric];
+    _trackedMetrics = _metrics.map(TrackedMetric.new).toList();
   }
 
   final int maxHolds;
@@ -217,6 +219,16 @@ class DownwardDog extends ExerciseBase {
   late final LegStraightnessMetric _legMetric;
 
   late final List<DownwardDogMetricBase> _metrics;
+  late final List<TrackedMetric> _trackedMetrics;
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
 
   // --- Fault accumulation across holds ---
   int holdCount = 0;

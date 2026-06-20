@@ -1,4 +1,4 @@
-// ignore_for_file: constant_identifier_names
+// ignore_for_file: constant_identifier_names, annotate_overrides
 import '../../exercise_base.dart';
 import '../../fault_record.dart';
 export '../../fault_record.dart';
@@ -24,18 +24,18 @@ class ClimberConfig {
   static const int MAX_DURATION_MS = 90000; // 90 s
 
   // --- Setup gate ---
-  static const double ARM_STRAIGHT_THRESHOLD = 160.0;
-  static const List<double> TRUNK_STRAIGHT_RANGE = [170.0, 180.0];
+  static const double ARM_STRAIGHT_THRESHOLD = 150.0;
+  static const List<double> TRUNK_STRAIGHT_RANGE = [160.0, 180.0];
 
   // --- Trunk stability ---
-  static const double HIP_DROP_TRUNK_ANGLE = 160.0; // Dưới mức này = võng lưng
-  static const double HIP_BOUNCE_NORM = 0.12; // ~10 cm / scale
+  static const double HIP_DROP_TRUNK_ANGLE = 150.0; // Dưới mức này = võng lưng
+  static const double HIP_BOUNCE_NORM = 0.18; // ~10 cm / scale
 
   // --- Peak detection ---
   /// Khi dist_chuẩn_hóa < ngưỡng này → coi là gối đã vào zone (co đủ sâu).
   /// Được hiệu chỉnh lại trong Setup: = restDist * ZONE_RATIO
-  static const double ZONE_RATIO = 0.72;
-  static const double ZONE_RATIO_DEFAULT = 1.15; // fallback nếu chưa calibrate
+  static const double ZONE_RATIO = 0.82;
+  static const double ZONE_RATIO_DEFAULT = 1.25; // fallback nếu chưa calibrate
 
   /// Hysteresis: phải ra ngoài (threshold + margin) mới tính exit
   static const double ZONE_HYSTERESIS = 0.12;
@@ -47,8 +47,8 @@ class ClimberConfig {
   static const double EMA_ALPHA = 0.62;
   static const double KNEE_FLEXION_ENTER_ANGLE = 138.0;
   static const double KNEE_EXTENSION_EXIT_ANGLE = 150.0;
-  static const double GOOD_ROM_RATIO_OF_COUNT_ZONE = 0.88;
-  static const int DOUBLE_KNEE_REQUIRED_FRAMES = 3;
+  static const double GOOD_ROM_RATIO_OF_COUNT_ZONE = 0.72;
+  static const int DOUBLE_KNEE_REQUIRED_FRAMES = 4;
 }
 
 class ClimberVoicePriority {
@@ -219,7 +219,7 @@ class KneePeakRepCounter {
 // Metric Base
 // ---------------------------------------------------------------------------
 
-abstract class ClimberMetricBase {
+abstract class ClimberMetricBase with FaultMetricDebugSource {
   String get name;
   int faultsCount = 0;
 

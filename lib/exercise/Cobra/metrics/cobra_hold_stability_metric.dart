@@ -12,9 +12,9 @@ class CobraHoldStabilityMetric extends CobraMetricBase {
   String get name => 'HoldStability';
 
   // Beginner thresholds
-  static const double _goodDurationMin = 3.0; // seconds
-  static const double _goodDriftMax = 8.0; // degrees SD
-  static const double _warningDriftMax = 12.0;
+  static const double _goodDurationMin = 2.0; // seconds
+  static const double _goodDriftMax = 12.0; // degrees SD
+  static const double _warningDriftMax = 18.0;
 
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};

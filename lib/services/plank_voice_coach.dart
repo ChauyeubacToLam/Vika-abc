@@ -1,5 +1,6 @@
 import '../exercise/exercise_base.dart';
 import '../exercise/plank/plank.dart';
+import 'generic_exercise_voice_assets.dart';
 import 'plank_voice_assets.dart';
 import 'queued_asset_voice_player.dart';
 
@@ -14,9 +15,13 @@ class _PlankAssetVoicePlayer implements PlankVoicePlayer {
   _PlankAssetVoicePlayer({QueuedAssetVoicePlayer? player})
       : _player = player ??
             QueuedAssetVoicePlayer(
-              assetMap: PlankVoiceAssets.files,
+              assetMap: {
+                ...GenericExerciseVoiceAssets.commonFiles,
+                ...PlankVoiceAssets.files,
+              },
               assetSourcePrefix: PlankVoiceAssets.assetSourcePrefix,
               assetBundlePrefix: PlankVoiceAssets.assetBundlePrefix,
+              assetResolver: GenericExerciseVoiceAssets.resolveAsset,
               logTag: 'PlankVoice',
             );
 
@@ -61,7 +66,7 @@ class PlankVoiceCoach implements ExerciseVoiceCoach {
     final repIncreased = repCount > _lastRepCount;
 
     if (exercise.exerciseState == ExerciseState.notActivated) {
-      _speakSetup();
+      _speakSetup(exercise);
       _lastRepCount = repCount;
       return;
     }
@@ -118,12 +123,14 @@ class PlankVoiceCoach implements ExerciseVoiceCoach {
     _lastRepCount = repCount;
   }
 
-  void _speakSetup() {
+  void _speakSetup(ExerciseBase exercise) {
     if (_didSpeakSetup) return;
 
-    _voicePlayer.speak('plank.setup_intro');
-    _voicePlayer.speak('plank.setup_position');
-    _voicePlayer.speak('plank.active_intro');
+    final script =
+        GenericExerciseVoiceAssets.scriptForExerciseName(exercise.exerciseName);
+    _voicePlayer.speak(script.setupIntroKey);
+    _voicePlayer.speak(script.cueKey('setup_position'));
+    _voicePlayer.speak(script.cueKey('active_intro'));
     _didSpeakSetup = true;
   }
 
