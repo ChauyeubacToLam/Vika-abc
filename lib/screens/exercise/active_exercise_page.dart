@@ -603,7 +603,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
   void _handleBackChromeTap() {
     if (!_isStaffUser) {
-      widget.onBack();
+      _requestExit();
       return;
     }
 
@@ -615,7 +615,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       if (!mounted) return;
       _debugBackTapCount = 0;
       _debugFirstBackTap = null;
-      widget.onBack();
+      _requestExit();
     });
   }
 
@@ -627,6 +627,18 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     final state = widget.exercise.exerciseState;
     if (state == ExerciseState.completed) return false;
     return state == ExerciseState.activated || widget.exercise.repCount > 0;
+  }
+
+  /// Single exit gate for both back affordances. While a set is in progress the
+  /// confirm dialog stands between the user and a lost set; otherwise (intro,
+  /// post-completion) back is instant. Mirrors the PopScope canPop condition so
+  /// the chrome back arrow and the system back behave identically.
+  void _requestExit() {
+    if (_isSetInProgress) {
+      unawaited(_confirmExitDuringActiveSet());
+    } else {
+      widget.onBack();
+    }
   }
 
   /// Shown when the system back / back-gesture is invoked mid-set. Only exits

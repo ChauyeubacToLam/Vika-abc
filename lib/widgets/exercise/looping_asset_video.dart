@@ -20,6 +20,8 @@ class LoopingAssetVideo extends StatefulWidget {
 }
 
 class _LoopingAssetVideoState extends State<LoopingAssetVideo> {
+  static final Set<String> _failedAssets = <String>{};
+
   VideoPlayerController? _controller;
   Future<void>? _initializeFuture;
   bool _hasError = false;
@@ -34,35 +36,65 @@ class _LoopingAssetVideoState extends State<LoopingAssetVideo> {
   void didUpdateWidget(covariant LoopingAssetVideo oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.asset != widget.asset) {
-      _controller?.dispose();
+      _disposeController();
       _load();
     }
   }
 
   @override
   void dispose() {
-    _controller?.dispose();
+    _disposeController();
     super.dispose();
   }
 
   void _load() {
     _hasError = false;
+    if (_failedAssets.contains(widget.asset)) {
+      _hasError = true;
+      _initializeFuture = null;
+      return;
+    }
     final controller = VideoPlayerController.asset(widget.asset);
     _controller = controller;
-    _initializeFuture = controller.initialize().then((_) async {
+    controller.addListener(_handleControllerUpdate);
+    _initializeFuture = _initializeController(controller);
+  }
+
+  Future<void> _initializeController(VideoPlayerController controller) async {
+    try {
+      await controller.initialize();
+      if (!mounted || _controller != controller) return;
       await controller.setLooping(true);
       await controller.setVolume(0);
       await controller.play();
-      if (mounted) setState(() {});
-    }).catchError((_) {
-      if (mounted) setState(() => _hasError = true);
-    });
+      if (mounted && _controller == controller) setState(() {});
+    } catch (_) {
+      if (mounted && _controller == controller) {
+        _failedAssets.add(widget.asset);
+        setState(() => _hasError = true);
+      }
+    }
+  }
+
+  void _handleControllerUpdate() {
+    final controller = _controller;
+    if (controller == null || _hasError || !controller.value.hasError) return;
+    _failedAssets.add(widget.asset);
+    if (mounted) setState(() => _hasError = true);
+  }
+
+  void _disposeController() {
+    final controller = _controller;
+    if (controller == null) return;
+    controller.removeListener(_handleControllerUpdate);
+    controller.dispose();
+    _controller = null;
   }
 
   @override
   Widget build(BuildContext context) {
     final controller = _controller;
-    if (controller == null || _hasError) {
+    if (controller == null || _hasError || controller.value.hasError) {
       return widget.fallback ?? const SizedBox.shrink();
     }
 

@@ -126,21 +126,24 @@ class _AppConfig {
 Future<_AppConfig> _loadAppConfig() async {
   const defineSupabaseUrl = String.fromEnvironment('SUPABASE_URL');
   const defineSupabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+  const defineSupabaseKey = String.fromEnvironment('SUPABASE_KEY');
 
   final env = await _loadOptionalBundledDotEnv();
-  final supabaseUrl = _firstNonEmpty(
+  final supabaseUrl = _firstNonEmpty([
     defineSupabaseUrl,
     env['SUPABASE_URL'],
-  );
-  final supabaseAnonKey = _firstNonEmpty(
+  ]);
+  final supabaseAnonKey = _firstNonEmpty([
     defineSupabaseAnonKey,
+    defineSupabaseKey,
     env['SUPABASE_ANON_KEY'],
-  );
+    env['SUPABASE_KEY'],
+  ]);
 
   if (supabaseUrl == null || supabaseAnonKey == null) {
     throw StateError(
       'Missing Supabase config. Provide SUPABASE_URL and '
-      'SUPABASE_ANON_KEY with --dart-define or bundled .env.',
+      'SUPABASE_ANON_KEY with --dart-define or a bundled env file.',
     );
   }
 
@@ -151,22 +154,40 @@ Future<_AppConfig> _loadAppConfig() async {
 }
 
 Future<Map<String, String>> _loadOptionalBundledDotEnv() async {
-  try {
-    final raw = await rootBundle.loadString('.env');
-    final values = <String, String>{};
-    for (final rawLine in raw.split('\n')) {
-      final line = rawLine.trim();
-      if (line.isEmpty || line.startsWith('#')) continue;
-      final separator = line.indexOf('=');
-      if (separator <= 0) continue;
-      final key = line.substring(0, separator).trim();
-      final value = line.substring(separator + 1).trim();
-      values[key] = _stripEnvQuotes(value);
+  const envAssetPaths = <String>[
+    '.env',
+    'assets/env/app.env',
+  ];
+
+  for (final path in envAssetPaths) {
+    try {
+      final raw = await rootBundle.loadString(path);
+      final values = _parseDotEnv(raw);
+      if (values.isNotEmpty) return values;
+    } catch (_) {
+      // Optional local env asset. Missing files are expected on clean checkouts.
     }
-    return values;
-  } catch (_) {
-    return const {};
   }
+
+  return const {};
+}
+
+Map<String, String> _parseDotEnv(String raw) {
+  final values = <String, String>{};
+  for (final rawLine in raw.split('\n')) {
+    var line = rawLine.trim();
+    if (line.isEmpty || line.startsWith('#')) continue;
+    if (line.startsWith('export ')) {
+      line = line.substring('export '.length).trimLeft();
+    }
+    final separator = line.indexOf('=');
+    if (separator <= 0) continue;
+    final key = line.substring(0, separator).trim();
+    final value = line.substring(separator + 1).trim();
+    if (key.isEmpty) continue;
+    values[key] = _stripEnvQuotes(value);
+  }
+  return values;
 }
 
 String _stripEnvQuotes(String value) {
@@ -179,11 +200,11 @@ String _stripEnvQuotes(String value) {
   return value;
 }
 
-String? _firstNonEmpty(String? first, String? second) {
-  final a = first?.trim();
-  if (a != null && a.isNotEmpty) return a;
-  final b = second?.trim();
-  if (b != null && b.isNotEmpty) return b;
+String? _firstNonEmpty(Iterable<String?> values) {
+  for (final value in values) {
+    final trimmed = value?.trim();
+    if (trimmed != null && trimmed.isNotEmpty) return trimmed;
+  }
   return null;
 }
 
@@ -556,7 +577,8 @@ class _AppEntryGateState extends State<AppEntryGate> {
 
   String _friendlyAuthStreamError(Object error) {
     if (error is AuthException) {
-      final code = '${error.code ?? ''} ${error.statusCode ?? ''}'.toLowerCase();
+      final code =
+          '${error.code ?? ''} ${error.statusCode ?? ''}'.toLowerCase();
       final message = error.message.toLowerCase();
       if (code.contains('expired') ||
           code.contains('otp') ||
@@ -582,8 +604,7 @@ class _AppEntryGateState extends State<AppEntryGate> {
 
     // Finished onboarding before but no live session (e.g. signed out, then
     // relaunched): open straight on login instead of flashing S01.
-    if (widget.initialSeenOnboarding &&
-        supabase.auth.currentSession == null) {
+    if (widget.initialSeenOnboarding && supabase.auth.currentSession == null) {
       return _AppEntryState.login;
     }
     return _AppEntryState.onboarding;
