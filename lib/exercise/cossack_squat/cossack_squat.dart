@@ -332,6 +332,7 @@ class CossackSquat extends ExerciseBase {
       for (final metric in _metrics) {
         metric.update(ctx);
       }
+      _publishFaultFeedback(_metrics.expand((metric) => metric.faults));
     }
 
     // Debug data
@@ -418,19 +419,15 @@ class CossackSquat extends ExerciseBase {
       allFaults.addAll(metric.faults);
     }
 
-    final calibratedCleanRep = _matchesCalibratedCleanRep(
+    _matchesCalibratedCleanRep(
       leftKneeAngle: leftKneeAngle,
       rightKneeAngle: rightKneeAngle,
       torsoAngle: torsoAngle,
     );
-    if (calibratedCleanRep) {
-      allFaults.clear();
-      resultIssues.feedback.clear();
-      resultIssues.instructions.clear();
-    }
 
     correctForm = !allFaults.any((f) => f.affectsForm);
     resultIssues.feedback['Result'] = correctForm ? 'Good Rep!' : 'Fix Form';
+    _publishFaultFeedback(allFaults);
 
     final faultMap = <String, Map<String, String>>{};
     for (final fault in allFaults) {
@@ -447,11 +444,40 @@ class CossackSquat extends ExerciseBase {
 
     correctForm = true;
     for (final metric in _metrics) {
-      if (calibratedCleanRep) {
-        metric.reset();
-      } else {
-        metric.resetAndCountFault();
-      }
+      metric.resetAndCountFault();
+    }
+  }
+
+  void _publishFaultFeedback(Iterable<FaultRecord> faults) {
+    final sorted = faults.toList()
+      ..sort((a, b) => a.priority.compareTo(b.priority));
+
+    for (final fault in sorted) {
+      final key = _feedbackKeyForFault(fault);
+      final message = fault.voiceMessage ?? fault.message;
+      final phase =
+          fault.phase == 'REP_COMPLETE' ? currentPhaseKey : fault.phase;
+      resultIssues.feedback[key] = message;
+      resultIssues.addInstruction(phase, key, fault.message);
+    }
+  }
+
+  String _feedbackKeyForFault(FaultRecord fault) {
+    switch (fault.type) {
+      case 'heel_lift':
+        return 'heel';
+      case 'knee_valgus':
+        return 'knee_valgus';
+      case 'bent_straight_leg':
+        return 'straight_leg';
+      case 'torso_lean':
+        return 'torso';
+      case 'too_deep':
+        return 'depth_deep';
+      case 'shallow_depth':
+        return 'depth_shallow';
+      default:
+        return fault.type;
     }
   }
 

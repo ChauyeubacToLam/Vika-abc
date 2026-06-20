@@ -36,6 +36,13 @@ class TakeOffDepthMetric extends JumpSquatMetricBase {
         _minSquatAngle = ctx.kneeAngle;
       }
       _debugData['takeOffDepth'] = _minSquatAngle?.toStringAsFixed(1) ?? '-';
+
+      if (_minSquatAngle != null &&
+          _minSquatAngle! > TakeOffConfig.SHALLOW_WARNING) {
+        const message = 'Lấy đà nông quá, hạ hông sâu hơn rồi mới bật.';
+        ctx.resultIssues.feedback['takeoff_depth'] = message;
+        ctx.resultIssues.addInstruction('squatting', 'takeoff_depth', message);
+      }
     }
   }
 
@@ -53,6 +60,7 @@ class TakeOffDepthMetric extends JumpSquatMetricBase {
               'Lấy đà quá nông (${_minSquatAngle!.toStringAsFixed(0)}°). Hạ hông sâu hơn!',
           voiceMessage: 'Hạ hông sâu hơn rồi mới bật nhảy',
           affectsForm: true,
+          priority: 2,
         ));
       }
     }

@@ -189,6 +189,11 @@ void main() {
       exercise.logger.repLogs.single.data['fault_types'],
       contains('Power'),
     );
+    expect(exercise.resultIssues.feedback, contains('takeoff_depth'));
+    expect(
+      exercise.resultIssues.instructions['standing'],
+      contains('takeoff_depth'),
+    );
 
     exercise.onSetComplete();
     expect(exercise.logger.setLogs['shallow_dip_fails_count'], 1);

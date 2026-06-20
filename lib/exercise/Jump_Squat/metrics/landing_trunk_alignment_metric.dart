@@ -38,7 +38,9 @@ class LandingTrunkAlignmentMetric extends JumpSquatMetricBase {
 
       // Live feedback nếu đang rạp lưng
       if (ctx.trunkVerticalAngle > TrunkLandingConfig.MAX_LEAN_ANGLE) {
-        ctx.resultIssues.feedback['Back'] = 'Cảnh báo: Rạp lưng khi tiếp đất!';
+        const message = 'Nâng ngực lên, đừng rạp lưng khi tiếp đất.';
+        ctx.resultIssues.feedback['trunk'] = message;
+        ctx.resultIssues.addInstruction('landing', 'trunk', message);
       }
     }
   }
@@ -54,8 +56,9 @@ class LandingTrunkAlignmentMetric extends JumpSquatMetricBase {
           type: 'Back',
           message:
               'Lưng rạp úp quá mức khi tiếp đất (${_maxLeanAngle!.toStringAsFixed(0)}°)! Giữ ngực cao.',
-          voiceMessage: 'Giữ thẳng lưng',
+          voiceMessage: 'Nâng ngực lên khi tiếp đất',
           affectsForm: true,
+          priority: 3,
         ));
       }
     }

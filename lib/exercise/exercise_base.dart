@@ -1215,6 +1215,11 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
         feedback.entries.where((entry) => !_isNonFaultFeedbackKey(entry.key));
 
     for (final entry in entries) {
+      final keyText = _normalizeFaultKey(entry.key);
+      for (final candidate in _candidateFaultIdsForKey(keyText)) {
+        if (script.hasFault(candidate)) return candidate;
+      }
+
       final valueText = _normalizeFaultText(entry.value);
       if (!_looksLikeFaultText(valueText)) continue;
 
@@ -1236,6 +1241,13 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
       'giu vai',
       'giu tay',
       'giu co tay',
+      'giu thang',
+      'giu dau',
+      'day ',
+      'mo ',
+      'doi ',
+      'trung ',
+      'tiep dat',
       'ha ',
       'xuong',
       'nang',
@@ -1291,6 +1303,11 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
   }
 
   Iterable<String> _candidateFaultIds(String text) sync* {
+    for (final candidate
+        in _candidateFaultIdsForKey(_normalizeFaultKey(text))) {
+      yield candidate;
+    }
+
     if (text.contains('tempo') ||
         text.contains('speed') ||
         text.contains('fast') ||
@@ -1327,6 +1344,21 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
       yield 'rear_depth';
       yield 'squat_depth';
       yield 'amplitude';
+    }
+    if (text.contains('takeoff') ||
+        text.contains('lay da') ||
+        text.contains('bat nhay')) {
+      yield 'takeoff_depth';
+    }
+    if (text.contains('landing') ||
+        text.contains('tiep dat') ||
+        text.contains('trung goi')) {
+      yield 'landing_depth';
+      if (text.contains('stiff') ||
+          text.contains('cung') ||
+          text.contains('thang')) {
+        yield 'landing_stiff';
+      }
     }
     if (text.contains('heel') || text.contains('got')) yield 'heel';
     if (text.contains('knee') || text.contains('goi')) {
@@ -1480,6 +1512,46 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
     }
   }
 
+  Iterable<String> _candidateFaultIdsForKey(String key) sync* {
+    if (key.isEmpty) return;
+    yield key;
+
+    switch (key) {
+      case 'heel_lift':
+        yield 'heel';
+        break;
+      case 'bent_straight_leg':
+        yield 'straight_leg';
+        break;
+      case 'torso_lean':
+        yield 'torso';
+        yield 'trunk';
+        break;
+      case 'shallow_depth':
+        yield 'depth_shallow';
+        yield 'depth';
+        break;
+      case 'too_deep':
+        yield 'depth_deep';
+        break;
+      case 'power':
+        yield 'takeoff_depth';
+        break;
+      case 'back':
+        yield 'trunk';
+        yield 'torso';
+        break;
+      case 'knee':
+        yield 'landing_stiff';
+        yield 'landing_depth';
+        yield 'knee';
+        break;
+      case 'error':
+        yield 'too_fast';
+        break;
+    }
+  }
+
   bool _feedbackIndicatesFault(Map<String, String> feedback) {
     final result = _normalizeFaultText(feedback['Result'] ?? '');
     if (result.contains('sai') ||
@@ -1503,6 +1575,14 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
         normalized == 'progress' ||
         normalized == 'status' ||
         normalized == 'phase';
+  }
+
+  String _normalizeFaultKey(String value) {
+    final normalized = _normalizeFaultText(value)
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^_|_$'), '');
+    return normalized;
   }
 
   String _normalizeFaultText(String value) {
@@ -1584,7 +1664,11 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
 
   bool _shouldSpeakLiveFault(Map<String, String> feedback) {
     final result = _normalizeFaultText(feedback['Result'] ?? '');
-    return result.contains('sai') || result.contains('fix');
+    return result.contains('sai') ||
+        result.contains('fix') ||
+        result.contains('no count') ||
+        result.contains('khong tinh') ||
+        result.contains('chua tinh');
   }
 
   @override

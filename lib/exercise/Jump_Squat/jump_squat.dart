@@ -267,6 +267,7 @@ class JumpSquat extends ExerciseBase {
       metric.update(ctx);
       debugData.addAll(metric.debugData);
     }
+    _publishFaultFeedback(_metrics.expand((metric) => metric.faults));
 
     // 4. Hoàn thành 1 Rep (từ landing -> standing)
     if (jumpSquatState == JumpSquatState.standing &&
@@ -292,6 +293,7 @@ class JumpSquat extends ExerciseBase {
 
         resultIssues.feedback['Result'] =
             correctForm ? 'Hoàn hảo! 🔥' : 'Cần chú ý an toàn!';
+        _publishFaultFeedback(allFaults);
 
         final faultMap = <String, Map<String, String>>{};
         for (final fault in allFaults) {
@@ -303,10 +305,10 @@ class JumpSquat extends ExerciseBase {
         for (final metric in _metrics) metric.resetAndCountFault();
       } else {
         resultIssues.feedback['Result'] = 'Không tính rep';
-        resultIssues.feedback['Error'] =
+        resultIssues.feedback['too_fast'] =
             'Chuyển động quá nhanh, AI không xác nhận được rep.';
         resultIssues.addInstruction(
-            currentPhaseKey, 'Error', 'Làm chậm lại và nhảy rõ hơn');
+            currentPhaseKey, 'too_fast', 'Làm chậm lại và nhảy rõ hơn');
         for (final metric in _metrics) metric.reset();
       }
 
@@ -430,6 +432,33 @@ class JumpSquat extends ExerciseBase {
     final start = _repStartedAtMs;
     if (start == null) return true;
     return now - start < JumpSquatConfig.MIN_REP_DURATION_MS;
+  }
+
+  void _publishFaultFeedback(Iterable<FaultRecord> faults) {
+    final sorted = faults.toList()
+      ..sort((a, b) => a.priority.compareTo(b.priority));
+
+    for (final fault in sorted) {
+      final key = _feedbackKeyForFault(fault);
+      final message = fault.voiceMessage ?? fault.message;
+      final phase =
+          fault.phase == 'REP_COMPLETE' ? currentPhaseKey : fault.phase;
+      resultIssues.feedback[key] = message;
+      resultIssues.addInstruction(phase, key, fault.message);
+    }
+  }
+
+  String _feedbackKeyForFault(FaultRecord fault) {
+    switch (fault.type) {
+      case 'Power':
+        return 'takeoff_depth';
+      case 'Back':
+        return 'trunk';
+      case 'Knee':
+        return fault.affectsForm ? 'landing_stiff' : 'landing_depth';
+      default:
+        return fault.type;
+    }
   }
 
   void _resetDebouncers() {

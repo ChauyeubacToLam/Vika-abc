@@ -22,6 +22,9 @@ class CossackStraightLegMetric extends CossackMetricBase {
     }
 
     if (ctx.straightKneeAngle < STRAIGHT_LEG_MIN_ANGLE) {
+      const message = 'Giữ thẳng chân duỗi, đừng chùng gối bên còn lại.';
+      ctx.resultIssues.feedback['straight_leg'] = message;
+      ctx.resultIssues.addInstruction(ctx.state.name, 'straight_leg', message);
       addFault(
         FaultRecord(
           type: 'bent_straight_leg',

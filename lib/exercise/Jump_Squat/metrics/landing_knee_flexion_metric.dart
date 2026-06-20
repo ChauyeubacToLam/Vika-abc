@@ -41,6 +41,16 @@ class LandingKneeFlexionMetric extends JumpSquatMetricBase {
       }
       _debugData['minLandingKnee'] =
           _minLandingKneeAngle?.toStringAsFixed(1) ?? '-';
+
+      if (ctx.kneeAngle > LandingConfig.STIFF_LANDING_MIN) {
+        const message = 'Tiếp đất quá cứng, trùng gối sâu hơn ngay.';
+        ctx.resultIssues.feedback['landing_stiff'] = message;
+        ctx.resultIssues.addInstruction('landing', 'landing_stiff', message);
+      } else if (ctx.kneeAngle > LandingConfig.SAFE_FLEXION_MAX) {
+        const message = 'Tiếp đất chưa đủ sâu, trùng gối thêm để giảm lực.';
+        ctx.resultIssues.feedback['landing_depth'] = message;
+        ctx.resultIssues.addInstruction('landing', 'landing_depth', message);
+      }
     }
   }
 
@@ -70,6 +80,8 @@ class LandingKneeFlexionMetric extends JumpSquatMetricBase {
         message:
             'Tiếp đất chân quá thẳng (${angle.toStringAsFixed(0)}°)! Nguy hiểm khớp gối.',
         affectsForm: true, // Hủy rep, tính là form hỏng nặng
+        voiceMessage: 'Trùng gối sâu hơn khi tiếp đất',
+        priority: 1,
       ));
     } else if (angle > LandingConfig.SAFE_FLEXION_MAX) {
       _faults.add(FaultRecord(
@@ -78,6 +90,8 @@ class LandingKneeFlexionMetric extends JumpSquatMetricBase {
         message:
             'Tiếp đất chưa đủ sâu (${angle.toStringAsFixed(0)}°). Hãy trùng gối thêm!',
         affectsForm: false, // Cảnh báo
+        voiceMessage: 'Trùng gối thêm khi tiếp đất',
+        priority: 2,
       ));
     }
   }

@@ -32,6 +32,9 @@ class CossackWorkingDepthMetric extends CossackMetricBase {
 
     if (ctx.state == CossackState.bottom) {
       if (ctx.workingKneeAngle < MIN_DEPTH_ANGLE) {
+        const message = 'Xuống quá sâu, kiểm soát lại biên độ gối.';
+        ctx.resultIssues.feedback['depth_deep'] = message;
+        ctx.resultIssues.addInstruction(ctx.state.name, 'depth_deep', message);
         addFault(
           FaultRecord(
             type: 'too_deep',
