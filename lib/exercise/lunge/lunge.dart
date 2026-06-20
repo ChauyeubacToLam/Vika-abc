@@ -400,9 +400,18 @@ class Lunge extends ExerciseBase {
       );
 
       correctForm = !allFaults.any((f) => f.affectsForm);
+      resultIssues.feedback
+          .removeWhere((key, _) => key != 'System' && key != 'progress');
       resultIssues.feedback['Result'] = correctForm ? 'Good Rep!' : 'Fix Form';
       if (!correctForm) {
-        final topFault = allFaults.firstWhere((fault) => fault.affectsForm);
+        final formFaults =
+            allFaults.where((fault) => fault.affectsForm).toList()
+              ..sort((a, b) {
+                final priorityCompare = a.priority.compareTo(b.priority);
+                if (priorityCompare != 0) return priorityCompare;
+                return a.type.compareTo(b.type);
+              });
+        final topFault = formFaults.first;
         resultIssues.feedback[topFault.type] =
             topFault.voiceMessage ?? topFault.message;
       }

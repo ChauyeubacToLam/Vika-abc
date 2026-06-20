@@ -1147,7 +1147,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
       'Bắt đầu khi sẵn sàng.'
     ],
-    videoAsset: 'assets/video/walking lunge.MOV',
+    videoAsset: 'assets/video/walking_lunge.MOV',
     createExercise: ({int? reps, int? seconds}) => _withReps(
         reps, (target) => WalkingLunge(maxRep: target), () => WalkingLunge()),
     phaseColors: {

@@ -54,6 +54,7 @@ class GenericExerciseVoiceAssets {
   static const Map<String, GenericExerciseVoiceScript> scriptsByExerciseName = {
     'Squat': GenericExerciseVoiceScript(
       slug: 'squat',
+      setupIntroCueId: 'common.thang_intro',
       faultIds: ['heel', 'depth', 'trunk', 'tempo', 'sync'],
     ),
     'Plank': GenericExerciseVoiceScript(

@@ -780,11 +780,7 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
 
   void _handleSetup(BirdDog exercise) {
     if (!_didSpeakSetupIntro) {
-      _voicePlayer.speak(
-        GenericExerciseVoiceAssets.setupIntroKeyForExerciseName(
-          exercise.exerciseName,
-        ),
-      );
+      _voicePlayer.speak(exercise.setupOrientationIntroVoiceKey);
       _voicePlayer.speak(_setupPosition);
       _voicePlayer.speak(_activeIntro);
       _speakPreviousSetAdviceIfNeeded();

@@ -28,7 +28,7 @@ class PushUpConfig {
   // Like Squat's stand-angle baseline, push-up entry/return uses the user's
   // own plank lockout angle instead of a fixed descent threshold.
   static const double PLANK_ANGLE_THRESHOLD = 160.0;
-  static const List<double> BOTTOM_ANGLE_RANGE = [80.0, 100.0];
+  static const List<double> BOTTOM_ANGLE_RANGE = [80.0, 115.0];
 
   // Trunk horizontal targets per facing direction (clock angle from vertical)
   static const double HORIZONTAL_CLOCK_LEFT = 90.0;
@@ -98,6 +98,8 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
   double? _baselineElbowAngle;
   double? _baselineWristY;
   double? _baselineHeelY;
+  double? _repStartShoulderY;
+  double? _repStartHipY;
   double? _repStartKneeY;
   double? _repMinElbowAngle;
   double _repMaxAbsTrunkDeviation = 0.0;
@@ -522,9 +524,11 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
       final isExtending = directionDetection.update(isExtendingFrame);
 
       if (!isExtending && entryReady) {
-        // We clear the buffer on active rep start like Squat. Keep the knee
-        // baseline outside the buffer so the anti-cheat still sees the body
-        // moving with the elbows on the first descent frames.
+        // We clear the buffer on active rep start like Squat. Keep the body
+        // baselines outside the buffer so the anti-cheat still sees full-body
+        // movement with the elbows on the first descent frames.
+        _repStartShoulderY = geometry.shoulderY;
+        _repStartHipY = geometry.hipY;
         _repStartKneeY = geometry.kneeY;
         _transitionState(PushUpState.descending, timestampMs);
         frameBuffer.clear();
@@ -602,16 +606,30 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
 
   void _updateActiveGuard(_PushUpGeometry geometry) {
     final positionGate = _positionGate(geometry.torsoLen);
+    final shoulderChange = frameBuffer.getChange("shoulderY", positionGate);
+    final hipChange = frameBuffer.getChange("hipY", positionGate);
     final kneeChange = frameBuffer.getChange("kneeY", positionGate);
+    final startShoulderY = _repStartShoulderY;
+    final startHipY = _repStartHipY;
     final startKneeY = _repStartKneeY;
+    final shoulderMovedFromStart = startShoulderY != null &&
+        (geometry.shoulderY - startShoulderY).abs() > positionGate;
+    final hipMovedFromStart =
+        startHipY != null && (geometry.hipY - startHipY).abs() > positionGate;
     final kneeMovedFromStart = startKneeY != null &&
         (geometry.kneeY - startKneeY).abs() > positionGate;
-    if (kneeChange != ChangeState.stable || kneeMovedFromStart) {
+    final bodyMovedFromStart =
+        shoulderMovedFromStart || hipMovedFromStart || kneeMovedFromStart;
+    final bodyStableFrame = shoulderChange == ChangeState.stable &&
+        hipChange == ChangeState.stable &&
+        kneeChange == ChangeState.stable;
+    if (!bodyStableFrame || bodyMovedFromStart) {
       _kneeMovedThisRep = true;
     }
     if (isDebugModeActive) {
-      _traceKneeChange = kneeChange.name;
-      _traceKneeMoveFromStart = _debugBool(kneeMovedFromStart);
+      _traceKneeChange =
+          's:${shoulderChange.name}/h:${hipChange.name}/k:${kneeChange.name}';
+      _traceKneeMoveFromStart = _debugBool(bodyMovedFromStart);
     }
 
     final activeStatus = _evaluateActiveGeometry(geometry);
@@ -656,7 +674,9 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
     final elbowBendFromTop = _topElbowAngle - geometry.elbowAngle;
     final elbowOnlyFrame = elbowBendFromTop > PushUpConfig.ROM_GATE &&
         pushUpState == PushUpState.descending &&
-        kneeChange == ChangeState.stable;
+        !_kneeMovedThisRep &&
+        bodyStableFrame &&
+        !bodyMovedFromStart;
     if (isDebugModeActive) {
       _traceElbowOnlyFrame = _debugBool(elbowOnlyFrame);
     }
@@ -698,6 +718,8 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
     _repRejectReason = null;
     _repRejectType = null;
     _kneeMovedThisRep = false;
+    _repStartShoulderY = null;
+    _repStartHipY = null;
     _repStartKneeY = null;
     _resetRepTelemetry();
     _bottomDebouncer.reset();

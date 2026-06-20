@@ -34,20 +34,26 @@ class ClimberConfig {
   // --- Peak detection ---
   /// Khi dist_chuẩn_hóa < ngưỡng này → coi là gối đã vào zone (co đủ sâu).
   /// Được hiệu chỉnh lại trong Setup: = restDist * ZONE_RATIO
-  static const double ZONE_RATIO = 0.82;
+  static const double ZONE_RATIO = 0.76;
+  static const double MIN_ZONE_DELTA = 0.18;
+  static const double MIN_ZONE_THRESHOLD = 0.35;
   static const double ZONE_RATIO_DEFAULT = 1.25; // fallback nếu chưa calibrate
 
   /// Hysteresis: phải ra ngoài (threshold + margin) mới tính exit
   static const double ZONE_HYSTERESIS = 0.12;
 
   /// Cooldown tối thiểu giữa 2 rep liên tiếp (ms). 250 ms = tối đa 4 rep/s
-  static const int REP_COOLDOWN_MS = 180;
+  static const int REP_COOLDOWN_MS = 350;
+  static const int GLOBAL_REP_COOLDOWN_MS = 280;
+  static const int SAME_SIDE_REP_COOLDOWN_MS = 700;
 
   /// EMA smoothing factor cho knee distance (0 < α ≤ 1, nhỏ = mượt hơn)
-  static const double EMA_ALPHA = 0.62;
+  static const double EMA_ALPHA = 0.45;
   static const double KNEE_FLEXION_ENTER_ANGLE = 138.0;
   static const double KNEE_EXTENSION_EXIT_ANGLE = 150.0;
   static const double GOOD_ROM_RATIO_OF_COUNT_ZONE = 0.72;
+  static const double MIN_COUNT_PEAK_RATIO = 0.92;
+  static const int MIN_ZONE_FRAMES = 1;
   static const int DOUBLE_KNEE_REQUIRED_FRAMES = 4;
 }
 
@@ -117,8 +123,11 @@ class KneePeakRepCounter {
   // --- Internal state ---
   double _smoothedDist = 1.0; // EMA-filtered distance
   double _rawDist = 1.0;
+  double _restDist = 1.0;
   double _kneeAngle = 180.0;
   bool _isInZone = false;
+  bool _hasCountableTuckInZone = false;
+  int _zoneFrames = 0;
   int _lastRepTimeMs = 0;
   double _minDistInZone = 1.0; // Gần nhất trong lần co hiện tại
   double _minAngleInZone = 180.0;
@@ -166,29 +175,46 @@ class KneePeakRepCounter {
       _isInZone = true;
       _minDistInZone = _smoothedDist;
       _minAngleInZone = _kneeAngle;
+      _hasCountableTuckInZone = false;
+      _zoneFrames = 0;
     }
 
     // 3. Đang trong zone → track điểm gần nhất
     if (_isInZone) {
+      _zoneFrames++;
       if (_smoothedDist < _minDistInZone) _minDistInZone = _smoothedDist;
       if (_rawDist < _minDistInZone) _minDistInZone = _rawDist;
       if (_kneeAngle < _minAngleInZone) _minAngleInZone = _kneeAngle;
+
+      final countableByDistance =
+          _minDistInZone <= zoneThreshold * ClimberConfig.MIN_COUNT_PEAK_RATIO;
+      final countableByAngle =
+          _minAngleInZone <= ClimberConfig.KNEE_FLEXION_ENTER_ANGLE;
+      if (_zoneFrames >= ClimberConfig.MIN_ZONE_FRAMES &&
+          (countableByDistance || countableByAngle)) {
+        _hasCountableTuckInZone = true;
+      }
     }
 
     // 4. Ra khỏi zone (hysteresis) → đếm rep
     if (_isInZone && exitZone) {
       _isInZone = false;
       final int elapsed = nowMs - _lastRepTimeMs;
-      if (elapsed >= ClimberConfig.REP_COOLDOWN_MS) {
+      if (_hasCountableTuckInZone &&
+          (_lastRepTimeMs == 0 || elapsed >= ClimberConfig.REP_COOLDOWN_MS)) {
         _lastRepTimeMs = nowMs;
         _lastCompletedPeakDist = _minDistInZone;
         _lastCompletedPeakAngle = _minAngleInZone;
         _minDistInZone = 1.0;
         _minAngleInZone = 180.0;
+        _hasCountableTuckInZone = false;
+        _zoneFrames = 0;
         return 1;
       }
       _minDistInZone = 1.0;
       _minAngleInZone = 180.0;
+      _hasCountableTuckInZone = false;
+      _zoneFrames = 0;
     }
 
     return 0;
@@ -197,16 +223,29 @@ class KneePeakRepCounter {
   /// Hiệu chỉnh ngưỡng zone dựa trên khoảng cách nghỉ thực tế của người dùng.
   void calibrate(double restDistNormalized) {
     if (!restDistNormalized.isFinite || restDistNormalized <= 0) return;
-    zoneThreshold = restDistNormalized * ClimberConfig.ZONE_RATIO;
+    _restDist = restDistNormalized;
+    final ratioThreshold = restDistNormalized * ClimberConfig.ZONE_RATIO;
+    final deltaThreshold = restDistNormalized - ClimberConfig.MIN_ZONE_DELTA;
+    var nextThreshold =
+        ratioThreshold < deltaThreshold ? ratioThreshold : deltaThreshold;
+    if (nextThreshold < ClimberConfig.MIN_ZONE_THRESHOLD) {
+      nextThreshold = ClimberConfig.MIN_ZONE_THRESHOLD;
+    }
+    if (nextThreshold >= restDistNormalized) {
+      nextThreshold = restDistNormalized * 0.8;
+    }
+    zoneThreshold = nextThreshold;
     _smoothedDist = restDistNormalized;
     _rawDist = restDistNormalized;
   }
 
   void reset() {
-    _smoothedDist = 1.0;
-    _rawDist = 1.0;
+    _smoothedDist = _restDist;
+    _rawDist = _restDist;
     _kneeAngle = 180.0;
     _isInZone = false;
+    _hasCountableTuckInZone = false;
+    _zoneFrames = 0;
     _minDistInZone = 1.0;
     _minAngleInZone = 180.0;
     _lastCompletedPeakDist = null;

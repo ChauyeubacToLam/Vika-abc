@@ -16,9 +16,13 @@ enum KteState { standing_base, approaching, touch, returning }
 
 class StandingKneeToElbowConfig {
   static const int MAX_REP = 30; // 15 per side
-  static const double KNEE_LIFT_START_RATIO = 0.07;
-  static const double TOUCH_DISTANCE_RATIO = 0.70;
-  static const double TOUCH_EXIT_DISTANCE_RATIO = 0.90;
+  static const double KNEE_LIFT_START_RATIO = 0.05;
+  static const double TOUCH_DISTANCE_RATIO = 0.95;
+  static const double TOUCH_EXIT_DISTANCE_RATIO = 1.15;
+  static const double TOUCH_HIP_WIDTH_RATIO = 1.20;
+  static const double TOUCH_EXIT_HIP_WIDTH_RATIO = 1.45;
+  static const double RETURN_KNEE_RATIO = 0.08;
+  static const double TOUCH_EXIT_KNEE_RATIO = 0.20;
 }
 
 class StandingKneeToElbow extends ExerciseBase {
@@ -255,7 +259,7 @@ class StandingKneeToElbow extends ExerciseBase {
     }, timeStamp: now));
 
     _updateStateMachine(
-        distanceD, liftingKnee.y, standingKnee.y, torsoLength, now);
+        distanceD, liftingKnee.y, standingKnee.y, torsoLength, hipWidth, now);
 
     final ctx = StandingKteRepContext(
       standingLegSide: _standingLegSide,
@@ -285,6 +289,9 @@ class StandingKneeToElbow extends ExerciseBase {
     debugData['kteState'] = kteState.name;
     debugData['liftingLeg'] = _liftingLegSide.name;
     debugData['distanceD'] = distanceD;
+    debugData['touchEnterDistance'] =
+        _touchEnterDistance(torsoLength, hipWidth);
+    debugData['touchExitDistance'] = _touchExitDistance(torsoLength, hipWidth);
 
     for (final metric in _metrics) {
       debugData.addAll(metric.debugData);
@@ -299,8 +306,17 @@ class StandingKneeToElbow extends ExerciseBase {
     }
   }
 
-  void _updateStateMachine(double distanceD, double liftingKneeY,
-      double standingKneeY, double torsoLength, int now) {
+  void _updateStateMachine(
+    double distanceD,
+    double liftingKneeY,
+    double standingKneeY,
+    double torsoLength,
+    double hipWidth,
+    int now,
+  ) {
+    final touchEnterDistance = _touchEnterDistance(torsoLength, hipWidth);
+    final touchExitDistance = _touchExitDistance(torsoLength, hipWidth);
+
     if (kteState == KteState.standing_base) {
       if (liftingKneeY <
           standingKneeY -
@@ -308,29 +324,48 @@ class StandingKneeToElbow extends ExerciseBase {
         _transitionState(KteState.approaching, now);
       }
     } else if (kteState == KteState.approaching) {
-      // Relaxed entry threshold from 0.6 to 0.85
-      if (distanceD <
-          torsoLength * StandingKneeToElbowConfig.TOUCH_DISTANCE_RATIO) {
+      if (distanceD <= touchEnterDistance) {
         _transitionState(KteState.touch, now);
-      } else if (liftingKneeY > standingKneeY - torsoLength * 0.1) {
+      } else if (liftingKneeY >
+              standingKneeY -
+                  torsoLength * StandingKneeToElbowConfig.RETURN_KNEE_RATIO &&
+          distanceD > touchExitDistance) {
         // Returned early without reaching touch distance
         _transitionState(KteState.standing_base, now);
       }
     } else if (kteState == KteState.touch) {
-      // Relaxed exit threshold from 0.8 to 1.0 to give time to reach peak
-      if (distanceD >
-              torsoLength *
-                  StandingKneeToElbowConfig.TOUCH_EXIT_DISTANCE_RATIO ||
-          liftingKneeY > standingKneeY - torsoLength * 0.2) {
+      if (distanceD > touchExitDistance ||
+          liftingKneeY >
+              standingKneeY -
+                  torsoLength *
+                      StandingKneeToElbowConfig.TOUCH_EXIT_KNEE_RATIO) {
         _transitionState(KteState.returning, now);
       }
     } else if (kteState == KteState.returning) {
       // Check if lifting knee returned back to normal level
-      if (liftingKneeY > standingKneeY - torsoLength * 0.1) {
+      if (liftingKneeY >
+          standingKneeY -
+              torsoLength * StandingKneeToElbowConfig.RETURN_KNEE_RATIO) {
         _completeRep();
         _transitionState(KteState.standing_base, now);
       }
     }
+  }
+
+  double _touchEnterDistance(double torsoLength, double hipWidth) {
+    final torsoThreshold =
+        torsoLength * StandingKneeToElbowConfig.TOUCH_DISTANCE_RATIO;
+    final hipThreshold =
+        hipWidth * StandingKneeToElbowConfig.TOUCH_HIP_WIDTH_RATIO;
+    return torsoThreshold > hipThreshold ? torsoThreshold : hipThreshold;
+  }
+
+  double _touchExitDistance(double torsoLength, double hipWidth) {
+    final torsoThreshold =
+        torsoLength * StandingKneeToElbowConfig.TOUCH_EXIT_DISTANCE_RATIO;
+    final hipThreshold =
+        hipWidth * StandingKneeToElbowConfig.TOUCH_EXIT_HIP_WIDTH_RATIO;
+    return torsoThreshold > hipThreshold ? torsoThreshold : hipThreshold;
   }
 
   void _transitionState(KteState newState, int timestampMs) {

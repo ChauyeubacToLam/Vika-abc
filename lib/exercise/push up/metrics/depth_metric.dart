@@ -20,9 +20,8 @@ import '../push_up.dart';
 
 class DepthConfig {
   /// Good depth: elbow flexion reaches 80°-100° (widened for desk workers)
-  static final double goodDepthMin = PushUpConfig.BOTTOM_ANGLE_RANGE[0]; // 80.0
-  static final double goodDepthMax =
-      PushUpConfig.BOTTOM_ANGLE_RANGE[1]; // 100.0
+  static final double goodDepthMin = PushUpConfig.BOTTOM_ANGLE_RANGE[0];
+  static final double goodDepthMax = PushUpConfig.BOTTOM_ANGLE_RANGE[1];
 
   /// Warning: 100°-110° — almost deep enough
   static const double SHALLOW_WARNING_MAX = 125.0;

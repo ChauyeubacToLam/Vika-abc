@@ -183,7 +183,7 @@ class WallPushUpVoiceCoach implements ExerciseVoiceCoach {
     }
     final script =
         GenericExerciseVoiceAssets.scriptForExerciseName(exercise.exerciseName);
-    _ttsService.speak(script.setupIntroKey);
+    _ttsService.speak(exercise.setupOrientationIntroVoiceKey);
     _ttsService.speak(script.cueKey('setup_position'));
     _ttsService.speak(script.cueKey('active_intro'));
     _didSpeakSetup = true;

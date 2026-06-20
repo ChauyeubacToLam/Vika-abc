@@ -89,6 +89,9 @@ class MountainClimber extends ExerciseBase {
   bool _isTimeout = false;
   int _doubleKneeRejects = 0;
   int _doubleKneeFrames = 0;
+  int _lastAcceptedRepTimeMs = 0;
+  int _sameSideRejects = 0;
+  KneeSide? _lastAcceptedSide;
 
   // ---------------------------------------------------------------------------
   // Safety check
@@ -288,14 +291,14 @@ class MountainClimber extends ExerciseBase {
           _leftCounter.lastCompletedPeakDist ?? _leftCounter.minDistInZone;
       final rightPeak =
           _rightCounter.lastCompletedPeakDist ?? _rightCounter.minDistInZone;
-      _onRepCompleted(
+      _onRepCandidate(
         ctx,
         leftPeak <= rightPeak ? KneeSide.left : KneeSide.right,
       );
     } else if (leftRep > 0) {
-      _onRepCompleted(ctx, KneeSide.left);
+      _onRepCandidate(ctx, KneeSide.left);
     } else if (rightRep > 0) {
-      _onRepCompleted(ctx, KneeSide.right);
+      _onRepCandidate(ctx, KneeSide.right);
     }
 
     // --- Cập nhật display state dựa trên zone của 2 counter ---
@@ -317,6 +320,7 @@ class MountainClimber extends ExerciseBase {
       'L_inZone': _leftCounter.isInZone,
       'R_inZone': _rightCounter.isInZone,
       'doubleKneeFrames': _doubleKneeFrames,
+      'sameSideRejects': _sameSideRejects,
       'L_threshold': _leftCounter.zoneThreshold.toStringAsFixed(2),
       'R_threshold': _rightCounter.zoneThreshold.toStringAsFixed(2),
       'scaleFactor': scaleFactor.toStringAsFixed(1),
@@ -326,6 +330,26 @@ class MountainClimber extends ExerciseBase {
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
+
+  void _onRepCandidate(RepContext ctx, KneeSide side) {
+    final now = ctx.frameTimestamp;
+    final elapsed = now - _lastAcceptedRepTimeMs;
+
+    if (_lastAcceptedRepTimeMs > 0 &&
+        elapsed < ClimberConfig.GLOBAL_REP_COOLDOWN_MS) {
+      return;
+    }
+
+    if (_lastAcceptedSide == side &&
+        elapsed < ClimberConfig.SAME_SIDE_REP_COOLDOWN_MS) {
+      _sameSideRejects++;
+      return;
+    }
+
+    _lastAcceptedRepTimeMs = now;
+    _lastAcceptedSide = side;
+    _onRepCompleted(ctx, side);
+  }
 
   void _onRepCompleted(RepContext ctx, KneeSide side) {
     // Lấy peakDist từ counter tương ứng
@@ -459,6 +483,7 @@ class MountainClimber extends ExerciseBase {
     logger.pushKey('trunk_fails_count', trunkMetric.faultsCount);
     logger.pushKey('rom_fails_count', romMetric.faultsCount);
     logger.pushKey('double_knee_rejects_count', _doubleKneeRejects);
+    logger.pushKey('same_side_rejects_count', _sameSideRejects);
     logger.pushKey('rom_good_count', romMetric.goodRomCount);
     logger.pushKey('rom_short_count', romMetric.shortRomCount);
     logger.pushKey('core_stability_ratio',
@@ -474,6 +499,9 @@ class MountainClimber extends ExerciseBase {
     _isTimeout = false;
     _doubleKneeRejects = 0;
     _doubleKneeFrames = 0;
+    _lastAcceptedRepTimeMs = 0;
+    _sameSideRejects = 0;
+    _lastAcceptedSide = null;
   }
 }
 

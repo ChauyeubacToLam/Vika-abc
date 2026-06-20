@@ -3,7 +3,7 @@ import '../standing_knee_to_elbow.dart';
 
 class CrossRomMetric extends StandingKteMetricBase {
   static const double MAX_TOUCH_DISTANCE_RATIO =
-      0.7; // Distance D > 50% of torso length
+      StandingKneeToElbowConfig.TOUCH_DISTANCE_RATIO;
 
   double _minDistanceRatio = 100.0;
 

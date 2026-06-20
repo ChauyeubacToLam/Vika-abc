@@ -125,7 +125,7 @@ class JumpingJackVoiceCoach implements ExerciseVoiceCoach {
 
     final script =
         GenericExerciseVoiceAssets.scriptForExerciseName(exercise.exerciseName);
-    _voicePlayer.speak(script.setupIntroKey);
+    _voicePlayer.speak(exercise.setupOrientationIntroVoiceKey);
     _voicePlayer.speak(script.cueKey('setup_position'));
     _voicePlayer.speak(script.cueKey('active_intro'));
     _didSpeakSetup = true;

@@ -114,6 +114,17 @@ abstract class ExerciseBase {
   Set<VikaImageOrientation> get supportedOrientations =>
       const <VikaImageOrientation>{VikaImageOrientation.portrait};
 
+  String get setupOrientationIntroVoiceKey {
+    final supportsPortrait =
+        supportedOrientations.contains(VikaImageOrientation.portrait);
+    final supportsLandscape =
+        supportedOrientations.any((orientation) => orientation.isLandscape);
+
+    if (supportsPortrait && !supportsLandscape) return 'common.thang_intro';
+    if (supportsLandscape && !supportsPortrait) return 'common.ngang_intro';
+    return supportsPortrait ? 'common.thang_intro' : 'common.ngang_intro';
+  }
+
   // Trigger segmentation
   bool _wasPoseAnomaly = false;
   bool _wasPoseFrameEdgeRisk = false;
@@ -1067,6 +1078,7 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
   final Set<String> _liveFaultsSpokenThisRep = {};
 
   int _lastRepCount = 0;
+  bool _currentRepHadFormFault = false;
   bool _didAnnounceReady = false;
   bool _didSpeakSetup = false;
   bool _didSpeakPreviousSetAdvice = false;
@@ -1098,7 +1110,7 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
     }
 
     if (exercise.exerciseState == ExerciseState.notActivated) {
-      _speakSetup(script);
+      _speakSetup(exercise, script);
       _lastRepCount = repCount;
       return;
     }
@@ -1117,6 +1129,9 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
       _speakPreviousSetAdviceIfNeeded(script);
     }
 
+    if (_feedbackIndicatesFault(feedback)) {
+      _currentRepHadFormFault = true;
+    }
     final liveFaultId = _faultIdForFeedback(script, feedback);
     if (liveFaultId != null) {
       _currentRepFaultIds.add(liveFaultId);
@@ -1128,6 +1143,7 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
       _lastRepCount = repCount;
       _currentRepFaultIds.clear();
       _liveFaultsSpokenThisRep.clear();
+      _currentRepHadFormFault = false;
       return;
     }
 
@@ -1142,9 +1158,12 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
     _lastRepCount = repCount;
   }
 
-  void _speakSetup(GenericExerciseVoiceScript script) {
+  void _speakSetup(
+    ExerciseBase exercise,
+    GenericExerciseVoiceScript script,
+  ) {
     if (_didSpeakSetup) return;
-    _voicePlayer.speak(script.setupIntroKey);
+    _voicePlayer.speak(exercise.setupOrientationIntroVoiceKey);
     _voicePlayer.speak(script.cueKey('setup_position'));
     _voicePlayer.speak(script.cueKey('active_intro'));
     _speakPreviousSetAdviceIfNeeded(script);
@@ -1155,11 +1174,18 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
     _voicePlayer.speak('$repCount');
 
     if (_currentRepFaultIds.isEmpty) {
-      _voicePlayer.speak(script.cueKey(script.cleanCueId));
+      _voicePlayer.speak(
+        _currentRepHadFormFault
+            ? 'common.fix_pose'
+            : script.cueKey(script.cleanCueId),
+      );
       return;
     }
 
-    final faultId = _currentRepFaultIds.first;
+    final faultId = script.faultIds.firstWhere(
+      _currentRepFaultIds.contains,
+      orElse: () => _currentRepFaultIds.first,
+    );
     _setFaultCounts[faultId] = (_setFaultCounts[faultId] ?? 0) + 1;
     _voicePlayer.speak(script.faultKey(faultId));
   }
@@ -1185,30 +1211,38 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
   ) {
     if (feedback.isEmpty || script.faultIds.isEmpty) return null;
 
-    final text = feedback.entries
-        .where((entry) =>
-            entry.key != 'System' &&
-            entry.key != 'Result' &&
-            entry.key != 'progress')
-        .map((entry) => '${entry.key} ${entry.value}')
-        .join(' ')
-        .toLowerCase();
-    if (text.isEmpty) return null;
+    final entries =
+        feedback.entries.where((entry) => !_isNonFaultFeedbackKey(entry.key));
 
-    final result = (feedback['Result'] ?? '').toLowerCase();
-    if (!_looksLikeFaultText(text) &&
-        !result.contains('sai') &&
-        !result.contains('fix')) {
-      return null;
-    }
+    for (final entry in entries) {
+      final valueText = _normalizeFaultText(entry.value);
+      if (!_looksLikeFaultText(valueText)) continue;
 
-    for (final candidate in _candidateFaultIds(text)) {
-      if (script.hasFault(candidate)) return candidate;
+      final entryText = _normalizeFaultText('${entry.key} ${entry.value}');
+      for (final candidate in _candidateFaultIds(entryText)) {
+        if (script.hasFault(candidate)) return candidate;
+      }
     }
-    return script.faultIds.first;
+    return null;
   }
 
   bool _looksLikeFaultText(String text) {
+    const correctivePhrases = [
+      'giu got',
+      'giu lung',
+      'giu than',
+      'giu hong',
+      'giu goi',
+      'giu vai',
+      'giu tay',
+      'giu co tay',
+      'ha ',
+      'xuong',
+      'nang',
+      'khong ',
+      'can ',
+      'thu ',
+    ];
     const markers = [
       'fault',
       'error',
@@ -1236,9 +1270,24 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
       'straighten',
       'unstable',
       'shallow',
+      'sai',
+      'chua',
+      'thieu',
+      'nong',
+      'thap',
+      'cao',
+      'qua',
+      'lech',
+      'vo',
+      'sup',
+      'gap',
+      'duoi',
+      'chong',
+      'cham',
+      'nhanh',
     ];
 
-    return markers.any(text.contains);
+    return correctivePhrases.any(text.contains) || markers.any(text.contains);
   }
 
   Iterable<String> _candidateFaultIds(String text) sync* {
@@ -1246,25 +1295,41 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
         text.contains('speed') ||
         text.contains('fast') ||
         text.contains('slow') ||
-        text.contains('cham')) {
+        text.contains('cham') ||
+        text.contains('nhanh') ||
+        text.contains('toc do')) {
       yield 'tempo';
       yield 'speed';
       yield 'tempo_fast';
       yield 'tempo_slow';
       yield 'too_fast';
     }
+    if (text.contains('too deep') ||
+        text.contains('qua sau') ||
+        text.contains('sau qua')) {
+      yield 'too_deep';
+      yield 'depth_deep';
+    }
     if (text.contains('depth') ||
         text.contains('rom') ||
-        text.contains('low')) {
+        text.contains('low') ||
+        text.contains('shallow') ||
+        text.contains('nong') ||
+        text.contains('sau') ||
+        text.contains('thap') ||
+        text.contains('ha') ||
+        text.contains('xuong')) {
       yield 'depth';
       yield 'rom';
       yield 'depth_shallow';
       yield 'takeoff_depth';
       yield 'landing_depth';
       yield 'rear_depth';
+      yield 'squat_depth';
+      yield 'amplitude';
     }
-    if (text.contains('heel')) yield 'heel';
-    if (text.contains('knee')) {
+    if (text.contains('heel') || text.contains('got')) yield 'heel';
+    if (text.contains('knee') || text.contains('goi')) {
       yield 'knee';
       yield 'knee_valgus';
       yield 'knee_angle';
@@ -1272,21 +1337,58 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
       yield 'knee_hover';
       yield 'front_knee';
       yield 'back_knee';
+      yield 'knees';
     }
-    if (text.contains('arm') || text.contains('wrist')) {
+    if (text.contains('arm') ||
+        text.contains('wrist') ||
+        text.contains('tay') ||
+        text.contains('co tay')) {
       yield 'arms';
       yield 'arm_extension';
       yield 'extension';
       yield 'straight_arm';
+      yield 'hand';
+      yield 'wrist';
     }
-    if (text.contains('leg') || text.contains('ankle')) {
+    if (text.contains('elbow') || text.contains('khuyu')) {
+      yield 'elbow';
+      yield 'extension';
+      yield 'arm_extension';
+      yield 'setup_guard';
+    }
+    if (text.contains('leg') ||
+        text.contains('ankle') ||
+        text.contains('chan') ||
+        text.contains('co chan')) {
       yield 'legs';
       yield 'leg';
       yield 'straight_leg';
       yield 'stable_limbs';
       yield 'elevation_leg';
+      yield 'ankle';
+      yield 'foot';
     }
-    if (text.contains('hip') || text.contains('pelvic')) {
+    if (text.contains('hip') ||
+        text.contains('pelvic') ||
+        text.contains('hong') ||
+        text.contains('chau')) {
+      if (text.contains('high') ||
+          text.contains('pike') ||
+          text.contains('cao') ||
+          text.contains('nang')) {
+        yield 'pike';
+        yield 'piked';
+        yield 'hip_high';
+      }
+      if (text.contains('drop') ||
+          text.contains('low') ||
+          text.contains('thap') ||
+          text.contains('sup')) {
+        yield 'sag';
+        yield 'sagging';
+        yield 'trunk_sag';
+        yield 'pelvic_drop';
+      }
       yield 'hip';
       yield 'hip_extension';
       yield 'hip_rotation';
@@ -1298,7 +1400,29 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
     if (text.contains('back') ||
         text.contains('trunk') ||
         text.contains('spine') ||
-        text.contains('lumbar')) {
+        text.contains('lumbar') ||
+        text.contains('lung') ||
+        text.contains('than') ||
+        text.contains('cot song') ||
+        text.contains('nguc')) {
+      if (text.contains('sag') ||
+          text.contains('drop') ||
+          text.contains('low') ||
+          text.contains('vo') ||
+          text.contains('sup')) {
+        yield 'sag';
+        yield 'sagging';
+        yield 'trunk_sag';
+        yield 'back_sag';
+      }
+      if (text.contains('pike') ||
+          text.contains('high') ||
+          text.contains('cao') ||
+          text.contains('nang')) {
+        yield 'pike';
+        yield 'piked';
+        yield 'trunk_pike';
+      }
       yield 'trunk';
       yield 'trunk_sag';
       yield 'trunk_pike';
@@ -1308,36 +1432,158 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
       yield 'lumbar';
       yield 'body_line';
       yield 'torso';
+      yield 'chest';
     }
     if (text.contains('neck') ||
         text.contains('head') ||
-        text.contains('ear')) {
+        text.contains('ear') ||
+        text.contains('dau')) {
       yield 'neck';
       yield 'head';
       yield 'cervical';
       yield 'neck_pull';
     }
-    if (text.contains('shoulder')) {
+    if (text.contains('shoulder') || text.contains('vai')) {
       yield 'shoulder';
       yield 'shrug';
     }
-    if (text.contains('elbow')) yield 'elbow';
     if (text.contains('hand')) yield 'hand';
-    if (text.contains('alternate')) {
+    if (text.contains('alternate') || text.contains('doi ben')) {
       yield 'alternate';
       yield 'alternating';
     }
-    if (text.contains('same') || text.contains('opposite')) {
+    if (text.contains('same') ||
+        text.contains('opposite') ||
+        text.contains('cheo') ||
+        text.contains('nguoc')) {
       yield 'opposite_side';
+      yield 'cross_rom';
     }
-    if (text.contains('still') || text.contains('stable')) {
+    if (text.contains('still') ||
+        text.contains('stable') ||
+        text.contains('on dinh')) {
       yield 'stability';
       yield 'drift';
     }
+    if (text.contains('setup') ||
+        text.contains('guard') ||
+        text.contains('tu the') ||
+        text.contains('chi gap')) {
+      yield 'setup';
+      yield 'setup_guard';
+      yield 'wall_guard';
+    }
+    if (text.contains('double')) yield 'double_knee';
+    if (text.contains('momentum') || text.contains('jerk')) {
+      yield 'momentum';
+      yield 'jerking';
+    }
+  }
+
+  bool _feedbackIndicatesFault(Map<String, String> feedback) {
+    final result = _normalizeFaultText(feedback['Result'] ?? '');
+    if (result.contains('sai') ||
+        result.contains('fix') ||
+        result.contains('no count') ||
+        result.contains('khong tinh') ||
+        result.contains('chua tinh')) {
+      return true;
+    }
+
+    return feedback.entries.any((entry) {
+      if (_isNonFaultFeedbackKey(entry.key)) return false;
+      return _looksLikeFaultText(_normalizeFaultText(entry.value));
+    });
+  }
+
+  bool _isNonFaultFeedbackKey(String key) {
+    final normalized = key.toLowerCase();
+    return normalized == 'system' ||
+        normalized == 'result' ||
+        normalized == 'progress' ||
+        normalized == 'status' ||
+        normalized == 'phase';
+  }
+
+  String _normalizeFaultText(String value) {
+    var text = value.toLowerCase();
+    const replacements = {
+      'á': 'a',
+      'à': 'a',
+      'ả': 'a',
+      'ã': 'a',
+      'ạ': 'a',
+      'ă': 'a',
+      'ắ': 'a',
+      'ằ': 'a',
+      'ẳ': 'a',
+      'ẵ': 'a',
+      'ặ': 'a',
+      'â': 'a',
+      'ấ': 'a',
+      'ầ': 'a',
+      'ẩ': 'a',
+      'ẫ': 'a',
+      'ậ': 'a',
+      'é': 'e',
+      'è': 'e',
+      'ẻ': 'e',
+      'ẽ': 'e',
+      'ẹ': 'e',
+      'ê': 'e',
+      'ế': 'e',
+      'ề': 'e',
+      'ể': 'e',
+      'ễ': 'e',
+      'ệ': 'e',
+      'í': 'i',
+      'ì': 'i',
+      'ỉ': 'i',
+      'ĩ': 'i',
+      'ị': 'i',
+      'ó': 'o',
+      'ò': 'o',
+      'ỏ': 'o',
+      'õ': 'o',
+      'ọ': 'o',
+      'ô': 'o',
+      'ố': 'o',
+      'ồ': 'o',
+      'ổ': 'o',
+      'ỗ': 'o',
+      'ộ': 'o',
+      'ơ': 'o',
+      'ớ': 'o',
+      'ờ': 'o',
+      'ở': 'o',
+      'ỡ': 'o',
+      'ợ': 'o',
+      'ú': 'u',
+      'ù': 'u',
+      'ủ': 'u',
+      'ũ': 'u',
+      'ụ': 'u',
+      'ư': 'u',
+      'ứ': 'u',
+      'ừ': 'u',
+      'ử': 'u',
+      'ữ': 'u',
+      'ự': 'u',
+      'ý': 'y',
+      'ỳ': 'y',
+      'ỷ': 'y',
+      'ỹ': 'y',
+      'ỵ': 'y',
+      'đ': 'd',
+    };
+    for (final entry in replacements.entries) {
+      text = text.replaceAll(entry.key, entry.value);
+    }
+    return text;
   }
 
   bool _shouldSpeakLiveFault(Map<String, String> feedback) {
-    final result = (feedback['Result'] ?? '').toLowerCase();
+    final result = _normalizeFaultText(feedback['Result'] ?? '');
     return result.contains('sai') || result.contains('fix');
   }
 
@@ -1345,6 +1591,7 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
   void dispose() {
     _currentRepFaultIds.clear();
     _liveFaultsSpokenThisRep.clear();
+    _currentRepHadFormFault = false;
     _setFaultCounts.clear();
     _voicePlayer.clearQueue();
     _voicePlayer.dispose();

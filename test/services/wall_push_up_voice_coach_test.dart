@@ -56,7 +56,7 @@ void main() {
     expect(
       player.spoken,
       [
-        'common.ngang_intro',
+        'common.thang_intro',
         'wall_push_up.setup_position',
         'wall_push_up.active_intro',
       ],

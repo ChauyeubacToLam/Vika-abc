@@ -7,6 +7,7 @@ import '../../utils/pose_math_helpers.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
 import '../exercise_base.dart';
+import '../side_tracked_exercise_mixin.dart';
 import '../../utils/exercise_logger.dart';
 import 'metrics/glute_bridge_metric_base.dart';
 import 'metrics/glute_bridge_hip_extension.dart';
@@ -47,13 +48,14 @@ class GluteBridgeConfig {
 
   /// Tolerance around horizontal target (degrees).
   static const double HORIZONTAL_TOLERANCE = 40.0;
+  static const double START_TRUNK_HORIZ_MAX = 28.0;
 
   /// Acceptable knee flexion range for starting posture (hip–knee–ankle).
   static const double KNEE_ANGLE_MIN = 60.0;
   static const double KNEE_ANGLE_MAX = 160.0;
 
   /// Max hip-to-shoulder vertical offset for flat-lying check.
-  static const double HIP_SHOULDER_RATIO = 0.35; // fraction of scaleFactor
+  static const double HIP_SHOULDER_RATIO = 0.55; // fraction of scaleFactor
   static const double HIP_SHOULDER_PIXELS = 55.0;
 }
 
@@ -70,7 +72,7 @@ enum GluteBridgeState {
 /* =========================================================================
    GLUTE BRIDGE LOGIC
    ========================================================================= */
-class GluteBridge extends ExerciseBase {
+class GluteBridge extends ExerciseBase with SideTrackedExerciseMixin {
   final int maxRep;
 
   GluteBridge({this.maxRep = GluteBridgeConfig.MAX_REP});
@@ -127,6 +129,34 @@ class GluteBridge extends ExerciseBase {
       );
 
   @override
+  Map<String, SideLandmarkPair> get requiredSideLandmarks => const {
+        'shoulder': (
+          right: PoseLandmarkType.rightShoulder,
+          left: PoseLandmarkType.leftShoulder,
+        ),
+        'hip': (
+          right: PoseLandmarkType.rightHip,
+          left: PoseLandmarkType.leftHip,
+        ),
+        'knee': (
+          right: PoseLandmarkType.rightKnee,
+          left: PoseLandmarkType.leftKnee,
+        ),
+        'ankle': (
+          right: PoseLandmarkType.rightAnkle,
+          left: PoseLandmarkType.leftAnkle,
+        ),
+      };
+
+  @override
+  Map<String, SideLandmarkPair> get optionalSideLandmarks => const {
+        'ear': (
+          right: PoseLandmarkType.rightEar,
+          left: PoseLandmarkType.leftEar,
+        ),
+      };
+
+  @override
   double? get liveHoldSeconds =>
       gluteState == GluteBridgeState.topHold && _topHoldStartMs != null
           ? (frameTimestampMs - _topHoldStartMs!) / 1000.0
@@ -175,41 +205,18 @@ class GluteBridge extends ExerciseBase {
   bool isInStartPosition(
     Map<PoseLandmarkType, PoseLandmark> landmarks,
   ) {
-    final shoulder = getSideLandmark(
-      landmarks: landmarks,
-      rightType: PoseLandmarkType.rightShoulder,
-      leftType: PoseLandmarkType.leftShoulder,
-    );
-    final hip = getSideLandmark(
-      landmarks: landmarks,
-      rightType: PoseLandmarkType.rightHip,
-      leftType: PoseLandmarkType.leftHip,
-    );
-    final knee = getSideLandmark(
-      landmarks: landmarks,
-      rightType: PoseLandmarkType.rightKnee,
-      leftType: PoseLandmarkType.leftKnee,
-    );
-    final ankle = getSideLandmark(
-      landmarks: landmarks,
-      rightType: PoseLandmarkType.rightAnkle,
-      leftType: PoseLandmarkType.leftAnkle,
-    );
+    final tracked = getSideTrackedLandmarks(landmarks);
+    if (tracked == null) return false;
 
-    if (shoulder == null || hip == null || knee == null || ankle == null) {
-      return false;
-    }
+    final shoulder = tracked['shoulder']!;
+    final hip = tracked['hip']!;
+    final knee = tracked['knee']!;
+    final ankle = tracked['ankle']!;
 
     // 1. Trunk must be roughly horizontal (clock angle near 90° or 270°).
-    double trunkClockAngle =
-        calculateVerticalAngle(pivot: hip, point: shoulder);
-    double horizontalTarget = cameraFacing == CameraFacing.right
-        ? GluteBridgeConfig.HORIZONTAL_CLOCK_RIGHT
-        : GluteBridgeConfig.HORIZONTAL_CLOCK_LEFT;
-    double diff = trunkClockAngle - horizontalTarget;
-    if (diff > 180) diff -= 360;
-    if (diff < -180) diff += 360;
-    if (diff.abs() > GluteBridgeConfig.HORIZONTAL_TOLERANCE) return false;
+    final trunkHoriz =
+        calculateAbsoluteHorizontalAngle(point1: shoulder, point2: hip);
+    if (trunkHoriz > GluteBridgeConfig.START_TRUNK_HORIZ_MAX) return false;
 
     // 2. Knees must be bent — hip-knee-ankle angle 70–150°.
     double kneeAngle = calculateAngleNormalized(
@@ -268,6 +275,10 @@ class GluteBridge extends ExerciseBase {
       return "⚠️ Xin hãy quay nghiêng để theo dõi tư thế Glute Bridge";
     }
 
+    if (getSideTrackedLandmarks(landmarks) != null) {
+      return null;
+    }
+
     final shoulder = getSideLandmark(
         landmarks: landmarks,
         rightType: PoseLandmarkType.rightShoulder,
@@ -303,38 +314,24 @@ class GluteBridge extends ExerciseBase {
   ) {
     // ---------- 1. Get Landmarks ----------
 
-    final shoulder = getSideLandmark(
-        landmarks: smoothedLandmarks,
-        rightType: PoseLandmarkType.rightShoulder,
-        leftType: PoseLandmarkType.leftShoulder);
-    final hip = getSideLandmark(
-        landmarks: smoothedLandmarks,
-        rightType: PoseLandmarkType.rightHip,
-        leftType: PoseLandmarkType.leftHip);
-    final knee = getSideLandmark(
-        landmarks: smoothedLandmarks,
-        rightType: PoseLandmarkType.rightKnee,
-        leftType: PoseLandmarkType.leftKnee);
-    final ankle = getSideLandmark(
-        landmarks: smoothedLandmarks,
-        rightType: PoseLandmarkType.rightAnkle,
-        leftType: PoseLandmarkType.leftAnkle);
+    final tracked = getSideTrackedLandmarks(smoothedLandmarks);
+    if (tracked == null) return;
+
+    final shoulder = tracked['shoulder']!;
+    final hip = tracked['hip']!;
+    final knee = tracked['knee']!;
+    final ankle = tracked['ankle']!;
+
     // Head: prefer camera-side ear, fall back to nose.
-    final ear = getSideLandmark(
-        landmarks: smoothedLandmarks,
-        rightType: PoseLandmarkType.rightEar,
-        leftType: PoseLandmarkType.leftEar);
+    final ear = tracked['ear'];
     final nose = smoothedLandmarks[PoseLandmarkType.nose];
 
     // Explicit null fallback hierarchy to prevent bypass when head goes out of frame
-    final double? headY = (ear != null && ExerciseBase.isLandmarkConfident(ear))
+    final double headY = (ear != null && ExerciseBase.isLandmarkConfident(ear))
         ? ear.y
         : (nose != null && ExerciseBase.isLandmarkConfident(nose))
             ? nose.y
-            : shoulder
-                ?.y; // Fallback to shoulder.y if head is totally lost to prevent metric crash
-
-    if (shoulder == null || hip == null || knee == null) return;
+            : shoulder.y; // Fallback if head is totally lost.
 
     // ---------- 2. Calculate Geometry ----------
 
@@ -356,13 +353,10 @@ class GluteBridge extends ExerciseBase {
         _computeNormalizedHipDeviation(shoulder, hip, knee);
 
     // Knee angle (hip-knee-ankle) — null if ankle not visible.
-    final double? kneeAngle =
-        (ankle != null && ExerciseBase.isLandmarkConfident(ankle))
-            ? calculateAngleNormalized(
-                firstPoint: hip, midPoint: knee, lastPoint: ankle)
-            : null;
+    final double kneeAngle = calculateAngleNormalized(
+        firstPoint: hip, midPoint: knee, lastPoint: ankle);
 
-    final int now = DateTime.now().millisecondsSinceEpoch;
+    final int now = frameTimestampMs;
 
     // Ensure baseline exists (fallback in case activation was unusual).
     _baselineHipY ??= hipY;
@@ -411,8 +405,7 @@ class GluteBridge extends ExerciseBase {
     debugData['shKneeAngle'] = shoulderHipKneeAngle.toStringAsFixed(1);
     debugData['hipDev'] =
         '${normalizedHipDeviation >= 0 ? "+" : ""}${normalizedHipDeviation.toStringAsFixed(3)}';
-    if (kneeAngle != null)
-      debugData['kneeAngle'] = kneeAngle.toStringAsFixed(1);
+    debugData['kneeAngle'] = kneeAngle.toStringAsFixed(1);
     debugData['baseline'] = _baselineHipY?.toStringAsFixed(1) ?? 'N/A';
     debugData['peak'] = _peakHipY?.toStringAsFixed(1) ?? 'N/A';
 

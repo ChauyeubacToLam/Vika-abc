@@ -102,6 +102,7 @@ class LungeHeelLiftMetric extends LungeMetricBase {
         type: 'Feet',
         message: message,
         voiceMessage: voiceMessage,
+        priority: 0,
         // Heel lift DOES affect form for lunges (unlike squat where it's informational)
         affectsForm: true,
       ));
