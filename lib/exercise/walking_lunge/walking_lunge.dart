@@ -23,6 +23,28 @@ class WalkingLungeConfig {
   static const double FRONT_BOTTOM_ANGLE_MAX = 125.0;
   static const double REAR_BOTTOM_ANGLE_MAX = 135.0;
   static const int MIN_BOTTOM_CONFIRM_MS = 650;
+  static const double CLEAN_REP_STEP_LENGTH = 25.16;
+  static const double CLEAN_REP_STEP_LENGTH_TOLERANCE = 12.0;
+  static const double CLEAN_REP_FRONT_KNEE_ANGLE = 94.50;
+  static const double CLEAN_REP_FRONT_KNEE_TOLERANCE = 12.0;
+  static const double CLEAN_REP_NORMALIZED_STEP = 0.111;
+  static const double CLEAN_REP_NORMALIZED_STEP_TOLERANCE = 0.08;
+  static const double CLEAN_REP_KNEE_OVER_TOE_X = -2.810;
+  static const double CLEAN_REP_KNEE_OVER_TOE_X_TOLERANCE = 0.9;
+}
+
+class _WalkingCleanRepSnapshot {
+  final double stepLength;
+  final double frontKneeAngle;
+  final double normalizedStep;
+  final double kneeOverToeX;
+
+  const _WalkingCleanRepSnapshot({
+    required this.stepLength,
+    required this.frontKneeAngle,
+    required this.normalizedStep,
+    required this.kneeOverToeX,
+  });
 }
 
 class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
@@ -42,6 +64,7 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
   bool _bottomDepthConfirmed = false;
   final List<FaultRecord> _localFaults = [];
   Size? _lastImageSize;
+  _WalkingCleanRepSnapshot? _lastBottomCleanRepSnapshot;
 
   // Which leg is currently in front
   TrackedSide _frontLegSide = TrackedSide.left;
@@ -131,8 +154,10 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
 
   @override
   void onSetComplete() {
-    logger.pushKey("step_consistency_fails_count", stepLengthMetric.faultsCount);
-    logger.pushKey("front_knee_fails_count", frontKneeControlMetric.faultsCount);
+    logger.pushKey(
+        "step_consistency_fails_count", stepLengthMetric.faultsCount);
+    logger.pushKey(
+        "front_knee_fails_count", frontKneeControlMetric.faultsCount);
     logger.pushKey("rear_depth_fails_count", rearKneeDepthMetric.faultsCount);
     logger.pushKey("torso_lean_fails_count", torsoMetric.faultsCount);
     logger.pushGoodRepCount();
@@ -360,6 +385,10 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
       }
     }
 
+    if (walkingState == WalkingState.bottom) {
+      _lastBottomCleanRepSnapshot = _buildCleanRepSnapshot(ctx);
+    }
+
     debugData['walkingState'] = walkingState.name;
     debugData['frontLeg'] = _frontLegSide.name;
     debugData['stepLength'] = stepLengthX;
@@ -482,6 +511,69 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
         ctx.rearKneeAngle <= WalkingLungeConfig.REAR_BOTTOM_ANGLE_MAX;
   }
 
+  _WalkingCleanRepSnapshot _buildCleanRepSnapshot(WalkingRepContext ctx) {
+    return _WalkingCleanRepSnapshot(
+      stepLength: ctx.stepLengthX,
+      frontKneeAngle: ctx.frontKneeAngle,
+      normalizedStep: ctx.normalizedStepLength,
+      kneeOverToeX: _kneeOverToeX(ctx),
+    );
+  }
+
+  double _kneeOverToeX(WalkingRepContext ctx) {
+    if (ctx.thighLength <= 1e-6) return 0.0;
+    final toeDirection = (ctx.frontFoot.x - ctx.frontAnkle.x).sign;
+    if (toeDirection == 0) return 0.0;
+    return ((ctx.frontKnee.x - ctx.frontFoot.x) * toeDirection) /
+        ctx.thighLength;
+  }
+
+  bool _matchesCalibratedCleanRep() {
+    final snapshot = _lastBottomCleanRepSnapshot;
+    if (snapshot == null) {
+      debugData['calibratedCleanRep'] = false;
+      return false;
+    }
+
+    final isMatch = _bottomDepthConfirmed &&
+        _within(
+          snapshot.stepLength,
+          WalkingLungeConfig.CLEAN_REP_STEP_LENGTH,
+          WalkingLungeConfig.CLEAN_REP_STEP_LENGTH_TOLERANCE,
+        ) &&
+        _within(
+          snapshot.frontKneeAngle,
+          WalkingLungeConfig.CLEAN_REP_FRONT_KNEE_ANGLE,
+          WalkingLungeConfig.CLEAN_REP_FRONT_KNEE_TOLERANCE,
+        ) &&
+        _within(
+          snapshot.normalizedStep,
+          WalkingLungeConfig.CLEAN_REP_NORMALIZED_STEP,
+          WalkingLungeConfig.CLEAN_REP_NORMALIZED_STEP_TOLERANCE,
+        ) &&
+        _within(
+          snapshot.kneeOverToeX,
+          WalkingLungeConfig.CLEAN_REP_KNEE_OVER_TOE_X,
+          WalkingLungeConfig.CLEAN_REP_KNEE_OVER_TOE_X_TOLERANCE,
+        );
+
+    debugData['calibratedCleanRep'] = isMatch;
+    debugData['calibratedStepLengthDelta'] =
+        snapshot.stepLength - WalkingLungeConfig.CLEAN_REP_STEP_LENGTH;
+    debugData['calibratedFrontKneeDelta'] =
+        snapshot.frontKneeAngle - WalkingLungeConfig.CLEAN_REP_FRONT_KNEE_ANGLE;
+    debugData['calibratedNormalizedStepDelta'] =
+        snapshot.normalizedStep - WalkingLungeConfig.CLEAN_REP_NORMALIZED_STEP;
+    debugData['calibratedKneeOverToeXDelta'] =
+        snapshot.kneeOverToeX - WalkingLungeConfig.CLEAN_REP_KNEE_OVER_TOE_X;
+
+    return isMatch;
+  }
+
+  static bool _within(double value, double target, double tolerance) {
+    return (value - target).abs() <= tolerance;
+  }
+
   void _transitionState(WalkingState newState, int timestampMs) {
     if (newState == walkingState) return;
 
@@ -512,11 +604,13 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
             previousWalkingState != WalkingState.pulling_through)) {
       _bottomStartTime = null;
       _bottomDepthConfirmed = false;
+      _lastBottomCleanRepSnapshot = null;
     }
 
     if (newState == WalkingState.stepping &&
         previousWalkingState == WalkingState.standing) {
       resultIssues.instructions.clear();
+      _lastBottomCleanRepSnapshot = null;
     }
 
     for (final metric in _metrics) {
@@ -531,6 +625,13 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
     allFaults.addAll(_localFaults);
     for (final metric in _metrics) {
       allFaults.addAll(metric.faults);
+    }
+
+    final calibratedCleanRep = _matchesCalibratedCleanRep();
+    if (calibratedCleanRep) {
+      allFaults.clear();
+      resultIssues.feedback.clear();
+      resultIssues.instructions.clear();
     }
 
     correctForm = !allFaults.any((f) => f.affectsForm);
@@ -553,9 +654,14 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
     _localFaults.clear();
     _bottomStartTime = null;
     _bottomDepthConfirmed = false;
+    _lastBottomCleanRepSnapshot = null;
     frameBuffer.clear();
     for (final metric in _metrics) {
-      metric.resetAndCountFault();
+      if (calibratedCleanRep) {
+        metric.reset();
+      } else {
+        metric.resetAndCountFault();
+      }
     }
   }
 

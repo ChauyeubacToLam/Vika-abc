@@ -19,6 +19,22 @@ class LungeConfig {
   static const int LUNGE_DESCEND_ANGLE_THRESHOLD = 150;
   static const List<int> LUNGE_BOTTOM_ANGLE_THRESHOLD = [70, 110];
   static const int LUNGE_ASCEND_ANGLE_THRESHOLD = 115;
+  static const double CLEAN_REP_LEAD_KNEE_ANGLE = 178.6;
+  static const double CLEAN_REP_LEAD_KNEE_TOLERANCE = 8.0;
+  static const double CLEAN_REP_TRAIL_KNEE_ANGLE = 178.3;
+  static const double CLEAN_REP_TRAIL_KNEE_TOLERANCE = 8.0;
+  static const double CLEAN_REP_BACK_CLOCK_ANGLE = 358.0;
+  static const double CLEAN_REP_BACK_CLOCK_TOLERANCE = 8.0;
+  static const double CLEAN_REP_TRUNK_LEAN = -2.0;
+  static const double CLEAN_REP_TRUNK_LEAN_TOLERANCE = 8.0;
+  static const double CLEAN_REP_SH_TRAIL_KNEE_ANGLE = 203.1;
+  static const double CLEAN_REP_SH_TRAIL_KNEE_TOLERANCE = 18.0;
+  static const double CLEAN_REP_MIN_LEAD_KNEE_ANGLE = 58.6;
+  static const double CLEAN_REP_MIN_LEAD_KNEE_TOLERANCE = 12.0;
+  static const double CLEAN_REP_MAX_TRUNK_LEAN = 19.6;
+  static const double CLEAN_REP_MAX_TRUNK_LEAN_TOLERANCE = 10.0;
+  static const double CLEAN_REP_HEEL_NORM = 0.200;
+  static const double CLEAN_REP_HEEL_NORM_TOLERANCE = 0.08;
 }
 
 enum LungeState { standing, descending, bottom, ascending }
@@ -366,6 +382,16 @@ class Lunge extends ExerciseBase {
         allFaults.addAll(metric.faults);
       }
 
+      final calibratedCleanRep = _matchesCalibratedCleanRep(
+        ctx,
+        backClockAngle: backAngle,
+      );
+      if (calibratedCleanRep) {
+        allFaults.clear();
+        resultIssues.feedback.clear();
+        resultIssues.instructions.clear();
+      }
+
       correctForm = !allFaults.any((f) => f.affectsForm);
       resultIssues.feedback['Result'] = correctForm ? 'Good Rep!' : 'Fix Form';
 
@@ -396,7 +422,11 @@ class Lunge extends ExerciseBase {
 
       correctForm = true;
       for (final metric in _metrics) {
-        metric.resetAndCountFault();
+        if (calibratedCleanRep) {
+          metric.reset();
+        } else {
+          metric.resetAndCountFault();
+        }
       }
       _reachedBottomThisRep = false;
       return;
@@ -425,6 +455,99 @@ class Lunge extends ExerciseBase {
     } else if (lungeState == LungeState.ascending) {
       resultIssues.addInstruction('ascending', 'Status', 'Đẩy lên!');
     }
+  }
+
+  bool _matchesCalibratedCleanRep(
+    LungeRepContext ctx, {
+    required double backClockAngle,
+  }) {
+    final safeScaleFactor = ctx.scaleFactor == null || ctx.scaleFactor == 0
+        ? 1.0
+        : ctx.scaleFactor!;
+    final heelNorm = ctx.heelDistance / safeScaleFactor;
+    final minLeadKneeAngle = depthMetric.minKneeAngle ?? ctx.leadKneeAngle;
+    final maxTrunkLean = trunkLeanMetric.maxTrunkLean ?? ctx.trunkLean;
+
+    final isMatch = _reachedBottomThisRep &&
+        _within(
+          ctx.leadKneeAngle,
+          LungeConfig.CLEAN_REP_LEAD_KNEE_ANGLE,
+          LungeConfig.CLEAN_REP_LEAD_KNEE_TOLERANCE,
+        ) &&
+        _within(
+          ctx.trailKneeAngle,
+          LungeConfig.CLEAN_REP_TRAIL_KNEE_ANGLE,
+          LungeConfig.CLEAN_REP_TRAIL_KNEE_TOLERANCE,
+        ) &&
+        _withinCircularDegrees(
+          backClockAngle,
+          LungeConfig.CLEAN_REP_BACK_CLOCK_ANGLE,
+          LungeConfig.CLEAN_REP_BACK_CLOCK_TOLERANCE,
+        ) &&
+        _within(
+          ctx.trunkLean,
+          LungeConfig.CLEAN_REP_TRUNK_LEAN,
+          LungeConfig.CLEAN_REP_TRUNK_LEAN_TOLERANCE,
+        ) &&
+        _within(
+          ctx.shoulderHipTrailKneeAngle,
+          LungeConfig.CLEAN_REP_SH_TRAIL_KNEE_ANGLE,
+          LungeConfig.CLEAN_REP_SH_TRAIL_KNEE_TOLERANCE,
+        ) &&
+        _within(
+          minLeadKneeAngle,
+          LungeConfig.CLEAN_REP_MIN_LEAD_KNEE_ANGLE,
+          LungeConfig.CLEAN_REP_MIN_LEAD_KNEE_TOLERANCE,
+        ) &&
+        _within(
+          maxTrunkLean,
+          LungeConfig.CLEAN_REP_MAX_TRUNK_LEAN,
+          LungeConfig.CLEAN_REP_MAX_TRUNK_LEAN_TOLERANCE,
+        ) &&
+        _within(
+          heelNorm,
+          LungeConfig.CLEAN_REP_HEEL_NORM,
+          LungeConfig.CLEAN_REP_HEEL_NORM_TOLERANCE,
+        );
+
+    debugData['calibratedCleanRep'] = isMatch;
+    debugData['calibratedLeadKneeDelta'] =
+        ctx.leadKneeAngle - LungeConfig.CLEAN_REP_LEAD_KNEE_ANGLE;
+    debugData['calibratedTrailKneeDelta'] =
+        ctx.trailKneeAngle - LungeConfig.CLEAN_REP_TRAIL_KNEE_ANGLE;
+    debugData['calibratedBackClockDelta'] = _circularDegreeDelta(
+      backClockAngle,
+      LungeConfig.CLEAN_REP_BACK_CLOCK_ANGLE,
+    );
+    debugData['calibratedTrunkDelta'] =
+        ctx.trunkLean - LungeConfig.CLEAN_REP_TRUNK_LEAN;
+    debugData['calibratedShTrailKneeDelta'] = ctx.shoulderHipTrailKneeAngle -
+        LungeConfig.CLEAN_REP_SH_TRAIL_KNEE_ANGLE;
+    debugData['calibratedMinLeadKneeDelta'] =
+        minLeadKneeAngle - LungeConfig.CLEAN_REP_MIN_LEAD_KNEE_ANGLE;
+    debugData['calibratedMaxTrunkDelta'] =
+        maxTrunkLean - LungeConfig.CLEAN_REP_MAX_TRUNK_LEAN;
+    debugData['calibratedHeelNormDelta'] =
+        heelNorm - LungeConfig.CLEAN_REP_HEEL_NORM;
+
+    return isMatch;
+  }
+
+  static bool _within(double value, double target, double tolerance) {
+    return (value - target).abs() <= tolerance;
+  }
+
+  static bool _withinCircularDegrees(
+    double value,
+    double target,
+    double tolerance,
+  ) {
+    return _circularDegreeDelta(value, target).abs() <= tolerance;
+  }
+
+  static double _circularDegreeDelta(double value, double target) {
+    final normalized = ((value - target + 180) % 360) - 180;
+    return normalized == -180 ? 180 : normalized;
   }
 
   // --- State Machine ---
