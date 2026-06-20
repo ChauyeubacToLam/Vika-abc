@@ -56,7 +56,6 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
   double? _baselineHipY;
   double? _minTrunkKneeAngleThisRep;
   bool _sawContractionThisRep = false;
-  bool _sawLegThrustThisRep = false;
   double _maxHipLiftThisRep = 0;
   double _maxLegAngleThisRep = 0;
   double _maxKneeAngleThisRep = 0;
@@ -315,7 +314,6 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
         crunchState == ReverseCrunchState.top) {
       _trackRepPeak(ctx);
       if (ctx.isContractionPosition) _sawContractionThisRep = true;
-      if (ctx.isLegThrustPeak) _sawLegThrustThisRep = true;
     }
 
     final startedCurl = ctx.trunkKneeAngle <=
@@ -332,9 +330,7 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
       _trackRepPeak(ctx);
       if (ctx.isContractionPosition) _sawContractionThisRep = true;
     } else if (_topDebouncer.update(crunchState == ReverseCrunchState.curling &&
-        _sawContractionThisRep &&
-        ctx.isLegThrustPeak)) {
-      _sawLegThrustThisRep = true;
+        _sawContractionThisRep)) {
       _trackRepPeak(ctx);
       _transitionState(ReverseCrunchState.top, ctx.frameTimestamp);
     } else if (_loweringDebouncer.update(crunchState ==
@@ -391,10 +387,7 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
 
   bool get _isRepCountable =>
       _sawContractionThisRep &&
-      _sawLegThrustThisRep &&
-      _maxHipLiftThisRep >= ReverseCrunchConfig.HIP_LIFT_MIN_NORMALIZED &&
-      _maxLegAngleThisRep >= ReverseCrunchConfig.PEAK_LEG_VERTICAL_MIN &&
-      _maxKneeAngleThisRep >= ReverseCrunchConfig.PEAK_KNEE_EXTENSION_MIN;
+      _maxHipLiftThisRep >= ReverseCrunchConfig.HIP_LIFT_MIN_NORMALIZED;
 
   void _rejectRepAttempt(RepContext ctx, String message) {
     _rejectedAttempts++;
@@ -407,7 +400,6 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
   void _resetRepAttempt({required bool clearBaseline}) {
     _minTrunkKneeAngleThisRep = null;
     _sawContractionThisRep = false;
-    _sawLegThrustThisRep = false;
     _maxHipLiftThisRep = 0;
     _maxLegAngleThisRep = 0;
     _maxKneeAngleThisRep = 0;
@@ -424,7 +416,7 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
   void _completeRep(RepContext ctx) {
     if (!_isRepCountable) {
       _rejectRepAttempt(
-          ctx, 'Hãy cuộn gối về ngực rồi duỗi chân thẳng lên ở đỉnh.');
+          ctx, 'Hãy cuộn gối về ngực và nhấc hông khỏi mặt sàn.');
       return;
     }
 

@@ -17,12 +17,12 @@ enum KteState { standing_base, approaching, touch, returning }
 class StandingKneeToElbowConfig {
   static const int MAX_REP = 30; // 15 per side
   static const double KNEE_LIFT_START_RATIO = 0.05;
-  static const double TOUCH_DISTANCE_RATIO = 0.95;
-  static const double TOUCH_EXIT_DISTANCE_RATIO = 1.15;
-  static const double TOUCH_HIP_WIDTH_RATIO = 1.20;
-  static const double TOUCH_EXIT_HIP_WIDTH_RATIO = 1.45;
-  static const double RETURN_KNEE_RATIO = 0.08;
-  static const double TOUCH_EXIT_KNEE_RATIO = 0.20;
+  static const double TOUCH_DISTANCE_RATIO = 1.30;
+  static const double TOUCH_EXIT_DISTANCE_RATIO = 1.60;
+  static const double TOUCH_HIP_WIDTH_RATIO = 1.40;
+  static const double TOUCH_EXIT_HIP_WIDTH_RATIO = 1.70;
+  static const double RETURN_KNEE_RATIO = 0.15;
+  static const double TOUCH_EXIT_KNEE_RATIO = 0.30;
 }
 
 class StandingKneeToElbow extends ExerciseBase {

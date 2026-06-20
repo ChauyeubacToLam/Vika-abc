@@ -196,6 +196,7 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
     if (tricepState == TricepDipState.setup_top &&
         previousTricepState != TricepDipState.setup_top) {
       _completeRep();
+      previousTricepState = tricepState;
       return;
     }
 

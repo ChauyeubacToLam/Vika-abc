@@ -75,7 +75,7 @@ class WallPushUpVoiceCoach implements ExerciseVoiceCoach {
 
     if (exercise.exerciseState == ExerciseState.completed) {
       if (!_didAnnounceSetComplete) {
-        _ttsService.clearQueue();
+        _ttsService.clearPendingButKeepCurrent();
         if (repIncreased) {
           _speakRepOutcome(
             exercise: exercise,
@@ -117,7 +117,7 @@ class WallPushUpVoiceCoach implements ExerciseVoiceCoach {
 
     final phasePhrase = _phasePhrase(exercise);
     if (!_didAnnounceReady) {
-      _ttsService.clearQueue();
+      _ttsService.clearPendingButKeepCurrent();
       for (final phrase in _readyCountdown) {
         _ttsService.speak(phrase);
       }
@@ -137,7 +137,7 @@ class WallPushUpVoiceCoach implements ExerciseVoiceCoach {
         _canSpeakLiveFaultVoice(liveFaultVoice, nowMs);
 
     if (repIncreased) {
-      _ttsService.clearQueue();
+      _ttsService.clearPendingButKeepCurrent();
       _speakRepOutcome(
         exercise: exercise,
         repCount: repCount,
@@ -173,7 +173,7 @@ class WallPushUpVoiceCoach implements ExerciseVoiceCoach {
 
   @override
   void dispose() {
-    _ttsService.clearQueue();
+    _ttsService.clearPendingButKeepCurrent();
     _ttsService.dispose();
   }
 

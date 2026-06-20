@@ -20,6 +20,7 @@ class RussianRepContext {
   final double kneeHipDx;
   final double directionMultiplier;
   final double trunkHorizontalAngle;
+  final double shoulderAngle;
 
   final RussianTwistState state;
   final TwistDirection direction;
@@ -40,6 +41,7 @@ class RussianRepContext {
     required this.kneeHipDx,
     required this.directionMultiplier,
     required this.trunkHorizontalAngle,
+    required this.shoulderAngle,
     required this.state,
     required this.direction,
     required this.frameTimestamp,

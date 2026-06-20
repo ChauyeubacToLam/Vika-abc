@@ -458,7 +458,7 @@ class WarriorOne extends ExerciseBase {
             'back_knee_seconds': backKneeMetric.isFaultingNow,
             'back_straight_seconds': backStraightMetric.isFaultingNow,
           },
-          goodBlockingKeys: const ['trunk_lean_seconds'],
+          goodBlockingKeys: const ['trunk_lean_seconds', 'arm_seconds'],
         );
 
         final remaining =

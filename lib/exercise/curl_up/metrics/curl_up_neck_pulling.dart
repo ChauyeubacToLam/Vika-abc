@@ -172,7 +172,7 @@ class NeckPullingMetric extends CurlUpMetricBase {
       _faults.clear();
       _faults.add(FaultRecord(
         phase: phase,
-        type: 'Neck',
+        type: 'neck_pull',
         message: 'Kéo cổ quá mạnh — giữ đầu trung tính',
         affectsForm: true,
         voiceMessage: 'Không kéo cổ',
@@ -187,7 +187,7 @@ class NeckPullingMetric extends CurlUpMetricBase {
     if (_loggedLevel == null) {
       _faults.add(FaultRecord(
         phase: phase,
-        type: 'Neck',
+        type: 'neck_pull',
         message: 'Hơi căng cổ — giữ đầu thẳng hàng với lưng',
         affectsForm: false,
         priority: CurlUpFaultVoicePriority.neckPulling,

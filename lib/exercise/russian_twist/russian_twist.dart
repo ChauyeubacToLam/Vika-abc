@@ -25,15 +25,13 @@ class RussianTwistConfig {
   static const double MIN_TRUNK_HORIZONTAL_ANGLE = 32.0;
   static const double MAX_TRUNK_HORIZONTAL_ANGLE = 72.0;
   static const double MIN_KNEE_HIP_DX_RATIO = 0.35;
-  static const double START_MIN_HAND_RATIO = 0.28;
-  static const double START_MAX_HAND_RATIO = 0.52;
-  static const double CENTER_MIN_HAND_RATIO = 0.30;
-  static const double CENTER_MAX_HAND_RATIO = 0.50;
-  static const double FORWARD_ROM_RATIO = 0.60;
-  static const double BACKWARD_ROM_RATIO = 0.20;
-  static const double FORWARD_GOOD_ROM_RATIO = 0.66;
-  static const double BACKWARD_GOOD_ROM_RATIO = 0.14;
-  static const double HAND_VELOCITY_GATE_PX = 3.0;
+
+  // New Angle thresholds for shoulder-hip-knee
+  static const double TWIST_START_ANGLE_DELTA = 10.0;
+  static const double FORWARD_GOOD_ROM_DELTA = 15.0;
+  static const double BACKWARD_GOOD_ROM_DELTA = 15.0;
+  static const double CENTER_TOLERANCE_ANGLE = 6.0;
+  static const double ANGLE_VELOCITY_GATE = 1.0;
 }
 
 class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
@@ -58,10 +56,6 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
           right: PoseLandmarkType.rightKnee,
           left: PoseLandmarkType.leftKnee
         ),
-        'wrist': (
-          right: PoseLandmarkType.rightWrist,
-          left: PoseLandmarkType.leftWrist
-        ),
       };
 
   final int maxRep;
@@ -74,7 +68,7 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
 
   int _halfRepCount = 0;
   int _rejectedHalfTwists = 0;
-  double? _centerHandSignal;
+  double? _centerShoulderAngle;
   final List<FaultRecord> _pendingFullRepFaults = [];
 
   static const Set<String> _blockingFaultTypes = {
@@ -169,7 +163,6 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
     final shoulder = sideLandmarks['shoulder']!;
     final hip = sideLandmarks['hip']!;
     final knee = sideLandmarks['knee']!;
-    final wrist = sideLandmarks['wrist']!;
 
     final trunkAngle = _trunkHorizontalAngle(shoulder, hip);
     if (trunkAngle > RussianTwistConfig.MAX_TRUNK_HORIZONTAL_ANGLE) {
@@ -192,12 +185,15 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
       return false;
     }
 
-    final wristHipDx = _normalizedDx(wrist, hip, directionMultiplier);
-    final handRatio = wristHipDx / kneeHipDx;
-    if (handRatio < RussianTwistConfig.CENTER_MIN_HAND_RATIO ||
-        handRatio > RussianTwistConfig.CENTER_MAX_HAND_RATIO) {
+    final shoulderAngle = calculateAngleNormalized(
+      firstPoint: shoulder,
+      midPoint: hip,
+      lastPoint: knee,
+    );
+
+    if (shoulderAngle < 70 || shoulderAngle > 115) {
       resultIssues.feedback['System'] =
-          'Đưa hai tay về giữa thân trước khi bắt đầu.';
+          'Giữ vai ổn định ở giữa, không vặn người khi chuẩn bị.';
       return false;
     }
 
@@ -206,7 +202,7 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
       'frontFacingRatio': frontFacingRatio.toStringAsFixed(2),
       'trunkAngle': trunkAngle.toStringAsFixed(1),
       'kneeHipDx': kneeHipDx.toStringAsFixed(1),
-      'handRatio': handRatio.toStringAsFixed(2),
+      'shoulderAngle': shoulderAngle.toStringAsFixed(1),
     };
     return true;
   }
@@ -225,7 +221,11 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
     final shoulder = sideLandmarks['shoulder']!;
     final hip = sideLandmarks['hip']!;
     final knee = sideLandmarks['knee']!;
-    final trackedWrist = sideLandmarks['wrist']!;
+    final trackedWrist = sideLandmarks['wrist'] ??
+        (smoothedLandmarks[PoseLandmarkType.leftWrist]!.presence >
+                smoothedLandmarks[PoseLandmarkType.rightWrist]!.presence
+            ? smoothedLandmarks[PoseLandmarkType.leftWrist]!
+            : smoothedLandmarks[PoseLandmarkType.rightWrist]!);
     final handPoint = _stableHandPoint(smoothedLandmarks, trackedWrist);
 
     final directionMultiplier = _directionMultiplier(hip, knee);
@@ -234,16 +234,22 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
     var kneeHipDx = _normalizedDx(knee, hip, directionMultiplier);
     final trunkAngle = _trunkHorizontalAngle(shoulder, hip);
 
+    final shoulderAngle = calculateAngleNormalized(
+      firstPoint: shoulder,
+      midPoint: hip,
+      lastPoint: knee,
+    );
+
     if (kneeHipDx <= 1e-6) kneeHipDx = 1.0;
 
     final now = frameTimestampMs;
     frameBuffer.addFrame(FrameSnapshot(log: {
       'wristHipDx': wristHipDx,
-      'handSignal': wristHipDx,
+      'shoulderAngle': shoulderAngle,
       'shoulderSignal': shoulderHipDx,
     }, timeStamp: now));
 
-    _updateStateMachine(wristHipDx, kneeHipDx, now);
+    _updateStateMachine(shoulderAngle, now);
 
     final ctx = RussianRepContext(
       wristX: handPoint.x,
@@ -259,6 +265,7 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
       kneeHipDx: kneeHipDx,
       directionMultiplier: directionMultiplier,
       trunkHorizontalAngle: trunkAngle,
+      shoulderAngle: shoulderAngle,
       state: russianState,
       direction: currentDirection,
       frameTimestamp: now,
@@ -296,49 +303,50 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
     }
   }
 
-  void _updateStateMachine(double handSignal, double kneeHipDx, int now) {
-    final handChange = frameBuffer.getChange(
-      'handSignal',
-      RussianTwistConfig.HAND_VELOCITY_GATE_PX,
+  void _updateStateMachine(double shoulderAngle, int now) {
+    final angleChange = frameBuffer.getChange(
+      'shoulderAngle',
+      RussianTwistConfig.ANGLE_VELOCITY_GATE,
     );
-    final handRatio = handSignal / kneeHipDx;
 
     if (russianState == RussianTwistState.center_setup) {
-      _centerHandSignal = handSignal;
-      if (handChange == ChangeState.increasing &&
-          handRatio >= RussianTwistConfig.START_MAX_HAND_RATIO) {
+      _centerShoulderAngle = shoulderAngle;
+      if (angleChange == ChangeState.decreasing &&
+          shoulderAngle <= _centerShoulderAngle! - RussianTwistConfig.TWIST_START_ANGLE_DELTA) {
         currentDirection = TwistDirection.forward;
         _transitionState(RussianTwistState.twisting, now);
-      } else if (handChange == ChangeState.decreasing &&
-          handRatio <= RussianTwistConfig.START_MIN_HAND_RATIO) {
+      } else if (angleChange == ChangeState.increasing &&
+          shoulderAngle >= _centerShoulderAngle! + RussianTwistConfig.TWIST_START_ANGLE_DELTA) {
         currentDirection = TwistDirection.backward;
         _transitionState(RussianTwistState.twisting, now);
       }
     } else if (russianState == RussianTwistState.twisting) {
-      if (currentDirection == TwistDirection.forward &&
-          handRatio >= RussianTwistConfig.FORWARD_ROM_RATIO) {
-        _transitionState(RussianTwistState.max_point, now);
-      } else if (currentDirection == TwistDirection.backward &&
-          handRatio <= RussianTwistConfig.BACKWARD_ROM_RATIO) {
-        _transitionState(RussianTwistState.max_point, now);
+      if (currentDirection == TwistDirection.forward) {
+        if (shoulderAngle <= _centerShoulderAngle! - RussianTwistConfig.FORWARD_GOOD_ROM_DELTA) {
+          _transitionState(RussianTwistState.max_point, now);
+        } else if (angleChange == ChangeState.increasing) {
+          _transitionState(RussianTwistState.returning, now);
+        }
+      } else if (currentDirection == TwistDirection.backward) {
+        if (shoulderAngle >= _centerShoulderAngle! + RussianTwistConfig.BACKWARD_GOOD_ROM_DELTA) {
+          _transitionState(RussianTwistState.max_point, now);
+        } else if (angleChange == ChangeState.decreasing) {
+          _transitionState(RussianTwistState.returning, now);
+        }
       }
     } else if (russianState == RussianTwistState.max_point) {
       if (currentDirection == TwistDirection.forward &&
-          handChange == ChangeState.decreasing) {
+          angleChange == ChangeState.increasing) {
         _transitionState(RussianTwistState.returning, now);
       } else if (currentDirection == TwistDirection.backward &&
-          handChange == ChangeState.increasing) {
+          angleChange == ChangeState.decreasing) {
         _transitionState(RussianTwistState.returning, now);
       }
     } else if (russianState == RussianTwistState.returning) {
-      final inCenterRatio =
-          handRatio >= RussianTwistConfig.CENTER_MIN_HAND_RATIO &&
-              handRatio <= RussianTwistConfig.CENTER_MAX_HAND_RATIO;
-      final centerTolerance = (kneeHipDx.abs() * 0.12).clamp(6.0, 24.0);
-      final nearCapturedCenter = _centerHandSignal != null &&
-          (handSignal - _centerHandSignal!).abs() <= centerTolerance;
+      final nearCenter = _centerShoulderAngle != null &&
+          (shoulderAngle - _centerShoulderAngle!).abs() <= RussianTwistConfig.CENTER_TOLERANCE_ANGLE;
 
-      if (inCenterRatio || nearCapturedCenter) {
+      if (nearCenter) {
         _transitionState(RussianTwistState.center_setup, now);
         _completeHalfRep();
       }

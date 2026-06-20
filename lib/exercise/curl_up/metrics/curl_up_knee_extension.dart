@@ -133,10 +133,10 @@ class KneeExtensionMetric extends CurlUpMetricBase {
     final phase = ctx.curlUpState.toString().split('.').last.toUpperCase();
 
     if (level == _KneeFaultLevel.error) {
-      _faults.removeWhere((f) => f.type == 'Knee');
+      _faults.removeWhere((f) => f.type == 'knee_extension');
       _faults.add(FaultRecord(
         phase: phase,
-        type: 'Knee',
+        type: 'knee_extension',
         message: 'Chân duỗi thẳng — co gối lại',
         affectsForm: true,
         voiceMessage: 'Giữ gối gập',
@@ -151,7 +151,7 @@ class KneeExtensionMetric extends CurlUpMetricBase {
     if (_loggedLevel == null) {
       _faults.add(FaultRecord(
         phase: phase,
-        type: 'Knee',
+        type: 'knee_extension',
         message: 'Gối hơi thẳng — co thêm để giữ tư thế McGill',
         affectsForm: false,
         priority: CurlUpFaultVoicePriority.kneeExtension,

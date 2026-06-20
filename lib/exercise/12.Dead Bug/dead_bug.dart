@@ -447,7 +447,8 @@ class DeadBug extends ExerciseBase {
     previousState = DeadBugState.setup;
     final coordinationFault = _blockingFaultFor(ctx);
     if (coordinationFault != null) {
-      _publishBlockingFault(coordinationFault);
+      _rejectAttempt(coordinationFault, ctx.frameTimestampMs);
+      return;
     }
 
     repCount++;
@@ -502,6 +503,11 @@ class DeadBug extends ExerciseBase {
     }
 
     return null;
+  }
+
+  void _rejectAttempt(FaultRecord fault, int timestampMs) {
+    _publishBlockingFault(fault);
+    _resetRepState();
   }
 
   void _publishBlockingFault(FaultRecord fault) {

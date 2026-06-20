@@ -162,7 +162,7 @@ class TrunkElevationMetric extends CurlUpMetricBase {
       _faults.clear();
       _faults.add(FaultRecord(
         phase: 'APEX',
-        type: 'Range',
+        type: 'trunk_high',
         message: 'Lên quá cao — chỉ cần nâng vai khỏi sàn',
         affectsForm: true,
         voiceMessage: 'Chỉ nâng vai',
@@ -177,7 +177,7 @@ class TrunkElevationMetric extends CurlUpMetricBase {
     if (_loggedLevel == null) {
       _faults.add(FaultRecord(
         phase: 'APEX',
-        type: 'Range',
+        type: 'trunk_high',
         message: 'Hơi cao — giữ biên độ ngắn để bảo vệ lưng',
         affectsForm: false,
         priority: CurlUpFaultVoicePriority.trunkTooHigh,
@@ -206,7 +206,7 @@ class TrunkElevationMetric extends CurlUpMetricBase {
       _status = MetricStatus.near;
       _faults.add(FaultRecord(
         phase: 'APEX',
-        type: 'Range',
+        type: 'trunk_low',
         message: 'Cuộn chưa đủ — nâng cao vai hơn',
         affectsForm: false,
         voiceMessage: 'Cuộn cao hơn',

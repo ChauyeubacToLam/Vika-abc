@@ -2,37 +2,48 @@ import 'russian_metric_base.dart';
 import '../russian_twist.dart';
 
 class TwistRomMetric extends RussianMetricBase {
-  double? _bestForwardRatio;
-  double? _bestBackwardRatio;
+  double? _bestForwardAngleDelta;
+  double? _bestBackwardAngleDelta;
+  double? _centerAngle;
   bool _evaluatedThisHalf = false;
 
   @override
   void update(RussianRepContext ctx) {
     if (ctx.kneeHipDx <= 1e-6) return;
 
-    final ratio = ctx.wristHipDx / ctx.kneeHipDx;
-    debugData['twistRomRatio'] = ratio.toStringAsFixed(2);
+    if (ctx.state == RussianTwistState.center_setup) {
+      _centerAngle = ctx.shoulderAngle;
+    }
+
+    if (_centerAngle == null) return;
+
+    final angleDelta = ctx.shoulderAngle - _centerAngle!;
+    debugData['twistRomDelta'] = angleDelta.toStringAsFixed(1);
 
     if (ctx.state == RussianTwistState.twisting ||
         ctx.state == RussianTwistState.max_point) {
       if (ctx.direction == TwistDirection.forward) {
-        _bestForwardRatio =
-            _bestForwardRatio == null ? ratio : _max(_bestForwardRatio!, ratio);
+        // Forward: angle decreases, so delta is negative
+        _bestForwardAngleDelta =
+            _bestForwardAngleDelta == null ? angleDelta : _min(_bestForwardAngleDelta!, angleDelta);
       } else if (ctx.direction == TwistDirection.backward) {
-        _bestBackwardRatio = _bestBackwardRatio == null
-            ? ratio
-            : _min(_bestBackwardRatio!, ratio);
+        // Backward: angle increases, so delta is positive
+        _bestBackwardAngleDelta = _bestBackwardAngleDelta == null
+            ? angleDelta
+            : _max(_bestBackwardAngleDelta!, angleDelta);
       }
     }
 
     if (ctx.state == RussianTwistState.returning && !_evaluatedThisHalf) {
       var sufficientRom = true;
       if (ctx.direction == TwistDirection.forward) {
-        sufficientRom = (_bestForwardRatio ?? ratio) >=
-            RussianTwistConfig.FORWARD_GOOD_ROM_RATIO;
+        // Need to decrease by at least FORWARD_GOOD_ROM_DELTA
+        sufficientRom = (_bestForwardAngleDelta ?? angleDelta) <=
+            -RussianTwistConfig.FORWARD_GOOD_ROM_DELTA;
       } else if (ctx.direction == TwistDirection.backward) {
-        sufficientRom = (_bestBackwardRatio ?? ratio) <=
-            RussianTwistConfig.BACKWARD_GOOD_ROM_RATIO;
+        // Need to increase by at least BACKWARD_GOOD_ROM_DELTA
+        sufficientRom = (_bestBackwardAngleDelta ?? angleDelta) >=
+            RussianTwistConfig.BACKWARD_GOOD_ROM_DELTA;
       }
 
       if (!sufficientRom) {
@@ -53,8 +64,9 @@ class TwistRomMetric extends RussianMetricBase {
 
   @override
   void resetAndCountFault() {
-    _bestForwardRatio = null;
-    _bestBackwardRatio = null;
+    _bestForwardAngleDelta = null;
+    _bestBackwardAngleDelta = null;
+    _centerAngle = null;
     _evaluatedThisHalf = false;
     super.resetAndCountFault();
   }

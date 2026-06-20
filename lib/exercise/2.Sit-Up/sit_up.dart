@@ -23,13 +23,11 @@ class SitUpConfig {
   // FIX: Spec yêu cầu 100° (code cũ là 110°)
   static const double START_KNEE_MAX = 115.0;
 
-  static const double RISING_TRUNK_START = 10.0;
+  static const double RISING_TRUNK_START = 30.0; // Must be > LYING_TRUNK_THRESHOLD
   static const double COUNTABLE_TOP_KHS_THRESHOLD = 142.0;
-  // FIX: Spec yêu cầu ≤ 90° (code cũ là 95°)
   static const double UPRIGHT_KHS_THRESHOLD = 105.0;
-  // FIX: Spec yêu cầu > 95° (code cũ là 100°)
   static const double LOWERING_KHS_THRESHOLD = 110.0;
-  static const double LOWERING_KHS_DIFF = 5.0;
+  static const double LOWERING_KHS_DIFF = 15.0; // Increased to prevent noise bouncing
   static const double LYING_TRUNK_THRESHOLD = 22.0;
 }
 

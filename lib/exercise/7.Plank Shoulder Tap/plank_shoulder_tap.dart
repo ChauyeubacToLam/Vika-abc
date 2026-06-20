@@ -287,10 +287,17 @@ class PlankShoulderTap extends ExerciseBase {
     final allFaults = <FaultRecord>[];
     for (final metric in _metrics) allFaults.addAll(metric.faults);
 
+    final faultMap = <String, Map<String, String>>{};
+    for (final fault in allFaults) {
+      faultMap.putIfAbsent(fault.phase, () => {});
+      faultMap[fault.phase]![fault.type] = fault.message;
+    }
+
     if (countRep) {
       repCount++;
       correctForm = !allFaults.any((f) => f.affectsForm);
       lastTappedSide = currentTappingSide;
+      setFeedback.add({correctForm: faultMap});
       logger.addRepLog(RepLog(
         correctForm: correctForm,
         repNumber: repCount,
@@ -302,6 +309,7 @@ class PlankShoulderTap extends ExerciseBase {
       _rejectedTapAttempts++;
       correctForm = false;
       resultIssues.feedback['Result'] = 'Không tính';
+      setFeedback.add({false: faultMap});
     }
 
     _transitionState(PlankTapState.base, ctx.frameTimestamp);

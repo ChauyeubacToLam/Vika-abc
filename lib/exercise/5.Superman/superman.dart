@@ -378,9 +378,13 @@ class Superman extends ExerciseBase {
     for (final m in _metrics) faults.addAll(m.faults);
     correctForm = !faults.any((f) => f.affectsForm);
 
-    // Validity is enforced upstream (prone/side cheat checks + ROM/hold state
-    // gates), so every rep that reaches here is real. Form faults lower the
-    // score; they do not void the rep.
+    final faultMap = <String, Map<String, String>>{};
+    for (final fault in faults) {
+      faultMap.putIfAbsent(fault.phase, () => {});
+      faultMap[fault.phase]![fault.type] = fault.message;
+    }
+    setFeedback.add({correctForm: faultMap});
+
     repCount++;
     if (!correctForm) resultIssues.feedback['Result'] = 'Fix Form';
 

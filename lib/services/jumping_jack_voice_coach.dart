@@ -51,6 +51,7 @@ class JumpingJackVoiceCoach implements ExerciseVoiceCoach {
   final Map<String, int> _lastPostRepVoiceRep = {};
 
   int _lastRepCount = 0;
+  int _lastCleanVoiceRep = -99;
   int _lastLiveFaultAtMs = 0;
   bool _didSpeakSetup = false;
   bool _didAnnounceReady = false;
@@ -135,7 +136,10 @@ class JumpingJackVoiceCoach implements ExerciseVoiceCoach {
     _voicePlayer.speak('$repCount');
 
     if (exercise is JumpingJack && exercise.lastRepWasClean) {
-      _voicePlayer.speak('jumping_jack.good_clean');
+      if (repCount - _lastCleanVoiceRep >= 4) {
+        _voicePlayer.speak('jumping_jack.good_clean');
+        _lastCleanVoiceRep = repCount;
+      }
       return;
     }
 

@@ -14,8 +14,8 @@ import 'metrics/hip_amplitude_metric.dart';
 
 class SidePlankConfig {
   static const int MAX_REP = 12;
-  static const double STRAIGHT_BODY_ANGLE = 175.0;
-  static const double BOTTOM_BODY_ANGLE = 160.0;
+  static const double STRAIGHT_BODY_ANGLE = 165.0;
+  static const double BOTTOM_BODY_ANGLE = 150.0;
   static const double MOVEMENT_THRESHOLD = 3.0; // Y-axis delta (pixels/cm)
   static const double MOVEMENT_THRESHOLD_NORM = 0.025;
   static const double BOTTOM_STILLNESS_NORM = 0.02;
@@ -293,44 +293,31 @@ class SidePlankDip extends ExerciseBase {
     double deltaY =
         currentHipY - _previousHipY!; // Y tăng -> đi xuống, Y giảm -> đi lên
     final deltaYNorm = deltaY / scale;
-    bool isTwisting =
-        shoulderWidthX > shoulderWidthY; // Xoay người (ngực úp xuống sàn)
-
     if (plankState == SidePlankState.setupPlank) {
       // Rotate into side plank
-      if (!isTwisting && bodyAngle > SidePlankConfig.BOTTOM_BODY_ANGLE) {
+      if (bodyAngle > SidePlankConfig.BOTTOM_BODY_ANGLE) {
         _transitionState(SidePlankState.basePlank, timestampMs);
       }
     } else if (plankState == SidePlankState.basePlank) {
       bool cooldownOk = _lastRepTime == null ||
           (timestampMs - _lastRepTime! > SidePlankConfig.REP_COOLDOWN_MS);
       if (cooldownOk &&
-          deltaYNorm > SidePlankConfig.MOVEMENT_THRESHOLD_NORM &&
-          !isTwisting) {
+          deltaYNorm > SidePlankConfig.MOVEMENT_THRESHOLD_NORM) {
         _transitionState(SidePlankState.descending, timestampMs);
-      } else if (isTwisting) {
-        _transitionState(SidePlankState.setupPlank, timestampMs);
       }
     } else if (plankState == SidePlankState.descending) {
       if (bodyAngle < SidePlankConfig.BOTTOM_BODY_ANGLE &&
           _bottomDebouncer.update(
               deltaYNorm.abs() < SidePlankConfig.BOTTOM_STILLNESS_NORM)) {
         _transitionState(SidePlankState.bottom, timestampMs);
-      } else if (isTwisting) {
-        _transitionState(SidePlankState.setupPlank, timestampMs);
       }
     } else if (plankState == SidePlankState.bottom) {
-      if (deltaYNorm < -SidePlankConfig.MOVEMENT_THRESHOLD_NORM &&
-          !isTwisting) {
+      if (deltaYNorm < -SidePlankConfig.MOVEMENT_THRESHOLD_NORM) {
         _transitionState(SidePlankState.ascending, timestampMs);
-      } else if (isTwisting) {
-        _transitionState(SidePlankState.setupPlank, timestampMs);
       }
     } else if (plankState == SidePlankState.ascending) {
-      if (bodyAngle > SidePlankConfig.STRAIGHT_BODY_ANGLE && !isTwisting) {
+      if (bodyAngle > SidePlankConfig.STRAIGHT_BODY_ANGLE) {
         _transitionState(SidePlankState.top, timestampMs);
-      } else if (isTwisting) {
-        _transitionState(SidePlankState.setupPlank, timestampMs);
       }
     }
   }

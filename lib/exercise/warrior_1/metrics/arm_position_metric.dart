@@ -119,7 +119,7 @@ class ArmPositionMetric extends WarriorOneMetricBase {
         type: type,
         message: message,
         voiceMessage: voiceMessage,
-        affectsForm: false, // coaching only
+        affectsForm: true,
       ));
     }
   }

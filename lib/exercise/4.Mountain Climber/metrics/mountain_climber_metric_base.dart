@@ -40,12 +40,12 @@ class ClimberConfig {
   static const double ZONE_RATIO_DEFAULT = 1.25; // fallback nếu chưa calibrate
 
   /// Hysteresis: phải ra ngoài (threshold + margin) mới tính exit
-  static const double ZONE_HYSTERESIS = 0.12;
+  static const double ZONE_HYSTERESIS = 0.20; // Increased from 0.12 to prevent bouncing
 
   /// Cooldown tối thiểu giữa 2 rep liên tiếp (ms). 250 ms = tối đa 4 rep/s
-  static const int REP_COOLDOWN_MS = 350;
-  static const int GLOBAL_REP_COOLDOWN_MS = 280;
-  static const int SAME_SIDE_REP_COOLDOWN_MS = 700;
+  static const int REP_COOLDOWN_MS = 600; // Increased from 350
+  static const int GLOBAL_REP_COOLDOWN_MS = 400; // Increased from 280
+  static const int SAME_SIDE_REP_COOLDOWN_MS = 1200; // Increased from 700
 
   /// EMA smoothing factor cho knee distance (0 < α ≤ 1, nhỏ = mượt hơn)
   static const double EMA_ALPHA = 0.45;

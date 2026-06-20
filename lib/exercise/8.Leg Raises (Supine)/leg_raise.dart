@@ -511,15 +511,23 @@ class LegRaise extends ExerciseBase {
     lastRepWasClean = correctForm;
     lastRepTopVoiceMessage = _topVoiceMessage(allFaults);
 
+    final faultMap = <String, Map<String, String>>{};
+    for (final fault in allFaults) {
+      faultMap.putIfAbsent(fault.phase, () => {});
+      faultMap[fault.phase]![fault.type] = fault.message;
+    }
+
     if (!correctForm) resultIssues.feedback['Result'] = 'Fix Form';
 
     bool hasBlockingFormFault =
         allFaults.any((f) => f.type == 'BentKnee' || f.type == 'ArmPosition');
     if (!hasBlockingFormFault) {
       repCount++;
+      setFeedback.add({correctForm: faultMap});
     } else {
       invalidAttemptCount++;
       ctx.resultIssues.feedback['Result'] = 'Không tính rep';
+      setFeedback.add({false: faultMap});
     }
 
     if (!hasBlockingFormFault) {

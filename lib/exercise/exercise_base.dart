@@ -1663,6 +1663,9 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
   }
 
   bool _shouldSpeakLiveFault(Map<String, String> feedback) {
+    if (feedback.entries.any((e) => !_isNonFaultFeedbackKey(e.key))) {
+      return true;
+    }
     final result = _normalizeFaultText(feedback['Result'] ?? '');
     return result.contains('sai') ||
         result.contains('fix') ||
