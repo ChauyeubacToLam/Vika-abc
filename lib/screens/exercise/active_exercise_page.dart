@@ -619,6 +619,104 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     });
   }
 
+  /// Whether the user is mid-set with progress an accidental back would discard.
+  /// Scoped to the genuinely-active window: the exercise has activated or at
+  /// least one rep is logged, and the set is not already finishing/torn down.
+  bool get _isSetInProgress {
+    if (_isCompletingSet || _didComplete) return false;
+    final state = widget.exercise.exerciseState;
+    if (state == ExerciseState.completed) return false;
+    return state == ExerciseState.activated || widget.exercise.repCount > 0;
+  }
+
+  /// Shown when the system back / back-gesture is invoked mid-set. Only exits
+  /// on explicit confirmation; the default (barrier dismiss / "Tiếp tục") keeps
+  /// the session running. Uses the existing exit path (widget.onBack).
+  Future<void> _confirmExitDuringActiveSet() async {
+    final shouldExit = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.55),
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: VikaIvory.surface,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 40),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 14),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Thoát buổi tập?',
+                  style: TextStyle(
+                    fontFamily: VikaIvory.fontFamily,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
+                    color: VikaIvory.ink,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Tiến độ hiệp này sẽ không được lưu. Cố thêm chút nữa nhé!',
+                  style: TextStyle(
+                    fontFamily: VikaIvory.fontFamily,
+                    fontSize: 14,
+                    height: 1.5,
+                    fontWeight: FontWeight.w500,
+                    color: VikaIvory.inkSoft,
+                  ),
+                ),
+                const SizedBox(height: 22),
+                // Primary, encouraging action: keep the session going.
+                SizedBox(
+                  height: 50,
+                  child: FilledButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(false),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: VikaIvory.ink,
+                      foregroundColor: VikaIvory.surface,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: Text(
+                      'Tiếp tục',
+                      style: TextStyle(
+                        fontFamily: VikaIvory.fontFamily,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                // De-emphasised exit.
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                  child: Text(
+                    'Thoát',
+                    style: TextStyle(
+                      fontFamily: VikaIvory.fontFamily,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: VikaIvory.inkSoft,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (shouldExit == true && mounted) {
+      widget.onBack();
+    }
+  }
+
   bool _recordStaffBackTap() {
     final now = DateTime.now();
     if (_debugFirstBackTap == null ||
@@ -1527,12 +1625,27 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     // native camera buffer is rotated server-side to match the same sensor
     // reading (see PoseLandmarkerService.applyOrientation), so the image
     // inside the rotated UI is already upright for the user's view.
+    final Widget content;
     if (!ExerciseBase.kLandscapeRotationEnabled) {
-      return inner;
+      content = inner;
+    } else {
+      content = RotatedBox(
+        quarterTurns: _currentOrientation.uiQuarterTurns,
+        child: inner,
+      );
     }
-    return RotatedBox(
-      quarterTurns: _currentOrientation.uiQuarterTurns,
-      child: inner,
+
+    // Guard accidental Android back / back-gesture while a set is in progress.
+    // PopScope blocks only the route-level pop (system / predictive back); the
+    // confirm path exits imperatively via widget.onBack. It lives only in the
+    // active phase, so the intro and summary screens keep their instant back.
+    return PopScope(
+      canPop: !_isSetInProgress,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        unawaited(_confirmExitDuringActiveSet());
+      },
+      child: content,
     );
   }
 
