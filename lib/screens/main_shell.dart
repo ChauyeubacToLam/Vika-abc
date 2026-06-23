@@ -133,12 +133,14 @@ class _MainShellState extends State<MainShell> {
       PlanScreen(
         bottomPadding: contentBottomPadding,
         program: _program,
+        userProfile: _profile,
         refreshListenable: _planRefreshNudge,
         onProfileChanged: _handleProfileChanged,
       ),
       LibraryScreen(
         bottomPadding: contentBottomPadding,
         onSelectExercise: _openExerciseFromLibrary,
+        userProfile: _profile,
       ),
       ProgressScreen(
         bottomPadding: contentBottomPadding,

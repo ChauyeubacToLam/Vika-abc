@@ -12,6 +12,7 @@
 import 'package:flutter/material.dart';
 
 import 'vika_albums.dart';
+import '../services/catalog/catalog_source.dart';
 import '../widgets/ivory/atoms.dart';
 import '../widgets/library/library_card.dart';
 import '../widgets/library/library_filter_chips.dart';
@@ -39,11 +40,13 @@ const List<LibraryCardData> libraryWhatsNewCards = [];
 final List<LibraryCardData> libraryAlbumCards = vikaAlbumCards;
 
 /// Featured exercises with camera-AI form coaching.
+// NOTE: no hardcoded `duration:` here — `LibraryCardData.displayDuration`
+// pulls the live per-set target from each exercise's ExerciseDefinition so
+// the card and the exercise intro never disagree.
 const List<LibraryCardData> libraryAiExerciseCards = [
   LibraryCardData(
     kind: LibraryCardKind.exercise,
     title: 'Squat',
-    duration: '15 rep',
     detail: 'Chân · hông',
     icon: Icons.accessibility_new_rounded,
     hasAi: true,
@@ -52,7 +55,6 @@ const List<LibraryCardData> libraryAiExerciseCards = [
   LibraryCardData(
     kind: LibraryCardKind.exercise,
     title: 'Chống đẩy',
-    duration: '10 rep',
     detail: 'Ngực · vai',
     icon: Icons.fitness_center_rounded,
     hasAi: true,
@@ -61,7 +63,6 @@ const List<LibraryCardData> libraryAiExerciseCards = [
   LibraryCardData(
     kind: LibraryCardKind.exercise,
     title: 'Plank',
-    duration: '30 giây',
     detail: 'Cốt lõi',
     icon: Icons.horizontal_rule_rounded,
     hasAi: true,
@@ -70,7 +71,6 @@ const List<LibraryCardData> libraryAiExerciseCards = [
   LibraryCardData(
     kind: LibraryCardKind.exercise,
     title: 'Chùng chân',
-    duration: '10 rep',
     detail: 'Chân · mông',
     icon: Icons.directions_walk_rounded,
     hasAi: true,
@@ -79,7 +79,6 @@ const List<LibraryCardData> libraryAiExerciseCards = [
   LibraryCardData(
     kind: LibraryCardKind.exercise,
     title: 'Cầu mông',
-    duration: '15 rep',
     detail: 'Mông · lưng',
     icon: Icons.height_rounded,
     hasAi: true,
@@ -113,6 +112,19 @@ class AllExerciseRowMock {
   final bool yoga;
   final String? definitionName;
   String? get thumbnailAsset => libraryExerciseThumbnailAssets[definitionName];
+
+  /// [cat] is the editorial muscle-group label only; the per-set volume is
+  /// appended live from the bundled catalog ([CatalogSource]) so the catalog
+  /// list never drifts from the exercise intro. Falls back to bare [cat] when
+  /// no catalog entry resolves (or before the catalog has loaded).
+  String get displayCat {
+    final name = definitionName;
+    if (name != null) {
+      final info = CatalogSource.instance.lookup(name);
+      if (info != null) return '$cat · ${info.volumeLabel}';
+    }
+    return cat;
+  }
 
   /// Group label used by the grouped catalog. e.g. 'CHÂN · MÔNG',
   /// 'CỐT LÕI', 'YOGA'. Curators can mint new groups freely — the
@@ -278,7 +290,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 1,
     name: 'Squat',
-    cat: 'Chân · Mông · 15 rep',
+    cat: 'Chân · Mông',
     diff: 'Trung bình',
     ai: true,
     glyph: PoseGlyphType.squat,
@@ -288,7 +300,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 2,
     name: 'Chùng chân',
-    cat: 'Đùi · Mông · 10 rep',
+    cat: 'Đùi · Mông',
     diff: 'Trung bình',
     ai: true,
     glyph: PoseGlyphType.lunge,
@@ -298,7 +310,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 3,
     name: 'Cầu mông',
-    cat: 'Mông · Lưng dưới · 15 rep',
+    cat: 'Mông · Lưng dưới',
     diff: 'Dễ–TB',
     ai: true,
     glyph: PoseGlyphType.plank,
@@ -308,7 +320,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 4,
     name: 'Lunge bước đi',
-    cat: 'Chân · Thăng bằng · 12 rep',
+    cat: 'Chân · Thăng bằng',
     diff: 'Trung bình',
     ai: true,
     glyph: PoseGlyphType.lunge,
@@ -318,7 +330,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 5,
     name: 'Squat Cossack',
-    cat: 'Chân · Hông · 8 rep',
+    cat: 'Chân · Hông',
     diff: 'TB–Khó',
     ai: true,
     glyph: PoseGlyphType.squat,
@@ -328,7 +340,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 6,
     name: 'Squat bật nhảy',
-    cat: 'Chân · Sức bật · 10 rep',
+    cat: 'Chân · Sức bật',
     diff: 'TB–Khó',
     ai: true,
     glyph: PoseGlyphType.squat,
@@ -338,7 +350,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 7,
     name: 'Bird Dog',
-    cat: 'Core · Lưng · 12 rep',
+    cat: 'Core · Lưng',
     diff: 'Dễ–TB',
     ai: true,
     glyph: PoseGlyphType.plank,
@@ -348,7 +360,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 8,
     name: 'Dead Bug',
-    cat: 'Core ổn định · 12 rep',
+    cat: 'Core ổn định',
     diff: 'Dễ–TB',
     ai: true,
     glyph: PoseGlyphType.plank,
@@ -358,7 +370,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 9,
     name: 'Gập bụng McGill',
-    cat: 'Core McGill · 12 rep',
+    cat: 'Core McGill',
     diff: 'Dễ–TB',
     ai: true,
     glyph: PoseGlyphType.plank,
@@ -368,7 +380,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 10,
     name: 'Plank thấp',
-    cat: 'Core · Giữ 30 giây',
+    cat: 'Core',
     diff: 'Dễ–TB',
     ai: true,
     glyph: PoseGlyphType.plank,
@@ -378,7 +390,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 11,
     name: 'Plank cao',
-    cat: 'Core · Vai · 30 giây',
+    cat: 'Core · Vai',
     diff: 'Dễ–TB',
     ai: true,
     glyph: PoseGlyphType.plank,
@@ -388,7 +400,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 12,
     name: 'Plank gấu',
-    cat: 'Core · Vai · 30 giây',
+    cat: 'Core · Vai',
     diff: 'Trung bình',
     ai: true,
     glyph: PoseGlyphType.plank,
@@ -398,7 +410,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 13,
     name: 'Gập bụng',
-    cat: 'Core · 12 rep',
+    cat: 'Core',
     diff: 'Trung bình',
     ai: true,
     glyph: PoseGlyphType.plank,
@@ -408,7 +420,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 14,
     name: 'Nâng chân',
-    cat: 'Core dưới · 12 rep',
+    cat: 'Core dưới',
     diff: 'Trung bình',
     ai: true,
     glyph: PoseGlyphType.plank,
@@ -418,7 +430,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 15,
     name: 'Gập bụng ngược',
-    cat: 'Core dưới · 12 rep',
+    cat: 'Core dưới',
     diff: 'Trung bình',
     ai: true,
     glyph: PoseGlyphType.plank,
@@ -428,7 +440,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 16,
     name: 'Gập bụng chữ V',
-    cat: 'Core · 10 rep',
+    cat: 'Core',
     diff: 'TB–Khó',
     ai: true,
     glyph: PoseGlyphType.plank,
@@ -438,7 +450,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 17,
     name: 'Xoay người kiểu Nga',
-    cat: 'Core xoay · 16 rep',
+    cat: 'Core xoay',
     diff: 'Trung bình',
     ai: true,
     glyph: PoseGlyphType.plank,
@@ -448,7 +460,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 18,
     name: 'Plank nghiêng hạ hông',
-    cat: 'Core bên · 10 rep',
+    cat: 'Core bên',
     diff: 'Trung bình',
     ai: true,
     glyph: PoseGlyphType.plank,
@@ -458,7 +470,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 19,
     name: 'Plank chạm vai',
-    cat: 'Core · Vai · 16 rep',
+    cat: 'Core · Vai',
     diff: 'Trung bình',
     ai: true,
     glyph: PoseGlyphType.plank,
@@ -468,7 +480,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 20,
     name: 'Plank lên xuống',
-    cat: 'Core · Tay sau · 10 rep',
+    cat: 'Core · Tay sau',
     diff: 'Trung bình',
     ai: true,
     glyph: PoseGlyphType.plank,
@@ -478,7 +490,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 21,
     name: 'Đứng chạm gối khuỷu tay',
-    cat: 'Core · Cardio nhẹ · 16 rep',
+    cat: 'Core · Cardio nhẹ',
     diff: 'Dễ–TB',
     ai: true,
     glyph: PoseGlyphType.plank,
@@ -488,7 +500,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 22,
     name: 'Superman',
-    cat: 'Lưng sau · 12 rep',
+    cat: 'Lưng sau',
     diff: 'Dễ–TB',
     ai: true,
     glyph: PoseGlyphType.plank,
@@ -498,7 +510,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 23,
     name: 'Chống đẩy',
-    cat: 'Ngực · Vai · 10 rep',
+    cat: 'Ngực · Vai',
     diff: 'Trung bình',
     ai: true,
     glyph: PoseGlyphType.wallPushUp,
@@ -508,7 +520,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 24,
     name: 'Chống đẩy tường',
-    cat: 'Ngực · Vai · 10 rep',
+    cat: 'Ngực · Vai',
     diff: 'Dễ',
     ai: true,
     glyph: PoseGlyphType.wallPushUp,
@@ -518,7 +530,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 25,
     name: 'Dip cơ tam đầu',
-    cat: 'Tay sau · Ngực · 10 rep',
+    cat: 'Tay sau · Ngực',
     diff: 'Trung bình',
     ai: true,
     glyph: PoseGlyphType.plank,
@@ -528,7 +540,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 26,
     name: 'Nhảy dang tay chân',
-    cat: 'Cardio · 30 rep',
+    cat: 'Cardio',
     diff: 'Dễ',
     ai: true,
     glyph: PoseGlyphType.plank,
@@ -538,7 +550,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 27,
     name: 'Leo núi',
-    cat: 'Cardio · Core · 20 rep',
+    cat: 'Cardio · Core',
     diff: 'Trung bình',
     ai: true,
     glyph: PoseGlyphType.plank,
@@ -548,7 +560,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 28,
     name: 'Burpee bước lùi',
-    cat: 'Cardio · Toàn thân · 8 rep',
+    cat: 'Cardio · Toàn thân',
     diff: 'TB–Khó',
     ai: true,
     glyph: PoseGlyphType.plank,
@@ -558,7 +570,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 29,
     name: 'Tư thế chiến binh I',
-    cat: 'Yoga · Giữ 30 giây',
+    cat: 'Yoga',
     diff: 'Trung bình',
     ai: true,
     glyph: PoseGlyphType.lunge,
@@ -569,7 +581,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 30,
     name: 'Tư thế rắn hổ mang',
-    cat: 'Yoga · Giữ 20 giây',
+    cat: 'Yoga',
     diff: 'Người mới',
     ai: true,
     glyph: PoseGlyphType.plank,
@@ -580,7 +592,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 31,
     name: 'Tư thế bướm',
-    cat: 'Yoga · Mở hông · 30 giây',
+    cat: 'Yoga · Mở hông',
     diff: 'Người mới',
     ai: true,
     glyph: PoseGlyphType.plank,
@@ -591,7 +603,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 32,
     name: 'Gập người ngồi',
-    cat: 'Yoga · Gân kheo · 30 giây',
+    cat: 'Yoga · Gân kheo',
     diff: 'Người mới',
     ai: true,
     glyph: PoseGlyphType.plank,
@@ -602,7 +614,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 33,
     name: 'Tư thế nhân sư',
-    cat: 'Yoga · Lưng nhẹ · 30 giây',
+    cat: 'Yoga · Lưng nhẹ',
     diff: 'Người mới',
     ai: true,
     glyph: PoseGlyphType.plank,
@@ -613,7 +625,7 @@ const List<AllExerciseRowMock> libraryMockAllExercises = [
   AllExerciseRowMock(
     idx: 34,
     name: 'Tư thế cánh cung',
-    cat: 'Yoga · Lưng sau · 20 giây',
+    cat: 'Yoga · Lưng sau',
     diff: 'Trung bình',
     ai: true,
     glyph: PoseGlyphType.plank,

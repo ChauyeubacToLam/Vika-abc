@@ -71,12 +71,11 @@ class _ProgressScreenState extends State<ProgressScreen> {
   bool _profileReloadQueued = false;
 
   /// Real ĐIỂM FORM / ĐƯỜNG TIẾN BỘ summary for the active period.
-  /// Null = loading (show placeholder); a loaded record with `to == null`
+  /// Null = loading (show placeholder); a loaded record with `average == null`
   /// = no sessions in this period (empty state).
   ({
-    int? to,
-    int? from,
-    int? delta,
+    int? average,
+    FormTrendDirection direction,
     List<int> trend,
     List<DateTime> trendDates,
     String fact,
@@ -352,9 +351,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   /// Mock ĐIỂM FORM gauge + trend for [period], built from progress_mock.
   ({
-    int? to,
-    int? from,
-    int? delta,
+    int? average,
+    FormTrendDirection direction,
     List<int> trend,
     List<DateTime> trendDates,
     String fact,
@@ -368,9 +366,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
     final trend = progressMockScoreTrend[key]!;
     final now = DateTime.now();
     return (
-      to: h.to,
-      from: h.from,
-      delta: h.from != null ? h.to - h.from! : null,
+      average: h.average,
+      direction: h.direction,
       trend: trend,
       trendDates: [
         for (var i = 0; i < trend.length; i++)
@@ -512,7 +509,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     // Real ĐIỂM FORM / ĐƯỜNG TIẾN BỘ data; only the coach copy stays static.
     final formSummary = _formSummary;
     final loadingForm = formSummary == null;
-    final hasForm = formSummary != null && formSummary.to != null;
+    final hasForm = formSummary != null && formSummary.average != null;
     // The trend line only reads as real with 3+ sessions (progressive reveal).
     final hasTrend = formSummary != null && formSummary.trend.length >= 3;
     final profile = _profile ?? widget.userProfile;
@@ -549,24 +546,22 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   const SizedBox(height: 24),
 
                   // 1. ĐIỂM FORM — score gauge card (wired to real data).
-                  // Renders at >= 1 session (to != null); from/delta stay null
-                  // until the 3-session baseline, and the card shows the score
-                  // alone with a quiet hint.
+                  // Headline is the period AVERAGE (renders at >= 1 session);
+                  // the trend chip stays hidden (direction none) until the
+                  // 3-session baseline, where the card shows the average alone
+                  // with a quiet hint.
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: hasForm
                         ? ScoreGaugeCard(
                             data: HeadlineForPeriod(
-                              to: formSummary.to!,
-                              from: formSummary.from,
-                              delta: formSummary.delta != null
-                                  ? _signedDelta(formSummary.delta!)
-                                  : null,
+                              average: formSummary.average!,
+                              direction: formSummary.direction,
                               // Real period label (1e); no mock import.
                               label: _gaugeLabel(),
                               // A factual trajectory one-liner (NOT coaching,
                               // NOT the session coach), derived from the real
-                              // trend + delta in progressFormSummary.
+                              // slope + average in progressFormSummary.
                               coach: formSummary.fact,
                             ),
                           )

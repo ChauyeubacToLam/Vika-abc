@@ -35,9 +35,6 @@ import 'metrics/back_straight_metric.dart';
 // --- Config (Week 1-4 launch defaults; tighten per spec threshold table) ---
 
 class WarriorOneConfig {
-  /// One hold per side → 2 holds per set.
-  static const int MAX_HOLDS = 2;
-
   /// Seconds to hold each side.
   static const double HOLD_DURATION = 30.0;
 
@@ -74,7 +71,7 @@ enum WarriorOneState { entry, hold, exit }
 class WarriorOne extends ExerciseBase {
   final int maxHolds;
 
-  WarriorOne({this.maxHolds = WarriorOneConfig.MAX_HOLDS});
+  WarriorOne({required this.maxHolds});
 
   WarriorOneState holdState = WarriorOneState.entry;
   WarriorOneState previousHoldState = WarriorOneState.entry;

@@ -37,7 +37,7 @@ void main() {
   test('speaks wall push up setup instructions only once before activation', () {
     final player = _FakeWallPushUpVoicePlayer();
     final coach = WallPushUpVoiceCoach(ttsService: player);
-    final exercise = WallPushUp()..exerciseState = ExerciseState.notActivated;
+    final exercise = WallPushUp(maxRep: 15)..exerciseState = ExerciseState.notActivated;
 
     coach.processFrame(
       exercise: exercise,
@@ -65,7 +65,7 @@ void main() {
   test('maps live wall push up faults to bundled voice cues', () {
     final player = _FakeWallPushUpVoicePlayer();
     final coach = WallPushUpVoiceCoach(ttsService: player);
-    final exercise = WallPushUp()..exerciseState = ExerciseState.activated;
+    final exercise = WallPushUp(maxRep: 15)..exerciseState = ExerciseState.activated;
 
     coach.processFrame(
       exercise: exercise,
@@ -80,7 +80,7 @@ void main() {
   test('speaks rep count and clean cue after a good rep', () {
     final player = _FakeWallPushUpVoicePlayer();
     final coach = WallPushUpVoiceCoach(ttsService: player);
-    final exercise = WallPushUp()
+    final exercise = WallPushUp(maxRep: 15)
       ..exerciseState = ExerciseState.activated
       ..lastRepWasClean = true;
 
@@ -97,7 +97,7 @@ void main() {
   test('speaks rep count and correction after a faulty rep', () {
     final player = _FakeWallPushUpVoicePlayer();
     final coach = WallPushUpVoiceCoach(ttsService: player);
-    final exercise = WallPushUp()
+    final exercise = WallPushUp(maxRep: 15)
       ..exerciseState = ExerciseState.activated
       ..lastRepWasClean = false
       ..lastRepTopVoiceMessage = 'Ép khuỷu tay vào';

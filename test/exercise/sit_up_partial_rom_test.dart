@@ -47,7 +47,7 @@ void _pump(
 }
 
 SitUp _activatedSitUp() {
-  return SitUp()
+  return SitUp(maxRep: 15)
     ..cameraFacing = CameraFacing.left
     ..exerciseState = ExerciseState.activated;
 }

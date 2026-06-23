@@ -68,6 +68,7 @@ import 'exercise_launch_args.dart';
 import 'exercise_intro_page.dart';
 import 'exercise_transition_moment.dart';
 import 'rest_screen.dart';
+import 'widgets/reviewer_tracking_demo_overlay.dart';
 import 'widgets/skeleton_annotation.dart';
 import 'workout_summary_screen.dart';
 import 'package:vika/services/session_persistence.dart';
@@ -778,6 +779,10 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
           onPreviousDifficulty:
               prev != null ? _handlePreviousExerciseDifficulty : null,
           onStart: _beginWorkout,
+          onReviewerDemoHold: (widget.definition.id == 'squat' ||
+                  widget.definition.id == 'squat_assessment')
+              ? () => ReviewerTrackingDemoOverlay.show(context)
+              : null,
           onBack: () => Navigator.of(context).pop(),
         ),
       _WorkoutFlowPhase.active => ActiveExercisePage(
@@ -821,6 +826,14 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
 }
 
 enum _WorkoutFlowPhase { intro, active, rest, transition }
+
+// Never-crash guard for a MISSING catalog entry (a data error — a launch asked
+// for an id with no row in exercise_catalog.json). These are NOT per-exercise
+// defaults; real volume always comes from the catalog. _resolveVolume logs in
+// debug whenever it falls back to these.
+const int kFallbackSets = 3;
+const int kFallbackReps = 8;
+const int kFallbackSeconds = 30;
 
 @visibleForTesting
 ({
@@ -880,12 +893,15 @@ class _ExerciseExperienceSpec {
     VolumePrescription? prescription,
     ExerciseLaunchCatalogInfo? catalogInfo,
   }) {
-    final overrideSets = prescription?.sets;
-    final overrideReps = prescription?.reps;
-    final overrideSeconds = prescription?.seconds;
     final overrideRest = prescription?.restSeconds;
-    final catalogReps = catalogInfo?.baseReps;
-    final catalogSeconds = catalogInfo?.baseSeconds;
+
+    // Resolve volume ONCE, precedence: prescription > catalog > definition
+    // default. `target` is the per-set rep/second goal — the displayed value
+    // AND the scoring denominator — so it is floored at 1 and can never be 0.
+    final volume = _resolveVolume(definition, prescription, catalogInfo);
+    final sets = volume.sets;
+    final target = volume.target;
+    final isHold = volume.isHold;
 
     switch (definition.id) {
       case 'squat_assessment':
@@ -967,8 +983,8 @@ class _ExerciseExperienceSpec {
         );
       case 'squat':
         return _ExerciseExperienceSpec(
-          sets: overrideSets ?? 3,
-          repsPerSet: overrideReps ?? catalogReps ?? 8,
+          sets: sets,
+          repsPerSet: target,
           restSeconds: overrideRest ?? 45,
           targetLabel: 'REP/HIỆP',
           secondsPerUnit: 4,
@@ -1018,86 +1034,123 @@ class _ExerciseExperienceSpec {
       case 'lunge':
         return _lungeSpec(
           definition: definition,
-          sets: overrideSets ?? 3,
-          repsPerSet: overrideReps ?? catalogReps ?? 8,
+          sets: sets,
+          repsPerSet: target,
           restSeconds: overrideRest,
           createExercise: (repsPerSet) => Lunge(maxRep: repsPerSet),
         );
       case 'push_up':
         return _pushUpSpec(
           definition: definition,
-          sets: overrideSets ?? 3,
-          repsPerSet: overrideReps ?? catalogReps ?? 6,
+          sets: sets,
+          repsPerSet: target,
           restSeconds: overrideRest,
           createExercise: (repsPerSet) => PushUp(maxRep: repsPerSet),
         );
       case 'plank':
         return _plankSpec(
           definition: definition,
-          sets: overrideSets ?? 3,
-          repsPerSet: overrideReps ?? catalogReps ?? 3,
+          sets: sets,
+          repsPerSet: target,
           restSeconds: overrideRest,
           createExercise: (repsPerSet) => Plank(maxRep: repsPerSet),
         );
       case 'jumping_jack':
         return _jumpingJackSpec(
           definition: definition,
-          sets: overrideSets ?? 3,
-          repsPerSet: overrideReps ?? catalogReps ?? 15,
+          sets: sets,
+          repsPerSet: target,
           restSeconds: overrideRest,
           createExercise: (repsPerSet) => JumpingJack(maxRep: repsPerSet),
         );
       case 'warrior_one':
         return _generic(
           definition: definition,
-          sets: overrideSets ?? 1,
-          repsPerSet: overrideReps ?? catalogReps ?? 2, // 2 lần giữ = 2 bên
+          sets: sets,
+          repsPerSet: target, // 2 lần giữ = 2 bên
           restSeconds: overrideRest,
           createExercise: (repsPerSet) => WarriorOne(maxHolds: repsPerSet),
         );
       case 'glute_bridge':
         return _gluteBridgeSpec(
           definition: definition,
-          sets: overrideSets ?? 3,
-          repsPerSet: overrideReps ?? catalogReps ?? 15,
+          sets: sets,
+          repsPerSet: target,
           restSeconds: overrideRest,
           createExercise: (repsPerSet) => GluteBridge(maxRep: repsPerSet),
         );
       case 'curl_up':
         return _curlUpSpec(
           definition: definition,
-          sets: overrideSets ?? 3,
-          repsPerSet: overrideReps ?? catalogReps ?? 12,
+          sets: sets,
+          repsPerSet: target,
           restSeconds: overrideRest,
           createExercise: (repsPerSet) => CurlUp(maxRep: repsPerSet),
         );
       case 'bird__dog':
         return _generic(
           definition: definition,
-          sets: overrideSets ?? 3,
-          repsPerSet: overrideReps ?? 8,
+          sets: sets,
+          repsPerSet: target,
           restSeconds: overrideRest,
           createExercise: (repsPerSet) => BirdDog(maxRep: repsPerSet),
         );
       default:
-        final isHold = overrideSeconds != null ||
-            (catalogSeconds != null && overrideReps == null);
-        final target = isHold
-            ? (overrideSeconds ?? catalogSeconds)
-            : (overrideReps ?? catalogReps);
+        // isHold comes from the DEFINITION's declared target type, not from
+        // catalog seconds. Rep-type and hold-type both feed the single
+        // resolved `target` into createExercise — never a null target.
         return _generic(
           definition: definition,
-          sets: overrideSets ?? 3,
-          repsPerSet: target ?? 0,
+          sets: sets,
+          repsPerSet: target,
           restSeconds: overrideRest,
           targetLabel: isHold ? 'GIÂY/HIỆP' : 'REP/HIỆP',
           secondsPerUnit: isHold ? 1 : 4,
           createExercise: (targetPerSet) => definition.createExercise(
-            reps: isHold || target == null ? null : targetPerSet,
-            seconds: isHold && target != null ? targetPerSet : null,
+            reps: isHold ? null : targetPerSet,
+            seconds: isHold ? targetPerSet : null,
           ),
         );
     }
+  }
+
+  /// Resolves (sets, target, isHold) for a launch from the CATALOG (+ any plan
+  /// prescription), never from the definition. Precedence is
+  /// prescription > catalog > floor fallback. Sets, type, and target all come
+  /// from the catalog entry; `target` is the per-set rep/second goal AND the
+  /// scoring denominator, so it is hard-floored at 1 and asserted positive — it
+  /// can never be 0.
+  static ({int sets, int target, bool isHold}) _resolveVolume(
+    ExerciseDefinition definition,
+    VolumePrescription? prescription,
+    ExerciseLaunchCatalogInfo? catalogInfo,
+  ) {
+    final catalogSeconds = catalogInfo?.baseSeconds;
+    final catalogReps = catalogInfo?.baseReps;
+    final rawSets = prescription?.sets ?? catalogInfo?.baseSets ?? kFallbackSets;
+    // Type comes from the catalog row, which carries exactly one of
+    // reps/seconds. With no catalog entry, default to rep-type.
+    final isHold = catalogSeconds != null;
+    final resolved = isHold
+        ? (prescription?.seconds ?? catalogSeconds)
+        : (prescription?.reps ?? catalogReps);
+    final sets = rawSets < 1 ? 1 : rawSets;
+    // Floor guards a missing or zero catalog target (a data error); the
+    // displayed target / scoring denominator is never 0.
+    final target = (resolved == null || resolved < 1)
+        ? (isHold ? kFallbackSeconds : kFallbackReps)
+        : resolved;
+    assert(target > 0);
+    assert(() {
+      if (catalogInfo == null && prescription == null) {
+        debugPrint(
+          '[Vika] _resolveVolume: no catalog entry or prescription for '
+          '"${definition.id}" — using floor fallback. Missing catalog asset row?',
+        );
+      }
+      return true;
+    }());
+    return (sets: sets, target: target, isHold: isHold);
   }
 
   static _ExerciseExperienceSpec _generic({

@@ -107,7 +107,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('start position rejects floor-like push-ups', () {
-    final wallPushUp = WallPushUp()..cameraFacing = CameraFacing.right;
+    final wallPushUp = WallPushUp(maxRep: 15)..cameraFacing = CameraFacing.right;
 
     final top = _wallPose(
       shoulderX: 300,
@@ -138,7 +138,7 @@ void main() {
   });
 
   test('counts only after a full bottom-to-standing wall push-up', () {
-    final wallPushUp = WallPushUp()
+    final wallPushUp = WallPushUp(maxRep: 15)
       ..cameraFacing = CameraFacing.right
       ..exerciseState = ExerciseState.activated;
 
@@ -195,7 +195,7 @@ void main() {
   });
 
   test('counts a rep but records coaching when the wall hand drifts', () {
-    final wallPushUp = WallPushUp()
+    final wallPushUp = WallPushUp(maxRep: 15)
       ..cameraFacing = CameraFacing.right
       ..exerciseState = ExerciseState.activated;
 
@@ -271,7 +271,7 @@ void main() {
   });
 
   test('counts a rep when body line bends', () {
-    final wallPushUp = WallPushUp()
+    final wallPushUp = WallPushUp(maxRep: 15)
       ..cameraFacing = CameraFacing.right
       ..exerciseState = ExerciseState.activated;
 

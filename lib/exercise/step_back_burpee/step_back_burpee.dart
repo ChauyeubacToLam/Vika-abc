@@ -11,7 +11,6 @@ import 'metrics/squat_hinge_metric.dart';
 import 'metrics/plank_form_metric.dart';
 
 class BurpeeConfig {
-  static const int MAX_REP = 15;
   static const double STANDING_BODY_ANGLE = 165.0; // Góc đứng thẳng
 
   // Ngưỡng khoảng cách ngang (X) để xác định Plank (đơn vị tương đối)
@@ -27,7 +26,7 @@ class StepBackBurpee extends ExerciseBase {
       };
 
   final int maxRep;
-  StepBackBurpee({this.maxRep = BurpeeConfig.MAX_REP});
+  StepBackBurpee({required this.maxRep});
 
   BurpeeState burpeeState = BurpeeState.standing;
   BurpeeState previousBurpeeState = BurpeeState.standing;

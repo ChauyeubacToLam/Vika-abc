@@ -20,7 +20,6 @@ enum RussianTwistState { center_setup, twisting, max_point, returning }
 enum TwistDirection { none, forward, backward }
 
 class RussianTwistConfig {
-  static const int MAX_REP = 20;
   static const double MIN_TRUNK_HORIZONTAL_ANGLE = 32.0;
   static const double MAX_TRUNK_HORIZONTAL_ANGLE = 72.0;
   static const double MIN_KNEE_HIP_DX_RATIO = 0.35;
@@ -64,7 +63,7 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
       };
 
   final int maxRep;
-  RussianTwist({this.maxRep = RussianTwistConfig.MAX_REP});
+  RussianTwist({required this.maxRep});
 
   RussianTwistState russianState = RussianTwistState.center_setup;
   RussianTwistState previousRussianState = RussianTwistState.center_setup;

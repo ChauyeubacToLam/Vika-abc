@@ -14,7 +14,6 @@ import 'metrics/pelvic_drop_metric.dart';
 enum KteState { standing_base, approaching, touch, returning }
 
 class StandingKneeToElbowConfig {
-  static const int MAX_REP = 30; // 15 per side
   static const double KNEE_LIFT_START_RATIO = 0.10;
   static const double TOUCH_DISTANCE_RATIO = 0.55;
   static const double TOUCH_EXIT_DISTANCE_RATIO = 0.80;
@@ -28,7 +27,7 @@ class StandingKneeToElbow extends ExerciseBase {
       };
 
   final int maxRep;
-  StandingKneeToElbow({this.maxRep = StandingKneeToElbowConfig.MAX_REP});
+  StandingKneeToElbow({required this.maxRep});
 
   KteState kteState = KteState.standing_base;
   KteState previousKteState = KteState.standing_base;

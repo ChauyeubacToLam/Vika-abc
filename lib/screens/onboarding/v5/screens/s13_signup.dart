@@ -217,6 +217,67 @@ class _S13SignupState extends State<S13Signup> {
     }
   }
 
+  Future<void> _showReviewerDemoPrompt() async {
+    if (_busy || !mounted) return;
+
+    // The dialog OWNS its TextEditingController (see [_ReviewerCodeDialog]) and
+    // disposes it in its own State.dispose — which only fires after the route is
+    // fully gone. The old code disposed a parent-owned controller synchronously
+    // right after showDialog returned, while the dialog was still animating out
+    // and its field still referenced it → "used after being disposed" crash.
+    final code = await showDialog<String>(
+      context: context,
+      barrierColor: V5.ink.withValues(alpha: 0.42),
+      builder: (_) => const _ReviewerCodeDialog(),
+    );
+
+    if (!mounted || code == null || code.isEmpty) return;
+    await _enterReviewerDemo(code);
+  }
+
+  Future<void> _enterReviewerDemo(String code) async {
+    if (_busy) return;
+
+    // Claim auth ownership BEFORE touching Supabase: verifyOTP below fires a
+    // `signedIn` event on the global auth stream, and the entry gate must
+    // already be standing down so it can't race the navigation that follows.
+    widget.onAuthStarted?.call();
+    _acceptAuthEvents = false;
+    _pendingProvider = null;
+    setState(() {
+      _busy = true;
+      _notice = null;
+    });
+
+    try {
+      final res = await Supabase.instance.client.functions.invoke(
+        'demo-session',
+        body: {'code': code},
+      );
+      final data = res.data;
+      final email = data is Map ? data['email']?.toString() : null;
+      final otp = data is Map ? data['otp']?.toString() : null;
+      if (email == null || email.isEmpty || otp == null || otp.isEmpty) {
+        throw const FormatException('Invalid demo session response');
+      }
+
+      await Supabase.instance.client.auth.verifyOTP(
+        email: email,
+        token: otp,
+        type: OtpType.magiclink,
+      );
+
+      if (!mounted) return;
+      // Reviewer sees a read-only plan reveal before entering the seeded home.
+      Navigator.of(context).pushReplacementNamed('/reviewer-demo');
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      // Reviewer-only chrome → English (audience is the Apple reviewer).
+      _showError('Unable to open reviewer mode. Check the code and try again.');
+    }
+  }
+
   Future<void> _magicLink() async {
     if (!_validEmail || _busy) return;
     final email = _emailController.text.trim();
@@ -228,8 +289,8 @@ class _S13SignupState extends State<S13Signup> {
         setState(() => _notice = 'Đã gửi link đăng nhập đến $email');
       }
     } catch (e) {
-      _showError(_friendlyError(e,
-          fallback: 'Chưa gửi được link. Vui lòng thử lại.'));
+      _showError(
+          _friendlyError(e, fallback: 'Chưa gửi được link. Vui lòng thử lại.'));
       _acceptAuthEvents = false;
       _pendingProvider = null;
     } finally {
@@ -305,6 +366,7 @@ class _S13SignupState extends State<S13Signup> {
           _ProviderRail(
             busy: _busy,
             onApple: _signInWithApple,
+            onAppleReviewerDemo: _showReviewerDemoPrompt,
             onGoogle: _signInWithGoogle,
             onFacebook: _signInWithFacebook,
           ),
@@ -321,8 +383,7 @@ class _S13SignupState extends State<S13Signup> {
             },
           ),
           const SizedBox(height: V5.space8),
-          if (_notice != null)
-            _NoticeBanner(message: _notice!),
+          if (_notice != null) _NoticeBanner(message: _notice!),
         ],
       ),
     );
@@ -462,8 +523,7 @@ class _InlineMagicLinkCtaState extends State<_InlineMagicLinkCta> {
           decoration: BoxDecoration(
             color: enabled ? V5.ink : Colors.transparent,
             borderRadius: BorderRadius.circular(V5.radiusFull),
-            border:
-                enabled ? null : Border.all(color: V5.borderHi, width: 1.4),
+            border: enabled ? null : Border.all(color: V5.borderHi, width: 1.4),
             boxShadow: enabled ? V5.elevation4 : null,
           ),
           child: Row(
@@ -499,6 +559,212 @@ class _InlineMagicLinkCtaState extends State<_InlineMagicLinkCta> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Reviewer access-code prompt, styled to the Premium Ivory design system.
+///
+/// Owns its [TextEditingController] and disposes it in its OWN [State.dispose],
+/// which fires only after the dialog route is fully gone — so the field never
+/// references a disposed controller mid dismiss-animation. (The prior version
+/// disposed a parent-owned controller right after showDialog returned, while
+/// the dialog was still animating out → "TextEditingController used after being
+/// disposed".)
+///
+/// This is reviewer-only chrome, so the copy is ENGLISH (audience: the Apple
+/// reviewer). Returns the trimmed code via [Navigator.pop], or null on cancel.
+class _ReviewerCodeDialog extends StatefulWidget {
+  const _ReviewerCodeDialog();
+
+  @override
+  State<_ReviewerCodeDialog> createState() => _ReviewerCodeDialogState();
+}
+
+class _ReviewerCodeDialogState extends State<_ReviewerCodeDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() => Navigator.of(context).pop(_controller.text.trim());
+  void _cancel() => Navigator.of(context).pop();
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+        decoration: BoxDecoration(
+          color: V5.surface,
+          borderRadius: BorderRadius.circular(V5.radiusLg),
+          border: Border.all(color: V5.border),
+          boxShadow: V5.elevation4,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: V5.yellowSoft,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.lock_outline_rounded,
+                    size: 16,
+                    color: V5.yellowDeep,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text('Reviewer access', style: V5.title(context, color: V5.ink)),
+              ],
+            ),
+            const SizedBox(height: V5.space8),
+            Text(
+              'Enter the access code to open a read-only demo of the app.',
+              style: V5.bodySm(context, color: V5.inkSoft),
+            ),
+            const SizedBox(height: V5.space16),
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              decoration: BoxDecoration(
+                color: V5.bgSoft,
+                border: Border.all(color: V5.border),
+                borderRadius: BorderRadius.circular(V5.radiusMd),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'ACCESS CODE',
+                    style: V5.eyebrow(context, color: V5.inkFaint),
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _controller,
+                    autofocus: true,
+                    obscureText: true,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => _submit(),
+                    cursorColor: V5.yellow,
+                    style: V5.text(
+                      context,
+                      size: 15,
+                      weight: FontWeight.w600,
+                      color: V5.ink,
+                      letterSpacing: 2,
+                    ),
+                    decoration: InputDecoration(
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                      hintText: '••••••',
+                      hintStyle: V5.text(
+                        context,
+                        size: 15,
+                        weight: FontWeight.w600,
+                        color: V5.inkFaint,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: V5.space16),
+            Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _cancel,
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      height: 50,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(V5.radiusFull),
+                        border: Border.all(color: V5.borderHi, width: 1.4),
+                      ),
+                      child: Text(
+                        'Cancel',
+                        style: V5.text(
+                          context,
+                          size: 14,
+                          weight: FontWeight.w700,
+                          color: V5.inkSoft,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _submit,
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      height: 50,
+                      padding: const EdgeInsets.fromLTRB(20, 0, 8, 0),
+                      decoration: BoxDecoration(
+                        color: V5.ink,
+                        borderRadius: BorderRadius.circular(V5.radiusFull),
+                        boxShadow: V5.elevation2,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Continue',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: V5.text(
+                                context,
+                                size: 14,
+                                weight: FontWeight.w700,
+                                color: V5.invInk,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            width: 34,
+                            height: 34,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: V5.yellow,
+                            ),
+                            child: const Icon(
+                              Icons.arrow_forward_rounded,
+                              size: 16,
+                              color: V5.yellowInk,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -753,12 +1019,14 @@ class _ProviderRail extends StatelessWidget {
   const _ProviderRail({
     required this.busy,
     required this.onApple,
+    required this.onAppleReviewerDemo,
     required this.onGoogle,
     required this.onFacebook,
   });
 
   final bool busy;
   final VoidCallback onApple;
+  final VoidCallback onAppleReviewerDemo;
   final VoidCallback onGoogle;
   final VoidCallback onFacebook;
 
@@ -778,6 +1046,7 @@ class _ProviderRail extends StatelessWidget {
               foreground: V5.ink,
               icon: const V5AppleMark(size: 18),
               onTap: busy ? null : onApple,
+              onHoldComplete: busy ? null : onAppleReviewerDemo,
               border: V5.borderHi,
             ),
           ),
@@ -874,6 +1143,7 @@ class _ProviderTile extends StatefulWidget {
     required this.icon,
     required this.onTap,
     this.border,
+    this.onHoldComplete,
   });
 
   final String label;
@@ -882,23 +1152,70 @@ class _ProviderTile extends StatefulWidget {
   final Widget icon;
   final VoidCallback? onTap;
   final Color? border;
+  final VoidCallback? onHoldComplete;
 
   @override
   State<_ProviderTile> createState() => _ProviderTileState();
 }
 
 class _ProviderTileState extends State<_ProviderTile> {
+  static const Duration _reviewerHoldDuration = Duration(seconds: 5);
+
+  Timer? _holdTimer;
   bool _pressed = false;
+  bool _suppressNextTap = false;
+
+  void _handleTapDown(TapDownDetails details) {
+    if (widget.onTap == null) return;
+    setState(() => _pressed = true);
+    if (widget.onHoldComplete == null) return;
+
+    _holdTimer?.cancel();
+    _suppressNextTap = false;
+    _holdTimer = Timer(_reviewerHoldDuration, () {
+      if (!mounted) return;
+      _suppressNextTap = true;
+      setState(() => _pressed = false);
+      widget.onHoldComplete?.call();
+    });
+  }
+
+  void _handleTapUp(TapUpDetails details) {
+    _holdTimer?.cancel();
+    if (!mounted) return;
+    setState(() => _pressed = false);
+  }
+
+  void _handleTapCancel() {
+    _holdTimer?.cancel();
+    _suppressNextTap = false;
+    if (!mounted) return;
+    setState(() => _pressed = false);
+  }
+
+  void _handleTap() {
+    if (_suppressNextTap) {
+      _suppressNextTap = false;
+      return;
+    }
+    widget.onTap?.call();
+  }
+
+  @override
+  void dispose() {
+    _holdTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final enabled = widget.onTap != null;
     final dense = MediaQuery.sizeOf(context).height < 640;
     return GestureDetector(
-      onTap: widget.onTap,
-      onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
-      onTapUp: enabled ? (_) => setState(() => _pressed = false) : null,
-      onTapCancel: enabled ? () => setState(() => _pressed = false) : null,
+      onTap: enabled ? _handleTap : null,
+      onTapDown: enabled ? _handleTapDown : null,
+      onTapUp: enabled ? _handleTapUp : null,
+      onTapCancel: enabled ? _handleTapCancel : null,
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 160),
         opacity: enabled ? 1 : 0.48,

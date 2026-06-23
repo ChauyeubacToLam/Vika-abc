@@ -22,6 +22,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../../services/catalog/catalog_source.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/vf_theme.dart';
 
@@ -147,6 +148,20 @@ class LibraryCardData {
   /// Album-specific: secondary line describing episode cadence (e.g.
   /// '6-8 phút mỗi tập').
   final String? episodeMeta;
+
+  /// The volume label to show on the card. When this card is backed by a real
+  /// exercise, pull the live volume from the bundled catalog ([CatalogSource])
+  /// so the card and the exercise intro never disagree. Falls back to the
+  /// static [duration] for non-exercise cards, or before the catalog has
+  /// loaded (preloaded in main(); screens may also ensureLoaded()).
+  String? get displayDuration {
+    final name = exerciseName;
+    if (name != null) {
+      final info = CatalogSource.instance.lookup(name);
+      if (info != null) return info.volumeLabel;
+    }
+    return duration;
+  }
 }
 
 class LibraryCard extends StatefulWidget {
@@ -401,8 +416,9 @@ class _Text extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
+    final duration = data.displayDuration;
     final metaParts = <String>[
-      if (data.duration != null) data.duration!,
+      if (duration != null) duration,
       if (data.detail != null) data.detail!,
     ];
     final cadenceShort = data.kind.cadenceShort;

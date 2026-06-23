@@ -9,7 +9,7 @@ import 'metrics/trunk_stability_metric.dart';
 import 'metrics/knee_drive_rom_metric.dart';
 
 class MountainClimber extends ExerciseBase {
-  MountainClimber({this.maxRep = ClimberConfig.MAX_REP});
+  MountainClimber({required this.maxRep});
 
   static const double _movingLegPresenceMin = 0.25;
   static const double _movingLegVisibilityMin = 0.05;

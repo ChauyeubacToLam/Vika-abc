@@ -123,7 +123,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('safety requires side camera instead of front or angled', () {
-    final exercise = RussianTwist();
+    final exercise = RussianTwist(maxRep: 20);
 
     exercise.cameraFacing = CameraFacing.front;
     expect(exercise.checkSafety(_russianPose()), isNotNull);
@@ -136,7 +136,7 @@ void main() {
   });
 
   test('start position requires lean-back torso and centered hands', () {
-    final exercise = RussianTwist()..cameraFacing = CameraFacing.right;
+    final exercise = RussianTwist(maxRep: 20)..cameraFacing = CameraFacing.right;
 
     expect(exercise.isInStartPosition(_russianPose()), isTrue);
     expect(

@@ -19,6 +19,7 @@ import '../data/library_mock.dart';
 import '../models/exercise_definition.dart';
 import '../models/exercise_lookup.dart';
 import '../screens/exercise/exercise_launch_args.dart';
+import '../services/user_profile_service.dart';
 import '../services/workout_launch_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/vf_theme.dart';
@@ -41,10 +42,12 @@ class LibraryScreen extends StatefulWidget {
     super.key,
     required this.bottomPadding,
     required this.onSelectExercise,
+    this.userProfile,
   });
 
   final double bottomPadding;
   final void Function(ExerciseDefinition) onSelectExercise;
+  final AppUserProfile? userProfile;
 
   @override
   State<LibraryScreen> createState() => _LibraryScreenState();
@@ -279,7 +282,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     totalCount: _totalLibraryCount,
                     onSelectFilter: (id) =>
                         setState(() => _selectedFilter = id),
-                    userInitial: 'N',
+                    userInitial: widget.userProfile?.initial ?? 'N',
+                    avatarUrl: widget.userProfile?.avatarUrl,
                   ),
                   // Canonical post-hero gap — matches Progress + Profile.
                   const SizedBox(height: 24),

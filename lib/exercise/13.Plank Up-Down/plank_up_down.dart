@@ -62,7 +62,7 @@ class PlankUpDown extends ExerciseBase {
   final Debouncer _loweringDebouncer = Debouncer(requiredFrames: 2);
   final Debouncer _forearmDebouncer = Debouncer(requiredFrames: 2);
 
-  PlankUpDown({this.maxRep = PlankConfig.MAX_REP});
+  PlankUpDown({required this.maxRep});
 
   @override
   String get exerciseName => 'Plank Up-Down';

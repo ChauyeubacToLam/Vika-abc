@@ -16,7 +16,6 @@ enum CossackState { standing, descending, bottom, ascending }
 enum WorkingLeg { none, left, right }
 
 class CossackConfig {
-  static const int MAX_REP = 16; // 8 per side
   static const double STANDING_HIP_VELOCITY_Y_THRESHOLD = 0.01;
   static const double BOTTOM_KNEE_ANGLE_THRESHOLD =
       95.0; // Angle to consider bottom
@@ -31,7 +30,7 @@ class CossackSquat extends ExerciseBase {
       };
 
   final int maxRep;
-  CossackSquat({this.maxRep = CossackConfig.MAX_REP});
+  CossackSquat({required this.maxRep});
 
   CossackState cossackState = CossackState.standing;
   CossackState previousCossackState = CossackState.standing;

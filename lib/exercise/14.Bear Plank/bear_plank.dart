@@ -13,7 +13,7 @@ import 'metrics/weight_distribution_metric.dart';
 
 class BearPlank extends ExerciseBase {
   BearPlank({
-    this.maxSeconds = BearConfig.TARGET_HOVER_MS ~/ 1000,
+    required this.maxSeconds,
   });
 
   final int maxSeconds;

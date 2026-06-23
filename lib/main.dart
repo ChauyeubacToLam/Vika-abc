@@ -24,7 +24,9 @@ import 'screens/exercise/exercise_experience_screen.dart';
 import 'screens/main_shell.dart';
 import 'screens/onboarding/v5/v5_onboarding_navigator.dart';
 import 'screens/plan_retest_screen.dart';
+import 'screens/reviewer/reviewer_plan_screen.dart';
 import 'screens/weekly_check_in_screen.dart';
+import 'services/catalog/catalog_source.dart';
 import 'services/recommendation/recommendation_service.dart';
 import 'theme/typography.dart';
 import 'theme/vf_theme.dart';
@@ -60,6 +62,9 @@ Future<void> main() async {
 
   if (startupError == null) {
     await _loadDeviceCameras();
+    // Preload the bundled exercise catalog so synchronous volume lookups
+    // (launch + list cards) are ready before first paint, offline-safe.
+    await CatalogSource.instance.ensureLoaded();
     _hasCompletedOnboarding = await _loadInitialOnboardingCompletion();
     try {
       _hasSeenOnboarding = await _readStoredOnboardingCompletion();
@@ -446,6 +451,12 @@ class VikaApp extends StatelessWidget {
             final email = settings.arguments as String? ?? '';
             return MaterialPageRoute(
               builder: (_) => MagicLinkSentScreen(email: email),
+            );
+          case '/reviewer-demo':
+            // Apple-reviewer read-only plan reveal between the demo-code prompt
+            // (S13) and the seeded home. Reads only; never generates/persists.
+            return MaterialPageRoute(
+              builder: (_) => const ReviewerPlanScreen(),
             );
           case '/exercise':
             final args = settings.arguments;
@@ -840,7 +851,13 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    _exercise = _definition.createExercise();
+    // Volume comes from the bundled catalog (preloaded in main()). If the entry
+    // is missing, createExercise falls back to the class's own default target.
+    final catalog = CatalogSource.instance.lookup(_definition.id);
+    _exercise = _definition.createExercise(
+      reps: catalog?.baseReps,
+      seconds: catalog?.baseSeconds,
+    );
 
     _bannerController = AnimationController(
       duration: const Duration(milliseconds: 2500),

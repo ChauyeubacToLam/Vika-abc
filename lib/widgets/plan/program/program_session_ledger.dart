@@ -62,32 +62,25 @@ class ProgramSessionLedger extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
 
-    // Each item knows whether it's the elevated NEXT panel. Flat editorial
-    // entries are separated by the page's hairline rule; the bordered panel
-    // gets clear space instead, so a stray line never butts against its edge.
-    final items = <({Widget widget, bool panel})>[
-      for (final s in block.sessions)
-        (widget: _entryFor(s), panel: s.status == ProgramStatus.current),
+    // Every entry — including the elevated NEXT panel — is separated by the
+    // page's hairline rule, so the ledger reads as one consistent editorial
+    // list. The panel's own vertical padding keeps the rule off its border.
+    final items = <Widget>[
+      for (final s in block.sessions) _entryFor(s),
       if (retest != null)
-        (
-          widget: _RetestEntry(
-            retest: retest!,
-            unlocked: retestUnlocked,
-            onStart: onStartRetest,
-          ),
-          panel: false,
+        _RetestEntry(
+          retest: retest!,
+          unlocked: retestUnlocked,
+          onStart: onStartRetest,
         ),
     ];
 
     final entries = <Widget>[];
     for (var i = 0; i < items.length; i++) {
       if (i > 0) {
-        final adjacentToPanel = items[i - 1].panel || items[i].panel;
-        entries.add(adjacentToPanel
-            ? const SizedBox(height: 4)
-            : Container(height: 1, color: c.border));
+        entries.add(Container(height: 1, color: c.border));
       }
-      entries.add(items[i].widget);
+      entries.add(items[i]);
     }
 
     return Column(

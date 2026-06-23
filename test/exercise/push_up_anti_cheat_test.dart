@@ -126,7 +126,7 @@ void main() {
 
   test('start position requires a full high plank with knees off the floor',
       () {
-    final pushUp = PushUp()..cameraFacing = CameraFacing.left;
+    final pushUp = PushUp(maxRep: 15)..cameraFacing = CameraFacing.left;
 
     final highPlank = _pushUpPose(
       bodyY: 220,
@@ -154,7 +154,7 @@ void main() {
   });
 
   test('counts a full-body push-up with elbow ROM and knee travel', () {
-    final pushUp = PushUp()
+    final pushUp = PushUp(maxRep: 15)
       ..cameraFacing = CameraFacing.left
       ..exerciseState = ExerciseState.activated;
 
@@ -218,7 +218,7 @@ void main() {
   });
 
   test('rejects elbow-only motion while body stays pinned', () {
-    final pushUp = PushUp()
+    final pushUp = PushUp(maxRep: 15)
       ..cameraFacing = CameraFacing.left
       ..exerciseState = ExerciseState.activated;
 
@@ -244,7 +244,7 @@ void main() {
   });
 
   test('rejects a rep when wrist height drifts from the start baseline', () {
-    final pushUp = PushUp()
+    final pushUp = PushUp(maxRep: 15)
       ..cameraFacing = CameraFacing.left
       ..exerciseState = ExerciseState.activated;
 
@@ -294,7 +294,7 @@ void main() {
   });
 
   test('rejects a rep when heel height drifts from the start baseline', () {
-    final pushUp = PushUp()
+    final pushUp = PushUp(maxRep: 15)
       ..cameraFacing = CameraFacing.left
       ..exerciseState = ExerciseState.activated;
 

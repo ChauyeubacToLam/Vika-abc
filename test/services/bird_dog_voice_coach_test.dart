@@ -36,7 +36,7 @@ void main() {
   test('speaks setup instructions only once before activation', () {
     final player = _FakeBirdDogVoicePlayer();
     final coach = BirdDogVoiceCoach(voicePlayer: player);
-    final exercise = BirdDog()..exerciseState = ExerciseState.notActivated;
+    final exercise = BirdDog(maxRep: 24)..exerciseState = ExerciseState.notActivated;
 
     coach.processFrame(
       exercise: exercise,
@@ -64,7 +64,7 @@ void main() {
   test('does not speak live frame faults before a rep attempt finishes', () {
     final player = _FakeBirdDogVoicePlayer();
     final coach = BirdDogVoiceCoach(voicePlayer: player);
-    final exercise = BirdDog()..exerciseState = ExerciseState.activated;
+    final exercise = BirdDog(maxRep: 24)..exerciseState = ExerciseState.activated;
 
     coach.processFrame(
       exercise: exercise,
@@ -86,7 +86,7 @@ void main() {
       () {
     final player = _FakeBirdDogVoicePlayer();
     final coach = BirdDogVoiceCoach(voicePlayer: player);
-    final exercise = BirdDog()
+    final exercise = BirdDog(maxRep: 24)
       ..exerciseState = ExerciseState.activated
       ..invalidAttemptCount = 1
       ..lastRepWasClean = false
@@ -106,7 +106,7 @@ void main() {
   test('speaks final rep outcome before set completion', () {
     final player = _FakeBirdDogVoicePlayer();
     final coach = BirdDogVoiceCoach(voicePlayer: player);
-    final exercise = BirdDog()
+    final exercise = BirdDog(maxRep: 24)
       ..exerciseState = ExerciseState.completed
       ..repCount = 8
       ..lastRepWasClean = true;

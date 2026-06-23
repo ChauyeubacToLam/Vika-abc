@@ -293,12 +293,12 @@ class _LibraryListCardState extends State<LibraryListCard> {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      if (widget.data.duration != null) ...[
+                      if (widget.data.displayDuration != null) ...[
                         Icon(Icons.access_time_rounded,
                             size: 11, color: c.inkFaint),
                         const SizedBox(width: 4),
                         Text(
-                          widget.data.duration!,
+                          widget.data.displayDuration!,
                           style: TextStyle(
                             fontFamily: 'BeVietnamPro',
                             fontSize: 11,
@@ -309,7 +309,7 @@ class _LibraryListCardState extends State<LibraryListCard> {
                         ),
                       ],
                       if (widget.data.detail != null) ...[
-                        if (widget.data.duration != null) ...[
+                        if (widget.data.displayDuration != null) ...[
                           const SizedBox(width: 8),
                           Container(
                             width: 2,

@@ -37,7 +37,7 @@ void main() {
   test('speaks leg raises setup instructions only once before activation', () {
     final player = _FakeLegRaiseVoicePlayer();
     final coach = LegRaiseVoiceCoach(voicePlayer: player);
-    final exercise = LegRaise()..exerciseState = ExerciseState.notActivated;
+    final exercise = LegRaise(maxRep: 12)..exerciseState = ExerciseState.notActivated;
 
     coach.processFrame(
       exercise: exercise,
@@ -65,7 +65,7 @@ void main() {
   test('speaks rep count and clean cue after a good rep', () {
     final player = _FakeLegRaiseVoicePlayer();
     final coach = LegRaiseVoiceCoach(voicePlayer: player);
-    final exercise = LegRaise()
+    final exercise = LegRaise(maxRep: 12)
       ..exerciseState = ExerciseState.activated
       ..lastRepWasClean = true;
 
@@ -82,7 +82,7 @@ void main() {
   test('speaks rep count and correction after a faulty counted rep', () {
     final player = _FakeLegRaiseVoicePlayer();
     final coach = LegRaiseVoiceCoach(voicePlayer: player);
-    final exercise = LegRaise()
+    final exercise = LegRaise(maxRep: 12)
       ..exerciseState = ExerciseState.activated
       ..lastRepWasClean = false
       ..lastRepTopVoiceMessage = 'Hạ chân chậm lại';
@@ -100,7 +100,7 @@ void main() {
   test('speaks no-count and correction after a blocked attempt', () {
     final player = _FakeLegRaiseVoicePlayer();
     final coach = LegRaiseVoiceCoach(voicePlayer: player);
-    final exercise = LegRaise()
+    final exercise = LegRaise(maxRep: 12)
       ..exerciseState = ExerciseState.activated
       ..invalidAttemptCount = 1
       ..lastRepWasClean = false
@@ -119,7 +119,7 @@ void main() {
   test('speaks live setup correction from feedback', () {
     final player = _FakeLegRaiseVoicePlayer();
     final coach = LegRaiseVoiceCoach(voicePlayer: player);
-    final exercise = LegRaise()..exerciseState = ExerciseState.activated;
+    final exercise = LegRaise(maxRep: 12)..exerciseState = ExerciseState.activated;
 
     coach.processFrame(
       exercise: exercise,

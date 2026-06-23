@@ -53,7 +53,7 @@ class SuryaNamaskarStep {
 
 class SuryaNamaskarExercise extends ExerciseBase {
   SuryaNamaskarExercise({
-    int maxRounds = SuryaNamaskarConfig.defaultRounds,
+    required int maxRounds,
     this.leadLeg = SuryaNamaskarLeadLeg.right,
   })  : maxRounds = maxRounds < 1 ? 1 : maxRounds,
         _steps = _buildSteps(leadLeg);

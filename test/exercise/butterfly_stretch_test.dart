@@ -76,7 +76,7 @@ int _pumpFrames(
 }
 
 ButterflyStretch _activeButterfly() {
-  return ButterflyStretch()
+  return ButterflyStretch(maxSeconds: 30)
     ..cameraFacing = CameraFacing.front
     ..stretchState = ButterflyState.isometric_hold;
 }
@@ -144,7 +144,7 @@ void main() {
   });
 
   test('start position rejects far feet and collapsed posture', () {
-    final exercise = ButterflyStretch()..cameraFacing = CameraFacing.front;
+    final exercise = ButterflyStretch(maxSeconds: 30)..cameraFacing = CameraFacing.front;
 
     expect(exercise.isInStartPosition(_butterflyPose()), isTrue);
     expect(
@@ -158,7 +158,7 @@ void main() {
   });
 
   test('safety rejects missing or low-confidence hip and heel landmarks', () {
-    final exercise = ButterflyStretch()..cameraFacing = CameraFacing.front;
+    final exercise = ButterflyStretch(maxSeconds: 30)..cameraFacing = CameraFacing.front;
 
     expect(exercise.checkSafety(_butterflyPose()), isNull);
     expect(

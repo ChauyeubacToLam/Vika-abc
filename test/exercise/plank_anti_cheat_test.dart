@@ -104,7 +104,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('start position requires forearm plank geometry', () {
-    final exercise = Plank()..cameraFacing = CameraFacing.right;
+    final exercise = Plank(maxRep: 5)..cameraFacing = CameraFacing.right;
 
     expect(exercise.liveHoldTargetSeconds, PlankConfig.HOLD_DURATION);
     expect(exercise.liveHoldTargetSeconds, 15.0);
@@ -114,7 +114,7 @@ void main() {
   });
 
   test('hold timer resets when user leaves forearm plank', () {
-    final exercise = Plank()
+    final exercise = Plank(maxRep: 5)
       ..cameraFacing = CameraFacing.right
       ..exerciseState = ExerciseState.activated;
 

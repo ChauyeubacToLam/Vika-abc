@@ -11,7 +11,6 @@ import 'metrics/knee_travel_metric.dart';
 import 'metrics/cervical_safety_metric.dart';
 
 class LowLungeConfig {
-  static const int MAX_REP = 2;
   static const double HOLD_DURATION = 30.0;
   static const double EXIT_DURATION = 4.0;
 
@@ -36,7 +35,7 @@ enum LowLungeState { entry, holding, exit }
 class LowLunge extends ExerciseBase {
   final int maxRep;
 
-  LowLunge({this.maxRep = LowLungeConfig.MAX_REP});
+  LowLunge({required this.maxRep});
 
   LowLungeState lowLungeState = LowLungeState.entry;
   LowLungeState previousLowLungeState = LowLungeState.entry;

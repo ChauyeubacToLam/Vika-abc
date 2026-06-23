@@ -23,7 +23,7 @@ class ButterflyConfig {
 
 class ButterflyStretch extends ExerciseBase {
   ButterflyStretch({
-    this.maxSeconds = ButterflyConfig.TARGET_HOLD_SECONDS,
+    required this.maxSeconds,
   });
 
   final int maxSeconds;

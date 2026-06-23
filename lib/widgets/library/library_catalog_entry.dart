@@ -221,7 +221,7 @@ class _FeaturedCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 5),
                           Text(
-                            '${row.cat} · ${row.diff}',
+                            '${row.displayCat} · ${row.diff}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(

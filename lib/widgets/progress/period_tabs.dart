@@ -10,6 +10,13 @@ import '../../theme/app_colors.dart';
 
 enum PeriodTab { week, month, program }
 
+/// Direction of the Progress-tab ĐIỂM FORM trend over the selected window,
+/// classified from the Theil-Sen slope of the session form scores. Drives the
+/// gauge's trend chip (arrow + short word). [none] = below the 3-session
+/// baseline, where the chip is hidden. Shared here (alongside [PeriodTab]) so
+/// the service that derives it and the widgets that render it agree on one type.
+enum FormTrendDirection { up, flat, down, none }
+
 class PeriodTabs extends StatelessWidget {
   const PeriodTabs({
     super.key,

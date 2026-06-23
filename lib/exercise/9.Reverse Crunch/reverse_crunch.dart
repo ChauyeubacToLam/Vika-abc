@@ -13,7 +13,7 @@ import '../../utils/exercise_logger.dart';
 import '../../utils/debouncer.dart';
 
 class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
-  ReverseCrunch({this.maxRep = ReverseCrunchConfig.MAX_REP});
+  ReverseCrunch({required this.maxRep});
 
   final int maxRep;
 

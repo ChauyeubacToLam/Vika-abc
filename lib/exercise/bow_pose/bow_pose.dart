@@ -12,8 +12,6 @@ import 'metrics/hold_duration_metric.dart';
 import 'metrics/stability_metric.dart';
 
 class BowPoseConfig {
-  static const int MAX_REP = 3;
-
   static const double KNEE_SETUP_ANGLE = 150.0;
   static const double CHEST_LIFT_THRESHOLD = 0.05;
   static const double THIGH_LIFT_THRESHOLD = 0.0;
@@ -30,7 +28,7 @@ class BowPose extends ExerciseBase {
       };
 
   final int maxRep;
-  BowPose({this.maxRep = BowPoseConfig.MAX_REP});
+  BowPose({required this.maxRep});
 
   BowPoseState bowPoseState = BowPoseState.prone;
   BowPoseState previousState = BowPoseState.prone;

@@ -7,7 +7,8 @@ import '../data/milestones.dart';
 import '../data/program_mock.dart';
 import '../exercise/report_builder_registry.dart';
 import '../models/pain_regions.dart';
-import '../widgets/progress/period_tabs.dart' show PeriodTab;
+import '../widgets/progress/period_tabs.dart'
+    show PeriodTab, FormTrendDirection;
 import 'recommendation/progression_service.dart';
 import 'streak_tier.dart';
 
@@ -829,18 +830,18 @@ class SessionPersistence {
   /// and frozen elsewhere; reads `session_form_score` (the composite shown
   /// to the user).
   ///
+  ///   average    — rounded mean of the window scores (the gauge headline),
+  ///                or null when the window is empty
+  ///   direction  — Theil-Sen slope direction over the window for the gauge's
+  ///                trend chip; [FormTrendDirection.none] until >= 3 sessions
   ///   trend      — window session form scores, oldest-first (empty = none)
   ///   trendDates — the completed_at of each trend point, parallel to [trend]
   ///                (UTC; call .toLocal() before formatting axis labels)
-  ///   to    — latest score in the window, or null when empty
-  ///   from  — earliest score in the window, or null until >= 3 sessions
-  ///   delta — to - from, or null until >= 3 sessions
-  ///   fact  — factual trajectory one-liner for the gauge ('' when empty)
+  ///   fact       — factual trajectory one-liner for the gauge ('' when empty)
   Future<
       ({
-        int? to,
-        int? from,
-        int? delta,
+        int? average,
+        FormTrendDirection direction,
         List<int> trend,
         List<DateTime> trendDates,
         String fact,
@@ -856,23 +857,32 @@ class SessionPersistence {
         PeriodTab.program => null,
       };
       final samples = await _sessionFormScoresInWindow(since: since);
-      final base = deriveProgressFormSummaryForTest(
-        [for (final sample in samples) sample.formScore],
-      );
+      final scores = [for (final sample in samples) sample.formScore];
+      final base = deriveProgressFormSummaryForTest(scores);
+      // Theil-Sen fitted rise across the span (slope · span) drives the
+      // trajectory sentence's granularity; null below the 3-session baseline,
+      // matching the gauge gate. Same fit the chip's [direction] reads.
+      final netChange = scores.length >= 3
+          ? (_theilSen([for (final v in scores) v.toDouble()]).slope *
+                  (scores.length - 1))
+              .round()
+          : null;
       return (
-        to: base.to,
-        from: base.from,
-        delta: base.delta,
+        average: base.average,
+        direction: base.direction,
         trend: base.trend,
         trendDates: [for (final sample in samples) sample.completedAt],
-        fact: deriveTrajectoryFactForTest(trend: base.trend, delta: base.delta),
+        fact: deriveTrajectoryFactForTest(
+          trend: base.trend,
+          netChange: netChange,
+          average: base.average,
+        ),
       );
     } catch (e) {
       debugPrint('[Vika] progressFormSummary failed: $e');
       return (
-        to: null,
-        from: null,
-        delta: null,
+        average: null,
+        direction: FormTrendDirection.none,
         trend: const <int>[],
         trendDates: const <DateTime>[],
         fact: '',
@@ -880,22 +890,40 @@ class SessionPersistence {
     }
   }
 
+  /// Theil-Sen slope (form points per session) the window must clear, in
+  /// either direction, for the gauge trend chip to read as rising/falling
+  /// rather than holding steady. Below this magnitude the slope reads as noise
+  /// and the direction is [FormTrendDirection.flat]. Tunable.
+  static const double kFormTrendSlopeThreshold = 0.5;
+
   /// Pure aggregation for [progressFormSummary]. [scores] are window session
-  /// form scores, oldest-first. Kept separate so the to/from/delta math is
-  /// unit-testable without a database.
+  /// form scores, oldest-first. Kept separate so the average + slope-direction
+  /// math is unit-testable without a database.
   ///
-  /// Progressive reveal: [to] (latest score) shows at >= 1 session, but a
-  /// baseline [from] + [delta] only read as real with >= 3 sessions of history
-  /// — below that, [from]/[delta] are null and the gauge shows the score alone.
+  /// Progressive reveal: [average] (rounded window mean) is the gauge headline
+  /// and shows at >= 1 session. [direction] reads the Theil-Sen slope over the
+  /// window (x = session index 0..n-1) but only past the same 3-session
+  /// baseline the rest of the Progress tab uses — below that it is
+  /// [FormTrendDirection.none] and the gauge hides the trend chip.
   @visibleForTesting
-  static ({int? to, int? from, int? delta, List<int> trend})
+  static ({int? average, FormTrendDirection direction, List<int> trend})
       deriveProgressFormSummaryForTest(List<int> scores) {
     final trend = List<int>.unmodifiable(scores);
-    final to = trend.isEmpty ? null : trend.last;
-    final hasBaseline = trend.length >= 3;
-    final from = hasBaseline ? trend.first : null;
-    final delta = (to != null && from != null) ? to - from : null;
-    return (to: to, from: from, delta: delta, trend: trend);
+    final average = trend.isEmpty ? null : _roundedMean(trend);
+    final FormTrendDirection direction;
+    if (trend.length < 3) {
+      direction = FormTrendDirection.none; // no baseline yet
+    } else {
+      final slope = _theilSen([for (final v in trend) v.toDouble()]).slope;
+      if (slope > kFormTrendSlopeThreshold) {
+        direction = FormTrendDirection.up;
+      } else if (slope < -kFormTrendSlopeThreshold) {
+        direction = FormTrendDirection.down;
+      } else {
+        direction = FormTrendDirection.flat;
+      }
+    }
+    return (average: average, direction: direction, trend: trend);
   }
 
   /// Pure windowing + averaging for [homeFormSummary]. `now` is injectable so
@@ -1514,13 +1542,15 @@ class SessionPersistence {
 
   /// A factual one-liner about the score TREND for the gauge card — NOT
   /// coaching, NOT the session coach. [trend] is the window's session form
-  /// scores oldest-first; [delta] is to−from (null below the 3-session
-  /// baseline, per the gauge gate). Priority-ordered, first match wins; rows
-  /// 4–9 never fire below N >= 3.
+  /// scores oldest-first; [netChange] is the Theil-Sen fitted change across the
+  /// span (fitted last − fitted first), and [average] is the window mean (the
+  /// gauge headline) — both null below the 3-session baseline, per the gauge
+  /// gate. Priority-ordered, first match wins; rows 4–9 never fire below N >= 3.
   @visibleForTesting
   static String deriveTrajectoryFactForTest({
     required List<int> trend,
-    required int? delta,
+    required int? netChange,
+    required int? average,
     int highThreshold = kTrajectoryHighThreshold,
   }) {
     final n = trend.length;
@@ -1533,17 +1563,23 @@ class SessionPersistence {
     // 2 / 3 — pre-baseline framing.
     if (n == 1) return 'Buổi đầu đã xong, Vika bắt đầu theo dõi form.';
     if (n == 2) return 'Hai buổi rồi, thêm một buổi nữa là thấy xu hướng.';
-    // 4–9 — only with a real baseline (N >= 3, delta resolved).
-    if (n >= 3 && delta != null) {
-      if (delta >= 8) return 'Form lên rõ qua $n buổi.';
-      if (delta >= 3) return 'Form đang đi lên.';
-      if (delta >= -2) {
-        return to >= highThreshold ? 'Giữ vững phong độ cao.' : 'Form ổn định.';
+    // 4–9 — only with a real baseline (N >= 3, netChange + average resolved).
+    // Driven by the Theil-Sen span change, not latest-minus-first; the steady
+    // rows read the AVERAGE (the headline) against the high threshold.
+    if (n >= 3 && netChange != null && average != null) {
+      if (netChange >= 8) return 'Form lên rõ qua $n buổi.';
+      if (netChange >= 3) return 'Form đang đi lên.';
+      if (netChange >= -2) {
+        return average >= highThreshold
+            ? 'Giữ vững phong độ cao.'
+            : 'Form ổn định.';
       }
-      if (delta >= -7) return 'Form chững lại một chút so với đầu giai đoạn.';
+      if (netChange >= -7) {
+        return 'Form chững lại một chút so với đầu giai đoạn.';
+      }
       return 'Form thấp hơn đầu giai đoạn.';
     }
-    // Defensive: N >= 3 but no delta (shouldn't happen given the gate).
+    // Defensive: N >= 3 but trend unresolved (shouldn't happen given the gate).
     return 'Form ổn định.';
   }
 

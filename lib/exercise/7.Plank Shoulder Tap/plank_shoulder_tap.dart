@@ -13,7 +13,7 @@ import 'metrics/tap_tempo_metric.dart';
 enum TappingSide { none, leftHandToRight, rightHandToLeft }
 
 class PlankShoulderTap extends ExerciseBase {
-  PlankShoulderTap({this.maxRep = PlankTapConfig.MAX_REP});
+  PlankShoulderTap({required this.maxRep});
 
   final int maxRep;
 

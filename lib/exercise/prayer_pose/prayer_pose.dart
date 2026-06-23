@@ -10,7 +10,6 @@ import 'metrics/prayer_pose_metric_base.dart';
 import 'metrics/posture_stack_metric.dart';
 
 class PrayerPoseConfig {
-  static const int MAX_REP = 1;
   static const double HOLD_DURATION = 12.0;
   static const double EXIT_DURATION = 3.0;
 
@@ -30,7 +29,7 @@ enum PrayerPoseState { entry, holding, exit }
 class PrayerPose extends ExerciseBase {
   final int maxRep;
 
-  PrayerPose({this.maxRep = PrayerPoseConfig.MAX_REP});
+  PrayerPose({required this.maxRep});
 
   PrayerPoseState prayerPoseState = PrayerPoseState.entry;
   PrayerPoseState previousPrayerPoseState = PrayerPoseState.entry;

@@ -110,7 +110,7 @@ void main() {
 
   test('Seated Forward Fold scores partial clean time over all three holds',
       () async {
-    final exercise = SeatedForwardFold()
+    final exercise = SeatedForwardFold(maxSeconds: 15)
       ..cameraFacing = CameraFacing.right
       ..exerciseState = ExerciseState.activated;
     final start = _seatedForwardPose(

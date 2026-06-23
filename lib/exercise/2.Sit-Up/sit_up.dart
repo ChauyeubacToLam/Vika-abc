@@ -14,7 +14,6 @@ import 'metrics/stability_metric.dart';
 import 'metrics/tempo_metric.dart';
 
 class SitUpConfig {
-  static const int MAX_REP = 15;
   static const int TIMEOUT_MS = 90000; // 90s
 
   // FIX: Spec yêu cầu < 10° (code cũ là 15°)
@@ -73,7 +72,7 @@ class SitUp extends ExerciseBase with SideTrackedExerciseMixin {
   final Debouncer _loweringDebouncer = Debouncer(requiredFrames: 2);
   final Debouncer _lyingDebouncer = Debouncer(requiredFrames: 2);
 
-  SitUp({this.maxRep = SitUpConfig.MAX_REP});
+  SitUp({required this.maxRep});
 
   @override
   Set<VikaImageOrientation> get supportedOrientations =>

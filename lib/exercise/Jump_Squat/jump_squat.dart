@@ -15,8 +15,6 @@ import 'metrics/landing_trunk_alignment_metric.dart';
 
 // --- Config ---
 class JumpSquatConfig {
-  static const int MAX_REP = 12; // Advanced plyometric mức thấp để giữ form
-
   // Góc chuyển trạng thái cơ bản
   static const double STANDING_KNEE_THRESHOLD = 160.0;
   static const double SQUATTING_KNEE_THRESHOLD = 150.0;
@@ -39,7 +37,7 @@ class JumpSquat extends ExerciseBase {
       };
 
   final int maxRep;
-  JumpSquat({this.maxRep = JumpSquatConfig.MAX_REP});
+  JumpSquat({required this.maxRep});
 
   JumpSquatState jumpSquatState = JumpSquatState.standing;
   JumpSquatState previousJumpSquatState = JumpSquatState.standing;

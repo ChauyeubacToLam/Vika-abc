@@ -14,7 +14,6 @@ import '../../utils/debouncer.dart';
 // --- Config ---
 
 class LungeConfig {
-  static const int MAX_REP = 15;
   static const int LUNGE_STAND_ANGLE_THRESHOLD = 160;
   static const int LUNGE_DESCEND_ANGLE_THRESHOLD = 150;
   static const List<int> LUNGE_BOTTOM_ANGLE_THRESHOLD = [70, 110];
@@ -34,7 +33,7 @@ class Lunge extends ExerciseBase {
 
   final int maxRep;
 
-  Lunge({this.maxRep = LungeConfig.MAX_REP});
+  Lunge({required this.maxRep});
 
   LungeState lungeState = LungeState.standing;
   LungeState previousLungeState = LungeState.standing;

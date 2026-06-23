@@ -171,8 +171,8 @@ void main() {
 
   group('CurlUp landscape orientation tolerance', () {
     test('start position accepts bent knee above or below hip', () {
-      final kneeAbove = CurlUp()..cameraFacing = CameraFacing.right;
-      final kneeBelow = CurlUp()..cameraFacing = CameraFacing.right;
+      final kneeAbove = CurlUp(maxRep: 12)..cameraFacing = CameraFacing.right;
+      final kneeBelow = CurlUp(maxRep: 12)..cameraFacing = CameraFacing.right;
 
       expect(
         kneeAbove.isInStartPosition(
@@ -190,8 +190,8 @@ void main() {
 
     test('first ascent starts when shoulder lift appears in either direction',
         () {
-      final shoulderMovesUp = CurlUp()..cameraFacing = CameraFacing.right;
-      final shoulderMovesDown = CurlUp()..cameraFacing = CameraFacing.right;
+      final shoulderMovesUp = CurlUp(maxRep: 12)..cameraFacing = CameraFacing.right;
+      final shoulderMovesDown = CurlUp(maxRep: 12)..cameraFacing = CameraFacing.right;
 
       final startPose = _curlUpLandmarks(shoulderY: 100, kneeY: 50);
       expect(shoulderMovesUp.isInStartPosition(startPose), isTrue);
@@ -218,7 +218,7 @@ void main() {
     });
 
     test('fixed rep logs peak telemetry from running scalars', () {
-      final curlUp = CurlUp()
+      final curlUp = CurlUp(maxRep: 12)
         ..cameraFacing = CameraFacing.right
         ..exerciseState = ExerciseState.activated;
 

@@ -185,6 +185,11 @@ abstract class ExerciseBase {
 
   bool _isPaused = false;
 
+  /// True when the current pause was triggered by the user tapping the pause
+  /// button (as opposed to the person walking out of frame). A manual pause is
+  /// never auto-resumed by presence detection — only [manualResume] clears it.
+  bool _manualPause = false;
+
   static const Duration _PERSON_CONFIRM_DURATION = Duration(milliseconds: 650);
   static const Duration _PERSON_LOST_GRACE = Duration(milliseconds: 900);
   static const Duration _PERSON_RESUME_CONFIRM_DURATION =
@@ -196,11 +201,13 @@ abstract class ExerciseBase {
   void manualPause() {
     if (exerciseState != ExerciseState.activated) return;
     _isPaused = true;
+    _manualPause = true;
   }
 
   /// Manually resume after a manual pause.
   void manualResume() {
     _isPaused = false;
+    _manualPause = false;
     _resumePresenceSince = DateTime.now();
     _personLostSince = null;
     _resetPresenceDetectors();
@@ -533,7 +540,9 @@ abstract class ExerciseBase {
 
     if (presentNow) {
       _personLostSince = null;
-      if (_isPaused) {
+      // A manual pause is held until the user taps resume — presence alone
+      // never clears it (otherwise standing in frame instantly un-pauses).
+      if (_isPaused && !_manualPause) {
         _resumePresenceSince ??= now;
         if (now.difference(_resumePresenceSince!) >=
             _PERSON_RESUME_CONFIRM_DURATION) {

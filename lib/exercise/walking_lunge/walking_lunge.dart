@@ -16,7 +16,6 @@ import 'dart:ui' show Size;
 enum WalkingState { standing, stepping, descending, bottom, pulling_through }
 
 class WalkingLungeConfig {
-  static const int MAX_REP = 20; // 10 per leg
   static const double STEP_START_NORM = 0.55;
   static const double STEP_CLOSE_NORM = 0.35;
   static const double FRAME_EDGE_MARGIN_RATIO = 0.04;
@@ -33,7 +32,7 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
       };
 
   final int maxRep;
-  WalkingLunge({this.maxRep = WalkingLungeConfig.MAX_REP});
+  WalkingLunge({required this.maxRep});
 
   WalkingState walkingState = WalkingState.standing;
   WalkingState previousWalkingState = WalkingState.standing;

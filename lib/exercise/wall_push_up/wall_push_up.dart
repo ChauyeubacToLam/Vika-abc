@@ -44,8 +44,6 @@ import 'metrics/wall_contact.dart';
 // --- Config ---
 
 class WallPushUpConfig {
-  static const int MAX_REP = 15;
-
   // State machine — driven by elbow angle β (shoulder→elbow→wrist), normalized.
   // ~175° = arms straight (standing/lockout). ~90° = elbows bent (bottom).
   static const double STANDING_ANGLE_THRESHOLD = 145.0; // > this → standing
@@ -313,7 +311,7 @@ class TempoMetric extends WallPushUpMetricBase {
 
 class WallPushUp extends ExerciseBase {
   final int maxRep;
-  WallPushUp({this.maxRep = WallPushUpConfig.MAX_REP});
+  WallPushUp({required this.maxRep});
 
   WallPushUpState wallPushUpState = WallPushUpState.standing;
   WallPushUpState previousWallPushUpState = WallPushUpState.standing;

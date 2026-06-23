@@ -15,7 +15,6 @@ enum AshtangaMode { transient, microHold }
 enum AshtangaState { entry, recognized, holding, exit }
 
 class AshtangaConfig {
-  static const int MAX_REP = 1;
   static const double MICRO_HOLD_DURATION = 4.0;
   static const double EXIT_DURATION = 2.0;
   static const int RECOGNITION_WINDOW_MS = 500;
@@ -34,7 +33,7 @@ class AshtangaNamaskara extends ExerciseBase {
   final AshtangaMode mode;
 
   AshtangaNamaskara({
-    this.maxRep = AshtangaConfig.MAX_REP,
+    required this.maxRep,
     this.mode = AshtangaMode.transient,
   });
 

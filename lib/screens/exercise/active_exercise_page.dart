@@ -832,6 +832,8 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     );
   }
 
+  // ─── Reviewer tracking-demo shortcut (squat only) ───
+  //
   Future<void> _initCamera() async {
     if (_setTeardownOwnsPipeline || _isLifecyclePaused || _isInitializing) {
       return;

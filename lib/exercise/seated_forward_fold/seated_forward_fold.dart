@@ -10,7 +10,7 @@ import 'metrics/ankle_dorsiflexion_metric.dart';
 
 class SeatedForwardFold extends ExerciseBase {
   SeatedForwardFold({
-    this.maxSeconds = SeatedForwardConfig.At_Min_Hold_Time,
+    required this.maxSeconds,
     this.maxHolds = SeatedForwardConfig.At_Num_Holds,
   }) : tempoMetric = HoldTempoMetric(minHoldSeconds: maxSeconds);
 

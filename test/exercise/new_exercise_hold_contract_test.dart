@@ -126,7 +126,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('Downward Dog counts only after full valid hold and writes logs', () {
-    final exercise = DownwardDog()..cameraFacing = CameraFacing.right;
+    final exercise = DownwardDog(maxHolds: 1)..cameraFacing = CameraFacing.right;
     final pose = _downwardDogPose();
 
     for (var i = 0; i < DownwardDogConfig.START_POSITION_FRAMES; i += 1) {
@@ -148,7 +148,7 @@ void main() {
   });
 
   test('Low Lunge start rejects lifted back knee', () {
-    final exercise = LowLunge()..cameraFacing = CameraFacing.right;
+    final exercise = LowLunge(maxRep: 2)..cameraFacing = CameraFacing.right;
 
     expect(exercise.isInStartPosition(_lowLungePose()), isTrue);
     expect(
@@ -158,7 +158,7 @@ void main() {
   });
 
   test('Low Lunge does not count when hold breaks before target duration', () {
-    final exercise = LowLunge()..cameraFacing = CameraFacing.right;
+    final exercise = LowLunge(maxRep: 2)..cameraFacing = CameraFacing.right;
     final good = _lowLungePose();
     final bad = _lowLungePose(backKneeGrounded: false);
 
@@ -173,7 +173,7 @@ void main() {
   });
 
   test('Raised Arms does not count when arms drop before hold target', () {
-    final exercise = RaisedArms()..cameraFacing = CameraFacing.right;
+    final exercise = RaisedArms(maxRep: 1)..cameraFacing = CameraFacing.right;
     final good = _raisedArmsPose();
     final bad = _raisedArmsPose(armsUp: false, hipY: 450);
 
@@ -188,7 +188,7 @@ void main() {
   });
 
   test('Ashtanga transient does not count a broken recognition window', () {
-    final exercise = AshtangaNamaskara()..cameraFacing = CameraFacing.right;
+    final exercise = AshtangaNamaskara(maxRep: 1)..cameraFacing = CameraFacing.right;
     final good = _ashtangaPose();
     final bad = _ashtangaPose(valid: false);
 

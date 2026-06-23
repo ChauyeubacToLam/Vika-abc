@@ -45,6 +45,7 @@ class _S10LevelIssueState extends State<S10LevelIssue>
         'Tăng nhẹ mỗi tuần',
       ],
       intensity: 0.35,
+      rank: 1,
     ),
     _LevelSpec(
       id: 'intermediate',
@@ -58,6 +59,7 @@ class _S10LevelIssueState extends State<S10LevelIssue>
         'Tập và phục hồi song song',
       ],
       intensity: 0.65,
+      rank: 2,
     ),
     _LevelSpec(
       id: 'advanced',
@@ -71,6 +73,7 @@ class _S10LevelIssueState extends State<S10LevelIssue>
         'Tối ưu hiệu suất từng tuần',
       ],
       intensity: 0.95,
+      rank: 3,
     ),
   ];
 
@@ -254,6 +257,7 @@ class _LevelSpec {
     required this.desc,
     required this.bullets,
     required this.intensity,
+    required this.rank,
   });
 
   final String id;
@@ -262,7 +266,14 @@ class _LevelSpec {
   final String sub;
   final String desc;
   final List<String> bullets;
+
+  /// Continuous fill (0–1) for the featured card's intensity bar.
   final double intensity;
+
+  /// Discrete level rank (1 = beginner, 2 = intermediate, 3 = advanced). Drives
+  /// the alternate tile's 3 mini dots, so they always reflect the true level
+  /// rather than a rounding of [intensity] (0.35 → ceil 2 misread beginner).
+  final int rank;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -383,8 +394,14 @@ class _FeaturedLevelCard extends StatelessWidget {
                                     level.title.toUpperCase(),
                                     style: V5
                                         .displaySm(context, color: V5.invInk)
-                                        .copyWith(letterSpacing: -1.1),
-                                    maxLines: 1,
+                                        .copyWith(
+                                          letterSpacing: -1.1,
+                                          height: 1.05,
+                                        ),
+                                    // Long titles (e.g. "NGƯỜI MỚI BẮT ĐẦU")
+                                    // wrap to a second line instead of
+                                    // ellipsis-truncating.
+                                    maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   const SizedBox(height: V5.space6),
@@ -673,7 +690,7 @@ class _AlternateLevelTile extends StatelessWidget {
             ),
             const SizedBox(height: V5.space10),
             _MiniIntensityDots(
-              value: level.intensity,
+              active: level.rank,
               dark: selected,
             ),
           ],
@@ -684,14 +701,15 @@ class _AlternateLevelTile extends StatelessWidget {
 }
 
 class _MiniIntensityDots extends StatelessWidget {
-  const _MiniIntensityDots({required this.value, required this.dark});
+  const _MiniIntensityDots({required this.active, required this.dark});
 
-  final double value;
+  /// Number of filled dots (1–3) — the level's true rank, not a rounding of a
+  /// continuous intensity (which over-filled beginner to 2).
+  final int active;
   final bool dark;
 
   @override
   Widget build(BuildContext context) {
-    final active = (value * 3).ceil();
     return Row(
       children: [
         for (var i = 0; i < 3; i++)

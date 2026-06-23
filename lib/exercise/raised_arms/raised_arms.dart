@@ -12,7 +12,6 @@ import 'metrics/cervical_safety_metric.dart';
 import 'metrics/arm_position_metric.dart';
 
 class RaisedArmsConfig {
-  static const int MAX_REP = 1;
   static const double HOLD_DURATION = 20.0;
   static const double EXIT_DURATION = 4.0;
 
@@ -30,7 +29,7 @@ enum RaisedArmsState { entry, holding, exit }
 class RaisedArms extends ExerciseBase {
   final int maxRep;
 
-  RaisedArms({this.maxRep = RaisedArmsConfig.MAX_REP});
+  RaisedArms({required this.maxRep});
 
   RaisedArmsState raisedArmsState = RaisedArmsState.entry;
   RaisedArmsState previousRaisedArmsState = RaisedArmsState.entry;

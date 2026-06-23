@@ -8,12 +8,21 @@ class LoopingAssetVideo extends StatefulWidget {
     this.fit = BoxFit.cover,
     this.alignment = Alignment.center,
     this.fallback,
+    this.volume = 0.0,
+    this.loop = true,
   });
 
   final String asset;
   final BoxFit fit;
   final Alignment alignment;
   final Widget? fallback;
+
+  /// Playback volume (0.0 muted by default — preserves existing callers).
+  final double volume;
+
+  /// Whether the clip loops (true by default — preserves existing callers).
+  /// Set false to play once and rest on the final frame.
+  final bool loop;
 
   @override
   State<LoopingAssetVideo> createState() => _LoopingAssetVideoState();
@@ -64,8 +73,8 @@ class _LoopingAssetVideoState extends State<LoopingAssetVideo> {
     try {
       await controller.initialize();
       if (!mounted || _controller != controller) return;
-      await controller.setLooping(true);
-      await controller.setVolume(0);
+      await controller.setLooping(widget.loop);
+      await controller.setVolume(widget.volume);
       await controller.play();
       if (mounted && _controller == controller) setState(() {});
     } catch (_) {

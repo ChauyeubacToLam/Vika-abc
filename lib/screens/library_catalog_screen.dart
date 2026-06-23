@@ -26,6 +26,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data/library_mock.dart';
+import '../services/catalog/catalog_source.dart';
 import '../theme/app_colors.dart';
 import '../theme/vf_theme.dart';
 import '../widgets/ivory/atoms.dart';
@@ -66,6 +67,11 @@ class _LibraryCatalogScreenState extends State<LibraryCatalogScreen>
   @override
   void initState() {
     super.initState();
+    // Catalog is preloaded in main(); ensure here too so list volume labels
+    // resolve even if this screen is reached first, then rebuild once ready.
+    CatalogSource.instance.ensureLoaded().then((_) {
+      if (mounted) setState(() {});
+    });
     _groups = orderedCatalogGroups(widget.rows);
 
     if (_groups.isNotEmpty) {
@@ -761,7 +767,7 @@ class _ResultRow extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '${row.cat} · ${row.diff}',
+                      '${row.displayCat} · ${row.diff}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(

@@ -44,7 +44,7 @@ void main() {
       expect(legRaise.logger.setLogs['max_rep'], 7);
       expect(legRaise.logger.setLogs['good_rep_count'], 1);
 
-      final shoulderTap = PlankShoulderTap()
+      final shoulderTap = PlankShoulderTap(maxRep: PlankTapConfig.MAX_REP)
         ..logger.addRepLog(RepLog(
           correctForm: true,
           repNumber: 1,
@@ -82,9 +82,11 @@ void main() {
       final deadBug = DeadBug(maxRep: 7)..onSetComplete();
       final russianTwist = RussianTwist(maxRep: 6)..onSetComplete();
       final jumpSquat = JumpSquat(maxRep: 5)..onSetComplete();
-      final mountainClimber = MountainClimber()..onSetComplete();
-      final superman = Superman()..onSetComplete();
-      final reverseCrunch = ReverseCrunch()..onSetComplete();
+      final mountainClimber =
+          MountainClimber(maxRep: ClimberConfig.MAX_REP)..onSetComplete();
+      final superman = Superman(maxRep: SupermanConfig.MAX_REP)..onSetComplete();
+      final reverseCrunch =
+          ReverseCrunch(maxRep: ReverseCrunchConfig.MAX_REP)..onSetComplete();
 
       expect(birdDog.logger.setLogs['max_rep'], 8);
       expect(deadBug.logger.setLogs['max_rep'], 7);
@@ -97,7 +99,7 @@ void main() {
         ReverseCrunchConfig.MAX_REP,
       );
 
-      final sphinx = SphinxStretch()..onSetComplete();
+      final sphinx = SphinxStretch(maxSeconds: 3)..onSetComplete();
       expect(sphinx.repCount, 0);
       expect(sphinx.logger.setLogs.containsKey('target_rep'), isFalse);
       expect(sphinx.logger.setLogs['max_rep'], SphinxConfig.Af_Max_Reps);
@@ -105,7 +107,7 @@ void main() {
 
     test('hold exercises publish fault seconds without duplicate count keys',
         () {
-      final highPlank = HighPlank();
+      final highPlank = HighPlank(maxSeconds: 30);
       highPlank.onSetComplete();
       highPlank.onSetComplete();
 
@@ -116,7 +118,7 @@ void main() {
       expect(highPlank.logger.setLogs['elbow_seconds'], 0.0);
       expect(highPlank.logger.repLogs, hasLength(1));
 
-      final bearPlank = BearPlank();
+      final bearPlank = BearPlank(maxSeconds: 30);
       bearPlank.onSetComplete();
       bearPlank.onSetComplete();
 

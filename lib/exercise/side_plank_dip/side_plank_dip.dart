@@ -12,7 +12,6 @@ import 'metrics/anti_rotation_metric.dart';
 import 'metrics/hip_amplitude_metric.dart';
 
 class SidePlankConfig {
-  static const int MAX_REP = 12;
   static const double STRAIGHT_BODY_ANGLE = 175.0;
   static const double BOTTOM_BODY_ANGLE = 160.0;
   static const double MOVEMENT_THRESHOLD = 3.0; // Y-axis delta (pixels/cm)
@@ -32,7 +31,7 @@ class SidePlankDip extends ExerciseBase {
       };
 
   final int maxRep;
-  SidePlankDip({this.maxRep = SidePlankConfig.MAX_REP});
+  SidePlankDip({required this.maxRep});
 
   SidePlankState plankState = SidePlankState.setupPlank;
   SidePlankState previousPlankState = SidePlankState.setupPlank;

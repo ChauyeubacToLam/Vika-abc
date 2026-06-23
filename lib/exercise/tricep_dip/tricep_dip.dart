@@ -14,7 +14,6 @@ import 'metrics/scapular_elevation_metric.dart';
 enum TricepDipState { setup_top, descending, bottom, ascending }
 
 class TricepDipConfig {
-  static const int MAX_REP = 15;
   static const double DESCENDING_ELBOW_ANGLE = 155.0;
   static const double BOTTOM_ELBOW_ANGLE = 110.0;
   static const double ASCENDING_ELBOW_ANGLE = 160.0;
@@ -29,7 +28,7 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
       };
 
   final int maxRep;
-  TricepDip({this.maxRep = TricepDipConfig.MAX_REP});
+  TricepDip({required this.maxRep});
 
   TricepDipState tricepState = TricepDipState.setup_top;
   TricepDipState previousTricepState = TricepDipState.setup_top;

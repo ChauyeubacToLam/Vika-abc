@@ -58,8 +58,6 @@ enum DownwardDogState {
 // ─────────────────────────────────────────────────────────────
 
 class DownwardDogConfig {
-  static const int MAX_HOLDS = 1;
-
   /// Default hold target (seconds).
   static const double HOLD_DURATION_SEC = 30.0;
 
@@ -99,7 +97,7 @@ class DownwardDogConfig {
 // ─────────────────────────────────────────────────────────────
 
 class DownwardDog extends ExerciseBase {
-  DownwardDog({this.maxHolds = DownwardDogConfig.MAX_HOLDS}) {
+  DownwardDog({required this.maxHolds}) {
     _spineMetric = SpineRoundMetric();
     _shoulderMetric = ShoulderShrugMetric();
     _legMetric = LegStraightnessMetric();
