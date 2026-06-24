@@ -1,50 +1,41 @@
+import 'dart:math' as math;
+
 import 'russian_metric_base.dart';
 import '../russian_twist.dart';
 
+/// Measures how far the hands travel laterally during a twist.
+///
+/// In front-view the wrist is the most reliable signal: hands stay in frame
+/// while twisting both ways, unlike the side-view shoulder which was fully
+/// occluded. ROM is measured as the peak |lateral offset| reached during the
+/// twisting phase, normalized by shoulder width.
 class TwistRomMetric extends RussianMetricBase {
-  double? _bestForwardAngleDelta;
-  double? _bestBackwardAngleDelta;
-  double? _centerAngle;
+  double? _bestAbsOffset;
+  double? _centerOffset;
   bool _evaluatedThisHalf = false;
 
   @override
   void update(RussianRepContext ctx) {
-    if (ctx.kneeHipDx <= 1e-6) return;
+    if (ctx.shoulderWidth <= 1e-6) return;
 
     if (ctx.state == RussianTwistState.center_setup) {
-      _centerAngle = ctx.shoulderAngle;
+      _centerOffset = ctx.wristLateralOffset;
     }
 
-    if (_centerAngle == null) return;
-
-    final angleDelta = ctx.shoulderAngle - _centerAngle!;
-    debugData['twistRomDelta'] = angleDelta.toStringAsFixed(1);
+    final delta =
+        ctx.wristLateralOffset - (_centerOffset ?? ctx.wristLateralOffset);
+    debugData['twistRomDelta'] = delta.toStringAsFixed(2);
 
     if (ctx.state == RussianTwistState.twisting ||
         ctx.state == RussianTwistState.max_point) {
-      if (ctx.direction == TwistDirection.forward) {
-        // Forward: angle decreases, so delta is negative
-        _bestForwardAngleDelta =
-            _bestForwardAngleDelta == null ? angleDelta : _min(_bestForwardAngleDelta!, angleDelta);
-      } else if (ctx.direction == TwistDirection.backward) {
-        // Backward: angle increases, so delta is positive
-        _bestBackwardAngleDelta = _bestBackwardAngleDelta == null
-            ? angleDelta
-            : _max(_bestBackwardAngleDelta!, angleDelta);
-      }
+      _bestAbsOffset = _bestAbsOffset == null
+          ? delta.abs()
+          : math.max(_bestAbsOffset!, delta.abs());
     }
 
     if (ctx.state == RussianTwistState.returning && !_evaluatedThisHalf) {
-      var sufficientRom = true;
-      if (ctx.direction == TwistDirection.forward) {
-        // Need to decrease by at least FORWARD_GOOD_ROM_DELTA
-        sufficientRom = (_bestForwardAngleDelta ?? angleDelta) <=
-            -RussianTwistConfig.FORWARD_GOOD_ROM_DELTA;
-      } else if (ctx.direction == TwistDirection.backward) {
-        // Need to increase by at least BACKWARD_GOOD_ROM_DELTA
-        sufficientRom = (_bestBackwardAngleDelta ?? angleDelta) >=
-            RussianTwistConfig.BACKWARD_GOOD_ROM_DELTA;
-      }
+      final sufficientRom = (_bestAbsOffset ?? delta.abs()) >=
+          RussianTwistConfig.GOOD_ROM_DELTA;
 
       if (!sufficientRom) {
         addFault(
@@ -64,13 +55,9 @@ class TwistRomMetric extends RussianMetricBase {
 
   @override
   void resetAndCountFault() {
-    _bestForwardAngleDelta = null;
-    _bestBackwardAngleDelta = null;
-    _centerAngle = null;
+    _bestAbsOffset = null;
+    _centerOffset = null;
     _evaluatedThisHalf = false;
     super.resetAndCountFault();
   }
-
-  double _max(double a, double b) => a > b ? a : b;
-  double _min(double a, double b) => a < b ? a : b;
 }

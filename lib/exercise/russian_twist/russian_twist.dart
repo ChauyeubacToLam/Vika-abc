@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:vika/debug/tracked_metric.dart';
 import 'package:vika/exercise/exercise_base.dart';
-import 'package:vika/exercise/side_tracked_exercise_mixin.dart';
 import 'package:vika/pose/vika_pose_landmark.dart';
 import 'package:vika/utils/exercise_logger.dart';
 
@@ -22,40 +21,46 @@ enum TwistDirection { none, forward, backward }
 
 class RussianTwistConfig {
   static const int MAX_REP = 20;
+
+  /// Trunk angle (shoulder midpoint -> hip midpoint, from horizontal) must
+  /// stay in [MIN, MAX] degrees so the user sits in a leaned-back V, neither
+  /// upright nor collapsed. In front-view this is measured via the dy/dx of
+  /// the shoulder-to-hip midline.
   static const double MIN_TRUNK_HORIZONTAL_ANGLE = 32.0;
   static const double MAX_TRUNK_HORIZONTAL_ANGLE = 72.0;
-  static const double MIN_KNEE_HIP_DX_RATIO = 0.35;
 
-  // New Angle thresholds for shoulder-hip-knee
-  static const double TWIST_START_ANGLE_DELTA = 10.0;
-  static const double FORWARD_GOOD_ROM_DELTA = 15.0;
-  static const double BACKWARD_GOOD_ROM_DELTA = 15.0;
-  static const double CENTER_TOLERANCE_ANGLE = 6.0;
-  static const double ANGLE_VELOCITY_GATE = 1.0;
+  /// Lateral wrist offset thresholds, all normalized by shoulder width so
+  /// they are body-size and camera-distance independent.
+  ///
+  /// A wrist offset of 0.30 means the hand is 30% of shoulder-width away
+  /// from the body midline — a comfortable full twist to one side.
+  static const double TWIST_START_DELTA = 0.12;
+  static const double GOOD_ROM_DELTA = 0.28;
+  static const double CENTER_TOLERANCE = 0.06;
+
+  /// Velocity gate for wrist-offset change detection (normalized units).
+  static const double OFFSET_VELOCITY_GATE = 0.015;
+
+  /// Minimum shoulder width (px) below which the frame is rejected as too far
+  /// away / unreliable.
+  static const double MIN_SHOULDER_WIDTH = 40.0;
 }
 
-class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
+/// Front-view Russian Twist.
+///
+/// Rep counting is driven by the lateral position of the leading hand
+/// relative to the body midline (midpoint of the two shoulders), normalized
+/// by shoulder width. This signal stays reliable while twisting to both
+/// sides because the hands remain in frame — unlike the previous side-view
+/// implementation whose tracked shoulder was fully occluded when twisting
+/// toward the camera's blind side, stalling the rep counter.
+class RussianTwist extends ExerciseBase {
   @override
-  Set<VikaImageOrientation> get supportedOrientations => <VikaImageOrientation>{
+  Set<VikaImageOrientation> get supportedOrientations =>
+      <VikaImageOrientation>{
         VikaImageOrientation.landscapeLeft,
         VikaImageOrientation.landscapeRight,
         VikaImageOrientation.portrait,
-      };
-
-  @override
-  Map<String, SideLandmarkPair> get requiredSideLandmarks => const {
-        'shoulder': (
-          right: PoseLandmarkType.rightShoulder,
-          left: PoseLandmarkType.leftShoulder
-        ),
-        'hip': (
-          right: PoseLandmarkType.rightHip,
-          left: PoseLandmarkType.leftHip
-        ),
-        'knee': (
-          right: PoseLandmarkType.rightKnee,
-          left: PoseLandmarkType.leftKnee
-        ),
       };
 
   final int maxRep;
@@ -68,12 +73,11 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
 
   int _halfRepCount = 0;
   int _rejectedHalfTwists = 0;
-  double? _centerShoulderAngle;
+  double? _centerOffset;
   final List<FaultRecord> _pendingFullRepFaults = [];
 
   static const Set<String> _blockingFaultTypes = {
     'shallow_twist',
-    'arm_swinging',
     'knee_wobble',
     'upright_torso',
     'collapsed_torso',
@@ -135,21 +139,23 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
     logger.pushKey("max_rep", maxRep);
   }
 
+  // -- Safety: require a front view --
+
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    if (cameraFacing != CameraFacing.left &&
-        cameraFacing != CameraFacing.right) {
-      if (cameraFacing == CameraFacing.front) {
-        return 'Đặt camera ngang bên hông, không quay chính diện.';
+    if (cameraFacing != CameraFacing.front) {
+      if (cameraFacing == CameraFacing.left ||
+          cameraFacing == CameraFacing.right) {
+        return 'Đặt camera chính diện trước mặt, không quay nghiêng hông.';
       }
       if (cameraFacing == CameraFacing.angled) {
-        return 'Xoay camera sang góc ngang bên hông rồi mới tập.';
+        return 'Xoay camera về chính diện trước mặt rồi mới tập.';
       }
-      return 'Giữ vai, hông, gối và tay trong khung hình ở góc ngang bên hông.';
+      return 'Đặt camera chính diện trước mặt để AI thấy rõ hai vai và hai tay.';
     }
 
-    final sideLandmarks = getSideTrackedLandmarks(landmarks);
-    if (sideLandmarks == null) {
+    final bundle = _collectFrontLandmarks(landmarks);
+    if (bundle == null) {
       return 'Không nhìn thấy đủ các điểm khớp vai, hông, gối và cổ tay.';
     }
     return null;
@@ -157,14 +163,10 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
 
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    final sideLandmarks = getSideTrackedLandmarks(landmarks);
-    if (sideLandmarks == null) return false;
+    final bundle = _collectFrontLandmarks(landmarks);
+    if (bundle == null) return false;
 
-    final shoulder = sideLandmarks['shoulder']!;
-    final hip = sideLandmarks['hip']!;
-    final knee = sideLandmarks['knee']!;
-
-    final trunkAngle = _trunkHorizontalAngle(shoulder, hip);
+    final trunkAngle = _trunkHorizontalAngle(bundle);
     if (trunkAngle > RussianTwistConfig.MAX_TRUNK_HORIZONTAL_ANGLE) {
       resultIssues.feedback['System'] =
           'Ngả lưng ra sau khoảng 35-60 độ, không ngồi thẳng lưng.';
@@ -176,24 +178,20 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
       return false;
     }
 
-    final directionMultiplier = _directionMultiplier(hip, knee);
-    final kneeHipDx = _normalizedDx(knee, hip, directionMultiplier);
-    final torsoLength = math.max(calculateDistance(shoulder, hip), 1.0);
-    if (kneeHipDx < torsoLength * RussianTwistConfig.MIN_KNEE_HIP_DX_RATIO) {
+    // Hands must start roughly centered (near the body midline).
+    final shoulderWidth = _shoulderWidth(bundle);
+    if (shoulderWidth < RussianTwistConfig.MIN_SHOULDER_WIDTH) {
       resultIssues.feedback['System'] =
-          'Co gối rõ hơn và giữ đầu gối ở phía trước hông.';
+          'Lùi xa hơn một chút để AI nhìn rõ toàn thân.';
       return false;
     }
 
-    final shoulderAngle = calculateAngleNormalized(
-      firstPoint: shoulder,
-      midPoint: hip,
-      lastPoint: knee,
-    );
-
-    if (shoulderAngle < 70 || shoulderAngle > 115) {
+    final wristPoint = _leadingWrist(landmarks, bundle);
+    final wristOffset =
+        (wristPoint.x - bundle.midShoulderX) / shoulderWidth;
+    if (wristOffset.abs() > RussianTwistConfig.TWIST_START_DELTA) {
       resultIssues.feedback['System'] =
-          'Giữ vai ổn định ở giữa, không vặn người khi chuẩn bị.';
+          'Đưa hai tay về giữa ngực trước khi bắt đầu.';
       return false;
     }
 
@@ -201,8 +199,8 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
       'cameraFacing': cameraFacing.name,
       'frontFacingRatio': frontFacingRatio.toStringAsFixed(2),
       'trunkAngle': trunkAngle.toStringAsFixed(1),
-      'kneeHipDx': kneeHipDx.toStringAsFixed(1),
-      'shoulderAngle': shoulderAngle.toStringAsFixed(1),
+      'shoulderWidth': shoulderWidth.toStringAsFixed(1),
+      'wristOffset': wristOffset.toStringAsFixed(2),
     };
     return true;
   }
@@ -215,57 +213,53 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
       return;
     }
 
-    final sideLandmarks = getSideTrackedLandmarks(smoothedLandmarks);
-    if (sideLandmarks == null) return;
+    final bundle = _collectFrontLandmarks(smoothedLandmarks);
+    if (bundle == null) return;
 
-    final shoulder = sideLandmarks['shoulder']!;
-    final hip = sideLandmarks['hip']!;
-    final knee = sideLandmarks['knee']!;
-    final trackedWrist = sideLandmarks['wrist'] ??
-        (smoothedLandmarks[PoseLandmarkType.leftWrist]!.presence >
-                smoothedLandmarks[PoseLandmarkType.rightWrist]!.presence
-            ? smoothedLandmarks[PoseLandmarkType.leftWrist]!
-            : smoothedLandmarks[PoseLandmarkType.rightWrist]!);
-    final handPoint = _stableHandPoint(smoothedLandmarks, trackedWrist);
+    final shoulderWidth = _shoulderWidth(bundle);
+    if (shoulderWidth < RussianTwistConfig.MIN_SHOULDER_WIDTH) return;
+    scaleFactor = shoulderWidth;
 
-    final directionMultiplier = _directionMultiplier(hip, knee);
-    final wristHipDx = (handPoint.x - hip.x) * directionMultiplier;
-    final shoulderHipDx = (shoulder.x - hip.x) * directionMultiplier;
-    var kneeHipDx = _normalizedDx(knee, hip, directionMultiplier);
-    final trunkAngle = _trunkHorizontalAngle(shoulder, hip);
-
-    final shoulderAngle = calculateAngleNormalized(
-      firstPoint: shoulder,
-      midPoint: hip,
-      lastPoint: knee,
-    );
-
-    if (kneeHipDx <= 1e-6) kneeHipDx = 1.0;
+    final wristPoint = _leadingWrist(smoothedLandmarks, bundle);
+    final wristOffset =
+        (wristPoint.x - bundle.midShoulderX) / shoulderWidth;
+    final shoulderRotationOffset =
+        (bundle.midShoulderX - bundle.midHipX) / shoulderWidth;
+    final trunkAngle = _trunkHorizontalAngle(bundle);
 
     final now = frameTimestampMs;
     frameBuffer.addFrame(FrameSnapshot(log: {
-      'wristHipDx': wristHipDx,
-      'shoulderAngle': shoulderAngle,
-      'shoulderSignal': shoulderHipDx,
+      'wristOffset': wristOffset,
     }, timeStamp: now));
 
-    _updateStateMachine(shoulderAngle, now);
+    _updateStateMachine(wristOffset, now);
 
     final ctx = RussianRepContext(
-      wristX: handPoint.x,
-      wristY: handPoint.y,
-      kneeX: knee.x,
-      kneeY: knee.y,
-      hipX: hip.x,
-      hipY: hip.y,
-      shoulderX: shoulder.x,
-      shoulderY: shoulder.y,
-      wristHipDx: wristHipDx,
-      shoulderHipDx: shoulderHipDx,
-      kneeHipDx: kneeHipDx,
-      directionMultiplier: directionMultiplier,
+      midShoulderX: bundle.midShoulderX,
+      midShoulderY: bundle.midShoulderY,
+      midHipX: bundle.midHipX,
+      midHipY: bundle.midHipY,
+      midKneeX: bundle.midKneeX,
+      midKneeY: bundle.midKneeY,
+      wristX: wristPoint.x,
+      wristY: wristPoint.y,
+      leftShoulderX: bundle.leftShoulder.x,
+      leftShoulderY: bundle.leftShoulder.y,
+      rightShoulderX: bundle.rightShoulder.x,
+      rightShoulderY: bundle.rightShoulder.y,
+      leftKneeX: bundle.leftKnee.x,
+      leftKneeY: bundle.leftKnee.y,
+      rightKneeX: bundle.rightKnee.x,
+      rightKneeY: bundle.rightKnee.y,
+      leftHipX: bundle.leftHip.x,
+      leftHipY: bundle.leftHip.y,
+      rightHipX: bundle.rightHip.x,
+      rightHipY: bundle.rightHip.y,
+      wristLateralOffset: wristOffset,
+      shoulderRotationOffset: shoulderRotationOffset,
+      kneeDriftRatio: 0.0,
       trunkHorizontalAngle: trunkAngle,
-      shoulderAngle: shoulderAngle,
+      shoulderWidth: shoulderWidth,
       state: russianState,
       direction: currentDirection,
       frameTimestamp: now,
@@ -284,9 +278,8 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
       'halfRepCount': _halfRepCount,
       'repCount': repCount,
       'rejectedHalfTwists': _rejectedHalfTwists,
-      'handSignal': wristHipDx.toStringAsFixed(1),
-      'handRatio': (wristHipDx / kneeHipDx).toStringAsFixed(2),
-      'shoulderSignal': shoulderHipDx.toStringAsFixed(1),
+      'wristOffset': wristOffset.toStringAsFixed(2),
+      'shoulderRotation': shoulderRotationOffset.toStringAsFixed(2),
       'trunkAngle': trunkAngle.toStringAsFixed(1),
     };
 
@@ -303,54 +296,54 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
     }
   }
 
-  void _updateStateMachine(double shoulderAngle, int now) {
-    final angleChange = frameBuffer.getChange(
-      'shoulderAngle',
-      RussianTwistConfig.ANGLE_VELOCITY_GATE,
+  // -- State machine (driven by signed wrist lateral offset) --
+
+  void _updateStateMachine(double wristOffset, int now) {
+    final change = frameBuffer.getChange(
+      'wristOffset',
+      RussianTwistConfig.OFFSET_VELOCITY_GATE,
     );
+    final center = _centerOffset ?? wristOffset;
+    final delta = wristOffset - center;
 
     if (russianState == RussianTwistState.center_setup) {
-      _centerShoulderAngle = shoulderAngle;
-      if (angleChange == ChangeState.decreasing &&
-          shoulderAngle <= _centerShoulderAngle! - RussianTwistConfig.TWIST_START_ANGLE_DELTA) {
+      _centerOffset = center;
+      if (delta >= RussianTwistConfig.TWIST_START_DELTA) {
         currentDirection = TwistDirection.forward;
         _transitionState(RussianTwistState.twisting, now);
-      } else if (angleChange == ChangeState.increasing &&
-          shoulderAngle >= _centerShoulderAngle! + RussianTwistConfig.TWIST_START_ANGLE_DELTA) {
+      } else if (delta <= -RussianTwistConfig.TWIST_START_DELTA) {
         currentDirection = TwistDirection.backward;
         _transitionState(RussianTwistState.twisting, now);
       }
     } else if (russianState == RussianTwistState.twisting) {
-      if (currentDirection == TwistDirection.forward) {
-        if (shoulderAngle <= _centerShoulderAngle! - RussianTwistConfig.FORWARD_GOOD_ROM_DELTA) {
-          _transitionState(RussianTwistState.max_point, now);
-        } else if (angleChange == ChangeState.increasing) {
-          _transitionState(RussianTwistState.returning, now);
-        }
-      } else if (currentDirection == TwistDirection.backward) {
-        if (shoulderAngle >= _centerShoulderAngle! + RussianTwistConfig.BACKWARD_GOOD_ROM_DELTA) {
-          _transitionState(RussianTwistState.max_point, now);
-        } else if (angleChange == ChangeState.decreasing) {
-          _transitionState(RussianTwistState.returning, now);
-        }
+      if (delta.abs() >= RussianTwistConfig.GOOD_ROM_DELTA) {
+        _transitionState(RussianTwistState.max_point, now);
+      } else if (_reversingFromPeak(change, delta)) {
+        _transitionState(RussianTwistState.returning, now);
       }
     } else if (russianState == RussianTwistState.max_point) {
-      if (currentDirection == TwistDirection.forward &&
-          angleChange == ChangeState.increasing) {
-        _transitionState(RussianTwistState.returning, now);
-      } else if (currentDirection == TwistDirection.backward &&
-          angleChange == ChangeState.decreasing) {
+      if (_reversingFromPeak(change, delta)) {
         _transitionState(RussianTwistState.returning, now);
       }
     } else if (russianState == RussianTwistState.returning) {
-      final nearCenter = _centerShoulderAngle != null &&
-          (shoulderAngle - _centerShoulderAngle!).abs() <= RussianTwistConfig.CENTER_TOLERANCE_ANGLE;
-
+      final nearCenter =
+          delta.abs() <= RussianTwistConfig.CENTER_TOLERANCE;
       if (nearCenter) {
         _transitionState(RussianTwistState.center_setup, now);
         _completeHalfRep();
       }
     }
+  }
+
+  /// True when the wrist is travelling back toward center after a twist.
+  bool _reversingFromPeak(ChangeState change, double delta) {
+    if (delta == 0) return false;
+    // Forward (positive delta) is reversing when offset is decreasing.
+    // Backward (negative delta) is reversing when offset is increasing.
+    if (delta > 0) {
+      return change == ChangeState.decreasing;
+    }
+    return change == ChangeState.increasing;
   }
 
   void _transitionState(RussianTwistState newState, int timestampMs) {
@@ -446,49 +439,123 @@ class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
     currentDirection = TwistDirection.none;
   }
 
-  double _directionMultiplier(PoseLandmark hip, PoseLandmark knee) {
-    return knee.x >= hip.x ? 1.0 : -1.0;
-  }
+  // -- Front-view landmark helpers --
 
-  double _normalizedDx(
-    PoseLandmark point,
-    PoseLandmark origin,
-    double directionMultiplier,
-  ) {
-    return (point.x - origin.x) * directionMultiplier;
-  }
+  _FrontBundle? _collectFrontLandmarks(
+      Map<PoseLandmarkType, PoseLandmark> landmarks) {
+    final leftShoulder = landmarks[PoseLandmarkType.leftShoulder];
+    final rightShoulder = landmarks[PoseLandmarkType.rightShoulder];
+    final leftHip = landmarks[PoseLandmarkType.leftHip];
+    final rightHip = landmarks[PoseLandmarkType.rightHip];
+    final leftKnee = landmarks[PoseLandmarkType.leftKnee];
+    final rightKnee = landmarks[PoseLandmarkType.rightKnee];
 
-  double _trunkHorizontalAngle(PoseLandmark shoulder, PoseLandmark hip) {
-    return calculateAbsoluteHorizontalAngle(point1: shoulder, point2: hip);
-  }
-
-  ({double x, double y}) _stableHandPoint(
-    Map<PoseLandmarkType, PoseLandmark> landmarks,
-    PoseLandmark trackedWrist,
-  ) {
-    var best = trackedWrist;
-    var bestScore = _landmarkReliability(trackedWrist);
-
-    for (final type in const [
-      PoseLandmarkType.leftWrist,
-      PoseLandmarkType.rightWrist,
-    ]) {
-      final candidate = landmarks[type];
-      if (candidate == null || !ExerciseBase.isLandmarkConfident(candidate)) {
-        continue;
-      }
-
-      final score = _landmarkReliability(candidate);
-      if (score > bestScore + 0.35) {
-        best = candidate;
-        bestScore = score;
-      }
+    if (leftShoulder == null ||
+        rightShoulder == null ||
+        leftHip == null ||
+        rightHip == null ||
+        leftKnee == null ||
+        rightKnee == null) {
+      return null;
+    }
+    if (!ExerciseBase.isLandmarkConfident(leftShoulder) ||
+        !ExerciseBase.isLandmarkConfident(rightShoulder) ||
+        !ExerciseBase.isLandmarkConfident(leftHip) ||
+        !ExerciseBase.isLandmarkConfident(rightHip) ||
+        !ExerciseBase.isLandmarkConfident(leftKnee) ||
+        !ExerciseBase.isLandmarkConfident(rightKnee)) {
+      return null;
     }
 
+    return _FrontBundle(
+      leftShoulder: leftShoulder,
+      rightShoulder: rightShoulder,
+      leftHip: leftHip,
+      rightHip: rightHip,
+      leftKnee: leftKnee,
+      rightKnee: rightKnee,
+    );
+  }
+
+  double _shoulderWidth(_FrontBundle bundle) {
+    return calculateDistance(bundle.leftShoulder, bundle.rightShoulder);
+  }
+
+  double _trunkHorizontalAngle(_FrontBundle bundle) {
+    final midShoulderY = (bundle.leftShoulder.y + bundle.rightShoulder.y) / 2;
+    final midHipY = (bundle.leftHip.y + bundle.rightHip.y) / 2;
+    final midShoulderX = (bundle.leftShoulder.x + bundle.rightShoulder.x) / 2;
+    final midHipX = (bundle.leftHip.x + bundle.rightHip.x) / 2;
+
+    final dy = (midShoulderY - midHipY).abs();
+    final dx = (midShoulderX - midHipX).abs();
+    // Angle of the shoulder->hip line from vertical. An upright torso reads
+    // near 0° (shoulders directly above hips); a fully laid-back torso reads
+    // near 90°. We reuse the same MIN/MAX trunk-angle config semantics, so
+    // measure from vertical here.
+    final fromVertical =
+        math.atan2(dx, dy) * (180.0 / math.pi);
+    return fromVertical;
+  }
+
+  /// Picks the more reliable wrist (highest presence/visibility/likelihood)
+  /// to represent the leading hand. While twisting, the leading hand is the
+  /// most stable signal and always stays in frame.
+  ({double x, double y}) _leadingWrist(
+    Map<PoseLandmarkType, PoseLandmark> landmarks,
+    _FrontBundle bundle,
+  ) {
+    final leftWrist = landmarks[PoseLandmarkType.leftWrist];
+    final rightWrist = landmarks[PoseLandmarkType.rightWrist];
+
+    if (leftWrist == null && rightWrist == null) {
+      // Fall back to the shoulder midpoint if no wrist is visible.
+      return (
+        x: bundle.midShoulderX,
+        y: bundle.midShoulderY,
+      );
+    }
+    if (leftWrist == null) {
+      return (x: rightWrist!.x, y: rightWrist.y);
+    }
+    if (rightWrist == null) {
+      return (x: leftWrist.x, y: leftWrist.y);
+    }
+
+    final leftScore = _landmarkReliability(leftWrist);
+    final rightScore = _landmarkReliability(rightWrist);
+    final best = leftScore >= rightScore ? leftWrist : rightWrist;
     return (x: best.x, y: best.y);
   }
 
   double _landmarkReliability(PoseLandmark landmark) {
     return landmark.likelihood + landmark.presence + landmark.visibility;
   }
+}
+
+/// Internal helper bundling the six required bilateral landmarks for a
+/// front-view frame, with precomputed midpoints.
+class _FrontBundle {
+  _FrontBundle({
+    required this.leftShoulder,
+    required this.rightShoulder,
+    required this.leftHip,
+    required this.rightHip,
+    required this.leftKnee,
+    required this.rightKnee,
+  });
+
+  final PoseLandmark leftShoulder;
+  final PoseLandmark rightShoulder;
+  final PoseLandmark leftHip;
+  final PoseLandmark rightHip;
+  final PoseLandmark leftKnee;
+  final PoseLandmark rightKnee;
+
+  double get midShoulderX => (leftShoulder.x + rightShoulder.x) / 2;
+  double get midShoulderY => (leftShoulder.y + rightShoulder.y) / 2;
+  double get midHipX => (leftHip.x + rightHip.x) / 2;
+  double get midHipY => (leftHip.y + rightHip.y) / 2;
+  double get midKneeX => (leftKnee.x + rightKnee.x) / 2;
+  double get midKneeY => (leftKnee.y + rightKnee.y) / 2;
 }

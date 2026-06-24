@@ -1,41 +1,48 @@
 import 'russian_metric_base.dart';
 import '../russian_twist.dart';
 
+/// Detects "arm swinging" — where the hands move but the torso/chest does
+/// not rotate with them.
+///
+/// In front-view, reliable trunk-rotation depth (z) is not available, so this
+/// metric uses a weaker proxy: how far the hands travel laterally relative to
+/// the shoulders. If the wrist barely crosses the shoulder line during a full
+/// twist, the user is mostly swinging the arms rather than rotating the
+/// chest.
+///
+/// This is a NON-blocking quality warning (affectsForm: false): the front-view
+/// signal is too indirect to reject reps on its own, and the primary goal is
+/// reliable rep counting.
 class ThoracicRotationMetric extends RussianMetricBase {
-  static const double SHOULDER_MOVEMENT_MIN = 0.06;
+  static const double SHOULDER_CROSS_MIN = 0.02;
 
-  double? _setupShoulderHipDx;
+  double? _setupShoulderX;
 
   @override
   void update(RussianRepContext ctx) {
-    if (ctx.kneeHipDx <= 1e-6) return;
+    if (ctx.shoulderWidth <= 1e-6) return;
 
     if (ctx.state == RussianTwistState.center_setup) {
-      _setupShoulderHipDx = ctx.shoulderHipDx;
+      _setupShoulderX = ctx.midShoulderX;
     }
 
     if (ctx.state == RussianTwistState.max_point &&
-        _setupShoulderHipDx != null) {
-      final signedMovement = ctx.shoulderHipDx - _setupShoulderHipDx!;
-      final expectedDirection = ctx.direction == TwistDirection.forward
-          ? 1.0
-          : ctx.direction == TwistDirection.backward
-              ? -1.0
-              : 0.0;
-      final movementRatio = signedMovement.abs() / ctx.kneeHipDx;
-      final movesWithHand =
-          expectedDirection == 0.0 || signedMovement * expectedDirection > 0;
+        _setupShoulderX != null) {
+      // How far the wrist has moved laterally relative to setup, normalized
+      // by shoulder width. A genuine twist moves the hands well past the
+      // shoulder line; arm-only swings stay close to center.
+      final signedMovement = (ctx.wristX - _setupShoulderX!) / ctx.shoulderWidth;
+      final movementRatio = signedMovement.abs();
 
       debugData['shoulderMovementRatio'] = movementRatio.toStringAsFixed(2);
-      debugData['shoulderMovesWithHand'] = movesWithHand;
 
-      if (movementRatio < SHOULDER_MOVEMENT_MIN || !movesWithHand) {
+      if (movementRatio < SHOULDER_CROSS_MIN) {
         addFault(
           FaultRecord(
             type: 'arm_swinging',
             message:
                 'Đừng chỉ vung tay, hãy xoay cả vai và ngực theo hướng tay.',
-            affectsForm: true,
+            affectsForm: false,
             phase: ctx.direction.name,
             priority: 1,
             voiceMessage: 'Xoay cả vai theo tay.',
@@ -43,5 +50,11 @@ class ThoracicRotationMetric extends RussianMetricBase {
         );
       }
     }
+  }
+
+  @override
+  void resetAndCountFault() {
+    _setupShoulderX = null;
+    super.resetAndCountFault();
   }
 }

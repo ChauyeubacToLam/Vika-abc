@@ -954,19 +954,22 @@ final List<ExerciseDefinition> exerciseDefinitions = [
   ExerciseDefinition(
     id: 'russian__twist',
     name: 'Russian Twist',
-    subtitle: 'Chưa có mô tả',
-    description: 'Bản xem trước của bài tập Russian Twist.',
+    subtitle: 'Vặn chéo thân, siết cơ liên sườn',
+    description:
+        'AI phân tích bài Russian Twist theo thời gian thực.\nTheo dõi biên độ vặn hai bên, xoay ngực và giữ thân dưới ổn định.',
     icon: Icons.fitness_center,
     primaryColor: const Color(0xFF00E5FF),
     secondaryColor: const Color(0xFF0091EA),
     difficulty: 'Trung bình',
-    targetMuscles: ['Toàn thân'],
-    duration: 'Tùy chọn',
-    cameraHint: 'Đặt camera đối diện hoặc nghiêng góc 45 độ.',
-    framingHint: 'Đảm bảo toàn thân nằm gọn trong khung hình.',
+    targetMuscles: ['Cơ liên sườn', 'Core', 'Bụng'],
+    duration: '20 reps',
+    cameraHint: 'Đặt camera chính diện trước mặt.',
+    framingHint:
+        'Ngồi đối diện camera, thấy rõ hai vai, hai tay, hông và gối.',
     setupTips: [
-      'Giữ đủ khoảng cách để AI nhận diện được toàn bộ cơ thể.',
-      'Bắt đầu khi sẵn sàng.'
+      'Đặt điện thoại nằm ngang trước mặt, ngang tầm ngực.',
+      'Ngồi ngả lưng ra sau khoảng 45 độ, co gối, hai tay chụm trước ngực.',
+      'Giữ hai vai và hai tay luôn trong khung hình khi vặn sang hai bên.',
     ],
     createExercise: ({int? reps, int? seconds}) => _withReps(
         reps, (target) => RussianTwist(maxRep: target), () => RussianTwist()),
