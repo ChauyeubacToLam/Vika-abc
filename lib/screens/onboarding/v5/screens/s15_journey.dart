@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:vika/models/exercise_definition.dart';
 import 'package:vika/models/exercise_lookup.dart';
 import '../../../../services/recommendation/models/plan.dart';
 import '../../../../services/recommendation/recommendation_service.dart';
@@ -967,7 +968,7 @@ String _formatVolume(VolumePrescription volume) {
 
 String _exerciseLabel(String id) {
   final definition = lookupExerciseDefinition(id);
-  if (definition != null) return definition.name;
+  if (definition != null) return definition.displayName;
   return switch (id) {
     'squat_bw' => 'Squat',
     'wall_pushup' || 'wall_pushup_assessment' => 'Wall Push-Up',

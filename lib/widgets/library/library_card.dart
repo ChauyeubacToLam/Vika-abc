@@ -98,7 +98,7 @@ extension LibraryCardKindLabel on LibraryCardKind {
 class LibraryCardData {
   const LibraryCardData({
     required this.kind,
-    required this.title,
+    required String title,
     this.duration,
     this.detail,
     this.hasAi = false,
@@ -109,12 +109,26 @@ class LibraryCardData {
     this.sequenceExerciseIds,
     this.episodeCount,
     this.episodeMeta,
-  });
+  }) : _title = title;
 
   final LibraryCardKind kind;
 
-  /// Italic display title, kept short (1–2 words ideal).
-  final String title;
+  /// Curated pre-load fallback title. NOT authoritative for exercise cards —
+  /// the [title] getter prefers the bundled catalog ([CatalogSource]).
+  final String _title;
+
+  /// Italic display title. For exercise-backed cards ([exerciseName] set),
+  /// resolves from the catalog (single source of truth) so the card never
+  /// disagrees with the exercise intro. Falls back to [_title] for albums /
+  /// non-exercise cards or before the catalog loads.
+  String get title {
+    final ex = exerciseName;
+    if (ex != null) {
+      final vn = CatalogSource.instance.lookup(ex)?.vietnameseName;
+      if (vn != null && vn.isNotEmpty) return vn;
+    }
+    return _title;
+  }
 
   /// e.g. '4 tuần', '15 phút', '5 phút/buổi'. Optional.
   final String? duration;

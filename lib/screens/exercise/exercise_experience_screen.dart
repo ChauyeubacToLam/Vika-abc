@@ -183,7 +183,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
   String? get _nextExerciseName {
     final nextIdx = widget.sequenceIndex + 1;
     if (nextIdx >= widget.sequence.length) return null;
-    return widget.sequence[nextIdx].definition.name;
+    return widget.sequence[nextIdx].definition.displayName;
   }
 
   /// The exercise that just finished before this one, if any. Used to
@@ -200,6 +200,11 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       if (!mounted) return;
       setState(mutation);
     });
+    // Post-frame callbacks don't schedule a frame. On the idle rest->active
+    // path (no pose overlay repainting) nothing else would, so force one.
+    // ensureVisualUpdate() only schedules when idle, so it's a no-op on the
+    // active->rest path that already has frames in flight.
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   @override
@@ -614,7 +619,10 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       // after dispose) — instead, the summary screen's own BuildContext
       // is used to pop.
       final streakWeeks = await SessionPersistence().currentStreak(
-        assumeTodayComplete: true,
+        // Standalone runs never write a workout_sessions row, so don't assume
+        // this week is active off a session that won't persist there. Plan
+        // runs do persist, so the assumption is honest for them.
+        assumeTodayComplete: widget.workoutSessionId != null,
       );
       if (!mounted) return;
 
@@ -635,6 +643,12 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
           await SessionPersistence().fetchPriorExerciseFormsScores(
         widget.workoutSessionId,
         exerciseIds,
+        // Standalone has no workout_session_id anchor, so exclude this run's
+        // own exercise_sessions row(s) by id instead — otherwise the current
+        // run leaks into its own "prior" history and masks a real PB.
+        excludeExerciseSessionIds: widget.workoutSessionId == null
+            ? [for (final r in accumulated) if (r.sessionId != null) r.sessionId!]
+            : const [],
       );
 
       final candidates = <FaultCandidate>[];
@@ -758,7 +772,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     final prev = _previousReport;
     final phaseBody = switch (_phase) {
       _WorkoutFlowPhase.intro => ExerciseIntroPage(
-          title: widget.definition.name,
+          title: widget.definition.displayName,
           difficulty: widget.definition.difficulty,
           totalSets: _spec.sets,
           repsPerSet: _spec.repsPerSet,
@@ -801,13 +815,14 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
           currentReps: _currentRepsTarget,
           baseRestSeconds: _spec.restSeconds,
           isLastSet: _currentSet >= _spec.sets,
+          exerciseName: widget.definition.displayName,
           setLogger: _currentSetLogger,
           onNext: _handleSummaryNext,
           previousSession: _sessionHistory,
           onDifficultyAnswer: _handleDifficultyAnswer,
         ),
       _WorkoutFlowPhase.transition => ExerciseTransitionMoment(
-          exerciseName: widget.definition.name,
+          exerciseName: widget.definition.displayName,
           formScore: _fullReport?.formScore ?? 0,
           setResults: _fullReport?.sets ?? const [],
           timeBased: _fullReport?.isSecondBased ?? false,

@@ -1991,24 +1991,33 @@ class SessionPersistence {
   }
 
   Future<Map<String, List<int>>> fetchPriorExerciseFormsScores(
-      String? workoutSessionId, List<String> sessionIds) async {
+      String? workoutSessionId, List<String> sessionIds,
+      {List<String> excludeExerciseSessionIds = const []}) async {
     final userId = _client.auth.currentUser?.id;
-    if (userId == null || workoutSessionId == null) return {};
+    if (userId == null) return {};
+    // Need at least one exclusion anchor or the current run leaks into its own
+    // "prior" history and masks a real PB. Plan runs anchor on
+    // workout_session_id; standalone runs anchor on the row id(s) just written.
+    if (workoutSessionId == null && excludeExerciseSessionIds.isEmpty) return {};
 
     try {
-      final response = await _client
+      var query = _client
           .from('exercise_sessions')
-          .select('exercise_id, form_score')
+          .select('id, exercise_id, form_score')
           .eq('user_id', userId)
           .inFilter('exercise_id', sessionIds)
-          .neq('workout_session_id',
-              workoutSessionId) // CRITICAL here, see below
-          .not('form_score', 'is', null)
-          .order('completed_at', ascending: true);
+          .not('form_score', 'is', null);
+      if (workoutSessionId != null) {
+        query = query.neq('workout_session_id', workoutSessionId);
+      }
+      final response = await query.order('completed_at', ascending: true);
 
+      final exclude = excludeExerciseSessionIds.toSet();
       final map = <String, List<int>>{};
       for (final raw in response as List) {
         final row = raw as Map<String, dynamic>;
+        // Standalone: drop the current run's own exercise_sessions row(s).
+        if (workoutSessionId == null && exclude.contains(row['id'])) continue;
         final id = row['exercise_id'] as String;
         final score = (row['form_score'] as num?)?.toInt();
         if (score == null) continue;

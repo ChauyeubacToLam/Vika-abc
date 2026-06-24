@@ -1324,7 +1324,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _definition.name,
+                            _definition.displayName,
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 18,
@@ -1746,7 +1746,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                _definition.name.toUpperCase(),
+                _definition.displayName.toUpperCase(),
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 15,

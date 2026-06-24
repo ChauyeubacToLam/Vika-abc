@@ -7,7 +7,7 @@
     "sets": 3,
     "reps": 5,
     "seconds": null,
-    "vietnameseName": "Tám Điểm Chạm Đất",
+    "vietnameseName": "Tư thế tám điểm chạm đất",
     "englishName": "Ashtanga Namaskara"
   },
   {
@@ -51,7 +51,7 @@
     "sets": 1,
     "reps": null,
     "seconds": 30,
-    "vietnameseName": "Tư thế bướm",
+    "vietnameseName": "Tư thế con bướm",
     "englishName": "Butterfly"
   },
   {
@@ -95,7 +95,7 @@
     "sets": 1,
     "reps": 1,
     "seconds": null,
-    "vietnameseName": "Chó Cúi Mặt",
+    "vietnameseName": "Tư thế chó úp mặt",
     "englishName": "Downward Dog"
   },
   {
@@ -139,7 +139,7 @@
     "sets": 3,
     "reps": 20,
     "seconds": null,
-    "vietnameseName": "Nhảy dang tay chân",
+    "vietnameseName": "Jumping Jack",
     "englishName": "Jumping Jack"
   },
   {
@@ -161,7 +161,7 @@
     "sets": 3,
     "reps": 2,
     "seconds": null,
-    "vietnameseName": "Kỵ Sĩ",
+    "vietnameseName": "Tư thế kỵ sĩ",
     "englishName": "Low Lunge"
   },
   {
@@ -172,7 +172,7 @@
     "sets": 3,
     "reps": 10,
     "seconds": null,
-    "vietnameseName": "Chùng chân",
+    "vietnameseName": "Lunge",
     "englishName": "Lunge"
   },
   {
@@ -238,7 +238,7 @@
     "sets": 1,
     "reps": 1,
     "seconds": null,
-    "vietnameseName": "Cầu Nguyện",
+    "vietnameseName": "Tư thế cầu nguyện",
     "englishName": "Prayer Pose"
   },
   {
@@ -260,7 +260,7 @@
     "sets": 1,
     "reps": 1,
     "seconds": null,
-    "vietnameseName": "Vươn Tay",
+    "vietnameseName": "Tư thế vươn tay",
     "englishName": "Raised Arms"
   },
   {
@@ -282,7 +282,7 @@
     "sets": 3,
     "reps": 16,
     "seconds": null,
-    "vietnameseName": "Xoay người kiểu Nga",
+    "vietnameseName": "Russian Twist",
     "englishName": "Russian Twist"
   },
   {
@@ -293,7 +293,7 @@
     "sets": 1,
     "reps": null,
     "seconds": 30,
-    "vietnameseName": "Gập người ngồi",
+    "vietnameseName": "Tư thế ngồi gập người",
     "englishName": "Seated Forward Fold"
   },
   {
@@ -348,7 +348,7 @@
     "sets": 3,
     "reps": 16,
     "seconds": null,
-    "vietnameseName": "Đứng chạm gối khuỷu tay",
+    "vietnameseName": "Đứng gối chạm khuỷu tay",
     "englishName": "Standing Knee to Elbow"
   },
   {
@@ -381,7 +381,7 @@
     "sets": 1,
     "reps": 3,
     "seconds": null,
-    "vietnameseName": "Chào Mặt Trời",
+    "vietnameseName": "Chào mặt trời",
     "englishName": "Surya Namaskar"
   },
   {
@@ -392,7 +392,7 @@
     "sets": 3,
     "reps": 10,
     "seconds": null,
-    "vietnameseName": "Dip cơ tam đầu",
+    "vietnameseName": "Dip cơ tay sau",
     "englishName": "Tricep Dip"
   },
   {

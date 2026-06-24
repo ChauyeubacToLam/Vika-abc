@@ -94,7 +94,7 @@ const List<LibraryCardData> libraryAiExerciseCards = [
 class AllExerciseRowMock {
   const AllExerciseRowMock({
     required this.idx,
-    required this.name,
+    required String name,
     required this.cat,
     required this.diff,
     required this.glyph,
@@ -102,9 +102,25 @@ class AllExerciseRowMock {
     this.ai = false,
     this.yoga = false,
     this.definitionName,
-  });
+  }) : _name = name;
   final int idx;
-  final String name;
+
+  /// Curated pre-load fallback name. NOT authoritative — the display [name]
+  /// getter prefers the bundled catalog ([CatalogSource]), the single source
+  /// of truth for exercise names.
+  final String _name;
+
+  /// Display name. Resolves from the catalog by [definitionName]; falls back
+  /// to [_name] only before the catalog loads or for ids it doesn't carry.
+  String get name {
+    final id = definitionName;
+    if (id != null) {
+      final vn = CatalogSource.instance.lookup(id)?.vietnameseName;
+      if (vn != null && vn.isNotEmpty) return vn;
+    }
+    return _name;
+  }
+
   final String cat;
   final String diff;
   final PoseGlyphType glyph;

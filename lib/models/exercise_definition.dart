@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/catalog/catalog_source.dart';
 import '../exercise/curl_up/curl_up.dart';
 import '../exercise/exercise_base.dart';
 import '../exercise/glute bridge/glute_bridge.dart';
@@ -111,6 +112,26 @@ class ExerciseDefinition {
     this.safetyWarning,
     required this.phaseColors,
   });
+}
+
+/// Display name resolved from the bundled catalog ([CatalogSource]) — the
+/// single source of truth for exercise names. Assessment variants
+/// (`<base>_assessment`) reuse the base exercise's catalog name, so onboarding
+/// shows e.g. "Squat" rather than "Squat Assessment". Falls back to [name] only
+/// before the catalog loads or for ids the catalog doesn't carry; [name] stays
+/// the raw/build-time label.
+extension ExerciseDefinitionDisplayName on ExerciseDefinition {
+  String get displayName {
+    final direct = CatalogSource.instance.lookup(id)?.vietnameseName;
+    if (direct != null && direct.isNotEmpty) return direct;
+    const suffix = '_assessment';
+    if (id.endsWith(suffix)) {
+      final base = id.substring(0, id.length - suffix.length);
+      final vn = CatalogSource.instance.lookup(base)?.vietnameseName;
+      if (vn != null && vn.isNotEmpty) return vn;
+    }
+    return name;
+  }
 }
 
 /* =========================================================================

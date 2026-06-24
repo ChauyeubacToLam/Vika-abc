@@ -56,6 +56,7 @@ class RestScreen extends StatefulWidget {
     required this.baseRestSeconds,
     required this.isLastSet,
     required this.onNext,
+    this.exerciseName,
     this.onDifficultyAnswer,
     this.setLogger,
     this.previousSession,
@@ -67,6 +68,7 @@ class RestScreen extends StatefulWidget {
   final int currentReps;
   final int baseRestSeconds;
   final bool isLastSet;
+  final String? exerciseName;
   final VoidCallback onNext;
   final void Function(String difficulty)? onDifficultyAnswer;
   final ExerciseLogger? setLogger;
@@ -97,6 +99,10 @@ class _RestScreenState extends State<RestScreen> with TickerProviderStateMixin {
   }
 
   String get _exerciseLabel {
+    final passed = widget.exerciseName;
+    if (passed != null && passed.trim().isNotEmpty) {
+      return passed.trim();
+    }
     final loggerLabel = widget.setLogger?.setLogs['exercise_name'];
     if (loggerLabel is String && loggerLabel.trim().isNotEmpty) {
       return loggerLabel.trim();
@@ -148,7 +154,7 @@ class _RestScreenState extends State<RestScreen> with TickerProviderStateMixin {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) return;
-      if (_remaining <= 1) {
+      if (_remaining <= 0) {
         _advance();
         return;
       }
