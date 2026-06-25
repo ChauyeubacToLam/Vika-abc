@@ -448,8 +448,9 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
               shimmer: _shimmer,
               reduceMotion: _reduceMotion,
               onDone: widget.onDone,
-              onShare: widget.onShare ?? () => _stub('Chia sẻ'),
-              onShareToZalo: widget.onShareToZalo ?? () => _stub('Zalo'),
+              // SHARE-DISABLED: restore alongside the share row in _Close.
+              // onShare: widget.onShare ?? () => _stub('Chia sẻ'),
+              // onShareToZalo: widget.onShareToZalo ?? () => _stub('Zalo'),
             ),
           ),
         ],
@@ -457,11 +458,13 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
     );
   }
 
-  void _stub(String label) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$label sẽ có ở phiên bản sau.')),
-    );
-  }
+  // SHARE-DISABLED: restore alongside the share row in _Close (used as the
+  // fallback handler for the share/Zalo links).
+  // void _stub(String label) {
+  //   ScaffoldMessenger.of(context).showSnackBar(
+  //     SnackBar(content: Text('$label sẽ có ở phiên bản sau.')),
+  //   );
+  // }
 }
 
 // ─── Beat reveal — fade + 18px rise ───
@@ -1864,15 +1867,17 @@ class _Close extends StatelessWidget {
     required this.shimmer,
     required this.reduceMotion,
     required this.onDone,
-    required this.onShare,
-    required this.onShareToZalo,
+    // SHARE-DISABLED: restore alongside the share row in build().
+    // required this.onShare,
+    // required this.onShareToZalo,
   });
 
   final AnimationController shimmer;
   final bool reduceMotion;
   final VoidCallback onDone;
-  final VoidCallback onShare;
-  final VoidCallback onShareToZalo;
+  // SHARE-DISABLED: restore alongside the share row in build().
+  // final VoidCallback onShare;
+  // final VoidCallback onShareToZalo;
 
   @override
   Widget build(BuildContext context) {
@@ -1880,6 +1885,11 @@ class _Close extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // SHARE-DISABLED: the post-session share row ("Chỉnh sửa & chia sẻ" +
+        // "Zalo") is hidden until the share/Zalo feature is built. To restore,
+        // uncomment this block (and the _ShareLink widget, the _Close
+        // onShare/onShareToZalo params + their wiring in _buildBody, and _stub).
+        /*
         // Quiet ghost share links on a hairline row (not buttons).
         Container(
           decoration: BoxDecoration(
@@ -1906,6 +1916,7 @@ class _Close extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 22),
+        */
         _DoneCta(shimmer: shimmer, reduceMotion: reduceMotion, onTap: onDone),
         const SizedBox(height: 12),
         Center(
@@ -1926,6 +1937,8 @@ class _Close extends StatelessWidget {
   }
 }
 
+// SHARE-DISABLED: restore alongside the share row in _Close.
+/*
 class _ShareLink extends StatelessWidget {
   const _ShareLink({required this.label, required this.onTap});
   final String label;
@@ -1961,6 +1974,7 @@ class _ShareLink extends StatelessWidget {
     );
   }
 }
+*/
 
 // ─── Done CTA — yellow halo pill with slow diagonal shimmer ───
 class _DoneCta extends StatefulWidget {

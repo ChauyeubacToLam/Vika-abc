@@ -3,7 +3,6 @@
 
 import 'package:flutter/material.dart';
 
-import '../widgets/progress/period_tabs.dart';
 import '../widgets/progress/personal_records_rail.dart';
 import '../widgets/progress/weekly_summary_band.dart';
 
@@ -11,12 +10,10 @@ import '../widgets/progress/weekly_summary_band.dart';
 class HeadlineForPeriod {
   const HeadlineForPeriod({
     required this.average,
-    required this.direction,
     required this.label,
     required this.coach,
   });
   final int average; // window mean — the gauge headline
-  final FormTrendDirection direction; // trend chip; .none hides the chip
   final String label; // 'CẢ LỘ TRÌNH · 4 TUẦN'
   final String coach; // multi-sentence coach quote
 }
@@ -24,21 +21,18 @@ class HeadlineForPeriod {
 const Map<String, HeadlineForPeriod> progressMockHeadline = {
   'week': HeadlineForPeriod(
     average: 72, // mean of progressMockScoreTrend['week']
-    direction: FormTrendDirection.up,
     label: '7 NGÀY GẦN NHẤT',
     coach: 'Bảy ngày qua: form ổn định. Squat depth giữ chuẩn '
         'rep này qua rep khác.',
   ),
   'month': HeadlineForPeriod(
     average: 69, // mean of progressMockScoreTrend['month']
-    direction: FormTrendDirection.up,
     label: '30 NGÀY GẦN NHẤT',
     coach: 'Một tháng đều đặn. Cốt lõi đuổi kịp chân — '
         'plank lên 16 điểm.',
   ),
   'program': HeadlineForPeriod(
     average: 67, // mean of progressMockScoreTrend['program']
-    direction: FormTrendDirection.up,
     label: 'CẢ LỘ TRÌNH · 4 TUẦN',
     coach: 'Bốn tuần đã qua. Squat sâu hơn 12°. Cốt lõi cuối cùng '
         'cũng đuổi kịp chân.',

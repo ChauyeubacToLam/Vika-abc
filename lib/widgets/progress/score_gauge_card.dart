@@ -1,8 +1,12 @@
 // ScoreGaugeCard — the central score moment on the Progress tab.
 // Circular arc gauge with a sweep-in animation on first build, the big
-// italic AVERAGE / 100 for the period in the center, a trend-direction
-// chip (arrow + short word) to the right, and the coach quote under a
-// hairline divider opened with a stylized italic glyph.
+// italic AVERAGE / 100 for the period in the center, and the coach quote
+// under a hairline divider opened with a stylized italic glyph.
+//
+// The gauge is a SCOPED AVERAGE, full stop — the period pills rescope it
+// (and the hero) but no trend/direction chip lives here. All trajectory
+// (the rising/falling story) lives in the fixed whole-program ĐƯỜNG TIẾN BỘ
+// chart below.
 //
 // Reads like a premium dashboard moment (Whoop / Oura / Apple Fitness)
 // while staying in Vika's editorial Ivory grammar.
@@ -15,7 +19,6 @@ import '../../data/progress_mock.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/vf_theme.dart';
 import '../plan/plan_typography.dart';
-import 'period_tabs.dart';
 
 class ScoreGaugeCard extends StatefulWidget {
   const ScoreGaugeCard({super.key, required this.data});
@@ -261,130 +264,17 @@ class _GaugeBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The arc gauge IS the moment — centered, no right-hand chip. The average
+    // stands alone; trajectory lives in the program chart below.
     return SizedBox(
       height: 216,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Arc gauge — dominant left moment, filled to the period average.
-          SizedBox(
-            width: 216,
-            height: 216,
-            child: _ArcGauge(score: data.average, animation: animation),
-          ),
-          const SizedBox(width: 6),
-          // Trend-direction chip on the right — or, below the baseline (no
-          // direction yet), a quiet hint in its place so the score stands alone.
-          Expanded(
-            child: data.direction != FormTrendDirection.none
-                ? _TrendChip(direction: data.direction)
-                : const _GaugeHint(),
-          ),
-        ],
+      child: Center(
+        child: SizedBox(
+          width: 216,
+          height: 216,
+          child: _ArcGauge(score: data.average, animation: animation),
+        ),
       ),
-    );
-  }
-}
-
-/// Shown in the delta slot when there's no baseline yet (< 3 sessions).
-/// Keeps the gauge composed without fabricating a delta number.
-class _GaugeHint extends StatelessWidget {
-  const _GaugeHint();
-
-  @override
-  Widget build(BuildContext context) {
-    final c = VikaColors.of(context);
-    return Text(
-      'Thêm buổi để thấy tiến triển.',
-      style: TextStyle(
-        fontFamily: 'BeVietnamPro',
-        fontSize: 12.5,
-        fontWeight: FontWeight.w600,
-        fontStyle: FontStyle.italic,
-        height: 1.45,
-        letterSpacing: -0.2,
-        color: c.invInkSoft.withValues(alpha: 0.7),
-      ),
-    );
-  }
-}
-
-/// Trend-direction chip for the gauge's right slot once a baseline exists: an
-/// arrow + a short word for where the period's form is heading. Yellow (a
-/// "stat" use of the reserved accent) when rising; a quiet neutral chip when
-/// holding or easing — Vika stays encouraging, so a dip reads neutral, never
-/// alarming red.
-class _TrendChip extends StatelessWidget {
-  const _TrendChip({required this.direction});
-  final FormTrendDirection direction;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = VikaColors.of(context);
-    final (IconData icon, String label, bool rising) = switch (direction) {
-      FormTrendDirection.up => (Icons.arrow_upward_rounded, 'Đang lên', true),
-      FormTrendDirection.down => (
-          Icons.arrow_downward_rounded,
-          'Đang xuống',
-          false,
-        ),
-      // flat (and the gated-out none) both render the steady chip.
-      _ => (Icons.trending_flat_rounded, 'Ổn định', false),
-    };
-    final fill = rising ? c.yellow : c.invInkSoft.withValues(alpha: 0.14);
-    final fg = rising ? c.yellowInk : c.invInkSoft;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.center,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.fromLTRB(12, 8, 14, 8),
-          decoration: BoxDecoration(
-            color: fill,
-            borderRadius: BorderRadius.circular(999),
-            boxShadow: rising
-                ? [
-                    BoxShadow(
-                      color: c.yellow.withValues(alpha: 0.44),
-                      blurRadius: 16,
-                      offset: const Offset(0, 6),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 17, color: fg),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontFamily: 'BeVietnamPro',
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  fontStyle: FontStyle.italic,
-                  letterSpacing: -0.4,
-                  height: 1.0,
-                  color: fg,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          'qua từng buổi',
-          style: TextStyle(
-            fontFamily: 'BeVietnamPro',
-            fontSize: 11.5,
-            fontWeight: FontWeight.w600,
-            color: c.invInkSoft.withValues(alpha: 0.6),
-          ),
-        ),
-      ],
     );
   }
 }

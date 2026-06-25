@@ -44,7 +44,7 @@ class _S06TrustState extends State<S06Trust> {
       body:
           'Supabase (Singapore) lưu tài khoản và kết quả tập. MediaPipe của Google '
           'chạy nhận diện tư thế ngay trên máy bạn, không gửi gì cho Google. '
-          'Apple / Google / Facebook chỉ dùng để đăng nhập. PostHog (EU) phân tích '
+          'Apple / Google chỉ dùng để đăng nhập. PostHog (EU) phân tích '
           'sản phẩm bằng định danh ngẫu nhiên.',
     ),
     _PolicySection(
@@ -74,7 +74,7 @@ class _S06TrustState extends State<S06Trust> {
       number: '08',
       title: 'Liên hệ',
       body:
-          'Trần Tuấn Kiệt — Đơn vị kiểm soát dữ liệu. Email: vikavn.app@gmail.com. '
+          'Trần Tuấn Kiệt — Đơn vị kiểm soát dữ liệu. Email: support@vikavn.app. '
           'Điện thoại: 0566665536. Khiếu nại có thể gửi tới Cục An ninh mạng và '
           'PCTP công nghệ cao (A05), hotline 1800 4040.',
     ),
