@@ -1,27 +1,31 @@
-// WorkoutSummaryScreen — "Cuốn Phim Form" (The Form Reel).
+// WorkoutSummaryScreen — "Đỉnh form" (the verdict, then the climb).
 //
-// A world-class finale rebuilt as ONE continuous warm-dark "reel of light",
-// not six disconnected cards. The whole session is drawn as a single
-// band-colored RIDGELINE built from every set's form score — the mountain
-// you climbed IS the screen. The reel then curves into cream for the close,
-// the only color transition (house lights coming up).
+// A world-class finale rebuilt to speak the app's OWN language instead of a
+// borrowed cinema metaphor. It follows the exact stage-hero shape every
+// primary tab uses — a warm-dark hero that curves at 36pt into the cream
+// body — so the summary reads as one app, not a separate dark experience.
 //
-// Reel (top → bottom), all on one dark surface until the cream close:
-//   1. Marquee        — wordmark + band-aware headline + the STARRING score
-//   2. Ridgeline      — one polyline of every report.sets[].score + vital strip
-//   3. Trophy billing — the earned highlight, billed like a lead film credit
-//   4. Coach note     — AI pull-quote + two editorial labeled rows
-//   5. Cast credits   — per-exercise indexed credits list (replaces the grid)
-//   6. Lights-up close— dark→cream curve, share links, yellow Done CTA
+// Two movements:
+//   1. HERO (dark)  — the VERDICT. The Vika ring (the same instrument that
+//      fills during rest between sets) resolves into the final form score,
+//      counting up inside it. Verdict headline + earned highlight fold into
+//      this one composition — the single triumphant focal point.
+//   2. BODY (cream) — the CLIMB. On the app's primary surface, with varied
+//      rhythm so nothing reads as stacked boxes: a wide calm form-journey
+//      chart (how the score was earned), a hairline vitals line, an intimate
+//      coach pull-quote, a lean exercise list, and the app-standard CTA.
+//
+// The ring (your grade) and the journey (how you got there) tell different
+// stories, so they complement rather than duplicate.
 //
 // This is a pure reward screen — the difficulty popup fires on entry via
 // _promptThenReveal() and the reveal cascade only plays once it resolves,
 // so nothing animates behind the barrier.
 //
-// All values use Premium Ivory tokens via VikaColors. Reserved yellow is
-// held to four uses: the sparkle dot, the score stat (gold band only), the
-// coach underline, and the Done CTA. No emojis. Band thresholds (>=80 gold /
-// 60-79 amber / <60 burnt) are the one evaluative signal.
+// All values use Premium Ivory tokens via VikaColors. Reserved yellow is held
+// to its sanctioned uses: the ring fill, the sparkle dot, the gold-band score,
+// the coach left-rule/underline, and the Done CTA. No emojis. Band thresholds
+// (>=80 gold / 60-79 amber / <60 burnt) are the one evaluative signal.
 
 import 'dart:math' as math;
 
@@ -117,12 +121,14 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
   late final Animation<double> _b3;
   late final Animation<double> _b4;
   late final Animation<double> _b5;
-  late final Animation<double> _b6;
 
-  /// Drives BOTH the marquee score count-up AND the ridgeline draw-on, so the
-  /// pen and the number always land on the same frame. Gated behind [_entry]
-  /// so the climb plays when the celebration lands, not behind the popup.
-  late final Animation<double> _heroClimb;
+  /// Drives BOTH the ring score count-up AND the journey draw-on, so the
+  /// gauge and the chart land on the same frames. Gated behind [_entry] so the
+  /// climb plays when the celebration lands, not behind the popup.
+  late final Animation<double> _climb;
+
+  bool _reduceMotion = false;
+  bool _depsReady = false;
 
   @override
   void initState() {
@@ -134,31 +140,42 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
     _shimmer = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 4),
-    )..repeat();
+    );
     _heroPulse = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2600),
-    )..repeat(reverse: true);
+    );
 
-    // Seven beats mapped to the reel's strata: marquee top, marquee score,
-    // ridgeline, trophy, coach, credits, close.
-    _b0 = _beat(0.00, 0.20);
-    _b1 = _beat(0.10, 0.40);
-    _b2 = _beat(0.22, 0.52);
-    _b3 = _beat(0.40, 0.66);
-    _b4 = _beat(0.50, 0.76);
-    _b5 = _beat(0.60, 0.88);
-    _b6 = _beat(0.72, 1.0);
+    // Six beats mapped to the strata: verdict headline, ring, journey, vitals,
+    // coach, then the exercise list + close.
+    _b0 = _beat(0.00, 0.26);
+    _b1 = _beat(0.10, 0.42);
+    _b2 = _beat(0.30, 0.62);
+    _b3 = _beat(0.44, 0.74);
+    _b4 = _beat(0.56, 0.86);
+    _b5 = _beat(0.68, 1.0);
 
-    _heroClimb = CurvedAnimation(
+    _climb = CurvedAnimation(
       parent: _entry,
       curve: const Interval(0.12, 0.97, curve: Curves.linear),
     );
 
     // Gate the celebration: fire the post-exercise reflection popup for the
     // last exercise on entry, then play the reveal once it resolves. The dark
-    // popup barrier covers the un-revealed (opacity-0) reel behind it.
+    // popup barrier covers the un-revealed (opacity-0) body behind it.
     WidgetsBinding.instance.addPostFrameCallback((_) => _promptThenReveal());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_depsReady) return;
+    _depsReady = true;
+    _reduceMotion = MediaQuery.of(context).disableAnimations;
+    if (!_reduceMotion) {
+      _shimmer.repeat();
+      _heroPulse.repeat(reverse: true);
+    }
   }
 
   Future<void> _promptThenReveal() async {
@@ -176,7 +193,12 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
       last.userDifficulty = difficulty;
       widget.onLastExerciseDifficulty?.call(difficulty);
     }
-    if (mounted) _entry.forward();
+    if (!mounted) return;
+    if (_reduceMotion) {
+      _entry.value = 1.0;
+    } else {
+      _entry.forward();
+    }
   }
 
   @override
@@ -192,7 +214,6 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
         curve: Interval(a, b, curve: Curves.easeOutCubic),
       );
 
-  // ── Session aggregates ────────────────────────────────────────
   int get _totalSets =>
       widget.reports.fold<int>(0, (s, r) => s + r.report.sets.length);
 
@@ -200,8 +221,8 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
 
-    // Clamp accessibility text scaling so the 132pt starring numeral and the
-    // tabular figures can't overflow at maxed-out system text.
+    // Clamp accessibility text scaling so the big ring numeral and the tabular
+    // figures can't overflow at maxed-out system text.
     final mq = MediaQuery.of(context);
     final clampedScaler = mq.textScaler.clamp(
       minScaleFactor: 0.92,
@@ -229,22 +250,14 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _buildReel(c, topInset),
-                    // The cream close rises into the dark reel: a 36pt
-                    // rounded-top curve pulled up over the reel's bottom edge
+                    _buildHero(c, topInset),
+                    // The cream body rises into the dark hero: a 36pt
+                    // rounded-top curve pulled up over the hero's bottom edge
                     // reveals the dark behind its corners — the signature
-                    // stage-hero curve, inverted (house lights up).
+                    // stage-hero curve (house lights coming up).
                     Transform.translate(
                       offset: const Offset(0, -36),
-                      child: _LightsUpClose(
-                        beat: _b6,
-                        shimmer: _shimmer,
-                        bottomInset: bottomInset,
-                        onDone: widget.onDone,
-                        onShare: widget.onShare ?? () => _stub('Chia sẻ'),
-                        onShareToZalo:
-                            widget.onShareToZalo ?? () => _stub('Zalo'),
-                      ),
+                      child: _buildBody(c, bottomInset),
                     ),
                   ],
                 ),
@@ -256,8 +269,8 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
     );
   }
 
-  // ── The continuous warm-dark reel: one surface behind sections 1-5 ──
-  Widget _buildReel(VikaColors c, double topInset) {
+  // ── HERO — the verdict. Warm-dark stage with the Vika ring at its heart ──
+  Widget _buildHero(VikaColors c, double topInset) {
     final summary = widget.sessionSummary;
     return Container(
       width: double.infinity,
@@ -267,6 +280,13 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
           end: const Alignment(0.8, 1),
           colors: [c.bgInverse, c.bgInverseHi],
         ),
+        boxShadow: [
+          BoxShadow(
+            color: c.ink.withValues(alpha: 0.22),
+            blurRadius: 48,
+            offset: const Offset(0, 14),
+          ),
+        ],
       ),
       child: Stack(
         children: [
@@ -299,23 +319,23 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
           ),
           // Amber bloom, bottom-left.
           const Positioned(
-            bottom: -200,
+            bottom: -160,
             left: -140,
             child: IgnorePointer(
               child: SizedBox(
-                width: 440,
-                height: 380,
+                width: 420,
+                height: 360,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: RadialGradient(
-                      colors: [Color(0x44CD7C45), Color(0x00CD7C45)],
+                      colors: [Color(0x40CD7C45), Color(0x00CD7C45)],
                     ),
                   ),
                 ),
               ),
             ),
           ),
-          // Deterministic film grain over the whole reel (never time-based).
+          // Deterministic film grain (never time-based).
           const Positioned.fill(
             child: IgnorePointer(
               child: CustomPaint(painter: _HeroGrainPainter()),
@@ -323,59 +343,49 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
           ),
           // Two quiet sparkle dots.
           Positioned(
-            top: topInset + 120,
-            left: 26,
-            child: _Sparkle(color: c.yellow, size: 3),
+            top: topInset + 116,
+            left: 28,
+            child: _SparkleDot(color: c.yellow, size: 3),
           ),
           Positioned(
-            top: topInset + 330,
-            right: 40,
-            child: _Sparkle(color: c.yellow, size: 2),
+            top: topInset + 300,
+            right: 36,
+            child: _SparkleDot(color: c.yellow, size: 2),
           ),
           // Foreground content column.
           Padding(
-            padding: EdgeInsets.fromLTRB(20, topInset + 16, 20, 60),
+            padding: EdgeInsets.fromLTRB(22, topInset + 16, 22, 64),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                _WordmarkRow(
+                  exerciseCount: widget.reports.length,
+                  totalDuration: widget.totalDuration,
+                ),
+                const SizedBox(height: 30),
+                // Eyebrow + band-aware verdict headline.
                 _BeatReveal(
                   animation: _b0,
-                  child: _Marquee(
-                    sessionFormScore: summary.sessionFormScore,
-                    streakBonus: summary.streakBonus,
-                    streakWeeks: summary.streakWeeks,
-                    exerciseCount: widget.reports.length,
-                    totalDuration: widget.totalDuration,
-                    climb: _heroClimb,
-                    headlineBeat: _b1,
-                  ),
+                  child: _Verdict(sessionFormScore: summary.sessionFormScore),
                 ),
                 const SizedBox(height: 26),
+                // The signature: the Vika ring resolving into the final score.
                 _BeatReveal(
-                  animation: _b2,
-                  child: _RidgeSection(
-                    reports: widget.reports,
-                    totalSets: _totalSets,
-                    climb: _heroClimb,
-                    sessionFormScore: summary.sessionFormScore,
-                    totalDuration: widget.totalDuration,
-                    totalCalories: widget.totalCalories,
+                  animation: _b1,
+                  child: Center(
+                    child: _VerdictRing(
+                      sessionFormScore: summary.sessionFormScore,
+                      streakBonus: summary.streakBonus,
+                      streakWeeks: summary.streakWeeks,
+                      climb: _climb,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 30),
+                const SizedBox(height: 24),
+                // The earned highlight, folded in as one quiet line.
                 _BeatReveal(
-                  animation: _b3,
-                  child: _TrophyBilling(trophy: widget.trophy),
-                ),
-                const SizedBox(height: 30),
-                _BeatReveal(
-                  animation: _b4,
-                  child: _CoachNote(coach: widget.coach),
-                ),
-                const SizedBox(height: 30),
-                _BeatReveal(
-                  animation: _b5,
-                  child: _CreditsList(reports: widget.reports),
+                  animation: _b1,
+                  child: Center(child: _TrophyLine(trophy: widget.trophy)),
                 ),
               ],
             ),
@@ -385,14 +395,79 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen>
     );
   }
 
-  void _stub(String label) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$label sẽ có ở phiên bản sau.')),
+  // ── BODY — the climb. Cream editorial surface, varied rhythm ──
+  Widget _buildBody(VikaColors c, double bottomInset) {
+    final summary = widget.sessionSummary;
+    return Container(
+      decoration: BoxDecoration(
+        color: c.bg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(36)),
+      ),
+      // +36 top compensates for the -36 overlap translate in the parent.
+      padding: EdgeInsets.fromLTRB(22, 36 + 30, 22, 26 + bottomInset),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 1. The climb — how the score was earned.
+          _BeatReveal(
+            animation: _b2,
+            child: _JourneySection(
+              reports: widget.reports,
+              totalSets: _totalSets,
+              sessionFormScore: summary.sessionFormScore,
+              climb: _climb,
+            ),
+          ),
+          const SizedBox(height: 26),
+          // 2. Hairline vitals line — one slim band, not a card grid.
+          _BeatReveal(
+            animation: _b3,
+            child: _VitalsLine(
+              reports: widget.reports,
+              totalDuration: widget.totalDuration,
+              totalCalories: widget.totalCalories,
+            ),
+          ),
+          const SizedBox(height: 28),
+          // 3. The coach voice — intimate pull-quote.
+          _BeatReveal(
+            animation: _b4,
+            child: _CoachNote(coach: widget.coach),
+          ),
+          const SizedBox(height: 28),
+          // 4. The lean exercise list.
+          _BeatReveal(
+            animation: _b5,
+            child: _ExerciseList(reports: widget.reports),
+          ),
+          const SizedBox(height: 30),
+          // 5. The close.
+          _BeatReveal(
+            animation: _b5,
+            child: _Close(
+              shimmer: _shimmer,
+              reduceMotion: _reduceMotion,
+              onDone: widget.onDone,
+              // SHARE-DISABLED: restore alongside the share row in _Close.
+              // onShare: widget.onShare ?? () => _stub('Chia sẻ'),
+              // onShareToZalo: widget.onShareToZalo ?? () => _stub('Zalo'),
+            ),
+          ),
+        ],
+      ),
     );
   }
+
+  // SHARE-DISABLED: restore alongside the share row in _Close (used as the
+  // fallback handler for the share/Zalo links).
+  // void _stub(String label) {
+  //   ScaffoldMessenger.of(context).showSnackBar(
+  //     SnackBar(content: Text('$label sẽ có ở phiên bản sau.')),
+  //   );
+  // }
 }
 
-// ─── Beat reveal — fade + 20px rise ───
+// ─── Beat reveal — fade + 18px rise ───
 class _BeatReveal extends StatelessWidget {
   const _BeatReveal({required this.animation, required this.child});
   final Animation<double> animation;
@@ -407,7 +482,7 @@ class _BeatReveal extends StatelessWidget {
         return Opacity(
           opacity: v,
           child: Transform.translate(
-            offset: Offset(0, (1 - v) * 20),
+            offset: Offset(0, (1 - v) * 18),
             child: child,
           ),
         );
@@ -416,8 +491,8 @@ class _BeatReveal extends StatelessWidget {
   }
 }
 
-class _Sparkle extends StatelessWidget {
-  const _Sparkle({required this.color, required this.size});
+class _SparkleDot extends StatelessWidget {
+  const _SparkleDot({required this.color, required this.size});
   final Color color;
   final double size;
   @override
@@ -439,29 +514,67 @@ class _Sparkle extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// MARQUEE — title card. Wordmark + meta, sparkle eyebrow, band-aware
-// verdict headline, then the STARRING session score (band-colored,
-// count-up, /105 superscript). No box — type floating on the reel.
+// WORDMARK ROW — inverted VIKA lockup + hairline session meta.
 // ═══════════════════════════════════════════════════════════════
 
-class _Marquee extends StatelessWidget {
-  const _Marquee({
-    required this.sessionFormScore,
-    required this.streakBonus,
-    required this.streakWeeks,
+class _WordmarkRow extends StatelessWidget {
+  const _WordmarkRow({
     required this.exerciseCount,
     required this.totalDuration,
-    required this.climb,
-    required this.headlineBeat,
   });
-
-  final int sessionFormScore;
-  final int streakBonus;
-  final int streakWeeks;
   final int exerciseCount;
   final Duration totalDuration;
-  final Animation<double> climb;
-  final Animation<double> headlineBeat;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(7),
+          child: Image.asset(
+            'assets/branding/Logo.jpeg',
+            width: 26,
+            height: 26,
+            fit: BoxFit.cover,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          'VIKA',
+          style: TextStyle(
+            fontFamily: 'BeVietnamPro',
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1,
+            color: c.invInk,
+          ),
+        ),
+        const Spacer(),
+        Text(
+          '$exerciseCount BÀI · ${_fmtClock(totalDuration)}',
+          style: TextStyle(
+            fontFamily: 'BeVietnamPro',
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.4,
+            color: c.invInkFaint,
+            fontFeatures: VikaIvoryMain.tabularFigures,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// VERDICT — sparkle eyebrow + band-aware italic headline.
+// ═══════════════════════════════════════════════════════════════
+
+class _Verdict extends StatelessWidget {
+  const _Verdict({required this.sessionFormScore});
+  final int sessionFormScore;
 
   String get _headline => sessionFormScore >= 80
       ? 'Form đỉnh.'
@@ -472,50 +585,9 @@ class _Marquee extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    final hasBonus = streakBonus > 0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Wordmark + hairline meta
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(7),
-              child: Image.asset(
-                'assets/branding/Logo.jpeg',
-                width: 26,
-                height: 26,
-                fit: BoxFit.cover,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'VIKA',
-              style: TextStyle(
-                fontFamily: 'BeVietnamPro',
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1,
-                color: c.invInk,
-              ),
-            ),
-            const Spacer(),
-            Text(
-              '$exerciseCount BÀI · ${_fmtClock(totalDuration)}',
-              style: TextStyle(
-                fontFamily: 'BeVietnamPro',
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.4,
-                color: c.invInkFaint,
-                fontFeatures: VikaIvoryMain.tabularFigures,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 26),
-        // Sparkle eyebrow
         Row(
           children: [
             Container(
@@ -541,7 +613,6 @@ class _Marquee extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        // Band-aware verdict headline
         Text(
           _headline,
           style: TextStyle(
@@ -554,170 +625,394 @@ class _Marquee extends StatelessWidget {
             color: c.invInk,
           ),
         ),
-        const SizedBox(height: 22),
-        // Score block gets its own staged reveal (the second marquee beat).
-        _BeatReveal(
-          animation: headlineBeat,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Starring score eyebrow
-              Text(
-                'BUỔI NÀY',
-                style: TextStyle(
-                  fontFamily: 'BeVietnamPro',
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 2.2,
-                  color: c.invInkFaint,
-                ),
-              ),
-              const SizedBox(height: 6),
-              // Starring numeral — counts up + inks to band color on the climb.
-              AnimatedBuilder(
-                animation: climb,
-                builder: (context, _) {
-            final v = climb.value.clamp(0.0, 1.0);
-            // Count up from 0 → sessionFormScore on every session; the climb
-            // naturally passes through the raw score, with any streak bonus
-            // landing as the final few digits + the caption reveal below.
-            final eased = Curves.easeOutCubic.transform(v);
-            final display = (sessionFormScore * eased).round();
-            final band = _bandColor(sessionFormScore, c.yellow);
-            // "print strike": ink from soft-invInk to full band over the climb.
-            final inkProg = ((v - 0.4) / 0.6).clamp(0.0, 1.0);
-            final numeralColor = Color.lerp(
-              c.invInk.withValues(alpha: 0.85),
-              band,
-              inkProg,
-            )!;
-            final bonusReveal =
-                hasBonus ? ((v - 0.68) / 0.32).clamp(0.0, 1.0) : 0.0;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Flexible(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 240),
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            '$display',
-                            style: TextStyle(
-                              fontFamily: 'BeVietnamPro',
-                              fontSize: 132,
-                              fontWeight: FontWeight.w800,
-                              fontStyle: FontStyle.italic,
-                              letterSpacing: -8,
-                              height: 0.85,
-                              color: numeralColor,
-                              fontFeatures: VikaIvoryMain.tabularFigures,
-                              shadows: [
-                                Shadow(
-                                  color: band.withValues(
-                                      alpha: 0.35 * inkProg),
-                                  blurRadius: 36,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 14),
-                      child: Text(
-                        '/105',
-                        style: TextStyle(
-                          fontFamily: 'BeVietnamPro',
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          fontStyle: FontStyle.italic,
-                          letterSpacing: -0.5,
-                          color: c.invInkFaint,
-                          fontFeatures: VikaIvoryMain.tabularFigures,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                if (hasBonus) ...[
-                  const SizedBox(height: 10),
-                  Opacity(
-                    opacity: bonusReveal,
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 24 * bonusReveal,
-                          height: 2,
-                          decoration: BoxDecoration(
-                            color: band,
-                            borderRadius: BorderRadius.circular(1),
-                            boxShadow: [
-                              BoxShadow(
-                                color: band.withValues(alpha: 0.5),
-                                blurRadius: 8,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          '+$streakBonus chuỗi · ${streakTierLabel(streakWeeks)}',
-                          style: TextStyle(
-                            fontFamily: 'BeVietnamPro',
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w700,
-                            fontStyle: FontStyle.italic,
-                            letterSpacing: -0.1,
-                            color: c.invInkSoft,
-                            fontFeatures: VikaIvoryMain.tabularFigures,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            );
-          },
-              ),
-            ],
-          ),
-        ),
       ],
     );
   }
 }
 
 // ═══════════════════════════════════════════════════════════════
-// RIDGELINE — the unification. One band-colored polyline built from
-// every set's form score concatenated across exercises, with set-node
-// rings, per-exercise boundary ticks + labels, and a glowing summit.
-// Below: a hairline-divided vital strip.
+// VERDICT RING — the signature. The same instrument that fills during
+// rest between sets, here resolving into the final form score: a fine
+// arc filling to score/105 on the climb, with the count-up numeral at
+// its center. One iconic focal point.
 // ═══════════════════════════════════════════════════════════════
 
-class _RidgeSection extends StatelessWidget {
-  const _RidgeSection({
+class _VerdictRing extends StatelessWidget {
+  const _VerdictRing({
+    required this.sessionFormScore,
+    required this.streakBonus,
+    required this.streakWeeks,
+    required this.climb,
+  });
+
+  final int sessionFormScore;
+  final int streakBonus;
+  final int streakWeeks;
+  final Animation<double> climb;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    final band = _bandColor(sessionFormScore, c.yellow);
+    final hasBonus = streakBonus > 0;
+    const dim = 208.0;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: dim,
+          height: dim,
+          child: AnimatedBuilder(
+            animation: climb,
+            builder: (context, _) {
+              final v = climb.value.clamp(0.0, 1.0);
+              final eased = Curves.easeOutCubic.transform(v);
+              final display = (sessionFormScore * eased).round();
+              // Ink the numeral from soft cream to full band over the climb.
+              final inkProg = ((v - 0.35) / 0.65).clamp(0.0, 1.0);
+              final numeralColor = Color.lerp(
+                c.invInk.withValues(alpha: 0.85),
+                band,
+                inkProg,
+              )!;
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Soft glow behind the arc.
+                  SizedBox(
+                    width: dim,
+                    height: dim,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            band.withValues(alpha: 0.12 * inkProg),
+                            band.withValues(alpha: 0),
+                          ],
+                          stops: const [0.55, 1.0],
+                        ),
+                      ),
+                    ),
+                  ),
+                  CustomPaint(
+                    size: const Size(dim, dim),
+                    painter: _RingPainter(
+                      progress: (sessionFormScore.clamp(0, 105) / 105) * eased,
+                      band: band,
+                      track: c.invInkFaint.withValues(alpha: 0.20),
+                      tick: c.invInkFaint.withValues(alpha: 0.30),
+                    ),
+                  ),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '$display',
+                            style: TextStyle(
+                              fontFamily: 'BeVietnamPro',
+                              fontSize: 84,
+                              fontWeight: FontWeight.w800,
+                              fontStyle: FontStyle.italic,
+                              letterSpacing: -4,
+                              height: 0.9,
+                              color: numeralColor,
+                              fontFeatures: VikaIvoryMain.tabularFigures,
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 10),
+                            child: Text(
+                              '/105',
+                              style: TextStyle(
+                                fontFamily: 'BeVietnamPro',
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                fontStyle: FontStyle.italic,
+                                letterSpacing: -0.4,
+                                color: c.invInkFaint,
+                                fontFeatures: VikaIvoryMain.tabularFigures,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'ĐIỂM FORM',
+                        style: TextStyle(
+                          fontFamily: 'BeVietnamPro',
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 2.4,
+                          color: c.invInkFaint,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+        if (hasBonus) ...[
+          const SizedBox(height: 18),
+          _BonusCaption(
+            band: band,
+            streakBonus: streakBonus,
+            streakWeeks: streakWeeks,
+            climb: climb,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _BonusCaption extends StatelessWidget {
+  const _BonusCaption({
+    required this.band,
+    required this.streakBonus,
+    required this.streakWeeks,
+    required this.climb,
+  });
+  final Color band;
+  final int streakBonus;
+  final int streakWeeks;
+  final Animation<double> climb;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    return AnimatedBuilder(
+      animation: climb,
+      builder: (context, _) {
+        final reveal = ((climb.value - 0.68) / 0.32).clamp(0.0, 1.0);
+        return Opacity(
+          opacity: reveal,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 22 * reveal,
+                height: 2,
+                decoration: BoxDecoration(
+                  color: band,
+                  borderRadius: BorderRadius.circular(1),
+                  boxShadow: [
+                    BoxShadow(
+                      color: band.withValues(alpha: 0.5),
+                      blurRadius: 8,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                '+$streakBonus chuỗi · ${streakTierLabel(streakWeeks)}',
+                style: TextStyle(
+                  fontFamily: 'BeVietnamPro',
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  fontStyle: FontStyle.italic,
+                  letterSpacing: -0.1,
+                  color: c.invInkSoft,
+                  fontFeatures: VikaIvoryMain.tabularFigures,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _RingPainter extends CustomPainter {
+  _RingPainter({
+    required this.progress,
+    required this.band,
+    required this.track,
+    required this.tick,
+  });
+
+  final double progress; // 0..1
+  final Color band;
+  final Color track;
+  final Color tick;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (math.min(size.width, size.height) / 2) - 12;
+    const stroke = 7.0;
+
+    // Track — full circle, hairline.
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = stroke
+        ..color = track,
+    );
+
+    // Tick marks every 30° — subtle, on the track.
+    for (var i = 0; i < 12; i++) {
+      final angle = (i / 12) * 2 * math.pi - math.pi / 2;
+      final inner = Offset(
+        center.dx + math.cos(angle) * (radius - stroke / 2 - 2),
+        center.dy + math.sin(angle) * (radius - stroke / 2 - 2),
+      );
+      final outer = Offset(
+        center.dx + math.cos(angle) * (radius - stroke / 2 - 6),
+        center.dy + math.sin(angle) * (radius - stroke / 2 - 6),
+      );
+      canvas.drawLine(
+        inner,
+        outer,
+        Paint()
+          ..color = tick
+          ..strokeWidth = 1,
+      );
+    }
+
+    if (progress <= 0.001) return;
+
+    // Band-colored fill arc — sweep from top clockwise.
+    final sweep = progress.clamp(0.0, 1.0) * 2 * math.pi;
+    final fillPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.round
+      ..shader = SweepGradient(
+        center: Alignment.center,
+        startAngle: -math.pi / 2,
+        endAngle: -math.pi / 2 + 2 * math.pi,
+        colors: [band.withValues(alpha: 0.5), band, band],
+        stops: const [0.0, 0.6, 1.0],
+      ).createShader(Rect.fromCircle(center: center, radius: radius));
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      -math.pi / 2,
+      sweep,
+      false,
+      fillPaint,
+    );
+
+    // Bright tip dot.
+    final tipAngle = -math.pi / 2 + sweep;
+    final tip = Offset(
+      center.dx + math.cos(tipAngle) * radius,
+      center.dy + math.sin(tipAngle) * radius,
+    );
+    canvas.drawCircle(
+      tip,
+      stroke / 2 + 5,
+      Paint()
+        ..color = band.withValues(alpha: 0.4)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+    );
+    canvas.drawCircle(tip, stroke / 2 + 1, Paint()..color = band);
+  }
+
+  @override
+  bool shouldRepaint(covariant _RingPainter old) =>
+      old.progress != progress ||
+      old.band != band ||
+      old.track != track ||
+      old.tick != tick;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TROPHY LINE — the earned highlight, folded into the hero as one
+// quiet pill. Deferential to the ring; never a giant billing.
+// ═══════════════════════════════════════════════════════════════
+
+class _TrophyLine extends StatelessWidget {
+  const _TrophyLine({required this.trophy});
+  final Trophy trophy;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 7, 14, 7),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.workspace_premium_rounded, size: 14, color: c.yellow),
+          const SizedBox(width: 8),
+          Text(
+            trophy.tag,
+            style: TextStyle(
+              fontFamily: 'BeVietnamPro',
+              fontSize: 9.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.5,
+              color: c.invInkFaint,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            width: 3,
+            height: 3,
+            decoration: BoxDecoration(
+              color: c.invInkFaint,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              trophy.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: 'BeVietnamPro',
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                fontStyle: FontStyle.italic,
+                letterSpacing: -0.2,
+                color: c.invInk,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// JOURNEY — the climb. One calm area chart of every set's form score
+// concatenated across exercises, band-colored, with set nodes, exercise
+// boundary labels, and a glowing summit. Retoned for the cream surface.
+// ═══════════════════════════════════════════════════════════════
+
+class _JourneySection extends StatelessWidget {
+  const _JourneySection({
     required this.reports,
     required this.totalSets,
-    required this.climb,
     required this.sessionFormScore,
-    required this.totalDuration,
-    required this.totalCalories,
+    required this.climb,
   });
 
   final List<ExerciseSessionReport> reports;
   final int totalSets;
-  final Animation<double> climb;
   final int sessionFormScore;
-  final Duration totalDuration;
-  final int totalCalories;
+  final Animation<double> climb;
 
   @override
   Widget build(BuildContext context) {
@@ -725,77 +1020,26 @@ class _RidgeSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Section eyebrow
-        Row(
-          children: [
-            Flexible(
-              child: Text(
-                'ĐƯỜNG FORM CẢ BUỔI',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontFamily: 'BeVietnamPro',
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.8,
-                  color: c.invInkFaint,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Container(
-                height: 1,
-                color: Colors.white.withValues(alpha: 0.08),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              '$totalSets HIỆP',
-              style: TextStyle(
-                fontFamily: 'BeVietnamPro',
-                fontSize: 9,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.4,
-                color: c.invInkFaint,
-                fontFeatures: VikaIvoryMain.tabularFigures,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
+        _SectionHeader(label: 'HÀNH TRÌNH FORM', trailing: '$totalSets HIỆP'),
+        const SizedBox(height: 18),
         SizedBox(
-          height: 150,
+          height: 158,
           child: AnimatedBuilder(
             animation: climb,
             builder: (context, _) {
               return CustomPaint(
                 size: Size.infinite,
-                painter: _RidgelinePainter(
+                painter: _JourneyPainter(
                   reports: reports,
                   progress: climb.value,
                   yellow: c.yellow,
-                  invInk: c.invInk,
-                  invInkSoft: c.invInkSoft,
-                  invInkFaint: c.invInkFaint,
+                  ink: c.ink,
+                  inkSoft: c.inkSoft,
+                  inkFaint: c.inkFaint,
                   sessionBand: _bandColor(sessionFormScore, c.yellow),
                 ),
               );
             },
-          ),
-        ),
-        const SizedBox(height: 18),
-        Container(
-          decoration: BoxDecoration(
-            border: Border(
-              top: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-            ),
-          ),
-          padding: const EdgeInsets.only(top: 14),
-          child: _VitalStrip(
-            reports: reports,
-            totalDuration: totalDuration,
-            totalCalories: totalCalories,
           ),
         ),
       ],
@@ -803,30 +1047,30 @@ class _RidgeSection extends StatelessWidget {
   }
 }
 
-class _RidgelinePainter extends CustomPainter {
-  _RidgelinePainter({
+class _JourneyPainter extends CustomPainter {
+  _JourneyPainter({
     required this.reports,
     required this.progress,
     required this.yellow,
-    required this.invInk,
-    required this.invInkSoft,
-    required this.invInkFaint,
+    required this.ink,
+    required this.inkSoft,
+    required this.inkFaint,
     required this.sessionBand,
   });
 
   final List<ExerciseSessionReport> reports;
   final double progress;
   final Color yellow;
-  final Color invInk;
-  final Color invInkSoft;
-  final Color invInkFaint;
+  final Color ink;
+  final Color inkSoft;
+  final Color inkFaint;
   final Color sessionBand;
 
   @override
   void paint(Canvas canvas, Size size) {
     // Concatenate every set's score across exercises, tracking boundaries.
     final scores = <int>[];
-    final boundaryStart = <int>[]; // first vertex index of each exercise
+    final boundaryStart = <int>[];
     final names = <String>[];
     for (final r in reports) {
       final s = r.report.sets.map((e) => e.score).toList();
@@ -845,11 +1089,12 @@ class _RidgelinePainter extends CustomPainter {
     double yFor(num s) => bottomY - (s.clamp(0, 100) / 100) * usableH;
 
     // ── Guide grid (full width, ahead of the pen) ──
-    final grid = Paint()
-      ..color = invInkFaint.withValues(alpha: 0.18)
-      ..strokeWidth = 1;
-    canvas.drawLine(Offset(padX, bottomY), Offset(size.width - padX, bottomY),
-        grid..color = invInkFaint.withValues(alpha: 0.22));
+    final grid = Paint()..strokeWidth = 1;
+    canvas.drawLine(
+      Offset(padX, bottomY),
+      Offset(size.width - padX, bottomY),
+      grid..color = inkFaint.withValues(alpha: 0.30),
+    );
     for (final v in [50, 100]) {
       final y = yFor(v);
       const dash = 4.0, gap = 5.0;
@@ -857,7 +1102,7 @@ class _RidgelinePainter extends CustomPainter {
       while (x < size.width - padX) {
         final next = math.min(x + dash, size.width - padX);
         canvas.drawLine(Offset(x, y), Offset(next, y),
-            grid..color = invInkFaint.withValues(alpha: 0.16));
+            grid..color = inkFaint.withValues(alpha: 0.22));
         x = next + gap;
       }
       _label(canvas, '$v', Offset(2, y),
@@ -865,7 +1110,7 @@ class _RidgelinePainter extends CustomPainter {
             fontFamily: 'BeVietnamPro',
             fontSize: 8.5,
             fontWeight: FontWeight.w700,
-            color: invInkFaint,
+            color: inkFaint,
             fontFeatures: VikaIvoryMain.tabularFigures,
           ),
           anchor: _Anchor.midLeft);
@@ -933,7 +1178,7 @@ class _RidgelinePainter extends CustomPainter {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            sessionBand.withValues(alpha: 0.26),
+            sessionBand.withValues(alpha: 0.22),
             sessionBand.withValues(alpha: 0.02),
           ],
         ).createShader(Rect.fromLTRB(0, padTop, size.width, bottomY)),
@@ -966,7 +1211,7 @@ class _RidgelinePainter extends CustomPainter {
           Offset(x, padTop - 4),
           Offset(x, bottomY),
           Paint()
-            ..color = invInkFaint.withValues(alpha: 0.25)
+            ..color = inkFaint.withValues(alpha: 0.28)
             ..strokeWidth = 1,
         );
       }
@@ -985,12 +1230,12 @@ class _RidgelinePainter extends CustomPainter {
       final p = nodePts[i];
       if (p.dx > penX + 0.5) continue;
       final isSummit = !singleCrest && i == summitIdx;
-      if (isSummit) continue; // drawn below with halo
+      if (isSummit) continue;
       canvas.drawCircle(
         p,
         2.6,
         Paint()
-          ..color = _bandColor(nodeScores[i], yellow).withValues(alpha: 0.9)
+          ..color = _bandColor(nodeScores[i], yellow).withValues(alpha: 0.95)
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1.6,
       );
@@ -999,7 +1244,7 @@ class _RidgelinePainter extends CustomPainter {
     // Summit with halo, only once the pen reaches it.
     if (summitPt.dx <= penX + 0.5) {
       canvas.drawCircle(
-          summitPt, 13, Paint()..color = summitColor.withValues(alpha: 0.20));
+          summitPt, 13, Paint()..color = summitColor.withValues(alpha: 0.18));
       canvas.drawCircle(
           summitPt, 6, Paint()..color = summitColor.withValues(alpha: 0.5));
       canvas.drawCircle(summitPt, 3.4, Paint()..color = summitColor);
@@ -1007,8 +1252,6 @@ class _RidgelinePainter extends CustomPainter {
 
     // ── Per-exercise name labels under each segment's midpoint ──
     if (!singleCrest) {
-      // Width-aware truncation so adjacent labels never collide on a narrow
-      // (e.g. 320pt) phone when there are many exercises.
       final slotPx = (size.width - padX * 2) / boundaryStart.length;
       final maxChars = (slotPx * 0.9 / 5.8).floor().clamp(3, 14);
       for (var b = 0; b < boundaryStart.length; b++) {
@@ -1034,7 +1277,7 @@ class _RidgelinePainter extends CustomPainter {
             fontSize: 8.5,
             fontWeight: FontWeight.w800,
             letterSpacing: 0.8,
-            color: invInkSoft.withValues(alpha: alpha),
+            color: inkSoft.withValues(alpha: alpha),
           ),
         );
       }
@@ -1048,7 +1291,7 @@ class _RidgelinePainter extends CustomPainter {
           fontSize: 8.5,
           fontWeight: FontWeight.w800,
           letterSpacing: 0.8,
-          color: invInkSoft.withValues(alpha: progress.clamp(0.0, 1.0)),
+          color: inkSoft.withValues(alpha: progress.clamp(0.0, 1.0)),
         ),
       );
     }
@@ -1069,21 +1312,24 @@ class _RidgelinePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _RidgelinePainter old) =>
+  bool shouldRepaint(covariant _JourneyPainter old) =>
       old.progress != progress ||
       old.reports != reports ||
       old.sessionBand != sessionBand ||
       old.yellow != yellow ||
-      old.invInk != invInk ||
-      old.invInkSoft != invInkSoft ||
-      old.invInkFaint != invInkFaint;
+      old.ink != ink ||
+      old.inkSoft != inkSoft ||
+      old.inkFaint != inkFaint;
 }
 
 enum _Anchor { midCenter, midLeft }
 
-// ─── Vital strip — 4-up tabular figures, hairline-divided, on dark ───
-class _VitalStrip extends StatelessWidget {
-  const _VitalStrip({
+// ═══════════════════════════════════════════════════════════════
+// VITALS LINE — one slim hairline-divided band of tabular figures.
+// ═══════════════════════════════════════════════════════════════
+
+class _VitalsLine extends StatelessWidget {
+  const _VitalsLine({
     required this.reports,
     required this.totalDuration,
     required this.totalCalories,
@@ -1095,6 +1341,8 @@ class _VitalStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+
     // "Đúng form": branch per modality — never sum reps across holds.
     final hasRep =
         reports.any((r) => !r.report.isSecondBased && (r.totalReps ?? 0) > 0);
@@ -1104,10 +1352,10 @@ class _VitalStrip extends StatelessWidget {
     final String workLabel;
     final String workValue;
     if (hasHold && !hasRep) {
-      final good = reports.fold<double>(
-          0, (s, r) => s + (r.report.goodSeconds ?? 0));
-      final total = reports.fold<double>(
-          0, (s, r) => s + (r.report.totalSeconds ?? 0));
+      final good =
+          reports.fold<double>(0, (s, r) => s + (r.report.goodSeconds ?? 0));
+      final total =
+          reports.fold<double>(0, (s, r) => s + (r.report.totalSeconds ?? 0));
       workLabel = 'GIÂY';
       workValue = '${_fmtSeconds(good)}/${_fmtSeconds(total)}';
     } else {
@@ -1117,17 +1365,23 @@ class _VitalStrip extends StatelessWidget {
       workValue = '$good/$total';
     }
 
-    return Row(
-      children: [
-        Expanded(child: _VitalStat(label: 'BÀI', value: '${reports.length}')),
-        _VitalDivider(),
-        Expanded(child: _VitalStat(label: workLabel, value: workValue)),
-        _VitalDivider(),
-        Expanded(
-            child: _VitalStat(label: 'GIỜ', value: _fmtClock(totalDuration))),
-        _VitalDivider(),
-        Expanded(child: _VitalStat(label: 'KCAL', value: '~$totalCalories')),
-      ],
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: c.border),
+          bottom: BorderSide(color: c.border),
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Row(
+        children: [
+          Expanded(child: _VitalStat(label: 'GIỜ', value: _fmtClock(totalDuration))),
+          _VitalDivider(),
+          Expanded(child: _VitalStat(label: workLabel, value: workValue)),
+          _VitalDivider(),
+          Expanded(child: _VitalStat(label: 'KCAL', value: '~$totalCalories')),
+        ],
+      ),
     );
   }
 }
@@ -1152,21 +1406,21 @@ class _VitalStat extends StatelessWidget {
             fontSize: 8.5,
             fontWeight: FontWeight.w800,
             letterSpacing: 1.4,
-            color: c.invInkFaint,
+            color: c.inkFaint,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 5),
         Text(
           value,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontFamily: 'BeVietnamPro',
-            fontSize: 17,
+            fontSize: 19,
             fontWeight: FontWeight.w800,
             fontStyle: FontStyle.italic,
             letterSpacing: -0.5,
-            color: c.invInk,
+            color: c.ink,
             fontFeatures: VikaIvoryMain.tabularFigures,
           ),
         ),
@@ -1178,120 +1432,18 @@ class _VitalStat extends StatelessWidget {
 class _VitalDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
     return Container(
       width: 1,
-      height: 28,
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      color: Colors.white.withValues(alpha: 0.08),
+      height: 30,
+      margin: const EdgeInsets.symmetric(horizontal: 6),
+      color: c.border,
     );
   }
 }
 
 // ═══════════════════════════════════════════════════════════════
-// TROPHY BILLING — the earned highlight, billed like a lead credit.
-// Hairline-ruled, no box, no icon — pure type, deferential to the ridge.
-// ═══════════════════════════════════════════════════════════════
-
-class _TrophyBilling extends StatelessWidget {
-  const _TrophyBilling({required this.trophy});
-  final Trophy trophy;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = VikaColors.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(height: 1, color: Colors.white.withValues(alpha: 0.08)),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-              ),
-              child: Text(
-                trophy.tag,
-                style: TextStyle(
-                  fontFamily: 'BeVietnamPro',
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.5,
-                  color: c.invInkSoft,
-                ),
-              ),
-            ),
-            const Spacer(),
-            Text(
-              'KHOẢNH KHẮC',
-              style: TextStyle(
-                fontFamily: 'BeVietnamPro',
-                fontSize: 9.5,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.7,
-                color: c.invInkFaint,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 200),
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.bottomLeft,
-                child: Text(
-                  trophy.value,
-                  style: TextStyle(
-                    fontFamily: 'BeVietnamPro',
-                    fontSize: 76,
-                    fontWeight: FontWeight.w800,
-                    fontStyle: FontStyle.italic,
-                    letterSpacing: -4,
-                    height: 0.88,
-                    color: c.invInk,
-                    fontFeatures: VikaIvoryMain.tabularFigures,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Text(
-                  trophy.label,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontFamily: 'BeVietnamPro',
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    fontStyle: FontStyle.italic,
-                    height: 1.35,
-                    letterSpacing: -0.3,
-                    color: c.invInkSoft,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Container(height: 1, color: Colors.white.withValues(alpha: 0.08)),
-      ],
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// COACH NOTE — AI pull-quote (yellow left-rule) + two editorial rows.
+// COACH NOTE — the voice. AI pull-quote (yellow left-rule) + two rows.
 // ═══════════════════════════════════════════════════════════════
 
 class _CoachNote extends StatelessWidget {
@@ -1304,7 +1456,7 @@ class _CoachNote extends StatelessWidget {
     final (IconData watchIcon, Color watchAccent) = switch (coach.kind) {
       CoachWatchKind.perfect => (Icons.check_circle_rounded, c.yellow),
       CoachWatchKind.fault => (Icons.center_focus_strong_rounded, c.attention),
-      CoachWatchKind.lowForm => (Icons.self_improvement_rounded, c.invInkSoft),
+      CoachWatchKind.lowForm => (Icons.self_improvement_rounded, c.inkSoft),
     };
     final watchBody = coach.watchExerciseName == null
         ? coach.watch
@@ -1320,9 +1472,8 @@ class _CoachNote extends StatelessWidget {
               width: 30,
               height: 30,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.05),
+                color: c.ink,
                 borderRadius: BorderRadius.circular(9),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
               ),
               alignment: Alignment.center,
               child: Text(
@@ -1348,7 +1499,7 @@ class _CoachNote extends StatelessWidget {
                     fontSize: 9.5,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 1.6,
-                    color: c.invInkFaint,
+                    color: c.inkFaint,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -1360,7 +1511,7 @@ class _CoachNote extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                     fontStyle: FontStyle.italic,
                     letterSpacing: -0.3,
-                    color: c.invInk,
+                    color: c.ink,
                   ),
                 ),
               ],
@@ -1378,12 +1529,12 @@ class _CoachNote extends StatelessWidget {
             coach.quote,
             style: TextStyle(
               fontFamily: 'BeVietnamPro',
-              fontSize: 15,
+              fontSize: 15.5,
               fontWeight: FontWeight.w500,
               fontStyle: FontStyle.italic,
               height: 1.55,
               letterSpacing: -0.1,
-              color: c.invInk,
+              color: c.ink,
             ),
           ),
         ),
@@ -1395,13 +1546,13 @@ class _CoachNote extends StatelessWidget {
           glyphColor: watchAccent,
         ),
         const SizedBox(height: 14),
-        Container(height: 1, color: Colors.white.withValues(alpha: 0.08)),
+        Container(height: 1, color: c.border),
         const SizedBox(height: 14),
         _CoachRow(
           label: 'BUỔI SAU',
           body: coach.next,
           glyph: Icons.east_rounded,
-          glyphColor: c.invInk,
+          glyphColor: c.ink,
         ),
       ],
     );
@@ -1435,7 +1586,7 @@ class _CoachRow extends StatelessWidget {
               fontSize: 9,
               fontWeight: FontWeight.w800,
               letterSpacing: 1.4,
-              color: c.invInkFaint,
+              color: c.inkFaint,
             ),
           ),
         ),
@@ -1455,7 +1606,7 @@ class _CoachRow extends StatelessWidget {
               fontStyle: FontStyle.italic,
               height: 1.4,
               letterSpacing: -0.2,
-              color: c.invInk,
+              color: c.ink,
             ),
           ),
         ),
@@ -1465,12 +1616,12 @@ class _CoachRow extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// CAST CREDITS — per-exercise indexed credits list. Replaces the old
-// stat-card grid; reads as the ridge's key, scales 1→N gracefully.
+// EXERCISE LIST — lean ranked rows: index, name, dotted leader, band
+// score, and a calm row of band-colored set dots (no micro-chart soup).
 // ═══════════════════════════════════════════════════════════════
 
-class _CreditsList extends StatelessWidget {
-  const _CreditsList({required this.reports});
+class _ExerciseList extends StatelessWidget {
+  const _ExerciseList({required this.reports});
   final List<ExerciseSessionReport> reports;
 
   @override
@@ -1479,57 +1630,19 @@ class _CreditsList extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Section eyebrow
-        Row(
-          children: [
-            Flexible(
-              child: Text(
-                'DIỄN VIÊN',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontFamily: 'BeVietnamPro',
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.8,
-                  color: c.invInkFaint,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Container(
-                height: 1,
-                color: Colors.white.withValues(alpha: 0.08),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              '${reports.length} BÀI',
-              style: TextStyle(
-                fontFamily: 'BeVietnamPro',
-                fontSize: 9,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.4,
-                color: c.invInkFaint,
-                fontFeatures: VikaIvoryMain.tabularFigures,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
+        _SectionHeader(label: 'CÁC BÀI ĐÃ TẬP', trailing: '${reports.length} BÀI'),
+        const SizedBox(height: 4),
         for (var i = 0; i < reports.length; i++) ...[
-          if (i > 0)
-            Container(height: 1, color: Colors.white.withValues(alpha: 0.06)),
-          _CreditRow(report: reports[i], index: i),
+          if (i > 0) Container(height: 1, color: c.border),
+          _ExerciseRow(report: reports[i], index: i),
         ],
       ],
     );
   }
 }
 
-class _CreditRow extends StatelessWidget {
-  const _CreditRow({required this.report, required this.index});
+class _ExerciseRow extends StatelessWidget {
+  const _ExerciseRow({required this.report, required this.index});
   final ExerciseSessionReport report;
   final int index;
 
@@ -1549,25 +1662,24 @@ class _CreditRow extends StatelessWidget {
     final difficulty = _difficultyLabel(report.userDifficulty);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
+      padding: const EdgeInsets.symmetric(vertical: 15),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Credits page-number index
               SizedBox(
-                width: 34,
+                width: 32,
                 child: Text(
                   (index + 1).toString().padLeft(2, '0'),
                   style: TextStyle(
                     fontFamily: 'BeVietnamPro',
-                    fontSize: 22,
+                    fontSize: 20,
                     fontWeight: FontWeight.w800,
                     fontStyle: FontStyle.italic,
                     letterSpacing: -1,
-                    color: c.invInkFaint,
+                    color: c.inkFaint,
                     fontFeatures: VikaIvoryMain.tabularFigures,
                   ),
                 ),
@@ -1584,11 +1696,10 @@ class _CreditRow extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                     fontStyle: FontStyle.italic,
                     letterSpacing: -0.5,
-                    color: c.invInk,
+                    color: c.ink,
                   ),
                 ),
               ),
-              // Dotted leader
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -1597,7 +1708,7 @@ class _CreditRow extends StatelessWidget {
                     child: CustomPaint(
                       size: Size.infinite,
                       painter: _DottedLeaderPainter(
-                        color: c.invInkFaint.withValues(alpha: 0.5),
+                        color: c.inkFaint.withValues(alpha: 0.45),
                       ),
                     ),
                   ),
@@ -1620,7 +1731,7 @@ class _CreditRow extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Padding(
-            padding: const EdgeInsets.only(left: 40),
+            padding: const EdgeInsets.only(left: 38),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
@@ -1635,31 +1746,47 @@ class _CreditRow extends StatelessWidget {
                       fontSize: 11.5,
                       fontWeight: FontWeight.w600,
                       letterSpacing: -0.1,
-                      color: c.invInkSoft,
+                      color: c.inkSoft,
                     ),
                   ),
                 ),
                 const SizedBox(width: 12),
-                // Inline per-set spark — this exercise's slice of the ridge.
-                SizedBox(
-                  width: math.min(40.0 + setScores.length * 14.0, 120.0),
-                  height: 34,
-                  child: ClipRect(
-                    child: CustomPaint(
-                      size: Size.infinite,
-                      painter: _SetSparkPainter(
-                        scores: setScores,
-                        accent: band,
-                        dim: c.invInkFaint,
-                      ),
-                    ),
-                  ),
-                ),
+                // Calm per-set dots — this exercise's set bands, no chart.
+                _SetDots(scores: setScores, yellow: c.yellow, dim: c.inkGhost),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SetDots extends StatelessWidget {
+  const _SetDots({required this.scores, required this.yellow, required this.dim});
+  final List<int> scores;
+  final Color yellow;
+  final Color dim;
+
+  @override
+  Widget build(BuildContext context) {
+    if (scores.isEmpty) return const SizedBox.shrink();
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 0; i < scores.length; i++)
+          Padding(
+            padding: EdgeInsets.only(left: i == 0 ? 0 : 5),
+            child: Container(
+              width: 7,
+              height: 7,
+              decoration: BoxDecoration(
+                color: _bandColor(scores[i], yellow),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -1684,190 +1811,134 @@ class _DottedLeaderPainter extends CustomPainter {
   bool shouldRepaint(covariant _DottedLeaderPainter old) => old.color != color;
 }
 
-class _SetSparkPainter extends CustomPainter {
-  const _SetSparkPainter({
-    required this.scores,
-    required this.accent,
-    required this.dim,
-  });
-  final List<int> scores;
-  final Color accent;
-  final Color dim;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (scores.isEmpty) return;
-    const padX = 6.0;
-    const topY = 6.0;
-    final bottomY = size.height - 14.0;
-    final usable = bottomY - topY;
-    final stepX = scores.length <= 1
-        ? 0.0
-        : (size.width - padX * 2) / (scores.length - 1);
-    final pts = <Offset>[];
-    for (var i = 0; i < scores.length; i++) {
-      final x = scores.length == 1 ? size.width / 2 : padX + stepX * i;
-      final y = bottomY - (scores[i] / 100) * usable;
-      pts.add(Offset(x, y));
-    }
-    final path = Path()..moveTo(pts.first.dx, pts.first.dy);
-    for (var i = 1; i < pts.length; i++) {
-      path.lineTo(pts[i].dx, pts[i].dy);
-    }
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = accent.withValues(alpha: 0.85)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.6
-        ..strokeCap = StrokeCap.round,
-    );
-    for (var i = 0; i < pts.length; i++) {
-      canvas.drawCircle(
-          pts[i], 3, Paint()..color = accent.withValues(alpha: 0.95));
-      final lp = TextPainter(
-        text: TextSpan(
-          text: 'S${i + 1}',
-          style: TextStyle(
-            fontFamily: 'BeVietnamPro',
-            fontSize: 8.5,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.8,
-            color: dim,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      lp.paint(canvas, Offset(pts[i].dx - lp.width / 2, bottomY + 2));
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _SetSparkPainter old) =>
-      old.scores != scores || old.accent != accent || old.dim != dim;
-}
-
 // ═══════════════════════════════════════════════════════════════
-// LIGHTS-UP CLOSE — the one color transition. Dark reel curves into
-// cream; HẾT wordmark, ghost share links, and the yellow Done CTA.
+// SECTION HEADER — eyebrow + hairline rule + trailing count.
 // ═══════════════════════════════════════════════════════════════
 
-class _LightsUpClose extends StatelessWidget {
-  const _LightsUpClose({
-    required this.beat,
-    required this.shimmer,
-    required this.bottomInset,
-    required this.onDone,
-    required this.onShare,
-    required this.onShareToZalo,
-  });
-
-  final Animation<double> beat;
-  final AnimationController shimmer;
-  final double bottomInset;
-  final VoidCallback onDone;
-  final VoidCallback onShare;
-  final VoidCallback onShareToZalo;
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.label, required this.trailing});
+  final String label;
+  final String trailing;
 
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        color: c.bg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(36)),
-      ),
-      // +36 top to compensate for the -36 overlap translate in the parent.
-      padding: EdgeInsets.fromLTRB(20, 36 + 30, 20, 28 + bottomInset),
-      child: _BeatReveal(
-        animation: beat,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'HẾT',
-                    style: TextStyle(
-                      fontFamily: 'BeVietnamPro',
-                      fontSize: 40,
-                      fontWeight: FontWeight.w800,
-                      fontStyle: FontStyle.italic,
-                      height: 1.0,
-                      letterSpacing: -1.6,
-                      color: c.ink,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    width: 24,
-                    height: 2,
-                    decoration: BoxDecoration(
-                      color: c.yellow,
-                      borderRadius: BorderRadius.circular(1),
-                      boxShadow: [
-                        BoxShadow(
-                          color: c.yellow.withValues(alpha: 0.5),
-                          blurRadius: 8,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+    return Row(
+      children: [
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontFamily: 'BeVietnamPro',
+              fontSize: 9.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.8,
+              color: c.inkFaint,
             ),
-            const SizedBox(height: 22),
-            // Quiet ghost share links on a hairline row (not buttons).
-            Container(
-              decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(color: c.border),
-                  bottom: BorderSide(color: c.border),
-                ),
-              ),
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Flexible(
-                    child: _ShareLink(
-                        label: 'Chỉnh sửa & chia sẻ', onTap: onShare),
-                  ),
-                  Container(
-                    width: 1,
-                    height: 14,
-                    margin: const EdgeInsets.symmetric(horizontal: 18),
-                    color: c.border,
-                  ),
-                  _ShareLink(label: 'Zalo', onTap: onShareToZalo),
-                ],
-              ),
-            ),
-            const SizedBox(height: 22),
-            _DoneCta(shimmer: shimmer, onTap: onDone),
-            const SizedBox(height: 12),
-            Center(
-              child: Text(
-                'Hẹn gặp lại buổi sau! 👋',
-                style: TextStyle(
-                  fontFamily: 'BeVietnamPro',
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  fontStyle: FontStyle.italic,
-                  letterSpacing: -0.1,
-                  color: c.inkFaint,
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
-      ),
+        const SizedBox(width: 12),
+        Expanded(child: Container(height: 1, color: c.border)),
+        const SizedBox(width: 12),
+        Text(
+          trailing,
+          style: TextStyle(
+            fontFamily: 'BeVietnamPro',
+            fontSize: 9.5,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.4,
+            color: c.inkFaint,
+            fontFeatures: VikaIvoryMain.tabularFigures,
+          ),
+        ),
+      ],
     );
   }
 }
 
+// ═══════════════════════════════════════════════════════════════
+// CLOSE — share links + the app-standard yellow halo Done CTA.
+// ═══════════════════════════════════════════════════════════════
+
+class _Close extends StatelessWidget {
+  const _Close({
+    required this.shimmer,
+    required this.reduceMotion,
+    required this.onDone,
+    // SHARE-DISABLED: restore alongside the share row in build().
+    // required this.onShare,
+    // required this.onShareToZalo,
+  });
+
+  final AnimationController shimmer;
+  final bool reduceMotion;
+  final VoidCallback onDone;
+  // SHARE-DISABLED: restore alongside the share row in build().
+  // final VoidCallback onShare;
+  // final VoidCallback onShareToZalo;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // SHARE-DISABLED: the post-session share row ("Chỉnh sửa & chia sẻ" +
+        // "Zalo") is hidden until the share/Zalo feature is built. To restore,
+        // uncomment this block (and the _ShareLink widget, the _Close
+        // onShare/onShareToZalo params + their wiring in _buildBody, and _stub).
+        /*
+        // Quiet ghost share links on a hairline row (not buttons).
+        Container(
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(color: c.border),
+              bottom: BorderSide(color: c.border),
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Flexible(
+                child: _ShareLink(label: 'Chỉnh sửa & chia sẻ', onTap: onShare),
+              ),
+              Container(
+                width: 1,
+                height: 14,
+                margin: const EdgeInsets.symmetric(horizontal: 18),
+                color: c.border,
+              ),
+              _ShareLink(label: 'Zalo', onTap: onShareToZalo),
+            ],
+          ),
+        ),
+        const SizedBox(height: 22),
+        */
+        _DoneCta(shimmer: shimmer, reduceMotion: reduceMotion, onTap: onDone),
+        const SizedBox(height: 12),
+        Center(
+          child: Text(
+            'Hẹn gặp lại buổi sau.',
+            style: TextStyle(
+              fontFamily: 'BeVietnamPro',
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              fontStyle: FontStyle.italic,
+              letterSpacing: -0.1,
+              color: c.inkFaint,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// SHARE-DISABLED: restore alongside the share row in _Close.
+/*
 class _ShareLink extends StatelessWidget {
   const _ShareLink({required this.label, required this.onTap});
   final String label;
@@ -1903,11 +1974,17 @@ class _ShareLink extends StatelessWidget {
     );
   }
 }
+*/
 
 // ─── Done CTA — yellow halo pill with slow diagonal shimmer ───
 class _DoneCta extends StatefulWidget {
-  const _DoneCta({required this.shimmer, required this.onTap});
+  const _DoneCta({
+    required this.shimmer,
+    required this.reduceMotion,
+    required this.onTap,
+  });
   final AnimationController shimmer;
+  final bool reduceMotion;
   final VoidCallback onTap;
 
   @override
@@ -1958,22 +2035,23 @@ class _DoneCtaState extends State<_DoneCta> {
                 borderRadius: BorderRadius.circular(20),
                 child: Stack(
                   children: [
-                    Positioned.fill(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment(-1.6 + (v * 3.2), -1),
-                            end: Alignment(-0.6 + (v * 3.2), 1),
-                            colors: [
-                              Colors.white.withValues(alpha: 0),
-                              Colors.white.withValues(alpha: 0.32),
-                              Colors.white.withValues(alpha: 0),
-                            ],
-                            stops: const [0.35, 0.5, 0.65],
+                    if (!widget.reduceMotion)
+                      Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment(-1.6 + (v * 3.2), -1),
+                              end: Alignment(-0.6 + (v * 3.2), 1),
+                              colors: [
+                                Colors.white.withValues(alpha: 0),
+                                Colors.white.withValues(alpha: 0.32),
+                                Colors.white.withValues(alpha: 0),
+                              ],
+                              stops: const [0.35, 0.5, 0.65],
+                            ),
                           ),
                         ),
                       ),
-                    ),
                     Center(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),

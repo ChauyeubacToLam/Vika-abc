@@ -11,8 +11,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'services/analytics_service.dart';
 
 import 'debug/debug_types.dart';
 import 'exercise/exercise_base.dart';
@@ -24,7 +27,9 @@ import 'screens/exercise/exercise_experience_screen.dart';
 import 'screens/main_shell.dart';
 import 'screens/onboarding/v5/v5_onboarding_navigator.dart';
 import 'screens/plan_retest_screen.dart';
+import 'screens/reviewer/reviewer_plan_screen.dart';
 import 'screens/weekly_check_in_screen.dart';
+import 'services/catalog/catalog_source.dart';
 import 'services/recommendation/recommendation_service.dart';
 import 'theme/typography.dart';
 import 'theme/vf_theme.dart';
@@ -51,6 +56,13 @@ Future<void> main() async {
       url: appConfig.supabaseUrl,
       anonKey: appConfig.supabaseAnonKey,
     );
+
+    // PostHog setup runs here, AFTER Supabase, and only configures the SDK —
+    // it does NOT start collecting. The SDK is set up opted-out; whether
+    // collection actually turns on is decided by the persisted consent flag in
+    // AnalyticsService.init() below, which can only enable for a user who
+    // already accepted the S06 policy on a prior launch.
+    await _setUpAnalytics(appConfig);
   } catch (error, stackTrace) {
     startupError = error;
     startupStackTrace = stackTrace;
@@ -60,6 +72,9 @@ Future<void> main() async {
 
   if (startupError == null) {
     await _loadDeviceCameras();
+    // Preload the bundled exercise catalog so synchronous volume lookups
+    // (launch + list cards) are ready before first paint, offline-safe.
+    await CatalogSource.instance.ensureLoaded();
     _hasCompletedOnboarding = await _loadInitialOnboardingCompletion();
     try {
       _hasSeenOnboarding = await _readStoredOnboardingCompletion();
@@ -117,56 +132,128 @@ class _AppConfig {
   const _AppConfig({
     required this.supabaseUrl,
     required this.supabaseAnonKey,
+    this.posthogApiKey,
+    required this.posthogHost,
   });
 
   final String supabaseUrl;
   final String supabaseAnonKey;
+
+  /// PostHog project token (publishable client key). Null/empty disables
+  /// analytics entirely — the app runs identically without it.
+  final String? posthogApiKey;
+
+  /// PostHog ingestion host. Defaults to the EU instance.
+  final String posthogHost;
 }
 
 Future<_AppConfig> _loadAppConfig() async {
   const defineSupabaseUrl = String.fromEnvironment('SUPABASE_URL');
   const defineSupabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+  const defineSupabaseKey = String.fromEnvironment('SUPABASE_KEY');
+  const definePosthogApiKey = String.fromEnvironment('POSTHOG_API_KEY');
+  const definePosthogHost = String.fromEnvironment('POSTHOG_HOST');
 
   final env = await _loadOptionalBundledDotEnv();
-  final supabaseUrl = _firstNonEmpty(
+  final supabaseUrl = _firstNonEmpty([
     defineSupabaseUrl,
     env['SUPABASE_URL'],
-  );
-  final supabaseAnonKey = _firstNonEmpty(
+  ]);
+  final supabaseAnonKey = _firstNonEmpty([
     defineSupabaseAnonKey,
+    defineSupabaseKey,
     env['SUPABASE_ANON_KEY'],
-  );
+    env['SUPABASE_KEY'],
+  ]);
 
   if (supabaseUrl == null || supabaseAnonKey == null) {
     throw StateError(
       'Missing Supabase config. Provide SUPABASE_URL and '
-      'SUPABASE_ANON_KEY with --dart-define or bundled .env.',
+      'SUPABASE_ANON_KEY with --dart-define or a bundled env file.',
     );
   }
+
+  // Optional — analytics stays off if unset. Default the host to the EU
+  // instance so a token-only config can never accidentally ship to US.
+  final posthogApiKey = _firstNonEmpty([
+    definePosthogApiKey,
+    env['POSTHOG_API_KEY'],
+  ]);
+  final posthogHost = _firstNonEmpty([
+        definePosthogHost,
+        env['POSTHOG_HOST'],
+      ]) ??
+      'https://eu.i.posthog.com';
 
   return _AppConfig(
     supabaseUrl: supabaseUrl,
     supabaseAnonKey: supabaseAnonKey,
+    posthogApiKey: posthogApiKey,
+    posthogHost: posthogHost,
   );
 }
 
-Future<Map<String, String>> _loadOptionalBundledDotEnv() async {
-  try {
-    final raw = await rootBundle.loadString('.env');
-    final values = <String, String>{};
-    for (final rawLine in raw.split('\n')) {
-      final line = rawLine.trim();
-      if (line.isEmpty || line.startsWith('#')) continue;
-      final separator = line.indexOf('=');
-      if (separator <= 0) continue;
-      final key = line.substring(0, separator).trim();
-      final value = line.substring(separator + 1).trim();
-      values[key] = _stripEnvQuotes(value);
-    }
-    return values;
-  } catch (_) {
-    return const {};
+/// Configures PostHog (EU, explicit events only) and aligns the analytics
+/// chokepoint to the persisted consent flag, then emits `app_open` (a hard
+/// no-op unless the user has consented). No token = analytics fully disabled.
+Future<void> _setUpAnalytics(_AppConfig config) async {
+  final apiKey = config.posthogApiKey;
+  if (apiKey == null || apiKey.isEmpty) {
+    // Still align the gate so capture()/identify() stay safe no-ops.
+    await AnalyticsService.instance.init();
+    return;
   }
+
+  final phConfig = PostHogConfig(apiKey)
+    ..host = config.posthogHost
+    // Start opted-out; AnalyticsService.init() enables only if consent persists.
+    ..optOut = true
+    // Explicit events only — no lifecycle autocapture, no screen/gesture
+    // autocapture (we never install PosthogObserver), no session replay.
+    ..captureApplicationLifecycleEvents = false
+    ..sessionReplay = false
+    ..debug = !kReleaseMode;
+  await Posthog().setup(phConfig);
+
+  await AnalyticsService.instance.init();
+  await AnalyticsService.instance.capture('app_open');
+}
+
+Future<Map<String, String>> _loadOptionalBundledDotEnv() async {
+  const envAssetPaths = <String>[
+    '.env',
+    'assets/env/app.env',
+  ];
+
+  for (final path in envAssetPaths) {
+    try {
+      final raw = await rootBundle.loadString(path);
+      final values = _parseDotEnv(raw);
+      if (values.isNotEmpty) return values;
+    } catch (_) {
+      // Optional local env asset. Missing files are expected on clean checkouts.
+    }
+  }
+
+  return const {};
+}
+
+Map<String, String> _parseDotEnv(String raw) {
+  final values = <String, String>{};
+  for (final rawLine in raw.split('\n')) {
+    var line = rawLine.trim();
+    if (line.isEmpty || line.startsWith('#')) continue;
+    if (line.startsWith('export ')) {
+      line = line.substring('export '.length).trimLeft();
+    }
+    final separator = line.indexOf('=');
+    if (separator <= 0) continue;
+    final key = line.substring(0, separator).trim();
+    final value = line.substring(separator + 1).trim();
+    if (key.isEmpty) continue;
+    values[key] = _stripEnvQuotes(value);
+  }
+  return values;
 }
 
 String _stripEnvQuotes(String value) {
@@ -179,11 +266,11 @@ String _stripEnvQuotes(String value) {
   return value;
 }
 
-String? _firstNonEmpty(String? first, String? second) {
-  final a = first?.trim();
-  if (a != null && a.isNotEmpty) return a;
-  final b = second?.trim();
-  if (b != null && b.isNotEmpty) return b;
+String? _firstNonEmpty(Iterable<String?> values) {
+  for (final value in values) {
+    final trimmed = value?.trim();
+    if (trimmed != null && trimmed.isNotEmpty) return trimmed;
+  }
   return null;
 }
 
@@ -371,8 +458,35 @@ class UIRepLog {
    APP
    ========================================================================= */
 
-class VikaApp extends StatelessWidget {
+class VikaApp extends StatefulWidget {
   const VikaApp({super.key});
+
+  @override
+  State<VikaApp> createState() => _VikaAppState();
+}
+
+/// App-level lifecycle observer. Owns the single `app_backgrounded` event so it
+/// fires once per app-wide background, independent of which screen is on top
+/// (the dead ExerciseScreen's own observer is unrelated and must NOT be used).
+class _VikaAppState extends State<VikaApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      unawaited(AnalyticsService.instance.capture('app_backgrounded'));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -425,6 +539,12 @@ class VikaApp extends StatelessWidget {
             final email = settings.arguments as String? ?? '';
             return MaterialPageRoute(
               builder: (_) => MagicLinkSentScreen(email: email),
+            );
+          case '/reviewer-demo':
+            // Apple-reviewer read-only plan reveal between the demo-code prompt
+            // (S13) and the seeded home. Reads only; never generates/persists.
+            return MaterialPageRoute(
+              builder: (_) => const ReviewerPlanScreen(),
             );
           case '/exercise':
             final args = settings.arguments;
@@ -556,7 +676,8 @@ class _AppEntryGateState extends State<AppEntryGate> {
 
   String _friendlyAuthStreamError(Object error) {
     if (error is AuthException) {
-      final code = '${error.code ?? ''} ${error.statusCode ?? ''}'.toLowerCase();
+      final code =
+          '${error.code ?? ''} ${error.statusCode ?? ''}'.toLowerCase();
       final message = error.message.toLowerCase();
       if (code.contains('expired') ||
           code.contains('otp') ||
@@ -582,8 +703,7 @@ class _AppEntryGateState extends State<AppEntryGate> {
 
     // Finished onboarding before but no live session (e.g. signed out, then
     // relaunched): open straight on login instead of flashing S01.
-    if (widget.initialSeenOnboarding &&
-        supabase.auth.currentSession == null) {
+    if (widget.initialSeenOnboarding && supabase.auth.currentSession == null) {
       return _AppEntryState.login;
     }
     return _AppEntryState.onboarding;
@@ -600,6 +720,25 @@ class _AppEntryGateState extends State<AppEntryGate> {
     // Reacting here would tear the navigator down mid-signup and bounce the
     // user to the standalone login.
     if (_onboardingOwnsAuth) return;
+
+    // Analytics identity tracks the auth session: identify by Supabase UID on
+    // sign-in / session restore, reset on sign-out / deletion so the next user
+    // never inherits the previous distinct_id. All hard no-ops without consent;
+    // the UID is the only thing ever sent — never name or email.
+    switch (data.event.name) {
+      case 'signedIn':
+      case 'initialSession':
+        final uid = supabase.auth.currentUser?.id;
+        if (uid != null) {
+          unawaited(AnalyticsService.instance.identify(uid));
+        }
+        break;
+      case 'signedOut':
+      case 'userDeleted':
+        unawaited(AnalyticsService.instance.reset());
+        break;
+    }
+
     switch (data.event.name) {
       case 'signedIn':
       case 'initialSession':
@@ -819,7 +958,13 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    _exercise = _definition.createExercise();
+    // Volume comes from the bundled catalog (preloaded in main()). If the entry
+    // is missing, createExercise falls back to the class's own default target.
+    final catalog = CatalogSource.instance.lookup(_definition.id);
+    _exercise = _definition.createExercise(
+      reps: catalog?.baseReps,
+      seconds: catalog?.baseSeconds,
+    );
 
     _bannerController = AnimationController(
       duration: const Duration(milliseconds: 2500),
@@ -1286,7 +1431,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _definition.name,
+                            _definition.displayName,
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 18,
@@ -1708,7 +1853,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                _definition.name.toUpperCase(),
+                _definition.displayName.toUpperCase(),
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 15,

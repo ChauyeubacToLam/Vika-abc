@@ -19,8 +19,6 @@ import 'metrics/tempo_metric.dart';
 // --- Config ---
 
 class JumpingJackConfig {
-  static const int MAX_REP = 30;
-
   // All normalized to shoulder width for body-size independence
   static const double OPEN_ANKLE_SPREAD_THRESHOLD = 1.0;
   static const double CLOSED_ANKLE_SPREAD_THRESHOLD = 0.65;
@@ -41,7 +39,7 @@ class JumpingJack extends ExerciseBase {
 
   final int maxRep;
 
-  JumpingJack({this.maxRep = JumpingJackConfig.MAX_REP});
+  JumpingJack({required this.maxRep});
 
   JJState jjState = JJState.closed;
   JJState previousJJState = JJState.closed;

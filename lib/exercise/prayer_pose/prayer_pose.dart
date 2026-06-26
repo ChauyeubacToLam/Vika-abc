@@ -31,7 +31,7 @@ enum PrayerPoseState { entry, holding, exit }
 class PrayerPose extends ExerciseBase {
   final int maxRep;
 
-  PrayerPose({this.maxRep = PrayerPoseConfig.MAX_REP});
+  PrayerPose({required this.maxRep});
 
   PrayerPoseState prayerPoseState = PrayerPoseState.entry;
   PrayerPoseState previousPrayerPoseState = PrayerPoseState.entry;

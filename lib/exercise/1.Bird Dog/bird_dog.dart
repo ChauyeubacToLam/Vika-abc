@@ -15,7 +15,6 @@ import 'metrics/trunk_stability_metric.dart';
 import 'metrics/tempo_metric.dart';
 
 class BirdDogConfig {
-  static const int MAX_REP = 24;
   static const int TIMEOUT_MS = 90000;
 
   static const double START_KNEE_MIN = 30;
@@ -80,7 +79,7 @@ class BirdDog extends ExerciseBase {
   bool? _lastPeakLeftLeg;
   bool? _lastPeakLeftArm;
 
-  BirdDog({this.maxRep = BirdDogConfig.MAX_REP});
+  BirdDog({required this.maxRep});
 
   @override
   Set<VikaImageOrientation> get supportedOrientations =>

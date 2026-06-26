@@ -28,6 +28,7 @@ class LibraryStageHero extends StatelessWidget {
     required this.totalCount,
     required this.onSelectFilter,
     required this.userInitial,
+    this.avatarUrl,
     this.onAvatarTap,
     this.onSearchTap,
   });
@@ -40,6 +41,7 @@ class LibraryStageHero extends StatelessWidget {
 
   final ValueChanged<String> onSelectFilter;
   final String userInitial;
+  final String? avatarUrl;
   final VoidCallback? onAvatarTap;
   final VoidCallback? onSearchTap;
 
@@ -141,6 +143,7 @@ class LibraryStageHero extends StatelessWidget {
                   WordmarkHeader(
                     inverted: true,
                     userInitial: userInitial,
+                    avatarUrl: avatarUrl,
                     trailingIcon: Icons.search_rounded,
                     trailingTooltip: 'Tìm',
                     onTrailingTap: onSearchTap,

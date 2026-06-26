@@ -42,7 +42,7 @@ void main() {
   test('speaks plank setup instructions only once before activation', () {
     final player = _FakePlankVoicePlayer();
     final coach = PlankVoiceCoach(voicePlayer: player);
-    final exercise = Plank()..exerciseState = ExerciseState.notActivated;
+    final exercise = Plank(maxRep: 5)..exerciseState = ExerciseState.notActivated;
 
     coach.processFrame(
       exercise: exercise,
@@ -70,7 +70,7 @@ void main() {
   test('speaks a correction when hold timer stops because form drops', () {
     final player = _FakePlankVoicePlayer();
     final coach = PlankVoiceCoach(voicePlayer: player);
-    final exercise = Plank()
+    final exercise = Plank(maxRep: 5)
       ..exerciseState = ExerciseState.activated
       ..previousPlankState = PlankState.holding
       ..plankState = PlankState.setup
@@ -89,7 +89,7 @@ void main() {
   test('speaks hold good when a plank hold completes', () {
     final player = _FakePlankVoicePlayer();
     final coach = PlankVoiceCoach(voicePlayer: player);
-    final exercise = Plank()..exerciseState = ExerciseState.activated;
+    final exercise = Plank(maxRep: 5)..exerciseState = ExerciseState.activated;
 
     coach.processFrame(
       exercise: exercise,

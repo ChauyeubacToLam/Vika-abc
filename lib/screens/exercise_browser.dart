@@ -23,6 +23,7 @@
 import 'package:flutter/material.dart';
 import '../data/library_mock.dart';
 import '../models/exercise_definition.dart';
+import '../services/catalog/catalog_source.dart';
 import '../models/exercise_lookup.dart';
 import '../theme/app_colors.dart';
 import '../theme/vf_theme.dart';
@@ -62,6 +63,11 @@ class _ExerciseBrowserState extends State<ExerciseBrowser>
   @override
   void initState() {
     super.initState();
+    // Catalog is preloaded in main(); ensure here too so list volume labels
+    // resolve even if this screen is reached first, then rebuild once ready.
+    CatalogSource.instance.ensureLoaded().then((_) {
+      if (mounted) setState(() {});
+    });
     _snapBackController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 220),

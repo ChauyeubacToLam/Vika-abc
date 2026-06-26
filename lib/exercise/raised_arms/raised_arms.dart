@@ -31,7 +31,7 @@ enum RaisedArmsState { entry, holding, exit }
 class RaisedArms extends ExerciseBase {
   final int maxRep;
 
-  RaisedArms({this.maxRep = RaisedArmsConfig.MAX_REP});
+  RaisedArms({required this.maxRep});
 
   RaisedArmsState raisedArmsState = RaisedArmsState.entry;
   RaisedArmsState previousRaisedArmsState = RaisedArmsState.entry;

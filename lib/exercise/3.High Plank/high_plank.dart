@@ -41,7 +41,7 @@ class HighPlankConfig {
 
 class HighPlank extends ExerciseBase {
   HighPlank({
-    this.maxSeconds = HighPlankConfig.TARGET_TIME_MS ~/ 1000,
+    required this.maxSeconds,
   });
 
   final int maxSeconds;

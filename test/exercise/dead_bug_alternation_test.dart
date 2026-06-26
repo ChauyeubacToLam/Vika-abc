@@ -167,7 +167,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('start position accepts tabletop arms and legs', () {
-    final exercise = DeadBug()..cameraFacing = CameraFacing.left;
+    final exercise = DeadBug(maxRep: 20)..cameraFacing = CameraFacing.left;
 
     expect(exercise.isInStartPosition(_deadBugPose()), isTrue);
   });

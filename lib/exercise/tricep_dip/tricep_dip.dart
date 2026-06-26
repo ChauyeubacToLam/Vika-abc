@@ -30,7 +30,7 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
       };
 
   final int maxRep;
-  TricepDip({this.maxRep = TricepDipConfig.MAX_REP});
+  TricepDip({required this.maxRep});
 
   TricepDipState tricepState = TricepDipState.setup_top;
   TricepDipState previousTricepState = TricepDipState.setup_top;

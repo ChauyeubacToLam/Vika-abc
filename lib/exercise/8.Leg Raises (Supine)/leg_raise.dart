@@ -67,7 +67,7 @@ class LegRaise extends ExerciseBase {
   final Debouncer _loweringDebouncer = Debouncer(requiredFrames: 2);
   final Debouncer _lyingDebouncer = Debouncer(requiredFrames: 2);
 
-  LegRaise({this.maxRep = LegRaiseConfig.MAX_REP});
+  LegRaise({required this.maxRep});
 
   @override
   String get exerciseName => 'Leg Raises';

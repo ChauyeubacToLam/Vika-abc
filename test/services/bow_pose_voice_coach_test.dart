@@ -42,7 +42,7 @@ void main() {
   test('speaks bow pose setup instructions only once before activation', () {
     final player = _FakeBowPoseVoicePlayer();
     final coach = BowPoseVoiceCoach(voicePlayer: player);
-    final exercise = BowPose()..exerciseState = ExerciseState.notActivated;
+    final exercise = BowPose(maxRep: 3)..exerciseState = ExerciseState.notActivated;
 
     coach.processFrame(
       exercise: exercise,
@@ -70,7 +70,7 @@ void main() {
   test('speaks rep count and good hold cue after a clean rep', () {
     final player = _FakeBowPoseVoicePlayer();
     final coach = BowPoseVoiceCoach(voicePlayer: player);
-    final exercise = BowPose()
+    final exercise = BowPose(maxRep: 3)
       ..exerciseState = ExerciseState.activated
       ..lastRepWasClean = true;
 
@@ -87,7 +87,7 @@ void main() {
   test('speaks rep count and correction after a faulty counted rep', () {
     final player = _FakeBowPoseVoicePlayer();
     final coach = BowPoseVoiceCoach(voicePlayer: player);
-    final exercise = BowPose()
+    final exercise = BowPose(maxRep: 3)
       ..exerciseState = ExerciseState.activated
       ..lastRepWasClean = false
       ..lastRepTopVoiceMessage = 'Mở ngực thêm một chút';
@@ -105,7 +105,7 @@ void main() {
   test('does not speak live correction from bow pose feedback', () {
     final player = _FakeBowPoseVoicePlayer();
     final coach = BowPoseVoiceCoach(voicePlayer: player);
-    final exercise = BowPose()..exerciseState = ExerciseState.activated;
+    final exercise = BowPose(maxRep: 3)..exerciseState = ExerciseState.activated;
 
     coach.processFrame(
       exercise: exercise,

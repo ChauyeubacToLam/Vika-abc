@@ -296,7 +296,7 @@ class _ExerciseCard extends StatelessWidget {
               ),
               const SizedBox(height: 5),
               Text(
-                '${row.cat} · ${row.diff}',
+                '${row.displayCat} · ${row.diff}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -354,7 +354,7 @@ class _ExerciseCard extends StatelessWidget {
         ),
         const SizedBox(height: 3),
         Text(
-          row.cat,
+          row.displayCat,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(

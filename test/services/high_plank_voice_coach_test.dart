@@ -43,7 +43,8 @@ void main() {
   test('speaks high plank setup instructions only once before activation', () {
     final player = _FakeHighPlankVoicePlayer();
     final coach = HighPlankVoiceCoach(voicePlayer: player);
-    final exercise = HighPlank()..exerciseState = ExerciseState.notActivated;
+    final exercise =
+        HighPlank(maxSeconds: 30)..exerciseState = ExerciseState.notActivated;
 
     coach.processFrame(
       exercise: exercise,

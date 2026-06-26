@@ -16,7 +16,6 @@ import 'metrics/knee_extension_metric.dart';
 // --- Config (McGill Short-Hold Protocol: 3 holds × 10s, 5s rest) ---
 
 class PlankConfig {
-  static const int MAX_REP = 5;
   static const double HOLD_DURATION = 15.0;
   static const double REST_DURATION = 5.0;
 
@@ -57,7 +56,7 @@ class Plank extends ExerciseBase {
 
   final int maxRep;
 
-  Plank({this.maxRep = PlankConfig.MAX_REP});
+  Plank({required this.maxRep});
 
   PlankState plankState = PlankState.setup;
   PlankState previousPlankState = PlankState.setup;

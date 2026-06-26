@@ -12,7 +12,7 @@ import 'metrics/hold_time_metric.dart';
 import 'metrics/lumbar_extension_metric.dart';
 
 class Superman extends ExerciseBase {
-  Superman({this.maxRep = SupermanConfig.MAX_REP});
+  Superman({required this.maxRep});
 
   final int maxRep;
 

@@ -46,7 +46,7 @@ void main() {
   test('Squat says "Sẵn sàng" then "Xuống" once on activation', () {
     final player = _FakeSquatVoicePlayer();
     final coach = SquatVoiceCoach(ttsService: player);
-    final squat = Squat()..exerciseState = ExerciseState.activated;
+    final squat = Squat(maxRep: 15)..exerciseState = ExerciseState.activated;
 
     squat.resultIssues.addInstruction(
       squat.currentPhaseKey,
@@ -77,7 +77,7 @@ void main() {
       () async {
     final player = _FakeSquatVoicePlayer();
     final coach = SquatVoiceCoach(ttsService: player);
-    final squat = Squat()..exerciseState = ExerciseState.activated;
+    final squat = Squat(maxRep: 15)..exerciseState = ExerciseState.activated;
 
     squat.resultIssues.addInstruction(
       squat.currentPhaseKey,
@@ -111,7 +111,7 @@ void main() {
       () async {
     final player = _FakeSquatVoicePlayer();
     final coach = SquatVoiceCoach(ttsService: player);
-    final squat = Squat()..exerciseState = ExerciseState.activated;
+    final squat = Squat(maxRep: 15)..exerciseState = ExerciseState.activated;
 
     squat.resultIssues.addInstruction(
       squat.currentPhaseKey,
@@ -160,7 +160,7 @@ void main() {
       () async {
     final player = _FakeSquatVoicePlayer();
     final coach = SquatVoiceCoach(ttsService: player);
-    final squat = Squat()..exerciseState = ExerciseState.activated;
+    final squat = Squat(maxRep: 15)..exerciseState = ExerciseState.activated;
 
     squat.resultIssues.addInstruction(
       squat.currentPhaseKey,
@@ -222,7 +222,7 @@ void main() {
       () async {
     final player = _FakeSquatVoicePlayer();
     final coach = SquatVoiceCoach(ttsService: player);
-    final squat = Squat()..exerciseState = ExerciseState.activated;
+    final squat = Squat(maxRep: 15)..exerciseState = ExerciseState.activated;
 
     squat.resultIssues.addInstruction(
       squat.currentPhaseKey,
@@ -274,7 +274,7 @@ void main() {
       () async {
     final player = _FakeSquatVoicePlayer();
     final coach = SquatVoiceCoach(ttsService: player);
-    final squat = Squat()..exerciseState = ExerciseState.activated;
+    final squat = Squat(maxRep: 15)..exerciseState = ExerciseState.activated;
 
     squat.resultIssues.addInstruction(
       squat.currentPhaseKey,
@@ -338,7 +338,7 @@ void main() {
       () async {
     final player = _FakeSquatVoicePlayer();
     final coach = SquatVoiceCoach(ttsService: player);
-    final squat = Squat()..exerciseState = ExerciseState.activated;
+    final squat = Squat(maxRep: 15)..exerciseState = ExerciseState.activated;
 
     squat.resultIssues.addInstruction(
       squat.currentPhaseKey,
@@ -390,7 +390,7 @@ void main() {
   test('Squat does not speak live depth correction during a rep', () async {
     final player = _FakeSquatVoicePlayer();
     final coach = SquatVoiceCoach(ttsService: player);
-    final squat = Squat()..exerciseState = ExerciseState.activated;
+    final squat = Squat(maxRep: 15)..exerciseState = ExerciseState.activated;
 
     squat.resultIssues.addInstruction(
       squat.currentPhaseKey,
@@ -422,7 +422,7 @@ void main() {
   test('Squat prefixes post-rep cues after every faulty rep', () {
     final player = _FakeSquatVoicePlayer();
     final coach = SquatVoiceCoach(ttsService: player);
-    final squat = Squat()..exerciseState = ExerciseState.activated;
+    final squat = Squat(maxRep: 15)..exerciseState = ExerciseState.activated;
 
     squat.resultIssues.addInstruction(
       squat.currentPhaseKey,
@@ -482,7 +482,7 @@ void main() {
   test('Squat does not count a new rep after the set is completed', () {
     final player = _FakeSquatVoicePlayer();
     final coach = SquatVoiceCoach(ttsService: player);
-    final squat = Squat()..exerciseState = ExerciseState.activated;
+    final squat = Squat(maxRep: 15);
 
     coach.processFrame(
       exercise: squat,
@@ -514,7 +514,7 @@ void main() {
       () async {
     final player = _FakeSquatVoicePlayer();
     final coach = SquatVoiceCoach(ttsService: player);
-    final squat = Squat()..exerciseState = ExerciseState.activated;
+    final squat = Squat(maxRep: 15)..exerciseState = ExerciseState.activated;
 
     squat.resultIssues.addInstruction(
       squat.currentPhaseKey,

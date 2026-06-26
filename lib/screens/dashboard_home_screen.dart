@@ -38,6 +38,7 @@ import 'package:flutter/services.dart';
 
 import '../data/home_mock.dart';
 import '../data/library_mock.dart';
+import '../models/exercise_definition.dart';
 import '../screens/exercise/exercise_launch_args.dart';
 import '../services/recommendation/recommendation_service.dart';
 import '../services/recommendation/weekly_check_in_service.dart';
@@ -382,7 +383,7 @@ class _HomeHeroFromTarget extends StatelessWidget {
     return target.sequence
         .map(
           (item) => HomeStageExercise(
-            name: item.definition.name,
+            name: item.definition.displayName,
             detail: item.prescription == null
                 ? ''
                 : workoutVolumeLabel(item.prescription!),

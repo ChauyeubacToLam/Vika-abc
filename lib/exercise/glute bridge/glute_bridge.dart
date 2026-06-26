@@ -19,8 +19,6 @@ import 'metrics/glute_bridge_neck_head.dart';
    CONFIGURATION & THRESHOLDS
    ========================================================================= */
 class GluteBridgeConfig {
-  static const int MAX_REP = 15;
-
   // --- Velocity thresholds (hip y pixels/frame at ~30 fps) ---
   // Screen coords: y increases downward.
   //   Hip RISING  → velocity NEGATIVE
@@ -75,7 +73,7 @@ enum GluteBridgeState {
 class GluteBridge extends ExerciseBase with SideTrackedExerciseMixin {
   final int maxRep;
 
-  GluteBridge({this.maxRep = GluteBridgeConfig.MAX_REP});
+  GluteBridge({required this.maxRep});
 
   GluteBridgeState gluteState = GluteBridgeState.bottom;
   GluteBridgeState previousGluteState = GluteBridgeState.bottom;

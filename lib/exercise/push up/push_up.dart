@@ -22,8 +22,6 @@ import 'metrics/tempo_metric.dart';
 // --- Config ---
 
 class PushUpConfig {
-  static const int MAX_REP = 15;
-
   // Top/plank fallback until the personal elbow baseline is captured.
   // Like Squat's stand-angle baseline, push-up entry/return uses the user's
   // own plank lockout angle instead of a fixed descent threshold.
@@ -66,7 +64,7 @@ enum PushUpState { plank, descending, bottom, ascending }
 
 class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
   final int maxRep;
-  PushUp({this.maxRep = PushUpConfig.MAX_REP});
+  PushUp({required this.maxRep});
 
   PushUpState pushUpState = PushUpState.plank;
   PushUpState previousPushUpState = PushUpState.plank;

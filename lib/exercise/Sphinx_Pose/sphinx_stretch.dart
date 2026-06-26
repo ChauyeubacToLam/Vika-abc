@@ -11,7 +11,7 @@ import 'Metrics/neck_shoulder_metric.dart';
 
 class SphinxStretch extends ExerciseBase {
   SphinxStretch({
-    this.maxSeconds = SphinxConfig.Ae_Min_Hold_Time,
+    required this.maxSeconds,
   });
 
   final int maxSeconds;

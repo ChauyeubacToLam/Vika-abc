@@ -741,7 +741,7 @@ class _BrowseRow extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '${row.cat} · ${row.diff}',
+                      '${row.displayCat} · ${row.diff}',
                       style: TextStyle(
                         fontFamily: 'BeVietnamPro',
                         fontSize: 10,

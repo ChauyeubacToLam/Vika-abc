@@ -17,7 +17,6 @@ import 'metrics/cobra_hold_stability_metric.dart';
 // --- Config ---
 
 class CobraConfig {
-  static const int MAX_REP = 3;
   static const double HOLD_DURATION = 15.0;
   static const double REST_DURATION = 5.0;
 
@@ -46,7 +45,7 @@ enum CobraState { setup, holding, resting }
 class Cobra extends ExerciseBase {
   final int maxRep;
 
-  Cobra({this.maxRep = CobraConfig.MAX_REP});
+  Cobra({required this.maxRep});
 
   CobraState cobraState = CobraState.setup;
   CobraState previousCobraState = CobraState.setup;

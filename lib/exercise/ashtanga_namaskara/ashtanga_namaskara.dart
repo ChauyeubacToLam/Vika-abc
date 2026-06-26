@@ -35,7 +35,7 @@ class AshtangaNamaskara extends ExerciseBase {
   final AshtangaMode mode;
 
   AshtangaNamaskara({
-    this.maxRep = AshtangaConfig.MAX_REP,
+    required this.maxRep,
     this.mode = AshtangaMode.transient,
   });
 

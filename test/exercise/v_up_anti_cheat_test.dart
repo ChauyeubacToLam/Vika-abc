@@ -153,7 +153,7 @@ void _pump(
 }
 
 VUp _activatedVUp() {
-  return VUp()
+  return VUp(maxRep: 12)
     ..cameraFacing = CameraFacing.left
     ..exerciseState = ExerciseState.activated;
 }
@@ -162,7 +162,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('start position requires flat full-body extension', () {
-    final vUp = VUp()..cameraFacing = CameraFacing.left;
+    final vUp = VUp(maxRep: 12)..cameraFacing = CameraFacing.left;
 
     expect(vUp.isInStartPosition(_flatStartPose()), isTrue);
     expect(vUp.isInStartPosition(_strictTopPose()), isFalse);

@@ -28,14 +28,14 @@ class S07AssessmentIntro extends StatelessWidget {
     final exercises = isYoga
         ? const [
             (
-              name: 'Warrior I',
+              name: 'Tư thế chiến binh I',
               vi: 'Tư thế chiến binh',
               hold: '20–30 giây',
               icon: Icons.self_improvement_rounded,
               focus: 'thăng bằng, hông, thân trên',
             ),
             (
-              name: 'Forward Fold',
+              name: 'Tư thế ngồi gập người',
               vi: 'Cúi người về trước',
               hold: '1 lần chậm',
               icon: Icons.airline_seat_legroom_extra_rounded,
@@ -51,7 +51,7 @@ class S07AssessmentIntro extends StatelessWidget {
               focus: 'gối, hông, lưng dưới',
             ),
             (
-              name: 'Wall Push-Up',
+              name: 'Chống đẩy tường',
               vi: 'Đẩy tường',
               hold: '5 lần chậm',
               icon: Icons.accessibility_new_rounded,

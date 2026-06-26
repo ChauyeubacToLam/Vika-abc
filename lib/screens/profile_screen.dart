@@ -25,6 +25,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../data/profile_goal_quote.dart';
 import '../data/profile_mock.dart';
+import '../services/analytics_service.dart';
 import '../services/data_export_service.dart';
 import '../services/recommendation/recommendation_service.dart';
 import '../services/session_persistence.dart';
@@ -65,6 +66,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _showDownFab = false;
   bool _deleting = false;
   bool _exporting = false;
+  // Mirrors AnalyticsService consent so the toggle reflects (and controls) the
+  // single source of truth. Seeded from the in-memory flag; flipped only via
+  // grant/revokeConsent below.
+  bool _analyticsConsent = AnalyticsService.instance.hasConsent;
   AppUserProfile? _profile;
 
   // Lifetime aggregate from completed workout_sessions. Null until the first
@@ -438,6 +443,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  // ─── Analytics consent toggle (Quyền riêng tư) ─────────────────────────
+  // The single user-facing switch over AnalyticsService consent. Turning it on
+  // grants consent (opts PostHog in); turning it off revokes (opts out, resets
+  // the distinct_id, stops all collection). Persistence lives in the service.
+  Future<void> _toggleAnalyticsConsent() async {
+    final next = !_analyticsConsent;
+    setState(() => _analyticsConsent = next);
+    if (next) {
+      await AnalyticsService.instance.grantConsent();
+    } else {
+      await AnalyticsService.instance.revokeConsent();
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            next
+                ? 'Đã bật chia sẻ dữ liệu sử dụng ẩn danh.'
+                : 'Đã tắt. Vika sẽ không thu thập dữ liệu sử dụng nữa.',
+          ),
+        ),
+      );
+  }
+
   // ─── Help & feedback — opens the user's mail app to support ────────────
   Future<void> _openSupportMail() async {
     final uri = Uri(
@@ -657,52 +688,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         SettingsGroup(
                           label: 'Quyền riêng tư',
-                          accentColor: c.phase4,
                           rows: [
                             SettingRow(
                               icon: Icons.shield_outlined,
                               label: 'Camera xử lý ngay trên điện thoại bạn',
                               sub: 'Video luôn ở trong điện thoại của bạn',
-                              accentColor: c.phase4,
                               onTap: _showCameraInfoSheet,
+                            ),
+                            SettingRow(
+                              icon: Icons.insights_outlined,
+                              label: 'Chia sẻ dữ liệu sử dụng ẩn danh',
+                              sub: _analyticsConsent
+                                  ? 'Đang bật · giúp Vika cải thiện sản phẩm'
+                                  : 'Đang tắt · không thu thập dữ liệu sử dụng',
+                              onTap: _toggleAnalyticsConsent,
+                              trailing: IgnorePointer(
+                                child: Switch.adaptive(
+                                  value: _analyticsConsent,
+                                  activeThumbColor: c.yellow,
+                                  onChanged: (_) {},
+                                ),
+                              ),
                             ),
                             SettingRow(
                               icon: Icons.download_rounded,
                               label: 'Xuất dữ liệu của bạn',
                               sub: _exporting ? 'Đang chuẩn bị…' : null,
-                              accentColor: c.phase4,
                               onTap: _exporting ? null : _exportData,
                             ),
                           ],
                         ),
                         SettingsGroup(
                           label: 'Hỗ trợ',
-                          accentColor: c.phase2,
                           rows: [
                             SettingRow(
                               icon: Icons.help_outline_rounded,
                               label: 'Trợ giúp & Phản hồi',
-                              accentColor: c.phase2,
                               onTap: _openSupportMail,
                             ),
                             SettingRow(
                               icon: Icons.info_outline_rounded,
                               label: 'Về Vika',
                               sub: profileMockVersion,
-                              accentColor: c.phase2,
                               onTap: _showAboutSheet,
                             ),
                           ],
                         ),
                         SettingsGroup(
                           label: 'Tài khoản',
-                          accentColor: c.phase3,
                           rows: [
                             SettingRow(
                               icon: Icons.person_outline_rounded,
                               label: 'Sửa hồ sơ',
                               sub: displayName,
-                              accentColor: c.phase3,
                               onTap: _openEditProfileSheet,
                             ),
                             if (profile?.email != null)
@@ -712,7 +750,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 icon: Icons.alternate_email_rounded,
                                 label: 'Email',
                                 sub: profile!.email,
-                                accentColor: c.phase3,
                                 showChevron: false,
                               ),
                             SettingRow(
@@ -2140,9 +2177,11 @@ class _ScrollDownFab extends StatelessWidget {
 
 // ═══════════════════════════════════════════════════════════════
 // CONFIRM DIALOG — Premium Ivory replacement for the stock AlertDialog on
-// account actions. Built as a compact dark "stage hero": warm-dark gradient
-// + ambient accent glow + medallion + italic display title + halo CTA. The
-// accent is brand gold for normal actions, warm amber for destructive ones.
+// account actions. Built in the same light cream-sheet language as the About
+// and Edit Profile modals: a warm-cream card, accent-tinted toward the action,
+// an accent medallion, eyebrow tick, italic display title, then a filled
+// confirm pill over a quiet "stay" button. Benign actions ride the brand gold;
+// a destructive action swaps to the warm amber alarm — clearly graver.
 // ═══════════════════════════════════════════════════════════════
 
 class _ConfirmDialog extends StatelessWidget {
@@ -2165,154 +2204,140 @@ class _ConfirmDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    // The dialog echoes the app's signature dark "stage hero": warm-dark
-    // gradient, an ambient accent glow, italic display title, and the halo
-    // CTA. Normal actions ride the brand gold; a destructive action swaps the
-    // accent to the warm amber alarm — same composition, clearly graver.
     final accent = destructive ? c.attention : c.yellow;
+    // Card tint + outline lean toward the action's accent — the exact recipe
+    // _InfoSheet / _EditProfileSheet use, so the confirm reads as the same
+    // family of modal, not a foreign popup.
+    final sheetTint = Color.lerp(c.bgRaised, accent, c.isDark ? 0.10 : 0.06)!;
+    final outline = Color.lerp(c.border, accent, c.isDark ? 0.28 : 0.34)!;
+    // The medallion glyph is warm-ink-leaned so the gold/amber stays a tint,
+    // not a flat fill — keeps the brand yellow reserved for the CTA.
+    final medallionGlyph = Color.lerp(accent, c.ink, c.isDark ? 0.10 : 0.34)!;
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 30),
+        padding: const EdgeInsets.symmetric(horizontal: 28),
         child: Material(
           color: Colors.transparent,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 380),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(30),
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: const Alignment(-0.7, -1),
-                    end: const Alignment(0.7, 1),
-                    colors: [c.bgInverse, c.bgInverseHi],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: accent.withValues(alpha: 0.22),
-                      blurRadius: 44,
-                      offset: const Offset(0, 18),
-                    ),
-                    BoxShadow(
-                      color: c.ink.withValues(alpha: 0.5),
-                      blurRadius: 54,
-                      offset: const Offset(0, 28),
-                    ),
-                  ],
+            child: Container(
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [c.bgRaised, sheetTint],
                 ),
-                child: Stack(
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: outline),
+                boxShadow: [
+                  BoxShadow(
+                    color: accent.withValues(alpha: c.isDark ? 0.16 : 0.16),
+                    blurRadius: 34,
+                    offset: const Offset(0, 16),
+                  ),
+                  BoxShadow(
+                    color: c.ink.withValues(alpha: c.isDark ? 0.34 : 0.14),
+                    blurRadius: 44,
+                    offset: const Offset(0, 24),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 26, 24, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Ambient accent glow, top-right shoulder.
-                    Positioned(
-                      top: -80,
-                      right: -70,
-                      child: IgnorePointer(
-                        child: _DialogGlow(color: accent, opacity: 0.24),
+                    // Accent medallion — a tinted square, hairline, soft lift.
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: c.isDark ? 0.16 : 0.13),
+                          borderRadius: BorderRadius.circular(17),
+                          border: Border.all(
+                            color: accent.withValues(alpha: 0.38),
+                          ),
+                        ),
+                        child: Icon(icon, size: 24, color: medallionGlyph),
                       ),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(26, 28, 26, 22),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // Accent medallion with a soft glow.
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: Container(
-                              width: 54,
-                              height: 54,
-                              decoration: BoxDecoration(
-                                color: accent.withValues(alpha: 0.18),
-                                borderRadius: BorderRadius.circular(18),
-                                border: Border.all(
-                                  color: accent.withValues(alpha: 0.5),
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: accent.withValues(alpha: 0.32),
-                                    blurRadius: 20,
-                                    offset: const Offset(0, 6),
-                                  ),
-                                ],
-                              ),
-                              child: Icon(icon, size: 25, color: accent),
-                            ),
+                    const SizedBox(height: 20),
+                    // Eyebrow with accent tick.
+                    Row(
+                      children: [
+                        Container(
+                          width: 5,
+                          height: 16,
+                          decoration: BoxDecoration(
+                            color: accent,
+                            borderRadius: BorderRadius.circular(2),
                           ),
-                          const SizedBox(height: 20),
-                          // Eyebrow with accent tick.
-                          Row(
-                            children: [
-                              Container(
-                                width: 5,
-                                height: 16,
-                                decoration: BoxDecoration(
-                                  color: accent,
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-                              const SizedBox(width: 9),
-                              Text(
-                                eyebrow,
-                                style: TextStyle(
-                                  fontFamily: 'BeVietnamPro',
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 1.8,
-                                  color: c.invInkSoft,
-                                ),
-                              ),
-                            ],
+                        ),
+                        const SizedBox(width: 9),
+                        Text(
+                          eyebrow,
+                          style: TextStyle(
+                            fontFamily: 'BeVietnamPro',
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.8,
+                            color: c.inkSoft,
                           ),
-                          const SizedBox(height: 12),
-                          Text(
-                            title,
-                            style: TextStyle(
-                              fontFamily: 'BeVietnamPro',
-                              fontSize: 26,
-                              fontWeight: FontWeight.w800,
-                              fontStyle: FontStyle.italic,
-                              letterSpacing: -0.8,
-                              color: c.invInk,
-                              height: 1.02,
-                            ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontFamily: 'BeVietnamPro',
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
+                        fontStyle: FontStyle.italic,
+                        letterSpacing: -0.8,
+                        color: c.ink,
+                        height: 1.02,
+                      ),
+                    ),
+                    const SizedBox(height: 11),
+                    Text(
+                      body,
+                      style: TextStyle(
+                        fontFamily: 'BeVietnamPro',
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w500,
+                        height: 1.55,
+                        color: c.inkSoft,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    _DialogConfirmButton(
+                      label: confirmLabel,
+                      accent: accent,
+                      destructive: destructive,
+                      onTap: () => Navigator.of(context).pop(true),
+                    ),
+                    const SizedBox(height: 4),
+                    SizedBox(
+                      height: 48,
+                      child: TextButton(
+                        style: TextButton.styleFrom(
+                          foregroundColor: c.inkSoft,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
                           ),
-                          const SizedBox(height: 11),
-                          Text(
-                            body,
-                            style: TextStyle(
-                              fontFamily: 'BeVietnamPro',
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w500,
-                              height: 1.55,
-                              color: c.invInkSoft,
-                            ),
+                          textStyle: const TextStyle(
+                            fontFamily: 'BeVietnamPro',
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w800,
                           ),
-                          const SizedBox(height: 24),
-                          _DialogConfirmButton(
-                            label: confirmLabel,
-                            accent: accent,
-                            onTap: () => Navigator.of(context).pop(true),
-                          ),
-                          const SizedBox(height: 6),
-                          SizedBox(
-                            height: 46,
-                            child: TextButton(
-                              style: TextButton.styleFrom(
-                                foregroundColor: c.invInkSoft,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                textStyle: const TextStyle(
-                                  fontFamily: 'BeVietnamPro',
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              onPressed: () => Navigator.of(context).pop(false),
-                              child: const Text('Ở lại'),
-                            ),
-                          ),
-                        ],
+                        ),
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: const Text('Ở lại'),
                       ),
                     ),
                   ],
@@ -2326,44 +2351,22 @@ class _ConfirmDialog extends StatelessWidget {
   }
 }
 
-/// Soft radial accent glow painted behind the confirm-dialog content.
-class _DialogGlow extends StatelessWidget {
-  const _DialogGlow({required this.color, required this.opacity});
-
-  final Color color;
-  final double opacity;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 240,
-      height: 240,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: RadialGradient(
-            colors: [
-              color.withValues(alpha: opacity),
-              color.withValues(alpha: 0),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Halo CTA pill with a press-scale and an arrow knob — mirrors the home
-/// hero's start button so the confirm action feels first-class.
+/// Confirm pill with a press-scale and an arrow knob — mirrors the home hero's
+/// start button so the confirm action feels first-class. The fill carries the
+/// action's accent; the knob is warm-ink with a reserved-yellow arrow on the
+/// benign path (the sanctioned CTA yellow).
 class _DialogConfirmButton extends StatefulWidget {
   const _DialogConfirmButton({
     required this.label,
     required this.accent,
     required this.onTap,
+    this.destructive = false,
   });
 
   final String label;
   final Color accent;
   final VoidCallback onTap;
+  final bool destructive;
 
   @override
   State<_DialogConfirmButton> createState() => _DialogConfirmButtonState();
@@ -2375,6 +2378,9 @@ class _DialogConfirmButtonState extends State<_DialogConfirmButton> {
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
+    // Destructive amber needs cream text for contrast; the gold path keeps the
+    // dark yellow-ink. The knob arrow echoes the fill so it reads as one piece.
+    final labelColor = widget.destructive ? c.invInk : c.yellowInk;
     return GestureDetector(
       onTap: widget.onTap,
       onTapDown: (_) => setState(() => _pressed = true),
@@ -2393,14 +2399,9 @@ class _DialogConfirmButtonState extends State<_DialogConfirmButton> {
             borderRadius: BorderRadius.circular(999),
             boxShadow: [
               BoxShadow(
-                color: widget.accent.withValues(alpha: 0.36),
-                blurRadius: 32,
-                offset: const Offset(0, 12),
-              ),
-              BoxShadow(
-                color: widget.accent.withValues(alpha: 0.18),
-                blurRadius: 60,
-                offset: const Offset(0, 26),
+                color: widget.accent.withValues(alpha: 0.34),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
               ),
             ],
           ),
@@ -2416,7 +2417,7 @@ class _DialogConfirmButtonState extends State<_DialogConfirmButton> {
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
                     letterSpacing: -0.3,
-                    color: c.yellowInk,
+                    color: labelColor,
                   ),
                 ),
               ),

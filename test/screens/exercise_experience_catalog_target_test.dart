@@ -107,63 +107,54 @@ void main() {
   test('hand-cased exercises prefer prescription, then catalog reps', () {
     final cases = <({
       String id,
-      int literal,
       int catalog,
       int prescription,
       int Function(Object exercise) targetOf,
     })>[
       (
         id: 'squat',
-        literal: 8,
         catalog: 10,
         prescription: 12,
         targetOf: (exercise) => (exercise as Squat).maxRep,
       ),
       (
         id: 'lunge',
-        literal: 8,
         catalog: 10,
         prescription: 12,
         targetOf: (exercise) => (exercise as Lunge).maxRep,
       ),
       (
         id: 'push_up',
-        literal: 6,
         catalog: 9,
         prescription: 11,
         targetOf: (exercise) => (exercise as PushUp).maxRep,
       ),
       (
         id: 'plank',
-        literal: 3,
         catalog: 4,
         prescription: 5,
         targetOf: (exercise) => (exercise as Plank).maxRep,
       ),
       (
         id: 'jumping_jack',
-        literal: 15,
         catalog: 18,
         prescription: 20,
         targetOf: (exercise) => (exercise as JumpingJack).maxRep,
       ),
       (
         id: 'warrior_one',
-        literal: 2,
         catalog: 4,
         prescription: 6,
         targetOf: (exercise) => (exercise as WarriorOne).maxHolds,
       ),
       (
         id: 'glute_bridge',
-        literal: 15,
         catalog: 18,
         prescription: 20,
         targetOf: (exercise) => (exercise as GluteBridge).maxRep,
       ),
       (
         id: 'curl_up',
-        literal: 12,
         catalog: 14,
         prescription: 16,
         targetOf: (exercise) => (exercise as CurlUp).maxRep,
@@ -172,11 +163,7 @@ void main() {
 
     for (final entry in cases) {
       final definition = lookupExerciseDefinition(entry.id)!;
-      final info = catalogInfo(
-        id: entry.id,
-        baseReps: entry.catalog,
-        baseSeconds: 99,
-      );
+      final info = catalogInfo(id: entry.id, baseReps: entry.catalog);
 
       final prescribed = debugBuildExerciseExperienceSpec(
         definition,
@@ -205,13 +192,16 @@ void main() {
       );
       expect(entry.targetOf(catalogBacked.exercise), entry.catalog);
 
-      final literalBacked = debugBuildExerciseExperienceSpec(definition);
+      // No catalog entry AND no prescription → never-crash floor. Volume now
+      // lives only in the catalog, so there is no per-definition literal to
+      // fall back to; every exercise floors to kFallbackReps.
+      final floored = debugBuildExerciseExperienceSpec(definition);
       expect(
-        literalBacked.targetPerSet,
-        entry.literal,
-        reason: '${entry.id} should retain its literal fallback',
+        floored.targetPerSet,
+        kFallbackReps,
+        reason: '${entry.id} floors to kFallbackReps with no catalog entry',
       );
-      expect(entry.targetOf(literalBacked.exercise), entry.literal);
+      expect(entry.targetOf(floored.exercise), kFallbackReps);
     }
   });
 

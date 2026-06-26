@@ -37,7 +37,7 @@ enum LowLungeState { entry, holding, exit }
 class LowLunge extends ExerciseBase {
   final int maxRep;
 
-  LowLunge({this.maxRep = LowLungeConfig.MAX_REP});
+  LowLunge({required this.maxRep});
 
   LowLungeState lowLungeState = LowLungeState.entry;
   LowLungeState previousLowLungeState = LowLungeState.entry;

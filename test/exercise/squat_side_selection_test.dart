@@ -304,7 +304,7 @@ void main() {
   test(
       'squat stays valid when the right side is visible but orientation is only angled',
       () {
-    final squat = Squat()..cameraFacing = CameraFacing.angled;
+    final squat = Squat(maxRep: 15)..cameraFacing = CameraFacing.angled;
     final landmarks = _buildSquatLandmarks(rightSideVisible: true);
 
     expect(squat.checkSafety(landmarks), isNull);
@@ -314,7 +314,7 @@ void main() {
   test(
       'squat stays valid when the left side is visible but orientation is undefined',
       () {
-    final squat = Squat()..cameraFacing = CameraFacing.undefined;
+    final squat = Squat(maxRep: 15)..cameraFacing = CameraFacing.undefined;
     final landmarks = _buildSquatLandmarks(rightSideVisible: false);
 
     expect(squat.checkSafety(landmarks), isNull);
@@ -323,7 +323,7 @@ void main() {
 
   test('tracked squat side can switch when the opposite side becomes clearer',
       () {
-    final squat = Squat()..cameraFacing = CameraFacing.angled;
+    final squat = Squat(maxRep: 15)..cameraFacing = CameraFacing.angled;
 
     expect(
       squat.checkSafety(_buildSquatLandmarks(rightSideVisible: true)),
@@ -341,7 +341,7 @@ void main() {
 
   test('camera facing uses z-score depth to switch from right to left side',
       () {
-    final squat = Squat();
+    final squat = Squat(maxRep: 15);
     final rightFacingLandmarks =
         _buildDepthFacingLandmarks(leftSideCloser: false);
     final leftFacingLandmarks =

@@ -21,6 +21,8 @@
 // Coach-quote + editorial closer from v2 are removed — they read as
 // "selling" and add length the user explicitly didn't want.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -58,6 +60,7 @@ class ExerciseIntroPage extends StatefulWidget {
     required this.coachNote,
     required this.onStart,
     required this.onBack,
+    this.onReviewerDemoHold,
     this.videoAsset,
     this.restSeconds = 45,
     this.subtitle,
@@ -95,6 +98,13 @@ class ExerciseIntroPage extends StatefulWidget {
 
   final VoidCallback onStart;
   final VoidCallback onBack;
+
+  /// When non-null, a deliberate 5-second press-and-hold on the
+  /// "Bắt đầu tập" pill fires this instead of starting the workout —
+  /// used to surface the reviewer tracking-demo overlay. A quick tap
+  /// (sub-5s press) still starts normally. Null = no long-press wiring.
+  final VoidCallback? onReviewerDemoHold;
+
   final int restSeconds;
   final String? subtitle;
   final SkeletonPosture posture;
@@ -187,47 +197,100 @@ class _ExerciseIntroPageState extends State<ExerciseIntroPage> {
   }
 
   /// Plain-Vietnamese one-liner: what the metric measures + why it
-  /// matters. Read above the threshold value so users understand the
+  /// matters. Surfaces above the target value so users understand the
   /// spec before they see the numbers.
+  ///
+  /// Keyed by the exact metric title authored per exercise in
+  /// `exercise_experience_screen.dart`, so each exercise gets copy that
+  /// is actually true for *that* movement (a push-up's "Thân người" is
+  /// about plank-body sag, not a squat's trunk lean). A small set of
+  /// substring fallbacks keeps any future metric from reading blank.
   String _defaultDescriptionFor(String name) {
+    const byTitle = <String, String>{
+      // ── Squat / Lunge ──
+      'Lưng nghiêng':
+          'Đo độ nghiêng của thân trên so với phương dọc. Vừa đủ — không gập quá (hại lưng dưới) cũng không quá thẳng (mất lực đùi).',
+      'Độ sâu gối':
+          'Đo góc gập đầu gối khi xuống đáy. Đủ sâu để đùi và mông làm việc, nhưng vẫn trong vùng an toàn cho khớp gối.',
+      'Gót chân':
+          'Đo gót chân có rời sàn không. Gót nhấc khiến trọng tâm dồn lên mũi chân và đầu gối — Vika nhắc bạn ấn gót xuống.',
+      'Core & hông':
+          'Đo hông và core có giữ vững khi bước xuống không. Giữ chắc giúp lực dồn vào chân thay vì xô lệch sang lưng dưới.',
+      // ── Push-up ──
+      'Thân người':
+          'Đo thân người có thẳng một đường từ vai đến gót không. Võng hông hay chổng mông đều làm mất tải và dễ đau lưng.',
+      'Độ sâu khuỷu':
+          'Đo góc gập khuỷu tay khi hạ xuống. Đủ sâu để ngực và tay sau làm việc trọn biên độ trong mỗi nhịp.',
+      'Khoá khuỷu':
+          'Đo tay có duỗi thẳng khi đẩy lên hết không. Khoá đủ ở trên cùng để hoàn thành trọn vẹn một rep.',
+      // ── Plank ──
+      'Đầu cổ':
+          'Đo đầu và cổ có thẳng hàng với cột sống không. Ngẩng hay cúi cổ tạo căng thừa khi giữ tư thế.',
+      'Đầu gối':
+          'Đo chân có duỗi thẳng khi giữ plank không. Gối cong làm tụt hông và giảm hiệu quả lên core.',
+      // ── Jumping jack ──
+      'Tay qua đầu':
+          'Đo tay có vươn đủ cao qua đầu trong pha mở không. Tay thấp làm hụt biên độ và loãng nhịp cardio.',
+      'Khuỷu tay':
+          'Đo tay có duỗi thẳng khi vung lên không. Khuỷu gập làm rep trông vội và thiếu trọn vẹn.',
+      'Chân rộng':
+          'Đo hai chân có mở đủ rộng so với vai trong pha nhảy không. Mở đủ rộng để rep trọn vẹn, không chỉ vung tay.',
+      // ── Glute bridge ──
+      'Nâng hông':
+          'Đo hông có nâng đủ cao không. Mục tiêu là siết mông ở đỉnh, không ưỡn lưng để bù.',
+      'Góc gối':
+          'Đo góc gối có giữ ổn định khi nâng hông không. Giữ đúng góc giúp lực dồn vào mông thay vì đùi sau.',
+      // ── Curl-up ──
+      'Biên độ cuộn':
+          'Đo thân trên cuộn lên bao nhiêu so với sàn. Curl-up cần biên độ ngắn, vừa đủ để bảo vệ cột sống thắt lưng.',
+      'Gối giữ cong':
+          'Đo một chân có giữ gối cong suốt rep không. Duỗi thẳng chân kéo lực xuống lưng dưới thay vì vào bụng.',
+      'Không kéo cổ':
+          'Đo cổ có bị giật về trước không. Kéo cổ bằng tay tạo lực sai và mỏi gáy thay vì làm việc cơ bụng.',
+      // ── Temporal badges ──
+      'Nhịp xuống':
+          'Đo thời gian hạ người xuống đáy. Hạ chậm và có kiểm soát giúp cơ chịu tải lâu hơn và Vika đo chính xác hơn.',
+      'Giữ đáy':
+          'Đo thời gian dừng ở đáy. Một nhịp dừng ngắn để Vika xác nhận độ sâu trước khi bạn đẩy lên.',
+      'Nhịp rep':
+          'Đo nhịp mỗi lần nhảy. Giữ nhịp đều giúp duy trì cường độ cardio mà vẫn đúng form.',
+      'Thời gian giữ':
+          'Đo thời gian giữ mỗi lần plank. Giữ đủ lâu để core chịu tải — Vika đếm khi tư thế còn chuẩn.',
+      'Hạ hông':
+          'Đo tốc độ hạ hông so với khi nâng. Hạ chậm hơn giúp mông kiểm soát chuyển động thay vì buông rơi.',
+      // ── Generic fallback metrics ──
+      'Tư thế thân trên':
+          'Vika theo dõi tư thế thân trên suốt bài để giữ bạn ổn định và đúng dáng.',
+      'Biên độ chính':
+          'Vika theo dõi biên độ chuyển động chính của bài để bạn tập đủ sâu và trọn vẹn mỗi nhịp.',
+      'Nhịp chuyển động':
+          'Vika theo dõi nhịp chuyển động để bạn giữ đều và kiểm soát, không làm quá nhanh.',
+      'Nhịp tập':
+          'Vika theo dõi nhịp tập để bạn giữ đều và ổn định trong suốt bài.',
+      'Kiểm soát':
+          'Vika theo dõi mức kiểm soát chuyển động để mỗi nhịp đều chắc và an toàn.',
+    };
+    final exact = byTitle[name];
+    if (exact != null) return exact;
+
+    // Substring fallbacks — keep any unmapped future metric readable.
     final n = name.toLowerCase();
-    if (n.contains('khuỷu')) {
-      return 'Đo góc gập của khuỷu tay ở đáy và khi khoá trên cùng. Đủ sâu nhưng vẫn kiểm soát giúp vai và cổ tay an toàn hơn.';
+    if (n.contains('cổ')) {
+      return 'Đo đầu và cổ có giữ thẳng hàng với cột sống không.';
     }
-    if (n.contains('tay qua đầu') || n.contains('tay')) {
-      return 'Đo tay có vươn đủ cao và đủ thẳng trong pha mở. Tay thấp làm bài cardio mất nhịp và giảm biên độ.';
+    if (n.contains('hông')) {
+      return 'Đo chuyển động của hông để giữ lực đúng nhóm cơ.';
     }
-    if (n.contains('chân rộng')) {
-      return 'Đo khoảng cách hai chân so với vai trong pha mở. Chân mở đủ rộng giúp rep trọn vẹn thay vì chỉ vung tay.';
-    }
-    if (n.contains('đầu cổ') || n.contains('cổ')) {
-      return 'Đo đầu và cổ có giữ trung tính không. Cổ lệch hoặc nhấc lên dễ tạo căng không cần thiết khi tập dưới sàn.';
-    }
-    if (n.contains('nâng hông') || n.contains('hông')) {
-      return 'Đo hông có lên đủ cao và không ưỡn quá mức. Mục tiêu là kích hoạt mông, không đẩy lực vào lưng dưới.';
-    }
-    if (n.contains('biên độ cuộn')) {
-      return 'Đo thân trên cuộn lên bao nhiêu so với tư thế nghỉ. McGill curl-up cần biên độ ngắn để bảo vệ lưng.';
-    }
-    if (n.contains('gối giữ cong')) {
-      return 'Đo đầu gối có giữ cong trong suốt rep không. Chân duỗi thẳng làm lực kéo chuyển xuống lưng dưới.';
-    }
-    if (n.contains('độ sâu') || n.contains('gối')) {
-      return 'Đo góc cong của đầu gối khi xuống đáy. Càng nhỏ = xuống càng sâu = đẩy mạnh cơ đùi và mông hơn.';
+    if (n.contains('gối') || n.contains('độ sâu')) {
+      return 'Đo góc gối trong chuyển động để bạn tập đủ sâu và an toàn cho khớp.';
     }
     if (n.contains('lưng') || n.contains('thân')) {
-      return 'Đo độ nghiêng của thân trên so với phương dọc. Vừa nghiêng — không quá gập (đau lưng) và không quá thẳng (mất tải).';
+      return 'Đo tư thế thân người để giữ cột sống an toàn và lực đúng chỗ.';
     }
-    if (n.contains('gót') || n.contains('chân')) {
-      return 'Đo gót chân có dính sàn không. Gót nhấc = trọng tâm đổ về đầu gối = xấu cho khớp.';
+    if (n.contains('nhịp') || n.contains('giữ')) {
+      return 'Đo nhịp và thời gian của chuyển động để bạn giữ kiểm soát.';
     }
-    if (n.contains('nhịp') || n.contains('xuống') || n.contains('tempo')) {
-      return 'Đo thời gian từ đứng đến đáy. Xuống chậm = ổn định hơn, AI đo chính xác hơn.';
-    }
-    if (n.contains('giữ') || n.contains('đáy') || n.contains('hold')) {
-      return 'Đo thời gian dừng ở đáy. AI cần thấy "đáy" rõ trước khi đếm rep và đo độ sâu.';
-    }
-    return 'Vika đo điểm này theo thời gian thực và nói khi bạn cần điều chỉnh.';
+    return 'Vika đo điểm này theo thời gian thực và nhắc khi bạn cần chỉnh.';
   }
 
   /// Returns a realistic session-over-session adaptation per metric
@@ -304,21 +367,6 @@ class _ExerciseIntroPageState extends State<ExerciseIntroPage> {
     final total = workSeconds + restSecondsTotal;
     final minutes = (total / 60).ceil();
     return '~$minutes phút';
-  }
-
-  /// Temporal chips for the diagram corner — derive from badges only.
-  List<SkeletonTempoChip> get _tempoChips {
-    final chips = <SkeletonTempoChip>[];
-    for (var i = 0; i < widget.badges.length; i++) {
-      final b = widget.badges[i];
-      chips.add(SkeletonTempoChip(
-        number: widget.callouts.length + i + 1,
-        label: b.title.toUpperCase(),
-        value: b.value,
-        icon: _tempoIconFor(b.title),
-      ));
-    }
-    return chips;
   }
 
   @override
@@ -402,18 +450,13 @@ class _ExerciseIntroPageState extends State<ExerciseIntroPage> {
                       eyebrow: 'AI THEO DÕI',
                       meta: '${_metrics.length} ĐIỂM ĐO',
                       intro:
-                          'Các điểm AI đo theo thời gian thực — ngưỡng cá nhân hoá theo buổi tập trước.',
+                          'Vuốt qua từng điểm Vika chấm theo thời gian thực để giữ form chuẩn từ rep đầu.',
                     ),
-                    const SizedBox(height: 14),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: _AiSpecCard(
-                        posture: widget.posture,
-                        metrics: _metrics,
-                        tempoChips: _tempoChips,
-                        callouts: widget.callouts,
-                      ),
-                    ),
+                    const SizedBox(height: 16),
+                    // Full-bleed (no horizontal padding) so the neighbouring
+                    // card can peek past the screen edge — the cue that the
+                    // metrics are a horizontal, swipeable gallery.
+                    _MetricPager(metrics: _metrics),
                     const SizedBox(height: 40),
 
                     // 3. MỤC TIÊU BUỔI NÀY — session targets.
@@ -477,6 +520,7 @@ class _ExerciseIntroPageState extends State<ExerciseIntroPage> {
     return _StickyCtaDock(
       onStart: widget.onStart,
       onWatchVideo: widget.onWatchVideo,
+      onReviewerDemoHold: widget.onReviewerDemoHold,
       showReadNotice: true,
     );
   }
@@ -1474,307 +1518,396 @@ class _SetupRow extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// AI SPEC CARD — diagram on top, per-metric config list below.
-// The single hero of the page.
+// AI METRIC GALLERY — horizontal, swipeable deck of "instrument" cards.
+//
+// One metric per card. Replaces the old long vertical list: the user
+// flicks sideways through each thing Vika watches, with the neighbour
+// card peeking past the screen edge and a focus scale/dim on the active
+// card. Page dots + a 0N/0M counter mark position.
 // ═══════════════════════════════════════════════════════════════
 
-class _AiSpecCard extends StatelessWidget {
-  const _AiSpecCard({
-    required this.posture,
-    required this.metrics,
-    required this.tempoChips,
-    required this.callouts,
+class _MetricPager extends StatefulWidget {
+  const _MetricPager({required this.metrics});
+
+  final List<_MetricConfig> metrics;
+
+  @override
+  State<_MetricPager> createState() => _MetricPagerState();
+}
+
+class _MetricPagerState extends State<_MetricPager> {
+  // <1 so the next card peeks; this is the swipeability cue.
+  static const double _viewportFraction = 0.82;
+  static const double _cardHeight = 392;
+
+  late final PageController _controller =
+      PageController(viewportFraction: _viewportFraction);
+  double _page = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    final p = _controller.page ?? 0;
+    if (p != _page) setState(() => _page = p);
+  }
+
+  @override
+  void dispose() {
+    _controller.removeListener(_onScroll);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final metrics = widget.metrics;
+    return Column(
+      children: [
+        SizedBox(
+          height: _cardHeight,
+          child: PageView.builder(
+            controller: _controller,
+            itemCount: metrics.length,
+            physics: const BouncingScrollPhysics(),
+            itemBuilder: (context, i) {
+              // Distance of this card from the focused page, 0..1.
+              final delta = (_page - i).abs().clamp(0.0, 1.0);
+              final scale = 1 - delta * 0.06;
+              final opacity = 1 - delta * 0.30;
+              return Transform.scale(
+                scale: scale,
+                child: Opacity(
+                  opacity: opacity,
+                  // showAdaptation stays false until real per-user
+                  // thresholds are wired (see _MetricCard.showAdaptation).
+                  child: _MetricCard(metric: metrics[i], showAdaptation: false),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 18),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            children: [
+              _MetricDots(count: metrics.length, page: _page),
+              const Spacer(),
+              Text(
+                '${(_page.round() + 1).toString().padLeft(2, '0')}'
+                ' / ${metrics.length.toString().padLeft(2, '0')}',
+                style: TextStyle(
+                  fontFamily: 'BeVietnamPro',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  fontStyle: FontStyle.italic,
+                  letterSpacing: 0.4,
+                  color: VikaColors.of(context).inkFaint,
+                  fontFeatures: VikaIvoryMain.tabularFigures,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Page-position dots — the active one stretches into a yellow pill.
+class _MetricDots extends StatelessWidget {
+  const _MetricDots({required this.count, required this.page});
+
+  final int count;
+  final double page;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    final active = page.round();
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 0; i < count; i++)
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 240),
+            curve: Curves.easeOut,
+            margin: const EdgeInsets.only(right: 5),
+            width: i == active ? 20 : 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: i == active
+                  ? c.yellow
+                  : c.inkFaint.withValues(alpha: 0.28),
+              borderRadius: BorderRadius.circular(3),
+              boxShadow: i == active
+                  ? [BoxShadow(color: c.yellow.withValues(alpha: 0.5), blurRadius: 6)]
+                  : null,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// One metric, presented as a precision-instrument card: medallion +
+/// Vietnamese kind label + name, a CAD-style gauge paired with its target
+/// readout, and plain-language "what + why".
+class _MetricCard extends StatelessWidget {
+  const _MetricCard({
+    required this.metric,
+    this.showAdaptation = false,
   });
 
-  // Posture / callouts / tempoChips are retained for backward-compat
-  // with the screen invocation but no longer rendered as a body diagram.
-  // Each metric now carries its own geometric diagram (see _MetricConfigRow).
-  final SkeletonPosture posture;
-  final List<_MetricConfig> metrics;
-  final List<SkeletonTempoChip> tempoChips;
-  final List<SkeletonCallout> callouts;
+  final _MetricConfig metric;
+
+  /// Reserved. Real per-user threshold adaptation isn't wired yet, so the
+  /// session-over-session delta is intentionally hidden — showing a
+  /// "personalised" change while every threshold is hard-coded and equal
+  /// for all users would be dishonest. Flip to true once the engine feeds
+  /// real per-user thresholds; the display (`_AdaptationStrip`) is kept.
+  final bool showAdaptation;
+
+  String get _kindLabel {
+    return switch (metric.kind) {
+      MetricKind.angle => 'GÓC ĐO',
+      MetricKind.time => 'NHỊP ĐỘ',
+      MetricKind.position => 'KHOẢNG CÁCH',
+    };
+  }
+
+  /// Numeric specs (85° — 105°, ≥ 3.0s) get the giant tabular treatment;
+  /// soft phrase values (Giữ ổn định) read better at a calmer size.
+  bool get _isNumericValue => RegExp(r'[0-9]').hasMatch(metric.value);
 
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
     return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 6),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: c.bgRaised,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: c.border),
         boxShadow: [
           BoxShadow(
-            color: c.ink.withValues(alpha: 0.04),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
+            color: c.ink.withValues(alpha: 0.05),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
-      child: Column(
-        children: [
-          // Card eyebrow strip — section identity + "CÁ NHÂN HOÁ" pill.
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-            child: Row(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // ── HEADER: medallion · kind label · VIKA tag ──
+            Row(
               children: [
                 Container(
-                  width: 4,
-                  height: 4,
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: c.yellow,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: c.ink, width: 1.2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: c.yellow.withValues(alpha: 0.32),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    metric.number.toString().padLeft(2, '0'),
+                    style: TextStyle(
+                      fontFamily: 'BeVietnamPro',
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                      fontStyle: FontStyle.italic,
+                      letterSpacing: -0.4,
+                      height: 1.0,
+                      color: c.yellowInk,
+                      fontFeatures: VikaIvoryMain.tabularFigures,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 11),
+                Text(
+                  _kindLabel,
+                  style: TextStyle(
+                    fontFamily: 'BeVietnamPro',
+                    fontSize: 8.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.6,
+                    color: c.inkFaint,
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  width: 5,
+                  height: 5,
                   decoration: BoxDecoration(
                     color: c.yellow,
                     shape: BoxShape.circle,
                     boxShadow: [BoxShadow(color: c.yellow, blurRadius: 4)],
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 Text(
-                  'CẤU HÌNH AI',
+                  'VIKA ĐO',
                   style: TextStyle(
                     fontFamily: 'BeVietnamPro',
-                    fontSize: 9.5,
+                    fontSize: 8.5,
                     fontWeight: FontWeight.w800,
-                    letterSpacing: 1.6,
+                    letterSpacing: 1.4,
                     color: c.inkSoft,
                   ),
                 ),
-                const Spacer(),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: c.yellowGhost,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: c.yellow.withValues(alpha: 0.35),
-                    ),
-                  ),
-                  child: Row(
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // ── NAME — the headline of the card ──
+            Text(
+              metric.name,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: 'BeVietnamPro',
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                fontStyle: FontStyle.italic,
+                letterSpacing: -0.7,
+                height: 1.05,
+                color: c.ink,
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // ── INSTRUMENT: gauge + target readout ──
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                MetricDiagram(
+                  kind: metric.kind,
+                  value: metric.value,
+                  size: 104,
+                ),
+                const SizedBox(width: 18),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        Icons.tune_rounded,
-                        size: 10,
-                        color: c.ink,
-                      ),
-                      const SizedBox(width: 4),
                       Text(
-                        'CÁ NHÂN HOÁ',
+                        'MỤC TIÊU FORM',
                         style: TextStyle(
                           fontFamily: 'BeVietnamPro',
                           fontSize: 8.5,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 1.4,
-                          color: c.ink,
+                          color: c.inkFaint,
                         ),
                       ),
+                      const SizedBox(height: 6),
+                      if (_isNumericValue)
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            metric.value,
+                            maxLines: 1,
+                            softWrap: false,
+                            style: TextStyle(
+                              fontFamily: 'BeVietnamPro',
+                              fontSize: 30,
+                              fontWeight: FontWeight.w800,
+                              fontStyle: FontStyle.italic,
+                              letterSpacing: -1.2,
+                              height: 1.0,
+                              color: c.ink,
+                              fontFeatures: VikaIvoryMain.tabularFigures,
+                            ),
+                          ),
+                        )
+                      else
+                        Text(
+                          metric.value,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontFamily: 'BeVietnamPro',
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            fontStyle: FontStyle.italic,
+                            letterSpacing: -0.4,
+                            height: 1.1,
+                            color: c.ink,
+                          ),
+                        ),
+                      const SizedBox(height: 10),
+                      Container(width: 22, height: 2, color: c.yellow),
                     ],
                   ),
                 ),
               ],
             ),
-          ),
-          // Top hairline before the first row.
-          Container(height: 1, color: c.border),
-          // Per-metric config rows.
-          for (var i = 0; i < metrics.length; i++) ...[
-            _MetricConfigRow(metric: metrics[i]),
-            if (i < metrics.length - 1) Container(height: 1, color: c.border),
+            const SizedBox(height: 20),
+            Container(height: 1, color: c.border),
+            const SizedBox(height: 16),
+
+            // ── WHAT it measures + WHY it matters ──
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 5),
+                    child: Container(
+                      width: 4,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: c.yellow,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      metric.description,
+                      maxLines: 5,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: 'BeVietnamPro',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        height: 1.5,
+                        letterSpacing: -0.1,
+                        color: c.inkSoft,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Reserved per-user adaptation delta (hidden — see field doc).
+            if (showAdaptation) ...[
+              const SizedBox(height: 14),
+              _AdaptationStrip(adaptation: metric.adaptation),
+            ],
           ],
-        ],
-      ),
-    );
-  }
-}
-
-class _MetricConfigRow extends StatelessWidget {
-  const _MetricConfigRow({required this.metric});
-  final _MetricConfig metric;
-
-  String get _kindLabel {
-    return switch (metric.kind) {
-      MetricKind.angle => 'ANATOMY · GÓC',
-      MetricKind.time => 'TEMPO · THỜI GIAN',
-      MetricKind.position => 'POSITION · KHOẢNG CÁCH',
-    };
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final c = VikaColors.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 20, 18, 22),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // ─── HEADER ROW: medallion · kind tag + name ───
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: c.yellow,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: c.ink, width: 1.2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: c.yellow.withValues(alpha: 0.32),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  metric.number.toString().padLeft(2, '0'),
-                  style: TextStyle(
-                    fontFamily: 'BeVietnamPro',
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w800,
-                    fontStyle: FontStyle.italic,
-                    letterSpacing: -0.4,
-                    height: 1.0,
-                    color: c.yellowInk,
-                    fontFeatures: VikaIvoryMain.tabularFigures,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      _kindLabel,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontFamily: 'BeVietnamPro',
-                        fontSize: 8.5,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.4,
-                        color: c.inkFaint,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      metric.name.toUpperCase(),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontFamily: 'BeVietnamPro',
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.4,
-                        color: c.ink,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          // ─── DESCRIPTION: WHAT this measures + WHY it matters ───
-          Container(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-            decoration: BoxDecoration(
-              color: c.bg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: c.border),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Container(
-                    width: 4,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: c.yellow,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    metric.description,
-                    style: TextStyle(
-                      fontFamily: 'BeVietnamPro',
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w500,
-                      height: 1.5,
-                      letterSpacing: -0.1,
-                      color: c.inkSoft,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // ─── SPEC ROW: huge italic threshold + diagram on right ───
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'NGƯỠNG HIỆN TẠI',
-                      style: TextStyle(
-                        fontFamily: 'BeVietnamPro',
-                        fontSize: 8.5,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.4,
-                        color: c.inkFaint,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        metric.value,
-                        maxLines: 1,
-                        softWrap: false,
-                        style: TextStyle(
-                          fontFamily: 'BeVietnamPro',
-                          fontSize: 32,
-                          fontWeight: FontWeight.w800,
-                          fontStyle: FontStyle.italic,
-                          letterSpacing: -1.4,
-                          height: 1.0,
-                          color: c.ink,
-                          fontFeatures: VikaIvoryMain.tabularFigures,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 14),
-              MetricDiagram(
-                kind: metric.kind,
-                value: metric.value,
-                size: 80,
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // ─── ADAPTATION: diff chip + previous value + reason ───
-          _AdaptationStrip(adaptation: metric.adaptation),
-        ],
+        ),
       ),
     );
   }
@@ -2058,11 +2191,17 @@ class _StickyCtaDock extends StatefulWidget {
   const _StickyCtaDock({
     required this.onStart,
     this.onWatchVideo,
+    this.onReviewerDemoHold,
     this.showReadNotice = false,
   });
 
   final VoidCallback onStart;
   final VoidCallback? onWatchVideo;
+
+  /// When non-null, a 5-second press-and-hold on the start pill fires
+  /// this (reviewer tracking-demo) instead of starting; a sub-5s press
+  /// still starts. Null = no long-press wiring (today's behaviour).
+  final VoidCallback? onReviewerDemoHold;
 
   /// When true, a small editorial notice sits above the CTA telling
   /// the user to read the page before starting.
@@ -2074,6 +2213,45 @@ class _StickyCtaDock extends StatefulWidget {
 
 class _StickyCtaDockState extends State<_StickyCtaDock> {
   bool _pressed = false;
+
+  /// Armed on long-press-down when [_StickyCtaDock.onReviewerDemoHold]
+  /// is wired; fires the demo at 5s. Cancelled by an early release.
+  Timer? _holdTimer;
+  bool _demoFired = false;
+
+  @override
+  void dispose() {
+    _holdTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startHold() {
+    _demoFired = false;
+    _holdTimer?.cancel();
+    _holdTimer = Timer(const Duration(seconds: 5), () {
+      _demoFired = true;
+      widget.onReviewerDemoHold?.call();
+    });
+  }
+
+  void _endHold() {
+    _holdTimer?.cancel();
+    _holdTimer = null;
+    if (_demoFired) {
+      // The 5s demo already fired — swallow the release, don't start.
+      _demoFired = false;
+      return;
+    }
+    // A sub-5s press still starts the workout.
+    HapticFeedback.mediumImpact();
+    widget.onStart();
+  }
+
+  void _cancelHold() {
+    _holdTimer?.cancel();
+    _holdTimer = null;
+    _demoFired = false;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2116,6 +2294,28 @@ class _StickyCtaDockState extends State<_StickyCtaDock> {
                   onTapDown: (_) => setState(() => _pressed = true),
                   onTapUp: (_) => setState(() => _pressed = false),
                   onTapCancel: () => setState(() => _pressed = false),
+                  // Reviewer tracking-demo track: a deliberate 5s hold on
+                  // the start pill opens the demo instead of starting; a
+                  // sub-5s press still starts (handled in _endHold). Only
+                  // wired when onReviewerDemoHold is provided.
+                  onLongPressDown: widget.onReviewerDemoHold != null
+                      ? (_) {
+                          setState(() => _pressed = true);
+                          _startHold();
+                        }
+                      : null,
+                  onLongPressEnd: widget.onReviewerDemoHold != null
+                      ? (_) {
+                          setState(() => _pressed = false);
+                          _endHold();
+                        }
+                      : null,
+                  onLongPressCancel: widget.onReviewerDemoHold != null
+                      ? () {
+                          setState(() => _pressed = false);
+                          _cancelHold();
+                        }
+                      : null,
                   behavior: HitTestBehavior.opaque,
                   child: AnimatedScale(
                     scale: _pressed ? 0.98 : 1.0,

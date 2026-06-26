@@ -14,7 +14,6 @@ import 'metrics/tempo_metric.dart';
 import 'metrics/floor_contact_metric.dart';
 
 class DeadBugConfig {
-  static const int MAX_REP = 20; // 10 rep mỗi bên
   static const int TIMEOUT_MS = 90000; // 90s timeout
 
   // Start Position (Tay chân dựng thẳng vuông góc sàn)
@@ -84,7 +83,7 @@ class DeadBug extends ExerciseBase {
   bool? _lastPhysicalLeftArm;
   bool? _lastPhysicalLeftLeg;
 
-  DeadBug({this.maxRep = DeadBugConfig.MAX_REP});
+  DeadBug({required this.maxRep});
 
   @override
   String get exerciseName => 'Dead Bug';

@@ -6,7 +6,8 @@
     <application
         android:label="Vika"
         android:name="${applicationName}"
-        android:icon="@mipmap/launcher_icon">
+        android:icon="@mipmap/launcher_icon"
+        android:enableOnBackInvokedCallback="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -61,6 +62,13 @@
                 <data android:scheme="@string/fb_login_protocol_scheme" />
             </intent-filter>
         </activity>
+
+        <!-- PostHog: disable native auto-init so the project token never lives
+             in a committed native file. The SDK is initialized manually in
+             Dart (main.dart) from the bundled env, gated behind user consent. -->
+        <meta-data
+            android:name="com.posthog.posthog.AUTO_INIT"
+            android:value="false" />
 
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

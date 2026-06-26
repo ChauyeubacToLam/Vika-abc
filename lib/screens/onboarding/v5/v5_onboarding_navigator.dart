@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:vika/models/exercise_definition.dart';
+import 'package:vika/services/analytics_service.dart';
 import 'package:vika/utils/exercise_logger.dart';
 import 'package:vika/utils/orientation_lock.dart';
 import 'package:vika/services/onboarding_persistence.dart';
@@ -284,6 +285,9 @@ class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('onboarding_complete', true);
 
+      // Onboarding finished (S16 CTA). No-op without consent.
+      unawaited(AnalyticsService.instance.capture('onboarding_completed'));
+
       // Why
       await prefs.setStringList(
         'user_problem_resonance',
@@ -456,7 +460,15 @@ class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
           body: PageView(
             controller: _pc,
             physics: const NeverScrollableScrollPhysics(),
-            onPageChanged: (i) => setState(() => _page = i),
+            onPageChanged: (i) {
+              setState(() => _page = i);
+              // Steps before S06 never fire — consent is granted on the S06
+              // accept, so the first captured view is the step right after it.
+              unawaited(
+                AnalyticsService.instance
+                    .capture('onboarding_step_viewed', props: {'step': i}),
+              );
+            },
             children: _pages,
           ),
         ),

@@ -28,7 +28,7 @@ class StepBackBurpee extends ExerciseBase {
       };
 
   final int maxRep;
-  StepBackBurpee({this.maxRep = BurpeeConfig.MAX_REP});
+  StepBackBurpee({required this.maxRep});
 
   BurpeeState burpeeState = BurpeeState.standing;
   BurpeeState previousBurpeeState = BurpeeState.standing;

@@ -93,7 +93,7 @@ void main() {
 
   test('requires 3 second holds at high and forearm plank before counting rep',
       () {
-    final exercise = PlankUpDown()
+    final exercise = PlankUpDown(maxRep: 12)
       ..cameraFacing = CameraFacing.left
       ..exerciseState = ExerciseState.activated;
 

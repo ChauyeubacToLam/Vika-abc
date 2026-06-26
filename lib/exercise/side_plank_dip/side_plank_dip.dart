@@ -33,7 +33,7 @@ class SidePlankDip extends ExerciseBase {
       };
 
   final int maxRep;
-  SidePlankDip({this.maxRep = SidePlankConfig.MAX_REP});
+  SidePlankDip({required this.maxRep});
 
   SidePlankState plankState = SidePlankState.setupPlank;
   SidePlankState previousPlankState = SidePlankState.setupPlank;

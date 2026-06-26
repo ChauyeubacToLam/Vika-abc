@@ -43,7 +43,7 @@ void main() {
       () {
     final player = _FakeJumpingJackVoicePlayer();
     final coach = JumpingJackVoiceCoach(voicePlayer: player);
-    final exercise = JumpingJack()..exerciseState = ExerciseState.notActivated;
+    final exercise = JumpingJack(maxRep: 30)..exerciseState = ExerciseState.notActivated;
 
     coach.processFrame(
       exercise: exercise,
@@ -71,7 +71,7 @@ void main() {
   test('speaks rep count and clean cue after a good rep', () {
     final player = _FakeJumpingJackVoicePlayer();
     final coach = JumpingJackVoiceCoach(voicePlayer: player);
-    final exercise = JumpingJack()
+    final exercise = JumpingJack(maxRep: 30)
       ..exerciseState = ExerciseState.activated
       ..lastRepWasClean = true;
 
@@ -88,7 +88,7 @@ void main() {
   test('speaks rep count and correction after a faulty rep', () {
     final player = _FakeJumpingJackVoicePlayer();
     final coach = JumpingJackVoiceCoach(voicePlayer: player);
-    final exercise = JumpingJack()
+    final exercise = JumpingJack(maxRep: 30)
       ..exerciseState = ExerciseState.activated
       ..lastRepWasClean = false
       ..lastRepTopVoiceMessage = 'Mở chân rộng hơn';
@@ -106,7 +106,7 @@ void main() {
   test('does not speak live arm correction during open phase feedback', () {
     final player = _FakeJumpingJackVoicePlayer();
     final coach = JumpingJackVoiceCoach(voicePlayer: player);
-    final exercise = JumpingJack()..exerciseState = ExerciseState.activated;
+    final exercise = JumpingJack(maxRep: 30)..exerciseState = ExerciseState.activated;
 
     coach.processFrame(
       exercise: exercise,

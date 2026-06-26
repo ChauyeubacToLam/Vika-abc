@@ -84,7 +84,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('start position captures a standing floor and hip baseline', () {
-    final exercise = JumpSquat()..cameraFacing = CameraFacing.left;
+    final exercise = JumpSquat(maxRep: 12)..cameraFacing = CameraFacing.left;
 
     expect(
       exercise.isInStartPosition(_jumpSquatPose(kneeAngle: 175, hipY: 200)),

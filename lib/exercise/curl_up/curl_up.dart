@@ -42,8 +42,6 @@ import 'metrics/curl_up_knee_extension.dart';
 // =========================================================================
 
 class CurlUpConfig {
-  static const int MAX_REP = 12;
-
   /// Trunk elevation past baseline that triggers ascending state, and
   /// the tolerance for declaring rep complete. Both in degrees.
   /// Real curl-ups produce 10-25° trunk lift, so 4° entry is generous
@@ -116,7 +114,7 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
   double? _repMinEarShoulderHipAngle;
   double? _repMaxHipKneeAnkleAngle;
 
-  CurlUp({this.maxRep = CurlUpConfig.MAX_REP});
+  CurlUp({required this.maxRep});
 
   // ── Voice-coach helpers (parity with Squat) ──
 

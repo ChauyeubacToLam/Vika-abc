@@ -57,6 +57,11 @@
 		<string>842720056940-6de5r778b6gqjspmhrn5u347od5oqhmc.apps.googleusercontent.com</string>
 		<key>ITSAppUsesNonExemptEncryption</key>
 		<false/>
+		<!-- PostHog: disable native auto-init so the project token never lives
+		     in a committed native file. The SDK is initialized manually in
+		     Dart (main.dart) from the bundled env, gated behind user consent. -->
+		<key>com.posthog.posthog.AUTO_INIT</key>
+		<false/>
 		<key>LSRequiresIPhoneOS</key>
 		<true/>
 		<key>NSCameraUsageDescription</key>

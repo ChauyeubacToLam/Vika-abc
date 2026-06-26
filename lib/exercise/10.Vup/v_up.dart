@@ -103,7 +103,7 @@ class VUp extends ExerciseBase with SideTrackedExerciseMixin {
   final Debouncer _abortDebouncer = Debouncer(requiredFrames: 2);
   final Debouncer _lyingDebouncer = Debouncer(requiredFrames: 2);
 
-  VUp({this.maxRep = VUpConfig.MAX_REP});
+  VUp({required this.maxRep});
 
   @override
   String get exerciseName => 'V-Up';

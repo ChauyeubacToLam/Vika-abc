@@ -70,20 +70,36 @@ class _ProgressScreenState extends State<ProgressScreen> {
   bool _loadingProfile = false;
   bool _profileReloadQueued = false;
 
-  /// Real ĐIỂM FORM / ĐƯỜNG TIẾN BỘ summary for the active period.
-  /// Null = loading (show placeholder); a loaded record with `to == null`
-  /// = no sessions in this period (empty state).
+  /// Real ĐIỂM FORM gauge summary, SCOPED to the active period pill (week /
+  /// phase / program). Drives the gauge's average + coach only — the trend
+  /// list is no longer rendered from here (the chart reads [_programSummary]).
+  /// Null = loading (placeholder); a loaded record with `average == null` =
+  /// no sessions in this scope (empty state).
   ({
-    int? to,
-    int? from,
-    int? delta,
+    int? average,
+    FormTrendDirection direction,
     List<int> trend,
     List<DateTime> trendDates,
     String fact,
   })? _formSummary;
 
-  /// Real BÀI TẬP NỔI BẬT ranked insights for the active period, best-first.
-  /// Null = loading; empty = nothing qualified yet (guided empty shown).
+  /// Real ĐƯỜNG TIẾN BỘ trajectory, FIXED to whole-program scope (NOT the
+  /// period pill). A program week caps at 3 sessions, so a week-scoped trend
+  /// sits at/under the 3-session reveal gate and reads thin; the trajectory
+  /// only reads over the full span. Loaded once when the plan resolves. Same
+  /// record shape as [_formSummary]. Null = loading.
+  ({
+    int? average,
+    FormTrendDirection direction,
+    List<int> trend,
+    List<DateTime> trendDates,
+    String fact,
+  })? _programSummary;
+
+  /// Real BÀI TẬP NỔI BẬT ranked insights, FIXED to whole-program scope (same
+  /// reasoning as [_programSummary] — week scope is too thin to rank). Loaded
+  /// once when the plan resolves, NOT on tab change. Null = loading; empty =
+  /// nothing qualified yet (guided empty shown).
   List<RankInsightHeadline>? _insights;
 
   /// Real hero phase/week label, derived from the active plan snapshot
@@ -92,7 +108,12 @@ class _ProgressScreenState extends State<ProgressScreen> {
   String? _phaseLabel;
   bool _planResolved = false;
 
-  /// Real TUẦN NÀY MỘT NHÌN weekly summary over a rolling 7-day window.
+  /// The active plan snapshot, RETAINED (not just its label string) so the
+  /// period feeds can scope by program position — the active week, the active
+  /// phase's weeks, or the whole plan. Null when there's no active plan.
+  PlanSnapshot? _snapshot;
+
+  /// Real TỔNG QUAN TUẦN NÀY weekly summary for the current program week.
   /// Null = loading.
   ({
     int sessions,
@@ -142,10 +163,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
     _profile = widget.userProfile;
     widget.refreshListenable?.addListener(_handleRefreshNudge);
     _scrollController.addListener(_onScroll);
-    unawaited(_loadFormSummary(_period));
-    unawaited(_loadInsights(_period));
-    unawaited(_loadPhaseLabel());
-    unawaited(_loadWeekly());
+    // The form + insights + weekly feeds scope by program position, so they're
+    // driven from the plan snapshot (loaded here) rather than fired independently.
+    unawaited(_loadPlan());
     unawaited(_loadMilestones());
     unawaited(_loadStreakWeekBars());
     unawaited(_loadPainReports());
@@ -174,10 +194,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   void _handleRefreshNudge() {
     unawaited(_loadProfile());
-    unawaited(_loadFormSummary(_period));
-    unawaited(_loadInsights(_period));
-    unawaited(_loadPhaseLabel());
-    unawaited(_loadWeekly());
+    unawaited(_loadPlan());
     unawaited(_loadMilestones());
     unawaited(_loadStreakWeekBars());
     unawaited(_loadPainReports());
@@ -246,34 +263,11 @@ class _ProgressScreenState extends State<ProgressScreen> {
     }
   }
 
-  /// Loads the real form summary for [period]. Stale responses (the user
-  /// switched period before this resolved) are discarded.
-  Future<void> _loadFormSummary(PeriodTab period) async {
-    if (_previewWithMock) {
-      await null; // defer past initState before setState
-      if (!mounted || period != _period) return;
-      setState(() => _formSummary = _mockFormSummary(period));
-      return;
-    }
-    final summary = await _sessions.progressFormSummary(period);
-    if (!mounted || period != _period) return;
-    setState(() => _formSummary = summary);
-  }
-
-  /// Loads the real ranked insights for [period]. Stale responses (the user
-  /// switched period before this resolved) are discarded.
-  Future<void> _loadInsights(PeriodTab period) async {
-    // Preview renders mock directly in _buildInsightsSection; skip the fetch.
-    if (_previewWithMock) return;
-    final insights = await _sessions.rankedInsights(period);
-    if (!mounted || period != _period) return;
-    setState(() => _insights = insights);
-  }
-
-  /// Loads the hero phase/week label from the active plan snapshot — the SAME
-  /// source the Plan tab uses (RecommendationService). Stays null (guided
-  /// empty) when there is no active plan.
-  Future<void> _loadPhaseLabel() async {
+  /// Loads the active plan snapshot — the SAME source the Plan tab uses
+  /// (RecommendationService) — RETAINING it so the period feeds can scope by
+  /// program position, then derives the hero label and kicks off the form +
+  /// insights feeds. Stays null (guided empty) when there is no active plan.
+  Future<void> _loadPlan() async {
     if (_previewWithMock) {
       await null; // defer past initState before setState
       if (!mounted) return;
@@ -281,15 +275,137 @@ class _ProgressScreenState extends State<ProgressScreen> {
         _planResolved = true;
         _phaseLabel = 'PHASE 2 · 18 / 28 BUỔI · TUẦN 4 / 7';
       });
+      unawaited(_loadFormSummary(_period));
+      unawaited(_loadProgramSummary());
+      unawaited(_loadInsights());
+      unawaited(_loadWeekly());
       return;
     }
     final snapshot =
         await _recommendations.fetchLatestActivePlanSnapshotForCurrentUser();
     if (!mounted) return;
     setState(() {
+      _snapshot = snapshot;
       _planResolved = true;
       _phaseLabel = _derivePhaseLabel(snapshot);
     });
+    // Now that the scope is known, load the feeds. The gauge ([_formSummary])
+    // is scoped to the active pill and re-loads on tab change; the trajectory
+    // chart ([_programSummary]), insights, and weekly band are FIXED-scope and
+    // load here once.
+    unawaited(_loadFormSummary(_period));
+    unawaited(_loadProgramSummary());
+    unawaited(_loadInsights());
+    unawaited(_loadWeekly());
+  }
+
+  /// Program-position scope for [period] from the retained snapshot:
+  ///   week    → the active plan week
+  ///   phase   → every week sharing the active week's phaseNumber
+  ///   program → null weekNumbers (the whole plan)
+  /// Null when there's no active plan to scope to (guided empty shown).
+  ({String recommendationId, List<int>? weekNumbers})? _scopeFor(
+      PeriodTab period) {
+    final snapshot = _snapshot;
+    if (snapshot == null || snapshot.plan.weeks.isEmpty) return null;
+    final weeks = snapshot.plan.weeks;
+    final recId = snapshot.plan.recommendationId;
+    // currentWeek falls back to the last week once the plan is complete.
+    final currentWeek = snapshot.currentWeek ?? weeks.last;
+    return switch (period) {
+      PeriodTab.week => (
+          recommendationId: recId,
+          weekNumbers: [currentWeek.weekNumber],
+        ),
+      PeriodTab.phase => (
+          recommendationId: recId,
+          weekNumbers: [
+            for (final w in weeks)
+              if (w.phaseNumber == currentWeek.phaseNumber) w.weekNumber,
+          ],
+        ),
+      PeriodTab.program => (recommendationId: recId, weekNumbers: null),
+    };
+  }
+
+  /// Loads the real form summary for [period], scoped to the active plan.
+  /// Stale responses (the user switched period before this resolved) are
+  /// discarded. No active plan → an empty record (guided empty), never a flash.
+  Future<void> _loadFormSummary(PeriodTab period) async {
+    if (_previewWithMock) {
+      await null; // defer past initState before setState
+      if (!mounted || period != _period) return;
+      setState(() => _formSummary = _mockFormSummary(period));
+      return;
+    }
+    final scope = _scopeFor(period);
+    if (scope == null) {
+      if (!mounted || period != _period) return;
+      setState(() => _formSummary = const (
+            average: null,
+            direction: FormTrendDirection.none,
+            trend: <int>[],
+            trendDates: <DateTime>[],
+            fact: '',
+          ));
+      return;
+    }
+    final summary = await _sessions.progressFormSummary(
+      scope.recommendationId,
+      scope.weekNumbers,
+    );
+    if (!mounted || period != _period) return;
+    setState(() => _formSummary = summary);
+  }
+
+  /// Loads the FIXED whole-program trajectory into [_programSummary] (drives
+  /// the ĐƯỜNG TIẾN BỘ chart). Independent of the period pill — uses the
+  /// program scope always. No active plan → an empty record (guided empty).
+  Future<void> _loadProgramSummary() async {
+    if (_previewWithMock) {
+      await null; // defer past initState before setState
+      if (!mounted) return;
+      setState(() => _programSummary = _mockFormSummary(PeriodTab.program));
+      return;
+    }
+    final scope = _scopeFor(PeriodTab.program);
+    if (scope == null) {
+      if (!mounted) return;
+      setState(() => _programSummary = const (
+            average: null,
+            direction: FormTrendDirection.none,
+            trend: <int>[],
+            trendDates: <DateTime>[],
+            fact: '',
+          ));
+      return;
+    }
+    final summary = await _sessions.progressFormSummary(
+      scope.recommendationId,
+      scope.weekNumbers, // null = whole program
+    );
+    if (!mounted) return;
+    setState(() => _programSummary = summary);
+  }
+
+  /// Loads the FIXED whole-program ranked insights into [_insights]. Independent
+  /// of the period pill (week scope is too thin to rank) — uses the program
+  /// scope always, loaded once when the plan resolves.
+  Future<void> _loadInsights() async {
+    // Preview renders mock directly in _buildInsightsSection; skip the fetch.
+    if (_previewWithMock) return;
+    final scope = _scopeFor(PeriodTab.program);
+    if (scope == null) {
+      if (!mounted) return;
+      setState(() => _insights = const <RankInsightHeadline>[]);
+      return;
+    }
+    final insights = await _sessions.rankedInsights(
+      scope.recommendationId,
+      scope.weekNumbers, // null = whole program
+    );
+    if (!mounted) return;
+    setState(() => _insights = insights);
   }
 
   /// 'PHASE p · done / total BUỔI · TUẦN w / W' from the engine snapshot, or
@@ -312,6 +428,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
         'TUẦN ${currentWeek.weekNumber} / ${weeks.length}';
   }
 
+  /// Loads the TỔNG QUAN TUẦN NÀY band for the CURRENT program week, scoped to
+  /// the retained snapshot (same source as the form/insights feeds). The band
+  /// is always the current week (NOT tab-driven). No snapshot / no plan → the
+  /// empty record (existing guided empty).
   Future<void> _loadWeekly() async {
     if (_previewWithMock) {
       await null; // defer past initState before setState
@@ -319,7 +439,25 @@ class _ProgressScreenState extends State<ProgressScreen> {
       setState(() => _weekly = _mockWeekly);
       return;
     }
-    final weekly = await _sessions.weeklySummary();
+    final snapshot = _snapshot;
+    if (snapshot == null || snapshot.plan.weeks.isEmpty) {
+      if (!mounted) return;
+      setState(() => _weekly = const (
+            sessions: 0,
+            totalSeconds: 0,
+            avgForm: null,
+            sessionsDelta: null,
+            secondsDelta: null,
+            avgFormDelta: null,
+          ));
+      return;
+    }
+    // currentWeek falls back to the last week once the plan is complete.
+    final currentWeek = snapshot.currentWeek ?? snapshot.plan.weeks.last;
+    final weekly = await _sessions.weeklySummary(
+      snapshot.plan.recommendationId,
+      currentWeek.weekNumber,
+    );
     if (!mounted) return;
     setState(() => _weekly = weekly);
   }
@@ -352,25 +490,27 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   /// Mock ĐIỂM FORM gauge + trend for [period], built from progress_mock.
   ({
-    int? to,
-    int? from,
-    int? delta,
+    int? average,
+    FormTrendDirection direction,
     List<int> trend,
     List<DateTime> trendDates,
     String fact,
   }) _mockFormSummary(PeriodTab period) {
     final key = switch (period) {
       PeriodTab.week => 'week',
-      PeriodTab.month => 'month',
+      // Reuse the existing 'month' preview bucket for the renamed phase tab —
+      // preview-only mock data, not part of the real program-scoped path.
+      PeriodTab.phase => 'month',
       PeriodTab.program => 'program',
     };
     final h = progressMockHeadline[key]!;
     final trend = progressMockScoreTrend[key]!;
     final now = DateTime.now();
     return (
-      to: h.to,
-      from: h.from,
-      delta: h.from != null ? h.to - h.from! : null,
+      average: h.average,
+      // The gauge no longer renders a direction chip; the program chart owns
+      // trajectory. `none` keeps the record shape without implying a chip.
+      direction: FormTrendDirection.none,
       trend: trend,
       trendDates: [
         for (var i = 0; i < trend.length; i++)
@@ -380,7 +520,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     );
   }
 
-  /// Mock TUẦN NÀY MỘT NHÌN weekly summary (5 buổi · 2h12' · form 74, +deltas).
+  /// Mock TỔNG QUAN TUẦN NÀY weekly summary (5 buổi · 2h12' · form 74, +deltas).
   static const ({
     int sessions,
     int totalSeconds,
@@ -424,13 +564,12 @@ class _ProgressScreenState extends State<ProgressScreen> {
     if (period == _period) return;
     setState(() {
       _period = period;
-      // Drop to the loading placeholder so the gauge re-mounts and
-      // re-animates when the new period's data arrives.
+      // Only the gauge rescopes. Drop it to the loading placeholder so it
+      // re-mounts and re-animates with the new scope's average. The trajectory
+      // chart + insights are fixed whole-program, so they stay put (no flash).
       _formSummary = null;
-      _insights = null;
     });
     unawaited(_loadFormSummary(period));
-    unawaited(_loadInsights(period));
   }
 
   void _onScroll() {
@@ -476,22 +615,74 @@ class _ProgressScreenState extends State<ProgressScreen> {
     );
   }
 
-  // Honest period date-stamp anchored to today (no fabricated fixed dates).
-  String _weekLabel() {
-    final now = DateTime.now();
-    String d(DateTime t) => '${t.day} / ${t.month}';
-    return switch (_period) {
+  /// Program-relative eyebrow for [period], derived from the retained plan
+  /// snapshot — replaces the old calendar (now − N days) date stamps. Drives
+  /// both the hero period stamp and the ĐIỂM FORM gauge eyebrow. Falls back to
+  /// neutral copy (no fabricated dates) when there's no active plan.
+  ///
+  ///   week    → TUẦN {abs} · {PHASE} · TUẦN {inPhase}/{phaseLen}
+  ///   phase   → {PHASE} · TUẦN {firstWk}-{lastWk}  (or TUẦN {wk} if single)
+  ///   program → TOÀN CHƯƠNG TRÌNH · {totalWeeks} TUẦN
+  String _periodEyebrow(PeriodTab period) {
+    final snapshot = _snapshot;
+    if (snapshot == null || snapshot.plan.weeks.isEmpty) {
+      return switch (period) {
+        PeriodTab.week => 'TUẦN NÀY',
+        PeriodTab.phase => 'GIAI ĐOẠN NÀY',
+        PeriodTab.program => 'TOÀN CHƯƠNG TRÌNH',
+      };
+    }
+    final weeks = snapshot.plan.weeks;
+    final currentWeek = snapshot.currentWeek ?? weeks.last;
+    final phaseName = currentWeek.phaseName.toUpperCase();
+    final phaseWeeks = [
+      for (final w in weeks)
+        if (w.phaseNumber == currentWeek.phaseNumber) w.weekNumber,
+    ]..sort();
+    final firstWk =
+        phaseWeeks.isEmpty ? currentWeek.weekNumber : phaseWeeks.first;
+    final lastWk =
+        phaseWeeks.isEmpty ? currentWeek.weekNumber : phaseWeeks.last;
+    final phaseLen = phaseWeeks.isEmpty ? 1 : phaseWeeks.length;
+    final inPhaseIdx = phaseWeeks.indexOf(currentWeek.weekNumber);
+    final inPhase = inPhaseIdx < 0 ? 1 : inPhaseIdx + 1;
+    return switch (period) {
       PeriodTab.week =>
-        'TUẦN NÀY · ${d(now.subtract(const Duration(days: 6)))} – ${d(now)}',
-      PeriodTab.month =>
-        'TỪ ${d(now.subtract(const Duration(days: 30)))} · 30 NGÀY QUA',
-      PeriodTab.program => 'CẢ LỘ TRÌNH · TÍNH ĐẾN ${d(now)}',
+        'TUẦN ${currentWeek.weekNumber} · $phaseName · TUẦN $inPhase/$phaseLen',
+      PeriodTab.phase => firstWk == lastWk
+          ? '$phaseName · TUẦN $firstWk'
+          : '$phaseName · TUẦN $firstWk-$lastWk',
+      PeriodTab.program => 'TOÀN CHƯƠNG TRÌNH · ${weeks.length} TUẦN',
+    };
+  }
+
+  /// Huge faint chapter mark for the hero, data-bound to program position:
+  ///   week    → 'T{currentWeek.weekNumber}'
+  ///   phase   → 'G{currentWeek.phaseNumber}'
+  ///   program → 'P{distinct phaseNumber count across the plan}'
+  /// No active plan → the old static 'T1'/'G1'/'P1' fallback.
+  String _heroWatermark(PeriodTab period) {
+    final snapshot = _snapshot;
+    if (snapshot == null || snapshot.plan.weeks.isEmpty) {
+      return switch (period) {
+        PeriodTab.week => 'T1',
+        PeriodTab.phase => 'G1',
+        PeriodTab.program => 'P1',
+      };
+    }
+    final weeks = snapshot.plan.weeks;
+    final currentWeek = snapshot.currentWeek ?? weeks.last;
+    return switch (period) {
+      PeriodTab.week => 'T${currentWeek.weekNumber}',
+      PeriodTab.phase => 'G${currentWeek.phaseNumber}',
+      PeriodTab.program =>
+        'P${weeks.map((w) => w.phaseNumber).toSet().length}',
     };
   }
 
   String _activePeriodLabel() => switch (_period) {
         PeriodTab.week => 'Tuần',
-        PeriodTab.month => 'Tháng',
+        PeriodTab.phase => 'Giai đoạn',
         PeriodTab.program => 'Cả lộ trình',
       };
 
@@ -499,22 +690,18 @@ class _ProgressScreenState extends State<ProgressScreen> {
   /// number itself; only non-negatives get a leading '+'.
   String _signedDelta(int d) => '${d >= 0 ? '+' : ''}$d';
 
-  /// Trend section-header meta, e.g. '+5 ĐIỂM' / '-3 ĐIỂM'. Empty trend
-  /// yields '' (defensive — the trend section is skipped when empty).
-  String _trendMeta(List<int> trend) {
-    if (trend.isEmpty) return '';
-    return '${_signedDelta(trend.last - trend.first)} ĐIỂM';
-  }
-
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    // Real ĐIỂM FORM / ĐƯỜNG TIẾN BỘ data; only the coach copy stays static.
+    // ĐIỂM FORM gauge is SCOPED to the active pill; the ĐƯỜNG TIẾN BỘ chart is
+    // FIXED to whole-program.
     final formSummary = _formSummary;
     final loadingForm = formSummary == null;
-    final hasForm = formSummary != null && formSummary.to != null;
-    // The trend line only reads as real with 3+ sessions (progressive reveal).
-    final hasTrend = formSummary != null && formSummary.trend.length >= 3;
+    final hasForm = formSummary != null && formSummary.average != null;
+    // The trajectory chart reads the FIXED program summary, gated on 3+
+    // sessions across the whole program (progressive reveal).
+    final programSummary = _programSummary;
+    final hasTrend = programSummary != null && programSummary.trend.length >= 3;
     final profile = _profile ?? widget.userProfile;
     final userInitial = profile?.initial ?? 'N';
     final streakWeeks = _previewWithMock
@@ -544,29 +731,27 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     userInitial: userInitial,
                     avatarUrl: profile?.avatarUrl,
                     phaseLabel: phaseLabel,
-                    weekLabel: _weekLabel(),
+                    weekLabel: _periodEyebrow(_period),
+                    watermark: _heroWatermark(_period),
                   ),
                   const SizedBox(height: 24),
 
-                  // 1. ĐIỂM FORM — score gauge card (wired to real data).
-                  // Renders at >= 1 session (to != null); from/delta stay null
-                  // until the 3-session baseline, and the card shows the score
-                  // alone with a quiet hint.
+                  // 1. ĐIỂM FORM — score gauge card, SCOPED to the active pill.
+                  // Headline is the scope AVERAGE (renders at >= 1 session); no
+                  // trend/direction chip — the gauge is a scoped average, full
+                  // stop. All trajectory lives in the fixed program chart below.
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: hasForm
                         ? ScoreGaugeCard(
                             data: HeadlineForPeriod(
-                              to: formSummary.to!,
-                              from: formSummary.from,
-                              delta: formSummary.delta != null
-                                  ? _signedDelta(formSummary.delta!)
-                                  : null,
-                              // Real period label (1e); no mock import.
+                              average: formSummary.average!,
+                              // Short scope tag (TUẦN NÀY / GIAI ĐOẠN NÀY /
+                              // TOÀN CHƯƠNG TRÌNH); the hero carries the detail.
                               label: _gaugeLabel(),
                               // A factual trajectory one-liner (NOT coaching,
                               // NOT the session coach), derived from the real
-                              // trend + delta in progressFormSummary.
+                              // slope + average in progressFormSummary.
                               coach: formSummary.fact,
                             ),
                           )
@@ -574,17 +759,19 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   ),
                   const SizedBox(height: 40),
 
-                  // 2. TUẦN NÀY MỘT NHÌN — weekly summary band (real data).
+                  // 2. TỔNG QUAN TUẦN NÀY — weekly summary band (real data).
                   _buildWeeklySection(c),
                   const SizedBox(height: 40),
 
-                  // 3. ĐƯỜNG TIẾN BỘ — score trend chart (wired to real data).
-                  // Gated on 3+ sessions (a trend needs enough points to read).
+                  // 3. ĐƯỜNG TIẾN BỘ — score trend chart, FIXED whole-program
+                  // (reads [_programSummary], NOT the period pill). Gated on 3+
+                  // sessions across the whole program. The TOÀN CHƯƠNG TRÌNH tag
+                  // makes the fixed scope legible next to the scoped gauge above.
                   if (hasTrend) ...[
                     _SectionHeader(
                       index: '01',
                       eyebrow: 'ĐƯỜNG TIẾN BỘ',
-                      meta: _trendMeta(formSummary.trend),
+                      meta: 'TOÀN CHƯƠNG TRÌNH',
                       intro:
                           'Mỗi điểm tô đậm là một buổi. Đường đi lên là form đã ổn.',
                     ),
@@ -592,14 +779,14 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     // Axis labels are real dates from the session timestamps
                     // backing the trend (start / mid / end), bucketed local.
                     ScoreTrendChart(
-                      points: formSummary.trend,
+                      points: programSummary.trend,
                       startLabel: _fmtDayMonth(
-                          formSummary.trendDates.first.toLocal()),
-                      midLabel: _fmtDayMonth(formSummary
-                          .trendDates[formSummary.trendDates.length ~/ 2]
+                          programSummary.trendDates.first.toLocal()),
+                      midLabel: _fmtDayMonth(programSummary
+                          .trendDates[programSummary.trendDates.length ~/ 2]
                           .toLocal()),
                       endLabel: _fmtDayMonth(
-                          formSummary.trendDates.last.toLocal()),
+                          programSummary.trendDates.last.toLocal()),
                     ),
                     const SizedBox(height: 40),
                   ],
@@ -657,7 +844,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     index: '03',
                     eyebrow: 'BÀI TẬP NỔI BẬT',
                     meta: _insightsMeta(),
-                    intro: 'Những bài tiến nhanh nhất trong giai đoạn.',
+                    intro: 'Những bài tiến nhanh nhất trong cả lộ trình.',
                   ),
                   const SizedBox(height: 16),
                   _buildInsightsSection(),
@@ -709,10 +896,12 @@ class _ProgressScreenState extends State<ProgressScreen> {
     );
   }
 
-  /// ĐIỂM FORM gauge eyebrow label, derived from the active period (1e).
+  /// ĐIỂM FORM gauge eyebrow — a SHORT scope tag (the hero already carries the
+  /// detailed week/phase stamp, so the gauge names its scope without echoing
+  /// that long string verbatim).
   String _gaugeLabel() => switch (_period) {
-        PeriodTab.week => '7 NGÀY GẦN NHẤT',
-        PeriodTab.month => '30 NGÀY GẦN NHẤT',
+        PeriodTab.week => 'TUẦN NÀY',
+        PeriodTab.phase => 'GIAI ĐOẠN NÀY',
         PeriodTab.program => 'TOÀN CHƯƠNG TRÌNH',
       };
 

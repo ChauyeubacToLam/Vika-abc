@@ -39,6 +39,7 @@ class ProgramStageHero extends StatefulWidget {
     required this.onSelectBlock,
     required this.onStartNext,
     this.userInitial = 'N',
+    this.avatarUrl,
     this.onAvatarTap,
     this.onMenuTap,
   });
@@ -48,6 +49,7 @@ class ProgramStageHero extends StatefulWidget {
   final ValueChanged<int> onSelectBlock;
   final VoidCallback onStartNext;
   final String userInitial;
+  final String? avatarUrl;
   final VoidCallback? onAvatarTap;
   final VoidCallback? onMenuTap;
 
@@ -171,6 +173,7 @@ class _ProgramStageHeroState extends State<ProgramStageHero>
                     WordmarkHeader(
                       inverted: true,
                       userInitial: widget.userInitial,
+                      avatarUrl: widget.avatarUrl,
                       trailingIcon: Icons.menu_book_rounded,
                       trailingTooltip: 'Sổ tập',
                       onTrailingTap: widget.onMenuTap,
