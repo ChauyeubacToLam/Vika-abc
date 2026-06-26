@@ -25,6 +25,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../data/profile_goal_quote.dart';
 import '../data/profile_mock.dart';
+import '../services/analytics_service.dart';
 import '../services/data_export_service.dart';
 import '../services/recommendation/recommendation_service.dart';
 import '../services/session_persistence.dart';
@@ -65,6 +66,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _showDownFab = false;
   bool _deleting = false;
   bool _exporting = false;
+  // Mirrors AnalyticsService consent so the toggle reflects (and controls) the
+  // single source of truth. Seeded from the in-memory flag; flipped only via
+  // grant/revokeConsent below.
+  bool _analyticsConsent = AnalyticsService.instance.hasConsent;
   AppUserProfile? _profile;
 
   // Lifetime aggregate from completed workout_sessions. Null until the first
@@ -438,6 +443,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  // ─── Analytics consent toggle (Quyền riêng tư) ─────────────────────────
+  // The single user-facing switch over AnalyticsService consent. Turning it on
+  // grants consent (opts PostHog in); turning it off revokes (opts out, resets
+  // the distinct_id, stops all collection). Persistence lives in the service.
+  Future<void> _toggleAnalyticsConsent() async {
+    final next = !_analyticsConsent;
+    setState(() => _analyticsConsent = next);
+    if (next) {
+      await AnalyticsService.instance.grantConsent();
+    } else {
+      await AnalyticsService.instance.revokeConsent();
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            next
+                ? 'Đã bật chia sẻ dữ liệu sử dụng ẩn danh.'
+                : 'Đã tắt. Vika sẽ không thu thập dữ liệu sử dụng nữa.',
+          ),
+        ),
+      );
+  }
+
   // ─── Help & feedback — opens the user's mail app to support ────────────
   Future<void> _openSupportMail() async {
     final uri = Uri(
@@ -663,6 +694,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               label: 'Camera xử lý ngay trên điện thoại bạn',
                               sub: 'Video luôn ở trong điện thoại của bạn',
                               onTap: _showCameraInfoSheet,
+                            ),
+                            SettingRow(
+                              icon: Icons.insights_outlined,
+                              label: 'Chia sẻ dữ liệu sử dụng ẩn danh',
+                              sub: _analyticsConsent
+                                  ? 'Đang bật · giúp Vika cải thiện sản phẩm'
+                                  : 'Đang tắt · không thu thập dữ liệu sử dụng',
+                              onTap: _toggleAnalyticsConsent,
+                              trailing: IgnorePointer(
+                                child: Switch.adaptive(
+                                  value: _analyticsConsent,
+                                  activeThumbColor: c.yellow,
+                                  onChanged: (_) {},
+                                ),
+                              ),
                             ),
                             SettingRow(
                               icon: Icons.download_rounded,

@@ -17,6 +17,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/exercise_definition.dart';
+import '../services/analytics_service.dart';
 import '../services/recommendation/recommendation_service.dart';
 import '../services/user_program_service.dart';
 import '../services/user_profile_service.dart';
@@ -77,6 +78,10 @@ class _MainShellState extends State<MainShell> {
       _planRefreshNudge.value++;
     } else if (idx == 3) {
       _progressRefreshNudge.value++;
+    } else if (idx == 4) {
+      // Hồ sơ is where settings (incl. the analytics consent toggle) live.
+      // No-op without consent.
+      unawaited(AnalyticsService.instance.capture('settings_opened'));
     }
   }
 

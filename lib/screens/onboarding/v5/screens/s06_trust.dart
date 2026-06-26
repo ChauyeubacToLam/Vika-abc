@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:vika/services/analytics_service.dart';
+
 import '../v5_primitives.dart';
 import '../v5_theme.dart';
 
@@ -28,7 +30,9 @@ class _S06TrustState extends State<S06Trust> {
       body:
           'Tên, email, ảnh đại diện khi đăng ký. Thông số bạn tự khai (giới tính, '
           'tuổi, chiều cao, cân nặng, vùng đau, mục tiêu). Lịch sử tập và kết quả '
-          'phân tích chuyển động. Thông tin thiết bị để cải thiện hiệu năng.',
+          'phân tích chuyển động. Thông tin thiết bị để cải thiện hiệu năng. '
+          'Cách bạn dùng ứng dụng (thao tác, bước hoàn thành, thời gian sử dụng), '
+          'gắn với tài khoản để cải thiện trải nghiệm.',
     ),
     _PolicySection(
       number: '03',
@@ -45,7 +49,7 @@ class _S06TrustState extends State<S06Trust> {
           'Supabase (Singapore) lưu tài khoản và kết quả tập. MediaPipe của Google '
           'chạy nhận diện tư thế ngay trên máy bạn, không gửi gì cho Google. '
           'Apple / Google chỉ dùng để đăng nhập. PostHog (EU) phân tích '
-          'sản phẩm bằng định danh ngẫu nhiên.',
+          'cách bạn dùng ứng dụng, gắn với tài khoản của bạn, để cải thiện sản phẩm.',
     ),
     _PolicySection(
       number: '05',
@@ -82,6 +86,17 @@ class _S06TrustState extends State<S06Trust> {
 
   bool _accepted = false;
 
+  /// The CTA is only enabled once [_accepted] is true, so reaching here means
+  /// the user has read and accepted the S06 privacy policy — which explicitly
+  /// covers PostHog analytics. That acceptance IS the analytics consent: grant
+  /// it (persists the flag + opts PostHog in) before advancing, so the very
+  /// next onboarding step is the first thing allowed to be captured.
+  Future<void> _acceptAndContinue() async {
+    await AnalyticsService.instance.grantConsent();
+    if (!mounted) return;
+    widget.onNext();
+  }
+
   @override
   Widget build(BuildContext context) {
     final r = V5Responsive.of(context);
@@ -93,7 +108,7 @@ class _S06TrustState extends State<S06Trust> {
         label: 'Đồng ý & tiếp tục',
         disabledLabel: 'Đọc & đồng ý để tiếp tục',
         enabled: _accepted,
-        onTap: widget.onNext,
+        onTap: _acceptAndContinue,
       ),
       child: Center(
         child: ConstrainedBox(

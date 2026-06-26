@@ -54,6 +54,7 @@ import '../../exercise/squat/metrics/trunk_lean_metric.dart';
 import '../../exercise/squat/squat.dart';
 import '../../models/exercise_definition.dart';
 import '../../models/fault_candidate.dart';
+import '../../services/analytics_service.dart';
 import '../../models/post_exercise_data.dart';
 import '../../models/workout_session_report.dart';
 import '../../services/recommendation/models/plan.dart';
@@ -290,6 +291,15 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
   }
 
   void _beginWorkout() {
+    // Lifecycle boundary: the user pressed start on the intro and the first set
+    // is being prepared. No-op without consent; exercise_id is the catalog id,
+    // never anything user-identifying.
+    unawaited(
+      AnalyticsService.instance.capture(
+        'exercise_started',
+        props: {'exercise_id': widget.definition.id},
+      ),
+    );
     setState(() {
       _setLoggers.clear();
       _difficultyLogs.clear();
@@ -591,6 +601,17 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       Navigator.of(context).pop({'completed': true});
       return;
     }
+
+    // Lifecycle boundary: every completed exercise (all sets done) converges
+    // here once the transition cinematic finishes. No-op without consent; this
+    // only emits an event — it does not touch the session data being written.
+    unawaited(
+      AnalyticsService.instance.capture(
+        'exercise_completed',
+        props: {'exercise_id': widget.definition.id},
+      ),
+    );
+
     final sessionId = await _sessionIdForTransition();
     if (!mounted) return;
 

@@ -11,8 +11,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'services/analytics_service.dart';
 
 import 'debug/debug_types.dart';
 import 'exercise/exercise_base.dart';
@@ -53,6 +56,13 @@ Future<void> main() async {
       url: appConfig.supabaseUrl,
       anonKey: appConfig.supabaseAnonKey,
     );
+
+    // PostHog setup runs here, AFTER Supabase, and only configures the SDK —
+    // it does NOT start collecting. The SDK is set up opted-out; whether
+    // collection actually turns on is decided by the persisted consent flag in
+    // AnalyticsService.init() below, which can only enable for a user who
+    // already accepted the S06 policy on a prior launch.
+    await _setUpAnalytics(appConfig);
   } catch (error, stackTrace) {
     startupError = error;
     startupStackTrace = stackTrace;
@@ -122,16 +132,27 @@ class _AppConfig {
   const _AppConfig({
     required this.supabaseUrl,
     required this.supabaseAnonKey,
+    this.posthogApiKey,
+    required this.posthogHost,
   });
 
   final String supabaseUrl;
   final String supabaseAnonKey;
+
+  /// PostHog project token (publishable client key). Null/empty disables
+  /// analytics entirely — the app runs identically without it.
+  final String? posthogApiKey;
+
+  /// PostHog ingestion host. Defaults to the EU instance.
+  final String posthogHost;
 }
 
 Future<_AppConfig> _loadAppConfig() async {
   const defineSupabaseUrl = String.fromEnvironment('SUPABASE_URL');
   const defineSupabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
   const defineSupabaseKey = String.fromEnvironment('SUPABASE_KEY');
+  const definePosthogApiKey = String.fromEnvironment('POSTHOG_API_KEY');
+  const definePosthogHost = String.fromEnvironment('POSTHOG_HOST');
 
   final env = await _loadOptionalBundledDotEnv();
   final supabaseUrl = _firstNonEmpty([
@@ -152,10 +173,50 @@ Future<_AppConfig> _loadAppConfig() async {
     );
   }
 
+  // Optional — analytics stays off if unset. Default the host to the EU
+  // instance so a token-only config can never accidentally ship to US.
+  final posthogApiKey = _firstNonEmpty([
+    definePosthogApiKey,
+    env['POSTHOG_API_KEY'],
+  ]);
+  final posthogHost = _firstNonEmpty([
+        definePosthogHost,
+        env['POSTHOG_HOST'],
+      ]) ??
+      'https://eu.i.posthog.com';
+
   return _AppConfig(
     supabaseUrl: supabaseUrl,
     supabaseAnonKey: supabaseAnonKey,
+    posthogApiKey: posthogApiKey,
+    posthogHost: posthogHost,
   );
+}
+
+/// Configures PostHog (EU, explicit events only) and aligns the analytics
+/// chokepoint to the persisted consent flag, then emits `app_open` (a hard
+/// no-op unless the user has consented). No token = analytics fully disabled.
+Future<void> _setUpAnalytics(_AppConfig config) async {
+  final apiKey = config.posthogApiKey;
+  if (apiKey == null || apiKey.isEmpty) {
+    // Still align the gate so capture()/identify() stay safe no-ops.
+    await AnalyticsService.instance.init();
+    return;
+  }
+
+  final phConfig = PostHogConfig(apiKey)
+    ..host = config.posthogHost
+    // Start opted-out; AnalyticsService.init() enables only if consent persists.
+    ..optOut = true
+    // Explicit events only — no lifecycle autocapture, no screen/gesture
+    // autocapture (we never install PosthogObserver), no session replay.
+    ..captureApplicationLifecycleEvents = false
+    ..sessionReplay = false
+    ..debug = !kReleaseMode;
+  await Posthog().setup(phConfig);
+
+  await AnalyticsService.instance.init();
+  await AnalyticsService.instance.capture('app_open');
 }
 
 Future<Map<String, String>> _loadOptionalBundledDotEnv() async {
@@ -397,8 +458,35 @@ class UIRepLog {
    APP
    ========================================================================= */
 
-class VikaApp extends StatelessWidget {
+class VikaApp extends StatefulWidget {
   const VikaApp({super.key});
+
+  @override
+  State<VikaApp> createState() => _VikaAppState();
+}
+
+/// App-level lifecycle observer. Owns the single `app_backgrounded` event so it
+/// fires once per app-wide background, independent of which screen is on top
+/// (the dead ExerciseScreen's own observer is unrelated and must NOT be used).
+class _VikaAppState extends State<VikaApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      unawaited(AnalyticsService.instance.capture('app_backgrounded'));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -632,6 +720,25 @@ class _AppEntryGateState extends State<AppEntryGate> {
     // Reacting here would tear the navigator down mid-signup and bounce the
     // user to the standalone login.
     if (_onboardingOwnsAuth) return;
+
+    // Analytics identity tracks the auth session: identify by Supabase UID on
+    // sign-in / session restore, reset on sign-out / deletion so the next user
+    // never inherits the previous distinct_id. All hard no-ops without consent;
+    // the UID is the only thing ever sent — never name or email.
+    switch (data.event.name) {
+      case 'signedIn':
+      case 'initialSession':
+        final uid = supabase.auth.currentUser?.id;
+        if (uid != null) {
+          unawaited(AnalyticsService.instance.identify(uid));
+        }
+        break;
+      case 'signedOut':
+      case 'userDeleted':
+        unawaited(AnalyticsService.instance.reset());
+        break;
+    }
+
     switch (data.event.name) {
       case 'signedIn':
       case 'initialSession':

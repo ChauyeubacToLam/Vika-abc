@@ -38,6 +38,7 @@ dependencies:
   share_plus: ^10.1.4
   flutter_svg: ^2.3.0
   video_player: ^2.9.5
+  posthog_flutter: ^5.28.0
 
 dev_dependencies:
   flutter_test:

@@ -105,6 +105,7 @@ class SettingRow extends StatelessWidget {
     this.onTap,
     this.comingSoon = false,
     this.showChevron = true,
+    this.trailing,
   });
 
   final IconData icon;
@@ -112,6 +113,12 @@ class SettingRow extends StatelessWidget {
   final String? sub;
   final bool danger;
   final VoidCallback? onTap;
+
+  /// Optional trailing widget shown in place of the chevron — e.g. a state
+  /// toggle. When set, the chevron is suppressed; the row's [onTap] still fires
+  /// so the whole row stays the tap target (wrap an indicator-only control in
+  /// IgnorePointer to avoid double handling).
+  final Widget? trailing;
 
   /// Renders the row visibly non-interactive (subdued, no tap ripple) with a
   /// "Sắp ra mắt" chip in place of the chevron. Used for features that are
@@ -201,6 +208,8 @@ class SettingRow extends StatelessWidget {
           ),
           if (comingSoon)
             _ComingSoonChip()
+          else if (trailing != null)
+            trailing!
           else if (!danger && showChevron)
             Icon(
               Icons.chevron_right_rounded,

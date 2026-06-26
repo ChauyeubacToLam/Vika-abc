@@ -18,6 +18,7 @@ import '../../exercise/exercise_base.dart';
 import '../../pose/pose_landmarker_adapter.dart';
 import '../../pose/pose_landmarker_channel.dart';
 import '../../models/exercise_definition.dart';
+import '../../services/analytics_service.dart';
 import '../../utils/exercise_logger.dart';
 import '../../utils/orientation_lock.dart';
 import '../../utils/segmentation_channel.dart';
@@ -725,6 +726,16 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       },
     );
     if (shouldExit == true && mounted) {
+      // Lifecycle boundary: the user confirmed leaving mid-set, discarding the
+      // in-progress set. Both the chrome back arrow and the system / predictive
+      // back gesture (PopScope) funnel through this confirm path. No-op without
+      // consent; exercise_id only.
+      unawaited(
+        AnalyticsService.instance.capture(
+          'exercise_abandoned',
+          props: {'exercise_id': widget.definition.id},
+        ),
+      );
       widget.onBack();
     }
   }
