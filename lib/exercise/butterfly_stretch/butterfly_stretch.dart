@@ -74,6 +74,9 @@ class ButterflyStretch extends ExerciseBase {
   String get exerciseName => 'Butterfly Stretch';
 
   @override
+  String get setupOrientationIntroVoiceKey => 'common.thang_intro';
+
+  @override
   String get currentPhaseKey => stretchState.toString().split('.').last;
 
   @override

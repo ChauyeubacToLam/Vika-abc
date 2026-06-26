@@ -11,27 +11,29 @@ class VUpConfig {
   static const int TIMEOUT_MS = 90000;
 
   // Start position must be a real flat, extended V-up baseline.
-  static const double START_BODY_MIN = 162.0;
-  static const double START_KNEE_MIN = 155.0;
-  static const double START_TRUNK_HORIZ_MAX = 18.0;
-  static const double START_LEG_HORIZ_MAX = 18.0;
-  static const double START_Y_SPREAD_MAX = 0.30;
-  static const double START_WRIST_ANKLE_DIST_MIN = 1.9;
+  static const double START_BODY_MIN = 155.0;
+  static const double START_KNEE_MIN = 145.0;
+  static const double START_TRUNK_HORIZ_MAX = 24.0;
+  static const double START_LEG_HORIZ_MAX = 24.0;
+  static const double START_Y_SPREAD_MAX = 0.42;
+  static const double START_WRIST_ANKLE_DIST_MIN = 1.55;
 
   // Rep gating.
   static const int REP_READY_FRAMES = 3;
   static const double RISING_ANGLE = 160.0;
   static const double RISING_MIN_LIFT = 0.08;
-  static const double V_POSITION_THRESHOLD = 112.0;
+  static const double V_POSITION_THRESHOLD = 130.0;
   static const double ROM_TARGET_ANGLE = 112.0;
-  static const double TOP_TRUNK_HORIZ_MIN = 18.0;
-  static const double TOP_LEG_HORIZ_MIN = 18.0;
-  static const double TOP_MIN_LIFT = 0.18;
-  static const double TOP_WRIST_ANKLE_DIST_MAX = 1.55;
-  static const double TOP_WRIST_ANKLE_CLOSURE_MIN = 0.85;
-  static const double ACTIVE_KNEE_MIN = 148.0;
-  static const double LOWERING_THRESHOLD_DIFF = 6.0;
-  static const double LYING_ANGLE = 158.0;
+  static const double TOP_TRUNK_HORIZ_MIN = 14.0;
+  static const double TOP_LEG_HORIZ_MIN = 14.0;
+  static const double TOP_MIN_LIFT = 0.12;
+  static const double TOP_WRIST_ANKLE_DIST_MAX = 1.25;
+  static const double TOP_WRIST_ANKLE_CLOSURE_MIN = 0.55;
+  static const double TOP_ARM_REACH_DIST_MAX = 1.85;
+  static const double TOP_ARM_REACH_CLOSURE_MIN = 0.25;
+  static const double ACTIVE_KNEE_MIN = 138.0;
+  static const double LOWERING_THRESHOLD_DIFF = 5.0;
+  static const double LYING_ANGLE = 152.0;
 }
 
 class VUpRepContext {

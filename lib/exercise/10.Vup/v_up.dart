@@ -399,10 +399,10 @@ class VUp extends ExerciseBase with SideTrackedExerciseMixin {
         _maxLegAngleThisRep < VUpConfig.TOP_LEG_HORIZ_MIN) {
       return false;
     }
-    final reachedHandsToFeet = (_minWristAnkleDistThisRep ?? double.infinity) <=
-            VUpConfig.TOP_WRIST_ANKLE_DIST_MAX ||
-        _maxWristAnkleClosureThisRep >= VUpConfig.TOP_WRIST_ANKLE_CLOSURE_MIN;
-    return reachedHandsToFeet && ctx.isStrictLying;
+    final armsReachedHigh = (_minWristAnkleDistThisRep ?? double.infinity) <=
+            VUpConfig.TOP_ARM_REACH_DIST_MAX ||
+        _maxWristAnkleClosureThisRep >= VUpConfig.TOP_ARM_REACH_CLOSURE_MIN;
+    return armsReachedHigh && ctx.isStrictLying;
   }
 
   void _rejectRepAttempt(String message) {
@@ -453,8 +453,7 @@ class VUp extends ExerciseBase with SideTrackedExerciseMixin {
     final allFaults = <FaultRecord>[];
     for (final metric in _metrics) allFaults.addAll(metric.faults);
 
-    final hasDisqualifyingFault = allFaults
-        .any((f) => f.type == 'BentKnee' || f.type == 'AsyncElevation');
+    final hasDisqualifyingFault = allFaults.any((f) => f.type == 'BentKnee');
 
     correctForm = !allFaults.any((f) => f.affectsForm);
 
@@ -542,9 +541,9 @@ class VUp extends ExerciseBase with SideTrackedExerciseMixin {
         bilateral.isHorizontal &&
         wristAnkleDist >= VUpConfig.START_WRIST_ANKLE_DIST_MIN;
 
-    final reachedHandsToFeet =
-        wristAnkleDist <= VUpConfig.TOP_WRIST_ANKLE_DIST_MAX ||
-            wristClosureFromBaseline >= VUpConfig.TOP_WRIST_ANKLE_CLOSURE_MIN;
+    final armsReachedHigh =
+        wristAnkleDist <= VUpConfig.TOP_ARM_REACH_DIST_MAX ||
+            wristClosureFromBaseline >= VUpConfig.TOP_ARM_REACH_CLOSURE_MIN;
 
     final isStrictVPosition = vAngle <= VUpConfig.V_POSITION_THRESHOLD &&
         kneeAngle >= VUpConfig.ACTIVE_KNEE_MIN &&
@@ -552,9 +551,7 @@ class VUp extends ExerciseBase with SideTrackedExerciseMixin {
         legHorizontal >= VUpConfig.TOP_LEG_HORIZ_MIN &&
         shoulderLiftFromBaseline >= VUpConfig.TOP_MIN_LIFT &&
         ankleLiftFromBaseline >= VUpConfig.TOP_MIN_LIFT &&
-        bilateral.bothShouldersLifted &&
-        bilateral.bothAnklesLifted &&
-        reachedHandsToFeet;
+        armsReachedHigh;
 
     return _VUpPoseProfile(
       vAngle: vAngle,
@@ -581,59 +578,67 @@ class VUp extends ExerciseBase with SideTrackedExerciseMixin {
     Map<PoseLandmarkType, PoseLandmark> landmarks,
     double scale,
   ) {
-    final leftShoulder = landmarks[PoseLandmarkType.leftShoulder];
-    final rightShoulder = landmarks[PoseLandmarkType.rightShoulder];
-    final leftHip = landmarks[PoseLandmarkType.leftHip];
-    final rightHip = landmarks[PoseLandmarkType.rightHip];
-    final leftKnee = landmarks[PoseLandmarkType.leftKnee];
-    final rightKnee = landmarks[PoseLandmarkType.rightKnee];
-    final leftAnkle = landmarks[PoseLandmarkType.leftAnkle];
-    final rightAnkle = landmarks[PoseLandmarkType.rightAnkle];
+    final samples = <({
+      PoseLandmark shoulder,
+      PoseLandmark hip,
+      PoseLandmark knee,
+      PoseLandmark ankle,
+    })>[];
 
-    if (leftShoulder == null ||
-        rightShoulder == null ||
-        leftHip == null ||
-        rightHip == null ||
-        leftKnee == null ||
-        rightKnee == null ||
-        leftAnkle == null ||
-        rightAnkle == null) {
-      return null;
+    void collectSide(
+      PoseLandmarkType shoulderType,
+      PoseLandmarkType hipType,
+      PoseLandmarkType kneeType,
+      PoseLandmarkType ankleType,
+    ) {
+      final shoulder = landmarks[shoulderType];
+      final hip = landmarks[hipType];
+      final knee = landmarks[kneeType];
+      final ankle = landmarks[ankleType];
+      if (shoulder == null || hip == null || knee == null || ankle == null) {
+        return;
+      }
+      if (![shoulder, hip, knee, ankle]
+          .every(ExerciseBase.isLandmarkConfident)) {
+        return;
+      }
+      samples.add((shoulder: shoulder, hip: hip, knee: knee, ankle: ankle));
     }
 
-    if (![
-      leftShoulder,
-      rightShoulder,
-      leftHip,
-      rightHip,
-      leftKnee,
-      rightKnee,
-      leftAnkle,
-      rightAnkle,
-    ].every(ExerciseBase.isLandmarkConfident)) {
-      return null;
+    collectSide(
+      PoseLandmarkType.leftShoulder,
+      PoseLandmarkType.leftHip,
+      PoseLandmarkType.leftKnee,
+      PoseLandmarkType.leftAnkle,
+    );
+    collectSide(
+      PoseLandmarkType.rightShoulder,
+      PoseLandmarkType.rightHip,
+      PoseLandmarkType.rightKnee,
+      PoseLandmarkType.rightAnkle,
+    );
+
+    if (samples.isEmpty) return null;
+
+    final spreads = <double>[];
+    final shoulderLifts = <double>[];
+    final ankleLifts = <double>[];
+    for (final sample in samples) {
+      spreads.add((sample.shoulder.y - sample.hip.y).abs() / scale);
+      spreads.add((sample.knee.y - sample.hip.y).abs() / scale);
+      spreads.add((sample.ankle.y - sample.hip.y).abs() / scale);
+      shoulderLifts.add((sample.hip.y - sample.shoulder.y) / scale);
+      ankleLifts.add((sample.hip.y - sample.ankle.y) / scale);
     }
 
-    final ySpread = <double>[
-      (leftShoulder.y - leftHip.y).abs() / scale,
-      (rightShoulder.y - rightHip.y).abs() / scale,
-      (leftKnee.y - leftHip.y).abs() / scale,
-      (rightKnee.y - rightHip.y).abs() / scale,
-      (leftAnkle.y - leftHip.y).abs() / scale,
-      (rightAnkle.y - rightHip.y).abs() / scale,
-    ].reduce((a, b) => a > b ? a : b);
-
-    final lShoulderLift = (leftHip.y - leftShoulder.y) / scale;
-    final rShoulderLift = (rightHip.y - rightShoulder.y) / scale;
-    final lAnkleLift = (leftHip.y - leftAnkle.y) / scale;
-    final rAnkleLift = (rightHip.y - rightAnkle.y) / scale;
+    final ySpread = spreads.reduce((a, b) => a > b ? a : b);
+    final bestShoulderLift = shoulderLifts.reduce((a, b) => a > b ? a : b);
+    final bestAnkleLift = ankleLifts.reduce((a, b) => a > b ? a : b);
 
     return _BilateralVUpProfile(
       isHorizontal: ySpread <= VUpConfig.START_Y_SPREAD_MAX,
-      bothShouldersLifted: lShoulderLift >= VUpConfig.TOP_MIN_LIFT &&
-          rShoulderLift >= VUpConfig.TOP_MIN_LIFT,
-      bothAnklesLifted: lAnkleLift >= VUpConfig.TOP_MIN_LIFT &&
-          rAnkleLift >= VUpConfig.TOP_MIN_LIFT,
+      bothShouldersLifted: bestShoulderLift >= VUpConfig.TOP_MIN_LIFT,
+      bothAnklesLifted: bestAnkleLift >= VUpConfig.TOP_MIN_LIFT,
     );
   }
 }

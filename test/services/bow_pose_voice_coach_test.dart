@@ -15,6 +15,11 @@ class _FakeBowPoseVoicePlayer implements BowPoseVoicePlayer {
   }
 
   @override
+  Future<void> waitUntilIdle({
+    Duration timeout = const Duration(seconds: 4),
+  }) async {}
+
+  @override
   void clearQueue() {
     clearQueueCount++;
     spoken.clear();
@@ -76,7 +81,7 @@ void main() {
       feedback: const {},
     );
 
-    expect(player.spoken.take(2), ['1', 'bow_pose.hold_good']);
+    expect(player.spoken.skip(1).take(2), ['1', 'common.correct']);
   });
 
   test('speaks rep count and correction after a faulty counted rep', () {
@@ -94,10 +99,10 @@ void main() {
       feedback: const {},
     );
 
-    expect(player.spoken.take(2), ['1', 'Mở ngực thêm một chút']);
+    expect(player.spoken.skip(1).take(2), ['1', 'Mở ngực thêm một chút']);
   });
 
-  test('speaks live correction from bow pose feedback', () {
+  test('does not speak live correction from bow pose feedback', () {
     final player = _FakeBowPoseVoicePlayer();
     final coach = BowPoseVoiceCoach(voicePlayer: player);
     final exercise = BowPose()..exerciseState = ExerciseState.activated;
@@ -109,6 +114,6 @@ void main() {
       feedback: const {'Connection': 'Tuột tay rồi!'},
     );
 
-    expect(player.spoken, contains('Nắm chân chắc hơn'));
+    expect(player.spoken, ['Sẵn sàng']);
   });
 }

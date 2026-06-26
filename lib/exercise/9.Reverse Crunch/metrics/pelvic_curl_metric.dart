@@ -40,8 +40,7 @@ class PelvicCurlMetric extends ReverseCrunchMetricBase {
     _debugData['maxHipLift'] = _maxHipLift.toStringAsFixed(2);
 
     if (ctx.state == ReverseCrunchState.top) {
-      ctx.resultIssues.feedback['Curl'] =
-          ctx.isLegThrustPeak ? 'Leg thrust tốt!' : 'Duỗi chân lên cao hơn';
+      ctx.resultIssues.feedback['Curl'] = 'Cuộn hông tốt';
     } else if (ctx.state == ReverseCrunchState.curling) {
       ctx.resultIssues.feedback['Curl'] = 'Cuộn gối về ngực';
     } else if (ctx.state == ReverseCrunchState.lowering) {
@@ -68,7 +67,7 @@ class PelvicCurlMetric extends ReverseCrunchMetricBase {
       ctx.resultIssues.addInstruction(
         'lying',
         'Curl',
-        'Co gối về ngực trước, cuộn xương chậu lên rồi mới duỗi chân.',
+        'Co gối về ngực trước, rồi cuộn xương chậu lên khỏi thảm.',
       );
     }
   }

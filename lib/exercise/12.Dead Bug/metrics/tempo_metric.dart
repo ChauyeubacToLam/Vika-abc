@@ -22,7 +22,7 @@ class TempoMetric extends DeadBugMetricBase {
   }
 
   @override
-  ThresholdBand? get threshold => const ThresholdBand(faultBelow: 1.5);
+  ThresholdBand? get threshold => const ThresholdBand(faultBelow: 0.8);
 
   @override
   void onStateTransition(DeadBugState from, DeadBugState to, int timestampMs) {
@@ -45,7 +45,7 @@ class TempoMetric extends DeadBugMetricBase {
 
   void evaluateRep(DeadBugRepContext ctx) {
     // Không được thả tay chân rơi rầm xuống (< 1.5s là quá nhanh)
-    if (extendingDuration != null && extendingDuration! < 1.5) {
+    if (extendingDuration != null && extendingDuration! < 0.8) {
       _faults.add(FaultRecord(
         phase: 'REP_COMPLETE',
         type: 'Tempo',

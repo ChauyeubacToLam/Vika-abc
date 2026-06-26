@@ -14,6 +14,11 @@ class _FakeBirdDogVoicePlayer implements BirdDogVoicePlayer {
   }
 
   @override
+  Future<void> waitUntilIdle({
+    Duration timeout = const Duration(seconds: 4),
+  }) async {}
+
+  @override
   void clearQueue() {
     clearQueueCount++;
     spoken.clear();
@@ -120,7 +125,7 @@ void main() {
 
     expect(
       player.spoken,
-      ['8', 'Tốt, hông giữ cân bằng.', 'Hoàn thành bài tập.'],
+      ['8', 'common.correct', 'Hoàn thành bài tập.'],
     );
   });
 }

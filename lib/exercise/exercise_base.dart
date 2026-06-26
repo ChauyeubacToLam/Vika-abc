@@ -48,6 +48,12 @@ abstract class ExerciseVoiceCoach {
     required Map<String, String> feedback,
   });
 
+  Future<void> waitUntilIdle({
+    Duration timeout = const Duration(seconds: 4),
+  }) {
+    return Future<void>.value();
+  }
+
   void dispose();
 }
 
@@ -994,7 +1000,6 @@ class _PhaseInstructionVoiceCoach implements ExerciseVoiceCoach {
     }
 
     if (!_didAnnounceReady) {
-      exercise.ttsService.clearQueue();
       exercise.ttsService.speak('Sẵn sàng');
       _didAnnounceReady = true;
     }
@@ -1046,6 +1051,13 @@ class _PhaseInstructionVoiceCoach implements ExerciseVoiceCoach {
   }
 
   @override
+  Future<void> waitUntilIdle({
+    Duration timeout = const Duration(seconds: 4),
+  }) {
+    return Future<void>.value();
+  }
+
+  @override
   void dispose() {
     _lastPhasePhrase = null;
   }
@@ -1064,6 +1076,8 @@ class _GenericAssetVoicePlayer {
   final QueuedAssetVoicePlayer _player;
 
   Future<void> speak(String text) => _player.speak(text);
+  Future<void> waitUntilIdle({required Duration timeout}) =>
+      _player.waitUntilIdle(timeout: timeout);
   void clearQueue() => _player.clearQueue();
   void clearPendingButKeepCurrent() => _player.clearPendingButKeepCurrent();
   void dispose() => _player.dispose();
@@ -1071,14 +1085,20 @@ class _GenericAssetVoicePlayer {
 
 class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
   static final Map<String, Map<String, int>> _previousSetFaultsBySlug = {};
+  static const int _noCountCueCooldownMs = 1200;
+  static const int _holdFaultCueCooldownMs = 2500;
+  static const int _holdStallFramesBeforeCue = 4;
+  static const double _holdProgressEpsilonSeconds = 0.05;
 
   final _GenericAssetVoicePlayer _voicePlayer = _GenericAssetVoicePlayer();
   final Map<String, int> _setFaultCounts = {};
-  final Set<String> _currentRepFaultIds = {};
-  final Set<String> _liveFaultsSpokenThisRep = {};
 
   int _lastRepCount = 0;
-  bool _currentRepHadFormFault = false;
+  int _lastNoCountCueAtMs = 0;
+  int _lastHoldFaultCueAtMs = 0;
+  int _holdStallFrames = 0;
+  int? _lastOutcomeRepNumber;
+  double? _lastLiveHoldSeconds;
   bool _didAnnounceReady = false;
   bool _didSpeakSetup = false;
   bool _didSpeakPreviousSetAdvice = false;
@@ -1094,12 +1114,46 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
     final script =
         GenericExerciseVoiceAssets.scriptForExerciseName(exercise.exerciseName);
     final repIncreased = repCount > _lastRepCount;
+    final isHoldTimerExercise = exercise.liveHoldTargetSeconds != null;
 
     if (exercise.exerciseState == ExerciseState.completed) {
       if (!_didAnnounceSetComplete) {
         _voicePlayer.clearPendingButKeepCurrent();
         if (repIncreased) {
-          _speakRepOutcome(script, repCount);
+          final completedRepLog = _latestRepLog(exercise, repCount);
+          final latestRepLog = _latestRepLogAnyNumber(exercise);
+          if (completedRepLog != null &&
+              completedRepLog.repNumber != _lastOutcomeRepNumber) {
+            _speakRepLogOutcome(
+              script: script,
+              repLog: completedRepLog,
+              includeCount: true,
+            );
+          } else if (isHoldTimerExercise &&
+              latestRepLog != null &&
+              latestRepLog.repNumber != _lastOutcomeRepNumber) {
+            _speakRepLogOutcome(
+              script: script,
+              repLog: latestRepLog,
+              includeCount: false,
+            );
+          } else if (completedRepLog == null && latestRepLog == null) {
+            _speakUnknownRepOutcome(
+              script: script,
+              repCount: repCount,
+              feedback: feedback,
+            );
+          }
+        } else if (isHoldTimerExercise) {
+          final latestRepLog = _latestRepLogAnyNumber(exercise);
+          if (latestRepLog != null &&
+              latestRepLog.repNumber != _lastOutcomeRepNumber) {
+            _speakRepLogOutcome(
+              script: script,
+              repLog: latestRepLog,
+              includeCount: false,
+            );
+          }
         }
         _voicePlayer.speak('common.exercise_complete');
         _previousSetFaultsBySlug[script.slug] = Map.of(_setFaultCounts);
@@ -1119,43 +1173,125 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
         exercise.isPaused ||
         !hasPose) {
       _lastRepCount = repCount;
+      _resetHoldProgressTracking();
       return;
     }
 
     if (!_didAnnounceReady) {
-      _voicePlayer.clearQueue();
       _voicePlayer.speak('common.ready');
       _didAnnounceReady = true;
       _speakPreviousSetAdviceIfNeeded(script);
     }
 
-    if (_feedbackIndicatesFault(feedback)) {
-      _currentRepHadFormFault = true;
-    }
-    final liveFaultId = _faultIdForFeedback(script, feedback);
-    if (liveFaultId != null) {
-      _currentRepFaultIds.add(liveFaultId);
+    if (isHoldTimerExercise) {
+      _handleHoldTimerProgress(
+        script: script,
+        exercise: exercise,
+        feedback: feedback,
+      );
+
+      if (repIncreased && _latestRepLog(exercise, repCount) == null) {
+        _lastRepCount = repCount;
+        return;
+      }
     }
 
-    if (repIncreased) {
-      _voicePlayer.clearPendingButKeepCurrent();
-      _speakRepOutcome(script, repCount);
+    if (!repIncreased && _isNoCountFeedback(feedback)) {
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      if (nowMs - _lastNoCountCueAtMs >= _noCountCueCooldownMs) {
+        _voicePlayer.clearPendingButKeepCurrent();
+        _voicePlayer.speak('common.no_count');
+        final faultId = _faultIdForFeedback(script, feedback);
+        if (faultId != null) {
+          _setFaultCounts[faultId] = (_setFaultCounts[faultId] ?? 0) + 1;
+          _voicePlayer.speak(script.faultKey(faultId));
+        } else if (_feedbackIndicatesFault(feedback)) {
+          _voicePlayer.speak('common.fix_pose');
+        }
+        _lastNoCountCueAtMs = nowMs;
+      }
       _lastRepCount = repCount;
-      _currentRepFaultIds.clear();
-      _liveFaultsSpokenThisRep.clear();
-      _currentRepHadFormFault = false;
       return;
     }
 
-    if (liveFaultId != null &&
-        !_liveFaultsSpokenThisRep.contains(liveFaultId) &&
-        _shouldSpeakLiveFault(feedback)) {
-      _liveFaultsSpokenThisRep.add(liveFaultId);
-      _setFaultCounts[liveFaultId] = (_setFaultCounts[liveFaultId] ?? 0) + 1;
-      _voicePlayer.speak(script.faultKey(liveFaultId));
+    if (repIncreased) {
+      final completedRepLog = _latestRepLog(exercise, repCount);
+      _voicePlayer.clearPendingButKeepCurrent();
+      if (completedRepLog != null) {
+        _speakRepLogOutcome(
+          script: script,
+          repLog: completedRepLog,
+          includeCount: true,
+        );
+      } else {
+        _speakUnknownRepOutcome(
+          script: script,
+          repCount: repCount,
+          feedback: feedback,
+        );
+      }
+      _lastRepCount = repCount;
+      return;
     }
 
     _lastRepCount = repCount;
+  }
+
+  void _handleHoldTimerProgress({
+    required GenericExerciseVoiceScript script,
+    required ExerciseBase exercise,
+    required Map<String, String> feedback,
+  }) {
+    final liveHoldSeconds = exercise.liveHoldSeconds;
+    if (liveHoldSeconds == null) {
+      _resetHoldProgressTracking();
+      return;
+    }
+
+    final targetSeconds = exercise.liveHoldTargetSeconds;
+    if (targetSeconds != null &&
+        liveHoldSeconds >= targetSeconds - _holdProgressEpsilonSeconds) {
+      _lastLiveHoldSeconds = liveHoldSeconds;
+      _holdStallFrames = 0;
+      return;
+    }
+
+    final previous = _lastLiveHoldSeconds;
+    _lastLiveHoldSeconds = liveHoldSeconds;
+    if (previous == null ||
+        liveHoldSeconds > previous + _holdProgressEpsilonSeconds) {
+      _holdStallFrames = 0;
+      return;
+    }
+
+    _holdStallFrames++;
+    if (_holdStallFrames < _holdStallFramesBeforeCue) {
+      return;
+    }
+
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    if (nowMs - _lastHoldFaultCueAtMs < _holdFaultCueCooldownMs) {
+      return;
+    }
+
+    final faultId = _faultIdForFeedback(script, feedback);
+    if (faultId != null) {
+      _voicePlayer.clearPendingButKeepCurrent();
+      _speakFaultId(script, faultId);
+      _lastHoldFaultCueAtMs = nowMs;
+      return;
+    }
+
+    if (_feedbackIndicatesFault(feedback)) {
+      _voicePlayer.clearPendingButKeepCurrent();
+      _voicePlayer.speak('common.fix_pose');
+      _lastHoldFaultCueAtMs = nowMs;
+    }
+  }
+
+  void _resetHoldProgressTracking() {
+    _lastLiveHoldSeconds = null;
+    _holdStallFrames = 0;
   }
 
   void _speakSetup(
@@ -1170,22 +1306,54 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
     _didSpeakSetup = true;
   }
 
-  void _speakRepOutcome(GenericExerciseVoiceScript script, int repCount) {
+  void _speakUnknownRepOutcome({
+    required GenericExerciseVoiceScript script,
+    required int repCount,
+    required Map<String, String> feedback,
+  }) {
+    _lastOutcomeRepNumber = repCount;
     _voicePlayer.speak('$repCount');
 
-    if (_currentRepFaultIds.isEmpty) {
-      _voicePlayer.speak(
-        _currentRepHadFormFault
-            ? 'common.fix_pose'
-            : script.cueKey(script.cleanCueId),
-      );
+    final faultId = _faultIdForFeedback(script, feedback);
+    if (faultId != null) {
+      _speakFaultId(script, faultId);
+      return;
+    }
+
+    _voicePlayer.speak(
+      _feedbackIndicatesFault(feedback) ? 'common.fix_pose' : 'common.correct',
+    );
+  }
+
+  void _speakRepLogOutcome({
+    required GenericExerciseVoiceScript script,
+    required RepLog repLog,
+    required bool includeCount,
+  }) {
+    _lastOutcomeRepNumber = repLog.repNumber;
+    if (includeCount) {
+      _voicePlayer.speak('${repLog.repNumber}');
+    }
+
+    if (repLog.correctForm) {
+      _voicePlayer.speak('common.correct');
+      return;
+    }
+
+    final faultIds = _faultIdsForRepLog(script, repLog);
+    if (faultIds.isEmpty) {
+      _voicePlayer.speak('common.fix_pose');
       return;
     }
 
     final faultId = script.faultIds.firstWhere(
-      _currentRepFaultIds.contains,
-      orElse: () => _currentRepFaultIds.first,
+      faultIds.contains,
+      orElse: () => faultIds.first,
     );
+    _speakFaultId(script, faultId);
+  }
+
+  void _speakFaultId(GenericExerciseVoiceScript script, String faultId) {
     _setFaultCounts[faultId] = (_setFaultCounts[faultId] ?? 0) + 1;
     _voicePlayer.speak(script.faultKey(faultId));
   }
@@ -1203,6 +1371,61 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
       _voicePlayer.speak(script.setNextFaultKey(entry.key));
     }
     _didSpeakPreviousSetAdvice = true;
+  }
+
+  Set<String> _faultIdsForRepLog(
+    GenericExerciseVoiceScript script,
+    RepLog repLog,
+  ) {
+    final ids = <String>{};
+
+    if (repLog.correctForm) return ids;
+
+    for (final faultType in _faultTypesFromLog(repLog)) {
+      ids.addAll(_faultIdsForText(script, faultType));
+    }
+
+    return ids;
+  }
+
+  RepLog? _latestRepLog(ExerciseBase exercise, int repCount) {
+    for (final log in exercise.logger.repLogs.reversed) {
+      if (log.repNumber != repCount) continue;
+      return log;
+    }
+    return null;
+  }
+
+  RepLog? _latestRepLogAnyNumber(ExerciseBase exercise) {
+    if (exercise.logger.repLogs.isEmpty) {
+      return null;
+    }
+    return exercise.logger.repLogs.last;
+  }
+
+  Iterable<String> _faultTypesFromLog(RepLog log) sync* {
+    final faultTypes = log.data['fault_types'];
+    if (faultTypes is Iterable) {
+      for (final faultType in faultTypes) {
+        final value = faultType.toString().trim();
+        if (value.isNotEmpty) yield value;
+      }
+    }
+  }
+
+  Iterable<String> _faultIdsForText(
+    GenericExerciseVoiceScript script,
+    String text,
+  ) sync* {
+    final normalizedKey = _normalizeFaultKey(text);
+    for (final candidate in _candidateFaultIdsForKey(normalizedKey)) {
+      if (script.hasFault(candidate)) yield candidate;
+    }
+
+    final normalizedText = _normalizeFaultText(text);
+    for (final candidate in _candidateFaultIds(normalizedText)) {
+      if (script.hasFault(candidate)) yield candidate;
+    }
   }
 
   String? _faultIdForFeedback(
@@ -1520,6 +1743,10 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
       case 'heel_lift':
         yield 'heel';
         break;
+      case 'feet':
+        yield 'heel';
+        yield 'foot';
+        break;
       case 'bent_straight_leg':
         yield 'straight_leg';
         break;
@@ -1527,9 +1754,19 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
         yield 'torso';
         yield 'trunk';
         break;
+      case 'back':
+        yield 'trunk';
+        yield 'torso';
+        break;
+      case 'core':
+        yield 'lumbar';
+        yield 'trunk';
+        break;
       case 'shallow_depth':
+      case 'shallow_lunge':
         yield 'depth_shallow';
         yield 'depth';
+        yield 'rear_depth';
         break;
       case 'too_deep':
         yield 'depth_deep';
@@ -1537,9 +1774,34 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
       case 'power':
         yield 'takeoff_depth';
         break;
-      case 'back':
-        yield 'trunk';
-        yield 'torso';
+      case 'speed_control':
+        yield 'speed';
+        yield 'tempo';
+        break;
+      case 'neck_head':
+        yield 'neck';
+        yield 'head';
+        break;
+      case 'knee_angle':
+        yield 'knee_angle';
+        yield 'knee';
+        break;
+      case 'hyperextension':
+        yield 'lumbar';
+        yield 'hip_extension';
+        break;
+      case 'hip_extension':
+        yield 'hip_extension';
+        break;
+      case 'knee_over_toe':
+        yield 'front_knee';
+        yield 'knee';
+        break;
+      case 'inconsistent_step':
+        yield 'step_length';
+        break;
+      case 'not_enough_hold':
+        yield 'hold';
         break;
       case 'knee':
         yield 'landing_stiff';
@@ -1566,6 +1828,13 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
       if (_isNonFaultFeedbackKey(entry.key)) return false;
       return _looksLikeFaultText(_normalizeFaultText(entry.value));
     });
+  }
+
+  bool _isNoCountFeedback(Map<String, String> feedback) {
+    final result = _normalizeFaultText(feedback['Result'] ?? '');
+    return result.contains('no count') ||
+        result.contains('khong tinh') ||
+        result.contains('chua tinh');
   }
 
   bool _isNonFaultFeedbackKey(String key) {
@@ -1662,23 +1931,16 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
     return text;
   }
 
-  bool _shouldSpeakLiveFault(Map<String, String> feedback) {
-    if (feedback.entries.any((e) => !_isNonFaultFeedbackKey(e.key))) {
-      return true;
-    }
-    final result = _normalizeFaultText(feedback['Result'] ?? '');
-    return result.contains('sai') ||
-        result.contains('fix') ||
-        result.contains('no count') ||
-        result.contains('khong tinh') ||
-        result.contains('chua tinh');
+  @override
+  Future<void> waitUntilIdle({
+    Duration timeout = const Duration(seconds: 4),
+  }) {
+    return _voicePlayer.waitUntilIdle(timeout: timeout);
   }
 
   @override
   void dispose() {
-    _currentRepFaultIds.clear();
-    _liveFaultsSpokenThisRep.clear();
-    _currentRepHadFormFault = false;
+    _resetHoldProgressTracking();
     _setFaultCounts.clear();
     _voicePlayer.clearQueue();
     _voicePlayer.dispose();

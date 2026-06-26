@@ -31,14 +31,18 @@ class VShapeRomMetric extends VUpMetricBase {
 
   void evaluateRep(VUpRepContext ctx) {
     // Góc phải khép lại <= ROM_TARGET_ANGLE mới tính là đạt
-    if (minVAngle != null && minVAngle! > VUpConfig.ROM_TARGET_ANGLE) {
+    final reachedHandsToFeet = minWristAnkleDist != null &&
+        minWristAnkleDist! <= VUpConfig.TOP_WRIST_ANKLE_DIST_MAX;
+    if (minVAngle != null &&
+        minVAngle! > VUpConfig.ROM_TARGET_ANGLE &&
+        !reachedHandsToFeet) {
       _faults.add(FaultRecord(
         phase: 'REP_COMPLETE',
         type: 'ROM',
         message:
             'Chưa gập đủ sâu (Góc nhỏ nhất: ${minVAngle!.toStringAsFixed(1)}°)',
         voiceMessage: 'Cố gắng rướn tay chạm vào mũi chân nhé',
-        affectsForm: true,
+        affectsForm: false,
         priority: VUpFaultPriority.rom,
       ));
     }

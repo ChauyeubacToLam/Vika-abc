@@ -6,6 +6,10 @@ import 'queued_asset_voice_player.dart';
 
 abstract class BowPoseVoicePlayer {
   Future<void> speak(String text);
+  Future<void> waitUntilIdle({Duration timeout = const Duration(seconds: 4)}) {
+    return Future<void>.value();
+  }
+
   void clearQueue();
   void clearPendingButKeepCurrent();
   void dispose() {}
@@ -31,6 +35,12 @@ class _BowPoseAssetVoicePlayer implements BowPoseVoicePlayer {
   Future<void> speak(String text) => _player.speak(text);
 
   @override
+  Future<void> waitUntilIdle({
+    Duration timeout = const Duration(seconds: 4),
+  }) =>
+      _player.waitUntilIdle(timeout: timeout);
+
+  @override
   void clearQueue() => _player.clearQueue();
 
   @override
@@ -44,18 +54,12 @@ class BowPoseVoiceCoach implements ExerciseVoiceCoach {
   BowPoseVoiceCoach({BowPoseVoicePlayer? voicePlayer})
       : _voicePlayer = voicePlayer ?? _BowPoseAssetVoicePlayer();
 
-  static const int _liveFaultCooldownMs = 3000;
-  static const int _postRepCueCooldownReps = 2;
-
   final BowPoseVoicePlayer _voicePlayer;
-  final Map<String, int> _lastPostRepVoiceRep = {};
 
   int _lastRepCount = 0;
-  int _lastLiveFaultAtMs = 0;
   bool _didSpeakSetup = false;
   bool _didAnnounceReady = false;
   bool _didAnnounceSetComplete = false;
-  String? _lastLiveFaultVoice;
 
   @override
   void processFrame({
@@ -64,7 +68,6 @@ class BowPoseVoiceCoach implements ExerciseVoiceCoach {
     required bool hasPose,
     required Map<String, String> feedback,
   }) {
-    final nowMs = DateTime.now().millisecondsSinceEpoch;
     final repIncreased = repCount > _lastRepCount;
 
     if (exercise.exerciseState == ExerciseState.notActivated) {
@@ -75,7 +78,7 @@ class BowPoseVoiceCoach implements ExerciseVoiceCoach {
 
     if (exercise.exerciseState == ExerciseState.completed) {
       if (!_didAnnounceSetComplete) {
-        _voicePlayer.clearQueue();
+        _voicePlayer.clearPendingButKeepCurrent();
         if (repIncreased) {
           _speakRepOutcome(exercise, repCount);
         }
@@ -94,27 +97,15 @@ class BowPoseVoiceCoach implements ExerciseVoiceCoach {
     }
 
     if (!_didAnnounceReady) {
-      _voicePlayer.clearQueue();
       _voicePlayer.speak('Sẵn sàng');
       _didAnnounceReady = true;
     }
 
     if (repIncreased) {
-      _voicePlayer.clearQueue();
+      _voicePlayer.clearPendingButKeepCurrent();
       _speakRepOutcome(exercise, repCount);
       _lastRepCount = repCount;
-      _lastLiveFaultVoice = null;
       return;
-    }
-
-    final liveFaultVoice = _liveFaultVoice(feedback);
-    if (liveFaultVoice != null &&
-        (liveFaultVoice != _lastLiveFaultVoice ||
-            nowMs - _lastLiveFaultAtMs >= _liveFaultCooldownMs)) {
-      _lastLiveFaultVoice = liveFaultVoice;
-      _lastLiveFaultAtMs = nowMs;
-      _voicePlayer.clearPendingButKeepCurrent();
-      _voicePlayer.speak(liveFaultVoice);
     }
 
     _lastRepCount = repCount;
@@ -135,7 +126,7 @@ class BowPoseVoiceCoach implements ExerciseVoiceCoach {
     _voicePlayer.speak('$repCount');
 
     if (exercise is BowPose && exercise.lastRepWasClean) {
-      _voicePlayer.speak('bow_pose.hold_good');
+      _voicePlayer.speak('common.correct');
       return;
     }
 
@@ -146,37 +137,18 @@ class BowPoseVoiceCoach implements ExerciseVoiceCoach {
     if (exercise is! BowPose) return;
 
     final voice = exercise.lastRepTopVoiceMessage;
-    if (voice == null || voice.isEmpty) return;
-
-    final lastRep = _lastPostRepVoiceRep[voice] ?? -99;
-    if (repNumber - lastRep < _postRepCueCooldownReps) return;
-
-    _lastPostRepVoiceRep[voice] = repNumber;
+    if (voice == null || voice.isEmpty) {
+      _voicePlayer.speak('common.fix_pose');
+      return;
+    }
     _voicePlayer.speak(voice);
   }
 
-  String? _liveFaultVoice(Map<String, String> feedback) {
-    final connection = feedback['Connection'] ?? '';
-    if (connection.contains('Tuột')) return 'Nắm chân chắc hơn';
-
-    final timer = feedback['Timer'] ?? '';
-    if (timer.contains('Giữ')) return null;
-
-    final thigh = feedback['Thigh'] ?? '';
-    if (thigh.contains('Kéo đùi')) {
-      return 'Nâng đùi cao hơn nếu lưng vẫn thoải mái';
-    }
-
-    final chest = feedback['Chest'] ?? '';
-    if (chest.contains('Mở căng')) return 'Mở ngực thêm một chút';
-
-    final stability = feedback['StabilityScore'] ?? '';
-    if (stability.isNotEmpty && stability != 'N/A') {
-      final score = int.tryParse(stability.replaceAll('%', '').trim());
-      if (score != null && score < 50) return 'Giữ người yên hơn';
-    }
-
-    return null;
+  @override
+  Future<void> waitUntilIdle({
+    Duration timeout = const Duration(seconds: 4),
+  }) {
+    return _voicePlayer.waitUntilIdle(timeout: timeout);
   }
 
   @override

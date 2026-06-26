@@ -15,6 +15,11 @@ class _FakePlankVoicePlayer implements PlankVoicePlayer {
   }
 
   @override
+  Future<void> waitUntilIdle({
+    Duration timeout = const Duration(seconds: 4),
+  }) async {}
+
+  @override
   void clearQueue() {
     clearQueueCount++;
     spoken.clear();
@@ -93,6 +98,6 @@ void main() {
       feedback: const {},
     );
 
-    expect(player.spoken.take(1), ['plank.hold_good']);
+    expect(player.spoken.skip(1).take(1), ['common.correct']);
   });
 }

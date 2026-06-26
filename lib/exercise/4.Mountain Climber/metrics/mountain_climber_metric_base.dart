@@ -24,35 +24,36 @@ class ClimberConfig {
   static const int MAX_DURATION_MS = 90000; // 90 s
 
   // --- Setup gate ---
-  static const double ARM_STRAIGHT_THRESHOLD = 150.0;
-  static const List<double> TRUNK_STRAIGHT_RANGE = [160.0, 180.0];
+  static const double ARM_STRAIGHT_THRESHOLD = 140.0;
+  static const List<double> TRUNK_STRAIGHT_RANGE = [145.0, 180.0];
 
   // --- Trunk stability ---
-  static const double HIP_DROP_TRUNK_ANGLE = 150.0; // Dưới mức này = võng lưng
-  static const double HIP_BOUNCE_NORM = 0.18; // ~10 cm / scale
+  static const double HIP_DROP_TRUNK_ANGLE = 138.0; // Dưới mức này = võng lưng
+  static const double HIP_BOUNCE_NORM = 0.25; // ~10 cm / scale
 
   // --- Peak detection ---
   /// Khi dist_chuẩn_hóa < ngưỡng này → coi là gối đã vào zone (co đủ sâu).
   /// Được hiệu chỉnh lại trong Setup: = restDist * ZONE_RATIO
-  static const double ZONE_RATIO = 0.76;
-  static const double MIN_ZONE_DELTA = 0.18;
-  static const double MIN_ZONE_THRESHOLD = 0.35;
+  static const double ZONE_RATIO = 0.86;
+  static const double MIN_ZONE_DELTA = 0.12;
+  static const double MIN_ZONE_THRESHOLD = 0.45;
   static const double ZONE_RATIO_DEFAULT = 1.25; // fallback nếu chưa calibrate
 
   /// Hysteresis: phải ra ngoài (threshold + margin) mới tính exit
-  static const double ZONE_HYSTERESIS = 0.20; // Increased from 0.12 to prevent bouncing
+  static const double ZONE_HYSTERESIS =
+      0.14; // Increased from 0.12 to prevent bouncing
 
   /// Cooldown tối thiểu giữa 2 rep liên tiếp (ms). 250 ms = tối đa 4 rep/s
-  static const int REP_COOLDOWN_MS = 600; // Increased from 350
-  static const int GLOBAL_REP_COOLDOWN_MS = 400; // Increased from 280
-  static const int SAME_SIDE_REP_COOLDOWN_MS = 1200; // Increased from 700
+  static const int REP_COOLDOWN_MS = 420; // Increased from 350
+  static const int GLOBAL_REP_COOLDOWN_MS = 260; // Increased from 280
+  static const int SAME_SIDE_REP_COOLDOWN_MS = 850; // Increased from 700
 
   /// EMA smoothing factor cho knee distance (0 < α ≤ 1, nhỏ = mượt hơn)
   static const double EMA_ALPHA = 0.45;
-  static const double KNEE_FLEXION_ENTER_ANGLE = 138.0;
-  static const double KNEE_EXTENSION_EXIT_ANGLE = 150.0;
-  static const double GOOD_ROM_RATIO_OF_COUNT_ZONE = 0.72;
-  static const double MIN_COUNT_PEAK_RATIO = 0.92;
+  static const double KNEE_FLEXION_ENTER_ANGLE = 150.0;
+  static const double KNEE_EXTENSION_EXIT_ANGLE = 145.0;
+  static const double GOOD_ROM_RATIO_OF_COUNT_ZONE = 0.85;
+  static const double MIN_COUNT_PEAK_RATIO = 1.05;
   static const int MIN_ZONE_FRAMES = 1;
   static const int DOUBLE_KNEE_REQUIRED_FRAMES = 4;
 }
@@ -168,7 +169,7 @@ class KneePeakRepCounter {
         (_rawDist >= zoneThreshold + ClimberConfig.ZONE_HYSTERESIS &&
                 _smoothedDist >= zoneThreshold) ||
             (_kneeAngle >= ClimberConfig.KNEE_EXTENSION_EXIT_ANGLE &&
-                _rawDist >= zoneThreshold);
+                _rawDist >= zoneThreshold * 0.90);
 
     // 2. Vào zone
     if (!_isInZone && enterZone) {

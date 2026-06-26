@@ -16,6 +16,11 @@ class _FakeHighPlankVoicePlayer implements HighPlankVoicePlayer {
   }
 
   @override
+  Future<void> waitUntilIdle({
+    Duration timeout = const Duration(seconds: 4),
+  }) async {}
+
+  @override
   void clearQueue() {
     clearQueueCount++;
     spoken.clear();
@@ -106,7 +111,7 @@ void main() {
     );
 
     expect(
-      player.spoken.where((text) => text == 'high_plank.hold_good'),
+      player.spoken.where((text) => text == 'common.correct'),
       hasLength(1),
     );
   });

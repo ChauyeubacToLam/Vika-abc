@@ -329,23 +329,29 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
       _minTrunkKneeAngleThisRep = ctx.trunkKneeAngle;
       _trackRepPeak(ctx);
       if (ctx.isContractionPosition) _sawContractionThisRep = true;
-    } else if (_topDebouncer.update(crunchState == ReverseCrunchState.curling &&
-        _sawContractionThisRep)) {
+    } else if (_topDebouncer.update(
+        crunchState == ReverseCrunchState.curling && _sawContractionThisRep)) {
       _trackRepPeak(ctx);
       _transitionState(ReverseCrunchState.top, ctx.frameTimestamp);
-    } else if (_loweringDebouncer.update(crunchState ==
-            ReverseCrunchState.top &&
-        (ctx.legHorizontalAngle <
-                ReverseCrunchConfig.PEAK_EXIT_LEG_VERTICAL_MIN ||
-            ctx.kneeAngle < ReverseCrunchConfig.PEAK_EXIT_KNEE_EXTENSION_MIN ||
-            ctx.hipLiftNormalized <
-                _maxHipLiftThisRep -
-                    ReverseCrunchConfig.HIP_LIFT_MIN_NORMALIZED))) {
+    } else if (_loweringDebouncer.update(
+        crunchState == ReverseCrunchState.top &&
+            (ctx.isSetupPosition ||
+                ctx.hipLiftNormalized <=
+                    _maxHipLiftThisRep -
+                        ReverseCrunchConfig.HIP_LIFT_EXIT_DROP_NORMALIZED ||
+                (_minTrunkKneeAngleThisRep != null &&
+                    ctx.trunkKneeAngle >=
+                        _minTrunkKneeAngleThisRep! +
+                            ReverseCrunchConfig.RETURN_ANGLE_RISE)))) {
       _transitionState(ReverseCrunchState.lowering, ctx.frameTimestamp);
     } else if (_lyingDebouncer.update(
         crunchState == ReverseCrunchState.curling && ctx.isSetupPosition)) {
-      _rejectRepAttempt(
-          ctx, 'Chưa duỗi chân lên ở đỉnh nên rep này chưa được tính.');
+      if (_isRepCountable) {
+        _completeRep(ctx);
+      } else {
+        _rejectRepAttempt(
+            ctx, 'Hãy cuộn gối về ngực và nhấc hông khỏi mặt sàn.');
+      }
     } else if (_lyingDebouncer.update(
         crunchState == ReverseCrunchState.lowering && ctx.isSetupPosition)) {
       _completeRep(ctx);
@@ -415,8 +421,7 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
 
   void _completeRep(RepContext ctx) {
     if (!_isRepCountable) {
-      _rejectRepAttempt(
-          ctx, 'Hãy cuộn gối về ngực và nhấc hông khỏi mặt sàn.');
+      _rejectRepAttempt(ctx, 'Hãy cuộn gối về ngực và nhấc hông khỏi mặt sàn.');
       return;
     }
 
@@ -424,23 +429,7 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
     final allFaults = <FaultRecord>[];
     for (final metric in _metrics) allFaults.addAll(metric.faults);
 
-    // Anti-cheat ONLY: swinging momentum means the rep wasn't driven by the abs.
-    final isAntiCheatReject = momentumMetric.faults.isNotEmpty;
     correctForm = !allFaults.any((f) => f.affectsForm);
-
-    if (isAntiCheatReject) {
-      _rejectedAttempts++;
-      resultIssues.feedback['Result'] = 'Không tính rep';
-      final faultMap = <String, Map<String, String>>{};
-      for (final fault in allFaults) {
-        faultMap.putIfAbsent(fault.phase, () => {});
-        faultMap[fault.phase]![fault.type] = fault.message;
-      }
-      setFeedback.add({false: faultMap});
-      _transitionState(ReverseCrunchState.lying, ctx.frameTimestamp);
-      for (final metric in _metrics) metric.reset();
-      return;
-    }
 
     repCount++;
     if (!correctForm) resultIssues.feedback['Result'] = 'Fix Form';

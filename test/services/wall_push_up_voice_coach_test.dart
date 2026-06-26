@@ -15,6 +15,11 @@ class _FakeWallPushUpVoicePlayer implements WallPushUpVoicePlayer {
   }
 
   @override
+  Future<void> waitUntilIdle({
+    Duration timeout = const Duration(seconds: 4),
+  }) async {}
+
+  @override
   void clearQueue() {
     clearQueueCount++;
     spoken.clear();
@@ -63,7 +68,7 @@ void main() {
     );
   });
 
-  test('maps live wall push up faults to bundled voice cues', () {
+  test('does not speak live wall push up faults before a rep finishes', () {
     final player = _FakeWallPushUpVoicePlayer();
     final coach = WallPushUpVoiceCoach(ttsService: player);
     final exercise = WallPushUp()..exerciseState = ExerciseState.activated;
@@ -75,7 +80,7 @@ void main() {
       feedback: const {'Arms': 'Ép khuỷu tay sát người hơn!'},
     );
 
-    expect(player.spoken, contains('Ép khuỷu tay vào'));
+    expect(player.spoken, ['Sẵn sàng', 'Hạ xuống']);
   });
 
   test('speaks rep count and clean cue after a good rep', () {
@@ -92,7 +97,7 @@ void main() {
       feedback: const {},
     );
 
-    expect(player.spoken.take(2), ['1', 'wall_push_up.good_clean']);
+    expect(player.spoken.skip(2).take(2), ['1', 'common.correct']);
   });
 
   test('speaks rep count and correction after a faulty rep', () {
@@ -116,7 +121,7 @@ void main() {
       feedback: const {},
     );
 
-    expect(player.spoken.take(2), ['1', 'Ép khuỷu tay vào']);
+    expect(player.spoken.skip(2).take(2), ['1', 'Ép khuỷu tay vào']);
   });
 
   test('speaks final rep count, clean cue, and completion', () {
@@ -135,7 +140,7 @@ void main() {
 
     expect(
       player.spoken,
-      ['1', 'wall_push_up.good_clean', 'Hoàn thành bài tập'],
+      ['1', 'common.correct', 'Hoàn thành bài tập'],
     );
   });
 }

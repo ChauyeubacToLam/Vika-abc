@@ -60,6 +60,7 @@ flutter:
     - assets/audio/push_up/
     - assets/audio/glute_bridge/
     - assets/audio/curl_up/
+    - assets/audio/mc_gill_curl_up/
     - assets/audio/warrior_one/
     - assets/audio/v_up/
     - assets/audio/dead_bug/

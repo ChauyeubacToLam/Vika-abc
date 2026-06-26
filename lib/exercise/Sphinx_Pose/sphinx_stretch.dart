@@ -124,12 +124,36 @@ class SphinxStretch extends ExerciseBase {
     final ankle = isLeftTracked
         ? landmarks[PoseLandmarkType.leftAnkle]
         : landmarks[PoseLandmarkType.rightAnkle];
+    final elbow = isLeftTracked
+        ? landmarks[PoseLandmarkType.leftElbow]
+        : landmarks[PoseLandmarkType.rightElbow];
+    final wrist = isLeftTracked
+        ? landmarks[PoseLandmarkType.leftWrist]
+        : landmarks[PoseLandmarkType.rightWrist];
+    final knee = isLeftTracked
+        ? landmarks[PoseLandmarkType.leftKnee]
+        : landmarks[PoseLandmarkType.rightKnee];
 
     if (shoulder == null || hip == null || ankle == null) return false;
 
     final bodyAngle = calculateAngleNormalized(
         firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
-    return bodyAngle >= SphinxConfig.Aa_Start_Body_Angle;
+    if (bodyAngle >= SphinxConfig.Aa_Start_Body_Angle) return true;
+
+    if (elbow == null || wrist == null || knee == null) return false;
+    if (![elbow, wrist, knee].every(ExerciseBase.isLandmarkConfident)) {
+      return false;
+    }
+
+    final elbowAngle = calculateAngleNormalized(
+        firstPoint: shoulder, midPoint: elbow, lastPoint: wrist);
+    final spineAngle = calculateAngleNormalized(
+        firstPoint: shoulder, midPoint: hip, lastPoint: knee);
+
+    return elbowAngle >= SphinxConfig.Ab_Elbow_Hold_Angle[0] &&
+        elbowAngle <= SphinxConfig.Al_Exit_Elbow_Angle &&
+        spineAngle >= SphinxConfig.Ac_Spine_Ext_Angle[0] &&
+        spineAngle <= SphinxConfig.Am_Exit_Spine_Angle;
   }
 
   @override
@@ -224,7 +248,7 @@ class SphinxStretch extends ExerciseBase {
 
     switch (state) {
       case SphinxState.proneSetup:
-        if (ctx.elbowAngle < 145 &&
+        if (ctx.elbowAngle < SphinxConfig.Al_Exit_Elbow_Angle &&
             ctx.spineAngle < SphinxConfig.Ac_Spine_Ext_Angle[1] + 10) {
           newState = SphinxState.ascending;
         }
@@ -240,8 +264,8 @@ class SphinxStretch extends ExerciseBase {
         break;
 
       case SphinxState.isometricHold:
-        if (ctx.elbowAngle > 140 ||
-            ctx.spineAngle > SphinxConfig.Aa_Start_Body_Angle - 10) {
+        if (ctx.elbowAngle > SphinxConfig.Al_Exit_Elbow_Angle ||
+            ctx.spineAngle > SphinxConfig.Am_Exit_Spine_Angle) {
           newState = SphinxState.descending;
         }
         break;
@@ -276,13 +300,8 @@ class SphinxStretch extends ExerciseBase {
       // Lấy thời gian hold thực tế đang diễn ra
       double liveHold = tempoMetric.getLiveHoldTime(ctx.frameTimestampMs);
 
-      // Kiểm tra xem 3 metrics (Hông, Tay, Cổ) có đang dính lỗi form nào không
-      bool isFormOkay = hipMetric.faults.isEmpty &&
-          elbowMetric.faults.isEmpty &&
-          neckMetric.faults.isEmpty;
-
-      // Nếu form chuẩn VÀ giữ đủ X giây
-      if (isFormOkay && liveHold >= maxSeconds) {
+      // Bài giữ: đủ thời gian thì hoàn thành, lỗi form được ghi vào báo cáo.
+      if (liveHold >= maxSeconds) {
         // Chốt 1 rep ngay lập tức
         _completeRep(ctx);
 

@@ -103,6 +103,12 @@ class KneeExtensionMetric extends CurlUpMetricBase {
     _kneeAngle = angle;
     _debugData['kneeExt'] = angle;
 
+    if (_baselineKnee != null && _baselineKnee! >= 145.0) {
+      _status = MetricStatus.pass;
+      ctx.resultIssues.feedback['Knee'] = 'âœ… Gá»‘i tá»‘t';
+      return;
+    }
+
     // Order matters: absolute checks first (highest severity), then
     // deviation chip (informational), then "good."
     if (angle >= KneeExtensionConfig.ERROR_THRESHOLD) {

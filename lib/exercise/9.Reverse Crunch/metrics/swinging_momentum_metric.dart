@@ -46,7 +46,7 @@ class SwingingMomentumMetric extends ReverseCrunchMetricBase {
       phase: 'CURLING',
       type: 'Swinging',
       message: 'Duỗi chân quá sớm để lấy đà',
-      affectsForm: true,
+      affectsForm: false,
       priority: CrunchVoicePriority.momentum,
       voiceMessage: 'Co gối về ngực trước, rồi mới duỗi chân lên ở đỉnh.',
     ));

@@ -25,13 +25,17 @@ class _FakeSquatVoicePlayer implements SquatVoicePlayer {
   Future<void> speak(String text) async {
     events.add('speak:$text');
   }
+
+  @override
+  Future<void> waitUntilIdle({
+    Duration timeout = const Duration(seconds: 4),
+  }) async {}
 }
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   final readyEvents = [
-    'clearQueue',
     'speak:3',
     'speak:2',
     'speak:1',
@@ -146,7 +150,7 @@ void main() {
         ...readyEvents,
         'clearPendingButKeepCurrent',
         'speak:1',
-        'speak:tốt',
+        'speak:common.correct',
         'speak:Xuống',
       ],
     );
@@ -330,8 +334,7 @@ void main() {
     );
   });
 
-  test(
-      'Squat prioritizes "Ưỡn ngực lên" over phase and depth cues once per rep',
+  test('Squat does not speak live trunk or depth correction during a rep',
       () async {
     final player = _FakeSquatVoicePlayer();
     final coach = SquatVoiceCoach(ttsService: player);
@@ -380,11 +383,7 @@ void main() {
 
     expect(
       player.events,
-      [
-        ...readyEvents,
-        'clearPendingButKeepCurrent',
-        'speak:Ưỡn ngực lên',
-      ],
+      readyEvents,
     );
   });
 
@@ -420,7 +419,7 @@ void main() {
     expect(player.events, readyEvents);
   });
 
-  test('Squat prefixes post-rep cues and suppresses consecutive repeats', () {
+  test('Squat prefixes post-rep cues after every faulty rep', () {
     final player = _FakeSquatVoicePlayer();
     final coach = SquatVoiceCoach(ttsService: player);
     final squat = Squat()..exerciseState = ExerciseState.activated;
@@ -472,6 +471,7 @@ void main() {
         'speak:nhớ giữ gót chân',
         'clearPendingButKeepCurrent',
         'speak:2',
+        'speak:nhớ giữ gót chân',
         'clearPendingButKeepCurrent',
         'speak:3',
         'speak:nhớ giữ gót chân',
@@ -503,7 +503,6 @@ void main() {
       player.events,
       [
         'clearPendingButKeepCurrent',
-        'speak:tốt',
         'speak:Hoàn thành bài tập',
       ],
     );

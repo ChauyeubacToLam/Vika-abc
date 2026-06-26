@@ -6,6 +6,10 @@ import 'queued_asset_voice_player.dart';
 
 abstract class PlankVoicePlayer {
   Future<void> speak(String text);
+  Future<void> waitUntilIdle({Duration timeout = const Duration(seconds: 4)}) {
+    return Future<void>.value();
+  }
+
   void clearQueue();
   void clearPendingButKeepCurrent();
   void dispose() {}
@@ -29,6 +33,12 @@ class _PlankAssetVoicePlayer implements PlankVoicePlayer {
 
   @override
   Future<void> speak(String text) => _player.speak(text);
+
+  @override
+  Future<void> waitUntilIdle({
+    Duration timeout = const Duration(seconds: 4),
+  }) =>
+      _player.waitUntilIdle(timeout: timeout);
 
   @override
   void clearQueue() => _player.clearQueue();
@@ -73,9 +83,9 @@ class PlankVoiceCoach implements ExerciseVoiceCoach {
 
     if (exercise.exerciseState == ExerciseState.completed) {
       if (!_didAnnounceSetComplete) {
-        _voicePlayer.clearQueue();
+        _voicePlayer.clearPendingButKeepCurrent();
         if (repIncreased) {
-          _voicePlayer.speak('plank.hold_good');
+          _voicePlayer.speak('common.correct');
         }
         _voicePlayer.speak('Hoàn thành bài tập');
         _didAnnounceSetComplete = true;
@@ -92,22 +102,22 @@ class PlankVoiceCoach implements ExerciseVoiceCoach {
     }
 
     if (!_didAnnounceReady) {
-      _voicePlayer.clearQueue();
       _voicePlayer.speak('Sẵn sàng');
       _didAnnounceReady = true;
     }
 
     if (repIncreased) {
-      _voicePlayer.clearQueue();
-      _voicePlayer.speak('plank.hold_good');
+      _voicePlayer.clearPendingButKeepCurrent();
+      _voicePlayer.speak('common.correct');
       _lastRepCount = repCount;
       return;
     }
 
-    final faultVoice = _faultVoice(exercise, feedback);
     final holdStopped = exercise is Plank &&
         exercise.previousPlankState == PlankState.holding &&
         exercise.plankState == PlankState.setup;
+    final faultVoice = _faultVoice(exercise, feedback) ??
+        (holdStopped ? 'common.fix_pose' : null);
     final shouldSpeakFault = faultVoice != null &&
         holdStopped &&
         (faultVoice != _lastFaultVoice ||
@@ -168,6 +178,13 @@ class PlankVoiceCoach implements ExerciseVoiceCoach {
     }
 
     return null;
+  }
+
+  @override
+  Future<void> waitUntilIdle({
+    Duration timeout = const Duration(seconds: 4),
+  }) {
+    return _voicePlayer.waitUntilIdle(timeout: timeout);
   }
 
   @override

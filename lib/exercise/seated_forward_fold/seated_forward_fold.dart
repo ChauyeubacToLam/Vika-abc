@@ -209,6 +209,7 @@ class SeatedForwardFold extends ExerciseBase {
 
   void _updateStateBuffer(SeatedForwardContext ctx) {
     var newState = state;
+    var completedHoldTarget = false;
 
     switch (state) {
       case SeatedForwardState.setup:
@@ -229,7 +230,7 @@ class SeatedForwardFold extends ExerciseBase {
         if (ctx.hipAngle < targetDepth &&
             ctx.hipVelocity.abs() < SeatedForwardConfig.Av_Stable_Velocity) {
           _stableStartTimeMs ??= ctx.frameTimestampMs;
-          if (ctx.frameTimestampMs - _stableStartTimeMs! >= 2000) {
+          if (ctx.frameTimestampMs - _stableStartTimeMs! >= 1000) {
             newState = SeatedForwardState.isometricHold;
             _stableStartTimeMs = null;
           }
@@ -242,7 +243,10 @@ class SeatedForwardFold extends ExerciseBase {
         if (ctx.hipAngle < _minHipAngleThisRep) {
           _minHipAngleThisRep = ctx.hipAngle;
         }
-        if (ctx.hipAngle >
+        if (tempoMetric.getLiveHoldTime(ctx.frameTimestampMs) >= maxSeconds) {
+          newState = SeatedForwardState.ascending;
+          completedHoldTarget = true;
+        } else if (ctx.hipAngle >
             _minHipAngleThisRep + SeatedForwardConfig.Ascending_Threshold) {
           newState = SeatedForwardState.ascending;
         }
@@ -256,23 +260,36 @@ class SeatedForwardFold extends ExerciseBase {
     }
 
     if (newState != state) {
+      final oldState = state;
       for (final m in _metrics) {
-        m.onStateTransition(state, newState, ctx.frameTimestampMs);
+        m.onStateTransition(oldState, newState, ctx.frameTimestampMs);
       }
-      prevState = state;
+      prevState = oldState;
       state = newState;
+
+      if (oldState == SeatedForwardState.isometricHold &&
+          newState == SeatedForwardState.ascending &&
+          completedHoldTarget) {
+        _completeRep(ctx);
+      }
 
       if (state == SeatedForwardState.setup &&
           prevState == SeatedForwardState.ascending) {
-        _completeRep(ctx);
+        _resetAttempt();
       }
     }
   }
 
   double _targetDepth() {
-    return _userMaxRom != null
-        ? _userMaxRom! * 1.15
-        : SeatedForwardConfig.Ah_Hold_Safety_Floor;
+    return SeatedForwardConfig.Ah_Hold_Safety_Floor;
+  }
+
+  void _resetAttempt() {
+    _minHipAngleThisRep = 999.0;
+    _stableStartTimeMs = null;
+    for (final m in _metrics) {
+      m.reset();
+    }
   }
 
   void _completeRep(SeatedForwardContext ctx) {

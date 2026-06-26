@@ -638,6 +638,10 @@ class BirdDog extends ExerciseBase {
 
 abstract class BirdDogVoicePlayer {
   Future<void> speak(String text);
+  Future<void> waitUntilIdle({Duration timeout = const Duration(seconds: 4)}) {
+    return Future<void>.value();
+  }
+
   void clearQueue();
   void clearPendingButKeepCurrent();
   void dispose() {}
@@ -661,6 +665,12 @@ class _BirdDogAssetVoicePlayer implements BirdDogVoicePlayer {
 
   @override
   Future<void> speak(String text) => _player.speak(text);
+
+  @override
+  Future<void> waitUntilIdle({
+    Duration timeout = const Duration(seconds: 4),
+  }) =>
+      _player.waitUntilIdle(timeout: timeout);
 
   @override
   void clearQueue() => _player.clearQueue();
@@ -688,7 +698,7 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
   static const String _noCount = 'Lần này chưa tính.';
   static const String _ready = 'Sẵn sàng.';
   static const String _complete = 'Hoàn thành bài tập.';
-  static const String _goodClean = 'Tốt, hông giữ cân bằng.';
+  static const String _goodClean = 'common.correct';
 
   static const String _faultOppositeSide = 'Giơ tay và chân đối diện.';
   static const String _faultAlternate = 'Đổi sang bên còn lại.';
@@ -811,6 +821,8 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
     final topAdvice = _immediateVoiceForRaw(exercise.lastRepTopVoiceMessage);
     if (topAdvice != null) {
       _voicePlayer.speak(topAdvice);
+    } else {
+      _voicePlayer.speak('common.fix_pose');
     }
   }
 
@@ -829,6 +841,8 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
         _setFaultCounts[faultId] = (_setFaultCounts[faultId] ?? 0) + 1;
       }
       _voicePlayer.speak(topAdvice);
+    } else {
+      _voicePlayer.speak('common.fix_pose');
     }
   }
 
@@ -920,6 +934,13 @@ class BirdDogVoiceCoach implements ExerciseVoiceCoach {
       'trunk' => 'Hiệp này đừng để hông lệch.',
       _ => null,
     };
+  }
+
+  @override
+  Future<void> waitUntilIdle({
+    Duration timeout = const Duration(seconds: 4),
+  }) {
+    return _voicePlayer.waitUntilIdle(timeout: timeout);
   }
 
   @override

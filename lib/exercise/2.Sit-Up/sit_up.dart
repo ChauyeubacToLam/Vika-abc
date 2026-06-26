@@ -23,11 +23,13 @@ class SitUpConfig {
   // FIX: Spec yêu cầu 100° (code cũ là 110°)
   static const double START_KNEE_MAX = 115.0;
 
-  static const double RISING_TRUNK_START = 30.0; // Must be > LYING_TRUNK_THRESHOLD
+  static const double RISING_TRUNK_START =
+      30.0; // Must be > LYING_TRUNK_THRESHOLD
   static const double COUNTABLE_TOP_KHS_THRESHOLD = 142.0;
   static const double UPRIGHT_KHS_THRESHOLD = 105.0;
   static const double LOWERING_KHS_THRESHOLD = 110.0;
-  static const double LOWERING_KHS_DIFF = 15.0; // Increased to prevent noise bouncing
+  static const double LOWERING_KHS_DIFF =
+      15.0; // Increased to prevent noise bouncing
   static const double LYING_TRUNK_THRESHOLD = 22.0;
 }
 
@@ -303,43 +305,25 @@ class SitUp extends ExerciseBase with SideTrackedExerciseMixin {
     final allFaults = <FaultRecord>[];
     for (var metric in _metrics) allFaults.addAll(metric.faults);
 
-    final legLifts = allFaults.where((f) => f.type == 'Stability').toList();
-    bool isLegLifted = legLifts.isNotEmpty;
-
-    if (!isLegLifted) {
-      repCount++;
-    } else {
-      final voiceMsg = legLifts.first.voiceMessage;
-      if (voiceMsg != null && voiceMsg.isNotEmpty) {
-        ttsService.speak(voiceMsg);
-      }
-    }
+    repCount++;
 
     correctForm = !allFaults.any((f) => f.affectsForm);
 
-    if (isLegLifted) {
-      resultIssues.feedback['Result'] = 'Không tính rep';
-    } else if (!correctForm) {
+    if (!correctForm) {
       resultIssues.feedback['Result'] = 'Fix Form';
     }
 
-    if (!isLegLifted) {
-      logger.addRepLog(
-          RepLog(correctForm: correctForm, repNumber: repCount, data: {
-        "min_khs_angle": romMetric.minKneeHipShoulder ?? 180.0,
-        "lowering_time": tempoMetric.loweringDuration ?? 0.0,
-        "fault_types": allFaults.map((e) => e.type).toSet().toList()
-      }));
-    }
+    logger
+        .addRepLog(RepLog(correctForm: correctForm, repNumber: repCount, data: {
+      "min_khs_angle": romMetric.minKneeHipShoulder ?? 180.0,
+      "lowering_time": tempoMetric.loweringDuration ?? 0.0,
+      "fault_types": allFaults.map((e) => e.type).toSet().toList()
+    }));
 
     correctForm = true;
     _minKhsThisRep = null;
     for (var metric in _metrics) {
-      if (isLegLifted) {
-        metric.reset();
-      } else {
-        metric.resetAndCountFault();
-      }
+      metric.resetAndCountFault();
     }
   }
 

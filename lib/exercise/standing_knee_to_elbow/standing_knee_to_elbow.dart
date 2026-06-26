@@ -215,17 +215,35 @@ class StandingKneeToElbow extends ExerciseBase {
       "rightKneeY": rightKneeY,
     }, timeStamp: now));
 
-    if (kteState == KteState.standing_base) {
-      // Fast movement: check if knee is significantly lifted relative to torso length
-      double torsoLength = (leftShoulder.y - leftHip.y).abs();
-      if (leftKneeY <
-          rightKneeY -
-              torsoLength * StandingKneeToElbowConfig.KNEE_LIFT_START_RATIO) {
+    if (kteState == KteState.standing_base ||
+        kteState == KteState.approaching) {
+      final torsoLengthForSide = (leftShoulder.y - leftHip.y).abs();
+      final hipWidthForSide = (leftHip.x - rightHip.x).abs();
+      final rawTouchDistanceForSide =
+          _touchEnterDistance(torsoLengthForSide, hipWidthForSide);
+      final touchDistanceForSide =
+          rawTouchDistanceForSide <= 1e-6 ? 1.0 : rawTouchDistanceForSide;
+      final leftCrossDistance = calculateDistance(rightElbow, leftKnee);
+      final rightCrossDistance = calculateDistance(leftElbow, rightKnee);
+      final leftLiftRatio = torsoLengthForSide <= 0
+          ? 0.0
+          : (rightKneeY - leftKneeY) / torsoLengthForSide;
+      final rightLiftRatio = torsoLengthForSide <= 0
+          ? 0.0
+          : (leftKneeY - rightKneeY) / torsoLengthForSide;
+      final leftScore =
+          leftLiftRatio + (1.0 - leftCrossDistance / touchDistanceForSide);
+      final rightScore =
+          rightLiftRatio + (1.0 - rightCrossDistance / touchDistanceForSide);
+
+      if ((leftLiftRatio > StandingKneeToElbowConfig.KNEE_LIFT_START_RATIO ||
+              leftCrossDistance <= touchDistanceForSide) &&
+          leftScore >= rightScore) {
         _liftingLegSide = TrackedSide.left;
         _standingLegSide = TrackedSide.right;
-      } else if (rightKneeY <
-          leftKneeY -
-              torsoLength * StandingKneeToElbowConfig.KNEE_LIFT_START_RATIO) {
+      } else if (rightLiftRatio >
+              StandingKneeToElbowConfig.KNEE_LIFT_START_RATIO ||
+          rightCrossDistance <= touchDistanceForSide) {
         _liftingLegSide = TrackedSide.right;
         _standingLegSide = TrackedSide.left;
       }
@@ -318,7 +336,9 @@ class StandingKneeToElbow extends ExerciseBase {
     final touchExitDistance = _touchExitDistance(torsoLength, hipWidth);
 
     if (kteState == KteState.standing_base) {
-      if (liftingKneeY <
+      if (distanceD <= touchEnterDistance) {
+        _transitionState(KteState.touch, now);
+      } else if (liftingKneeY <
           standingKneeY -
               torsoLength * StandingKneeToElbowConfig.KNEE_LIFT_START_RATIO) {
         _transitionState(KteState.approaching, now);

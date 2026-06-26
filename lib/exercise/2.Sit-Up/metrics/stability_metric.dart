@@ -36,7 +36,7 @@ class StabilityMetric extends SitUpMetricBase {
       final dy = ctx.ankleY - _startAnkleY!;
       final deviation = math.sqrt(dx * dx + dy * dy) / ctx.scaleFactor!;
 
-      if (deviation > 0.10 && !_faults.any((f) => f.type == 'Stability')) {
+      if (deviation > 0.22 && !_faults.any((f) => f.type == 'Stability')) {
         _faults.add(FaultRecord(
           phase: ctx.state.name,
           type: 'Stability',

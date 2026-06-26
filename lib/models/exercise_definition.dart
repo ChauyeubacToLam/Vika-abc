@@ -825,13 +825,13 @@ final List<ExerciseDefinition> exerciseDefinitions = [
     name: 'Bow Pose',
     subtitle: 'Nâng ngực và đùi thành hình cánh cung',
     description:
-        '3 lần giữ × 15 giây. AI theo dõi kết nối tay-chân và độ nâng đồng đều của ngực và đùi theo thời gian thực.',
+        '10 lần giữ × 15 giây. AI theo dõi kết nối tay-chân và độ nâng đồng đều của ngực và đùi theo thời gian thực.',
     icon: Icons.fitness_center,
     primaryColor: const Color(0xFF00E5FF),
     secondaryColor: const Color(0xFF0091EA),
     difficulty: 'Trung bình',
     targetMuscles: ['Lưng dưới', 'Cơ dựng sống', 'Đùi trước'],
-    duration: '3 × 15s',
+    duration: '10 × 15s',
     cameraHint: 'Quay nghiêng người so với camera.',
     framingHint: 'Giữ vai, hông, gối và cổ chân trong khung hình.',
     setupTips: [
@@ -964,8 +964,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
     targetMuscles: ['Cơ liên sườn', 'Core', 'Bụng'],
     duration: '20 reps',
     cameraHint: 'Đặt camera chính diện trước mặt.',
-    framingHint:
-        'Ngồi đối diện camera, thấy rõ hai vai, hai tay, hông và gối.',
+    framingHint: 'Ngồi đối diện camera, thấy rõ hai vai, hai tay, hông và gối.',
     setupTips: [
       'Đặt điện thoại nằm ngang trước mặt, ngang tầm ngực.',
       'Ngồi ngả lưng ra sau khoảng 45 độ, co gối, hai tay chụm trước ngực.',
@@ -982,13 +981,13 @@ final List<ExerciseDefinition> exerciseDefinitions = [
     name: 'Seated Forward Fold',
     subtitle: 'Giãn gân kheo và lưng dưới',
     description:
-        'Gập người về trước và giữ tĩnh 30 giây. AI theo dõi độ thẳng của gối và đường cong cột sống theo thời gian thực.',
+        '10 lần gập người và giữ 8 giây. AI theo dõi độ thẳng của gối và đường cong cột sống theo thời gian thực.',
     icon: Icons.fitness_center,
     primaryColor: const Color(0xFF00E5FF),
     secondaryColor: const Color(0xFF0091EA),
     difficulty: 'Người mới',
     targetMuscles: ['Gân kheo', 'Lưng dưới', 'Hông'],
-    duration: '30s',
+    duration: '10 × 8s',
     cameraHint: 'Quay nghiêng người so với camera.',
     framingHint:
         'Đặt điện thoại nằm ngang, thấy rõ vai, hông, gối và bàn chân.',

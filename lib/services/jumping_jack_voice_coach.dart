@@ -6,6 +6,10 @@ import 'queued_asset_voice_player.dart';
 
 abstract class JumpingJackVoicePlayer {
   Future<void> speak(String text);
+  Future<void> waitUntilIdle({Duration timeout = const Duration(seconds: 4)}) {
+    return Future<void>.value();
+  }
+
   void clearQueue();
   void clearPendingButKeepCurrent();
   void dispose() {}
@@ -31,6 +35,12 @@ class _JumpingJackAssetVoicePlayer implements JumpingJackVoicePlayer {
   Future<void> speak(String text) => _player.speak(text);
 
   @override
+  Future<void> waitUntilIdle({
+    Duration timeout = const Duration(seconds: 4),
+  }) =>
+      _player.waitUntilIdle(timeout: timeout);
+
+  @override
   void clearQueue() => _player.clearQueue();
 
   @override
@@ -44,19 +54,12 @@ class JumpingJackVoiceCoach implements ExerciseVoiceCoach {
   JumpingJackVoiceCoach({JumpingJackVoicePlayer? voicePlayer})
       : _voicePlayer = voicePlayer ?? _JumpingJackAssetVoicePlayer();
 
-  static const int _liveFaultCooldownMs = 2500;
-  static const int _postRepCueCooldownReps = 2;
-
   final JumpingJackVoicePlayer _voicePlayer;
-  final Map<String, int> _lastPostRepVoiceRep = {};
 
   int _lastRepCount = 0;
-  int _lastCleanVoiceRep = -99;
-  int _lastLiveFaultAtMs = 0;
   bool _didSpeakSetup = false;
   bool _didAnnounceReady = false;
   bool _didAnnounceSetComplete = false;
-  String? _lastLiveFaultVoice;
 
   @override
   void processFrame({
@@ -65,7 +68,6 @@ class JumpingJackVoiceCoach implements ExerciseVoiceCoach {
     required bool hasPose,
     required Map<String, String> feedback,
   }) {
-    final nowMs = DateTime.now().millisecondsSinceEpoch;
     final repIncreased = repCount > _lastRepCount;
 
     if (exercise.exerciseState == ExerciseState.notActivated) {
@@ -76,7 +78,7 @@ class JumpingJackVoiceCoach implements ExerciseVoiceCoach {
 
     if (exercise.exerciseState == ExerciseState.completed) {
       if (!_didAnnounceSetComplete) {
-        _voicePlayer.clearQueue();
+        _voicePlayer.clearPendingButKeepCurrent();
         if (repIncreased) {
           _speakRepOutcome(exercise, repCount);
         }
@@ -95,27 +97,15 @@ class JumpingJackVoiceCoach implements ExerciseVoiceCoach {
     }
 
     if (!_didAnnounceReady) {
-      _voicePlayer.clearQueue();
       _voicePlayer.speak('Sẵn sàng');
       _didAnnounceReady = true;
     }
 
     if (repIncreased) {
-      _voicePlayer.clearQueue();
+      _voicePlayer.clearPendingButKeepCurrent();
       _speakRepOutcome(exercise, repCount);
       _lastRepCount = repCount;
-      _lastLiveFaultVoice = null;
       return;
-    }
-
-    final liveFaultVoice = _liveFaultVoice(feedback);
-    if (liveFaultVoice != null &&
-        (liveFaultVoice != _lastLiveFaultVoice ||
-            nowMs - _lastLiveFaultAtMs >= _liveFaultCooldownMs)) {
-      _lastLiveFaultVoice = liveFaultVoice;
-      _lastLiveFaultAtMs = nowMs;
-      _voicePlayer.clearPendingButKeepCurrent();
-      _voicePlayer.speak(liveFaultVoice);
     }
 
     _lastRepCount = repCount;
@@ -136,45 +126,25 @@ class JumpingJackVoiceCoach implements ExerciseVoiceCoach {
     _voicePlayer.speak('$repCount');
 
     if (exercise is JumpingJack && exercise.lastRepWasClean) {
-      if (repCount - _lastCleanVoiceRep >= 4) {
-        _voicePlayer.speak('jumping_jack.good_clean');
-        _lastCleanVoiceRep = repCount;
-      }
+      _voicePlayer.speak('common.correct');
       return;
     }
 
     if (exercise is! JumpingJack) return;
 
     final voice = exercise.lastRepTopVoiceMessage;
-    if (voice == null || voice.isEmpty) return;
-
-    final lastRep = _lastPostRepVoiceRep[voice] ?? -99;
-    if (repCount - lastRep < _postRepCueCooldownReps) return;
-
-    _lastPostRepVoiceRep[voice] = repCount;
+    if (voice == null || voice.isEmpty) {
+      _voicePlayer.speak('common.fix_pose');
+      return;
+    }
     _voicePlayer.speak(voice);
   }
 
-  String? _liveFaultVoice(Map<String, String> feedback) {
-    final arms = feedback['Arms'] ?? '';
-    if (arms.contains('cao') || arms.contains('Duỗi')) {
-      return 'Vươn tay cao hơn';
-    }
-
-    final legs = feedback['Legs'] ?? '';
-    if (legs.contains('rộng')) {
-      return 'Mở chân rộng hơn';
-    }
-
-    final tempo = feedback['Tempo'] ?? '';
-    if (tempo.contains('Chậm') || tempo.contains('nhanh')) {
-      return 'Chậm lại, giữ tư thế';
-    }
-    if (tempo.contains('Nhanh hơn')) {
-      return 'Nhanh hơn một chút';
-    }
-
-    return null;
+  @override
+  Future<void> waitUntilIdle({
+    Duration timeout = const Duration(seconds: 4),
+  }) {
+    return _voicePlayer.waitUntilIdle(timeout: timeout);
   }
 
   @override

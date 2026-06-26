@@ -88,14 +88,11 @@ Future<int> _completeShortHoldRep({
   expect(exercise.state, SeatedForwardState.isometricHold);
 
   var currentTimestamp = timestampMs + 2200;
-  for (var i = 0; i < 4; i += 1) {
+  for (var i = 0; i < 12; i += 1) {
     await Future<void>.delayed(const Duration(milliseconds: 70));
     currentTimestamp += 100;
     _pump(exercise, cleanHold, currentTimestamp);
   }
-
-  currentTimestamp += 100;
-  _pump(exercise, start, currentTimestamp);
   expect(exercise.state, SeatedForwardState.ascending);
 
   currentTimestamp += 100;
@@ -110,7 +107,7 @@ void main() {
 
   test('Seated Forward Fold scores partial clean time over all three holds',
       () async {
-    final exercise = SeatedForwardFold()
+    final exercise = SeatedForwardFold(maxSeconds: 2, maxHolds: 3)
       ..cameraFacing = CameraFacing.right
       ..exerciseState = ExerciseState.activated;
     final start = _seatedForwardPose(
@@ -145,9 +142,9 @@ void main() {
       metValue: 2.5,
     );
 
-    expect(setLogs['total_seconds'], 45.0);
+    expect(setLogs['total_seconds'], 6.0);
     expect(goodSeconds, greaterThan(0.0));
-    expect(goodSeconds, lessThan(45.0));
+    expect(goodSeconds, lessThan(6.0));
     expect(report.formScore, lessThan(100));
   });
 }

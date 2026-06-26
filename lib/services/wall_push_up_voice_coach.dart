@@ -6,6 +6,10 @@ import 'wall_push_up_voice_assets.dart';
 
 abstract class WallPushUpVoicePlayer {
   Future<void> speak(String text);
+  Future<void> waitUntilIdle({Duration timeout = const Duration(seconds: 4)}) {
+    return Future<void>.value();
+  }
+
   void clearQueue();
   void clearPendingButKeepCurrent();
   void dispose() {}
@@ -31,6 +35,12 @@ class _WallPushUpAssetVoicePlayer implements WallPushUpVoicePlayer {
   Future<void> speak(String text) => _player.speak(text);
 
   @override
+  Future<void> waitUntilIdle({
+    Duration timeout = const Duration(seconds: 4),
+  }) =>
+      _player.waitUntilIdle(timeout: timeout);
+
+  @override
   void clearQueue() => _player.clearQueue();
 
   @override
@@ -45,11 +55,9 @@ class WallPushUpVoiceCoach implements ExerciseVoiceCoach {
       : _ttsService = ttsService ?? _WallPushUpAssetVoicePlayer();
 
   static const int _phaseCueMinGapMs = 350;
-  static const int _faultCueCooldownMs = 3000;
-  static const int _postRepCueCooldownReps = 2;
 
   static const List<String> _readyCountdown = ['Sẵn sàng'];
-  static const String _cleanRepCue = 'wall_push_up.good_clean';
+  static const String _cleanRepCue = 'common.correct';
 
   final WallPushUpVoicePlayer _ttsService;
 
@@ -59,9 +67,6 @@ class WallPushUpVoiceCoach implements ExerciseVoiceCoach {
   bool _didAnnounceSetComplete = false;
   bool _didAnnounceReady = false;
   bool _didSpeakSetup = false;
-  final Map<String, int> _lastFaultVoiceAtMs = {};
-  final Map<String, int> _lastPostRepVoiceRep = {};
-  final Set<String> _liveFaultVoicesSpokenThisRep = {};
 
   @override
   void processFrame({
@@ -80,7 +85,6 @@ class WallPushUpVoiceCoach implements ExerciseVoiceCoach {
           _speakRepOutcome(
             exercise: exercise,
             repCount: repCount,
-            nowMs: nowMs,
             includeCount: _shouldSpeakCompletedRepCount(
               exercise: exercise,
               repCount: repCount,
@@ -91,14 +95,12 @@ class WallPushUpVoiceCoach implements ExerciseVoiceCoach {
         _didAnnounceSetComplete = true;
       }
       _lastPhasePhrase = null;
-      _liveFaultVoicesSpokenThisRep.clear();
       _lastRepCount = repCount;
       return;
     }
 
     if (exercise.exerciseState == ExerciseState.notActivated) {
       _speakSetup(exercise);
-      _liveFaultVoicesSpokenThisRep.clear();
       _lastPhasePhrase = null;
       _lastRepCount = repCount;
       return;
@@ -108,16 +110,12 @@ class WallPushUpVoiceCoach implements ExerciseVoiceCoach {
         exercise.isPaused ||
         !hasPose) {
       _lastPhasePhrase = null;
-      if (exercise.exerciseState != ExerciseState.activated) {
-        _liveFaultVoicesSpokenThisRep.clear();
-      }
       _lastRepCount = repCount;
       return;
     }
 
     final phasePhrase = _phasePhrase(exercise);
     if (!_didAnnounceReady) {
-      _ttsService.clearPendingButKeepCurrent();
       for (final phrase in _readyCountdown) {
         _ttsService.speak(phrase);
       }
@@ -129,26 +127,17 @@ class WallPushUpVoiceCoach implements ExerciseVoiceCoach {
       _lastPhaseCueAtMs = nowMs;
     }
 
-    final liveFaultVoice = _highestPriorityLiveFaultVoice(feedback);
-    final liveFaultAlreadySpokenThisRep = liveFaultVoice != null &&
-        _liveFaultVoicesSpokenThisRep.contains(liveFaultVoice);
-    final canSpeakLiveFault = liveFaultVoice != null &&
-        !liveFaultAlreadySpokenThisRep &&
-        _canSpeakLiveFaultVoice(liveFaultVoice, nowMs);
-
     if (repIncreased) {
       _ttsService.clearPendingButKeepCurrent();
       _speakRepOutcome(
         exercise: exercise,
         repCount: repCount,
-        nowMs: nowMs,
         includeCount: true,
       );
       if (!exercise.requestStop()) {
         _ttsService.speak('Hạ xuống');
       }
       _lastPhasePhrase = null;
-      _liveFaultVoicesSpokenThisRep.clear();
       _lastRepCount = repCount;
       return;
     }
@@ -162,13 +151,14 @@ class WallPushUpVoiceCoach implements ExerciseVoiceCoach {
       _lastPhaseCueAtMs = nowMs;
     }
 
-    if (liveFaultVoice != null && canSpeakLiveFault) {
-      _lastFaultVoiceAtMs[liveFaultVoice] = nowMs;
-      _liveFaultVoicesSpokenThisRep.add(liveFaultVoice);
-      _ttsService.speak(liveFaultVoice);
-    }
-
     _lastRepCount = repCount;
+  }
+
+  @override
+  Future<void> waitUntilIdle({
+    Duration timeout = const Duration(seconds: 4),
+  }) {
+    return _ttsService.waitUntilIdle(timeout: timeout);
   }
 
   @override
@@ -205,11 +195,6 @@ class WallPushUpVoiceCoach implements ExerciseVoiceCoach {
     }
   }
 
-  bool _canSpeakLiveFaultVoice(String voice, int nowMs) {
-    final lastSpokenAt = _lastFaultVoiceAtMs[voice] ?? 0;
-    return nowMs - lastSpokenAt >= _faultCueCooldownMs;
-  }
-
   bool _shouldSpeakCompletedRepCount({
     required ExerciseBase exercise,
     required int repCount,
@@ -220,67 +205,9 @@ class WallPushUpVoiceCoach implements ExerciseVoiceCoach {
     return true;
   }
 
-  String? _highestPriorityLiveFaultVoice(Map<String, String> feedback) {
-    final form = feedback['Form'] ?? '';
-    if (form.contains('Chưa xuống đủ sâu')) return 'Xuống thấp hơn';
-    if (form.contains('Vai, hông') || form.contains('thẳng hàng')) {
-      return 'Giữ thân thẳng';
-    }
-    if (form.contains('Wall Push Up')) return 'Đứng nghiêng vào tường';
-
-    final body = feedback['Body'] ?? '';
-    if (body.contains('Giữ vai') || body.contains('lệch')) {
-      return 'Giữ thân thẳng';
-    }
-
-    final arms = feedback['Arms'] ?? '';
-    if (arms.contains('Ép khuỷu') || arms.contains('Khuỷu tay')) {
-      return 'Ép khuỷu tay vào';
-    }
-
-    final shoulders = feedback['Shoulders'] ?? '';
-    if (shoulders.contains('Hạ vai') || shoulders.contains('nhún')) {
-      return 'Hạ vai xuống';
-    }
-
-    final neck = feedback['Neck'] ?? '';
-    if (neck.contains('Giữ cổ') || neck.contains('ngửa')) {
-      return 'Giữ cổ thẳng';
-    }
-
-    final head = feedback['Head'] ?? '';
-    if (head.contains('Kéo cằm') || head.contains('Đầu')) {
-      return 'Kéo cằm về';
-    }
-
-    final feet = feedback['Feet'] ?? '';
-    if (feet.contains('Kiễng gót')) return 'Kiễng gót chân lên';
-    if (feet.contains('Giữ chân') || feet.contains('Chân hơi')) {
-      return 'Giữ chân cố định';
-    }
-
-    final wall = feedback['Wall'] ?? '';
-    if (wall.contains('Tay bị') || wall.contains('giữ tay')) {
-      return 'Chống tay vào tường';
-    }
-
-    final tempo = feedback['Tempo'] ?? '';
-    if (tempo.contains('Hạ chậm')) return 'Chậm lại';
-
-    final setup = feedback['Setup'] ?? '';
-    if (setup.contains('tay ngang vai') ||
-        setup.contains('tường') ||
-        setup.contains('nghiêng người')) {
-      return 'Đứng nghiêng vào tường';
-    }
-
-    return null;
-  }
-
   void _speakRepOutcome({
     required ExerciseBase exercise,
     required int repCount,
-    required int nowMs,
     required bool includeCount,
   }) {
     if (includeCount) {
@@ -295,14 +222,12 @@ class WallPushUpVoiceCoach implements ExerciseVoiceCoach {
     _enqueuePostRepFeedbackIfAllowed(
       exercise: exercise,
       repCount: repCount,
-      nowMs: nowMs,
     );
   }
 
   void _enqueuePostRepFeedbackIfAllowed({
     required ExerciseBase exercise,
     required int repCount,
-    required int nowMs,
   }) {
     if (exercise is! WallPushUp || exercise.lastRepWasClean) {
       return;
@@ -310,20 +235,16 @@ class WallPushUpVoiceCoach implements ExerciseVoiceCoach {
 
     final rawVoice = exercise.lastRepTopVoiceMessage;
     if (rawVoice == null || rawVoice.isEmpty) {
+      _ttsService.speak('common.fix_pose');
       return;
     }
 
     final voice = _postRepVoice(rawVoice);
     if (voice == null) {
+      _ttsService.speak('common.fix_pose');
       return;
     }
 
-    final lastPostRepRep = _lastPostRepVoiceRep[voice] ?? -99;
-    if (repCount - lastPostRepRep < _postRepCueCooldownReps) {
-      return;
-    }
-
-    _lastPostRepVoiceRep[voice] = repCount;
     _ttsService.speak(voice);
   }
 

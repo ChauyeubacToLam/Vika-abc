@@ -7,7 +7,7 @@ class StableLimbsMetric extends DeadBugMetricBase {
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
 
-  final Debouncer _faultDebouncer = Debouncer(requiredFrames: 3);
+  final Debouncer _faultDebouncer = Debouncer(requiredFrames: 5);
 
   @override
   List<FaultRecord> get faults => _faults;
@@ -18,25 +18,25 @@ class StableLimbsMetric extends DeadBugMetricBase {
   double? get value => _debugData['supportMaxAngle'] as double?;
 
   @override
-  ThresholdBand? get threshold => const ThresholdBand(faultAbove: 115.0);
+  ThresholdBand? get threshold => const ThresholdBand(faultAbove: 135.0);
 
   @override
   void update(DeadBugRepContext ctx) {
     if (ctx.state == DeadBugState.extending || ctx.state == DeadBugState.hold) {
       // Tìm chi ĐANG DUỖI (>125)
-      bool lArmExt = ctx.leftArmAngle > 125.0;
-      bool rArmExt = ctx.rightArmAngle > 125.0;
-      bool lHipExt = ctx.leftHipAngle > 125.0;
-      bool rHipExt = ctx.rightHipAngle > 125.0;
+      bool lArmExt = ctx.leftArmAngle > 118.0;
+      bool rArmExt = ctx.rightArmAngle > 118.0;
+      bool lHipExt = ctx.leftHipAngle > 118.0;
+      bool rHipExt = ctx.rightHipAngle > 118.0;
 
       bool anyExtending = lArmExt || rArmExt || lHipExt || rHipExt;
       if (!anyExtending) return;
 
       // Chi TRỤ (không duỗi) phải giữ ở mức < 115 độ
-      bool lArmUnstable = !lArmExt && ctx.leftArmAngle > 115.0;
-      bool rArmUnstable = !rArmExt && ctx.rightArmAngle > 115.0;
-      bool lHipUnstable = !lHipExt && ctx.leftHipAngle > 115.0;
-      bool rHipUnstable = !rHipExt && ctx.rightHipAngle > 115.0;
+      bool lArmUnstable = !lArmExt && ctx.leftArmAngle > 135.0;
+      bool rArmUnstable = !rArmExt && ctx.rightArmAngle > 135.0;
+      bool lHipUnstable = !lHipExt && ctx.leftHipAngle > 135.0;
+      bool rHipUnstable = !rHipExt && ctx.rightHipAngle > 135.0;
       final supportAngles = <double>[
         if (!lArmExt) ctx.leftArmAngle,
         if (!rArmExt) ctx.rightArmAngle,

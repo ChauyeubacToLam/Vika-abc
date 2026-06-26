@@ -16,8 +16,8 @@ class AlignmentMetric extends BirdDogMetricBase {
   double? get value => _limbDeviation;
   @override
   ThresholdBand? get threshold => const ThresholdBand(
-        warningAbove: 15.0,
-        faultAbove: 20.0,
+        warningAbove: 25.0,
+        faultAbove: 35.0,
       );
   @override
   MetricStatus get status => _status;
@@ -25,15 +25,15 @@ class AlignmentMetric extends BirdDogMetricBase {
   @override
   void update(BirdDogRepContext ctx) {
     // 1. Lỗi căn chỉnh tay chân
-    bool armBad = ctx.activeArmHorizontalAngle > 20.0;
-    bool legBad = ctx.activeLegHorizontalAngle > 20.0;
+    bool armBad = ctx.activeArmHorizontalAngle > 35.0;
+    bool legBad = ctx.activeLegHorizontalAngle > 35.0;
 
     _limbDeviation = ctx.activeArmHorizontalAngle > ctx.activeLegHorizontalAngle
         ? ctx.activeArmHorizontalAngle
         : ctx.activeLegHorizontalAngle;
     _status = armBad || legBad
         ? MetricStatus.fault
-        : _limbDeviation! > 15.0
+        : _limbDeviation! > 25.0
             ? MetricStatus.near
             : MetricStatus.pass;
     _debugData['armHorizontal'] = ctx.activeArmHorizontalAngle;

@@ -23,9 +23,11 @@ class ReverseCrunchConfig {
 
   // Y Khoa (McGill & Sarti) thresholds
   static const double PELVIC_CURL_ANGLE_MIN_DROP =
-      10.0; // Ở Top, góc Vai-Hông-Gối phải giảm > 15 độ
+      7.0; // Ở Top, góc Vai-Hông-Gối phải giảm > 15 độ
   static const double HIP_LIFT_MIN_NORMALIZED =
-      0.035; // Hông phải rời mặt sàn tối thiểu
+      0.02; // Hông phải rời mặt sàn tối thiểu
+  static const double HIP_LIFT_EXIT_DROP_NORMALIZED = 0.012;
+  static const double RETURN_ANGLE_RISE = 5.0;
   static const double PEAK_KNEE_EXTENSION_MIN = 138.0;
   static const double PEAK_LEG_VERTICAL_MIN = 55.0;
   static const double PEAK_EXIT_LEG_VERTICAL_MIN = 45.0;

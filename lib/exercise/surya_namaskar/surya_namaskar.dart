@@ -214,6 +214,9 @@ class SuryaNamaskarExercise extends ExerciseBase {
   @override
   String get exerciseName => 'Surya Namaskar';
 
+  @override
+  ExerciseVoiceCoach? createVoiceCoach() => null;
+
   bool get usesSegmentationPersonGate => false;
 
   @override
@@ -836,6 +839,13 @@ class _SuryaFlowVoiceCoach implements ExerciseVoiceCoach {
     required bool hasPose,
     required Map<String, String> feedback,
   }) {}
+
+  @override
+  Future<void> waitUntilIdle({
+    Duration timeout = const Duration(seconds: 4),
+  }) {
+    return Future<void>.value();
+  }
 
   @override
   void dispose() {}

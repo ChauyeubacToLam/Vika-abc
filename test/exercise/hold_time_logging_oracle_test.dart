@@ -283,11 +283,11 @@ void main() {
       _pump(exercise, cleanHold, 5000);
       _pump(exercise, cleanHold, 5100);
 
-      expect(exercise.liveHoldSeconds, closeTo(2.9, 0.001));
+      expect(exercise.liveHoldSeconds, closeTo(3.9, 0.001));
 
       exercise.onSetComplete();
 
-      expect(exercise.logger.setLogs['total_seconds'], 30.0);
+      expect(exercise.logger.setLogs['total_seconds'], 100.0);
       expect(exercise.logger.setLogs['good_seconds'], 0.0);
     });
   });

@@ -40,7 +40,8 @@ class ElbowAngleMetric extends SphinxMetricBase {
     }
 
     // Phase isometricHold: Bắt lỗi đẩy thẳng tay
-    if (_straightArmDebouncer.update(ctx.elbowAngle > 120)) {
+    if (_straightArmDebouncer
+        .update(ctx.elbowAngle > SphinxConfig.Ab_Elbow_Hold_Angle[1])) {
       _isFaultingNow = true;
       ctx.resultIssues.feedback['Arm'] = 'Gập khuỷu tay lại!';
       if (!_instructionSet) {

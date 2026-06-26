@@ -5,20 +5,22 @@ export '../../fault_record.dart';
 
 // --- Quy định danh: Các biến thuật toán 'A', ký tự 2 duy nhất ---
 class SphinxConfig {
-  static const double Aa_Start_Body_Angle = 160.0;
-  static const List<double> Ab_Elbow_Hold_Angle = [55.0, 135.0];
-  static const List<double> Ac_Spine_Ext_Angle = [115.0, 180.0];
-  static const double Ad_Hip_Ground_Tol = 0.25;
-  static const int Ae_Min_Hold_Time = 2;
+  static const double Aa_Start_Body_Angle = 140.0;
+  static const List<double> Ab_Elbow_Hold_Angle = [45.0, 155.0];
+  static const List<double> Ac_Spine_Ext_Angle = [105.0, 175.0];
+  static const double Ad_Hip_Ground_Tol = 0.35;
+  static const int Ae_Min_Hold_Time = 30;
   static const int Af_Max_Reps = 1;
-  static const double Ag_Neck_Shrug_Tol = 0.14;
+  static const double Ag_Neck_Shrug_Tol = 0.10;
   static const double Ah_Stability_Var = 35.0;
   // [Fix Gap 1]: Ngưỡng phát hiện ngửa cổ (hyperextension).
   // neckAngle = góc Tai - Vai - Hông. Khi nằm trung tính ~160-170
   // Nếu < 140 là ngửa ra sau quá nhiều so với ngực
-  static const double Ai_Neck_Hyper_Tol = 125.0;
-  static const double Aj_Forearm_Horiz_Tol = 42.0;
-  static const double Ak_UpperArm_Vert_Tol = 75.0;
+  static const double Ai_Neck_Hyper_Tol = 110.0;
+  static const double Aj_Forearm_Horiz_Tol = 55.0;
+  static const double Ak_UpperArm_Vert_Tol = 55.0;
+  static const double Al_Exit_Elbow_Angle = 165.0;
+  static const double Am_Exit_Spine_Angle = 172.0;
 }
 
 enum SphinxState { proneSetup, ascending, isometricHold, descending }

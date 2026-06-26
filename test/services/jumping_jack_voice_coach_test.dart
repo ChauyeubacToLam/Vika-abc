@@ -15,6 +15,11 @@ class _FakeJumpingJackVoicePlayer implements JumpingJackVoicePlayer {
   }
 
   @override
+  Future<void> waitUntilIdle({
+    Duration timeout = const Duration(seconds: 4),
+  }) async {}
+
+  @override
   void clearQueue() {
     clearQueueCount++;
     spoken.clear();
@@ -77,7 +82,7 @@ void main() {
       feedback: const {},
     );
 
-    expect(player.spoken.take(2), ['1', 'jumping_jack.good_clean']);
+    expect(player.spoken.skip(1).take(2), ['1', 'common.correct']);
   });
 
   test('speaks rep count and correction after a faulty rep', () {
@@ -95,10 +100,10 @@ void main() {
       feedback: const {},
     );
 
-    expect(player.spoken.take(2), ['1', 'Mở chân rộng hơn']);
+    expect(player.spoken.skip(1).take(2), ['1', 'Mở chân rộng hơn']);
   });
 
-  test('speaks live arm correction during open phase feedback', () {
+  test('does not speak live arm correction during open phase feedback', () {
     final player = _FakeJumpingJackVoicePlayer();
     final coach = JumpingJackVoiceCoach(voicePlayer: player);
     final exercise = JumpingJack()..exerciseState = ExerciseState.activated;
@@ -110,6 +115,6 @@ void main() {
       feedback: const {'Arms': 'Vươn tay cao hơn!'},
     );
 
-    expect(player.spoken, contains('Vươn tay cao hơn'));
+    expect(player.spoken, ['Sẵn sàng']);
   });
 }

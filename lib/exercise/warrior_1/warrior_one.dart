@@ -55,6 +55,11 @@ class WarriorOneConfig {
   /// isInStartPosition / Check 4: minimum stance ratio to count as "feet apart".
   static const double START_STANCE_MIN = 0.65;
 
+  /// Entry gate: hold timer starts only after the full Warrior I shape appears.
+  static const double ENTRY_FRONT_KNEE_MAX = 165.0;
+  static const double ENTRY_BACK_KNEE_MIN = 140.0;
+  static const double ENTRY_ARM_MAX = 60.0;
+
   // --- Check 3: front-knee depth (coaching only) ---
   static const double DEPTH_GOOD_MIN = 85.0; // desk-worker band
   static const double DEPTH_GOOD_MAX = 165.0;
@@ -389,6 +394,12 @@ class WarriorOne extends ExerciseBase {
 
     // 5. Hip Y-velocity → "is still?".
     final bool isStill = _updateStill(hip.y, now);
+    final bool frontKneeReady =
+        frontKneeAngle <= WarriorOneConfig.ENTRY_FRONT_KNEE_MAX;
+    final bool backLegReady =
+        backKneeAngle >= WarriorOneConfig.ENTRY_BACK_KNEE_MIN;
+    final bool armsReady = armVerticalAngle <= WarriorOneConfig.ENTRY_ARM_MAX;
+    final bool readyToHold = frontKneeReady && backLegReady && armsReady;
 
     // 6. Build HoldContext.
     final ctx = HoldContext(
@@ -421,17 +432,23 @@ class WarriorOne extends ExerciseBase {
     debugData['backKnee'] = backKneeAngle.toStringAsFixed(1);
     debugData['stance'] = stance.toStringAsFixed(2);
     debugData['isStill'] = isStill;
+    debugData['readyToHold'] = readyToHold;
     debugData['holdTime'] = _currentHoldSeconds().toStringAsFixed(1);
     debugData['repCount'] = repCount.toString();
 
     // 8. State machine.
-    _updateState(isStill, frontKneeAngle, trunkLean, cervicalAngle, now);
+    _updateState(isStill, readyToHold, trunkLean, cervicalAngle, now);
 
     // 9. Phase-specific work.
     switch (holdState) {
       case WarriorOneState.entry:
         _holdSeconds.resetTick();
-        _runEntry(stance);
+        _runEntry(
+          stance,
+          frontKneeReady: frontKneeReady,
+          backLegReady: backLegReady,
+          armsReady: armsReady,
+        );
         break;
 
       case WarriorOneState.hold:
@@ -486,9 +503,34 @@ class WarriorOne extends ExerciseBase {
 
   // --- ENTRY: one-time stance check (Check 4) ---
 
-  void _runEntry(double stance) {
+  void _runEntry(
+    double stance, {
+    required bool frontKneeReady,
+    required bool backLegReady,
+    required bool armsReady,
+  }) {
     resultIssues.addInstruction(
-        'entry', 'Status', 'Vào tư thế, giơ tay lên cao...');
+      'entry',
+      'Status',
+      _entryGuidance(
+        frontKneeReady: frontKneeReady,
+        backLegReady: backLegReady,
+        armsReady: armsReady,
+      ),
+    );
+
+    if (!frontKneeReady) {
+      resultIssues.addInstruction(
+          'entry', 'Depth', 'Hạ gối chân trước xuống thêm một chút.');
+    }
+    if (!backLegReady) {
+      resultIssues.addInstruction(
+          'entry', 'Back leg', 'Duỗi thẳng chân sau trước khi giữ.');
+    }
+    if (!armsReady) {
+      resultIssues.addInstruction(
+          'entry', 'Arms', 'Giơ hai tay lên cao rồi giữ yên.');
+    }
 
     if (_stanceChecked || scaleFactor <= 0) return;
     _stanceChecked = true;
@@ -500,6 +542,19 @@ class WarriorOne extends ExerciseBase {
       resultIssues.addInstruction(
           'entry', 'Stance', 'Bước ngắn lại một chút để giữ thăng bằng nhé!');
     }
+  }
+
+  String _entryGuidance({
+    required bool frontKneeReady,
+    required bool backLegReady,
+    required bool armsReady,
+  }) {
+    if (frontKneeReady && backLegReady && armsReady) {
+      return 'Giữ yên tư thế Warrior I để bắt đầu đếm.';
+    }
+    if (!frontKneeReady) return 'Hạ gối chân trước xuống thêm một chút.';
+    if (!backLegReady) return 'Duỗi thẳng chân sau trước khi giữ.';
+    return 'Giơ hai tay lên cao rồi giữ yên.';
   }
 
   // --- HOLD complete: finalize, score, depth coaching, side switch ---
@@ -553,12 +608,12 @@ class WarriorOne extends ExerciseBase {
 
   // --- State Machine ---
 
-  void _updateState(bool isStill, double frontKneeAngle, double trunkLean,
+  void _updateState(bool isStill, bool readyToHold, double trunkLean,
       double cervicalAngle, int now) {
     switch (holdState) {
       case WarriorOneState.entry:
         // Stable → begin the hold and capture baselines.
-        if (isStill) {
+        if (isStill && readyToHold) {
           _transition(WarriorOneState.hold, now);
           _holdStartMs = now;
           _trunkBaseline = trunkLean;

@@ -52,7 +52,7 @@ class SyncElevationMetric extends VUpMetricBase {
           type: 'AsyncElevation',
           message: 'Mất đồng bộ thân trên và chi dưới',
           voiceMessage: 'Hãy nâng cả tay và chân CÙNG LÚC để bảo vệ lưng!',
-          affectsForm: true,
+          affectsForm: false,
           priority: VUpFaultPriority.syncElevation,
         ));
         _evaluatedThisRep = true; // Chỉ log 1 lần mỗi rep

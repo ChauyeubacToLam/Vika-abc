@@ -122,6 +122,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   int _cameraInitGeneration = 0;
   int? _activeCameraInitGeneration;
   static const Duration _personDetectionInterval = Duration(milliseconds: 450);
+  static const Duration _voiceCompletionTimeout = Duration(seconds: 5);
 
   @override
   void initState() {
@@ -1024,14 +1025,19 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     _setCompleteTimer?.cancel();
     unawaited(_poseChannel.stopDetection().catchError((Object _) {}));
 
-    // Give the completion cue a short breath, then make teardown deterministic
-    // before the parent swaps this active page out of the tree.
+    // Let the final rep verdict and completion cue drain before the parent
+    // swaps this active page out of the tree.
     _setCompleteTimer = Timer(const Duration(milliseconds: 250), () {
       unawaited(_finishSetAndNotifyParent());
     });
   }
 
   Future<void> _finishSetAndNotifyParent() async {
+    if (_isDisposed) return;
+    final voiceCoach = _voiceCoach;
+    if (voiceCoach != null) {
+      await voiceCoach.waitUntilIdle(timeout: _voiceCompletionTimeout);
+    }
     if (_isDisposed) return;
     await _shutdownPipelines();
     _voiceCoach?.dispose();
@@ -2116,8 +2122,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       return const _GuidanceCopy(
         icon: Icons.fit_screen_rounded,
         title: 'Lùi lại để thấy toàn thân',
-        body:
-            'Lùi lại hoặc hạ điện thoại để thấy từ vai đến bàn chân.',
+        body: 'Lùi lại hoặc hạ điện thoại để thấy từ vai đến bàn chân.',
         mode: SystemBannerMode.warn,
       );
     }

@@ -6,6 +6,10 @@ import 'queued_asset_voice_player.dart';
 
 abstract class LegRaiseVoicePlayer {
   Future<void> speak(String text);
+  Future<void> waitUntilIdle({Duration timeout = const Duration(seconds: 4)}) {
+    return Future<void>.value();
+  }
+
   void clearQueue();
   void clearPendingButKeepCurrent();
   void dispose() {}
@@ -31,6 +35,12 @@ class _LegRaiseAssetVoicePlayer implements LegRaiseVoicePlayer {
   Future<void> speak(String text) => _player.speak(text);
 
   @override
+  Future<void> waitUntilIdle({
+    Duration timeout = const Duration(seconds: 4),
+  }) =>
+      _player.waitUntilIdle(timeout: timeout);
+
+  @override
   void clearQueue() => _player.clearQueue();
 
   @override
@@ -44,19 +54,13 @@ class LegRaiseVoiceCoach implements ExerciseVoiceCoach {
   LegRaiseVoiceCoach({LegRaiseVoicePlayer? voicePlayer})
       : _voicePlayer = voicePlayer ?? _LegRaiseAssetVoicePlayer();
 
-  static const int _liveFaultCooldownMs = 2500;
-  static const int _postRepCueCooldownReps = 2;
-
   final LegRaiseVoicePlayer _voicePlayer;
-  final Map<String, int> _lastPostRepVoiceRep = {};
 
   int _lastRepCount = 0;
   int _lastInvalidAttemptCount = 0;
-  int _lastLiveFaultAtMs = 0;
   bool _didSpeakSetup = false;
   bool _didAnnounceReady = false;
   bool _didAnnounceSetComplete = false;
-  String? _lastLiveFaultVoice;
 
   @override
   void processFrame({
@@ -65,7 +69,6 @@ class LegRaiseVoiceCoach implements ExerciseVoiceCoach {
     required bool hasPose,
     required Map<String, String> feedback,
   }) {
-    final nowMs = DateTime.now().millisecondsSinceEpoch;
     final repIncreased = repCount > _lastRepCount;
     final invalidAttemptIncreased = exercise is LegRaise &&
         exercise.invalidAttemptCount > _lastInvalidAttemptCount;
@@ -78,7 +81,7 @@ class LegRaiseVoiceCoach implements ExerciseVoiceCoach {
 
     if (exercise.exerciseState == ExerciseState.completed) {
       if (!_didAnnounceSetComplete) {
-        _voicePlayer.clearQueue();
+        _voicePlayer.clearPendingButKeepCurrent();
         if (repIncreased) {
           _speakRepOutcome(exercise, repCount);
         }
@@ -97,36 +100,23 @@ class LegRaiseVoiceCoach implements ExerciseVoiceCoach {
     }
 
     if (!_didAnnounceReady) {
-      _voicePlayer.clearQueue();
       _voicePlayer.speak('Sẵn sàng');
       _didAnnounceReady = true;
     }
 
     if (repIncreased) {
-      _voicePlayer.clearQueue();
+      _voicePlayer.clearPendingButKeepCurrent();
       _speakRepOutcome(exercise, repCount);
       _syncCounters(exercise, repCount);
-      _lastLiveFaultVoice = null;
       return;
     }
 
     if (invalidAttemptIncreased) {
-      _voicePlayer.clearQueue();
+      _voicePlayer.clearPendingButKeepCurrent();
       _voicePlayer.speak('Lần này chưa tính');
       _speakCorrection(exercise, repCount + 1);
       _syncCounters(exercise, repCount);
-      _lastLiveFaultVoice = null;
       return;
-    }
-
-    final liveFaultVoice = _liveFaultVoice(feedback);
-    if (liveFaultVoice != null &&
-        (liveFaultVoice != _lastLiveFaultVoice ||
-            nowMs - _lastLiveFaultAtMs >= _liveFaultCooldownMs)) {
-      _lastLiveFaultVoice = liveFaultVoice;
-      _lastLiveFaultAtMs = nowMs;
-      _voicePlayer.clearPendingButKeepCurrent();
-      _voicePlayer.speak(liveFaultVoice);
     }
 
     _syncCounters(exercise, repCount);
@@ -147,7 +137,7 @@ class LegRaiseVoiceCoach implements ExerciseVoiceCoach {
     _voicePlayer.speak('$repCount');
 
     if (exercise is LegRaise && exercise.lastRepWasClean) {
-      _voicePlayer.speak('leg_raises.good_clean');
+      _voicePlayer.speak('common.correct');
       return;
     }
 
@@ -158,26 +148,11 @@ class LegRaiseVoiceCoach implements ExerciseVoiceCoach {
     if (exercise is! LegRaise) return;
 
     final voice = exercise.lastRepTopVoiceMessage;
-    if (voice == null || voice.isEmpty) return;
-
-    final lastRep = _lastPostRepVoiceRep[voice] ?? -99;
-    if (repNumber - lastRep < _postRepCueCooldownReps) return;
-
-    _lastPostRepVoiceRep[voice] = repNumber;
-    _voicePlayer.speak(voice);
-  }
-
-  String? _liveFaultVoice(Map<String, String> feedback) {
-    final error = feedback['Error'] ?? '';
-    if (error.contains('Gập gối')) return 'Duỗi thẳng đầu gối';
-    if (error.contains('Lưng')) return 'Ép lưng dưới xuống sàn';
-
-    final arms = feedback['Arms'] ?? '';
-    if (arms.contains('tay') || arms.contains('hông')) {
-      return 'Duỗi tay sát hông';
+    if (voice == null || voice.isEmpty) {
+      _voicePlayer.speak('common.fix_pose');
+      return;
     }
-
-    return null;
+    _voicePlayer.speak(voice);
   }
 
   void _syncCounters(ExerciseBase exercise, int repCount) {
@@ -185,6 +160,13 @@ class LegRaiseVoiceCoach implements ExerciseVoiceCoach {
     if (exercise is LegRaise) {
       _lastInvalidAttemptCount = exercise.invalidAttemptCount;
     }
+  }
+
+  @override
+  Future<void> waitUntilIdle({
+    Duration timeout = const Duration(seconds: 4),
+  }) {
+    return _voicePlayer.waitUntilIdle(timeout: timeout);
   }
 
   @override

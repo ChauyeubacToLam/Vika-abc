@@ -23,6 +23,7 @@ class QueuedAssetVoicePlayer {
         return;
       }
       unawaited(_processQueue());
+      _notifyIdleWaitersIfNeeded();
     });
   }
 
@@ -33,6 +34,7 @@ class QueuedAssetVoicePlayer {
   final String logTag;
   final AudioPlayer _audioPlayer = AudioPlayer();
   final List<String> _queue = [];
+  final List<Completer<void>> _idleWaiters = [];
 
   late final StreamSubscription<void> _completionSubscription;
   Future<void>? _configFuture;
@@ -40,6 +42,8 @@ class QueuedAssetVoicePlayer {
   bool _isClearingQueue = false;
   bool _isConfigured = false;
   bool _isDisposed = false;
+
+  bool get _isIdle => !_isPlaying && !_isClearingQueue && _queue.isEmpty;
 
   Future<void> _configurePlayer() async {
     try {
@@ -84,6 +88,22 @@ class QueuedAssetVoicePlayer {
     }
   }
 
+  Future<void> waitUntilIdle({
+    Duration timeout = const Duration(seconds: 4),
+  }) {
+    if (_isDisposed || _isIdle) {
+      return Future<void>.value();
+    }
+
+    final completer = Completer<void>();
+    _idleWaiters.add(completer);
+    final future = completer.future;
+    if (timeout == Duration.zero) {
+      return future;
+    }
+    return future.timeout(timeout, onTimeout: () {});
+  }
+
   void clearQueue() {
     unawaited(_clearQueue());
   }
@@ -91,11 +111,13 @@ class QueuedAssetVoicePlayer {
   Future<void> _clearQueue() async {
     _queue.clear();
     if (_isDisposed || _isClearingQueue) {
+      _notifyIdleWaitersIfNeeded();
       return;
     }
 
     if (!_isPlaying) {
       debugPrint('[$logTag] queue cleared (idle)');
+      _notifyIdleWaitersIfNeeded();
       return;
     }
 
@@ -109,15 +131,18 @@ class QueuedAssetVoicePlayer {
       _isClearingQueue = false;
     }
     debugPrint('[$logTag] queue cleared');
+    _notifyIdleWaitersIfNeeded();
   }
 
   void clearPendingButKeepCurrent() {
     _queue.clear();
     debugPrint('[$logTag] pending queue cleared');
+    _notifyIdleWaitersIfNeeded();
   }
 
   Future<void> _processQueue() async {
     if (_isDisposed || _queue.isEmpty || _isPlaying || _isClearingQueue) {
+      _notifyIdleWaitersIfNeeded();
       return;
     }
 
@@ -127,6 +152,7 @@ class QueuedAssetVoicePlayer {
       await _configFuture;
       if (_isDisposed) {
         _isPlaying = false;
+        _notifyIdleWaitersIfNeeded();
         return;
       }
     }
@@ -136,11 +162,13 @@ class QueuedAssetVoicePlayer {
       final started = await _playText(text);
       if (!started) {
         _isPlaying = false;
+        _notifyIdleWaitersIfNeeded();
         unawaited(_processQueue());
       }
     } catch (error) {
       debugPrint('[$logTag] process queue exception: $error');
       _isPlaying = false;
+      _notifyIdleWaitersIfNeeded();
       unawaited(_processQueue());
     }
   }
@@ -183,8 +211,28 @@ class QueuedAssetVoicePlayer {
     _isPlaying = false;
     _isClearingQueue = false;
     _queue.clear();
+    _completeIdleWaiters();
     unawaited(_completionSubscription.cancel());
     unawaited(_disposePlayer());
+  }
+
+  void _notifyIdleWaitersIfNeeded() {
+    if (_isIdle) {
+      _completeIdleWaiters();
+    }
+  }
+
+  void _completeIdleWaiters() {
+    if (_idleWaiters.isEmpty) {
+      return;
+    }
+    final waiters = List<Completer<void>>.from(_idleWaiters);
+    _idleWaiters.clear();
+    for (final waiter in waiters) {
+      if (!waiter.isCompleted) {
+        waiter.complete();
+      }
+    }
   }
 
   Future<void> _disposePlayer() async {
