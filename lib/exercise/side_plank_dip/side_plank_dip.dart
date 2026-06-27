@@ -1,333 +1,333 @@
-// ignore_for_file: curly_braces_in_flow_control_structures, non_constant_identifier_names
-
-import 'package:vika/debug/tracked_metric.dart';
-import 'package:vika/utils/debouncer.dart';
-import '../../utils/exercise_logger.dart';
-import '../../utils/pose_math_helpers.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
+import '../../utils/exercise_logger.dart';
+import '../../utils/pose_math_helpers.dart';
 import '../exercise_base.dart';
 import 'metrics/side_plank_dip_metric_base.dart';
-import 'metrics/shoulder_alignment_metric.dart';
-import 'metrics/anti_rotation_metric.dart';
-import 'metrics/hip_amplitude_metric.dart';
 
 class SidePlankConfig {
-  static const int MAX_REP = 12;
-  static const double STRAIGHT_BODY_ANGLE = 165.0;
-  static const double BOTTOM_BODY_ANGLE = 150.0;
-  static const double MOVEMENT_THRESHOLD = 3.0; // Y-axis delta (pixels/cm)
-  static const double MOVEMENT_THRESHOLD_NORM = 0.025;
-  static const double BOTTOM_STILLNESS_NORM = 0.02;
-  static const int REP_COOLDOWN_MS = 500; // 0.5s
-  static const int REP_TIMEOUT_MS = 4000; // 4s
+  static const double MIN_BODY_ANGLE = 155.0;
+  static const double MAX_SHOULDER_ELBOW_OFFSET_RATIO = 0.55;
+  static const double MIN_BASELINE_WIDTH_RATIO = 0.05;
+  static const double MIN_ROTATION_RATIO = 0.60;
+  static const double MAX_ROTATION_RATIO = 1.55;
+  static const int MAX_FRAME_DELTA_MS = 250;
 }
 
+/// Static side plank hold.
+///
+/// The historical class/id is retained so saved sessions and report routing
+/// remain compatible, but hip-dip rep counting is intentionally removed.
 class SidePlankDip extends ExerciseBase {
+  SidePlankDip({required this.maxSeconds});
+
+  final int maxSeconds;
+
+  SidePlankState plankState = SidePlankState.setupPlank;
+  int _validHoldTimeMs = 0;
+  int? _lastFrameTimeMs;
+  double? _baselineShoulderWidth;
+  double? _baselineHipWidth;
+  bool _shoulderFaultSeen = false;
+  bool _rotationFaultSeen = false;
+  bool _bodyLineFaultSeen = false;
+
+  final HoldSecondsAccumulator _holdSeconds = HoldSecondsAccumulator(const [
+    'shoulder_seconds',
+    'rotation_seconds',
+    'body_line_seconds',
+  ]);
+
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
       const <VikaImageOrientation>{
-        VikaImageOrientation.portrait, // Ưu tiên quay dọc/ngang chính diện
+        VikaImageOrientation.portrait,
         VikaImageOrientation.landscapeLeft,
         VikaImageOrientation.landscapeRight,
       };
-
-  final int maxRep;
-  SidePlankDip({required this.maxRep});
-
-  SidePlankState plankState = SidePlankState.setupPlank;
-  SidePlankState previousPlankState = SidePlankState.setupPlank;
-
-  double? _previousHipY;
-  int? _lastRepTime;
-  int? _stateEnterTime;
-
-  final Debouncer _bottomDebouncer = Debouncer(requiredFrames: 3);
-
-  // Metrics & Report
-  final ShoulderAlignmentMetric shoulderAlignmentMetric =
-      ShoulderAlignmentMetric();
-  final AntiRotationMetric antiRotationMetric = AntiRotationMetric();
-  final HipAmplitudeMetric hipAmplitudeMetric = HipAmplitudeMetric();
-
-  late final List<SidePlankDipMetricBase> _metrics = [
-    shoulderAlignmentMetric,
-    antiRotationMetric,
-    hipAmplitudeMetric,
-  ];
-  late final List<TrackedMetric> _trackedMetrics =
-      _metrics.map(TrackedMetric.new).toList();
-
-  @override
-  List<TrackedMetric> get trackedDebugMetrics =>
-      List<TrackedMetric>.unmodifiable(
-        [
-          ...super.trackedDebugMetrics,
-          ..._trackedMetrics,
-        ],
-      );
 
   @override
   String get exerciseName => 'Side Plank with Hip Dip';
 
   @override
-  String get currentPhaseKey => plankState.toString().split('.').last;
+  String get currentPhaseKey => plankState.name;
 
   @override
-  String get currentPhaseLabel {
-    switch (plankState) {
-      case SidePlankState.setupPlank:
-        return 'Tư thế Plank';
-      case SidePlankState.basePlank:
-        return 'Chuẩn bị';
-      case SidePlankState.descending:
-        return 'Hạ hông';
-      case SidePlankState.bottom:
-        return 'Giữ đáy';
-      case SidePlankState.ascending:
-        return 'Nâng hông';
-      case SidePlankState.top:
-        return 'Đỉnh điểm';
-    }
+  String get currentPhaseLabel => plankState == SidePlankState.setupPlank
+      ? 'Vào tư thế plank nghiêng'
+      : 'Giữ plank nghiêng';
+
+  @override
+  double? get liveHoldSeconds => exerciseState == ExerciseState.activated
+      ? _validHoldTimeMs / 1000.0
+      : null;
+
+  @override
+  double? get liveHoldTargetSeconds => maxSeconds.toDouble();
+
+  @override
+  bool requestStop() => _validHoldTimeMs >= maxSeconds * 1000;
+
+  @override
+  void onExerciseActivated() {
+    super.onExerciseActivated();
+    plankState = SidePlankState.basePlank;
+    _validHoldTimeMs = 0;
+    _lastFrameTimeMs = null;
+    _holdSeconds.reset();
   }
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.left &&
         cameraFacing != CameraFacing.right) {
-      return 'Quay ngang người với camera để đo side plank chính xác.';
+      return 'Quay ngang người với camera để đo plank nghiêng chính xác.';
     }
 
-    final required = [
-      PoseLandmarkType.leftShoulder,
-      PoseLandmarkType.rightShoulder,
-      PoseLandmarkType.leftHip,
-      PoseLandmarkType.rightHip,
-      PoseLandmarkType.leftElbow,
-      PoseLandmarkType.rightElbow,
-      PoseLandmarkType.leftAnkle,
-      PoseLandmarkType.rightAnkle,
-    ];
-    for (final type in required) {
-      final landmark = landmarks[type];
-      if (landmark == null || !ExerciseBase.isLandmarkConfident(landmark)) {
-        return 'Giữ vai, khuỷu tay, hông và cổ chân rõ trong khung hình.';
-      }
+    final body = _trackedBody(landmarks);
+    if (body == null) {
+      return 'Giữ vai, khuỷu tay, hông và cổ chân rõ trong khung hình.';
     }
-    // Note: Gate y khoa rách chóp xoay cần làm ở UI trước khi mở cam.
-    return null; // Không ép góc quay cứng, nhưng yêu cầu chính diện.
+    return null;
   }
 
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    final leftShoulder = landmarks[PoseLandmarkType.leftShoulder];
-    final rightShoulder = landmarks[PoseLandmarkType.rightShoulder];
-    final leftHip = landmarks[PoseLandmarkType.leftHip];
-    final rightHip = landmarks[PoseLandmarkType.rightHip];
+    final body = _trackedBody(landmarks);
+    if (body == null) return false;
 
-    if (leftShoulder == null ||
-        rightShoulder == null ||
-        leftHip == null ||
-        rightHip == null) return false;
-    if (![leftShoulder, rightShoulder, leftHip, rightHip]
-        .every(ExerciseBase.isLandmarkConfident)) return false;
+    final geometry = _geometry(body);
+    if (!geometry.bodyStraight || !geometry.shoulderAligned) return false;
 
-    // Tư thế chuẩn bị giống hệt bài plank (thân người nằm ngang)
-    double trunkClockAngle =
-        calculateVerticalAngle(pivot: leftHip, point: leftShoulder);
-    double horizontalDiff = (trunkClockAngle % 180) - 90;
-    if (horizontalDiff.abs() > 30.0) return false;
-
-    antiRotationMetric.captureBaseline(landmarks); // Chụp baseline 2D
+    _baselineShoulderWidth = (body.leftShoulder.x - body.rightShoulder.x).abs();
+    _baselineHipWidth = (body.leftHip.x - body.rightHip.x).abs();
     return true;
   }
 
   @override
-  bool requestStop() => repCount >= maxRep;
+  void checkingPose(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+    final body = _trackedBody(landmarks);
+    if (body == null) {
+      _lastFrameTimeMs = null;
+      _holdSeconds.resetTick();
+      return;
+    }
+
+    final now = frameTimestampMs;
+    final previous = _lastFrameTimeMs;
+    _lastFrameTimeMs = now;
+    final dt = previous == null
+        ? 0
+        : (now - previous).clamp(0, SidePlankConfig.MAX_FRAME_DELTA_MS);
+
+    final geometry = _geometry(body);
+    final rotationStable = _rotationIsStable(body, geometry.scale);
+    final formClean =
+        geometry.bodyStraight && geometry.shoulderAligned && rotationStable;
+
+    if (formClean) {
+      _validHoldTimeMs += dt;
+    }
+
+    _shoulderFaultSeen |= !geometry.shoulderAligned;
+    _rotationFaultSeen |= !rotationStable;
+    _bodyLineFaultSeen |= !geometry.bodyStraight;
+
+    if (!geometry.bodyStraight) {
+      resultIssues.feedback['Amplitude'] =
+          'Nâng hông để vai, hông và cổ chân thành một đường thẳng.';
+    }
+    if (!geometry.shoulderAligned) {
+      resultIssues.feedback['Shoulder'] = 'Đặt khuỷu tay trụ ngay dưới vai.';
+    }
+    if (!rotationStable) {
+      resultIssues.feedback['Rotation'] =
+          'Giữ ngực và hông không đổ về trước hoặc sau.';
+    }
+
+    _holdSeconds.accumulate(
+      elapsedMs: elapsedMs,
+      faultingByKey: {
+        'shoulder_seconds': !geometry.shoulderAligned,
+        'rotation_seconds': !rotationStable,
+        'body_line_seconds': !geometry.bodyStraight,
+      },
+    );
+
+    resultIssues.addInstruction(
+      'basePlank',
+      'Status',
+      formClean
+          ? 'Giữ nguyên tư thế.'
+          : 'Chỉnh lại tư thế để tiếp tục tính giờ.',
+    );
+
+    debugData['sidePlankBodyAngle'] = geometry.bodyAngle;
+    debugData['sidePlankShoulderOffset'] = geometry.shoulderOffsetRatio;
+    debugData['sidePlankHoldSeconds'] = _validHoldTimeMs / 1000.0;
+  }
 
   @override
   void onSetComplete() {
+    if (repCount == 0) repCount = 1;
+
+    final faultTypes = <String>[
+      if (_shoulderFaultSeen) 'shoulder',
+      if (_rotationFaultSeen) 'rotation',
+      if (_bodyLineFaultSeen) 'amplitude',
+    ];
+    correctForm = faultTypes.isEmpty;
+
+    logger.addRepLog(RepLog(
+      correctForm: correctForm,
+      repNumber: repCount,
+      data: {
+        'hold_time': _validHoldTimeMs / 1000.0,
+        'fault_types': faultTypes,
+      },
+    ));
+    logger.pushKey('shoulder_align_fails_count', _shoulderFaultSeen ? 1 : 0);
+    logger.pushKey('rotation_fails_count', _rotationFaultSeen ? 1 : 0);
+    logger.pushKey('dip_depth_fails_count', _bodyLineFaultSeen ? 1 : 0);
+    logger.pushKey('total_seconds', maxSeconds.toDouble());
     logger.pushKey(
-        "shoulder_align_fails_count", shoulderAlignmentMetric.faultsCount);
-    logger.pushKey("rotation_fails_count", antiRotationMetric.faultsCount);
-    logger.pushKey("dip_depth_fails_count", hipAmplitudeMetric.faultsCount);
-    logger.pushGoodRepCount();
-    logger.pushKey('max_rep', maxRep);
-  }
-
-  @override
-  void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
-    final leftElbow = smoothedLandmarks[PoseLandmarkType.leftElbow];
-    final rightElbow = smoothedLandmarks[PoseLandmarkType.rightElbow];
-    if (leftElbow == null || rightElbow == null) return;
-
-    bool isLeftSupport = leftElbow.y > rightElbow.y;
-
-    final supportShoulder = smoothedLandmarks[isLeftSupport
-        ? PoseLandmarkType.leftShoulder
-        : PoseLandmarkType.rightShoulder];
-    final supportHip = smoothedLandmarks[
-        isLeftSupport ? PoseLandmarkType.leftHip : PoseLandmarkType.rightHip];
-    final supportAnkle = smoothedLandmarks[isLeftSupport
-        ? PoseLandmarkType.leftAnkle
-        : PoseLandmarkType.rightAnkle];
-    final supportElbow = isLeftSupport ? leftElbow : rightElbow;
-
-    final lShoulder = smoothedLandmarks[PoseLandmarkType.leftShoulder];
-    final rShoulder = smoothedLandmarks[PoseLandmarkType.rightShoulder];
-    final lHip = smoothedLandmarks[PoseLandmarkType.leftHip];
-    final rHip = smoothedLandmarks[PoseLandmarkType.rightHip];
-
-    if (supportShoulder == null ||
-        supportHip == null ||
-        supportAnkle == null ||
-        lShoulder == null ||
-        rShoulder == null ||
-        lHip == null ||
-        rHip == null) return;
-    if (![
-      supportShoulder,
-      supportHip,
-      supportAnkle,
-      supportElbow,
-      lShoulder,
-      rShoulder,
-      lHip,
-      rHip,
-    ].every(ExerciseBase.isLandmarkConfident)) return;
-
-    scaleFactor = calculateDistance(supportShoulder, supportHip);
-    if (!scaleFactor.isFinite || scaleFactor <= 1e-6) return;
-
-    // 1. Tính toán Hình học
-    double bodyAngle = calculateAngle(
-        firstPoint: supportShoulder,
-        midPoint: supportHip,
-        lastPoint: supportAnkle);
-    double shoulderElbowOffsetX =
-        (supportShoulder.x - supportElbow.x).abs() / scaleFactor;
-
-    double shoulderWidthX = (lShoulder.x - rShoulder.x).abs();
-    double shoulderWidthY = (lShoulder.y - rShoulder.y).abs();
-    double hipWidthX = (lHip.x - rHip.x).abs();
-    double lowerHipY = supportHip.y;
-    int now = frameTimestampMs;
-
-    final ctx = RepContext(
-      bodyAngle: bodyAngle,
-      shoulderElbowOffsetX: shoulderElbowOffsetX,
-      shoulderWidthX: shoulderWidthX,
-      hipWidthX: hipWidthX,
-      lowerHipY: lowerHipY,
-      shoulderWidthY: shoulderWidthY,
-      plankState: plankState,
-      frameTimestamp: now,
-      resultIssues: resultIssues,
+      'good_seconds',
+      _holdSeconds.goodSeconds.clamp(0.0, maxSeconds.toDouble()),
     );
-
-    debugData['State'] = currentPhaseKey;
-    debugData['BodyAng'] = bodyAngle.toStringAsFixed(0);
-    debugData['Offset'] = shoulderElbowOffsetX.toStringAsFixed(1);
-
-    // 2. State Machine Update
-    _updateState(
-        lowerHipY, bodyAngle, shoulderWidthY, shoulderWidthX, scaleFactor, now);
-    _previousHipY = lowerHipY;
-
-    // 3. Update Metrics
-    for (final metric in _metrics) {
-      metric.update(ctx);
-      debugData.addAll(metric.debugData);
-    }
-
-    // 4. Hoàn thành 1 Rep
-    if (plankState == SidePlankState.top &&
-        previousPlankState == SidePlankState.ascending) {
-      repCount += 1;
-      _lastRepTime = now;
-
-      final allFaults = <FaultRecord>[];
-      for (final metric in _metrics) allFaults.addAll(metric.faults);
-
-      correctForm = !allFaults.any((f) => f.affectsForm);
-      resultIssues.feedback['Result'] =
-          correctForm ? 'Hoàn hảo!' : 'Sửa form nhé';
-
-      final faultMap = <String, Map<String, String>>{};
-      for (final fault in allFaults) {
-        if (!faultMap.containsKey(fault.phase)) faultMap[fault.phase] = {};
-        faultMap[fault.phase]![fault.type] = fault.message;
-      }
-      setFeedback.add({correctForm: faultMap});
-
-      logger.addRepLog(RepLog(
-        correctForm: correctForm,
-        repNumber: repCount,
-        data: {
-          'fault_types': allFaults.map((f) => f.type).toSet().toList(),
-        },
-      ));
-
-      for (final metric in _metrics) metric.resetAndCountFault();
-
-      correctForm = true;
-
-      _transitionState(SidePlankState.basePlank, now);
-    }
+    logger.pushKey(
+      'shoulder_seconds',
+      _holdSeconds.faultSecondsFor('shoulder_seconds'),
+    );
+    logger.pushKey(
+      'rotation_seconds',
+      _holdSeconds.faultSecondsFor('rotation_seconds'),
+    );
+    logger.pushKey(
+      'body_line_seconds',
+      _holdSeconds.faultSecondsFor('body_line_seconds'),
+    );
+    logger.pushKey('max_rep', 1);
+    logger.pushGoodRepCount();
   }
 
-  void _updateState(double currentHipY, double bodyAngle, double shoulderWidthY,
-      double shoulderWidthX, double scale, int timestampMs) {
-    if (_previousHipY == null) return;
+  _SidePlankBody? _trackedBody(
+    Map<PoseLandmarkType, PoseLandmark> landmarks,
+  ) {
+    final leftElbow = landmarks[PoseLandmarkType.leftElbow];
+    final rightElbow = landmarks[PoseLandmarkType.rightElbow];
+    final leftShoulder = landmarks[PoseLandmarkType.leftShoulder];
+    final rightShoulder = landmarks[PoseLandmarkType.rightShoulder];
+    final leftHip = landmarks[PoseLandmarkType.leftHip];
+    final rightHip = landmarks[PoseLandmarkType.rightHip];
+    final leftAnkle = landmarks[PoseLandmarkType.leftAnkle];
+    final rightAnkle = landmarks[PoseLandmarkType.rightAnkle];
 
-    _stateEnterTime ??= timestampMs;
-
-    // Timeout logic: reset to basePlank or setupPlank if stuck for 4 seconds
-    if (plankState != SidePlankState.setupPlank &&
-        plankState != SidePlankState.basePlank) {
-      if (timestampMs - _stateEnterTime! > SidePlankConfig.REP_TIMEOUT_MS) {
-        _transitionState(SidePlankState.basePlank, timestampMs);
-      }
+    final required = [
+      leftElbow,
+      rightElbow,
+      leftShoulder,
+      rightShoulder,
+      leftHip,
+      rightHip,
+      leftAnkle,
+      rightAnkle,
+    ];
+    if (required.any((landmark) =>
+        landmark == null || !ExerciseBase.isLandmarkConfident(landmark))) {
+      return null;
     }
 
-    double deltaY =
-        currentHipY - _previousHipY!; // Y tăng -> đi xuống, Y giảm -> đi lên
-    final deltaYNorm = deltaY / scale;
-    if (plankState == SidePlankState.setupPlank) {
-      // Rotate into side plank
-      if (bodyAngle > SidePlankConfig.BOTTOM_BODY_ANGLE) {
-        _transitionState(SidePlankState.basePlank, timestampMs);
-      }
-    } else if (plankState == SidePlankState.basePlank) {
-      bool cooldownOk = _lastRepTime == null ||
-          (timestampMs - _lastRepTime! > SidePlankConfig.REP_COOLDOWN_MS);
-      if (cooldownOk &&
-          deltaYNorm > SidePlankConfig.MOVEMENT_THRESHOLD_NORM) {
-        _transitionState(SidePlankState.descending, timestampMs);
-      }
-    } else if (plankState == SidePlankState.descending) {
-      if (bodyAngle < SidePlankConfig.BOTTOM_BODY_ANGLE &&
-          _bottomDebouncer.update(
-              deltaYNorm.abs() < SidePlankConfig.BOTTOM_STILLNESS_NORM)) {
-        _transitionState(SidePlankState.bottom, timestampMs);
-      }
-    } else if (plankState == SidePlankState.bottom) {
-      if (deltaYNorm < -SidePlankConfig.MOVEMENT_THRESHOLD_NORM) {
-        _transitionState(SidePlankState.ascending, timestampMs);
-      }
-    } else if (plankState == SidePlankState.ascending) {
-      if (bodyAngle > SidePlankConfig.STRAIGHT_BODY_ANGLE) {
-        _transitionState(SidePlankState.top, timestampMs);
-      }
-    }
+    final isLeftSupport = leftElbow!.y >= rightElbow!.y;
+    return _SidePlankBody(
+      supportShoulder: isLeftSupport ? leftShoulder! : rightShoulder!,
+      supportElbow: isLeftSupport ? leftElbow : rightElbow,
+      supportHip: isLeftSupport ? leftHip! : rightHip!,
+      supportAnkle: isLeftSupport ? leftAnkle! : rightAnkle!,
+      leftShoulder: leftShoulder!,
+      rightShoulder: rightShoulder!,
+      leftHip: leftHip!,
+      rightHip: rightHip!,
+    );
   }
 
-  void _transitionState(SidePlankState newState, int timestampMs) {
-    previousPlankState = plankState;
-    plankState = newState;
-    _stateEnterTime = timestampMs;
-    for (final metric in _metrics) {
-      metric.onStateTransition(previousPlankState, newState, timestampMs);
+  ({
+    double scale,
+    double bodyAngle,
+    double shoulderOffsetRatio,
+    bool bodyStraight,
+    bool shoulderAligned,
+  }) _geometry(_SidePlankBody body) {
+    final scale = calculateDistance(body.supportShoulder, body.supportHip);
+    if (!scale.isFinite || scale <= 1e-6) {
+      return (
+        scale: 1.0,
+        bodyAngle: 0.0,
+        shoulderOffsetRatio: double.infinity,
+        bodyStraight: false,
+        shoulderAligned: false,
+      );
     }
+
+    final bodyAngle = calculateAngleNormalized(
+      firstPoint: body.supportShoulder,
+      midPoint: body.supportHip,
+      lastPoint: body.supportAnkle,
+    );
+    final shoulderOffset =
+        (body.supportShoulder.x - body.supportElbow.x).abs() / scale;
+    return (
+      scale: scale,
+      bodyAngle: bodyAngle,
+      shoulderOffsetRatio: shoulderOffset,
+      bodyStraight: bodyAngle >= SidePlankConfig.MIN_BODY_ANGLE,
+      shoulderAligned:
+          shoulderOffset <= SidePlankConfig.MAX_SHOULDER_ELBOW_OFFSET_RATIO,
+    );
   }
+
+  bool _rotationIsStable(_SidePlankBody body, double scale) {
+    final baselineShoulder = _baselineShoulderWidth;
+    final baselineHip = _baselineHipWidth;
+    if (baselineShoulder == null || baselineHip == null) return true;
+
+    bool stable(double current, double baseline) {
+      if (baseline / scale < SidePlankConfig.MIN_BASELINE_WIDTH_RATIO) {
+        return true;
+      }
+      final ratio = current / baseline;
+      return ratio >= SidePlankConfig.MIN_ROTATION_RATIO &&
+          ratio <= SidePlankConfig.MAX_ROTATION_RATIO;
+    }
+
+    return stable(
+          (body.leftShoulder.x - body.rightShoulder.x).abs(),
+          baselineShoulder,
+        ) &&
+        stable(
+          (body.leftHip.x - body.rightHip.x).abs(),
+          baselineHip,
+        );
+  }
+}
+
+class _SidePlankBody {
+  const _SidePlankBody({
+    required this.supportShoulder,
+    required this.supportElbow,
+    required this.supportHip,
+    required this.supportAnkle,
+    required this.leftShoulder,
+    required this.rightShoulder,
+    required this.leftHip,
+    required this.rightHip,
+  });
+
+  final PoseLandmark supportShoulder;
+  final PoseLandmark supportElbow;
+  final PoseLandmark supportHip;
+  final PoseLandmark supportAnkle;
+  final PoseLandmark leftShoulder;
+  final PoseLandmark rightShoulder;
+  final PoseLandmark leftHip;
+  final PoseLandmark rightHip;
 }

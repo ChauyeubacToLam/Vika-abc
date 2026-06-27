@@ -7,7 +7,7 @@ class SidePlankDipReportBuilderV2 extends ExerciseReportBuilder {
   Map<String, String> praiseMetricNames() => {
         'shoulder_align_fails_count': 'Vai an toàn',
         'rotation_fails_count': 'Chống xoay',
-        'dip_depth_fails_count': 'Biên độ hạ hông',
+        'dip_depth_fails_count': 'Đường thẳng thân người',
       };
 
   @override
@@ -22,8 +22,8 @@ class SidePlankDipReportBuilderV2 extends ExerciseReportBuilder {
               'Tưởng tượng lưng tựa phẳng vào tường, giữ thân thẳng thành một mặt phẳng.',
         ),
         'dip_depth_fails_count': (
-          watch: 'Trong Side Plank: nhịp hạ hông còn nông.',
-          next: 'Hạ hông xuống gần sàn hơn rồi dùng lực hông đẩy mạnh lên.',
+          watch: 'Trong Side Plank: hông có lúc hạ khỏi đường thẳng cơ thể.',
+          next: 'Nâng hông để vai, hông và cổ chân nằm trên một đường thẳng.',
         ),
       };
 
@@ -33,8 +33,8 @@ class SidePlankDipReportBuilderV2 extends ExerciseReportBuilder {
             'Khuỷu tay thẳng trục $c/$t rep - khớp vai an toàn!',
         'Chống xoay': (c, t) =>
             'Thân giữ phẳng $c/$t rep - cơ lõi kiểm soát tốt!',
-        'Biên độ hạ hông': (c, t) =>
-            'Hạ hông sâu $c/$t rep - cơ liên sườn làm việc tốt!',
+        'Đường thẳng thân người': (c, t) =>
+            'Giữ thân thẳng ổn định trong $c/$t hiệp!',
       };
 
   @override

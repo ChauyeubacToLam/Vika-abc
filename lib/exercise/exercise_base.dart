@@ -488,6 +488,10 @@ abstract class ExerciseBase {
 
   ExerciseVoiceCoach? createVoiceCoach() => _GenericExerciseVoiceCoach();
 
+  /// Whether the generic coach may replay faults from the previous set while
+  /// preparing the next one.
+  bool get shouldReplayPreviousSetVoiceFaults => true;
+
   void _populateBaseDebugData() {
     // debugData['exerciseState'] = exerciseState.toString().split('.').last;
     // debugData['cameraFacing'] = cameraFacing.toString().split('.').last;
@@ -1189,7 +1193,7 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
     if (!_didAnnounceReady) {
       _voicePlayer.speak('common.ready');
       _didAnnounceReady = true;
-      _speakPreviousSetAdviceIfNeeded(script);
+      _speakPreviousSetAdviceIfNeeded(exercise, script);
     }
 
     if (isHoldTimerExercise) {
@@ -1311,7 +1315,7 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
     _voicePlayer.speak(exercise.setupOrientationIntroVoiceKey);
     _voicePlayer.speak(script.cueKey('setup_position'));
     _voicePlayer.speak(script.cueKey('active_intro'));
-    _speakPreviousSetAdviceIfNeeded(script);
+    _speakPreviousSetAdviceIfNeeded(exercise, script);
     _didSpeakSetup = true;
   }
 
@@ -1367,8 +1371,12 @@ class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
     _voicePlayer.speak(script.faultKey(faultId));
   }
 
-  void _speakPreviousSetAdviceIfNeeded(GenericExerciseVoiceScript script) {
+  void _speakPreviousSetAdviceIfNeeded(
+    ExerciseBase exercise,
+    GenericExerciseVoiceScript script,
+  ) {
     if (_didSpeakPreviousSetAdvice) return;
+    if (!exercise.shouldReplayPreviousSetVoiceFaults) return;
 
     final previous = _previousSetFaultsBySlug[script.slug];
     if (previous == null || previous.isEmpty) return;

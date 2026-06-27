@@ -2,8 +2,6 @@ import 'walking_metric_base.dart';
 import '../walking_lunge.dart';
 
 class FrontKneeControlMetric extends WalkingMetricBase {
-  static const double MAX_KNEE_OVER_TOE_X = 0.12; // allow small margin
-
   @override
   void update(WalkingRepContext ctx) {
     if (ctx.state == WalkingState.standing ||
@@ -19,18 +17,9 @@ class FrontKneeControlMetric extends WalkingMetricBase {
           ctx.thighLength;
       debugData['kneeOverToeX'] = kneeOverToe.toStringAsFixed(2);
 
-      if (kneeOverToe > MAX_KNEE_OVER_TOE_X) {
-        addFault(
-          FaultRecord(
-            type: 'knee_over_toe',
-            message: 'Đầu gối đâm về trước quá nhiều! Bước chân dài ra.',
-            affectsForm: true,
-            phase: ctx.state.name,
-            priority: 1, // Critical
-            voiceMessage: 'Bước dài ra, đừng để gối đâm về trước!',
-          ),
-        );
-      }
+      // Keep this value for diagnostics only. Knee travel past the toes does
+      // not, by itself, prove that the step is too short, so it must not fail
+      // the rep or tell the user to lengthen the step.
     }
   }
 }

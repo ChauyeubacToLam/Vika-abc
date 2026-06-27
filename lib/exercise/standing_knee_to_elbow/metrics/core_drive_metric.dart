@@ -26,10 +26,10 @@ class CoreDriveMetric extends StandingKteMetricBase {
         if (kneeBelowHip && dropRatio > SHOULDER_DROP_RATIO_LIMIT) {
           addFault(
             FaultRecord(
-              type: 'neck_pulling',
+              type: 'core_drive',
               message:
                   'Hãy nhấc cao đùi lên! Đừng bẻ gập cổ và lưng chúi xuống!',
-              affectsForm: false, // High priority warning
+              affectsForm: true,
               phase: ctx.state.name,
               priority: 2,
               voiceMessage: 'Nhấc đùi cao lên!',

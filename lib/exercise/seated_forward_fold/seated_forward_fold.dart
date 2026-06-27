@@ -32,6 +32,7 @@ class SeatedForwardFold extends ExerciseBase {
   double _minHipAngleThisRep = 999.0;
   double _lastMaxDepth = 0.0;
   double? _userMaxRom;
+  double? _setupHipAngle;
 
   double _lastHipAngle = -1.0;
   int _lastTimestampMs = -1;
@@ -116,9 +117,13 @@ class SeatedForwardFold extends ExerciseBase {
       'kneeAngle': ak.toStringAsFixed(1),
     };
 
-    return ak >= SeatedForwardConfig.Ak_Start_Knee_Angle &&
+    final isValid = ak >= SeatedForwardConfig.Ak_Start_Knee_Angle &&
         ah >= SeatedForwardConfig.Ah_Start_Hip_Angle[0] &&
         ah <= SeatedForwardConfig.Ah_Start_Hip_Angle[1];
+    if (isValid) {
+      _setupHipAngle = ah;
+    }
+    return isValid;
   }
 
   @override
@@ -213,10 +218,15 @@ class SeatedForwardFold extends ExerciseBase {
 
     switch (state) {
       case SeatedForwardState.setup:
-        final movedFromStart =
-            ctx.hipAngle < SeatedForwardConfig.Ah_Start_Hip_Angle[0] - 5.0;
-        if (ctx.hipAngle < SeatedForwardConfig.Ah_Start_Hip_Angle[0] &&
-            (ctx.hipVelocity < -10.0 || movedFromStart)) {
+        final setupAngle = _setupHipAngle ?? 90.0;
+        final movedFromStart = ctx.hipAngle <
+            setupAngle - SeatedForwardConfig.Ah_Min_Fold_From_Setup;
+        if (movedFromStart &&
+            (ctx.hipVelocity < -6.0 ||
+                ctx.hipAngle <
+                    setupAngle -
+                        SeatedForwardConfig.Ah_Min_Fold_From_Setup -
+                        2.0)) {
           newState = SeatedForwardState.descending;
         }
         break;
@@ -281,7 +291,11 @@ class SeatedForwardFold extends ExerciseBase {
   }
 
   double _targetDepth() {
-    return SeatedForwardConfig.Ah_Hold_Safety_Floor;
+    final setupTarget =
+        (_setupHipAngle ?? 90.0) - SeatedForwardConfig.Ah_Min_Fold_From_Setup;
+    return setupTarget > SeatedForwardConfig.Ah_Hold_Safety_Floor
+        ? setupTarget
+        : SeatedForwardConfig.Ah_Hold_Safety_Floor;
   }
 
   void _resetAttempt() {

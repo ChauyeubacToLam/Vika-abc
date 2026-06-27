@@ -38,7 +38,7 @@ class KneeValgusMetric extends StandingKteMetricBase {
         if (isInward) {
           addFault(
             FaultRecord(
-              type: 'standing_knee_valgus',
+              type: 'knee_valgus',
               message:
                   'Gồng chặt chân trụ! Mở đầu gối ra, đừng để sụp vào trong!',
               affectsForm: true, // Critical error

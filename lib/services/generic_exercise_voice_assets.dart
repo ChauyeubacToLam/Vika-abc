@@ -221,14 +221,7 @@ class GenericExerciseVoiceAssets {
     'Sphinx Pose': GenericExerciseVoiceScript(
       slug: 'sphinx',
       cleanCueId: 'hold_good',
-      faultIds: [
-        'hip',
-        'straight_arm',
-        'forearm',
-        'upper_arm',
-        'shrug',
-        'neck'
-      ],
+      faultIds: ['straight_arm', 'forearm', 'upper_arm', 'shrug', 'neck'],
     ),
     'Standing Knee-to-Elbow': GenericExerciseVoiceScript(
       slug: 'standing_kte',

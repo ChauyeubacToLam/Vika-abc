@@ -2,8 +2,7 @@ import 'package:vika/exercise/exercise_base.dart';
 import 'package:vika/debug/tracked_metric.dart';
 import 'package:vika/utils/exercise_logger.dart';
 import '../../utils/pose_math_helpers.dart';
-import '../../utils/frame_buffer.dart';
-import '../../utils/frame_snapshot.dart';
+import '../../utils/debouncer.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../side_tracked_exercise_mixin.dart';
 import 'metrics/tricep_metric_base.dart';
@@ -16,9 +15,13 @@ enum TricepDipState { setup_top, descending, bottom, ascending }
 
 class TricepDipConfig {
   static const int MAX_REP = 15;
-  static const double DESCENDING_ELBOW_ANGLE = 145.0;
-  static const double BOTTOM_ELBOW_ANGLE = 125.0;
-  static const double ASCENDING_ELBOW_ANGLE = 150.0;
+  static const double MAX_SUPPORT_HEIGHT_DELTA_RATIO = 0.55;
+  static const double MAX_SEATED_HIP_HEIGHT_RATIO = 0.65;
+  static const double MIN_SEATED_HIP_HEIGHT_RATIO = -0.10;
+  static const double HIP_LIFT_START_RATIO = 0.16;
+  static const double HIP_LIFT_COUNT_RATIO = 0.22;
+  static const double HIP_LOWER_START_RATIO = 0.12;
+  static const double HIP_RETURN_RATIO = 0.07;
 }
 
 class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
@@ -34,8 +37,13 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
 
   TricepDipState tricepState = TricepDipState.setup_top;
   TricepDipState previousTricepState = TricepDipState.setup_top;
-  double _minElbowAngleThisRep = 180.0;
-  bool _hasStartedAscending = false;
+  double? _setupHipY;
+  double? _setupScale;
+
+  final Debouncer _liftDebouncer = Debouncer(requiredFrames: 2);
+  final Debouncer _topDebouncer = Debouncer(requiredFrames: 2);
+  final Debouncer _lowerDebouncer = Debouncer(requiredFrames: 2);
+  final Debouncer _returnDebouncer = Debouncer(requiredFrames: 2);
 
   // Metrics
   final HipThrustMetric hipThrustMetric = HipThrustMetric();
@@ -104,13 +112,13 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
   String get currentPhaseLabel {
     switch (tricepState) {
       case TricepDipState.setup_top:
-        return 'Vị trí bắt đầu';
+        return 'Ngồi chạm sàn';
       case TricepDipState.descending:
-        return 'Hạ xuống';
+        return 'Hạ mông';
       case TricepDipState.bottom:
-        return 'Giữ';
+        return 'Đã nhấc mông';
       case TricepDipState.ascending:
-        return 'Đẩy lên';
+        return 'Nhấc mông';
     }
   }
 
@@ -145,25 +153,32 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
     if (req == null) return false;
 
     final shoulder = req['shoulder']!;
-    final elbow = req['elbow']!;
     final wrist = req['wrist']!;
     final hip = req['hip']!;
     final ankle = req['ankle']!;
 
-    // 1. Arm almost vertical / straight
-    double elbowAngle = calculateAngleNormalized(
-        firstPoint: shoulder, midPoint: elbow, lastPoint: wrist);
-    if (elbowAngle < 155.0) {
-      resultIssues.feedback['System'] = 'Duỗi thẳng cánh tay.';
+    final scale = calculateDistance(shoulder, hip);
+    if (!scale.isFinite || scale <= 1e-6) return false;
+
+    // The setup is the seated floor position: hand and foot share the ground
+    // line while the hip remains close to it. The lift happens after activation.
+    final supportDelta = (wrist.y - ankle.y).abs() / scale;
+    final groundY = (wrist.y + ankle.y) / 2.0;
+    final seatedHipHeight = (groundY - hip.y) / scale;
+    if (supportDelta > TricepDipConfig.MAX_SUPPORT_HEIGHT_DELTA_RATIO) {
+      resultIssues.feedback['System'] =
+          'Đặt bàn tay và bàn chân cùng chống chắc xuống sàn.';
+      return false;
+    }
+    if (seatedHipHeight < TricepDipConfig.MIN_SEATED_HIP_HEIGHT_RATIO ||
+        seatedHipHeight > TricepDipConfig.MAX_SEATED_HIP_HEIGHT_RATIO) {
+      resultIssues.feedback['System'] =
+          'Ngồi để mông chạm sàn trước khi bắt đầu.';
       return false;
     }
 
-    // 2. Hip is off the ground (Y is smaller than ankle Y)
-    // Note: mlkit Y increases downwards. So hip.y < ankle.y means hip is higher.
-    if (hip.y >= ankle.y - 0.02) {
-      resultIssues.feedback['System'] = 'Nhấc hông lên khỏi mặt đất.';
-      return false;
-    }
+    _setupHipY = hip.y;
+    _setupScale = scale;
 
     return true;
   }
@@ -174,106 +189,77 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
     if (req == null) return;
 
     final shoulder = req['shoulder']!;
-    final elbow = req['elbow']!;
     final wrist = req['wrist']!;
     final hip = req['hip']!;
-    final ear = req['ear'];
-
-    double elbowAngle = calculateAngleNormalized(
-        firstPoint: shoulder, midPoint: elbow, lastPoint: wrist);
-    double forearmLength = calculateDistance(elbow, wrist);
+    final ankle = req['ankle']!;
 
     int now = frameTimestampMs;
+    final scale = calculateDistance(shoulder, hip);
+    if (!scale.isFinite || scale <= 1e-6) return;
+    _setupScale ??= scale;
+    _setupHipY ??= hip.y;
 
-    frameBuffer.addFrame(FrameSnapshot(log: {
-      "shoulderY": shoulder.y,
-      "hipY": hip.y,
-      "elbowAngle": elbowAngle,
-    }, timeStamp: now));
+    final normalizedScale = _setupScale! <= 1e-6 ? scale : _setupScale!;
+    final hipLiftRatio = (_setupHipY! - hip.y) / normalizedScale;
+    final supportDelta = (wrist.y - ankle.y).abs() / normalizedScale;
+    final supportsGrounded =
+        supportDelta <= TricepDipConfig.MAX_SUPPORT_HEIGHT_DELTA_RATIO;
 
-    _updateStateMachine(elbowAngle, now);
-
-    if (tricepState == TricepDipState.setup_top &&
-        previousTricepState != TricepDipState.setup_top) {
-      _completeRep();
-      previousTricepState = tricepState;
-      return;
-    }
-
-    final ctx = TricepRepContext(
-      elbowAngle: elbowAngle,
-      shoulder: shoulder,
-      elbow: elbow,
-      wrist: wrist,
-      hip: hip,
-      ear: ear,
-      forearmLength: forearmLength,
-      state: tricepState,
-      frameTimestamp: now,
-      resultIssues: resultIssues,
+    _updateStateMachine(
+      hipLiftRatio: hipLiftRatio,
+      supportsGrounded: supportsGrounded,
+      now: now,
     );
 
-    if (tricepState != TricepDipState.setup_top) {
-      for (final metric in _metrics) {
-        metric.update(ctx);
-      }
-    }
-
     debugData['tricepState'] = tricepState.name;
-    debugData['elbowAngle'] = elbowAngle;
+    debugData['hipLiftRatio'] = hipLiftRatio;
+    debugData['supportHeightDeltaRatio'] = supportDelta;
 
-    for (final metric in _metrics) {
-      debugData.addAll(metric.debugData);
-    }
-
-    if (tricepState == TricepDipState.descending) {
-      resultIssues.addInstruction('descending', 'Status', 'Gập tay xuống...');
+    if (!supportsGrounded) {
+      resultIssues.feedback['Support'] =
+          'Giữ bàn tay và bàn chân chống trên sàn.';
+    } else if (tricepState == TricepDipState.descending) {
+      resultIssues.addInstruction('descending', 'Status',
+          'Hạ mông chạm sàn để sẵn sàng nhịp tiếp theo.');
     } else if (tricepState == TricepDipState.bottom) {
-      resultIssues.addInstruction('bottom', 'Status', 'Đẩy lên!');
+      resultIssues.addInstruction('bottom', 'Status', 'Tốt! Hạ mông xuống.');
     } else if (tricepState == TricepDipState.ascending) {
-      resultIssues.addInstruction('ascending', 'Status', 'Duỗi thẳng tay!');
+      resultIssues.addInstruction('ascending', 'Status', 'Nhấc mông lên!');
+    } else {
+      resultIssues.addInstruction(
+          'setup_top', 'Status', 'Giữ tay và chân chống sàn, nhấc mông lên.');
     }
   }
 
-  void _updateStateMachine(double elbowAngle, int now) {
-    final hipYChange = frameBuffer.getChange("hipY", 3);
-    final elbowAngleChange = frameBuffer.getChange("elbowAngle", 3);
-
+  void _updateStateMachine({
+    required double hipLiftRatio,
+    required bool supportsGrounded,
+    required int now,
+  }) {
     if (tricepState == TricepDipState.setup_top) {
-      if (elbowAngle < TricepDipConfig.DESCENDING_ELBOW_ANGLE) {
-        _minElbowAngleThisRep = elbowAngle;
-        _hasStartedAscending = false;
-        _transitionState(TricepDipState.descending, now);
-      }
-    } else if (tricepState == TricepDipState.descending) {
-      _minElbowAngleThisRep = elbowAngle < _minElbowAngleThisRep
-          ? elbowAngle
-          : _minElbowAngleThisRep;
-      if (elbowAngle <= TricepRomMetric.MIN_DEPTH_ANGLE &&
-          (hipYChange == ChangeState.decreasing ||
-              elbowAngleChange == ChangeState.increasing)) {
-        _transitionState(TricepDipState.bottom, now);
-      }
-    } else if (tricepState == TricepDipState.bottom) {
-      if (hipYChange == ChangeState.decreasing ||
-          elbowAngleChange == ChangeState.increasing) {
-        _hasStartedAscending = true;
+      if (_liftDebouncer.update(supportsGrounded &&
+          hipLiftRatio >= TricepDipConfig.HIP_LIFT_START_RATIO)) {
         _transitionState(TricepDipState.ascending, now);
       }
     } else if (tricepState == TricepDipState.ascending) {
-      if (elbowAngleChange == ChangeState.increasing) {
-        _hasStartedAscending = true;
-      }
-      if (_hasStartedAscending &&
-          elbowAngle > TricepDipConfig.ASCENDING_ELBOW_ANGLE) {
+      if (_topDebouncer.update(supportsGrounded &&
+          hipLiftRatio >= TricepDipConfig.HIP_LIFT_COUNT_RATIO)) {
+        _transitionState(TricepDipState.bottom, now);
+        _completeRep();
+      } else if (hipLiftRatio <= TricepDipConfig.HIP_RETURN_RATIO) {
         _transitionState(TricepDipState.setup_top, now);
-      } else if (elbowAngleChange == ChangeState.decreasing &&
-          elbowAngle < TricepDipConfig.ASCENDING_ELBOW_ANGLE - 10) {
-        // Started another descent before finishing the rep: reject this attempt.
+      }
+    } else if (tricepState == TricepDipState.bottom) {
+      if (_lowerDebouncer
+          .update(hipLiftRatio <= TricepDipConfig.HIP_LOWER_START_RATIO)) {
         _transitionState(TricepDipState.descending, now);
-        for (final metric in _metrics) {
-          metric.reset();
-        }
+      }
+    } else if (tricepState == TricepDipState.descending) {
+      if (_returnDebouncer.update(supportsGrounded &&
+          hipLiftRatio <= TricepDipConfig.HIP_RETURN_RATIO)) {
+        _transitionState(TricepDipState.setup_top, now);
+        _setupHipY = _setupHipY! * 0.8 +
+            (_setupHipY! - hipLiftRatio * (_setupScale ?? 1.0)) * 0.2;
       }
     }
   }
@@ -284,13 +270,9 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
     previousTricepState = tricepState;
     tricepState = newState;
 
-    if (newState == TricepDipState.descending &&
+    if (newState == TricepDipState.ascending &&
         previousTricepState == TricepDipState.setup_top) {
       resultIssues.instructions.clear();
-    }
-
-    for (final metric in _metrics) {
-      metric.onStateTransition(previousTricepState, newState, timestampMs);
     }
   }
 
@@ -298,9 +280,6 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
     repCount++;
 
     final allFaults = <FaultRecord>[];
-    for (final metric in _metrics) {
-      allFaults.addAll(metric.faults);
-    }
 
     correctForm = !allFaults.any((f) => f.affectsForm);
     resultIssues.feedback['Result'] = correctForm ? 'Good Rep!' : 'Fix Form';
@@ -319,8 +298,5 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
     }));
 
     correctForm = true;
-    for (final metric in _metrics) {
-      metric.resetAndCountFault();
-    }
   }
 }

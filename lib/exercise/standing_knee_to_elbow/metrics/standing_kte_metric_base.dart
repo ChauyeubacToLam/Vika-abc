@@ -71,4 +71,9 @@ abstract class StandingKteMetricBase with FaultMetricDebugSource {
     _faults.clear();
     debugData.clear();
   }
+
+  void reset() {
+    _faults.clear();
+    debugData.clear();
+  }
 }

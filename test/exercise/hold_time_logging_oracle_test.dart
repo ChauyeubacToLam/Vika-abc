@@ -237,7 +237,7 @@ void main() {
 
     test('Seated Forward Fold good_seconds excludes active form-fault frames',
         () {
-      final exercise = SeatedForwardFold(maxSeconds: 10)
+      final exercise = SeatedForwardFold(maxSeconds: 10, maxHolds: 10)
         ..cameraFacing = CameraFacing.right;
       final start = _seatedForwardPose(
         shoulderX: 200,

@@ -290,9 +290,9 @@
     "definitionId": "seated__forward__fold",
     "classKey": "seated_forward_fold",
     "isFormChecked": true,
-    "sets": 1,
+    "sets": 3,
     "reps": null,
-    "seconds": 30,
+    "seconds": 15,
     "vietnameseName": "Tư thế ngồi gập người",
     "englishName": "Seated Forward Fold"
   },
@@ -302,10 +302,10 @@
     "classKey": "side_plank_dip",
     "isFormChecked": true,
     "sets": 3,
-    "reps": 10,
-    "seconds": null,
-    "vietnameseName": "Plank nghiêng hạ hông",
-    "englishName": "Side Plank with Hip Dip"
+    "reps": null,
+    "seconds": 15,
+    "vietnameseName": "Plank nghiêng",
+    "englishName": "Side Plank"
   },
   {
     "catalogId": "situp",
@@ -323,9 +323,9 @@
     "definitionId": "sphinx_",
     "classKey": "sphinx",
     "isFormChecked": true,
-    "sets": 1,
+    "sets": 3,
     "reps": null,
-    "seconds": 30,
+    "seconds": 15,
     "vietnameseName": "Tư thế nhân sư",
     "englishName": "Sphinx"
   },

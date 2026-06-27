@@ -4,7 +4,6 @@ import '../../utils/pose_math_helpers.dart';
 import '../../utils/exercise_logger.dart';
 import '../exercise_base.dart';
 import 'Metrics/sphinx_metric_base.dart';
-import 'Metrics/hip_ground_metric.dart';
 import 'Metrics/hold_tempo_metric.dart';
 import 'Metrics/elbow_angle_metric.dart';
 import 'Metrics/neck_shoulder_metric.dart';
@@ -24,18 +23,15 @@ class SphinxStretch extends ExerciseBase {
   double _lastHoldTime = 0.0;
   double _lastStabilityScore = 0.0;
   final HoldSecondsAccumulator _holdSeconds = HoldSecondsAccumulator(const [
-    'hip_seconds',
     'straight_arm_seconds',
     'shrug_neck_seconds',
   ]);
 
-  final HipGroundMetric hipMetric = HipGroundMetric();
   final HoldTempoMetric tempoMetric = HoldTempoMetric();
   final ElbowAngleMetric elbowMetric = ElbowAngleMetric();
   final NeckShoulderMetric neckMetric = NeckShoulderMetric();
 
   late final List<SphinxMetricBase> _metrics = [
-    hipMetric,
     tempoMetric,
     elbowMetric,
     neckMetric,
@@ -233,7 +229,6 @@ class SphinxStretch extends ExerciseBase {
       _holdSeconds.accumulate(
         elapsedMs: elapsedMs,
         faultingByKey: {
-          'hip_seconds': hipMetric.isFaultingNow,
           'straight_arm_seconds': elbowMetric.isFaultingNow,
           'shrug_neck_seconds': neckMetric.isFaultingNow,
         },
@@ -287,7 +282,6 @@ class SphinxStretch extends ExerciseBase {
       if (oldState == SphinxState.ascending &&
           newState == SphinxState.isometricHold) {
         _holdSeconds.resetTick();
-        hipMetric.reset();
         elbowMetric.reset();
         neckMetric.reset();
       } else if (oldState == SphinxState.isometricHold) {
@@ -324,7 +318,6 @@ class SphinxStretch extends ExerciseBase {
     tempoMetric.flushCurrentSegment(ctx.frameTimestampMs);
 
     final allFaults = <FaultRecord>[
-      ...hipMetric.faults,
       ...elbowMetric.faults,
       ...neckMetric.faults,
       ...tempoMetric.faults,
@@ -413,7 +406,10 @@ class SphinxStretch extends ExerciseBase {
     logger.pushKey("total_seconds", maxSeconds.toDouble());
     logger.pushKey(
         "good_seconds", _holdSeconds.goodSeconds.clamp(0.0, maxSeconds));
-    logger.pushKey("hip_seconds", _holdSeconds.faultSecondsFor('hip_seconds'));
+    // Hip pressure cannot be inferred reliably from 2D pose landmarks. Keep
+    // the historical report key at zero instead of coaching the user to press
+    // harder into the floor.
+    logger.pushKey("hip_seconds", 0.0);
     logger.pushKey("straight_arm_seconds",
         _holdSeconds.faultSecondsFor('straight_arm_seconds'));
     logger.pushKey("shrug_neck_seconds",

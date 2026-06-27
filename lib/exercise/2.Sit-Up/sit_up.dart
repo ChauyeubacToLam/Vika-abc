@@ -271,17 +271,18 @@ class SitUp extends ExerciseBase with SideTrackedExerciseMixin {
     } else if (_uprightDebouncer.update(state == SitUpState.rising &&
         khsAngle <= SitUpConfig.UPRIGHT_KHS_THRESHOLD)) {
       _transitionState(SitUpState.upright, now);
-    } else if (_loweringDebouncer.update(state == SitUpState.rising &&
-        _hasReachedCountableTop &&
-        khsAngle > _minKhsThisRep! + SitUpConfig.LOWERING_KHS_DIFF)) {
-      _transitionState(SitUpState.lowering, now);
-    } else if (_loweringDebouncer.update(state == SitUpState.upright &&
-        khsAngle > SitUpConfig.LOWERING_KHS_THRESHOLD)) {
-      _transitionState(SitUpState.lowering, now);
     } else if (_lyingDebouncer.update(
         (state == SitUpState.lowering || state == SitUpState.rising) &&
             trunkHoriz < SitUpConfig.LYING_TRUNK_THRESHOLD)) {
       _transitionState(SitUpState.lying, now);
+    } else if (_loweringDebouncer.update(
+      (state == SitUpState.rising &&
+              _hasReachedCountableTop &&
+              khsAngle > _minKhsThisRep! + SitUpConfig.LOWERING_KHS_DIFF) ||
+          (state == SitUpState.upright &&
+              khsAngle > SitUpConfig.LOWERING_KHS_THRESHOLD),
+    )) {
+      _transitionState(SitUpState.lowering, now);
     }
   }
 

@@ -51,6 +51,15 @@ void main() {
     expect(highPlank.volumeLabel, '1 x 20 giây');
   });
 
+  test('updated static holds use three sets of fifteen seconds', () {
+    for (final id in ['side_plank_dip', 'seated_forward_fold', 'sphinx']) {
+      final exercise = source.lookup(id)!;
+      expect(exercise.baseSets, 3, reason: id);
+      expect(exercise.baseSeconds, 15, reason: id);
+      expect(exercise.baseReps, isNull, reason: id);
+    }
+  });
+
   test('form-unchecked yoga rows still resolve', () {
     final surya = source.lookup('surya_namaskar')!;
     expect(surya.isFormChecked, isFalse);

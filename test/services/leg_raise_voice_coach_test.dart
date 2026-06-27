@@ -42,7 +42,8 @@ void main() {
   test('speaks leg raises setup instructions only once before activation', () {
     final player = _FakeLegRaiseVoicePlayer();
     final coach = LegRaiseVoiceCoach(voicePlayer: player);
-    final exercise = LegRaise(maxRep: 12)..exerciseState = ExerciseState.notActivated;
+    final exercise = LegRaise(maxRep: 12)
+      ..exerciseState = ExerciseState.notActivated;
 
     coach.processFrame(
       exercise: exercise,
@@ -62,7 +63,6 @@ void main() {
       [
         'common.ngang_intro',
         'leg_raises.setup_position',
-        'leg_raises.active_intro',
       ],
     );
   });
@@ -81,7 +81,10 @@ void main() {
       feedback: const {},
     );
 
-    expect(player.spoken.skip(1).take(2), ['1', 'common.correct']);
+    expect(
+      player.spoken,
+      ['Sẵn sàng', 'leg_raises.active_intro', '1', 'common.correct'],
+    );
   });
 
   test('speaks rep count and correction after a faulty counted rep', () {
@@ -99,7 +102,10 @@ void main() {
       feedback: const {},
     );
 
-    expect(player.spoken.skip(1).take(2), ['1', 'Hạ chân chậm lại']);
+    expect(
+      player.spoken,
+      ['Sẵn sàng', 'leg_raises.active_intro', '1', 'Hạ chân chậm lại'],
+    );
   });
 
   test('speaks no-count and correction after a blocked attempt', () {
@@ -118,16 +124,19 @@ void main() {
       feedback: const {},
     );
 
-    expect(
-      player.spoken.skip(1).take(2),
-      ['Lần này chưa tính', 'Duỗi thẳng đầu gối'],
-    );
+    expect(player.spoken, [
+      'Sẵn sàng',
+      'leg_raises.active_intro',
+      'Lần này chưa tính',
+      'Duỗi thẳng đầu gối',
+    ]);
   });
 
   test('does not speak live setup correction from feedback', () {
     final player = _FakeLegRaiseVoicePlayer();
     final coach = LegRaiseVoiceCoach(voicePlayer: player);
-    final exercise = LegRaise(maxRep: 12)..exerciseState = ExerciseState.activated;
+    final exercise = LegRaise(maxRep: 12)
+      ..exerciseState = ExerciseState.activated;
 
     coach.processFrame(
       exercise: exercise,
@@ -136,6 +145,6 @@ void main() {
       feedback: const {'Arms': 'Duỗi thẳng hai tay, khép sát hông.'},
     );
 
-    expect(player.spoken, ['Sẵn sàng']);
+    expect(player.spoken, ['Sẵn sàng', 'leg_raises.active_intro']);
   });
 }

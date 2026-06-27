@@ -31,6 +31,7 @@ class ButterflyStretch extends ExerciseBase {
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
       const <VikaImageOrientation>{
+        VikaImageOrientation.portrait,
         VikaImageOrientation.landscapeLeft,
         VikaImageOrientation.landscapeRight,
       };

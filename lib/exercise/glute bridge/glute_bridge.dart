@@ -166,6 +166,12 @@ class GluteBridge extends ExerciseBase with SideTrackedExerciseMixin {
   @override
   String get exerciseName => 'Glute Bridge';
 
+  // Glute Bridge starts from a floor setup that can take time to settle.
+  // Replaying old faults here sounds like a fault from the current set before
+  // the user has completed any movement.
+  @override
+  bool get shouldReplayPreviousSetVoiceFaults => false;
+
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
       const <VikaImageOrientation>{

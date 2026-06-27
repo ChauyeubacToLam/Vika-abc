@@ -31,7 +31,7 @@ class PelvicDropMetric extends StandingKteMetricBase {
           FaultRecord(
             type: 'pelvic_drop',
             message: 'Rớt hông bên chân giơ lên! Gồng chặt cơ mông chân trụ.',
-            affectsForm: false, // High priority warning
+            affectsForm: true,
             phase: ctx.state.name,
             priority: 2,
             voiceMessage: 'Giữ hông thăng bằng!',

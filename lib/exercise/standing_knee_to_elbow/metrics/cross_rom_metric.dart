@@ -29,9 +29,9 @@ class CrossRomMetric extends StandingKteMetricBase {
       if (_minDistanceRatio > MAX_TOUCH_DISTANCE_RATIO) {
         addFault(
           FaultRecord(
-            type: 'shallow_cross_rom',
+            type: 'cross_rom',
             message: 'Vặn người mạnh hơn, cho khuỷu tay và đầu gối chạm nhau!',
-            affectsForm: false, // Medium priority
+            affectsForm: true,
             phase: oldState.name,
             priority: 3,
             voiceMessage: 'Vặn người sâu hơn!',

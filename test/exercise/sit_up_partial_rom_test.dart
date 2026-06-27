@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:vika/exercise/2.Sit-Up/sit_up.dart';
+import 'package:vika/exercise/2.Sit-Up/metrics/sit_up_metric_base.dart';
 import 'package:vika/exercise/exercise_base.dart';
 
 PoseLandmark _landmark(
@@ -74,5 +75,29 @@ void main() {
     expect(sitUp.repCount, 1);
     expect(sitUp.logger.repLogs.single.correctForm, isTrue);
     expect(sitUp.logger.repLogs.single.data['fault_types'], isEmpty);
+  });
+
+  test('leaves upright hold state and counts after lowering to the floor', () {
+    final sitUp = _activatedSitUp();
+    final lying = _sitUpPose(shoulderX: 180, shoulderY: 300);
+    final upright = _sitUpPose(shoulderX: 300, shoulderY: 180);
+    final lowering = _sitUpPose(shoulderX: 240, shoulderY: 220);
+
+    _pump(sitUp, lying, 0);
+    _pump(sitUp, upright, 100);
+    _pump(sitUp, upright, 200);
+    _pump(sitUp, upright, 300);
+    _pump(sitUp, upright, 400);
+    expect(sitUp.state, SitUpState.upright);
+
+    _pump(sitUp, lowering, 500);
+    _pump(sitUp, lowering, 600);
+    expect(sitUp.state, SitUpState.lowering);
+
+    _pump(sitUp, lying, 700);
+    _pump(sitUp, lying, 800);
+
+    expect(sitUp.state, SitUpState.lying);
+    expect(sitUp.repCount, 1);
   });
 }

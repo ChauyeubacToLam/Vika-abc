@@ -3,6 +3,7 @@ import 'package:vika/debug/tracked_metric.dart';
 import '../../utils/pose_math_helpers.dart';
 import 'package:vika/utils/exercise_logger.dart';
 import 'package:vika/exercise/side_tracked_exercise_mixin.dart';
+import 'package:vika/utils/debouncer.dart';
 
 import '../../utils/frame_snapshot.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
@@ -16,13 +17,17 @@ enum KteState { standing_base, approaching, touch, returning }
 
 class StandingKneeToElbowConfig {
   static const int MAX_REP = 30; // 15 per side
-  static const double KNEE_LIFT_START_RATIO = 0.05;
-  static const double TOUCH_DISTANCE_RATIO = 1.30;
-  static const double TOUCH_EXIT_DISTANCE_RATIO = 1.60;
-  static const double TOUCH_HIP_WIDTH_RATIO = 1.40;
-  static const double TOUCH_EXIT_HIP_WIDTH_RATIO = 1.70;
-  static const double RETURN_KNEE_RATIO = 0.15;
-  static const double TOUCH_EXIT_KNEE_RATIO = 0.30;
+  static const double KNEE_LIFT_START_RATIO = 0.12;
+  static const double TOUCH_DISTANCE_RATIO = 0.55;
+  static const double TOUCH_EXIT_DISTANCE_RATIO = 0.85;
+  static const double TOUCH_HIP_WIDTH_RATIO = 0.75;
+  static const double TOUCH_EXIT_HIP_WIDTH_RATIO = 1.05;
+  static const double RETURN_KNEE_RATIO = 0.10;
+  static const double TOUCH_EXIT_KNEE_RATIO = 0.22;
+  static const double TOUCH_MAX_KNEE_BELOW_HIP_RATIO = 0.25;
+  static const int MIN_APPROACH_MS = 120;
+  static const int MIN_TOUCH_MS = 120;
+  static const int MIN_REP_CYCLE_MS = 500;
 }
 
 class StandingKneeToElbow extends ExerciseBase {
@@ -41,6 +46,14 @@ class StandingKneeToElbow extends ExerciseBase {
   // Track legs dynamically
   TrackedSide _liftingLegSide = TrackedSide.left;
   TrackedSide _standingLegSide = TrackedSide.right;
+  int? _attemptStartedAtMs;
+  int _stateEnteredAtMs = 0;
+  bool _baseReady = true;
+
+  final Debouncer _approachDebouncer = Debouncer(requiredFrames: 2);
+  final Debouncer _touchDebouncer = Debouncer(requiredFrames: 2);
+  final Debouncer _returnDebouncer = Debouncer(requiredFrames: 3);
+  final Debouncer _baseDebouncer = Debouncer(requiredFrames: 4);
 
   // Metrics
   final KneeValgusMetric kneeValgusMetric = KneeValgusMetric();
@@ -215,35 +228,21 @@ class StandingKneeToElbow extends ExerciseBase {
       "rightKneeY": rightKneeY,
     }, timeStamp: now));
 
-    if (kteState == KteState.standing_base ||
-        kteState == KteState.approaching) {
+    if (kteState == KteState.standing_base) {
       final torsoLengthForSide = (leftShoulder.y - leftHip.y).abs();
-      final hipWidthForSide = (leftHip.x - rightHip.x).abs();
-      final rawTouchDistanceForSide =
-          _touchEnterDistance(torsoLengthForSide, hipWidthForSide);
-      final touchDistanceForSide =
-          rawTouchDistanceForSide <= 1e-6 ? 1.0 : rawTouchDistanceForSide;
-      final leftCrossDistance = calculateDistance(rightElbow, leftKnee);
-      final rightCrossDistance = calculateDistance(leftElbow, rightKnee);
       final leftLiftRatio = torsoLengthForSide <= 0
           ? 0.0
           : (rightKneeY - leftKneeY) / torsoLengthForSide;
       final rightLiftRatio = torsoLengthForSide <= 0
           ? 0.0
           : (leftKneeY - rightKneeY) / torsoLengthForSide;
-      final leftScore =
-          leftLiftRatio + (1.0 - leftCrossDistance / touchDistanceForSide);
-      final rightScore =
-          rightLiftRatio + (1.0 - rightCrossDistance / touchDistanceForSide);
 
-      if ((leftLiftRatio > StandingKneeToElbowConfig.KNEE_LIFT_START_RATIO ||
-              leftCrossDistance <= touchDistanceForSide) &&
-          leftScore >= rightScore) {
+      if (leftLiftRatio > StandingKneeToElbowConfig.KNEE_LIFT_START_RATIO &&
+          leftLiftRatio >= rightLiftRatio) {
         _liftingLegSide = TrackedSide.left;
         _standingLegSide = TrackedSide.right;
       } else if (rightLiftRatio >
-              StandingKneeToElbowConfig.KNEE_LIFT_START_RATIO ||
-          rightCrossDistance <= touchDistanceForSide) {
+          StandingKneeToElbowConfig.KNEE_LIFT_START_RATIO) {
         _liftingLegSide = TrackedSide.right;
         _standingLegSide = TrackedSide.left;
       }
@@ -277,7 +276,14 @@ class StandingKneeToElbow extends ExerciseBase {
     }, timeStamp: now));
 
     _updateStateMachine(
-        distanceD, liftingKnee.y, standingKnee.y, torsoLength, hipWidth, now);
+      distanceD,
+      liftingKnee.y,
+      liftingHip.y,
+      standingKnee.y,
+      torsoLength,
+      hipWidth,
+      now,
+    );
 
     final ctx = StandingKteRepContext(
       standingLegSide: _standingLegSide,
@@ -327,6 +333,7 @@ class StandingKneeToElbow extends ExerciseBase {
   void _updateStateMachine(
     double distanceD,
     double liftingKneeY,
+    double liftingHipY,
     double standingKneeY,
     double torsoLength,
     double hipWidth,
@@ -335,41 +342,77 @@ class StandingKneeToElbow extends ExerciseBase {
     final touchEnterDistance = _touchEnterDistance(torsoLength, hipWidth);
     final touchExitDistance = _touchExitDistance(torsoLength, hipWidth);
 
+    final kneeLifted = liftingKneeY <
+        standingKneeY -
+            torsoLength * StandingKneeToElbowConfig.KNEE_LIFT_START_RATIO;
+    final kneeNearHip = liftingKneeY <=
+        liftingHipY +
+            torsoLength *
+                StandingKneeToElbowConfig.TOUCH_MAX_KNEE_BELOW_HIP_RATIO;
+
     if (kteState == KteState.standing_base) {
-      if (distanceD <= touchEnterDistance) {
-        _transitionState(KteState.touch, now);
-      } else if (liftingKneeY <
-          standingKneeY -
-              torsoLength * StandingKneeToElbowConfig.KNEE_LIFT_START_RATIO) {
+      if (!_baseReady) {
+        _baseReady = _baseDebouncer.update(
+          (liftingKneeY - standingKneeY).abs() <= torsoLength * 0.10,
+        );
+        _approachDebouncer.update(false);
+        return;
+      }
+      if (_approachDebouncer.update(kneeLifted)) {
+        _attemptStartedAtMs = now;
         _transitionState(KteState.approaching, now);
       }
     } else if (kteState == KteState.approaching) {
-      if (distanceD <= touchEnterDistance) {
+      final approachOldEnough =
+          now - _stateEnteredAtMs >= StandingKneeToElbowConfig.MIN_APPROACH_MS;
+      if (_touchDebouncer.update(approachOldEnough &&
+          kneeNearHip &&
+          distanceD <= touchEnterDistance)) {
         _transitionState(KteState.touch, now);
       } else if (liftingKneeY >
               standingKneeY -
                   torsoLength * StandingKneeToElbowConfig.RETURN_KNEE_RATIO &&
           distanceD > touchExitDistance) {
         // Returned early without reaching touch distance
-        _transitionState(KteState.standing_base, now);
+        _cancelAttempt(now);
       }
     } else if (kteState == KteState.touch) {
-      if (distanceD > touchExitDistance ||
-          liftingKneeY >
-              standingKneeY -
-                  torsoLength *
-                      StandingKneeToElbowConfig.TOUCH_EXIT_KNEE_RATIO) {
+      final touchOldEnough =
+          now - _stateEnteredAtMs >= StandingKneeToElbowConfig.MIN_TOUCH_MS;
+      if (touchOldEnough &&
+          (distanceD > touchExitDistance ||
+              liftingKneeY >
+                  standingKneeY -
+                      torsoLength *
+                          StandingKneeToElbowConfig.TOUCH_EXIT_KNEE_RATIO)) {
         _transitionState(KteState.returning, now);
       }
     } else if (kteState == KteState.returning) {
-      // Check if lifting knee returned back to normal level
-      if (liftingKneeY >
+      final returnedToBase = liftingKneeY >
           standingKneeY -
-              torsoLength * StandingKneeToElbowConfig.RETURN_KNEE_RATIO) {
-        _completeRep();
+              torsoLength * StandingKneeToElbowConfig.RETURN_KNEE_RATIO;
+      if (_returnDebouncer.update(returnedToBase)) {
+        final cycleMs = now - (_attemptStartedAtMs ?? now);
+        if (cycleMs >= StandingKneeToElbowConfig.MIN_REP_CYCLE_MS) {
+          _completeRep();
+        }
+        _baseReady = false;
+        _attemptStartedAtMs = null;
         _transitionState(KteState.standing_base, now);
       }
     }
+  }
+
+  void _cancelAttempt(int now) {
+    _attemptStartedAtMs = null;
+    _baseReady = false;
+    resultIssues.feedback['Result'] = 'Không tính rep';
+    resultIssues.feedback['CrossRom'] =
+        'Đưa gối chạm khuỷu tay đối diện trước khi hạ chân.';
+    for (final metric in _metrics) {
+      metric.reset();
+    }
+    _transitionState(KteState.standing_base, now);
   }
 
   double _touchEnterDistance(double torsoLength, double hipWidth) {
@@ -393,6 +436,7 @@ class StandingKneeToElbow extends ExerciseBase {
 
     previousKteState = kteState;
     kteState = newState;
+    _stateEnteredAtMs = timestampMs;
 
     if (newState == KteState.approaching &&
         previousKteState == KteState.standing_base) {

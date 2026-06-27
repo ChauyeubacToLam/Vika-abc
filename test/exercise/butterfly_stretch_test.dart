@@ -144,7 +144,8 @@ void main() {
   });
 
   test('start position rejects far feet and collapsed posture', () {
-    final exercise = ButterflyStretch(maxSeconds: 30)..cameraFacing = CameraFacing.front;
+    final exercise = ButterflyStretch(maxSeconds: 30)
+      ..cameraFacing = CameraFacing.front;
 
     expect(exercise.isInStartPosition(_butterflyPose()), isTrue);
     expect(
@@ -157,8 +158,23 @@ void main() {
     );
   });
 
+  test('supports both upright and landscape phone orientations', () {
+    final exercise = ButterflyStretch(maxSeconds: 30);
+
+    expect(
+      exercise.supportedOrientations,
+      containsAll(<VikaImageOrientation>{
+        VikaImageOrientation.portrait,
+        VikaImageOrientation.landscapeLeft,
+        VikaImageOrientation.landscapeRight,
+      }),
+    );
+    expect(exercise.setupOrientationIntroVoiceKey, 'common.thang_intro');
+  });
+
   test('safety rejects missing or low-confidence hip and heel landmarks', () {
-    final exercise = ButterflyStretch(maxSeconds: 30)..cameraFacing = CameraFacing.front;
+    final exercise = ButterflyStretch(maxSeconds: 30)
+      ..cameraFacing = CameraFacing.front;
 
     expect(exercise.checkSafety(_butterflyPose()), isNull);
     expect(

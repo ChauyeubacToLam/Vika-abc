@@ -59,6 +59,7 @@ class LegRaiseVoiceCoach implements ExerciseVoiceCoach {
   int _lastRepCount = 0;
   int _lastInvalidAttemptCount = 0;
   bool _didSpeakSetup = false;
+  bool _didSpeakActiveIntro = false;
   bool _didAnnounceReady = false;
   bool _didAnnounceSetComplete = false;
 
@@ -103,6 +104,13 @@ class LegRaiseVoiceCoach implements ExerciseVoiceCoach {
       _voicePlayer.speak('Sẵn sàng');
       _didAnnounceReady = true;
     }
+    if (!_didSpeakActiveIntro) {
+      final script = GenericExerciseVoiceAssets.scriptForExerciseName(
+        exercise.exerciseName,
+      );
+      _voicePlayer.speak(script.cueKey('active_intro'));
+      _didSpeakActiveIntro = true;
+    }
 
     if (repIncreased) {
       _voicePlayer.clearPendingButKeepCurrent();
@@ -129,7 +137,6 @@ class LegRaiseVoiceCoach implements ExerciseVoiceCoach {
         GenericExerciseVoiceAssets.scriptForExerciseName(exercise.exerciseName);
     _voicePlayer.speak(exercise.setupOrientationIntroVoiceKey);
     _voicePlayer.speak(script.cueKey('setup_position'));
-    _voicePlayer.speak(script.cueKey('active_intro'));
     _didSpeakSetup = true;
   }
 

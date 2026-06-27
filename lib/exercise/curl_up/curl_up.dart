@@ -224,6 +224,9 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
   String get exerciseName => 'McGill Curl-up';
 
   @override
+  bool get shouldReplayPreviousSetVoiceFaults => false;
+
+  @override
   Set<VikaImageOrientation> get supportedOrientations =>
       const <VikaImageOrientation>{
         VikaImageOrientation.landscapeLeft,
