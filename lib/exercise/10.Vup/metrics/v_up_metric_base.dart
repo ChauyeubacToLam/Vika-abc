@@ -10,30 +10,35 @@ class VUpConfig {
   static const int MAX_REP = 12;
   static const int TIMEOUT_MS = 90000;
 
-  // Start position must be a real flat, extended V-up baseline.
-  static const double START_BODY_MIN = 155.0;
-  static const double START_KNEE_MIN = 145.0;
-  static const double START_TRUNK_HORIZ_MAX = 24.0;
-  static const double START_LEG_HORIZ_MAX = 24.0;
-  static const double START_Y_SPREAD_MAX = 0.42;
-  static const double START_WRIST_ANKLE_DIST_MIN = 1.55;
+  // Keep a clear lying baseline, with enough tolerance for camera perspective
+  // and the landmark jitter seen on a real phone.
+  static const double START_BODY_MIN = 145.0;
+  static const double START_KNEE_MIN = 135.0;
+  static const double START_TRUNK_HORIZ_MAX = 35.0;
+  static const double START_LEG_HORIZ_MAX = 35.0;
+  static const double START_Y_SPREAD_MAX = 0.55;
+  static const double START_WRIST_ANKLE_DIST_MIN = 1.30;
 
   // Rep gating.
   static const int REP_READY_FRAMES = 3;
-  static const double RISING_ANGLE = 160.0;
+  static const double RISING_ANGLE = 165.0;
   static const double RISING_MIN_LIFT = 0.08;
-  static const double V_POSITION_THRESHOLD = 130.0;
-  static const double ROM_TARGET_ANGLE = 112.0;
-  static const double TOP_TRUNK_HORIZ_MIN = 14.0;
-  static const double TOP_LEG_HORIZ_MIN = 14.0;
-  static const double TOP_MIN_LIFT = 0.12;
-  static const double TOP_WRIST_ANKLE_DIST_MAX = 1.25;
+  static const double V_POSITION_THRESHOLD = 145.0;
+  static const double ROM_TARGET_ANGLE = 135.0;
+  static const double TOP_TRUNK_HORIZ_MIN = 8.0;
+  static const double TOP_LEG_HORIZ_MIN = 8.0;
+  static const double TOP_MIN_LIFT = 0.08;
+  static const double TOP_WRIST_ANKLE_DIST_MAX = 1.45;
   static const double TOP_WRIST_ANKLE_CLOSURE_MIN = 0.55;
   static const double TOP_ARM_REACH_DIST_MAX = 1.85;
   static const double TOP_ARM_REACH_CLOSURE_MIN = 0.25;
-  static const double ACTIVE_KNEE_MIN = 138.0;
+  static const double ACTIVE_KNEE_MIN = 130.0;
   static const double LOWERING_THRESHOLD_DIFF = 5.0;
-  static const double LYING_ANGLE = 152.0;
+  static const double LYING_ANGLE = 145.0;
+
+  // A single ML Kit position jump must not be classified as momentum.
+  static const double JERKING_VELOCITY_THRESHOLD = 4.5;
+  static const int JERKING_FAULT_FRAMES = 3;
 }
 
 class VUpRepContext {

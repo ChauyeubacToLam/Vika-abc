@@ -18,7 +18,8 @@ class KneeExtensionMetric extends VUpMetricBase {
   void update(VUpRepContext ctx) {
     if (ctx.state == VUpState.lying) return;
 
-    if (_faultDebouncer.update(ctx.hipKneeAnkleAngle < 150.0)) {
+    if (_faultDebouncer
+        .update(ctx.hipKneeAnkleAngle < VUpConfig.ACTIVE_KNEE_MIN)) {
       if (!_faults.any((f) => f.type == 'BentKnee')) {
         _faults.add(FaultRecord(
           phase: ctx.state.name,
