@@ -66,8 +66,6 @@ class ExerciseIntroPage extends StatefulWidget {
     this.subtitle,
     this.posture = SkeletonPosture.standing,
     this.onWatchVideo,
-    this.onSaveTap,
-    this.onShareTap,
     this.targetLabel = 'REP/HIỆP',
     this.secondsPerUnit = 4,
     this.sessionProgressLabel,
@@ -109,8 +107,6 @@ class ExerciseIntroPage extends StatefulWidget {
   final String? subtitle;
   final SkeletonPosture posture;
   final VoidCallback? onWatchVideo;
-  final VoidCallback? onSaveTap;
-  final VoidCallback? onShareTap;
   final String targetLabel;
   final double secondsPerUnit;
   final String? sessionProgressLabel;
@@ -133,7 +129,6 @@ class ExerciseIntroPage extends StatefulWidget {
 }
 
 class _ExerciseIntroPageState extends State<ExerciseIntroPage> {
-  bool _saved = false;
   String? _selectedPreviousDifficulty;
   bool _ratingPopupHandled = false;
 
@@ -413,16 +408,9 @@ class _ExerciseIntroPageState extends State<ExerciseIntroPage> {
                       difficulty: widget.difficulty,
                       difficultyDots: _difficultyDots,
                       videoAsset: widget.videoAsset,
-                      saved: _saved,
                       sessionProgressLabel: widget.sessionProgressLabel,
                       onBack: widget.onBack,
                       onWatchVideo: widget.onWatchVideo,
-                      onSaveTap: () {
-                        HapticFeedback.selectionClick();
-                        setState(() => _saved = !_saved);
-                        widget.onSaveTap?.call();
-                      },
-                      onShareTap: widget.onShareTap,
                     ),
                     const SizedBox(height: 24),
 
@@ -666,13 +654,10 @@ class _StageHero extends StatelessWidget {
     required this.muscles,
     required this.difficulty,
     required this.difficultyDots,
-    required this.saved,
     required this.onBack,
     this.videoAsset,
     this.sessionProgressLabel,
     this.onWatchVideo,
-    this.onSaveTap,
-    this.onShareTap,
   });
 
   /// Captured by the parent BEFORE `MediaQuery.removePadding(removeTop)`
@@ -688,12 +673,9 @@ class _StageHero extends StatelessWidget {
   final String difficulty;
   final int difficultyDots;
   final String? videoAsset;
-  final bool saved;
   final VoidCallback onBack;
   final String? sessionProgressLabel;
   final VoidCallback? onWatchVideo;
-  final VoidCallback? onSaveTap;
-  final VoidCallback? onShareTap;
 
   @override
   Widget build(BuildContext context) {
@@ -772,12 +754,7 @@ class _StageHero extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _TopBar(
-                      saved: saved,
-                      onBack: onBack,
-                      onSaveTap: onSaveTap,
-                      onShareTap: onShareTap,
-                    ),
+                    _TopBar(onBack: onBack),
                     if (sessionProgressLabel != null) ...[
                       const SizedBox(height: 10),
                       Padding(
@@ -882,15 +859,9 @@ class _StageHero extends StatelessWidget {
 
 class _TopBar extends StatelessWidget {
   const _TopBar({
-    required this.saved,
     required this.onBack,
-    this.onSaveTap,
-    this.onShareTap,
   });
-  final bool saved;
   final VoidCallback onBack;
-  final VoidCallback? onSaveTap;
-  final VoidCallback? onShareTap;
 
   @override
   Widget build(BuildContext context) {
@@ -904,19 +875,6 @@ class _TopBar extends StatelessWidget {
             onTap: onBack,
           ),
           const Spacer(),
-          _CircleButton(
-            icon:
-                saved ? Icons.favorite_rounded : Icons.favorite_outline_rounded,
-            tooltip: saved ? 'Đã lưu' : 'Lưu',
-            filled: saved,
-            onTap: onSaveTap,
-          ),
-          const SizedBox(width: 8),
-          _CircleButton(
-            icon: Icons.ios_share_rounded,
-            tooltip: 'Chia sẻ',
-            onTap: onShareTap,
-          ),
         ],
       ),
     );
@@ -927,12 +885,10 @@ class _CircleButton extends StatefulWidget {
   const _CircleButton({
     required this.icon,
     required this.tooltip,
-    this.filled = false,
     this.onTap,
   });
   final IconData icon;
   final String tooltip;
-  final bool filled;
   final VoidCallback? onTap;
 
   @override
@@ -945,10 +901,8 @@ class _CircleButtonState extends State<_CircleButton> {
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    final bg = widget.filled ? c.yellow : Colors.white.withValues(alpha: 0.06);
-    final borderColor =
-        widget.filled ? c.yellow : Colors.white.withValues(alpha: 0.18);
-    final fg = widget.filled ? c.yellowInk : c.invInk;
+    final bg = Colors.white.withValues(alpha: 0.06);
+    final borderColor = Colors.white.withValues(alpha: 0.18);
 
     return Tooltip(
       message: widget.tooltip,
@@ -972,18 +926,9 @@ class _CircleButtonState extends State<_CircleButton> {
               color: bg,
               shape: BoxShape.circle,
               border: Border.all(color: borderColor, width: 1),
-              boxShadow: widget.filled
-                  ? [
-                      BoxShadow(
-                        color: c.yellow.withValues(alpha: 0.4),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ]
-                  : null,
             ),
             alignment: Alignment.center,
-            child: Icon(widget.icon, size: 18, color: fg),
+            child: Icon(widget.icon, size: 18, color: c.invInk),
           ),
         ),
       ),

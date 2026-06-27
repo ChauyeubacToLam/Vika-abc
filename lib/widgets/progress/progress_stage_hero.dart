@@ -27,7 +27,6 @@ class ProgressStageHero extends StatelessWidget {
     required this.weekLabel,
     required this.watermark,
     this.avatarUrl,
-    this.onShareTap,
     this.onAvatarTap,
   });
 
@@ -48,7 +47,6 @@ class ProgressStageHero extends StatelessWidget {
   /// and has no snapshot, so it just renders what it's handed.
   final String watermark;
 
-  final VoidCallback? onShareTap;
   final VoidCallback? onAvatarTap;
 
   String get _subtitle {
@@ -163,9 +161,7 @@ class ProgressStageHero extends StatelessWidget {
                         inverted: true,
                         userInitial: userInitial,
                         avatarUrl: avatarUrl,
-                        trailingIcon: Icons.ios_share_rounded,
-                        trailingTooltip: 'Chia sẻ tiến bộ',
-                        onTrailingTap: onShareTap,
+                        trailingIcon: null,
                         onAvatarTap: onAvatarTap,
                       ),
                       const SizedBox(height: 22),
