@@ -47,10 +47,8 @@ class ProfileStageHero extends StatelessWidget {
     required this.goalProgress,
     required this.inlineStats,
     this.avatarUrl,
-    this.onSettingsTap,
     this.onAvatarTap,
     this.onEdit,
-    this.onShare,
     this.onEditPhoto,
   });
 
@@ -74,10 +72,8 @@ class ProfileStageHero extends StatelessWidget {
   /// ["12 NGÀY", "8 BUỔI", "74% FORM"]. 2-4 entries.
   final List<String> inlineStats;
 
-  final VoidCallback? onSettingsTap;
   final VoidCallback? onAvatarTap;
   final VoidCallback? onEdit;
-  final VoidCallback? onShare;
   final VoidCallback? onEditPhoto;
 
   @override
@@ -159,9 +155,7 @@ class ProfileStageHero extends StatelessWidget {
                     inverted: true,
                     userInitial: userInitial,
                     avatarUrl: avatarUrl,
-                    trailingIcon: Icons.tune_rounded,
-                    trailingTooltip: 'Cài đặt',
-                    onTrailingTap: onSettingsTap,
+                    trailingIcon: null,
                     onAvatarTap: onAvatarTap,
                   ),
                   const SizedBox(height: 28),
@@ -236,25 +230,13 @@ class ProfileStageHero extends StatelessWidget {
                   ],
                   const SizedBox(height: 24),
 
-                  // Edit + share pill buttons, centered.
+                  // The only available profile action.
                   Center(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _HeroPillButton(
-                          icon: Icons.edit_outlined,
-                          label: 'Sửa hồ sơ',
-                          filled: true,
-                          onTap: onEdit,
-                        ),
-                        const SizedBox(width: 10),
-                        _HeroPillButton(
-                          icon: Icons.ios_share_rounded,
-                          label: 'Chia sẻ',
-                          filled: false,
-                          onTap: onShare,
-                        ),
-                      ],
+                    child: _HeroPillButton(
+                      icon: Icons.edit_outlined,
+                      label: 'Sửa hồ sơ',
+                      filled: true,
+                      onTap: onEdit,
                     ),
                   ),
                   // Canonical hero internal bottom padding — matches

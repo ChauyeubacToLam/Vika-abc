@@ -30,7 +30,6 @@ class LibraryStageHero extends StatelessWidget {
     required this.userInitial,
     this.avatarUrl,
     this.onAvatarTap,
-    this.onSearchTap,
   });
 
   final List<LibraryFilter> filters;
@@ -43,7 +42,6 @@ class LibraryStageHero extends StatelessWidget {
   final String userInitial;
   final String? avatarUrl;
   final VoidCallback? onAvatarTap;
-  final VoidCallback? onSearchTap;
 
   LibraryFilter get _selected => filters
       .firstWhere((f) => f.id == selectedFilterId, orElse: () => filters.first);
@@ -144,9 +142,7 @@ class LibraryStageHero extends StatelessWidget {
                     inverted: true,
                     userInitial: userInitial,
                     avatarUrl: avatarUrl,
-                    trailingIcon: Icons.search_rounded,
-                    trailingTooltip: 'Tìm',
-                    onTrailingTap: onSearchTap,
+                    trailingIcon: null,
                     onAvatarTap: onAvatarTap,
                   ),
                   const SizedBox(height: 22),

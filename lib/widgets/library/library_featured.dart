@@ -202,10 +202,11 @@ class _LibraryFeaturedState extends State<LibraryFeatured> {
                           fontWeight: FontWeight.w800,
                           fontStyle: FontStyle.italic,
                           letterSpacing: -2.6,
-                          height: 0.94,
+                          height: 1.02,
                           color: c.ink,
                         ),
                       ),
+                      const SizedBox(height: 2),
                       Text(
                         widget.titleLine2,
                         style: TextStyle(
@@ -213,7 +214,7 @@ class _LibraryFeaturedState extends State<LibraryFeatured> {
                           fontSize: 48,
                           fontWeight: FontWeight.w800,
                           letterSpacing: -2.6,
-                          height: 0.94,
+                          height: 1.02,
                           color: c.ink,
                         ),
                       ),

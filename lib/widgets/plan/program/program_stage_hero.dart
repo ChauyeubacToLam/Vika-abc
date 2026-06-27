@@ -41,7 +41,6 @@ class ProgramStageHero extends StatefulWidget {
     this.userInitial = 'N',
     this.avatarUrl,
     this.onAvatarTap,
-    this.onMenuTap,
   });
 
   final ProgramPlan program;
@@ -51,7 +50,6 @@ class ProgramStageHero extends StatefulWidget {
   final String userInitial;
   final String? avatarUrl;
   final VoidCallback? onAvatarTap;
-  final VoidCallback? onMenuTap;
 
   @override
   State<ProgramStageHero> createState() => _ProgramStageHeroState();
@@ -174,9 +172,7 @@ class _ProgramStageHeroState extends State<ProgramStageHero>
                       inverted: true,
                       userInitial: widget.userInitial,
                       avatarUrl: widget.avatarUrl,
-                      trailingIcon: Icons.menu_book_rounded,
-                      trailingTooltip: 'Sổ tập',
-                      onTrailingTap: widget.onMenuTap,
+                      trailingIcon: null,
                       onAvatarTap: widget.onAvatarTap,
                     ),
                     SizedBox(height: r.gap(20)),
