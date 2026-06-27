@@ -101,7 +101,6 @@ flutter:
     - assets/images/
     - assets/habt/
     - assets/env/
-    - .env
     - assets/video/
 #    - assets/images/onboarding/
 
