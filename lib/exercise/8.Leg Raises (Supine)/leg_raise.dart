@@ -5,7 +5,6 @@ import 'package:vika/utils/debouncer.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/exercise_logger.dart';
-import '../../services/leg_raise_voice_coach.dart';
 import '../exercise_base.dart';
 
 import 'metrics/leg_raise_metric_base.dart';
@@ -71,9 +70,6 @@ class LegRaise extends ExerciseBase {
 
   @override
   String get exerciseName => 'Leg Raises';
-
-  @override
-  ExerciseVoiceCoach? createVoiceCoach() => LegRaiseVoiceCoach();
 
   @override
   String get currentPhaseKey => state.toString().split('.').last;

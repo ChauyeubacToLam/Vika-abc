@@ -450,12 +450,16 @@ class IvoryBottomChrome extends StatelessWidget {
     this.holdProgress,
     this.holdRemaining,
     this.isHoldPhase = false,
+    this.isTimeBased = false,
+    this.elapsedSeconds = 0,
     this.faultIndices = const [],
   });
   final String phaseVerb, phaseHint;
   final int repCount, totalReps;
   final double? holdProgress, holdRemaining;
   final bool isHoldPhase;
+  final bool isTimeBased;
+  final int elapsedSeconds;
   final List<int> faultIndices;
 
   @override
@@ -532,7 +536,7 @@ class IvoryBottomChrome extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text('Giữ đáy',
+        Text(isTimeBased ? 'ĐANG GIỮ' : 'GIỮ ĐÁY',
             style: TextStyle(
               fontFamily: _font,
               fontSize: 9,
@@ -617,7 +621,7 @@ class IvoryBottomChrome extends StatelessWidget {
                       ],
                     )),
                 const SizedBox(height: 3),
-                Text('Cố thêm 1 nhịp nữa',
+                Text(isTimeBased ? 'Giữ đúng tư thế' : 'Cố thêm 1 nhịp nữa',
                     style: TextStyle(
                       fontFamily: _font,
                       fontSize: 12,
@@ -640,11 +644,14 @@ class IvoryBottomChrome extends StatelessWidget {
   }
 
   Widget _buildRepCounter() {
+    final count = isTimeBased
+        ? elapsedSeconds.clamp(0, totalReps)
+        : repCount.clamp(0, totalReps);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text('LẦN',
+        Text(isTimeBased ? 'GIÂY' : 'LẦN',
             style: TextStyle(
               fontFamily: _font,
               fontSize: 9,
@@ -663,7 +670,7 @@ class IvoryBottomChrome extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.baseline,
           textBaseline: TextBaseline.alphabetic,
           children: [
-            Text(repCount.toString().padLeft(2, '0'),
+            Text(count.toString().padLeft(2, '0'),
                 style: TextStyle(
                   fontFamily: _font,
                   fontSize: 36,
@@ -696,7 +703,7 @@ class IvoryBottomChrome extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         IvoryRepTallyDots(
-            count: repCount, total: totalReps, faultIndices: faultIndices),
+            count: count, total: totalReps, faultIndices: faultIndices),
       ],
     );
   }

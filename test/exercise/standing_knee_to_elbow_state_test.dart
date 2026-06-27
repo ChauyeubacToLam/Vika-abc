@@ -62,6 +62,7 @@ void main() {
     );
     final base = _pose();
 
+    _pump(exercise, base, 0);
     _pump(exercise, approach, 100);
     _pump(exercise, approach, 200);
     expect(exercise.kteState, KteState.approaching);
@@ -109,6 +110,7 @@ void main() {
     final approach = _pose(leftKneeY: 440);
     final base = _pose();
 
+    _pump(exercise, base, 0);
     _pump(exercise, approach, 100);
     _pump(exercise, approach, 200);
     _pump(exercise, base, 300);
@@ -116,5 +118,33 @@ void main() {
     expect(exercise.repCount, 0);
     expect(exercise.resultIssues.feedback['Result'], 'Không tính rep');
     expect(exercise.resultIssues.feedback['CrossRom'], contains('chạm'));
+  });
+
+  test('counts a clear relative cross-body approach without literal contact',
+      () {
+    final exercise = StandingKneeToElbow(maxRep: 16)
+      ..cameraFacing = CameraFacing.front
+      ..exerciseState = ExerciseState.activated;
+    final base = _pose();
+    final approach = _pose(leftKneeY: 430);
+    final near = _pose(
+      leftKneeY: 360,
+      rightElbowX: 340,
+      rightElbowY: 260,
+    );
+
+    _pump(exercise, base, 0);
+    _pump(exercise, approach, 100);
+    _pump(exercise, approach, 200);
+    _pump(exercise, near, 400);
+    _pump(exercise, near, 500);
+    expect(exercise.kteState, KteState.touch);
+
+    _pump(exercise, base, 700);
+    _pump(exercise, base, 800);
+    _pump(exercise, base, 900);
+    _pump(exercise, base, 1000);
+
+    expect(exercise.repCount, 1);
   });
 }

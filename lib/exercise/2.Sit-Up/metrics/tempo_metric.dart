@@ -30,17 +30,9 @@ class TempoMetric extends SitUpMetricBase {
 
   // FIX: Bỏ param ctx — hàm chỉ dùng loweringDuration đã được tính qua onStateTransition()
   void evaluateRep() {
-    if (loweringDuration != null && loweringDuration! < 1.5) {
-      _faults.add(FaultRecord(
-        phase: 'REP_COMPLETE',
-        type: 'Tempo',
-        message:
-            'Hạ người quá nhanh (${loweringDuration!.toStringAsFixed(1)}s)',
-        voiceMessage: 'Hạ lưng xuống chậm lại, cảm nhận cơ bụng căng ra',
-        affectsForm: true,
-        priority: SitUpFaultPriority.tempo,
-      ));
-    }
+    // Lowering speed is intentionally unrestricted. Keep measuring the
+    // duration for the session report, but never turn it into a form fault or
+    // a voice correction.
   }
 
   @override

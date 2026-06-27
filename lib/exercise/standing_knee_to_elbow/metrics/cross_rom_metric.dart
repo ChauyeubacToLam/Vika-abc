@@ -2,9 +2,6 @@ import 'standing_kte_metric_base.dart';
 import '../standing_knee_to_elbow.dart';
 
 class CrossRomMetric extends StandingKteMetricBase {
-  static const double MAX_TOUCH_DISTANCE_RATIO =
-      StandingKneeToElbowConfig.TOUCH_DISTANCE_RATIO;
-
   double _minDistanceRatio = 100.0;
 
   @override
@@ -25,20 +22,10 @@ class CrossRomMetric extends StandingKteMetricBase {
   @override
   void onStateTransition(
       KteState oldState, KteState newState, int timestampMs) {
-    if (oldState == KteState.touch && newState == KteState.returning) {
-      if (_minDistanceRatio > MAX_TOUCH_DISTANCE_RATIO) {
-        addFault(
-          FaultRecord(
-            type: 'cross_rom',
-            message: 'Vặn người mạnh hơn, cho khuỷu tay và đầu gối chạm nhau!',
-            affectsForm: true,
-            phase: oldState.name,
-            priority: 3,
-            voiceMessage: 'Vặn người sâu hơn!',
-          ),
-        );
-      }
-    } else if (newState == KteState.standing_base) {
+    // The state machine already validates ROM from the reduction relative to
+    // the user's setup distance. Do not re-apply the old absolute touch gate
+    // here; that gate rejected valid reps on wider/taller camera framing.
+    if (newState == KteState.standing_base) {
       _minDistanceRatio = 100.0;
     }
   }

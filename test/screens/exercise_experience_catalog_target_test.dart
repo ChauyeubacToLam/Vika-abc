@@ -12,6 +12,9 @@ import 'package:vika/exercise/push up/push_up.dart';
 import 'package:vika/exercise/squat/squat.dart';
 import 'package:vika/exercise/wall_push_up/wall_push_up.dart';
 import 'package:vika/exercise/warrior_1/warrior_one.dart';
+import 'package:vika/exercise/seated_forward_fold/seated_forward_fold.dart';
+import 'package:vika/exercise/side_plank_dip/side_plank_dip.dart';
+import 'package:vika/exercise/Sphinx_Pose/sphinx_stretch.dart';
 import 'package:vika/models/exercise_definition.dart';
 import 'package:vika/models/exercise_lookup.dart';
 import 'package:vika/screens/exercise/exercise_experience_screen.dart';
@@ -71,6 +74,7 @@ void main() {
     expect(spec.targetPerSet, 36);
     expect(spec.targetLabel, 'GIÂY/HIỆP');
     expect(spec.secondsPerUnit, 1);
+    expect(spec.timeBased, isTrue);
     expect(spec.exercise, isA<HighPlank>());
     expect((spec.exercise as HighPlank).maxSeconds, 36);
   });
@@ -100,8 +104,39 @@ void main() {
     expect(spec.targetPerSet, 24);
     expect(spec.targetLabel, 'GIÂY/HIỆP');
     expect(spec.secondsPerUnit, 1);
+    expect(spec.timeBased, isTrue);
     expect(spec.exercise, isA<BearPlank>());
     expect((spec.exercise as BearPlank).maxSeconds, 24);
+  });
+
+  test('static stretch definitions launch and display as seconds', () {
+    final cases = <({String id, int Function(Object) targetOf})>[
+      (
+        id: 'seated__forward__fold',
+        targetOf: (exercise) => (exercise as SeatedForwardFold).maxSeconds,
+      ),
+      (
+        id: 'side__plank_with__hip__dip',
+        targetOf: (exercise) => (exercise as SidePlankDip).maxSeconds,
+      ),
+      (
+        id: 'sphinx_',
+        targetOf: (exercise) => (exercise as SphinxStretch).maxSeconds,
+      ),
+    ];
+
+    for (final entry in cases) {
+      final definition = lookupExerciseDefinition(entry.id)!;
+      final spec = debugBuildExerciseExperienceSpec(
+        definition,
+        catalogInfo: catalogInfo(id: entry.id, baseSeconds: 15),
+      );
+
+      expect(spec.targetPerSet, 15, reason: entry.id);
+      expect(spec.targetLabel, 'GIÂY/HIỆP', reason: entry.id);
+      expect(spec.timeBased, isTrue, reason: entry.id);
+      expect(entry.targetOf(spec.exercise), 15, reason: entry.id);
+    }
   });
 
   test('hand-cased exercises prefer prescription, then catalog reps', () {

@@ -182,6 +182,12 @@ class WarriorOne extends ExerciseBase {
   @override
   String get exerciseName => 'Warrior I';
 
+  // Warrior I is one two-sided hold inside a single set. Replaying advice from
+  // the process-wide generic voice cache can inject stale cues from an older
+  // workout before the normal setup sequence.
+  @override
+  bool get shouldReplayPreviousSetVoiceFaults => false;
+
   @override
   String get currentPhaseKey => holdState.toString().split('.').last;
 

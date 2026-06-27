@@ -37,6 +37,7 @@ class ActiveExercisePage extends StatefulWidget {
     required this.currentSet,
     required this.totalSets,
     required this.totalReps,
+    this.isTimeBased = false,
     required this.onSetComplete,
     required this.onBack,
   });
@@ -46,6 +47,7 @@ class ActiveExercisePage extends StatefulWidget {
   final int currentSet;
   final int totalSets;
   final int totalReps;
+  final bool isTimeBased;
   final ValueChanged<ExerciseLogger> onSetComplete;
   final VoidCallback onBack;
 
@@ -1776,19 +1778,29 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     final isHoldPhase = bottomHoldCue != null;
     String phaseVerb;
     String phaseHint;
-    switch (phaseKey) {
-      case 'descending':
-        phaseVerb = 'XUỐNG';
-        phaseHint = 'Hạ chậm, giữ kiểm soát';
-      case 'bottom':
-        phaseVerb = 'GIỮ';
-        phaseHint = 'Giữ ở đáy, ổn định';
-      case 'ascending':
-        phaseVerb = 'LÊN';
-        phaseHint = 'Đẩy mạnh lên';
-      default: // 'standing' or any other
-        phaseVerb = 'XUỐNG';
-        phaseHint = 'Bắt đầu hạ người';
+    if (widget.isTimeBased) {
+      final liveSeconds = widget.exercise.liveHoldSeconds;
+      phaseVerb = liveSeconds == null
+          ? widget.exercise.currentPhaseLabel.toUpperCase()
+          : 'GIỮ';
+      phaseHint = liveSeconds == null
+          ? 'Vào đúng tư thế để bắt đầu tính giờ'
+          : '${liveSeconds.floor().clamp(0, widget.totalReps)}/${widget.totalReps} giây đúng tư thế';
+    } else {
+      switch (phaseKey) {
+        case 'descending':
+          phaseVerb = 'XUỐNG';
+          phaseHint = 'Hạ chậm, giữ kiểm soát';
+        case 'bottom':
+          phaseVerb = 'GIỮ';
+          phaseHint = 'Giữ ở đáy, ổn định';
+        case 'ascending':
+          phaseVerb = 'LÊN';
+          phaseHint = 'Đẩy mạnh lên';
+        default: // 'standing' or any other
+          phaseVerb = widget.exercise.currentPhaseLabel.toUpperCase();
+          phaseHint = 'Giữ chuyển động đúng kỹ thuật';
+      }
     }
 
     // TODO(caption): Wire mid-rep fault detection caption here
@@ -2029,6 +2041,8 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                 phaseHint: phaseHint,
                 repCount: widget.exercise.repCount,
                 totalReps: widget.totalReps,
+                isTimeBased: widget.isTimeBased,
+                elapsedSeconds: widget.exercise.liveHoldSeconds?.floor() ?? 0,
                 isHoldPhase: isHoldPhase,
                 holdProgress: bottomHoldCue?.progress,
                 holdRemaining: bottomHoldCue?.remaining,
@@ -2315,6 +2329,21 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     if (widget.exercise.exerciseState != ExerciseState.activated) {
       return null;
     }
+
+    final liveSeconds = widget.exercise.liveHoldSeconds;
+    final targetSeconds = widget.exercise.liveHoldTargetSeconds;
+    if (liveSeconds != null && targetSeconds != null && targetSeconds > 0) {
+      return _BottomHoldCue(
+        progress: (liveSeconds / targetSeconds).clamp(0.0, 1.0),
+        remaining: (targetSeconds - liveSeconds).clamp(0.0, targetSeconds),
+        readyToPush: liveSeconds >= targetSeconds,
+      );
+    }
+
+    // Time-based exercises expose their real timer through liveHoldSeconds.
+    // Outside the actual hold phase, do not synthesize a squat-style timer
+    // from status copy.
+    if (widget.isTimeBased) return null;
 
     final status = _currentPhaseStatus;
     if (status == null || status.isEmpty) {

@@ -55,6 +55,7 @@ import '../../exercise/squat/squat.dart';
 import '../../models/exercise_definition.dart';
 import '../../models/fault_candidate.dart';
 import '../../services/analytics_service.dart';
+import '../../services/catalog/catalog_source.dart';
 import '../../models/post_exercise_data.dart';
 import '../../models/workout_session_report.dart';
 import '../../services/recommendation/models/plan.dart';
@@ -668,7 +669,10 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
         // own exercise_sessions row(s) by id instead — otherwise the current
         // run leaks into its own "prior" history and masks a real PB.
         excludeExerciseSessionIds: widget.workoutSessionId == null
-            ? [for (final r in accumulated) if (r.sessionId != null) r.sessionId!]
+            ? [
+                for (final r in accumulated)
+                  if (r.sessionId != null) r.sessionId!
+              ]
             : const [],
       );
 
@@ -826,6 +830,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
           currentSet: _currentSet,
           totalSets: _spec.sets,
           totalReps: _currentRepsTarget,
+          isTimeBased: _spec.timeBased,
           onSetComplete: _handleSetComplete,
           onBack: () => Navigator.of(context).pop(),
         ),
@@ -877,6 +882,7 @@ const int kFallbackSeconds = 30;
   int targetPerSet,
   String targetLabel,
   double secondsPerUnit,
+  bool timeBased,
   ExerciseBase exercise,
 }) debugBuildExerciseExperienceSpec(
   ExerciseDefinition definition, {
@@ -893,6 +899,7 @@ const int kFallbackSeconds = 30;
     targetPerSet: spec.repsPerSet,
     targetLabel: spec.targetLabel,
     secondsPerUnit: spec.secondsPerUnit,
+    timeBased: spec.timeBased,
     exercise: spec.createExercise(spec.repsPerSet),
   );
 }
@@ -910,6 +917,7 @@ class _ExerciseExperienceSpec {
     required this.badges,
     required this.callouts,
     required this.createExercise,
+    this.timeBased = false,
   });
 
   final int sets;
@@ -923,6 +931,7 @@ class _ExerciseExperienceSpec {
   final List<ExerciseIntroBadge> badges;
   final List<SkeletonCallout> callouts;
   final ExerciseBase Function(int repsPerSet) createExercise;
+  final bool timeBased;
 
   factory _ExerciseExperienceSpec.fromDefinition(
     ExerciseDefinition definition, {
@@ -934,7 +943,10 @@ class _ExerciseExperienceSpec {
     // Resolve volume ONCE, precedence: prescription > catalog > definition
     // default. `target` is the per-set rep/second goal — the displayed value
     // AND the scoring denominator — so it is floored at 1 and can never be 0.
-    final volume = _resolveVolume(definition, prescription, catalogInfo);
+    final resolvedCatalogInfo =
+        catalogInfo ?? CatalogSource.instance.lookup(definition.id);
+    final volume =
+        _resolveVolume(definition, prescription, resolvedCatalogInfo);
     final sets = volume.sets;
     final target = volume.target;
     final isHold = volume.isHold;
@@ -1014,6 +1026,7 @@ class _ExerciseExperienceSpec {
           restSeconds: overrideRest,
           targetLabel: 'GIÂY/HIỆP',
           secondsPerUnit: 1,
+          timeBased: true,
           createExercise: (repsPerSet) =>
               definition.createExercise(seconds: repsPerSet),
         );
@@ -1142,6 +1155,7 @@ class _ExerciseExperienceSpec {
           restSeconds: overrideRest,
           targetLabel: isHold ? 'GIÂY/HIỆP' : 'REP/HIỆP',
           secondsPerUnit: isHold ? 1 : 4,
+          timeBased: isHold,
           createExercise: (targetPerSet) => definition.createExercise(
             reps: isHold ? null : targetPerSet,
             seconds: isHold ? targetPerSet : null,
@@ -1163,10 +1177,20 @@ class _ExerciseExperienceSpec {
   ) {
     final catalogSeconds = catalogInfo?.baseSeconds;
     final catalogReps = catalogInfo?.baseReps;
-    final rawSets = prescription?.sets ?? catalogInfo?.baseSets ?? kFallbackSets;
-    // Type comes from the catalog row, which carries exactly one of
-    // reps/seconds. With no catalog entry, default to rep-type.
-    final isHold = catalogSeconds != null;
+    final rawSets =
+        prescription?.sets ?? catalogInfo?.baseSets ?? kFallbackSets;
+    // A plan may explicitly override the catalog modality. If neither source
+    // is available (for example a direct library launch), the definition still
+    // carries the modality so second-based exercises never fall back to reps.
+    final isHold = prescription?.seconds != null
+        ? true
+        : prescription?.reps != null
+            ? false
+            : catalogSeconds != null
+                ? true
+                : catalogReps != null
+                    ? false
+                    : definition.targetType == ExerciseTargetType.seconds;
     final resolved = isHold
         ? (prescription?.seconds ?? catalogSeconds)
         : (prescription?.reps ?? catalogReps);
@@ -1196,6 +1220,7 @@ class _ExerciseExperienceSpec {
     int? restSeconds,
     String targetLabel = 'REP/HIỆP',
     double secondsPerUnit = 4,
+    bool timeBased = false,
     required ExerciseBase Function(int repsPerSet) createExercise,
   }) {
     return _ExerciseExperienceSpec(
@@ -1243,6 +1268,7 @@ class _ExerciseExperienceSpec {
         ),
       ],
       createExercise: createExercise,
+      timeBased: timeBased,
     );
   }
 

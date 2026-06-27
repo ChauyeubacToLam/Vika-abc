@@ -45,6 +45,8 @@ import '../exercise/raised_arms/raised_arms.dart';
 
 typedef ExerciseFactory = ExerciseBase Function({int? reps, int? seconds});
 
+enum ExerciseTargetType { reps, seconds }
+
 ExerciseBase _withReps(
   int? reps,
   ExerciseBase Function(int reps) createWithTarget,
@@ -88,6 +90,7 @@ class ExerciseDefinition {
   final List<String> setupTips;
   final String? videoAsset;
   final ExerciseFactory createExercise;
+  final ExerciseTargetType targetType;
 
   /// Optional safety warning shown prominently before exercise starts.
   final String? safetyWarning;
@@ -111,6 +114,7 @@ class ExerciseDefinition {
     required this.setupTips,
     this.videoAsset,
     required this.createExercise,
+    this.targetType = ExerciseTargetType.reps,
     this.safetyWarning,
     required this.phaseColors,
   });
@@ -253,6 +257,7 @@ final seatedForwardFoldAssessmentDefinition = ExerciseDefinition(
       'Gập từ từ theo hơi thở, đừng giật mạnh. Dừng nếu căng đau ở lưng dưới.',
   createExercise: ({int? reps, int? seconds}) =>
       SeatedForwardFold(maxSeconds: seconds ?? 30, maxHolds: 1),
+  targetType: ExerciseTargetType.seconds,
   phaseColors: {
     'default': const Color(0xFF00E676),
   },
@@ -628,6 +633,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
     videoAsset: 'assets/video/bear_plank.mp4',
     createExercise: ({int? reps, int? seconds}) =>
         _withSeconds(seconds, (target) => BearPlank(maxSeconds: target)),
+    targetType: ExerciseTargetType.seconds,
     phaseColors: {
       'setup': const Color(0xFFFF6D00),
       'hovering': const Color(0xFF00E676),
@@ -687,6 +693,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
     videoAsset: 'assets/video/high_plank.mp4',
     createExercise: ({int? reps, int? seconds}) =>
         _withSeconds(seconds, (target) => HighPlank(maxSeconds: target)),
+    targetType: ExerciseTargetType.seconds,
     phaseColors: {
       'setup': const Color(0xFFFF6D00),
       'holding': const Color(0xFF00E676),
@@ -892,6 +899,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
     safetyWarning: 'Đừng dùng tay ép gối xuống. Để gối tự rơi theo nhịp thở.',
     createExercise: ({int? reps, int? seconds}) =>
         _withSeconds(seconds, (target) => ButterflyStretch(maxSeconds: target)),
+    targetType: ExerciseTargetType.seconds,
     phaseColors: {
       'default': const Color(0xFF00E676),
     },
@@ -1021,6 +1029,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
         'Gập từ từ theo hơi thở, đừng giật mạnh. Dừng nếu căng đau ở lưng dưới.',
     createExercise: ({int? reps, int? seconds}) => _withSeconds(seconds,
         (target) => SeatedForwardFold(maxSeconds: target, maxHolds: 1)),
+    targetType: ExerciseTargetType.seconds,
     phaseColors: {
       'default': const Color(0xFF00E676),
     },
@@ -1047,6 +1056,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
     videoAsset: 'assets/video/side_plank.mp4',
     createExercise: ({int? reps, int? seconds}) =>
         _withSeconds(seconds, (target) => SidePlankDip(maxSeconds: target)),
+    targetType: ExerciseTargetType.seconds,
     phaseColors: {
       'default': const Color(0xFF00E676),
     },
@@ -1075,6 +1085,7 @@ final List<ExerciseDefinition> exerciseDefinitions = [
     videoAsset: 'assets/video/sphinx_pose.mp4',
     createExercise: ({int? reps, int? seconds}) =>
         _withSeconds(seconds, (target) => SphinxStretch(maxSeconds: target)),
+    targetType: ExerciseTargetType.seconds,
     phaseColors: {
       'default': const Color(0xFF00E676),
     },

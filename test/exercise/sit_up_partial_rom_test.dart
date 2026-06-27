@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:vika/exercise/2.Sit-Up/sit_up.dart';
 import 'package:vika/exercise/2.Sit-Up/metrics/sit_up_metric_base.dart';
+import 'package:vika/exercise/2.Sit-Up/metrics/tempo_metric.dart';
 import 'package:vika/exercise/exercise_base.dart';
 
 PoseLandmark _landmark(
@@ -55,6 +56,17 @@ SitUp _activatedSitUp() {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('does not fault or coach any lowering speed', () {
+    final tempo = TempoMetric();
+    tempo.onStateTransition(SitUpState.upright, SitUpState.lowering, 1000);
+    tempo.onStateTransition(SitUpState.lowering, SitUpState.lying, 1100);
+
+    tempo.evaluateRep();
+
+    expect(tempo.loweringDuration, closeTo(0.1, 0.001));
+    expect(tempo.faults, isEmpty);
+  });
 
   test('counts a controlled partial sit-up without requiring upright torso',
       () {
