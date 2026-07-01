@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:ui';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
@@ -2651,112 +2650,6 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       return null;
     }
     return double.tryParse(match.group(1)!);
-  }
-
-  // ignore: unused_element
-  Widget _buildDebugPanel() {
-    final debugEntries = widget.exercise.debugData.entries.toList()
-      ..sort((a, b) => a.key.compareTo(b.key));
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-          constraints: const BoxConstraints(maxHeight: 320),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.48),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-          ),
-          child: debugEntries.isEmpty
-              ? Text(
-                  'Đang chờ dữ liệu pose...',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white.withValues(alpha: 0.42),
-                  ),
-                )
-              : SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.terminal_rounded,
-                            size: 12,
-                            color: VFTheme.jadeGlow.withValues(alpha: 0.74),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Dữ liệu debug',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.3,
-                              color: Colors.white.withValues(alpha: 0.82),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: debugEntries.map((entry) {
-                          return _debugChip(
-                            label: entry.key,
-                            value: '${entry.value}',
-                          );
-                        }).toList(),
-                      ),
-                    ],
-                  ),
-                ),
-        ),
-      ),
-    );
-  }
-
-  // ignore: unused_element
-  Widget _debugChip({
-    required String label,
-    required String value,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
-      ),
-      child: RichText(
-        text: TextSpan(
-          style: const TextStyle(fontFamily: 'monospace'),
-          children: [
-            TextSpan(
-              text: '$label ',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: Colors.white.withValues(alpha: 0.42),
-              ),
-            ),
-            TextSpan(
-              text: value,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: Colors.white.withValues(alpha: 0.86),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   Widget _buildPreviewSurface() {
