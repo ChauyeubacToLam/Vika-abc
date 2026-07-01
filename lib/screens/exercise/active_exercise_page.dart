@@ -24,6 +24,7 @@ import '../../utils/orientation_lock.dart';
 import '../../utils/segmentation_channel.dart';
 import '../../theme/vf_theme.dart';
 import 'widgets/form_score_arc.dart';
+import 'widgets/hold_hero_ring.dart';
 import 'widgets/ivory_chrome.dart';
 import 'widgets/pose_overlay_painter.dart';
 import 'widgets/rep_reward_layer.dart';
@@ -102,6 +103,11 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   int _rewardRepSeen = 0; // highest repCount already evaluated for reward
   int _cleanRepCount = 0; // cumulative clean reps this set (drives pool level)
   int _rewardPulseId = 0; // bumps once per clean rep (fires a bloom)
+
+  // Last non-null accrued hold seconds. The hold hero ring keeps showing the
+  // frozen count when the exercise momentarily reports null (user dropped out
+  // of the hold pose) instead of snapping back to zero.
+  double _lastKnownHoldSeconds = 0;
   bool _isManualPause = false;
   _PoseRuntime _runtime = _PoseRuntime.nativeMediaPipe;
   DebugMode _settingsDebugMode = DebugMode.off;
@@ -2030,6 +2036,19 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
             ),
           ),
 
+          // ── Layer 11: Hold hero ring (category 1 — time-based holds) ──
+          // The centerpiece for hold exercises: one large transparent ring
+          // center-screen. Flowing vs frozen is derived from the accrued
+          // seconds advancing or not — see HoldHeroRing.
+          if (widget.isTimeBased && activeState && guidanceCopy == null)
+            Center(
+              child: HoldHeroRing(
+                seconds: _liveHoldRingSeconds,
+                targetSeconds: widget.exercise.liveHoldTargetSeconds ??
+                    widget.totalReps.toDouble(),
+              ),
+            ),
+
           // ── Layer 12: Bottom chrome (phase verb + rep counter) ──
           if (activeState && !showDebugPanel)
             Positioned(
@@ -2316,6 +2335,17 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       return 'Tạm dừng. đứng trong  khung ảnh để tiếp tục';
     }
     return raw.replaceAll('⚠️ ', '').replaceAll('⏸ ', '').replaceAll('⚸ ', '');
+  }
+
+  /// Accrued correct seconds for the hold hero ring. Holds the last known
+  /// value when the exercise reports null (user out of the hold pose) so the
+  /// numeral freezes in place instead of resetting.
+  double get _liveHoldRingSeconds {
+    final live = widget.exercise.liveHoldSeconds;
+    if (live != null) {
+      _lastKnownHoldSeconds = live;
+    }
+    return _lastKnownHoldSeconds;
   }
 
   Map<String, String>? get _currentPhaseInstructions {
