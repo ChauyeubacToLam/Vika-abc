@@ -1640,12 +1640,14 @@ class _MetricDots extends StatelessWidget {
             width: i == active ? 20 : 6,
             height: 6,
             decoration: BoxDecoration(
-              color: i == active
-                  ? c.yellow
-                  : c.inkFaint.withValues(alpha: 0.28),
+              color:
+                  i == active ? c.yellow : c.inkFaint.withValues(alpha: 0.28),
               borderRadius: BorderRadius.circular(3),
               boxShadow: i == active
-                  ? [BoxShadow(color: c.yellow.withValues(alpha: 0.5), blurRadius: 6)]
+                  ? [
+                      BoxShadow(
+                          color: c.yellow.withValues(alpha: 0.5), blurRadius: 6)
+                    ]
                   : null,
             ),
           ),

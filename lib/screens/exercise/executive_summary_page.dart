@@ -302,8 +302,9 @@ class _HeroPhotoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = VFTheme.scale(context);
     final accent = _accent(report.formScore);
-    final headline =
-        isFinalWorkoutSlot ? _scoreHeadline(report.formScore) : 'Bài này đã xong';
+    final headline = isFinalWorkoutSlot
+        ? _scoreHeadline(report.formScore)
+        : 'Bài này đã xong';
     final subtitle = isFinalWorkoutSlot
         ? _heroSubtitle(
             score: report.formScore,
@@ -1706,7 +1707,9 @@ class _DoneSection extends StatelessWidget {
         ),
         SizedBox(height: 10 * s),
         Text(
-          disabled ? 'Đánh giá buổi tập để tiếp tục' : 'Hẹn gặp lại buổi sau! 👋',
+          disabled
+              ? 'Đánh giá buổi tập để tiếp tục'
+              : 'Hẹn gặp lại buổi sau! 👋',
           style: VFTheme.textStyle(
             context,
             size: 11,

@@ -1105,7 +1105,10 @@ class _JourneyPainter extends CustomPainter {
             grid..color = inkFaint.withValues(alpha: 0.22));
         x = next + gap;
       }
-      _label(canvas, '$v', Offset(2, y),
+      _label(
+          canvas,
+          '$v',
+          Offset(2, y),
           TextStyle(
             fontFamily: 'BeVietnamPro',
             fontSize: 8.5,
@@ -1375,7 +1378,8 @@ class _VitalsLine extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Row(
         children: [
-          Expanded(child: _VitalStat(label: 'GIỜ', value: _fmtClock(totalDuration))),
+          Expanded(
+              child: _VitalStat(label: 'GIỜ', value: _fmtClock(totalDuration))),
           _VitalDivider(),
           Expanded(child: _VitalStat(label: workLabel, value: workValue)),
           _VitalDivider(),
@@ -1630,7 +1634,8 @@ class _ExerciseList extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionHeader(label: 'CÁC BÀI ĐÃ TẬP', trailing: '${reports.length} BÀI'),
+        _SectionHeader(
+            label: 'CÁC BÀI ĐÃ TẬP', trailing: '${reports.length} BÀI'),
         const SizedBox(height: 4),
         for (var i = 0; i < reports.length; i++) ...[
           if (i > 0) Container(height: 1, color: c.border),
@@ -1763,7 +1768,8 @@ class _ExerciseRow extends StatelessWidget {
 }
 
 class _SetDots extends StatelessWidget {
-  const _SetDots({required this.scores, required this.yellow, required this.dim});
+  const _SetDots(
+      {required this.scores, required this.yellow, required this.dim});
   final List<int> scores;
   final Color yellow;
   final Color dim;

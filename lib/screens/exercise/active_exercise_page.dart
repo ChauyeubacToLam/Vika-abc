@@ -24,6 +24,7 @@ import '../../utils/orientation_lock.dart';
 import '../../utils/segmentation_channel.dart';
 import '../../theme/vf_theme.dart';
 import 'widgets/form_score_arc.dart';
+import 'widgets/guidance_signage.dart';
 import 'widgets/hold_hero_ring.dart';
 import 'widgets/hybrid_hold_cue.dart';
 import 'widgets/ivory_chrome.dart';
@@ -1981,15 +1982,19 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
               child: IvoryCoachCaption(message: coachMessage),
             ),
 
-          // ── Layer 9: Setup/safety guidance panel ──
+          // ── Layer 9: Setup/safety guidance — signage, not paragraphs ──
+          // Glyph-first, animated directionally, upper-center of the screen
+          // so it never hides the user's own body in the mirror.
           if (guidanceCopy != null && !widget.exercise.isPaused)
-            Positioned(
-              left: 20,
-              right: 20,
-              top: media.padding.top + 78,
+            Align(
+              alignment: const Alignment(0, -0.45),
               child: IgnorePointer(
-                child: _SetupGuidancePanel(
-                  copy: guidanceCopy,
+                child: GuidanceSignage(
+                  icon: guidanceCopy.icon,
+                  kind: guidanceCopy.kind,
+                  title: guidanceCopy.title,
+                  body: guidanceCopy.body,
+                  mode: guidanceCopy.mode,
                 ),
               ),
             ),
@@ -2092,13 +2097,24 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
               ),
             ),
 
+          // Orientation guidance riding above the pause overlay — compact
+          // pill so it never collides with the centered pause card.
           if (orientationGuidanceActive)
             Positioned(
               left: 20,
               right: 20,
               top: media.padding.top + 78,
               child: IgnorePointer(
-                child: _SetupGuidancePanel(copy: guidanceCopy),
+                child: Center(
+                  child: GuidanceSignage(
+                    icon: guidanceCopy.icon,
+                    kind: guidanceCopy.kind,
+                    title: guidanceCopy.title,
+                    body: guidanceCopy.body,
+                    mode: guidanceCopy.mode,
+                    compact: true,
+                  ),
+                ),
               ),
             ),
 
@@ -2220,7 +2236,8 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     if (rawNormalized.contains('wrong_orientation_landscape')) {
       return const _GuidanceCopy(
         icon: Icons.screen_rotation_alt_rounded,
-        title: 'Xoay ngang điện thoại',
+        kind: GuidanceGlyphKind.rotate,
+        title: 'Xoay ngang máy',
         body: 'Bài này cần điẹn thoại nằm ngang để AI thấy rõ toàn thân bạn.',
         mode: SystemBannerMode.warn,
       );
@@ -2228,7 +2245,8 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     if (rawNormalized.contains('wrong_orientation_portrait')) {
       return const _GuidanceCopy(
         icon: Icons.screen_rotation_alt_rounded,
-        title: 'Xoay dọc điện thoại',
+        kind: GuidanceGlyphKind.rotate,
+        title: 'Xoay dọc máy',
         body: 'Bài này cần màn hình dọc.',
         mode: SystemBannerMode.warn,
       );
@@ -2238,8 +2256,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         normalized.contains('quay nghiêng') ||
         normalized.contains('quay sang bên')) {
       return const _GuidanceCopy(
-        icon: Icons.screen_rotation_alt_rounded,
-        title: 'Đứng nghiêng người với camera',
+        icon: Icons.accessibility_new_rounded,
+        kind: GuidanceGlyphKind.turnSide,
+        title: 'Đứng nghiêng người',
         body:
             'Đứng nghiêng người với camera để AI thấy rõ vai, hông, gối và mắt cá.',
         mode: SystemBannerMode.warn,
@@ -2248,7 +2267,8 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     if (normalized.contains('quay mặt')) {
       return const _GuidanceCopy(
         icon: Icons.center_focus_strong_rounded,
-        title: 'Hướng mặt về phía camera',
+        kind: GuidanceGlyphKind.faceCamera,
+        title: 'Hướng về camera',
         body: 'Đứng đối diện camera để AI thấy cả hai bên người rõ hơn.',
         mode: SystemBannerMode.warn,
       );
@@ -2259,7 +2279,8 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         normalized.contains('hình ảnh không rõ')) {
       return const _GuidanceCopy(
         icon: Icons.light_mode_rounded,
-        title: 'Các điểm cần nhận diện đang không thấy rõ.',
+        kind: GuidanceGlyphKind.light,
+        title: 'Thêm ánh sáng',
         body:
             'Đứng chỗ sáng hơn hoặc tránh ngược sáng để AI nhận diện ổn định hơn.',
         mode: SystemBannerMode.warn,
@@ -2268,6 +2289,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     if (normalized.contains('đang tìm người')) {
       return const _GuidanceCopy(
         icon: Icons.person_search_rounded,
+        kind: GuidanceGlyphKind.search,
         title: 'Đang tìm người',
         body: 'Đứng trong khung hình để bắt đầu.',
         mode: SystemBannerMode.scan,
@@ -2277,6 +2299,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         normalized.contains('quay lại khung hình')) {
       return const _GuidanceCopy(
         icon: Icons.pause_circle_filled_rounded,
+        kind: GuidanceGlyphKind.still,
         title: 'Tạm dừng',
         body: 'Đứng trong khung hình để tiếp tục.',
         mode: SystemBannerMode.pause,
@@ -2284,8 +2307,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     }
     if (normalized.contains('phần trên cơ thể')) {
       return const _GuidanceCopy(
-        icon: Icons.fit_screen_rounded,
-        title: 'Lùi lại để thấy thân trên',
+        icon: Icons.accessibility_new_rounded,
+        kind: GuidanceGlyphKind.stepBack,
+        title: 'Lùi lại chút',
         body: 'Lùi lại một chút để thấy rõ vai, khuỷu tay và hông.',
         mode: SystemBannerMode.warn,
       );
@@ -2293,8 +2317,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     if (rawNormalized.contains('body not fully visible') ||
         normalized.contains('toàn thân')) {
       return const _GuidanceCopy(
-        icon: Icons.fit_screen_rounded,
-        title: 'Lùi lại để thấy toàn thân',
+        icon: Icons.accessibility_new_rounded,
+        kind: GuidanceGlyphKind.stepBack,
+        title: 'Lùi lại',
         body: 'Lùi lại hoặc hạ điện thoại để thấy từ vai đến bàn chân.',
         mode: SystemBannerMode.warn,
       );
@@ -2304,7 +2329,8 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         normalized.contains('vai, hông và gối')) {
       return const _GuidanceCopy(
         icon: Icons.fit_screen_rounded,
-        title: 'Điều chỉnh để cơ thể vào khung hình',
+        kind: GuidanceGlyphKind.stepBack,
+        title: 'Chỉnh khung hình',
         body: 'Lùi lại hoặc chỉnh góc điện thoại để AI nhìn rõ hơn.',
         mode: SystemBannerMode.warn,
       );
@@ -2314,7 +2340,8 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         normalized.contains('bắt đầu')) {
       return _GuidanceCopy(
         icon: Icons.accessibility_new_rounded,
-        title: 'Vào vị trí bắt đầu',
+        kind: GuidanceGlyphKind.faceCamera,
+        title: 'Vào vị trí',
         body: message,
         mode: SystemBannerMode.info,
       );
@@ -2680,13 +2707,21 @@ enum _LiveOverlayState { scan, warn, position, hold, paused, active }
 class _GuidanceCopy {
   const _GuidanceCopy({
     required this.icon,
+    required this.kind,
     required this.title,
     required this.body,
     required this.mode,
   });
 
   final IconData icon;
+
+  /// How the signage glyph animates — directional where meaningful.
+  final GuidanceGlyphKind kind;
+
+  /// At most ~3 words: the instruction itself, readable from 2.5 m mid-motion.
   final String title;
+
+  /// Near-view detail, rendered small under the title.
   final String body;
   final SystemBannerMode mode;
 }
@@ -2701,105 +2736,6 @@ class _BottomHoldCue {
   final double progress;
   final double? remaining;
   final bool readyToPush;
-}
-
-class _SetupGuidancePanel extends StatelessWidget {
-  const _SetupGuidancePanel({
-    required this.copy,
-  });
-
-  final _GuidanceCopy copy;
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = switch (copy.mode) {
-      SystemBannerMode.warn => const Color(0xFFFFB4A8),
-      SystemBannerMode.scan => const Color(0xCCFFFFFF),
-      SystemBannerMode.pause => const Color(0xCCFFFFFF),
-      SystemBannerMode.info => VikaIvory.yellow,
-    };
-    final background = switch (copy.mode) {
-      SystemBannerMode.warn => const Color(0xD1150C09),
-      SystemBannerMode.scan => const Color(0xC914100D),
-      SystemBannerMode.pause => const Color(0xC914100D),
-      SystemBannerMode.info => const Color(0xD1150C09),
-    };
-    final border = switch (copy.mode) {
-      SystemBannerMode.warn => const Color(0x4DFFB4A8),
-      SystemBannerMode.scan => const Color(0x22FFFFFF),
-      SystemBannerMode.pause => const Color(0x22FFFFFF),
-      SystemBannerMode.info => VikaIvory.yellowGlowWeak,
-    };
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-          decoration: BoxDecoration(
-            color: background,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: border),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.34),
-                blurRadius: 28,
-                offset: const Offset(0, 12),
-              ),
-            ],
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.13),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: accent.withValues(alpha: 0.24)),
-                ),
-                child: Icon(copy.icon, size: 20, color: accent),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      copy.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontFamily: VikaIvory.fontFamily,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: VikaIvory.invInk,
-                        height: 1.15,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      copy.body,
-                      style: TextStyle(
-                        fontFamily: VikaIvory.fontFamily,
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w600,
-                        color: VikaIvory.invInkSoft,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class _CenterOverlay extends StatelessWidget {
@@ -2871,22 +2807,20 @@ class _CenterOverlay extends StatelessWidget {
             : (remainingSeconds < 1
                 ? remainingSeconds.toStringAsFixed(1)
                 : remainingSeconds.ceil().toString());
-        // Live activation gauge with a frosted-glass backing disc.
+        // Live activation gauge on a solid warm-dark backing disc.
         //
-        // Why all this layered chrome:
+        // Why this layered chrome:
         //   1. FormScoreArc — yellow progress ring that traces around
         //      the outside; readable on ANY background regardless of
         //      camera content.
         //   2. Outer breathing pulse — wider yellow halo that gently
         //      breathes (driven by the existing pulseController) to
         //      pull the eye from across the room.
-        //   3. ClipOval + BackdropFilter blur — the camera scene
-        //      behind the disc is physically blurred, so any color
-        //      under the disc is washed out before our backing
-        //      composites on top. Strongest possible contrast.
-        //   4. Warm-dark backing disc at 0.92 alpha + yellow border —
-        //      brand-consistent surface for the numeral.
-        //   5. Numeral with brand yellow glow + crisp dark text stroke
+        //   3. Warm-dark backing disc at 0.95 alpha + yellow border —
+        //      solid fill, no BackdropFilter (workstream H): at this
+        //      alpha the camera barely reads through, so blurring it
+        //      first bought nothing but GPU time.
+        //   4. Numeral with brand yellow glow + crisp dark text stroke
         //      so the edge stays sharp even where backing alpha fades.
         return AnimatedBuilder(
           animation: pulseController,
@@ -2927,88 +2861,80 @@ class _CenterOverlay extends StatelessWidget {
                     strokeWidth: 6,
                     glow: true,
                     duration: const Duration(milliseconds: 240),
-                    child: ClipOval(
-                      child: BackdropFilter(
-                        // Frosted glass — physically blurs whatever
-                        // camera content sits behind the disc.
-                        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                        child: Container(
-                          width: 124,
-                          height: 124,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: VikaIvory.heroBg.withValues(alpha: 0.92),
-                            border: Border.all(
-                              color: VikaIvory.yellow.withValues(alpha: 0.5),
-                              width: 1.5,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.5),
-                                blurRadius: 24,
-                                spreadRadius: 1,
-                              ),
-                            ],
+                    child: Container(
+                      width: 124,
+                      height: 124,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: VikaIvory.heroBg.withValues(alpha: 0.95),
+                        border: Border.all(
+                          color: VikaIvory.yellow.withValues(alpha: 0.5),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: VikaIvory.heroBg.withValues(alpha: 0.55),
+                            blurRadius: 24,
+                            spreadRadius: 1,
                           ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              // FittedBox so the numeral never overflows
-                              // on small screens or with large system
-                              // text scaling.
-                              SizedBox(
-                                height: isReadyToStart ? 28 : 56,
-                                child: FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  child: Text(
-                                    remainingLabel,
-                                    style: TextStyle(
-                                      fontFamily: VikaIvory.fontFamily,
-                                      fontSize: isReadyToStart ? 22 : 48,
-                                      fontWeight: FontWeight.w800,
-                                      color: VikaIvory.yellow,
-                                      letterSpacing:
-                                          isReadyToStart ? 0.1 : -2.2,
-                                      height: 1,
-                                      shadows: [
-                                        Shadow(
-                                          color: VikaIvory.yellowGlow,
-                                          blurRadius: 14,
-                                        ),
-                                        Shadow(
-                                          color: Colors.black
-                                              .withValues(alpha: 0.85),
-                                          blurRadius: 4,
-                                          offset: const Offset(0, 1),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                isReadyToStart ? 'Bắt đầu' : 'Giữ yên',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // FittedBox so the numeral never overflows
+                          // on small screens or with large system
+                          // text scaling.
+                          SizedBox(
+                            height: isReadyToStart ? 28 : 56,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                remainingLabel,
                                 style: TextStyle(
                                   fontFamily: VikaIvory.fontFamily,
-                                  fontSize: 11,
+                                  fontSize: isReadyToStart ? 22 : 48,
                                   fontWeight: FontWeight.w800,
-                                  color: VikaIvory.invInk,
-                                  letterSpacing: 1.0,
+                                  color: VikaIvory.yellow,
+                                  letterSpacing: isReadyToStart ? 0.1 : -2.2,
+                                  height: 1,
                                   shadows: [
                                     Shadow(
-                                      color:
-                                          Colors.black.withValues(alpha: 0.7),
+                                      color: VikaIvory.yellowGlow,
+                                      blurRadius: 14,
+                                    ),
+                                    Shadow(
+                                      color: VikaIvory.heroBg
+                                          .withValues(alpha: 0.85),
                                       blurRadius: 4,
+                                      offset: const Offset(0, 1),
                                     ),
                                   ],
                                 ),
                               ),
-                            ],
+                            ),
                           ),
-                        ),
+                          const SizedBox(height: 6),
+                          Text(
+                            isReadyToStart ? 'Bắt đầu' : 'Giữ yên',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: VikaIvory.fontFamily,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: VikaIvory.invInk,
+                              letterSpacing: 1.0,
+                              shadows: [
+                                Shadow(
+                                  color:
+                                      VikaIvory.heroBg.withValues(alpha: 0.7),
+                                  blurRadius: 4,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -3038,15 +2964,17 @@ class _OverlayBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Sized for the 2.5 m viewing distance — the bubble is a gross state
+    // marker, not a detail element.
     return Container(
-      width: 84,
-      height: 84,
+      width: 112,
+      height: 112,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: fillColor,
-        border: Border.all(color: outlineColor, width: 2),
+        border: Border.all(color: outlineColor, width: 2.5),
       ),
-      child: Icon(icon, size: 34, color: iconColor),
+      child: Icon(icon, size: 48, color: iconColor),
     );
   }
 }
