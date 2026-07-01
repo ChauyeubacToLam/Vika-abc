@@ -15,9 +15,10 @@ import '../../../widgets/exercise/looping_asset_video.dart';
 /// build and is not gated on `is_staff`.
 ///
 /// Playback reuses [LoopingAssetVideo] (unmuted, single-shot) — the same
-/// `video_player` controller setup/dispose pattern that [IvoryPTReferenceLoop]
-/// uses on the live screen. The overlay is pushed as a full-screen route on top
-/// of the intro page; closing it returns straight to the intro.
+/// `video_player` controller setup/dispose pattern that [ExerciseDemoPage]
+/// uses on the live screen's swipe-to-demo page. The overlay is pushed as a
+/// full-screen route on top of the intro page; closing it returns straight to
+/// the intro.
 class ReviewerTrackingDemoOverlay extends StatelessWidget {
   const ReviewerTrackingDemoOverlay({super.key});
 

@@ -23,6 +23,7 @@ import '../../utils/exercise_logger.dart';
 import '../../utils/orientation_lock.dart';
 import '../../utils/segmentation_channel.dart';
 import '../../theme/vf_theme.dart';
+import 'widgets/exercise_demo_page.dart';
 import 'widgets/form_score_arc.dart';
 import 'widgets/guidance_signage.dart';
 import 'widgets/hold_hero_ring.dart';
@@ -112,6 +113,10 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   // frozen count when the exercise momentarily reports null (user dropped out
   // of the hold pose) instead of snapping back to zero.
   double _lastKnownHoldSeconds = 0;
+
+  // ─── Swipe-to-demo (camera view ↔ full-screen demo) ───
+  final PageController _pageController = PageController();
+  int _demoPageIndex = 0;
   bool _isManualPause = false;
   _PoseRuntime _runtime = _PoseRuntime.nativeMediaPipe;
   DebugMode _settingsDebugMode = DebugMode.off;
@@ -176,6 +181,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     unawaited(OrientationLock.portraitOnly());
     unawaited(_shutdownPipelines());
     _pulseController.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -1793,310 +1799,367 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         !showDebugPanel &&
         guidanceCopy == null;
 
+    // ── Page 1: the live camera stage ──
+    // Everything that belongs to the camera view lives in this stack. The
+    // full-screen overlays (pause, orientation gate, debug) live OUTSIDE the
+    // PageView so they cover both pages.
+    final cameraStage = Stack(
+      fit: StackFit.expand,
+      children: [
+        // ── Layer 1: Camera preview ──
+        _orientCameraScene(
+          RepaintBoundary(
+            child: ColoredBox(
+              color: Colors.black,
+              child: ClipRect(
+                child: SizedBox.expand(
+                  child: FittedBox(
+                    fit: previewFit,
+                    alignment: Alignment.center,
+                    child: SizedBox(
+                      width: _previewRenderSize.width,
+                      height: _previewRenderSize.height,
+                      child: _buildPreviewSurface(),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        // ── Layer 2: Skeleton overlay (unchanged — jade colors preserved) ──
+        Positioned.fill(
+          child: _orientCameraScene(
+            IgnorePointer(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  if (_detectedPose == null || _imageSize == Size.zero) {
+                    return const SizedBox.shrink();
+                  }
+                  return CustomPaint(
+                    size: constraints.biggest,
+                    painter: PoseOverlayPainter(
+                        pose: _detectedPose!,
+                        imageSize: _imageSize,
+                        rotation: _imageRotation,
+                        lensDirection: _currentLens,
+                        fit: previewFit,
+                        // Native texture preview and native pose landmarks
+                        // are produced from the same oriented frame. The old
+                        // Flutter camera fallback still needs front-camera
+                        // mirroring to match CameraPreview.
+                        mirrorHorizontally:
+                            _runtime == _PoseRuntime.mlKitFallback &&
+                                _currentLens == CameraLensDirection.front,
+                        debugData: widget.exercise.debugData,
+                        debugLabelsEnabled: debugEnabled,
+                        style: SkeletonStyle.vikaCream),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+
+        // ── Layer 3: Top scrim — anchors the status bar + top chrome
+        // row against the camera scene. Fades to transparent by ~140 px
+        // so the live body area stays bright.
+        const Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 140,
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color.fromRGBO(15, 11, 9, 0.78),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        // ── Layer 4: Bottom scrim — anchors the phase verb + rep
+        // counter. Stronger alpha than the top scrim because the bottom
+        // carries more glass-on-bright-scene text and a wider safe-area.
+        const Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: 200,
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    Color.fromRGBO(15, 11, 9, 0.92),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        // ── Layer 4.5: Ambient reward (Hearthlight) ──
+        // Additive warm-light feedback for clean reps. Sits above the camera
+        // + scrims but below the chrome, and is bottom/edge anchored +
+        // transparent through the center, so the live body and the jade
+        // skeleton stay fully visible. Always mounted (even when paused) so
+        // the accumulated hearth pool persists across the whole set.
+        Positioned.fill(
+          child: RepRewardLayer(
+            cleanReps: _cleanRepCount,
+            totalReps: widget.totalReps,
+            pulseId: _rewardPulseId,
+          ),
+        ),
+
+        // ── Layer 4: Top chrome left (back + HIỆP pill) ──
+        Positioned(
+          top: media.padding.top + 10,
+          left: 16,
+          child: IvoryTopChromeLeft(
+            currentSet: widget.currentSet,
+            totalSets: widget.totalSets,
+            setSeconds: _setElapsedSeconds,
+            onBack: _handleBackChromeTap,
+          ),
+        ),
+
+        // ── Layer 5: Top chrome right (flip + pause) ──
+        // No live form score lives here — real-time feedback on this screen
+        // is encouragement and safety only, never a verdict the user performs
+        // under. The form verdict is computed after the set.
+        Positioned(
+          top: media.padding.top + 10,
+          right: 16,
+          child: IvoryTopChromeRight(
+            onPause: () {
+              _isManualPause = true;
+              widget.exercise.manualPause();
+              setState(() {});
+            },
+            onFlipCamera: _toggleCamera,
+            debugBadge: showDebugEntryBadge
+                ? DebugIndicatorBadge(
+                    mode: debugEnabled ? debugMode : DebugMode.dev,
+                    panelOpen: debugEnabled && _debugPanelOpen,
+                    onToggle: () {
+                      if (!debugEnabled) {
+                        _showDevModeSheet();
+                        return;
+                      }
+                      setState(() {
+                        _debugPanelOpen = !_debugPanelOpen;
+                      });
+                    },
+                  )
+                : null,
+          ),
+        ),
+
+        // (v9) The 80×108 PT reference thumbnail is gone — the demo's home
+        // is now the full-screen second page of the PageView, so no video
+        // decoder runs behind the camera view.
+
+        // ── Layer 8: Coach caption (upper third, timed) ──
+        // High enough to clear the center hold ring / hybrid cue and far
+        // from the bottom rep hero; the caption times its own ~2s life.
+        if (showCaption)
+          Positioned(
+            left: 24,
+            right: 24,
+            top: media.padding.top + 64,
+            child: IvoryCoachCaption(message: coachMessage),
+          ),
+
+        // ── Layer 9: Setup/safety guidance — signage, not paragraphs ──
+        // Glyph-first, animated directionally, upper-center of the screen
+        // so it never hides the user's own body in the mirror.
+        if (guidanceCopy != null && !widget.exercise.isPaused)
+          Align(
+            alignment: const Alignment(0, -0.45),
+            child: IgnorePointer(
+              child: GuidanceSignage(
+                icon: guidanceCopy.icon,
+                kind: guidanceCopy.kind,
+                title: guidanceCopy.title,
+                body: guidanceCopy.body,
+                mode: guidanceCopy.mode,
+              ),
+            ),
+          ),
+
+        // ── Layer 10: Center overlay (scan/warn/position/hold) ──
+        IgnorePointer(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 260),
+            child:
+                overlayState == _LiveOverlayState.active || guidanceCopy != null
+                    ? const SizedBox.shrink()
+                    : Center(
+                        child: _CenterOverlay(
+                          state: overlayState,
+                          pulseController: _pulseController,
+                          progress: widget.exercise.activationProgress,
+                          holdCue: bottomHoldCue,
+                        ),
+                      ),
+          ),
+        ),
+
+        // ── Layer 11: Hold hero ring (category 1 — time-based holds) ──
+        // The centerpiece for hold exercises: one large transparent ring
+        // center-screen. Flowing vs frozen is derived from the accrued
+        // seconds advancing or not — see HoldHeroRing.
+        if (widget.isTimeBased && activeState && guidanceCopy == null)
+          Center(
+            child: HoldHeroRing(
+              seconds: _liveHoldRingSeconds,
+              targetSeconds: widget.exercise.liveHoldTargetSeconds ??
+                  widget.totalReps.toDouble(),
+            ),
+          ),
+
+        // ── Layer 11.2: Phase direction chevrons (rep-based, ambient) ──
+        // Beside the body area, never over it. Down while descending, up
+        // while ascending, hidden otherwise. Deliberately quiet.
+        if (!widget.isTimeBased &&
+            activeState &&
+            guidanceCopy == null &&
+            !showDebugPanel &&
+            _phaseChevronFlow != null)
+          Positioned(
+            right: 14,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: PhaseChevronStream(flow: _phaseChevronFlow!),
+            ),
+          ),
+
+        // ── Layer 11.5: Hybrid bottom-hold cue (category 2b) ──
+        // A compact mid-rep checkpoint, structurally distinct from the
+        // category-1 ring: counts DOWN, much smaller, lives 1–3 seconds.
+        // "LÊN!" is deliberately the loudest visual beat — hesitating
+        // loaded at the bottom is a safety problem.
+        if (!widget.isTimeBased && !showDebugPanel)
+          IgnorePointer(
+            child: Center(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 220),
+                transitionBuilder: (child, animation) {
+                  return FadeTransition(
+                    opacity: animation,
+                    child: ScaleTransition(scale: animation, child: child),
+                  );
+                },
+                child: (activeState &&
+                        bottomHoldCue != null &&
+                        guidanceCopy == null)
+                    ? HybridHoldCue(
+                        // Stable key: hold → release must update the same
+                        // widget so the release pop animates, not crossfade.
+                        key: const ValueKey<String>('hybrid-hold-cue'),
+                        remainingSeconds: bottomHoldCue.remaining,
+                        readyToPush: bottomHoldCue.readyToPush,
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ),
+          ),
+
+        // ── Layer 12: Rep hero (category 2 — bottom-center) ──
+        // The one number a rep-based user glances for. No fault marking —
+        // feedback during the set is additive only; the form verdict is
+        // computed after the set, never during.
+        if (!widget.isTimeBased && activeState && !showDebugPanel)
+          Positioned(
+            left: 24,
+            right: 24,
+            bottom: media.padding.bottom + 28,
+            child: Center(
+              child: IvoryRepHero(
+                repCount: widget.exercise.repCount,
+                totalReps: widget.totalReps,
+              ),
+            ),
+          ),
+      ],
+    );
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // ── Layer 1: Camera preview ──
-          _orientCameraScene(
-            RepaintBoundary(
-              child: ColoredBox(
-                color: Colors.black,
-                child: ClipRect(
-                  child: SizedBox.expand(
-                    child: FittedBox(
-                      fit: previewFit,
-                      alignment: Alignment.center,
-                      child: SizedBox(
-                        width: _previewRenderSize.width,
-                        height: _previewRenderSize.height,
-                        child: _buildPreviewSurface(),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // ── Layer 2: Skeleton overlay (unchanged — jade colors preserved) ──
-          Positioned.fill(
-            child: _orientCameraScene(
-              IgnorePointer(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    if (_detectedPose == null || _imageSize == Size.zero) {
-                      return const SizedBox.shrink();
-                    }
-                    return CustomPaint(
-                      size: constraints.biggest,
-                      painter: PoseOverlayPainter(
-                          pose: _detectedPose!,
-                          imageSize: _imageSize,
-                          rotation: _imageRotation,
-                          lensDirection: _currentLens,
-                          fit: previewFit,
-                          // Native texture preview and native pose landmarks
-                          // are produced from the same oriented frame. The old
-                          // Flutter camera fallback still needs front-camera
-                          // mirroring to match CameraPreview.
-                          mirrorHorizontally:
-                              _runtime == _PoseRuntime.mlKitFallback &&
-                                  _currentLens == CameraLensDirection.front,
-                          debugData: widget.exercise.debugData,
-                          debugLabelsEnabled: debugEnabled,
-                          style: SkeletonStyle.vikaCream),
-                    );
-                  },
-                ),
-              ),
-            ),
-          ),
-
-          // ── Layer 3: Top scrim — anchors the status bar + top chrome
-          // row against the camera scene. Fades to transparent by ~140 px
-          // so the live body area stays bright.
-          const Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 140,
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Color.fromRGBO(15, 11, 9, 0.78),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // ── Layer 4: Bottom scrim — anchors the phase verb + rep
-          // counter. Stronger alpha than the top scrim because the bottom
-          // carries more glass-on-bright-scene text and a wider safe-area.
-          const Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: 200,
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [
-                      Color.fromRGBO(15, 11, 9, 0.92),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // ── Layer 4.5: Ambient reward (Hearthlight) ──
-          // Additive warm-light feedback for clean reps. Sits above the camera
-          // + scrims but below the chrome, and is bottom/edge anchored +
-          // transparent through the center, so the live body and the jade
-          // skeleton stay fully visible. Always mounted (even when paused) so
-          // the accumulated hearth pool persists across the whole set.
-          Positioned.fill(
-            child: RepRewardLayer(
-              cleanReps: _cleanRepCount,
-              totalReps: widget.totalReps,
-              pulseId: _rewardPulseId,
-            ),
-          ),
-
-          // ── Layer 4: Top chrome left (back + HIỆP pill) ──
-          Positioned(
-            top: media.padding.top + 10,
-            left: 16,
-            child: IvoryTopChromeLeft(
-              currentSet: widget.currentSet,
-              totalSets: widget.totalSets,
-              setSeconds: _setElapsedSeconds,
-              onBack: _handleBackChromeTap,
-            ),
-          ),
-
-          // ── Layer 5: Top chrome right (flip + pause) ──
-          // No live form score lives here — real-time feedback on this screen
-          // is encouragement and safety only, never a verdict the user performs
-          // under. The form verdict is computed after the set.
-          Positioned(
-            top: media.padding.top + 10,
-            right: 16,
-            child: IvoryTopChromeRight(
-              onPause: () {
-                _isManualPause = true;
-                widget.exercise.manualPause();
-                setState(() {});
-              },
-              onFlipCamera: _toggleCamera,
-              debugBadge: showDebugEntryBadge
-                  ? DebugIndicatorBadge(
-                      mode: debugEnabled ? debugMode : DebugMode.dev,
-                      panelOpen: debugEnabled && _debugPanelOpen,
-                      onToggle: () {
-                        if (!debugEnabled) {
-                          _showDevModeSheet();
-                          return;
-                        }
-                        setState(() {
-                          _debugPanelOpen = !_debugPanelOpen;
-                        });
-                      },
-                    )
-                  : null,
-            ),
-          ),
-
-          // ── Layer 7: PT reference loop (top-left, just below chrome row) ──
-          // JSX places it at top:116 (16px below chrome bottom). chrome bottom
-          // = media.padding.top + 10 + 36 = +46, so PT loop sits at +56.
-          if (activeState &&
-              !(debugEnabled && _debugPanelOpen) &&
-              guidanceCopy == null)
-            Positioned(
-              top: media.padding.top + 56,
-              left: 16,
-              child: IvoryPTReferenceLoop(
+          // ── Swipeable stage: camera view ↔ full-screen demo ──
+          // The swipe changes what is DISPLAYED, never the session state —
+          // detection, rep counting, timers and voice keep running on either
+          // page. Swiping is locked while paused or with the debug panel
+          // open so the drag never fights those surfaces' own gestures.
+          PageView(
+            controller: _pageController,
+            // Keeps both pages alive so swiping back never rebuilds the
+            // camera stage from scratch; the demo's video decoder is still
+            // gated off by videoActive while the camera page is showing.
+            allowImplicitScrolling: true,
+            physics: (widget.exercise.isPaused || showDebugPanel)
+                ? const NeverScrollableScrollPhysics()
+                : null,
+            onPageChanged: (index) {
+              setState(() => _demoPageIndex = index);
+            },
+            children: [
+              cameraStage,
+              ExerciseDemoPage(
                 videoAsset: widget.definition.videoAsset,
+                exerciseName: widget.exercise.exerciseName,
+                isTimeBased: widget.isTimeBased,
+                liveValue: widget.isTimeBased
+                    ? _liveHoldRingSeconds.floor()
+                    : widget.exercise.repCount,
+                totalValue: widget.totalReps,
+                videoActive: _demoPageIndex == 1,
               ),
-            ),
-
-          // ── Layer 8: Coach caption (upper third, timed) ──
-          // High enough to clear the center hold ring / hybrid cue and far
-          // from the bottom rep hero; the caption times its own ~2s life.
-          if (showCaption)
-            Positioned(
-              left: 24,
-              right: 24,
-              top: media.padding.top + 64,
-              child: IvoryCoachCaption(message: coachMessage),
-            ),
-
-          // ── Layer 9: Setup/safety guidance — signage, not paragraphs ──
-          // Glyph-first, animated directionally, upper-center of the screen
-          // so it never hides the user's own body in the mirror.
-          if (guidanceCopy != null && !widget.exercise.isPaused)
-            Align(
-              alignment: const Alignment(0, -0.45),
-              child: IgnorePointer(
-                child: GuidanceSignage(
-                  icon: guidanceCopy.icon,
-                  kind: guidanceCopy.kind,
-                  title: guidanceCopy.title,
-                  body: guidanceCopy.body,
-                  mode: guidanceCopy.mode,
-                ),
-              ),
-            ),
-
-          // ── Layer 10: Center overlay (scan/warn/position/hold) ──
-          IgnorePointer(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 260),
-              child: overlayState == _LiveOverlayState.active ||
-                      guidanceCopy != null
-                  ? const SizedBox.shrink()
-                  : Center(
-                      child: _CenterOverlay(
-                        state: overlayState,
-                        pulseController: _pulseController,
-                        progress: widget.exercise.activationProgress,
-                        holdCue: bottomHoldCue,
-                      ),
-                    ),
-            ),
+            ],
           ),
 
-          // ── Layer 11: Hold hero ring (category 1 — time-based holds) ──
-          // The centerpiece for hold exercises: one large transparent ring
-          // center-screen. Flowing vs frozen is derived from the accrued
-          // seconds advancing or not — see HoldHeroRing.
-          if (widget.isTimeBased && activeState && guidanceCopy == null)
-            Center(
-              child: HoldHeroRing(
-                seconds: _liveHoldRingSeconds,
-                targetSeconds: widget.exercise.liveHoldTargetSeconds ??
-                    widget.totalReps.toDouble(),
+          // Quiet swipe affordance: two page dots top-center, clear of the
+          // corner chrome.
+          Positioned(
+            top: media.padding.top + 24,
+            left: 0,
+            right: 0,
+            child: IgnorePointer(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  for (var i = 0; i < 2; i++)
+                    Container(
+                      width: 5,
+                      height: 5,
+                      margin: const EdgeInsets.symmetric(horizontal: 3),
+                      decoration: BoxDecoration(
+                        color: VikaIvory.invInk.withValues(
+                            alpha: _demoPageIndex == i ? 0.85 : 0.30),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                ],
               ),
             ),
-
-          // ── Layer 11.2: Phase direction chevrons (rep-based, ambient) ──
-          // Beside the body area, never over it. Down while descending, up
-          // while ascending, hidden otherwise. Deliberately quiet.
-          if (!widget.isTimeBased &&
-              activeState &&
-              guidanceCopy == null &&
-              !showDebugPanel &&
-              _phaseChevronFlow != null)
-            Positioned(
-              right: 14,
-              top: 0,
-              bottom: 0,
-              child: Center(
-                child: PhaseChevronStream(flow: _phaseChevronFlow!),
-              ),
-            ),
-
-          // ── Layer 11.5: Hybrid bottom-hold cue (category 2b) ──
-          // A compact mid-rep checkpoint, structurally distinct from the
-          // category-1 ring: counts DOWN, much smaller, lives 1–3 seconds.
-          // "LÊN!" is deliberately the loudest visual beat — hesitating
-          // loaded at the bottom is a safety problem.
-          if (!widget.isTimeBased && !showDebugPanel)
-            IgnorePointer(
-              child: Center(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 220),
-                  transitionBuilder: (child, animation) {
-                    return FadeTransition(
-                      opacity: animation,
-                      child: ScaleTransition(scale: animation, child: child),
-                    );
-                  },
-                  child: (activeState &&
-                          bottomHoldCue != null &&
-                          guidanceCopy == null)
-                      ? HybridHoldCue(
-                          // Stable key: hold → release must update the same
-                          // widget so the release pop animates, not crossfade.
-                          key: const ValueKey<String>('hybrid-hold-cue'),
-                          remainingSeconds: bottomHoldCue.remaining,
-                          readyToPush: bottomHoldCue.readyToPush,
-                        )
-                      : const SizedBox.shrink(),
-                ),
-              ),
-            ),
-
-          // ── Layer 12: Rep hero (category 2 — bottom-center) ──
-          // The one number a rep-based user glances for. No fault marking —
-          // feedback during the set is additive only; the form verdict is
-          // computed after the set, never during.
-          if (!widget.isTimeBased && activeState && !showDebugPanel)
-            Positioned(
-              left: 24,
-              right: 24,
-              bottom: media.padding.bottom + 28,
-              child: Center(
-                child: IvoryRepHero(
-                  repCount: widget.exercise.repCount,
-                  totalReps: widget.totalReps,
-                ),
-              ),
-            ),
+          ),
 
           // ── Layer 13: Pause overlay ──
           if (widget.exercise.isPaused)

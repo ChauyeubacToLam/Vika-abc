@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../theme/vf_theme.dart';
-import '../../../widgets/exercise/looping_asset_video.dart';
 
 // ═══════════════════════════════════════════════════════════════════
 // Ivory v9 Chrome Widgets for Active Exercise Screen
@@ -208,90 +207,6 @@ class IvoryTopChromeRight extends StatelessWidget {
         IvoryGlassIconButton(
           onTap: onPause,
           child: Icon(Icons.pause_rounded, size: 14, color: VikaIvory.invInk),
-        ),
-      ],
-    );
-  }
-}
-
-// ─── PT Reference Loop (80×108 placeholder) ───
-
-class IvoryPTReferenceLoop extends StatelessWidget {
-  const IvoryPTReferenceLoop({super.key, this.videoAsset});
-
-  final String? videoAsset;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 80,
-          height: 108,
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            gradient: const LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFF2A1F18), Color(0xFF15110D)],
-            ),
-            border: Border.all(
-              color: const Color.fromRGBO(255, 255, 255, 0.18),
-              width: 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                  color: const Color(0xFF15110D).withValues(alpha: 0.4),
-                  blurRadius: 24,
-                  offset: const Offset(0, 8)),
-            ],
-          ),
-          child: videoAsset == null
-              ? Center(
-                  child: Icon(Icons.play_circle_outline_rounded,
-                      color: VikaIvory.invInkDim, size: 28),
-                )
-              : LoopingAssetVideo(
-                  asset: videoAsset!,
-                  fit: BoxFit.cover,
-                  alignment: Alignment.center,
-                  fallback: Center(
-                    child: Icon(Icons.play_circle_outline_rounded,
-                        color: VikaIvory.invInkDim, size: 28),
-                  ),
-                ),
-        ),
-        const SizedBox(height: 6),
-        Padding(
-          padding: const EdgeInsets.only(left: 2),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 5,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: VikaIvory.yellow,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(color: VikaIvory.yellowGlow, blurRadius: 6)
-                  ],
-                ),
-              ),
-              const SizedBox(width: 5),
-              Text('HLV MẪU',
-                  style: TextStyle(
-                    fontFamily: _font,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    color: VikaIvory.invInk,
-                    letterSpacing: 1.6,
-                  )),
-            ],
-          ),
         ),
       ],
     );
