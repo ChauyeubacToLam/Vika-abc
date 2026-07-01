@@ -117,6 +117,13 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   // even if the exercise restarts its live timer for a new hold attempt.
   double _holdPoolPeakSeconds = 0;
 
+  // Release-beat linger for the hybrid hold cue: the raw cue dies the frame
+  // the exercise leaves the bottom phase, so "LÊN!" keeps showing briefly
+  // into the ascent (see _displayedHoldCue).
+  _BottomHoldCue? _lingeringReleaseCue;
+  DateTime? _releaseLingerUntil;
+  static const Duration _releaseLingerDuration = Duration(milliseconds: 650);
+
   // ─── Swipe-to-demo (camera view ↔ full-screen demo) ───
   final PageController _pageController = PageController();
   int _demoPageIndex = 0;
@@ -1772,7 +1779,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   Widget _buildActiveLayout(BuildContext context) {
     final media = MediaQuery.of(context);
     final overlayState = _overlayState;
-    final bottomHoldCue = _bottomHoldCue;
+    final bottomHoldCue = _displayedHoldCue;
     final guidanceCopy = _currentGuidanceCopy;
     final orientationGuidanceActive =
         _orientationPauseActive && guidanceCopy != null;
@@ -1989,12 +1996,42 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
             child: IvoryCoachCaption(message: coachMessage),
           ),
 
+        // ── Layer 8.5: Guidance mode-scrim ──
+        // At 2.5m only gross screen change registers, so guidance dims the
+        // whole stage: heavy at the edges, light through the center — the
+        // user still sees their own mirror, which is HOW they comply with
+        // "step back" / "get in frame". Always mounted; a single 300ms fade
+        // (no flashing).
+        Positioned.fill(
+          child: IgnorePointer(
+            child: AnimatedOpacity(
+              opacity: (guidanceCopy != null && !widget.exercise.isPaused)
+                  ? 1.0
+                  : 0.0,
+              duration: const Duration(milliseconds: 300),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: Alignment.center,
+                    radius: 1.1,
+                    colors: [
+                      VikaIvory.heroBg.withValues(alpha: 0.28),
+                      VikaIvory.heroBg.withValues(alpha: 0.78),
+                    ],
+                    stops: const [0.35, 1.0],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+
         // ── Layer 9: Setup/safety guidance — signage, not paragraphs ──
         // Glyph-first, animated directionally, upper-center of the screen
         // so it never hides the user's own body in the mirror.
         if (guidanceCopy != null && !widget.exercise.isPaused)
           Align(
-            alignment: const Alignment(0, -0.45),
+            alignment: const Alignment(0, -0.25),
             child: IgnorePointer(
               child: GuidanceSignage(
                 icon: guidanceCopy.icon,
@@ -2056,14 +2093,16 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
         // ── Layer 11.5: Hybrid bottom-hold cue (category 2b) ──
         // A compact mid-rep checkpoint, structurally distinct from the
-        // category-1 ring: counts DOWN, much smaller, lives 1–3 seconds.
+        // category-1 ring: much smaller, lives around a second, GIỮ → LÊN!.
         // "LÊN!" is deliberately the loudest visual beat — hesitating
-        // loaded at the bottom is a safety problem.
+        // loaded at the bottom is a safety problem. Squat holds are only
+        // 0.35s, so the widget guarantees each beat a legible minimum life;
+        // the entrance here is fast for the same reason.
         if (!widget.isTimeBased && !showDebugPanel)
           IgnorePointer(
             child: Center(
               child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 220),
+                duration: const Duration(milliseconds: 110),
                 transitionBuilder: (child, animation) {
                   return FadeTransition(
                     opacity: animation,
@@ -2079,6 +2118,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                         key: const ValueKey<String>('hybrid-hold-cue'),
                         remainingSeconds: bottomHoldCue.remaining,
                         readyToPush: bottomHoldCue.readyToPush,
+                        showCountdown: bottomHoldCue.showCountdown,
                       )
                     : const SizedBox.shrink(),
               ),
@@ -2511,6 +2551,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         progress: (liveSeconds / targetSeconds).clamp(0.0, 1.0),
         remaining: (targetSeconds - liveSeconds).clamp(0.0, targetSeconds),
         readyToPush: liveSeconds >= targetSeconds,
+        targetSeconds: targetSeconds,
       );
     }
 
@@ -2518,6 +2559,12 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     // Outside the actual hold phase, do not synthesize a squat-style timer
     // from status copy.
     if (widget.isTimeBased) return null;
+
+    // Status-copy fallback is scoped to the bottom phase. Exercises write the
+    // release verb ('Đứng lên') as the Status of the whole ascending phase
+    // too — an anticipatory coaching line, not a hold cue. Without this gate
+    // the LÊN! beat would shadow the entire ascent.
+    if (widget.exercise.currentPhaseKey != 'bottom') return null;
 
     final status = _currentPhaseStatus;
     if (status == null || status.isEmpty) {
@@ -2542,6 +2589,31 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       remaining: _extractDurationSeconds(status),
       readyToPush: isRelease,
     );
+  }
+
+  /// What the hybrid-cue layer actually renders. The raw cue dies the instant
+  /// the exercise leaves the bottom phase — for a squat that means "LÊN!"
+  /// would exist for a couple of frames. The release beat lingers ~650ms into
+  /// the ascent so the loudest visual beat lands during the explosive
+  /// concentric, then dies. Purely presentation; reads exercise state only.
+  _BottomHoldCue? get _displayedHoldCue {
+    final raw = _bottomHoldCue;
+    final now = DateTime.now();
+    if (raw != null) {
+      _lingeringReleaseCue = raw.readyToPush ? raw : null;
+      _releaseLingerUntil = null;
+      return raw;
+    }
+    final lingering = _lingeringReleaseCue;
+    if (lingering != null) {
+      _releaseLingerUntil ??= now.add(_releaseLingerDuration);
+      if (now.isBefore(_releaseLingerUntil!)) {
+        return lingering;
+      }
+      _lingeringReleaseCue = null;
+      _releaseLingerUntil = null;
+    }
+    return null;
   }
 
   bool _isHoldStatus(String value) =>
@@ -2740,11 +2812,25 @@ class _BottomHoldCue {
     required this.progress,
     required this.remaining,
     required this.readyToPush,
+    this.targetSeconds,
   });
 
   final double progress;
   final double? remaining;
   final bool readyToPush;
+
+  /// Total hold length when the exercise exposes it. Sub-second holds (squat:
+  /// 0.35s) render as a wordless GIỮ beat — a numeric countdown would only
+  /// ever flash "1" and read as noise.
+  final double? targetSeconds;
+
+  /// Whether a countdown numeral means anything at this hold length.
+  bool get showCountdown {
+    final t = targetSeconds;
+    if (t != null) return t >= 1.2;
+    final r = remaining;
+    return r != null && r >= 1.2;
+  }
 }
 
 class _CenterOverlay extends StatelessWidget {

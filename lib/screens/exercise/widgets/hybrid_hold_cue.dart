@@ -7,19 +7,28 @@ import '../../../theme/vf_theme.dart';
 // ═══════════════════════════════════════════════════════════════════════════
 // HybridHoldCue — the category-2b (rep with mid-rep hold) checkpoint.
 //
-// A squat-with-bottom-hold pauses loaded at the bottom for 1–3 seconds. This
-// cue reads as "hold for a beat, then explode up" — and must never be
-// mistaken for the category-1 HoldHeroRing. Differentiation is structural:
+// A squat-with-bottom-hold pauses loaded at the bottom; this cue reads as
+// "hold for a beat, then explode up" — and must never be mistaken for the
+// category-1 HoldHeroRing. Differentiation is structural:
 //
-//   • counts DOWN ("GIỮ · 3 → 2 → 1"), the ring counts up
 //   • no ring at all — a compact badge, clearly smaller than 230pt
-//   • lives 1–3 seconds and disappears; the ring lives the whole set
-//   • countdown is cream; yellow is saved for the release beat
+//   • lives around a second; the ring lives the whole set
+//   • the hold beat is cream; yellow is saved for the release moment
+//
+// The physical hold can be sub-second (squat: 0.35s), far too short for a
+// human to read raw state changes. So this widget is a BEAT SEQUENCER, not a
+// mirror: GIỮ is guaranteed a minimum legible life (~600ms) before the
+// release visual may replace it, even when the exercise reports readyToPush
+// earlier. Voice leads ("Giữ" → "Lên"); the screen lands the same beats at a
+// readable tempo. Holds long enough to count ([showCountdown]) get a
+// per-second countdown numeral; sub-second holds show a single wordless GIỮ.
 //
 // The release moment ("LÊN!") is the loudest visual beat on purpose: the cue
-// doubles as a safety cue — hesitating loaded at the bottom is bad.
+// doubles as a safety cue — hesitating loaded at the bottom is bad. If the
+// user does hesitate, LÊN! stays until they actually move (the parent keeps
+// the cue alive through the bottom phase and ~650ms into the ascent).
 //
-// Per-second pulse only (≤1Hz); entrance/exit crossfades are owned by the
+// Per-second pulses only (≤1Hz); entrance/exit crossfades are owned by the
 // parent AnimatedSwitcher.
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -28,14 +37,19 @@ class HybridHoldCue extends StatefulWidget {
     super.key,
     required this.remainingSeconds,
     required this.readyToPush,
+    this.showCountdown = true,
   });
 
   /// Seconds left in the bottom hold; null when the exercise doesn't expose
-  /// a numeric countdown (the badge then pulses wordlessly on "GIỮ").
+  /// a numeric countdown.
   final double? remainingSeconds;
 
   /// True the instant the hold is served and the user should drive up.
   final bool readyToPush;
+
+  /// Whether a numeric countdown means anything at this hold length. False
+  /// for sub-second holds (a flashing "· 1" reads as noise, not time).
+  final bool showCountdown;
 
   @override
   State<HybridHoldCue> createState() => _HybridHoldCueState();
@@ -45,7 +59,24 @@ class _HybridHoldCueState extends State<HybridHoldCue>
     with TickerProviderStateMixin {
   late final AnimationController _tick;
   late final AnimationController _release;
+
+  /// Runs the GIỮ beat's minimum legible life. Vsync-driven so it stays
+  /// honest under fake-async tests and janky frames alike.
+  late final AnimationController _minBeat;
+
+  /// Whether the release visual is actually showing — lags [widget.readyToPush]
+  /// while the hold beat hasn't lived long enough to register.
+  bool _showRelease = false;
+
+  /// The exercise said "go up" before the GIỮ beat floor passed; fire the
+  /// release the moment [_minBeat] completes.
+  bool _pendingRelease = false;
+
   int _lastShownSecond = -1;
+
+  /// Minimum time GIỮ stays on screen before LÊN! may replace it. Squat's
+  /// physical hold is 0.35s; anything shorter than this floor is subliminal.
+  static const Duration _minHoldBeat = Duration(milliseconds: 600);
 
   @override
   void initState() {
@@ -58,8 +89,20 @@ class _HybridHoldCueState extends State<HybridHoldCue>
       vsync: this,
       duration: const Duration(milliseconds: 460),
     );
+    _minBeat = AnimationController(vsync: this, duration: _minHoldBeat)
+      ..addStatusListener((status) {
+        if (status == AnimationStatus.completed && _pendingRelease) {
+          _fireRelease();
+        }
+      });
     _lastShownSecond = _displaySecond ?? -1;
-    if (widget.readyToPush) _release.value = 1;
+    if (widget.readyToPush) {
+      // Born in release (e.g. the lingering beat after a remount): show it.
+      _showRelease = true;
+      _release.value = 1;
+    } else {
+      _minBeat.forward();
+    }
   }
 
   int? get _displaySecond {
@@ -72,20 +115,39 @@ class _HybridHoldCueState extends State<HybridHoldCue>
   void didUpdateWidget(HybridHoldCue oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.readyToPush && !oldWidget.readyToPush) {
-      _release.forward(from: 0);
+      if (_minBeat.isCompleted) {
+        _fireRelease();
+      } else {
+        _pendingRelease = true;
+      }
+      return;
+    }
+    if (!widget.readyToPush && oldWidget.readyToPush) {
+      // Back into a fresh hold (user sank again before ascending).
+      _pendingRelease = false;
+      setState(() => _showRelease = false);
+      _minBeat.forward(from: 0);
       return;
     }
     final second = _displaySecond;
-    if (second != null && second != _lastShownSecond) {
+    if (!widget.readyToPush && second != null && second != _lastShownSecond) {
       _lastShownSecond = second;
       _tick.forward(from: 0);
     }
+  }
+
+  void _fireRelease() {
+    if (!mounted) return;
+    _pendingRelease = false;
+    setState(() => _showRelease = true);
+    _release.forward(from: 0);
   }
 
   @override
   void dispose() {
     _tick.dispose();
     _release.dispose();
+    _minBeat.dispose();
     super.dispose();
   }
 
@@ -96,17 +158,18 @@ class _HybridHoldCueState extends State<HybridHoldCue>
         child: AnimatedBuilder(
           animation: Listenable.merge(<Listenable>[_tick, _release]),
           builder: (context, _) {
-            return widget.readyToPush ? _buildRelease() : _buildCountdown();
+            return _showRelease ? _buildRelease() : _buildHold();
           },
         ),
       ),
     );
   }
 
-  Widget _buildCountdown() {
-    // Per-second pulse: brief swell as each second lands.
+  Widget _buildHold() {
+    // Per-second pulse while counting; a steady presence for beat-holds.
     final scale = 1.0 + 0.09 * math.sin(_tick.value * math.pi);
-    final second = _displaySecond;
+    final second = widget.showCountdown ? _displaySecond : null;
+    final holdLabelSize = second == null ? 46.0 : 30.0;
 
     return Transform.scale(
       scale: scale,
@@ -126,7 +189,7 @@ class _HybridHoldCueState extends State<HybridHoldCue>
               'GIỮ',
               style: TextStyle(
                 fontFamily: VikaIvory.fontFamily,
-                fontSize: 30,
+                fontSize: holdLabelSize,
                 fontWeight: FontWeight.w800,
                 color: VikaIvory.invInk,
                 letterSpacing: 1.2,

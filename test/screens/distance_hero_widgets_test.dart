@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vika/screens/exercise/widgets/hold_hero_ring.dart';
+import 'package:vika/screens/exercise/widgets/hybrid_hold_cue.dart';
 import 'package:vika/screens/exercise/widgets/rep_hero.dart';
 
 void main() {
@@ -52,5 +53,50 @@ void main() {
 
     expect(find.text('12'), findsOneWidget);
     expect(find.text('/12'), findsOneWidget);
+  });
+
+  Widget hostCue({required bool readyToPush}) {
+    return MaterialApp(
+      home: Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: HybridHoldCue(
+            // Sub-second hold (squat: 0.35s target) — no countdown numeral.
+            remainingSeconds: readyToPush ? 0 : 0.35,
+            readyToPush: readyToPush,
+            showCountdown: false,
+          ),
+        ),
+      ),
+    );
+  }
+
+  testWidgets(
+      'hybrid cue guarantees the GIỮ beat before LÊN! even on a 0.35s hold',
+      (tester) async {
+    await tester.pumpWidget(hostCue(readyToPush: false));
+    expect(find.text('GIỮ'), findsOneWidget);
+    expect(find.text('LÊN!'), findsNothing);
+
+    // The exercise reports readyToPush after only 350ms of physical hold.
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpWidget(hostCue(readyToPush: true));
+
+    // The hold beat hasn't lived its 600ms minimum — GIỮ must still show.
+    expect(find.text('GIỮ'), findsOneWidget);
+    expect(find.text('LÊN!'), findsNothing);
+
+    // Once the beat floor passes, the release pop takes over.
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('LÊN!'), findsOneWidget);
+    expect(find.text('GIỮ'), findsNothing);
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('hybrid cue with no countdown never shows a numeral',
+      (tester) async {
+    await tester.pumpWidget(hostCue(readyToPush: false));
+    expect(find.text('1'), findsNothing);
+    expect(find.textContaining('·'), findsNothing);
   });
 }

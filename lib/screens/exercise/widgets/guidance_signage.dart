@@ -112,29 +112,46 @@ class _GuidanceSignageState extends State<GuidanceSignage>
   }
 
   Widget _buildFull() {
+    // No card, no box: the page dims the whole screen behind this signage
+    // (a gross, distance-readable mode change), and the signage floats on it
+    // — one huge moving glyph, a 40pt instruction, near-view detail below.
     return RepaintBoundary(
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 320),
-        padding: const EdgeInsets.fromLTRB(28, 26, 28, 24),
-        decoration: BoxDecoration(
-          // Solid high-alpha warm-dark — no blur.
-          color: VikaIvory.heroBg.withValues(alpha: 0.82),
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: _border),
-        ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 340),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             SizedBox(
-              width: 120,
-              height: 108,
-              child: AnimatedBuilder(
-                animation: _motion,
-                builder: (context, _) => _buildGlyph(_motion.value),
+              width: 220,
+              height: 190,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Soft accent aura — color carries state at any distance.
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        colors: [
+                          _accent.withValues(alpha: 0.22),
+                          _accent.withValues(alpha: 0),
+                        ],
+                        stops: const [0, 0.85],
+                      ),
+                    ),
+                    child: const SizedBox(width: 220, height: 190),
+                  ),
+                  Positioned.fill(
+                    child: AnimatedBuilder(
+                      animation: _motion,
+                      builder: (context, _) =>
+                          _buildGlyph(_motion.value, size: 140),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 14),
-            // ≤3 words, 30pt — the instruction itself, readable mid-motion.
+            const SizedBox(height: 16),
+            // ≤3 words, 40pt — the instruction itself, readable mid-motion.
             Text(
               widget.title,
               textAlign: TextAlign.center,
@@ -142,14 +159,20 @@ class _GuidanceSignageState extends State<GuidanceSignage>
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontFamily: VikaIvory.fontFamily,
-                fontSize: 30,
+                fontSize: 40,
                 fontWeight: FontWeight.w800,
                 color: VikaIvory.invInk,
-                letterSpacing: -0.8,
-                height: 1.08,
+                letterSpacing: -1.2,
+                height: 1.05,
+                shadows: [
+                  Shadow(
+                    color: VikaIvory.heroBg.withValues(alpha: 0.9),
+                    blurRadius: 12,
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             // Near-view detail — kept from the old panel.
             Text(
               widget.body,
@@ -158,10 +181,16 @@ class _GuidanceSignageState extends State<GuidanceSignage>
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontFamily: VikaIvory.fontFamily,
-                fontSize: 13,
+                fontSize: 14,
                 fontWeight: FontWeight.w600,
                 color: VikaIvory.invInkSoft,
                 height: 1.4,
+                shadows: [
+                  Shadow(
+                    color: VikaIvory.heroBg.withValues(alpha: 0.8),
+                    blurRadius: 8,
+                  ),
+                ],
               ),
             ),
           ],
@@ -288,17 +317,19 @@ class _FlowChevronsPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Everything scales off the canvas so the same painter serves both the
+    // 140pt hero glyph and the compact pill variant.
     final paint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.5
+      ..strokeWidth = math.max(3.0, size.width * 0.022)
       ..strokeCap = StrokeCap.round;
 
     const chevrons = 3;
     final cx = size.width / 2;
     final laneTop = size.height * 0.62;
     final laneHeight = size.height * 0.38;
-    const halfWidth = 13.0;
-    const depth = 7.0;
+    final halfWidth = math.max(13.0, size.width * 0.11);
+    final depth = halfWidth * 0.55;
 
     for (var i = 0; i < chevrons; i++) {
       // Each chevron rides the loop offset by a third, fading out as it
