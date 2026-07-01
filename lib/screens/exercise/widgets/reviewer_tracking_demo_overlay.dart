@@ -137,10 +137,12 @@ class _DemoCaption extends StatelessWidget {
         Container(
           padding: const EdgeInsets.fromLTRB(10, 5, 12, 5),
           decoration: BoxDecoration(
-            color: ReviewerTrackingDemoOverlay._warmDark.withValues(alpha: 0.72),
+            color:
+                ReviewerTrackingDemoOverlay._warmDark.withValues(alpha: 0.72),
             borderRadius: BorderRadius.circular(100),
             border: Border.all(
-              color: ReviewerTrackingDemoOverlay._yellow.withValues(alpha: 0.32),
+              color:
+                  ReviewerTrackingDemoOverlay._yellow.withValues(alpha: 0.32),
               width: 0.8,
             ),
           ),

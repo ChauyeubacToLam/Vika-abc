@@ -25,7 +25,9 @@ import '../../utils/segmentation_channel.dart';
 import '../../theme/vf_theme.dart';
 import 'widgets/form_score_arc.dart';
 import 'widgets/hold_hero_ring.dart';
+import 'widgets/hybrid_hold_cue.dart';
 import 'widgets/ivory_chrome.dart';
+import 'widgets/rep_hero.dart';
 import 'widgets/pose_overlay_painter.dart';
 import 'widgets/rep_reward_layer.dart';
 import 'widgets/system_banner.dart';
@@ -1778,36 +1780,10 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     final showDebugPanel = debugEnabled && _debugPanelOpen;
     final previewFit = _previewFit;
 
-    // Derive ivory phase verb from squat state machine phases.
-    // Standing = default resting position (not a "ready" state).
-    final phaseKey = widget.exercise.currentPhaseKey;
-    final isHoldPhase = bottomHoldCue != null;
-    String phaseVerb;
-    String phaseHint;
-    if (widget.isTimeBased) {
-      final liveSeconds = widget.exercise.liveHoldSeconds;
-      phaseVerb = liveSeconds == null
-          ? widget.exercise.currentPhaseLabel.toUpperCase()
-          : 'GIỮ';
-      phaseHint = liveSeconds == null
-          ? 'Vào đúng tư thế để bắt đầu tính giờ'
-          : '${liveSeconds.floor().clamp(0, widget.totalReps)}/${widget.totalReps} giây đúng tư thế';
-    } else {
-      switch (phaseKey) {
-        case 'descending':
-          phaseVerb = 'XUỐNG';
-          phaseHint = 'Hạ chậm, giữ kiểm soát';
-        case 'bottom':
-          phaseVerb = 'GIỮ';
-          phaseHint = 'Giữ ở đáy, ổn định';
-        case 'ascending':
-          phaseVerb = 'LÊN';
-          phaseHint = 'Đẩy mạnh lên';
-        default: // 'standing' or any other
-          phaseVerb = widget.exercise.currentPhaseLabel.toUpperCase();
-          phaseHint = 'Giữ chuyển động đúng kỹ thuật';
-      }
-    }
+    // The persistent phase verb (XUỐNG/LÊN) and phase hint are gone in v9:
+    // they duplicated the user's own proprioception and were illegible from
+    // 2.5 m anyway. Direction is now the quiet chevron stream's job; the
+    // bottom zone belongs to the rep hero alone.
 
     // TODO(caption): Wire mid-rep fault detection caption here
     final showCaption = activeState &&
@@ -2049,25 +2025,51 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
               ),
             ),
 
-          // ── Layer 12: Bottom chrome (phase verb + rep counter) ──
-          if (activeState && !showDebugPanel)
+          // ── Layer 11.5: Hybrid bottom-hold cue (category 2b) ──
+          // A compact mid-rep checkpoint, structurally distinct from the
+          // category-1 ring: counts DOWN, much smaller, lives 1–3 seconds.
+          // "LÊN!" is deliberately the loudest visual beat — hesitating
+          // loaded at the bottom is a safety problem.
+          if (!widget.isTimeBased && !showDebugPanel)
+            IgnorePointer(
+              child: Center(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  transitionBuilder: (child, animation) {
+                    return FadeTransition(
+                      opacity: animation,
+                      child: ScaleTransition(scale: animation, child: child),
+                    );
+                  },
+                  child: (activeState &&
+                          bottomHoldCue != null &&
+                          guidanceCopy == null)
+                      ? HybridHoldCue(
+                          // Stable key: hold → release must update the same
+                          // widget so the release pop animates, not crossfade.
+                          key: const ValueKey<String>('hybrid-hold-cue'),
+                          remainingSeconds: bottomHoldCue.remaining,
+                          readyToPush: bottomHoldCue.readyToPush,
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ),
+            ),
+
+          // ── Layer 12: Rep hero (category 2 — bottom-center) ──
+          // The one number a rep-based user glances for. No fault marking —
+          // feedback during the set is additive only; the form verdict is
+          // computed after the set, never during.
+          if (!widget.isTimeBased && activeState && !showDebugPanel)
             Positioned(
               left: 24,
               right: 24,
-              bottom: media.padding.bottom + 36,
-              child: IvoryBottomChrome(
-                phaseVerb: phaseVerb,
-                phaseHint: phaseHint,
-                repCount: widget.exercise.repCount,
-                totalReps: widget.totalReps,
-                isTimeBased: widget.isTimeBased,
-                elapsedSeconds: widget.exercise.liveHoldSeconds?.floor() ?? 0,
-                isHoldPhase: isHoldPhase,
-                holdProgress: bottomHoldCue?.progress,
-                holdRemaining: bottomHoldCue?.remaining,
-                // No fault marking on the live rep tally — feedback during the
-                // set is additive only. The dots fill warm as reps land; the
-                // form verdict is computed after the set, never during.
+              bottom: media.padding.bottom + 28,
+              child: Center(
+                child: IvoryRepHero(
+                  repCount: widget.exercise.repCount,
+                  totalReps: widget.totalReps,
+                ),
               ),
             ),
 
@@ -2851,8 +2853,8 @@ class _CenterOverlay extends StatelessWidget {
           outlineColor: Color(0x1AFFFFFF),
         );
       case _LiveOverlayState.hold:
-        // Mid-rep bottom hold is owned by IvoryBottomChrome — don't render
-        // a duplicate centered ring during squat-bottom holds.
+        // Mid-rep bottom hold is owned by the HybridHoldCue layer — don't
+        // render a duplicate centered element during squat-bottom holds.
         if (holdCue != null) {
           return const SizedBox.shrink();
         }
