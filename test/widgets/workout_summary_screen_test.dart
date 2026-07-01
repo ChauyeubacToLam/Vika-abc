@@ -17,7 +17,8 @@ import 'package:vika/services/session_summary_builder.dart';
 import 'package:vika/services/session_trophy_picker.dart';
 
 void main() {
-  testWidgets('multi-exercise session renders without overflow', (tester) async {
+  testWidgets('multi-exercise session renders without overflow',
+      (tester) async {
     final reports = [
       _report(name: 'Squat', setScores: [82, 88, 91]),
       _report(name: 'Chùng chân', setScores: [70, 66, 74]),
@@ -212,7 +213,7 @@ ExerciseDefinition _definition({required String id, required String name}) {
     cameraHint: '',
     framingHint: '',
     setupTips: const [],
-    createExercise: () => throw UnimplementedError(),
+    createExercise: ({int? reps, int? seconds}) => throw UnimplementedError(),
     phaseColors: const {},
   );
 }

@@ -70,6 +70,7 @@ class PersonDetector {
   bool personDetected = false;
   int segmentationEventCount = 0;
   DateTime? _lastSegmentationEventAt;
+  bool _smoothedInitialized = false;
 
   int? get configuredMinProcessIntervalMs =>
       _configuredMinProcessInterval?.inMilliseconds;
@@ -205,17 +206,19 @@ class PersonDetector {
       lastSoftPersonRatio * PersonDetectorConfig.SOFT_RATIO_SCORE_WEIGHT,
     );
 
-    smoothedPersonRatio = smoothedPersonRatio == 0.0
-        ? lastPersonRatio
-        : (smoothedPersonRatio *
-                (1.0 - PersonDetectorConfig.RATIO_SMOOTHING_ALPHA)) +
-            (lastPersonRatio * PersonDetectorConfig.RATIO_SMOOTHING_ALPHA);
+    if (!_smoothedInitialized) {
+      smoothedPersonRatio = lastPersonRatio;
+      smoothedSoftPersonRatio = lastSoftPersonRatio;
+      _smoothedInitialized = true;
+    } else {
+      smoothedPersonRatio = (smoothedPersonRatio *
+              (1.0 - PersonDetectorConfig.RATIO_SMOOTHING_ALPHA)) +
+          (lastPersonRatio * PersonDetectorConfig.RATIO_SMOOTHING_ALPHA);
 
-    smoothedSoftPersonRatio = smoothedSoftPersonRatio == 0.0
-        ? lastSoftPersonRatio
-        : (smoothedSoftPersonRatio *
-                (1.0 - PersonDetectorConfig.RATIO_SMOOTHING_ALPHA)) +
-            (lastSoftPersonRatio * PersonDetectorConfig.RATIO_SMOOTHING_ALPHA);
+      smoothedSoftPersonRatio = (smoothedSoftPersonRatio *
+              (1.0 - PersonDetectorConfig.RATIO_SMOOTHING_ALPHA)) +
+          (lastSoftPersonRatio * PersonDetectorConfig.RATIO_SMOOTHING_ALPHA);
+    }
 
     presenceScore = math.max(
       smoothedPersonRatio,

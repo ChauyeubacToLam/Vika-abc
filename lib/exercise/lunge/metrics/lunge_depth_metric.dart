@@ -18,13 +18,13 @@ import '../lunge.dart';
 
 class LungeDepthConfig {
   /// Lead knee angle range considered good depth.
-  static const List<int> GOOD_DEPTH_RANGE = [70, 110];
+  static const List<int> GOOD_DEPTH_RANGE = [55, 125];
 
   /// Below this = too deep
-  static const int TOO_DEEP_THRESHOLD = 70;
+  static const int TOO_DEEP_THRESHOLD = 55;
 
   /// Shallow warning zone: 110° – 140°
-  static const int SHALLOW_WARN_THRESHOLD = 140;
+  static const int SHALLOW_WARN_THRESHOLD = 150;
 }
 
 class LungeDepthMetric extends LungeMetricBase {

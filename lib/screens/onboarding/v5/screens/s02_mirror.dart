@@ -31,25 +31,25 @@ class _S02MirrorState extends State<S02Mirror> {
     _PainStory(
       id: 'form_uncertainty',
       eyebrow: 'Tập theo video',
-      quote: 'Bạn làm theo video, nhưng không chắc form của mình có đúng.',
+      quote: 'Tập theo video, nhưng không biết mình làm có đúng không.',
       visual: _PainVisualKind.mirror,
     ),
     _PainStory(
       id: 'generic_apps',
       eyebrow: 'App tập đại trà',
-      quote: 'App hỏi vài câu rồi đưa một lịch tập giống nhau cho mọi người.',
+      quote: 'Tập theo app đại trà, không có lộ trình riêng cho mình.',
       visual: _PainVisualKind.generic,
     ),
     _PainStory(
       id: 'pt_expensive',
       eyebrow: 'PT 1-1',
-      quote: 'Có người sửa form thì tốt, nhưng chi phí không dễ theo lâu dài.',
+      quote: 'Mong có người hướng dẫn tập cho đúng, nhưng chi phí PT lại quá cao.',
       visual: _PainVisualKind.cost,
     ),
     _PainStory(
       id: 'solo_demotivation',
       eyebrow: 'Tập một mình',
-      quote: 'Tuần đầu rất hăng. Đến tuần ba, bạn phải tự kéo mình quay lại.',
+      quote: 'Tuần đầu đầy nhiệt huyết. Càng về sau càng mất động lực do tập mà không có hiệu quả.',
       visual: _PainVisualKind.fade,
     ),
   ];
@@ -120,9 +120,9 @@ class _S02MirrorState extends State<S02Mirror> {
         label: _canContinue
             ? 'Tiếp tục với $_markedCount điều đã chọn'
             : (_index < _stories.length - 1
-                ? 'Trượt để xem tiếp'
-                : 'Chọn điều bạn từng gặp'),
-        disabledLabel: 'Chạm thẻ để chọn',
+                ? 'Vuốt để xem tiếp'
+                : 'Chọn nếu bạn từng thấy vậy'),
+        disabledLabel: 'Chạm để chọn',
         enabled: _canContinue,
         onTap: widget.onNext,
       ),
@@ -135,12 +135,12 @@ class _S02MirrorState extends State<S02Mirror> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Điều nào nghe\ngiống bạn nhất?',
+                  'Bạn thấy mình ở đâu?',
                   style: r.isShort ? V5.titleLg(context) : V5.headline(context),
                 ),
                 SizedBox(height: r.pick(cozy: V5.space8, short: V5.space6)),
                 Text(
-                  'Chạm vào thẻ để chọn. Trượt ngang nếu muốn xem thêm.',
+                  'Chạm để chọn. Vuốt sang để xem thêm.',
                   style: V5.bodySm(context, color: V5.inkSoft),
                 ),
               ],
@@ -698,7 +698,7 @@ class _PainPainter extends CustomPainter {
     );
     final tp = TextPainter(
       text: TextSpan(
-        text: 'cùng một lịch',
+        text: 'cùng một lộ trình',
         style: TextStyle(
           color: Colors.white.withValues(alpha: 0.64),
           fontSize: 11,

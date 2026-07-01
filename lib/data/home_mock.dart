@@ -1,6 +1,6 @@
 // Mock data for the polished Stage Home design. Single source of truth so
 // the screen stays declarative. Replace each block per the
-// `// TODO(wiring)` markers inside dashboard_home_screen.dart.
+// `// NOTE(wiring)` markers inside dashboard_home_screen.dart.
 
 import '../widgets/home/home_stage_hero.dart';
 

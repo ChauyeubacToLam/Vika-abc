@@ -1,0 +1,538 @@
+// ignore_for_file: curly_braces_in_flow_control_structures
+import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:vika/debug/tracked_metric.dart';
+import 'package:vika/pose/vika_pose_landmark.dart';
+import '../../utils/pose_math_helpers.dart';
+import '../../utils/exercise_logger.dart';
+import '../exercise_base.dart';
+import 'metrics/mountain_climber_metric_base.dart';
+import 'metrics/trunk_stability_metric.dart';
+import 'metrics/knee_drive_rom_metric.dart';
+
+class MountainClimber extends ExerciseBase {
+  MountainClimber({required this.maxRep});
+
+  static const double _movingLegPresenceMin = 0.25;
+  static const double _movingLegVisibilityMin = 0.05;
+
+  // ---------------------------------------------------------------------------
+  // Config
+  // ---------------------------------------------------------------------------
+  final int maxRep;
+
+  @override
+  Set<VikaImageOrientation> get supportedOrientations =>
+      const <VikaImageOrientation>{
+        VikaImageOrientation.landscapeLeft,
+        VikaImageOrientation.landscapeRight,
+      };
+
+  @override
+  String get exerciseName => 'Mountain Climber';
+
+  // ---------------------------------------------------------------------------
+  // State — chỉ dùng để hiển thị UI label, KHÔNG dùng để đếm rep
+  // ---------------------------------------------------------------------------
+
+  ClimberState _displayState = ClimberState.high_plank_base;
+
+  @override
+  String get currentPhaseKey => _displayState.toString().split('.').last;
+
+  @override
+  String get currentPhaseLabel {
+    switch (_displayState) {
+      case ClimberState.high_plank_base:
+        return 'Chuẩn bị';
+      case ClimberState.knee_driving_in:
+        return 'Kéo gối lên';
+      case ClimberState.max_flexion:
+        return 'Chạm đỉnh';
+      case ClimberState.knee_driving_out:
+        return 'Duỗi chân về';
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Core tracking objects
+  // ---------------------------------------------------------------------------
+
+  /// Counter độc lập cho từng chân
+  final KneePeakRepCounter _leftCounter =
+      KneePeakRepCounter(side: KneeSide.left);
+  final KneePeakRepCounter _rightCounter =
+      KneePeakRepCounter(side: KneeSide.right);
+
+  final TrunkStabilityMetric trunkMetric = TrunkStabilityMetric();
+  final KneeDriveRomMetric romMetric = KneeDriveRomMetric();
+  late final List<ClimberMetricBase> _metrics = [
+    trunkMetric,
+    romMetric,
+  ];
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
+
+  // ---------------------------------------------------------------------------
+  // Session state
+  // ---------------------------------------------------------------------------
+
+  int? _exerciseStartTimeMs;
+  bool _isTimeout = false;
+  int _doubleKneeRejects = 0;
+  int _doubleKneeFrames = 0;
+  int _lastAcceptedRepTimeMs = 0;
+  int _sameSideRejects = 0;
+  KneeSide? _lastAcceptedSide;
+
+  // ---------------------------------------------------------------------------
+  // Safety check
+  // ---------------------------------------------------------------------------
+
+  @override
+  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
+    if (cameraFacing != CameraFacing.left &&
+        cameraFacing != CameraFacing.right) {
+      return 'Vui lòng quay ngang người 100% với camera!';
+    }
+    if (_extractLandmarks(smoothedLandmarks) == null) {
+      return 'Giữ vai, tay, hông, gối và cổ chân rõ trong khung hình.';
+    }
+    return null;
+  }
+
+  // ---------------------------------------------------------------------------
+  // isInStartPosition
+  // ---------------------------------------------------------------------------
+
+  @override
+  bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+    final lm = _extractLandmarks(landmarks);
+    if (lm == null) return false;
+
+    // Tính góc trên bên có thể nhìn rõ hơn (ưu tiên trái nếu cả 2 đều ok)
+    final double armAngle = calculateAngleNormalized(
+      firstPoint: lm.shoulder,
+      midPoint: lm.elbow,
+      lastPoint: lm.wrist,
+    );
+    final double scale = calculateDistance(lm.shoulder, lm.hip);
+    if (!scale.isFinite || scale <= 1e-6) return false;
+
+    final leftKneeDist = calculateDistance(lm.leftKnee, lm.shoulder) / scale;
+    final rightKneeDist = calculateDistance(lm.rightKnee, lm.shoulder) / scale;
+    final supportAnkle =
+        leftKneeDist > rightKneeDist ? lm.leftAnkle : lm.rightAnkle;
+    final leftKneeAngle = calculateAngleNormalized(
+      firstPoint: lm.leftHip,
+      midPoint: lm.leftKnee,
+      lastPoint: lm.leftAnkle,
+    );
+    final rightKneeAngle = calculateAngleNormalized(
+      firstPoint: lm.rightHip,
+      midPoint: lm.rightKnee,
+      lastPoint: lm.rightAnkle,
+    );
+
+    final double trunkAngle = calculateAngleNormalized(
+      firstPoint: lm.shoulder,
+      midPoint: lm.hip,
+      lastPoint: supportAnkle,
+    );
+
+    debugData['Setup'] = {
+      'armAngle': armAngle.toStringAsFixed(1),
+      'trunkAngle': trunkAngle.toStringAsFixed(1),
+      'armOk': armAngle > ClimberConfig.ARM_STRAIGHT_THRESHOLD,
+      'trunkOk': trunkAngle >= ClimberConfig.TRUNK_STRAIGHT_RANGE[0] &&
+          trunkAngle <= ClimberConfig.TRUNK_STRAIGHT_RANGE[1],
+      'leftKneeAngle': leftKneeAngle.toStringAsFixed(1),
+      'rightKneeAngle': rightKneeAngle.toStringAsFixed(1),
+    };
+
+    if (armAngle <= ClimberConfig.ARM_STRAIGHT_THRESHOLD) return false;
+    if (trunkAngle < ClimberConfig.TRUNK_STRAIGHT_RANGE[0] ||
+        trunkAngle > ClimberConfig.TRUNK_STRAIGHT_RANGE[1]) return false;
+
+    // --- Calibrate ngưỡng zone theo tư thế thực tế của người dùng ---
+    if (scale > 0) {
+      // Lấy trung bình 3 frame để ổn định (đơn giản: gán thẳng khi form đạt)
+      _leftCounter.calibrate(leftKneeDist);
+      _rightCounter.calibrate(rightKneeDist);
+
+      debugData['Setup']['calibratedThresholdL'] =
+          _leftCounter.zoneThreshold.toStringAsFixed(2);
+      debugData['Setup']['calibratedThresholdR'] =
+          _rightCounter.zoneThreshold.toStringAsFixed(2);
+    }
+
+    return true;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Stop condition
+  // ---------------------------------------------------------------------------
+
+  @override
+  bool requestStop() {
+    if (_exerciseStartTimeMs != null &&
+        (frameTimestampMs - _exerciseStartTimeMs!) >
+            ClimberConfig.MAX_DURATION_MS) {
+      _isTimeout = true;
+      return true;
+    }
+    return repCount >= maxRep;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Main loop
+  // ---------------------------------------------------------------------------
+
+  @override
+  void checkingPose(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+    _exerciseStartTimeMs ??= frameTimestampMs;
+    final int now = frameTimestampMs;
+
+    final lm = _extractLandmarks(landmarks);
+    if (lm == null) return;
+
+    scaleFactor = calculateDistance(lm.shoulder, lm.hip);
+    if (!scaleFactor.isFinite || scaleFactor <= 1e-6) return;
+
+    final double armAngle = calculateAngleNormalized(
+      firstPoint: lm.shoulder,
+      midPoint: lm.elbow,
+      lastPoint: lm.wrist,
+    );
+    final double trunkAngle = calculateAngleNormalized(
+      firstPoint: lm.shoulder,
+      midPoint: lm.hip,
+      lastPoint: lm.ankle,
+    );
+    final leftKneeDistNorm =
+        calculateDistance(lm.leftKnee, lm.shoulder) / scaleFactor;
+    final rightKneeDistNorm =
+        calculateDistance(lm.rightKnee, lm.shoulder) / scaleFactor;
+    final leftKneeAngle = calculateAngleNormalized(
+      firstPoint: lm.leftHip,
+      midPoint: lm.leftKnee,
+      lastPoint: lm.leftAnkle,
+    );
+    final rightKneeAngle = calculateAngleNormalized(
+      firstPoint: lm.rightHip,
+      midPoint: lm.rightKnee,
+      lastPoint: lm.rightAnkle,
+    );
+
+    // --- Build context ---
+    final ctx = RepContext(
+      state: _displayState,
+      frameTimestamp: now,
+      scaleFactor: scaleFactor,
+      armAngle: armAngle,
+      trunkAngle: trunkAngle,
+      hipY: lm.hip.y,
+      shoulderX: lm.shoulder.x,
+      hipX: lm.hip.x,
+      leftKneeDistNorm: leftKneeDistNorm,
+      rightKneeDistNorm: rightKneeDistNorm,
+      leftKneeAngle: leftKneeAngle,
+      rightKneeAngle: rightKneeAngle,
+      resultIssues: resultIssues,
+    );
+
+    // --- Trunk metric (chạy mỗi frame, độc lập) ---
+    trunkMetric.update(ctx);
+    debugData.addAll(trunkMetric.debugData);
+
+    // --- ROM metric (cập nhật min dist mỗi frame) ---
+    romMetric.update(ctx);
+    debugData.addAll(romMetric.debugData);
+
+    // --- Peak counter trái ---
+    final int leftRep = _leftCounter.update(
+      kneeShoulderDistNorm: leftKneeDistNorm,
+      kneeAngle: leftKneeAngle,
+      nowMs: now,
+    );
+
+    // --- Peak counter phải ---
+    final int rightRep = _rightCounter.update(
+      kneeShoulderDistNorm: rightKneeDistNorm,
+      kneeAngle: rightKneeAngle,
+      nowMs: now,
+    );
+    final bothKneesDeep = _leftCounter.isDeepTuck && _rightCounter.isDeepTuck;
+    _doubleKneeFrames = bothKneesDeep ? _doubleKneeFrames + 1 : 0;
+    final rejectsDoubleKneeRep =
+        _doubleKneeFrames >= ClimberConfig.DOUBLE_KNEE_REQUIRED_FRAMES;
+
+    if (rejectsDoubleKneeRep) {
+      _doubleKneeRejects++;
+      resultIssues.feedback['Result'] = 'Không tính rep';
+      resultIssues.feedback['ROM'] = 'Luân phiên từng gối';
+      resultIssues.addInstruction(
+          'high_plank_base', 'ROM', 'Kéo từng gối một, không co cả hai gối');
+      trunkMetric.reset();
+      romMetric.reset();
+      _leftCounter.reset();
+      _rightCounter.reset();
+      _doubleKneeFrames = 0;
+    } else if (leftRep > 0 && rightRep > 0) {
+      final leftPeak =
+          _leftCounter.lastCompletedPeakDist ?? _leftCounter.minDistInZone;
+      final rightPeak =
+          _rightCounter.lastCompletedPeakDist ?? _rightCounter.minDistInZone;
+      _onRepCandidate(
+        ctx,
+        leftPeak <= rightPeak ? KneeSide.left : KneeSide.right,
+      );
+    } else if (leftRep > 0) {
+      _onRepCandidate(ctx, KneeSide.left);
+    } else if (rightRep > 0) {
+      _onRepCandidate(ctx, KneeSide.right);
+    }
+
+    // --- Cập nhật display state dựa trên zone của 2 counter ---
+    _updateDisplayState();
+
+    // --- Diagnostic table ---
+    debugData['Diag'] = {
+      'state': _displayState.name,
+      'repCount': repCount,
+      'elapsed_s': ((now - _exerciseStartTimeMs!) / 1000).toStringAsFixed(1),
+      'armAngle': armAngle.toStringAsFixed(1),
+      'trunkAngle': trunkAngle.toStringAsFixed(1),
+      'L_dist': _leftCounter.smoothedDist.toStringAsFixed(2),
+      'R_dist': _rightCounter.smoothedDist.toStringAsFixed(2),
+      'L_rawDist': _leftCounter.rawDist.toStringAsFixed(2),
+      'R_rawDist': _rightCounter.rawDist.toStringAsFixed(2),
+      'L_kneeAngle': leftKneeAngle.toStringAsFixed(1),
+      'R_kneeAngle': rightKneeAngle.toStringAsFixed(1),
+      'L_inZone': _leftCounter.isInZone,
+      'R_inZone': _rightCounter.isInZone,
+      'doubleKneeFrames': _doubleKneeFrames,
+      'sameSideRejects': _sameSideRejects,
+      'L_threshold': _leftCounter.zoneThreshold.toStringAsFixed(2),
+      'R_threshold': _rightCounter.zoneThreshold.toStringAsFixed(2),
+      'scaleFactor': scaleFactor.toStringAsFixed(1),
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+
+  void _onRepCandidate(RepContext ctx, KneeSide side) {
+    final now = ctx.frameTimestamp;
+    final elapsed = now - _lastAcceptedRepTimeMs;
+
+    if (_lastAcceptedRepTimeMs > 0 &&
+        elapsed < ClimberConfig.GLOBAL_REP_COOLDOWN_MS) {
+      return;
+    }
+
+    if (_lastAcceptedSide == side &&
+        elapsed < ClimberConfig.SAME_SIDE_REP_COOLDOWN_MS) {
+      _sameSideRejects++;
+      return;
+    }
+
+    _lastAcceptedRepTimeMs = now;
+    _lastAcceptedSide = side;
+    _onRepCompleted(ctx, side);
+  }
+
+  void _onRepCompleted(RepContext ctx, KneeSide side) {
+    // Lấy peakDist từ counter tương ứng
+    final double peakDist = side == KneeSide.left
+        ? (_leftCounter.lastCompletedPeakDist ?? _leftCounter.minDistInZone)
+        : (_rightCounter.lastCompletedPeakDist ?? _rightCounter.minDistInZone);
+
+    final double threshold = side == KneeSide.left
+        ? _leftCounter.zoneThreshold
+        : _rightCounter.zoneThreshold;
+    final double? peakAngle = side == KneeSide.left
+        ? _leftCounter.lastCompletedPeakAngle
+        : _rightCounter.lastCompletedPeakAngle;
+
+    romMetric.evaluateRepEnd(ctx, side, peakDist, threshold);
+
+    final allFaults = <FaultRecord>[
+      ...trunkMetric.faults,
+      ...romMetric.faults,
+    ];
+    correctForm = !allFaults.any((f) => f.affectsForm);
+    repCount++;
+    if (!correctForm) resultIssues.feedback['Result'] = 'Chỉnh form';
+
+    logger.addRepLog(RepLog(
+      correctForm: correctForm,
+      repNumber: repCount,
+      data: {
+        'side': side.name,
+        'peak_dist': peakDist,
+        'peak_knee_angle': peakAngle,
+        'zone_threshold': threshold,
+        'fault_types': allFaults.map((f) => f.type).toSet().toList(),
+      },
+    ));
+
+    trunkMetric.resetAndCountFault();
+    romMetric.resetAndCountFault();
+  }
+
+  void _updateDisplayState() {
+    final bool anyInZone = _leftCounter.isInZone || _rightCounter.isInZone;
+
+    if (anyInZone) {
+      // Đơn giản: nếu đang trong zone thì hiển thị knee_driving_in hoặc max_flexion
+      // Dùng dist để phân biệt: đang tiến vào hay đã qua đỉnh
+      final activeCounter =
+          _leftCounter.isInZone ? _leftCounter : _rightCounter;
+      _displayState = activeCounter.isDeepTuck
+          ? ClimberState.max_flexion
+          : ClimberState.knee_driving_in;
+    } else {
+      _displayState = ClimberState.high_plank_base;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Landmark extraction
+  // ---------------------------------------------------------------------------
+
+  _LandmarkSet? _extractLandmarks(Map<PoseLandmarkType, PoseLandmark> lm) {
+    final useRight = cameraFacing == CameraFacing.right;
+    final PoseLandmark? shoulder = lm[useRight
+        ? PoseLandmarkType.rightShoulder
+        : PoseLandmarkType.leftShoulder];
+    final PoseLandmark? elbow =
+        lm[useRight ? PoseLandmarkType.rightElbow : PoseLandmarkType.leftElbow];
+    final PoseLandmark? wrist =
+        lm[useRight ? PoseLandmarkType.rightWrist : PoseLandmarkType.leftWrist];
+    final PoseLandmark? hip =
+        lm[useRight ? PoseLandmarkType.rightHip : PoseLandmarkType.leftHip];
+    final PoseLandmark? ankle =
+        lm[useRight ? PoseLandmarkType.rightAnkle : PoseLandmarkType.leftAnkle];
+    final PoseLandmark? leftHip = lm[PoseLandmarkType.leftHip];
+    final PoseLandmark? rightHip = lm[PoseLandmarkType.rightHip];
+    final PoseLandmark? leftAnkle = lm[PoseLandmarkType.leftAnkle];
+    final PoseLandmark? rightAnkle = lm[PoseLandmarkType.rightAnkle];
+    final PoseLandmark? leftKnee = lm[PoseLandmarkType.leftKnee];
+    final PoseLandmark? rightKnee = lm[PoseLandmarkType.rightKnee];
+
+    if (shoulder == null ||
+        elbow == null ||
+        wrist == null ||
+        hip == null ||
+        ankle == null ||
+        leftHip == null ||
+        rightHip == null ||
+        leftAnkle == null ||
+        rightAnkle == null ||
+        leftKnee == null ||
+        rightKnee == null) {
+      return null;
+    }
+    if (![shoulder, elbow, wrist, hip, ankle]
+        .every(ExerciseBase.isLandmarkConfident)) {
+      return null;
+    }
+    if (![leftHip, rightHip, leftAnkle, rightAnkle, leftKnee, rightKnee]
+        .every(_isMovingLegUsable)) {
+      return null;
+    }
+
+    return _LandmarkSet(
+      shoulder: shoulder,
+      elbow: elbow,
+      wrist: wrist,
+      hip: hip,
+      ankle: ankle,
+      leftHip: leftHip,
+      rightHip: rightHip,
+      leftAnkle: leftAnkle,
+      rightAnkle: rightAnkle,
+      leftKnee: leftKnee,
+      rightKnee: rightKnee,
+    );
+  }
+
+  static bool _isMovingLegUsable(PoseLandmark landmark) {
+    return landmark.presence >= _movingLegPresenceMin &&
+        landmark.visibility >= _movingLegVisibilityMin;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Set complete
+  // ---------------------------------------------------------------------------
+
+  @override
+  void onSetComplete() {
+    logger.pushKey('timeout_triggered', _isTimeout);
+    logger.pushKey('max_rep', maxRep);
+    logger.pushKey('trunk_fails_count', trunkMetric.faultsCount);
+    logger.pushKey('rom_fails_count', romMetric.faultsCount);
+    logger.pushKey('double_knee_rejects_count', _doubleKneeRejects);
+    logger.pushKey('same_side_rejects_count', _sameSideRejects);
+    logger.pushKey('rom_good_count', romMetric.goodRomCount);
+    logger.pushKey('rom_short_count', romMetric.shortRomCount);
+    logger.pushKey('core_stability_ratio',
+        trunkMetric.coreStabilityRatio.toStringAsFixed(2));
+    logger.pushGoodRepCount();
+
+    // Full reset cho set tiếp theo
+    trunkMetric.fullReset();
+    romMetric.fullReset();
+    _leftCounter.reset();
+    _rightCounter.reset();
+    _exerciseStartTimeMs = null;
+    _isTimeout = false;
+    _doubleKneeRejects = 0;
+    _doubleKneeFrames = 0;
+    _lastAcceptedRepTimeMs = 0;
+    _sameSideRejects = 0;
+    _lastAcceptedSide = null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Internal data class — gom landmarks đã validate
+// ---------------------------------------------------------------------------
+
+class _LandmarkSet {
+  const _LandmarkSet({
+    required this.shoulder,
+    required this.elbow,
+    required this.wrist,
+    required this.hip,
+    required this.ankle,
+    required this.leftHip,
+    required this.rightHip,
+    required this.leftAnkle,
+    required this.rightAnkle,
+    required this.leftKnee,
+    required this.rightKnee,
+  });
+
+  final PoseLandmark shoulder;
+  final PoseLandmark elbow;
+  final PoseLandmark wrist;
+  final PoseLandmark hip;
+  final PoseLandmark ankle;
+  final PoseLandmark leftHip;
+  final PoseLandmark rightHip;
+  final PoseLandmark leftAnkle;
+  final PoseLandmark rightAnkle;
+  final PoseLandmark leftKnee;
+  final PoseLandmark rightKnee;
+}

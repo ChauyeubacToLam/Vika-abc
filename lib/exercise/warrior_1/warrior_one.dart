@@ -20,6 +20,8 @@
 import 'dart:math' as math;
 
 import 'package:vika/exercise/exercise_base.dart';
+import 'package:vika/debug/tracked_metric.dart';
+import 'package:vika/utils/exercise_logger.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
 import '../../utils/pose_math_helpers.dart';
@@ -34,36 +36,38 @@ import 'metrics/back_straight_metric.dart';
 // --- Config (Week 1-4 launch defaults; tighten per spec threshold table) ---
 
 class WarriorOneConfig {
-  /// One hold per side → 2 holds per set.
-  static const int MAX_HOLDS = 2;
-
   /// Seconds to hold each side.
-  static const double HOLD_DURATION = 30.0;
+  static const double HOLD_DURATION = 20.0;
 
   /// Hip Y-velocity (normalized units / sec) below which the user is "still".
   /// ESTIMATE — tune on device. BlazePose y is normalized [0,1].
   static const double STILL_VELOCITY_THRESHOLD = 2.5;
 
   /// Frames the user must be still to enter HOLD (~500ms at 30fps).
-  static const int STILL_FRAMES = 15;
+  static const int STILL_FRAMES = 10;
 
   /// isInStartPosition: trunk must be within this many degrees of vertical.
-  static const double START_TRUNK_TOLERANCE = 30.0;
+  static const double START_TRUNK_TOLERANCE = 40.0;
 
   /// isInStartPosition / Check 4: minimum stance ratio to count as "feet apart".
-  static const double START_STANCE_MIN = 0.8;
+  static const double START_STANCE_MIN = 0.65;
+
+  /// Entry gate: hold timer starts only after the full Warrior I shape appears.
+  static const double ENTRY_FRONT_KNEE_MAX = 165.0;
+  static const double ENTRY_BACK_KNEE_MIN = 140.0;
+  static const double ENTRY_ARM_MAX = 60.0;
 
   // --- Check 3: front-knee depth (coaching only) ---
-  static const double DEPTH_GOOD_MIN = 100.0; // desk-worker band
-  static const double DEPTH_GOOD_MAX = 155.0;
-  static const double DEPTH_SHALLOW = 155.0; // > this = shallow
-  static const double DEPTH_DECAY_LIMIT = 10.0; // angle creep during hold
+  static const double DEPTH_GOOD_MIN = 85.0; // desk-worker band
+  static const double DEPTH_GOOD_MAX = 165.0;
+  static const double DEPTH_SHALLOW = 170.0; // > this = shallow
+  static const double DEPTH_DECAY_LIMIT = 18.0; // angle creep during hold
 
   // --- Check 4: stance length (coaching only), normalized by scaleFactor ---
-  static const double STANCE_GOOD_MIN = 1.2;
-  static const double STANCE_GOOD_MAX = 2.0;
-  static const double STANCE_TOO_SHORT = 1.0;
-  static const double STANCE_TOO_LONG = 2.2;
+  static const double STANCE_GOOD_MIN = 0.9;
+  static const double STANCE_GOOD_MAX = 2.4;
+  static const double STANCE_TOO_SHORT = 0.75;
+  static const double STANCE_TOO_LONG = 2.7;
 }
 
 enum WarriorOneState { entry, hold, exit }
@@ -73,7 +77,7 @@ enum WarriorOneState { entry, hold, exit }
 class WarriorOne extends ExerciseBase {
   final int maxHolds;
 
-  WarriorOne({this.maxHolds = WarriorOneConfig.MAX_HOLDS});
+  WarriorOne({required this.maxHolds});
 
   WarriorOneState holdState = WarriorOneState.entry;
   WarriorOneState previousHoldState = WarriorOneState.entry;
@@ -92,12 +96,30 @@ class WarriorOne extends ExerciseBase {
     backKneeMetric,
     backStraightMetric,
   ];
+  late final List<TrackedMetric> _trackedMetrics =
+      _metrics.map(TrackedMetric.new).toList();
+
+  @override
+  List<TrackedMetric> get trackedDebugMetrics =>
+      List<TrackedMetric>.unmodifiable(
+        [
+          ...super.trackedDebugMetrics,
+          ..._trackedMetrics,
+        ],
+      );
 
   // --- Hold timing ---
   int? _holdStartMs;
   final StickyDebouncer _stillDebouncer = StickyDebouncer(
       requiredFrames: WarriorOneConfig.STILL_FRAMES, currentState: false);
   double? _prevHipY;
+  final HoldSecondsAccumulator _holdSeconds = HoldSecondsAccumulator(const [
+    'trunk_lean_seconds',
+    'cervical_seconds',
+    'arm_seconds',
+    'back_knee_seconds',
+    'back_straight_seconds',
+  ]);
 
   // --- Baselines (captured at ENTRY → HOLD) ---
   double? _trunkBaseline;
@@ -160,6 +182,12 @@ class WarriorOne extends ExerciseBase {
   @override
   String get exerciseName => 'Warrior I';
 
+  // Warrior I is one two-sided hold inside a single set. Replaying advice from
+  // the process-wide generic voice cache can inject stale cues from an older
+  // workout before the normal setup sequence.
+  @override
+  bool get shouldReplayPreviousSetVoiceFaults => false;
+
   @override
   String get currentPhaseKey => holdState.toString().split('.').last;
 
@@ -175,20 +203,50 @@ class WarriorOne extends ExerciseBase {
     }
   }
 
+  @override
+  double? get liveHoldSeconds =>
+      holdState == WarriorOneState.hold ? _currentHoldSeconds() : null;
+
+  @override
+  double? get liveHoldTargetSeconds => WarriorOneConfig.HOLD_DURATION;
+
   // --- Stop Condition ---
 
   @override
   bool requestStop() => repCount >= maxHolds;
 
   @override
-  void onSetComplete() {}
+  void onExerciseActivated() {
+    super.onExerciseActivated();
+    _holdSeconds.reset();
+  }
+
+  @override
+  void onSetComplete() {
+    logger.pushKey('max_rep', maxHolds);
+    final targetSeconds = maxHolds * WarriorOneConfig.HOLD_DURATION;
+    logger.pushKey('total_seconds', targetSeconds);
+    logger.pushKey(
+        'good_seconds', _holdSeconds.goodSeconds.clamp(0.0, targetSeconds));
+    logger.pushKey('trunk_lean_seconds',
+        _holdSeconds.faultSecondsFor('trunk_lean_seconds'));
+    logger.pushKey(
+        'cervical_seconds', _holdSeconds.faultSecondsFor('cervical_seconds'));
+    logger.pushKey('arm_seconds', _holdSeconds.faultSecondsFor('arm_seconds'));
+    logger.pushKey(
+        'back_knee_seconds', _holdSeconds.faultSecondsFor('back_knee_seconds'));
+    logger.pushKey('back_straight_seconds',
+        _holdSeconds.faultSecondsFor('back_straight_seconds'));
+    logger.pushGoodRepCount();
+  }
 
   // --- Safety Checks (needs BOTH legs, like Lunge) ---
 
   @override
   String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    if (cameraFacing == CameraFacing.front) {
-      return "⚠️ Hãy quay sang bên để theo dõi Warrior I tốt hơn";
+    if (cameraFacing != CameraFacing.left &&
+        cameraFacing != CameraFacing.right) {
+      return "Hãy quay sang bên để theo dõi Warrior I tốt hơn";
     }
 
     final required = [
@@ -339,6 +397,12 @@ class WarriorOne extends ExerciseBase {
 
     // 5. Hip Y-velocity → "is still?".
     final bool isStill = _updateStill(hip.y, now);
+    final bool frontKneeReady =
+        frontKneeAngle <= WarriorOneConfig.ENTRY_FRONT_KNEE_MAX;
+    final bool backLegReady =
+        backKneeAngle >= WarriorOneConfig.ENTRY_BACK_KNEE_MIN;
+    final bool armsReady = armVerticalAngle <= WarriorOneConfig.ENTRY_ARM_MAX;
+    final bool readyToHold = frontKneeReady && backLegReady && armsReady;
 
     // 6. Build HoldContext.
     final ctx = HoldContext(
@@ -357,6 +421,7 @@ class WarriorOne extends ExerciseBase {
       resultIssues: resultIssues,
     );
 
+    final debugEnabled = isDebugModeActive;
     // 7. Debug.
     debugData['holdState'] = holdState.name;
     debugData['frontLeg'] = (_isLeftLegFront ?? true) ? 'Left' : 'Right';
@@ -370,16 +435,23 @@ class WarriorOne extends ExerciseBase {
     debugData['backKnee'] = backKneeAngle.toStringAsFixed(1);
     debugData['stance'] = stance.toStringAsFixed(2);
     debugData['isStill'] = isStill;
+    debugData['readyToHold'] = readyToHold;
     debugData['holdTime'] = _currentHoldSeconds().toStringAsFixed(1);
     debugData['repCount'] = repCount.toString();
 
     // 8. State machine.
-    _updateState(isStill, frontKneeAngle, trunkLean, cervicalAngle, now);
+    _updateState(isStill, readyToHold, trunkLean, cervicalAngle, now);
 
     // 9. Phase-specific work.
     switch (holdState) {
       case WarriorOneState.entry:
-        _runEntry(stance);
+        _holdSeconds.resetTick();
+        _runEntry(
+          stance,
+          frontKneeReady: frontKneeReady,
+          backLegReady: backLegReady,
+          armsReady: armsReady,
+        );
         break;
 
       case WarriorOneState.hold:
@@ -397,6 +469,18 @@ class WarriorOne extends ExerciseBase {
           metric.update(ctx);
         }
 
+        _holdSeconds.accumulate(
+          elapsedMs: elapsedMs,
+          faultingByKey: {
+            'trunk_lean_seconds': trunkLeanMetric.isFaultingNow,
+            'cervical_seconds': cervicalMetric.isFaultingNow,
+            'arm_seconds': armMetric.isFaultingNow,
+            'back_knee_seconds': backKneeMetric.isFaultingNow,
+            'back_straight_seconds': backStraightMetric.isFaultingNow,
+          },
+          goodBlockingKeys: const ['trunk_lean_seconds', 'arm_seconds'],
+        );
+
         final remaining =
             (WarriorOneConfig.HOLD_DURATION - _currentHoldSeconds())
                 .clamp(0.0, WarriorOneConfig.HOLD_DURATION);
@@ -408,20 +492,48 @@ class WarriorOne extends ExerciseBase {
         break;
 
       case WarriorOneState.exit:
+        _holdSeconds.resetTick();
         break;
     }
 
     // 10. Merge metric debug.
-    for (final metric in _metrics) {
-      debugData.addAll(metric.debugData);
+    if (debugEnabled) {
+      for (final metric in _metrics) {
+        debugData.addAll(metric.debugData);
+      }
     }
   }
 
   // --- ENTRY: one-time stance check (Check 4) ---
 
-  void _runEntry(double stance) {
+  void _runEntry(
+    double stance, {
+    required bool frontKneeReady,
+    required bool backLegReady,
+    required bool armsReady,
+  }) {
     resultIssues.addInstruction(
-        'entry', 'Status', 'Vào tư thế, giơ tay lên cao...');
+      'entry',
+      'Status',
+      _entryGuidance(
+        frontKneeReady: frontKneeReady,
+        backLegReady: backLegReady,
+        armsReady: armsReady,
+      ),
+    );
+
+    if (!frontKneeReady) {
+      resultIssues.addInstruction(
+          'entry', 'Depth', 'Hạ gối chân trước xuống thêm một chút.');
+    }
+    if (!backLegReady) {
+      resultIssues.addInstruction(
+          'entry', 'Back leg', 'Duỗi thẳng chân sau trước khi giữ.');
+    }
+    if (!armsReady) {
+      resultIssues.addInstruction(
+          'entry', 'Arms', 'Giơ hai tay lên cao rồi giữ yên.');
+    }
 
     if (_stanceChecked || scaleFactor <= 0) return;
     _stanceChecked = true;
@@ -433,6 +545,19 @@ class WarriorOne extends ExerciseBase {
       resultIssues.addInstruction(
           'entry', 'Stance', 'Bước ngắn lại một chút để giữ thăng bằng nhé!');
     }
+  }
+
+  String _entryGuidance({
+    required bool frontKneeReady,
+    required bool backLegReady,
+    required bool armsReady,
+  }) {
+    if (frontKneeReady && backLegReady && armsReady) {
+      return 'Giữ yên tư thế Warrior I để bắt đầu đếm.';
+    }
+    if (!frontKneeReady) return 'Hạ gối chân trước xuống thêm một chút.';
+    if (!backLegReady) return 'Duỗi thẳng chân sau trước khi giữ.';
+    return 'Giơ hai tay lên cao rồi giữ yên.';
   }
 
   // --- HOLD complete: finalize, score, depth coaching, side switch ---
@@ -471,16 +596,27 @@ class WarriorOne extends ExerciseBase {
       faultMap[fault.phase]![fault.type] = fault.message;
     }
     setFeedback.add({correctForm: faultMap});
+    logger.addRepLog(RepLog(
+      correctForm: correctForm,
+      repNumber: repCount,
+      data: {
+        'hold_time': WarriorOneConfig.HOLD_DURATION,
+        'fault_types': allFaults.map((f) => f.type).toSet().toList(),
+      },
+    ));
+    for (final metric in _metrics) {
+      metric.resetAndCountFault();
+    }
   }
 
   // --- State Machine ---
 
-  void _updateState(bool isStill, double frontKneeAngle, double trunkLean,
+  void _updateState(bool isStill, bool readyToHold, double trunkLean,
       double cervicalAngle, int now) {
     switch (holdState) {
       case WarriorOneState.entry:
         // Stable → begin the hold and capture baselines.
-        if (isStill) {
+        if (isStill && readyToHold) {
           _transition(WarriorOneState.hold, now);
           _holdStartMs = now;
           _trunkBaseline = trunkLean;
@@ -514,11 +650,14 @@ class WarriorOne extends ExerciseBase {
 
     // Lock the front leg for the duration of the hold.
     if (newState == WarriorOneState.hold) {
+      _holdSeconds.resetTick();
       _frontLegLocked = true;
       resultIssues.instructions.clear();
     } else if (newState == WarriorOneState.exit) {
+      _holdSeconds.resetTick();
       _onHoldComplete();
     } else if (newState == WarriorOneState.entry) {
+      _holdSeconds.resetTick();
       _frontLegLocked = false;
     }
 
@@ -529,6 +668,7 @@ class WarriorOne extends ExerciseBase {
 
   void _resetForNextSide() {
     _holdStartMs = null;
+    _holdSeconds.resetTick();
     _prevHipY = null;
     _stillDebouncer.reset();
     _trunkBaseline = null;
@@ -541,6 +681,19 @@ class WarriorOne extends ExerciseBase {
     for (final metric in _metrics) {
       metric.reset();
     }
+  }
+
+  @override
+  Map<String, String> processNoPoseFrame() {
+    if (holdState == WarriorOneState.hold) {
+      _holdSeconds.resetTick();
+      _resetForNextSide();
+      previousHoldState = holdState;
+      holdState = WarriorOneState.entry;
+      resultIssues.addInstruction(
+          'entry', 'Status', 'Mất mốc cơ thể, vào lại tư thế trước khi giữ.');
+    }
+    return super.processNoPoseFrame();
   }
 
   // --- Helpers ---

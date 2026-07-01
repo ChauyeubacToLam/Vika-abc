@@ -17,6 +17,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/exercise_definition.dart';
+import '../services/analytics_service.dart';
+import '../services/recommendation/recommendation_service.dart';
 import '../services/user_program_service.dart';
 import '../services/user_profile_service.dart';
 import '../theme/app_colors.dart';
@@ -24,6 +26,7 @@ import '../theme/responsive.dart';
 import '../utils/orientation_lock.dart';
 import '../widgets/ivory/bottom_nav.dart';
 import 'dashboard_home_screen.dart';
+import 'exercise/exercise_launch_args.dart';
 import 'library_screen.dart';
 import 'plan_screen.dart';
 import 'profile_screen.dart';
@@ -42,6 +45,7 @@ class _MainShellState extends State<MainShell> {
   final ValueNotifier<int> _progressRefreshNudge = ValueNotifier<int>(0);
   UserProgramData? _program;
   AppUserProfile? _profile;
+  final RecommendationService _recommendations = RecommendationService();
 
   @override
   void initState() {
@@ -74,11 +78,33 @@ class _MainShellState extends State<MainShell> {
       _planRefreshNudge.value++;
     } else if (idx == 3) {
       _progressRefreshNudge.value++;
+    } else if (idx == 4) {
+      // Hồ sơ is where settings (incl. the analytics consent toggle) live.
+      // No-op without consent.
+      unawaited(AnalyticsService.instance.capture('settings_opened'));
     }
   }
 
   void _openExerciseFromLibrary(ExerciseDefinition definition) {
-    Navigator.of(context).pushNamed('/exercise', arguments: definition);
+    unawaited(_openExerciseFromLibraryWithCatalog(definition));
+  }
+
+  Future<void> _openExerciseFromLibraryWithCatalog(
+    ExerciseDefinition definition,
+  ) async {
+    final catalogInfoById =
+        await _recommendations.fetchLaunchCatalogInfoForExerciseIds(
+      [definition.id],
+    );
+    if (!mounted) return;
+    Navigator.of(context).pushNamed(
+      '/exercise',
+      arguments: ExerciseLaunchArgs(
+        definition: definition,
+        catalogExerciseId: definition.id,
+        catalogInfo: catalogInfoById[definition.id],
+      ),
+    );
   }
 
   @override
@@ -112,12 +138,14 @@ class _MainShellState extends State<MainShell> {
       PlanScreen(
         bottomPadding: contentBottomPadding,
         program: _program,
+        userProfile: _profile,
         refreshListenable: _planRefreshNudge,
         onProfileChanged: _handleProfileChanged,
       ),
       LibraryScreen(
         bottomPadding: contentBottomPadding,
         onSelectExercise: _openExerciseFromLibrary,
+        userProfile: _profile,
       ),
       ProgressScreen(
         bottomPadding: contentBottomPadding,

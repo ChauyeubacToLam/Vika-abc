@@ -38,15 +38,15 @@ import '../../../../utils/debouncer.dart';
 
 class SpeedControlConfig {
   // Minimum acceptable eccentric-to-concentric duration ratio.
-  static const double MIN_ECCENTRIC_RATIO = 1.5;
+  static const double MIN_ECCENTRIC_RATIO = 1.1;
 
   // Velocity thresholds during descent (pixels/frame, positive = falling).
   // In screen coordinates hip FALLING → velocity POSITIVE.
-  static const double RAPID_VELOCITY_WARNING = 6.0; // affectsForm = false
-  static const double RAPID_VELOCITY_ERROR = 10.0; // affectsForm = true
+  static const double RAPID_VELOCITY_WARNING = 0.09; // affectsForm = false
+  static const double RAPID_VELOCITY_ERROR = 0.16; // affectsForm = true
 
   // Frames of sustained rapid velocity before triggering live coaching.
-  static const int RAPID_DEBOUNCE_FRAMES = 3;
+  static const int RAPID_DEBOUNCE_FRAMES = 5;
 }
 
 class SpeedControlMetric extends GluteBridgeMetricBase {
@@ -88,7 +88,9 @@ class SpeedControlMetric extends GluteBridgeMetricBase {
   void update(RepContext ctx) {
     if (ctx.state != GluteBridgeState.descending) return;
 
-    final double vel = ctx.hipVelocity; // positive = hip falling
+    final scale = ctx.scaleFactor;
+    if (scale == null || scale <= 1e-6) return;
+    final double vel = ctx.hipVelocity / scale;
 
     if (vel > _peakDescentVelocity) _peakDescentVelocity = vel;
 

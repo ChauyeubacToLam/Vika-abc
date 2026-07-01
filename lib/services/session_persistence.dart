@@ -6,7 +6,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/milestones.dart';
 import '../data/program_mock.dart';
 import '../exercise/report_builder_registry.dart';
-import '../widgets/progress/period_tabs.dart' show PeriodTab;
+import '../models/pain_regions.dart';
+import '../widgets/progress/period_tabs.dart' show FormTrendDirection;
 import 'recommendation/progression_service.dart';
 import 'streak_tier.dart';
 
@@ -598,7 +599,8 @@ class SessionPersistence {
         final completedAt = _dateTimeOrNull(row['completed_at']);
         if (completedAt != null) completedAtValues.add(completedAt);
       }
-      return deriveStreakWeekBarsForTest(completedAtValues, weekCount: weekCount);
+      return deriveStreakWeekBarsForTest(completedAtValues,
+          weekCount: weekCount);
     } catch (e) {
       debugPrint('[Vika] streakWeekBars failed: $e');
       return const <bool>[];
@@ -822,55 +824,104 @@ class SessionPersistence {
     return samples;
   }
 
+  /// Completed-session form samples for the active PLAN, oldest-first, scoped
+  /// by program position. Parallels [_sessionFormScoresInWindow] but filters
+  /// on `recommendation_id` (+ `week_number` when [weekNumbers] is non-null)
+  /// instead of a `completed_at` calendar window — it does NOT touch the shared
+  /// window helper, which Home's calendar vital still uses. Reads the same
+  /// composite `session_form_score`. [weekNumbers] null = the whole program;
+  /// empty = nothing in scope (returns `[]` without a round trip). Returns
+  /// empty when signed out; throws on a genuine fetch error so callers can log
+  /// + fall back.
+  Future<List<({DateTime completedAt, int formScore})>> _planSessionFormScores(
+    String recommendationId,
+    List<int>? weekNumbers,
+  ) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return const [];
+    if (weekNumbers != null && weekNumbers.isEmpty) return const [];
+
+    var query = _client
+        .from('workout_sessions')
+        .select('session_form_score, completed_at')
+        .eq('user_id', userId)
+        .eq('recommendation_id', recommendationId)
+        .not('session_form_score', 'is', null);
+    if (weekNumbers != null) {
+      query = query.inFilter('week_number', weekNumbers);
+    }
+    final rows = await query.order('completed_at', ascending: true);
+
+    final samples = <({DateTime completedAt, int formScore})>[];
+    for (final raw in rows as List) {
+      final row = (raw as Map).cast<String, dynamic>();
+      final completedAt = _dateTimeOrNull(row['completed_at']);
+      final score = (row['session_form_score'] as num?)?.toInt();
+      if (completedAt == null || score == null) continue;
+      samples.add((completedAt: completedAt, formScore: score));
+    }
+    return samples;
+  }
+
   /// Progress tab "ĐIỂM FORM" gauge + "ĐƯỜNG TIẾN BỘ" trend, scoped to a
-  /// [PeriodTab] window. Read-only display aggregate — scores are computed
-  /// and frozen elsewhere; reads `session_form_score` (the composite shown
-  /// to the user).
+  /// position in the active plan rather than a calendar window. Read-only
+  /// display aggregate — scores are computed and frozen elsewhere; reads
+  /// `session_form_score` (the composite shown to the user).
   ///
+  /// [recommendationId] is the active plan; [weekNumbers] restricts to those
+  /// plan weeks (the active week for the `week` tab, every week of the active
+  /// phase for the `phase` tab). `null` = the whole program. Scoping by
+  /// recommendation_id (rather than `now - N days`) is what closed the old
+  /// single-program TODO(wiring).
+  ///
+  ///   average    — rounded mean of the window scores (the gauge headline),
+  ///                or null when the window is empty
+  ///   direction  — Theil-Sen slope direction over the window for the gauge's
+  ///                trend chip; [FormTrendDirection.none] until >= 3 sessions
   ///   trend      — window session form scores, oldest-first (empty = none)
   ///   trendDates — the completed_at of each trend point, parallel to [trend]
   ///                (UTC; call .toLocal() before formatting axis labels)
-  ///   to    — latest score in the window, or null when empty
-  ///   from  — earliest score in the window, or null until >= 3 sessions
-  ///   delta — to - from, or null until >= 3 sessions
-  ///   fact  — factual trajectory one-liner for the gauge ('' when empty)
+  ///   fact       — factual trajectory one-liner for the gauge ('' when empty)
   Future<
       ({
-        int? to,
-        int? from,
-        int? delta,
+        int? average,
+        FormTrendDirection direction,
         List<int> trend,
         List<DateTime> trendDates,
         String fact,
-      })> progressFormSummary(PeriodTab period) async {
+      })> progressFormSummary(
+    String recommendationId,
+    List<int>? weekNumbers,
+  ) async {
     try {
-      final now = DateTime.now();
-      final since = switch (period) {
-        PeriodTab.week => now.subtract(const Duration(days: 7)),
-        PeriodTab.month => now.subtract(const Duration(days: 30)),
-        // TODO(wiring): single-program MVP — this returns ALL completed
-        // sessions for the user. Scope to the active program
-        // (recommendation_id) once multi-program history lands.
-        PeriodTab.program => null,
-      };
-      final samples = await _sessionFormScoresInWindow(since: since);
-      final base = deriveProgressFormSummaryForTest(
-        [for (final sample in samples) sample.formScore],
-      );
+      final samples =
+          await _planSessionFormScores(recommendationId, weekNumbers);
+      final scores = [for (final sample in samples) sample.formScore];
+      final base = deriveProgressFormSummaryForTest(scores);
+      // Theil-Sen fitted rise across the span (slope · span) drives the
+      // trajectory sentence's granularity; null below the 3-session baseline,
+      // matching the gauge gate. Same fit the chip's [direction] reads.
+      final netChange = scores.length >= 3
+          ? (_theilSen([for (final v in scores) v.toDouble()]).slope *
+                  (scores.length - 1))
+              .round()
+          : null;
       return (
-        to: base.to,
-        from: base.from,
-        delta: base.delta,
+        average: base.average,
+        direction: base.direction,
         trend: base.trend,
         trendDates: [for (final sample in samples) sample.completedAt],
-        fact: deriveTrajectoryFactForTest(trend: base.trend, delta: base.delta),
+        fact: deriveTrajectoryFactForTest(
+          trend: base.trend,
+          netChange: netChange,
+          average: base.average,
+        ),
       );
     } catch (e) {
       debugPrint('[Vika] progressFormSummary failed: $e');
       return (
-        to: null,
-        from: null,
-        delta: null,
+        average: null,
+        direction: FormTrendDirection.none,
         trend: const <int>[],
         trendDates: const <DateTime>[],
         fact: '',
@@ -878,22 +929,40 @@ class SessionPersistence {
     }
   }
 
+  /// Theil-Sen slope (form points per session) the window must clear, in
+  /// either direction, for the gauge trend chip to read as rising/falling
+  /// rather than holding steady. Below this magnitude the slope reads as noise
+  /// and the direction is [FormTrendDirection.flat]. Tunable.
+  static const double kFormTrendSlopeThreshold = 0.5;
+
   /// Pure aggregation for [progressFormSummary]. [scores] are window session
-  /// form scores, oldest-first. Kept separate so the to/from/delta math is
-  /// unit-testable without a database.
+  /// form scores, oldest-first. Kept separate so the average + slope-direction
+  /// math is unit-testable without a database.
   ///
-  /// Progressive reveal: [to] (latest score) shows at >= 1 session, but a
-  /// baseline [from] + [delta] only read as real with >= 3 sessions of history
-  /// — below that, [from]/[delta] are null and the gauge shows the score alone.
+  /// Progressive reveal: [average] (rounded window mean) is the gauge headline
+  /// and shows at >= 1 session. [direction] reads the Theil-Sen slope over the
+  /// window (x = session index 0..n-1) but only past the same 3-session
+  /// baseline the rest of the Progress tab uses — below that it is
+  /// [FormTrendDirection.none] and the gauge hides the trend chip.
   @visibleForTesting
-  static ({int? to, int? from, int? delta, List<int> trend})
+  static ({int? average, FormTrendDirection direction, List<int> trend})
       deriveProgressFormSummaryForTest(List<int> scores) {
     final trend = List<int>.unmodifiable(scores);
-    final to = trend.isEmpty ? null : trend.last;
-    final hasBaseline = trend.length >= 3;
-    final from = hasBaseline ? trend.first : null;
-    final delta = (to != null && from != null) ? to - from : null;
-    return (to: to, from: from, delta: delta, trend: trend);
+    final average = trend.isEmpty ? null : _roundedMean(trend);
+    final FormTrendDirection direction;
+    if (trend.length < 3) {
+      direction = FormTrendDirection.none; // no baseline yet
+    } else {
+      final slope = _theilSen([for (final v in trend) v.toDouble()]).slope;
+      if (slope > kFormTrendSlopeThreshold) {
+        direction = FormTrendDirection.up;
+      } else if (slope < -kFormTrendSlopeThreshold) {
+        direction = FormTrendDirection.down;
+      } else {
+        direction = FormTrendDirection.flat;
+      }
+    }
+    return (average: average, direction: direction, trend: trend);
   }
 
   /// Pure windowing + averaging for [homeFormSummary]. `now` is injectable so
@@ -944,18 +1013,25 @@ class SessionPersistence {
     return (sum / values.length).round();
   }
 
-  // ─── Progress tab: weekly summary band (TUẦN NÀY MỘT NHÌN) ──────────
+  // ─── Progress tab: weekly summary band (TỔNG QUAN TUẦN NÀY) ─────────
 
-  /// Rolling 7-day summary for the Progress-tab weekly band: sessions
-  /// completed, total active seconds, and mean form. Single round trip;
-  /// the windowing + deltas live in [deriveWeeklySummaryForTest].
+  /// Minimum completed sessions the PRIOR program week must hold before the
+  /// weekly band reveals its deltas. Program week 1 has no prior week, so the
+  /// deltas stay hidden there. Tunable.
+  static const int kBandPriorMinSessions = 1;
+
+  /// Progress-tab weekly band (TỔNG QUAN TUẦN NÀY) for the CURRENT program
+  /// week: sessions completed, total active seconds, and mean form, plus
+  /// week-over-week deltas vs the prior program week. Scoped to
+  /// [recommendationId] + program week — NOT a calendar window. Single round
+  /// trip; the counting + deltas live in [deriveWeeklySummaryForTest].
   ///
-  ///   sessions       — completed sessions in [now-7d, now]
-  ///   totalSeconds   — sum of total_duration_seconds in the window
+  ///   sessions       — completed sessions in program week [currentWeekNumber]
+  ///   totalSeconds   — sum of total_duration_seconds for that week
   ///   avgForm        — rounded mean session_form_score, null if none scored
-  ///   sessionsDelta  — vs the prior 7-day window, or null unless that prior
-  ///   secondsDelta     window holds >= 3 sessions (no baseline -> hide notes)
-  ///   avgFormDelta
+  ///   sessionsDelta  — vs the prior program week (currentWeekNumber - 1), or
+  ///   secondsDelta     null unless that prior week holds
+  ///   avgFormDelta     >= [kBandPriorMinSessions] sessions (no baseline -> hide)
   Future<
       ({
         int sessions,
@@ -964,33 +1040,40 @@ class SessionPersistence {
         int? sessionsDelta,
         int? secondsDelta,
         int? avgFormDelta,
-      })> weeklySummary() async {
+      })> weeklySummary(
+    String recommendationId,
+    int currentWeekNumber,
+  ) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return _emptyWeeklySummary;
 
     try {
-      final since = DateTime.now().subtract(const Duration(days: 14));
+      final priorWeekNumber = currentWeekNumber - 1;
       final rows = await _client
           .from('workout_sessions')
-          .select('session_form_score, total_duration_seconds, completed_at')
+          .select('session_form_score, total_duration_seconds, week_number')
           .eq('user_id', userId)
+          .eq('recommendation_id', recommendationId)
           .not('completed_at', 'is', null)
-          .gte('completed_at', since.toUtc().toIso8601String())
-          .order('completed_at', ascending: true);
+          .inFilter('week_number', [currentWeekNumber, priorWeekNumber]);
 
-      final samples =
-          <({DateTime completedAt, int? formScore, int? durationSeconds})>[];
+      final current = <({int? formScore, int? durationSeconds})>[];
+      final prior = <({int? formScore, int? durationSeconds})>[];
       for (final raw in rows as List) {
         final row = (raw as Map).cast<String, dynamic>();
-        final completedAt = _dateTimeOrNull(row['completed_at']);
-        if (completedAt == null) continue;
-        samples.add((
-          completedAt: completedAt,
+        final week = (row['week_number'] as num?)?.toInt();
+        if (week == null) continue;
+        final sample = (
           formScore: (row['session_form_score'] as num?)?.toInt(),
           durationSeconds: (row['total_duration_seconds'] as num?)?.toInt(),
-        ));
+        );
+        if (week == currentWeekNumber) {
+          current.add(sample);
+        } else if (week == priorWeekNumber) {
+          prior.add(sample);
+        }
       }
-      return deriveWeeklySummaryForTest(samples);
+      return deriveWeeklySummaryForTest(current, prior);
     } catch (e) {
       debugPrint('[Vika] weeklySummary failed: $e');
       return _emptyWeeklySummary;
@@ -1006,9 +1089,11 @@ class SessionPersistence {
     avgFormDelta: null,
   );
 
-  /// Pure windowing for [weeklySummary]. `now` is injectable so the rolling
-  /// windows are deterministic in tests.
-  ///   current = [now-7d, now]      prior = [now-14d, now-7d)
+  /// Pure counting + deltas for [weeklySummary]. Takes the two PRE-BUCKETED
+  /// completed sample lists — [current] = this program week, [prior] = the
+  /// week before — and computes the band counts + deltas. The windowing (which
+  /// rows belong to which program week) lives in [weeklySummary]; this function
+  /// no longer knows about dates.
   @visibleForTesting
   static ({
     int sessions,
@@ -1018,38 +1103,30 @@ class SessionPersistence {
     int? secondsDelta,
     int? avgFormDelta,
   }) deriveWeeklySummaryForTest(
-    Iterable<({DateTime completedAt, int? formScore, int? durationSeconds})>
-        samples, {
-    DateTime? now,
-  }) {
-    final end = now ?? DateTime.now();
-    final currentStart = end.subtract(const Duration(days: 7));
-    final priorStart = end.subtract(const Duration(days: 14));
-
+    Iterable<({int? formScore, int? durationSeconds})> current,
+    Iterable<({int? formScore, int? durationSeconds})> prior,
+  ) {
     var sessions = 0;
     var totalSeconds = 0;
     final currentForms = <int>[];
+    for (final s in current) {
+      sessions++;
+      if (s.durationSeconds != null) totalSeconds += s.durationSeconds!;
+      if (s.formScore != null) currentForms.add(s.formScore!);
+    }
 
     var priorSessions = 0;
     var priorSeconds = 0;
     final priorForms = <int>[];
-
-    for (final s in samples) {
-      final at = s.completedAt;
-      if (!at.isBefore(currentStart) && !at.isAfter(end)) {
-        sessions++;
-        if (s.durationSeconds != null) totalSeconds += s.durationSeconds!;
-        if (s.formScore != null) currentForms.add(s.formScore!);
-      } else if (!at.isBefore(priorStart) && at.isBefore(currentStart)) {
-        priorSessions++;
-        if (s.durationSeconds != null) priorSeconds += s.durationSeconds!;
-        if (s.formScore != null) priorForms.add(s.formScore!);
-      }
+    for (final s in prior) {
+      priorSessions++;
+      if (s.durationSeconds != null) priorSeconds += s.durationSeconds!;
+      if (s.formScore != null) priorForms.add(s.formScore!);
     }
 
     final avgForm = currentForms.isEmpty ? null : _roundedMean(currentForms);
-    // Deltas only read as real once the prior window has >= 3 sessions.
-    final hasBaseline = priorSessions >= 3;
+    // Deltas only read as real once the prior program week has enough sessions.
+    final hasBaseline = priorSessions >= kBandPriorMinSessions;
     final priorAvgForm = priorForms.isEmpty ? null : _roundedMean(priorForms);
 
     return (
@@ -1070,14 +1147,13 @@ class SessionPersistence {
   /// exercise_sessions, highest-first. Name resolution to a display label is
   /// the caller's job (via the exercise catalog) — this stays DB-only.
   Future<
-          List<
-              ({
-                String exerciseId,
-                int bestScore,
-                int? previousBest,
-                DateTime achievedAt,
-              })>>
-      personalRecords() async {
+      List<
+          ({
+            String exerciseId,
+            int bestScore,
+            int? previousBest,
+            DateTime achievedAt,
+          })>> personalRecords() async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return const [];
 
@@ -1089,7 +1165,8 @@ class SessionPersistence {
           .not('form_score', 'is', null)
           .not('completed_at', 'is', null);
 
-      final sessions = <({String exerciseId, int formScore, DateTime completedAt})>[];
+      final sessions =
+          <({String exerciseId, int formScore, DateTime completedAt})>[];
       for (final raw in rows as List) {
         final row = (raw as Map).cast<String, dynamic>();
         final id = (row['exercise_id'] as String?)?.trim();
@@ -1098,7 +1175,8 @@ class SessionPersistence {
         if (id == null || id.isEmpty || score == null || completedAt == null) {
           continue;
         }
-        sessions.add((exerciseId: id, formScore: score, completedAt: completedAt));
+        sessions
+            .add((exerciseId: id, formScore: score, completedAt: completedAt));
       }
       return derivePersonalRecordsForTest(sessions);
     } catch (e) {
@@ -1190,34 +1268,57 @@ class SessionPersistence {
   static const double MIN_FAULT_RATE_SLOPE = 0.03;
 
   /// Per-exercise improvement ranking for the BÀI TẬP NỔI BẬT cards, scoped to
-  /// a [PeriodTab] window. Pulls each exercise's sessions oldest-first, derives
-  /// one headline per qualifying exercise, and returns them already sorted
-  /// (best first). Name resolution + copy formatting is the caller's job. DB
-  /// errors and signed-out fall back to an empty list (the section shows its
-  /// guided empty).
-  Future<List<RankInsightHeadline>> rankedInsights(PeriodTab period) async {
+  /// a position in the active plan rather than a calendar window. Pulls each
+  /// exercise's sessions oldest-first, derives one headline per qualifying
+  /// exercise, and returns them already sorted (best first). Name resolution +
+  /// copy formatting is the caller's job. DB errors and signed-out fall back
+  /// to an empty list (the section shows its guided empty).
+  ///
+  /// [recommendationId] is the active plan; the `.eq('recommendation_id', …)`
+  /// filter alone excludes standalone library rows (null recommendation_id).
+  /// [weekNumbers] restricts to those plan weeks (null = the whole program) by
+  /// first resolving the matching workout_session ids, then keeping only
+  /// exercise rows under those workouts.
+  Future<List<RankInsightHeadline>> rankedInsights(
+    String recommendationId,
+    List<int>? weekNumbers,
+  ) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return const [];
+    if (weekNumbers != null && weekNumbers.isEmpty) return const [];
 
     try {
-      final now = DateTime.now();
-      final since = switch (period) {
-        PeriodTab.week => now.subtract(const Duration(days: 7)),
-        PeriodTab.month => now.subtract(const Duration(days: 30)),
-        // TODO(wiring): single-program MVP — all completed sessions. Scope to
-        // the active program (recommendation_id) once history lands.
-        PeriodTab.program => null,
-      };
+      // For a week/phase scope, resolve the workout_session ids of the scoped
+      // weeks (one extra query) so exercise rows can be restricted to them.
+      // Whole-program (null) needs no id restriction — recommendation_id is it.
+      List<String>? workoutIds;
+      if (weekNumbers != null) {
+        final wsRows = await _client
+            .from('workout_sessions')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('recommendation_id', recommendationId)
+            // Completed-only, matching the gauge feed — an in-progress
+            // workout's already-saved exercise rows must not leak in.
+            .not('completed_at', 'is', null)
+            .inFilter('week_number', weekNumbers);
+        workoutIds = [
+          for (final raw in wsRows as List) (raw as Map)['id'] as String,
+        ];
+        if (workoutIds.isEmpty) return const [];
+      }
 
       var query = _client
           .from('exercise_sessions')
-          .select('exercise_id, form_score, fault_counts, total_reps, completed_at')
+          .select(
+              'exercise_id, form_score, fault_counts, total_reps, completed_at')
           .eq('user_id', userId)
+          .eq('recommendation_id', recommendationId)
           .not('form_score', 'is', null)
           .not('total_reps', 'is', null)
           .not('completed_at', 'is', null);
-      if (since != null) {
-        query = query.gte('completed_at', since.toUtc().toIso8601String());
+      if (workoutIds != null) {
+        query = query.inFilter('workout_session_id', workoutIds);
       }
       // Oldest-first so the session order index is the x-axis for every slope.
       final rows = await query.order('completed_at', ascending: true);
@@ -1245,7 +1346,7 @@ class SessionPersistence {
       // exercises fall back to GenericReportBuilder (empty maps) → form-only.
       final metaByExercise = <String, RankInsightMeta>{};
       for (final id in sessions.map((s) => s.exerciseId).toSet()) {
-        final builder = reportBuilders[id]?.builder ?? GenericReportBuilder();
+        final builder = resolveReportBuilder(id).builder;
         metaByExercise[id] = (
           painToFaultMap: builder.painToFaultMap(),
           praiseMetricNames: builder.praiseMetricNames(),
@@ -1510,13 +1611,15 @@ class SessionPersistence {
 
   /// A factual one-liner about the score TREND for the gauge card — NOT
   /// coaching, NOT the session coach. [trend] is the window's session form
-  /// scores oldest-first; [delta] is to−from (null below the 3-session
-  /// baseline, per the gauge gate). Priority-ordered, first match wins; rows
-  /// 4–9 never fire below N >= 3.
+  /// scores oldest-first; [netChange] is the Theil-Sen fitted change across the
+  /// span (fitted last − fitted first), and [average] is the window mean (the
+  /// gauge headline) — both null below the 3-session baseline, per the gauge
+  /// gate. Priority-ordered, first match wins; rows 4–9 never fire below N >= 3.
   @visibleForTesting
   static String deriveTrajectoryFactForTest({
     required List<int> trend,
-    required int? delta,
+    required int? netChange,
+    required int? average,
     int highThreshold = kTrajectoryHighThreshold,
   }) {
     final n = trend.length;
@@ -1529,17 +1632,23 @@ class SessionPersistence {
     // 2 / 3 — pre-baseline framing.
     if (n == 1) return 'Buổi đầu đã xong, Vika bắt đầu theo dõi form.';
     if (n == 2) return 'Hai buổi rồi, thêm một buổi nữa là thấy xu hướng.';
-    // 4–9 — only with a real baseline (N >= 3, delta resolved).
-    if (n >= 3 && delta != null) {
-      if (delta >= 8) return 'Form lên rõ qua $n buổi.';
-      if (delta >= 3) return 'Form đang đi lên.';
-      if (delta >= -2) {
-        return to >= highThreshold ? 'Giữ vững phong độ cao.' : 'Form ổn định.';
+    // 4–9 — only with a real baseline (N >= 3, netChange + average resolved).
+    // Driven by the Theil-Sen span change, not latest-minus-first; the steady
+    // rows read the AVERAGE (the headline) against the high threshold.
+    if (n >= 3 && netChange != null && average != null) {
+      if (netChange >= 8) return 'Form lên rõ qua $n buổi.';
+      if (netChange >= 3) return 'Form đang đi lên.';
+      if (netChange >= -2) {
+        return average >= highThreshold
+            ? 'Giữ vững phong độ cao.'
+            : 'Form ổn định.';
       }
-      if (delta >= -7) return 'Form chững lại một chút so với đầu giai đoạn.';
+      if (netChange >= -7) {
+        return 'Form chững lại một chút so với đầu giai đoạn.';
+      }
       return 'Form thấp hơn đầu giai đoạn.';
     }
-    // Defensive: N >= 3 but no delta (shouldn't happen given the gate).
+    // Defensive: N >= 3 but trend unresolved (shouldn't happen given the gate).
     return 'Form ổn định.';
   }
 
@@ -1785,16 +1894,20 @@ class SessionPersistence {
     int intensity, {
     String? notes,
   }) async {
+    final canonicalRegion = canonicalPainRegion(region);
+    if (canonicalRegion == null) return;
+
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return;
 
     try {
+      final clampedIntensity = intensity.clamp(1, 5).toInt();
       final now = DateTime.now().toIso8601String();
       final existing = await _client
           .from('user_pain_areas')
           .select('id, flag_count')
           .eq('user_id', userId)
-          .eq('body_region', region)
+          .eq('body_region', canonicalRegion)
           .eq('status', 'active')
           .maybeSingle();
 
@@ -1804,22 +1917,24 @@ class SessionPersistence {
         // is on purpose — do not downgrade a 'confirmed' row.
         final newCount = ((existing['flag_count'] as num?)?.toInt() ?? 1) + 1;
         await _client.from('user_pain_areas').update({
-          'intensity': intensity,
+          'intensity': clampedIntensity,
           'last_reaffirmed_at': now,
           'flag_count': newCount,
-          if (region == 'other' && notes != null) 'notes': notes,
+          if (canonicalRegion == kOtherPainRegion && notes != null)
+            'notes': notes,
         }).eq('id', existing['id']);
       } else {
         await _client.from('user_pain_areas').insert({
           'user_id': userId,
-          'body_region': region,
+          'body_region': canonicalRegion,
           'source': 'self_reported',
           'status': 'active',
-          'intensity': intensity,
+          'intensity': clampedIntensity,
           'first_flagged_at': now,
           'last_reaffirmed_at': now,
           'flag_count': 1,
-          if (region == 'other' && notes != null) 'notes': notes,
+          if (canonicalRegion == kOtherPainRegion && notes != null)
+            'notes': notes,
         });
       }
     } catch (e) {
@@ -1945,24 +2060,33 @@ class SessionPersistence {
   }
 
   Future<Map<String, List<int>>> fetchPriorExerciseFormsScores(
-      String? workoutSessionId, List<String> sessionIds) async {
+      String? workoutSessionId, List<String> sessionIds,
+      {List<String> excludeExerciseSessionIds = const []}) async {
     final userId = _client.auth.currentUser?.id;
-    if (userId == null || workoutSessionId == null) return {};
+    if (userId == null) return {};
+    // Need at least one exclusion anchor or the current run leaks into its own
+    // "prior" history and masks a real PB. Plan runs anchor on
+    // workout_session_id; standalone runs anchor on the row id(s) just written.
+    if (workoutSessionId == null && excludeExerciseSessionIds.isEmpty) return {};
 
     try {
-      final response = await _client
+      var query = _client
           .from('exercise_sessions')
-          .select('exercise_id, form_score')
+          .select('id, exercise_id, form_score')
           .eq('user_id', userId)
           .inFilter('exercise_id', sessionIds)
-          .neq('workout_session_id',
-              workoutSessionId) // CRITICAL here, see below
-          .not('form_score', 'is', null)
-          .order('completed_at', ascending: true);
+          .not('form_score', 'is', null);
+      if (workoutSessionId != null) {
+        query = query.neq('workout_session_id', workoutSessionId);
+      }
+      final response = await query.order('completed_at', ascending: true);
 
+      final exclude = excludeExerciseSessionIds.toSet();
       final map = <String, List<int>>{};
       for (final raw in response as List) {
         final row = raw as Map<String, dynamic>;
+        // Standalone: drop the current run's own exercise_sessions row(s).
+        if (workoutSessionId == null && exclude.contains(row['id'])) continue;
         final id = row['exercise_id'] as String;
         final score = (row['form_score'] as num?)?.toInt();
         if (score == null) continue;

@@ -28,6 +28,7 @@ class LibraryStageHero extends StatelessWidget {
     required this.totalCount,
     required this.onSelectFilter,
     required this.userInitial,
+    this.avatarUrl,
     this.onAvatarTap,
     this.onSearchTap,
   });
@@ -40,6 +41,7 @@ class LibraryStageHero extends StatelessWidget {
 
   final ValueChanged<String> onSelectFilter;
   final String userInitial;
+  final String? avatarUrl;
   final VoidCallback? onAvatarTap;
   final VoidCallback? onSearchTap;
 
@@ -47,19 +49,19 @@ class LibraryStageHero extends StatelessWidget {
       .firstWhere((f) => f.id == selectedFilterId, orElse: () => filters.first);
 
   String get _eyebrow {
-    if (_selected.id == 'all') return 'THƯ VIỆN  ·  $totalCount BÀI';
+    if (_selected.id == 'all') return 'THƯ VIỆN  ·  $totalCount MỤC';
     final n = _selected.count ?? 0;
-    return '${_selected.label.toUpperCase()}  ·  $n BÀI';
+    final unit = _selected.id == 'album' ? 'BỘ' : 'BÀI';
+    return '${_selected.label.toUpperCase()}  ·  $n $unit';
   }
 
   String get _subtitle {
     return switch (_selected.id) {
-      'program' => 'Lộ trình nhiều tuần. Mỗi tuần một mục tiêu rõ ràng.',
-      'collection' => 'Bộ sưu tập ngắn. Tập nhanh, gọn, theo mục đích.',
+      'album' => 'Bộ tập được xếp sẵn. Chạm một lần, tập liền nhiều bài.',
       'exercise' => 'Bài tập riêng lẻ. Chọn theo phần thân hoặc cường độ.',
       'ai' => 'Camera Vika theo dõi tư thế của bạn theo thời gian thực.',
       'yoga' => 'Tư thế yoga để linh hoạt, thư giãn, cân bằng.',
-      _ => 'Tìm bài tập, lộ trình, bộ sưu tập theo mục tiêu.',
+      _ => 'Tìm bài tập và bộ tập theo mục tiêu hôm nay.',
     };
   }
 
@@ -141,6 +143,7 @@ class LibraryStageHero extends StatelessWidget {
                   WordmarkHeader(
                     inverted: true,
                     userInitial: userInitial,
+                    avatarUrl: avatarUrl,
                     trailingIcon: Icons.search_rounded,
                     trailingTooltip: 'Tìm',
                     onTrailingTap: onSearchTap,

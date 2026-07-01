@@ -1,10 +1,15 @@
 import '../exercise/exercise_base.dart';
 import '../exercise/squat/squat.dart';
+import 'generic_exercise_voice_assets.dart';
 import 'queued_asset_voice_player.dart';
 import 'squat_voice_assets.dart';
 
 abstract class SquatVoicePlayer {
   Future<void> speak(String text);
+  Future<void> waitUntilIdle({Duration timeout = const Duration(seconds: 4)}) {
+    return Future<void>.value();
+  }
+
   void clearQueue();
   void clearPendingButKeepCurrent();
   void dispose() {}
@@ -14,9 +19,14 @@ class _SquatAssetVoicePlayer implements SquatVoicePlayer {
   _SquatAssetVoicePlayer({QueuedAssetVoicePlayer? player})
       : _player = player ??
             QueuedAssetVoicePlayer(
-              assetMap: SquatVoiceAssets.files,
-              assetSourcePrefix: SquatVoiceAssets.assetSourcePrefix,
-              assetBundlePrefix: SquatVoiceAssets.assetBundlePrefix,
+              assetMap: {
+                ...GenericExerciseVoiceAssets.commonFiles,
+                for (final entry in SquatVoiceAssets.files.entries)
+                  entry.key: 'squat/${entry.value}',
+              },
+              assetSourcePrefix: GenericExerciseVoiceAssets.assetSourcePrefix,
+              assetBundlePrefix: GenericExerciseVoiceAssets.assetBundlePrefix,
+              assetResolver: GenericExerciseVoiceAssets.resolveAsset,
               logTag: 'SquatVoice',
             );
 
@@ -24,6 +34,12 @@ class _SquatAssetVoicePlayer implements SquatVoicePlayer {
 
   @override
   Future<void> speak(String text) => _player.speak(text);
+
+  @override
+  Future<void> waitUntilIdle({
+    Duration timeout = const Duration(seconds: 4),
+  }) =>
+      _player.waitUntilIdle(timeout: timeout);
 
   @override
   void clearQueue() => _player.clearQueue();
@@ -40,12 +56,9 @@ class SquatVoiceCoach implements ExerciseVoiceCoach {
       : _ttsService = ttsService ?? _SquatAssetVoicePlayer();
 
   static const int _phaseCueMinGapMs = 250;
-  static const int _faultCueCooldownMs = 3000;
-  static const int _postRepCueCooldownReps = 2;
-  static const int _postRepRepeatSuppressMs = 1500;
 
   static const List<String> _readyCountdown = ['3', '2', '1', 'Sẵn sàng'];
-  static const String _cleanRepCue = 'tốt';
+  static const String _cleanRepCue = 'common.correct';
   static const String _trunkPriorityCue = 'Ưỡn ngực lên';
 
   final SquatVoicePlayer _ttsService;
@@ -55,10 +68,7 @@ class SquatVoiceCoach implements ExerciseVoiceCoach {
   int _lastPhaseCueAtMs = 0;
   bool _didAnnounceSetComplete = false;
   bool _didAnnounceReady = false;
-  bool _wasTrunkFaultActive = false;
-  final Map<String, int> _lastFaultVoiceAtMs = {};
-  final Map<String, int> _lastPostRepVoiceRep = {};
-  final Set<String> _liveFaultVoicesSpokenThisRep = {};
+  bool _didSpeakSetup = false;
 
   @override
   void processFrame({
@@ -76,20 +86,26 @@ class SquatVoiceCoach implements ExerciseVoiceCoach {
       if (!_didAnnounceSetComplete) {
         _ttsService.clearPendingButKeepCurrent();
         if (repIncreased) {
-          _speakRepOutcome(
-            exercise: exercise,
-            repCount: repCount,
-            nowMs: nowMs,
-            includeCount: false,
-          );
+          if (_hasRepLog(exercise, repCount)) {
+            _speakRepOutcome(
+              exercise: exercise,
+              repCount: repCount,
+              includeCount: true,
+            );
+          }
         }
         _ttsService.speak('Hoàn thành bài tập');
         _didAnnounceSetComplete = true;
       }
 
       _lastPhasePhrase = null;
-      _wasTrunkFaultActive = false;
-      _liveFaultVoicesSpokenThisRep.clear();
+      _lastRepCount = repCount;
+      return;
+    }
+
+    if (currentExerciseState == ExerciseState.notActivated) {
+      _speakSetup(exercise);
+      _lastPhasePhrase = null;
       _lastRepCount = repCount;
       return;
     }
@@ -98,10 +114,6 @@ class SquatVoiceCoach implements ExerciseVoiceCoach {
         exercise.isPaused ||
         !hasPose) {
       _lastPhasePhrase = null;
-      _wasTrunkFaultActive = false;
-      if (currentExerciseState != ExerciseState.activated) {
-        _liveFaultVoicesSpokenThisRep.clear();
-      }
       _lastRepCount = repCount;
       return;
     }
@@ -113,7 +125,6 @@ class SquatVoiceCoach implements ExerciseVoiceCoach {
       exercise: exercise,
     );
     if (!_didAnnounceReady) {
-      _ttsService.clearQueue();
       for (final phrase in _readyCountdown) {
         _ttsService.speak(phrase);
       }
@@ -127,27 +138,14 @@ class SquatVoiceCoach implements ExerciseVoiceCoach {
       }
     }
 
-    final liveFaultVoice = _highestPriorityLiveFaultVoice(feedback);
-    final trunkFaultActive = liveFaultVoice == _trunkPriorityCue;
-    final trunkFaultJustDetected = trunkFaultActive && !_wasTrunkFaultActive;
-    final liveFaultAlreadySpokenThisRep = liveFaultVoice != null &&
-        _liveFaultVoicesSpokenThisRep.contains(liveFaultVoice);
-    final canSpeakLiveFault = liveFaultVoice != null &&
-        !liveFaultAlreadySpokenThisRep &&
-        (trunkFaultJustDetected ||
-            _canSpeakLiveFaultVoice(liveFaultVoice, nowMs));
-
     if (repIncreased) {
       _ttsService.clearPendingButKeepCurrent();
       _speakRepOutcome(
         exercise: exercise,
         repCount: repCount,
-        nowMs: nowMs,
         includeCount: true,
       );
       _lastPhasePhrase = phasePhrase == 'Xuống' ? null : phasePhrase;
-      _wasTrunkFaultActive = false;
-      _liveFaultVoicesSpokenThisRep.clear();
       _lastRepCount = repCount;
       return;
     }
@@ -160,13 +158,8 @@ class SquatVoiceCoach implements ExerciseVoiceCoach {
           exercise: exercise,
         ) &&
         phraseChanged;
-    final suppressLiveFaultForReleaseCue = releaseCueJustUnlocked;
-    final trunkCueTakesPriority = !releaseCueJustUnlocked &&
-        liveFaultVoice == _trunkPriorityCue &&
-        canSpeakLiveFault;
 
-    if (!trunkCueTakesPriority &&
-        phasePhrase != null &&
+    if (phasePhrase != null &&
         phraseChanged &&
         (canSpeakPhaseCue || releaseCueJustUnlocked)) {
       if (releaseCueJustUnlocked) {
@@ -177,27 +170,32 @@ class SquatVoiceCoach implements ExerciseVoiceCoach {
       _lastPhaseCueAtMs = nowMs;
     }
 
-    if (!suppressLiveFaultForReleaseCue &&
-        liveFaultVoice != null &&
-        canSpeakLiveFault) {
-      if (liveFaultVoice == _trunkPriorityCue) {
-        // Let the current phrase finish, but bring chest cue to the front.
-        _ttsService.clearPendingButKeepCurrent();
-      }
-      _lastFaultVoiceAtMs[liveFaultVoice] = nowMs;
-      _liveFaultVoicesSpokenThisRep.add(liveFaultVoice);
-      _ttsService.speak(liveFaultVoice);
-    }
-
     _lastPhasePhrase = phasePhrase;
-    _wasTrunkFaultActive = trunkFaultActive;
     _lastRepCount = repCount;
+  }
+
+  @override
+  Future<void> waitUntilIdle({
+    Duration timeout = const Duration(seconds: 4),
+  }) {
+    return _ttsService.waitUntilIdle(timeout: timeout);
   }
 
   @override
   void dispose() {
     _ttsService.clearQueue();
     _ttsService.dispose();
+  }
+
+  void _speakSetup(ExerciseBase exercise) {
+    if (_didSpeakSetup) return;
+
+    final script =
+        GenericExerciseVoiceAssets.scriptForExerciseName(exercise.exerciseName);
+    _ttsService.speak(exercise.setupOrientationIntroVoiceKey);
+    _ttsService.speak(script.cueKey('setup_position'));
+    _ttsService.speak(script.cueKey('active_intro'));
+    _didSpeakSetup = true;
   }
 
   String? _effectivePhasePhrase(
@@ -257,29 +255,9 @@ class SquatVoiceCoach implements ExerciseVoiceCoach {
     return null;
   }
 
-  bool _canSpeakLiveFaultVoice(String voice, int nowMs) {
-    final lastSpokenAt = _lastFaultVoiceAtMs[voice] ?? 0;
-    return nowMs - lastSpokenAt >= _faultCueCooldownMs;
-  }
-
-  String? _highestPriorityLiveFaultVoice(Map<String, String> feedback) {
-    final back = (feedback['Back'] ?? '').toLowerCase();
-    if (back.contains('chest up')) {
-      return _trunkPriorityCue;
-    }
-
-    final sync = (feedback['Sync'] ?? '').toLowerCase();
-    if (sync.contains('chest up')) {
-      return _trunkPriorityCue;
-    }
-
-    return null;
-  }
-
   void _speakRepOutcome({
     required ExerciseBase exercise,
     required int repCount,
-    required int nowMs,
     required bool includeCount,
   }) {
     if (includeCount) {
@@ -294,14 +272,12 @@ class SquatVoiceCoach implements ExerciseVoiceCoach {
     _enqueuePostRepFeedbackIfAllowed(
       exercise: exercise,
       repCount: repCount,
-      nowMs: nowMs,
     );
   }
 
   void _enqueuePostRepFeedbackIfAllowed({
     required ExerciseBase exercise,
     required int repCount,
-    required int nowMs,
   }) {
     if (exercise is! Squat || exercise.lastRepWasClean) {
       return;
@@ -309,33 +285,29 @@ class SquatVoiceCoach implements ExerciseVoiceCoach {
 
     final rawVoice = exercise.lastRepTopVoiceMessage;
     if (rawVoice == null || rawVoice.isEmpty) {
+      _ttsService.speak('common.fix_pose');
       return;
     }
 
     final voice = _postRepVoice(rawVoice);
     if (voice == null) {
+      _ttsService.speak('common.fix_pose');
       return;
     }
 
-    final lastPostRepRep = _lastPostRepVoiceRep[voice] ?? -99;
-    if (repCount - lastPostRepRep < _postRepCueCooldownReps) {
-      return;
-    }
-
-    final lastLiveVoiceAt = _lastFaultVoiceAtMs[rawVoice] ?? 0;
-    if (nowMs - lastLiveVoiceAt < _postRepRepeatSuppressMs) {
-      return;
-    }
-
-    _lastPostRepVoiceRep[voice] = repCount;
     _ttsService.speak(voice);
+  }
+
+  bool _hasRepLog(ExerciseBase exercise, int repCount) {
+    return exercise.logger.repLogs.any((log) => log.repNumber == repCount);
   }
 
   String? _postRepVoice(String rawVoice) {
     final voice = rawVoice.trim();
-    if (voice.isEmpty || voice == _trunkPriorityCue) {
+    if (voice.isEmpty) {
       return null;
     }
+    if (voice == _trunkPriorityCue) return voice;
 
     final lowerVoice = voice.toLowerCase();
     if (lowerVoice.startsWith('nhớ ')) {

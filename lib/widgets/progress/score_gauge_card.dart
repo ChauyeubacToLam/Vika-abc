@@ -1,8 +1,12 @@
 // ScoreGaugeCard — the central score moment on the Progress tab.
-// Circular arc gauge with a sweep-in animation on first build, big
-// italic 74 / 100 in the center, an editorial "+14" badge to the
-// right, refined from-to bar with tick marks, and the coach quote
+// Circular arc gauge with a sweep-in animation on first build, the big
+// italic AVERAGE / 100 for the period in the center, and the coach quote
 // under a hairline divider opened with a stylized italic glyph.
+//
+// The gauge is a SCOPED AVERAGE, full stop — the period pills rescope it
+// (and the hero) but no trend/direction chip lives here. All trajectory
+// (the rising/falling story) lives in the fixed whole-program ĐƯỜNG TIẾN BỘ
+// chart below.
 //
 // Reads like a premium dashboard moment (Whoop / Oura / Apple Fitness)
 // while staying in Vika's editorial Ivory grammar.
@@ -44,7 +48,7 @@ class _ScoreGaugeCardState extends State<ScoreGaugeCard>
   @override
   void didUpdateWidget(covariant ScoreGaugeCard old) {
     super.didUpdateWidget(old);
-    if (old.data.to != widget.data.to) {
+    if (old.data.average != widget.data.average) {
       _ctl
         ..reset()
         ..forward();
@@ -130,12 +134,9 @@ class _ScoreGaugeCardState extends State<ScoreGaugeCard>
               const SizedBox(height: 28),
               _GaugeBlock(data: widget.data, animation: _t),
               const SizedBox(height: 26),
-              // The from→to bar only reads as real with a baseline (3+
-              // sessions). Below that, [from]/[delta] are null and we show
-              // the score alone — no delta row.
-              if (widget.data.from != null)
-                _FromToBar(from: widget.data.from!, to: widget.data.to),
-              if (widget.data.from != null) const SizedBox(height: 24),
+              // The net-change story lives in the ĐƯỜNG TIẾN BỘ chart directly
+              // below; the gauge headline is the period AVERAGE, so there is no
+              // from→to bar here (it would conflict with an average).
               Container(
                 padding: const EdgeInsets.only(top: 18),
                 decoration: BoxDecoration(
@@ -263,128 +264,17 @@ class _GaugeBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The arc gauge IS the moment — centered, no right-hand chip. The average
+    // stands alone; trajectory lives in the program chart below.
     return SizedBox(
       height: 216,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Arc gauge — dominant left moment.
-          SizedBox(
-            width: 216,
-            height: 216,
-            child: _ArcGauge(score: data.to, animation: animation),
-          ),
-          const SizedBox(width: 6),
-          // Delta + descriptor stacked on the right — or, below the baseline,
-          // a quiet hint in its place so the score stands alone.
-          Expanded(
-            child: data.delta != null
-                ? _DeltaBadge(delta: data.delta!)
-                : const _GaugeHint(),
-          ),
-        ],
+      child: Center(
+        child: SizedBox(
+          width: 216,
+          height: 216,
+          child: _ArcGauge(score: data.average, animation: animation),
+        ),
       ),
-    );
-  }
-}
-
-/// Shown in the delta slot when there's no baseline yet (< 3 sessions).
-/// Keeps the gauge composed without fabricating a delta number.
-class _GaugeHint extends StatelessWidget {
-  const _GaugeHint();
-
-  @override
-  Widget build(BuildContext context) {
-    final c = VikaColors.of(context);
-    return Text(
-      'Thêm buổi để thấy tiến triển.',
-      style: TextStyle(
-        fontFamily: 'BeVietnamPro',
-        fontSize: 12.5,
-        fontWeight: FontWeight.w600,
-        fontStyle: FontStyle.italic,
-        height: 1.45,
-        letterSpacing: -0.2,
-        color: c.invInkSoft.withValues(alpha: 0.7),
-      ),
-    );
-  }
-}
-
-class _DeltaBadge extends StatelessWidget {
-  const _DeltaBadge({required this.delta});
-  final String delta;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = VikaColors.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.center,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // The +14 chip — ink-filled, yellow text, with a tiny up arrow.
-        Container(
-          padding: const EdgeInsets.fromLTRB(10, 6, 12, 6),
-          decoration: BoxDecoration(
-            color: c.yellow,
-            borderRadius: BorderRadius.circular(999),
-            boxShadow: [
-              BoxShadow(
-                color: c.yellow.withValues(alpha: 0.44),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.arrow_upward_rounded,
-                size: 14,
-                color: c.yellowInk,
-              ),
-              const SizedBox(width: 2),
-              Text(
-                delta.replaceAll('+', ''),
-                style: TextStyle(
-                  fontFamily: 'BeVietnamPro',
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  fontStyle: FontStyle.italic,
-                  letterSpacing: -1.0,
-                  height: 1.0,
-                  color: c.yellowInk,
-                  fontFeatures: VikaIvoryMain.tabularFigures,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          'điểm form',
-          style: TextStyle(
-            fontFamily: 'BeVietnamPro',
-            fontSize: 14,
-            fontWeight: FontWeight.w800,
-            fontStyle: FontStyle.italic,
-            letterSpacing: -0.3,
-            color: c.invInk,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'từ điểm xuất phát',
-          style: TextStyle(
-            fontFamily: 'BeVietnamPro',
-            fontSize: 11.5,
-            fontWeight: FontWeight.w600,
-            color: c.invInkSoft.withValues(alpha: 0.6),
-          ),
-        ),
-      ],
     );
   }
 }
@@ -603,173 +493,4 @@ class _ArcPainter extends CustomPainter {
       old.progress != progress ||
       old.fillColor != fillColor ||
       old.trackColor != trackColor;
-}
-
-// ═══════════════════════════════════════════════════════════════
-// FROM → TO BAR (refined: now with quartile tick marks)
-// ═══════════════════════════════════════════════════════════════
-
-class _FromToBar extends StatelessWidget {
-  const _FromToBar({required this.from, required this.to});
-
-  final int from;
-  final int to;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = VikaColors.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                PlanEyebrow('BẮT ĐẦU', size: 9, letterSpacing: 1.4, dark: true),
-                const SizedBox(width: 8),
-                Text(
-                  '$from',
-                  style: TextStyle(
-                    fontFamily: 'BeVietnamPro',
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: c.invInkSoft,
-                    letterSpacing: -0.2,
-                    fontFeatures: VikaIvoryMain.tabularFigures,
-                  ),
-                ),
-              ],
-            ),
-            Row(
-              children: [
-                Text(
-                  '$to',
-                  style: TextStyle(
-                    fontFamily: 'BeVietnamPro',
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    fontStyle: FontStyle.italic,
-                    color: c.invInk,
-                    letterSpacing: -0.3,
-                    fontFeatures: VikaIvoryMain.tabularFigures,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                PlanEyebrow('HÔM NAY', size: 9, letterSpacing: 1.4, dark: true),
-              ],
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 22,
-          child: LayoutBuilder(
-            builder: (context, bc) {
-              final width = bc.maxWidth;
-              // Composite scores can ride past 100; clamp the bar geometry to
-              // the [0,100] track so the dots never overflow, while the
-              // printed numbers above stay true.
-              final fromX = (from.clamp(0, 100) / 100) * width;
-              final toX = (to.clamp(0, 100) / 100) * width;
-              return Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  // Track.
-                  Positioned(
-                    top: 7,
-                    left: 0,
-                    right: 0,
-                    child: Container(
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: c.invInk.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                  ),
-                  // Quartile tick marks above the track.
-                  for (final pct in const [0.25, 0.5, 0.75])
-                    Positioned(
-                      top: 0,
-                      left: pct * width - 0.5,
-                      child: Container(
-                        width: 1,
-                        height: 5,
-                        color: c.invInkSoft.withValues(alpha: 0.32),
-                      ),
-                    ),
-                  // Yellow segment from→to.
-                  Positioned(
-                    top: 7,
-                    left: fromX,
-                    width: toX - fromX,
-                    child: Container(
-                      height: 8,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            c.yellow.withValues(alpha: 0.35),
-                            c.yellow,
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(4),
-                        boxShadow: [
-                          BoxShadow(
-                            color: c.yellow.withValues(alpha: 0.30),
-                            blurRadius: 12,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // Start dot.
-                  Positioned(
-                    top: 4,
-                    left: fromX - 7,
-                    child: Container(
-                      width: 14,
-                      height: 14,
-                      decoration: BoxDecoration(
-                        color: c.bgInverse,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: c.invInk.withValues(alpha: 0.4),
-                          width: 2,
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Today dot.
-                  Positioned(
-                    top: 3,
-                    left: toX - 8,
-                    child: Container(
-                      width: 16,
-                      height: 16,
-                      decoration: BoxDecoration(
-                        color: c.yellow,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: c.bgInverse,
-                          width: 2,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: c.yellow.withValues(alpha: 0.5),
-                            blurRadius: 10,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
 }

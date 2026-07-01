@@ -96,7 +96,7 @@ class AISpotlight extends StatelessWidget {
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 260),
                 child: const PlanH1(
-                  'Camera xem bạn tập.',
+                  'Camera AI theo dõi từng động tác.',
                   size: 36,
                   dark: true,
                   letterSpacing: -1.6,
@@ -107,7 +107,7 @@ class AISpotlight extends StatelessWidget {
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 280),
                 child: const PlanP(
-                  'Hai mươi bài đã được dạy cho camera. Sửa lỗi tức thì khi bạn tập sai.',
+                  '20 bài đã được có camera AI. Phản hồi tức thì khi bạn tập sai.',
                   dark: true,
                   soft: true,
                   size: 13,
@@ -152,7 +152,7 @@ class AISpotlight extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      'Form chính xác. Không đoán.',
+                      'Tập chuẩn hơn mỗi rep',
                       style: TextStyle(
                         fontFamily: 'BeVietnamPro',
                         fontSize: 11,
@@ -178,7 +178,7 @@ class AISpotlight extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              'Vào bộ sưu tập',
+                              'Xem bộ sưu tập',
                               style: TextStyle(
                                 fontFamily: 'BeVietnamPro',
                                 fontSize: 12,

@@ -1,6 +1,5 @@
 import 'package:flutter/services.dart';
 import 'package:vika/exercise/exercise_base.dart';
-import 'package:vika/pose/vika_image_orientation.dart';
 
 class SegmentationChannel {
   static const MethodChannel _methodChannel = MethodChannel(

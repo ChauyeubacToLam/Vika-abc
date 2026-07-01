@@ -487,11 +487,17 @@ class _DebugMetricRowState extends State<DebugMetricRow>
   @override
   Widget build(BuildContext context) {
     final tracked = widget.tracked;
-    final status = tracked.status;
+    final lastSample =
+        tracked.history.isNotEmpty ? tracked.history.last : null;
+    final hasCurrentValue = tracked.value != null;
+    final status = hasCurrentValue
+        ? tracked.status
+        : (lastSample?.status ?? tracked.status);
     final statusColor = _statusColor(status);
     final label = widget.isDev
         ? tracked.metric.name
         : (tracked.metric.nameVi ?? tracked.metric.name);
+    final displayValue = tracked.value ?? lastSample?.value;
 
     final baseBg = switch (status) {
       MetricStatus.fault => _DebugPalette.fault.withValues(alpha: 0.14),
@@ -571,7 +577,7 @@ class _DebugMetricRowState extends State<DebugMetricRow>
                 SizedBox(
                   width: 64,
                   child: Text(
-                    _formatNullableValue(tracked.value),
+                    _formatNullableValue(displayValue),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.right,

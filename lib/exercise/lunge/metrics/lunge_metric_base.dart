@@ -1,4 +1,4 @@
-// ignore_for_file: constant_identifier_names, non_constant_identifier_names
+// ignore_for_file: constant_identifier_names, non_constant_identifier_names, annotate_overrides
 
 /* =========================================================================
    LungeMetricBase — Abstract base for all lunge form metrics.
@@ -50,7 +50,9 @@ class LungeRepContext {
 /* =========================================================================
    LungeMetricBase — Interface every lunge metric implements.
    ========================================================================= */
-abstract class LungeMetricBase {
+abstract class LungeMetricBase with FaultMetricDebugSource {
+  int faultsCount = 0;
+
   /// Human-readable name for debug/logging.
   String get name;
 
@@ -66,6 +68,11 @@ abstract class LungeMetricBase {
 
   /// Reset all internal state for the next rep.
   void reset();
+
+  void resetAndCountFault() {
+    if (faults.isNotEmpty) faultsCount++;
+    reset();
+  }
 
   /// Called when lunge state transitions (e.g. descending → bottom).
   /// Override in metrics that care about transitions (tempo, etc.).

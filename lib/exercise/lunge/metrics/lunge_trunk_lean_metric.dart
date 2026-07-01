@@ -19,13 +19,13 @@ import '../../../utils/debouncer.dart';
 
 class LungeTrunkLeanConfig {
   /// Good forward lean range (degrees from vertical).
-  static const List<int> GOOD_LEAN_RANGE = [10, 30];
+  static const List<int> GOOD_LEAN_RANGE = [-5, 45];
 
   /// Warning zone upper bound (degrees). Above this = core collapse.
-  static const int WARN_LEAN_LIMIT = 39;
+  static const int WARN_LEAN_LIMIT = 55;
 
   /// Backward lean threshold (degrees). Below 0 = leaning back.
-  static const double BACKWARD_LIMIT = 0.0;
+  static const double BACKWARD_LIMIT = -10.0;
 }
 
 class LungeTrunkLeanMetric extends LungeMetricBase {
@@ -37,9 +37,9 @@ class LungeTrunkLeanMetric extends LungeMetricBase {
 
   // Separate debouncers for forward/backward
   // 10 frames (~333ms) for forward lean
-  final Debouncer _forwardDebouncer = Debouncer(requiredFrames: 10);
+  final Debouncer _forwardDebouncer = Debouncer(requiredFrames: 12);
   // 5 frames for backward lean
-  final Debouncer _backwardDebouncer = Debouncer(requiredFrames: 5);
+  final Debouncer _backwardDebouncer = Debouncer(requiredFrames: 8);
 
   /// Track maximum trunk lean this rep (for post-rep analysis)
   double? maxTrunkLean;

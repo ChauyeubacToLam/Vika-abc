@@ -1,6 +1,7 @@
 import 'package:vika/interpreter/squat_interpreter.dart';
 import 'package:vika/utils/exercise_logger.dart';
 import 'package:vika/screens/onboarding/v5/fork_recommendation.dart';
+import 'package:vika/services/recommendation/fitness_test_scoring.dart';
 import 'onboarding_assessment_thresholds.dart';
 
 class OnboardingData {
@@ -14,8 +15,8 @@ class OnboardingData {
   List<String> problemResonance = [];
 
   // Step 4: Pain check
-  List<String> painAreas =
-      []; // 'none', 'lower_back', 'knee', 'shoulder_neck', 'hip', 'other'
+  List<String> painAreas = []; // shared pain_region ids + 'other'
+  Map<String, int> painIntensities = {}; // region id -> 1..5
   bool noPain = false;
   String? painOtherText; // free text when 'other' selected (optional)
 
@@ -23,7 +24,7 @@ class OnboardingData {
   String? goal;
 
   // Step 3: Frequency
-  String? duration; // '<3m', '3-11m', '1y+'
+  String? duration; // '<6m', '6m-2y', '2y+'
 
   String? get trainingDuration => duration;
   set trainingDuration(String? value) => duration = value;
@@ -34,16 +35,26 @@ class OnboardingData {
   // Step 5-7: Assessment
   List<String> detectedIssues = [];
   ExerciseLogger? _squatLogger;
-  ExerciseLogger? pushUpLogger;
+  ExerciseLogger? _wallPushUpLogger;
+  ExerciseLogger? _warriorLogger;
+  ExerciseLogger? _forwardFoldLogger;
   SquatInterpreter? _squatInterpreter;
   Map<String, List<String>> feedbackByExercise = {};
 
   ForkRecommendation? forkRec;
   bool get hasSquatAssessment =>
       _squatLogger != null && _squatInterpreter != null;
+  bool get hasWallPushUpAssessment => _wallPushUpLogger != null;
+  bool get hasWarriorAssessment => _warriorLogger != null;
+  bool get hasForwardFoldAssessment => _forwardFoldLogger != null;
+  bool get hasYogaAssessment =>
+      _warriorLogger != null || _forwardFoldLogger != null;
 
   // Non-null getters preserve analyzer compatibility for older unused pages.
   ExerciseLogger get squatLogger => _squatLogger!;
+  ExerciseLogger get wallPushUpLogger => _wallPushUpLogger!;
+  ExerciseLogger get warriorLogger => _warriorLogger!;
+  ExerciseLogger get forwardFoldLogger => _forwardFoldLogger!;
   SquatInterpreter get squatInterpreter => _squatInterpreter!;
   SquatInterpreter? get squatInterpreterOrNull => _squatInterpreter;
 
@@ -56,9 +67,25 @@ class OnboardingData {
       ..addAll(_squatInterpreter!.detectedIssues);
   }
 
+  void onWallPushUpComplete(ExerciseLogger logger) {
+    _wallPushUpLogger = logger;
+  }
+
+  void onWarriorOneComplete(ExerciseLogger logger) {
+    _warriorLogger = logger;
+  }
+
+  void onForwardFoldComplete(ExerciseLogger logger) {
+    _forwardFoldLogger = logger;
+  }
+
   String? level;
   String? get confirmedLevel => level;
   set confirmedLevel(String? value) => level = value;
+
+  // Full scorer breakdown captured at S10 (band, degrade, clean ratios,
+  // recommended level). `level` stays the final/confirmed value.
+  FitnessTestScoringResult? levelAssessment;
 
   String? issueAnswer;
   bool medicalClear = false;

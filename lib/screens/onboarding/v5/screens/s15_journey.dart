@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:vika/models/exercise_definition.dart';
 import 'package:vika/models/exercise_lookup.dart';
 import '../../../../services/recommendation/models/plan.dart';
 import '../../../../services/recommendation/recommendation_service.dart';
@@ -118,7 +119,7 @@ class _S15JourneyState extends State<S15Journey> {
                     child: V5ScreenHeader(
                       eyebrow: 'Hành trình',
                       title: loading
-                          ? 'Vika đang dệt\nlộ trình…'
+                          ? 'Vika đang tạo\nlộ trình…'
                           : hasPlan
                               ? '${weeks.length} tuần\nphía trước.'
                               : 'Chưa tải được\nlộ trình.',
@@ -171,7 +172,7 @@ class _S15JourneyState extends State<S15Journey> {
           },
         ),
         V5PillCTA(
-          label: 'Sẵn sàng bắt đầu',
+          label: 'Bắt đầu hành trình',
           enabled: true,
           onTap: widget.onNext,
           bottom: 32 + bottomInset,
@@ -193,14 +194,14 @@ class _S15JourneyState extends State<S15Journey> {
         headline: week.isDeloadWeek
             ? 'Giảm tải để cơ thể hồi phục'
             : week.weekNumber == 1
-                ? 'Bắt đầu chắc và đúng form'
-                : 'Tăng dần mục tiêu trong tuần này',
+                ? 'Khởi đầu chắc chắn, đúng form ngay từ đầu'
+                : 'Nâng dần độ khó cho tuần này',
         feeling: week.isDeloadWeek
-            ? 'Tuần này nhẹ hơn có chủ đích. Cơ thể được hồi lại trước khi kiểm tra tiến độ.'
-            : 'Bài tập giữ ổn định, chỉ tăng lượng vừa đủ để bạn thấy tiến bộ mà không bị quá sức.',
+            ? 'Tuần này nhẹ hơn để cơ thể được hồi phục trước khi đánh giá tiến độ.'
+            : 'Bài tập giữ nguyên, chỉ tăng độ khó để bạn cảm thấy tiến bộ.',
         sessionCount: week.sessions.length,
         exercises:
-            exercises.isEmpty ? ['Vika đang chuẩn bị bài tập'] : exercises,
+            exercises.isEmpty ? ['Vika đang chuẩn bị các bài tập'] : exercises,
         tag: week.isDeloadWeek ? 'Phục hồi' : 'Tuần ${week.weekNumber}',
       );
     }).toList();
@@ -216,8 +217,8 @@ class _S15JourneyState extends State<S15Journey> {
               : week <= 3
                   ? 'Nền tảng'
                   : 'Phát triển',
-          headline: 'Đang ghép bài tập phù hợp',
-          feeling: 'Vika đang đọc hồ sơ, vùng đau và lịch tập của bạn.',
+          headline: 'Đang lắp ghép các bài tập phù hợp',
+          feeling: 'Vika đang xem xét hồ sơ, vùng bị đau và lịch tập của bạn.',
           sessionCount: p.freq,
           exercises: const [
             'Đang tạo bài tập',
@@ -369,7 +370,7 @@ class _RetryPanel extends StatelessWidget {
                 ),
                 const SizedBox(height: V5.space2),
                 Text(
-                  'Bạn vẫn xem được preview, nhưng tiến độ sẽ không sync.',
+                  'Bạn vẫn xem được lộ trình, nhưng sẽ không được lưu lại.',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: V5.caption(context, color: V5.inkSoft),
@@ -967,7 +968,7 @@ String _formatVolume(VolumePrescription volume) {
 
 String _exerciseLabel(String id) {
   final definition = lookupExerciseDefinition(id);
-  if (definition != null) return definition.name;
+  if (definition != null) return definition.displayName;
   return switch (id) {
     'squat_bw' => 'Squat',
     'wall_pushup' || 'wall_pushup_assessment' => 'Wall Push-Up',

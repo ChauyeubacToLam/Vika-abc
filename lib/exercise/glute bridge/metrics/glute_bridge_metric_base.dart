@@ -1,3 +1,5 @@
+// ignore_for_file: annotate_overrides
+
 /* =========================================================================
    GluteBridgeMetricBase — Abstract base for all glute-bridge form metrics.
 
@@ -82,7 +84,9 @@ class RepContext {
 /* =========================================================================
    GluteBridgeMetricBase — Interface every glute-bridge metric implements.
    ========================================================================= */
-abstract class GluteBridgeMetricBase {
+abstract class GluteBridgeMetricBase with FaultMetricDebugSource {
+  int faultsCount = 0;
+
   String get name;
 
   /// Called every frame while state == bottom (setup coaching).
@@ -99,6 +103,11 @@ abstract class GluteBridgeMetricBase {
 
   /// Reset all internal state for the next rep.
   void reset();
+
+  void resetAndCountFault() {
+    if (faults.isNotEmpty) faultsCount++;
+    reset();
+  }
 
   /// Called on every glute-bridge state transition.
   void onStateTransition(

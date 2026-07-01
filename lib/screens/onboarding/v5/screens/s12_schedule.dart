@@ -52,10 +52,10 @@ class _S12ScheduleState extends State<S12Schedule> {
   String get _reason {
     final level = widget.data.level ?? 'beginner';
     return level == 'advanced'
-        ? 'Cường độ cao cho người tập đều'
+        ? 'Dành cho người có thể tập đều đặn'
         : level == 'intermediate'
-            ? 'Tốt cho mục tiêu của bạn'
-            : 'Phù hợp với mức bắt đầu';
+            ? 'Phù hợp với mục tiêu của bạn'
+            : 'Hợp lý để bắt đầu';
   }
 
   int get _minutesPerSession {
@@ -100,7 +100,7 @@ class _S12ScheduleState extends State<S12Schedule> {
               children: [
                 V5ScreenHeader(
                   eyebrow: 'Lịch tập',
-                  title: 'Bạn rảnh\nlúc nào?',
+                  title: 'Bạn thường tập\nlúc nào?',
                   size: r.isShort ? V5HeaderSize.medium : V5HeaderSize.large,
                 ),
                 SizedBox(height: r.pick(cozy: V5.space16, short: V5.space10)),
@@ -121,7 +121,7 @@ class _S12ScheduleState extends State<S12Schedule> {
                   children: [
                     Expanded(
                       child: Text(
-                        'CHỌN BUỔI TẬP',
+                        'CHỌN GIỜ TẬP',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: V5.eyebrow(context, color: V5.inkSoft),
@@ -188,8 +188,8 @@ class _S12ScheduleState extends State<S12Schedule> {
           ),
         ),
         V5PillCTA(
-          label: 'Khoá lịch tập',
-          disabledLabel: 'Chạm để chọn buổi tập',
+          label: 'Lịch tập chưa được chọn',
+          disabledLabel: 'Chọn giờ tập để tiếp tục',
           enabled: sessions.length >= 2,
           onTap: widget.onNext,
           bottom: 32 + r.viewPadding.bottom,
@@ -292,7 +292,7 @@ class _RecommendationStrip extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'TUẦN CỦA BẠN',
+                      'LỊCH TẬP CỦA BẠN THEO TUẦN',
                       style: V5.eyebrow(context, color: V5.invInkFaint),
                     ),
                     const SizedBox(height: 8),

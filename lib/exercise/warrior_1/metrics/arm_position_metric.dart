@@ -24,17 +24,17 @@ import '../../../utils/debouncer.dart';
 
 class ArmPositionConfig {
   /// Sub-A: arms considered "raised enough" to bother checking the elbow.
-  static const double RAISED_GATE = 30.0;
+  static const double RAISED_GATE = 45.0;
 
   /// Sub-A: above this from vertical = arms too low.
-  static const double TOO_LOW = 40.0;
+  static const double TOO_LOW = 55.0;
 
   /// Sub-A good band.
   static const double GOOD_MIN = 0.0;
-  static const double GOOD_MAX = 40.0;
+  static const double GOOD_MAX = 55.0;
 
   /// Sub-B: below this = elbow too bent.
-  static const double ELBOW_TOO_BENT = 150.0;
+  static const double ELBOW_TOO_BENT = 135.0;
 }
 
 class ArmPositionMetric extends WarriorOneMetricBase {
@@ -50,15 +50,19 @@ class ArmPositionMetric extends WarriorOneMetricBase {
 
   bool _lowInstructionSet = false;
   bool _elbowInstructionSet = false;
+  bool _isFaultingNow = false;
 
   @override
   List<FaultRecord> get faults => _faults;
+  @override
+  bool get isFaultingNow => _isFaultingNow;
 
   @override
   Map<String, dynamic> get debugData => _debugData;
 
   @override
   void update(HoldContext ctx) {
+    _isFaultingNow = false;
     if (ctx.holdState != WarriorOneState.hold) return;
 
     final double armV = ctx.armVerticalAngle;
@@ -73,6 +77,7 @@ class ArmPositionMetric extends WarriorOneMetricBase {
     final bool tooLow =
         _tooLowDebouncer.update(armV > ArmPositionConfig.TOO_LOW);
     if (tooLow) {
+      _isFaultingNow = true;
       ctx.resultIssues.feedback['arms'] = 'Vươn tay cao hơn nhé!';
       if (!_lowInstructionSet) {
         ctx.resultIssues.addInstruction(
@@ -94,6 +99,7 @@ class ArmPositionMetric extends WarriorOneMetricBase {
     final bool elbowBent =
         _elbowDebouncer.update(elbow < ArmPositionConfig.ELBOW_TOO_BENT);
     if (elbowBent) {
+      _isFaultingNow = true;
       ctx.resultIssues.feedback['arms'] = 'Duỗi thẳng khuỷu tay nhé!';
       if (!_elbowInstructionSet) {
         ctx.resultIssues
@@ -113,7 +119,7 @@ class ArmPositionMetric extends WarriorOneMetricBase {
         type: type,
         message: message,
         voiceMessage: voiceMessage,
-        affectsForm: false, // coaching only
+        affectsForm: false,
       ));
     }
   }
@@ -126,5 +132,6 @@ class ArmPositionMetric extends WarriorOneMetricBase {
     _elbowDebouncer.reset();
     _lowInstructionSet = false;
     _elbowInstructionSet = false;
+    _isFaultingNow = false;
   }
 }

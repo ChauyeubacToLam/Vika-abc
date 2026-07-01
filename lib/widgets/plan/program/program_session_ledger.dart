@@ -19,15 +19,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../data/library_mock.dart';
 import '../../../data/program_mock.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/responsive.dart';
 import '../../../theme/vf_theme.dart';
+import '../../ivory/atoms.dart';
 import '../plan_typography.dart';
 import 'program_atoms.dart';
-
-/// Left stat-gutter width — sized for a two-digit italic form numeral.
-const double _kGutter = 56;
 
 Color _formColor(int? form, VikaColors c) {
   if (form == null) return c.inkGhost;
@@ -62,23 +61,26 @@ class ProgramSessionLedger extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
+
+    // Every entry — including the elevated NEXT panel — is separated by the
+    // page's hairline rule, so the ledger reads as one consistent editorial
+    // list. The panel's own vertical padding keeps the rule off its border.
+    final items = <Widget>[
+      for (final s in block.sessions) _entryFor(s),
+      if (retest != null)
+        _RetestEntry(
+          retest: retest!,
+          unlocked: retestUnlocked,
+          onStart: onStartRetest,
+        ),
+    ];
+
     final entries = <Widget>[];
-    void add(Widget w) {
-      if (entries.isNotEmpty) {
+    for (var i = 0; i < items.length; i++) {
+      if (i > 0) {
         entries.add(Container(height: 1, color: c.border));
       }
-      entries.add(w);
-    }
-
-    for (final s in block.sessions) {
-      add(_entryFor(s));
-    }
-    if (retest != null) {
-      add(_RetestEntry(
-        retest: retest!,
-        unlocked: retestUnlocked,
-        onStart: onStartRetest,
-      ));
+      entries.add(items[i]);
     }
 
     return Column(
@@ -108,56 +110,132 @@ class ProgramSessionLedger extends StatelessWidget {
           expanded: expandedIndex == s.index,
           onTap: () => onToggleExpand(s.index),
         ),
-      ProgramStatus.current => _NextEntry(session: s, onStart: onStartNext),
+      ProgramStatus.current =>
+        _NextEntry(session: s, onStart: onStartNext),
       ProgramStatus.upcoming => _UpcomingEntry(session: s),
     };
   }
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Shared entry scaffold — left gutter marker + right body
+// Shared entry scaffold — full width (no left gutter). Status reads
+// inline via the header dot + the eyebrow; nothing is skewed right.
 // ═══════════════════════════════════════════════════════════════
 
 class _Entry extends StatelessWidget {
-  const _Entry({
-    required this.marker,
-    required this.body,
-    this.onTap,
-    this.vertical = 18,
-  });
+  const _Entry({required this.child, this.onTap});
 
-  final Widget marker;
-  final Widget body;
+  final Widget child;
   final VoidCallback? onTap;
-  final double vertical;
 
   @override
   Widget build(BuildContext context) {
-    final row = Padding(
-      padding: EdgeInsets.symmetric(vertical: vertical),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(width: _kGutter, child: marker),
-          const SizedBox(width: 18),
-          Expanded(child: body),
-        ],
-      ),
+    final padded = Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: child,
     );
-    if (onTap == null) return row;
+    if (onTap == null) return padded;
     return GestureDetector(
       onTap: () {
         HapticFeedback.selectionClick();
         onTap!();
       },
       behavior: HitTestBehavior.opaque,
-      child: row,
+      child: padded,
+    );
+  }
+}
+
+/// Inline status dot that opens each entry's header — replaces the old 56px
+/// marker gutter. Tiny, so the eyebrow sits right beside it.
+class _StatusDot extends StatelessWidget {
+  const _StatusDot({required this.status});
+  final ProgramStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    switch (status) {
+      case ProgramStatus.done:
+        return Container(
+          width: 9,
+          height: 9,
+          decoration: BoxDecoration(
+            color: c.yellow,
+            shape: BoxShape.circle,
+            border:
+                Border.all(color: c.ink.withValues(alpha: 0.14), width: 1),
+          ),
+        );
+      case ProgramStatus.current:
+        return Container(
+          width: 9,
+          height: 9,
+          decoration: BoxDecoration(
+            color: c.yellow,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(color: c.yellow.withValues(alpha: 0.5), blurRadius: 7),
+            ],
+          ),
+        );
+      case ProgramStatus.upcoming:
+        return Container(
+          width: 9,
+          height: 9,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: c.borderHi, width: 1.4),
+          ),
+        );
+    }
+  }
+}
+
+/// The eyebrow line that opens every entry: status dot + label, with an
+/// optional trailing widget (form stat / count) pinned right.
+class _EntryHeader extends StatelessWidget {
+  const _EntryHeader({
+    required this.status,
+    required this.label,
+    required this.labelColor,
+    this.trailing,
+  });
+
+  final ProgramStatus status;
+  final String label;
+  final Color labelColor;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        _StatusDot(status: status),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: beVietnamPro(
+              size: 10.5,
+              weight: FontWeight.w800,
+              letterSpacing: 1.6,
+              color: labelColor,
+              fontFeatures: VikaIvoryMain.tabularFigures,
+            ),
+          ),
+        ),
+        if (trailing != null) ...[const SizedBox(width: 12), trailing!],
+      ],
     );
   }
 }
 
 // ═══════════════════════════════════════════════════════════════
-// DONE — drop-cap form numeral + recap, expands to per-exercise bars
+// DONE — full-width recap with an inline form stat, expands to tiles
 // ═══════════════════════════════════════════════════════════════
 
 class _DoneEntry extends StatelessWidget {
@@ -177,32 +255,24 @@ class _DoneEntry extends StatelessWidget {
     final r = Responsive.of(context);
     return _Entry(
       onTap: onTap,
-      marker: _DropCapForm(form: session.formScore),
-      body: Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 3),
-            child: Text(
-              session.label.toUpperCase(),
-              style: beVietnamPro(
-                size: 10.5,
-                weight: FontWeight.w800,
-                letterSpacing: 1.6,
-                color: c.inkSoft,
-                fontFeatures: VikaIvoryMain.tabularFigures,
-              ),
-            ),
+          _EntryHeader(
+            status: ProgramStatus.done,
+            label: session.label.toUpperCase(),
+            labelColor: c.inkSoft,
+            trailing: _FormStat(form: session.formScore),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 12),
           Text(
             session.title.isEmpty ? session.label : session.title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: beVietnamPro(
-              size: r.sp(18),
+              size: r.sp(20),
               weight: FontWeight.w800,
-              letterSpacing: -0.5,
+              letterSpacing: -0.6,
               color: c.ink,
             ),
           ),
@@ -244,29 +314,19 @@ class _DoneEntry extends StatelessWidget {
   }
 }
 
-class _DropCapForm extends StatelessWidget {
-  const _DropCapForm({required this.form});
+/// Compact inline form stat (right of the DONE header) — color-coded italic
+/// numeral + tiny label. Replaces the old left drop-cap.
+class _FormStat extends StatelessWidget {
+  const _FormStat({required this.form});
   final int? form;
 
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(
-          form?.toString() ?? '—',
-          style: frauncesItalic(
-            size: 42,
-            weight: FontWeight.w800,
-            letterSpacing: -2.4,
-            height: 0.82,
-            color: _formColor(form, c),
-            fontFeatures: VikaIvoryMain.tabularFigures,
-          ),
-        ),
-        const SizedBox(height: 6),
         Text(
           'PHONG ĐỘ',
           style: beVietnamPro(
@@ -274,6 +334,18 @@ class _DropCapForm extends StatelessWidget {
             weight: FontWeight.w800,
             letterSpacing: 1.2,
             color: c.inkFaint,
+          ),
+        ),
+        const SizedBox(width: 7),
+        Text(
+          form?.toString() ?? '—',
+          style: frauncesItalic(
+            size: 30,
+            weight: FontWeight.w800,
+            letterSpacing: -1.6,
+            height: 0.9,
+            color: _formColor(form, c),
+            fontFeatures: VikaIvoryMain.tabularFigures,
           ),
         ),
       ],
@@ -319,14 +391,11 @@ class _Expansion extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = VikaColors.of(context);
     return Padding(
       padding: const EdgeInsets.only(top: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(height: 1, color: c.border),
-          const SizedBox(height: 10),
           for (final ex in session.exercises) _ExerciseFormRow(exercise: ex),
         ],
       ),
@@ -342,182 +411,166 @@ class _ExerciseFormRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
     final f = exercise.formScore;
+    final tone = _formColor(f, c);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(
-        children: [
-          _AiDot(active: exercise.hasAi),
-          const SizedBox(width: 10),
-          SizedBox(
-            width: 76,
-            child: Text(
-              exercise.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: beVietnamPro(
-                size: 12.5,
-                weight: FontWeight.w700,
-                letterSpacing: -0.1,
-                color: c.inkSoft,
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
+        decoration: _exerciseTileDecoration(c),
+        child: Row(
+          children: [
+            SessionExerciseThumb(
+              asset: exerciseThumbnailForId(exercise.exerciseId),
+              size: 48,
+              radius: 13,
+              showAi: exercise.hasAi,
+            ),
+            const SizedBox(width: 13),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    exercise.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: beVietnamPro(
+                      size: 14,
+                      weight: FontWeight.w800,
+                      letterSpacing: -0.3,
+                      color: c.ink,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Slim form bar — the recap of how the rep quality scored.
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(3),
+                    child: Container(
+                      height: 5,
+                      color: c.border,
+                      child: FractionallySizedBox(
+                        alignment: Alignment.centerLeft,
+                        widthFactor: f == null ? 0 : (f.clamp(0, 100)) / 100,
+                        child: Container(color: tone),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(3),
-              child: Container(
-                height: 5,
-                color: c.border,
-                child: FractionallySizedBox(
-                  alignment: Alignment.centerLeft,
-                  widthFactor: f == null ? 0 : (f.clamp(0, 100)) / 100,
-                  child: Container(color: _formColor(f, c)),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          SizedBox(
-            width: 22,
-            child: Text(
-              f?.toString() ?? '—',
-              textAlign: TextAlign.right,
-              style: beVietnamPro(
-                size: 12.5,
-                weight: FontWeight.w800,
-                letterSpacing: -0.2,
-                color: f == null ? c.inkGhost : c.ink,
-                fontFeatures: VikaIvoryMain.tabularFigures,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// NEXT — the focal entry (gold marker + accents, no box)
-// ═══════════════════════════════════════════════════════════════
-
-class _NextEntry extends StatefulWidget {
-  const _NextEntry({required this.session, required this.onStart});
-  final PlanSession session;
-  final VoidCallback onStart;
-
-  @override
-  State<_NextEntry> createState() => _NextEntryState();
-}
-
-class _NextEntryState extends State<_NextEntry> {
-  bool _pressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = VikaColors.of(context);
-    final r = Responsive.of(context);
-    final session = widget.session;
-    final aiCount = session.exercises.where((e) => e.hasAi).length;
-    final metaBits = <String>[
-      if (session.durationLabel.isNotEmpty) '~${session.durationLabel}',
-      '${session.exerciseCount} bài',
-      if (aiCount > 0) '$aiCount có AI',
-    ];
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        widget.onStart();
-      },
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) => setState(() => _pressed = false),
-      onTapCancel: () => setState(() => _pressed = false),
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedScale(
-        scale: _pressed ? 0.99 : 1.0,
-        duration: const Duration(milliseconds: 120),
-        curve: Curves.easeOut,
-        child: _Entry(
-          vertical: 20,
-          marker: const _PlayMarker(),
-          body: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Text(
-                  'TIẾP THEO · ${session.label.toUpperCase()}',
-                  style: beVietnamPro(
-                    size: 10.5,
+            const SizedBox(width: 12),
+            // Form score as a contained stat — color-coded, the one number
+            // that matters for a completed exercise.
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  f?.toString() ?? '—',
+                  style: frauncesItalic(
+                    size: 22,
                     weight: FontWeight.w800,
-                    letterSpacing: 1.6,
-                    color: c.yellow,
+                    letterSpacing: -1.0,
+                    height: 0.9,
+                    color: f == null ? c.inkGhost : tone,
                     fontFeatures: VikaIvoryMain.tabularFigures,
                   ),
                 ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                session.title.isEmpty ? session.label : session.title,
-                style: frauncesItalic(
-                  size: r.sp(24),
-                  weight: FontWeight.w800,
-                  letterSpacing: -1.0,
-                  height: 1.0,
-                  color: c.ink,
+                const SizedBox(height: 2),
+                Text(
+                  'ĐIỂM',
+                  style: beVietnamPro(
+                    size: 7.5,
+                    weight: FontWeight.w800,
+                    letterSpacing: 1.0,
+                    color: c.inkFaint,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                metaBits.join('  ·  '),
-                style: beVietnamPro(
-                  size: 12.5,
-                  weight: FontWeight.w600,
-                  letterSpacing: -0.1,
-                  color: c.inkFaint,
-                  fontFeatures: VikaIvoryMain.tabularFigures,
-                ),
-              ),
-              const SizedBox(height: 14),
-              for (final ex in session.exercises) _PreviewRow(exercise: ex),
-              const SizedBox(height: 12),
-              ProgramCoachNote(text: session.coachNote, size: 13),
-              const SizedBox(height: 16),
-              _StartCue(label: 'Bắt đầu ${session.label}'),
-            ],
-          ),
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _PlayMarker extends StatelessWidget {
-  const _PlayMarker();
+// ═══════════════════════════════════════════════════════════════
+// NEXT — the focal entry: the full breakdown of today's session.
+// The single launch action lives in the hero's halo CTA, so this
+// entry carries NO button (it was the duplicate "second play").
+// ═══════════════════════════════════════════════════════════════
+
+class _NextEntry extends StatelessWidget {
+  const _NextEntry({required this.session, required this.onStart});
+  final PlanSession session;
+  final VoidCallback onStart;
 
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(top: 2),
-      child: Align(
-        alignment: Alignment.topLeft,
-        child: Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            color: c.yellow,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: c.yellow.withValues(alpha: 0.35),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
+    final r = Responsive.of(context);
+    final aiCount = session.exercises.where((e) => e.hasAi).length;
+    final metaBits = <String>[
+      if (session.durationLabel.isNotEmpty) '~${session.durationLabel}',
+      '${session.exerciseCount} bài',
+      if (aiCount > 0) '$aiCount có AI',
+    ];
+    // The one focal session is an elevated, self-contained card — the active
+    // block reads as a distinct premium object against the flat editorial
+    // done/upcoming entries around it. Everything for today lives in here:
+    // the breakdown of exercises and, at the end, the start button.
+    return _Entry(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: c.bgRaised,
+          borderRadius: BorderRadius.circular(18),
+          // Same 1px c.border hairline the section header + dividers use, so
+          // the panel belongs to the Plan's editorial language instead of
+          // floating like a catalog card. No drop shadow — the page is flat.
+          border: Border.all(color: c.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _EntryHeader(
+              status: ProgramStatus.current,
+              label: 'TIẾP THEO · ${session.label.toUpperCase()}',
+              labelColor: c.yellow,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              session.title.isEmpty ? session.label : session.title,
+              style: frauncesItalic(
+                size: r.sp(27),
+                weight: FontWeight.w800,
+                letterSpacing: -1.2,
+                height: 1.0,
+                color: c.ink,
               ),
-            ],
-          ),
-          child: Icon(Icons.play_arrow_rounded, size: 20, color: c.yellowInk),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              metaBits.join('  ·  '),
+              style: beVietnamPro(
+                size: 12.5,
+                weight: FontWeight.w600,
+                letterSpacing: -0.1,
+                color: c.inkFaint,
+                fontFeatures: VikaIvoryMain.tabularFigures,
+              ),
+            ),
+            const SizedBox(height: 16),
+            for (final ex in session.exercises) _PreviewRow(exercise: ex),
+            const SizedBox(height: 8),
+            Container(height: 1, color: c.border),
+            const SizedBox(height: 12),
+            ProgramCoachNote(text: session.coachNote, size: 13),
+            const SizedBox(height: 16),
+            _StartCue(label: 'Bắt đầu ${session.label}', onTap: onStart),
+          ],
         ),
       ),
     );
@@ -532,35 +585,73 @@ class _PreviewRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(
-        children: [
-          _AiDot(active: exercise.hasAi),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              exercise.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: beVietnamPro(
-                size: 13,
-                weight: FontWeight.w700,
-                letterSpacing: -0.1,
-                color: c.ink,
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
+        decoration: _exerciseTileDecoration(c),
+        child: Row(
+          children: [
+            SessionExerciseThumb(
+              asset: exerciseThumbnailForId(exercise.exerciseId),
+              size: 52,
+              radius: 13,
+              showAi: exercise.hasAi,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                exercise.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: beVietnamPro(
+                  size: 15,
+                  weight: FontWeight.w800,
+                  letterSpacing: -0.3,
+                  color: c.ink,
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 10),
-          Text(
-            exercise.volumeLabel,
-            style: beVietnamPro(
-              size: 12,
-              weight: FontWeight.w600,
-              color: c.inkFaint,
-              fontFeatures: VikaIvoryMain.tabularFigures,
-            ),
-          ),
-        ],
+            const SizedBox(width: 10),
+            _VolumeChip(label: exercise.volumeLabel),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Shared exercise-chip surface — a soft warm inset (powder) so each exercise
+/// reads as a distinct item inside the session card without stacking a second
+/// shadow against the card's own elevation.
+BoxDecoration _exerciseTileDecoration(VikaColors c) => BoxDecoration(
+      color: c.powder,
+      borderRadius: BorderRadius.circular(14),
+    );
+
+/// Right-anchored prescription pill, e.g. "3 × 12". Tabular figures keep the
+/// numerals aligned tile to tile.
+class _VolumeChip extends StatelessWidget {
+  const _VolumeChip({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+      decoration: BoxDecoration(
+        color: c.bgRaised,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        label,
+        style: beVietnamPro(
+          size: 12,
+          weight: FontWeight.w800,
+          letterSpacing: -0.1,
+          color: c.inkSoft,
+          fontFeatures: VikaIvoryMain.tabularFigures,
+        ),
       ),
     );
   }
@@ -568,32 +659,90 @@ class _PreviewRow extends StatelessWidget {
 
 /// Quiet start affordance inside the NEXT entry — the loud halo CTA is the
 /// hero's; this is the subordinate launch point.
-class _StartCue extends StatelessWidget {
-  const _StartCue({required this.label});
+class _StartCue extends StatefulWidget {
+  const _StartCue({required this.label, this.onTap});
   final String label;
+  final VoidCallback? onTap;
+
+  @override
+  State<_StartCue> createState() => _StartCueState();
+}
+
+class _StartCueState extends State<_StartCue> {
+  bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
     final c = VikaColors.of(context);
-    return Row(
-      children: [
-        Text(
-          label,
-          style: beVietnamPro(
-            size: 14,
-            weight: FontWeight.w800,
-            letterSpacing: -0.2,
+    // A substantial filled pill — ink body with a yellow knob. The hero owns
+    // the loud yellow halo CTA; this caps the session card so starting reads
+    // contextually at the end of the breakdown.
+    return GestureDetector(
+      onTap: widget.onTap == null
+          ? null
+          : () {
+              HapticFeedback.lightImpact();
+              widget.onTap!();
+            },
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedScale(
+        scale: _pressed ? 0.98 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+        child: Container(
+          height: 54,
+          padding: const EdgeInsets.fromLTRB(20, 0, 7, 0),
+          decoration: BoxDecoration(
             color: c.ink,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: c.ink.withValues(alpha: 0.22),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  widget.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: beVietnamPro(
+                    size: 15,
+                    weight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                    color: c.invInk,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: c.yellow,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: c.yellow.withValues(alpha: 0.4),
+                      blurRadius: 14,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Icon(Icons.arrow_forward_rounded,
+                    size: 18, color: c.yellowInk),
+              ),
+            ],
           ),
         ),
-        const Spacer(),
-        Container(
-          width: 30,
-          height: 30,
-          decoration: BoxDecoration(color: c.ink, shape: BoxShape.circle),
-          child: Icon(Icons.arrow_forward_rounded, size: 16, color: c.yellow),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -611,42 +760,25 @@ class _UpcomingEntry extends StatelessWidget {
     final c = VikaColors.of(context);
     final r = Responsive.of(context);
     return _Entry(
-      marker: const Padding(
-        padding: EdgeInsets.only(top: 4),
-        child: Align(alignment: Alignment.topLeft, child: _RingMarker()),
-      ),
-      body: Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 3),
-            child: Row(
-              children: [
-                Text(
-                  session.label.toUpperCase(),
-                  style: beVietnamPro(
-                    size: 10.5,
-                    weight: FontWeight.w800,
-                    letterSpacing: 1.6,
-                    color: c.inkFaint,
-                    fontFeatures: VikaIvoryMain.tabularFigures,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  '${session.exerciseCount} bài · Sắp tới',
-                  style: beVietnamPro(
-                    size: 11,
-                    weight: FontWeight.w700,
-                    letterSpacing: 0.2,
-                    color: c.inkFaint,
-                    fontFeatures: VikaIvoryMain.tabularFigures,
-                  ),
-                ),
-              ],
+          _EntryHeader(
+            status: ProgramStatus.upcoming,
+            label: session.label.toUpperCase(),
+            labelColor: c.inkFaint,
+            trailing: Text(
+              '${session.exerciseCount} bài · Sắp tới',
+              style: beVietnamPro(
+                size: 11,
+                weight: FontWeight.w700,
+                letterSpacing: 0.2,
+                color: c.inkFaint,
+                fontFeatures: VikaIvoryMain.tabularFigures,
+              ),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 10),
           Text(
             session.title.isEmpty ? session.label : session.title,
             maxLines: 1,
@@ -666,23 +798,6 @@ class _UpcomingEntry extends StatelessWidget {
             maxLines: 2,
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _RingMarker extends StatelessWidget {
-  const _RingMarker();
-
-  @override
-  Widget build(BuildContext context) {
-    final c = VikaColors.of(context);
-    return Container(
-      width: 13,
-      height: 13,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: c.borderHi, width: 1.4),
       ),
     );
   }
@@ -708,39 +823,33 @@ class _RetestEntry extends StatelessWidget {
     final c = VikaColors.of(context);
     final r = Responsive.of(context);
     return _Entry(
-      vertical: 20,
-      onTap: unlocked ? onStart : null,
-      marker: Padding(
-        padding: const EdgeInsets.only(top: 2),
-        child: Align(
-          alignment: Alignment.topLeft,
-          child: Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: c.yellowGhost,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(Icons.flag_rounded, size: 19, color: c.yellow),
-          ),
-        ),
-      ),
-      body: Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Text(
-              'CHẶNG CUỐI',
-              style: beVietnamPro(
-                size: 10.5,
-                weight: FontWeight.w800,
-                letterSpacing: 1.6,
-                color: c.yellow,
+          Row(
+            children: [
+              Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  color: c.yellowGhost,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.flag_rounded, size: 14, color: c.yellow),
               ),
-            ),
+              const SizedBox(width: 10),
+              Text(
+                'CHẶNG CUỐI',
+                style: beVietnamPro(
+                  size: 10.5,
+                  weight: FontWeight.w800,
+                  letterSpacing: 1.6,
+                  color: c.yellow,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 12),
           Text(
             retest.title,
             maxLines: 1,
@@ -757,7 +866,10 @@ class _RetestEntry extends StatelessWidget {
           ProgramCoachNote(text: retest.coachNote, soft: true, size: 12.5),
           const SizedBox(height: 14),
           if (unlocked)
-            _StartCue(label: 'Bắt đầu ${retest.title.toLowerCase()}')
+            _StartCue(
+              label: 'Bắt đầu ${retest.title.toLowerCase()}',
+              onTap: onStart,
+            )
           else
             Row(
               children: [
@@ -784,55 +896,3 @@ class _RetestEntry extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// AI DOT — yellow filled dot with faint outer ring
-// ═══════════════════════════════════════════════════════════════
-
-class _AiDot extends StatelessWidget {
-  const _AiDot({required this.active});
-  final bool active;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = VikaColors.of(context);
-    if (!active) {
-      return SizedBox(
-        width: 12,
-        height: 12,
-        child: Center(
-          child: Container(
-            width: 5,
-            height: 5,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: c.inkGhost, width: 1),
-            ),
-          ),
-        ),
-      );
-    }
-    return SizedBox(
-      width: 12,
-      height: 12,
-      child: Center(
-        child: Container(
-          width: 11,
-          height: 11,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border:
-                Border.all(color: c.yellow.withValues(alpha: 0.5), width: 1),
-          ),
-          child: Center(
-            child: Container(
-              width: 6,
-              height: 6,
-              decoration:
-                  BoxDecoration(color: c.yellow, shape: BoxShape.circle),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}

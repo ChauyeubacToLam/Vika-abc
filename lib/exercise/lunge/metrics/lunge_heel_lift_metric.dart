@@ -19,10 +19,10 @@ import '../../../utils/debouncer.dart';
 
 class LungeHeelLiftConfig {
   /// Good heel contact — ratio below this is fine.
-  static const double WARNING_THRESHOLD = 0.05;
+  static const double WARNING_THRESHOLD = 0.10;
 
   /// Warning zone — heel slightly lifting.
-  static const double BAD_THRESHOLD = 0.08;
+  static const double BAD_THRESHOLD = 0.16;
 }
 
 class LungeHeelLiftMetric extends LungeMetricBase {
@@ -33,8 +33,8 @@ class LungeHeelLiftMetric extends LungeMetricBase {
   final Map<String, dynamic> _debugData = {};
 
   // 10 frames ~333ms at 30fps — prevents false triggers from floor jitter
-  final Debouncer _heelWarnDebouncer = Debouncer(requiredFrames: 10);
-  final Debouncer _heelBadDebouncer = Debouncer(requiredFrames: 10);
+  final Debouncer _heelWarnDebouncer = Debouncer(requiredFrames: 12);
+  final Debouncer _heelBadDebouncer = Debouncer(requiredFrames: 12);
 
   /// Prevent instruction spam — only set coaching once per rep.
   bool _instructionSet = false;
@@ -102,6 +102,7 @@ class LungeHeelLiftMetric extends LungeMetricBase {
         type: 'Feet',
         message: message,
         voiceMessage: voiceMessage,
+        priority: 0,
         // Heel lift DOES affect form for lunges (unlike squat where it's informational)
         affectsForm: true,
       ));

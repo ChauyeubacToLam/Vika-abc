@@ -1,3 +1,5 @@
+// ignore_for_file: annotate_overrides
+
 /* =========================================================================
    JJMetricBase — Abstract base for all jumping jack form metrics.
    
@@ -88,7 +90,9 @@ class RepContext {
 /* =========================================================================
    JJMetricBase — Interface every jumping jack metric implements.
    ========================================================================= */
-abstract class JJMetricBase {
+abstract class JJMetricBase with FaultMetricDebugSource {
+  int faultsCount = 0;
+
   /// Human-readable name for debug/logging.
   String get name;
 
@@ -104,6 +108,11 @@ abstract class JJMetricBase {
 
   /// Reset all internal state for the next rep.
   void reset();
+
+  void resetAndCountFault() {
+    if (faults.isNotEmpty) faultsCount++;
+    reset();
+  }
 
   /// Called when JJ state transitions (e.g. closed → open).
   /// Override in metrics that care about transitions (tempo).

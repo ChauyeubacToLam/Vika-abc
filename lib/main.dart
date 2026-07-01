@@ -11,9 +11,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'services/analytics_service.dart';
+
+import 'debug/debug_types.dart';
 import 'exercise/exercise_base.dart';
 import 'models/exercise_definition.dart';
 import 'screens/auth/login_screen.dart';
@@ -23,7 +27,9 @@ import 'screens/exercise/exercise_experience_screen.dart';
 import 'screens/main_shell.dart';
 import 'screens/onboarding/v5/v5_onboarding_navigator.dart';
 import 'screens/plan_retest_screen.dart';
+import 'screens/reviewer/reviewer_plan_screen.dart';
 import 'screens/weekly_check_in_screen.dart';
+import 'services/catalog/catalog_source.dart';
 import 'services/recommendation/recommendation_service.dart';
 import 'theme/typography.dart';
 import 'theme/vf_theme.dart';
@@ -39,80 +45,215 @@ bool _hasSeenOnboarding = false;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final appConfig = await _loadAppConfig();
 
-  await Supabase.initialize(
-    url: appConfig.supabaseUrl,
-    anonKey: appConfig.supabaseAnonKey,
-  );
+  Object? startupError;
+  StackTrace? startupStackTrace;
 
-  await OrientationLock.portraitOnly();
+  try {
+    final appConfig = await _loadAppConfig();
+
+    await Supabase.initialize(
+      url: appConfig.supabaseUrl,
+      anonKey: appConfig.supabaseAnonKey,
+    );
+
+    // PostHog setup runs here, AFTER Supabase, and only configures the SDK —
+    // it does NOT start collecting. The SDK is set up opted-out; whether
+    // collection actually turns on is decided by the persisted consent flag in
+    // AnalyticsService.init() below, which can only enable for a user who
+    // already accepted the S06 policy on a prior launch.
+    await _setUpAnalytics(appConfig);
+  } catch (error, stackTrace) {
+    startupError = error;
+    startupStackTrace = stackTrace;
+  }
+
+  await _configureAppChrome();
+
+  if (startupError == null) {
+    await _loadDeviceCameras();
+    // Preload the bundled exercise catalog so synchronous volume lookups
+    // (launch + list cards) are ready before first paint, offline-safe.
+    await CatalogSource.instance.ensureLoaded();
+    _hasCompletedOnboarding = await _loadInitialOnboardingCompletion();
+    try {
+      _hasSeenOnboarding = await _readStoredOnboardingCompletion();
+    } catch (error, stackTrace) {
+      debugPrint('[Vika] Failed to read seen onboarding state: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      _hasSeenOnboarding = false;
+    }
+    runApp(const VikaApp());
+    return;
+  }
+
+  debugPrint('[Vika] Startup failed: $startupError');
+  debugPrintStack(stackTrace: startupStackTrace);
+  runApp(_VikaStartupErrorApp(error: startupError));
+}
+
+Future<void> _configureAppChrome() async {
+  try {
+    await OrientationLock.portraitOnly();
+  } catch (error, stackTrace) {
+    debugPrint('[Vika] Failed to lock portrait orientation: $error');
+    debugPrintStack(stackTrace: stackTrace);
+  }
+
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.light,
     ),
   );
-  _cameras = await availableCameras();
-  _hasCompletedOnboarding = await isOnboardingComplete();
-  _hasSeenOnboarding = await _readStoredOnboardingCompletion();
-  runApp(const VikaApp());
+}
+
+Future<void> _loadDeviceCameras() async {
+  try {
+    _cameras = await availableCameras();
+  } catch (error, stackTrace) {
+    debugPrint('[Vika] Failed to list cameras: $error');
+    debugPrintStack(stackTrace: stackTrace);
+    _cameras = const <CameraDescription>[];
+  }
+}
+
+Future<bool> _loadInitialOnboardingCompletion() async {
+  try {
+    return await isOnboardingComplete();
+  } catch (error, stackTrace) {
+    debugPrint('[Vika] Failed to read onboarding state: $error');
+    debugPrintStack(stackTrace: stackTrace);
+    return false;
+  }
 }
 
 class _AppConfig {
   const _AppConfig({
     required this.supabaseUrl,
     required this.supabaseAnonKey,
+    this.posthogApiKey,
+    required this.posthogHost,
   });
 
   final String supabaseUrl;
   final String supabaseAnonKey;
+
+  /// PostHog project token (publishable client key). Null/empty disables
+  /// analytics entirely — the app runs identically without it.
+  final String? posthogApiKey;
+
+  /// PostHog ingestion host. Defaults to the EU instance.
+  final String posthogHost;
 }
 
 Future<_AppConfig> _loadAppConfig() async {
   const defineSupabaseUrl = String.fromEnvironment('SUPABASE_URL');
   const defineSupabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+  const defineSupabaseKey = String.fromEnvironment('SUPABASE_KEY');
+  const definePosthogApiKey = String.fromEnvironment('POSTHOG_API_KEY');
+  const definePosthogHost = String.fromEnvironment('POSTHOG_HOST');
 
-  final env = await _loadBundledDotEnv();
-  final supabaseUrl = _firstNonEmpty(
+  final env = await _loadOptionalBundledDotEnv();
+  final supabaseUrl = _firstNonEmpty([
     defineSupabaseUrl,
     env['SUPABASE_URL'],
-  );
-  final supabaseAnonKey = _firstNonEmpty(
+  ]);
+  final supabaseAnonKey = _firstNonEmpty([
     defineSupabaseAnonKey,
+    defineSupabaseKey,
     env['SUPABASE_ANON_KEY'],
-  );
+    env['SUPABASE_KEY'],
+  ]);
 
   if (supabaseUrl == null || supabaseAnonKey == null) {
     throw StateError(
       'Missing Supabase config. Provide SUPABASE_URL and '
-      'SUPABASE_ANON_KEY in .env or with --dart-define.',
+      'SUPABASE_ANON_KEY with --dart-define or a bundled env file.',
     );
   }
+
+  // Optional — analytics stays off if unset. Default the host to the EU
+  // instance so a token-only config can never accidentally ship to US.
+  final posthogApiKey = _firstNonEmpty([
+    definePosthogApiKey,
+    env['POSTHOG_API_KEY'],
+  ]);
+  final posthogHost = _firstNonEmpty([
+        definePosthogHost,
+        env['POSTHOG_HOST'],
+      ]) ??
+      'https://eu.i.posthog.com';
 
   return _AppConfig(
     supabaseUrl: supabaseUrl,
     supabaseAnonKey: supabaseAnonKey,
+    posthogApiKey: posthogApiKey,
+    posthogHost: posthogHost,
   );
 }
 
-Future<Map<String, String>> _loadBundledDotEnv() async {
-  try {
-    final raw = await rootBundle.loadString('.env');
-    final values = <String, String>{};
-    for (final rawLine in raw.split('\n')) {
-      final line = rawLine.trim();
-      if (line.isEmpty || line.startsWith('#')) continue;
-      final separator = line.indexOf('=');
-      if (separator <= 0) continue;
-      final key = line.substring(0, separator).trim();
-      final value = line.substring(separator + 1).trim();
-      values[key] = _stripEnvQuotes(value);
-    }
-    return values;
-  } catch (_) {
-    return const {};
+/// Configures PostHog (EU, explicit events only) and aligns the analytics
+/// chokepoint to the persisted consent flag, then emits `app_open` (a hard
+/// no-op unless the user has consented). No token = analytics fully disabled.
+Future<void> _setUpAnalytics(_AppConfig config) async {
+  final apiKey = config.posthogApiKey;
+  if (apiKey == null || apiKey.isEmpty) {
+    // Still align the gate so capture()/identify() stay safe no-ops.
+    await AnalyticsService.instance.init();
+    return;
   }
+
+  final phConfig = PostHogConfig(apiKey)
+    ..host = config.posthogHost
+    // Start opted-out; AnalyticsService.init() enables only if consent persists.
+    ..optOut = true
+    // Explicit events only — no lifecycle autocapture, no screen/gesture
+    // autocapture (we never install PosthogObserver), no session replay.
+    ..captureApplicationLifecycleEvents = false
+    ..sessionReplay = false
+    ..debug = !kReleaseMode;
+  await Posthog().setup(phConfig);
+
+  await AnalyticsService.instance.init();
+  await AnalyticsService.instance.capture('app_open');
+}
+
+Future<Map<String, String>> _loadOptionalBundledDotEnv() async {
+  const envAssetPaths = <String>[
+    '.env',
+    'assets/env/app.env',
+  ];
+
+  for (final path in envAssetPaths) {
+    try {
+      final raw = await rootBundle.loadString(path);
+      final values = _parseDotEnv(raw);
+      if (values.isNotEmpty) return values;
+    } catch (_) {
+      // Optional local env asset. Missing files are expected on clean checkouts.
+    }
+  }
+
+  return const {};
+}
+
+Map<String, String> _parseDotEnv(String raw) {
+  final values = <String, String>{};
+  for (final rawLine in raw.split('\n')) {
+    var line = rawLine.trim();
+    if (line.isEmpty || line.startsWith('#')) continue;
+    if (line.startsWith('export ')) {
+      line = line.substring('export '.length).trimLeft();
+    }
+    final separator = line.indexOf('=');
+    if (separator <= 0) continue;
+    final key = line.substring(0, separator).trim();
+    final value = line.substring(separator + 1).trim();
+    if (key.isEmpty) continue;
+    values[key] = _stripEnvQuotes(value);
+  }
+  return values;
 }
 
 String _stripEnvQuotes(String value) {
@@ -125,12 +266,103 @@ String _stripEnvQuotes(String value) {
   return value;
 }
 
-String? _firstNonEmpty(String? first, String? second) {
-  final a = first?.trim();
-  if (a != null && a.isNotEmpty) return a;
-  final b = second?.trim();
-  if (b != null && b.isNotEmpty) return b;
+String? _firstNonEmpty(Iterable<String?> values) {
+  for (final value in values) {
+    final trimmed = value?.trim();
+    if (trimmed != null && trimmed.isNotEmpty) return trimmed;
+  }
   return null;
+}
+
+class _VikaStartupErrorApp extends StatelessWidget {
+  const _VikaStartupErrorApp({required this.error});
+
+  final Object error;
+
+  @override
+  Widget build(BuildContext context) {
+    const background = Color(0xFFFFFBF5);
+    const ink = Color(0xFF1D2939);
+    const muted = Color(0xFF667085);
+    const accent = Color(0xFF0E8F6E);
+
+    return MaterialApp(
+      title: 'Vika',
+      debugShowCheckedModeBanner: false,
+      home: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.dark,
+          statusBarBrightness: Brightness.light,
+        ),
+        child: Scaffold(
+          backgroundColor: background,
+          body: SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 440),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.fitness_center_rounded,
+                          color: accent,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        'Không thể khởi động Vika',
+                        style: TextStyle(
+                          color: ink,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Ứng dụng đang thiếu cấu hình máy chủ. Hãy thêm '
+                        'SUPABASE_URL và SUPABASE_ANON_KEY bằng --dart-define '
+                        'hoặc file .env được đóng gói trong build.',
+                        style: TextStyle(
+                          color: muted,
+                          fontSize: 15,
+                          height: 1.45,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      if (!kReleaseMode) ...[
+                        const SizedBox(height: 18),
+                        SelectableText(
+                          '$error',
+                          style: const TextStyle(
+                            color: Color(0xFFB42318),
+                            fontSize: 12,
+                            height: 1.35,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // Add this at the top level of the file for easy access everywhere
@@ -226,8 +458,35 @@ class UIRepLog {
    APP
    ========================================================================= */
 
-class VikaApp extends StatelessWidget {
+class VikaApp extends StatefulWidget {
   const VikaApp({super.key});
+
+  @override
+  State<VikaApp> createState() => _VikaAppState();
+}
+
+/// App-level lifecycle observer. Owns the single `app_backgrounded` event so it
+/// fires once per app-wide background, independent of which screen is on top
+/// (the dead ExerciseScreen's own observer is unrelated and must NOT be used).
+class _VikaAppState extends State<VikaApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      unawaited(AnalyticsService.instance.capture('app_backgrounded'));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -281,6 +540,12 @@ class VikaApp extends StatelessWidget {
             return MaterialPageRoute(
               builder: (_) => MagicLinkSentScreen(email: email),
             );
+          case '/reviewer-demo':
+            // Apple-reviewer read-only plan reveal between the demo-code prompt
+            // (S13) and the seeded home. Reads only; never generates/persists.
+            return MaterialPageRoute(
+              builder: (_) => const ReviewerPlanScreen(),
+            );
           case '/exercise':
             final args = settings.arguments;
             final launchArgs = args is ExerciseLaunchArgs
@@ -293,6 +558,7 @@ class VikaApp extends StatelessWidget {
                 workoutSessionId: launchArgs.workoutSessionId,
                 definition: launchArgs.definition,
                 catalogExerciseId: launchArgs.catalogExerciseId,
+                catalogInfo: launchArgs.catalogInfo,
                 prescription: launchArgs.prescription,
                 recommendationId: launchArgs.recommendationId,
                 weekNumber: launchArgs.weekNumber,
@@ -410,7 +676,8 @@ class _AppEntryGateState extends State<AppEntryGate> {
 
   String _friendlyAuthStreamError(Object error) {
     if (error is AuthException) {
-      final code = '${error.code ?? ''} ${error.statusCode ?? ''}'.toLowerCase();
+      final code =
+          '${error.code ?? ''} ${error.statusCode ?? ''}'.toLowerCase();
       final message = error.message.toLowerCase();
       if (code.contains('expired') ||
           code.contains('otp') ||
@@ -436,8 +703,7 @@ class _AppEntryGateState extends State<AppEntryGate> {
 
     // Finished onboarding before but no live session (e.g. signed out, then
     // relaunched): open straight on login instead of flashing S01.
-    if (widget.initialSeenOnboarding &&
-        supabase.auth.currentSession == null) {
+    if (widget.initialSeenOnboarding && supabase.auth.currentSession == null) {
       return _AppEntryState.login;
     }
     return _AppEntryState.onboarding;
@@ -454,6 +720,25 @@ class _AppEntryGateState extends State<AppEntryGate> {
     // Reacting here would tear the navigator down mid-signup and bounce the
     // user to the standalone login.
     if (_onboardingOwnsAuth) return;
+
+    // Analytics identity tracks the auth session: identify by Supabase UID on
+    // sign-in / session restore, reset on sign-out / deletion so the next user
+    // never inherits the previous distinct_id. All hard no-ops without consent;
+    // the UID is the only thing ever sent — never name or email.
+    switch (data.event.name) {
+      case 'signedIn':
+      case 'initialSession':
+        final uid = supabase.auth.currentUser?.id;
+        if (uid != null) {
+          unawaited(AnalyticsService.instance.identify(uid));
+        }
+        break;
+      case 'signedOut':
+      case 'userDeleted':
+        unawaited(AnalyticsService.instance.reset());
+        break;
+    }
+
     switch (data.event.name) {
       case 'signedIn':
       case 'initialSession':
@@ -481,7 +766,6 @@ class _AppEntryGateState extends State<AppEntryGate> {
   /// Re-resolves the entry state without flashing through `loading`. Stays
   /// in the current state if no transition is required — preserves the
   /// V5OnboardingNavigator's State (PageController + OnboardingData) when
-  /// the signup screen completes auth mid-flow.
   Future<void> _quietResolveEntryState() async {
     final session = supabase.auth.currentSession;
     if (session == null) {
@@ -674,7 +958,13 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    _exercise = _definition.createExercise();
+    // Volume comes from the bundled catalog (preloaded in main()). If the entry
+    // is missing, createExercise falls back to the class's own default target.
+    final catalog = CatalogSource.instance.lookup(_definition.id);
+    _exercise = _definition.createExercise(
+      reps: catalog?.baseReps,
+      seconds: catalog?.baseSeconds,
+    );
 
     _bannerController = AnimationController(
       duration: const Duration(milliseconds: 2500),
@@ -894,6 +1184,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
   /* -----------------------------------------------------------------------
      POSE PIPELINE
      ----------------------------------------------------------------------- */
+
   void _processCameraImage(CameraImage cameraImage) {
     if (_isDetecting) return;
     _isDetecting = true;
@@ -904,7 +1195,6 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     try {
       final inputImage = _buildInputImage(cameraImage);
       if (inputImage == null) return;
-
       await _exercise.runPersonDetection(inputImage);
       final poses = await _poseDetector.processImage(inputImage);
 
@@ -928,12 +1218,26 @@ class _ExerciseScreenState extends State<ExerciseScreen>
             }
           }
         }
-
         _logStateChanges();
       } else {
         _detectedPose = null;
         _feedback = _exercise.processNoPoseFrame();
       }
+
+      // ============================================================
+      // 👉 ĐOẠN CODE MỚI THÊM: BẮT LỖI HẾT GIỜ / YÊU CẦU DỪNG TỪ AI
+      // ============================================================
+      if (_exercise.requestStop() && !_didComplete) {
+        if (mounted) {
+          setState(() {
+            _feedback = {'Result': 'Kết thúc bài tập!'};
+          });
+        }
+        // Buộc lưu lại Rep hiện tại và pop màn hình về bảng Table (Report)
+        _logSetComplete();
+        _popWithLogger();
+      }
+      // ============================================================
 
       // FPS
       _frameCount++;
@@ -952,7 +1256,9 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         setState(() {});
       }
     } catch (e) {
-      debugPrint('[Vika] Detection error: $e');
+      if (kDebugMode) {
+        debugPrint('[Vika] Detection error: $e');
+      }
     }
   }
 
@@ -970,20 +1276,31 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     });
   }
 
+  void _setShowDebug(bool value) {
+    setState(() {
+      _showDebug = value;
+      _exercise.debugMode = value ? DebugMode.dev : DebugMode.off;
+    });
+  }
+
   /* -----------------------------------------------------------------------
      LOGGING (UI debug panel only)
      ----------------------------------------------------------------------- */
   void _logStateChanges() {
     final exState = _exercise.exerciseState.toString().split('.').last;
     final phaseState = _exercise.currentPhaseKey;
-    if (exState != _lastLoggedState) {
+    if (_showDebug && exState != _lastLoggedState) {
       debugPrint('[Vika][State] Exercise: $_lastLoggedState -> $exState');
+    }
+    if (exState != _lastLoggedState) {
       _lastLoggedState = exState;
     }
-    if (phaseState != _lastLoggedPhaseState) {
+    if (_showDebug && phaseState != _lastLoggedPhaseState) {
       debugPrint(
         '[Vika][State] ${_exercise.exerciseName}: $_lastLoggedPhaseState -> $phaseState',
       );
+    }
+    if (phaseState != _lastLoggedPhaseState) {
       _lastLoggedPhaseState = phaseState;
     }
   }
@@ -1035,10 +1352,12 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     );
     _repLogs.add(log);
 
-    debugPrint('[Vika][Rep] $log');
-    debugPrint(
-      '[Vika][Feedback] ${_feedback.entries.map((e) => '${e.key}: ${e.value}').join(' | ')}',
-    );
+    if (_showDebug) {
+      debugPrint('[Vika][Rep] $log');
+      debugPrint(
+        '[Vika][Feedback] ${_feedback.entries.map((e) => '${e.key}: ${e.value}').join(' | ')}',
+      );
+    }
 
     _repBannerGood = log.correctForm;
     final parts = <String>[];
@@ -1052,25 +1371,27 @@ class _ExerciseScreenState extends State<ExerciseScreen>
     if (_repLogs.isEmpty) return;
     final goodReps = _repLogs.where((r) => r.correctForm).length;
     final badReps = _repLogs.where((r) => !r.correctForm).length;
-    debugPrint('');
-    debugPrint('============================================');
-    debugPrint(
-      '[Vika][SET COMPLETE] ${_exercise.exerciseName} — $_repCount reps total',
-    );
-    debugPrint('[Vika][SET] Good: $goodReps | Bad: $badReps');
-    debugPrint('--------------------------------------------');
-    for (final log in _repLogs) {
-      final status = log.correctForm ? 'OK' : 'BAD';
-      final faultStr = log.allFaultMessages.isEmpty
-          ? 'No issues'
-          : log.allFaultMessages.join(', ');
+    if (_showDebug) {
+      debugPrint('');
+      debugPrint('============================================');
       debugPrint(
-        '[Vika][SET] Rep ${log.repNumber} [$status] '
-        'Tempo: ${log.tempo ?? "N/A"} | $faultStr',
+        '[Vika][SET COMPLETE] ${_exercise.exerciseName} — $_repCount reps total',
       );
+      debugPrint('[Vika][SET] Good: $goodReps | Bad: $badReps');
+      debugPrint('--------------------------------------------');
+      for (final log in _repLogs) {
+        final status = log.correctForm ? 'OK' : 'BAD';
+        final faultStr = log.allFaultMessages.isEmpty
+            ? 'No issues'
+            : log.allFaultMessages.join(', ');
+        debugPrint(
+          '[Vika][SET] Rep ${log.repNumber} [$status] '
+          'Tempo: ${log.tempo ?? "N/A"} | $faultStr',
+        );
+      }
+      debugPrint('============================================');
+      debugPrint('');
     }
-    debugPrint('============================================');
-    debugPrint('');
   }
 
   Future<void> _showSetupSheet({bool force = false}) async {
@@ -1110,7 +1431,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _definition.name,
+                            _definition.displayName,
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 18,
@@ -1532,7 +1853,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                _definition.name.toUpperCase(),
+                _definition.displayName.toUpperCase(),
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 15,
@@ -1714,6 +2035,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
                     rotation: _imageRotation,
                     lensDirection: controller.description.lensDirection,
                     debugData: _exercise.debugData,
+                    debugLabelsEnabled: _showDebug,
                   ),
                 ),
               ),
@@ -2256,7 +2578,7 @@ class _ExerciseScreenState extends State<ExerciseScreen>
             icon: Icons.bug_report_outlined,
             label: 'Debug',
             isActive: _showDebug,
-            onTap: () => setState(() => _showDebug = !_showDebug),
+            onTap: () => _setShowDebug(!_showDebug),
           ),
         ],
       ),
@@ -2692,6 +3014,7 @@ class PosePainter extends CustomPainter {
   final InputImageRotation rotation;
   final CameraLensDirection lensDirection;
   final Map<String, dynamic> debugData;
+  final bool debugLabelsEnabled;
 
   PosePainter({
     required this.pose,
@@ -2700,6 +3023,7 @@ class PosePainter extends CustomPainter {
     required this.rotation,
     required this.lensDirection,
     this.debugData = const {},
+    this.debugLabelsEnabled = false,
   });
 
   static const List<List<PoseLandmarkType>> _bodyConnections = [
@@ -2863,7 +3187,9 @@ class PosePainter extends CustomPainter {
       );
     }
 
-    _drawAngleLabels(canvas, landmarks, transformPoint);
+    if (debugLabelsEnabled) {
+      _drawAngleLabels(canvas, landmarks, transformPoint);
+    }
   }
 
   void _drawAngleLabels(
@@ -2962,6 +3288,8 @@ class PosePainter extends CustomPainter {
         oldDelegate.widgetSize != widgetSize ||
         oldDelegate.rotation != rotation ||
         oldDelegate.lensDirection != lensDirection ||
-        !mapEquals(oldDelegate.debugData, debugData);
+        oldDelegate.debugLabelsEnabled != debugLabelsEnabled ||
+        ((oldDelegate.debugLabelsEnabled || debugLabelsEnabled) &&
+            !mapEquals(oldDelegate.debugData, debugData));
   }
 }

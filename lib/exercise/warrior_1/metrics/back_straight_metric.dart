@@ -15,10 +15,10 @@ import '../../../utils/debouncer.dart';
 
 class BackStraightConfig {
   /// Lưng thẳng đẹp
-  static const double GOOD_THRESHOLD = 160.0;
+  static const double GOOD_THRESHOLD = 148.0;
 
   /// Dưới mức này bị đánh giá là gù lưng / rụt cổ chồm về trước
-  static const double HUNCHED_ERROR = 145.0;
+  static const double HUNCHED_ERROR = 130.0;
 }
 
 class BackStraightMetric extends WarriorOneMetricBase {
@@ -32,15 +32,19 @@ class BackStraightMetric extends WarriorOneMetricBase {
   final Debouncer _hunchedDebouncer = Debouncer(requiredFrames: 10);
 
   bool _instructionSet = false;
+  bool _isFaultingNow = false;
 
   @override
   List<FaultRecord> get faults => _faults;
+  @override
+  bool get isFaultingNow => _isFaultingNow;
 
   @override
   Map<String, dynamic> get debugData => _debugData;
 
   @override
   void update(HoldContext ctx) {
+    _isFaultingNow = false;
     if (ctx.holdState != WarriorOneState.hold) return;
 
     // Giả sử trong HoldContext bạn đã tính sẵn biến này:
@@ -55,6 +59,7 @@ class BackStraightMetric extends WarriorOneMetricBase {
         _hunchedDebouncer.update(angle < BackStraightConfig.HUNCHED_ERROR);
 
     if (isHunched) {
+      _isFaultingNow = true;
       ctx.resultIssues.feedback['back_straight'] =
           'Lưng đang bị gù! Mở rộng ngực và vươn thẳng lưng lên nhé.';
 
@@ -91,5 +96,6 @@ class BackStraightMetric extends WarriorOneMetricBase {
     _debugData.clear();
     _hunchedDebouncer.reset();
     _instructionSet = false;
+    _isFaultingNow = false;
   }
 }

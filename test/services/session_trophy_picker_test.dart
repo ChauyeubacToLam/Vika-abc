@@ -87,7 +87,8 @@ void main() {
     expect(trophy.exerciseName, isNull);
   });
 
-  test('streak milestone fires at a tier week (4) but not between (3 or 5)', () {
+  test('streak milestone fires at a tier week (4) but not between (3 or 5)',
+      () {
     Trophy pickAt(int weeks) => SessionTrophyPicker.pick(
           reports: [
             _report(name: 'Squat', formScore: 40, totalReps: 10),
@@ -261,7 +262,7 @@ ExerciseDefinition _definition({
     cameraHint: '',
     framingHint: '',
     setupTips: const [],
-    createExercise: () => throw UnimplementedError(),
+    createExercise: ({int? reps, int? seconds}) => throw UnimplementedError(),
     phaseColors: const {},
   );
 }

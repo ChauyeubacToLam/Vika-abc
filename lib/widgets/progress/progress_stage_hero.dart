@@ -2,7 +2,7 @@
 // the Home / Plan / Library stage pattern (atmospherics, italic display
 // headline, inverted wordmark) so all primary tabs read as one app.
 //
-// Embeds the period tabs (Tuần / Tháng / Cả lộ trình) INSIDE the dark
+// Embeds the period tabs (Tuần / Giai đoạn / Cả lộ trình) INSIDE the dark
 // hero — same interactive-in-hero pattern as Library's filter chips.
 // Tapping a tab updates the hero's subtitle in place (crossfade) AND
 // the cream body below.
@@ -25,6 +25,7 @@ class ProgressStageHero extends StatelessWidget {
     required this.userInitial,
     required this.phaseLabel,
     required this.weekLabel,
+    required this.watermark,
     this.avatarUrl,
     this.onShareTap,
     this.onAvatarTap,
@@ -41,26 +42,21 @@ class ProgressStageHero extends StatelessWidget {
   /// e.g. 'TỪ 21 / 4 · 4 TUẦN QUA' — period-aware date stamp.
   final String weekLabel;
 
+  /// Huge faint italic chapter mark painted behind the headline (e.g. 'T5' /
+  /// 'G2' / 'P3'). Data-bound to the active week/phase by the caller so the
+  /// canvas always reads "this is where you are now"; the hero is stateless
+  /// and has no snapshot, so it just renders what it's handed.
+  final String watermark;
+
   final VoidCallback? onShareTap;
   final VoidCallback? onAvatarTap;
 
   String get _subtitle {
     return switch (period) {
-      PeriodTab.week => 'Bảy ngày gần nhất. Hôm nay là điểm chốt của tuần.',
-      PeriodTab.month => 'Ba mươi ngày gần nhất. Đường tiến bộ đã rõ.',
+      PeriodTab.week => 'Tuần này trong lộ trình. Đây là chặng hiện tại.',
+      PeriodTab.phase => 'Cả giai đoạn này. Mỗi tuần một bước. Đây là chương.',
       PeriodTab.program =>
-        'Cả lộ trình. Mỗi tuần một chương — đây là toàn cảnh.',
-    };
-  }
-
-  /// Huge italic chapter mark painted behind the headline. Changes
-  /// with the period so the canvas always reads "this is where you
-  /// are now."
-  String get _watermarkNumeral {
-    return switch (period) {
-      PeriodTab.week => 'T3',
-      PeriodTab.month => 'M1',
-      PeriodTab.program => 'P1',
+        'Cả lộ trình. Mỗi tuần một chương. Đây là toàn cảnh.',
     };
   }
 
@@ -137,15 +133,15 @@ class ProgressStageHero extends StatelessWidget {
               padding: EdgeInsets.only(top: topInset),
               child: Stack(
                 children: [
-                  // Huge italic watermark numeral — "T3" reads as the
-                  // chapter mark of the current phase. Very faint, so
+                  // Huge italic watermark numeral — e.g. "T5" reads as the
+                  // chapter mark of the current week/phase. Very faint, so
                   // it's atmosphere rather than information.
                   Positioned(
                     top: 70,
                     right: -22,
                     child: IgnorePointer(
                       child: Text(
-                        _watermarkNumeral,
+                        watermark,
                         style: TextStyle(
                           fontFamily: 'BeVietnamPro',
                           fontSize: 200,
@@ -404,7 +400,7 @@ class _InvPill extends StatelessWidget {
     final c = VikaColors.of(context);
     final label = switch (tab) {
       PeriodTab.week => 'Tuần',
-      PeriodTab.month => 'Tháng',
+      PeriodTab.phase => 'Giai đoạn',
       PeriodTab.program => 'Cả lộ trình',
     };
     return GestureDetector(

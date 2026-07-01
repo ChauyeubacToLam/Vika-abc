@@ -58,7 +58,7 @@ class _S05ForkState extends State<S05Fork> {
             alignment: Alignment.centerLeft,
             child: V5ScreenHeader(
               eyebrow: 'Lộ trình của bạn',
-              title: 'Chọn cách\ntập.',
+              title: 'Chọn thể loại\nbạn muốn tập.',
               size: r.isShort ? V5HeaderSize.medium : V5HeaderSize.large,
             ),
           ),
@@ -192,7 +192,7 @@ class _ForkHero extends StatelessWidget {
                               const SizedBox(width: V5.space8),
                               Flexible(
                                 child: Text(
-                                  isRecommended ? 'VIKA GỢI Ý' : 'ĐÃ CHỌN',
+                                  isRecommended ? 'VIKA ĐỀ XUẤT' : 'ĐÃ CHỌN',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: V5.eyebrow(
@@ -460,7 +460,7 @@ class _ForkOptionPanel extends StatelessWidget {
             else
               _MiniTag(
                 label:
-                    choice.equipment == 'Cần thảm' ? 'Cần thảm' : '0 dụng cụ',
+                    choice.equipment == 'Cần thảm' ? 'Cần thảm' : 'Không cần dụng cụ',
                 dark: selected,
               ),
             SizedBox(height: tiny ? V5.space8 : V5.space10),
@@ -533,11 +533,11 @@ List<String> _panelHighlights(String id, {required bool tiny}) {
       ? const [
           'Mở khớp, giảm căng',
           'Thở chậm, thả lỏng',
-          'Thả lỏng cuối ngày',
+          'Thư giãn cuối ngày',
         ]
       : const [
           'Tăng sức mạnh',
-          'Săn chắc, đốt năng lượng',
+          'Săn chắc, đốt mỡ hiệu quả',
           'Tập gọn tại nhà',
         ];
   return items.take(tiny ? 2 : 3).toList(growable: false);

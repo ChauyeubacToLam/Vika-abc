@@ -10,12 +10,22 @@ class TrackedMetric {
   final List<StatusTransition> _transitions = [];
   final Map<String, List<num>> _keyHistories = {};
   MetricStatus _lastStatus = MetricStatus.pass;
+  int? _lastTickFrameTimestampMs;
 
   TrackedMetric(this.metric);
 
   String get id => metric.name;
-  double? get value => metric.value;
-  MetricStatus get status => metric.status;
+  double? get value => _effectiveValue();
+  MetricStatus get status {
+    final explicitStatus = metric.status;
+    final v = _effectiveValue();
+    final band = metric.threshold;
+    if (explicitStatus == MetricStatus.pass && v != null && band != null) {
+      return band.evaluate(v);
+    }
+    return explicitStatus;
+  }
+
   ThresholdBand? get threshold => metric.threshold;
   List<MetricSample> get history => List.unmodifiable(_history);
   List<StatusTransition> get transitions => List.unmodifiable(_transitions);
@@ -29,8 +39,11 @@ class TrackedMetric {
       .length;
 
   void onTick(int frameTimestampMs) {
-    final v = metric.value;
-    final st = metric.status;
+    if (_lastTickFrameTimestampMs == frameTimestampMs) return;
+    _lastTickFrameTimestampMs = frameTimestampMs;
+
+    final v = _effectiveValue();
+    final st = status;
 
     if (v != null) {
       _history.add(MetricSample(v, st));
@@ -53,6 +66,16 @@ class TrackedMetric {
     });
   }
 
+  double? _effectiveValue() => metric.value ?? _primaryDebugValue();
+
+  double? _primaryDebugValue() {
+    for (final value in metric.debugData.values) {
+      final numeric = _numericValue(value);
+      if (numeric != null) return numeric.toDouble();
+    }
+    return null;
+  }
+
   num? _numericValue(dynamic value) {
     if (value is num) return value;
     if (value is! String) return null;
@@ -67,5 +90,6 @@ class TrackedMetric {
     _transitions.clear();
     _keyHistories.clear();
     _lastStatus = MetricStatus.pass;
+    _lastTickFrameTimestampMs = null;
   }
 }

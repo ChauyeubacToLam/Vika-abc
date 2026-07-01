@@ -33,10 +33,15 @@ class _S09Phase1State extends State<S09Phase1>
   bool _showBars = false;
 
   List<AssessmentResultData> get _results {
-    if (widget.data.fork == 'yoga') return yogaResultsMock;
+    if (widget.data.fork == 'yoga') {
+      return [
+        warriorOneResultFromData(widget.data),
+        seatedForwardFoldResultFromData(widget.data),
+      ];
+    }
     return [
       squatResultFromData(widget.data),
-      homeResultsMock[1],
+      wallPushUpResultFromData(widget.data),
     ];
   }
 
@@ -130,11 +135,20 @@ class _S09Phase1State extends State<S09Phase1>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _DataCard(
-                        ex: ex,
-                        scoreAnimation: _scoreController,
-                        showBars: _showBars,
-                      ),
+                      // Yoga poses are single static holds — render the real
+                      // clean-hold gauge; rep-based home exercises keep the
+                      // per-rep bar chart card.
+                      if (widget.data.fork == 'yoga')
+                        _YogaHoldCard(
+                          ex: ex,
+                          scoreAnimation: _scoreController,
+                        )
+                      else
+                        _DataCard(
+                          ex: ex,
+                          scoreAnimation: _scoreController,
+                          showBars: _showBars,
+                        ),
                       const SizedBox(height: V5.space12),
                       _AnalysisCard(
                         ex: ex,
@@ -245,7 +259,7 @@ class _SwipeHint extends StatelessWidget {
             const SizedBox(width: 7),
             Expanded(
               child: Text(
-                'Vuốt ngang để xem bài khác',
+                'Vuốt sang để xem bài tiếp',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: V5.caption(context, color: V5.inkSoft),
@@ -716,6 +730,405 @@ class _GrowingBarState extends State<_GrowingBar> {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Yoga hold card — a single static hold has no per-rep series, so the
+// per-rep bar chart is replaced by a radial gauge of the REAL clean-hold
+// ratio (good_seconds / total_seconds, the same values the scorer reads).
+// Same dark assessment-card chrome as the home _DataCard.
+// ─────────────────────────────────────────────────────────────
+
+// UI-only "strong hold" reference marker. Deliberately NOT the 0.50 scoring
+// degrade threshold — we don't surface scoring internals in the UI.
+const double _kStrongHoldReference = 0.80;
+
+class _YogaHoldCard extends StatelessWidget {
+  const _YogaHoldCard({
+    required this.ex,
+    required this.scoreAnimation,
+  });
+
+  final AssessmentResultData ex;
+  final Animation<double> scoreAnimation;
+
+  @override
+  Widget build(BuildContext context) {
+    final narrow = MediaQuery.sizeOf(context).width < 360;
+    final viz = ex.holdViz;
+    return V5HeroCard(
+      borderRadius: V5.radiusLg,
+      elevation: 2,
+      child: Stack(
+        children: [
+          Positioned(
+            top: -60,
+            right: -40,
+            child: V5AmbientGlow(
+              size: const Size(240, 240),
+              opacity: 0.18,
+              color: V5.yellow,
+            ),
+          ),
+          Column(
+            children: [
+              // Top — real clean-hold seconds headline + verdict pill.
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  narrow ? 16 : 22,
+                  narrow ? 18 : 22,
+                  narrow ? 16 : 22,
+                  narrow ? 14 : 18,
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            ex.metric.toUpperCase(),
+                            style: V5.eyebrow(context, color: V5.invInkSoft),
+                          ),
+                          const SizedBox(height: 10),
+                          _holdHeadline(context, viz, narrow),
+                          const SizedBox(height: 6),
+                          Text(
+                            ex.metricLabel,
+                            style: V5.bodySm(context, color: V5.invInkSoft),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (viz != null)
+                      Flexible(
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: _HoldVerdict(ratio: viz.cleanHoldRatio),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const V5Divider(dark: true),
+              // Bottom — radial clean-hold gauge, or a real empty state.
+              Padding(
+                padding: const EdgeInsets.fromLTRB(22, 16, 22, 22),
+                child: viz == null
+                    ? _holdGaugeFrame(
+                        context,
+                        center: _emptyGaugeCenter(context),
+                        progress: 0,
+                        muted: true,
+                      )
+                    : _holdGaugeFrame(
+                        context,
+                        center: _gaugeCenter(context, viz, narrow),
+                        progressAnimation: scoreAnimation,
+                        ratio: viz.cleanHoldRatio,
+                      ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _holdHeadline(
+      BuildContext context, YogaHoldViz? viz, bool narrow) {
+    if (viz == null) {
+      return Text(
+        '—',
+        style: V5
+            .stat(context, color: V5.invInkSoft)
+            .copyWith(fontSize: narrow ? 42 : 58),
+      );
+    }
+    return AnimatedBuilder(
+      animation: scoreAnimation,
+      builder: (context, _) {
+        final eased = 1 - math.pow(1 - scoreAnimation.value, 3);
+        final secs = (viz.goodSeconds * eased).round();
+        return FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                '$secs',
+                style: V5
+                    .stat(context, color: V5.yellow)
+                    .copyWith(fontSize: narrow ? 42 : 58),
+              ),
+              const SizedBox(width: 6),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  's',
+                  style: V5
+                      .titleLg(context, color: V5.yellow)
+                      .copyWith(fontSize: narrow ? 14 : 18),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // Shared gauge frame: section title + strong-hold legend + the radial dial.
+  Widget _holdGaugeFrame(
+    BuildContext context, {
+    required Widget center,
+    Animation<double>? progressAnimation,
+    double ratio = 0,
+    double progress = 0,
+    bool muted = false,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                ex.chartTitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: V5.eyebrow(context, color: V5.invInk),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 12,
+                  height: 2,
+                  color: muted
+                      ? V5.invInkFaint
+                      : V5.yellow.withValues(alpha: 0.7),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Giữ tốt ${(_kStrongHoldReference * 100).round()}%',
+                  style: V5.caption(context, color: V5.invInkSoft),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        Center(
+          child: SizedBox(
+            width: 176,
+            height: 176,
+            child: progressAnimation == null
+                ? Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      CustomPaint(
+                        size: const Size(176, 176),
+                        painter: _HoldGaugePainter(
+                          progress: progress,
+                          referenceFraction: _kStrongHoldReference,
+                          muted: muted,
+                        ),
+                      ),
+                      center,
+                    ],
+                  )
+                : AnimatedBuilder(
+                    animation: progressAnimation,
+                    builder: (context, _) {
+                      final eased =
+                          1 - math.pow(1 - progressAnimation.value, 3);
+                      return Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          CustomPaint(
+                            size: const Size(176, 176),
+                            painter: _HoldGaugePainter(
+                              progress: (ratio * eased).clamp(0.0, 1.0).toDouble(),
+                              referenceFraction: _kStrongHoldReference,
+                            ),
+                          ),
+                          center,
+                        ],
+                      );
+                    },
+                  ),
+          ),
+        ),
+        const SizedBox(height: 4),
+      ],
+    );
+  }
+
+  Widget _gaugeCenter(BuildContext context, YogaHoldViz viz, bool narrow) {
+    return AnimatedBuilder(
+      animation: scoreAnimation,
+      builder: (context, _) {
+        final eased = 1 - math.pow(1 - scoreAnimation.value, 3);
+        final pct = (viz.cleanHoldRatio * 100 * eased).round();
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '$pct%',
+              style: V5
+                  .stat(context, color: V5.yellow)
+                  .copyWith(fontSize: narrow ? 34 : 42),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'Tập CHUẨN',
+              style: V5
+                  .eyebrow(context, color: V5.invInkSoft)
+                  .copyWith(letterSpacing: 1.4),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _emptyGaugeCenter(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.videocam_off_rounded, color: V5.invInkSoft, size: 24),
+        const SizedBox(height: 8),
+        Text(
+          'Chưa đo được',
+          style: V5.bodySm(context, color: V5.invInkSoft),
+        ),
+      ],
+    );
+  }
+}
+
+// Verdict pill — mirrors the home _ScoreVerdict treatment, anchored to the
+// UI strong-hold reference (not a scoring threshold).
+class _HoldVerdict extends StatelessWidget {
+  const _HoldVerdict({required this.ratio});
+
+  final double ratio;
+
+  @override
+  Widget build(BuildContext context) {
+    final strong = ratio >= _kStrongHoldReference;
+    final label = strong ? 'GIỮ TỐT' : 'CẦN GIỮ ĐỀU';
+    final color = strong ? V5.success : V5.yellow;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(V5.radiusFull),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(strong ? Icons.check_rounded : Icons.trending_up_rounded,
+                color: color, size: 12),
+            const SizedBox(width: 6),
+            Text(label, style: V5.eyebrow(context, color: color)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Radial clean-hold gauge: a 270° dial whose yellow fill = clean-hold ratio,
+// with a strong-hold reference tick. Every value is real (no mock).
+class _HoldGaugePainter extends CustomPainter {
+  _HoldGaugePainter({
+    required this.progress,
+    required this.referenceFraction,
+    this.muted = false,
+  });
+
+  final double progress; // 0..1 of the swept arc
+  final double referenceFraction; // 0..1, the strong-hold tick
+  final bool muted;
+
+  static const double _startAngle = math.pi * 0.75; // 135° (bottom-left)
+  static const double _totalSweep = math.pi * 1.5; // 270°, gap at the bottom
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    const stroke = 14.0;
+    final radius = (math.min(size.width, size.height) - stroke) / 2 - 2;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+
+    // Track.
+    final track = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.round
+      ..color = V5.invInk.withValues(alpha: 0.10);
+    canvas.drawArc(rect, _startAngle, _totalSweep, false, track);
+
+    final fill = progress.clamp(0.0, 1.0);
+    if (!muted && fill > 0) {
+      // Soft glow under the fill.
+      final glow = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = stroke + 7
+        ..strokeCap = StrokeCap.round
+        ..color = V5.yellow.withValues(alpha: 0.16)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+      canvas.drawArc(rect, _startAngle, _totalSweep * fill, false, glow);
+
+      // Fill arc with a warm sweep gradient.
+      final arc = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = stroke
+        ..strokeCap = StrokeCap.round
+        ..shader = const SweepGradient(
+          startAngle: _startAngle,
+          endAngle: _startAngle + _totalSweep,
+          colors: [V5.yellowDeep, V5.yellow, V5.yellowSpark],
+        ).createShader(rect);
+      canvas.drawArc(rect, _startAngle, _totalSweep * fill, false, arc);
+    }
+
+    // Strong-hold reference tick across the band.
+    final tickAngle = _startAngle + _totalSweep * referenceFraction;
+    final cosA = math.cos(tickAngle);
+    final sinA = math.sin(tickAngle);
+    final inner = Offset(
+      center.dx + (radius - stroke / 2 - 2) * cosA,
+      center.dy + (radius - stroke / 2 - 2) * sinA,
+    );
+    final outer = Offset(
+      center.dx + (radius + stroke / 2 + 2) * cosA,
+      center.dy + (radius + stroke / 2 + 2) * sinA,
+    );
+    final tick = Paint()
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round
+      ..color = muted
+          ? V5.invInk.withValues(alpha: 0.28)
+          : V5.invInk.withValues(alpha: 0.75);
+    canvas.drawLine(inner, outer, tick);
+  }
+
+  @override
+  bool shouldRepaint(covariant _HoldGaugePainter old) =>
+      old.progress != progress ||
+      old.referenceFraction != referenceFraction ||
+      old.muted != muted;
+}
+
+// ─────────────────────────────────────────────────────────────
 // Analysis card — Vika coaching feedback + self-report chips
 // ─────────────────────────────────────────────────────────────
 
@@ -760,7 +1173,7 @@ class _AnalysisCard extends StatelessWidget {
                 const SizedBox(width: 7),
                 Expanded(
                   child: Text(
-                    'VIKA PHÁT HIỆN · ${ex.detectedPattern}'.toUpperCase(),
+                    'VIKA GHI NHẬN · ${ex.detectedPattern}'.toUpperCase(),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: V5

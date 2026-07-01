@@ -6,6 +6,7 @@ import 'package:vika/services/auth_service.dart';
 import '../onboarding/v5/v5_primitives.dart';
 import '../onboarding/v5/v5_theme.dart';
 import 'auth_v5_widgets.dart';
+import 'reviewer_demo_gate.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, this.onBack});
@@ -67,7 +68,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (error) {
       _showError(_friendlyError(
         error,
-        fallback: 'Không thể đăng nhập lúc này. Vui lòng thử lại.',
+        fallback: 'Đăng nhập không thành công. Vui lòng thử lại.',
       ));
     } finally {
       if (mounted) {
@@ -78,7 +79,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _signInWithApple() async {
     if (!Platform.isIOS) {
-      _showError('Đăng nhập Apple chỉ hỗ trợ trên iPhone.');
+      _showError('Đăng nhập Apple chỉ khả dụng trên iPhone.');
       return;
     }
     await _runAuth(() async {
@@ -90,6 +91,29 @@ class _LoginScreenState extends State<LoginScreen> {
     await _runAuth(() async {
       await _authService.signInWithGoogle();
     });
+  }
+
+  // Silent reviewer-access gate (5s hold on the Apple tile). Lets an App Review
+  // reviewer reach the seeded read-only demo without finishing onboarding. The
+  // flow itself is shared with the S13 onboarding sign-in — see
+  // [showReviewerDemoGate].
+  Future<void> _showReviewerDemoPrompt() async {
+    if (_busy) return;
+    await showReviewerDemoGate(
+      context,
+      onStart: () {
+        if (!mounted) return;
+        setState(() {
+          _busy = true;
+          _notice = null;
+        });
+      },
+      onError: (message) {
+        if (!mounted) return;
+        setState(() => _busy = false);
+        _showError(message);
+      },
+    );
   }
 
   Future<void> _signInWithFacebook() async {
@@ -115,7 +139,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (error) {
       _showError(_friendlyError(
         error,
-        fallback: 'Không thể gửi link đăng nhập lúc này. Vui lòng thử lại.',
+        fallback: 'Không gửi được link. Vui lòng thử lại.',
       ));
     } finally {
       if (mounted) {
@@ -176,7 +200,7 @@ class _LoginScreenState extends State<LoginScreen> {
       footer: AnimatedBuilder(
         animation: _emailController,
         builder: (context, _) => _MagicLinkCta(
-          label: _busy ? 'Đang xử lý...' : 'Gửi link đăng nhập',
+          label: _busy ? 'Đang xử lý…' : 'Gửi link đăng nhập',
           disabledLabel: 'Nhập email để nhận link',
           enabled: _validEmail && !_busy,
           onTap: _sendMagicLink,
@@ -209,6 +233,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: AuthProviderRail(
                   busy: _busy,
                   onApple: _signInWithApple,
+                  onAppleHoldComplete: _showReviewerDemoPrompt,
                   onGoogle: _signInWithGoogle,
                   onFacebook: _signInWithFacebook,
                 ),

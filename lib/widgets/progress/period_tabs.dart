@@ -1,4 +1,4 @@
-// PeriodTabs — segmented pill control for week / month / program on the
+// PeriodTabs — segmented pill control for week / phase / program on the
 // Progress screen. Active pill is ink with cream text; inactive pills are
 // transparent ink-soft text.
 //
@@ -8,7 +8,17 @@ import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
 
-enum PeriodTab { week, month, program }
+/// Program-relative scope for the Progress feeds. [week] = the active plan
+/// week, [phase] = every week sharing the active week's phase, [program] = the
+/// whole plan. (Renamed from the old calendar `month` window.)
+enum PeriodTab { week, phase, program }
+
+/// Direction of the Progress-tab ĐIỂM FORM trend over the selected window,
+/// classified from the Theil-Sen slope of the session form scores. Drives the
+/// gauge's trend chip (arrow + short word). [none] = below the 3-session
+/// baseline, where the chip is hidden. Shared here (alongside [PeriodTab]) so
+/// the service that derives it and the widgets that render it agree on one type.
+enum FormTrendDirection { up, flat, down, none }
 
 class PeriodTabs extends StatelessWidget {
   const PeriodTabs({
@@ -54,7 +64,7 @@ class _Pill extends StatelessWidget {
     final c = VikaColors.of(context);
     final label = switch (tab) {
       PeriodTab.week => 'Tuần này',
-      PeriodTab.month => 'Tháng',
+      PeriodTab.phase => 'Giai đoạn',
       PeriodTab.program => 'Cả lộ trình',
     };
     return Material(

@@ -1,4 +1,4 @@
-// ignore_for_file: constant_identifier_names, non_constant_identifier_names
+// ignore_for_file: constant_identifier_names, non_constant_identifier_names, annotate_overrides
 
 /* =========================================================================
    WarriorOneMetricBase — Abstract base for all Warrior I form metrics.
@@ -84,7 +84,9 @@ class HoldContext {
 /* =========================================================================
    WarriorOneMetricBase — Interface every Warrior I metric implements.
    ========================================================================= */
-abstract class WarriorOneMetricBase {
+abstract class WarriorOneMetricBase with FaultMetricDebugSource {
+  int faultsCount = 0;
+
   /// Human-readable name for debug/logging.
   String get name;
 
@@ -94,12 +96,18 @@ abstract class WarriorOneMetricBase {
 
   /// Faults accumulated this hold. WarriorOne reads these at hold completion.
   List<FaultRecord> get faults;
+  bool get isFaultingNow => false;
 
   /// Debug data for the overlay. Keys should be metric-specific.
   Map<String, dynamic> get debugData;
 
   /// Reset all internal state for the next hold (e.g. the other side).
   void reset();
+
+  void resetAndCountFault() {
+    if (faults.isNotEmpty) faultsCount++;
+    reset();
+  }
 
   /// Called when the hold state transitions (entry → hold → exit).
   /// Override in metrics that care about transitions.

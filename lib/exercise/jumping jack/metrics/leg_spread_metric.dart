@@ -29,11 +29,11 @@ import '../../../utils/debouncer.dart';
 class LegSpreadConfig {
   /// Good: feet clearly spread wider than shoulders
   // ignore: constant_identifier_names
-  static const double SPREAD_GOOD = 1.5;
+  static const double SPREAD_GOOD = 1.25;
 
   /// Warning: feet apart but not wide enough
   // ignore: constant_identifier_names
-  static const double SPREAD_WARNING = 1.0;
+  static const double SPREAD_WARNING = 0.75;
 
   // Below SPREAD_WARNING = error (feet barely moved)
 }
@@ -46,7 +46,7 @@ class LegSpreadMetric extends JJMetricBase {
   final Map<String, dynamic> _debugData = {};
 
   // Fast movement → low debounce
-  final Debouncer _spreadDebouncer = Debouncer(requiredFrames: 2);
+  final Debouncer _spreadDebouncer = Debouncer(requiredFrames: 3);
 
   /// Track peak spread this rep
   double _peakSpread = 0.0;

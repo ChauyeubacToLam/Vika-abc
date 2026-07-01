@@ -167,7 +167,7 @@ ExerciseDefinition _definition(String name) {
     cameraHint: '',
     framingHint: '',
     setupTips: const [],
-    createExercise: () => throw UnimplementedError(),
+    createExercise: ({int? reps, int? seconds}) => throw UnimplementedError(),
     phaseColors: const {},
   );
 }

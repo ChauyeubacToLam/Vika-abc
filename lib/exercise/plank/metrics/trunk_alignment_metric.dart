@@ -32,7 +32,7 @@ class TrunkAlignmentConfig {
   static const double PIKE_WARNING_MAX = PlankConfig.PIKE_WARNING_MAX;
 
   /// Fault percentage threshold
-  static const double FAULT_PERCENT_THRESHOLD = 0.30;
+  static const double FAULT_PERCENT_THRESHOLD = 0.45;
 }
 
 class TrunkAlignmentMetric extends PlankMetricBase {
@@ -49,6 +49,7 @@ class TrunkAlignmentMetric extends PlankMetricBase {
   // Fault time tracking
   int _totalFrames = 0;
   int _faultFrames = 0;
+  bool _isFaultingNow = false;
 
   // Prevent instruction spam
   bool _sagInstructionSet = false;
@@ -56,6 +57,8 @@ class TrunkAlignmentMetric extends PlankMetricBase {
 
   @override
   List<FaultRecord> get faults => _faults;
+  @override
+  bool get isFaultingNow => _isFaultingNow;
 
   @override
   Map<String, dynamic> get debugData => _debugData;
@@ -66,6 +69,7 @@ class TrunkAlignmentMetric extends PlankMetricBase {
   @override
   void update(RepContext ctx) {
     _totalFrames++;
+    _isFaultingNow = false;
 
     final dev = ctx.trunkDeviation;
     final absDev = dev.abs();
@@ -137,6 +141,7 @@ class TrunkAlignmentMetric extends PlankMetricBase {
     }
 
     if (isFault) _faultFrames++;
+    _isFaultingNow = isFault;
 
     _debugData['trunkStatus'] = isFault ? 'FAULT' : 'GOOD';
   }
@@ -179,6 +184,7 @@ class TrunkAlignmentMetric extends PlankMetricBase {
     _pikeDebouncer.reset();
     _totalFrames = 0;
     _faultFrames = 0;
+    _isFaultingNow = false;
     _sagInstructionSet = false;
     _pikeInstructionSet = false;
   }

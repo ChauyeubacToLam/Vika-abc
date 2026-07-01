@@ -25,14 +25,14 @@ import '../../../utils/debouncer.dart';
 
 class LungeLumbarProxyConfig {
   /// Good alignment: angle ≥ 160°
-  static const double GOOD_THRESHOLD = 160.0;
+  static const double GOOD_THRESHOLD = 145.0;
 
   /// Warning zone: 140° – 159°
-  static const double WARN_THRESHOLD = 140.0;
+  static const double WARN_THRESHOLD = 125.0;
 
   /// Trunk lean must be below this (degrees) for the fault to trigger.
   /// If the user is leaning forward naturally, the acute angle is expected.
-  static const double UPRIGHT_TORSO_LIMIT = 10.0;
+  static const double UPRIGHT_TORSO_LIMIT = 5.0;
 }
 
 class LungeLumbarProxyMetric extends LungeMetricBase {
@@ -43,7 +43,7 @@ class LungeLumbarProxyMetric extends LungeMetricBase {
   final Map<String, dynamic> _debugData = {};
 
   // 5 frames (~167ms) debounce
-  final Debouncer _faultDebouncer = Debouncer(requiredFrames: 5);
+  final Debouncer _faultDebouncer = Debouncer(requiredFrames: 8);
 
   /// Prevent instruction spam — only set coaching once per rep.
   bool _instructionSet = false;

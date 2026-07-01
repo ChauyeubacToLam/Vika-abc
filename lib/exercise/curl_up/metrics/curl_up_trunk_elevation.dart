@@ -47,13 +47,15 @@ import 'curl_up_metric_base.dart';
 
 class TrunkElevationConfig {
   /// Peak elevation above which the rep is a full sit-up — fail the rep.
-  static const double ERROR_HIGH = 20.0;
+  static const double ERROR_HIGH = 26.0;
 
   /// Upper bound of the safe range. Above = "too high" warning.
-  static const double WARNING_HIGH = 13.0;
+  static const double WARNING_HIGH = 18.0;
 
   /// Lower bound of the safe range. Below = "too shallow" warning.
-  static const double WARNING_LOW = 5.0;
+  static const double WARNING_LOW = 3.0;
+
+  static const double RESTING_BASELINE_REFRESH_MAX_DELTA = 2.0;
 }
 
 enum _HighFaultLevel { warning, error }
@@ -104,7 +106,11 @@ class TrunkElevationMetric extends CurlUpMetricBase {
   /// replacement is fine — resting trunk angle is stable signal.
   @override
   void onRestingFrame(RepContext ctx) {
-    _baselineTrunkAngle = ctx.trunkAngle;
+    if (_baselineTrunkAngle == null ||
+        (ctx.trunkAngle - _baselineTrunkAngle!).abs() <=
+            TrunkElevationConfig.RESTING_BASELINE_REFRESH_MAX_DELTA) {
+      _baselineTrunkAngle = ctx.trunkAngle;
+    }
     _debugData['trunkBase'] = _baselineTrunkAngle;
   }
 
@@ -156,7 +162,7 @@ class TrunkElevationMetric extends CurlUpMetricBase {
       _faults.clear();
       _faults.add(FaultRecord(
         phase: 'APEX',
-        type: 'Range',
+        type: 'trunk_high',
         message: 'Lên quá cao — chỉ cần nâng vai khỏi sàn',
         affectsForm: true,
         voiceMessage: 'Chỉ nâng vai',
@@ -171,7 +177,7 @@ class TrunkElevationMetric extends CurlUpMetricBase {
     if (_loggedLevel == null) {
       _faults.add(FaultRecord(
         phase: 'APEX',
-        type: 'Range',
+        type: 'trunk_high',
         message: 'Hơi cao — giữ biên độ ngắn để bảo vệ lưng',
         affectsForm: false,
         priority: CurlUpFaultVoicePriority.trunkTooHigh,
@@ -200,7 +206,7 @@ class TrunkElevationMetric extends CurlUpMetricBase {
       _status = MetricStatus.near;
       _faults.add(FaultRecord(
         phase: 'APEX',
-        type: 'Range',
+        type: 'trunk_low',
         message: 'Cuộn chưa đủ — nâng cao vai hơn',
         affectsForm: false,
         voiceMessage: 'Cuộn cao hơn',

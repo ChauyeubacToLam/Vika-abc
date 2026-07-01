@@ -70,6 +70,10 @@ class _WordmarkHeaderState extends State<WordmarkHeader> {
   @override
   void didUpdateWidget(covariant WordmarkHeader oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.avatarUrl != null || widget.userInitial != 'N') {
+      _profile = null;
+      return;
+    }
     if (widget.avatarUrl == null &&
         widget.userInitial == 'N' &&
         (oldWidget.avatarUrl != widget.avatarUrl ||
@@ -93,8 +97,14 @@ class _WordmarkHeaderState extends State<WordmarkHeader> {
     final avatarBg = widget.inverted ? c.bg : c.ink;
     final avatarFg = widget.inverted ? c.ink : c.yellow;
     final avatarBorder = widget.inverted ? c.yellow : c.yellow;
-    final userInitial = _profile?.initial ?? widget.userInitial;
-    final avatarUrl = widget.avatarUrl ?? _profile?.avatarUrl;
+    final hasParentProfile =
+        widget.avatarUrl != null || widget.userInitial != 'N';
+    final userInitial = hasParentProfile
+        ? widget.userInitial
+        : (_profile?.initial ?? widget.userInitial);
+    final avatarUrl = hasParentProfile
+        ? widget.avatarUrl
+        : (widget.avatarUrl ?? _profile?.avatarUrl);
 
     return Padding(
       padding: widget.padding,
