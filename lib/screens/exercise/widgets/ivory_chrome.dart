@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../theme/vf_theme.dart';
@@ -296,78 +298,95 @@ class IvoryPTReferenceLoop extends StatelessWidget {
   }
 }
 
-// ─── Coach Caption (center lower-third) ───
+// ─── Coach Caption (upper third, timed) ───
 
-class IvoryCoachCaption extends StatelessWidget {
+/// The coach caption assumes the reader is 2.5 m away: upper-third placement,
+/// large type, strong shadow — and short-lived. Each new message fades in,
+/// stays ~2 s, then fades out; the voice channel carries the full sentence,
+/// the caption is its visual echo. Message *selection* is untouched upstream.
+class IvoryCoachCaption extends StatefulWidget {
   const IvoryCoachCaption({super.key, required this.message});
-  // TODO(caption): Wire trigger conditions for mid-rep + post-rep captions
+  // TODO(caption): Wire trigger conditions for mid-rep + post-rep captions.
+  // TODO(caption): Keyword-ized copy (Vietnamese content pass) — until then
+  // the existing sentences render in the new style, capped at 2 lines.
   final String message;
 
   @override
+  State<IvoryCoachCaption> createState() => _IvoryCoachCaptionState();
+}
+
+class _IvoryCoachCaptionState extends State<IvoryCoachCaption>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _fade;
+  Timer? _hide;
+  String _displayed = '';
+
+  static const Duration _visibleFor = Duration(milliseconds: 2200);
+
+  @override
+  void initState() {
+    super.initState();
+    _fade = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 240),
+      reverseDuration: const Duration(milliseconds: 380),
+    );
+    if (widget.message.isNotEmpty) _show(widget.message);
+  }
+
+  @override
+  void didUpdateWidget(IvoryCoachCaption oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.message != oldWidget.message && widget.message.isNotEmpty) {
+      _show(widget.message);
+    }
+  }
+
+  void _show(String message) {
+    _displayed = message;
+    _fade.forward();
+    _hide?.cancel();
+    _hide = Timer(_visibleFor, () {
+      if (mounted) _fade.reverse();
+    });
+  }
+
+  @override
+  void dispose() {
+    _hide?.cancel();
+    _fade.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Eyebrow as a tight pill so the label always reads as a label,
-        // never as noise on a busy camera scene.
-        Container(
-          padding: const EdgeInsets.fromLTRB(8, 4, 10, 4),
-          decoration: BoxDecoration(
-            color: const Color(0xFF15110D).withValues(alpha: 0.55),
-            borderRadius: BorderRadius.circular(100),
-            border: Border.all(
-              color: VikaIvory.yellow.withValues(alpha: 0.32),
-              width: 0.8,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  color: VikaIvory.yellow,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(color: VikaIvory.yellowGlow, blurRadius: 8)
-                  ],
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text('HLV AI',
-                  style: TextStyle(
-                    fontFamily: _font,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: VikaIvory.yellow,
-                    letterSpacing: 1.6,
-                  )),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          message,
+    return IgnorePointer(
+      child: FadeTransition(
+        opacity: CurvedAnimation(parent: _fade, curve: Curves.easeOut),
+        child: Text(
+          _displayed,
           textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontFamily: _font,
-            fontSize: 17,
-            fontWeight: FontWeight.w700,
+            fontSize: 26,
+            fontWeight: FontWeight.w800,
             color: VikaIvory.invInk,
-            letterSpacing: -0.2,
-            height: 1.35,
+            letterSpacing: -0.5,
+            height: 1.22,
             shadows: [
               Shadow(
                   color: const Color(0xFF15110D).withValues(alpha: 0.95),
-                  blurRadius: 16),
+                  blurRadius: 18),
               Shadow(
-                  color: const Color(0xFF15110D).withValues(alpha: 0.7),
-                  blurRadius: 4),
+                  color: const Color(0xFF15110D).withValues(alpha: 0.8),
+                  blurRadius: 5,
+                  offset: const Offset(0, 1)),
             ],
           ),
         ),
-      ],
+      ),
     );
   }
 }

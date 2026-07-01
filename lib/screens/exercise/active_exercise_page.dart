@@ -1973,12 +1973,14 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
               ),
             ),
 
-          // ── Layer 8: Coach caption (center lower-third) ──
+          // ── Layer 8: Coach caption (upper third, timed) ──
+          // High enough to clear the center hold ring / hybrid cue and far
+          // from the bottom rep hero; the caption times its own ~2s life.
           if (showCaption)
             Positioned(
               left: 24,
               right: 24,
-              bottom: media.padding.bottom + 156,
+              top: media.padding.top + 64,
               child: IvoryCoachCaption(message: coachMessage),
             ),
 
