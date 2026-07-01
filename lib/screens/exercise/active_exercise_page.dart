@@ -114,6 +114,10 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   // of the hold pose) instead of snapping back to zero.
   double _lastKnownHoldSeconds = 0;
 
+  // Peak accrued hold seconds this set — keeps the hearth pool monotonic
+  // even if the exercise restarts its live timer for a new hold attempt.
+  double _holdPoolPeakSeconds = 0;
+
   // ─── Swipe-to-demo (camera view ↔ full-screen demo) ───
   final PageController _pageController = PageController();
   int _demoPageIndex = 0;
@@ -1921,6 +1925,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
             cleanReps: _cleanRepCount,
             totalReps: widget.totalReps,
             pulseId: _rewardPulseId,
+            // Holds get a continuous hearth: the pool rises with every
+            // accrued correct second instead of per-rep steps.
+            holdProgress: widget.isTimeBased ? _holdPoolProgress : null,
           ),
         ),
 
@@ -2466,8 +2473,24 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     final live = widget.exercise.liveHoldSeconds;
     if (live != null) {
       _lastKnownHoldSeconds = live;
+      if (live > _holdPoolPeakSeconds) {
+        _holdPoolPeakSeconds = live;
+      }
     }
     return _lastKnownHoldSeconds;
+  }
+
+  /// Monotonic hearth-pool level for time-based holds: peak accrued correct
+  /// seconds over the target. The pool only ever rises across the set.
+  double get _holdPoolProgress {
+    // Touch the ring getter so the peak keeps tracking on frames where the
+    // ring itself isn't built (e.g. debug panel open).
+    final seconds = _liveHoldRingSeconds;
+    assert(seconds >= 0);
+    final target =
+        widget.exercise.liveHoldTargetSeconds ?? widget.totalReps.toDouble();
+    if (target <= 0) return 0;
+    return (_holdPoolPeakSeconds / target).clamp(0.0, 1.0);
   }
 
   Map<String, String>? get _currentPhaseInstructions {

@@ -40,6 +40,7 @@ class RepRewardLayer extends StatefulWidget {
     required this.cleanReps,
     required this.totalReps,
     required this.pulseId,
+    this.holdProgress,
   });
 
   /// Cumulative count of clean reps this set. Only ever increases. Drives how
@@ -53,6 +54,14 @@ class RepRewardLayer extends StatefulWidget {
   /// Increments exactly once per clean rep. A change fires a fresh swell.
   /// Faulted reps never bump this, so they produce no reward.
   final int pulseId;
+
+  /// Continuous mode for time-based holds (category 1): when non-null, the
+  /// resting pool level follows this 0–1 value (accrued correct seconds over
+  /// the target) instead of cleanReps/totalReps, so the hearth rises with
+  /// every correct second rather than in per-rep steps. The caller keeps it
+  /// monotonic — the pool never falls mid-set. Completion still blooms
+  /// through [pulseId] exactly like a clean rep.
+  final double? holdProgress;
 
   @override
   State<RepRewardLayer> createState() => _RepRewardLayerState();
@@ -122,9 +131,10 @@ class _RepRewardLayerState extends State<RepRewardLayer>
 
   @override
   Widget build(BuildContext context) {
-    final baseline = widget.totalReps <= 0
-        ? 0.0
-        : (widget.cleanReps / widget.totalReps).clamp(0.0, 1.0);
+    final baseline = widget.holdProgress?.clamp(0.0, 1.0) ??
+        (widget.totalReps <= 0
+            ? 0.0
+            : (widget.cleanReps / widget.totalReps).clamp(0.0, 1.0));
 
     return IgnorePointer(
       child: RepaintBoundary(
