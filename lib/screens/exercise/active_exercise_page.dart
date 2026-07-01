@@ -28,6 +28,7 @@ import 'widgets/guidance_signage.dart';
 import 'widgets/hold_hero_ring.dart';
 import 'widgets/hybrid_hold_cue.dart';
 import 'widgets/ivory_chrome.dart';
+import 'widgets/phase_chevron_stream.dart';
 import 'widgets/rep_hero.dart';
 import 'widgets/pose_overlay_painter.dart';
 import 'widgets/rep_reward_layer.dart';
@@ -2032,6 +2033,23 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
               ),
             ),
 
+          // ── Layer 11.2: Phase direction chevrons (rep-based, ambient) ──
+          // Beside the body area, never over it. Down while descending, up
+          // while ascending, hidden otherwise. Deliberately quiet.
+          if (!widget.isTimeBased &&
+              activeState &&
+              guidanceCopy == null &&
+              !showDebugPanel &&
+              _phaseChevronFlow != null)
+            Positioned(
+              right: 14,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: PhaseChevronStream(flow: _phaseChevronFlow!),
+              ),
+            ),
+
           // ── Layer 11.5: Hybrid bottom-hold cue (category 2b) ──
           // A compact mid-rep checkpoint, structurally distinct from the
           // category-1 ring: counts DOWN, much smaller, lives 1–3 seconds.
@@ -2366,6 +2384,16 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       return 'Tạm dừng. đứng trong  khung ảnh để tiếp tục';
     }
     return raw.replaceAll('⚠️ ', '').replaceAll('⏸ ', '').replaceAll('⚸ ', '');
+  }
+
+  /// Chevron flow for the ambient phase-direction stream — only the two
+  /// travelling phases show it; bottom/standing/holds render nothing.
+  ChevronFlow? get _phaseChevronFlow {
+    return switch (widget.exercise.currentPhaseKey) {
+      'descending' => ChevronFlow.down,
+      'ascending' => ChevronFlow.up,
+      _ => null,
+    };
   }
 
   /// Accrued correct seconds for the hold hero ring. Holds the last known
