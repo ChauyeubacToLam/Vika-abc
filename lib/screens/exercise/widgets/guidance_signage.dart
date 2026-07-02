@@ -165,28 +165,36 @@ class _GuidanceSignageState extends State<GuidanceSignage>
           children: [
             _glyphHero(boxWidth: 230, boxHeight: 200, glyphSize: 150),
             const SizedBox(height: 16),
-            // ≤3 words, 46pt — the instruction itself, readable mid-motion.
-            Text(
-              widget.title,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontFamily: VikaIvory.fontFamily,
-                fontSize: 46,
-                fontWeight: FontWeight.w800,
-                color: VikaIvory.invInk,
-                letterSpacing: -1.4,
-                height: 1.05,
-                shadows: [
-                  Shadow(
-                    color: VikaIvory.heroBg.withValues(alpha: 0.9),
-                    blurRadius: 12,
+            // The instruction itself, width-adaptive: short commands ("Lùi
+            // lại") render at the full 72pt; longer ones scale down to fill
+            // the width exactly. Italic display — the brand's editorial
+            // register.
+            SizedBox(
+              width: 330,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  widget.title,
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontFamily: VikaIvory.fontFamily,
+                    fontSize: 72,
+                    fontWeight: FontWeight.w800,
+                    fontStyle: FontStyle.italic,
+                    color: VikaIvory.invInk,
+                    letterSpacing: -2,
+                    height: 1.05,
+                    shadows: [
+                      Shadow(
+                        color: VikaIvory.heroBg.withValues(alpha: 0.9),
+                        blurRadius: 14,
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             // Near-view detail — kept from the old panel.
             Text(
               widget.body,
@@ -195,7 +203,7 @@ class _GuidanceSignageState extends State<GuidanceSignage>
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontFamily: VikaIvory.fontFamily,
-                fontSize: 14,
+                fontSize: 15,
                 fontWeight: FontWeight.w600,
                 color: VikaIvory.invInkSoft,
                 height: 1.4,
@@ -229,23 +237,31 @@ class _GuidanceSignageState extends State<GuidanceSignage>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    widget.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontFamily: VikaIvory.fontFamily,
-                      fontSize: 36,
-                      fontWeight: FontWeight.w800,
-                      color: VikaIvory.invInk,
-                      letterSpacing: -1.0,
-                      height: 1.05,
-                      shadows: [
-                        Shadow(
-                          color: VikaIvory.heroBg.withValues(alpha: 0.9),
-                          blurRadius: 12,
+                  // Width-adaptive title, same treatment as portrait.
+                  SizedBox(
+                    width: double.infinity,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        widget.title,
+                        maxLines: 1,
+                        style: TextStyle(
+                          fontFamily: VikaIvory.fontFamily,
+                          fontSize: 56,
+                          fontWeight: FontWeight.w800,
+                          fontStyle: FontStyle.italic,
+                          color: VikaIvory.invInk,
+                          letterSpacing: -1.6,
+                          height: 1.05,
+                          shadows: [
+                            Shadow(
+                              color: VikaIvory.heroBg.withValues(alpha: 0.9),
+                              blurRadius: 12,
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -255,7 +271,7 @@ class _GuidanceSignageState extends State<GuidanceSignage>
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontFamily: VikaIvory.fontFamily,
-                      fontSize: 13.5,
+                      fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: VikaIvory.invInkSoft,
                       height: 1.4,

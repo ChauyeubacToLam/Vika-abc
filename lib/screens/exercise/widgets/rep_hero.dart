@@ -90,26 +90,30 @@ class _IvoryRepHeroState extends State<IvoryRepHero>
                 crossAxisAlignment: CrossAxisAlignment.baseline,
                 textBaseline: TextBaseline.alphabetic,
                 children: [
+                  // Italic display numeral — the brand's signature editorial
+                  // register (the transition screen's 132pt score), sized
+                  // and weighted for 2.5m.
                   Text(
                     '$count',
                     style: TextStyle(
                       fontFamily: VikaIvory.fontFamily,
-                      fontSize: 110,
+                      fontSize: 128,
                       fontWeight: FontWeight.w800,
+                      fontStyle: FontStyle.italic,
                       color: VikaIvory.yellow,
-                      letterSpacing: -5,
+                      letterSpacing: -5.5,
                       height: 0.95,
                       shadows: [
-                        Shadow(color: VikaIvory.yellowGlow, blurRadius: 26),
+                        Shadow(color: VikaIvory.yellowGlow, blurRadius: 30),
                         Shadow(
-                          color: VikaIvory.heroBg.withValues(alpha: 0.8),
-                          blurRadius: 6,
+                          color: VikaIvory.heroBg.withValues(alpha: 0.85),
+                          blurRadius: 7,
                           offset: const Offset(0, 2),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   // The target is the second read ("am I almost done?") and
                   // must survive 2.5m too — bright cream, headline-sized,
                   // still clearly subordinate to the yellow count.
@@ -117,14 +121,15 @@ class _IvoryRepHeroState extends State<IvoryRepHero>
                     '/${widget.totalReps}',
                     style: TextStyle(
                       fontFamily: VikaIvory.fontFamily,
-                      fontSize: 44,
+                      fontSize: 56,
                       fontWeight: FontWeight.w800,
+                      fontStyle: FontStyle.italic,
                       color: VikaIvory.invInk,
-                      letterSpacing: -1.5,
+                      letterSpacing: -2,
                       shadows: [
                         Shadow(
-                          color: VikaIvory.heroBg.withValues(alpha: 0.85),
-                          blurRadius: 7,
+                          color: VikaIvory.heroBg.withValues(alpha: 0.9),
+                          blurRadius: 8,
                         ),
                       ],
                     ),
@@ -135,14 +140,14 @@ class _IvoryRepHeroState extends State<IvoryRepHero>
               // Slim set-progress underline — the tally dots' job at a size
               // that still means something across the room.
               SizedBox(
-                width: 128,
-                height: 4,
+                width: 150,
+                height: 5,
                 child: Stack(
                   children: [
                     DecoratedBox(
                       decoration: BoxDecoration(
-                        color: VikaIvory.invInk.withValues(alpha: 0.20),
-                        borderRadius: BorderRadius.circular(2),
+                        color: VikaIvory.invInk.withValues(alpha: 0.24),
+                        borderRadius: BorderRadius.circular(2.5),
                       ),
                       child: const SizedBox.expand(),
                     ),

@@ -209,8 +209,9 @@ class _HoldHeroRingState extends State<HoldHeroRing>
                                 '${widget.seconds.floor()}',
                                 style: TextStyle(
                                   fontFamily: VikaIvory.fontFamily,
-                                  fontSize: 92,
+                                  fontSize: 96,
                                   fontWeight: FontWeight.w800,
+                                  fontStyle: FontStyle.italic,
                                   color: numeralColor,
                                   letterSpacing: -3.5,
                                   height: 1,
@@ -218,12 +219,12 @@ class _HoldHeroRingState extends State<HoldHeroRing>
                                     Shadow(
                                       color: VikaIvory.yellow
                                           .withValues(alpha: 0.55 * glow),
-                                      blurRadius: 22,
+                                      blurRadius: 24,
                                     ),
                                     Shadow(
                                       color: VikaIvory.heroBg
                                           .withValues(alpha: 0.85),
-                                      blurRadius: 6,
+                                      blurRadius: 7,
                                       offset: const Offset(0, 2),
                                     ),
                                   ],
@@ -231,25 +232,26 @@ class _HoldHeroRingState extends State<HoldHeroRing>
                               ),
                             ),
                           ),
-                          const SizedBox(height: 2),
-                          // Target — near-view detail only, deliberately small.
+                          const SizedBox(height: 3),
+                          // Target — the "how long is this" second read, big
+                          // enough to survive the room.
                           Text(
                             '/ ${widget.targetSeconds.round()} GIÂY',
                             style: TextStyle(
                               fontFamily: VikaIvory.fontFamily,
-                              fontSize: 14,
+                              fontSize: 19,
                               fontWeight: FontWeight.w800,
-                              letterSpacing: 1.4,
+                              letterSpacing: 1.6,
                               color: Color.lerp(
-                                VikaIvory.invInk.withValues(alpha: 0.30),
-                                VikaIvory.invInkSoft,
+                                VikaIvory.invInk.withValues(alpha: 0.45),
+                                VikaIvory.invInk,
                                 flow,
                               ),
                               shadows: [
                                 Shadow(
                                   color:
-                                      VikaIvory.heroBg.withValues(alpha: 0.8),
-                                  blurRadius: 5,
+                                      VikaIvory.heroBg.withValues(alpha: 0.85),
+                                  blurRadius: 6,
                                 ),
                               ],
                             ),
@@ -281,7 +283,7 @@ class _HoldRingPainter extends CustomPainter {
   /// 0–1. Drives the breathing halo behind the arc. Zero while frozen.
   final double glowStrength;
 
-  static const double _stroke = 11.0;
+  static const double _stroke = 12.0;
 
   @override
   void paint(Canvas canvas, Size size) {

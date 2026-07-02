@@ -198,7 +198,9 @@ class _HybridHoldCueState extends State<HybridHoldCue>
         : (1.0 - _minBeat.value).clamp(0.0, 1.0);
     // Per-second pulse: brief swell as each second lands.
     final pulse = 1.0 + 0.07 * math.sin(_tick.value * math.pi);
-    final second = widget.showCountdown ? _displaySecond : null;
+    // Always show the seconds when the exercise exposes them — even a
+    // sub-second beat reads better as "1" draining away than as a word.
+    final second = _displaySecond;
 
     return Transform.scale(
       scale: pulse,
@@ -227,7 +229,7 @@ class _HybridHoldCueState extends State<HybridHoldCue>
             builder: (context, animatedDrain, child) {
               return CustomPaint(
                 size: Size.square(widget.diameter),
-                painter: _DrainRingPainter(
+                painter: DrainRingPainter(
                   fraction: animatedDrain,
                   color: VikaIvory.yellow,
                 ),
@@ -237,64 +239,23 @@ class _HybridHoldCueState extends State<HybridHoldCue>
             child: SizedBox.square(
               dimension: widget.diameter,
               child: Center(
+                // The seconds alone, italic and huge — no label. The word is
+                // the voice channel's job; the ring is the clock.
                 child: second != null
-                    ? Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'GIỮ',
-                            style: TextStyle(
-                              fontFamily: VikaIvory.fontFamily,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              color: VikaIvory.invInk,
-                              letterSpacing: 2.4,
-                              shadows: [
-                                Shadow(
-                                  color:
-                                      VikaIvory.heroBg.withValues(alpha: 0.8),
-                                  blurRadius: 5,
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '$second',
-                            style: TextStyle(
-                              fontFamily: VikaIvory.fontFamily,
-                              fontSize: 62,
-                              fontWeight: FontWeight.w800,
-                              color: VikaIvory.yellow,
-                              letterSpacing: -2.5,
-                              height: 1,
-                              shadows: [
-                                Shadow(
-                                  color: VikaIvory.yellowGlow,
-                                  blurRadius: 18,
-                                ),
-                                Shadow(
-                                  color:
-                                      VikaIvory.heroBg.withValues(alpha: 0.85),
-                                  blurRadius: 8,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      )
-                    : Text(
-                        'GIỮ',
+                    ? Text(
+                        '$second',
                         style: TextStyle(
                           fontFamily: VikaIvory.fontFamily,
-                          fontSize: 38,
+                          fontSize: 74,
                           fontWeight: FontWeight.w800,
+                          fontStyle: FontStyle.italic,
                           color: VikaIvory.yellow,
-                          letterSpacing: 1.2,
+                          letterSpacing: -2.5,
+                          height: 1,
                           shadows: [
                             Shadow(
                               color: VikaIvory.yellowGlow,
-                              blurRadius: 16,
+                              blurRadius: 20,
                             ),
                             Shadow(
                               color: VikaIvory.heroBg.withValues(alpha: 0.85),
@@ -302,7 +263,8 @@ class _HybridHoldCueState extends State<HybridHoldCue>
                             ),
                           ],
                         ),
-                      ),
+                      )
+                    : const SizedBox.shrink(),
               ),
             ),
           ),
@@ -328,7 +290,7 @@ class _HybridHoldCueState extends State<HybridHoldCue>
             scale: 1.0 + 0.45 * burst,
             child: CustomPaint(
               size: Size.square(widget.diameter),
-              painter: _DrainRingPainter(
+              painter: DrainRingPainter(
                 fraction: 1.0,
                 color: VikaIvory.yellow,
               ),
@@ -366,19 +328,22 @@ class _HybridHoldCueState extends State<HybridHoldCue>
 /// The draining arc: full circle at fraction 1.0, unwinding clockwise from
 /// 12 o'clock as the hold is served. Transparent fill — the camera stays the
 /// hero through the ring.
-class _DrainRingPainter extends CustomPainter {
-  const _DrainRingPainter({required this.fraction, required this.color});
+class DrainRingPainter extends CustomPainter {
+  const DrainRingPainter({
+    required this.fraction,
+    required this.color,
+    this.stroke = 9.0,
+  });
 
   /// Remaining fraction of the hold, 1.0 → 0.0.
   final double fraction;
   final Color color;
-
-  static const double _stroke = 9.0;
+  final double stroke;
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.shortestSide - _stroke) / 2 - 3;
+    final radius = (size.shortestSide - stroke) / 2 - 3;
     final rect = Rect.fromCircle(center: center, radius: radius);
     const startAngle = -math.pi / 2;
     final sweep = 2 * math.pi * fraction.clamp(0.0, 1.0);
@@ -387,7 +352,7 @@ class _DrainRingPainter extends CustomPainter {
     final track = Paint()
       ..color = color.withValues(alpha: 0.14)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = _stroke;
+      ..strokeWidth = stroke;
     canvas.drawArc(rect, startAngle, 2 * math.pi, false, track);
 
     if (sweep > 0.001) {
@@ -397,7 +362,7 @@ class _DrainRingPainter extends CustomPainter {
         ..color = color.withValues(alpha: 0.30)
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round
-        ..strokeWidth = _stroke + 7
+        ..strokeWidth = stroke + 7
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7);
       canvas.drawArc(rect, startAngle, sweep, false, halo);
 
@@ -405,13 +370,15 @@ class _DrainRingPainter extends CustomPainter {
         ..color = color.withValues(alpha: 0.95)
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round
-        ..strokeWidth = _stroke;
+        ..strokeWidth = stroke;
       canvas.drawArc(rect, startAngle, sweep, false, arc);
     }
   }
 
   @override
-  bool shouldRepaint(covariant _DrainRingPainter old) {
-    return old.fraction != fraction || old.color != color;
+  bool shouldRepaint(covariant DrainRingPainter old) {
+    return old.fraction != fraction ||
+        old.color != color ||
+        old.stroke != stroke;
   }
 }

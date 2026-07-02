@@ -285,11 +285,11 @@ class _IvoryCoachCaptionState extends State<IvoryCoachCaption>
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontFamily: _font,
-            fontSize: 26,
+            fontSize: 30,
             fontWeight: FontWeight.w800,
             color: VikaIvory.invInk,
-            letterSpacing: -0.5,
-            height: 1.22,
+            letterSpacing: -0.7,
+            height: 1.18,
             shadows: [
               Shadow(
                   color: const Color(0xFF15110D).withValues(alpha: 0.95),

@@ -30,6 +30,7 @@ import 'widgets/hybrid_hold_cue.dart';
 import 'widgets/ivory_chrome.dart';
 import 'widgets/phase_chevron_stream.dart';
 import 'widgets/rep_hero.dart';
+import 'widgets/rest_countdown_ring.dart';
 import 'widgets/pose_overlay_painter.dart';
 import 'widgets/rep_reward_layer.dart';
 import 'widgets/system_banner.dart';
@@ -123,6 +124,11 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   _BottomHoldCue? _lingeringReleaseCue;
   DateTime? _releaseLingerUntil;
   static const Duration _releaseLingerDuration = Duration(milliseconds: 650);
+
+  // Full length of the current in-set rest (e.g. plank's 5s between McGill
+  // holds), captured from the first remaining value seen — drives the rest
+  // ring's drain fraction.
+  double _restRingTotalSeconds = 0;
 
   // ─── Swipe-to-demo (camera view ↔ full-screen demo) ───
   final PageController _pageController = PageController();
@@ -1780,6 +1786,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     final media = MediaQuery.of(context);
     final overlayState = _overlayState;
     final bottomHoldCue = _displayedHoldCue;
+    final holdRestRemaining = _holdRestRemaining;
     final guidanceCopy = _currentGuidanceCopy;
     final orientationGuidanceActive =
         _orientationPauseActive && guidanceCopy != null;
@@ -2069,16 +2076,38 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
           ),
         ),
 
-        // ── Layer 11: Hold hero ring (category 1 — time-based holds) ──
-        // The centerpiece for hold exercises: one large transparent ring
-        // center-screen. Flowing vs frozen is derived from the accrued
-        // seconds advancing or not — see HoldHeroRing.
+        // ── Layer 11: Hold hero ring / rest ring (category 1) ──
+        // One center slot, two opposite states that crossfade: WORK fills
+        // yellow and counts up (HoldHeroRing); an in-set BREAK (e.g. plank's
+        // McGill 5s between holds) drains amber and counts down
+        // (RestCountdownRing). Anything counting down gets a ring.
         if (widget.isTimeBased && activeState && guidanceCopy == null)
           Center(
-            child: HoldHeroRing(
-              seconds: _liveHoldRingSeconds,
-              targetSeconds: widget.exercise.liveHoldTargetSeconds ??
-                  widget.totalReps.toDouble(),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 320),
+              transitionBuilder: (child, animation) {
+                return FadeTransition(
+                  opacity: animation,
+                  child: ScaleTransition(
+                    scale: Tween<double>(begin: 0.92, end: 1).animate(
+                      CurvedAnimation(parent: animation, curve: Curves.easeOut),
+                    ),
+                    child: child,
+                  ),
+                );
+              },
+              child: holdRestRemaining != null
+                  ? RestCountdownRing(
+                      key: const ValueKey<String>('hold-rest-ring'),
+                      remainingSeconds: holdRestRemaining,
+                      totalSeconds: _restRingTotalSeconds,
+                    )
+                  : HoldHeroRing(
+                      key: const ValueKey<String>('hold-hero-ring'),
+                      seconds: _liveHoldRingSeconds,
+                      targetSeconds: widget.exercise.liveHoldTargetSeconds ??
+                          widget.totalReps.toDouble(),
+                    ),
             ),
           ),
 
@@ -2545,6 +2574,29 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       }
     }
     return _lastKnownHoldSeconds;
+  }
+
+  /// Remaining seconds of an in-set break in a hold exercise (e.g. plank's
+  /// 'Nghỉ 4.2s' status during PlankState.resting), or null while working.
+  /// Presentation-only read of the status vocabulary; also captures the rest
+  /// length for the ring's drain fraction.
+  double? get _holdRestRemaining {
+    if (!widget.isTimeBased) return null;
+    final status = _currentPhaseStatus;
+    final remaining = (status != null && status.contains('Nghỉ'))
+        ? _extractDurationSeconds(status)
+        : null;
+    if (remaining == null) {
+      // Not resting — clear the anchor so the next rest re-measures even if
+      // it's shorter than the last one.
+      _restRingTotalSeconds = 0;
+      return null;
+    }
+    // First frame of a new rest anchors the total for the drain fraction.
+    if (remaining > _restRingTotalSeconds) {
+      _restRingTotalSeconds = remaining.ceilToDouble();
+    }
+    return remaining;
   }
 
   /// Monotonic hearth-pool level for time-based holds: peak accrued correct
