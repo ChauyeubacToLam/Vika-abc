@@ -1797,6 +1797,13 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         trackedMetrics.isNotEmpty && (debugEnabled || _isStaffUser);
     final showDebugPanel = debugEnabled && _debugPanelOpen;
     final previewFit = _previewFit;
+    // Landscape re-seats the heroes: the viewport is short, so stacking
+    // center cue + signage + bottom rep hero collides. The rep hero moves to
+    // the right edge (vertically centered), chevrons flip to the left, and
+    // the guidance signage lays out horizontally. Center stays owned by the
+    // hold cue / hold ring.
+    final isLandscape = ExerciseBase.kLandscapeRotationEnabled &&
+        _sessionOrientation.isLandscape;
 
     // The persistent phase verb (XUỐNG/LÊN) and phase hint are gone in v9:
     // they duplicated the user's own proprioception and were illegible from
@@ -2015,8 +2022,8 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                     center: Alignment.center,
                     radius: 1.1,
                     colors: [
-                      VikaIvory.heroBg.withValues(alpha: 0.28),
-                      VikaIvory.heroBg.withValues(alpha: 0.78),
+                      VikaIvory.heroBg.withValues(alpha: 0.34),
+                      VikaIvory.heroBg.withValues(alpha: 0.86),
                     ],
                     stops: const [0.35, 1.0],
                   ),
@@ -2031,7 +2038,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         // so it never hides the user's own body in the mirror.
         if (guidanceCopy != null && !widget.exercise.isPaused)
           Align(
-            alignment: const Alignment(0, -0.25),
+            alignment: Alignment(0, isLandscape ? -0.35 : -0.25),
             child: IgnorePointer(
               child: GuidanceSignage(
                 icon: guidanceCopy.icon,
@@ -2039,6 +2046,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                 title: guidanceCopy.title,
                 body: guidanceCopy.body,
                 mode: guidanceCopy.mode,
+                horizontal: isLandscape,
               ),
             ),
           ),
@@ -2076,14 +2084,17 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
         // ── Layer 11.2: Phase direction chevrons (rep-based, ambient) ──
         // Beside the body area, never over it. Down while descending, up
-        // while ascending, hidden otherwise. Deliberately quiet.
+        // while ascending, hidden otherwise. Deliberately quiet. In
+        // landscape the right edge belongs to the rep hero, so the stream
+        // moves to the left.
         if (!widget.isTimeBased &&
             activeState &&
             guidanceCopy == null &&
             !showDebugPanel &&
             _phaseChevronFlow != null)
           Positioned(
-            right: 14,
+            left: isLandscape ? 18 : null,
+            right: isLandscape ? null : 14,
             top: 0,
             bottom: 0,
             child: Center(
@@ -2127,22 +2138,37 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
             ),
           ),
 
-        // ── Layer 12: Rep hero (category 2 — bottom-center) ──
-        // The one number a rep-based user glances for. No fault marking —
-        // feedback during the set is additive only; the form verdict is
-        // computed after the set, never during.
+        // ── Layer 12: Rep hero (category 2) ──
+        // The one number a rep-based user glances for. Bottom-center in
+        // portrait; in landscape the short viewport puts bottom-center under
+        // the hold cue and signage, so the hero owns the right edge instead.
+        // No fault marking — feedback during the set is additive only; the
+        // form verdict is computed after the set, never during.
         if (!widget.isTimeBased && activeState && !showDebugPanel)
-          Positioned(
-            left: 24,
-            right: 24,
-            bottom: media.padding.bottom + 28,
-            child: Center(
-              child: IvoryRepHero(
-                repCount: widget.exercise.repCount,
-                totalReps: widget.totalReps,
+          if (isLandscape)
+            Positioned(
+              right: 40,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: IvoryRepHero(
+                  repCount: widget.exercise.repCount,
+                  totalReps: widget.totalReps,
+                ),
+              ),
+            )
+          else
+            Positioned(
+              left: 24,
+              right: 24,
+              bottom: media.padding.bottom + 28,
+              child: Center(
+                child: IvoryRepHero(
+                  repCount: widget.exercise.repCount,
+                  totalReps: widget.totalReps,
+                ),
               ),
             ),
-          ),
       ],
     );
 

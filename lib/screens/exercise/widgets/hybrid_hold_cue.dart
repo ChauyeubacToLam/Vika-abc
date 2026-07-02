@@ -12,13 +12,19 @@ import '../../../theme/vf_theme.dart';
 // release beat ("LÊN!"). Rich enough to read as *time passing* from 2.5m —
 // motion + a shrinking arc, not a text label.
 //
-// It must never be mistaken for the category-1 HoldHeroRing, so every axis
-// is opposite:
+// It must never be mistaken for the category-1 HoldHeroRing. The two can
+// never actually share a screen (the set ring exists only in time-based
+// exercises, this cue only in rep-based ones), and every structural axis is
+// opposite:
 //
 //   • DRAINS (full → empty) — the set ring FILLS (empty → full)
-//   • cream — the set ring is yellow (yellow here is saved for LÊN!)
 //   • ~150pt — clearly smaller than 230pt
 //   • lives seconds — the set ring lives the whole set
+//
+// Color is deliberately NOT spent on differentiation: the ring is yellow
+// because that is the one color engineered to read at 2.5m — cream on a
+// bright camera scene disappears. The cue is transient, so the momentary
+// yellow surplus is within the design system's transient-moment exemption.
 //
 // The physical hold can be sub-second (squat: 0.35s), far too short for a
 // human to read raw state changes. So this widget is a BEAT SEQUENCER, not a
@@ -196,78 +202,111 @@ class _HybridHoldCueState extends State<HybridHoldCue>
 
     return Transform.scale(
       scale: pulse,
-      child: TweenAnimationBuilder<double>(
-        // Smooth between coarse metric ticks so the drain never stutters.
-        tween: Tween<double>(begin: drain, end: drain),
-        duration: const Duration(milliseconds: 160),
-        curve: Curves.linear,
-        builder: (context, animatedDrain, child) {
-          return CustomPaint(
-            painter: _DrainRingPainter(
-              fraction: animatedDrain,
-              color: VikaIvory.invInk,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Soft dark pool inside the ring so the yellow numeral pops on any
+          // camera scene — fades to nothing at the rim, mirror stays visible.
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                colors: [
+                  VikaIvory.heroBg.withValues(alpha: 0.52),
+                  VikaIvory.heroBg.withValues(alpha: 0),
+                ],
+                stops: const [0.35, 1.0],
+              ),
             ),
-            child: child,
-          );
-        },
-        child: Center(
-          child: second != null
-              ? Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'GIỮ',
-                      style: TextStyle(
-                        fontFamily: VikaIvory.fontFamily,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: VikaIvory.invInkSoft,
-                        letterSpacing: 2.4,
-                        shadows: [
-                          Shadow(
-                            color: VikaIvory.heroBg.withValues(alpha: 0.8),
-                            blurRadius: 5,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '$second',
-                      style: TextStyle(
-                        fontFamily: VikaIvory.fontFamily,
-                        fontSize: 62,
-                        fontWeight: FontWeight.w800,
-                        color: VikaIvory.invInk,
-                        letterSpacing: -2.5,
-                        height: 1,
-                        shadows: [
-                          Shadow(
-                            color: VikaIvory.heroBg.withValues(alpha: 0.85),
-                            blurRadius: 8,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                )
-              : Text(
-                  'GIỮ',
-                  style: TextStyle(
-                    fontFamily: VikaIvory.fontFamily,
-                    fontSize: 38,
-                    fontWeight: FontWeight.w800,
-                    color: VikaIvory.invInk,
-                    letterSpacing: 1.2,
-                    shadows: [
-                      Shadow(
-                        color: VikaIvory.heroBg.withValues(alpha: 0.85),
-                        blurRadius: 8,
-                      ),
-                    ],
-                  ),
+            child: SizedBox.square(dimension: widget.diameter),
+          ),
+          TweenAnimationBuilder<double>(
+            // Smooth between coarse metric ticks so the drain never stutters.
+            tween: Tween<double>(begin: drain, end: drain),
+            duration: const Duration(milliseconds: 160),
+            curve: Curves.linear,
+            builder: (context, animatedDrain, child) {
+              return CustomPaint(
+                size: Size.square(widget.diameter),
+                painter: _DrainRingPainter(
+                  fraction: animatedDrain,
+                  color: VikaIvory.yellow,
                 ),
-        ),
+                child: child,
+              );
+            },
+            child: SizedBox.square(
+              dimension: widget.diameter,
+              child: Center(
+                child: second != null
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'GIỮ',
+                            style: TextStyle(
+                              fontFamily: VikaIvory.fontFamily,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: VikaIvory.invInk,
+                              letterSpacing: 2.4,
+                              shadows: [
+                                Shadow(
+                                  color:
+                                      VikaIvory.heroBg.withValues(alpha: 0.8),
+                                  blurRadius: 5,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '$second',
+                            style: TextStyle(
+                              fontFamily: VikaIvory.fontFamily,
+                              fontSize: 62,
+                              fontWeight: FontWeight.w800,
+                              color: VikaIvory.yellow,
+                              letterSpacing: -2.5,
+                              height: 1,
+                              shadows: [
+                                Shadow(
+                                  color: VikaIvory.yellowGlow,
+                                  blurRadius: 18,
+                                ),
+                                Shadow(
+                                  color:
+                                      VikaIvory.heroBg.withValues(alpha: 0.85),
+                                  blurRadius: 8,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      )
+                    : Text(
+                        'GIỮ',
+                        style: TextStyle(
+                          fontFamily: VikaIvory.fontFamily,
+                          fontSize: 38,
+                          fontWeight: FontWeight.w800,
+                          color: VikaIvory.yellow,
+                          letterSpacing: 1.2,
+                          shadows: [
+                            Shadow(
+                              color: VikaIvory.yellowGlow,
+                              blurRadius: 16,
+                            ),
+                            Shadow(
+                              color: VikaIvory.heroBg.withValues(alpha: 0.85),
+                              blurRadius: 8,
+                            ),
+                          ],
+                        ),
+                      ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

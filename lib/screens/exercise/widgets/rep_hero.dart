@@ -110,18 +110,21 @@ class _IvoryRepHeroState extends State<IvoryRepHero>
                     ),
                   ),
                   const SizedBox(width: 8),
+                  // The target is the second read ("am I almost done?") and
+                  // must survive 2.5m too — bright cream, headline-sized,
+                  // still clearly subordinate to the yellow count.
                   Text(
                     '/${widget.totalReps}',
                     style: TextStyle(
                       fontFamily: VikaIvory.fontFamily,
-                      fontSize: 30,
-                      fontWeight: FontWeight.w700,
-                      color: VikaIvory.invInkSoft,
-                      letterSpacing: -1,
+                      fontSize: 44,
+                      fontWeight: FontWeight.w800,
+                      color: VikaIvory.invInk,
+                      letterSpacing: -1.5,
                       shadows: [
                         Shadow(
-                          color: VikaIvory.heroBg.withValues(alpha: 0.7),
-                          blurRadius: 5,
+                          color: VikaIvory.heroBg.withValues(alpha: 0.85),
+                          blurRadius: 7,
                         ),
                       ],
                     ),

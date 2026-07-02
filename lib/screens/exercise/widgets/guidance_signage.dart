@@ -57,6 +57,7 @@ class GuidanceSignage extends StatefulWidget {
     required this.body,
     required this.mode,
     this.compact = false,
+    this.horizontal = false,
   });
 
   final IconData icon;
@@ -68,6 +69,10 @@ class GuidanceSignage extends StatefulWidget {
   /// Compact horizontal pill — used when the signage rides above another
   /// full-screen surface (e.g. the orientation gate over the pause overlay).
   final bool compact;
+
+  /// Landscape layout: glyph beside the text instead of above it, so the
+  /// signage fits a short viewport without stacking onto other heroes.
+  final bool horizontal;
 
   @override
   State<GuidanceSignage> createState() => _GuidanceSignageState();
@@ -108,50 +113,59 @@ class _GuidanceSignageState extends State<GuidanceSignage>
 
   @override
   Widget build(BuildContext context) {
-    return widget.compact ? _buildCompact() : _buildFull();
+    if (widget.compact) return _buildCompact();
+    return widget.horizontal ? _buildHorizontal() : _buildFull();
+  }
+
+  /// The animated glyph inside its accent aura — shared by both full layouts.
+  Widget _glyphHero(
+      {required double boxWidth,
+      required double boxHeight,
+      required double glyphSize}) {
+    return SizedBox(
+      width: boxWidth,
+      height: boxHeight,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Soft accent aura — color carries state at any distance.
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                colors: [
+                  _accent.withValues(alpha: 0.24),
+                  _accent.withValues(alpha: 0),
+                ],
+                stops: const [0, 0.85],
+              ),
+            ),
+            child: SizedBox(width: boxWidth, height: boxHeight),
+          ),
+          Positioned.fill(
+            child: AnimatedBuilder(
+              animation: _motion,
+              builder: (context, _) =>
+                  _buildGlyph(_motion.value, size: glyphSize),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildFull() {
     // No card, no box: the page dims the whole screen behind this signage
     // (a gross, distance-readable mode change), and the signage floats on it
-    // — one huge moving glyph, a 40pt instruction, near-view detail below.
+    // — one huge moving glyph, a 46pt instruction, near-view detail below.
     return RepaintBoundary(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 340),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(
-              width: 220,
-              height: 190,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  // Soft accent aura — color carries state at any distance.
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: RadialGradient(
-                        colors: [
-                          _accent.withValues(alpha: 0.22),
-                          _accent.withValues(alpha: 0),
-                        ],
-                        stops: const [0, 0.85],
-                      ),
-                    ),
-                    child: const SizedBox(width: 220, height: 190),
-                  ),
-                  Positioned.fill(
-                    child: AnimatedBuilder(
-                      animation: _motion,
-                      builder: (context, _) =>
-                          _buildGlyph(_motion.value, size: 140),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            _glyphHero(boxWidth: 230, boxHeight: 200, glyphSize: 150),
             const SizedBox(height: 16),
-            // ≤3 words, 40pt — the instruction itself, readable mid-motion.
+            // ≤3 words, 46pt — the instruction itself, readable mid-motion.
             Text(
               widget.title,
               textAlign: TextAlign.center,
@@ -159,10 +173,10 @@ class _GuidanceSignageState extends State<GuidanceSignage>
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontFamily: VikaIvory.fontFamily,
-                fontSize: 40,
+                fontSize: 46,
                 fontWeight: FontWeight.w800,
                 color: VikaIvory.invInk,
-                letterSpacing: -1.2,
+                letterSpacing: -1.4,
                 height: 1.05,
                 shadows: [
                   Shadow(
@@ -189,6 +203,69 @@ class _GuidanceSignageState extends State<GuidanceSignage>
                   Shadow(
                     color: VikaIvory.heroBg.withValues(alpha: 0.8),
                     blurRadius: 8,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Landscape: glyph beside the text so the signage stays inside a short
+  /// viewport and clear of the center/edge heroes.
+  Widget _buildHorizontal() {
+    return RepaintBoundary(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 460),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _glyphHero(boxWidth: 150, boxHeight: 140, glyphSize: 104),
+            const SizedBox(width: 20),
+            Flexible(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: VikaIvory.fontFamily,
+                      fontSize: 36,
+                      fontWeight: FontWeight.w800,
+                      color: VikaIvory.invInk,
+                      letterSpacing: -1.0,
+                      height: 1.05,
+                      shadows: [
+                        Shadow(
+                          color: VikaIvory.heroBg.withValues(alpha: 0.9),
+                          blurRadius: 12,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.body,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: VikaIvory.fontFamily,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      color: VikaIvory.invInkSoft,
+                      height: 1.4,
+                      shadows: [
+                        Shadow(
+                          color: VikaIvory.heroBg.withValues(alpha: 0.8),
+                          blurRadius: 8,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
