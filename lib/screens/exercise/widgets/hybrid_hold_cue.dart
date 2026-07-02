@@ -7,26 +7,31 @@ import '../../../theme/vf_theme.dart';
 // ═══════════════════════════════════════════════════════════════════════════
 // HybridHoldCue — the category-2b (rep with mid-rep hold) checkpoint.
 //
-// A squat-with-bottom-hold pauses loaded at the bottom; this cue reads as
-// "hold for a beat, then explode up" — and must never be mistaken for the
-// category-1 HoldHeroRing. Differentiation is structural:
+// A DRAINING countdown ring: it appears full and unwinds as the hold is
+// served, with the seconds counting down inside, then bursts outward on the
+// release beat ("LÊN!"). Rich enough to read as *time passing* from 2.5m —
+// motion + a shrinking arc, not a text label.
 //
-//   • no ring at all — a compact badge, clearly smaller than 230pt
-//   • lives around a second; the ring lives the whole set
-//   • the hold beat is cream; yellow is saved for the release moment
+// It must never be mistaken for the category-1 HoldHeroRing, so every axis
+// is opposite:
+//
+//   • DRAINS (full → empty) — the set ring FILLS (empty → full)
+//   • cream — the set ring is yellow (yellow here is saved for LÊN!)
+//   • ~150pt — clearly smaller than 230pt
+//   • lives seconds — the set ring lives the whole set
 //
 // The physical hold can be sub-second (squat: 0.35s), far too short for a
 // human to read raw state changes. So this widget is a BEAT SEQUENCER, not a
-// mirror: GIỮ is guaranteed a minimum legible life (~600ms) before the
-// release visual may replace it, even when the exercise reports readyToPush
-// earlier. Voice leads ("Giữ" → "Lên"); the screen lands the same beats at a
-// readable tempo. Holds long enough to count ([showCountdown]) get a
-// per-second countdown numeral; sub-second holds show a single wordless GIỮ.
+// mirror: sub-second holds drain the ring over the 600ms minimum legible
+// beat (the ring IS the beat) with a wordless GIỮ; holds long enough to
+// count ([showCountdown]) drain on real progress with a per-second numeral
+// pulse. Voice leads ("Giữ" → "Lên"); the screen lands the same beats at a
+// readable tempo.
 //
-// The release moment ("LÊN!") is the loudest visual beat on purpose: the cue
-// doubles as a safety cue — hesitating loaded at the bottom is bad. If the
-// user does hesitate, LÊN! stays until they actually move (the parent keeps
-// the cue alive through the bottom phase and ~650ms into the ascent).
+// The release moment is the loudest visual beat on purpose: the cue doubles
+// as a safety cue — hesitating loaded at the bottom is bad. If the user does
+// hesitate, LÊN! stays until they actually move (the parent keeps the cue
+// alive through the bottom phase and ~650ms into the ascent).
 //
 // Per-second pulses only (≤1Hz); entrance/exit crossfades are owned by the
 // parent AnimatedSwitcher.
@@ -37,7 +42,9 @@ class HybridHoldCue extends StatefulWidget {
     super.key,
     required this.remainingSeconds,
     required this.readyToPush,
+    this.progress = 0.0,
     this.showCountdown = true,
+    this.diameter = 150,
   });
 
   /// Seconds left in the bottom hold; null when the exercise doesn't expose
@@ -47,9 +54,14 @@ class HybridHoldCue extends StatefulWidget {
   /// True the instant the hold is served and the user should drive up.
   final bool readyToPush;
 
+  /// Real hold progress 0–1 — drives the ring drain for countable holds.
+  final double progress;
+
   /// Whether a numeric countdown means anything at this hold length. False
-  /// for sub-second holds (a flashing "· 1" reads as noise, not time).
+  /// for sub-second holds, whose ring drains over the minimum beat instead.
   final bool showCountdown;
+
+  final double diameter;
 
   @override
   State<HybridHoldCue> createState() => _HybridHoldCueState();
@@ -60,8 +72,9 @@ class _HybridHoldCueState extends State<HybridHoldCue>
   late final AnimationController _tick;
   late final AnimationController _release;
 
-  /// Runs the GIỮ beat's minimum legible life. Vsync-driven so it stays
-  /// honest under fake-async tests and janky frames alike.
+  /// Runs the GIỮ beat's minimum legible life — and, for sub-second holds,
+  /// the ring drain itself. Vsync-driven so it stays honest under fake-async
+  /// tests and janky frames alike.
   late final AnimationController _minBeat;
 
   /// Whether the release visual is actually showing — lags [widget.readyToPush]
@@ -87,7 +100,7 @@ class _HybridHoldCueState extends State<HybridHoldCue>
     );
     _release = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 460),
+      duration: const Duration(milliseconds: 520),
     );
     _minBeat = AnimationController(vsync: this, duration: _minHoldBeat)
       ..addStatusListener((status) {
@@ -155,111 +168,211 @@ class _HybridHoldCueState extends State<HybridHoldCue>
   Widget build(BuildContext context) {
     return IgnorePointer(
       child: RepaintBoundary(
-        child: AnimatedBuilder(
-          animation: Listenable.merge(<Listenable>[_tick, _release]),
-          builder: (context, _) {
-            return _showRelease ? _buildRelease() : _buildHold();
-          },
+        child: SizedBox(
+          width: widget.diameter,
+          height: widget.diameter,
+          child: AnimatedBuilder(
+            animation:
+                Listenable.merge(<Listenable>[_tick, _release, _minBeat]),
+            builder: (context, _) {
+              return _showRelease ? _buildRelease() : _buildHold();
+            },
+          ),
         ),
       ),
     );
   }
 
   Widget _buildHold() {
-    // Per-second pulse while counting; a steady presence for beat-holds.
-    final scale = 1.0 + 0.09 * math.sin(_tick.value * math.pi);
+    // The remaining fraction the ring still shows. Countable holds drain on
+    // real progress; sub-second beat-holds drain over the minimum beat so
+    // the drain is legible instead of a 350ms blink.
+    final drain = widget.showCountdown
+        ? (1.0 - widget.progress).clamp(0.0, 1.0)
+        : (1.0 - _minBeat.value).clamp(0.0, 1.0);
+    // Per-second pulse: brief swell as each second lands.
+    final pulse = 1.0 + 0.07 * math.sin(_tick.value * math.pi);
     final second = widget.showCountdown ? _displaySecond : null;
-    final holdLabelSize = second == null ? 46.0 : 30.0;
 
     return Transform.scale(
-      scale: scale,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 14),
-        decoration: BoxDecoration(
-          color: VikaIvory.heroBg.withValues(alpha: 0.55),
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: VikaIvory.glass12),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Text(
-              'GIỮ',
-              style: TextStyle(
-                fontFamily: VikaIvory.fontFamily,
-                fontSize: holdLabelSize,
-                fontWeight: FontWeight.w800,
-                color: VikaIvory.invInk,
-                letterSpacing: 1.2,
-                shadows: [
-                  Shadow(
-                    color: VikaIvory.heroBg.withValues(alpha: 0.8),
-                    blurRadius: 5,
-                  ),
-                ],
-              ),
+      scale: pulse,
+      child: TweenAnimationBuilder<double>(
+        // Smooth between coarse metric ticks so the drain never stutters.
+        tween: Tween<double>(begin: drain, end: drain),
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.linear,
+        builder: (context, animatedDrain, child) {
+          return CustomPaint(
+            painter: _DrainRingPainter(
+              fraction: animatedDrain,
+              color: VikaIvory.invInk,
             ),
-            if (second != null) ...[
-              Text(
-                ' · ',
-                style: TextStyle(
-                  fontFamily: VikaIvory.fontFamily,
-                  fontSize: 30,
-                  fontWeight: FontWeight.w700,
-                  color: VikaIvory.invInkDim,
-                ),
-              ),
-              Text(
-                '$second',
-                style: TextStyle(
-                  fontFamily: VikaIvory.fontFamily,
-                  fontSize: 58,
-                  fontWeight: FontWeight.w800,
-                  color: VikaIvory.invInk,
-                  letterSpacing: -2,
-                  height: 1,
-                  shadows: [
-                    Shadow(
-                      color: VikaIvory.heroBg.withValues(alpha: 0.8),
-                      blurRadius: 6,
+            child: child,
+          );
+        },
+        child: Center(
+          child: second != null
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'GIỮ',
+                      style: TextStyle(
+                        fontFamily: VikaIvory.fontFamily,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: VikaIvory.invInkSoft,
+                        letterSpacing: 2.4,
+                        shadows: [
+                          Shadow(
+                            color: VikaIvory.heroBg.withValues(alpha: 0.8),
+                            blurRadius: 5,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$second',
+                      style: TextStyle(
+                        fontFamily: VikaIvory.fontFamily,
+                        fontSize: 62,
+                        fontWeight: FontWeight.w800,
+                        color: VikaIvory.invInk,
+                        letterSpacing: -2.5,
+                        height: 1,
+                        shadows: [
+                          Shadow(
+                            color: VikaIvory.heroBg.withValues(alpha: 0.85),
+                            blurRadius: 8,
+                          ),
+                        ],
+                      ),
                     ),
                   ],
+                )
+              : Text(
+                  'GIỮ',
+                  style: TextStyle(
+                    fontFamily: VikaIvory.fontFamily,
+                    fontSize: 38,
+                    fontWeight: FontWeight.w800,
+                    color: VikaIvory.invInk,
+                    letterSpacing: 1.2,
+                    shadows: [
+                      Shadow(
+                        color: VikaIvory.heroBg.withValues(alpha: 0.85),
+                        blurRadius: 8,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ],
         ),
       ),
     );
   }
 
   Widget _buildRelease() {
-    // The loudest visual beat on the screen: a single decisive pop, no loop.
-    final t = Curves.easeOutBack.transform(_release.value.clamp(0.0, 1.0));
-    return Transform.scale(
-      scale: 0.7 + 0.5 * t,
-      child: Text(
-        'LÊN!',
-        style: TextStyle(
-          fontFamily: VikaIvory.fontFamily,
-          fontSize: 74,
-          fontWeight: FontWeight.w800,
-          fontStyle: FontStyle.italic,
-          color: VikaIvory.yellow,
-          letterSpacing: -1.5,
-          height: 1,
-          shadows: [
-            Shadow(color: VikaIvory.yellowGlow, blurRadius: 30),
-            Shadow(
-              color: VikaIvory.heroBg.withValues(alpha: 0.85),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+    // The loudest visual beat on the screen: the drained ring bursts outward
+    // and dies while LÊN! pops in its place. Single decisive event, no loop.
+    final t = _release.value.clamp(0.0, 1.0);
+    final pop = Curves.easeOutBack.transform(t);
+    final burst = Curves.easeOutCubic.transform(t);
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        // Ring shockwave — expands and fades.
+        Opacity(
+          opacity: (1.0 - burst).clamp(0.0, 1.0),
+          child: Transform.scale(
+            scale: 1.0 + 0.45 * burst,
+            child: CustomPaint(
+              size: Size.square(widget.diameter),
+              painter: _DrainRingPainter(
+                fraction: 1.0,
+                color: VikaIvory.yellow,
+              ),
             ),
-          ],
+          ),
         ),
-      ),
+        Transform.scale(
+          scale: 0.7 + 0.5 * pop,
+          child: Text(
+            'LÊN!',
+            style: TextStyle(
+              fontFamily: VikaIvory.fontFamily,
+              fontSize: 64,
+              fontWeight: FontWeight.w800,
+              fontStyle: FontStyle.italic,
+              color: VikaIvory.yellow,
+              letterSpacing: -1.5,
+              height: 1,
+              shadows: [
+                Shadow(color: VikaIvory.yellowGlow, blurRadius: 30),
+                Shadow(
+                  color: VikaIvory.heroBg.withValues(alpha: 0.85),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
+  }
+}
+
+/// The draining arc: full circle at fraction 1.0, unwinding clockwise from
+/// 12 o'clock as the hold is served. Transparent fill — the camera stays the
+/// hero through the ring.
+class _DrainRingPainter extends CustomPainter {
+  const _DrainRingPainter({required this.fraction, required this.color});
+
+  /// Remaining fraction of the hold, 1.0 → 0.0.
+  final double fraction;
+  final Color color;
+
+  static const double _stroke = 9.0;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.shortestSide - _stroke) / 2 - 3;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+    const startAngle = -math.pi / 2;
+    final sweep = 2 * math.pi * fraction.clamp(0.0, 1.0);
+
+    // Faint full track so the drained portion reads as "time already spent".
+    final track = Paint()
+      ..color = color.withValues(alpha: 0.14)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = _stroke;
+    canvas.drawArc(rect, startAngle, 2 * math.pi, false, track);
+
+    if (sweep > 0.001) {
+      // Soft halo under the live arc — presence without competing with the
+      // yellow set-level elements.
+      final halo = Paint()
+        ..color = color.withValues(alpha: 0.30)
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = _stroke + 7
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7);
+      canvas.drawArc(rect, startAngle, sweep, false, halo);
+
+      final arc = Paint()
+        ..color = color.withValues(alpha: 0.95)
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = _stroke;
+      canvas.drawArc(rect, startAngle, sweep, false, arc);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DrainRingPainter old) {
+    return old.fraction != fraction || old.color != color;
   }
 }

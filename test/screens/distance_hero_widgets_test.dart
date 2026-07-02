@@ -97,6 +97,30 @@ void main() {
       (tester) async {
     await tester.pumpWidget(hostCue(readyToPush: false));
     expect(find.text('1'), findsNothing);
-    expect(find.textContaining('·'), findsNothing);
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('hybrid cue countdown mode shows the draining seconds',
+      (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          backgroundColor: Colors.black,
+          body: Center(
+            child: HybridHoldCue(
+              // Walking-lunge-style 2s hold, 0.6s in.
+              remainingSeconds: 1.4,
+              readyToPush: false,
+              progress: 0.3,
+              showCountdown: true,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('GIỮ'), findsOneWidget);
+    expect(find.text('2'), findsOneWidget);
+    await tester.pumpAndSettle();
   });
 }

@@ -2092,12 +2092,13 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
           ),
 
         // ── Layer 11.5: Hybrid bottom-hold cue (category 2b) ──
-        // A compact mid-rep checkpoint, structurally distinct from the
-        // category-1 ring: much smaller, lives around a second, GIỮ → LÊN!.
-        // "LÊN!" is deliberately the loudest visual beat — hesitating
-        // loaded at the bottom is a safety problem. Squat holds are only
-        // 0.35s, so the widget guarantees each beat a legible minimum life;
-        // the entrance here is fast for the same reason.
+        // A draining countdown ring, structurally opposite to the category-1
+        // ring on every axis (drains vs fills, cream vs yellow, 150pt vs
+        // 230pt, seconds vs whole set). "LÊN!" is deliberately the loudest
+        // visual beat — hesitating loaded at the bottom is a safety problem.
+        // Squat holds are only 0.35s, so the widget guarantees each beat a
+        // legible minimum life; the entrance here is fast for the same
+        // reason.
         if (!widget.isTimeBased && !showDebugPanel)
           IgnorePointer(
             child: Center(
@@ -2118,6 +2119,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                         key: const ValueKey<String>('hybrid-hold-cue'),
                         remainingSeconds: bottomHoldCue.remaining,
                         readyToPush: bottomHoldCue.readyToPush,
+                        progress: bottomHoldCue.progress,
                         showCountdown: bottomHoldCue.showCountdown,
                       )
                     : const SizedBox.shrink(),
