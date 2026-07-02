@@ -57,30 +57,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
   String _selectedFilter = 'all';
   final ScrollController _scrollController = ScrollController();
   final _launches = WorkoutLaunchService();
-  bool _showStickyBar = false;
-
-  /// Scroll offset (in logical px) past which the compact pill bar
-  /// fades in. ~ where the stage hero's headline crosses the top.
-  static const double _stickyBarThreshold = 230;
-
-  @override
-  void initState() {
-    super.initState();
-    _scrollController.addListener(_onScroll);
-  }
 
   @override
   void dispose() {
-    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
-  }
-
-  void _onScroll() {
-    final shouldShow = _scrollController.offset > _stickyBarThreshold;
-    if (shouldShow != _showStickyBar) {
-      setState(() => _showStickyBar = shouldShow);
-    }
   }
 
   void _onStickyBarTap() {
@@ -92,11 +73,6 @@ class _LibraryScreenState extends State<LibraryScreen> {
       curve: Curves.easeOutCubic,
     );
   }
-
-  LibraryFilter get _activeFilter => libraryFilters.firstWhere(
-        (f) => f.id == _selectedFilter,
-        orElse: () => libraryFilters.first,
-      );
 
   int get _totalLibraryCount =>
       libraryAlbumCards.length + libraryMockAllExercises.length;
@@ -300,11 +276,6 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 ],
               ),
             ),
-            _StickyPillBar(
-              visible: _showStickyBar,
-              activeFilter: _activeFilter,
-              onTap: _onStickyBarTap,
-            ),
           ],
         ),
       ),
@@ -359,6 +330,7 @@ class _CatalogSection extends StatelessWidget {
 // discovery while protecting the cinematic stage hero entrance.
 // ═══════════════════════════════════════════════════════════════
 
+// ignore: unused_element
 class _StickyPillBar extends StatelessWidget {
   const _StickyPillBar({
     required this.visible,
