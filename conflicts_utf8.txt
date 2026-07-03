@@ -1,0 +1,625 @@
+﻿diff --cc lib/exercise/ashtanga_namaskara/ashtanga_namaskara.dart
+index 783d76c,728a402..0000000
+--- a/lib/exercise/ashtanga_namaskara/ashtanga_namaskara.dart
++++ b/lib/exercise/ashtanga_namaskara/ashtanga_namaskara.dart
+@@@ -16,16 -15,15 +16,20 @@@ enum AshtangaMode { transient, microHol
+  enum AshtangaState { entry, recognized, holding, exit }
+  
+  class AshtangaConfig {
+++<<<<<<< HEAD
+ +  static const int MAX_REP = 1;
+ +  static const double MICRO_HOLD_DURATION = 3.0;
+++=======
++   static const double MICRO_HOLD_DURATION = 4.0;
+++>>>>>>> 0ba7277ac08d09f8b29271d87d81c351246bf2c8
+    static const double EXIT_DURATION = 2.0;
+    static const int RECOGNITION_WINDOW_MS = 500;
+ -  static const int SETUP_STILL_FRAMES = 6;
+ +  static const int SETUP_STILL_FRAMES = 4;
+    static const int CALIBRATION_FRAMES = 12;
+  
+ -  static const double START_HIP_RATIO_MIN = 0.12;
+ -  static const double START_KNEE_ANKLE_MAX = 1.0;
+ -  static const double START_CHEST_LOW_MIN = 0.05;
+ +  static const double START_HIP_RATIO_MIN = 0.08;
+ +  static const double START_KNEE_ANKLE_MAX = 1.2;
+ +  static const double START_CHEST_LOW_MIN = 0.035;
+    static const double HOLD_VELOCITY_MAX = 0.08;
+    static const double BREAK_VELOCITY_MIN = 0.22;
+  }
+diff --cc lib/exercise/bow_pose/bow_pose.dart
+index 4f6bb48,283759e..0000000
+--- a/lib/exercise/bow_pose/bow_pose.dart
++++ b/lib/exercise/bow_pose/bow_pose.dart
+@@@ -13,8 -12,6 +13,11 @@@ import 'metrics/hold_duration_metric.da
+  import 'metrics/stability_metric.dart';
+  
+  class BowPoseConfig {
+++<<<<<<< HEAD
+ +  static const int MAX_REP = 10;
+ +
+++=======
+++>>>>>>> 0ba7277ac08d09f8b29271d87d81c351246bf2c8
+    static const double KNEE_SETUP_ANGLE = 150.0;
+    static const double CHEST_LIFT_THRESHOLD = 0.05;
+    static const double THIGH_LIFT_THRESHOLD = 0.0;
+diff --cc lib/exercise/low_lunge/low_lunge.dart
+index 190d910,1246a8f..0000000
+--- a/lib/exercise/low_lunge/low_lunge.dart
++++ b/lib/exercise/low_lunge/low_lunge.dart
+@@@ -12,16 -11,15 +12,20 @@@ import 'metrics/knee_travel_metric.dart
+  import 'metrics/cervical_safety_metric.dart';
+  
+  class LowLungeConfig {
+++<<<<<<< HEAD
+ +  static const int MAX_REP = 2;
+ +  static const double HOLD_DURATION = 20.0;
+++=======
++   static const double HOLD_DURATION = 30.0;
+++>>>>>>> 0ba7277ac08d09f8b29271d87d81c351246bf2c8
+    static const double EXIT_DURATION = 4.0;
+  
+ -  static const int SETUP_STILL_FRAMES = 6;
+ +  static const int SETUP_STILL_FRAMES = 4;
+    static const int CALIBRATION_FRAMES = 20;
+  
+ -  static const double MIN_STANCE_RATIO = 0.55;
+ -  static const double BACK_KNEE_GROUNDED_MAX = 0.80;
+ -  static const double FRONT_KNEE_SETUP_MAX = 165.0;
+ +  static const double MIN_STANCE_RATIO = 0.42;
+ +  static const double BACK_KNEE_GROUNDED_MAX = 0.95;
+ +  static const double FRONT_KNEE_SETUP_MAX = 175.0;
+  
+    static const double HOLD_HIP_VELOCITY_MAX = 0.06;
+    static const double BREAK_HIP_VELOCITY_MIN = 0.18;
+diff --cc lib/exercise/lunge/lunge.dart
+index 0b70a85,85de51f..0000000
+--- a/lib/exercise/lunge/lunge.dart
++++ b/lib/exercise/lunge/lunge.dart
+@@@ -15,27 -14,10 +15,34 @@@ import '../../utils/debouncer.dart'
+  // --- Config ---
+  
+  class LungeConfig {
+++<<<<<<< HEAD
+ +  static const int MAX_REP = 15;
+ +  static const int LUNGE_STAND_ANGLE_THRESHOLD = 155;
+ +  static const int LUNGE_DESCEND_ANGLE_THRESHOLD = 145;
+ +  static const List<int> LUNGE_BOTTOM_ANGLE_THRESHOLD = [55, 125];
+ +  static const int LUNGE_ASCEND_ANGLE_THRESHOLD = 125;
+ +  static const double CLEAN_REP_LEAD_KNEE_ANGLE = 178.6;
+ +  static const double CLEAN_REP_LEAD_KNEE_TOLERANCE = 8.0;
+ +  static const double CLEAN_REP_TRAIL_KNEE_ANGLE = 178.3;
+ +  static const double CLEAN_REP_TRAIL_KNEE_TOLERANCE = 8.0;
+ +  static const double CLEAN_REP_BACK_CLOCK_ANGLE = 358.0;
+ +  static const double CLEAN_REP_BACK_CLOCK_TOLERANCE = 8.0;
+ +  static const double CLEAN_REP_TRUNK_LEAN = -2.0;
+ +  static const double CLEAN_REP_TRUNK_LEAN_TOLERANCE = 8.0;
+ +  static const double CLEAN_REP_SH_TRAIL_KNEE_ANGLE = 203.1;
+ +  static const double CLEAN_REP_SH_TRAIL_KNEE_TOLERANCE = 18.0;
+ +  static const double CLEAN_REP_MIN_LEAD_KNEE_ANGLE = 58.6;
+ +  static const double CLEAN_REP_MIN_LEAD_KNEE_TOLERANCE = 12.0;
+ +  static const double CLEAN_REP_MAX_TRUNK_LEAN = 19.6;
+ +  static const double CLEAN_REP_MAX_TRUNK_LEAN_TOLERANCE = 10.0;
+ +  static const double CLEAN_REP_HEEL_NORM = 0.200;
+ +  static const double CLEAN_REP_HEEL_NORM_TOLERANCE = 0.08;
+++=======
++   static const int LUNGE_STAND_ANGLE_THRESHOLD = 160;
++   static const int LUNGE_DESCEND_ANGLE_THRESHOLD = 150;
++   static const List<int> LUNGE_BOTTOM_ANGLE_THRESHOLD = [70, 110];
++   static const int LUNGE_ASCEND_ANGLE_THRESHOLD = 115;
+++>>>>>>> 0ba7277ac08d09f8b29271d87d81c351246bf2c8
+  }
+  
+  enum LungeState { standing, descending, bottom, ascending }
+diff --cc lib/exercise/prayer_pose/prayer_pose.dart
+index 9b0dddb,3d420e0..0000000
+--- a/lib/exercise/prayer_pose/prayer_pose.dart
++++ b/lib/exercise/prayer_pose/prayer_pose.dart
+@@@ -11,19 -10,18 +11,23 @@@ import 'metrics/prayer_pose_metric_base
+  import 'metrics/posture_stack_metric.dart';
+  
+  class PrayerPoseConfig {
+++<<<<<<< HEAD
+ +  static const int MAX_REP = 1;
+ +  static const double HOLD_DURATION = 8.0;
+++=======
++   static const double HOLD_DURATION = 12.0;
+++>>>>>>> 0ba7277ac08d09f8b29271d87d81c351246bf2c8
+    static const double EXIT_DURATION = 3.0;
+  
+ -  static const int SETUP_STILL_FRAMES = 15;
+ +  static const int SETUP_STILL_FRAMES = 10;
+    static const int CALIBRATION_FRAMES = 20;
+  
+ -  static const double ENTRY_TRUNK_TOLERANCE = 35.0;
+ -  static const double START_SHOULDER_EASE_MIN = 0.30;
+ +  static const double ENTRY_TRUNK_TOLERANCE = 50.0;
+ +  static const double START_SHOULDER_EASE_MIN = 0.22;
+    static const double HOLD_HIP_VELOCITY_MAX = 0.06;
+    static const double BREAK_HIP_VELOCITY_MIN = 0.18;
+ -  static const double SHOULDER_EASE_RATIO_MIN = 0.70;
+ -  static const double HOLD_TRUNK_DRIFT_MAX = 18.0;
+ +  static const double SHOULDER_EASE_RATIO_MIN = 0.55;
+ +  static const double HOLD_TRUNK_DRIFT_MAX = 28.0;
+  }
+  
+  enum PrayerPoseState { entry, holding, exit }
+diff --cc lib/exercise/raised_arms/raised_arms.dart
+index 06906e4,0602514..0000000
+--- a/lib/exercise/raised_arms/raised_arms.dart
++++ b/lib/exercise/raised_arms/raised_arms.dart
+@@@ -13,17 -12,16 +13,21 @@@ import 'metrics/cervical_safety_metric.
+  import 'metrics/arm_position_metric.dart';
+  
+  class RaisedArmsConfig {
+++<<<<<<< HEAD
+ +  static const int MAX_REP = 1;
+ +  static const double HOLD_DURATION = 12.0;
+++=======
++   static const double HOLD_DURATION = 20.0;
+++>>>>>>> 0ba7277ac08d09f8b29271d87d81c351246bf2c8
+    static const double EXIT_DURATION = 4.0;
+  
+ -  static const int SETUP_STILL_FRAMES = 15;
+ +  static const int SETUP_STILL_FRAMES = 10;
+    static const int CALIBRATION_FRAMES = 20;
+  
+ -  static const double ENTRY_TRUNK_TOLERANCE = 20.0;
+ +  static const double ENTRY_TRUNK_TOLERANCE = 35.0;
+    static const double HOLD_HIP_VELOCITY_MAX = 0.025;
+    static const double BREAK_HIP_VELOCITY_MIN = 0.09;
+ -  static const double LUMBAR_EXIT_BACK_LEAN = 15.0;
+ +  static const double LUMBAR_EXIT_BACK_LEAN = 25.0;
+  }
+  
+  enum RaisedArmsState { entry, holding, exit }
+diff --cc lib/exercise/russian_twist/russian_twist.dart
+index edd9ea5,49359bd..0000000
+--- a/lib/exercise/russian_twist/russian_twist.dart
++++ b/lib/exercise/russian_twist/russian_twist.dart
+@@@ -20,51 -20,50 +20,54 @@@ enum RussianTwistState { center_setup, 
+  enum TwistDirection { none, forward, backward }
+  
+  class RussianTwistConfig {
+++<<<<<<< HEAD
+ +  static const int MAX_REP = 20;
+ +
+ +  /// Trunk angle (shoulder midpoint -> hip midpoint, from horizontal) must
+ +  /// stay in [MIN, MAX] degrees so the user sits in a leaned-back V, neither
+ +  /// upright nor collapsed. In front-view this is measured via the dy/dx of
+ +  /// the shoulder-to-hip midline.
+++=======
+++>>>>>>> 0ba7277ac08d09f8b29271d87d81c351246bf2c8
+    static const double MIN_TRUNK_HORIZONTAL_ANGLE = 32.0;
+    static const double MAX_TRUNK_HORIZONTAL_ANGLE = 72.0;
+ -  static const double MIN_KNEE_HIP_DX_RATIO = 0.35;
+ -  static const double START_MIN_HAND_RATIO = 0.28;
+ -  static const double START_MAX_HAND_RATIO = 0.52;
+ -  static const double CENTER_MIN_HAND_RATIO = 0.30;
+ -  static const double CENTER_MAX_HAND_RATIO = 0.50;
+ -  static const double FORWARD_ROM_RATIO = 0.60;
+ -  static const double BACKWARD_ROM_RATIO = 0.20;
+ -  static const double FORWARD_GOOD_ROM_RATIO = 0.66;
+ -  static const double BACKWARD_GOOD_ROM_RATIO = 0.14;
+ -  static const double HAND_VELOCITY_GATE_PX = 3.0;
+ +
+ +  /// Lateral wrist offset thresholds, all normalized by shoulder width so
+ +  /// they are body-size and camera-distance independent.
+ +  ///
+ +  /// A wrist offset of 0.30 means the hand is 30% of shoulder-width away
+ +  /// from the body midline ΓÇö a comfortable full twist to one side.
+ +  static const double TWIST_START_DELTA = 0.12;
+ +  static const double GOOD_ROM_DELTA = 0.28;
+ +  static const double CENTER_TOLERANCE = 0.06;
+ +
+ +  /// Velocity gate for wrist-offset change detection (normalized units).
+ +  static const double OFFSET_VELOCITY_GATE = 0.015;
+ +
+ +  /// Minimum shoulder width (px) below which the frame is rejected as too far
+ +  /// away / unreliable.
+ +  static const double MIN_SHOULDER_WIDTH = 40.0;
+  }
+  
+ -class RussianTwist extends ExerciseBase with SideTrackedExerciseMixin {
+ +/// Front-view Russian Twist.
+ +///
+ +/// Rep counting is driven by the lateral position of the leading hand
+ +/// relative to the body midline (midpoint of the two shoulders), normalized
+ +/// by shoulder width. This signal stays reliable while twisting to both
+ +/// sides because the hands remain in frame ΓÇö unlike the previous side-view
+ +/// implementation whose tracked shoulder was fully occluded when twisting
+ +/// toward the camera's blind side, stalling the rep counter.
+ +class RussianTwist extends ExerciseBase {
+    @override
+ -  Set<VikaImageOrientation> get supportedOrientations => <VikaImageOrientation>{
+ +  Set<VikaImageOrientation> get supportedOrientations =>
+ +      <VikaImageOrientation>{
+          VikaImageOrientation.landscapeLeft,
+          VikaImageOrientation.landscapeRight,
+          VikaImageOrientation.portrait,
+        };
+  
+ -  @override
+ -  Map<String, SideLandmarkPair> get requiredSideLandmarks => const {
+ -        'shoulder': (
+ -          right: PoseLandmarkType.rightShoulder,
+ -          left: PoseLandmarkType.leftShoulder
+ -        ),
+ -        'hip': (
+ -          right: PoseLandmarkType.rightHip,
+ -          left: PoseLandmarkType.leftHip
+ -        ),
+ -        'knee': (
+ -          right: PoseLandmarkType.rightKnee,
+ -          left: PoseLandmarkType.leftKnee
+ -        ),
+ -        'wrist': (
+ -          right: PoseLandmarkType.rightWrist,
+ -          left: PoseLandmarkType.leftWrist
+ -        ),
+ -      };
+ -
+    final int maxRep;
+-   RussianTwist({this.maxRep = RussianTwistConfig.MAX_REP});
++   RussianTwist({required this.maxRep});
+  
+    RussianTwistState russianState = RussianTwistState.center_setup;
+    RussianTwistState previousRussianState = RussianTwistState.center_setup;
+diff --cc lib/exercise/side_plank_dip/side_plank_dip.dart
+index 4cfee94,7ce7bf5..0000000
+--- a/lib/exercise/side_plank_dip/side_plank_dip.dart
++++ b/lib/exercise/side_plank_dip/side_plank_dip.dart
+@@@ -13,9 -12,8 +13,14 @@@ import 'metrics/anti_rotation_metric.da
+  import 'metrics/hip_amplitude_metric.dart';
+  
+  class SidePlankConfig {
+++<<<<<<< HEAD
+ +  static const int MAX_REP = 12;
+ +  static const double STRAIGHT_BODY_ANGLE = 165.0;
+ +  static const double BOTTOM_BODY_ANGLE = 150.0;
+++=======
++   static const double STRAIGHT_BODY_ANGLE = 175.0;
++   static const double BOTTOM_BODY_ANGLE = 160.0;
+++>>>>>>> 0ba7277ac08d09f8b29271d87d81c351246bf2c8
+    static const double MOVEMENT_THRESHOLD = 3.0; // Y-axis delta (pixels/cm)
+    static const double MOVEMENT_THRESHOLD_NORM = 0.025;
+    static const double BOTTOM_STILLNESS_NORM = 0.02;
+diff --cc lib/exercise/squat/squat.dart
+index 653eabe,d0dbec7..0000000
+--- a/lib/exercise/squat/squat.dart
++++ b/lib/exercise/squat/squat.dart
+@@@ -22,19 -22,9 +22,24 @@@ import '../../services/squat_voice_coac
+  
+  class SquatConfig {
+    static const double ERROR_ALLOW = 2;
+++<<<<<<< HEAD
+ +  static const int MAX_REP = 15;
+ +  static const double SQUAT_STAND_ANGLE_THRESHOLD = 155;
+ +  static const List<int> SQUAT_BOTTOM_ANGLE_THRESHOLD = [70, 115];
+++=======
++   static const double SQUAT_STAND_ANGLE_THRESHOLD = 160;
++   static const List<int> SQUAT_BOTTOM_ANGLE_THRESHOLD = [80, 100];
+++>>>>>>> 0ba7277ac08d09f8b29271d87d81c351246bf2c8
+    static const double BOTTOM_RELEASE_READY_TOLERANCE_SECONDS = 0.05;
+ +  static const double CLEAN_REP_KNEE_ANGLE = 171.2;
+ +  static const double CLEAN_REP_KNEE_TOLERANCE = 12.0;
+ +  static const double CLEAN_REP_BACK_ANGLE = 17.43;
+ +  static const double CLEAN_REP_BACK_TOLERANCE = 12.0;
+ +  static const double CLEAN_REP_TRUNK_LEAN = 17.43;
+ +  static const double CLEAN_REP_TRUNK_LEAN_TOLERANCE = 12.0;
+ +  static const double CLEAN_REP_HEEL_LIFT_PCT = 3.081;
+ +  static const double CLEAN_REP_HEEL_LIFT_PCT_TOLERANCE = 8.0;
+ +  static const double CLEAN_REP_BOTTOM_HOLD_PROGRESS_MIN = 0.80;
+    static const double ANGLE_STABLE_GATE =
+        2; // degrees, for FrameBuffer angle change detection
+    static const double ROM_GATE =
+diff --cc lib/exercise/standing_knee_to_elbow/standing_knee_to_elbow.dart
+index c7fea77,9477aac..0000000
+--- a/lib/exercise/standing_knee_to_elbow/standing_knee_to_elbow.dart
++++ b/lib/exercise/standing_knee_to_elbow/standing_knee_to_elbow.dart
+@@@ -15,14 -14,9 +15,20 @@@ import 'metrics/pelvic_drop_metric.dart
+  enum KteState { standing_base, approaching, touch, returning }
+  
+  class StandingKneeToElbowConfig {
+++<<<<<<< HEAD
+ +  static const int MAX_REP = 30; // 15 per side
+ +  static const double KNEE_LIFT_START_RATIO = 0.05;
+ +  static const double TOUCH_DISTANCE_RATIO = 1.30;
+ +  static const double TOUCH_EXIT_DISTANCE_RATIO = 1.60;
+ +  static const double TOUCH_HIP_WIDTH_RATIO = 1.40;
+ +  static const double TOUCH_EXIT_HIP_WIDTH_RATIO = 1.70;
+ +  static const double RETURN_KNEE_RATIO = 0.15;
+ +  static const double TOUCH_EXIT_KNEE_RATIO = 0.30;
+++=======
++   static const double KNEE_LIFT_START_RATIO = 0.10;
++   static const double TOUCH_DISTANCE_RATIO = 0.55;
++   static const double TOUCH_EXIT_DISTANCE_RATIO = 0.80;
+++>>>>>>> 0ba7277ac08d09f8b29271d87d81c351246bf2c8
+  }
+  
+  class StandingKneeToElbow extends ExerciseBase {
+diff --cc lib/exercise/step_back_burpee/step_back_burpee.dart
+index 245a772,8ecfb75..0000000
+--- a/lib/exercise/step_back_burpee/step_back_burpee.dart
++++ b/lib/exercise/step_back_burpee/step_back_burpee.dart
+@@@ -12,11 -11,10 +12,15 @@@ import 'metrics/squat_hinge_metric.dart
+  import 'metrics/plank_form_metric.dart';
+  
+  class BurpeeConfig {
+++<<<<<<< HEAD
+ +  static const int MAX_REP = 15;
+ +  static const double STANDING_BODY_ANGLE = 155.0; // G├│c ─æß╗⌐ng thß║│ng
+++=======
++   static const double STANDING_BODY_ANGLE = 165.0; // G├│c ─æß╗⌐ng thß║│ng
+++>>>>>>> 0ba7277ac08d09f8b29271d87d81c351246bf2c8
+  
+    // Ng╞░ß╗íng khoß║úng c├ích ngang (X) ─æß╗â x├íc ─æß╗ïnh Plank (─æ╞ín vß╗ï t╞░╞íng ─æß╗æi)
+ -  static const double PLANK_MIN_DIST_X = 0.65; // normalized by torso length
+ +  static const double PLANK_MIN_DIST_X = 0.55; // normalized by torso length
+  }
+  
+  class StepBackBurpee extends ExerciseBase {
+diff --cc lib/exercise/tricep_dip/tricep_dip.dart
+index 43e9c33,80893c9..0000000
+--- a/lib/exercise/tricep_dip/tricep_dip.dart
++++ b/lib/exercise/tricep_dip/tricep_dip.dart
+@@@ -15,10 -14,9 +15,16 @@@ import 'metrics/scapular_elevation_metr
+  enum TricepDipState { setup_top, descending, bottom, ascending }
+  
+  class TricepDipConfig {
+++<<<<<<< HEAD
+ +  static const int MAX_REP = 15;
+ +  static const double DESCENDING_ELBOW_ANGLE = 145.0;
+ +  static const double BOTTOM_ELBOW_ANGLE = 125.0;
+ +  static const double ASCENDING_ELBOW_ANGLE = 150.0;
+++=======
++   static const double DESCENDING_ELBOW_ANGLE = 155.0;
++   static const double BOTTOM_ELBOW_ANGLE = 110.0;
++   static const double ASCENDING_ELBOW_ANGLE = 160.0;
+++>>>>>>> 0ba7277ac08d09f8b29271d87d81c351246bf2c8
+  }
+  
+  class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
+diff --cc lib/exercise/walking_lunge/walking_lunge.dart
+index 6fa95ab,a5bfeb7..0000000
+--- a/lib/exercise/walking_lunge/walking_lunge.dart
++++ b/lib/exercise/walking_lunge/walking_lunge.dart
+@@@ -16,35 -16,12 +16,40 @@@ import 'dart:ui' show Size
+  enum WalkingState { standing, stepping, descending, bottom, pulling_through }
+  
+  class WalkingLungeConfig {
+++<<<<<<< HEAD
+ +  static const int MAX_REP = 20; // 10 per leg
+ +  static const double STEP_START_NORM = 0.45;
+ +  static const double STEP_CLOSE_NORM = 0.42;
+++=======
++   static const double STEP_START_NORM = 0.55;
++   static const double STEP_CLOSE_NORM = 0.35;
+++>>>>>>> 0ba7277ac08d09f8b29271d87d81c351246bf2c8
+    static const double FRAME_EDGE_MARGIN_RATIO = 0.04;
+ -  static const double FRONT_BOTTOM_ANGLE_MAX = 125.0;
+ -  static const double REAR_BOTTOM_ANGLE_MAX = 135.0;
+ -  static const int MIN_BOTTOM_CONFIRM_MS = 650;
+ +  static const double FRONT_BOTTOM_ANGLE_MAX = 140.0;
+ +  static const double REAR_BOTTOM_ANGLE_MAX = 150.0;
+ +  static const int MIN_BOTTOM_CONFIRM_MS = 450;
+ +  static const double CLEAN_REP_STEP_LENGTH = 25.16;
+ +  static const double CLEAN_REP_STEP_LENGTH_TOLERANCE = 18.0;
+ +  static const double CLEAN_REP_FRONT_KNEE_ANGLE = 94.50;
+ +  static const double CLEAN_REP_FRONT_KNEE_TOLERANCE = 18.0;
+ +  static const double CLEAN_REP_NORMALIZED_STEP = 0.111;
+ +  static const double CLEAN_REP_NORMALIZED_STEP_TOLERANCE = 0.12;
+ +  static const double CLEAN_REP_KNEE_OVER_TOE_X = -2.810;
+ +  static const double CLEAN_REP_KNEE_OVER_TOE_X_TOLERANCE = 1.2;
+ +}
+ +
+ +class _WalkingCleanRepSnapshot {
+ +  final double stepLength;
+ +  final double frontKneeAngle;
+ +  final double normalizedStep;
+ +  final double kneeOverToeX;
+ +
+ +  const _WalkingCleanRepSnapshot({
+ +    required this.stepLength,
+ +    required this.frontKneeAngle,
+ +    required this.normalizedStep,
+ +    required this.kneeOverToeX,
+ +  });
+  }
+  
+  class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
+diff --cc lib/models/exercise_definition.dart
+index 4883f55,41cceee..0000000
+--- a/lib/models/exercise_definition.dart
++++ b/lib/models/exercise_definition.dart
+@@@ -961,17 -980,16 +981,17 @@@ final List<ExerciseDefinition> exercise
+      primaryColor: const Color(0xFF00E5FF),
+      secondaryColor: const Color(0xFF0091EA),
+      difficulty: 'Trung b├¼nh',
+ -    targetMuscles: ['To├án th├ón'],
+ -    duration: 'T├╣y chß╗ìn',
+ -    cameraHint: '─Éß║╖t camera ─æß╗æi diß╗çn hoß║╖c nghi├¬ng g├│c 45 ─æß╗Ö.',
+ -    framingHint: '─Éß║úm bß║úo to├án th├ón nß║▒m gß╗ìn trong khung h├¼nh.',
+ +    targetMuscles: ['C╞í li├¬n s╞░ß╗¥n', 'Core', 'Bß╗Ñng'],
+ +    duration: '20 reps',
+ +    cameraHint: '─Éß║╖t camera ch├¡nh diß╗çn tr╞░ß╗¢c mß║╖t.',
+ +    framingHint: 'Ngß╗ôi ─æß╗æi diß╗çn camera, thß║Ñy r├╡ hai vai, hai tay, h├┤ng v├á gß╗æi.',
+      setupTips: [
+ -      'Giß╗» ─æß╗º khoß║úng c├ích ─æß╗â AI nhß║¡n diß╗çn ─æ╞░ß╗úc to├án bß╗Ö c╞í thß╗â.',
+ -      'Bß║»t ─æß║ºu khi sß║╡n s├áng.'
+ +      '─Éß║╖t ─æiß╗çn thoß║íi nß║▒m ngang tr╞░ß╗¢c mß║╖t, ngang tß║ºm ngß╗▒c.',
+ +      'Ngß╗ôi ngß║ú l╞░ng ra sau khoß║úng 45 ─æß╗Ö, co gß╗æi, hai tay chß╗Ñm tr╞░ß╗¢c ngß╗▒c.',
+ +      'Giß╗» hai vai v├á hai tay lu├┤n trong khung h├¼nh khi vß║╖n sang hai b├¬n.',
+      ],
+      createExercise: ({int? reps, int? seconds}) => _withReps(
+-         reps, (target) => RussianTwist(maxRep: target), () => RussianTwist()),
++         reps, (target) => RussianTwist(maxRep: target)),
+      phaseColors: {
+        'default': const Color(0xFF00E676),
+      },
+@@@ -1149,9 -1165,9 +1167,13 @@@
+        'Giß╗» ─æß╗º khoß║úng c├ích ─æß╗â AI nhß║¡n diß╗çn ─æ╞░ß╗úc to├án bß╗Ö c╞í thß╗â.',
+        'Bß║»t ─æß║ºu khi sß║╡n s├áng.'
+      ],
+++<<<<<<< HEAD
+ +    videoAsset: 'assets/video/walking_lunge.MOV',
+++=======
++     videoAsset: 'assets/video/walking lunge.mp4',
+++>>>>>>> 0ba7277ac08d09f8b29271d87d81c351246bf2c8
+      createExercise: ({int? reps, int? seconds}) => _withReps(
+-         reps, (target) => WalkingLunge(maxRep: target), () => WalkingLunge()),
++         reps, (target) => WalkingLunge(maxRep: target)),
+      phaseColors: {
+        'default': const Color(0xFF00E676),
+      },
+diff --cc test/exercise/russian_twist_anti_cheat_test.dart
+index e515fd9,dfffeb3..0000000
+--- a/test/exercise/russian_twist_anti_cheat_test.dart
++++ b/test/exercise/russian_twist_anti_cheat_test.dart
+@@@ -103,31 -122,31 +103,41 @@@ void _completeBackwardHalf(RussianTwis
+  void main() {
+    TestWidgetsFlutterBinding.ensureInitialized();
+  
+++<<<<<<< HEAD
+ +  test('safety requires front camera instead of side or angled', () {
+ +    final exercise = RussianTwist();
+++=======
++   test('safety requires side camera instead of front or angled', () {
++     final exercise = RussianTwist(maxRep: 20);
+++>>>>>>> 0ba7277ac08d09f8b29271d87d81c351246bf2c8
+  
+      exercise.cameraFacing = CameraFacing.front;
+ -    expect(exercise.checkSafety(_russianPose()), isNotNull);
+ +    expect(exercise.checkSafety(_frontPose()), isNull);
+  
+      exercise.cameraFacing = CameraFacing.right;
+ -    expect(exercise.checkSafety(_russianPose()), isNull);
+ +    expect(exercise.checkSafety(_frontPose()), isNotNull);
+  
+      exercise.cameraFacing = CameraFacing.angled;
+ -    expect(exercise.checkSafety(_russianPose()), isNotNull);
+ +    expect(exercise.checkSafety(_frontPose()), isNotNull);
+    });
+  
+++<<<<<<< HEAD
+ +  test('start position requires leaned-back torso and centered hands', () {
+ +    final exercise = RussianTwist()..cameraFacing = CameraFacing.front;
+++=======
++   test('start position requires lean-back torso and centered hands', () {
++     final exercise = RussianTwist(maxRep: 20)..cameraFacing = CameraFacing.right;
+++>>>>>>> 0ba7277ac08d09f8b29271d87d81c351246bf2c8
+  
+ -    expect(exercise.isInStartPosition(_russianPose()), isTrue);
+ +    expect(exercise.isInStartPosition(_frontPose()), isTrue);
+ +    // Hands off-center -> not ready.
+      expect(
+ -      exercise.isInStartPosition(_russianPose(shoulderX: 300, shoulderY: 200)),
+ +      exercise.isInStartPosition(_frontPose(wristX: _forwardTargetX)),
+        isFalse,
+      );
+ -    expect(exercise.isInStartPosition(_russianPose(wristX: 385)), isFalse);
+    });
+  
+ -  test('counts one rep when user twists to both sides with torso rotation', () {
+ +  test('counts one rep when user twists to both sides', () {
+      final exercise = _activatedRussianTwist();
+  
+      _completeForwardHalf(exercise, 0);
+diff --cc test/exercise/seated_forward_fold_logging_regression_test.dart
+index d74d53b,8f4fcd4..0000000
+--- a/test/exercise/seated_forward_fold_logging_regression_test.dart
++++ b/test/exercise/seated_forward_fold_logging_regression_test.dart
+@@@ -107,7 -110,7 +107,11 @@@ void main() 
+  
+    test('Seated Forward Fold scores partial clean time over all three holds',
+        () async {
+++<<<<<<< HEAD
+ +    final exercise = SeatedForwardFold(maxSeconds: 2, maxHolds: 3)
+++=======
++     final exercise = SeatedForwardFold(maxSeconds: 15)
+++>>>>>>> 0ba7277ac08d09f8b29271d87d81c351246bf2c8
+        ..cameraFacing = CameraFacing.right
+        ..exerciseState = ExerciseState.activated;
+      final start = _seatedForwardPose(
+diff --cc test/services/squat_voice_coach_test.dart
+index 7dd48a4,4ae3e18..0000000
+--- a/test/services/squat_voice_coach_test.dart
++++ b/test/services/squat_voice_coach_test.dart
+@@@ -419,10 -420,10 +419,10 @@@ void main() 
+      expect(player.events, readyEvents);
+    });
+  
+ -  test('Squat prefixes post-rep cues and suppresses consecutive repeats', () {
+ +  test('Squat prefixes post-rep cues after every faulty rep', () {
+      final player = _FakeSquatVoicePlayer();
+      final coach = SquatVoiceCoach(ttsService: player);
+-     final squat = Squat()..exerciseState = ExerciseState.activated;
++     final squat = Squat(maxRep: 15)..exerciseState = ExerciseState.activated;
+  
+      squat.resultIssues.addInstruction(
+        squat.currentPhaseKey,
+@@@ -482,7 -482,7 +482,11 @@@
+    test('Squat does not count a new rep after the set is completed', () {
+      final player = _FakeSquatVoicePlayer();
+      final coach = SquatVoiceCoach(ttsService: player);
+++<<<<<<< HEAD
+ +    final squat = Squat()..exerciseState = ExerciseState.activated;
+++=======
++     final squat = Squat(maxRep: 15);
+++>>>>>>> 0ba7277ac08d09f8b29271d87d81c351246bf2c8
+  
+      coach.processFrame(
+        exercise: squat,
+diff --git a/pubspec.lock b/pubspec.lock
+index 3f902e6..a317f22 100644
+--- a/pubspec.lock
++++ b/pubspec.lock
+@@ -165,10 +165,10 @@ packages:
+     dependency: transitive
+     description:
+       name: characters
+-      sha256: faf38497bda5ead2a8c7615f4f7939df04333478bf32e4173fcb06d428b5716b
++      sha256: f71061c654a3380576a52b451dd5532377954cf9dbd272a78fc8479606670803
+       url: "https://pub.dev"
+     source: hosted
+-    version: "1.4.1"
++    version: "1.4.0"
+   checked_yaml:
+     dependency: transitive
+     description:
+@@ -732,18 +732,18 @@ packages:
+     dependency: transitive
+     description:
+       name: matcher
+-      sha256: "12956d0ad8390bbcc63ca2e1469c0619946ccb52809807067a7020d57e647aa6"
++      sha256: dc58c723c3c24bf8d3e2d3ad3f2f9d7bd9cf43ec6feaa64181775e60190153f2
+       url: "https://pub.dev"
+     source: hosted
+-    version: "0.12.18"
++    version: "0.12.17"
+   material_color_utilities:
+     dependency: transitive
+     description:
+       name: material_color_utilities
+-      sha256: "9c337007e82b1889149c82ed242ed1cb24a66044e30979c44912381e9be4c48b"
++      sha256: f7142bb1154231d7ea5f96bc7bde4bda2a0945d2806bb11670e30b850d56bdec
+       url: "https://pub.dev"
+     source: hosted
+-    version: "0.13.0"
++    version: "0.11.1"
+   meta:
+     dependency: transitive
+     description:
+@@ -1177,10 +1177,10 @@ packages:
+     dependency: transitive
+     description:
+       name: test_api
+-      sha256: "93167629bfc610f71560ab9312acdda4959de4df6fac7492c89ff0d3886f6636"
++      sha256: ab2726c1a94d3176a45960b6234466ec367179b87dd74f1611adb1f3b5fb9d55
+       url: "https://pub.dev"
+     source: hosted
+-    version: "0.7.9"
++    version: "0.7.7"
+   typed_data:
+     dependency: transitive
+     description:

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vika/services/session_coach_builder.dart';
 
+import '../../exercise/1.Bird Dog/bird_dog.dart';
 import '../../exercise/exercise_base.dart';
 import '../../exercise/calorie_estimator_registry.dart';
 import '../../exercise/curl_up/curl_up.dart';
@@ -40,6 +41,7 @@ import '../../exercise/push up/metrics/depth_metric.dart' as push_depth;
 import '../../exercise/push up/metrics/tempo_metric.dart' as push_tempo;
 import '../../exercise/push up/metrics/trunk_alignment_metric.dart'
     as push_trunk;
+import '../../exercise/wall_push_up/wall_push_up.dart' show WallPushUp;
 import '../../exercise/report_builder_registry.dart';
 import '../../exercise/curl_up/metrics/curl_up_knee_extension.dart'
     as curl_knee;
@@ -52,10 +54,13 @@ import '../../exercise/squat/metrics/trunk_lean_metric.dart';
 import '../../exercise/squat/squat.dart';
 import '../../models/exercise_definition.dart';
 import '../../models/fault_candidate.dart';
+import '../../services/analytics_service.dart';
+import '../../services/catalog/catalog_source.dart';
 import '../../models/post_exercise_data.dart';
 import '../../models/workout_session_report.dart';
 import '../../services/recommendation/models/plan.dart';
 import '../../services/recommendation/progression_service.dart';
+import '../../services/recommendation/recommendation_service.dart';
 import '../../services/session_summary_builder.dart';
 import '../../services/session_trophy_picker.dart';
 import '../../utils/exercise_logger.dart';
@@ -65,6 +70,7 @@ import 'exercise_launch_args.dart';
 import 'exercise_intro_page.dart';
 import 'exercise_transition_moment.dart';
 import 'rest_screen.dart';
+import 'widgets/reviewer_tracking_demo_overlay.dart';
 import 'widgets/skeleton_annotation.dart';
 import 'workout_summary_screen.dart';
 import 'package:vika/services/session_persistence.dart';
@@ -76,6 +82,7 @@ class ExerciseExperienceScreen extends StatefulWidget {
     required this.definition,
     this.workoutSessionId,
     this.catalogExerciseId,
+    this.catalogInfo,
     this.prescription,
     this.recommendationId,
     this.weekNumber,
@@ -89,6 +96,7 @@ class ExerciseExperienceScreen extends StatefulWidget {
   final ExerciseDefinition definition;
   final String? workoutSessionId;
   final String? catalogExerciseId;
+  final ExerciseLaunchCatalogInfo? catalogInfo;
   final VolumePrescription? prescription;
   final String? recommendationId;
   final int? weekNumber;
@@ -157,6 +165,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     final base = ExerciseLaunchArgs(
       definition: widget.definition,
       catalogExerciseId: widget.catalogExerciseId,
+      catalogInfo: widget.catalogInfo,
       prescription: widget.prescription,
       recommendationId: widget.recommendationId,
       weekNumber: widget.weekNumber,
@@ -176,7 +185,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
   String? get _nextExerciseName {
     final nextIdx = widget.sequenceIndex + 1;
     if (nextIdx >= widget.sequence.length) return null;
-    return widget.sequence[nextIdx].definition.name;
+    return widget.sequence[nextIdx].definition.displayName;
   }
 
   /// The exercise that just finished before this one, if any. Used to
@@ -193,6 +202,11 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       if (!mounted) return;
       setState(mutation);
     });
+    // Post-frame callbacks don't schedule a frame. On the idle rest->active
+    // path (no pose overlay repainting) nothing else would, so force one.
+    // ensureVisualUpdate() only schedules when idle, so it's a no-op on the
+    // active->rest path that already has frames in flight.
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   @override
@@ -202,6 +216,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     _spec = _ExerciseExperienceSpec.fromDefinition(
       widget.definition,
       prescription: widget.prescription,
+      catalogInfo: widget.catalogInfo,
     );
     _currentRepsTarget = _spec.repsPerSet;
     _loadCoachNote();
@@ -277,6 +292,15 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
   }
 
   void _beginWorkout() {
+    // Lifecycle boundary: the user pressed start on the intro and the first set
+    // is being prepared. No-op without consent; exercise_id is the catalog id,
+    // never anything user-identifying.
+    unawaited(
+      AnalyticsService.instance.capture(
+        'exercise_started',
+        props: {'exercise_id': widget.definition.id},
+      ),
+    );
     setState(() {
       _setLoggers.clear();
       _difficultyLogs.clear();
@@ -306,8 +330,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
   }
 
   ({ExerciseReportBuilder builder, double met}) _resolveReportEntry() {
-    return reportBuilders[widget.definition.id] ??
-        (builder: GenericReportBuilder(), met: 3.5);
+    return resolveReportBuilder(widget.definition.id);
   }
 
   PostExerciseData _buildReport() {
@@ -579,6 +602,17 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       Navigator.of(context).pop({'completed': true});
       return;
     }
+
+    // Lifecycle boundary: every completed exercise (all sets done) converges
+    // here once the transition cinematic finishes. No-op without consent; this
+    // only emits an event — it does not touch the session data being written.
+    unawaited(
+      AnalyticsService.instance.capture(
+        'exercise_completed',
+        props: {'exercise_id': widget.definition.id},
+      ),
+    );
+
     final sessionId = await _sessionIdForTransition();
     if (!mounted) return;
 
@@ -607,7 +641,10 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
       // after dispose) — instead, the summary screen's own BuildContext
       // is used to pop.
       final streakWeeks = await SessionPersistence().currentStreak(
-        assumeTodayComplete: true,
+        // Standalone runs never write a workout_sessions row, so don't assume
+        // this week is active off a session that won't persist there. Plan
+        // runs do persist, so the assumption is honest for them.
+        assumeTodayComplete: widget.workoutSessionId != null,
       );
       if (!mounted) return;
 
@@ -628,21 +665,31 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
           await SessionPersistence().fetchPriorExerciseFormsScores(
         widget.workoutSessionId,
         exerciseIds,
+        // Standalone has no workout_session_id anchor, so exclude this run's
+        // own exercise_sessions row(s) by id instead — otherwise the current
+        // run leaks into its own "prior" history and masks a real PB.
+        excludeExerciseSessionIds: widget.workoutSessionId == null
+            ? [
+                for (final r in accumulated)
+                  if (r.sessionId != null) r.sessionId!
+              ]
+            : const [],
       );
 
       final candidates = <FaultCandidate>[];
       var lowestFormScore = accumulated.first.formScore;
       for (final r in accumulated) {
         lowestFormScore = min(r.formScore, lowestFormScore);
-        final builder =
-            reportBuilders[r.definition.id]?.builder ?? GenericReportBuilder();
+        final builder = resolveReportBuilder(r.definition.id).builder;
         candidates.addAll(
           builder.buildFaultCandidates(
             exerciseId: r.exerciseKey,
             exerciseName: r.exerciseName,
             exerciseFormScore: r.formScore,
             faultCounts: r.report.faultCounts,
-            totalReps: r.totalReps ?? 0,
+            totalReps: r.report.isSecondBased
+                ? (r.report.totalSeconds ?? 0).round()
+                : (r.totalReps ?? 0),
             userPainAreas: _painAreas,
           ),
         );
@@ -750,11 +797,11 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
     final prev = _previousReport;
     final phaseBody = switch (_phase) {
       _WorkoutFlowPhase.intro => ExerciseIntroPage(
-          title: widget.definition.name,
+          title: widget.definition.displayName,
           difficulty: widget.definition.difficulty,
           totalSets: _spec.sets,
           repsPerSet: _spec.repsPerSet,
-          videoDuration: _spec.videoDuration,
+          videoAsset: widget.definition.videoAsset,
           targetLabel: _spec.targetLabel,
           secondsPerUnit: _spec.secondsPerUnit,
           muscles: _spec.muscles,
@@ -771,6 +818,10 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
           onPreviousDifficulty:
               prev != null ? _handlePreviousExerciseDifficulty : null,
           onStart: _beginWorkout,
+          onReviewerDemoHold: (widget.definition.id == 'squat' ||
+                  widget.definition.id == 'squat_assessment')
+              ? () => ReviewerTrackingDemoOverlay.show(context)
+              : null,
           onBack: () => Navigator.of(context).pop(),
         ),
       _WorkoutFlowPhase.active => ActiveExercisePage(
@@ -779,6 +830,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
           currentSet: _currentSet,
           totalSets: _spec.sets,
           totalReps: _currentRepsTarget,
+          isTimeBased: _spec.timeBased,
           onSetComplete: _handleSetComplete,
           onBack: () => Navigator.of(context).pop(),
         ),
@@ -789,13 +841,14 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
           currentReps: _currentRepsTarget,
           baseRestSeconds: _spec.restSeconds,
           isLastSet: _currentSet >= _spec.sets,
+          exerciseName: widget.definition.displayName,
           setLogger: _currentSetLogger,
           onNext: _handleSummaryNext,
           previousSession: _sessionHistory,
           onDifficultyAnswer: _handleDifficultyAnswer,
         ),
       _WorkoutFlowPhase.transition => ExerciseTransitionMoment(
-          exerciseName: widget.definition.name,
+          exerciseName: widget.definition.displayName,
           formScore: _fullReport?.formScore ?? 0,
           setResults: _fullReport?.sets ?? const [],
           timeBased: _fullReport?.isSecondBased ?? false,
@@ -815,11 +868,46 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
 
 enum _WorkoutFlowPhase { intro, active, rest, transition }
 
+// Never-crash guard for a MISSING catalog entry (a data error — a launch asked
+// for an id with no row in exercise_catalog.json). These are NOT per-exercise
+// defaults; real volume always comes from the catalog. _resolveVolume logs in
+// debug whenever it falls back to these.
+const int kFallbackSets = 3;
+const int kFallbackReps = 8;
+const int kFallbackSeconds = 30;
+
+@visibleForTesting
+({
+  int sets,
+  int targetPerSet,
+  String targetLabel,
+  double secondsPerUnit,
+  bool timeBased,
+  ExerciseBase exercise,
+}) debugBuildExerciseExperienceSpec(
+  ExerciseDefinition definition, {
+  VolumePrescription? prescription,
+  ExerciseLaunchCatalogInfo? catalogInfo,
+}) {
+  final spec = _ExerciseExperienceSpec.fromDefinition(
+    definition,
+    prescription: prescription,
+    catalogInfo: catalogInfo,
+  );
+  return (
+    sets: spec.sets,
+    targetPerSet: spec.repsPerSet,
+    targetLabel: spec.targetLabel,
+    secondsPerUnit: spec.secondsPerUnit,
+    timeBased: spec.timeBased,
+    exercise: spec.createExercise(spec.repsPerSet),
+  );
+}
+
 class _ExerciseExperienceSpec {
   const _ExerciseExperienceSpec({
     required this.sets,
     required this.repsPerSet,
-    required this.videoDuration,
     required this.restSeconds,
     required this.targetLabel,
     required this.secondsPerUnit,
@@ -829,11 +917,11 @@ class _ExerciseExperienceSpec {
     required this.badges,
     required this.callouts,
     required this.createExercise,
+    this.timeBased = false,
   });
 
   final int sets;
   final int repsPerSet;
-  final String videoDuration;
   final int restSeconds;
   final String targetLabel;
   final double secondsPerUnit;
@@ -843,21 +931,31 @@ class _ExerciseExperienceSpec {
   final List<ExerciseIntroBadge> badges;
   final List<SkeletonCallout> callouts;
   final ExerciseBase Function(int repsPerSet) createExercise;
+  final bool timeBased;
 
   factory _ExerciseExperienceSpec.fromDefinition(
     ExerciseDefinition definition, {
     VolumePrescription? prescription,
+    ExerciseLaunchCatalogInfo? catalogInfo,
   }) {
-    final overrideSets = prescription?.sets;
-    final overrideReps = prescription?.reps;
     final overrideRest = prescription?.restSeconds;
+
+    // Resolve volume ONCE, precedence: prescription > catalog > definition
+    // default. `target` is the per-set rep/second goal — the displayed value
+    // AND the scoring denominator — so it is floored at 1 and can never be 0.
+    final resolvedCatalogInfo =
+        catalogInfo ?? CatalogSource.instance.lookup(definition.id);
+    final volume =
+        _resolveVolume(definition, prescription, resolvedCatalogInfo);
+    final sets = volume.sets;
+    final target = volume.target;
+    final isHold = volume.isHold;
 
     switch (definition.id) {
       case 'squat_assessment':
         return _ExerciseExperienceSpec(
           sets: 1,
           repsPerSet: 5,
-          videoDuration: '1:18',
           restSeconds: overrideRest ?? 45,
           targetLabel: 'REP/HIỆP',
           secondsPerUnit: 4,
@@ -910,14 +1008,32 @@ class _ExerciseExperienceSpec {
           sets: 1,
           repsPerSet: 5,
           restSeconds: overrideRest,
-          videoDuration: '1:12',
-          createExercise: (repsPerSet) => PushUp(maxRep: repsPerSet),
+          createExercise: (repsPerSet) => WallPushUp(maxRep: repsPerSet),
+        );
+      case 'warrior_one_assessment':
+        return _generic(
+          definition: definition,
+          sets: 1,
+          repsPerSet: 1, // một lần giữ để đánh giá
+          restSeconds: overrideRest,
+          createExercise: (repsPerSet) => WarriorOne(maxHolds: repsPerSet),
+        );
+      case 'seated_forward_fold_assessment':
+        return _generic(
+          definition: definition,
+          sets: 1,
+          repsPerSet: 30, // giữ 30 giây để đánh giá
+          restSeconds: overrideRest,
+          targetLabel: 'GIÂY/HIỆP',
+          secondsPerUnit: 1,
+          timeBased: true,
+          createExercise: (repsPerSet) =>
+              definition.createExercise(seconds: repsPerSet),
         );
       case 'squat':
         return _ExerciseExperienceSpec(
-          sets: overrideSets ?? 3,
-          repsPerSet: overrideReps ?? 8,
-          videoDuration: '2:15',
+          sets: sets,
+          repsPerSet: target,
           restSeconds: overrideRest ?? 45,
           targetLabel: 'REP/HIỆP',
           secondsPerUnit: 4,
@@ -967,76 +1083,134 @@ class _ExerciseExperienceSpec {
       case 'lunge':
         return _lungeSpec(
           definition: definition,
-          sets: overrideSets ?? 3,
-          repsPerSet: overrideReps ?? 8,
+          sets: sets,
+          repsPerSet: target,
           restSeconds: overrideRest,
-          videoDuration: '1:58',
           createExercise: (repsPerSet) => Lunge(maxRep: repsPerSet),
         );
       case 'push_up':
         return _pushUpSpec(
           definition: definition,
-          sets: overrideSets ?? 3,
-          repsPerSet: overrideReps ?? 6,
+          sets: sets,
+          repsPerSet: target,
           restSeconds: overrideRest,
-          videoDuration: '1:42',
           createExercise: (repsPerSet) => PushUp(maxRep: repsPerSet),
         );
       case 'plank':
         return _plankSpec(
           definition: definition,
-          sets: overrideSets ?? 3,
-          repsPerSet: overrideReps ?? 3,
+          sets: sets,
+          repsPerSet: target,
           restSeconds: overrideRest,
-          videoDuration: '1:28',
           createExercise: (repsPerSet) => Plank(maxRep: repsPerSet),
         );
       case 'jumping_jack':
         return _jumpingJackSpec(
           definition: definition,
-          sets: overrideSets ?? 3,
-          repsPerSet: overrideReps ?? 15,
+          sets: sets,
+          repsPerSet: target,
           restSeconds: overrideRest,
-          videoDuration: '1:10',
           createExercise: (repsPerSet) => JumpingJack(maxRep: repsPerSet),
         );
       case 'warrior_one':
         return _generic(
           definition: definition,
-          sets: overrideSets ?? 1,
-          repsPerSet: overrideReps ?? 2, // 2 lần giữ = 2 bên
+          sets: sets,
+          repsPerSet: target, // 2 lần giữ = 2 bên
           restSeconds: overrideRest,
-          videoDuration: '1:20',
           createExercise: (repsPerSet) => WarriorOne(maxHolds: repsPerSet),
         );
       case 'glute_bridge':
         return _gluteBridgeSpec(
           definition: definition,
-          sets: overrideSets ?? 3,
-          repsPerSet: overrideReps ?? 15,
+          sets: sets,
+          repsPerSet: target,
           restSeconds: overrideRest,
-          videoDuration: '1:36',
           createExercise: (repsPerSet) => GluteBridge(maxRep: repsPerSet),
         );
       case 'curl_up':
         return _curlUpSpec(
           definition: definition,
-          sets: overrideSets ?? 3,
-          repsPerSet: overrideReps ?? 12,
+          sets: sets,
+          repsPerSet: target,
           restSeconds: overrideRest,
-          videoDuration: '1:34',
           createExercise: (repsPerSet) => CurlUp(maxRep: repsPerSet),
         );
-      default:
+      case 'bird__dog':
         return _generic(
           definition: definition,
-          sets: overrideSets ?? 3,
-          repsPerSet: overrideReps ?? 8,
+          sets: sets,
+          repsPerSet: target,
           restSeconds: overrideRest,
-          videoDuration: '1:30',
-          createExercise: (_) => definition.createExercise(),
+          createExercise: (repsPerSet) => BirdDog(maxRep: repsPerSet),
+        );
+      default:
+        // isHold comes from the DEFINITION's declared target type, not from
+        // catalog seconds. Rep-type and hold-type both feed the single
+        // resolved `target` into createExercise — never a null target.
+        return _generic(
+          definition: definition,
+          sets: sets,
+          repsPerSet: target,
+          restSeconds: overrideRest,
+          targetLabel: isHold ? 'GIÂY/HIỆP' : 'REP/HIỆP',
+          secondsPerUnit: isHold ? 1 : 4,
+          timeBased: isHold,
+          createExercise: (targetPerSet) => definition.createExercise(
+            reps: isHold ? null : targetPerSet,
+            seconds: isHold ? targetPerSet : null,
+          ),
         );
     }
+  }
+
+  /// Resolves (sets, target, isHold) for a launch from the CATALOG (+ any plan
+  /// prescription), never from the definition. Precedence is
+  /// prescription > catalog > floor fallback. Sets, type, and target all come
+  /// from the catalog entry; `target` is the per-set rep/second goal AND the
+  /// scoring denominator, so it is hard-floored at 1 and asserted positive — it
+  /// can never be 0.
+  static ({int sets, int target, bool isHold}) _resolveVolume(
+    ExerciseDefinition definition,
+    VolumePrescription? prescription,
+    ExerciseLaunchCatalogInfo? catalogInfo,
+  ) {
+    final catalogSeconds = catalogInfo?.baseSeconds;
+    final catalogReps = catalogInfo?.baseReps;
+    final rawSets =
+        prescription?.sets ?? catalogInfo?.baseSets ?? kFallbackSets;
+    // A plan may explicitly override the catalog modality. If neither source
+    // is available (for example a direct library launch), the definition still
+    // carries the modality so second-based exercises never fall back to reps.
+    final isHold = prescription?.seconds != null
+        ? true
+        : prescription?.reps != null
+            ? false
+            : catalogSeconds != null
+                ? true
+                : catalogReps != null
+                    ? false
+                    : definition.targetType == ExerciseTargetType.seconds;
+    final resolved = isHold
+        ? (prescription?.seconds ?? catalogSeconds)
+        : (prescription?.reps ?? catalogReps);
+    final sets = rawSets < 1 ? 1 : rawSets;
+    // Floor guards a missing or zero catalog target (a data error); the
+    // displayed target / scoring denominator is never 0.
+    final target = (resolved == null || resolved < 1)
+        ? (isHold ? kFallbackSeconds : kFallbackReps)
+        : resolved;
+    assert(target > 0);
+    assert(() {
+      if (catalogInfo == null && prescription == null) {
+        debugPrint(
+          '[Vika] _resolveVolume: no catalog entry or prescription for '
+          '"${definition.id}" — using floor fallback. Missing catalog asset row?',
+        );
+      }
+      return true;
+    }());
+    return (sets: sets, target: target, isHold: isHold);
   }
 
   static _ExerciseExperienceSpec _generic({
@@ -1044,16 +1218,17 @@ class _ExerciseExperienceSpec {
     int sets = 3,
     required int repsPerSet,
     int? restSeconds,
-    required String videoDuration,
+    String targetLabel = 'REP/HIỆP',
+    double secondsPerUnit = 4,
+    bool timeBased = false,
     required ExerciseBase Function(int repsPerSet) createExercise,
   }) {
     return _ExerciseExperienceSpec(
       sets: sets,
       repsPerSet: repsPerSet,
-      videoDuration: videoDuration,
       restSeconds: restSeconds ?? 45,
-      targetLabel: 'REP/HIỆP',
-      secondsPerUnit: 4,
+      targetLabel: targetLabel,
+      secondsPerUnit: secondsPerUnit,
       posture: SkeletonPosture.standing,
       muscles: definition.targetMuscles,
       tips: definition.setupTips,
@@ -1093,6 +1268,7 @@ class _ExerciseExperienceSpec {
         ),
       ],
       createExercise: createExercise,
+      timeBased: timeBased,
     );
   }
 
@@ -1101,13 +1277,11 @@ class _ExerciseExperienceSpec {
     required int sets,
     required int repsPerSet,
     int? restSeconds,
-    required String videoDuration,
     required ExerciseBase Function(int repsPerSet) createExercise,
   }) {
     return _ExerciseExperienceSpec(
       sets: sets,
       repsPerSet: repsPerSet,
-      videoDuration: videoDuration,
       restSeconds: restSeconds ?? 45,
       targetLabel: 'REP/HIỆP',
       secondsPerUnit: 4,
@@ -1158,13 +1332,11 @@ class _ExerciseExperienceSpec {
     required int sets,
     required int repsPerSet,
     int? restSeconds,
-    required String videoDuration,
     required ExerciseBase Function(int repsPerSet) createExercise,
   }) {
     return _ExerciseExperienceSpec(
       sets: sets,
       repsPerSet: repsPerSet,
-      videoDuration: videoDuration,
       restSeconds: restSeconds ?? 45,
       targetLabel: 'REP/HIỆP',
       secondsPerUnit: 4,
@@ -1212,13 +1384,11 @@ class _ExerciseExperienceSpec {
     required int sets,
     required int repsPerSet,
     int? restSeconds,
-    required String videoDuration,
     required ExerciseBase Function(int repsPerSet) createExercise,
   }) {
     return _ExerciseExperienceSpec(
       sets: sets,
       repsPerSet: repsPerSet,
-      videoDuration: videoDuration,
       restSeconds: restSeconds ?? PlankConfig.REST_DURATION.round(),
       targetLabel: 'LẦN GIỮ/HIỆP',
       secondsPerUnit: PlankConfig.HOLD_DURATION,
@@ -1266,13 +1436,11 @@ class _ExerciseExperienceSpec {
     required int sets,
     required int repsPerSet,
     int? restSeconds,
-    required String videoDuration,
     required ExerciseBase Function(int repsPerSet) createExercise,
   }) {
     return _ExerciseExperienceSpec(
       sets: sets,
       repsPerSet: repsPerSet,
-      videoDuration: videoDuration,
       restSeconds: restSeconds ?? 35,
       targetLabel: 'REP/HIỆP',
       secondsPerUnit: 1.2,
@@ -1320,13 +1488,11 @@ class _ExerciseExperienceSpec {
     required int sets,
     required int repsPerSet,
     int? restSeconds,
-    required String videoDuration,
     required ExerciseBase Function(int repsPerSet) createExercise,
   }) {
     return _ExerciseExperienceSpec(
       sets: sets,
       repsPerSet: repsPerSet,
-      videoDuration: videoDuration,
       restSeconds: restSeconds ?? 45,
       targetLabel: 'REP/HIỆP',
       secondsPerUnit: 4,
@@ -1376,13 +1542,11 @@ class _ExerciseExperienceSpec {
     required int sets,
     required int repsPerSet,
     int? restSeconds,
-    required String videoDuration,
     required ExerciseBase Function(int repsPerSet) createExercise,
   }) {
     return _ExerciseExperienceSpec(
       sets: sets,
       repsPerSet: repsPerSet,
-      videoDuration: videoDuration,
       restSeconds: restSeconds ?? 45,
       targetLabel: 'REP/HIỆP',
       secondsPerUnit: 4,

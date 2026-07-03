@@ -43,5 +43,8 @@ class ExerciseSessionReport {
   int? get goodReps => report.totalGoodReps;
   double? get ratio => report.cleanRatio;
   int get formScore => report.formScore;
-  String get exerciseName => report.exerciseName;
+
+  /// User-facing name, resolved from the catalog SSOT via [definition]
+  /// (not the raw name baked into [report] at build time).
+  String get exerciseName => definition.displayName;
 }

@@ -2,27 +2,22 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vika/services/session_persistence.dart';
 
 // Pure aggregations behind the Progress tab sections wired off mock data:
-//   • weeklySummary       (TUẦN NÀY MỘT NHÌN)
+//   • weeklySummary       (TỔNG QUAN TUẦN NÀY)
 //   • personalRecords     (KỶ LỤC CÁ NHÂN)
 //   • nextStreakMilestone (streak tier thresholds, in consecutive active weeks)
 //
-// Anchored to a fixed `now` so the rolling windows are deterministic:
-//   now      = 2026-06-10 12:00
-//   current  = [2026-06-03 12:00, 2026-06-10 12:00]
-//   prior    = [2026-05-27 12:00, 2026-06-03 12:00)
+// weeklySummary is now program-week-relative: deriveWeeklySummaryForTest takes
+// two PRE-BUCKETED completed sample lists (current program week, then the prior
+// week). The windowing moved into weeklySummary(), so these samples are
+// date-free — just form score + duration.
 void main() {
-  final now = DateTime(2026, 6, 10, 12);
-
-  ({DateTime completedAt, int? formScore, int? durationSeconds}) wk(
-    DateTime at, {
-    int? form,
-    int? secs,
-  }) =>
-      (completedAt: at, formScore: form, durationSeconds: secs);
+  ({int? formScore, int? durationSeconds}) wk({int? form, int? secs}) =>
+      (formScore: form, durationSeconds: secs);
 
   group('weeklySummary', () {
-    test('no sessions this week -> zero stats, deltas null', () {
-      final r = SessionPersistence.deriveWeeklySummaryForTest(const [], now: now);
+    test('no sessions -> zero stats, deltas null', () {
+      final r =
+          SessionPersistence.deriveWeeklySummaryForTest(const [], const []);
 
       expect(r.sessions, 0);
       expect(r.totalSeconds, 0);
@@ -32,17 +27,14 @@ void main() {
       expect(r.avgFormDelta, isNull);
     });
 
-    test('current sessions sum + average; deltas hidden when prior < 3', () {
+    test('current program week 1 (no prior) -> sums + avg, deltas null', () {
       final r = SessionPersistence.deriveWeeklySummaryForTest(
         [
-          wk(DateTime(2026, 6, 4, 9), form: 70, secs: 600),
-          wk(DateTime(2026, 6, 6, 9), form: 80, secs: 900),
-          wk(DateTime(2026, 6, 9, 9), form: 90, secs: 300),
-          // prior window holds only 2 -> no baseline.
-          wk(DateTime(2026, 5, 29, 9), form: 60, secs: 600),
-          wk(DateTime(2026, 5, 31, 9), form: 60, secs: 600),
+          wk(form: 70, secs: 600),
+          wk(form: 80, secs: 900),
+          wk(form: 90, secs: 300),
         ],
-        now: now,
+        const [],
       );
 
       expect(r.sessions, 3);
@@ -53,31 +45,40 @@ void main() {
       expect(r.avgFormDelta, isNull);
     });
 
-    test('deltas reveal once the prior window holds >= 3 sessions', () {
+    test('current week 5 (3 sessions) vs prior week 4 (2) -> deltas revealed',
+        () {
       final r = SessionPersistence.deriveWeeklySummaryForTest(
         [
-          wk(DateTime(2026, 6, 4, 9), form: 80, secs: 1000),
-          wk(DateTime(2026, 6, 6, 9), form: 90, secs: 1000),
-          // prior: 3 sessions, mean form 60, total 1500s.
-          wk(DateTime(2026, 5, 28, 9), form: 60, secs: 500),
-          wk(DateTime(2026, 5, 29, 9), form: 60, secs: 500),
-          wk(DateTime(2026, 5, 31, 9), form: 60, secs: 500),
+          wk(form: 80, secs: 1000),
+          wk(form: 90, secs: 1000),
+          wk(form: 85, secs: 1000),
         ],
-        now: now,
+        [wk(form: 60, secs: 500), wk(form: 70, secs: 500)],
       );
 
-      expect(r.sessions, 2);
-      expect(r.totalSeconds, 2000);
-      expect(r.avgForm, 85);
-      expect(r.sessionsDelta, -1); // 2 - 3
-      expect(r.secondsDelta, 500); // 2000 - 1500
-      expect(r.avgFormDelta, 25); // 85 - 60
+      expect(r.sessions, 3);
+      expect(r.totalSeconds, 3000);
+      expect(r.avgForm, 85); // mean(80, 90, 85)
+      expect(r.sessionsDelta, 1); // 3 - 2
+      expect(r.secondsDelta, 2000); // 3000 - 1000
+      expect(r.avgFormDelta, 20); // 85 - mean(60, 70)=65
+    });
+
+    test('a single prior session is enough to reveal deltas (min = 1)', () {
+      final r = SessionPersistence.deriveWeeklySummaryForTest(
+        [wk(form: 80, secs: 600)],
+        [wk(form: 60, secs: 400)],
+      );
+
+      expect(r.sessionsDelta, 0); // 1 - 1
+      expect(r.secondsDelta, 200); // 600 - 400
+      expect(r.avgFormDelta, 20); // 80 - 60
     });
 
     test('avgForm null when no current session carries a score', () {
       final r = SessionPersistence.deriveWeeklySummaryForTest(
-        [wk(DateTime(2026, 6, 9, 9), form: null, secs: 300)],
-        now: now,
+        [wk(form: null, secs: 300)],
+        const [],
       );
 
       expect(r.sessions, 1);

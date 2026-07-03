@@ -14,6 +14,7 @@
 // text comes later from the three-pillar aggregator.
 
 import '../../data/program_mock.dart';
+import '../catalog/catalog_source.dart';
 import 'models/plan.dart';
 import 'recommendation_service.dart'; // PlanSnapshot + ExerciseLaunchCatalogInfo
 import '../workout_launch_service.dart'; // workoutVolumeLabel
@@ -219,7 +220,10 @@ class ProgramPlanMapper {
       // SCREEN drives its own squat + wall push-up assessment regardless.
       exercises: retest.exercises
           .map((e) => SessionExercise(
-                name: e.vietnameseName,
+                // Display name from the catalog SSOT; fall back to the value
+                // persisted on the retest only if the catalog misses the id.
+                name: CatalogSource.instance.lookup(e.exerciseId)?.vietnameseName ??
+                    e.vietnameseName,
                 volumeLabel: '${e.durationSeconds} giây',
                 exerciseId: e.exerciseId,
                 hasAi: catalogById[e.exerciseId]?.isFormChecked ?? false,

@@ -254,13 +254,17 @@ abstract class ExerciseReportBuilder {
     List<PreviousSessionSummary> history = const [],
     List<String> userPainAreas = const [],
   }) {
-    final totalReps = (logger.setLogs['max_rep'] as num?)?.toInt() ?? 0;
-    final goodReps = (logger.setLogs['good_rep_count'] as num?)?.toInt() ?? 0;
-    if (totalReps == 0) return null;
+    final totalUnits = _scoreableTotalUnits(logger);
+    final goodUnits = _scoreableGoodUnits(logger);
+    if (totalUnits <= 0) return null;
+    final totalLabel = _scoreableUnitLabel(totalUnits);
+    final goodLabel = _scoreableUnitLabel(goodUnits);
 
     // ─── Tier 0: Perfect set ───
-    if (goodReps == totalReps) {
-      return 'Hoàn hảo! Tất cả $totalReps rep đúng form.';
+    if (goodUnits >= totalUnits) {
+      return isSecondBased
+          ? 'Hoàn hảo! Giữ sạch $totalLabel.'
+          : 'Hoàn hảo! Tất cả $totalLabel rep đúng form.';
     }
 
     final metrics = praiseMetricNames();
@@ -282,7 +286,7 @@ abstract class ExerciseReportBuilder {
     // ─── Tier 2: Pain-linked metric win ───
     for (final faultKey in painFaultKeys) {
       if (!metrics.containsKey(faultKey)) continue;
-      final ratio = _cleanRatio(logger, faultKey, totalReps);
+      final ratio = _cleanRatio(logger, faultKey, totalUnits);
       if (ratio >= _metricWinThreshold) {
         final label = metrics[faultKey]!;
         return '$label hôm nay tốt — vùng bạn đang tập trung.';
@@ -293,7 +297,7 @@ abstract class ExerciseReportBuilder {
     if (history.isNotEmpty) {
       for (final faultKey in metrics.keys) {
         if (!_wasHistoricallyWeak(faultKey, history)) continue;
-        final currentRatio = _cleanRatio(logger, faultKey, totalReps);
+        final currentRatio = _cleanRatio(logger, faultKey, totalUnits);
         if (currentRatio >= _metricWinThreshold) {
           final label = metrics[faultKey]!;
           return '$label hôm nay tốt hơn hẳn mọi khi.';
@@ -310,15 +314,17 @@ abstract class ExerciseReportBuilder {
     }
 
     // tier 4.5: Correct rep count > 60% of max rep count
-    final ratio = goodReps / totalReps;
+    final ratio = goodUnits / totalUnits;
     if (ratio >= 0.65) {
-      return '$goodReps/$totalReps rep đúng form — tốt đấy.';
+      return isSecondBased
+          ? 'Giữ sạch $goodLabel/$totalLabel — tốt đấy.'
+          : '$goodLabel/$totalLabel rep đúng form — tốt đấy.';
     }
 
     // ─── Tier 5: Generic metric win (filtered) ───
     return _genericMetricPraise(
       logger: logger,
-      totalReps: totalReps,
+      totalReps: totalUnits,
       history: history,
     );
   }
@@ -330,17 +336,17 @@ abstract class ExerciseReportBuilder {
     if (tipMap.isEmpty) return null;
 
     String? worstKey;
-    int worstCount = 0;
+    double worstValue = 0.0;
 
     for (final key in tipMap.keys) {
-      final count = (logger.setLogs[key] as num?)?.toInt() ?? 0;
-      if (count > worstCount) {
-        worstCount = count;
+      final value = (logger.setLogs[key] as num?)?.toDouble() ?? 0.0;
+      if (value > worstValue) {
+        worstValue = value;
         worstKey = key;
       }
     }
 
-    if (worstKey == null || worstCount == 0) return null;
+    if (worstKey == null || worstValue == 0) return null;
     return tipMap[worstKey]?.next;
   }
 
@@ -359,7 +365,7 @@ abstract class ExerciseReportBuilder {
   /// 0.0 = every rep had the fault, 1.0 = no rep had it.
   double _cleanRatio(ExerciseLogger logger, String faultKey, int totalReps) {
     if (totalReps == 0) return 0;
-    final fails = (logger.setLogs[faultKey] as num?)?.toInt() ?? 0;
+    final fails = (logger.setLogs[faultKey] as num?)?.toDouble() ?? 0.0;
     return (totalReps - fails) / totalReps;
   }
 
@@ -387,9 +393,10 @@ abstract class ExerciseReportBuilder {
     if (matchingFaultKey == null) return null;
 
     final previousCount =
-        (previousSetLogger.setLogs[matchingFaultKey] as num?)?.toInt() ?? 0;
+        (previousSetLogger.setLogs[matchingFaultKey] as num?)?.toDouble() ??
+            0.0;
     final currentCount =
-        (currentLogger.setLogs[matchingFaultKey] as num?)?.toInt() ?? 0;
+        (currentLogger.setLogs[matchingFaultKey] as num?)?.toDouble() ?? 0.0;
 
     // Previous set had the fault, current set has fewer — loop closed.
     if (previousCount > 0 && currentCount < previousCount) {
@@ -450,12 +457,10 @@ abstract class ExerciseReportBuilder {
     ExerciseLogger previousSet,
     ExerciseLogger currentSet,
   ) {
-    final previousMax = (previousSet.setLogs['max_rep'] as num?)?.toInt() ?? 0;
-    final previousGood =
-        (previousSet.setLogs['good_rep_count'] as num?)?.toInt() ?? 0;
-    final currentMax = (currentSet.setLogs['max_rep'] as num?)?.toInt() ?? 0;
-    final currentGood =
-        (currentSet.setLogs['good_rep_count'] as num?)?.toInt() ?? 0;
+    final previousMax = _scoreableTotalUnits(previousSet);
+    final previousGood = _scoreableGoodUnits(previousSet);
+    final currentMax = _scoreableTotalUnits(currentSet);
+    final currentGood = _scoreableGoodUnits(currentSet);
 
     if (previousMax == 0 || currentMax == 0) return false;
 
@@ -492,13 +497,13 @@ abstract class ExerciseReportBuilder {
       // Skip habitual strengths — prevents depth-always-praised failure mode.
       if (_isHabitualStrength(faultKey, history)) continue;
 
-      final fails = (logger.setLogs[faultKey] as num?)?.toInt() ?? 0;
-      final good = totalReps - fails;
+      final fails = (logger.setLogs[faultKey] as num?)?.toDouble() ?? 0.0;
+      final good = (totalReps - fails).clamp(0.0, totalReps.toDouble());
       final ratio = good / totalReps;
 
       if (ratio > 0.5 && ratio > bestRatio) {
         bestRatio = ratio;
-        bestGood = good;
+        bestGood = good.round();
         bestLabel = entry.value;
         bestKey = faultKey;
       }
@@ -562,7 +567,13 @@ abstract class ExerciseReportBuilder {
     final counts = <String, int>{};
     for (final logger in setLoggers) {
       for (final entry in logger.setLogs.entries) {
-        if (entry.key.endsWith('_fails_count') && entry.value is num) {
+        final isFaultCount = entry.key.endsWith('_fails_count') ||
+            entry.key.endsWith('_fails') ||
+            (isSecondBased &&
+                entry.key.endsWith('_seconds') &&
+                entry.key != 'good_seconds' &&
+                entry.key != 'total_seconds');
+        if (isFaultCount && entry.value is num) {
           counts[entry.key] =
               (counts[entry.key] ?? 0) + (entry.value as num).toInt();
         }
@@ -658,5 +669,25 @@ abstract class ExerciseReportBuilder {
           faultCounts: faultCounts,
         );
     }
+  }
+
+  int _scoreableTotalUnits(ExerciseLogger logger) {
+    if (!isSecondBased) {
+      return (logger.setLogs['max_rep'] as num?)?.toInt() ?? 0;
+    }
+    return ((logger.setLogs['total_seconds'] as num?)?.toDouble() ?? 0.0)
+        .round();
+  }
+
+  int _scoreableGoodUnits(ExerciseLogger logger) {
+    if (!isSecondBased) {
+      return (logger.setLogs['good_rep_count'] as num?)?.toInt() ?? 0;
+    }
+    return ((logger.setLogs['good_seconds'] as num?)?.toDouble() ?? 0.0)
+        .round();
+  }
+
+  String _scoreableUnitLabel(int units) {
+    return isSecondBased ? '${units}s' : units.toString();
   }
 }

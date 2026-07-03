@@ -35,11 +35,11 @@ class HeadNeckConfig {
   static const double NEUTRAL = 180.0;
 
   /// Deviation thresholds from neutral
-  static const double WARNING_DEVIATION = 10.0;
-  static const double ERROR_DEVIATION = 20.0;
+  static const double WARNING_DEVIATION = 16.0;
+  static const double ERROR_DEVIATION = 30.0;
 
   /// Fault percentage threshold
-  static const double FAULT_PERCENT_THRESHOLD = 0.30;
+  static const double FAULT_PERCENT_THRESHOLD = 0.45;
 }
 
 class HeadNeckMetric extends PlankMetricBase {
@@ -56,6 +56,7 @@ class HeadNeckMetric extends PlankMetricBase {
   // Fault time tracking
   int _totalFrames = 0;
   int _faultFrames = 0;
+  bool _isFaultingNow = false;
 
   // Prevent instruction spam — one per direction per hold
   bool _dropInstructionSet = false;
@@ -63,6 +64,8 @@ class HeadNeckMetric extends PlankMetricBase {
 
   @override
   List<FaultRecord> get faults => _faults;
+  @override
+  bool get isFaultingNow => _isFaultingNow;
 
   @override
   Map<String, dynamic> get debugData => _debugData;
@@ -73,6 +76,7 @@ class HeadNeckMetric extends PlankMetricBase {
   @override
   void update(RepContext ctx) {
     _totalFrames++;
+    _isFaultingNow = false;
 
     final angle = ctx.neckAngle;
     final deviation = (HeadNeckConfig.NEUTRAL - angle).abs();
@@ -149,6 +153,7 @@ class HeadNeckMetric extends PlankMetricBase {
     }
 
     if (isFault) _faultFrames++;
+    _isFaultingNow = isFault;
 
     _debugData['neckStatus'] = isFault ? 'FAULT' : 'GOOD';
   }
@@ -191,6 +196,7 @@ class HeadNeckMetric extends PlankMetricBase {
     _liftDebouncer.reset();
     _totalFrames = 0;
     _faultFrames = 0;
+    _isFaultingNow = false;
     _dropInstructionSet = false;
     _liftInstructionSet = false;
   }

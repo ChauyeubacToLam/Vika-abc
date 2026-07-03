@@ -9,10 +9,22 @@ enum ChangeState {
 }
 
 class FrameBuffer {
+  /// Stored frames form the current analysis window.
+  ///
+  /// Peak/travel/elapsed helpers read this entire window, so callers that need
+  /// per-rep values must call [clear] at rep boundaries or pass [maxLength] for
+  /// rolling-window behavior.
+  FrameBuffer({this.maxLength});
+
+  final int? maxLength;
   List<FrameSnapshot> frameBuffer = [];
 
   void addFrame(FrameSnapshot frame) {
     frameBuffer.add(frame);
+    final limit = maxLength;
+    if (limit != null && limit > 0 && frameBuffer.length > limit) {
+      frameBuffer.removeRange(0, frameBuffer.length - limit);
+    }
   }
 
   void clear() {

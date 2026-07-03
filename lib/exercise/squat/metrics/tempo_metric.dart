@@ -34,16 +34,16 @@ import '../squat.dart';
 
 class TempoConfig {
   /* --- Descent Duration (seconds) --- */
-  static const double DESCENT_MIN_GOOD = 0.45;
-  static const double DESCENT_MIN_ERROR = 0.35;
+  static const double DESCENT_MIN_GOOD = 0.30;
+  static const double DESCENT_MIN_ERROR = 0.20;
 
   /* --- Bottom Hold (seconds) --- */
   // Keep the bottom cue snappy for bodyweight squats while preserving a clear pause.
-  static const double BOTTOM_HOLD_MIN = 0.6;
+  static const double BOTTOM_HOLD_MIN = 0.35;
 
   /* --- Descent:Ascent Ratio --- */
   static const double RATIO_GOOD = 2.0;
-  static const double RATIO_WARNING = 0.5;
+  static const double RATIO_WARNING = 0.35;
 
   /* --- Ascent Struggle Detection --- */
   static const double ASCENT_STRUGGLE_MULTIPLIER = 2.0;
@@ -56,10 +56,6 @@ class TempoConfig {
 class TempoMetric extends SquatMetricBase {
   @override
   String get name => 'Tempo';
-
-  @override
-  String? get nameVi => 'Nhịp độ';
-
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
 

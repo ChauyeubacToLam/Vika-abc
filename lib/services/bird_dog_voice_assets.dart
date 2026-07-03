@@ -1,0 +1,60 @@
+class BirdDogVoiceAssets {
+  static const String assetSourcePrefix = 'audio';
+  static const String assetBundlePrefix = 'assets/audio';
+
+  static const Map<String, String> files = {
+    '1': 'common/count_1.mp3',
+    '2': 'common/count_2.mp3',
+    '3': 'common/count_3.mp3',
+    '4': 'common/count_4.mp3',
+    '5': 'common/count_5.mp3',
+    '6': 'common/count_6.mp3',
+    '7': 'common/count_7.mp3',
+    '8': 'common/count_8.mp3',
+    '9': 'common/count_9.mp3',
+    '10': 'common/count_10.mp3',
+    '11': 'common/count_11.mp3',
+    '12': 'common/count_12.mp3',
+    '13': 'common/count_13.mp3',
+    '14': 'common/count_14.mp3',
+    '15': 'common/count_15.mp3',
+    '16': '16.mp3',
+    '17': '17.mp3',
+    '18': '18.mp3',
+    '19': '19.mp3',
+    '20': '20.mp3',
+    '21': '21.mp3',
+    '22': '22.mp3',
+    '23': '23.mp3',
+    '24': '24.mp3',
+    'Sẵn sàng.': 'common/ready.mp3',
+    'Bắt đầu.': 'common/start.mp3',
+    'Giữ cả người trong khung hình.': 'common/keep_full_body.mp3',
+    'Giữ yên 3 giây để bắt đầu.': 'common/hold_still.mp3',
+    'Lần này chưa tính.': 'common/no_count.mp3',
+    'Hoàn thành bài tập.': 'common/exercise_complete.mp3',
+    'Đặt điện thoại hơi chéo để thấy toàn thân trên thảm.':
+        'bird_dog/bird_dog.setup_intro.mp3',
+    'Chống hai tay và hai gối. Tay dưới vai, gối dưới hông, lưng phẳng.':
+        'bird_dog/bird_dog.setup_position.mp3',
+    'Giơ tay và chân đối diện. Vươn dài. Giữ 2 giây rồi đổi bên.':
+        'bird_dog/bird_dog.active_intro.mp3',
+    'Tốt, hông giữ cân bằng.': 'bird_dog/bird_dog.good_clean.mp3',
+    'Hiệp này chống lại bốn điểm. Lưng phẳng, tay dưới vai.':
+        'bird_dog/bird_dog.set_next_setup.mp3',
+    'Giơ tay và chân đối diện.': 'bird_dog/opposite_side.mp3',
+    'Đổi sang bên còn lại.': 'bird_dog/alternate.mp3',
+    'Vươn dài tay và chân.': 'bird_dog/alignment.mp3',
+    'Nâng đầu nhẹ, mắt nhìn xuống thảm.': 'bird_dog/head.mp3',
+    'Hạ chân xuống ngang thân.': 'bird_dog/lumbar.mp3',
+    'Giữ 2 giây ở điểm cao nhất.': 'bird_dog/hold.mp3',
+    'Siết bụng, giữ hông cân bằng.': 'bird_dog/trunk.mp3',
+    'Hiệp này đừng giơ cùng bên.': 'bird_dog/set_next_opposite_side.mp3',
+    'Hiệp này đổi bên sau mỗi lần.': 'bird_dog/set_next_alternate.mp3',
+    'Hiệp này giữ tay chân thẳng hơn.': 'bird_dog/set_next_alignment.mp3',
+    'Hiệp này đừng cúi đầu quá thấp.': 'bird_dog/set_next_head.mp3',
+    'Hiệp này đừng đá chân quá cao.': 'bird_dog/set_next_lumbar.mp3',
+    'Hiệp này giữ đủ lâu rồi mới hạ.': 'bird_dog/set_next_hold.mp3',
+    'Hiệp này đừng để hông lệch.': 'bird_dog/set_next_trunk.mp3',
+  };
+}

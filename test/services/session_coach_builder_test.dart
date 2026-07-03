@@ -1,4 +1,4 @@
-import 'package:flutter_test/flutter_test.dart';
+﻿import 'package:flutter_test/flutter_test.dart';
 import 'package:vika/models/fault_candidate.dart';
 import 'package:vika/services/session_coach_builder.dart';
 import 'package:vika/services/session_trophy_picker.dart';
@@ -22,7 +22,7 @@ void main() {
         ),
       ],
       trophy: _trophy(),
-      lowestFormScore: 80,
+      lowestFormScore: 100,
     );
 
     expect(coach.kind, CoachWatchKind.fault);
@@ -54,7 +54,7 @@ void main() {
         ),
       ],
       trophy: _trophy(),
-      lowestFormScore: 80,
+      lowestFormScore: 100,
     );
 
     expect(coach.watch, 'Lunge watch');
@@ -82,7 +82,7 @@ void main() {
         ),
       ],
       trophy: _trophy(),
-      lowestFormScore: 80,
+      lowestFormScore: 100,
     );
 
     expect(coach.watch, 'Push Up watch');
@@ -107,7 +107,7 @@ void main() {
         ),
       ],
       trophy: _trophy(),
-      lowestFormScore: 80,
+      lowestFormScore: 100,
     );
 
     final sortIndexCoach = SessionCoachBuilder.build(
@@ -128,7 +128,7 @@ void main() {
         ),
       ],
       trophy: _trophy(),
-      lowestFormScore: 80,
+      lowestFormScore: 100,
     );
 
     expect(criticalityCoach.watch, 'Depth watch');
@@ -141,13 +141,13 @@ void main() {
         _candidate(rate: 0.09),
       ],
       trophy: _trophy(),
-      lowestFormScore: 80,
+      lowestFormScore: 100,
     );
 
     final moderateCoach = SessionCoachBuilder.build(
       candidates: const [],
       trophy: _trophy(),
-      lowestFormScore: 80,
+      lowestFormScore: 100,
     );
 
     final hardCoach = SessionCoachBuilder.build(
@@ -155,7 +155,7 @@ void main() {
         _candidate(rate: 0.01),
       ],
       trophy: _trophy(),
-      lowestFormScore: 80,
+      lowestFormScore: 100,
     );
 
     expect(easyCoach.kind, CoachWatchKind.perfect);
@@ -163,9 +163,9 @@ void main() {
       easyCoach.watch,
       'Buổi tập hoàn hảo, chuẩn không cần chỉnh',
     );
-    expect(easyCoach.next, 'Giữ nguyên mức này, buổi sau sẽ mượt hơn nữa.');
-    expect(moderateCoach.next, 'Giữ nguyên mức này, buổi sau sẽ mượt hơn nữa.');
-    expect(hardCoach.next, 'Giữ nguyên mức này, buổi sau sẽ mượt hơn nữa.');
+    expect(easyCoach.next, 'Giữ đà này, buổi sau sẽ còn mượt hơn.');
+    expect(moderateCoach.next, 'Giữ đà này, buổi sau sẽ còn mượt hơn.');
+    expect(hardCoach.next, 'Giữ đà này, buổi sau sẽ còn mượt hơn.');
   });
 
   test('quote composes win and the path-specific tail', () {
@@ -174,22 +174,22 @@ void main() {
         _candidate(rate: 0.10),
       ],
       trophy: _trophy(tier: TrophyTier.streakMilestone, value: '7'),
-      lowestFormScore: 80,
+      lowestFormScore: 100,
     );
 
     final perfectCoach = SessionCoachBuilder.build(
       candidates: const [],
       trophy: _trophy(tier: TrophyTier.cleanSession),
-      lowestFormScore: 80,
+      lowestFormScore: 100,
     );
 
     expect(
       faultCoach.quote,
-      'Chuỗi 7 ngày, quá đỉnh! Tinh chỉnh chút xíu nữa là chuẩn.',
+      '7 ngày liên tiếp rồi, quá đỉnh! Điều chỉnh thêm một chút nữa là chuẩn.',
     );
     expect(
       perfectCoach.quote,
-      'Buổi tập sạch form thật sự! Giữ vững nhé!',
+      'Buổi này form chuẩn thật sự! Cứ giữ vững như này nhé!',
     );
   });
 
@@ -211,7 +211,7 @@ void main() {
         ),
       ],
       trophy: _trophy(),
-      lowestFormScore: 80,
+      lowestFormScore: 100,
     );
 
     expect(coach.kind, CoachWatchKind.fault);

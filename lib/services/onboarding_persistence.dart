@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:vika/interpreter/intepreting_map.dart';
+import 'package:vika/models/pain_regions.dart';
 
 import '../screens/onboarding/onboarding_data.dart';
 import 'issues_service.dart';
@@ -48,6 +49,7 @@ class OnboardingPersistence {
 
     await _writePainAreas(user.id, data);
     await _writeForkDecision(user.id, data);
+    await _writeLevelAssessment(user.id, data);
 
     // Camera-detected from squat assessment. Future interpreters
     // (push-up, warrior, fold) plug in here as they exist.
@@ -104,11 +106,20 @@ class OnboardingPersistence {
     // 'low_back_pain') counts as two flags — both are genuine user signals.
     final regionCounts = <String, int>{};
     final regionNotes = <String, String?>{};
+    final regionIntensities = <String, int>{};
 
     if (!data.noPain) {
-      for (final region in data.painAreas) {
+      for (final rawRegion in data.painAreas) {
+        final region = canonicalPainRegion(rawRegion);
+        if (region == null) continue;
+
         regionCounts[region] = (regionCounts[region] ?? 0) + 1;
-        if (region == 'other' &&
+        final intensity =
+            data.painIntensities[rawRegion] ?? data.painIntensities[region];
+        if (intensity != null) {
+          regionIntensities[region] = intensity.clamp(1, 5).toInt();
+        }
+        if (region == kOtherPainRegion &&
             (data.painOtherText?.trim().isNotEmpty ?? false)) {
           regionNotes[region] = data.painOtherText!.trim();
         }
@@ -119,7 +130,9 @@ class OnboardingPersistence {
       for (final candidateId in picks) {
         final def = interpretingMap[candidateId];
         if (def == null) continue; // 'none' or unknown candidate id
-        regionCounts[def.bodyRegion] = (regionCounts[def.bodyRegion] ?? 0) + 1;
+        final region = canonicalPainRegion(def.bodyRegion);
+        if (region == null) continue;
+        regionCounts[region] = (regionCounts[region] ?? 0) + 1;
       }
     }
 
@@ -144,6 +157,7 @@ class OnboardingPersistence {
         final region = entry.key;
         final count = entry.value;
         final notes = regionNotes[region];
+        final intensity = regionIntensities[region];
 
         if (existingByRegion.containsKey(region)) {
           // Reaffirm: increment flag_count by this onboarding's contribution.
@@ -152,8 +166,10 @@ class OnboardingPersistence {
           final row = existingByRegion[region]!;
           final newCount = ((row['flag_count'] as int?) ?? 1) + count;
           await _client.from('user_pain_areas').update({
+            if (intensity != null) 'intensity': intensity,
             'last_reaffirmed_at': now,
             'flag_count': newCount,
+            if (region == kOtherPainRegion && notes != null) 'notes': notes,
           }).eq('id', row['id']);
         } else {
           toInsert.add({
@@ -161,6 +177,7 @@ class OnboardingPersistence {
             'body_region': region,
             'source': 'self_reported',
             'status': 'active',
+            if (intensity != null) 'intensity': intensity,
             'first_flagged_at': now,
             'last_reaffirmed_at': now,
             'flag_count': count, // not 1 — could be 2+ from S04+S09 merge
@@ -201,6 +218,53 @@ class OnboardingPersistence {
       });
     } catch (e) {
       debugPrint('[OnboardingPersistence] fork_decision insert failed: $e');
+    }
+  }
+
+  // ─── level_assessments (S10) ──────────────────────────────────────
+  //
+  // The scorer's full breakdown captured at S10: the two clean ratios, the
+  // degrade flag, the AI-recommended level and the level the user ended up
+  // with (which they may have overridden by tapping an alternate tile).
+  Future<void> _writeLevelAssessment(
+    String userId,
+    OnboardingData data,
+  ) async {
+    final result = data.levelAssessment;
+    if (result == null) {
+      debugPrint(
+          '[OnboardingPersistence] no levelAssessment, skipping level_assessments');
+      return;
+    }
+
+    final recommended = result.suggestedLevel;
+    final finalLevel = data.level ?? recommended;
+    final a = result.assessmentA;
+    final b = result.assessmentB;
+
+    try {
+      await _client.from('level_assessments').insert({
+        'user_id': userId,
+        'fork': data.fork,
+        'training_duration': data.trainingDuration,
+        'duration_band': result.durationBand,
+        'recommended_level': recommended,
+        'final_level': finalLevel,
+        'override': recommended != finalLevel,
+        'degraded': result.degraded,
+        'degrade_threshold': result.degradeThreshold,
+        'assessment_a_exercise': a?.exercise,
+        'assessment_a_clean_ratio': a?.cleanRatio,
+        'assessment_a_good': a?.good,
+        'assessment_a_total': a?.total,
+        'assessment_b_exercise': b?.exercise,
+        'assessment_b_clean_ratio': b?.cleanRatio,
+        'assessment_b_good': b?.good,
+        'assessment_b_total': b?.total,
+        'algorithm_version': 'v1.0',
+      });
+    } catch (e) {
+      debugPrint('[OnboardingPersistence] level_assessment insert failed: $e');
     }
   }
 }

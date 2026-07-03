@@ -77,9 +77,8 @@ class SquatFaultVoicePriority {
 /* =========================================================================
    SquatMetricBase — Interface every metric implements.
    ========================================================================= */
-abstract class SquatMetricBase implements DebugMetricSource {
+abstract class SquatMetricBase {
   /// Human-readable name for debug/logging.
-  @override
   String get name;
   // faults count for each metric
   int faultsCount = 0;
@@ -92,29 +91,23 @@ abstract class SquatMetricBase implements DebugMetricSource {
   List<FaultRecord> get faults;
 
   /// Debug data for the overlay. Keys should be metric-specific.
-  @override
   Map<String, dynamic> get debugData;
 
   /// Primary threshold-checked scalar shown in the debug panel.
-  @override
   double? get value => null;
 
-  /// Warning/fault bounds used by debug sparklines. The metric's own status
+  /// Warning/fault bounds for developer diagnostics. The metric's own status
   /// remains the source of truth for current pass/near/fault state.
-  @override
   ThresholdBand? get threshold => null;
 
   /// Current metric decision. Override when a metric has a primary value.
-  @override
-  MetricStatus get status => MetricStatus.pass;
-
-  /// Friendly Vietnamese label for user-facing debug mode.
-  @override
-  String? get nameVi => null;
-
-  /// Hide highly technical metrics from user-facing debug mode.
-  @override
-  bool get devOnly => false;
+  MetricStatus get status {
+    if (faults.any((fault) => fault.affectsForm)) {
+      return MetricStatus.fault;
+    }
+    if (faults.isNotEmpty) return MetricStatus.near;
+    return MetricStatus.pass;
+  }
 
   /// Reset all internal state for the next rep.
   void reset();

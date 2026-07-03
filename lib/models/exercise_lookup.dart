@@ -1,11 +1,11 @@
 import 'exercise_definition.dart';
 
 ExerciseDefinition? lookupExerciseDefinition(String query) {
-  final normalizedQuery = _normalizeExerciseKey(_exerciseAlias(query));
+  final normalizedQuery = normalizeExerciseKey(_exerciseAlias(query));
 
   for (final definition in exerciseDefinitions) {
-    if (_normalizeExerciseKey(definition.id) == normalizedQuery ||
-        _normalizeExerciseKey(definition.name) == normalizedQuery) {
+    if (normalizeExerciseKey(definition.id) == normalizedQuery ||
+        normalizeExerciseKey(definition.name) == normalizedQuery) {
       return definition;
     }
   }
@@ -14,7 +14,7 @@ ExerciseDefinition? lookupExerciseDefinition(String query) {
 }
 
 String _exerciseAlias(String value) {
-  return switch (_normalizeExerciseKey(value)) {
+  return switch (normalizeExerciseKey(value)) {
     'airsquat' => 'squat',
     'squats' => 'squat',
     'squatbw' => 'squat',
@@ -26,10 +26,10 @@ String _exerciseAlias(String value) {
     'pushup' => 'push_up',
     'pushups' => 'push_up',
     'pushupbw' => 'push_up',
-    'wallpushup' => 'push_up',
-    'wallpushups' => 'push_up',
-    'wallpushupbw' => 'push_up',
-    'pushupwall' => 'push_up',
+    'wallpushup' => 'wall_push_up',
+    'wallpushups' => 'wall_push_up',
+    'wallpushupbw' => 'wall_push_up',
+    'pushupwall' => 'wall_push_up',
     'inclinepushup' => 'push_up',
     'pushupexercise' => 'push_up',
     'glutebridge' => 'glute_bridge',
@@ -56,10 +56,15 @@ String _exerciseAlias(String value) {
     'warriori' => 'warrior_one',
     'warriorone' => 'warrior_one',
     'warrior1' => 'warrior_one',
+    // Catalog-id -> Dart def-id bridges (resolve by ID, not display name).
+    'butterfly' => 'butterfly__stretch',
+    'tricepdip' => 'tricep__dip_(_floor)',
+    'sideplankdip' => 'side__plank_with__hip__dip',
+    'bowpose' => 'bow_',
     _ => value,
   };
 }
 
-String _normalizeExerciseKey(String value) {
+String normalizeExerciseKey(String value) {
   return value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '');
 }

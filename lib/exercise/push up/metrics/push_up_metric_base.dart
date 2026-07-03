@@ -1,3 +1,5 @@
+// ignore_for_file: annotate_overrides
+
 /* =========================================================================
    PushUpMetricBase — Abstract base for all push-up form metrics.
    
@@ -59,7 +61,7 @@ class RepContext {
 /* =========================================================================
    PushUpMetricBase — Interface every push-up metric implements.
    ========================================================================= */
-abstract class PushUpMetricBase {
+abstract class PushUpMetricBase with FaultMetricDebugSource {
   /// Human-readable name for debug/logging.
   String get name;
 

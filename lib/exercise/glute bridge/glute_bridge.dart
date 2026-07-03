@@ -1,12 +1,13 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, non_constant_identifier_names, constant_identifier_names
 
 import 'package:vika/utils/debouncer.dart';
-import 'package:vika/pose/vika_image_orientation.dart';
 
 import '../../utils/pose_math_helpers.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
 import '../exercise_base.dart';
+import '../side_tracked_exercise_mixin.dart';
+import '../../utils/exercise_logger.dart';
 import 'metrics/glute_bridge_metric_base.dart';
 import 'metrics/glute_bridge_hip_extension.dart';
 import 'metrics/glute_bridge_knee_angle.dart';
@@ -17,26 +18,24 @@ import 'metrics/glute_bridge_neck_head.dart';
    CONFIGURATION & THRESHOLDS
    ========================================================================= */
 class GluteBridgeConfig {
-  static const int MAX_REP = 15;
-
   // --- Velocity thresholds (hip y pixels/frame at ~30 fps) ---
   // Screen coords: y increases downward.
   //   Hip RISING  → velocity NEGATIVE
   //   Hip FALLING → velocity POSITIVE
-  static const double ASCENDING_VELOCITY_THRESHOLD = -2.5;
-  static const double DESCENDING_VELOCITY_THRESHOLD = 2.5;
-  static const double REST_VELOCITY_THRESHOLD = 1.5;
+  static const double ASCENDING_VELOCITY_THRESHOLD = -1.8;
+  static const double DESCENDING_VELOCITY_THRESHOLD = 1.8;
+  static const double REST_VELOCITY_THRESHOLD = 2.0;
 
   // --- Hip elevation thresholds (fraction of scaleFactor) ---
   /// Minimum rise to be counted as elevated (TOP_HOLD detection).
-  static const double HIP_ELEVATED_RATIO = 0.10;
+  static const double HIP_ELEVATED_RATIO = 0.07;
 
   /// Pixel fallback when scaleFactor is unavailable.
-  static const double HIP_ELEVATED_PIXELS = 15.0;
+  static const double HIP_ELEVATED_PIXELS = 10.0;
 
   /// Hip must return within this fraction of scaleFactor to baseline.
-  static const double BOTTOM_TOLERANCE_RATIO = 0.08;
-  static const double BOTTOM_TOLERANCE_PIXELS = 12.0;
+  static const double BOTTOM_TOLERANCE_RATIO = 0.12;
+  static const double BOTTOM_TOLERANCE_PIXELS = 18.0;
 
   // --- Start-position geometry ---
   /// Trunk clock-angle target (degrees from vertical, clockwise).
@@ -45,15 +44,16 @@ class GluteBridgeConfig {
   static const double HORIZONTAL_CLOCK_RIGHT = 90.0;
 
   /// Tolerance around horizontal target (degrees).
-  static const double HORIZONTAL_TOLERANCE = 30.0;
+  static const double HORIZONTAL_TOLERANCE = 40.0;
+  static const double START_TRUNK_HORIZ_MAX = 28.0;
 
   /// Acceptable knee flexion range for starting posture (hip–knee–ankle).
-  static const double KNEE_ANGLE_MIN = 70.0;
-  static const double KNEE_ANGLE_MAX = 150.0;
+  static const double KNEE_ANGLE_MIN = 60.0;
+  static const double KNEE_ANGLE_MAX = 160.0;
 
   /// Max hip-to-shoulder vertical offset for flat-lying check.
-  static const double HIP_SHOULDER_RATIO = 0.25; // fraction of scaleFactor
-  static const double HIP_SHOULDER_PIXELS = 40.0;
+  static const double HIP_SHOULDER_RATIO = 0.55; // fraction of scaleFactor
+  static const double HIP_SHOULDER_PIXELS = 55.0;
 }
 
 /* =========================================================================
@@ -69,10 +69,10 @@ enum GluteBridgeState {
 /* =========================================================================
    GLUTE BRIDGE LOGIC
    ========================================================================= */
-class GluteBridge extends ExerciseBase {
+class GluteBridge extends ExerciseBase with SideTrackedExerciseMixin {
   final int maxRep;
 
-  GluteBridge({this.maxRep = GluteBridgeConfig.MAX_REP});
+  GluteBridge({required this.maxRep});
 
   GluteBridgeState gluteState = GluteBridgeState.bottom;
   GluteBridgeState previousGluteState = GluteBridgeState.bottom;
@@ -86,6 +86,7 @@ class GluteBridge extends ExerciseBase {
 
   // --- Peak hip position tracked during ascending ---
   double? _peakHipY;
+  int? _topHoldStartMs;
 
   // --- Angle and deviation at peak hip (for HipExtension per-rep check) ---
   double? _peakShoulderHipKneeAngle;
@@ -113,11 +114,51 @@ class GluteBridge extends ExerciseBase {
     neckHeadMetric,
   ];
 
+  @override
+  Map<String, SideLandmarkPair> get requiredSideLandmarks => const {
+        'shoulder': (
+          right: PoseLandmarkType.rightShoulder,
+          left: PoseLandmarkType.leftShoulder,
+        ),
+        'hip': (
+          right: PoseLandmarkType.rightHip,
+          left: PoseLandmarkType.leftHip,
+        ),
+        'knee': (
+          right: PoseLandmarkType.rightKnee,
+          left: PoseLandmarkType.leftKnee,
+        ),
+        'ankle': (
+          right: PoseLandmarkType.rightAnkle,
+          left: PoseLandmarkType.leftAnkle,
+        ),
+      };
+
+  @override
+  Map<String, SideLandmarkPair> get optionalSideLandmarks => const {
+        'ear': (
+          right: PoseLandmarkType.rightEar,
+          left: PoseLandmarkType.leftEar,
+        ),
+      };
+
+  @override
+  double? get liveHoldSeconds =>
+      gluteState == GluteBridgeState.topHold && _topHoldStartMs != null
+          ? (frameTimestampMs - _topHoldStartMs!) / 1000.0
+          : null;
+
   /* -----------------------------------------------------------------------
      UI BRIDGE
      ----------------------------------------------------------------------- */
   @override
   String get exerciseName => 'Glute Bridge';
+
+  // Glute Bridge starts from a floor setup that can take time to settle.
+  // Replaying old faults here sounds like a fault from the current set before
+  // the user has completed any movement.
+  @override
+  bool get shouldReplayPreviousSetVoiceFaults => false;
 
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
@@ -156,41 +197,18 @@ class GluteBridge extends ExerciseBase {
   bool isInStartPosition(
     Map<PoseLandmarkType, PoseLandmark> landmarks,
   ) {
-    final shoulder = getSideLandmark(
-      landmarks: landmarks,
-      rightType: PoseLandmarkType.rightShoulder,
-      leftType: PoseLandmarkType.leftShoulder,
-    );
-    final hip = getSideLandmark(
-      landmarks: landmarks,
-      rightType: PoseLandmarkType.rightHip,
-      leftType: PoseLandmarkType.leftHip,
-    );
-    final knee = getSideLandmark(
-      landmarks: landmarks,
-      rightType: PoseLandmarkType.rightKnee,
-      leftType: PoseLandmarkType.leftKnee,
-    );
-    final ankle = getSideLandmark(
-      landmarks: landmarks,
-      rightType: PoseLandmarkType.rightAnkle,
-      leftType: PoseLandmarkType.leftAnkle,
-    );
+    final tracked = getSideTrackedLandmarks(landmarks);
+    if (tracked == null) return false;
 
-    if (shoulder == null || hip == null || knee == null || ankle == null) {
-      return false;
-    }
+    final shoulder = tracked['shoulder']!;
+    final hip = tracked['hip']!;
+    final knee = tracked['knee']!;
+    final ankle = tracked['ankle']!;
 
     // 1. Trunk must be roughly horizontal (clock angle near 90° or 270°).
-    double trunkClockAngle =
-        calculateVerticalAngle(pivot: hip, point: shoulder);
-    double horizontalTarget = cameraFacing == CameraFacing.right
-        ? GluteBridgeConfig.HORIZONTAL_CLOCK_RIGHT
-        : GluteBridgeConfig.HORIZONTAL_CLOCK_LEFT;
-    double diff = trunkClockAngle - horizontalTarget;
-    if (diff > 180) diff -= 360;
-    if (diff < -180) diff += 360;
-    if (diff.abs() > GluteBridgeConfig.HORIZONTAL_TOLERANCE) return false;
+    final trunkHoriz =
+        calculateAbsoluteHorizontalAngle(point1: shoulder, point2: hip);
+    if (trunkHoriz > GluteBridgeConfig.START_TRUNK_HORIZ_MAX) return false;
 
     // 2. Knees must be bent — hip-knee-ankle angle 70–150°.
     double kneeAngle = calculateAngleNormalized(
@@ -222,7 +240,20 @@ class GluteBridge extends ExerciseBase {
   }
 
   @override
-  void onSetComplete() {}
+  void onSetComplete() {
+    logger.pushKey("hip_extension_fails_count", hipExtensionMetric.faultsCount);
+    logger.pushKey("knee_angle_fails_count", kneeAngleMetric.faultsCount);
+    logger.pushKey("speed_control_fails_count", speedControlMetric.faultsCount);
+    logger.pushKey("neck_head_fails_count", neckHeadMetric.faultsCount);
+
+    logger.pushMax("peak_hip_extension_angle", "max_hip_extension_angle");
+    logger.pushMax(
+        "peak_normalized_hip_deviation", "max_normalized_hip_deviation");
+    logger.pushMin("peak_knee_angle", "min_peak_knee_angle");
+
+    logger.pushGoodRepCount();
+    logger.pushKey("max_rep", maxRep);
+  }
 
   /* -----------------------------------------------------------------------
      SAFETY CHECKS
@@ -231,8 +262,13 @@ class GluteBridge extends ExerciseBase {
   String? checkSafety(
     Map<PoseLandmarkType, PoseLandmark> landmarks,
   ) {
-    if (cameraFacing == CameraFacing.front) {
+    if (cameraFacing != CameraFacing.left &&
+        cameraFacing != CameraFacing.right) {
       return "⚠️ Xin hãy quay nghiêng để theo dõi tư thế Glute Bridge";
+    }
+
+    if (getSideTrackedLandmarks(landmarks) != null) {
+      return null;
     }
 
     final shoulder = getSideLandmark(
@@ -270,38 +306,24 @@ class GluteBridge extends ExerciseBase {
   ) {
     // ---------- 1. Get Landmarks ----------
 
-    final shoulder = getSideLandmark(
-        landmarks: smoothedLandmarks,
-        rightType: PoseLandmarkType.rightShoulder,
-        leftType: PoseLandmarkType.leftShoulder);
-    final hip = getSideLandmark(
-        landmarks: smoothedLandmarks,
-        rightType: PoseLandmarkType.rightHip,
-        leftType: PoseLandmarkType.leftHip);
-    final knee = getSideLandmark(
-        landmarks: smoothedLandmarks,
-        rightType: PoseLandmarkType.rightKnee,
-        leftType: PoseLandmarkType.leftKnee);
-    final ankle = getSideLandmark(
-        landmarks: smoothedLandmarks,
-        rightType: PoseLandmarkType.rightAnkle,
-        leftType: PoseLandmarkType.leftAnkle);
+    final tracked = getSideTrackedLandmarks(smoothedLandmarks);
+    if (tracked == null) return;
+
+    final shoulder = tracked['shoulder']!;
+    final hip = tracked['hip']!;
+    final knee = tracked['knee']!;
+    final ankle = tracked['ankle']!;
+
     // Head: prefer camera-side ear, fall back to nose.
-    final ear = getSideLandmark(
-        landmarks: smoothedLandmarks,
-        rightType: PoseLandmarkType.rightEar,
-        leftType: PoseLandmarkType.leftEar);
+    final ear = tracked['ear'];
     final nose = smoothedLandmarks[PoseLandmarkType.nose];
 
     // Explicit null fallback hierarchy to prevent bypass when head goes out of frame
-    final double? headY = (ear != null && ExerciseBase.isLandmarkConfident(ear))
+    final double headY = (ear != null && ExerciseBase.isLandmarkConfident(ear))
         ? ear.y
         : (nose != null && ExerciseBase.isLandmarkConfident(nose))
             ? nose.y
-            : shoulder
-                ?.y; // Fallback to shoulder.y if head is totally lost to prevent metric crash
-
-    if (shoulder == null || hip == null || knee == null) return;
+            : shoulder.y; // Fallback if head is totally lost.
 
     // ---------- 2. Calculate Geometry ----------
 
@@ -323,13 +345,10 @@ class GluteBridge extends ExerciseBase {
         _computeNormalizedHipDeviation(shoulder, hip, knee);
 
     // Knee angle (hip-knee-ankle) — null if ankle not visible.
-    final double? kneeAngle =
-        (ankle != null && ExerciseBase.isLandmarkConfident(ankle))
-            ? calculateAngleNormalized(
-                firstPoint: hip, midPoint: knee, lastPoint: ankle)
-            : null;
+    final double kneeAngle = calculateAngleNormalized(
+        firstPoint: hip, midPoint: knee, lastPoint: ankle);
 
-    final int now = DateTime.now().millisecondsSinceEpoch;
+    final int now = frameTimestampMs;
 
     // Ensure baseline exists (fallback in case activation was unusual).
     _baselineHipY ??= hipY;
@@ -368,6 +387,7 @@ class GluteBridge extends ExerciseBase {
       resultIssues: resultIssues,
     );
 
+    final debugEnabled = isDebugModeActive;
     // ---------- 4. Populate Debug Data ----------
 
     debugData['gluteState'] = gluteState.toString().split('.').last;
@@ -377,8 +397,7 @@ class GluteBridge extends ExerciseBase {
     debugData['shKneeAngle'] = shoulderHipKneeAngle.toStringAsFixed(1);
     debugData['hipDev'] =
         '${normalizedHipDeviation >= 0 ? "+" : ""}${normalizedHipDeviation.toStringAsFixed(3)}';
-    if (kneeAngle != null)
-      debugData['kneeAngle'] = kneeAngle.toStringAsFixed(1);
+    debugData['kneeAngle'] = kneeAngle.toStringAsFixed(1);
     debugData['baseline'] = _baselineHipY?.toStringAsFixed(1) ?? 'N/A';
     debugData['peak'] = _peakHipY?.toStringAsFixed(1) ?? 'N/A';
 
@@ -400,8 +419,10 @@ class GluteBridge extends ExerciseBase {
     }
 
     // Merge metric debug data.
-    for (final metric in _metrics) {
-      debugData.addAll(metric.debugData);
+    if (debugEnabled) {
+      for (final metric in _metrics) {
+        debugData.addAll(metric.debugData);
+      }
     }
 
     // ---------- 7. Status Coaching ----------
@@ -579,7 +600,22 @@ class GluteBridge extends ExerciseBase {
     }
 
     correctForm = !allFaults.any((f) => f.affectsForm);
+    resultIssues.feedback
+        .removeWhere((key, _) => key != 'System' && key != 'progress');
     resultIssues.feedback['Result'] = correctForm ? 'Tốt!' : 'Chỉnh tư thế';
+    if (!correctForm) {
+      final formFaults = allFaults.where((fault) => fault.affectsForm).toList()
+        ..sort((a, b) {
+          final priorityCompare = a.priority.compareTo(b.priority);
+          if (priorityCompare != 0) return priorityCompare;
+          return a.type.compareTo(b.type);
+        });
+      if (formFaults.isNotEmpty) {
+        final topFault = formFaults.first;
+        resultIssues.feedback[topFault.type] =
+            topFault.voiceMessage ?? topFault.message;
+      }
+    }
 
     // Build fault map for set history.
     final faultMap = <String, Map<String, String>>{};
@@ -589,9 +625,22 @@ class GluteBridge extends ExerciseBase {
     setFeedback.add({correctForm: faultMap});
 
     // Merge metric debug data BEFORE reset.
-    for (final metric in _metrics) {
-      debugData.addAll(metric.debugData);
+    if (isDebugModeActive) {
+      for (final metric in _metrics) {
+        debugData.addAll(metric.debugData);
+      }
     }
+
+    logger.addRepLog(RepLog(
+      correctForm: correctForm,
+      repNumber: repCount,
+      data: {
+        "peak_hip_extension_angle": _peakShoulderHipKneeAngle ?? 0.0,
+        "peak_normalized_hip_deviation": _peakNormalizedDeviation ?? 0.0,
+        "peak_knee_angle": _peakKneeAngle ?? 0.0,
+        "fault_types": allFaults.map((f) => f.type).toSet().toList(),
+      },
+    ));
 
     // Reset for next rep.
     correctForm = true;
@@ -600,7 +649,7 @@ class GluteBridge extends ExerciseBase {
     _peakNormalizedDeviation = null;
     _peakKneeAngle = null;
     for (final metric in _metrics) {
-      metric.reset();
+      metric.resetAndCountFault();
     }
   }
 
@@ -610,6 +659,7 @@ class GluteBridge extends ExerciseBase {
   void _transitionState(GluteBridgeState newState, int timestampMs) {
     previousGluteState = gluteState;
     gluteState = newState;
+    _topHoldStartMs = newState == GluteBridgeState.topHold ? timestampMs : null;
 
     // Clear coaching instructions at the start of a new rep.
     if (newState == GluteBridgeState.ascending) {

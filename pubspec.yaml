@@ -1,7 +1,7 @@
 name: vika
 description: Vika - AI fitness coaching for Vietnamese home exercisers
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.3+140
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -37,22 +37,72 @@ dependencies:
   image_picker: ^1.1.2
   share_plus: ^10.1.4
   flutter_svg: ^2.3.0
+  video_player: ^2.9.5
+  posthog_flutter: ^5.28.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.13.1
 
 
 flutter:
+  config:
+    enable-swift-package-manager: false
   uses-material-design: true
   assets:
+    - assets/data/exercise_catalog.json
     - assets/audio/
+    - assets/audio/common/
+    - assets/audio/bird_dog/
+    - assets/audio/plank/
+    - assets/audio/lunge/
+    - assets/audio/jumping_jack/
+    - assets/audio/push_up/
+    - assets/audio/glute_bridge/
+    - assets/audio/curl_up/
+    - assets/audio/mc_gill_curl_up/
+    - assets/audio/warrior_one/
+    - assets/audio/v_up/
+    - assets/audio/dead_bug/
+    - assets/audio/plank_up_down/
+    - assets/audio/bear_plank/
+    - assets/audio/sit_up/
+    - assets/audio/high_plank/
+    - assets/audio/mountain_climber/
+    - assets/audio/superman/
+    - assets/audio/plank_shoulder_tap/
+    - assets/audio/leg_raises/
+    - assets/audio/reverse_crunch/
+    - assets/audio/bow_pose/
+    - assets/audio/butterfly_stretch/
+    - assets/audio/cobra/
+    - assets/audio/cossack_squat/
+    - assets/audio/jump_squat/
+    - assets/audio/russian_twist/
+    - assets/audio/seated_forward_fold/
+    - assets/audio/side_plank_dip/
+    - assets/audio/sphinx/
+    - assets/audio/standing_kte/
+    - assets/audio/step_back_burpee/
+    - assets/audio/tricep_dip/
+    - assets/audio/walking_lunge/
+    - assets/audio/surya_namaskar/
+    - assets/audio/wall_push_up/
+    - assets/audio/downward_dog/
+    - assets/audio/ashtanga_namaskara/
+    - assets/audio/low_lunge/
+    - assets/audio/prayer_pose/
+    - assets/audio/raised_arms/
     - assets/brands/
     - assets/audio/squat/
     - assets/branding/
     - assets/images/
-    - .env
+    - assets/habt/
+    - assets/env/
+    - assets/video/
+#    - assets/images/onboarding/
 
   # ─── Fonts ───
   # Vika uses Be Vietnam Pro as a single family for the whole main app

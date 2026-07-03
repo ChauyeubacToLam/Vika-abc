@@ -1502,7 +1502,7 @@ class V5ChoiceRow extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// BODY SILHOUETTE — decoration only (used by S04)
+// BODY SILHOUETTE — legacy decoration only
 //
 // Uses the real PNG silhouette from assets/images/body_*.png. No
 // pinpoint markers — selected pain areas are shown in the surrounding
@@ -1650,7 +1650,7 @@ class _PainRibbonPainter extends CustomPainter {
     Offset p(double x, double y) => Offset(size.width * x, size.height * y);
 
     switch (area) {
-      case 'neck':
+      case 'shoulder_neck':
         final path = Path()
           ..moveTo(size.width * 0.34, size.height * 0.23)
           ..quadraticBezierTo(
@@ -1662,6 +1662,17 @@ class _PainRibbonPainter extends CustomPainter {
         canvas.drawPath(path, paint);
         break;
       case 'back':
+        final path = Path()
+          ..moveTo(size.width * 0.36, size.height * 0.34)
+          ..quadraticBezierTo(
+            size.width * 0.50,
+            size.height * 0.30,
+            size.width * 0.64,
+            size.height * 0.34,
+          );
+        canvas.drawPath(path, paint);
+        break;
+      case 'lower_back':
         final path = Path()
           ..moveTo(size.width * 0.40, size.height * 0.43)
           ..quadraticBezierTo(
@@ -1690,6 +1701,10 @@ class _PainRibbonPainter extends CustomPainter {
       case 'wrist':
         canvas.drawLine(p(0.23, 0.48), p(0.25, 0.55), paint);
         canvas.drawLine(p(0.77, 0.48), p(0.75, 0.55), paint);
+        break;
+      case 'ankle':
+        canvas.drawLine(p(0.42, 0.95), p(0.49, 0.95), paint);
+        canvas.drawLine(p(0.51, 0.95), p(0.58, 0.95), paint);
         break;
       default:
         final path = Path()
@@ -1824,13 +1839,16 @@ class _BodyDiagramPainter extends CustomPainter {
       const Offset(122, 168)
     ]));
 
-    marker(canvas, const Offset(100, 56), 'neck');
-    marker(canvas, const Offset(100, 100), 'back');
+    marker(canvas, const Offset(100, 56), 'shoulder_neck');
+    marker(canvas, const Offset(100, 88), 'back');
+    marker(canvas, const Offset(100, 112), 'lower_back');
     marker(canvas, const Offset(100, 148), 'hip');
     marker(canvas, const Offset(48, 146), 'wrist', 4);
     marker(canvas, const Offset(152, 146), 'wrist', 4);
     marker(canvas, const Offset(84, 200), 'knee', 4);
     marker(canvas, const Offset(116, 200), 'knee', 4);
+    marker(canvas, const Offset(84, 246), 'ankle', 4);
+    marker(canvas, const Offset(116, 246), 'ankle', 4);
     canvas.restore();
   }
 
@@ -1917,4 +1935,3 @@ class V5AppleMark extends StatelessWidget {
         colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
       );
 }
-

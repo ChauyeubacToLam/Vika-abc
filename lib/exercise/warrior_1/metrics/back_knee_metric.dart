@@ -25,8 +25,8 @@ import '../warrior_one.dart';
 import '../../../utils/debouncer.dart';
 
 class BackKneeConfig {
-  static const double GOOD_THRESHOLD = 160.0;
-  static const double WARN_THRESHOLD = 150.0; // 150–160 = warning
+  static const double GOOD_THRESHOLD = 145.0;
+  static const double WARN_THRESHOLD = 130.0; // 150–160 = warning
   // < 150 = coaching fault
 }
 
@@ -41,15 +41,19 @@ class BackKneeMetric extends WarriorOneMetricBase {
   final Debouncer _bentDebouncer = Debouncer(requiredFrames: 10);
 
   bool _instructionSet = false;
+  bool _isFaultingNow = false;
 
   @override
   List<FaultRecord> get faults => _faults;
+  @override
+  bool get isFaultingNow => _isFaultingNow;
 
   @override
   Map<String, dynamic> get debugData => _debugData;
 
   @override
   void update(HoldContext ctx) {
+    _isFaultingNow = false;
     if (ctx.holdState != WarriorOneState.hold) return;
 
     final double angle = ctx.backKneeAngle;
@@ -60,6 +64,7 @@ class BackKneeMetric extends WarriorOneMetricBase {
         _bentDebouncer.update(angle < BackKneeConfig.WARN_THRESHOLD);
 
     if (bent) {
+      _isFaultingNow = true;
       ctx.resultIssues.feedback['back_knee'] =
           'Duỗi thẳng chân sau hơn nhé! Siết cơ đùi trước để giữ chân vững.';
       if (!_instructionSet) {
@@ -97,5 +102,6 @@ class BackKneeMetric extends WarriorOneMetricBase {
     _debugData.clear();
     _bentDebouncer.reset();
     _instructionSet = false;
+    _isFaultingNow = false;
   }
 }

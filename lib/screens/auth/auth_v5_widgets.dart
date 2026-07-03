@@ -1,9 +1,17 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
 import '../onboarding/v5/v5_primitives.dart';
 import '../onboarding/v5/v5_theme.dart';
+import 'reviewer_demo_gate.dart';
+
+// FB_LOGIN_PRELAUNCH_HIDE: Facebook app pending Meta verification, not Live, so
+// a Facebook login fails for non-app-roles. Flip to true to restore the Facebook
+// sign-in tile post-verification. (Top-level so the dead `if` branch below isn't
+// flagged as dead_code while the flag is false; OAuth wiring stays intact.)
+bool _showFacebookTile = false;
 
 class AuthProviderRail extends StatelessWidget {
   const AuthProviderRail({
@@ -12,12 +20,17 @@ class AuthProviderRail extends StatelessWidget {
     required this.onApple,
     required this.onGoogle,
     required this.onFacebook,
+    this.onAppleHoldComplete,
   });
 
   final bool busy;
   final VoidCallback onApple;
   final VoidCallback onGoogle;
   final VoidCallback onFacebook;
+
+  /// Optional silent press-and-hold on the Apple tile (5s, no visible hint) for
+  /// the reviewer-access gate. A normal tap still triggers [onApple] unchanged.
+  final VoidCallback? onAppleHoldComplete;
 
   @override
   Widget build(BuildContext context) {
@@ -37,6 +50,7 @@ class AuthProviderRail extends StatelessWidget {
               foreground: V5.ink,
               icon: const V5AppleMark(size: 18),
               onTap: busy ? null : onApple,
+              onHoldComplete: busy ? null : onAppleHoldComplete,
               border: V5.borderHi,
             ),
           ),
@@ -51,17 +65,19 @@ class AuthProviderRail extends StatelessWidget {
               border: V5.borderHi,
             ),
           ),
-          const SizedBox(width: V5.space8),
-          Expanded(
-            child: _AuthProviderTile(
-              label: 'Facebook',
-              background: V5.surface,
-              foreground: V5.ink,
-              icon: const V5FacebookMark(size: 18),
-              onTap: busy ? null : onFacebook,
-              border: V5.borderHi,
+          if (_showFacebookTile) ...[
+            const SizedBox(width: V5.space8),
+            Expanded(
+              child: _AuthProviderTile(
+                label: 'Facebook',
+                background: V5.surface,
+                foreground: V5.ink,
+                icon: const V5FacebookMark(size: 18),
+                onTap: busy ? null : onFacebook,
+                border: V5.borderHi,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -76,6 +92,7 @@ class _AuthProviderTile extends StatefulWidget {
     required this.icon,
     required this.onTap,
     this.border,
+    this.onHoldComplete,
   });
 
   final String label;
@@ -85,22 +102,71 @@ class _AuthProviderTile extends StatefulWidget {
   final VoidCallback? onTap;
   final Color? border;
 
+  /// Fires after a [reviewerHoldDuration] silent press-and-hold (no visible
+  /// hint). A normal tap still triggers [onTap] unchanged; the hold timer is
+  /// cancelled on tap-up/cancel so a quick tap never fires this.
+  final VoidCallback? onHoldComplete;
+
   @override
   State<_AuthProviderTile> createState() => _AuthProviderTileState();
 }
 
 class _AuthProviderTileState extends State<_AuthProviderTile> {
+  Timer? _holdTimer;
   bool _pressed = false;
+  bool _suppressNextTap = false;
+
+  void _handleTapDown(TapDownDetails details) {
+    if (widget.onTap == null) return;
+    setState(() => _pressed = true);
+    if (widget.onHoldComplete == null) return;
+
+    _holdTimer?.cancel();
+    _suppressNextTap = false;
+    _holdTimer = Timer(reviewerHoldDuration, () {
+      if (!mounted) return;
+      _suppressNextTap = true;
+      setState(() => _pressed = false);
+      widget.onHoldComplete?.call();
+    });
+  }
+
+  void _handleTapUp(TapUpDetails details) {
+    _holdTimer?.cancel();
+    if (!mounted) return;
+    setState(() => _pressed = false);
+  }
+
+  void _handleTapCancel() {
+    _holdTimer?.cancel();
+    _suppressNextTap = false;
+    if (!mounted) return;
+    setState(() => _pressed = false);
+  }
+
+  void _handleTap() {
+    if (_suppressNextTap) {
+      _suppressNextTap = false;
+      return;
+    }
+    widget.onTap?.call();
+  }
+
+  @override
+  void dispose() {
+    _holdTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final enabled = widget.onTap != null;
     final dense = MediaQuery.sizeOf(context).height < 640;
     return GestureDetector(
-      onTap: widget.onTap,
-      onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
-      onTapUp: enabled ? (_) => setState(() => _pressed = false) : null,
-      onTapCancel: enabled ? () => setState(() => _pressed = false) : null,
+      onTap: enabled ? _handleTap : null,
+      onTapDown: enabled ? _handleTapDown : null,
+      onTapUp: enabled ? _handleTapUp : null,
+      onTapCancel: enabled ? _handleTapCancel : null,
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 160),
         opacity: enabled ? 1 : 0.48,

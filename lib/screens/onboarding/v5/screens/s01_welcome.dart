@@ -96,7 +96,7 @@ class S01Welcome extends StatelessWidget {
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        'Camera AI quan sát từng chuyển động và đưa ra hướng dẫn cá nhân hoá cho cơ thể bạn.',
+                        'Camera AI theo dõi từng chuyển động và đưa ra phản hồi riêng cho cơ thể bạn.',
                         maxLines: r.isVeryShort ? 2 : 3,
                         style: V5.bodyLg(context, color: V5.invInkSoft),
                       ),
@@ -220,7 +220,7 @@ class _WelcomeBrand extends StatelessWidget {
         ),
         const SizedBox(height: V5.space8),
         Text(
-          'HUẤN LUYỆN VIÊN AI CỦA BẠN',
+          'HLV AI CỦA BẠN',
           style: V5
               .eyebrow(context, color: V5.invInkSoft)
               .copyWith(letterSpacing: 1.4),
@@ -247,7 +247,7 @@ class _CameraAiPill extends StatelessWidget {
           const V5PulseDot(color: V5.yellow),
           const SizedBox(width: V5.space8),
           Text(
-            'CAMERA AI  ·  PHÂN TÍCH FORM THỜI GIAN THỰC',
+            'CAMERA AI  ·  Theo dõi form trong THỜI GIAN THỰC',
             style: V5
                 .eyebrow(context, color: V5.invInk)
                 .copyWith(letterSpacing: 1.0),

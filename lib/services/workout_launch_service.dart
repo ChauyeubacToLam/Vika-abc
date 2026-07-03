@@ -32,6 +32,7 @@ class WorkoutLaunchTarget {
     return ExerciseLaunchArgs(
       definition: first.definition,
       catalogExerciseId: first.catalogExerciseId,
+      catalogInfo: first.catalogInfo,
       prescription: first.prescription,
       recommendationId: first.recommendationId,
       weekNumber: first.weekNumber,
@@ -71,6 +72,46 @@ class WorkoutLaunchService {
         await _recommendations.fetchLatestActivePlanSnapshotForCurrentUser();
     if (snapshot == null) return null;
     return resolveFromSnapshot(snapshot);
+  }
+
+  Future<List<ExerciseSequenceItem>> buildSequenceFromCatalogIds(
+    List<String> catalogIds,
+  ) async {
+    final catalogInfoById =
+        await _recommendations.fetchLaunchCatalogInfoForExerciseIds(catalogIds);
+
+    final items = <ExerciseSequenceItem>[];
+    final unsupportedCatalogIds = <String>[];
+    for (final id in catalogIds) {
+      final catalogInfo = catalogInfoById[id];
+      final definition = _lookupLaunchDefinition(id, catalogInfo);
+      if (definition == null) {
+        unsupportedCatalogIds.add(id);
+        debugPrint(
+          '[WorkoutLaunchService] skipping unsupported catalog id "$id"',
+        );
+        continue;
+      }
+      items.add(
+        ExerciseSequenceItem(
+          definition: definition,
+          catalogExerciseId: id,
+          catalogInfo: catalogInfo,
+          prescription: _oneSetPrescription(catalogInfo),
+          recommendationId: null,
+          weekNumber: null,
+          sessionIndex: null,
+        ),
+      );
+    }
+
+    if (items.isEmpty && unsupportedCatalogIds.isNotEmpty) {
+      debugPrint(
+        '[WorkoutLaunchService] no launchable catalog sequence items; '
+        'unsupported=$unsupportedCatalogIds',
+      );
+    }
+    return items;
   }
 
   Future<WorkoutLaunchHomeState> resolveHomeState() async {
@@ -157,16 +198,13 @@ class WorkoutLaunchService {
     WeekPlan week,
     SessionPlan session,
   ) async {
-    final unresolvedCatalogIds = <String>{};
-    for (final slot in session.slots) {
-      if (lookupExerciseDefinition(slot.exerciseId) == null) {
-        unresolvedCatalogIds.add(slot.exerciseId);
-      }
-    }
-    final catalogInfoById = unresolvedCatalogIds.isEmpty
+    final catalogIds = <String>{
+      for (final slot in session.slots) slot.exerciseId,
+    };
+    final catalogInfoById = catalogIds.isEmpty
         ? const <String, ExerciseLaunchCatalogInfo>{}
         : await _recommendations.fetchLaunchCatalogInfoForExerciseIds(
-            unresolvedCatalogIds,
+            catalogIds,
           );
 
     final items = <ExerciseSequenceItem>[];
@@ -184,6 +222,7 @@ class WorkoutLaunchService {
         ExerciseSequenceItem(
           definition: definition,
           catalogExerciseId: slot.exerciseId,
+          catalogInfo: catalogInfoById[slot.exerciseId],
           prescription: slot.volume,
           recommendationId: recommendationId,
           weekNumber: week.weekNumber,
@@ -213,6 +252,27 @@ class WorkoutLaunchService {
     for (final key in catalogInfo.lookupKeys) {
       final definition = lookupExerciseDefinition(key);
       if (definition != null) return definition;
+    }
+    return null;
+  }
+
+  VolumePrescription? _oneSetPrescription(
+    ExerciseLaunchCatalogInfo? catalogInfo,
+  ) {
+    if (catalogInfo == null) return null;
+    if (catalogInfo.baseReps != null) {
+      return VolumePrescription(
+        sets: 1,
+        reps: catalogInfo.baseReps,
+        restSeconds: 60,
+      );
+    }
+    if (catalogInfo.baseSeconds != null) {
+      return VolumePrescription(
+        sets: 1,
+        seconds: catalogInfo.baseSeconds,
+        restSeconds: 60,
+      );
     }
     return null;
   }

@@ -236,15 +236,10 @@ class _ExerciseRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: row.yoga ? c.powder : c.bgInverse,
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                alignment: Alignment.center,
-                child: PoseGlyph(type: row.glyph, size: 22, dark: !row.yoga),
+              ExerciseThumbnail(
+                glyph: row.glyph,
+                asset: row.thumbnailAsset,
+                yoga: row.yoga,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -276,7 +271,7 @@ class _ExerciseRow extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '${row.cat} · ${row.diff}',
+                      '${row.displayCat} · ${row.diff}',
                       style: TextStyle(
                         fontFamily: 'BeVietnamPro',
                         fontSize: 10,

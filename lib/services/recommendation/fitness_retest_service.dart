@@ -109,6 +109,7 @@ class FitnessRetestService {
     final input = result.scoringInput ??
         FitnessTestScoringInput.fromSquatLogger(
           logger: result.squatLogger,
+          wallPushUpLogger: result.wallPushupLogger,
           trainingDuration: trainingDuration,
           fork: fork,
         );
@@ -138,6 +139,7 @@ class FitnessRetestService {
       final scoringInput = result.scoringInput ??
           FitnessTestScoringInput.fromSquatLogger(
             logger: result.squatLogger,
+            wallPushUpLogger: result.wallPushupLogger,
             trainingDuration: profile?['training_duration'] as String?,
             fork: profile?['fork'] as String?,
           );

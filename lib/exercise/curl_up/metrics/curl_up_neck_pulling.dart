@@ -51,10 +51,10 @@ import 'curl_up_metric_base.dart';
 
 class NeckPullingConfig {
   /// Deviation from personal baseline that triggers a warning.
-  static const double WARNING_DEVIATION = 12.0;
+  static const double WARNING_DEVIATION = 18.0;
 
   /// Deviation from personal baseline that triggers an error.
-  static const double ERROR_DEVIATION = 15.0;
+  static const double ERROR_DEVIATION = 24.0;
 
   /// Number of resting frames averaged when hold-still snapshot is missing.
   static const int BASELINE_SAMPLE_COUNT = 5;
@@ -66,8 +66,6 @@ enum _NeckFaultLevel { warning, error }
 class NeckPullingMetric extends CurlUpMetricBase {
   @override
   String get name => 'NeckPulling';
-  @override
-  String? get nameVi => 'Gập cổ';
   @override
   List<FaultRecord> get faults => _faults;
 
@@ -172,7 +170,7 @@ class NeckPullingMetric extends CurlUpMetricBase {
       _faults.clear();
       _faults.add(FaultRecord(
         phase: phase,
-        type: 'Neck',
+        type: 'neck_pull',
         message: 'Kéo cổ quá mạnh — giữ đầu trung tính',
         affectsForm: true,
         voiceMessage: 'Không kéo cổ',
@@ -187,7 +185,7 @@ class NeckPullingMetric extends CurlUpMetricBase {
     if (_loggedLevel == null) {
       _faults.add(FaultRecord(
         phase: phase,
-        type: 'Neck',
+        type: 'neck_pull',
         message: 'Hơi căng cổ — giữ đầu thẳng hàng với lưng',
         affectsForm: false,
         priority: CurlUpFaultVoicePriority.neckPulling,

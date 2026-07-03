@@ -32,15 +32,15 @@ import '../../../../utils/debouncer.dart';
 class TrunkAlignmentConfig {
   /// Sag thresholds (positive deviation = hips dropping)
   /// More lenient than plank because dynamic movement causes natural sway
-  static const double SAG_GOOD_MAX = 8.0; // degrees
-  static const double SAG_WARNING_MAX = 10.0;
-  static const double SAG_ERROR_MAX = 18.0; // STOP level
+  static const double SAG_GOOD_MAX = 12.0; // degrees
+  static const double SAG_WARNING_MAX = 16.0;
+  static const double SAG_ERROR_MAX = 25.0; // STOP level
 
   /// Pike thresholds (negative deviation = hips too high)
   /// Slight pike is NORMAL for Vietnamese users — don't over-flag
-  static const double PIKE_GOOD_MAX = 3.0;
-  static const double PIKE_WARNING_MAX = 6.0;
-  static const double PIKE_ERROR_MAX = 10.0;
+  static const double PIKE_GOOD_MAX = 6.0;
+  static const double PIKE_WARNING_MAX = 10.0;
+  static const double PIKE_ERROR_MAX = 16.0;
 }
 
 class TrunkAlignmentMetric extends PushUpMetricBase {

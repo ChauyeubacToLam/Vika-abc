@@ -9,6 +9,7 @@
    ========================================================================= */
 
 import '../plank.dart';
+import '../../../debug/debug_types.dart';
 import '../../exercise_base.dart';
 
 /* =========================================================================
@@ -66,6 +67,8 @@ class FaultRecord {
    PlankMetricBase — Interface every plank metric implements.
    ========================================================================= */
 abstract class PlankMetricBase {
+  int faultsCount = 0;
+
   /// Human-readable name for debug/logging.
   String get name;
 
@@ -74,12 +77,23 @@ abstract class PlankMetricBase {
 
   /// Faults accumulated this hold.
   List<FaultRecord> get faults;
+  bool get isFaultingNow => false;
 
   /// Debug data for the overlay.
   Map<String, dynamic> get debugData;
+  double? get value => null;
+  ThresholdBand? get threshold => null;
+  MetricStatus get status => faults.any((fault) => fault.affectsForm)
+      ? MetricStatus.fault
+      : MetricStatus.pass;
 
   /// Reset all internal state for the next hold.
   void reset();
+
+  void resetAndCountFault() {
+    if (faults.isNotEmpty) faultsCount++;
+    reset();
+  }
 
   /// Called before collecting faults at hold completion.
   /// Metrics that use fault percentage override this.

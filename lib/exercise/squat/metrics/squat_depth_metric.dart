@@ -24,10 +24,6 @@ class DepthMetricConfig {
 class DepthMetric extends SquatMetricBase {
   @override
   String get name => 'Depth';
-
-  @override
-  String? get nameVi => 'Độ sâu';
-
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
 

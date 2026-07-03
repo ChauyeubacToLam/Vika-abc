@@ -28,16 +28,16 @@ import 'curl_up_metric_base.dart';
 
 class KneeExtensionConfig {
   /// Knee angle at or above which the leg is locked — fault, fail rep.
-  static const double ERROR_THRESHOLD = 175.0;
+  static const double ERROR_THRESHOLD = 168.0;
 
   /// Warning band: drifting toward straight but not yet locked.
-  static const double WARNING_THRESHOLD = 165.0;
+  static const double WARNING_THRESHOLD = 155.0;
 
   /// Baseline-relative deviation that triggers a live nudge chip.
   /// Activation guarantees baseline is ~90° (≤ 100° max), so 15° drift
   /// means the user has crept up to ~110°. Visible signal but not a
   /// fault — they can self-correct.
-  static const double DEVIATION_WARNING = 15.0;
+  static const double DEVIATION_WARNING = 25.0;
 }
 
 /// Tracks the highest fault level reached so far this rep (absolute check).
@@ -46,9 +46,6 @@ enum _KneeFaultLevel { warning, error }
 class KneeExtensionMetric extends CurlUpMetricBase {
   @override
   String get name => 'KneeExtension';
-  @override
-  String? get nameVi => 'Gối';
-
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
   double? _kneeAngle;
@@ -103,6 +100,12 @@ class KneeExtensionMetric extends CurlUpMetricBase {
     _kneeAngle = angle;
     _debugData['kneeExt'] = angle;
 
+    if (_baselineKnee != null && _baselineKnee! >= 145.0) {
+      _status = MetricStatus.pass;
+      ctx.resultIssues.feedback['Knee'] = 'âœ… Gá»‘i tá»‘t';
+      return;
+    }
+
     // Order matters: absolute checks first (highest severity), then
     // deviation chip (informational), then "good."
     if (angle >= KneeExtensionConfig.ERROR_THRESHOLD) {
@@ -133,10 +136,10 @@ class KneeExtensionMetric extends CurlUpMetricBase {
     final phase = ctx.curlUpState.toString().split('.').last.toUpperCase();
 
     if (level == _KneeFaultLevel.error) {
-      _faults.removeWhere((f) => f.type == 'Knee');
+      _faults.removeWhere((f) => f.type == 'knee_extension');
       _faults.add(FaultRecord(
         phase: phase,
-        type: 'Knee',
+        type: 'knee_extension',
         message: 'Chân duỗi thẳng — co gối lại',
         affectsForm: true,
         voiceMessage: 'Giữ gối gập',
@@ -151,7 +154,7 @@ class KneeExtensionMetric extends CurlUpMetricBase {
     if (_loggedLevel == null) {
       _faults.add(FaultRecord(
         phase: phase,
-        type: 'Knee',
+        type: 'knee_extension',
         message: 'Gối hơi thẳng — co thêm để giữ tư thế McGill',
         affectsForm: false,
         priority: CurlUpFaultVoicePriority.kneeExtension,

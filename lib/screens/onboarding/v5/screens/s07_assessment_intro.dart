@@ -9,11 +9,17 @@ class S07AssessmentIntro extends StatelessWidget {
     super.key,
     required this.data,
     required this.onNext,
+    required this.onSkip,
     required this.onBack,
   });
 
   final OnboardingData data;
   final VoidCallback onNext;
+
+  /// Secondary action: opt out of the live assessment. The level picker still
+  /// suggests a level from the user's stated history. Guarded by a confirm
+  /// sheet so it can't be skipped by accident.
+  final VoidCallback onSkip;
   final VoidCallback onBack;
 
   @override
@@ -22,18 +28,18 @@ class S07AssessmentIntro extends StatelessWidget {
     final exercises = isYoga
         ? const [
             (
-              name: 'Warrior I',
+              name: 'Tư thế chiến binh I',
               vi: 'Tư thế chiến binh',
               hold: '20–30 giây',
               icon: Icons.self_improvement_rounded,
-              focus: 'thăng bằng, hông, thân người',
+              focus: 'thăng bằng, hông, thân trên',
             ),
             (
-              name: 'Forward Fold',
-              vi: 'Cúi gập chậm',
+              name: 'Tư thế ngồi gập người',
+              vi: 'Cúi người về trước',
               hold: '1 lần chậm',
               icon: Icons.airline_seat_legroom_extra_rounded,
-              focus: 'gân kheo, lưng, hông',
+              focus: 'đùi sau, lưng dưới, hông',
             ),
           ]
         : const [
@@ -42,28 +48,52 @@ class S07AssessmentIntro extends StatelessWidget {
               vi: 'Ngồi xuống / đứng lên',
               hold: '5 lần chậm',
               icon: Icons.fitness_center_rounded,
-              focus: 'gối, hông, lưng',
+              focus: 'gối, hông, lưng dưới',
             ),
             (
-              name: 'Wall Push-Up',
+              name: 'Chống đẩy tường',
               vi: 'Đẩy tường',
               hold: '5 lần chậm',
               icon: Icons.accessibility_new_rounded,
-              focus: 'vai, khuỷu tay, thân người',
+              focus: 'vai, khuỷu tay, thân trên',
             ),
           ];
     final r = V5Responsive.of(context);
     final tight = r.size.height < 700;
+    final bottomInset = r.viewPadding.bottom;
+    // Skip link tucks just under a raised primary pill. V5PillCTA is a
+    // self-positioning Positioned, so the cluster lives in a fills-the-screen
+    // Stack and both children anchor to the bottom edge.
+    final linkBottom = bottomInset + 18;
+    final pillBottom = linkBottom + 48;
     return V5Page(
       index: 9,
       onBack: onBack,
-      cta: V5PillCTA(label: 'Bắt đầu đánh giá', onTap: onNext),
+      bottomPaddingOverride: pillBottom + 60 + 20,
+      cta: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          V5PillCTA(
+            label: 'Bắt đầu đánh giá',
+            onTap: onNext,
+            bottom: pillBottom,
+          ),
+          Positioned(
+            left: V5.gutter,
+            right: V5.gutter,
+            bottom: linkBottom,
+            child: Center(
+              child: _SkipAssessmentLink(onTap: () => _confirmSkip(context)),
+            ),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           V5ScreenHeader(
-            eyebrow: 'Đánh giá ban đầu',
-            title: 'Làm 2 động tác.\nNhận level & plan.',
+            eyebrow: 'Đánh giá thể lực.',
+            title: '2 động tác.\nVika sẽ xem và xây dựng lộ trình phù hợp.',
             size: tight ? V5HeaderSize.medium : V5HeaderSize.large,
           ),
           SizedBox(height: r.pick(cozy: V5.space16, short: V5.space10)),
@@ -106,6 +136,162 @@ class S07AssessmentIntro extends StatelessWidget {
             );
           }),
         ],
+      ),
+    );
+  }
+
+  Future<void> _confirmSkip(BuildContext context) async {
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: V5.ink.withValues(alpha: 0.46),
+      builder: (_) => const _SkipConfirmSheet(),
+    );
+    if (confirmed == true) onSkip();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Skip affordance — quiet link + confirm sheet
+// ─────────────────────────────────────────────────────────────
+
+class _SkipAssessmentLink extends StatelessWidget {
+  const _SkipAssessmentLink({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        child: Text(
+          'Bỏ qua · đánh giá theo thời gian tập luyện của tôi.',
+          style: V5.bodySm(context, color: V5.inkSoft).copyWith(
+            fontWeight: FontWeight.w600,
+            decoration: TextDecoration.underline,
+            decorationColor: V5.inkFaint,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SkipConfirmSheet extends StatelessWidget {
+  const _SkipConfirmSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewPadding.bottom;
+    return Container(
+      decoration: const BoxDecoration(
+        color: V5.surface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(V5.radius2xl)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+        V5.gutter,
+        V5.space12,
+        V5.gutter,
+        bottomInset + V5.space20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: V5.inkDim,
+                borderRadius: BorderRadius.circular(V5.radiusFull),
+              ),
+            ),
+          ),
+          const SizedBox(height: V5.space20),
+          Row(
+            children: [
+              const V5Sparkle(size: 13),
+              const SizedBox(width: V5.space8),
+              Text(
+                'TỰ CHỌN MỨC TẬP',
+                style: V5.eyebrow(context, color: V5.yellowDeep),
+              ),
+            ],
+          ),
+          const SizedBox(height: V5.space10),
+          Text('Bỏ qua đánh giá?', style: V5.titleLg(context)),
+          const SizedBox(height: V5.space8),
+          Text(
+            'Không sao, Vika vẫn gợi ý mức phù hợp dựa trên thời gian luyện tập bạn đã chia sẻ. Bạn có thể làm kiểm tra bất cứ lúc nào từ màn hình Hồ sơ.',
+            style: V5.body(context, color: V5.inkSoft),
+          ),
+          const SizedBox(height: V5.space24),
+          _SheetPrimaryButton(
+            label: 'Bỏ qua, gợi ý theo thời gian bạn đã luyện tập',
+            onTap: () => Navigator.of(context).pop(true),
+          ),
+          const SizedBox(height: V5.space6),
+          _SheetSecondaryButton(
+            label: 'Quay lại, tôi muốn tham gia đánh giá',
+            onTap: () => Navigator.of(context).pop(false),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SheetPrimaryButton extends StatelessWidget {
+  const _SheetPrimaryButton({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        height: 54,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: V5.ink,
+          borderRadius: BorderRadius.circular(V5.radiusFull),
+          boxShadow: V5.elevation2,
+        ),
+        child: Text(
+          label,
+          style: V5.titleSm(context, color: V5.invInk),
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetSecondaryButton extends StatelessWidget {
+  const _SheetSecondaryButton({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        height: 52,
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: V5.titleSm(context, color: V5.inkSoft),
+        ),
       ),
     );
   }
@@ -171,8 +357,8 @@ class _AssessmentHero extends StatelessWidget {
                 const Spacer(),
                 Text(
                   isYoga
-                      ? 'Thực hiện 2 tư thế sau.'
-                      : 'Thực hiện 2 động tác sau.',
+                      ? 'Thực hiện 2 tư thế dưới đây.'
+                      : 'Thực hiện 2 động tác dưới đây.',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: (tight
@@ -184,7 +370,7 @@ class _AssessmentHero extends StatelessWidget {
                 ),
                 SizedBox(height: tight ? V5.space4 : V5.space8),
                 Text(
-                  'Vika xem form để gợi ý level, điểm cần cải thiện và plan.',
+                  'Vika theo dõi để gợi ý level phù hợp và những điểm cần cải thiện.',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: V5.bodySm(context, color: V5.invInkSoft),
@@ -193,11 +379,11 @@ class _AssessmentHero extends StatelessWidget {
                   const Spacer(),
                   Row(
                     children: const [
-                      Expanded(child: _FlowStep(label: 'Đo form')),
+                      Expanded(child: _FlowStep(label: 'Đánh giá form')),
                       SizedBox(width: V5.space8),
                       Expanded(child: _FlowStep(label: 'Gợi ý level')),
                       SizedBox(width: V5.space8),
-                      Expanded(child: _FlowStep(label: 'Lập plan')),
+                      Expanded(child: _FlowStep(label: 'Xây dựng lộ trình')),
                     ],
                   ),
                 ],

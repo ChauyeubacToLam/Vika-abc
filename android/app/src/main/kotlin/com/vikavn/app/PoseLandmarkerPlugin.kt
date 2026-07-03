@@ -57,6 +57,11 @@ class PoseLandmarkerPlugin(
     @Volatile private var currentTargetRotation: Int? = null
     private var rotationLogFrameCount = 0
     private var detectionEnabled = true
+    // Last frame timestamp (ms) that passed the analysis throttle. Read/written
+    // only on the single-threaded cameraExecutor, mirroring the segmentation
+    // helper's throttle; @Volatile keeps it visible to a fresh executor after
+    // a pause/resume re-bind.
+    @Volatile private var lastAnalyzedTimestampMs = Long.MIN_VALUE
 
     init {
         methodChannel.setMethodCallHandler(this)
@@ -326,8 +331,15 @@ class PoseLandmarkerPlugin(
         imageProxy: ImageProxy,
         helper: PoseLandmarkerHelper,
     ) {
+        val timestampMs = imageProxy.imageInfo.timestamp / 1_000_000L
+        // Thermal guard: cap analysis cadence before decoding the frame so we
+        // skip the per-frame bitmap work entirely on dropped frames. No-op on
+        // ~30fps sensors; sheds redundant frames on faster ones.
+        if (!shouldAnalyzeFrame(timestampMs)) {
+            imageProxy.close()
+            return
+        }
         try {
-            val timestampMs = imageProxy.imageInfo.timestamp / 1_000_000L
             val rotationDegrees = imageProxy.imageInfo.rotationDegrees
             val rawBitmap = rgbaImageProxyToBitmap(imageProxy)
             val rotationStartedNs = SystemClock.elapsedRealtimeNanos()
@@ -374,6 +386,15 @@ class PoseLandmarkerPlugin(
         } finally {
             imageProxy.close()
         }
+    }
+
+    private fun shouldAnalyzeFrame(timestampMs: Long): Boolean {
+        val last = lastAnalyzedTimestampMs
+        if (last != Long.MIN_VALUE && timestampMs - last < MIN_FRAME_INTERVAL_MS) {
+            return false
+        }
+        lastAnalyzedTimestampMs = timestampMs
+        return true
     }
 
     private fun rgbaImageProxyToBitmap(imageProxy: ImageProxy): Bitmap {
@@ -535,6 +556,12 @@ class PoseLandmarkerPlugin(
         private const val EVENT_CHANNEL_NAME = "com.vikavn.app/pose_landmarker_stream"
         private const val ROTATION_LOG_SAMPLE_RATE = 30
         private const val ROTATION_SLOW_FRAME_MS = 12.0
+        // Minimum gap between analyzed frames (~30fps cap). A 30ms floor keeps
+        // every frame from a native 30fps stream (period ~33ms) while halving a
+        // 60fps sensor to ~30fps. Pose metrics are timestamp-based, so capping
+        // cadence does not alter rep counts or angles — it only cuts CPU heat
+        // over long sessions. Tune here if a device needs a lower ceiling.
+        private const val MIN_FRAME_INTERVAL_MS = 30L
         // 720p keeps a sharper, wider preview while staying light enough for
         // live pose analysis on mainstream phones. CameraX picks the closest
         // supported size when 1280x720 is unavailable.

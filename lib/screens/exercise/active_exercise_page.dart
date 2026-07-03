@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:ui';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
@@ -17,14 +16,21 @@ import '../../debug/debug_types.dart';
 import '../../exercise/exercise_base.dart';
 import '../../pose/pose_landmarker_adapter.dart';
 import '../../pose/pose_landmarker_channel.dart';
-import '../../pose/vika_image_orientation.dart';
 import '../../models/exercise_definition.dart';
+import '../../services/analytics_service.dart';
 import '../../utils/exercise_logger.dart';
 import '../../utils/orientation_lock.dart';
 import '../../utils/segmentation_channel.dart';
 import '../../theme/vf_theme.dart';
+import 'widgets/exercise_demo_page.dart';
 import 'widgets/form_score_arc.dart';
+import 'widgets/guidance_signage.dart';
+import 'widgets/hold_hero_ring.dart';
+import 'widgets/hybrid_hold_cue.dart';
 import 'widgets/ivory_chrome.dart';
+import 'widgets/phase_chevron_stream.dart';
+import 'widgets/rep_hero.dart';
+import 'widgets/rest_countdown_ring.dart';
 import 'widgets/pose_overlay_painter.dart';
 import 'widgets/rep_reward_layer.dart';
 import 'widgets/system_banner.dart';
@@ -37,6 +43,7 @@ class ActiveExercisePage extends StatefulWidget {
     required this.currentSet,
     required this.totalSets,
     required this.totalReps,
+    this.isTimeBased = false,
     required this.onSetComplete,
     required this.onBack,
   });
@@ -46,6 +53,7 @@ class ActiveExercisePage extends StatefulWidget {
   final int currentSet;
   final int totalSets;
   final int totalReps;
+  final bool isTimeBased;
   final ValueChanged<ExerciseLogger> onSetComplete;
   final VoidCallback onBack;
 
@@ -100,12 +108,40 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   int _rewardRepSeen = 0; // highest repCount already evaluated for reward
   int _cleanRepCount = 0; // cumulative clean reps this set (drives pool level)
   int _rewardPulseId = 0; // bumps once per clean rep (fires a bloom)
+
+  // Last non-null accrued hold seconds. The hold hero ring keeps showing the
+  // frozen count when the exercise momentarily reports null (user dropped out
+  // of the hold pose) instead of snapping back to zero.
+  double _lastKnownHoldSeconds = 0;
+
+  // Peak accrued hold seconds this set — keeps the hearth pool monotonic
+  // even if the exercise restarts its live timer for a new hold attempt.
+  double _holdPoolPeakSeconds = 0;
+
+  // Release-beat linger for the hybrid hold cue: the raw cue dies the frame
+  // the exercise leaves the bottom phase, so "LÊN!" keeps showing briefly
+  // into the ascent (see _displayedHoldCue).
+  _BottomHoldCue? _lingeringReleaseCue;
+  DateTime? _releaseLingerUntil;
+  static const Duration _releaseLingerDuration = Duration(milliseconds: 650);
+
+  // Full length of the current in-set rest (e.g. plank's 5s between McGill
+  // holds), captured from the first remaining value seen — drives the rest
+  // ring's drain fraction.
+  double _restRingTotalSeconds = 0;
+
+  // ─── Swipe-to-demo (camera view ↔ full-screen demo) ───
+  final PageController _pageController = PageController();
+  int _demoPageIndex = 0;
   bool _isManualPause = false;
   _PoseRuntime _runtime = _PoseRuntime.nativeMediaPipe;
   DebugMode _settingsDebugMode = DebugMode.off;
   bool _isStaffUser = false;
   bool _debugPanelOpen = false;
-  String? _expandedMetricId;
+  // Host-owned so the camera scrims + guidance mode-scrim can step aside when
+  // the panel goes fullscreen, letting the see-through glass composite over the
+  // live PT feed + skeleton.
+  bool _debugFullscreen = false;
   int _debugBackTapCount = 0;
   DateTime? _debugFirstBackTap;
   Timer? _pendingStaffBackTimer;
@@ -113,11 +149,17 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   DateTime? _lastPersonDetectionAt;
   bool _personDetectionInFlight = false;
   bool _orientationPauseActive = false;
+  bool _isLifecyclePaused = false;
+  bool _resumeInitRequested = false;
   VikaImageOrientation _currentOrientation = VikaImageOrientation.portrait;
   VikaImageOrientation? _lastSentOrientation;
   bool? _lastSentOrientationFrontCamera;
   Future<void>? _pipelineShutdownFuture;
+  Future<void>? _lifecyclePauseFuture;
+  int _cameraInitGeneration = 0;
+  int? _activeCameraInitGeneration;
   static const Duration _personDetectionInterval = Duration(milliseconds: 450);
+  static const Duration _voiceCompletionTimeout = Duration(seconds: 5);
 
   @override
   void initState() {
@@ -158,6 +200,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     unawaited(OrientationLock.portraitOnly());
     unawaited(_shutdownPipelines());
     _pulseController.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -170,6 +213,122 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     // does not fire after rotation.
     if (!ExerciseBase.kLandscapeRotationEnabled || _isDisposed) return;
     unawaited(_handleMetricsChange());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _handleLifecycleResumed();
+        break;
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+        _handleLifecyclePaused();
+        break;
+      case AppLifecycleState.detached:
+        break;
+    }
+  }
+
+  bool get _setTeardownOwnsPipeline =>
+      _isDisposed || _isCompletingSet || _didComplete;
+
+  bool get _hasCameraPipelineWork =>
+      _isInitializing ||
+      _isCameraReady ||
+      _textureId != null ||
+      _cameraController != null ||
+      _landmarkSubscription != null;
+
+  bool get _pipelineReady =>
+      _isCameraReady &&
+      ((_runtime == _PoseRuntime.nativeMediaPipe && _textureId != null) ||
+          (_runtime == _PoseRuntime.mlKitFallback &&
+              _cameraController != null));
+
+  bool _shouldAbortCameraInit(int generation) {
+    return !mounted ||
+        _setTeardownOwnsPipeline ||
+        _isLifecyclePaused ||
+        generation != _cameraInitGeneration;
+  }
+
+  void _handleLifecyclePaused() {
+    if (_setTeardownOwnsPipeline) return;
+
+    _isLifecyclePaused = true;
+    _resumeInitRequested = false;
+    _cameraInitGeneration++;
+    _pipelineShutdownFuture = null;
+
+    if (!_hasCameraPipelineWork && _lifecyclePauseFuture == null) {
+      return;
+    }
+
+    final pauseFuture = _lifecyclePauseFuture ??= _pausePipelinesForLifecycle();
+    unawaited(pauseFuture.whenComplete(() {
+      if (identical(_lifecyclePauseFuture, pauseFuture)) {
+        _lifecyclePauseFuture = null;
+      }
+    }));
+  }
+
+  void _handleLifecycleResumed() {
+    if (_setTeardownOwnsPipeline) return;
+
+    _isLifecyclePaused = false;
+    unawaited(_resumePipelinesAfterLifecycle());
+  }
+
+  Future<void> _resumePipelinesAfterLifecycle() async {
+    final pauseFuture = _lifecyclePauseFuture;
+    if (pauseFuture != null) {
+      await pauseFuture;
+    }
+
+    if (!mounted || _setTeardownOwnsPipeline || _isLifecyclePaused) {
+      return;
+    }
+    if (_pipelineReady) {
+      return;
+    }
+    if (_isInitializing) {
+      _resumeInitRequested = true;
+      return;
+    }
+
+    await _initCamera();
+  }
+
+  Future<void> _pausePipelinesForLifecycle() async {
+    try {
+      final landmarkSubscription = _landmarkSubscription;
+      _landmarkSubscription = null;
+      try {
+        await landmarkSubscription?.cancel();
+      } catch (_) {}
+
+      await _stopAndDisposePoseChannel();
+      await _disposeFallbackCamera();
+    } finally {
+      _pipelineShutdownFuture = null;
+      _lastSentOrientation = null;
+      _lastSentOrientationFrontCamera = null;
+      _isProcessingFrame = false;
+
+      if (!_isDisposed) {
+        if (mounted) {
+          setState(() {
+            _isCameraReady = false;
+            _textureId = null;
+          });
+        } else {
+          _isCameraReady = false;
+          _textureId = null;
+        }
+      }
+    }
   }
 
   Future<void> _handleMetricsChange() async {
@@ -234,6 +393,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     if (!mounted) return;
     _isStaffUser = isStaff;
     final resolved = _resolveDebugMode(mode);
+    widget.exercise.debugMode = resolved;
     setState(() {
       _settingsDebugMode = mode;
       _isStaffUser = isStaff;
@@ -297,7 +457,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     // /private/var/Managed Preferences/mobile/com.apple.CoreMotion.plist.
     // On some iPhones that read can stall (managed-prefs sandbox check)
     // and never returns. Without the timeout, _initCamera() never
-    // proceeds and the user sits forever on "Đang chuẩn bị camera".
+    // proceeds and the user sits forever on "Đang khởi động camera".
     try {
       final nativeOrientation = await _orientationCommunicator
           .orientation(useSensor: true)
@@ -470,18 +630,16 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     await DebugPreferences.saveMode(mode);
     if (!mounted) return;
     final resolved = _resolveDebugMode(mode);
+    widget.exercise.debugMode = resolved;
     setState(() {
       _settingsDebugMode = mode;
       _debugPanelOpen = resolved != DebugMode.off;
-      if (resolved == DebugMode.off) {
-        _expandedMetricId = null;
-      }
     });
   }
 
   void _handleBackChromeTap() {
     if (!_isStaffUser) {
-      widget.onBack();
+      _requestExit();
       return;
     }
 
@@ -493,8 +651,128 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       if (!mounted) return;
       _debugBackTapCount = 0;
       _debugFirstBackTap = null;
-      widget.onBack();
+      _requestExit();
     });
+  }
+
+  /// Whether the user is mid-set with progress an accidental back would discard.
+  /// Scoped to the genuinely-active window: the exercise has activated or at
+  /// least one rep is logged, and the set is not already finishing/torn down.
+  bool get _isSetInProgress {
+    if (_isCompletingSet || _didComplete) return false;
+    final state = widget.exercise.exerciseState;
+    if (state == ExerciseState.completed) return false;
+    return state == ExerciseState.activated || widget.exercise.repCount > 0;
+  }
+
+  /// Single exit gate for both back affordances. While a set is in progress the
+  /// confirm dialog stands between the user and a lost set; otherwise (intro,
+  /// post-completion) back is instant. Mirrors the PopScope canPop condition so
+  /// the chrome back arrow and the system back behave identically.
+  void _requestExit() {
+    if (_isSetInProgress) {
+      unawaited(_confirmExitDuringActiveSet());
+    } else {
+      widget.onBack();
+    }
+  }
+
+  /// Shown when the system back / back-gesture is invoked mid-set. Only exits
+  /// on explicit confirmation; the default (barrier dismiss / "Tiếp tục") keeps
+  /// the session running. Uses the existing exit path (widget.onBack).
+  Future<void> _confirmExitDuringActiveSet() async {
+    final shouldExit = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.55),
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: VikaIvory.surface,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 40),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 14),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Thoát buổi tập?',
+                  style: TextStyle(
+                    fontFamily: VikaIvory.fontFamily,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
+                    color: VikaIvory.ink,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Tiến độ hiệp này sẽ không được lưu. Cố thêm chút nữa nhé!',
+                  style: TextStyle(
+                    fontFamily: VikaIvory.fontFamily,
+                    fontSize: 14,
+                    height: 1.5,
+                    fontWeight: FontWeight.w500,
+                    color: VikaIvory.inkSoft,
+                  ),
+                ),
+                const SizedBox(height: 22),
+                // Primary, encouraging action: keep the session going.
+                SizedBox(
+                  height: 50,
+                  child: FilledButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(false),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: VikaIvory.ink,
+                      foregroundColor: VikaIvory.surface,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: Text(
+                      'Tiếp tục',
+                      style: TextStyle(
+                        fontFamily: VikaIvory.fontFamily,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                // De-emphasised exit.
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                  child: Text(
+                    'Thoát',
+                    style: TextStyle(
+                      fontFamily: VikaIvory.fontFamily,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: VikaIvory.inkSoft,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (shouldExit == true && mounted) {
+      // Lifecycle boundary: the user confirmed leaving mid-set, discarding the
+      // in-progress set. Both the chrome back arrow and the system / predictive
+      // back gesture (PopScope) funnel through this confirm path. No-op without
+      // consent; exercise_id only.
+      unawaited(
+        AnalyticsService.instance.capture(
+          'exercise_abandoned',
+          props: {'exercise_id': widget.definition.id},
+        ),
+      );
+      widget.onBack();
+    }
   }
 
   bool _recordStaffBackTap() {
@@ -578,7 +856,6 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                           Text(
                             switch (mode) {
                               DebugMode.off => 'Off',
-                              DebugMode.user => 'User',
                               DebugMode.dev => 'Dev',
                             },
                             style: TextStyle(
@@ -600,13 +877,18 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     );
   }
 
+  // ─── Reviewer tracking-demo shortcut (squat only) ───
+  //
   Future<void> _initCamera() async {
-    if (_isDisposed) return;
-    await _refreshCurrentOrientation();
-    if (_isDisposed) return;
-    _syncOrientationGate();
-    await _disposeFallbackCamera();
-    if (!_isDisposed && mounted) {
+    if (_setTeardownOwnsPipeline || _isLifecyclePaused || _isInitializing) {
+      return;
+    }
+
+    final initGeneration = _cameraInitGeneration;
+    _activeCameraInitGeneration = initGeneration;
+    _resumeInitRequested = false;
+    _isInitializing = true;
+    if (mounted) {
       setState(() {
         _isInitializing = true;
         _isCameraReady = false;
@@ -615,118 +897,148 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       });
     }
 
-    final status = await Permission.camera.request();
-    if (_isDisposed || !mounted) return;
-    _permissionStatus = status;
-    if (!status.isGranted) {
-      if (!_isDisposed && mounted) {
-        setState(() {
-          _isInitializing = false;
-          _isCameraReady = false;
-          _cameraErrorMessage = status.isPermanentlyDenied
-              ? 'Quyền camera đang bị chặn. Hãy mở lại trong cài đặt.'
-              : 'Cần quyền camera để AI theo dõi bài tập.';
-        });
-      }
-      return;
-    }
-
     try {
-      _ensureLandmarkSubscription();
-      // Hard-timeout the native init so a hung PoseLandmarkerService
-      // (completion handler never called, deadlocked Swift queue)
-      // doesn't strand the UI on "Đang chuẩn bị camera" forever. After
-      // 8 seconds we throw and surface a real error with a Retry button.
-      //
-      // ML Kit fallback intentionally NOT triggered here on real devices
-      // (iPhone/Android). It's for simulator/emulator only — see
-      // _shouldUseMlKitFallback() which gates on specific error strings
-      // ("x86_64", "native library", etc.) emitted by emulator builds.
-      final textureId = await _poseChannel
-          .initialize(
-            useFrontCamera: _isFrontCamera,
-            initialOrientation: _isCurrentOrientationSupported
-                ? _sessionOrientation
-                : VikaImageOrientation.portrait,
-            isFrontCamera: _isFrontCamera,
-          )
-          .timeout(const Duration(seconds: 8));
-      if (_isDisposed || !mounted) {
-        await _stopAndDisposePoseChannel();
-        return;
-      }
-      await _poseChannel.startDetection().timeout(const Duration(seconds: 4));
-      if (_isDisposed || !mounted) {
-        await _stopAndDisposePoseChannel();
+      await _refreshCurrentOrientation();
+      if (_shouldAbortCameraInit(initGeneration)) return;
+      _syncOrientationGate();
+      await _disposeFallbackCamera();
+      if (_shouldAbortCameraInit(initGeneration)) return;
+
+      final status = await Permission.camera.request();
+      if (_shouldAbortCameraInit(initGeneration)) return;
+      _permissionStatus = status;
+      if (!status.isGranted) {
+        if (!_isDisposed && mounted) {
+          setState(() {
+            _isInitializing = false;
+            _isCameraReady = false;
+            _cameraErrorMessage = status.isPermanentlyDenied
+                ? 'Quyền camera chưa được bật. Hãy mở lại trong cài đặt.'
+                : 'AI cần camera để theo dõi bài tập.';
+          });
+        }
         return;
       }
 
-      setState(() {
-        _runtime = _PoseRuntime.nativeMediaPipe;
-        _textureId = textureId;
-        _isCameraReady = true;
-        _isInitializing = false;
-      });
-    } on TimeoutException catch (_) {
-      // Native side never responded. Surface an error so the user can
-      // retry — don't auto-fallback to ML Kit on real device.
-      if (_isDisposed || !mounted) return;
-      debugPrint('[Vika] Native pose init timed out after 8s.');
       try {
-        await _poseChannel.dispose();
-      } catch (_) {}
-      if (!_isDisposed && mounted) {
+        _ensureLandmarkSubscription();
+        // Hard-timeout the native init so a hung PoseLandmarkerService
+        // (completion handler never called, deadlocked Swift queue)
+        // doesn't strand the UI on "Đang khởi động camera" forever. After
+        // 8 seconds we throw and surface a real error with a Retry button.
+        //
+        // ML Kit fallback intentionally NOT triggered here on real devices
+        // (iPhone/Android). It's for simulator/emulator only — see
+        // _shouldUseMlKitFallback() which gates on specific error strings
+        // ("x86_64", "native library", etc.) emitted by emulator builds.
+        final textureId = await _poseChannel
+            .initialize(
+              useFrontCamera: _isFrontCamera,
+              initialOrientation: _isCurrentOrientationSupported
+                  ? _sessionOrientation
+                  : VikaImageOrientation.portrait,
+              isFrontCamera: _isFrontCamera,
+            )
+            .timeout(const Duration(seconds: 8));
+        if (_shouldAbortCameraInit(initGeneration)) {
+          await _stopAndDisposePoseChannel();
+          return;
+        }
+        await _poseChannel.startDetection().timeout(const Duration(seconds: 4));
+        if (_shouldAbortCameraInit(initGeneration)) {
+          await _stopAndDisposePoseChannel();
+          return;
+        }
+
         setState(() {
+          _runtime = _PoseRuntime.nativeMediaPipe;
+          _textureId = textureId;
+          _isCameraReady = true;
           _isInitializing = false;
-          _isCameraReady = false;
-          _textureId = null;
-          _cameraErrorMessage = 'Camera khoi dong qua lau. Hay thu lai.';
         });
+      } on TimeoutException catch (_) {
+        // Native side never responded. Surface an error so the user can
+        // retry — don't auto-fallback to ML Kit on real device.
+        if (_shouldAbortCameraInit(initGeneration)) return;
+        debugPrint('[Vika] Native pose init timed out after 8s.');
+        try {
+          await _poseChannel.dispose();
+        } catch (_) {}
+        if (!_isDisposed && mounted) {
+          setState(() {
+            _isInitializing = false;
+            _isCameraReady = false;
+            _textureId = null;
+            _cameraErrorMessage = 'Camera khoi dong qua lau. Hay thu lai.';
+          });
+        }
+      } on PlatformException catch (error) {
+        if (_shouldAbortCameraInit(initGeneration)) return;
+        if (_shouldUseMlKitFallback(error)) {
+          // Emulator-only path. _shouldUseMlKitFallback gates on error
+          // strings emitted by simulator builds where the native MediaPipe
+          // dylib isn't shipped (x86_64, missing native library).
+          await _startMlKitFallback(error.message);
+          return;
+        }
+        if (!_isDisposed && mounted) {
+          setState(() {
+            _isInitializing = false;
+            _isCameraReady = false;
+            _textureId = null;
+            _cameraErrorMessage = error.message ??
+                'Khong the khoi dong MediaPipe tren thiet bi nay.';
+          });
+        }
+      } on MissingPluginException catch (_) {
+        // Native MediaPipe channel not implemented for this build target
+        // (typically simulator without native pods). Use ML Kit fallback —
+        // emulator path only.
+        if (_shouldAbortCameraInit(initGeneration)) return;
+        await _startMlKitFallback('Native pose landmarker not registered');
+      } catch (_) {
+        // Any other error — surface to the user with retry instead of
+        // silently swapping engines on a real device.
+        if (_shouldAbortCameraInit(initGeneration)) return;
+        try {
+          await _poseChannel.dispose();
+        } catch (_) {}
+        if (!_isDisposed && mounted) {
+          setState(() {
+            _isInitializing = false;
+            _isCameraReady = false;
+            _textureId = null;
+            _cameraErrorMessage = 'Loi khi khoi dong camera. Hay thu lai.';
+          });
+        }
       }
-    } on PlatformException catch (error) {
-      if (_isDisposed || !mounted) return;
-      if (_shouldUseMlKitFallback(error)) {
-        // Emulator-only path. _shouldUseMlKitFallback gates on error
-        // strings emitted by simulator builds where the native MediaPipe
-        // dylib isn't shipped (x86_64, missing native library).
-        await _startMlKitFallback(error.message);
-        return;
+    } finally {
+      if (_activeCameraInitGeneration == initGeneration) {
+        _activeCameraInitGeneration = null;
+        if (_isInitializing) {
+          if (!_isDisposed && mounted) {
+            setState(() {
+              _isInitializing = false;
+            });
+          } else {
+            _isInitializing = false;
+          }
+        }
       }
-      if (!_isDisposed && mounted) {
-        setState(() {
-          _isInitializing = false;
-          _isCameraReady = false;
-          _textureId = null;
-          _cameraErrorMessage = error.message ??
-              'Khong the khoi dong MediaPipe tren thiet bi nay.';
-        });
-      }
-    } on MissingPluginException catch (_) {
-      // Native MediaPipe channel not implemented for this build target
-      // (typically simulator without native pods). Use ML Kit fallback —
-      // emulator path only.
-      if (_isDisposed || !mounted) return;
-      await _startMlKitFallback('Native pose landmarker not registered');
-    } catch (_) {
-      // Any other error — surface to the user with retry instead of
-      // silently swapping engines on a real device.
-      if (_isDisposed || !mounted) return;
-      try {
-        await _poseChannel.dispose();
-      } catch (_) {}
-      if (!_isDisposed && mounted) {
-        setState(() {
-          _isInitializing = false;
-          _isCameraReady = false;
-          _textureId = null;
-          _cameraErrorMessage = 'Loi khi khoi dong camera. Hay thu lai.';
-        });
+
+      if (_resumeInitRequested &&
+          !_isInitializing &&
+          !_isLifecyclePaused &&
+          !_setTeardownOwnsPipeline &&
+          mounted) {
+        _resumeInitRequested = false;
+        unawaited(_initCamera());
       }
     }
   }
 
   Future<void> _toggleCamera() async {
-    if (_isDisposed || _isCompletingSet) return;
+    if (_setTeardownOwnsPipeline || _isLifecyclePaused) return;
     final nextLens = _currentLens == CameraLensDirection.back
         ? CameraLensDirection.front
         : CameraLensDirection.back;
@@ -781,6 +1093,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     if (_isDisposed ||
         _isCompletingSet ||
         _didComplete ||
+        _isLifecyclePaused ||
         (_isProcessingFrame && !ExerciseBase.kDiagnosticMode)) {
       return;
     }
@@ -790,7 +1103,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     }
 
     try {
-      if (_isDisposed) return;
+      if (_isDisposed || _isLifecyclePaused) return;
       _schedulePersonDetection();
 
       _currentLens = PoseLandmarkerAdapter.lensDirectionFromChannelData(data);
@@ -868,14 +1181,19 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     _setCompleteTimer?.cancel();
     unawaited(_poseChannel.stopDetection().catchError((Object _) {}));
 
-    // Give the completion cue a short breath, then make teardown deterministic
-    // before the parent swaps this active page out of the tree.
+    // Let the final rep verdict and completion cue drain before the parent
+    // swaps this active page out of the tree.
     _setCompleteTimer = Timer(const Duration(milliseconds: 250), () {
       unawaited(_finishSetAndNotifyParent());
     });
   }
 
   Future<void> _finishSetAndNotifyParent() async {
+    if (_isDisposed) return;
+    final voiceCoach = _voiceCoach;
+    if (voiceCoach != null) {
+      await voiceCoach.waitUntilIdle(timeout: _voiceCompletionTimeout);
+    }
     if (_isDisposed) return;
     await _shutdownPipelines();
     _voiceCoach?.dispose();
@@ -886,7 +1204,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   void _handleLandmarkStreamError(Object error) {
-    if (_isDisposed || !mounted) {
+    if (_setTeardownOwnsPipeline || _isLifecyclePaused || !mounted) {
       return;
     }
 
@@ -898,14 +1216,14 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   Future<void> _startMlKitFallback(String? nativeErrorMessage) async {
-    if (_isDisposed) return;
+    if (_setTeardownOwnsPipeline || _isLifecyclePaused) return;
     debugPrint(
       '[Vika] Falling back to Flutter camera + ML Kit: ${nativeErrorMessage ?? "unknown native init error"}',
     );
     try {
       await _poseChannel.dispose();
     } catch (_) {}
-    if (_isDisposed || !mounted) return;
+    if (_setTeardownOwnsPipeline || _isLifecyclePaused || !mounted) return;
     await _initMlKitCamera();
   }
 
@@ -927,12 +1245,12 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   Future<void> _initMlKitCamera() async {
-    if (_isDisposed) return;
+    if (_setTeardownOwnsPipeline || _isLifecyclePaused) return;
     await _disposeFallbackCamera();
-    if (_isDisposed || !mounted) return;
+    if (_setTeardownOwnsPipeline || _isLifecyclePaused || !mounted) return;
 
     final cameras = await availableCameras();
-    if (_isDisposed || !mounted) return;
+    if (_setTeardownOwnsPipeline || _isLifecyclePaused || !mounted) return;
     if (cameras.isEmpty) {
       setState(() {
         _runtime = _PoseRuntime.mlKitFallback;
@@ -975,12 +1293,12 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
       try {
         await controller.initialize().timeout(const Duration(seconds: 6));
-        if (_isDisposed || !mounted) {
+        if (_setTeardownOwnsPipeline || _isLifecyclePaused || !mounted) {
           await controller.dispose();
           return;
         }
         await controller.startImageStream(_processFallbackCameraImage);
-        if (_isDisposed || !mounted) {
+        if (_setTeardownOwnsPipeline || _isLifecyclePaused || !mounted) {
           await controller.dispose();
           return;
         }
@@ -1005,7 +1323,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       }
     }
 
-    if (_isDisposed || !mounted) return;
+    if (_setTeardownOwnsPipeline || _isLifecyclePaused || !mounted) return;
     setState(() {
       _runtime = _PoseRuntime.mlKitFallback;
       _isInitializing = false;
@@ -1015,11 +1333,11 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   Future<void> _switchMlKitCamera(CameraLensDirection nextLens) async {
-    if (_isDisposed) return;
+    if (_setTeardownOwnsPipeline || _isLifecyclePaused) return;
     if (_availableCameras.isEmpty) {
       _availableCameras = await availableCameras();
     }
-    if (_isDisposed || !mounted) return;
+    if (_setTeardownOwnsPipeline || _isLifecyclePaused || !mounted) return;
     final newIndex = _availableCameras.indexWhere(
       (camera) => camera.lensDirection == nextLens,
     );
@@ -1039,12 +1357,12 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
           : ImageFormatGroup.bgra8888,
     );
     await controller.initialize();
-    if (_isDisposed || !mounted) {
+    if (_setTeardownOwnsPipeline || _isLifecyclePaused || !mounted) {
       await controller.dispose();
       return;
     }
     await controller.startImageStream(_processFallbackCameraImage);
-    if (_isDisposed || !mounted) {
+    if (_setTeardownOwnsPipeline || _isLifecyclePaused || !mounted) {
       await controller.dispose();
       return;
     }
@@ -1077,6 +1395,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     if (_isDisposed ||
         _isCompletingSet ||
         _didComplete ||
+        _isLifecyclePaused ||
         (_isProcessingFrame && !ExerciseBase.kDiagnosticMode)) {
       return;
     }
@@ -1091,7 +1410,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   Future<void> _detectPoseFromFallback(CameraImage cameraImage) async {
-    if (_isDisposed || _isCompletingSet) return;
+    if (_setTeardownOwnsPipeline || _isLifecyclePaused) return;
     try {
       final inputImage = _buildInputImage(cameraImage);
       if (inputImage == null) {
@@ -1100,7 +1419,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
       _schedulePersonDetection(inputImage);
       final poses = await _poseDetector.processImage(inputImage);
-      if (_isDisposed || _isCompletingSet || !mounted) return;
+      if (_setTeardownOwnsPipeline || _isLifecyclePaused || !mounted) return;
 
       if (_syncOrientationGate()) {
         _detectedPose = poses.isNotEmpty ? poses.first : null;
@@ -1114,17 +1433,17 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       if (poses.isNotEmpty) {
         _handlePose(poses.first);
       } else {
-        if (_isDisposed) return;
+        if (_isDisposed || _isLifecyclePaused) return;
         _detectedPose = null;
         _feedback = widget.exercise.processNoPoseFrame();
         _processVoiceFrame(hasPose: false);
       }
 
-      if (!_isDisposed && mounted) {
+      if (!_isDisposed && !_isLifecyclePaused && mounted) {
         setState(() {});
       }
     } catch (_) {
-      if (_isDisposed || !mounted) return;
+      if (_setTeardownOwnsPipeline || _isLifecyclePaused || !mounted) return;
       setState(() {
         _isCameraReady = false;
         _cameraErrorMessage = 'Khong the nhan du lieu pose. Hay thu lai.';
@@ -1133,7 +1452,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   void _handlePose(Pose pose) {
-    if (_isDisposed) {
+    if (_isDisposed || _isLifecyclePaused) {
       return;
     }
 
@@ -1182,6 +1501,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     if (_isDisposed ||
         _isCompletingSet ||
         _personDetectionInFlight ||
+        _isLifecyclePaused ||
         widget.exercise.exerciseState == ExerciseState.completed) {
       return;
     }
@@ -1206,7 +1526,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   void _processVoiceFrame({required bool hasPose}) {
-    if (_isDisposed) {
+    if (_isDisposed || _isLifecyclePaused) {
       return;
     }
 
@@ -1323,11 +1643,11 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     if (!permissionGranted) {
       inner = _buildCameraFallback(
         icon: Icons.camera_alt_outlined,
-        title: 'Cần quyền camera',
+        title: 'Cần quyền truy cập camera',
         subtitle: _cameraErrorMessage ??
-            'Hãy cấp quyền camera để AI theo dõi bài tập của bạn.',
+            'Cấp quyền camera để AI có thể theo dõi form.',
         actionLabel: _permissionStatus?.isPermanentlyDenied == true
-            ? 'Mở cài đặt'
+            ? 'Mở Cài đặt'
             : 'Cấp quyền',
         onAction: _permissionStatus?.isPermanentlyDenied == true
             ? openAppSettings
@@ -1348,12 +1668,12 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
               ? Icons.videocam_outlined
               : Icons.videocam_off_outlined,
           title: _cameraErrorMessage == null
-              ? 'Đang chuẩn bị camera'
+              ? 'Đang khởi động camera'
               : 'Camera chưa sẵn sàng',
           subtitle: _cameraErrorMessage ??
               (_isInitializing || waitingForFallback
-                  ? 'AI đang kết nối camera và chuẩn bị theo dõi form của bạn.'
-                  : 'Đang chờ camera sẵn sàng...'),
+                  ? 'AI đang kết nối camera để theo dõi form của bạn.'
+                  : 'Đang chờ camera khởi động…'),
           actionLabel: _cameraErrorMessage == null ? null : 'Thử lại',
           onAction: _cameraErrorMessage == null ? null : _initCamera,
         );
@@ -1369,12 +1689,27 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     // native camera buffer is rotated server-side to match the same sensor
     // reading (see PoseLandmarkerService.applyOrientation), so the image
     // inside the rotated UI is already upright for the user's view.
+    final Widget content;
     if (!ExerciseBase.kLandscapeRotationEnabled) {
-      return inner;
+      content = inner;
+    } else {
+      content = RotatedBox(
+        quarterTurns: _currentOrientation.uiQuarterTurns,
+        child: inner,
+      );
     }
-    return RotatedBox(
-      quarterTurns: _currentOrientation.uiQuarterTurns,
-      child: inner,
+
+    // Guard accidental Android back / back-gesture while a set is in progress.
+    // PopScope blocks only the route-level pop (system / predictive back); the
+    // confirm path exits imperatively via widget.onBack. It lives only in the
+    // active phase, so the intro and summary screens keep their instant back.
+    return PopScope(
+      canPop: !_isSetInProgress,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        unawaited(_confirmExitDuringActiveSet());
+      },
+      child: content,
     );
   }
 
@@ -1449,114 +1784,104 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   Widget _buildActiveLayout(BuildContext context) {
     final media = MediaQuery.of(context);
     final overlayState = _overlayState;
-    final bottomHoldCue = _bottomHoldCue;
+    final bottomHoldCue = _displayedHoldCue;
+    final holdRestRemaining = _holdRestRemaining;
     final guidanceCopy = _currentGuidanceCopy;
-    final orientationGuidanceActive =
-        _orientationPauseActive && guidanceCopy != null;
-    final coachMessage = _coachMessage;
     final activeState =
         widget.exercise.exerciseState == ExerciseState.activated &&
             !widget.exercise.isPaused;
-    final trackedMetrics = widget.exercise.trackedDebugMetrics;
-    final debugMode = trackedMetrics.isEmpty
-        ? DebugMode.off
-        : _resolveDebugMode(_settingsDebugMode);
+    final debugMode = _resolveDebugMode(_settingsDebugMode);
     final debugEnabled = debugMode != DebugMode.off;
-    final showDebugEntryBadge =
-        trackedMetrics.isNotEmpty && (debugEnabled || _isStaffUser);
+    widget.exercise.debugMode = debugMode;
+    final showDebugEntryBadge = debugEnabled || _isStaffUser;
     final showDebugPanel = debugEnabled && _debugPanelOpen;
+    // Only true while the panel is actually up AND expanded; keeps the scrims
+    // from vanishing if the panel is closed while _debugFullscreen lingers.
+    final debugFullscreen = showDebugPanel && _debugFullscreen;
     final previewFit = _previewFit;
+    // Landscape re-seats the heroes: the viewport is short, so stacking
+    // center cue + signage + bottom rep hero collides. The rep hero moves to
+    // the right edge (vertically centered), chevrons flip to the left, and
+    // the guidance signage lays out horizontally. Center stays owned by the
+    // hold cue / hold ring.
+    final isLandscape = ExerciseBase.kLandscapeRotationEnabled &&
+        _sessionOrientation.isLandscape;
 
-    // Derive ivory phase verb from squat state machine phases.
-    // Standing = default resting position (not a "ready" state).
-    final phaseKey = widget.exercise.currentPhaseKey;
-    final isHoldPhase = bottomHoldCue != null;
-    String phaseVerb;
-    String phaseHint;
-    switch (phaseKey) {
-      case 'descending':
-        phaseVerb = 'XUỐNG';
-        phaseHint = 'Hạ chậm, kiểm soát';
-      case 'bottom':
-        phaseVerb = 'GIỮ';
-        phaseHint = 'Giữ đáy, ổn định';
-      case 'ascending':
-        phaseVerb = 'LÊN';
-        phaseHint = 'Đẩy sàn xuống';
-      default: // 'standing' or any other
-        phaseVerb = 'XUỐNG';
-        phaseHint = 'Bắt đầu hạ người';
-    }
+    // The persistent phase verb (XUỐNG/LÊN) and phase hint are gone in v9:
+    // they duplicated the user's own proprioception and were illegible from
+    // 2.5 m anyway. Direction is now the quiet chevron stream's job; the
+    // bottom zone belongs to the rep hero alone. The full-sentence coach
+    // caption is gone too — text coaching isn't readable mid-exercise; the
+    // voice channel and other mediums carry those cues.
 
-    // TODO(caption): Wire mid-rep fault detection caption here
-    final showCaption = activeState &&
-        coachMessage.isNotEmpty &&
-        !showDebugPanel &&
-        guidanceCopy == null;
-
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // ── Layer 1: Camera preview ──
-          _orientCameraScene(
-            RepaintBoundary(
-              child: ColoredBox(
-                color: Colors.black,
-                child: ClipRect(
-                  child: SizedBox.expand(
-                    child: FittedBox(
-                      fit: previewFit,
-                      alignment: Alignment.center,
-                      child: SizedBox(
-                        width: _previewRenderSize.width,
-                        height: _previewRenderSize.height,
-                        child: _buildPreviewSurface(),
-                      ),
+    // ── Page 1: the live camera stage ──
+    // Everything that belongs to the camera view lives in this stack. The
+    // full-screen overlays (pause, orientation gate, debug) live OUTSIDE the
+    // PageView so they cover both pages.
+    final cameraStage = Stack(
+      fit: StackFit.expand,
+      children: [
+        // ── Layer 1: Camera preview ──
+        _orientCameraScene(
+          RepaintBoundary(
+            child: ColoredBox(
+              color: Colors.black,
+              child: ClipRect(
+                child: SizedBox.expand(
+                  child: FittedBox(
+                    fit: previewFit,
+                    alignment: Alignment.center,
+                    child: SizedBox(
+                      width: _previewRenderSize.width,
+                      height: _previewRenderSize.height,
+                      child: _buildPreviewSurface(),
                     ),
                   ),
                 ),
               ),
             ),
           ),
+        ),
 
-          // ── Layer 2: Skeleton overlay (unchanged — jade colors preserved) ──
-          Positioned.fill(
-            child: _orientCameraScene(
-              IgnorePointer(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    if (_detectedPose == null || _imageSize == Size.zero) {
-                      return const SizedBox.shrink();
-                    }
-                    return CustomPaint(
-                      size: constraints.biggest,
-                      painter: PoseOverlayPainter(
-                          pose: _detectedPose!,
-                          imageSize: _imageSize,
-                          rotation: _imageRotation,
-                          lensDirection: _currentLens,
-                          fit: previewFit,
-                          // Native texture preview and native pose landmarks
-                          // are produced from the same oriented frame. The old
-                          // Flutter camera fallback still needs front-camera
-                          // mirroring to match CameraPreview.
-                          mirrorHorizontally:
-                              _runtime == _PoseRuntime.mlKitFallback &&
-                                  _currentLens == CameraLensDirection.front,
-                          debugData: widget.exercise.debugData,
-                          style: SkeletonStyle.vikaCream),
-                    );
-                  },
-                ),
+        // ── Layer 2: Skeleton overlay (unchanged — jade colors preserved) ──
+        Positioned.fill(
+          child: _orientCameraScene(
+            IgnorePointer(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  if (_detectedPose == null || _imageSize == Size.zero) {
+                    return const SizedBox.shrink();
+                  }
+                  return CustomPaint(
+                    size: constraints.biggest,
+                    painter: PoseOverlayPainter(
+                        pose: _detectedPose!,
+                        imageSize: _imageSize,
+                        rotation: _imageRotation,
+                        lensDirection: _currentLens,
+                        fit: previewFit,
+                        // Native texture preview and native pose landmarks
+                        // are produced from the same oriented frame. The old
+                        // Flutter camera fallback still needs front-camera
+                        // mirroring to match CameraPreview.
+                        mirrorHorizontally:
+                            _runtime == _PoseRuntime.mlKitFallback &&
+                                _currentLens == CameraLensDirection.front,
+                        debugData: widget.exercise.debugData,
+                        debugLabelsEnabled: debugEnabled,
+                        style: SkeletonStyle.vikaCream),
+                  );
+                },
               ),
             ),
           ),
+        ),
 
-          // ── Layer 3: Top scrim — anchors the status bar + top chrome
-          // row against the camera scene. Fades to transparent by ~140 px
-          // so the live body area stays bright.
+        // ── Layer 3: Top scrim — anchors the status bar + top chrome
+        // row against the camera scene. Fades to transparent by ~140 px
+        // so the live body area stays bright. Hidden under the fullscreen
+        // debug glass so it doesn't tint the see-through dump.
+        if (!debugFullscreen)
           const Positioned(
             top: 0,
             left: 0,
@@ -1578,9 +1903,11 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
             ),
           ),
 
-          // ── Layer 4: Bottom scrim — anchors the phase verb + rep
-          // counter. Stronger alpha than the top scrim because the bottom
-          // carries more glass-on-bright-scene text and a wider safe-area.
+        // ── Layer 4: Bottom scrim — anchors the phase verb + rep
+        // counter. Stronger alpha than the top scrim because the bottom
+        // carries more glass-on-bright-scene text and a wider safe-area.
+        // Hidden under the fullscreen debug glass, same as the top scrim.
+        if (!debugFullscreen)
           const Positioned(
             bottom: 0,
             left: 0,
@@ -1602,21 +1929,332 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
             ),
           ),
 
-          // ── Layer 4.5: Ambient reward (Hearthlight) ──
-          // Additive warm-light feedback for clean reps. Sits above the camera
-          // + scrims but below the chrome, and is bottom/edge anchored +
-          // transparent through the center, so the live body and the jade
-          // skeleton stay fully visible. Always mounted (even when paused) so
-          // the accumulated hearth pool persists across the whole set.
+        // (v9 follow-along) The Hearthlight reward glow moved OUT to the
+        // outer stack so the correct-rep glow rises on the trainer video
+        // page too — same accumulated pool, shared instance.
+
+        // (v9) The 80×108 PT reference thumbnail is gone — the demo's home
+        // is now the full-screen second page of the PageView, so no video
+        // decoder runs behind the camera view.
+
+        // (v9) The full-sentence coach caption is gone — form-correction
+        // text isn't readable mid-set; voice and other mediums carry it.
+
+        // (v9 follow-along) The guidance mode-scrim + full-screen signage
+        // moved OUT to the outer stack (above the PageView) so the trainer
+        // video page gets the exact same distance-legible takeover as the
+        // camera view — one shared instance, no small-text variant.
+
+        // (v9 follow-along) The center overlay (ready/activation countdown),
+        // phase chevrons, hold/rest rings, hybrid hold cue, rep hero and top
+        // chrome all moved OUT of the camera stage to the outer stack — they
+        // now sit above the PageView so both pages (camera + trainer video)
+        // share one instance and everything stays fixed mid-swipe.
+      ],
+    );
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // ── Swipeable stage: camera view ↔ full-screen demo ──
+          // The swipe changes what is DISPLAYED, never the session state —
+          // detection, rep counting, timers and voice keep running on either
+          // page. Swiping is locked while paused or with the debug panel
+          // open so the drag never fights those surfaces' own gestures.
+          PageView(
+            controller: _pageController,
+            // Keeps both pages alive so swiping back never rebuilds the
+            // camera stage from scratch; the demo's video decoder is still
+            // gated off by videoActive while the camera page is showing.
+            allowImplicitScrolling: true,
+            physics: (widget.exercise.isPaused || showDebugPanel)
+                ? const NeverScrollableScrollPhysics()
+                : null,
+            onPageChanged: (index) {
+              setState(() => _demoPageIndex = index);
+            },
+            children: [
+              cameraStage,
+              ExerciseDemoPage(
+                videoAsset: widget.definition.videoAsset,
+                exerciseName: widget.exercise.exerciseName,
+                isTimeBased: widget.isTimeBased,
+                isLandscape: isLandscape,
+                videoActive: _demoPageIndex == 1,
+              ),
+            ],
+          ),
+
+          // ── Ambient reward (Hearthlight) — shared by both pages ──
+          // Additive warm-light feedback for clean reps. Bottom/edge anchored
+          // + transparent through the center, so it never hides the camera
+          // body or the trainer video; the correct-rep glow now rises on the
+          // follow-along page too. Sits lowest (just above the PageView) so
+          // the guidance scrim, metrics and chrome all draw over it. Always
+          // mounted (even when paused) so the accumulated hearth pool persists
+          // across the whole set.
           Positioned.fill(
             child: RepRewardLayer(
               cleanReps: _cleanRepCount,
               totalReps: widget.totalReps,
               pulseId: _rewardPulseId,
+              // Holds get a continuous hearth: the pool rises with every
+              // accrued correct second instead of per-rep steps.
+              holdProgress: widget.isTimeBased ? _holdPoolProgress : null,
             ),
           ),
 
-          // ── Layer 4: Top chrome left (back + HIỆP pill) ──
+          // ── Guidance mode-scrim — shared by both pages ──
+          // At 2.5m only gross screen change registers, so guidance dims the
+          // whole stage: heavy at the edges, light through the center. On the
+          // camera page the user still sees their own mirror (which is HOW
+          // they comply); on the trainer video page it dims the demo so the
+          // instruction pops. Always mounted; a single 300ms fade (no
+          // flashing). Sits above the PageView but below the metric heroes
+          // and chrome, exactly as it did inside the camera stage. Hidden
+          // under the fullscreen debug glass so the dump reads over the raw
+          // feed + skeleton, not a dimmed one.
+          if (!debugFullscreen)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: AnimatedOpacity(
+                  opacity: (guidanceCopy != null && !widget.exercise.isPaused)
+                      ? 1.0
+                      : 0.0,
+                  duration: const Duration(milliseconds: 300),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        center: Alignment.center,
+                        radius: 1.1,
+                        colors: [
+                          VikaIvory.heroBg.withValues(alpha: 0.34),
+                          VikaIvory.heroBg.withValues(alpha: 0.86),
+                        ],
+                        stops: const [0.35, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+          // ── Setup/safety guidance — the same signage on both pages ──
+          // Glyph-first, animated directionally, dead-center of the screen —
+          // large enough to read from 2.5m. The mode-scrim dims everything
+          // behind it, so the sign owns the middle; identical on the camera
+          // and video pages so swiping never changes what it looks like.
+          if (guidanceCopy != null && !widget.exercise.isPaused)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Center(
+                  child: GuidanceSignage(
+                    icon: guidanceCopy.icon,
+                    kind: guidanceCopy.kind,
+                    title: guidanceCopy.title,
+                    body: guidanceCopy.body,
+                    mode: guidanceCopy.mode,
+                    landscape: isLandscape,
+                  ),
+                ),
+              ),
+            ),
+
+          // ── Center overlay — ready/activation countdown, scan, position ──
+          // The count-in before a set, the "đang tìm người" scan pulse and
+          // the hold-still-to-activate progress ring. Shared so the trainer
+          // video page shows the exact same ready state as the camera view.
+          IgnorePointer(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 260),
+              child: overlayState == _LiveOverlayState.active ||
+                      guidanceCopy != null
+                  ? const SizedBox.shrink()
+                  : Center(
+                      child: _CenterOverlay(
+                        state: overlayState,
+                        pulseController: _pulseController,
+                        progress: widget.exercise.activationProgress,
+                        holdCue: bottomHoldCue,
+                      ),
+                    ),
+            ),
+          ),
+
+          // ── Phase direction chevrons (rep-based, ambient) ──
+          // Beside the body area, never over it. Down while descending, up
+          // while ascending, hidden otherwise. Deliberately quiet. In
+          // landscape the right edge belongs to the rep hero, so the stream
+          // moves to the left. Shared so the tempo cue tracks on both pages.
+          if (!widget.isTimeBased &&
+              activeState &&
+              guidanceCopy == null &&
+              !showDebugPanel &&
+              _phaseChevronFlow != null)
+            Positioned(
+              left: isLandscape ? 18 : null,
+              right: isLandscape ? null : 14,
+              top: 0,
+              bottom: 0,
+              child: IgnorePointer(
+                child: Center(
+                  child: PhaseChevronStream(flow: _phaseChevronFlow!),
+                ),
+              ),
+            ),
+
+          // ── Lifted metric layer — shared by both pages ──
+          // The rings, hold cue and rep hero sit above the PageView so the
+          // camera view AND the trainer video page show the same single
+          // instance: one animation controller each, and the numbers stay
+          // fixed in place while the pages slide underneath during a swipe.
+
+          // ── Hold hero ring / rest ring (category 1) ──
+          // One center slot, two opposite states that crossfade: WORK fills
+          // yellow and counts up (HoldHeroRing); an in-set BREAK (e.g.
+          // plank's McGill 5s between holds) drains amber and counts down
+          // (RestCountdownRing). Anything counting down gets a ring.
+          if (widget.isTimeBased && activeState && guidanceCopy == null)
+            Center(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 320),
+                transitionBuilder: (child, animation) {
+                  return FadeTransition(
+                    opacity: animation,
+                    child: ScaleTransition(
+                      scale: Tween<double>(begin: 0.92, end: 1).animate(
+                        CurvedAnimation(
+                            parent: animation, curve: Curves.easeOut),
+                      ),
+                      child: child,
+                    ),
+                  );
+                },
+                child: holdRestRemaining != null
+                    ? RestCountdownRing(
+                        key: const ValueKey<String>('hold-rest-ring'),
+                        remainingSeconds: holdRestRemaining,
+                        totalSeconds: _restRingTotalSeconds,
+                      )
+                    : HoldHeroRing(
+                        key: const ValueKey<String>('hold-hero-ring'),
+                        seconds: _liveHoldRingSeconds,
+                        targetSeconds: widget.exercise.liveHoldTargetSeconds ??
+                            widget.totalReps.toDouble(),
+                      ),
+              ),
+            ),
+
+          // ── Hybrid bottom-hold cue (category 2b) ──
+          // A draining countdown ring, structurally opposite to the
+          // category-1 ring on every axis (drains vs fills, cream vs yellow,
+          // 150pt vs 230pt, seconds vs whole set). "LÊN!" is deliberately
+          // the loudest visual beat — hesitating loaded at the bottom is a
+          // safety problem. Squat holds are only 0.35s, so the widget
+          // guarantees each beat a legible minimum life; the entrance here
+          // is fast for the same reason.
+          if (!widget.isTimeBased && !showDebugPanel)
+            IgnorePointer(
+              child: Center(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 110),
+                  transitionBuilder: (child, animation) {
+                    return FadeTransition(
+                      opacity: animation,
+                      child: ScaleTransition(scale: animation, child: child),
+                    );
+                  },
+                  child: (activeState &&
+                          bottomHoldCue != null &&
+                          guidanceCopy == null)
+                      ? HybridHoldCue(
+                          // Stable key: hold → release must update the same
+                          // widget so the release pop animates, not
+                          // crossfade.
+                          key: const ValueKey<String>('hybrid-hold-cue'),
+                          remainingSeconds: bottomHoldCue.remaining,
+                          readyToPush: bottomHoldCue.readyToPush,
+                          progress: bottomHoldCue.progress,
+                          showCountdown: bottomHoldCue.showCountdown,
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ),
+            ),
+
+          // ── Rep hero (category 2) ──
+          // The one number a rep-based user glances for. Bottom-center in
+          // portrait; in landscape the short viewport puts bottom-center
+          // under the hold cue and signage, so the hero owns the right edge
+          // instead. No fault marking — feedback during the set is additive
+          // only; the form verdict is computed after the set, never during.
+          if (!widget.isTimeBased && activeState && !showDebugPanel)
+            if (isLandscape)
+              Positioned(
+                right: 40,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: IvoryRepHero(
+                    repCount: widget.exercise.repCount,
+                    totalReps: widget.totalReps,
+                  ),
+                ),
+              )
+            else
+              Positioned(
+                left: 24,
+                right: 24,
+                bottom: media.padding.bottom + 28,
+                child: Center(
+                  child: IvoryRepHero(
+                    repCount: widget.exercise.repCount,
+                    totalReps: widget.totalReps,
+                  ),
+                ),
+              ),
+
+          // ── Page arrows — left/right center edges ──
+          if (!widget.exercise.isPaused && !showDebugPanel) ...[
+            if (_demoPageIndex == 0)
+              Positioned(
+                right: 12,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: GestureDetector(
+                    onTap: () => _pageController.animateToPage(1,
+                        duration: const Duration(milliseconds: 280),
+                        curve: Curves.easeInOut),
+                    child: _PageArrowButton(
+                        icon: Icons.keyboard_double_arrow_right_rounded),
+                  ),
+                ),
+              ),
+            if (_demoPageIndex == 1)
+              Positioned(
+                left: 12,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: GestureDetector(
+                    onTap: () => _pageController.animateToPage(0,
+                        duration: const Duration(milliseconds: 280),
+                        curve: Curves.easeInOut),
+                    child: _PageArrowButton(
+                        icon: Icons.keyboard_double_arrow_left_rounded),
+                  ),
+                ),
+              ),
+          ],
+
+          // ── Top chrome: lifted above the PageView so both pages carry
+          // the set pill, timer, back and pause. Sits above the guidance
+          // scrim (inside cameraStage) exactly as before. The flip-camera
+          // button only exists on the camera page — flipping while watching
+          // the trainer video changes nothing visible.
           Positioned(
             top: media.padding.top + 10,
             left: 16,
@@ -1627,11 +2265,6 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
               onBack: _handleBackChromeTap,
             ),
           ),
-
-          // ── Layer 5: Top chrome right (flip + pause) ──
-          // No live form score lives here — real-time feedback on this screen
-          // is encouragement and safety only, never a verdict the user performs
-          // under. The form verdict is computed after the set.
           Positioned(
             top: media.padding.top + 10,
             right: 16,
@@ -1641,7 +2274,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                 widget.exercise.manualPause();
                 setState(() {});
               },
-              onFlipCamera: _toggleCamera,
+              onFlipCamera: _demoPageIndex == 0 ? _toggleCamera : null,
               debugBadge: showDebugEntryBadge
                   ? DebugIndicatorBadge(
                       mode: debugEnabled ? debugMode : DebugMode.dev,
@@ -1660,78 +2293,6 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
             ),
           ),
 
-          // ── Layer 7: PT reference loop (top-left, just below chrome row) ──
-          // JSX places it at top:116 (16px below chrome bottom). chrome bottom
-          // = media.padding.top + 10 + 36 = +46, so PT loop sits at +56.
-          if (activeState &&
-              !(debugEnabled && _debugPanelOpen) &&
-              guidanceCopy == null)
-            Positioned(
-              top: media.padding.top + 56,
-              left: 16,
-              child: const IvoryPTReferenceLoop(),
-            ),
-
-          // ── Layer 8: Coach caption (center lower-third) ──
-          if (showCaption)
-            Positioned(
-              left: 24,
-              right: 24,
-              bottom: media.padding.bottom + 156,
-              child: IvoryCoachCaption(message: coachMessage),
-            ),
-
-          // ── Layer 9: Setup/safety guidance panel ──
-          if (guidanceCopy != null && !widget.exercise.isPaused)
-            Positioned(
-              left: 20,
-              right: 20,
-              top: media.padding.top + 78,
-              child: IgnorePointer(
-                child: _SetupGuidancePanel(
-                  copy: guidanceCopy,
-                ),
-              ),
-            ),
-
-          // ── Layer 10: Center overlay (scan/warn/position/hold) ──
-          IgnorePointer(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 260),
-              child: overlayState == _LiveOverlayState.active ||
-                      guidanceCopy != null
-                  ? const SizedBox.shrink()
-                  : Center(
-                      child: _CenterOverlay(
-                        state: overlayState,
-                        pulseController: _pulseController,
-                        progress: widget.exercise.activationProgress,
-                        holdCue: bottomHoldCue,
-                      ),
-                    ),
-            ),
-          ),
-
-          // ── Layer 12: Bottom chrome (phase verb + rep counter) ──
-          if (activeState && !showDebugPanel)
-            Positioned(
-              left: 24,
-              right: 24,
-              bottom: media.padding.bottom + 36,
-              child: IvoryBottomChrome(
-                phaseVerb: phaseVerb,
-                phaseHint: phaseHint,
-                repCount: widget.exercise.repCount,
-                totalReps: widget.totalReps,
-                isHoldPhase: isHoldPhase,
-                holdProgress: bottomHoldCue?.progress,
-                holdRemaining: bottomHoldCue?.remaining,
-                // No fault marking on the live rep tally — feedback during the
-                // set is additive only. The dots fill warm as reps land; the
-                // form verdict is computed after the set, never during.
-              ),
-            ),
-
           // ── Layer 13: Pause overlay ──
           if (widget.exercise.isPaused)
             Positioned.fill(
@@ -1748,16 +2309,6 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                   setState(() {});
                 },
                 onEnd: widget.onBack,
-              ),
-            ),
-
-          if (orientationGuidanceActive)
-            Positioned(
-              left: 20,
-              right: 20,
-              top: media.padding.top + 78,
-              child: IgnorePointer(
-                child: _SetupGuidancePanel(copy: guidanceCopy),
               ),
             ),
 
@@ -1794,33 +2345,26 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
           // ── Layer 15: Debug panel ──
           if (showDebugPanel)
-            Positioned(
-              left: 12,
-              right: 12,
-              bottom: media.padding.bottom + 16,
+            Positioned.fill(
               child: DebugPanel(
                 mode: debugMode,
-                metrics: trackedMetrics,
-                expandedMetricId: _expandedMetricId,
-                onToggleExpand: (metricId) {
-                  setState(() {
-                    _expandedMetricId =
-                        _expandedMetricId == metricId ? null : metricId;
-                  });
-                },
-                phaseLabel: debugMode == DebugMode.dev
-                    ? widget.exercise.currentPhaseKey
-                    : widget.exercise.currentPhaseLabel,
+                debugData: widget.exercise.debugData,
+                phaseLabel: widget.exercise.currentPhaseKey,
                 repCount: widget.exercise.repCount,
                 totalReps: widget.totalReps,
                 setSeconds: _setElapsedSeconds,
                 fps: widget.exercise.currentFps,
-                frameTimestampMs: widget.exercise.frameTimestampMs,
-                confidence: widget.exercise.personPresenceScore,
                 footerLabel:
                     '${widget.exercise.exerciseName} · ${AppMetadata.displayVersion}',
+                fullscreen: _debugFullscreen,
+                onToggleFullscreen: () {
+                  setState(() => _debugFullscreen = !_debugFullscreen);
+                },
                 onMinimize: () {
-                  setState(() => _debugPanelOpen = false);
+                  setState(() {
+                    _debugPanelOpen = false;
+                    _debugFullscreen = false;
+                  });
                 },
               ),
             ),
@@ -1872,23 +2416,25 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     final normalized = message.toLowerCase();
     final rawNormalized = rawMessage.toLowerCase();
 
-    if (normalized.contains('giữ yên')) {
+    if (normalized.contains('đứng yên')) {
       return null;
     }
 
     if (rawNormalized.contains('wrong_orientation_landscape')) {
       return const _GuidanceCopy(
         icon: Icons.screen_rotation_alt_rounded,
-        title: 'Quay điện thoại nằm ngang',
-        body: 'Bài tập này cần điện thoại nằm ngang để AI thấy rõ toàn thân.',
+        kind: GuidanceGlyphKind.rotate,
+        title: 'Xoay ngang máy',
+        body: 'Bài này cần điẹn thoại nằm ngang để AI thấy rõ toàn thân bạn.',
         mode: SystemBannerMode.warn,
       );
     }
     if (rawNormalized.contains('wrong_orientation_portrait')) {
       return const _GuidanceCopy(
         icon: Icons.screen_rotation_alt_rounded,
-        title: 'Quay điện thoại đứng',
-        body: 'Bài tập này cần điện thoại đứng dọc.',
+        kind: GuidanceGlyphKind.rotate,
+        title: 'Xoay dọc máy',
+        body: 'Bài này cần màn hình dọc.',
         mode: SystemBannerMode.warn,
       );
     }
@@ -1897,18 +2443,20 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         normalized.contains('quay nghiêng') ||
         normalized.contains('quay sang bên')) {
       return const _GuidanceCopy(
-        icon: Icons.screen_rotation_alt_rounded,
-        title: 'Quay ngang người',
+        icon: Icons.accessibility_new_rounded,
+        kind: GuidanceGlyphKind.turnSide,
+        title: 'Đứng nghiêng người',
         body:
-            'Đứng ngang với camera để AI thấy vai, hông, gối và cổ chân rõ hơn.',
+            'Đứng nghiêng người với camera để AI thấy rõ vai, hông, gối và mắt cá.',
         mode: SystemBannerMode.warn,
       );
     }
     if (normalized.contains('quay mặt')) {
       return const _GuidanceCopy(
         icon: Icons.center_focus_strong_rounded,
-        title: 'Quay mặt về camera',
-        body: 'Đứng đối diện camera để AI thấy hai bên cơ thể rõ hơn.',
+        kind: GuidanceGlyphKind.faceCamera,
+        title: 'Hướng về camera',
+        body: 'Đứng đối diện camera để AI thấy cả hai bên người rõ hơn.',
         mode: SystemBannerMode.warn,
       );
     }
@@ -1918,17 +2466,19 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         normalized.contains('hình ảnh không rõ')) {
       return const _GuidanceCopy(
         icon: Icons.light_mode_rounded,
-        title: 'Tăng ánh sáng',
+        kind: GuidanceGlyphKind.light,
+        title: 'Thêm ánh sáng',
         body:
-            'Đứng nơi sáng hơn hoặc tránh ngược sáng để AI nhận landmark ổn định.',
+            'Đứng chỗ sáng hơn hoặc tránh ngược sáng để AI nhận diện ổn định hơn.',
         mode: SystemBannerMode.warn,
       );
     }
     if (normalized.contains('đang tìm người')) {
       return const _GuidanceCopy(
         icon: Icons.person_search_rounded,
+        kind: GuidanceGlyphKind.search,
         title: 'Đang tìm người',
-        body: 'Đứng trong khung hình để bắt đầu theo dõi.',
+        body: 'Đứng trong khung hình để bắt đầu.',
         mode: SystemBannerMode.scan,
       );
     }
@@ -1936,26 +2486,28 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         normalized.contains('quay lại khung hình')) {
       return const _GuidanceCopy(
         icon: Icons.pause_circle_filled_rounded,
+        kind: GuidanceGlyphKind.still,
         title: 'Tạm dừng',
-        body: 'Quay lại khung hình để AI tiếp tục theo dõi.',
+        body: 'Đứng trong khung hình để tiếp tục.',
         mode: SystemBannerMode.pause,
       );
     }
     if (normalized.contains('phần trên cơ thể')) {
       return const _GuidanceCopy(
-        icon: Icons.fit_screen_rounded,
-        title: 'Đưa thân trên vào khung',
-        body: 'Lùi lại một chút để thấy rõ vai, khuỷu tay, cổ tay và hông.',
+        icon: Icons.accessibility_new_rounded,
+        kind: GuidanceGlyphKind.stepBack,
+        title: 'Lùi lại chút',
+        body: 'Lùi lại một chút để thấy rõ vai, khuỷu tay và hông.',
         mode: SystemBannerMode.warn,
       );
     }
     if (rawNormalized.contains('body not fully visible') ||
         normalized.contains('toàn thân')) {
       return const _GuidanceCopy(
-        icon: Icons.fit_screen_rounded,
-        title: 'Đưa toàn thân vào khung',
-        body:
-            'Lùi lại một chút hoặc hạ máy để thấy vai, hông, gối, cổ chân và bàn chân.',
+        icon: Icons.accessibility_new_rounded,
+        kind: GuidanceGlyphKind.stepBack,
+        title: 'Lùi lại',
+        body: 'Lùi lại hoặc hạ điện thoại để thấy từ vai đến bàn chân.',
         mode: SystemBannerMode.warn,
       );
     }
@@ -1964,8 +2516,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         normalized.contains('vai, hông và gối')) {
       return const _GuidanceCopy(
         icon: Icons.fit_screen_rounded,
-        title: 'Đưa cơ thể vào khung',
-        body: 'Lùi lại hoặc chỉnh góc máy để các mốc cần theo dõi hiện rõ.',
+        kind: GuidanceGlyphKind.stepBack,
+        title: 'Chỉnh khung hình',
+        body: 'Lùi lại hoặc chỉnh góc điện thoại để AI nhìn rõ hơn.',
         mode: SystemBannerMode.warn,
       );
     }
@@ -1974,7 +2527,8 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         normalized.contains('bắt đầu')) {
       return _GuidanceCopy(
         icon: Icons.accessibility_new_rounded,
-        title: 'Vào tư thế bắt đầu',
+        kind: GuidanceGlyphKind.faceCamera,
+        title: 'Vào vị trí',
         body: message,
         mode: SystemBannerMode.info,
       );
@@ -1985,18 +2539,78 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
   String _translateSystemMessage(String raw) {
     if (raw.contains('Please turn to the side')) {
-      return 'Quay ngang người để AI theo dõi tốt hơn';
+      return 'Quay ngang người với camera để AI theo dõi tốt hơn';
     }
     if (raw.contains('Body not fully visible')) {
-      return 'Giữ toàn thân trong khung hình';
+      return 'Lùi lại, giữ toàn thân vào khung';
     }
     if (raw.contains('Adjust lighting/position')) {
-      return 'Điều chỉnh ánh sáng hoặc vị trí để AI nhận rõ hơn';
+      return 'Di chuyển ra chỗ sáng hơn để AI nhận diện tốt hơn';
     }
     if (raw.contains('⏸') || raw.contains('⚸')) {
-      return 'Tạm dừng. Quay lại khung hình để tiếp tục';
+      return 'Tạm dừng. đứng trong  khung ảnh để tiếp tục';
     }
     return raw.replaceAll('⚠️ ', '').replaceAll('⏸ ', '').replaceAll('⚸ ', '');
+  }
+
+  /// Chevron flow for the ambient phase-direction stream — only the two
+  /// travelling phases show it; bottom/standing/holds render nothing.
+  ChevronFlow? get _phaseChevronFlow {
+    return switch (widget.exercise.currentPhaseKey) {
+      'descending' => ChevronFlow.down,
+      'ascending' => ChevronFlow.up,
+      _ => null,
+    };
+  }
+
+  /// Accrued correct seconds for the hold hero ring. Holds the last known
+  /// value when the exercise reports null (user out of the hold pose) so the
+  /// numeral freezes in place instead of resetting.
+  double get _liveHoldRingSeconds {
+    final live = widget.exercise.liveHoldSeconds;
+    if (live != null) {
+      _lastKnownHoldSeconds = live;
+      if (live > _holdPoolPeakSeconds) {
+        _holdPoolPeakSeconds = live;
+      }
+    }
+    return _lastKnownHoldSeconds;
+  }
+
+  /// Remaining seconds of an in-set break in a hold exercise (e.g. plank's
+  /// 'Nghỉ 4.2s' status during PlankState.resting), or null while working.
+  /// Presentation-only read of the status vocabulary; also captures the rest
+  /// length for the ring's drain fraction.
+  double? get _holdRestRemaining {
+    if (!widget.isTimeBased) return null;
+    final status = _currentPhaseStatus;
+    final remaining = (status != null && status.contains('Nghỉ'))
+        ? _extractDurationSeconds(status)
+        : null;
+    if (remaining == null) {
+      // Not resting — clear the anchor so the next rest re-measures even if
+      // it's shorter than the last one.
+      _restRingTotalSeconds = 0;
+      return null;
+    }
+    // First frame of a new rest anchors the total for the drain fraction.
+    if (remaining > _restRingTotalSeconds) {
+      _restRingTotalSeconds = remaining.ceilToDouble();
+    }
+    return remaining;
+  }
+
+  /// Monotonic hearth-pool level for time-based holds: peak accrued correct
+  /// seconds over the target. The pool only ever rises across the set.
+  double get _holdPoolProgress {
+    // Touch the ring getter so the peak keeps tracking on frames where the
+    // ring itself isn't built (e.g. debug panel open).
+    final seconds = _liveHoldRingSeconds;
+    assert(seconds >= 0);
+    final target =
+        widget.exercise.liveHoldTargetSeconds ?? widget.totalReps.toDouble();
+    if (target <= 0) return 0;
+    return (_holdPoolPeakSeconds / target).clamp(0.0, 1.0);
   }
 
   Map<String, String>? get _currentPhaseInstructions {
@@ -2010,6 +2624,28 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     if (widget.exercise.exerciseState != ExerciseState.activated) {
       return null;
     }
+
+    final liveSeconds = widget.exercise.liveHoldSeconds;
+    final targetSeconds = widget.exercise.liveHoldTargetSeconds;
+    if (liveSeconds != null && targetSeconds != null && targetSeconds > 0) {
+      return _BottomHoldCue(
+        progress: (liveSeconds / targetSeconds).clamp(0.0, 1.0),
+        remaining: (targetSeconds - liveSeconds).clamp(0.0, targetSeconds),
+        readyToPush: liveSeconds >= targetSeconds,
+        targetSeconds: targetSeconds,
+      );
+    }
+
+    // Time-based exercises expose their real timer through liveHoldSeconds.
+    // Outside the actual hold phase, do not synthesize a squat-style timer
+    // from status copy.
+    if (widget.isTimeBased) return null;
+
+    // Status-copy fallback is scoped to the bottom phase. Exercises write the
+    // release verb ('Đứng lên') as the Status of the whole ascending phase
+    // too — an anticipatory coaching line, not a hold cue. Without this gate
+    // the LÊN! beat would shadow the entire ascent.
+    if (widget.exercise.currentPhaseKey != 'bottom') return null;
 
     final status = _currentPhaseStatus;
     if (status == null || status.isEmpty) {
@@ -2036,6 +2672,31 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     );
   }
 
+  /// What the hybrid-cue layer actually renders. The raw cue dies the instant
+  /// the exercise leaves the bottom phase — for a squat that means "LÊN!"
+  /// would exist for a couple of frames. The release beat lingers ~650ms into
+  /// the ascent so the loudest visual beat lands during the explosive
+  /// concentric, then dies. Purely presentation; reads exercise state only.
+  _BottomHoldCue? get _displayedHoldCue {
+    final raw = _bottomHoldCue;
+    final now = DateTime.now();
+    if (raw != null) {
+      _lingeringReleaseCue = raw.readyToPush ? raw : null;
+      _releaseLingerUntil = null;
+      return raw;
+    }
+    final lingering = _lingeringReleaseCue;
+    if (lingering != null) {
+      _releaseLingerUntil ??= now.add(_releaseLingerDuration);
+      if (now.isBefore(_releaseLingerUntil!)) {
+        return lingering;
+      }
+      _lingeringReleaseCue = null;
+      _releaseLingerUntil = null;
+    }
+    return null;
+  }
+
   bool _isHoldStatus(String value) =>
       value.contains('Hold') || value.contains('Giữ');
 
@@ -2047,29 +2708,6 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         value.contains('đẩy lên');
   }
 
-  String get _coachMessage {
-    final phaseInstructions = _currentPhaseInstructions;
-    if (phaseInstructions != null) {
-      for (final entry in phaseInstructions.entries) {
-        if (entry.key == 'Status') {
-          continue;
-        }
-        return _translateInstruction(entry.value);
-      }
-    }
-
-    final status = _currentPhaseStatus;
-    if (status != null && status.isNotEmpty) {
-      return _translateStatus(status);
-    }
-
-    final result = _feedback['Result'];
-    if (result != null && result.isNotEmpty) {
-      return _translateResult(result);
-    }
-    return 'Giữ nhịp đều và kiểm soát toàn bộ chuyển động.';
-  }
-
   double? _readDebugNumber(dynamic value) {
     if (value is num) return value.toDouble();
     if (value is String) {
@@ -2079,175 +2717,12 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     return null;
   }
 
-  String _translateInstruction(String value) {
-    if (value.contains('Keep chest up')) {
-      return 'Mở ngực hơn ở rep tới để giữ thân trên vững.';
-    }
-    if (value.contains('Heels lifting')) {
-      return 'Ấn gót xuống sàn để squat chắc hơn.';
-    }
-    if (value.contains('Dropped too fast')) {
-      return 'Hạ chậm hơn để AI bắt trọn chuyển động.';
-    }
-    if (value.contains('pause')) {
-      return 'Giữ đáy thêm một nhịp rồi mới đứng lên.';
-    }
-    if (value == 'Going Down...') {
-      return 'Hạ người chậm và kiểm soát.';
-    }
-    if (value == 'Đứng lên') {
-      return 'Đứng lên dứt khoát.';
-    }
-    if (value == 'Push Up!') {
-      return 'Đứng lên mạnh nhưng vẫn giữ thân chắc.';
-    }
-    return value
-        .replaceAll('Going Down...', 'Hạ người chậm xuống.')
-        .replaceAll('Push Up Now!', 'Đứng lên dứt khoát.')
-        .replaceAll('Hold!', 'Giữ vững.');
-  }
-
-  String _translateResult(String value) {
-    if (value == 'Good Rep!' || value == 'Tốt lắm!') {
-      return 'Rep đẹp. Giữ nhịp này.';
-    }
-    if (value == 'Fix Form') {
-      return 'Điều chỉnh lại form ở rep tiếp theo.';
-    }
-    return value;
-  }
-
-  String _translateStatus(String value) {
-    final seconds = _extractDurationSeconds(value);
-    if (_isHoldStatus(value)) {
-      return seconds == null
-          ? 'Giữ đáy rồi đẩy lên.'
-          : 'Giữ đáy ${seconds.toStringAsFixed(1)} giây rồi đẩy lên.';
-    }
-    if (_isReleaseStatus(value)) {
-      return 'Đẩy lên ngay.';
-    }
-    if (value.contains('Push Up!')) {
-      return 'Đứng lên dứt khoát.';
-    }
-    if (value.contains('Going Down...')) {
-      return 'Hạ người xuống có kiểm soát.';
-    }
-    return _translateInstruction(value);
-  }
-
   double? _extractDurationSeconds(String value) {
     final match = RegExp(r'(\d+(?:\.\d+)?)s').firstMatch(value);
     if (match == null) {
       return null;
     }
     return double.tryParse(match.group(1)!);
-  }
-
-  // ignore: unused_element
-  Widget _buildDebugPanel() {
-    final debugEntries = widget.exercise.debugData.entries.toList()
-      ..sort((a, b) => a.key.compareTo(b.key));
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-          constraints: const BoxConstraints(maxHeight: 320),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.48),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-          ),
-          child: debugEntries.isEmpty
-              ? Text(
-                  'Đang chờ dữ liệu pose...',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white.withValues(alpha: 0.42),
-                  ),
-                )
-              : SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.terminal_rounded,
-                            size: 12,
-                            color: VFTheme.jadeGlow.withValues(alpha: 0.74),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Dữ liệu debug',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.3,
-                              color: Colors.white.withValues(alpha: 0.82),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: debugEntries.map((entry) {
-                          return _debugChip(
-                            label: entry.key,
-                            value: '${entry.value}',
-                          );
-                        }).toList(),
-                      ),
-                    ],
-                  ),
-                ),
-        ),
-      ),
-    );
-  }
-
-  // ignore: unused_element
-  Widget _debugChip({
-    required String label,
-    required String value,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
-      ),
-      child: RichText(
-        text: TextSpan(
-          style: const TextStyle(fontFamily: 'monospace'),
-          children: [
-            TextSpan(
-              text: '$label ',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: Colors.white.withValues(alpha: 0.42),
-              ),
-            ),
-            TextSpan(
-              text: value,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: Colors.white.withValues(alpha: 0.86),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   Widget _buildPreviewSurface() {
@@ -2314,13 +2789,21 @@ enum _LiveOverlayState { scan, warn, position, hold, paused, active }
 class _GuidanceCopy {
   const _GuidanceCopy({
     required this.icon,
+    required this.kind,
     required this.title,
     required this.body,
     required this.mode,
   });
 
   final IconData icon;
+
+  /// How the signage glyph animates — directional where meaningful.
+  final GuidanceGlyphKind kind;
+
+  /// At most ~3 words: the instruction itself, readable from 2.5 m mid-motion.
   final String title;
+
+  /// Near-view detail, rendered small under the title.
   final String body;
   final SystemBannerMode mode;
 }
@@ -2330,109 +2813,24 @@ class _BottomHoldCue {
     required this.progress,
     required this.remaining,
     required this.readyToPush,
+    this.targetSeconds,
   });
 
   final double progress;
   final double? remaining;
   final bool readyToPush;
-}
 
-class _SetupGuidancePanel extends StatelessWidget {
-  const _SetupGuidancePanel({
-    required this.copy,
-  });
+  /// Total hold length when the exercise exposes it. Sub-second holds (squat:
+  /// 0.35s) render as a wordless GIỮ beat — a numeric countdown would only
+  /// ever flash "1" and read as noise.
+  final double? targetSeconds;
 
-  final _GuidanceCopy copy;
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = switch (copy.mode) {
-      SystemBannerMode.warn => const Color(0xFFFFB4A8),
-      SystemBannerMode.scan => const Color(0xCCFFFFFF),
-      SystemBannerMode.pause => const Color(0xCCFFFFFF),
-      SystemBannerMode.info => VikaIvory.yellow,
-    };
-    final background = switch (copy.mode) {
-      SystemBannerMode.warn => const Color(0xD1150C09),
-      SystemBannerMode.scan => const Color(0xC914100D),
-      SystemBannerMode.pause => const Color(0xC914100D),
-      SystemBannerMode.info => const Color(0xD1150C09),
-    };
-    final border = switch (copy.mode) {
-      SystemBannerMode.warn => const Color(0x4DFFB4A8),
-      SystemBannerMode.scan => const Color(0x22FFFFFF),
-      SystemBannerMode.pause => const Color(0x22FFFFFF),
-      SystemBannerMode.info => VikaIvory.yellowGlowWeak,
-    };
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-          decoration: BoxDecoration(
-            color: background,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: border),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.34),
-                blurRadius: 28,
-                offset: const Offset(0, 12),
-              ),
-            ],
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.13),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: accent.withValues(alpha: 0.24)),
-                ),
-                child: Icon(copy.icon, size: 20, color: accent),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      copy.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontFamily: VikaIvory.fontFamily,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: VikaIvory.invInk,
-                        height: 1.15,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      copy.body,
-                      style: TextStyle(
-                        fontFamily: VikaIvory.fontFamily,
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w600,
-                        color: VikaIvory.invInkSoft,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  /// Whether a countdown numeral means anything at this hold length.
+  bool get showCountdown {
+    final t = targetSeconds;
+    if (t != null) return t >= 1.2;
+    final r = remaining;
+    return r != null && r >= 1.2;
   }
 }
 
@@ -2487,8 +2885,8 @@ class _CenterOverlay extends StatelessWidget {
           outlineColor: Color(0x1AFFFFFF),
         );
       case _LiveOverlayState.hold:
-        // Mid-rep bottom hold is owned by IvoryBottomChrome — don't render
-        // a duplicate centered ring during squat-bottom holds.
+        // Mid-rep bottom hold is owned by the HybridHoldCue layer — don't
+        // render a duplicate centered element during squat-bottom holds.
         if (holdCue != null) {
           return const SizedBox.shrink();
         }
@@ -2505,22 +2903,20 @@ class _CenterOverlay extends StatelessWidget {
             : (remainingSeconds < 1
                 ? remainingSeconds.toStringAsFixed(1)
                 : remainingSeconds.ceil().toString());
-        // Live activation gauge with a frosted-glass backing disc.
+        // Live activation gauge on a solid warm-dark backing disc.
         //
-        // Why all this layered chrome:
+        // Why this layered chrome:
         //   1. FormScoreArc — yellow progress ring that traces around
         //      the outside; readable on ANY background regardless of
         //      camera content.
         //   2. Outer breathing pulse — wider yellow halo that gently
         //      breathes (driven by the existing pulseController) to
         //      pull the eye from across the room.
-        //   3. ClipOval + BackdropFilter blur — the camera scene
-        //      behind the disc is physically blurred, so any color
-        //      under the disc is washed out before our backing
-        //      composites on top. Strongest possible contrast.
-        //   4. Warm-dark backing disc at 0.92 alpha + yellow border —
-        //      brand-consistent surface for the numeral.
-        //   5. Numeral with brand yellow glow + crisp dark text stroke
+        //   3. Warm-dark backing disc at 0.95 alpha + yellow border —
+        //      solid fill, no BackdropFilter (workstream H): at this
+        //      alpha the camera barely reads through, so blurring it
+        //      first bought nothing but GPU time.
+        //   4. Numeral with brand yellow glow + crisp dark text stroke
         //      so the edge stays sharp even where backing alpha fades.
         return AnimatedBuilder(
           animation: pulseController,
@@ -2561,88 +2957,80 @@ class _CenterOverlay extends StatelessWidget {
                     strokeWidth: 6,
                     glow: true,
                     duration: const Duration(milliseconds: 240),
-                    child: ClipOval(
-                      child: BackdropFilter(
-                        // Frosted glass — physically blurs whatever
-                        // camera content sits behind the disc.
-                        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                        child: Container(
-                          width: 124,
-                          height: 124,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: VikaIvory.heroBg.withValues(alpha: 0.92),
-                            border: Border.all(
-                              color: VikaIvory.yellow.withValues(alpha: 0.5),
-                              width: 1.5,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.5),
-                                blurRadius: 24,
-                                spreadRadius: 1,
-                              ),
-                            ],
+                    child: Container(
+                      width: 124,
+                      height: 124,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: VikaIvory.heroBg.withValues(alpha: 0.95),
+                        border: Border.all(
+                          color: VikaIvory.yellow.withValues(alpha: 0.5),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: VikaIvory.heroBg.withValues(alpha: 0.55),
+                            blurRadius: 24,
+                            spreadRadius: 1,
                           ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              // FittedBox so the numeral never overflows
-                              // on small screens or with large system
-                              // text scaling.
-                              SizedBox(
-                                height: isReadyToStart ? 28 : 56,
-                                child: FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  child: Text(
-                                    remainingLabel,
-                                    style: TextStyle(
-                                      fontFamily: VikaIvory.fontFamily,
-                                      fontSize: isReadyToStart ? 22 : 48,
-                                      fontWeight: FontWeight.w800,
-                                      color: VikaIvory.yellow,
-                                      letterSpacing:
-                                          isReadyToStart ? 0.1 : -2.2,
-                                      height: 1,
-                                      shadows: [
-                                        Shadow(
-                                          color: VikaIvory.yellowGlow,
-                                          blurRadius: 14,
-                                        ),
-                                        Shadow(
-                                          color: Colors.black
-                                              .withValues(alpha: 0.85),
-                                          blurRadius: 4,
-                                          offset: const Offset(0, 1),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                isReadyToStart ? 'Bắt đầu tập' : 'Giữ yên',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // FittedBox so the numeral never overflows
+                          // on small screens or with large system
+                          // text scaling.
+                          SizedBox(
+                            height: isReadyToStart ? 28 : 56,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                remainingLabel,
                                 style: TextStyle(
                                   fontFamily: VikaIvory.fontFamily,
-                                  fontSize: 11,
+                                  fontSize: isReadyToStart ? 22 : 48,
                                   fontWeight: FontWeight.w800,
-                                  color: VikaIvory.invInk,
-                                  letterSpacing: 1.0,
+                                  color: VikaIvory.yellow,
+                                  letterSpacing: isReadyToStart ? 0.1 : -2.2,
+                                  height: 1,
                                   shadows: [
                                     Shadow(
-                                      color:
-                                          Colors.black.withValues(alpha: 0.7),
+                                      color: VikaIvory.yellowGlow,
+                                      blurRadius: 14,
+                                    ),
+                                    Shadow(
+                                      color: VikaIvory.heroBg
+                                          .withValues(alpha: 0.85),
                                       blurRadius: 4,
+                                      offset: const Offset(0, 1),
                                     ),
                                   ],
                                 ),
                               ),
-                            ],
+                            ),
                           ),
-                        ),
+                          const SizedBox(height: 6),
+                          Text(
+                            isReadyToStart ? 'Bắt đầu' : 'Giữ yên',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: VikaIvory.fontFamily,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: VikaIvory.invInk,
+                              letterSpacing: 1.0,
+                              shadows: [
+                                Shadow(
+                                  color:
+                                      VikaIvory.heroBg.withValues(alpha: 0.7),
+                                  blurRadius: 4,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -2672,15 +3060,40 @@ class _OverlayBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Sized for the 2.5 m viewing distance — the bubble is a gross state
+    // marker, not a detail element.
     return Container(
-      width: 84,
-      height: 84,
+      width: 112,
+      height: 112,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: fillColor,
-        border: Border.all(color: outlineColor, width: 2),
+        border: Border.all(color: outlineColor, width: 2.5),
       ),
-      child: Icon(icon, size: 34, color: iconColor),
+      child: Icon(icon, size: 48, color: iconColor),
+    );
+  }
+}
+
+/// Bare double-chevron page hint — no background, just floating arrows with a
+/// soft shadow so they read on any camera frame without blocking anything.
+class _PageArrowButton extends StatelessWidget {
+  const _PageArrowButton({required this.icon});
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: 0.55,
+      child: Icon(
+        icon,
+        size: 32,
+        color: VikaIvory.invInk,
+        shadows: const [
+          Shadow(color: Color(0xFF0F0B09), blurRadius: 12),
+          Shadow(color: Color(0xFF0F0B09), blurRadius: 4),
+        ],
+      ),
     );
   }
 }

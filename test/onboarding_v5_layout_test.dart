@@ -77,7 +77,7 @@ List<Widget> _screens() {
   final data = OnboardingData()
     ..problemResonance = ['form_uncertainty']
     ..goal = 'health'
-    ..duration = '<3m'
+    ..duration = '<6m'
     ..painAreas = ['back']
     ..fork = 'yoga'
     ..level = 'beginner'
@@ -98,7 +98,7 @@ List<Widget> _screens() {
     S04PainCheck(data: data, onNext: noop, onBack: noop),
     S05Fork(data: data, onNext: noop, onBack: noop),
     S06Trust(onNext: noop, onBack: noop),
-    S07AssessmentIntro(data: data, onNext: noop, onBack: noop),
+    S07AssessmentIntro(data: data, onNext: noop, onSkip: noop, onBack: noop),
     S08Analyzing(data: data, active: false, onNext: noop, onBack: noop),
     S09Phase1(data: data, onNext: noop, onBack: noop),
     S10LevelIssue(data: data, onNext: noop, onBack: noop),

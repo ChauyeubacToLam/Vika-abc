@@ -6,7 +6,7 @@ class IssueDefinition {
   final List<String> overactive; // muscles to stretch/inhibit
   final List<String> underactive; // muscles to activate/strengthen
   final List<String> correctives; // exercise IDs for corrective program
-  final String bodyRegion; // 'ankle', 'hip', 'core', 'shoulder'
+  final String bodyRegion; // canonical pain region, or '' for no pain row
 
   const IssueDefinition({
     required this.priority,
@@ -87,12 +87,12 @@ final interpretingMap = {
   'thigh_fatigue': IssueDefinition(
     priority: 99,
     questions: ['Đùi mỏi nhanh'],
-    bodyRegion: 'leg',
+    bodyRegion: '',
   ),
   'shoulder_pain': IssueDefinition(
     priority: 99,
     questions: ['Đau vai khi đẩy'],
-    bodyRegion: 'shoulder',
+    bodyRegion: 'shoulder_neck',
   ),
   'wrist_discomfort': IssueDefinition(
     priority: 99,
@@ -102,12 +102,12 @@ final interpretingMap = {
   'shoulder_fatigue': IssueDefinition(
     priority: 99,
     questions: ['Vai mỏi nhanh'],
-    bodyRegion: 'shoulder',
+    bodyRegion: '',
   ),
   'chest_tight': IssueDefinition(
     priority: 99,
     questions: ['Cứng ngực/vai trước'],
-    bodyRegion: 'chest',
+    bodyRegion: 'shoulder_neck',
   ),
   'hip_pain': IssueDefinition(
     priority: 99,
@@ -117,22 +117,22 @@ final interpretingMap = {
   'shoulder_high': IssueDefinition(
     priority: 99,
     questions: ['Vai bị cao/căng'],
-    bodyRegion: 'shoulder',
+    bodyRegion: 'shoulder_neck',
   ),
   'leg_shake': IssueDefinition(
     priority: 99,
     questions: ['Đùi run nhiều'],
-    bodyRegion: 'leg',
+    bodyRegion: '',
   ),
   'breath': IssueDefinition(
     priority: 99,
     questions: ['Hụt hơi'],
-    bodyRegion: 'core',
+    bodyRegion: '',
   ),
   'hamstring_tight': IssueDefinition(
     priority: 99,
     questions: ['Căng gân kheo'],
-    bodyRegion: 'leg',
+    bodyRegion: 'lower_back',
   ),
   'low_back_pain': IssueDefinition(
     priority: 99,
@@ -142,6 +142,6 @@ final interpretingMap = {
   'calf_tight': IssueDefinition(
     priority: 99,
     questions: ['Cứng bắp chân'],
-    bodyRegion: 'leg',
+    bodyRegion: 'ankle',
   ),
 };

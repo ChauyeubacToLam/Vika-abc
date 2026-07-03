@@ -48,6 +48,155 @@ class PoseGlyph extends StatelessWidget {
   }
 }
 
+class ExerciseThumbnail extends StatelessWidget {
+  const ExerciseThumbnail({
+    super.key,
+    required this.glyph,
+    this.asset,
+    this.yoga = false,
+    this.size = 36,
+    this.radius = 9,
+  });
+
+  final PoseGlyphType glyph;
+  final String? asset;
+  final bool yoga;
+  final double size;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    final assetPath = asset;
+    final cacheSize = (size * MediaQuery.devicePixelRatioOf(context)).round();
+
+    return Container(
+      width: size,
+      height: size,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: assetPath == null ? (yoga ? c.powder : c.bgInverse) : c.bgRaised,
+        borderRadius: BorderRadius.circular(radius),
+      ),
+      alignment: Alignment.center,
+      child: assetPath == null
+          ? PoseGlyph(type: glyph, size: 22, dark: !yoga)
+          : Image.asset(
+              assetPath,
+              fit: BoxFit.cover,
+              alignment: Alignment.center,
+              width: size,
+              height: size,
+              cacheWidth: cacheSize,
+              cacheHeight: cacheSize,
+              filterQuality: FilterQuality.medium,
+              excludeFromSemantics: true,
+              errorBuilder: (_, __, ___) =>
+                  PoseGlyph(type: glyph, size: 22, dark: !yoga),
+            ),
+    );
+  }
+}
+
+/// A small, premium exercise thumbnail tile for session lists (Home hero +
+/// Plan ledger). Shows the real 16:9 render cropped to a rounded square; when
+/// no art resolves it falls back to a quiet tile with a dumbbell mark instead
+/// of a bare colour. Works on both the dark hero (`inverted`) and cream.
+///
+/// An optional yellow corner pip carries the camera-AI signal so the row body
+/// no longer needs an "AI" chip.
+class SessionExerciseThumb extends StatelessWidget {
+  const SessionExerciseThumb({
+    super.key,
+    required this.asset,
+    this.size = 44,
+    this.radius = 12,
+    this.inverted = false,
+    this.showAi = false,
+  });
+
+  final String? asset;
+  final double size;
+  final double radius;
+  final bool inverted;
+  final bool showAi;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VikaColors.of(context);
+    final a = asset;
+    final cache = (size * MediaQuery.devicePixelRatioOf(context)).round();
+
+    final fallbackBg = inverted ? Colors.white.withValues(alpha: 0.06) : c.powder;
+    final fallbackBorder =
+        inverted ? Colors.white.withValues(alpha: 0.14) : c.border;
+    final fallbackInk = inverted ? c.invInkSoft : c.inkFaint;
+
+    Widget fallback() => Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            color: fallbackBg,
+            borderRadius: BorderRadius.circular(radius),
+            border: Border.all(color: fallbackBorder),
+          ),
+          alignment: Alignment.center,
+          child: Icon(Icons.fitness_center_rounded,
+              size: size * 0.42, color: fallbackInk),
+        );
+
+    final tile = a == null
+        ? fallback()
+        : Container(
+            width: size,
+            height: size,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: c.bgRaised,
+              borderRadius: BorderRadius.circular(radius),
+              border: Border.all(color: fallbackBorder),
+            ),
+            child: Image.asset(
+              a,
+              fit: BoxFit.cover,
+              alignment: Alignment.center,
+              width: size,
+              height: size,
+              cacheWidth: cache,
+              cacheHeight: cache,
+              filterQuality: FilterQuality.medium,
+              excludeFromSemantics: true,
+              errorBuilder: (_, __, ___) => fallback(),
+            ),
+          );
+
+    if (!showAi) return tile;
+    // Yellow camera-AI pip, ringed so it reads on any underlying render.
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        tile,
+        Positioned(
+          top: -3,
+          right: -3,
+          child: Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(
+              color: c.yellow,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: inverted ? c.bgInverse : c.bg,
+                width: 2,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _PoseGlyphPainter extends CustomPainter {
   _PoseGlyphPainter({
     required this.type,

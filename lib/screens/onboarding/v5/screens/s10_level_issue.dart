@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../../../../services/recommendation/fitness_test_scoring.dart';
 import '../../onboarding_data.dart';
-import '../v5_models.dart';
 import '../v5_primitives.dart';
 import '../v5_theme.dart';
 
@@ -35,43 +34,46 @@ class _S10LevelIssueState extends State<S10LevelIssue>
   static const _levels = <_LevelSpec>[
     _LevelSpec(
       id: 'beginner',
-      title: 'Người mới',
+      title: 'Người mới bắt đầu',
       stat: '15–25',
       sub: 'Đang xây nền tảng',
       desc:
-          'Tập trung vào nền tảng & form chuẩn. Ít reps, nhiều thời gian học cơ.',
+          'Tập trung vào nền tảng và form chuẩn. Ít rep hơn, chú trọng kỹ thuật.',
       bullets: [
-        'Bài tập cơ bản, lặp lại',
-        'Form chuẩn ưu tiên hơn tốc độ',
+        'Bài tập nền tảng, lặp lại',
+        'Tập đúng trước, tăng nhịp sau',
         'Tăng nhẹ mỗi tuần',
       ],
       intensity: 0.35,
+      rank: 1,
     ),
     _LevelSpec(
       id: 'intermediate',
       title: 'Trung cấp',
       stat: '25–40',
-      sub: 'Đã có kinh nghiệm',
-      desc: 'Cường độ vừa phải. Bài tập đa dạng & thử thách hơn.',
+      sub: 'Đã có nền tảng',
+      desc: 'Cường độ vừa phải. Bài tập đa dạng và thử thách hơn.',
       bullets: [
-        'Tổ hợp đa dạng, ít lặp lại',
-        'Thử thách form ở các góc khó',
-        'Phục hồi & tiến độ song hành',
+        'Tổ hợp đa dạng, ít lặp đi lặp lại',
+        'Thử thách ở mức độ khó hơn',
+        'Tập và phục hồi song song',
       ],
       intensity: 0.65,
+      rank: 2,
     ),
     _LevelSpec(
       id: 'advanced',
       title: 'Nâng cao',
       stat: '40+',
-      sub: 'Tập đều 1+ năm',
-      desc: 'Cường độ cao + tổ hợp bài. Yêu cầu thực hiện chuẩn xác.',
+      sub: 'Tập đều trên 1 năm',
+      desc: 'Cường độ cao, tổ hợp bài phức tạp. Yêu cầu kỹ thuật chắc.',
       bullets: [
-        'Tổ hợp dài, cường độ cao',
-        'Yêu cầu form chuẩn xác',
-        'Tối ưu hiệu suất theo từng tuần',
+        'Chuỗi bài dài, cường độ cao',
+        'Form yêu cầu độ chuẩn xác cao',
+        'Tối ưu hiệu suất từng tuần',
       ],
       intensity: 0.95,
+      rank: 3,
     ),
   ];
 
@@ -93,37 +95,33 @@ class _S10LevelIssueState extends State<S10LevelIssue>
   }
 
   String _recommendedLevel() {
+    final FitnessTestScoringResult result;
     if (widget.data.fork == 'yoga') {
-      final results = yogaResultsMock;
-      final allValues = results.expand((r) => r.chartData).toList();
-      final totalCandidates = results.fold<int>(
-        0,
-        (sum, r) => sum + r.candidates.where((c) => c.id != 'none').length,
-      );
-      final confirmedIssues = widget.data.feedbackByExercise.values.fold<int>(
-        0,
-        (sum, items) => sum + items.where((id) => id != 'none').length,
-      );
-      return FitnessTestScorer.score(
-        FitnessTestScoringInput(
-          fork: widget.data.fork,
+      result = FitnessTestScorer.score(
+        FitnessTestScoringInput.fromYogaLoggers(
+          warriorLogger: widget.data.hasWarriorAssessment
+              ? widget.data.warriorLogger
+              : null,
+          forwardFoldLogger: widget.data.hasForwardFoldAssessment
+              ? widget.data.forwardFoldLogger
+              : null,
           trainingDuration: widget.data.duration,
-          yogaAssessment: YogaMobilityAssessment(
-            chartValues: allValues,
-            chartTarget: results.first.chartTarget,
-            totalIssueCandidates: totalCandidates,
-            confirmedIssueCount: confirmedIssues,
-          ),
         ),
-      ).suggestedLevel;
+      );
+    } else {
+      result = FitnessTestScorer.score(
+        FitnessTestScoringInput.fromSquatLogger(
+          logger:
+              widget.data.hasSquatAssessment ? widget.data.squatLogger : null,
+          wallPushUpLogger: widget.data.hasWallPushUpAssessment
+              ? widget.data.wallPushUpLogger
+              : null,
+          trainingDuration: widget.data.duration,
+        ),
+      );
     }
-
-    return FitnessTestScorer.score(
-      FitnessTestScoringInput.fromSquatLogger(
-        logger: widget.data.hasSquatAssessment ? widget.data.squatLogger : null,
-        trainingDuration: widget.data.duration,
-      ),
-    ).suggestedLevel;
+    widget.data.levelAssessment = result;
+    return result.suggestedLevel;
   }
 
   void _pick(String id) => setState(() => widget.data.level = id);
@@ -132,6 +130,13 @@ class _S10LevelIssueState extends State<S10LevelIssue>
       .expand((items) => items)
       .where((id) => id != 'none')
       .length;
+
+  /// Whether any live assessment leg was captured. When false (the user skipped
+  /// from S07), the suggestion comes purely from their stated training history,
+  /// so the copy reflects that instead of naming a "bài đánh giá" they never did.
+  bool get _assessmentDone => widget.data.fork == 'yoga'
+      ? widget.data.hasWarriorAssessment || widget.data.hasForwardFoldAssessment
+      : widget.data.hasSquatAssessment || widget.data.hasWallPushUpAssessment;
 
   @override
   Widget build(BuildContext context) {
@@ -169,7 +174,7 @@ class _S10LevelIssueState extends State<S10LevelIssue>
               text: TextSpan(
                 style: r.isShort ? V5.titleLg(context) : V5.headline(context),
                 children: [
-                  const TextSpan(text: 'Vika gợi ý mức\n'),
+                  const TextSpan(text: 'Vika gợi ý level:\n'),
                   TextSpan(
                     text: rec.title,
                     style: TextStyle(color: V5.yellowDeep),
@@ -184,9 +189,11 @@ class _S10LevelIssueState extends State<S10LevelIssue>
             delay: const Duration(milliseconds: 120),
             slideY: 8,
             child: Text(
-              _issueCount == 0
-                  ? 'Plan sẽ tăng nhịp từ từ dựa trên bài đánh giá.'
-                  : 'Plan sẽ ưu tiên $_issueCount điểm cần luyện từ bài đánh giá.',
+              !_assessmentDone
+                  ? 'Dựa trên kinh nghiệm bạn chia sẻ, bạn có thể kiểm tra lại bất cứ lúc nào để điều chỉnh.'
+                  : _issueCount == 0
+                      ? 'Lộ trình sẽ tăng dần mức độ dựa trên bài đánh giá.'
+                      : 'Lộ trình sẽ ưu tiên $_issueCount điểm cần cải thiện từ kết quả đánh giá.',
               style: V5.body(context, color: V5.inkSoft),
               maxLines: 2,
             ),
@@ -250,6 +257,7 @@ class _LevelSpec {
     required this.desc,
     required this.bullets,
     required this.intensity,
+    required this.rank,
   });
 
   final String id;
@@ -258,7 +266,14 @@ class _LevelSpec {
   final String sub;
   final String desc;
   final List<String> bullets;
+
+  /// Continuous fill (0–1) for the featured card's intensity bar.
   final double intensity;
+
+  /// Discrete level rank (1 = beginner, 2 = intermediate, 3 = advanced). Drives
+  /// the alternate tile's 3 mini dots, so they always reflect the true level
+  /// rather than a rounding of [intensity] (0.35 → ceil 2 misread beginner).
+  final int rank;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -379,8 +394,14 @@ class _FeaturedLevelCard extends StatelessWidget {
                                     level.title.toUpperCase(),
                                     style: V5
                                         .displaySm(context, color: V5.invInk)
-                                        .copyWith(letterSpacing: -1.1),
-                                    maxLines: 1,
+                                        .copyWith(
+                                          letterSpacing: -1.1,
+                                          height: 1.05,
+                                        ),
+                                    // Long titles (e.g. "NGƯỜI MỚI BẮT ĐẦU")
+                                    // wrap to a second line instead of
+                                    // ellipsis-truncating.
+                                    maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   const SizedBox(height: V5.space6),
@@ -469,7 +490,7 @@ class _MinutesBlock extends StatelessWidget {
         ),
         const SizedBox(height: V5.space4),
         Text(
-          'PHÚT / BUỔI',
+          'PHÚT/BUỔI',
           style: V5
               .eyebrow(context, color: V5.invInkSoft)
               .copyWith(letterSpacing: 1.4),
@@ -669,7 +690,7 @@ class _AlternateLevelTile extends StatelessWidget {
             ),
             const SizedBox(height: V5.space10),
             _MiniIntensityDots(
-              value: level.intensity,
+              active: level.rank,
               dark: selected,
             ),
           ],
@@ -680,14 +701,15 @@ class _AlternateLevelTile extends StatelessWidget {
 }
 
 class _MiniIntensityDots extends StatelessWidget {
-  const _MiniIntensityDots({required this.value, required this.dark});
+  const _MiniIntensityDots({required this.active, required this.dark});
 
-  final double value;
+  /// Number of filled dots (1–3) — the level's true rank, not a rounding of a
+  /// continuous intensity (which over-filled beginner to 2).
+  final int active;
   final bool dark;
 
   @override
   Widget build(BuildContext context) {
-    final active = (value * 3).ceil();
     return Row(
       children: [
         for (var i = 0; i < 3; i++)

@@ -284,7 +284,7 @@ class _GoalHero extends StatelessWidget {
                     SizedBox(width: dense ? V5.space6 : V5.space8),
                     Expanded(
                       child: Text(
-                        'MỤC TIÊU SAU 4 TUẦN',
+                        'SAU 4 TUẦN',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: V5.eyebrow(context, color: V5.invInkSoft),
@@ -505,7 +505,7 @@ class _GoalEmptyHero extends StatelessWidget {
                     SizedBox(
                         height: r.pick(cozy: V5.space10, short: V5.space6)),
                     Text(
-                      'Chọn mục tiêu bên dưới',
+                      'Chọn mục tiêu của bạn',
                       style: r.isShort
                           ? V5.bodySm(context, color: V5.inkSoft)
                           : V5.body(context, color: V5.inkSoft),
@@ -513,7 +513,7 @@ class _GoalEmptyHero extends StatelessWidget {
                     if (!r.isShort) ...[
                       const SizedBox(height: V5.space4),
                       Text(
-                        'Vika sẽ tính lộ trình theo điều bạn chọn',
+                        'Vika sẽ xây dựng lộ trình theo đúng mục tiêu của bạn.',
                         style: V5.caption(context, color: V5.inkFaint),
                       ),
                     ],

@@ -49,11 +49,13 @@ class PlanScreen extends StatefulWidget {
     super.key,
     required this.bottomPadding,
     this.program,
+    this.userProfile,
     this.refreshListenable,
     this.onProfileChanged,
   });
 
   final double bottomPadding;
+  final AppUserProfile? userProfile;
 
   /// Real assigned-program data from MainShell. Not consumed directly — the
   /// screen loads its own PlanSnapshot via RecommendationService and maps it.
@@ -248,7 +250,10 @@ class _PlanScreenState extends State<PlanScreen> {
     // Loading: snapshot/catalog fetch in flight — shimmer a stand-in plan
     // (hero + ledger) instead of a bare spinner.
     if (program == null) {
-      return _PlanSkeleton(bottomPadding: widget.bottomPadding);
+      return _PlanSkeleton(
+        bottomPadding: widget.bottomPadding,
+        userProfile: widget.userProfile,
+      );
     }
 
     // No active plan (e.g. onboarding not finished). Graceful, never crashes
@@ -259,7 +264,7 @@ class _PlanScreenState extends State<PlanScreen> {
         alignment: Alignment.center,
         padding: const EdgeInsets.symmetric(horizontal: 32),
         child: Text(
-          'Chưa có lộ trình. Hoàn tất phần thiết lập để Vika dựng kế hoạch cho bạn nhé.',
+          'Chưa có lộ trình. Hoàn tất thiết lập để Vika lên kế hoạch cho bạn nhé.',
           textAlign: TextAlign.center,
           style: TextStyle(color: c.inkSoft, height: 1.5),
         ),
@@ -289,7 +294,8 @@ class _PlanScreenState extends State<PlanScreen> {
                 selectedIndex: _selectedBlockIndex,
                 onSelectBlock: _selectBlock,
                 onStartNext: _startNextSession,
-                userInitial: 'N',
+                userInitial: widget.userProfile?.initial ?? 'N',
+                avatarUrl: widget.userProfile?.avatarUrl,
               ),
               SizedBox(height: r.gap(34)),
               ProgramSessionLedger(
@@ -321,9 +327,13 @@ class _PlanScreenState extends State<PlanScreen> {
 // ═══════════════════════════════════════════════════════════════
 
 class _PlanSkeleton extends StatelessWidget {
-  const _PlanSkeleton({required this.bottomPadding});
+  const _PlanSkeleton({
+    required this.bottomPadding,
+    this.userProfile,
+  });
 
   final double bottomPadding;
+  final AppUserProfile? userProfile;
 
   @override
   Widget build(BuildContext context) {
@@ -363,15 +373,16 @@ class _PlanSkeleton extends StatelessWidget {
                     padding: EdgeInsets.only(top: topInset),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: const [
+                      children: [
                         WordmarkHeader(
                           inverted: true,
-                          userInitial: 'N',
+                          userInitial: userProfile?.initial ?? 'N',
+                          avatarUrl: userProfile?.avatarUrl,
                           trailingIcon: Icons.menu_book_rounded,
                           trailingTooltip: 'Sổ tập',
                         ),
-                        SizedBox(height: 22),
-                        Padding(
+                        const SizedBox(height: 22),
+                        const Padding(
                           padding: EdgeInsets.fromLTRB(24, 0, 24, 28),
                           child: Shimmer(
                             inverted: true,

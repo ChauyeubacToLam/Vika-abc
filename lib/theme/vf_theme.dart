@@ -306,7 +306,22 @@ class VFScrollBehavior extends MaterialScrollBehavior {
 
   @override
   ScrollPhysics getScrollPhysics(BuildContext context) {
-    return const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics());
+    // Bouncing reads as native on iOS, but on Android the rubber-band feels
+    // foreign — Android users expect a clamped edge. Match the platform.
+    switch (getPlatform(context)) {
+      case TargetPlatform.android:
+      case TargetPlatform.fuchsia:
+        return const ClampingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
+        );
+      case TargetPlatform.iOS:
+      case TargetPlatform.macOS:
+      case TargetPlatform.windows:
+      case TargetPlatform.linux:
+        return const BouncingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
+        );
+    }
   }
 
   @override

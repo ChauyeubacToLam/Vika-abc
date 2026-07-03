@@ -1,4 +1,5 @@
 import '../models/post_exercise_data.dart';
+import '../models/exercise_lookup.dart';
 import '../utils/exercise_logger.dart';
 
 /// Base contract for exercise-specific calorie estimation.
@@ -102,3 +103,16 @@ final Map<String, ExerciseCalorieEstimator> calorieEstimators = {
   'squat_assessment': const SquatDepthCalorieEstimator(),
   // 'plank': const PlankCalorieEstimator(),
 };
+
+ExerciseCalorieEstimator? resolveCalorieEstimator(String exerciseId) {
+  final direct = calorieEstimators[exerciseId];
+  if (direct != null) return direct;
+
+  final normalizedId = normalizeExerciseKey(exerciseId);
+  for (final entry in calorieEstimators.entries) {
+    if (normalizeExerciseKey(entry.key) == normalizedId) {
+      return entry.value;
+    }
+  }
+  return null;
+}

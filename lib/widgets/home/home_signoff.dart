@@ -57,7 +57,7 @@ class HomeSignoff extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Text(
-            'HLV CÁ NHÂN HOÁ',
+            'HLV CÁ NHÂN',
             style: TextStyle(
               fontFamily: 'BeVietnamPro',
               fontSize: 10.5,

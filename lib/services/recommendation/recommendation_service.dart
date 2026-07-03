@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vika/services/session_persistence.dart';
 
+import '../catalog/catalog_source.dart';
 import 'models/exercise_catalog_entry.dart';
 import 'models/plan.dart';
 import 'models/recommendation_result.dart';
@@ -143,6 +144,10 @@ class RecommendationService {
     return _fetchPlanSnapshotForCurrentUser(activeOnly: false);
   }
 
+  /// The launch path's catalog read. Now served from the bundled asset via
+  /// [CatalogSource] (offline-safe), keyed by the requested id. Same return
+  /// type/shape as before, so callers are unchanged. The live Supabase read for
+  /// plan generation lives in [generatePlanForCurrentUser] and is untouched.
   Future<Map<String, ExerciseLaunchCatalogInfo>>
       fetchLaunchCatalogInfoForExerciseIds(
     Iterable<String> exerciseIds,
@@ -154,32 +159,8 @@ class RecommendationService {
         .toList(growable: false);
     if (ids.isEmpty) return const {};
 
-    String? cleanString(dynamic value) {
-      if (value is! String) return null;
-      final trimmed = value.trim();
-      return trimmed.isEmpty ? null : trimmed;
-    }
-
-    try {
-      final rows = await _client
-          .from('exercise_catalog')
-          .select('id, english_name, class_key, is_form_checked')
-          .inFilter('id', ids);
-
-      return {
-        for (final raw in rows as List)
-          if ((raw as Map)['id'] is String)
-            raw['id'] as String: ExerciseLaunchCatalogInfo(
-              id: raw['id'] as String,
-              englishName: cleanString(raw['english_name']),
-              classKey: cleanString(raw['class_key']),
-              isFormChecked: raw['is_form_checked'] == true,
-            ),
-      };
-    } catch (e) {
-      debugPrint('[RecommendationService] launch catalog fetch failed: $e');
-      return const {};
-    }
+    await CatalogSource.instance.ensureLoaded();
+    return CatalogSource.instance.lookupMany(ids);
   }
 
   Future<PlanSnapshot?> _fetchPlanSnapshotForCurrentUser({
@@ -456,6 +437,9 @@ class ExerciseLaunchCatalogInfo {
     this.vietnameseName,
     this.englishName,
     this.classKey,
+    this.baseReps,
+    this.baseSeconds,
+    this.baseSets,
   });
 
   final String id;
@@ -463,6 +447,9 @@ class ExerciseLaunchCatalogInfo {
   final String? englishName;
   final String? vietnameseName;
   final String? classKey;
+  final int? baseReps;
+  final int? baseSeconds;
+  final int? baseSets;
 
   Iterable<String> get lookupKeys sync* {
     final keys = [classKey, id, englishName];
@@ -470,5 +457,16 @@ class ExerciseLaunchCatalogInfo {
       final value = key?.trim();
       if (value != null && value.isNotEmpty) yield value;
     }
+  }
+
+  /// Compact volume label for list/summary surfaces, e.g. "3 x 8 rep" or
+  /// "1 x 30 giây" — matches [workoutVolumeLabel]'s "sets x target" wording so
+  /// cards and the exercise intro never disagree. Returns '' if the entry is
+  /// malformed (neither reps nor seconds).
+  String get volumeLabel {
+    final sets = baseSets ?? 1;
+    if (baseSeconds != null) return '$sets x $baseSeconds giây';
+    if (baseReps != null) return '$sets x $baseReps rep';
+    return '';
   }
 }

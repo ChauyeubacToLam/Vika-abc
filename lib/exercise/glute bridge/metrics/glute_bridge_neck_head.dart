@@ -32,13 +32,13 @@ import '../../../../utils/debouncer.dart';
 class NeckHeadConfig {
   /// Normalized threshold. (shoulderY − headY) / scaleFactor > this → fault.
   /// 5 % of shoulder-to-hip distance — filters minor camera / landmark noise.
-  static const double HEAD_LIFT_THRESHOLD = 0.05;
+  static const double HEAD_LIFT_THRESHOLD = 0.08;
 
   /// Pixel fallback when scaleFactor is unavailable.
-  static const double HEAD_LIFT_PIXELS = 8.0;
+  static const double HEAD_LIFT_PIXELS = 12.0;
 
   /// Consecutive frames of sustained lift before coaching fires.
-  static const int DEBOUNCE_FRAMES = 5;
+  static const int DEBOUNCE_FRAMES = 7;
 }
 
 class NeckHeadMetric extends GluteBridgeMetricBase {

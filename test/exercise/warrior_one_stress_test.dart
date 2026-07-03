@@ -216,11 +216,11 @@ void main() {
     expect(byName, isNotNull);
     expect(byId, same(byName));
     expect(byLegacyId, same(byName));
-    expect(byName!.createExercise(), isA<WarriorOne>());
+    expect(byName!.createExercise(reps: 2), isA<WarriorOne>());
   });
 
   test('safety and start gates reject bad framing before activation', () {
-    final exercise = WarriorOne()
+    final exercise = WarriorOne(maxHolds: 2)
       ..cameraFacing = CameraFacing.left
       ..scaleFactor = 100;
     final pose = _warriorOnePose();

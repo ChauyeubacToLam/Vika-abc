@@ -22,8 +22,8 @@ import '../push_up.dart';
 
 class TempoConfig {
   /// Descent duration thresholds (seconds)
-  static const double DESCENT_GOOD_MIN = 1.0;
-  static const double DESCENT_WARNING_MIN = 0.5;
+  static const double DESCENT_GOOD_MIN = 0.6;
+  static const double DESCENT_WARNING_MIN = 0.3;
   // Below WARNING_MIN = error (free-fall)
 }
 

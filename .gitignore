@@ -69,6 +69,8 @@ app.*.map.json
 # Environment & secrets (if you add any later)
 .env
 .env.*
+assets/env/*.env
+!assets/env/*.env.example
 *.keystore
 *.jks
 secrets.json
@@ -80,3 +82,4 @@ secrets.json
 # Android signing keys 
 android/key.properties
 android/app/vika-release.keystore
+nul
