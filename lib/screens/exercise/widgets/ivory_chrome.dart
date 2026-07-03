@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../../../theme/vf_theme.dart';
@@ -179,11 +177,14 @@ class IvoryTopChromeRight extends StatelessWidget {
   const IvoryTopChromeRight({
     super.key,
     required this.onPause,
-    required this.onFlipCamera,
+    this.onFlipCamera,
     this.debugBadge,
   });
   final VoidCallback onPause;
-  final VoidCallback onFlipCamera;
+
+  /// Null hides the flip button — flipping the camera is meaningless while
+  /// the trainer video page is showing.
+  final VoidCallback? onFlipCamera;
   final Widget? debugBadge;
 
   @override
@@ -198,110 +199,19 @@ class IvoryTopChromeRight extends StatelessWidget {
           debugBadge!,
           const SizedBox(width: 8),
         ],
-        IvoryGlassIconButton(
-          onTap: onFlipCamera,
-          child: Icon(Icons.cameraswitch_rounded,
-              size: 14, color: VikaIvory.invInk),
-        ),
-        const SizedBox(width: 8),
+        if (onFlipCamera != null) ...[
+          IvoryGlassIconButton(
+            onTap: onFlipCamera,
+            child: Icon(Icons.cameraswitch_rounded,
+                size: 14, color: VikaIvory.invInk),
+          ),
+          const SizedBox(width: 8),
+        ],
         IvoryGlassIconButton(
           onTap: onPause,
           child: Icon(Icons.pause_rounded, size: 14, color: VikaIvory.invInk),
         ),
       ],
-    );
-  }
-}
-
-// ─── Coach Caption (upper third, timed) ───
-
-/// The coach caption assumes the reader is 2.5 m away: upper-third placement,
-/// large type, strong shadow — and short-lived. Each new message fades in,
-/// stays ~2 s, then fades out; the voice channel carries the full sentence,
-/// the caption is its visual echo. Message *selection* is untouched upstream.
-class IvoryCoachCaption extends StatefulWidget {
-  const IvoryCoachCaption({super.key, required this.message});
-  // TODO(caption): Wire trigger conditions for mid-rep + post-rep captions.
-  // TODO(caption): Keyword-ized copy (Vietnamese content pass) — until then
-  // the existing sentences render in the new style, capped at 2 lines.
-  final String message;
-
-  @override
-  State<IvoryCoachCaption> createState() => _IvoryCoachCaptionState();
-}
-
-class _IvoryCoachCaptionState extends State<IvoryCoachCaption>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _fade;
-  Timer? _hide;
-  String _displayed = '';
-
-  static const Duration _visibleFor = Duration(milliseconds: 2200);
-
-  @override
-  void initState() {
-    super.initState();
-    _fade = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 240),
-      reverseDuration: const Duration(milliseconds: 380),
-    );
-    if (widget.message.isNotEmpty) _show(widget.message);
-  }
-
-  @override
-  void didUpdateWidget(IvoryCoachCaption oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.message != oldWidget.message && widget.message.isNotEmpty) {
-      _show(widget.message);
-    }
-  }
-
-  void _show(String message) {
-    _displayed = message;
-    _fade.forward();
-    _hide?.cancel();
-    _hide = Timer(_visibleFor, () {
-      if (mounted) _fade.reverse();
-    });
-  }
-
-  @override
-  void dispose() {
-    _hide?.cancel();
-    _fade.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: FadeTransition(
-        opacity: CurvedAnimation(parent: _fade, curve: Curves.easeOut),
-        child: Text(
-          _displayed,
-          textAlign: TextAlign.center,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontFamily: _font,
-            fontSize: 30,
-            fontWeight: FontWeight.w800,
-            color: VikaIvory.invInk,
-            letterSpacing: -0.7,
-            height: 1.18,
-            shadows: [
-              Shadow(
-                  color: const Color(0xFF15110D).withValues(alpha: 0.95),
-                  blurRadius: 18),
-              Shadow(
-                  color: const Color(0xFF15110D).withValues(alpha: 0.8),
-                  blurRadius: 5,
-                  offset: const Offset(0, 1)),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

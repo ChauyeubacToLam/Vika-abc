@@ -56,10 +56,6 @@ class TempoConfig {
 class TempoMetric extends SquatMetricBase {
   @override
   String get name => 'Tempo';
-
-  @override
-  String? get nameVi => 'Nhịp độ';
-
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
 

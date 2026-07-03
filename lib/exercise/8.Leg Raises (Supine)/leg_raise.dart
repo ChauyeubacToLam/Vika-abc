@@ -1,6 +1,5 @@
 // ignore_for_file: non_constant_identifier_names, curly_braces_in_flow_control_structures
 import 'dart:math' as math;
-import 'package:vika/debug/tracked_metric.dart';
 import 'package:vika/utils/debouncer.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
@@ -49,17 +48,6 @@ class LegRaise extends ExerciseBase {
     tempoMetric,
     armMetric
   ];
-  late final List<TrackedMetric> _trackedMetrics =
-      _metrics.map(TrackedMetric.new).toList();
-
-  @override
-  List<TrackedMetric> get trackedDebugMetrics =>
-      List<TrackedMetric>.unmodifiable(
-        [
-          ...super.trackedDebugMetrics,
-          ..._trackedMetrics,
-        ],
-      );
 
   final Debouncer _raisingDebouncer = Debouncer(requiredFrames: 2);
   final Debouncer _topDebouncer = Debouncer(requiredFrames: 2);

@@ -62,24 +62,16 @@ class BirdDogFaultPriority {
   static const int alignment = 3;
 }
 
-abstract class BirdDogMetricBase implements DebugMetricSource {
-  @override
+abstract class BirdDogMetricBase {
   String get name;
   int faultsCount = 0;
 
   void update(BirdDogRepContext ctx);
 
   List<FaultRecord> get faults;
-  @override
   Map<String, dynamic> get debugData;
-
-  @override
   double? get value => null;
-
-  @override
   ThresholdBand? get threshold => null;
-
-  @override
   MetricStatus get status {
     if (faults.any((fault) => fault.affectsForm)) {
       return MetricStatus.fault;
@@ -87,12 +79,6 @@ abstract class BirdDogMetricBase implements DebugMetricSource {
     if (faults.isNotEmpty) return MetricStatus.near;
     return MetricStatus.pass;
   }
-
-  @override
-  String? get nameVi => null;
-
-  @override
-  bool get devOnly => false;
 
   void reset();
 

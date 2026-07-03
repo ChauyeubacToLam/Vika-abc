@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
-import 'package:vika/debug/tracked_metric.dart';
 import 'package:vika/exercise/exercise_base.dart';
 import 'package:vika/pose/vika_pose_landmark.dart';
 import 'package:vika/utils/exercise_logger.dart';
@@ -94,17 +93,6 @@ class RussianTwist extends ExerciseBase {
     twistRomMetric,
     spinalMetric,
   ];
-  late final List<TrackedMetric> _trackedMetrics =
-      _metrics.map(TrackedMetric.new).toList();
-
-  @override
-  List<TrackedMetric> get trackedDebugMetrics =>
-      List<TrackedMetric>.unmodifiable(
-        [
-          ...super.trackedDebugMetrics,
-          ..._trackedMetrics,
-        ],
-      );
 
   @override
   String get exerciseName => 'Russian Twist';

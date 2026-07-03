@@ -1,5 +1,4 @@
 import 'package:vika/exercise/exercise_base.dart';
-import 'package:vika/debug/tracked_metric.dart';
 import '../../utils/pose_math_helpers.dart';
 import 'package:vika/utils/exercise_logger.dart';
 import 'package:vika/exercise/side_tracked_exercise_mixin.dart';
@@ -72,17 +71,6 @@ class StandingKneeToElbow extends ExerciseBase {
     crossRomMetric,
     pelvicDropMetric,
   ];
-  late final List<TrackedMetric> _trackedMetrics =
-      _metrics.map(TrackedMetric.new).toList();
-
-  @override
-  List<TrackedMetric> get trackedDebugMetrics =>
-      List<TrackedMetric>.unmodifiable(
-        [
-          ...super.trackedDebugMetrics,
-          ..._trackedMetrics,
-        ],
-      );
 
   @override
   String get exerciseName => 'Standing Knee-to-Elbow';

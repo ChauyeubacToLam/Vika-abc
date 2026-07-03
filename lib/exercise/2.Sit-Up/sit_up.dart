@@ -1,6 +1,5 @@
 // ignore_for_file: non_constant_identifier_names, curly_braces_in_flow_control_structures
 import 'package:vika/utils/debouncer.dart';
-import 'package:vika/debug/tracked_metric.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/exercise_logger.dart';
@@ -55,17 +54,6 @@ class SitUp extends ExerciseBase with SideTrackedExerciseMixin {
     stabilityMetric,
     tempoMetric
   ];
-  late final List<TrackedMetric> _trackedMetrics =
-      _metrics.map(TrackedMetric.new).toList();
-
-  @override
-  List<TrackedMetric> get trackedDebugMetrics =>
-      List<TrackedMetric>.unmodifiable(
-        [
-          ...super.trackedDebugMetrics,
-          ..._trackedMetrics,
-        ],
-      );
 
   final Debouncer _risingDebouncer = Debouncer(requiredFrames: 2);
   final Debouncer _uprightDebouncer = Debouncer(requiredFrames: 2);

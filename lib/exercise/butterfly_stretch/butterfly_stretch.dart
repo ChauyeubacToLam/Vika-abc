@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:vika/utils/debouncer.dart';
-import 'package:vika/debug/tracked_metric.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/frame_snapshot.dart';
 import '../../utils/exercise_logger.dart';
@@ -56,17 +55,6 @@ class ButterflyStretch extends ExerciseBase {
     postureMetric,
     footPlacementMetric,
   ];
-  late final List<TrackedMetric> _trackedMetrics =
-      _metrics.map(TrackedMetric.new).toList();
-
-  @override
-  List<TrackedMetric> get trackedDebugMetrics =>
-      List<TrackedMetric>.unmodifiable(
-        [
-          ...super.trackedDebugMetrics,
-          ..._trackedMetrics,
-        ],
-      );
 
   final Debouncer _holdDebouncer = Debouncer(requiredFrames: 10);
   final Debouncer _releaseDebouncer = Debouncer(requiredFrames: 5);

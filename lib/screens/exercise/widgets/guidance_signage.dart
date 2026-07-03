@@ -57,7 +57,7 @@ class GuidanceSignage extends StatefulWidget {
     required this.body,
     required this.mode,
     this.compact = false,
-    this.horizontal = false,
+    this.landscape = false,
   });
 
   final IconData icon;
@@ -70,9 +70,10 @@ class GuidanceSignage extends StatefulWidget {
   /// full-screen surface (e.g. the orientation gate over the pause overlay).
   final bool compact;
 
-  /// Landscape layout: glyph beside the text instead of above it, so the
-  /// signage fits a short viewport without stacking onto other heroes.
-  final bool horizontal;
+  /// Landscape sizing: the same centered glyph-above-title layout, scaled
+  /// down so the stack fits the short viewport. (During guidance the center
+  /// heroes are hidden, so the sign owns the middle of the screen.)
+  final bool landscape;
 
   @override
   State<GuidanceSignage> createState() => _GuidanceSignageState();
@@ -114,7 +115,12 @@ class _GuidanceSignageState extends State<GuidanceSignage>
   @override
   Widget build(BuildContext context) {
     if (widget.compact) return _buildCompact();
-    return widget.horizontal ? _buildHorizontal() : _buildFull();
+    // Same centered glyph-above-title stack in both orientations — just
+    // scaled down in landscape so it fits the short viewport. Centering is
+    // owned by the caller (a screen-filling Center); this only sizes itself.
+    return widget.landscape
+        ? _buildSign(glyphBox: 158, glyphSize: 108, titleSize: 54)
+        : _buildSign(glyphBox: 200, glyphSize: 150, titleSize: 72);
   }
 
   /// The animated glyph inside its accent aura — shared by both full layouts.
@@ -153,36 +159,41 @@ class _GuidanceSignageState extends State<GuidanceSignage>
     );
   }
 
-  Widget _buildFull() {
-    // No card, no box: the page dims the whole screen behind this signage
-    // (a gross, distance-readable mode change), and the signage floats on it
-    // — one huge moving glyph, a 46pt instruction, near-view detail below.
+  /// One centered stack: a big moving glyph above a short, upright title.
+  /// No card, no box — the page dims the whole screen behind it (a gross,
+  /// distance-readable mode change) and the sign floats dead-center. No body
+  /// text: unreadable from 2 m and redundant with the voice channel.
+  Widget _buildSign({
+    required double glyphBox,
+    required double glyphSize,
+    required double titleSize,
+  }) {
     return RepaintBoundary(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 340),
+        constraints: const BoxConstraints(maxWidth: 360),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _glyphHero(boxWidth: 230, boxHeight: 200, glyphSize: 150),
+            _glyphHero(
+              boxWidth: glyphBox * 1.15,
+              boxHeight: glyphBox,
+              glyphSize: glyphSize,
+            ),
             const SizedBox(height: 16),
-            // The instruction itself, width-adaptive: short commands ("Lùi
-            // lại") render at the full 72pt; longer ones scale down to fill
-            // the width exactly. Italic display — the brand's editorial
-            // register.
             SizedBox(
-              width: 330,
+              width: 340,
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(
                   widget.title,
                   maxLines: 1,
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                     fontFamily: VikaIvory.fontFamily,
-                    fontSize: 72,
+                    fontSize: titleSize,
                     fontWeight: FontWeight.w800,
-                    fontStyle: FontStyle.italic,
                     color: VikaIvory.invInk,
-                    letterSpacing: -2,
+                    letterSpacing: -1.5,
                     height: 1.05,
                     shadows: [
                       Shadow(
@@ -192,98 +203,6 @@ class _GuidanceSignageState extends State<GuidanceSignage>
                     ],
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            // Near-view detail — kept from the old panel.
-            Text(
-              widget.body,
-              textAlign: TextAlign.center,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontFamily: VikaIvory.fontFamily,
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: VikaIvory.invInkSoft,
-                height: 1.4,
-                shadows: [
-                  Shadow(
-                    color: VikaIvory.heroBg.withValues(alpha: 0.8),
-                    blurRadius: 8,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Landscape: glyph beside the text so the signage stays inside a short
-  /// viewport and clear of the center/edge heroes.
-  Widget _buildHorizontal() {
-    return RepaintBoundary(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 460),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _glyphHero(boxWidth: 150, boxHeight: 140, glyphSize: 104),
-            const SizedBox(width: 20),
-            Flexible(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Width-adaptive title, same treatment as portrait.
-                  SizedBox(
-                    width: double.infinity,
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        widget.title,
-                        maxLines: 1,
-                        style: TextStyle(
-                          fontFamily: VikaIvory.fontFamily,
-                          fontSize: 56,
-                          fontWeight: FontWeight.w800,
-                          fontStyle: FontStyle.italic,
-                          color: VikaIvory.invInk,
-                          letterSpacing: -1.6,
-                          height: 1.05,
-                          shadows: [
-                            Shadow(
-                              color: VikaIvory.heroBg.withValues(alpha: 0.9),
-                              blurRadius: 12,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    widget.body,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontFamily: VikaIvory.fontFamily,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: VikaIvory.invInkSoft,
-                      height: 1.4,
-                      shadows: [
-                        Shadow(
-                          color: VikaIvory.heroBg.withValues(alpha: 0.8),
-                          blurRadius: 8,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
               ),
             ),
           ],

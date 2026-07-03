@@ -36,10 +36,6 @@ class FootPlacementMetric extends ButterflyMetricBase {
 
   @override
   MetricStatus get status => _status;
-
-  @override
-  String? get nameVi => 'Vị trí gót chân';
-
   @override
   void update(StretchContext ctx) {
     _isFaultingNow = false;

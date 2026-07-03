@@ -73,26 +73,17 @@ class LegRaiseFaultPriority {
   static const int rom = 3; // Lên chưa đủ cao (Low)
 }
 
-abstract class LegRaiseMetricBase implements DebugMetricSource {
-  @override
+abstract class LegRaiseMetricBase {
   String get name;
   int faultsCount = 0;
   void update(LegRaiseRepContext ctx);
   List<FaultRecord> get faults;
-  @override
   Map<String, dynamic> get debugData;
-  @override
   double? get value => null;
-  @override
   ThresholdBand? get threshold => null;
-  @override
   MetricStatus get status => faults.any((fault) => fault.affectsForm)
       ? MetricStatus.fault
       : MetricStatus.pass;
-  @override
-  String? get nameVi => null;
-  @override
-  bool get devOnly => false;
   void reset();
   void resetAndCountFault() {
     if (faults.isNotEmpty) faultsCount++;

@@ -35,10 +35,6 @@ class LegStraightnessConfig {
 class LegStraightnessMetric extends DownwardDogMetricBase {
   @override
   String get name => 'LegStraightness';
-
-  @override
-  String? get nameVi => 'Chân';
-
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
 

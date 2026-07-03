@@ -24,7 +24,6 @@
 import 'dart:math' as math;
 
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
-import 'package:vika/debug/tracked_metric.dart';
 import 'package:vika/utils/debouncer.dart';
 import 'package:vika/utils/exercise_logger.dart';
 
@@ -348,17 +347,6 @@ class WallPushUp extends ExerciseBase {
     wallContactMetric,
     tempoMetric,
   ];
-  late final List<TrackedMetric> _trackedMetrics =
-      _metrics.map(TrackedMetric.new).toList();
-
-  @override
-  List<TrackedMetric> get trackedDebugMetrics =>
-      List<TrackedMetric>.unmodifiable(
-        [
-          ...super.trackedDebugMetrics,
-          ..._trackedMetrics,
-        ],
-      );
 
   static List<FaultRecord> orderedVoicedFaults(Iterable<FaultRecord> faults) {
     final voicedFaults = faults

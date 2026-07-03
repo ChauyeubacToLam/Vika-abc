@@ -1,6 +1,5 @@
 // ignore_for_file: curly_braces_in_flow_control_structures
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
-import 'package:vika/debug/tracked_metric.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/debouncer.dart';
 import '../../utils/exercise_logger.dart';
@@ -45,17 +44,6 @@ class Superman extends ExerciseBase {
     holdMetric,
     lumbarMetric
   ];
-  late final List<TrackedMetric> _trackedMetrics =
-      _metrics.map(TrackedMetric.new).toList();
-
-  @override
-  List<TrackedMetric> get trackedDebugMetrics =>
-      List<TrackedMetric>.unmodifiable(
-        [
-          ...super.trackedDebugMetrics,
-          ..._trackedMetrics,
-        ],
-      );
 
   final Debouncer _liftDebouncer = Debouncer(requiredFrames: 3);
   final Debouncer _topDebouncer = Debouncer(requiredFrames: 2);

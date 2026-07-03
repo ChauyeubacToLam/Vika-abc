@@ -28,10 +28,6 @@ class TrunkLeanConfig {
 class TrunkLeanMetric extends SquatMetricBase {
   @override
   String get name => 'TrunkLean';
-
-  @override
-  String? get nameVi => 'Thân trên';
-
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
 

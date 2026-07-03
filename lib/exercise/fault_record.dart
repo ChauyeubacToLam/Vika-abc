@@ -18,13 +18,10 @@ class FaultRecord {
   });
 }
 
-mixin FaultMetricDebugSource implements DebugMetricSource {
+mixin FaultMetricDebugSource {
+  String get name;
   List<FaultRecord> get faults;
-
-  @override
   Map<String, dynamic> get debugData;
-
-  @override
   double? get value {
     for (final entryValue in debugData.values) {
       if (entryValue is num) return entryValue.toDouble();
@@ -36,10 +33,7 @@ mixin FaultMetricDebugSource implements DebugMetricSource {
     return null;
   }
 
-  @override
   ThresholdBand? get threshold => null;
-
-  @override
   MetricStatus get status {
     if (faults.any((fault) => fault.affectsForm)) {
       return MetricStatus.fault;
@@ -47,10 +41,4 @@ mixin FaultMetricDebugSource implements DebugMetricSource {
     if (faults.isNotEmpty) return MetricStatus.near;
     return MetricStatus.pass;
   }
-
-  @override
-  String? get nameVi => null;
-
-  @override
-  bool get devOnly => false;
 }

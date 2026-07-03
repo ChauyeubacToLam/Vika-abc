@@ -64,18 +64,13 @@ class PlankRepContext {
   });
 }
 
-abstract class PlankMetricBase implements DebugMetricSource {
-  @override
+abstract class PlankMetricBase {
   String get name;
   int faultsCount = 0;
   List<FaultRecord> get faults;
-  @override
   Map<String, dynamic> get debugData;
-  @override
   double? get value => null;
-  @override
   ThresholdBand? get threshold => null;
-  @override
   MetricStatus get status {
     if (faults.any((fault) => fault.affectsForm)) {
       return MetricStatus.fault;
@@ -83,11 +78,6 @@ abstract class PlankMetricBase implements DebugMetricSource {
     if (faults.isNotEmpty) return MetricStatus.near;
     return MetricStatus.pass;
   }
-
-  @override
-  String? get nameVi => null;
-  @override
-  bool get devOnly => false;
 
   void update(PlankRepContext ctx);
   void reset();

@@ -51,21 +51,16 @@ class BearRepContext {
 }
 
 // ─── Metric Base ─────────────────────────────────────────────────────────────
-abstract class BearMetricBase implements DebugMetricSource {
+abstract class BearMetricBase {
   int faultsCount = 0;
   bool isFaultingNow = false;
   final List<FaultRecord> _faults = [];
-  @override
   final Map<String, dynamic> debugData = {};
 
   List<FaultRecord> get faults => List.unmodifiable(_faults);
-  @override
   String get name => runtimeType.toString();
-  @override
   double? get value => null;
-  @override
   ThresholdBand? get threshold => null;
-  @override
   MetricStatus get status {
     if (faults.any((fault) => fault.affectsForm)) {
       return MetricStatus.fault;
@@ -73,11 +68,6 @@ abstract class BearMetricBase implements DebugMetricSource {
     if (faults.isNotEmpty) return MetricStatus.near;
     return MetricStatus.pass;
   }
-
-  @override
-  String? get nameVi => null;
-  @override
-  bool get devOnly => false;
 
   void update(BearRepContext ctx);
   void onStateTransition(BearState from, BearState to, int timestampMs) {}

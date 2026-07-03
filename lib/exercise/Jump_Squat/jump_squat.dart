@@ -2,7 +2,6 @@
 
 import 'dart:math' as math;
 
-import 'package:vika/debug/tracked_metric.dart';
 import '../../utils/debouncer.dart';
 import '../../utils/exercise_logger.dart';
 import '../../utils/pose_math_helpers.dart';
@@ -67,17 +66,6 @@ class JumpSquat extends ExerciseBase {
     takeOffDepthMetric,
     landingTrunkMetric,
   ];
-  late final List<TrackedMetric> _trackedMetrics =
-      _metrics.map(TrackedMetric.new).toList();
-
-  @override
-  List<TrackedMetric> get trackedDebugMetrics =>
-      List<TrackedMetric>.unmodifiable(
-        [
-          ...super.trackedDebugMetrics,
-          ..._trackedMetrics,
-        ],
-      );
 
   @override
   String get exerciseName => 'Jump Squat';

@@ -28,7 +28,6 @@
    ========================================================================= */
 
 import 'package:vika/exercise/exercise_base.dart';
-import 'package:vika/debug/tracked_metric.dart';
 import 'package:vika/utils/exercise_logger.dart';
 import '../../utils/pose_math_helpers.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
@@ -104,7 +103,6 @@ class DownwardDog extends ExerciseBase {
     _legMetric = LegStraightnessMetric();
 
     _metrics = [_spineMetric, _shoulderMetric, _legMetric];
-    _trackedMetrics = _metrics.map(TrackedMetric.new).toList();
   }
 
   final int maxHolds;
@@ -217,16 +215,6 @@ class DownwardDog extends ExerciseBase {
   late final LegStraightnessMetric _legMetric;
 
   late final List<DownwardDogMetricBase> _metrics;
-  late final List<TrackedMetric> _trackedMetrics;
-
-  @override
-  List<TrackedMetric> get trackedDebugMetrics =>
-      List<TrackedMetric>.unmodifiable(
-        [
-          ...super.trackedDebugMetrics,
-          ..._trackedMetrics,
-        ],
-      );
 
   // --- Fault accumulation across holds ---
   int holdCount = 0;

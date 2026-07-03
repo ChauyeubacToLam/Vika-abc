@@ -138,7 +138,10 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   DebugMode _settingsDebugMode = DebugMode.off;
   bool _isStaffUser = false;
   bool _debugPanelOpen = false;
-  String? _expandedMetricId;
+  // Host-owned so the camera scrims + guidance mode-scrim can step aside when
+  // the panel goes fullscreen, letting the see-through glass composite over the
+  // live PT feed + skeleton.
+  bool _debugFullscreen = false;
   int _debugBackTapCount = 0;
   DateTime? _debugFirstBackTap;
   Timer? _pendingStaffBackTimer;
@@ -631,9 +634,6 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     setState(() {
       _settingsDebugMode = mode;
       _debugPanelOpen = resolved != DebugMode.off;
-      if (resolved == DebugMode.off) {
-        _expandedMetricId = null;
-      }
     });
   }
 
@@ -856,7 +856,6 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                           Text(
                             switch (mode) {
                               DebugMode.off => 'Off',
-                              DebugMode.user => 'User',
                               DebugMode.dev => 'Dev',
                             },
                             style: TextStyle(
@@ -1788,21 +1787,17 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     final bottomHoldCue = _displayedHoldCue;
     final holdRestRemaining = _holdRestRemaining;
     final guidanceCopy = _currentGuidanceCopy;
-    final orientationGuidanceActive =
-        _orientationPauseActive && guidanceCopy != null;
-    final coachMessage = _coachMessage;
     final activeState =
         widget.exercise.exerciseState == ExerciseState.activated &&
             !widget.exercise.isPaused;
-    final trackedMetrics = widget.exercise.trackedDebugMetrics;
-    final debugMode = trackedMetrics.isEmpty
-        ? DebugMode.off
-        : _resolveDebugMode(_settingsDebugMode);
+    final debugMode = _resolveDebugMode(_settingsDebugMode);
     final debugEnabled = debugMode != DebugMode.off;
     widget.exercise.debugMode = debugMode;
-    final showDebugEntryBadge =
-        trackedMetrics.isNotEmpty && (debugEnabled || _isStaffUser);
+    final showDebugEntryBadge = debugEnabled || _isStaffUser;
     final showDebugPanel = debugEnabled && _debugPanelOpen;
+    // Only true while the panel is actually up AND expanded; keeps the scrims
+    // from vanishing if the panel is closed while _debugFullscreen lingers.
+    final debugFullscreen = showDebugPanel && _debugFullscreen;
     final previewFit = _previewFit;
     // Landscape re-seats the heroes: the viewport is short, so stacking
     // center cue + signage + bottom rep hero collides. The rep hero moves to
@@ -1815,13 +1810,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     // The persistent phase verb (XUỐNG/LÊN) and phase hint are gone in v9:
     // they duplicated the user's own proprioception and were illegible from
     // 2.5 m anyway. Direction is now the quiet chevron stream's job; the
-    // bottom zone belongs to the rep hero alone.
-
-    // TODO(caption): Wire mid-rep fault detection caption here
-    final showCaption = activeState &&
-        coachMessage.isNotEmpty &&
-        !showDebugPanel &&
-        guidanceCopy == null;
+    // bottom zone belongs to the rep hero alone. The full-sentence coach
+    // caption is gone too — text coaching isn't readable mid-exercise; the
+    // voice channel and other mediums carry those cues.
 
     // ── Page 1: the live camera stage ──
     // Everything that belongs to the camera view lives in this stack. The
@@ -1888,316 +1879,77 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
         // ── Layer 3: Top scrim — anchors the status bar + top chrome
         // row against the camera scene. Fades to transparent by ~140 px
-        // so the live body area stays bright.
-        const Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 140,
-          child: IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Color.fromRGBO(15, 11, 9, 0.78),
-                    Colors.transparent,
-                  ],
+        // so the live body area stays bright. Hidden under the fullscreen
+        // debug glass so it doesn't tint the see-through dump.
+        if (!debugFullscreen)
+          const Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 140,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color.fromRGBO(15, 11, 9, 0.78),
+                      Colors.transparent,
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
 
         // ── Layer 4: Bottom scrim — anchors the phase verb + rep
         // counter. Stronger alpha than the top scrim because the bottom
         // carries more glass-on-bright-scene text and a wider safe-area.
-        const Positioned(
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: 200,
-          child: IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                  colors: [
-                    Color.fromRGBO(15, 11, 9, 0.92),
-                    Colors.transparent,
-                  ],
+        // Hidden under the fullscreen debug glass, same as the top scrim.
+        if (!debugFullscreen)
+          const Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 200,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [
+                      Color.fromRGBO(15, 11, 9, 0.92),
+                      Colors.transparent,
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
 
-        // ── Layer 4.5: Ambient reward (Hearthlight) ──
-        // Additive warm-light feedback for clean reps. Sits above the camera
-        // + scrims but below the chrome, and is bottom/edge anchored +
-        // transparent through the center, so the live body and the jade
-        // skeleton stay fully visible. Always mounted (even when paused) so
-        // the accumulated hearth pool persists across the whole set.
-        Positioned.fill(
-          child: RepRewardLayer(
-            cleanReps: _cleanRepCount,
-            totalReps: widget.totalReps,
-            pulseId: _rewardPulseId,
-            // Holds get a continuous hearth: the pool rises with every
-            // accrued correct second instead of per-rep steps.
-            holdProgress: widget.isTimeBased ? _holdPoolProgress : null,
-          ),
-        ),
-
-        // ── Layer 4: Top chrome left (back + HIỆP pill) ──
-        Positioned(
-          top: media.padding.top + 10,
-          left: 16,
-          child: IvoryTopChromeLeft(
-            currentSet: widget.currentSet,
-            totalSets: widget.totalSets,
-            setSeconds: _setElapsedSeconds,
-            onBack: _handleBackChromeTap,
-          ),
-        ),
-
-        // ── Layer 5: Top chrome right (flip + pause) ──
-        // No live form score lives here — real-time feedback on this screen
-        // is encouragement and safety only, never a verdict the user performs
-        // under. The form verdict is computed after the set.
-        Positioned(
-          top: media.padding.top + 10,
-          right: 16,
-          child: IvoryTopChromeRight(
-            onPause: () {
-              _isManualPause = true;
-              widget.exercise.manualPause();
-              setState(() {});
-            },
-            onFlipCamera: _toggleCamera,
-            debugBadge: showDebugEntryBadge
-                ? DebugIndicatorBadge(
-                    mode: debugEnabled ? debugMode : DebugMode.dev,
-                    panelOpen: debugEnabled && _debugPanelOpen,
-                    onToggle: () {
-                      if (!debugEnabled) {
-                        _showDevModeSheet();
-                        return;
-                      }
-                      setState(() {
-                        _debugPanelOpen = !_debugPanelOpen;
-                      });
-                    },
-                  )
-                : null,
-          ),
-        ),
+        // (v9 follow-along) The Hearthlight reward glow moved OUT to the
+        // outer stack so the correct-rep glow rises on the trainer video
+        // page too — same accumulated pool, shared instance.
 
         // (v9) The 80×108 PT reference thumbnail is gone — the demo's home
         // is now the full-screen second page of the PageView, so no video
         // decoder runs behind the camera view.
 
-        // ── Layer 8: Coach caption (upper third, timed) ──
-        // High enough to clear the center hold ring / hybrid cue and far
-        // from the bottom rep hero; the caption times its own ~2s life.
-        if (showCaption)
-          Positioned(
-            left: 24,
-            right: 24,
-            top: media.padding.top + 64,
-            child: IvoryCoachCaption(message: coachMessage),
-          ),
+        // (v9) The full-sentence coach caption is gone — form-correction
+        // text isn't readable mid-set; voice and other mediums carry it.
 
-        // ── Layer 8.5: Guidance mode-scrim ──
-        // At 2.5m only gross screen change registers, so guidance dims the
-        // whole stage: heavy at the edges, light through the center — the
-        // user still sees their own mirror, which is HOW they comply with
-        // "step back" / "get in frame". Always mounted; a single 300ms fade
-        // (no flashing).
-        Positioned.fill(
-          child: IgnorePointer(
-            child: AnimatedOpacity(
-              opacity: (guidanceCopy != null && !widget.exercise.isPaused)
-                  ? 1.0
-                  : 0.0,
-              duration: const Duration(milliseconds: 300),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    center: Alignment.center,
-                    radius: 1.1,
-                    colors: [
-                      VikaIvory.heroBg.withValues(alpha: 0.34),
-                      VikaIvory.heroBg.withValues(alpha: 0.86),
-                    ],
-                    stops: const [0.35, 1.0],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
+        // (v9 follow-along) The guidance mode-scrim + full-screen signage
+        // moved OUT to the outer stack (above the PageView) so the trainer
+        // video page gets the exact same distance-legible takeover as the
+        // camera view — one shared instance, no small-text variant.
 
-        // ── Layer 9: Setup/safety guidance — signage, not paragraphs ──
-        // Glyph-first, animated directionally, upper-center of the screen
-        // so it never hides the user's own body in the mirror.
-        if (guidanceCopy != null && !widget.exercise.isPaused)
-          Align(
-            alignment: Alignment(0, isLandscape ? -0.35 : -0.25),
-            child: IgnorePointer(
-              child: GuidanceSignage(
-                icon: guidanceCopy.icon,
-                kind: guidanceCopy.kind,
-                title: guidanceCopy.title,
-                body: guidanceCopy.body,
-                mode: guidanceCopy.mode,
-                horizontal: isLandscape,
-              ),
-            ),
-          ),
-
-        // ── Layer 10: Center overlay (scan/warn/position/hold) ──
-        IgnorePointer(
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 260),
-            child:
-                overlayState == _LiveOverlayState.active || guidanceCopy != null
-                    ? const SizedBox.shrink()
-                    : Center(
-                        child: _CenterOverlay(
-                          state: overlayState,
-                          pulseController: _pulseController,
-                          progress: widget.exercise.activationProgress,
-                          holdCue: bottomHoldCue,
-                        ),
-                      ),
-          ),
-        ),
-
-        // ── Layer 11: Hold hero ring / rest ring (category 1) ──
-        // One center slot, two opposite states that crossfade: WORK fills
-        // yellow and counts up (HoldHeroRing); an in-set BREAK (e.g. plank's
-        // McGill 5s between holds) drains amber and counts down
-        // (RestCountdownRing). Anything counting down gets a ring.
-        if (widget.isTimeBased && activeState && guidanceCopy == null)
-          Center(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 320),
-              transitionBuilder: (child, animation) {
-                return FadeTransition(
-                  opacity: animation,
-                  child: ScaleTransition(
-                    scale: Tween<double>(begin: 0.92, end: 1).animate(
-                      CurvedAnimation(parent: animation, curve: Curves.easeOut),
-                    ),
-                    child: child,
-                  ),
-                );
-              },
-              child: holdRestRemaining != null
-                  ? RestCountdownRing(
-                      key: const ValueKey<String>('hold-rest-ring'),
-                      remainingSeconds: holdRestRemaining,
-                      totalSeconds: _restRingTotalSeconds,
-                    )
-                  : HoldHeroRing(
-                      key: const ValueKey<String>('hold-hero-ring'),
-                      seconds: _liveHoldRingSeconds,
-                      targetSeconds: widget.exercise.liveHoldTargetSeconds ??
-                          widget.totalReps.toDouble(),
-                    ),
-            ),
-          ),
-
-        // ── Layer 11.2: Phase direction chevrons (rep-based, ambient) ──
-        // Beside the body area, never over it. Down while descending, up
-        // while ascending, hidden otherwise. Deliberately quiet. In
-        // landscape the right edge belongs to the rep hero, so the stream
-        // moves to the left.
-        if (!widget.isTimeBased &&
-            activeState &&
-            guidanceCopy == null &&
-            !showDebugPanel &&
-            _phaseChevronFlow != null)
-          Positioned(
-            left: isLandscape ? 18 : null,
-            right: isLandscape ? null : 14,
-            top: 0,
-            bottom: 0,
-            child: Center(
-              child: PhaseChevronStream(flow: _phaseChevronFlow!),
-            ),
-          ),
-
-        // ── Layer 11.5: Hybrid bottom-hold cue (category 2b) ──
-        // A draining countdown ring, structurally opposite to the category-1
-        // ring on every axis (drains vs fills, cream vs yellow, 150pt vs
-        // 230pt, seconds vs whole set). "LÊN!" is deliberately the loudest
-        // visual beat — hesitating loaded at the bottom is a safety problem.
-        // Squat holds are only 0.35s, so the widget guarantees each beat a
-        // legible minimum life; the entrance here is fast for the same
-        // reason.
-        if (!widget.isTimeBased && !showDebugPanel)
-          IgnorePointer(
-            child: Center(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 110),
-                transitionBuilder: (child, animation) {
-                  return FadeTransition(
-                    opacity: animation,
-                    child: ScaleTransition(scale: animation, child: child),
-                  );
-                },
-                child: (activeState &&
-                        bottomHoldCue != null &&
-                        guidanceCopy == null)
-                    ? HybridHoldCue(
-                        // Stable key: hold → release must update the same
-                        // widget so the release pop animates, not crossfade.
-                        key: const ValueKey<String>('hybrid-hold-cue'),
-                        remainingSeconds: bottomHoldCue.remaining,
-                        readyToPush: bottomHoldCue.readyToPush,
-                        progress: bottomHoldCue.progress,
-                        showCountdown: bottomHoldCue.showCountdown,
-                      )
-                    : const SizedBox.shrink(),
-              ),
-            ),
-          ),
-
-        // ── Layer 12: Rep hero (category 2) ──
-        // The one number a rep-based user glances for. Bottom-center in
-        // portrait; in landscape the short viewport puts bottom-center under
-        // the hold cue and signage, so the hero owns the right edge instead.
-        // No fault marking — feedback during the set is additive only; the
-        // form verdict is computed after the set, never during.
-        if (!widget.isTimeBased && activeState && !showDebugPanel)
-          if (isLandscape)
-            Positioned(
-              right: 40,
-              top: 0,
-              bottom: 0,
-              child: Center(
-                child: IvoryRepHero(
-                  repCount: widget.exercise.repCount,
-                  totalReps: widget.totalReps,
-                ),
-              ),
-            )
-          else
-            Positioned(
-              left: 24,
-              right: 24,
-              bottom: media.padding.bottom + 28,
-              child: Center(
-                child: IvoryRepHero(
-                  repCount: widget.exercise.repCount,
-                  totalReps: widget.totalReps,
-                ),
-              ),
-            ),
+        // (v9 follow-along) The center overlay (ready/activation countdown),
+        // phase chevrons, hold/rest rings, hybrid hold cue, rep hero and top
+        // chrome all moved OUT of the camera stage to the outer stack — they
+        // now sit above the PageView so both pages (camera + trainer video)
+        // share one instance and everything stays fixed mid-swipe.
       ],
     );
 
@@ -2229,38 +1981,315 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                 videoAsset: widget.definition.videoAsset,
                 exerciseName: widget.exercise.exerciseName,
                 isTimeBased: widget.isTimeBased,
-                liveValue: widget.isTimeBased
-                    ? _liveHoldRingSeconds.floor()
-                    : widget.exercise.repCount,
-                totalValue: widget.totalReps,
+                isLandscape: isLandscape,
                 videoActive: _demoPageIndex == 1,
               ),
             ],
           ),
 
-          // Quiet swipe affordance: two page dots top-center, clear of the
-          // corner chrome.
-          Positioned(
-            top: media.padding.top + 24,
-            left: 0,
-            right: 0,
-            child: IgnorePointer(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  for (var i = 0; i < 2; i++)
-                    Container(
-                      width: 5,
-                      height: 5,
-                      margin: const EdgeInsets.symmetric(horizontal: 3),
-                      decoration: BoxDecoration(
-                        color: VikaIvory.invInk.withValues(
-                            alpha: _demoPageIndex == i ? 0.85 : 0.30),
-                        shape: BoxShape.circle,
+          // ── Ambient reward (Hearthlight) — shared by both pages ──
+          // Additive warm-light feedback for clean reps. Bottom/edge anchored
+          // + transparent through the center, so it never hides the camera
+          // body or the trainer video; the correct-rep glow now rises on the
+          // follow-along page too. Sits lowest (just above the PageView) so
+          // the guidance scrim, metrics and chrome all draw over it. Always
+          // mounted (even when paused) so the accumulated hearth pool persists
+          // across the whole set.
+          Positioned.fill(
+            child: RepRewardLayer(
+              cleanReps: _cleanRepCount,
+              totalReps: widget.totalReps,
+              pulseId: _rewardPulseId,
+              // Holds get a continuous hearth: the pool rises with every
+              // accrued correct second instead of per-rep steps.
+              holdProgress: widget.isTimeBased ? _holdPoolProgress : null,
+            ),
+          ),
+
+          // ── Guidance mode-scrim — shared by both pages ──
+          // At 2.5m only gross screen change registers, so guidance dims the
+          // whole stage: heavy at the edges, light through the center. On the
+          // camera page the user still sees their own mirror (which is HOW
+          // they comply); on the trainer video page it dims the demo so the
+          // instruction pops. Always mounted; a single 300ms fade (no
+          // flashing). Sits above the PageView but below the metric heroes
+          // and chrome, exactly as it did inside the camera stage. Hidden
+          // under the fullscreen debug glass so the dump reads over the raw
+          // feed + skeleton, not a dimmed one.
+          if (!debugFullscreen)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: AnimatedOpacity(
+                  opacity: (guidanceCopy != null && !widget.exercise.isPaused)
+                      ? 1.0
+                      : 0.0,
+                  duration: const Duration(milliseconds: 300),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        center: Alignment.center,
+                        radius: 1.1,
+                        colors: [
+                          VikaIvory.heroBg.withValues(alpha: 0.34),
+                          VikaIvory.heroBg.withValues(alpha: 0.86),
+                        ],
+                        stops: const [0.35, 1.0],
                       ),
                     ),
-                ],
+                  ),
+                ),
               ),
+            ),
+
+          // ── Setup/safety guidance — the same signage on both pages ──
+          // Glyph-first, animated directionally, dead-center of the screen —
+          // large enough to read from 2.5m. The mode-scrim dims everything
+          // behind it, so the sign owns the middle; identical on the camera
+          // and video pages so swiping never changes what it looks like.
+          if (guidanceCopy != null && !widget.exercise.isPaused)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Center(
+                  child: GuidanceSignage(
+                    icon: guidanceCopy.icon,
+                    kind: guidanceCopy.kind,
+                    title: guidanceCopy.title,
+                    body: guidanceCopy.body,
+                    mode: guidanceCopy.mode,
+                    landscape: isLandscape,
+                  ),
+                ),
+              ),
+            ),
+
+          // ── Center overlay — ready/activation countdown, scan, position ──
+          // The count-in before a set, the "đang tìm người" scan pulse and
+          // the hold-still-to-activate progress ring. Shared so the trainer
+          // video page shows the exact same ready state as the camera view.
+          IgnorePointer(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 260),
+              child: overlayState == _LiveOverlayState.active ||
+                      guidanceCopy != null
+                  ? const SizedBox.shrink()
+                  : Center(
+                      child: _CenterOverlay(
+                        state: overlayState,
+                        pulseController: _pulseController,
+                        progress: widget.exercise.activationProgress,
+                        holdCue: bottomHoldCue,
+                      ),
+                    ),
+            ),
+          ),
+
+          // ── Phase direction chevrons (rep-based, ambient) ──
+          // Beside the body area, never over it. Down while descending, up
+          // while ascending, hidden otherwise. Deliberately quiet. In
+          // landscape the right edge belongs to the rep hero, so the stream
+          // moves to the left. Shared so the tempo cue tracks on both pages.
+          if (!widget.isTimeBased &&
+              activeState &&
+              guidanceCopy == null &&
+              !showDebugPanel &&
+              _phaseChevronFlow != null)
+            Positioned(
+              left: isLandscape ? 18 : null,
+              right: isLandscape ? null : 14,
+              top: 0,
+              bottom: 0,
+              child: IgnorePointer(
+                child: Center(
+                  child: PhaseChevronStream(flow: _phaseChevronFlow!),
+                ),
+              ),
+            ),
+
+          // ── Lifted metric layer — shared by both pages ──
+          // The rings, hold cue and rep hero sit above the PageView so the
+          // camera view AND the trainer video page show the same single
+          // instance: one animation controller each, and the numbers stay
+          // fixed in place while the pages slide underneath during a swipe.
+
+          // ── Hold hero ring / rest ring (category 1) ──
+          // One center slot, two opposite states that crossfade: WORK fills
+          // yellow and counts up (HoldHeroRing); an in-set BREAK (e.g.
+          // plank's McGill 5s between holds) drains amber and counts down
+          // (RestCountdownRing). Anything counting down gets a ring.
+          if (widget.isTimeBased && activeState && guidanceCopy == null)
+            Center(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 320),
+                transitionBuilder: (child, animation) {
+                  return FadeTransition(
+                    opacity: animation,
+                    child: ScaleTransition(
+                      scale: Tween<double>(begin: 0.92, end: 1).animate(
+                        CurvedAnimation(
+                            parent: animation, curve: Curves.easeOut),
+                      ),
+                      child: child,
+                    ),
+                  );
+                },
+                child: holdRestRemaining != null
+                    ? RestCountdownRing(
+                        key: const ValueKey<String>('hold-rest-ring'),
+                        remainingSeconds: holdRestRemaining,
+                        totalSeconds: _restRingTotalSeconds,
+                      )
+                    : HoldHeroRing(
+                        key: const ValueKey<String>('hold-hero-ring'),
+                        seconds: _liveHoldRingSeconds,
+                        targetSeconds: widget.exercise.liveHoldTargetSeconds ??
+                            widget.totalReps.toDouble(),
+                      ),
+              ),
+            ),
+
+          // ── Hybrid bottom-hold cue (category 2b) ──
+          // A draining countdown ring, structurally opposite to the
+          // category-1 ring on every axis (drains vs fills, cream vs yellow,
+          // 150pt vs 230pt, seconds vs whole set). "LÊN!" is deliberately
+          // the loudest visual beat — hesitating loaded at the bottom is a
+          // safety problem. Squat holds are only 0.35s, so the widget
+          // guarantees each beat a legible minimum life; the entrance here
+          // is fast for the same reason.
+          if (!widget.isTimeBased && !showDebugPanel)
+            IgnorePointer(
+              child: Center(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 110),
+                  transitionBuilder: (child, animation) {
+                    return FadeTransition(
+                      opacity: animation,
+                      child: ScaleTransition(scale: animation, child: child),
+                    );
+                  },
+                  child: (activeState &&
+                          bottomHoldCue != null &&
+                          guidanceCopy == null)
+                      ? HybridHoldCue(
+                          // Stable key: hold → release must update the same
+                          // widget so the release pop animates, not
+                          // crossfade.
+                          key: const ValueKey<String>('hybrid-hold-cue'),
+                          remainingSeconds: bottomHoldCue.remaining,
+                          readyToPush: bottomHoldCue.readyToPush,
+                          progress: bottomHoldCue.progress,
+                          showCountdown: bottomHoldCue.showCountdown,
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ),
+            ),
+
+          // ── Rep hero (category 2) ──
+          // The one number a rep-based user glances for. Bottom-center in
+          // portrait; in landscape the short viewport puts bottom-center
+          // under the hold cue and signage, so the hero owns the right edge
+          // instead. No fault marking — feedback during the set is additive
+          // only; the form verdict is computed after the set, never during.
+          if (!widget.isTimeBased && activeState && !showDebugPanel)
+            if (isLandscape)
+              Positioned(
+                right: 40,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: IvoryRepHero(
+                    repCount: widget.exercise.repCount,
+                    totalReps: widget.totalReps,
+                  ),
+                ),
+              )
+            else
+              Positioned(
+                left: 24,
+                right: 24,
+                bottom: media.padding.bottom + 28,
+                child: Center(
+                  child: IvoryRepHero(
+                    repCount: widget.exercise.repCount,
+                    totalReps: widget.totalReps,
+                  ),
+                ),
+              ),
+
+          // ── Page arrows — left/right center edges ──
+          if (!widget.exercise.isPaused && !showDebugPanel) ...[
+            if (_demoPageIndex == 0)
+              Positioned(
+                right: 12,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: GestureDetector(
+                    onTap: () => _pageController.animateToPage(1,
+                        duration: const Duration(milliseconds: 280),
+                        curve: Curves.easeInOut),
+                    child: _PageArrowButton(
+                        icon: Icons.keyboard_double_arrow_right_rounded),
+                  ),
+                ),
+              ),
+            if (_demoPageIndex == 1)
+              Positioned(
+                left: 12,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: GestureDetector(
+                    onTap: () => _pageController.animateToPage(0,
+                        duration: const Duration(milliseconds: 280),
+                        curve: Curves.easeInOut),
+                    child: _PageArrowButton(
+                        icon: Icons.keyboard_double_arrow_left_rounded),
+                  ),
+                ),
+              ),
+          ],
+
+          // ── Top chrome: lifted above the PageView so both pages carry
+          // the set pill, timer, back and pause. Sits above the guidance
+          // scrim (inside cameraStage) exactly as before. The flip-camera
+          // button only exists on the camera page — flipping while watching
+          // the trainer video changes nothing visible.
+          Positioned(
+            top: media.padding.top + 10,
+            left: 16,
+            child: IvoryTopChromeLeft(
+              currentSet: widget.currentSet,
+              totalSets: widget.totalSets,
+              setSeconds: _setElapsedSeconds,
+              onBack: _handleBackChromeTap,
+            ),
+          ),
+          Positioned(
+            top: media.padding.top + 10,
+            right: 16,
+            child: IvoryTopChromeRight(
+              onPause: () {
+                _isManualPause = true;
+                widget.exercise.manualPause();
+                setState(() {});
+              },
+              onFlipCamera: _demoPageIndex == 0 ? _toggleCamera : null,
+              debugBadge: showDebugEntryBadge
+                  ? DebugIndicatorBadge(
+                      mode: debugEnabled ? debugMode : DebugMode.dev,
+                      panelOpen: debugEnabled && _debugPanelOpen,
+                      onToggle: () {
+                        if (!debugEnabled) {
+                          _showDevModeSheet();
+                          return;
+                        }
+                        setState(() {
+                          _debugPanelOpen = !_debugPanelOpen;
+                        });
+                      },
+                    )
+                  : null,
             ),
           ),
 
@@ -2280,27 +2309,6 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                   setState(() {});
                 },
                 onEnd: widget.onBack,
-              ),
-            ),
-
-          // Orientation guidance riding above the pause overlay — compact
-          // pill so it never collides with the centered pause card.
-          if (orientationGuidanceActive)
-            Positioned(
-              left: 20,
-              right: 20,
-              top: media.padding.top + 78,
-              child: IgnorePointer(
-                child: Center(
-                  child: GuidanceSignage(
-                    icon: guidanceCopy.icon,
-                    kind: guidanceCopy.kind,
-                    title: guidanceCopy.title,
-                    body: guidanceCopy.body,
-                    mode: guidanceCopy.mode,
-                    compact: true,
-                  ),
-                ),
               ),
             ),
 
@@ -2337,33 +2345,26 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
 
           // ── Layer 15: Debug panel ──
           if (showDebugPanel)
-            Positioned(
-              left: 12,
-              right: 12,
-              bottom: media.padding.bottom + 16,
+            Positioned.fill(
               child: DebugPanel(
                 mode: debugMode,
-                metrics: trackedMetrics,
-                expandedMetricId: _expandedMetricId,
-                onToggleExpand: (metricId) {
-                  setState(() {
-                    _expandedMetricId =
-                        _expandedMetricId == metricId ? null : metricId;
-                  });
-                },
-                phaseLabel: debugMode == DebugMode.dev
-                    ? widget.exercise.currentPhaseKey
-                    : widget.exercise.currentPhaseLabel,
+                debugData: widget.exercise.debugData,
+                phaseLabel: widget.exercise.currentPhaseKey,
                 repCount: widget.exercise.repCount,
                 totalReps: widget.totalReps,
                 setSeconds: _setElapsedSeconds,
                 fps: widget.exercise.currentFps,
-                frameTimestampMs: widget.exercise.frameTimestampMs,
-                confidence: widget.exercise.personPresenceScore,
                 footerLabel:
                     '${widget.exercise.exerciseName} · ${AppMetadata.displayVersion}',
+                fullscreen: _debugFullscreen,
+                onToggleFullscreen: () {
+                  setState(() => _debugFullscreen = !_debugFullscreen);
+                },
                 onMinimize: () {
-                  setState(() => _debugPanelOpen = false);
+                  setState(() {
+                    _debugPanelOpen = false;
+                    _debugFullscreen = false;
+                  });
                 },
               ),
             ),
@@ -2707,29 +2708,6 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         value.contains('đẩy lên');
   }
 
-  String get _coachMessage {
-    final phaseInstructions = _currentPhaseInstructions;
-    if (phaseInstructions != null) {
-      for (final entry in phaseInstructions.entries) {
-        if (entry.key == 'Status') {
-          continue;
-        }
-        return _translateInstruction(entry.value);
-      }
-    }
-
-    final status = _currentPhaseStatus;
-    if (status != null && status.isNotEmpty) {
-      return _translateStatus(status);
-    }
-
-    final result = _feedback['Result'];
-    if (result != null && result.isNotEmpty) {
-      return _translateResult(result);
-    }
-    return 'Giữ nhịp đều, kiểm soát chuyển động.';
-  }
-
   double? _readDebugNumber(dynamic value) {
     if (value is num) return value.toDouble();
     if (value is String) {
@@ -2737,63 +2715,6 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       return double.tryParse(cleaned);
     }
     return null;
-  }
-
-  String _translateInstruction(String value) {
-    if (value.contains('Keep chest up')) {
-      return 'Rep tiếp theo, mở ngực ra để thân trên thẳng hơn.';
-    }
-    if (value.contains('Heels lifting')) {
-      return 'Ép gót chân xuống sàn để đứng chắc hơn.';
-    }
-    if (value.contains('Dropped too fast')) {
-      return 'Hạ chậm hơn một chút để AI theo dõi tốt hơn.';
-    }
-    if (value.contains('pause')) {
-      return 'Giữ ở đáy thêm một nhịp rồi đứng lên.';
-    }
-    if (value == 'Going Down...') {
-      return 'Hạ người xuống thật chậm.';
-    }
-    if (value == 'Đứng lên') {
-      return 'Đứng lên dứt khoát.';
-    }
-    if (value == 'Push Up!') {
-      return 'Đứng mạnh lên, giữ người thẳng.';
-    }
-    return value
-        .replaceAll('Going Down...', 'Hạ người chậm xuống.')
-        .replaceAll('Push Up Now!', 'Đứng lên dứt khoát.')
-        .replaceAll('Hold!', 'Giữ vững.');
-  }
-
-  String _translateResult(String value) {
-    if (value == 'Good Rep!' || value == 'Tốt lắm!') {
-      return 'Tập chuẩn lắm. Giữ nhịp này.';
-    }
-    if (value == 'Fix Form') {
-      return 'Rep tiếp theo chú ý form hơn nhé.';
-    }
-    return value;
-  }
-
-  String _translateStatus(String value) {
-    final seconds = _extractDurationSeconds(value);
-    if (_isHoldStatus(value)) {
-      return seconds == null
-          ? 'Giữ ở đáy, rồi đẩy lên.'
-          : 'Giữ ở đáy ${seconds.toStringAsFixed(1)} giây, rồi đẩy lên.';
-    }
-    if (_isReleaseStatus(value)) {
-      return 'Đẩy lên luôn.';
-    }
-    if (value.contains('Push Up!')) {
-      return 'Đứng lên dứt khoát.';
-    }
-    if (value.contains('Going Down...')) {
-      return 'Hạ người xuống chậm có kiểm soát.';
-    }
-    return _translateInstruction(value);
   }
 
   double? _extractDurationSeconds(String value) {
@@ -3150,6 +3071,29 @@ class _OverlayBubble extends StatelessWidget {
         border: Border.all(color: outlineColor, width: 2.5),
       ),
       child: Icon(icon, size: 48, color: iconColor),
+    );
+  }
+}
+
+/// Bare double-chevron page hint — no background, just floating arrows with a
+/// soft shadow so they read on any camera frame without blocking anything.
+class _PageArrowButton extends StatelessWidget {
+  const _PageArrowButton({required this.icon});
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: 0.55,
+      child: Icon(
+        icon,
+        size: 32,
+        color: VikaIvory.invInk,
+        shadows: const [
+          Shadow(color: Color(0xFF0F0B09), blurRadius: 12),
+          Shadow(color: Color(0xFF0F0B09), blurRadius: 4),
+        ],
+      ),
     );
   }
 }

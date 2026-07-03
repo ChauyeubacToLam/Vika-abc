@@ -47,10 +47,6 @@ class ShoulderShrugConfig {
 class ShoulderShrugMetric extends DownwardDogMetricBase {
   @override
   String get name => 'ShoulderShrug';
-
-  @override
-  String? get nameVi => 'Vai';
-
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
 

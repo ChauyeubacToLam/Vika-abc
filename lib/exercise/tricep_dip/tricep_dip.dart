@@ -1,5 +1,4 @@
 import 'package:vika/exercise/exercise_base.dart';
-import 'package:vika/debug/tracked_metric.dart';
 import 'package:vika/utils/exercise_logger.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/debouncer.dart';
@@ -51,24 +50,6 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
   final FullExtensionMetric fullExtensionMetric = FullExtensionMetric();
   final ScapularElevationMetric scapularElevationMetric =
       ScapularElevationMetric();
-
-  late final List<TricepMetricBase> _metrics = [
-    hipThrustMetric,
-    tricepRomMetric,
-    fullExtensionMetric,
-    scapularElevationMetric,
-  ];
-  late final List<TrackedMetric> _trackedMetrics =
-      _metrics.map(TrackedMetric.new).toList();
-
-  @override
-  List<TrackedMetric> get trackedDebugMetrics =>
-      List<TrackedMetric>.unmodifiable(
-        [
-          ...super.trackedDebugMetrics,
-          ..._trackedMetrics,
-        ],
-      );
 
   @override
   Map<String, SideLandmarkPair> get requiredSideLandmarks => const {

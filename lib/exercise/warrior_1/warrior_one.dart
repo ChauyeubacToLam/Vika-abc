@@ -20,7 +20,6 @@
 import 'dart:math' as math;
 
 import 'package:vika/exercise/exercise_base.dart';
-import 'package:vika/debug/tracked_metric.dart';
 import 'package:vika/utils/exercise_logger.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
@@ -96,17 +95,6 @@ class WarriorOne extends ExerciseBase {
     backKneeMetric,
     backStraightMetric,
   ];
-  late final List<TrackedMetric> _trackedMetrics =
-      _metrics.map(TrackedMetric.new).toList();
-
-  @override
-  List<TrackedMetric> get trackedDebugMetrics =>
-      List<TrackedMetric>.unmodifiable(
-        [
-          ...super.trackedDebugMetrics,
-          ..._trackedMetrics,
-        ],
-      );
 
   // --- Hold timing ---
   int? _holdStartMs;

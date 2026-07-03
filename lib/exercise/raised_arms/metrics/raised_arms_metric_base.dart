@@ -64,29 +64,19 @@ class FaultRecord {
   });
 }
 
-abstract class RaisedArmsMetricBase implements DebugMetricSource {
-  @override
+abstract class RaisedArmsMetricBase {
   String get name;
   int faultsCount = 0;
 
   void update(RaisedArmsContext ctx);
 
   List<FaultRecord> get faults;
-  @override
   Map<String, dynamic> get debugData;
-  @override
   double? get value => null;
-  @override
   ThresholdBand? get threshold => null;
-  @override
   MetricStatus get status => faults.any((fault) => fault.affectsForm)
       ? MetricStatus.fault
       : MetricStatus.pass;
-  @override
-  String? get nameVi => null;
-  @override
-  bool get devOnly => false;
-
   void reset();
 
   void resetAndCountFault() {

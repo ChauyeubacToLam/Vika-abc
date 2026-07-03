@@ -54,21 +54,16 @@ class WalkingFaultPriority {
   static const int stepConsistency = 3;
 }
 
-abstract class WalkingMetricBase implements DebugMetricSource {
+abstract class WalkingMetricBase {
   int _faultsCount = 0;
   final List<FaultRecord> _faults = [];
-  @override
   Map<String, dynamic> debugData = {};
 
   int get faultsCount => _faultsCount;
   List<FaultRecord> get faults => List.unmodifiable(_faults);
-  @override
   String get name => runtimeType.toString();
-  @override
   double? get value => null;
-  @override
   ThresholdBand? get threshold => null;
-  @override
   MetricStatus get status {
     if (faults.any((fault) => fault.affectsForm)) {
       return MetricStatus.fault;
@@ -76,11 +71,6 @@ abstract class WalkingMetricBase implements DebugMetricSource {
     if (faults.isNotEmpty) return MetricStatus.near;
     return MetricStatus.pass;
   }
-
-  @override
-  String? get nameVi => null;
-  @override
-  bool get devOnly => false;
 
   void update(WalkingRepContext ctx);
 

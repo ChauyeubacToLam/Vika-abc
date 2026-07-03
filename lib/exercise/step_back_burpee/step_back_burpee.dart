@@ -1,6 +1,5 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, non_constant_identifier_names
 
-import 'package:vika/debug/tracked_metric.dart';
 import 'package:vika/utils/debouncer.dart';
 import '../../utils/exercise_logger.dart';
 import '../../utils/pose_math_helpers.dart';
@@ -44,17 +43,6 @@ class StepBackBurpee extends ExerciseBase {
     squatHingeMetric,
     plankFormMetric,
   ];
-  late final List<TrackedMetric> _trackedMetrics =
-      _metrics.map(TrackedMetric.new).toList();
-
-  @override
-  List<TrackedMetric> get trackedDebugMetrics =>
-      List<TrackedMetric>.unmodifiable(
-        [
-          ...super.trackedDebugMetrics,
-          ..._trackedMetrics,
-        ],
-      );
 
   @override
   String get exerciseName => 'Step-Back Burpee';

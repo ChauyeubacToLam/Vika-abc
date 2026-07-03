@@ -4,7 +4,6 @@ import 'dart:math' as math;
 
 import 'package:vika/utils/debouncer.dart';
 import 'package:vika/utils/frame_buffer.dart';
-import 'package:vika/debug/tracked_metric.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
 import '../../utils/pose_math_helpers.dart';
@@ -161,19 +160,6 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
   ];
 
   // Debug metrics
-  late final List<TrackedMetric> _trackedMetrics =
-      _metrics.map(TrackedMetric.new).toList();
-
-  List<TrackedMetric> get trackedMetrics => List.unmodifiable(_trackedMetrics);
-
-  @override
-  List<TrackedMetric> get trackedDebugMetrics =>
-      List<TrackedMetric>.unmodifiable(
-        [
-          ...super.trackedDebugMetrics,
-          ..._trackedMetrics,
-        ],
-      );
 
   @override
   Map<String, SideLandmarkPair> get requiredSideLandmarks => const {
@@ -463,16 +449,10 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
     if (curlUpState == CurlUpState.resting) {
       for (var i = 0; i < _metrics.length; i++) {
         _metrics[i].onRestingFrame(ctx);
-        if (debugEnabled) {
-          _trackedMetrics[i].onTick(now);
-        }
       }
     } else {
       for (var i = 0; i < _metrics.length; i++) {
         _metrics[i].update(ctx);
-        if (debugEnabled) {
-          _trackedMetrics[i].onTick(now);
-        }
       }
     }
 
@@ -492,11 +472,6 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
     repCount += 1;
 
     trunkElevationMetric.checkRepCompletion(ctx);
-    if (isDebugModeActive) {
-      for (final trackedMetric in _trackedMetrics) {
-        trackedMetric.onTick(ctx.frameTimestamp);
-      }
-    }
 
     final allFaults = <FaultRecord>[];
     for (final metric in _metrics) {

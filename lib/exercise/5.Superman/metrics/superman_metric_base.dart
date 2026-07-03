@@ -53,20 +53,15 @@ class SupermanRepContext {
 }
 
 // ─── Metric Base ─────────────────────────────────────────────────────────────
-abstract class SupermanMetricBase implements DebugMetricSource {
+abstract class SupermanMetricBase {
   int faultsCount = 0;
   final List<FaultRecord> _faults = [];
-  @override
   final Map<String, dynamic> debugData = {};
 
   List<FaultRecord> get faults => List.unmodifiable(_faults);
-  @override
   String get name;
-  @override
   double? get value => null;
-  @override
   ThresholdBand? get threshold => null;
-  @override
   MetricStatus get status {
     if (faults.any((fault) => fault.affectsForm)) {
       return MetricStatus.fault;
@@ -74,11 +69,6 @@ abstract class SupermanMetricBase implements DebugMetricSource {
     if (faults.isNotEmpty) return MetricStatus.near;
     return MetricStatus.pass;
   }
-
-  @override
-  String? get nameVi => null;
-  @override
-  bool get devOnly => false;
 
   void update(SupermanRepContext ctx);
   void onStateTransition(

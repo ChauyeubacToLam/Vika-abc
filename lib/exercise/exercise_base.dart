@@ -18,7 +18,6 @@ import '../utils/pose_math_helpers.dart';
 import "../utils/frame_buffer.dart";
 import "../utils/exercise_logger.dart";
 import '../debug/debug_types.dart';
-import '../debug/tracked_metric.dart';
 import '../services/generic_exercise_voice_assets.dart';
 import '../services/queued_asset_voice_player.dart';
 import '../services/viettel_tts_service.dart';
@@ -169,17 +168,6 @@ abstract class ExerciseBase {
   double frontFacingRatio = 1.0;
 
   Map<String, dynamic> debugData = {};
-  late final TrackedMetric _exerciseDebugTracker =
-      TrackedMetric(_ExerciseDebugMetricSource(this));
-  final Map<String, TrackedMetric> _debugDataTrackers = {};
-
-  List<TrackedMetric> get trackedDebugMetrics =>
-      List<TrackedMetric>.unmodifiable(
-        [
-          _exerciseDebugTracker,
-          ..._currentDebugDataTrackers(),
-        ],
-      );
 
   bool get isDebugModeActive => debugMode != DebugMode.off;
 
@@ -207,7 +195,7 @@ abstract class ExerciseBase {
   /// never auto-resumed by presence detection — only [manualResume] clears it.
   bool _manualPause = false;
 
-  static const Duration _PERSON_CONFIRM_DURATION = Duration(milliseconds: 650);
+  static const Duration _PERSON_CONFIRM_DURATION = Duration(milliseconds: 500);
   static const Duration _PERSON_LOST_GRACE = Duration(milliseconds: 900);
   static const Duration _PERSON_RESUME_CONFIRM_DURATION =
       Duration(milliseconds: 320);
@@ -259,12 +247,12 @@ abstract class ExerciseBase {
     InputImage? inputImage,
     Size? imageSize,
   }) {
-    final now = DateTime.now();
+    final now = DateTime.now(); // NOTE: redundant?
     if (_lastFrameTime != null) {
       final deltaMs = now.difference(_lastFrameTime!).inMilliseconds;
       if (deltaMs > 0) {
-        final frameFps = 1000.0 / deltaMs;
-        _currentFps = _currentFps * 0.9 + frameFps * 0.1;
+        final frameFps = 1000.0 / deltaMs; // NOTE: why
+        _currentFps = _currentFps * 0.9 + frameFps * 0.1; // why?
       }
     }
     _lastFrameTime = now;
@@ -283,23 +271,6 @@ abstract class ExerciseBase {
 
     _syncPresenceState(hasPose: true);
 
-    // debugData['hasPose'] = true;
-    // debugData['personRatio'] = _personDetector.lastPersonRatio;
-    // debugData['personSoftRatio'] = _personDetector.lastSoftPersonRatio;
-    // debugData['personSmoothedRatio'] = _personDetector.smoothedPersonRatio;
-    // debugData['personSmoothedSoftRatio'] =
-    //     _personDetector.smoothedSoftPersonRatio;
-    // debugData['personScore'] = _personDetector.presenceScore;
-    // debugData['personDetected'] = _personDetector.personDetected;
-    // debugData['personPresent'] = _personDetector.personDetected;
-    // debugData['segIntervalMs'] =
-    //     _personDetector.configuredMinProcessIntervalMs ?? '-';
-    // debugData['segEvents'] = _personDetector.segmentationEventCount;
-    // debugData['segEventAgeMs'] =
-    //     _personDetector.lastSegmentationEventAgeMs ?? '-';
-    // debugData['segTriggerCounts'] = _personDetector.triggerCountByReason;
-    // debugData['isPaused'] = _isPaused;
-
     // Person detection — only before activation
     if (exerciseState == ExerciseState.notActivated && !_personConfirmed) {
       final stableFor = _personSeenSince == null
@@ -313,8 +284,6 @@ abstract class ExerciseBase {
         resultIssues.feedback["System"] =
             "Đang tìm người... Vui lòng đứng trong khung hình.";
         _populateBaseDebugData();
-
-        _trackDebugFrame();
         return [repCount, resultIssues.feedback];
       }
     }
@@ -326,7 +295,6 @@ abstract class ExerciseBase {
         resultIssues.feedback["System"] =
             "⏸ Tạm dừng — Quay lại khung hình để tiếp tục";
         _populateBaseDebugData();
-        _trackDebugFrame();
         return [repCount, resultIssues.feedback];
       }
     }
@@ -366,35 +334,19 @@ abstract class ExerciseBase {
     if (safetyError != null) {
       resultIssues.feedback["System"] = safetyError;
       _populateBaseDebugData();
-      _trackDebugFrame();
       return [repCount, resultIssues.feedback];
     }
 
     // Calculate scale factor (shoulder-to-hip distance)
-    calScaleFacrtor(smoothedLandmarks);
-
+     scaleFactor = calScaleFactor(smoothedLandmarks);
     // State machine
     checkExerciseState(smoothedLandmarks, exerciseState);
 
     _populateBaseDebugData();
-    // debugData['posePresenceBaseline'] = _posePresenceDetector.baseline;
-    // debugData['posePresenceRecent'] = _posePresenceDetector.recent;
-    // debugData['posePresenceDelta'] = _posePresenceDetector.currentDelta;
-    // debugData['posePresenceAnomaly'] = _posePresenceDetector.isAnomalyConfirmed;
-    // debugData['poseLowPresence'] = poseLowPresence;
-    // debugData['poseFrameEdgeRisk'] = poseFrameEdgeRisk;
-    // debugData['personPresent'] = _personDetector.personDetected;
-    // debugData['segIntervalMs'] =
-    //     _personDetector.configuredMinProcessIntervalMs ?? '-';
-    // debugData['segEvents'] = _personDetector.segmentationEventCount;
-    // debugData['segEventAgeMs'] =
-    //     _personDetector.lastSegmentationEventAgeMs ?? '-';
-    // debugData['segTriggerCounts'] = _personDetector.triggerCountByReason;
-    // debugData['scaleFactor'] = scaleFactor;
+ 
 
     if (exerciseState == ExerciseState.activated) {
       checkingPose(smoothedLandmarks);
-      _trackDebugFrame();
       if (exerciseState == ExerciseState.activated && requestStop()) {
         exerciseState = ExerciseState.completed;
         onSetComplete();
@@ -403,11 +355,9 @@ abstract class ExerciseBase {
           ? getSetFeedback()
           : getRepCountAndFeedback();
     } else if (exerciseState == ExerciseState.completed) {
-      _trackDebugFrame();
       return getSetFeedback();
     }
 
-    _trackDebugFrame();
     return [repCount, resultIssues.feedback];
   }
 
@@ -437,25 +387,8 @@ abstract class ExerciseBase {
     _syncPresenceState(hasPose: false);
     _populateBaseDebugData();
 
-    // debugData['hasPose'] = false;
-    // debugData['personRatio'] = _personDetector.lastPersonRatio;
-    // debugData['personSoftRatio'] = _personDetector.lastSoftPersonRatio;
-    // debugData['personSmoothedRatio'] = _personDetector.smoothedPersonRatio;
-    // debugData['personSmoothedSoftRatio'] =
-    //     _personDetector.smoothedSoftPersonRatio;
-    // debugData['personScore'] = _personDetector.presenceScore;
-    // debugData['personDetected'] = _personDetector.personDetected;
-    // debugData['personPresent'] = _personDetector.personDetected;
-    // debugData['segIntervalMs'] =
-    //     _personDetector.configuredMinProcessIntervalMs ?? '-';
-    // debugData['segEvents'] = _personDetector.segmentationEventCount;
-    // debugData['segEventAgeMs'] =
-    //     _personDetector.lastSegmentationEventAgeMs ?? '-';
-    // debugData['segTriggerCounts'] = _personDetector.triggerCountByReason;
-    // debugData['isPaused'] = _isPaused;
 
     if (exerciseState == ExerciseState.completed) {
-      _trackDebugFrame();
       return {'Result': 'Hoàn thành! $repCount reps'};
     }
 
@@ -471,7 +404,6 @@ abstract class ExerciseBase {
           'Giữ toàn thân trong khung hình để AI theo dõi ổn định hơn.';
     }
 
-    _trackDebugFrame();
     return Map<String, String>.from(resultIssues.feedback);
   }
 
@@ -496,43 +428,6 @@ abstract class ExerciseBase {
     // debugData['exerciseState'] = exerciseState.toString().split('.').last;
     // debugData['cameraFacing'] = cameraFacing.toString().split('.').last;
     // debugData['personConfirmed'] = _personConfirmed;
-  }
-
-  void _trackDebugFrame() {
-    if (!isDebugModeActive) return;
-
-    final seen = <TrackedMetric>{};
-    for (final trackedMetric in trackedDebugMetrics) {
-      if (seen.add(trackedMetric)) {
-        trackedMetric.onTick(frameTimestampMs);
-      }
-    }
-  }
-
-  List<TrackedMetric> _currentDebugDataTrackers() {
-    final activeKeys = <String>{};
-    for (final entry in debugData.entries) {
-      if (_debugDataMetricValue(entry.value) == null) continue;
-
-      final key = entry.key;
-      activeKeys.add(key);
-      _debugDataTrackers.putIfAbsent(
-        key,
-        () => TrackedMetric(_DebugDataMetricSource(this, key)),
-      );
-    }
-
-    _debugDataTrackers.removeWhere((key, _) => !activeKeys.contains(key));
-    return _debugDataTrackers.values.toList(growable: false);
-  }
-
-  static double? _debugDataMetricValue(dynamic value) {
-    if (value is num) return value.toDouble();
-    if (value is! String) return null;
-
-    final match = RegExp(r'[-+]?\d+(?:\.\d+)?').firstMatch(value);
-    if (match == null) return null;
-    return double.tryParse(match.group(0)!);
   }
 
   void _syncPresenceState({required bool hasPose}) {
@@ -651,7 +546,7 @@ abstract class ExerciseBase {
 
   // --- Helpers ---
 
-  double calScaleFacrtor(
+  double calScaleFactor(
       Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
     final ls = smoothedLandmarks[PoseLandmarkType.leftShoulder];
     final rs = smoothedLandmarks[PoseLandmarkType.rightShoulder];
@@ -664,9 +559,10 @@ abstract class ExerciseBase {
       final hipMidY = (lh.y + rh.y) / 2;
       final dx = shoulderMidX - hipMidX;
       final dy = shoulderMidY - hipMidY;
-      scaleFactor = math.sqrt(dx * dx + dy * dy);
+      final scale = math.sqrt(dx * dx + dy * dy);
+      return scale;
     }
-    return scaleFactor;
+    return 1.0; // should we guard this, or just basically let it 1.0 like this?
   }
 
   void _resetPresenceDetectors() {
@@ -906,67 +802,6 @@ class HoldSecondsAccumulator {
       _goodSeconds += seconds;
     }
   }
-}
-
-class _ExerciseDebugMetricSource implements DebugMetricSource {
-  const _ExerciseDebugMetricSource(this.exercise);
-
-  final ExerciseBase exercise;
-
-  @override
-  String get name => exercise.exerciseName;
-
-  @override
-  String? get nameVi => null;
-
-  @override
-  Map<String, dynamic> get debugData => exercise.debugData;
-
-  @override
-  double? get value => exercise.currentFps;
-
-  @override
-  ThresholdBand? get threshold =>
-      const ThresholdBand(warningBelow: 24, faultBelow: 18);
-
-  @override
-  MetricStatus get status {
-    if (exercise.currentFps < 18) return MetricStatus.fault;
-    if (exercise.currentFps < 24) return MetricStatus.near;
-    return MetricStatus.pass;
-  }
-
-  @override
-  bool get devOnly => false;
-}
-
-class _DebugDataMetricSource implements DebugMetricSource {
-  const _DebugDataMetricSource(this.exercise, this.key);
-
-  final ExerciseBase exercise;
-  final String key;
-
-  @override
-  String get name => 'debug.$key';
-
-  @override
-  String? get nameVi => null;
-
-  @override
-  Map<String, dynamic> get debugData => {key: exercise.debugData[key]};
-
-  @override
-  double? get value =>
-      ExerciseBase._debugDataMetricValue(exercise.debugData[key]);
-
-  @override
-  ThresholdBand? get threshold => null;
-
-  @override
-  MetricStatus get status => MetricStatus.pass;
-
-  @override
-  bool get devOnly => true;
 }
 
 // ignore: unused_element

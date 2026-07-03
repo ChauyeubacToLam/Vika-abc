@@ -45,10 +45,6 @@ class SpineRoundConfig {
 class SpineRoundMetric extends DownwardDogMetricBase {
   @override
   String get name => 'SpineRound';
-
-  @override
-  String? get nameVi => 'Cột sống';
-
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
 

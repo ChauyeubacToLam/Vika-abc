@@ -25,16 +25,12 @@ class HeelRiseMetric extends SquatMetricBase {
 
   @override
   String get name => 'HeelRise';
-
-  @override
-  String? get nameVi => 'Gót chân';
-
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
 
   // 3 frames  ~0.1875s at 16fps — prevents false triggers from floor jitter
   final Debouncer _heelDebouncer = Debouncer(requiredFrames: 5);
-
+  
   /// Prevent instruction spam — only set coaching once per rep.
   bool _instructionSet = false;
   double? _normalizedHeelLift;

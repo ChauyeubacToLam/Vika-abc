@@ -62,8 +62,7 @@ class FaultRecord {
   });
 }
 
-abstract class CobraMetricBase implements DebugMetricSource {
-  @override
+abstract class CobraMetricBase {
   String get name;
   int faultsCount = 0;
 
@@ -71,21 +70,12 @@ abstract class CobraMetricBase implements DebugMetricSource {
 
   List<FaultRecord> get faults;
   bool get isFaultingNow => false;
-  @override
   Map<String, dynamic> get debugData;
-  @override
   double? get value => null;
-  @override
   ThresholdBand? get threshold => null;
-  @override
   MetricStatus get status => faults.any((fault) => fault.affectsForm)
       ? MetricStatus.fault
       : MetricStatus.pass;
-  @override
-  String? get nameVi => null;
-  @override
-  bool get devOnly => false;
-
   void reset();
 
   void resetAndCountFault() {

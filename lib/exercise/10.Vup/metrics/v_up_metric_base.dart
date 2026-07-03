@@ -123,19 +123,14 @@ class VUpFaultPriority {
   static const int tempo = 4;
 }
 
-abstract class VUpMetricBase implements DebugMetricSource {
-  @override
+abstract class VUpMetricBase {
   String get name;
   int faultsCount = 0;
   void update(VUpRepContext ctx);
   List<FaultRecord> get faults;
-  @override
   Map<String, dynamic> get debugData;
-  @override
   double? get value => null;
-  @override
   ThresholdBand? get threshold => null;
-  @override
   MetricStatus get status {
     if (faults.any((fault) => fault.affectsForm)) {
       return MetricStatus.fault;
@@ -144,10 +139,6 @@ abstract class VUpMetricBase implements DebugMetricSource {
     return MetricStatus.pass;
   }
 
-  @override
-  String? get nameVi => null;
-  @override
-  bool get devOnly => false;
   void reset();
   void resetAndCountFault() {
     if (faults.isNotEmpty) faultsCount++;

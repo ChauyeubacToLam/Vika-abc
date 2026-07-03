@@ -1,7 +1,6 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, non_constant_identifier_names, constant_identifier_names
 
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
-import 'package:vika/debug/tracked_metric.dart';
 import 'package:vika/exercise/exercise_base.dart';
 import 'package:vika/utils/debouncer.dart';
 import 'package:vika/utils/pose_math_helpers.dart';
@@ -60,17 +59,6 @@ class LowLunge extends ExerciseBase {
     _kneeTravelMetric,
     _cervicalSafetyMetric,
   ];
-  late final List<TrackedMetric> _trackedMetrics =
-      _metrics.map(TrackedMetric.new).toList();
-
-  @override
-  List<TrackedMetric> get trackedDebugMetrics =>
-      List<TrackedMetric>.unmodifiable(
-        [
-          ...super.trackedDebugMetrics,
-          ..._trackedMetrics,
-        ],
-      );
 
   final List<double> _calibrationScaleSamples = [];
   final List<double> _calibrationCervicalSamples = [];

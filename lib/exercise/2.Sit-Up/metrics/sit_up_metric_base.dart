@@ -40,23 +40,15 @@ class SitUpFaultPriority {
   static const int tempo = 3; // Hạ nhanh quá (Medium)
 }
 
-abstract class SitUpMetricBase implements DebugMetricSource {
-  @override
+abstract class SitUpMetricBase {
   String get name;
   int faultsCount = 0;
 
   void update(SitUpRepContext ctx);
   List<FaultRecord> get faults;
-  @override
   Map<String, dynamic> get debugData;
-
-  @override
   double? get value => null;
-
-  @override
   ThresholdBand? get threshold => null;
-
-  @override
   MetricStatus get status {
     if (faults.any((fault) => fault.affectsForm)) {
       return MetricStatus.fault;
@@ -65,11 +57,6 @@ abstract class SitUpMetricBase implements DebugMetricSource {
     return MetricStatus.pass;
   }
 
-  @override
-  String? get nameVi => null;
-
-  @override
-  bool get devOnly => false;
   void reset();
 
   void resetAndCountFault() {

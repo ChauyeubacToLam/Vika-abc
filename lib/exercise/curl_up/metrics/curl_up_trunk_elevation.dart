@@ -63,9 +63,6 @@ enum _HighFaultLevel { warning, error }
 class TrunkElevationMetric extends CurlUpMetricBase {
   @override
   String get name => 'TrunkElevation';
-  @override
-  String? get nameVi => 'Biên độ cuộn';
-
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
   MetricStatus _status = MetricStatus.pass;

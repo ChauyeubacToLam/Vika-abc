@@ -53,10 +53,6 @@ class HipShoulderSyncConfig {
 class HipShoulderSyncMetric extends SquatMetricBase {
   @override
   String get name => 'HipShoulderSync';
-
-  @override
-  String? get nameVi => 'Đồng bộ hông-vai';
-
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
 

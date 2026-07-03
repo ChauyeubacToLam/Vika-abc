@@ -46,9 +46,6 @@ enum _KneeFaultLevel { warning, error }
 class KneeExtensionMetric extends CurlUpMetricBase {
   @override
   String get name => 'KneeExtension';
-  @override
-  String? get nameVi => 'Gối';
-
   final List<FaultRecord> _faults = [];
   final Map<String, dynamic> _debugData = {};
   double? _kneeAngle;

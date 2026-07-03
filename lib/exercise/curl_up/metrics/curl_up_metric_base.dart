@@ -123,9 +123,8 @@ class CurlUpFaultVoicePriority {
    CurlUpMetricBase — Interface every metric implements.
    ========================================================================= */
 
-abstract class CurlUpMetricBase implements DebugMetricSource {
+abstract class CurlUpMetricBase {
   /// Human-readable name for debug/logging.
-  @override
   String get name;
 
   /// Cumulative count of reps in which this metric logged at least one fault.
@@ -140,20 +139,16 @@ abstract class CurlUpMetricBase implements DebugMetricSource {
   List<FaultRecord> get faults;
 
   /// Debug data for the overlay. Keys should be metric-specific.
-  @override
   Map<String, dynamic> get debugData;
 
   /// Primary threshold-checked scalar shown in the debug panel.
-  @override
   double? get value => null;
 
-  /// Warning/fault bounds used by debug sparklines. The metric's own status
+  /// Warning/fault bounds for developer diagnostics. The metric's own status
   /// remains the source of truth for current pass/near/fault state.
-  @override
   ThresholdBand? get threshold => null;
 
   /// Current metric decision. Override when a metric has a primary value.
-  @override
   MetricStatus get status {
     if (faults.any((fault) => fault.affectsForm)) {
       return MetricStatus.fault;
@@ -161,14 +156,6 @@ abstract class CurlUpMetricBase implements DebugMetricSource {
     if (faults.isNotEmpty) return MetricStatus.near;
     return MetricStatus.pass;
   }
-
-  /// Friendly Vietnamese label for user-facing debug mode.
-  @override
-  String? get nameVi => null;
-
-  /// Hide highly technical metrics from user-facing debug mode.
-  @override
-  bool get devOnly => false;
 
   /// Called every frame while the user is in resting state (between reps).
   /// Override in metrics that refine personal baselines from lying frames.

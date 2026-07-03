@@ -67,8 +67,6 @@ class NeckPullingMetric extends CurlUpMetricBase {
   @override
   String get name => 'NeckPulling';
   @override
-  String? get nameVi => 'Gập cổ';
-  @override
   List<FaultRecord> get faults => _faults;
 
   @override

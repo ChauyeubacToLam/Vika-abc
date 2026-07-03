@@ -66,11 +66,10 @@ class FaultRecord {
 /* =========================================================================
    PlankMetricBase — Interface every plank metric implements.
    ========================================================================= */
-abstract class PlankMetricBase implements DebugMetricSource {
+abstract class PlankMetricBase {
   int faultsCount = 0;
 
   /// Human-readable name for debug/logging.
-  @override
   String get name;
 
   /// Called every frame during an active hold (plankState == holding).
@@ -81,20 +80,12 @@ abstract class PlankMetricBase implements DebugMetricSource {
   bool get isFaultingNow => false;
 
   /// Debug data for the overlay.
-  @override
   Map<String, dynamic> get debugData;
-  @override
   double? get value => null;
-  @override
   ThresholdBand? get threshold => null;
-  @override
   MetricStatus get status => faults.any((fault) => fault.affectsForm)
       ? MetricStatus.fault
       : MetricStatus.pass;
-  @override
-  String? get nameVi => null;
-  @override
-  bool get devOnly => false;
 
   /// Reset all internal state for the next hold.
   void reset();

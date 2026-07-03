@@ -3,7 +3,6 @@
 import 'dart:io';
 import 'dart:math' as math;
 
-import 'package:vika/debug/tracked_metric.dart';
 import 'package:vika/utils/debouncer.dart';
 import 'package:vika/utils/frame_buffer.dart';
 
@@ -128,17 +127,6 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
     depthMetric,
     tempoMetric,
   ];
-  late final List<TrackedMetric> _trackedMetrics =
-      _metrics.map(TrackedMetric.new).toList();
-
-  @override
-  List<TrackedMetric> get trackedDebugMetrics =>
-      List<TrackedMetric>.unmodifiable(
-        [
-          ...super.trackedDebugMetrics,
-          ..._trackedMetrics,
-        ],
-      );
 
   @override
   Map<String, SideLandmarkPair> get requiredSideLandmarks => const {

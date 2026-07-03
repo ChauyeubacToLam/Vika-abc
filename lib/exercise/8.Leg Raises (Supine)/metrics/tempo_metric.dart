@@ -13,7 +13,6 @@ class TempoMetric extends LegRaiseMetricBase {
   List<FaultRecord> get faults => _faults;
   @override
   Map<String, dynamic> get debugData => _debugData;
-
   @override
   double? get value {
     final liveDuration = _debugData['loweringSeconds'];

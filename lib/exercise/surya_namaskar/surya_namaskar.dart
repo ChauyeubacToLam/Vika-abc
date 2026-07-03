@@ -32,7 +32,7 @@ class SuryaNamaskarStep {
     required this.number,
     required this.poseId,
     required this.phaseKey,
-    required this.nameVi,
+    required this.labelVi,
     required this.shortName,
     required this.breath,
     required this.voiceCue,
@@ -43,7 +43,7 @@ class SuryaNamaskarStep {
   final int number;
   final SuryaPoseId poseId;
   final String phaseKey;
-  final String nameVi;
+  final String labelVi;
   final String shortName;
   final String breath;
   final String voiceCue;
@@ -70,7 +70,7 @@ class SuryaNamaskarExercise extends ExerciseBase {
         number: 1,
         poseId: SuryaPoseId.pranamasana,
         phaseKey: 'surya_pose_1',
-        nameVi: 'Tư thế Cầu nguyện',
+        labelVi: 'Tư thế Cầu nguyện',
         shortName: 'Cầu nguyện',
         breath: 'Thở ra',
         voiceCue: 'Đứng thẳng, chắp tay trước ngực. Thở ra một hơi.',
@@ -79,7 +79,7 @@ class SuryaNamaskarExercise extends ExerciseBase {
         number: 2,
         poseId: SuryaPoseId.hastaUttanasana,
         phaseKey: 'surya_pose_2',
-        nameVi: 'Tư thế Vươn tay',
+        labelVi: 'Tư thế Vươn tay',
         shortName: 'Vươn tay',
         breath: 'Hít vào',
         voiceCue: 'Hít vào, vươn tay lên cao, ngả nhẹ.',
@@ -88,7 +88,7 @@ class SuryaNamaskarExercise extends ExerciseBase {
         number: 3,
         poseId: SuryaPoseId.uttanasana,
         phaseKey: 'surya_pose_3',
-        nameVi: 'Tư thế Gập người',
+        labelVi: 'Tư thế Gập người',
         shortName: 'Gập người',
         breath: 'Thở ra',
         voiceCue: 'Thở ra, gập người về trước. Gập gối nếu cần.',
@@ -99,7 +99,7 @@ class SuryaNamaskarExercise extends ExerciseBase {
             ? SuryaPoseId.lowLungeRightBack
             : SuryaPoseId.lowLungeLeftBack,
         phaseKey: 'surya_pose_4',
-        nameVi: isRightLead
+        labelVi: isRightLead
             ? 'Tư thế Kỵ sĩ - chân phải sau'
             : 'Tư thế Kỵ sĩ - chân trái sau',
         shortName: isRightLead ? 'Kỵ sĩ phải' : 'Kỵ sĩ trái',
@@ -112,7 +112,7 @@ class SuryaNamaskarExercise extends ExerciseBase {
         number: 5,
         poseId: SuryaPoseId.highPlankBlank,
         phaseKey: 'surya_pose_5',
-        nameVi: 'Tư thế Tấm ván cao',
+        labelVi: 'Tư thế Tấm ván cao',
         shortName: 'Plank cao',
         breath: 'Giữ hơi',
         voiceCue: 'Bước về tấm ván cao, vai trên cổ tay và thân người thẳng.',
@@ -121,7 +121,7 @@ class SuryaNamaskarExercise extends ExerciseBase {
         number: 6,
         poseId: SuryaPoseId.ashtangaNamaskara,
         phaseKey: 'surya_pose_6',
-        nameVi: 'Tư thế 8 điểm chạm',
+        labelVi: 'Tư thế 8 điểm chạm',
         shortName: '8 điểm chạm',
         breath: 'Thở ra',
         voiceCue: 'Thở ra, hạ gối, ngực, cằm. Hông giữ cao.',
@@ -131,7 +131,7 @@ class SuryaNamaskarExercise extends ExerciseBase {
         number: 7,
         poseId: SuryaPoseId.cobra,
         phaseKey: 'surya_pose_7',
-        nameVi: 'Tư thế Rắn hổ mang',
+        labelVi: 'Tư thế Rắn hổ mang',
         shortName: 'Rắn hổ mang',
         breath: 'Hít vào',
         voiceCue: 'Hít vào, trượt ngực lên thành rắn hổ mang. Ngả nhẹ thôi.',
@@ -140,7 +140,7 @@ class SuryaNamaskarExercise extends ExerciseBase {
         number: 8,
         poseId: SuryaPoseId.downwardDog,
         phaseKey: 'surya_pose_8',
-        nameVi: 'Tư thế Chó cúi mặt',
+        labelVi: 'Tư thế Chó cúi mặt',
         shortName: 'Chó cúi mặt',
         breath: 'Thở ra',
         voiceCue: 'Thở ra, đẩy hông lên cao thành chó cúi mặt.',
@@ -151,7 +151,7 @@ class SuryaNamaskarExercise extends ExerciseBase {
             ? SuryaPoseId.lowLungeLeftBack
             : SuryaPoseId.lowLungeRightBack,
         phaseKey: 'surya_pose_9',
-        nameVi: isRightLead
+        labelVi: isRightLead
             ? 'Tư thế Kỵ sĩ - chân phải lên trước'
             : 'Tư thế Kỵ sĩ - chân trái lên trước',
         shortName: isRightLead ? 'Kỵ sĩ phải' : 'Kỵ sĩ trái',
@@ -164,7 +164,7 @@ class SuryaNamaskarExercise extends ExerciseBase {
         number: 10,
         poseId: SuryaPoseId.uttanasana,
         phaseKey: 'surya_pose_10',
-        nameVi: 'Tư thế Gập người',
+        labelVi: 'Tư thế Gập người',
         shortName: 'Gập người',
         breath: 'Thở ra',
         voiceCue: isRightLead
@@ -175,7 +175,7 @@ class SuryaNamaskarExercise extends ExerciseBase {
         number: 11,
         poseId: SuryaPoseId.hastaUttanasana,
         phaseKey: 'surya_pose_11',
-        nameVi: 'Tư thế Vươn tay',
+        labelVi: 'Tư thế Vươn tay',
         shortName: 'Vươn tay',
         breath: 'Hít vào',
         voiceCue: 'Hít vào, đứng dậy, vươn tay lên cao, ngả nhẹ.',
@@ -184,7 +184,7 @@ class SuryaNamaskarExercise extends ExerciseBase {
         number: 12,
         poseId: SuryaPoseId.pranamasana,
         phaseKey: 'surya_pose_12',
-        nameVi: 'Tư thế Cầu nguyện',
+        labelVi: 'Tư thế Cầu nguyện',
         shortName: 'Cầu nguyện',
         breath: 'Thở ra',
         voiceCue: 'Thở ra, chắp tay trước ngực. Hoàn thành vòng.',

@@ -101,9 +101,8 @@ class DownwardDogFaultVoicePriority {
 /* =========================================================================
    DownwardDogMetricBase — Interface every metric implements.
    ========================================================================= */
-abstract class DownwardDogMetricBase implements DebugMetricSource {
+abstract class DownwardDogMetricBase {
   /// Human-readable name for debug / logging.
-  @override
   String get name;
 
   /// Fault counter across holds.
@@ -118,19 +117,15 @@ abstract class DownwardDogMetricBase implements DebugMetricSource {
   bool get isFaultingNow => false;
 
   /// Debug data for the overlay. Keys should be metric-specific.
-  @override
   Map<String, dynamic> get debugData;
 
   /// Primary threshold-checked scalar shown in the debug panel.
-  @override
   double? get value => null;
 
-  /// Warning/fault bounds for debug sparklines.
-  @override
+  /// Warning/fault bounds for developer diagnostics.
   ThresholdBand? get threshold => null;
 
   /// Current metric decision.
-  @override
   MetricStatus get status {
     if (faults.any((fault) => fault.affectsForm)) {
       return MetricStatus.fault;
@@ -138,14 +133,6 @@ abstract class DownwardDogMetricBase implements DebugMetricSource {
     if (faults.isNotEmpty) return MetricStatus.near;
     return MetricStatus.pass;
   }
-
-  /// Friendly Vietnamese label for user-facing debug mode.
-  @override
-  String? get nameVi => null;
-
-  /// Hide highly technical metrics from user-facing debug mode.
-  @override
-  bool get devOnly => false;
 
   /// Reset all internal state for the next hold.
   void reset();

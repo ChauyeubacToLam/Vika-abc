@@ -1,6 +1,5 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, non_constant_identifier_names
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
-import 'package:vika/debug/tracked_metric.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/debouncer.dart';
 import '../../utils/exercise_logger.dart';
@@ -58,17 +57,6 @@ class BowPose extends ExerciseBase {
     holdDurationMetric,
     stabilityMetric,
   ];
-  late final List<TrackedMetric> _trackedMetrics =
-      _metrics.map(TrackedMetric.new).toList();
-
-  @override
-  List<TrackedMetric> get trackedDebugMetrics =>
-      List<TrackedMetric>.unmodifiable(
-        [
-          ...super.trackedDebugMetrics,
-          ..._trackedMetrics,
-        ],
-      );
 
   @override
   String get exerciseName => 'Bow Pose';
