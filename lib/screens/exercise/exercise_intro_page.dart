@@ -1154,33 +1154,34 @@ class _VideoCardState extends State<_VideoCard> {
                     ),
                   ),
                 ],
-                Positioned(
-                  left: 16,
-                  bottom: 14,
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 4,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: c.yellow,
-                          shape: BoxShape.circle,
+                if (widget.asset == null)
+                  Positioned(
+                    left: 16,
+                    bottom: 14,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 4,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: c.yellow,
+                            shape: BoxShape.circle,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'XEM HƯỚNG DẪN',
-                        style: TextStyle(
-                          fontFamily: 'BeVietnamPro',
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.6,
-                          color: c.invInk.withValues(alpha: 0.7),
+                        const SizedBox(width: 6),
+                        Text(
+                          'XEM HƯỚNG DẪN',
+                          style: TextStyle(
+                            fontFamily: 'BeVietnamPro',
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.6,
+                            color: c.invInk.withValues(alpha: 0.7),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -1585,12 +1586,14 @@ class _MetricDots extends StatelessWidget {
             width: i == active ? 20 : 6,
             height: 6,
             decoration: BoxDecoration(
-              color: i == active
-                  ? c.yellow
-                  : c.inkFaint.withValues(alpha: 0.28),
+              color:
+                  i == active ? c.yellow : c.inkFaint.withValues(alpha: 0.28),
               borderRadius: BorderRadius.circular(3),
               boxShadow: i == active
-                  ? [BoxShadow(color: c.yellow.withValues(alpha: 0.5), blurRadius: 6)]
+                  ? [
+                      BoxShadow(
+                          color: c.yellow.withValues(alpha: 0.5), blurRadius: 6)
+                    ]
                   : null,
             ),
           ),
@@ -2159,8 +2162,8 @@ class _StickyCtaDock extends StatefulWidget {
 class _StickyCtaDockState extends State<_StickyCtaDock> {
   bool _pressed = false;
 
-  /// Armed on long-press-down when [_StickyCtaDock.onReviewerDemoHold]
-  /// is wired; fires the demo at 5s. Cancelled by an early release.
+  /// Armed on press-down when [_StickyCtaDock.onReviewerDemoHold] is wired;
+  /// fires the demo at 5s. Cancelled by an early release.
   Timer? _holdTimer;
   bool _demoFired = false;
 
@@ -2171,10 +2174,13 @@ class _StickyCtaDockState extends State<_StickyCtaDock> {
   }
 
   void _startHold() {
+    if (widget.onReviewerDemoHold == null) return;
     _demoFired = false;
     _holdTimer?.cancel();
     _holdTimer = Timer(const Duration(seconds: 5), () {
+      _holdTimer = null;
       _demoFired = true;
+      if (mounted) setState(() => _pressed = false);
       widget.onReviewerDemoHold?.call();
     });
   }
@@ -2196,6 +2202,21 @@ class _StickyCtaDockState extends State<_StickyCtaDock> {
     _holdTimer?.cancel();
     _holdTimer = null;
     _demoFired = false;
+  }
+
+  void _handlePressDown() {
+    setState(() => _pressed = true);
+    _startHold();
+  }
+
+  void _handlePressUp() {
+    setState(() => _pressed = false);
+    _endHold();
+  }
+
+  void _handlePressCancel() {
+    setState(() => _pressed = false);
+    _cancelHold();
   }
 
   @override
@@ -2232,35 +2253,9 @@ class _StickyCtaDockState extends State<_StickyCtaDock> {
               ],
               Expanded(
                 child: GestureDetector(
-                  onTap: () {
-                    HapticFeedback.mediumImpact();
-                    widget.onStart();
-                  },
-                  onTapDown: (_) => setState(() => _pressed = true),
-                  onTapUp: (_) => setState(() => _pressed = false),
-                  onTapCancel: () => setState(() => _pressed = false),
-                  // Reviewer tracking-demo track: a deliberate 5s hold on
-                  // the start pill opens the demo instead of starting; a
-                  // sub-5s press still starts (handled in _endHold). Only
-                  // wired when onReviewerDemoHold is provided.
-                  onLongPressDown: widget.onReviewerDemoHold != null
-                      ? (_) {
-                          setState(() => _pressed = true);
-                          _startHold();
-                        }
-                      : null,
-                  onLongPressEnd: widget.onReviewerDemoHold != null
-                      ? (_) {
-                          setState(() => _pressed = false);
-                          _endHold();
-                        }
-                      : null,
-                  onLongPressCancel: widget.onReviewerDemoHold != null
-                      ? () {
-                          setState(() => _pressed = false);
-                          _cancelHold();
-                        }
-                      : null,
+                  onTapDown: (_) => _handlePressDown(),
+                  onTapUp: (_) => _handlePressUp(),
+                  onTapCancel: _handlePressCancel,
                   behavior: HitTestBehavior.opaque,
                   child: AnimatedScale(
                     scale: _pressed ? 0.98 : 1.0,

@@ -76,6 +76,18 @@ import 'workout_summary_screen.dart';
 import 'package:vika/services/session_persistence.dart';
 import '../../exercise/warrior_1/warrior_one.dart';
 
+const Map<String, String> _reviewerDemoAssetsByExerciseId = {
+  'squat': 'assets/video/squat_tracking_demo.mp4',
+  'squat_assessment': 'assets/video/squat_tracking_demo.mp4',
+  'plank': 'assets/video/plank_demo.mp4',
+  'glute_bridge': 'assets/video/glute_bridge_demo.mp4',
+  'jumping_jack': 'assets/video/jumping_jack_demo.mp4',
+  'bird__dog': 'assets/video/bird_dog_demo.mp4',
+  'high__plank': 'assets/video/high_plank_demo.mp4',
+  'mountain__climber': 'assets/video/mountain_climber_demo.mp4',
+  'step__back__burpee': 'assets/video/step_back_burpee_demo.mp4',
+};
+
 class ExerciseExperienceScreen extends StatefulWidget {
   const ExerciseExperienceScreen({
     super.key,
@@ -152,6 +164,9 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
   bool get _isWorkoutSequence => widget.sequence.length > 1;
   bool get _isContinuationSlot =>
       _isWorkoutSequence && widget.sequenceIndex > 0;
+  String? get _reviewerDemoAsset =>
+      _reviewerDemoAssetsByExerciseId[widget.definition.id] ??
+      widget.definition.videoAsset;
   String? get _sessionProgressLabel => _isWorkoutSequence
       ? 'Buổi tập · Bài ${widget.sequenceIndex + 1}/${widget.sequence.length}'
       : null;
@@ -789,6 +804,7 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final reviewerDemoAsset = _reviewerDemoAsset;
     final backgroundColor = switch (_phase) {
       _WorkoutFlowPhase.active => const Color(0xFF15110D),
       _WorkoutFlowPhase.transition => const Color(0xFF15110D),
@@ -818,9 +834,11 @@ class _ExerciseExperienceScreenState extends State<ExerciseExperienceScreen> {
           onPreviousDifficulty:
               prev != null ? _handlePreviousExerciseDifficulty : null,
           onStart: _beginWorkout,
-          onReviewerDemoHold: (widget.definition.id == 'squat' ||
-                  widget.definition.id == 'squat_assessment')
-              ? () => ReviewerTrackingDemoOverlay.show(context)
+          onReviewerDemoHold: reviewerDemoAsset != null
+              ? () => ReviewerTrackingDemoOverlay.show(
+                    context,
+                    asset: reviewerDemoAsset,
+                  )
               : null,
           onBack: () => Navigator.of(context).pop(),
         ),

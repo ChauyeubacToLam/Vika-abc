@@ -83,3 +83,6 @@ secrets.json
 android/key.properties
 android/app/vika-release.keystore
 nul
+
+# Raw source videos; compressed mp4 assets live under assets/video/.
+assets/video bấm 5s/
