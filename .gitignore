@@ -66,6 +66,9 @@ app.*.map.json
 /ios/Flutter/Flutter.framework
 /ios/Flutter/Flutter.podspec
 
+# Agent memory: shared notes are committed; private-* notes stay local (personal/sensitive)
+docs/agent-memory/private-*.md
+
 # Environment & secrets (if you add any later)
 .env
 .env.*

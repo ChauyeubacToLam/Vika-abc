@@ -71,6 +71,20 @@ docs/reference/ doc. grep for a fact before writing it; update in place, never a
 docs/state.md is a living snapshot, NOT an append log: date items, move shipped out, delete stale.
 If it only grows, it's rotting.
 
+## Agent memory (shared across every agent)
+docs/agent-memory/ is the cross-agent memory store. Every agent (Claude Code, Codex, whatever runs
+next) reads docs/agent-memory/MEMORY.md at session start; it's a one-line index pointing at
+one-fact-per-file notes in the same dir. Codex: read it, it is not auto-loaded for you.
+Mechanism: Claude Code's private auto-memory dir is a symlink to docs/agent-memory/, so Claude's
+automatic capture/recall lands here, in git, where all agents see it. Don't break the symlink.
+Routing (which store gets a fact):
+- Durable structured project knowledge -> the owning docs/ file (canonical-numbers / state /
+  decisions / reference). That's still one-fact-one-place; agent-memory does NOT duplicate it.
+- Ambient learnings + working preferences (a gotcha, a "Nam prefers X", a tool quirk) ->
+  docs/agent-memory/ as a new note + a MEMORY.md pointer line.
+- Personal / sensitive facts that must NOT be committed -> docs/agent-memory/private-*.md
+  (gitignored, so it stays local and off Codex's radar). Never put personal data in a committed note.
+
 ## Data (Supabase — PROD, project frjtlfzbvdgwgzegfzxh, vinafit-prod, Singapore)
 Default read-only.
 - Reads (SELECT, list tables, inspect schema): run directly.

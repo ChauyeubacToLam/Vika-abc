@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multi-agent memory &amp; context — options for Vika</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,700;0,800;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#1F1812; --ink-soft:#4A4031; --muted:#8A7C63;
+  --bg:#F6F1E4; --raised:#FBF7EE; --line:#E4DAC5; --line-soft:#EEE6D5;
+  --yellow:#FFB701;
+  --tip:#2E6E63; --tip-bg:#E9F1EE; --tip-line:#BFDBD3;
+  --warn:#A2472B; --warn-bg:#F7EAE2; --warn-line:#E7C6B6;
+  --sans:'Be Vietnam Pro',system-ui,-apple-system,sans-serif;
+  --mono:'SF Mono',Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.65;-webkit-font-smoothing:antialiased}
+main{max-width:980px;margin:0 auto;padding:0 28px 96px}
+section{margin-top:56px}
+h1{font-size:34px;font-weight:800;line-height:1.2;margin:0 0 6px;letter-spacing:-.01em}
+h2{font-size:23px;font-weight:800;margin:0 0 4px;letter-spacing:-.005em}
+h3{font-size:17px;font-weight:700;margin:0 0 6px}
+p{margin:0 0 12px;color:var(--ink-soft)}
+strong{color:var(--ink)}
+a{color:var(--tip);text-decoration-color:var(--tip-line)}
+code{font-family:var(--mono);font-size:.86em;background:var(--line-soft);border-radius:4px;padding:1px 5px;color:var(--ink)}
+pre{background:var(--ink);color:#F2EBDD;border-radius:12px;padding:18px 20px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.7;margin:12px 0}
+pre code{background:none;padding:0;color:inherit;font-size:inherit}
+pre .cm{color:#9B8C72}
+pre .hl{color:var(--yellow)}
+
+/* hero */
+.hero{margin:0 -28px;padding:64px 28px 52px;background:linear-gradient(160deg,#241B12 0%,#1F1812 55%,#2A2015 100%);color:#F2EBDD}
+.hero-inner{max-width:924px;margin:0 auto}
+.eyebrow{font-size:11.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--yellow);margin-bottom:14px}
+.hero h1{color:#F7F1E3}
+.hero p{color:#C9BCA4;max-width:640px;margin-top:10px}
+.hero .meta{display:flex;gap:18px;flex-wrap:wrap;margin-top:22px;font-size:12.5px;color:#9B8C72;font-family:var(--mono)}
+.hero .meta span b{color:#F2EBDD;font-weight:600}
+
+.sec-eyebrow{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.sec-eyebrow .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--yellow);margin-right:8px;vertical-align:1px}
+.sub{color:var(--muted);font-size:14.5px;margin-bottom:20px}
+
+.card{background:var(--raised);border:1px solid var(--line);border-radius:14px;padding:22px 24px;margin-bottom:14px}
+.card.flat{background:transparent;border-style:dashed}
+
+/* verdict */
+.verdict{display:grid;grid-template-columns:minmax(0,1fr);gap:0;background:var(--raised);border:1px solid var(--line);border-left:4px solid var(--yellow);border-radius:14px;padding:24px 26px}
+.verdict .v-label{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.verdict h2{margin-bottom:10px}
+.verdict ul{margin:8px 0 0;padding-left:20px;color:var(--ink-soft)}
+.verdict li{margin-bottom:7px}
+.verdict li::marker{color:var(--yellow)}
+
+/* callouts */
+.callout{border-radius:12px;padding:14px 18px;font-size:14.5px;margin:14px 0;line-height:1.6}
+.callout.warn{background:var(--warn-bg);border:1px solid var(--warn-line);color:var(--warn)}
+.callout.tip{background:var(--tip-bg);border:1px solid var(--tip-line);color:var(--tip)}
+.callout b{font-weight:700}
+
+/* tables */
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--raised)}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:640px}
+th{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-align:left;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--line-soft)}
+td{padding:12px 16px;border-bottom:1px solid var(--line-soft);vertical-align:top;color:var(--ink-soft)}
+tr:last-child td{border-bottom:none}
+td b{color:var(--ink)}
+td code{white-space:nowrap}
+.status{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.06em;border-radius:999px;padding:3px 10px;white-space:nowrap}
+.status.ok{background:var(--tip-bg);color:var(--tip);border:1px solid var(--tip-line)}
+.status.gap{background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-line)}
+.status.part{background:#F5EED9;color:#8A6D1B;border:1px solid #E4D5A6}
+
+/* confidence chips */
+.conf{display:inline-block;font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:.04em;border-radius:5px;padding:2px 7px;vertical-align:1px;margin-left:6px;white-space:nowrap}
+.conf.hi{background:var(--tip-bg);color:var(--tip);border:1px solid var(--tip-line)}
+.conf.med{background:#F5EED9;color:#8A6D1B;border:1px solid #E4D5A6}
+.conf.lo{background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-line)}
+
+/* three-layer model */
+.layers{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.layer{background:var(--raised);border:1px solid var(--line);border-radius:14px;padding:20px 22px;min-width:0}
+.layer .l-num{font-family:var(--mono);font-size:26px;font-weight:700;color:var(--yellow);line-height:1;margin-bottom:10px}
+.layer h3{margin-bottom:4px}
+.layer .l-q{font-size:13px;color:var(--muted);font-style:italic;margin-bottom:10px}
+.layer p{font-size:14px;margin-bottom:0}
+
+/* option cards */
+.option{background:var(--raised);border:1px solid var(--line);border-radius:16px;padding:0;margin-bottom:18px;overflow:hidden}
+.option.rec{border-color:var(--ink);box-shadow:0 14px 34px -22px rgba(31,24,18,.35)}
+.opt-head{display:flex;align-items:center;gap:14px;padding:18px 24px;border-bottom:1px solid var(--line-soft);flex-wrap:wrap}
+.opt-rank{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--muted);flex:none}
+.opt-head h3{margin:0;font-size:18px;flex:1;min-width:200px}
+.badge{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;border-radius:999px;padding:4px 12px;flex:none}
+.badge.rec{background:var(--yellow);color:var(--ink)}
+.badge.later{background:var(--line-soft);color:var(--muted)}
+.badge.no{background:var(--warn-bg);color:var(--warn)}
+.opt-body{padding:18px 24px 20px}
+.opt-body p{font-size:14.5px}
+.procon{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:12px}
+.procon .pc{background:var(--bg);border:1px solid var(--line-soft);border-radius:10px;padding:12px 16px;min-width:0}
+.procon h4{margin:0 0 6px;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
+.procon .pro h4{color:var(--tip)}
+.procon .con h4{color:var(--warn)}
+.procon ul{margin:0;padding-left:18px;font-size:13.5px;color:var(--ink-soft)}
+.procon li{margin-bottom:4px}
+.effort{font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:10px}
+
+/* steps */
+.step{display:flex;gap:16px;margin-bottom:22px}
+.step-num{flex:none;width:30px;height:30px;border-radius:50%;background:var(--ink);color:var(--raised);font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;margin-top:2px}
+.step-body{flex:1;min-width:0}
+.step-body h3{margin-bottom:4px}
+.step-body p{font-size:14.5px}
+
+/* sources */
+.src{font-size:13.5px}
+.src td{padding:10px 16px}
+footer{margin-top:64px;padding-top:18px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted);font-family:var(--mono)}
+@media(max-width:700px){ main{padding:0 18px 80px} .hero{margin:0 -18px;padding:48px 18px 40px} h1{font-size:27px} }
+
+/* notepad token bridge */
+:root{ --np-sans:var(--sans); --np-mono:var(--mono); }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="eyebrow">Research report · Agent infrastructure</div>
+    <h1>Shared memory &amp; context for every agent on Vika</h1>
+    <p>How the ecosystem solves cross-agent context in mid-2026, where Vika already stands, four options ranked, and the one concrete setup I recommend.</p>
+    <div class="meta">
+      <span>date <b>2026-07-05</b></span>
+      <span>agents today <b>Claude Code + Codex</b></span>
+      <span>repo <b>project/vika</b></span>
+    </div>
+  </div>
+</div>
+
+<main>
+
+<!-- ============ VERDICT ============ -->
+<section id="verdict">
+  <div class="verdict">
+    <div class="v-label">TL;DR — the verdict</div>
+    <h2>You're already ~80% at best practice. Don't add infrastructure — close three small gaps.</h2>
+    <p>Your setup (one instruction file both agents read via symlink + a checked-in <code>docs/</code> knowledge base) <strong>is</strong> the pattern the ecosystem converged on. The industry name for what your <code>docs/</code> already does is the "memory bank" pattern. The only real hole: Claude's private auto-memory is invisible to Codex, and nothing tells either agent where learned facts should land.</p>
+    <ul>
+      <li><strong>Add a memory-routing rule to CLAUDE.md</strong> — project learnings → <code>docs/</code> (all agents see them); Claude-workflow-only prefs → auto-memory. One paragraph, fixes the silo permanently.</li>
+      <li><strong>Create the missing <code>docs/decisions.md</code></strong> — it's your shared long-term "what we decided &amp; why" memory, referenced by CLAUDE.md but doesn't exist.</li>
+      <li><strong>Optionally flip the symlink</strong> — make <code>AGENTS.md</code> the real file, <code>CLAUDE.md</code> the symlink. Future agents (Cursor, Gemini CLI, 25+ tools) then work with zero setup.</li>
+      <li><strong>Skip MCP memory servers and vector DBs.</strong> Real tech, wrong scale for a solo dev — and files-in-git beats them on auditability anyway.</li>
+    </ul>
+  </div>
+
+  <div class="callout warn"><b>Honesty note on the research run:</b> the deep-research workflow's adversarial verification phase died mid-run (hit your session usage limit — 50 verifier agents failed, not a content problem). I re-verified the load-bearing claims manually afterwards: fetched the official <a href="https://agents.md">agents.md</a> spec page directly, plus fresh searches. Every claim below carries a confidence chip: <span class="conf hi">verified</span> = checked against a primary source; <span class="conf med">multi-source</span> = consistent across 2+ secondary sources; <span class="conf lo">single-source</span> = one blog, treat as lead not fact.</div>
+</section>
+
+<!-- ============ THREE LAYERS ============ -->
+<section id="layers">
+  <div class="sec-eyebrow"><span class="dot"></span>Finding 1 · The mental model</div>
+  <h2>Everyone converged on the same three-layer split</h2>
+  <p class="sub">Across Cline's Memory Bank, Cursor rules, AGENTS.md guides, and MCP memory write-ups, the same separation keeps reappearing — and it maps 1:1 onto files you already have.</p>
+
+  <div class="layers">
+    <div class="layer">
+      <div class="l-num">01</div>
+      <h3>Instructions</h3>
+      <div class="l-q">"How do we work here?"</div>
+      <p>Stable rules: build commands, conventions, architecture, guardrails. Checked in, versioned, rarely churns. <strong>This is what AGENTS.md / CLAUDE.md are for</strong> — and only this. Vika: <code>CLAUDE.md</code>.</p>
+    </div>
+    <div class="layer">
+      <div class="l-num">02</div>
+      <h3>Memory</h3>
+      <div class="l-q">"What have we learned &amp; decided?"</div>
+      <p>Accumulates over time: decisions + rationale, discovered constraints, canonical numbers, design docs. Grows append-ish, needs an index. Vika: <code>docs/</code> — plus the Claude-only auto-memory silo (the gap).</p>
+    </div>
+    <div class="layer">
+      <div class="l-num">03</div>
+      <h3>State</h3>
+      <div class="l-q">"What are we doing right now?"</div>
+      <p>Current focus, todos, blockers. Living snapshot, rewritten not appended, rots fast if unmaintained. Cline calls it <code>activeContext.md</code>; Vika calls it <code>docs/state.md</code>. Same thing.</p>
+    </div>
+  </div>
+
+  <div class="callout tip"><b>Why the split matters for tokens:</b> instructions load into <i>every</i> session prompt, so they must stay lean (one guide cites HumanLayer research that frontier models reliably follow only ~150–200 instructions <span class="conf lo">single-source</span>). Memory and state should be <i>pulled on demand</i> — an index the agent reads, then opens only the relevant file. That's exactly your "grounding" rule, and it's the right call.</div>
+</section>
+
+<!-- ============ LANDSCAPE ============ -->
+<section id="landscape">
+  <div class="sec-eyebrow"><span class="dot"></span>Finding 2 · The landscape</div>
+  <h2>What exists out there, layer by layer</h2>
+
+  <h3 style="margin-top:22px">Instructions: AGENTS.md won</h3>
+  <p><code>AGENTS.md</code> is now the cross-tool standard — an intentionally loose "README for agents" (plain markdown, any headings) stewarded by the <strong>Agentic AI Foundation under the Linux Foundation</strong>, originally a collaboration around OpenAI Codex, Google Jules, Amp, Cursor and Factory. <span class="conf hi">verified — agents.md</span> The spec page lists 25+ native tools: Codex, Gemini CLI, Jules, Cursor, GitHub Copilot, Windsurf, Aider, Zed, Warp, Devin, RooCode, JetBrains Junie, VS Code, goose, opencode and more. <span class="conf hi">verified — agents.md</span> Secondary sources claim 60k+ repos ship one. <span class="conf lo">single-source</span></p>
+  <p>Nested files are part of the spec: agents read the <em>nearest</em> AGENTS.md up the directory tree, so subprojects can ship their own. <span class="conf hi">verified — agents.md</span></p>
+  <p><strong>The one asterisk is Claude Code itself.</strong> Whether it natively reads AGENTS.md is genuinely murky: the official agents.md supporters list does <em>not</em> include Claude Code, and the feature request (anthropics/claude-code <a href="https://github.com/anthropics/claude-code/issues/6235">#6235</a>, reportedly 5,000+ reactions) has been the tracker's biggest open ask — yet some 2026 guides now say it reads AGENTS.md natively. <span class="conf med">conflicting sources</span> <strong>For you this is moot: your symlink makes the question irrelevant.</strong> CLAUDE.md keeps a few extras AGENTS.md lacks regardless — <code>@file</code> imports, hierarchical user/project scopes, and auto-memory. <span class="conf med">multi-source</span></p>
+
+  <h3 style="margin-top:26px">Memory: three families, no winner — but a clear fit for you</h3>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Family</th><th>Examples</th><th>How it works</th><th>Verdict for a solo dev</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>In-repo "memory bank"</b><br><span class="conf hi">verified — docs.cline.bot</span></td>
+          <td>Cline Memory Bank, Cursor community memory-bank rules</td>
+          <td>Structured markdown checked into the repo: <code>activeContext.md</code> (now), <code>systemPatterns.md</code> (architecture), <code>techContext.md</code> (stack/numbers), <code>progress.md</code> / decision log. Agent is instructed to read them at session start and update after significant work. Tool-agnostic by construction — it's just files.</td>
+          <td><b>Best fit.</b> Zero infra, versioned, diffable, every agent reads files. You already run this pattern under a different name.</td>
+        </tr>
+        <tr>
+          <td><b>Tool built-in memories</b><br><span class="conf med">multi-source</span></td>
+          <td>Claude Code auto-memory, Codex CLI memories (v0.107+)</td>
+          <td>The agent writes its own notes to a private per-tool store outside the repo. Automatic and frictionless — but each tool's store is invisible to every other tool.</td>
+          <td>Keep, but <b>demote</b>: fine for tool-specific workflow prefs, wrong place for project knowledge. This silo is exactly your current gap.</td>
+        </tr>
+        <tr>
+          <td><b>MCP memory servers</b><br><span class="conf med">multi-source</span></td>
+          <td>MemPalace (cloud, Apr 2026, inbox-approval model), engram (Go+SQLite), Basic Memory</td>
+          <td>One memory server speaks MCP; every MCP-capable agent (Claude Code, Codex, Cursor…) connects to the same store. Searchable, sometimes vector-backed.</td>
+          <td><b>Skip for now.</b> Real solution to a team-scale problem you don't have; adds a service to run, a dependency to trust, and pulls memory out of git where you can't diff/review it. Revisit if agents multiply.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="margin-top:12px">The cross-tool memory article's own recommendation ladder agrees: <em>file-based &amp; version-controlled first; MCP servers only when multiple tools/teammates make duplication painful; always separate instruction memory (versioned) from learned knowledge (indexed/searchable)</em>. <span class="conf med">multi-source</span> (<code>llms.txt</code>, for completeness, solved a different problem — websites describing themselves to crawlers — and is irrelevant here.)</p>
+</section>
+
+<!-- ============ VIKA MAPPING ============ -->
+<section id="mapping">
+  <div class="sec-eyebrow"><span class="dot"></span>Finding 3 · Gap analysis</div>
+  <h2>Vika vs. the pattern — you already built most of it</h2>
+  <p class="sub">Side-by-side against the memory-bank canon. Green = have it, amber = have it with drift, red = the gap.</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Layer / canon file</th><th>Vika today</th><th>Status</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr><td><b>Instructions</b> · AGENTS.md</td><td><code>CLAUDE.md</code> + <code>AGENTS.md</code> symlink</td><td><span class="status ok">SOLID</span></td><td>Single source, two readers. Only tweak worth considering: flip which name is real (§ Options).</td></tr>
+        <tr><td><b>State</b> · activeContext.md</td><td><code>docs/state.md</code></td><td><span class="status part">DRIFT</span></td><td>Right file, right rules ("living snapshot, not append log") — docs/README itself admits it's overdue a hygiene pass.</td></tr>
+        <tr><td><b>Tech context</b> · techContext.md</td><td><code>docs/canonical-numbers.md</code></td><td><span class="status ok">SOLID</span></td><td>Arguably stronger than the canon: single numeric source of truth + a read-before-quoting rule.</td></tr>
+        <tr><td><b>System patterns</b> · systemPatterns.md</td><td><code>docs/reference/</code> (5 docs)</td><td><span class="status ok">SOLID</span></td><td>Schema, anti-cheat, engine, wiring. Some flagged UNVERIFIED, which is honest and fine.</td></tr>
+        <tr><td><b>Decision log</b> · progress.md / ADRs</td><td><code>docs/decisions.md</code> — <b>does not exist</b></td><td><span class="status gap">MISSING</span></td><td>CLAUDE.md and docs/README both point at it; step 1 of your "did we decide X?" lookup chain is a dead path. This IS the shared what-we-decided memory.</td></tr>
+        <tr><td><b>Learned facts</b> · (memory bank core)</td><td>Claude auto-memory in <code>~/.claude/projects/…/memory/</code></td><td><span class="status gap">SILOED</span></td><td>Works, but Claude-only, per-machine, outside git. Codex will never see anything stored there. No rule says what belongs there vs in docs/.</td></tr>
+        <tr><td><b>Index / recall</b></td><td>docs/README.md map + grounding rules + MEMORY.md</td><td><span class="status ok">SOLID</span></td><td>"Read the owning doc before answering" = pull-on-demand memory. Correct token economics.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ OPTIONS ============ -->
+<section id="options">
+  <div class="sec-eyebrow"><span class="dot"></span>Decision</div>
+  <h2>Four options, ranked</h2>
+
+  <div class="option rec">
+    <div class="opt-head">
+      <span class="opt-rank">#1</span>
+      <h3>A · Route memory into the repo (minimal delta)</h3>
+      <span class="badge rec">Recommended</span>
+    </div>
+    <div class="opt-body">
+      <p>Keep everything you have. Declare <code>docs/</code> the shared memory for all agents and add one routing rule to CLAUDE.md: <strong>anything project-relevant an agent learns goes into the owning <code>docs/</code> file; auto-memory is only for Claude-specific workflow preferences.</strong> Create the missing <code>decisions.md</code>. Because AGENTS.md is the same bytes, Codex inherits the exact same rule for free.</p>
+      <div class="procon">
+        <div class="pc pro"><h4>Pros</h4><ul>
+          <li>Zero new infra, zero dependencies</li>
+          <li>Memory is versioned, diffable, reviewable in git</li>
+          <li>Preserves your "one fact, one place" rule — no parallel store to drift</li>
+          <li>Any future agent that reads files (all of them) gets it free</li>
+        </ul></div>
+        <div class="pc con"><h4>Cons</h4><ul>
+          <li>Relies on discipline — agents must be told to write learnings down (the rule does that, but it's prompt-enforced, not mechanical)</li>
+          <li>Codex won't proactively self-journal the way Claude auto-memory does; it only writes when instructed by AGENTS.md</li>
+        </ul></div>
+      </div>
+      <div class="effort">Effort: ~20 min · Risk: none · Reversible: trivially</div>
+    </div>
+  </div>
+
+  <div class="option">
+    <div class="opt-head">
+      <span class="opt-rank">#2</span>
+      <h3>B · Flip the symlink: AGENTS.md becomes the real file</h3>
+      <span class="badge rec">Do with A</span>
+    </div>
+    <div class="opt-body">
+      <p>Same content, swapped roles: <code>AGENTS.md</code> is the real file, <code>CLAUDE.md → AGENTS.md</code>. Claude Code follows the symlink identically, so nothing changes for it — but the 25+ tools that look for <code>AGENTS.md</code> by name (Cursor, Gemini CLI, Copilot, Windsurf…) now find a real file with zero setup the day you try one. Git tracks symlinks, so this survives clones.</p>
+      <div class="procon">
+        <div class="pc pro"><h4>Pros</h4><ul>
+          <li>Future-proof: standard-named file is the canonical one</li>
+          <li>5-minute change, cosmetic risk only</li>
+        </ul></div>
+        <div class="pc con"><h4>Cons</h4><ul>
+          <li>Symlinks are awkward on Windows (needs Developer Mode) — irrelevant on your Mac, worth knowing if a collaborator ever clones on Windows <span class="conf med">multi-source</span></li>
+          <li>If Claude Code ever gains richer CLAUDE.md-only features (@imports, path-scoped rules), you'd want the real CLAUDE.md back — easy to re-flip</li>
+        </ul></div>
+      </div>
+      <div class="effort">Effort: 5 min · Risk: cosmetic · Reversible: trivially</div>
+    </div>
+  </div>
+
+  <div class="option">
+    <div class="opt-head">
+      <span class="opt-rank">#3</span>
+      <h3>C · MCP memory server (MemPalace / engram / Basic Memory)</h3>
+      <span class="badge later">Revisit later</span>
+    </div>
+    <div class="opt-body">
+      <p>Run one memory service both agents connect to over MCP. Genuinely the right architecture once you have <em>teams</em> of agents or humans who can't all read one repo — and the only family that gives semantic search over memories. Today it would violate two of your own rules: it's a new dependency (ask-first rule) and it moves facts out of the one-fact-one-place system into an unauditable store.</p>
+      <div class="procon">
+        <div class="pc pro"><h4>Pros</h4><ul><li>True automatic cross-tool memory, queryable</li><li>Scales past what files can index</li></ul></div>
+        <div class="pc con"><h4>Cons</h4><ul><li>Service to run/maintain (or a cloud account holding your project brain)</li><li>Memory leaves git — no diff, no review, no provenance</li><li>Duplicates docs/ → guaranteed drift against canonical-numbers.md</li></ul></div>
+      </div>
+      <div class="effort">Trigger to revisit: 3+ agents in rotation, or memories outgrowing grep</div>
+    </div>
+  </div>
+
+  <div class="option">
+    <div class="opt-head">
+      <span class="opt-rank">#4</span>
+      <h3>D · Symlink Claude's auto-memory dir into the repo</h3>
+      <span class="badge no">Rejected</span>
+    </div>
+    <div class="opt-body">
+      <p>The literal version of "make your memory file appear for other agents": link <code>~/.claude/projects/…/memory/</code> into the repo so Codex can read it. Rejected: the harness owns that directory's lifecycle and format; the path is machine-specific (breaks anywhere else); its content is written <em>for Claude</em>, not as shared docs; and you'd end up with two competing knowledge stores — the exact drift your one-fact-one-place rule exists to prevent. Option A gets the same outcome (Codex sees project learnings) the clean way: route the facts to docs/ instead of exposing the silo.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SETUP ============ -->
+<section id="setup">
+  <div class="sec-eyebrow"><span class="dot"></span>The concrete setup</div>
+  <h2>What I'd actually change (A + B, four steps)</h2>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <h3>Add a memory-routing rule to CLAUDE.md Part 1</h3>
+      <p>Slots in right after "Writing docs (one fact, one place)". Because AGENTS.md is the same file, Codex reads it too:</p>
+<pre><code><span class="cm">## Agent memory routing (all agents)</span>
+docs/ is the shared memory for every agent on this repo. Anything learned that outlives
+the session and matters to the project — a decision, a constraint, a number, a gotcha —
+goes in the owning docs/ file (decisions.md / canonical-numbers.md / state.md / reference/),
+not in any tool-private memory. Tool-private memory (Claude auto-memory, Codex memories)
+is for <span class="hl">how-I-work preferences of that tool only</span>, never project facts.
+End of a work session that produced decisions or learnings: write them to docs/ before stopping.</code></pre>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <h3>Create docs/decisions.md (fixes the dead reference)</h3>
+      <p>Seed it thin — an entry template plus backfill of the 2–3 decisions you already treat as settled (v4.3 plan shape, symlink approach, h265 re-encode). Append-only, mark superseded, never delete — the rules CLAUDE.md already states:</p>
+<pre><code><span class="cm"># Decisions — append-only ledger. Mark superseded, never delete.</span>
+
+## 2026-07-05 · docs/ is the cross-agent shared memory
+<span class="hl">Status:</span> active
+<span class="hl">Decision:</span> All agents route project learnings to docs/; tool-private memory
+holds tool workflow prefs only. AGENTS.md stays a symlink twin of CLAUDE.md.
+<span class="hl">Why:</span> One fact one place; git-versioned memory beats siloed/tool-private
+stores for a solo dev. MCP memory servers deferred until 3+ agents.
+<span class="hl">Alternatives considered:</span> MCP memory server (infra overkill),
+exposing Claude auto-memory dir (machine-specific, format not shared).</code></pre>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <h3>Flip the symlink (optional, 5 min)</h3>
+<pre><code><span class="cm"># AGENTS.md becomes the real file, CLAUDE.md the symlink</span>
+rm AGENTS.md
+mv CLAUDE.md AGENTS.md
+ln -s AGENTS.md CLAUDE.md
+git add -A AGENTS.md CLAUDE.md</code></pre>
+      <p>Claude Code behaves identically through the symlink; every AGENTS.md-native tool now works with zero setup. Re-flip any time if CLAUDE.md-only features become worth it.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body">
+      <h3>Nothing to migrate from auto-memory today — and that's the point</h3>
+      <p>Your auto-memory currently holds exactly one fact (the lavish-HTML delivery preference), and it's genuinely Claude-workflow-specific — it stays. Going forward the routing rule keeps it that way: project facts land in docs/ where Codex sees them, and auto-memory stays a thin layer of Claude quirks. Periodic check: if a memory file in there ever describes <em>Vika</em> rather than <em>how Claude should behave</em>, it's in the wrong place — move it to docs/.</p>
+    </div>
+  </div>
+
+  <div class="callout tip"><b>What this buys you concretely:</b> next time Codex works a session, it reads the same manual, the same decision ledger, the same numbers — and when it learns something (a build quirk, a threshold that works), the manual tells it to write that where Claude will find it next session. Two agents, one brain, no new moving parts.</div>
+</section>
+
+<!-- ============ SOURCES ============ -->
+<section id="sources">
+  <div class="sec-eyebrow"><span class="dot"></span>Appendix</div>
+  <h2>Sources</h2>
+  <div class="tablewrap">
+    <table class="src">
+      <thead><tr><th>Source</th><th>Type</th><th>Used for</th></tr></thead>
+      <tbody>
+        <tr><td><a href="https://agents.md/">agents.md — official spec</a></td><td><b>Primary</b> · fetched directly</td><td>Spec intent, Linux Foundation / Agentic AI Foundation stewardship, native tool list, nested-file behavior, Claude Code absent from supporters list</td></tr>
+        <tr><td><a href="https://docs.cline.bot/features/memory-bank">Cline Memory Bank docs</a></td><td><b>Primary</b> · vendor docs</td><td>Memory-bank file structure (activeContext / systemPatterns / techContext), read-at-start + update-after-work loop</td></tr>
+        <tr><td><a href="https://codex.danielvaughan.com/2026/04/17/cross-tool-agent-memory-mempalace-portability/">Cross-Tool Agent Memory (Apr 2026)</a></td><td>Secondary · fetched</td><td>Portability problem framing, MemPalace / engram / Basic Memory, Codex v0.107+ built-in memories, files-first-then-MCP recommendation ladder</td></tr>
+        <tr><td><a href="https://github.com/anthropics/claude-code/issues/6235">anthropics/claude-code #6235</a></td><td>Primary · issue tracker</td><td>AGENTS.md native-support feature request (existence confirmed; reaction count not independently verified)</td></tr>
+        <tr><td><a href="https://www.deployhq.com/blog/ai-coding-config-files-guide">DeployHQ config-files guide</a> · <a href="https://vibecoding.app/blog/agents-md-guide">vibecoding AGENTS.md guide (2026)</a> · <a href="https://www.morphllm.com/agents-md-guide">Morph AGENTS.md spec guide</a> · <a href="https://www.augmentcode.com/guides/how-to-build-agents-md">Augment Code guide</a></td><td>Secondary · search snippets</td><td>Tool-support breadth, 60k-repos adoption claim, per-tool file precedence (GEMINI.md, .cursorrules)</td></tr>
+        <tr><td><a href="https://hivetrail.com/blog/agents-md-vs-claude-md-cross-tool-standard">Hivetrail AGENTS.md vs CLAUDE.md</a> · <a href="https://gist.github.com/yurukusa/d36197848911f025add142abefcde685">yurukusa gist</a></td><td>Secondary · from workflow run, <b>unverified</b></td><td>CLAUDE.md-only capabilities (@imports, scopes, auto-memory), symlink-vs-import bridges, Windows symlink caveat, ~150–200 instruction ceiling claim</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="margin-top:12px;font-size:13.5px;color:var(--muted)">Known conflict left open: whether Claude Code now reads AGENTS.md natively (agents.md list says no; two 2026 blogs say yes). Moot under either symlink direction, so not chased further.</p>
+</section>
+
+<footer>vika · agent-memory research · 2026-07-05 · deep-research run wf_eab38794 (verification degraded, manually re-verified) · report by Claude</footer>
+
+</main>
+
+<!--NP:MARKUP-->
+<button class="note-fab" id="noteFab" aria-label="Open your notes">🖊 Notes <span class="cnt" id="noteCount">0</span></button>
+<div class="note-pop" id="notePop"><button id="notePopBtn" type="button">🖊 Note this</button></div>
+<aside class="note-panel" id="notePanel" aria-label="Your private notes">
+  <div class="ph">
+    <div><h3>Your notes</h3><div class="sub">private · not sent to the agent</div></div>
+    <button class="x" id="notePanelClose" type="button" aria-label="Close">&times;</button>
+  </div>
+  <div class="composer">
+    <div class="anchor" id="noteAnchor" hidden></div>
+    <textarea id="noteInput" placeholder="Type your note, then click outside the box (or ⌘/Ctrl+Enter) to save…"></textarea>
+    <div class="crow">
+      <span class="chint" id="noteHint">Will attach to the section you're viewing</span>
+      <button class="addbtn" id="noteAdd" type="button">Add note</button>
+    </div>
+  </div>
+  <div class="storage-note" id="storageNote" hidden></div>
+  <div class="note-list" id="noteList"></div>
+  <div class="pf">
+    <button id="noteCopy" type="button">Copy all</button>
+    <button id="noteDownload" type="button">Download .md</button>
+    <button id="noteClear" type="button">Clear all</button>
+  </div>
+</aside>
+
+<style>
+/* NP:STYLE */
+:root{
+  --np-ink:var(--ink,#1f1812); --np-ink-soft:var(--ink-soft,#4a4031); --np-muted:var(--muted,#8a7c63);
+  --np-raised:var(--raised,#fbf7ee); --np-line:var(--line,#e4dac5); --np-line-soft:var(--line-soft,#eee6d5);
+  --np-yellow:var(--yellow,#ffb701);
+  --np-tip:var(--tip,#2e6e63); --np-tip-bg:var(--tip-bg,#e9f1ee); --np-tip-line:var(--tip-line,#bfdbd3);
+  --np-warn:var(--warn,#a2472b); --np-warn-bg:var(--warn-bg,#f7eae2); --np-warn-line:var(--warn-line,#e7c6b6);
+}
+mark.note-hl{background:rgba(255,183,1,.20);border-bottom:2px solid rgba(255,183,1,.7);border-radius:2px;
+  cursor:pointer;color:inherit;padding:0 .5px;transition:background .12s ease}
+mark.note-hl.hot{background:rgba(255,183,1,.45)}
+mark.note-hl.flash{animation:npflash 1.2s ease}
+@keyframes npflash{0%,100%{background-color:rgba(255,183,1,.20)}30%{background-color:rgba(255,183,1,.62)}}
+.note-badge{display:inline-flex;align-items:center;justify-content:center;min-width:14px;height:14px;padding:0 3px;
+  margin:0 1px 0 2px;font-family:var(--np-sans);font-size:9px;font-weight:800;line-height:1;vertical-align:super;
+  background:var(--np-ink);color:#fbf7ee;border-radius:7px;cursor:pointer;user-select:none;transition:background .12s ease}
+.note-badge.hot{background:var(--np-yellow);color:var(--np-ink)}
+.note-fab{position:fixed;right:22px;bottom:22px;z-index:2147483000;display:flex;align-items:center;gap:9px;
+  background:var(--np-ink);color:#fbf7ee;border:none;border-radius:999px;padding:12px 17px;cursor:pointer;
+  font-family:var(--np-sans);font-weight:600;font-size:14px;box-shadow:0 10px 26px -10px rgba(31,24,18,.55)}
+.note-fab:hover{background:#332619}
+.note-fab .cnt{font-family:var(--np-mono);font-size:12px;background:var(--np-yellow);color:var(--np-ink);
+  border-radius:999px;padding:1px 8px;min-width:20px;text-align:center}
+.note-pop{position:absolute;z-index:2147483001;transform:translate(-50%,-100%);margin-top:-9px;display:none;
+  background:var(--np-ink);border-radius:9px;padding:5px;box-shadow:0 12px 30px -12px rgba(0,0,0,.5)}
+.note-pop button{background:var(--np-yellow);color:var(--np-ink);border:none;border-radius:6px;
+  padding:7px 12px;font-family:var(--np-sans);font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap}
+.note-pop:after{content:"";position:absolute;left:50%;top:100%;transform:translateX(-50%);
+  border:6px solid transparent;border-top-color:var(--np-ink)}
+.note-panel{position:fixed;top:0;right:0;height:100%;width:min(380px,92vw);z-index:2147483002;background:var(--np-raised);
+  border-left:1px solid var(--np-line);box-shadow:-18px 0 40px -30px rgba(31,24,18,.5);display:flex;flex-direction:column;
+  opacity:0;visibility:hidden;transform:translateY(6px);transition:opacity .18s ease,transform .18s ease,visibility .18s}
+.note-panel.open{opacity:1;visibility:visible;transform:none}
+.note-panel .ph{padding:18px 18px 14px;border-bottom:1px solid var(--np-line);display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.note-panel .ph h3{margin:0;font-size:17px;font-weight:800;font-family:var(--np-sans);color:var(--np-ink)}
+.note-panel .ph .sub{font-family:var(--np-mono);font-size:11px;color:var(--np-muted);letter-spacing:.03em}
+.note-panel .x{background:none;border:none;font-size:24px;line-height:1;cursor:pointer;color:var(--np-muted)}
+.composer{padding:12px 14px;border-bottom:1px solid var(--np-line);background:#fff}
+.composer .anchor{font-family:var(--np-mono);font-size:11px;color:var(--np-tip);background:var(--np-tip-bg);
+  border:1px solid var(--np-tip-line);border-radius:7px;padding:5px 8px;margin-bottom:8px;display:flex;gap:6px;align-items:center;overflow:hidden}
+.composer .anchor span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.composer .anchor .axn{margin-left:auto;cursor:pointer;font-weight:700;flex:none}
+.composer textarea{width:100%;box-sizing:border-box;border:1px solid var(--np-line);border-radius:9px;
+  font-family:var(--np-sans);font-size:15px;padding:10px;resize:vertical;min-height:82px;background:#fff;color:var(--np-ink)}
+.composer textarea:focus{outline:2px solid var(--np-yellow);outline-offset:0;border-color:transparent}
+.composer .crow{display:flex;flex-direction:column;align-items:stretch;gap:7px;margin-top:8px}
+.composer .chint{font-size:11.5px;color:var(--np-muted)}
+.composer .addbtn{display:block;width:100%;background:var(--np-ink);color:#fbf7ee;border:none;border-radius:9px;
+  padding:12px 16px;font-family:var(--np-sans);font-weight:700;font-size:15px;cursor:pointer}
+.composer .addbtn:hover{background:#332619}
+.composer .addbtn:active{background:#0f0b07}
+.storage-note{margin:0;padding:9px 14px;background:var(--np-warn-bg);border-bottom:1px solid var(--np-warn-line);
+  color:var(--np-warn);font-size:12px;line-height:1.5;font-family:var(--np-sans)}
+.storage-note.ok{background:var(--np-tip-bg);border-bottom-color:var(--np-tip-line);color:var(--np-tip)}
+.note-list{flex:1;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:12px}
+.note-empty{color:var(--np-muted);font-size:14px;text-align:center;padding:40px 14px;line-height:1.7;font-family:var(--np-sans)}
+.note-empty b{color:var(--np-ink)}
+.note-card{background:#fff;border:1px solid var(--np-line);border-radius:11px;padding:12px 13px;font-family:var(--np-sans);
+  transition:box-shadow .12s ease,border-color .12s ease}
+.note-card.linked{border-color:var(--np-yellow);box-shadow:0 0 0 2px rgba(255,183,1,.28)}
+.note-card.active{border-color:var(--np-yellow);box-shadow:0 0 0 3px rgba(255,183,1,.42)}
+.note-card .loc{font-family:var(--np-mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--np-tip);font-weight:700;cursor:pointer;margin-bottom:6px;display:inline-block}
+.note-card .cnum{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;
+  background:var(--np-ink);color:#fbf7ee;border-radius:8px;font-size:10px;font-weight:800;margin-right:7px;vertical-align:middle}
+.note-card .quote{font-size:12px;color:var(--np-ink-soft);border-left:3px solid var(--np-line);padding:2px 0 2px 9px;
+  margin:0 0 8px;font-family:var(--np-mono);white-space:pre-wrap;word-break:break-word;max-height:74px;overflow:auto}
+.note-card .body{font-size:14.5px;white-space:pre-wrap;word-break:break-word;color:var(--np-ink)}
+.note-card .body.empty{color:var(--np-muted);font-style:italic}
+.note-card textarea{width:100%;box-sizing:border-box;border:1px solid var(--np-line);border-radius:8px;font-family:var(--np-sans);
+  font-size:14.5px;padding:8px;resize:vertical;min-height:66px;background:#fff;color:var(--np-ink)}
+.note-card .row{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
+.note-card .row button{border:none;border-radius:7px;padding:6px 11px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:var(--np-sans)}
+.note-card .save{background:var(--np-ink);color:#fbf7ee}
+.note-card .edit{background:var(--np-line-soft);color:var(--np-ink-soft)}
+.note-card .del{background:var(--np-warn-bg);color:var(--np-warn)}
+.note-panel .pf{padding:11px 14px;border-top:1px solid var(--np-line);display:flex;gap:8px}
+.note-panel .pf button{flex:1;border:1px solid var(--np-line);background:#fff;border-radius:8px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--np-sans);color:var(--np-ink-soft)}
+.note-panel .pf button:hover{background:var(--np-line-soft)}
+@media(max-width:900px){.note-fab{right:14px;bottom:14px}}
+</style>
+
+<!--NP:SCRIPT-->
+<script>
+// ===== lavish reviewer notepad: anchored, local-only, never sent to the agent =====
+(function () {
+  var DOC = (document.title || location.pathname || 'doc').trim();
+  var KEY = 'lavish-notes::' + DOC;
+  var NP_TAG = 'LAVISH_NOTES::';
+  var REMOTE = 'http://127.0.0.1:4599/notes?doc=' + encodeURIComponent(DOC);
+  var localOk = true, remoteOk = false;
+  try { localStorage.setItem('np-t', '1'); localStorage.removeItem('np-t'); } catch (e) { localOk = false; }
+
+  function loadName() {
+    try {
+      if (window.name && window.name.indexOf(NP_TAG) === 0) {
+        var rest = window.name.slice(NP_TAG.length), nl = rest.indexOf('\n');
+        if (nl > -1 && rest.slice(0, nl) === KEY) return JSON.parse(rest.slice(nl + 1));
+      }
+    } catch (e) {}
+    return null;
+  }
+  function loadLocal() {
+    if (localOk) { try { var v = localStorage.getItem(KEY); if (v) return JSON.parse(v); } catch (e) {} }
+    var n = loadName(); if (n) return n;
+    return [];
+  }
+  var notes = loadLocal();
+
+  var fab = document.getElementById('noteFab'), cnt = document.getElementById('noteCount');
+  var panel = document.getElementById('notePanel'), list = document.getElementById('noteList');
+  var pop = document.getElementById('notePop'), popBtn = document.getElementById('notePopBtn');
+  var input = document.getElementById('noteInput'), anchorEl = document.getElementById('noteAnchor');
+  var hintEl = document.getElementById('noteHint');
+  var lastSel = null, pendingAnchor = null;
+
+  function mirrorLocal() {
+    var s = JSON.stringify(notes);
+    if (localOk) { try { localStorage.setItem(KEY, s); } catch (e) { localOk = false; } }
+    try { window.name = NP_TAG + KEY + '\n' + s; } catch (e) {}
+  }
+  function save() {
+    cnt.textContent = notes.length;
+    mirrorLocal();
+    if (remoteOk) {
+      try {
+        fetch(REMOTE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(notes) })
+          .catch(function () { remoteOk = false; updateStatus(); });
+      } catch (e) { remoteOk = false; }
+    }
+    updateStatus();
+  }
+  function updateStatus() {
+    var el = document.getElementById('storageNote'); if (!el) return;
+    if (remoteOk) { el.hidden = false; el.className = 'storage-note ok';
+      el.textContent = '✓ Saved to disk (survives reloads & restarts while the notes server runs).'; }
+    else if (localOk) { el.hidden = true; }
+    else { el.hidden = false; el.className = 'storage-note';
+      el.textContent = '⚠ The viewer blocks browser storage, so notes only survive reloads this session. To keep them for good, run the notes server or use “Download .md”.'; }
+  }
+  function uid() { return 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function sectionOf(node) {
+    var el = node && node.nodeType === 3 ? node.parentElement : node;
+    while (el && !(el.tagName === 'SECTION' && el.id)) el = el.parentElement;
+    return el;
+  }
+  function titleOf(sec) { if (!sec) return 'Document'; var h = sec.querySelector('h1,h2,h3'); return h ? h.textContent.trim() : sec.id; }
+  function currentSection() {
+    var secs = document.querySelectorAll('main section[id], section[id]');
+    var mid = window.scrollY + window.innerHeight / 2, best = null;
+    secs.forEach(function (s) { if (mid >= s.offsetTop && mid < s.offsetTop + s.offsetHeight) best = s; });
+    return best || secs[0] || null;
+  }
+  function setAnchor(a) {
+    pendingAnchor = a;
+    if (a && a.quote) {
+      anchorEl.hidden = false; anchorEl.innerHTML = '';
+      var t = document.createElement('span');
+      t.textContent = '“' + a.quote.slice(0, 90) + (a.quote.length > 90 ? '…' : '') + '”';
+      var x = document.createElement('span'); x.className = 'axn'; x.textContent = '✕'; x.title = 'Remove anchor';
+      x.onclick = function () { setAnchor(null); };
+      anchorEl.appendChild(t); anchorEl.appendChild(x);
+      hintEl.textContent = 'Attaching to this selection';
+    } else { anchorEl.hidden = true; anchorEl.innerHTML = ''; hintEl.textContent = "Will attach to the section you're viewing"; }
+  }
+  function addFromComposer() {
+    var body = input.value.trim();
+    if (!body) { input.focus(); return; }
+    var a = pendingAnchor, sec = a ? document.getElementById(a.sectionId) : currentSection();
+    var n = { id: uid(), sectionId: a ? a.sectionId : (sec ? sec.id : ''),
+      sectionTitle: a ? a.sectionTitle : (sec ? titleOf(sec) : 'Document'),
+      quote: a ? a.quote : '', start: a && a.start != null ? a.start : null, end: a && a.end != null ? a.end : null,
+      body: body, createdAt: Date.now() };
+    notes.push(n); render(); try { applyAll(); } catch (e) {} save();
+    input.value = ''; setAnchor(null);
+  }
+
+  function offsetOf(section, node, nodeOffset) {
+    var r = document.createRange(); r.selectNodeContents(section);
+    try { r.setEnd(node, nodeOffset); } catch (e) { return 0; } return r.toString().length;
+  }
+  function appendBadge(mark, num, id) {
+    var b = document.createElement('sup'); b.className = 'note-badge'; b.dataset.nid = id; b.textContent = num;
+    b.title = 'Note ' + num + ' — click to open';
+    if (mark.parentNode) mark.parentNode.insertBefore(b, mark.nextSibling);
+  }
+  function clearHighlights() {
+    document.querySelectorAll('.note-badge').forEach(function (b) { b.remove(); });
+    document.querySelectorAll('mark.note-hl').forEach(function (m) {
+      var p = m.parentNode; while (m.firstChild) p.insertBefore(m.firstChild, m); p.removeChild(m); p.normalize();
+    });
+  }
+  function highlightRange(section, start, end, id, num) {
+    if (!section || start == null || end == null || end <= start) return false;
+    var w = document.createTreeWalker(section, NodeFilter.SHOW_TEXT, null), n, pos = 0, segs = [];
+    while ((n = w.nextNode())) {
+      var len = n.nodeValue.length, nodeStart = pos; pos += len;
+      if (pos <= start) continue;
+      if (nodeStart >= end) break;
+      if (n.parentElement && n.parentElement.closest('mark.note-hl')) continue;
+      var s = Math.max(0, start - nodeStart), e = Math.min(len, end - nodeStart);
+      if (e > s) segs.push({ node: n, s: s, e: e });
+    }
+    var made = 0, last = null;
+    segs.forEach(function (seg) {
+      var r = document.createRange(); r.setStart(seg.node, seg.s); r.setEnd(seg.node, seg.e);
+      var m = document.createElement('mark'); m.className = 'note-hl'; m.dataset.nid = id;
+      try { r.surroundContents(m); made++; last = m; } catch (e2) {}
+    });
+    if (made && last) appendBadge(last, num, id);
+    return made > 0;
+  }
+  function highlightFirst(section, quote, id, num) {
+    if (!section || !quote) return false;
+    var w = document.createTreeWalker(section, NodeFilter.SHOW_TEXT, null), tn;
+    while ((tn = w.nextNode())) {
+      if (tn.parentElement && tn.parentElement.closest('mark.note-hl')) continue;
+      var i = tn.nodeValue.indexOf(quote);
+      if (i >= 0) {
+        var r = document.createRange(); r.setStart(tn, i); r.setEnd(tn, i + quote.length);
+        var m = document.createElement('mark'); m.className = 'note-hl'; m.dataset.nid = id;
+        try { r.surroundContents(m); appendBadge(m, num, id); return true; } catch (e) { return false; }
+      }
+    }
+    return false;
+  }
+  function applyAll() {
+    clearHighlights();
+    notes.forEach(function (n, i) {
+      var sec = document.getElementById(n.sectionId); if (!sec) return;
+      var ok = false;
+      if (n.start != null && n.end != null) ok = highlightRange(sec, n.start, n.end, n.id, i + 1);
+      if (!ok && n.quote) highlightFirst(sec, n.quote, n.id, i + 1);
+    });
+  }
+  function setLinked(id, on) {
+    document.querySelectorAll('mark.note-hl[data-nid="' + id + '"], .note-badge[data-nid="' + id + '"]')
+      .forEach(function (el) { el.classList.toggle('hot', on); });
+    var card = list.querySelector('.note-card[data-nid="' + id + '"]');
+    if (card) card.classList.toggle('linked', on);
+  }
+
+  function render() {
+    list.innerHTML = '';
+    if (!notes.length) {
+      var e = document.createElement('div'); e.className = 'note-empty';
+      e.innerHTML = 'No notes yet.<br>Type in the box above and hit <b>Add note</b>,<br>or select text/code and hit <b>🖊 Note this</b>.';
+      list.appendChild(e); return;
+    }
+    notes.slice().reverse().forEach(function (n) {
+      var num = notes.indexOf(n) + 1;
+      var card = document.createElement('div'); card.className = 'note-card'; card.dataset.nid = n.id;
+      card.onmouseenter = function () { setLinked(n.id, true); };
+      card.onmouseleave = function () { setLinked(n.id, false); };
+      var loc = document.createElement('span'); loc.className = 'loc'; loc.title = 'Jump to this spot';
+      var cn = document.createElement('span'); cn.className = 'cnum'; cn.textContent = num; loc.appendChild(cn);
+      loc.appendChild(document.createTextNode(' § ' + n.sectionTitle));
+      loc.onclick = function () { jump(n.id); }; card.appendChild(loc);
+      if (n.quote) { var q = document.createElement('div'); q.className = 'quote'; q.textContent = n.quote; card.appendChild(q); }
+      var body = document.createElement('div'); body.className = 'body' + (n.body ? '' : ' empty');
+      body.textContent = n.body || 'Empty — click Edit to write.'; card.appendChild(body);
+      var row = document.createElement('div'); row.className = 'row';
+      var ed = document.createElement('button'); ed.className = 'edit'; ed.textContent = 'Edit'; ed.onclick = function () { editCard(card, n); };
+      var dl = document.createElement('button'); dl.className = 'del'; dl.textContent = 'Delete';
+      dl.onclick = function () { notes = notes.filter(function (x) { return x.id !== n.id; }); render(); try { applyAll(); } catch (e) {} save(); };
+      row.appendChild(ed); row.appendChild(dl); card.appendChild(row);
+      list.appendChild(card);
+    });
+  }
+  function editCard(card, n) {
+    card.innerHTML = '';
+    var loc = document.createElement('span'); loc.className = 'loc'; loc.textContent = '§ ' + n.sectionTitle; card.appendChild(loc);
+    if (n.quote) { var q = document.createElement('div'); q.className = 'quote'; q.textContent = n.quote; card.appendChild(q); }
+    var ta = document.createElement('textarea'); ta.value = n.body || ''; ta.placeholder = 'Type your note…'; card.appendChild(ta);
+    var row = document.createElement('div'); row.className = 'row';
+    var sv = document.createElement('button'); sv.className = 'save'; sv.textContent = 'Save';
+    sv.onclick = function () { n.body = ta.value.trim(); save(); render(); try { applyAll(); } catch (e) {} };
+    row.appendChild(sv); card.appendChild(row);
+    ta.focus();
+    ta.addEventListener('keydown', function (e) { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') sv.click(); });
+  }
+  function openPanel() { panel.classList.add('open'); setTimeout(function () { if (input) input.focus(); }, 40); }
+  fab.onclick = function () { panel.classList.toggle('open'); if (panel.classList.contains('open')) setTimeout(function () { if (input) input.focus(); }, 40); };
+  document.getElementById('notePanelClose').onclick = function () { panel.classList.remove('open'); };
+  document.getElementById('noteAdd').onclick = addFromComposer;
+  input.addEventListener('keydown', function (e) { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); addFromComposer(); } });
+  input.addEventListener('blur', function () { if (input.value.trim()) addFromComposer(); });
+
+  function jump(id) {
+    var marks = document.querySelectorAll('mark.note-hl[data-nid="' + id + '"]');
+    var n = notes.find(function (x) { return x.id === id; });
+    var target = marks[0] || (n && document.getElementById(n.sectionId));
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    marks.forEach(function (m) { m.classList.remove('flash'); void m.offsetWidth; m.classList.add('flash'); });
+  }
+
+  function hidePop() { pop.style.display = 'none'; }
+  document.addEventListener('mouseup', function () {
+    setTimeout(function () {
+      var s = document.getSelection();
+      if (!s || s.isCollapsed) { hidePop(); return; }
+      var txt = s.toString();
+      if (!txt.trim()) { hidePop(); return; }
+      var host = s.anchorNode && (s.anchorNode.nodeType === 3 ? s.anchorNode.parentElement : s.anchorNode);
+      if (!host || host.closest('.note-panel') || host.closest('.note-pop')) { hidePop(); return; }
+      var range = s.getRangeAt(0), section = sectionOf(range.startContainer);
+      var start = 0, end = 0;
+      if (section) {
+        start = offsetOf(section, range.startContainer, range.startOffset);
+        end = offsetOf(section, range.endContainer, range.endOffset);
+        if (end < start) { var tmp = start; start = end; end = tmp; }
+      }
+      lastSel = { quote: txt.trim().slice(0, 2000), section: section, start: start, end: end };
+      var rect = range.getBoundingClientRect(), cw = document.documentElement.clientWidth;
+      var x = Math.min(Math.max(64, rect.left + rect.width / 2), cw - 64);
+      pop.style.left = (window.scrollX + x) + 'px';
+      pop.style.top = (window.scrollY + Math.max(rect.top, 8)) + 'px';
+      pop.style.display = 'block';
+    }, 10);
+  });
+  document.addEventListener('scroll', hidePop, { passive: true });
+  popBtn.addEventListener('mousedown', function (e) {
+    e.preventDefault();
+    if (!lastSel) return;
+    var sec = lastSel.section;
+    setAnchor({ sectionId: sec ? sec.id : '', sectionTitle: titleOf(sec), quote: lastSel.quote, start: lastSel.start, end: lastSel.end });
+    openPanel(); hidePop();
+    var sel = window.getSelection(); if (sel) sel.removeAllRanges();
+  });
+
+  document.addEventListener('click', function (e) {
+    var m = e.target.closest && e.target.closest('mark.note-hl, .note-badge');
+    if (!m || !m.dataset.nid) return;
+    openPanel(); render();
+    var card = list.querySelector('.note-card[data-nid="' + m.dataset.nid + '"]');
+    if (card) { card.scrollIntoView({ block: 'center' }); card.classList.add('active'); setTimeout(function () { card.classList.remove('active'); }, 1600); }
+  });
+  document.addEventListener('mouseover', function (e) { var m = e.target.closest && e.target.closest('mark.note-hl, .note-badge'); if (m && m.dataset.nid) setLinked(m.dataset.nid, true); });
+  document.addEventListener('mouseout', function (e) { var m = e.target.closest && e.target.closest('mark.note-hl, .note-badge'); if (m && m.dataset.nid) setLinked(m.dataset.nid, false); });
+
+  function toMd() {
+    return '# Notes — ' + DOC + '\n\n' + notes.map(function (n, i) {
+      return '## ' + (i + 1) + '. § ' + n.sectionTitle + '\n' + (n.quote ? '> ' + n.quote.replace(/\n/g, '\n> ') + '\n\n' : '') + (n.body || '') + '\n';
+    }).join('\n');
+  }
+  document.getElementById('noteCopy').onclick = function () { if (navigator.clipboard) navigator.clipboard.writeText(toMd()); };
+  document.getElementById('noteDownload').onclick = function () {
+    var b = new Blob([toMd()], { type: 'text/markdown' }), u = URL.createObjectURL(b);
+    var a = document.createElement('a'); a.href = u; a.download = 'notes.md'; a.click(); URL.revokeObjectURL(u);
+  };
+  document.getElementById('noteClear').onclick = function () { if (confirm('Delete ALL your notes? This cannot be undone.')) { notes = []; save(); applyAll(); render(); } };
+
+  render(); try { applyAll(); } catch (e) {} mirrorLocal(); cnt.textContent = notes.length; updateStatus();
+  try {
+    fetch(REMOTE).then(function (r) { return r.ok ? r.json() : null; }).then(function (server) {
+      if (!Array.isArray(server)) return;
+      remoteOk = true;
+      if (server.length >= notes.length) { notes = server; render(); try { applyAll(); } catch (e) {} cnt.textContent = notes.length; }
+      else { save(); }
+      updateStatus();
+    }).catch(function () { remoteOk = false; updateStatus(); });
+  } catch (e) { updateStatus(); }
+})();
+</script>
+</body>
+</html>
