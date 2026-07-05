@@ -279,19 +279,6 @@ class _LibraryAlbumCardState extends State<LibraryAlbumCard> {
                         ),
                       ),
                     ),
-                    // Terracotta hairline accent above the title.
-                    Positioned(
-                      left: 14,
-                      bottom: 100,
-                      child: Container(
-                        width: 24,
-                        height: 2,
-                        decoration: BoxDecoration(
-                          color: _accent,
-                          borderRadius: BorderRadius.circular(1),
-                        ),
-                      ),
-                    ),
                     // Title overlay block.
                     Positioned(
                       left: 14,
@@ -301,6 +288,15 @@ class _LibraryAlbumCardState extends State<LibraryAlbumCard> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          Container(
+                            width: 24,
+                            height: 2,
+                            decoration: BoxDecoration(
+                              color: _accent,
+                              borderRadius: BorderRadius.circular(1),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
                           Row(
                             children: [
                               Container(

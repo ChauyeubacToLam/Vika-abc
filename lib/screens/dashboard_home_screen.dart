@@ -15,8 +15,6 @@
 //   │           coach card stacked below)
 //   │     • Halo CTA pill
 //   │
-//   ├─ WEEKLY CHECK-IN BANNER (when due, real data)
-//   │
 //   └─ VITALS SPREAD (cream, NO CARD — magazine typography spread)
 //         • Header rail: TUẦN 03 ─── NỀN TẢNG
 //         • Drop-cap sessions hero: BIG italic 3 + /4 + progress dots +
@@ -28,8 +26,7 @@
 // The previous v4 stacked TWO raised cards below the hero (vitals panel
 // + coach card) — that read as "lazy stacking". v5 absorbs coach into
 // the hero (cohesive action surface) and renders vitals as naked
-// typography on cream (editorial, no card chrome). One card surface
-// total below the hero, only when a weekly check-in is actually due.
+// typography on cream (editorial, no card chrome).
 
 import 'dart:async';
 
@@ -40,8 +37,6 @@ import '../data/home_mock.dart';
 import '../data/library_mock.dart';
 import '../models/exercise_definition.dart';
 import '../screens/exercise/exercise_launch_args.dart';
-import '../services/recommendation/recommendation_service.dart';
-import '../services/recommendation/weekly_check_in_service.dart';
 import '../services/session_persistence.dart';
 import '../services/streak_tier.dart';
 import '../services/user_program_service.dart';
@@ -52,7 +47,6 @@ import '../utils/orientation_lock.dart';
 import '../widgets/home/home_signoff.dart';
 import '../widgets/home/home_stage_hero.dart';
 import '../widgets/home/home_vitals_spread.dart';
-import 'weekly_check_in_screen.dart';
 
 class DashboardHomeScreen extends StatefulWidget {
   const DashboardHomeScreen({
@@ -82,13 +76,10 @@ class DashboardHomeScreen extends StatefulWidget {
 }
 
 class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
-  final _recommendations = RecommendationService();
-  final _checkIns = WeeklyCheckInService();
   final _launches = WorkoutLaunchService();
   late Future<WorkoutLaunchHomeState> _launchStateFuture;
   late Future<int> _streakFuture;
   late Future<({int? percent, int? delta, List<int> week})> _formSummaryFuture;
-  _CheckInPrompt? _checkInPrompt;
 
   @override
   void initState() {
@@ -97,28 +88,6 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
     _launchStateFuture = _launches.resolveHomeState();
     _streakFuture = SessionPersistence().currentStreak();
     _formSummaryFuture = SessionPersistence().homeFormSummary();
-    unawaited(_loadCheckInPrompt());
-  }
-
-  Future<void> _loadCheckInPrompt() async {
-    final snapshot =
-        await _recommendations.fetchLatestPlanSnapshotForCurrentUser();
-    final plan = snapshot?.plan;
-    final position = snapshot?.currentPosition;
-    if (snapshot == null || plan == null || position == null) return;
-    final weekNumber = position.$1;
-    if (!plan.weeklyCheckInWeeks.contains(weekNumber)) return;
-    final due = await _checkIns.isDue(
-      recommendationId: plan.recommendationId,
-      weekNumber: weekNumber,
-    );
-    if (!mounted || !due) return;
-    setState(() {
-      _checkInPrompt = _CheckInPrompt(
-        recommendationId: plan.recommendationId,
-        weekNumber: weekNumber,
-      );
-    });
   }
 
   void _reloadLaunchTarget() {
@@ -127,22 +96,6 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
       _streakFuture = SessionPersistence().currentStreak();
       _formSummaryFuture = SessionPersistence().homeFormSummary();
     });
-  }
-
-  Future<void> _openCheckIn() async {
-    final prompt = _checkInPrompt;
-    if (prompt == null) return;
-    final completed = await Navigator.of(context).pushNamed(
-      '/weekly-check-in',
-      arguments: WeeklyCheckInLaunchArgs(
-        recommendationId: prompt.recommendationId,
-        weekNumber: prompt.weekNumber,
-      ),
-    );
-    if (!mounted) return;
-    if (completed == true) {
-      setState(() => _checkInPrompt = null);
-    }
   }
 
   @override
@@ -182,11 +135,6 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
                   );
                 },
               ),
-              if (_checkInPrompt != null)
-                _WeeklyCheckInAlert(
-                  weekNumber: _checkInPrompt!.weekNumber,
-                  onTap: _openCheckIn,
-                ),
               FutureBuilder<WorkoutLaunchHomeState>(
                 future: _launchStateFuture,
                 builder: (context, snapshot) {
@@ -195,7 +143,8 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
                   // the vitals spread rather than seeding it with mock counts.
                   final Widget vitals = snapshot.connectionState ==
                           ConnectionState.waiting
-                      ? const HomeVitalsSkeleton(key: ValueKey('vitals-skeleton'))
+                      ? const HomeVitalsSkeleton(
+                          key: ValueKey('vitals-skeleton'))
                       : KeyedSubtree(
                           key: const ValueKey('vitals-real'),
                           child: FutureBuilder<int>(
@@ -392,106 +341,5 @@ class _HomeHeroFromTarget extends StatelessWidget {
           ),
         )
         .toList(growable: false);
-  }
-}
-
-class _CheckInPrompt {
-  const _CheckInPrompt({
-    required this.recommendationId,
-    required this.weekNumber,
-  });
-
-  final String recommendationId;
-  final int weekNumber;
-}
-
-/// Editorial-style weekly check-in alert. Hairline-bordered band instead
-/// of a raised card — matches the typography-first vibe of the vitals
-/// spread so we don't reintroduce a "card" right where we just removed
-/// them.
-class _WeeklyCheckInAlert extends StatelessWidget {
-  const _WeeklyCheckInAlert({
-    required this.weekNumber,
-    required this.onTap,
-  });
-
-  final int weekNumber;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = VikaColors.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 30, 24, 0),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(2),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            decoration: BoxDecoration(
-              border: Border(
-                top: BorderSide(color: c.border),
-                bottom: BorderSide(color: c.border),
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 22,
-                  height: 22,
-                  decoration: BoxDecoration(
-                    color: c.yellow,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.tune_rounded,
-                    size: 12,
-                    color: c.yellowInk,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: RichText(
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    text: TextSpan(
-                      style: const TextStyle(
-                        fontFamily: 'BeVietnamPro',
-                        fontSize: 13,
-                        letterSpacing: -0.1,
-                      ),
-                      children: [
-                        TextSpan(
-                          text: 'Check-in tuần $weekNumber',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            color: c.ink,
-                          ),
-                        ),
-                        TextSpan(
-                          text: '   ·   30 giây',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: c.inkSoft,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Icon(
-                  Icons.arrow_forward_rounded,
-                  size: 14,
-                  color: c.inkSoft,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
   }
 }

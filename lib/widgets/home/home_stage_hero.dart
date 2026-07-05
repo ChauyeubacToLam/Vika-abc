@@ -80,7 +80,6 @@ class HomeStageHero extends StatelessWidget {
     this.secondaryCtaLabel,
     this.onSecondaryCta,
     this.onAvatarTap,
-    this.onNotificationsTap,
   });
 
   /// e.g. 'HÔM NAY · BUỔI 03'.
@@ -109,7 +108,6 @@ class HomeStageHero extends StatelessWidget {
   final String userInitial;
   final String? avatarUrl;
   final VoidCallback? onAvatarTap;
-  final VoidCallback? onNotificationsTap;
 
   @override
   Widget build(BuildContext context) {
@@ -194,9 +192,7 @@ class HomeStageHero extends StatelessWidget {
                     inverted: true,
                     userInitial: userInitial,
                     avatarUrl: avatarUrl,
-                    trailingIcon: Icons.notifications_none_rounded,
-                    trailingTooltip: 'Thông báo',
-                    onTrailingTap: onNotificationsTap,
+                    trailingIcon: null,
                     onAvatarTap: onAvatarTap,
                   ),
                   const SizedBox(height: 20),
@@ -293,13 +289,11 @@ class HomeStageHeroSkeleton extends StatelessWidget {
     required this.userInitial,
     this.avatarUrl,
     this.onAvatarTap,
-    this.onNotificationsTap,
   });
 
   final String userInitial;
   final String? avatarUrl;
   final VoidCallback? onAvatarTap;
-  final VoidCallback? onNotificationsTap;
 
   @override
   Widget build(BuildContext context) {
@@ -348,9 +342,7 @@ class HomeStageHeroSkeleton extends StatelessWidget {
                     inverted: true,
                     userInitial: userInitial,
                     avatarUrl: avatarUrl,
-                    trailingIcon: Icons.notifications_none_rounded,
-                    trailingTooltip: 'Thông báo',
-                    onTrailingTap: onNotificationsTap,
+                    trailingIcon: null,
                     onAvatarTap: onAvatarTap,
                   ),
                   const SizedBox(height: 22),

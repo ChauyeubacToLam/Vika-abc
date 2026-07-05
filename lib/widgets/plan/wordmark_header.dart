@@ -1,6 +1,6 @@
 // WordmarkHeader — the top of every main-app screen: the rounded VIKA logo
-// mark + italic "VIKA" wordmark on the left, trailing icon button + avatar
-// on the right.
+// mark + italic "VIKA" wordmark on the left, optional trailing action +
+// avatar on the right.
 //
 // Accessibility:
 //   • Wordmark wraps in `Semantics(header: true, label: 'Vika')` —
@@ -37,7 +37,8 @@ class WordmarkHeader extends StatefulWidget {
     this.inverted = false,
   });
 
-  final IconData trailingIcon;
+  /// Null removes the action and its tap target entirely.
+  final IconData? trailingIcon;
   final String trailingTooltip;
   final String userInitial;
   final String? avatarUrl;
@@ -131,21 +132,27 @@ class _WordmarkHeaderState extends State<WordmarkHeader> {
             ),
           ),
           const Spacer(),
-          _IconButton(
-            tooltip: widget.trailingTooltip,
-            semanticsLabel: widget.trailingTooltip,
-            onTap: widget.onTrailingTap,
-            child: Container(
-              width: _iconVisualSize,
-              height: _iconVisualSize,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: iconBorder),
+          if (widget.trailingIcon != null) ...[
+            _IconButton(
+              tooltip: widget.trailingTooltip,
+              semanticsLabel: widget.trailingTooltip,
+              onTap: widget.onTrailingTap,
+              child: Container(
+                width: _iconVisualSize,
+                height: _iconVisualSize,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: iconBorder),
+                ),
+                child: Icon(
+                  widget.trailingIcon,
+                  size: 16,
+                  color: iconColor,
+                ),
               ),
-              child: Icon(widget.trailingIcon, size: 16, color: iconColor),
             ),
-          ),
-          const SizedBox(width: 4),
+            const SizedBox(width: 4),
+          ],
           _IconButton(
             tooltip: widget.userTooltip,
             semanticsLabel: '${widget.userTooltip} $userInitial',
