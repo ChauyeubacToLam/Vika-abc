@@ -1,0 +1,3315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ExerciseBase, explained — Vika</title>
+<style>
+:root{
+  --ink:#1F1812; --ink-soft:#4A4031; --muted:#8a7c63;
+  --page:#F1E9D9; --raised:#FBF7EE; --line:#E4DAC5; --line-soft:#EEE6D5;
+  --yellow:#FFB701;
+  --code-bg:#211A12; --code-fg:#EDE3CE; --code-dim:#9A8C71; --code-ln:#6B5D45; --code-rule:#37291a;
+  --tip:#2E6E63; --tip-bg:#E9F1EE; --tip-line:#BFDBD3;
+  --warn:#A2472B; --warn-bg:#F7EAE2; --warn-line:#E7C6B6;
+  --idea:#8A6608; --idea-bg:#FBF0D6; --idea-line:#EBD69E;
+  --mono:"JetBrains Mono","SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--page);color:var(--ink);font-family:var(--sans);line-height:1.62;
+  -webkit-font-smoothing:antialiased;font-size:16px}
+a{color:inherit}
+h1,h2,h3{line-height:1.18;text-wrap:balance;font-weight:800;letter-spacing:-.01em}
+code{font-family:var(--mono)}
+.wrap{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:248px minmax(0,1fr);
+  gap:52px;padding:0 28px 120px}
+/* ---- Top hero ---- */
+header.hero{padding:56px 28px 40px;
+  background:radial-gradient(120% 140% at 12% 0%,#2b2117 0%,#1c150e 60%,#160f09 100%);
+  color:#F3ECDD;position:relative;overflow:hidden}
+header.hero::after{content:"";position:absolute;inset:0;opacity:.05;pointer-events:none;
+  background-image:repeating-linear-gradient(0deg,#fff 0 1px,transparent 1px 3px)}
+.hero-in{max-width:1144px;margin:0 auto;position:relative}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.24em;text-transform:uppercase;
+  color:var(--yellow);margin:0 0 14px}
+header.hero h1{font-size:clamp(30px,5vw,50px);margin:0 0 14px;color:#FBF7EE}
+header.hero h1 .u{background:linear-gradient(transparent 68%,rgba(255,183,1,.42) 0);padding:0 2px}
+header.hero p.lede{font-size:18px;max-width:70ch;color:#D9CFBD;margin:0 0 26px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-family:var(--mono);font-size:12px;padding:6px 11px;border-radius:999px;
+  border:1px solid rgba(255,255,255,.16);color:#E8DFCD;background:rgba(255,255,255,.04)}
+.chip b{color:var(--yellow);font-weight:600}
+/* ---- TOC ---- */
+nav.toc{position:sticky;top:0;align-self:start;max-height:100vh;overflow:auto;
+  padding:34px 0;font-size:13.5px}
+nav.toc .lbl{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--muted);margin:0 0 12px}
+nav.toc ol{list-style:none;margin:0;padding:0;counter-reset:toc}
+nav.toc li{counter-increment:toc;margin:1px 0}
+nav.toc a{display:flex;gap:9px;text-decoration:none;color:var(--ink-soft);padding:5px 10px;
+  border-radius:7px;border-left:2px solid transparent}
+nav.toc a:before{content:counter(toc,decimal-leading-zero);font-family:var(--mono);font-size:11px;
+  color:var(--muted);padding-top:2px}
+nav.toc a:hover{background:var(--line-soft)}
+nav.toc a.on{background:#fff;border-left-color:var(--yellow);color:var(--ink);font-weight:600}
+/* ---- Main ---- */
+main{min-width:0;padding-top:20px}
+section{scroll-margin-top:20px;padding:30px 0;border-top:1px solid var(--line)}
+section:first-of-type{border-top:0}
+.kicker{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--yellow);font-weight:600;margin:0 0 6px;display:flex;align-items:center;gap:10px}
+.kicker .n{color:var(--muted)}
+h2{font-size:clamp(22px,3.2vw,30px);margin:0 0 8px}
+h3{font-size:18px;margin:26px 0 6px;font-weight:700}
+.range{font-family:var(--mono);font-size:12px;color:var(--muted)}
+p{margin:12px 0;max-width:72ch}
+.lead{font-size:17px;color:var(--ink-soft)}
+strong{font-weight:700}
+em.term{font-style:normal;font-weight:700;color:var(--ink);
+  background:linear-gradient(transparent 70%,rgba(255,183,1,.34) 0);padding:0 1px}
+ul{max-width:72ch;padding-left:20px}
+li{margin:5px 0}
+/* ---- code ---- */
+.code{border-radius:12px;overflow:hidden;background:var(--code-bg);margin:18px 0;
+  box-shadow:0 1px 0 rgba(0,0,0,.04),0 14px 30px -22px rgba(31,24,18,.5)}
+.code-head{font-family:var(--mono);font-size:11.5px;color:var(--code-dim);padding:9px 14px;
+  border-bottom:1px solid var(--code-rule);letter-spacing:.03em;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.code-head span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.code-head b{color:var(--yellow);font-weight:600;flex:none}
+.code-body{display:flex;overflow-x:auto;font-family:var(--mono);font-size:12.5px;line-height:1.72}
+.gut{position:sticky;left:0;flex:none;background:var(--code-bg);color:var(--code-ln);text-align:right;
+  padding:14px 10px 16px 16px;user-select:none;border-right:1px solid var(--code-rule);white-space:pre;z-index:1}
+.src{padding:14px 20px 16px;color:var(--code-fg);white-space:pre;margin:0;min-width:max-content}
+.src .c{color:var(--code-dim);font-style:italic}
+.src .k{color:#E7A93A}
+.src .s{color:#9FBE7E}
+.elide{font-family:var(--mono);font-size:12px;color:var(--code-dim);padding:2px 20px 2px}
+/* ---- callouts ---- */
+.call{border-radius:11px;padding:15px 17px 15px 16px;margin:16px 0;border:1px solid;
+  border-left-width:4px;font-size:15px}
+.call p{margin:7px 0;max-width:none}
+.call .ct{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+  font-weight:700;display:flex;align-items:center;gap:8px;margin:0 0 4px}
+.call.eli{background:var(--raised);border-color:var(--line);border-left-color:var(--yellow)}
+.call.eli .ct{color:var(--idea)}
+.call.tip{background:var(--tip-bg);border-color:var(--tip-line);border-left-color:var(--tip)}
+.call.tip .ct{color:var(--tip)}
+.call.warn{background:var(--warn-bg);border-color:var(--warn-line);border-left-color:var(--warn)}
+.call.warn .ct{color:var(--warn)}
+.call.idea{background:var(--idea-bg);border-color:var(--idea-line);border-left-color:var(--idea)}
+.call.idea .ct{color:var(--idea)}
+/* ---- legend ---- */
+.legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:22px 0}
+.legend div{background:var(--raised);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:14px}
+.legend b{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px}
+/* ---- flow diagrams ---- */
+.lifecycle{display:flex;flex-wrap:wrap;align-items:stretch;gap:0;margin:22px 0;
+  background:var(--raised);border:1px solid var(--line);border-radius:14px;padding:22px;overflow-x:auto}
+.lc-node{flex:1;min-width:150px;text-align:center;padding:16px 12px;border-radius:11px;
+  border:1.5px solid var(--line);background:#fff}
+.lc-node .st{font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink)}
+.lc-node .sub{font-size:12.5px;color:var(--muted);margin-top:5px}
+.lc-arrow{flex:none;display:flex;flex-direction:column;justify-content:center;align-items:center;
+  padding:0 14px;color:var(--muted);font-size:12px;min-width:110px}
+.lc-arrow .big{font-size:20px;color:var(--yellow);line-height:1}
+.lc-arrow .cond{font-family:var(--mono);font-size:11px;text-align:center;margin-top:4px}
+.pipe{counter-reset:pipe;margin:22px 0;border:1px solid var(--line);border-radius:14px;
+  background:var(--raised);overflow:hidden}
+.pipe .row{display:grid;grid-template-columns:52px 1fr;gap:0;border-top:1px solid var(--line-soft)}
+.pipe .row:first-child{border-top:0}
+.pipe .row .num{counter-increment:pipe;font-family:var(--mono);font-size:12px;color:var(--muted);
+  display:flex;align-items:flex-start;justify-content:center;padding:14px 0;background:#fff;border-right:1px solid var(--line-soft)}
+.pipe .row .num:before{content:counter(pipe,decimal-leading-zero)}
+.pipe .row .body{padding:12px 16px}
+.pipe .row .body b{font-family:var(--mono);font-size:13.5px}
+.pipe .row .body .d{font-size:14px;color:var(--ink-soft);margin-top:2px}
+.pipe .row.stop .num{background:var(--warn-bg);color:var(--warn)}
+.pipe .row.stop .body b{color:var(--warn)}
+/* recap table */
+.recap{width:100%;border-collapse:collapse;margin:18px 0;font-size:14.5px;background:var(--raised);
+  border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.recap th,.recap td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+.recap th{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:#fff}
+.recap tr:last-child td{border-bottom:0}
+.recap .sev{font-family:var(--mono);font-size:11px;font-weight:700;white-space:nowrap}
+.recap .sev.hi{color:var(--warn)} .recap .sev.med{color:var(--idea)} .recap .sev.lo{color:var(--tip)}
+.recap td code{font-size:12.5px;background:var(--line-soft);padding:1px 5px;border-radius:5px}
+.foot{grid-column:1/-1;margin-top:40px;padding-top:22px;border-top:1px solid var(--line);
+  color:var(--muted);font-size:13.5px;font-family:var(--mono)}
+@media(max-width:900px){
+  .wrap{grid-template-columns:1fr;gap:0;padding:0 18px 80px}
+  nav.toc{position:static;max-height:none;height:auto;padding:22px 0;border-bottom:1px solid var(--line);margin-bottom:8px}
+  nav.toc ol{columns:2;gap:8px}
+  header.hero{padding:44px 18px 32px}
+  .note-fab{right:14px;bottom:14px}
+}
+/* ===== personal notes layer ===== */
+mark.note-hl{background:rgba(255,183,1,.20);border-bottom:2px solid rgba(255,183,1,.7);border-radius:2px;
+  cursor:pointer;color:inherit;padding:0 .5px;transition:background .12s ease}
+mark.note-hl.hot{background:rgba(255,183,1,.45)}
+mark.note-hl.flash{animation:noteflash 1.2s ease}
+@keyframes noteflash{0%,100%{background-color:rgba(255,183,1,.20)}30%{background-color:rgba(255,183,1,.62)}}
+.note-badge{display:inline-flex;align-items:center;justify-content:center;min-width:14px;height:14px;padding:0 3px;
+  margin:0 1px 0 2px;font-family:var(--sans);font-size:9px;font-weight:800;line-height:1;vertical-align:super;
+  background:var(--ink);color:#FBF7EE;border-radius:7px;cursor:pointer;user-select:none;transition:background .12s ease}
+.note-badge.hot{background:var(--yellow);color:var(--ink)}
+.note-card{transition:box-shadow .12s ease,border-color .12s ease}
+.note-card.linked{border-color:var(--yellow);box-shadow:0 0 0 2px rgba(255,183,1,.28)}
+.note-card.active{border-color:var(--yellow);box-shadow:0 0 0 3px rgba(255,183,1,.42)}
+.note-card .cnum{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;
+  background:var(--ink);color:#FBF7EE;border-radius:8px;font-size:10px;font-weight:800;margin-right:7px;vertical-align:middle}
+.note-fab{position:fixed;right:22px;bottom:22px;z-index:50;display:flex;align-items:center;gap:9px;
+  background:var(--ink);color:#FBF7EE;border:none;border-radius:999px;padding:12px 17px;cursor:pointer;
+  font-family:var(--sans);font-weight:600;font-size:14px;box-shadow:0 10px 26px -10px rgba(31,24,18,.55)}
+.note-fab:hover{background:#332619}
+.note-fab .cnt{font-family:var(--mono);font-size:12px;background:var(--yellow);color:var(--ink);
+  border-radius:999px;padding:1px 8px;min-width:20px;text-align:center}
+.note-pop{position:absolute;z-index:60;transform:translate(-50%,-100%);margin-top:-9px;display:none;
+  background:var(--ink);border-radius:9px;padding:5px;box-shadow:0 12px 30px -12px rgba(0,0,0,.5)}
+.note-pop button{background:var(--yellow);color:var(--ink);border:none;border-radius:6px;
+  padding:7px 12px;font-family:var(--sans);font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap}
+.note-pop:after{content:"";position:absolute;left:50%;top:100%;transform:translateX(-50%);
+  border:6px solid transparent;border-top-color:var(--ink)}
+.note-panel{position:fixed;top:0;right:0;height:100%;width:min(380px,92vw);z-index:70;background:var(--raised);
+  border-left:1px solid var(--line);box-shadow:-18px 0 40px -30px rgba(31,24,18,.5);display:flex;flex-direction:column;
+  opacity:0;visibility:hidden;transform:translateY(6px);transition:opacity .18s ease,transform .18s ease,visibility .18s}
+.note-panel.open{opacity:1;visibility:visible;transform:none}
+.note-panel .ph{padding:18px 18px 14px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.note-panel .ph h3{margin:0;font-size:17px;font-weight:800}
+.note-panel .ph .sub{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.03em}
+.note-panel .x{background:none;border:none;font-size:24px;line-height:1;cursor:pointer;color:var(--muted)}
+.note-panel .ph-act{display:flex;align-items:center;gap:8px}
+.newbtn{background:var(--ink);color:#FBF7EE;border:none;border-radius:8px;padding:7px 12px;font-family:var(--sans);font-weight:700;font-size:12.5px;cursor:pointer;white-space:nowrap}
+.newbtn:hover{background:#332619}
+.emptybtn{background:var(--ink);color:#FBF7EE;border:none;border-radius:9px;padding:10px 16px;font-family:var(--sans);font-weight:700;font-size:14px;cursor:pointer;margin-top:4px}
+.emptybtn:hover{background:#332619}
+.composer{padding:12px 14px;border-bottom:1px solid var(--line);background:#fff}
+.composer .anchor{font-family:var(--mono);font-size:11px;color:var(--tip);background:var(--tip-bg);
+  border:1px solid var(--tip-line);border-radius:7px;padding:5px 8px;margin-bottom:8px;display:flex;gap:6px;align-items:center;overflow:hidden}
+.composer .anchor span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.composer .anchor .axn{margin-left:auto;cursor:pointer;font-weight:700;flex:none}
+.composer textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:9px;
+  font-family:var(--sans);font-size:15px;padding:10px;resize:vertical;min-height:82px;background:#fff;color:var(--ink)}
+.composer textarea:focus{outline:2px solid var(--yellow);outline-offset:0;border-color:transparent}
+.composer .crow{display:flex;flex-direction:column;align-items:stretch;gap:7px;margin-top:8px}
+.composer .chint{font-size:11.5px;color:var(--muted)}
+.composer .addbtn{display:block;width:100%;background:var(--ink);color:#FBF7EE;border:none;border-radius:9px;
+  padding:12px 16px;font-family:var(--sans);font-weight:700;font-size:15px;cursor:pointer}
+.composer .addbtn:hover{background:#332619}
+.composer .addbtn:active{background:#0f0b07}
+.storage-note{margin:0;padding:9px 14px;background:var(--warn-bg);border-bottom:1px solid var(--warn-line);
+  color:var(--warn);font-size:12px;line-height:1.5}
+.storage-note.ok{background:var(--tip-bg);border-bottom-color:var(--tip-line);color:var(--tip)}
+.note-list{flex:1;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:12px}
+.note-empty{color:var(--muted);font-size:14px;text-align:center;padding:40px 14px;line-height:1.7}
+.note-empty b{color:var(--ink)}
+.note-card{background:#fff;border:1px solid var(--line);border-radius:11px;padding:12px 13px}
+.note-card .loc{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--tip);font-weight:700;cursor:pointer;margin-bottom:6px;display:inline-block}
+.note-card .quote{font-size:12px;color:var(--ink-soft);border-left:3px solid var(--line);padding:2px 0 2px 9px;
+  margin:0 0 8px;font-family:var(--mono);white-space:pre-wrap;word-break:break-word;max-height:74px;overflow:auto}
+.note-card .body{font-size:14.5px;white-space:pre-wrap;word-break:break-word}
+.note-card .body.empty{color:var(--muted);font-style:italic}
+.note-card textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;font-family:var(--sans);
+  font-size:14.5px;padding:8px;resize:vertical;min-height:66px;background:#fff;color:var(--ink)}
+.note-card .row{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
+.note-card .row button{border:none;border-radius:7px;padding:6px 11px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:var(--sans)}
+.note-card .save{background:var(--ink);color:#FBF7EE}
+.note-card .edit{background:var(--line-soft);color:var(--ink-soft)}
+.note-card .del{background:var(--warn-bg);color:var(--warn)}
+.note-panel .pf{padding:11px 14px;border-top:1px solid var(--line);display:flex;gap:8px}
+.note-panel .pf button{flex:1;border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans);color:var(--ink-soft)}
+.note-panel .pf button:hover{background:var(--line-soft)}
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-in">
+    <p class="eyebrow">Codebase walkthrough · pose pipeline</p>
+    <h1><span class="u">ExerciseBase</span>, explained line by line</h1>
+    <p class="lede">The abstract “parent class” every Vika exercise inherits from. It runs the per-frame
+      camera loop, decides when you’ve started and finished, watches whether you’re still in frame, and
+      hands the talking coach what to say. This page walks the whole file top-to-bottom — real code,
+      plain-English translation, and honest suggestions for what could be cleaner.</p>
+    <div class="chips">
+      <span class="chip"><b>file</b> lib/exercise/exercise_base.dart</span>
+      <span class="chip"><b>~1662</b> lines</span>
+      <span class="chip"><b>Dart</b> / Flutter</span>
+      <span class="chip"><b>1</b> abstract class + 3 helpers</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc" aria-label="Contents">
+  <p class="lbl">On this page</p>
+  <ol>
+    <li><a href="#big">The big picture</a></li>
+    <li><a href="#imports">Header &amp; imports</a></li>
+    <li><a href="#consts">Constants &amp; enums</a></li>
+    <li><a href="#coach">The VoiceCoach contract</a></li>
+    <li><a href="#result">ResultIssues</a></li>
+    <li><a href="#fields">The class &amp; its fields</a></li>
+    <li><a href="#processpose">processPose — the heartbeat</a></li>
+    <li><a href="#nopose">processNoPoseFrame</a></li>
+    <li><a href="#detect-lifecycle">Detection lifecycle hooks</a></li>
+    <li><a href="#sync">_syncPresenceState</a></li>
+    <li><a href="#orientation">Orientation detection</a></li>
+    <li><a href="#helpers">Math &amp; frame helpers</a></li>
+    <li><a href="#statemachine">The state machine</a></li>
+    <li><a href="#abstract">Abstract methods &amp; UI bridge</a></li>
+    <li><a href="#hold">HoldSecondsAccumulator</a></li>
+    <li><a href="#voice">The voice-coach machinery</a></li>
+    <li><a href="#recap">Suggestions recap</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<!-- ============ 0 BIG PICTURE ============ -->
+<section id="big">
+  <p class="kicker"><span class="n">00</span> Orientation</p>
+  <h2>The big picture — read this first</h2>
+  <p class="lead">Before any code: what <em class="term">is</em> this file, in one breath.</p>
+
+  <div class="call eli">
+    <p class="ct">🧒 Like you’re five</p>
+    <p><strong>ExerciseBase is a fill-in-the-blanks worksheet for exercises.</strong> Every exercise
+    (Squat, Plank, Cobra…) is a different worksheet, but they all share the same printed parts: “find the
+    person,” “wait for them to get ready,” “count reps,” “notice if they walk away,” “tell the coach what
+    to say.” ExerciseBase prints all those shared parts <em class="term">once</em>. Each real exercise only
+    fills in the blanks that are special to it — like “what does the ‘down’ position look like?”</p>
+  </div>
+
+  <p>The phone’s camera AI (Google ML Kit) looks at each video frame and drops <strong>33 dots</strong> on
+  your body — shoulder, elbow, hip, knee, and so on. These dots are called <em class="term">pose landmarks</em>.
+  Each dot carries: <code>x, y</code> (where on screen), <code>z</code> (how near/far), <code>presence</code>
+  (“is this joint really there?”) and <code>visibility</code> (“can we actually see it?”). ExerciseBase’s
+  whole job is to turn a stream of these dots into “rep counted,” “good form,” “paused,” etc.</p>
+
+  <h3>Two mental models to hold</h3>
+  <p><strong>1. The lifecycle</strong> — an exercise is a 3-square board game. You only ever move forward:</p>
+  <div class="lifecycle">
+    <div class="lc-node"><div class="st">notActivated</div><div class="sub">“Get into position.” Looking for a person &amp; waiting for the ready pose.</div></div>
+    <div class="lc-arrow"><div class="big">→</div><div class="cond">hold the start pose<br>still for 3 seconds</div></div>
+    <div class="lc-node"><div class="st">activated</div><div class="sub">The set is live. Counting reps, checking form, watching presence.</div></div>
+    <div class="lc-arrow"><div class="big">→</div><div class="cond">target reps reached<br>(<code>requestStop()</code>)</div></div>
+    <div class="lc-node"><div class="st">completed</div><div class="sub">Set done. Show the summary; stop counting.</div></div>
+  </div>
+
+  <p><strong>2. The heartbeat</strong> — a function called <code>processPose()</code> runs for
+  <em class="term">every single camera frame</em> (~30 times a second). Everything below is really just
+  “what happens on each heartbeat.” Here’s the order it does things in:</p>
+  <div class="pipe">
+    <div class="row"><div class="num"></div><div class="body"><b>Update FPS &amp; timestamp</b><div class="d">Stamp “now” once so the whole frame agrees on the time.</div></div></div>
+    <div class="row"><div class="num"></div><div class="body"><b>Smooth the dots</b><div class="d">Run landmarks through the One Euro Filter so they stop jittering.</div></div></div>
+    <div class="row"><div class="num"></div><div class="body"><b>Sync presence</b><div class="d">Is a human in frame? Confirm arrivals, start the auto-pause clock on exits.</div></div></div>
+    <div class="row stop"><div class="num"></div><div class="body"><b>Early exits</b><div class="d">No person yet, or paused → return a status message and stop here.</div></div></div>
+    <div class="row"><div class="num"></div><div class="body"><b>Poke segmentation on trouble</b><div class="d">Low presence / edge-of-frame / anomaly → ask the person-detector to re-check.</div></div></div>
+    <div class="row"><div class="num"></div><div class="body"><b>Detect facing &amp; scale</b><div class="d">Front or side view? How big on screen? (normalizes measurements.)</div></div></div>
+    <div class="row stop"><div class="num"></div><div class="body"><b>Safety check</b><div class="d">Subclass can veto with a warning message → stop here.</div></div></div>
+    <div class="row"><div class="num"></div><div class="body"><b>Run the state machine</b><div class="d">Advance the board game: activate, or count reps &amp; check form, or finish.</div></div></div>
+    <div class="row"><div class="num"></div><div class="body"><b>Return feedback</b><div class="d">Give the UI back <code>[repCount, feedbackMap]</code> or the final set summary.</div></div></div>
+  </div>
+
+  <h3>How to read the callouts</h3>
+  <div class="legend">
+    <div><b style="color:var(--idea)">🧒 Like you’re five</b>The plain-English translation, no jargon.</div>
+    <div><b style="color:var(--tip)">💡 Could be better</b>A concrete cleanup or refactor idea.</div>
+    <div><b style="color:var(--warn)">⚠️ Watch out</b>A real gotcha, bug smell, or dead code.</div>
+    <div><b style="color:var(--ink)">Verbatim code</b>Dark blocks are the exact file, real line numbers in the gutter.</div>
+  </div>
+  <div class="call tip">
+    <p class="ct">🖊 Take your own notes</p>
+    <p>This page has a private note pad built in. <strong>Select any text or code</strong> and click the
+    <em class="term">🖊 Note this</em> bubble, or open the <em class="term">Notes</em> button (bottom-right)
+    to see them all. Your notes are saved in <strong>your browser only</strong> — they are <em class="term">not</em>
+    sent to me. Export anytime with “Copy all” or “Download .md”.</p>
+  </div>
+</section>
+
+<!-- ============ 1 IMPORTS ============ -->
+<section id="imports">
+  <p class="kicker"><span class="n">01</span> Setup <span class="range">· L1–27</span></p>
+  <h2>File header &amp; imports</h2>
+  <p>The top of the file: a docstring saying what the class is for, one analyzer switch, and the list of
+  other files this one leans on.</p>
+  <div class="code">
+    <div class="code-head"><span>lib/exercise/exercise_base.dart</span><b>L1–27</b></div>
+    <div class="code-body">
+<pre class="gut">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27</pre>
+<pre class="src"><span class="c">/* =========================================================================
+      ExerciseBase: abstract base class for all exercises. Centralizes common
+      logic such as activation, person detection, orientation detection, and
+      rep counting. Subclasses implement specific exercises by overriding the
+      abstract methods at the bottom of this file.
+      ========================================================================= */</span>
+
+<span class="c">// ignore_for_file: constant_identifier_names</span>
+
+<span class="k">import</span> <span class="s">'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart'</span>;
+<span class="k">import</span> <span class="s">'package:vika/pose/vika_pose_landmark.dart'</span>;
+<span class="k">import</span> <span class="s">'package:vika/pose/vika_image_orientation.dart'</span>;
+<span class="k">export</span> <span class="s">'package:vika/pose/vika_image_orientation.dart'</span>;
+<span class="k">import</span> <span class="s">'package:vika/utils/debouncer.dart'</span>;
+<span class="k">import</span> <span class="s">'package:vika/utils/person_detector.dart'</span>;
+<span class="k">import</span> <span class="s">'../utils/pose_smoother.dart'</span>;
+<span class="k">import</span> <span class="s">'../utils/pose_math_helpers.dart'</span>;
+<span class="k">import</span> <span class="s">"../utils/frame_buffer.dart"</span>;
+<span class="k">import</span> <span class="s">"../utils/exercise_logger.dart"</span>;
+<span class="k">import</span> <span class="s">'../debug/debug_types.dart'</span>;
+<span class="k">import</span> <span class="s">'../services/generic_exercise_voice_assets.dart'</span>;
+<span class="k">import</span> <span class="s">'../services/queued_asset_voice_player.dart'</span>;
+<span class="k">import</span> <span class="s">'../services/viettel_tts_service.dart'</span>;
+<span class="k">import</span> <span class="s">'../pose/presence_anomaly_detector.dart'</span>;
+<span class="k">import</span> <span class="s">'dart:math'</span> <span class="k">as</span> math;
+<span class="k">import</span> <span class="s">'dart:async'</span>;
+<span class="k">import</span> <span class="s">'dart:ui'</span> <span class="k">show</span> Size;</pre>
+    </div>
+  </div>
+  <div class="call eli">
+    <p class="ct">🧒 Like you’re five</p>
+    <p>These are the “ingredients I’m borrowing from other boxes.” The important ones:
+    <code>google_mlkit_pose_detection</code> is the AI that gives us the 33 body dots;
+    <code>pose_smoother</code> steadies the jittery dots; <code>person_detector</code> is a
+    <em class="term">second</em> AI that just answers “is a human blob in the picture?”;
+    <code>viettel_tts_service</code> is the Vietnamese talking voice; <code>exercise_logger</code>
+    writes down what happened each rep.</p>
+  </div>
+  <div class="call idea">
+    <p class="ct">🧠 One thing to notice</p>
+    <p>Line 13 is an <code>export</code>, not an import. That means anyone who imports
+    <code>exercise_base.dart</code> automatically also gets <code>vika_image_orientation.dart</code> for
+    free — a small convenience so every exercise file doesn’t have to import orientation types separately.</p>
+  </div>
+  <div class="call tip">
+    <p class="ct">💡 Tiny cleanup</p>
+    <p>Lines 18–19 use <code>"double quotes"</code> while every other import uses <code>'single quotes'</code>.
+    Harmless, but the Dart convention (and the rest of this file) is single quotes. One-second fix.</p>
+  </div>
+</section>
+
+<!-- ============ 2 CONSTANTS ============ -->
+<section id="consts">
+  <p class="kicker"><span class="n">02</span> Vocabulary <span class="range">· L29–38</span></p>
+  <h2>Constants &amp; enums</h2>
+  <p>Two magic numbers and two “lists of allowed words” (enums).</p>
+  <div class="code">
+    <div class="code-head"><span>constants &amp; enums</span><b>L29–38</b></div>
+    <div class="code-body">
+<pre class="gut">29
+30
+31
+32
+33
+34
+35
+36
+37
+38</pre>
+<pre class="src"><span class="c">// --- Constants ---</span>
+
+<span class="k">const double</span> FRONT_FACING_SHOULDER_THRESHOLD = 0.57;
+<span class="k">const double</span> SIDE_FACING_SHOULDER_THRESHOLD = 0.35;
+
+<span class="c">// --- Enums ---</span>
+
+<span class="k">enum</span> ExerciseState { notActivated, activated, completed }
+
+<span class="k">enum</span> CameraFacing { front, left, right, angled, undefined }</pre>
+    </div>
+  </div>
+  <div class="call eli">
+    <p class="ct">🧒 Like you’re five</p>
+    <p>An <em class="term">enum</em> is just “a short list of the only allowed answers.” <code>ExerciseState</code>
+    is the 3 squares of the board game. <code>CameraFacing</code> is “which way is the person turned?” —
+    facing the camera, turned to their left/right, at an angle, or we-can’t-tell.</p>
+    <p>The two numbers decide front-vs-side. The trick: when you face the camera your shoulders look
+    <em class="term">wide</em>; when you turn sideways they look <em class="term">narrow</em> (one shoulder
+    hides behind the other). So “shoulder width ÷ torso height” is big when facing you (&gt; 0.57 → front)
+    and small when sideways (&lt; 0.35 → side). In between is “angled.”</p>
+  </div>
+  <div class="call idea">
+    <p class="ct">🧠 Naming convention</p>
+    <p>The <code>UPPER_SNAKE_CASE</code> names would normally make Dart’s linter complain — that’s exactly
+    what the <code>// ignore_for_file: constant_identifier_names</code> back on line 8 silences. It’s a
+    deliberate house style for tuning constants.</p>
+  </div>
+</section>
+
+<!-- ============ 3 VOICE COACH CONTRACT ============ -->
+<section id="coach">
+  <p class="kicker"><span class="n">03</span> A promise <span class="range">· L40–55</span></p>
+  <h2>The <code>ExerciseVoiceCoach</code> contract</h2>
+  <p>An <em class="term">abstract class</em> with no real body — it’s a <strong>contract</strong>: “any voice
+  coach must have these three abilities.”</p>
+  <div class="code">
+    <div class="code-head"><span>abstract class ExerciseVoiceCoach</span><b>L40–55</b></div>
+    <div class="code-body">
+<pre class="gut">40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55</pre>
+<pre class="src"><span class="k">abstract class</span> ExerciseVoiceCoach {
+  <span class="k">void</span> processFrame({
+    <span class="k">required</span> ExerciseBase exercise,
+    <span class="k">required int</span> repCount,
+    <span class="k">required bool</span> hasPose,
+    <span class="k">required</span> Map&lt;String, String&gt; feedback,
+  });
+
+  Future&lt;<span class="k">void</span>&gt; waitUntilIdle({
+    Duration timeout = <span class="k">const</span> Duration(seconds: 4),
+  }) {
+    <span class="k">return</span> Future&lt;<span class="k">void</span>&gt;.value();
+  }
+
+  <span class="k">void</span> dispose();
+}</pre>
+    </div>
+  </div>
+  <div class="call eli">
+    <p class="ct">🧒 Like you’re five</p>
+    <p>Think of it as a job description for “the trainer who talks.” To be hired, you must be able to:
+    <strong>(1)</strong> <code>processFrame</code> — react every frame (say “2!”, “go lower”);
+    <strong>(2)</strong> <code>waitUntilIdle</code> — “finish talking before we move on”;
+    <strong>(3)</strong> <code>dispose</code> — pack up and shut off. Squat, Plank, Bird Dog each hire their
+    <em class="term">own</em> trainer that fits this description. The generic one lives at the bottom of this
+    very file (section 16).</p>
+  </div>
+  <div class="call idea">
+    <p class="ct">🧠 What is that “4” in <code>waitUntilIdle</code>?</p>
+    <p>It is <strong>not</strong> “wait 4 seconds before talking.” <code>waitUntilIdle</code> means “pause
+    until the coach has finished saying everything already queued.” <code>Duration(seconds: 4)</code> is the
+    <em class="term">most</em> it will ever wait — a safety cap so a stuck audio clip can’t freeze the app;
+    after 4s it gives up and moves on. And in <em class="term">this</em> base version the body is literally
+    <code>return Future.value()</code>, which finishes <em class="term">instantly</em> — the default coach
+    doesn’t actually wait at all, so here the 4 never even gets used. It’s just the default value that real
+    coaches (Squat, Plank) rely on when <strong>they</strong> override this method with a real “wait for the
+    audio queue to drain” body. Think of it as a fallback timeout, not a pause-before-speaking delay.</p>
+  </div>
+  <div class="call idea">
+    <p class="ct">🧠 Why it’s here matters later</p>
+    <p>This little contract is imported by ~18 files (every exercise + the camera page). So even after we
+    move the big generic coach out of this file, this <em class="term">interface</em> has to stay somewhere
+    importable. Keep this fact in your pocket for the refactor.</p>
+  </div>
+</section>
+
+<!-- ============ 4 RESULT ISSUES ============ -->
+<section id="result">
+  <p class="kicker"><span class="n">04</span> A mailbox <span class="range">· L57–72</span></p>
+  <h2><code>ResultIssues</code> — the feedback mailbox</h2>
+  <div class="code">
+    <div class="code-head"><span>class ResultIssues</span><b>L57–72</b></div>
+    <div class="code-body">
+<pre class="gut">57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72</pre>
+<pre class="src"><span class="c">// --- Result Tracking ---</span>
+
+<span class="k">class</span> ResultIssues {
+  Map&lt;String, String&gt; feedback = {};
+  Map&lt;String, Map&lt;String, String&gt;&gt; instructions = {};
+
+  <span class="k">void</span> addInstruction(String phase, String type, String message) {
+    instructions.putIfAbsent(phase, () =&gt; {});
+    instructions[phase]![type] = message;
+  }
+
+  <span class="k">void</span> clear() {
+    feedback.clear();
+    instructions.clear();
+  }
+}
+</pre>
+    </div>
+  </div>
+  <div class="call eli">
+    <p class="ct">🧒 Like you’re five</p>
+    <p>Two mailboxes for messages to show the user. <code>feedback</code> is the “right now, this frame”
+    box — it gets <strong>emptied every frame</strong> (you’ll see <code>resultIssues.feedback.clear()</code>
+    at the start of the heartbeat). <code>instructions</code> is the “sticky” box, organized by phase
+    (“going down,” “hold”), that survives across frames until someone changes it.</p>
+  </div>
+  <div class="call idea">
+    <p class="ct">🧠 Reading the types</p>
+    <p><code>Map&lt;String, String&gt;</code> = a labeled box: key “System” → value “Đang tìm người…”.
+    <code>Map&lt;String, Map&lt;String,String&gt;&gt;</code> is a box-of-boxes: phase → (type → message).
+    <code>putIfAbsent</code> means “make an empty inner box only if this phase doesn’t have one yet.”</p>
+  </div>
+</section>
+
+<!-- ============ 5 FIELDS ============ -->
+<section id="fields">
+  <p class="kicker"><span class="n">05</span> The state <span class="range">· L80–239</span></p>
+  <h2>The class &amp; all its fields</h2>
+  <p class="lead">Before any behavior, <code>ExerciseBase</code> declares everything it <em class="term">remembers</em>
+  between frames. I’ll show it in themed chunks so it’s not a wall.</p>
+
+  <h3>5a · Core state + landmark-confidence thresholds</h3>
+  <div class="code">
+    <div class="code-head"><span>class ExerciseBase — core + thresholds</span><b>L80–108</b></div>
+    <div class="code-body">
+<pre class="gut">80
+81
+82
+83
+84
+85
+86
+87
+88
+89
+90
+91
+92
+93
+94
+95
+96
+97
+98
+99
+100
+101
+102
+103
+104
+105
+106
+107
+108</pre>
+<pre class="src"><span class="k">abstract class</span> ExerciseBase {
+  <span class="c">// Logger</span>
+  ExerciseLogger logger = ExerciseLogger();
+  <span class="c">// Core state</span>
+  <span class="k">late</span> PoseSmoother poseSmoother;
+  <span class="k">int</span> repCount = 0;
+
+  <span class="c">/// Probability the landmark actually exists in the predicted skeleton.
+  /// Drops cleanly when a person leaves frame; stays high for legitimately
+  /// occluded landmarks such as the back leg in side-view squats.</span>
+  <span class="k">static const double</span> MIN_PRESENCE = 0.7;
+
+  <span class="c">/// Average presence below this threshold may indicate a faulty pose or that the
+  /// person is not fully in frame.</span>
+  <span class="k">static const double</span> AVG_LOW_PRESENCE_THRESHOLD = 0.35;
+
+  <span class="c">/// Probability the landmark is unoccluded given that it exists.
+  /// Used only as a secondary gate to reject fully extrapolated landmarks.</span>
+  <span class="k">static const double</span> MIN_VISIBILITY = 0.3;
+
+  <span class="c">/// Diagnostic-only bypass for auto-pause and pose-event backpressure.
+  /// Keep false in production; enabling this disables pause paths while
+  /// collecting continuity diagnostics.</span>
+  <span class="k">static const bool</span> kDiagnosticMode = false;
+
+  <span class="c">/// Master toggle for landscape orientation support across pose pipeline.
+  /// When false, all paths fall through to portrait behavior identical to
+  /// pre-spec production.</span>
+  <span class="k">static const bool</span> kLandscapeRotationEnabled = true;</pre>
+    </div>
+  </div>
+  <div class="call eli">
+    <p class="ct">🧒 Like you’re five</p>
+    <p><code>repCount</code> is the tally of reps. <code>logger</code> is the notebook. <code>poseSmoother</code>
+    is the jitter-remover (<code>late</code> = “I’ll fill this in a moment, in the constructor”).</p>
+    <p>The two probabilities per dot: <em class="term">presence</em> = “is this joint actually there?” and
+    <em class="term">visibility</em> = “can we see it, or is it hidden behind something?” A dot only counts
+    as trustworthy if presence ≥ 0.7 <strong>and</strong> visibility ≥ 0.3.</p>
+  </div>
+  <div class="call idea">
+    <p class="ct">🧠 The <code>k</code> flags are compile-time switches</p>
+    <p><code>kDiagnosticMode</code> and <code>kLandscapeRotationEnabled</code> are <code>static const</code> —
+    they’re read from other files (the camera page, the segmentation channel) as global on/off switches.
+    <code>kDiagnosticMode = true</code> disables all auto-pausing so engineers can record continuous
+    diagnostics. Leave it false in the app.</p>
+  </div>
+
+  <h3>5b · Which orientations this exercise supports</h3>
+  <div class="code">
+    <div class="code-head"><span>supportedOrientations + intro voice key</span><b>L110–129</b></div>
+    <div class="code-body">
+<pre class="gut">110
+111
+112
+113
+114
+115
+116
+117
+118
+119
+120
+121
+122
+123
+124
+125
+126
+127
+128
+129</pre>
+<pre class="src">  <span class="c">/// Device orientations under which this exercise is designed to work.
+  /// Defaults to portrait. Floor, prone, and seated exercises should override
+  /// this with the tested orientations as they are added.
+  ///
+  /// Convention for future floor/prone/seated work such as Cobra, Sphinx,
+  /// Seated Forward Fold, or Butterfly: declare both supported landscape
+  /// orientations once the exercise metrics and framing are validated there.</span>
+  Set&lt;VikaImageOrientation&gt; <span class="k">get</span> supportedOrientations =&gt;
+      <span class="k">const</span> &lt;VikaImageOrientation&gt;{VikaImageOrientation.portrait};
+
+  String <span class="k">get</span> setupOrientationIntroVoiceKey {
+    <span class="k">final</span> supportsPortrait =
+        supportedOrientations.contains(VikaImageOrientation.portrait);
+    <span class="k">final</span> supportsLandscape =
+        supportedOrientations.any((orientation) =&gt; orientation.isLandscape);
+
+    <span class="k">if</span> (supportsPortrait &amp;&amp; !supportsLandscape) <span class="k">return</span> <span class="s">'common.thang_intro'</span>;
+    <span class="k">if</span> (supportsLandscape &amp;&amp; !supportsPortrait) <span class="k">return</span> <span class="s">'common.ngang_intro'</span>;
+    <span class="k">return</span> supportsPortrait ? <span class="s">'common.thang_intro'</span> : <span class="s">'common.ngang_intro'</span>;
+  }</pre>
+    </div>
+  </div>
+  <div class="call eli">
+    <p class="ct">🧒 Like you’re five</p>
+    <p>“Should the phone be upright or on its side for this exercise?” By default: upright (portrait).
+    A floor exercise like Cobra would <em class="term">override</em> this to also allow sideways. The
+    <code>get</code> keyword means it looks like a variable but is computed on the fly. The second one picks
+    which spoken intro to play — <code>thang</code> (“thẳng” = upright) vs <code>ngang</code> (“ngang” =
+    sideways) — so the coach tells you how to prop your phone.</p>
+  </div>
+
+  <h3>5c · The “when should I re-check for a person?” flags</h3>
+  <div class="code">
+    <div class="code-head"><span>segmentation-trigger flags + isLandmarkConfident</span><b>L131–166</b></div>
+    <div class="code-body">
+<pre class="gut">131
+132
+133
+134
+135
+136
+137
+138
+139
+140
+141
+142
+143
+144
+145
+146
+147
+148
+149
+150
+151
+152
+153
+154
+155
+156
+157
+158
+159
+160
+161
+162
+163
+164
+165
+166</pre>
+<pre class="src">  <span class="c">// Trigger segmentation</span>
+  <span class="k">bool</span> _wasPoseAnomaly = false;
+  <span class="k">bool</span> _wasPoseFrameEdgeRisk = false;
+  <span class="k">bool</span> _wasPoseLowPresence = false;
+  <span class="k">bool</span> _wasNoLandmarks = false;
+  <span class="k">final</span> PresenceAnomalyDetector _posePresenceDetector =
+      PresenceAnomalyDetector();
+
+  <span class="k">static bool</span> isLandmarkConfident(PoseLandmark landmark) {
+    <span class="k">return</span> landmark.presence &gt;= MIN_PRESENCE &amp;&amp;
+        landmark.visibility &gt;= MIN_VISIBILITY;
+  }
+
+  <span class="c">// Voice Service</span>
+  <span class="k">final</span> ViettelTTSService ttsService = ViettelTTSService();
+
+  <span class="c">// Scale factor (shoulder-to-hip distance)</span>
+  <span class="k">double</span> scaleFactor = 1.0;
+
+  <span class="c">// Frame buffer</span>
+  FrameBuffer frameBuffer = FrameBuffer();
+
+  <span class="c">// Centralized per-frame timestamp (set once at the start of each frame)</span>
+  DateTime frameTimestamp = DateTime.now();
+  <span class="k">int get</span> frameTimestampMs =&gt; frameTimestamp.millisecondsSinceEpoch;
+  <span class="k">final</span> Stopwatch _sessionStopwatch = Stopwatch();
+  <span class="k">int get</span> elapsedMs =&gt; _sessionStopwatch.elapsedMilliseconds;
+
+  List&lt;Map&lt;<span class="k">bool</span>, Map&lt;String, Map&lt;String, String&gt;&gt;&gt;&gt; setFeedback = [];
+  ResultIssues resultIssues = ResultIssues();
+
+  ExerciseState exerciseState = ExerciseState.notActivated;
+  CameraFacing cameraFacing = CameraFacing.front;
+  DebugMode debugMode = DebugMode.off;
+  <span class="k">bool</span> correctForm = true;
+  <span class="k">double</span> frontFacingRatio = 1.0;</pre>
+    </div>
+  </div>
+  <div class="call eli">
+    <p class="ct">🧒 Like you’re five</p>
+    <p>The four <code>_was…</code> booleans are “was this a problem <em class="term">last</em> frame?” memory
+    switches. They exist so we only sound the alarm on the <strong>moment it turns bad</strong> (false → true),
+    not every frame while it stays bad. <code>isLandmarkConfident</code> is the reusable “do we trust this dot?”
+    check that ~50 other exercise files call. <code>_sessionStopwatch</code> times the live set;
+    <code>frameTimestamp</code> is “now,” stamped once per frame so every calculation agrees.</p>
+  </div>
+  <div class="call idea">
+    <p class="ct">🧠 “Trigger segmentation” = poke the second AI</p>
+    <p>Running the person-detector (selfie segmentation) every frame would be expensive, so normally it runs
+    slowly in the background. These flags detect “something looks wrong with the skeleton” and
+    <em class="term">poke</em> the detector to re-check <strong>right now</strong>. That’s the whole point of
+    this cluster — you’ll see it fire in <code>processPose</code>.</p>
+  </div>
+
+  <h3>5d · Debug, FPS, person-detection &amp; pause bookkeeping</h3>
+  <div class="code">
+    <div class="code-head"><span>debug / fps / person-detection / pause / activation</span><b>L168–239</b></div>
+    <div class="code-body">
+<pre class="gut">168
+169
+170
+171
+172
+173
+174
+175
+176
+177
+178
+179
+180
+181
+182
+183
+184
+185
+186
+187
+188
+189
+190
+191
+192
+193
+194
+195
+196
+197
+198
+199
+200
+201
+202
+203
+204
+205
+206
+207
+208
+209
+210
+211
+212
+213
+214
+215
+216
+217
+218
+219
+220
+221
+222
+223
+224
+225
+226
+227
+228
+229
+230
+231
+232
+233
+234
+235
+236
+237
+238
+239</pre>
+<pre class="src">  Map&lt;String, <span class="k">dynamic</span>&gt; debugData = {};
+
+  <span class="k">bool get</span> isDebugModeActive =&gt; debugMode != DebugMode.off;
+
+  <span class="c">// Orientation debouncer</span>
+  StickyDebouncer leftRightDebouncer = StickyDebouncer(requiredFrames: 5);
+
+  <span class="c">// -- FPS Tracking --</span>
+  DateTime? _lastFrameTime;
+  <span class="k">double</span> _currentFps = 30.0;
+
+  <span class="k">double get</span> currentFps =&gt; _currentFps;
+  <span class="k">double get</span> fpsRatio =&gt; _currentFps / 30.0;
+
+  <span class="c">// Person detection (selfie segmentation)</span>
+  <span class="k">final</span> PersonDetector _personDetector = PersonDetector();
+  <span class="k">bool</span> _personConfirmed = false;
+  DateTime? _personSeenSince;
+  DateTime? _personLostSince;
+  DateTime? _resumePresenceSince;
+
+  <span class="k">bool</span> _isPaused = false;
+
+  <span class="c">/// True when the current pause was triggered by the user tapping the pause
+  /// button (as opposed to the person walking out of frame). A manual pause is
+  /// never auto-resumed by presence detection — only [manualResume] clears it.</span>
+  <span class="k">bool</span> _manualPause = false;
+
+  <span class="k">static const</span> Duration _PERSON_CONFIRM_DURATION = Duration(milliseconds: 500);
+  <span class="k">static const</span> Duration _PERSON_LOST_GRACE = Duration(milliseconds: 900);
+  <span class="k">static const</span> Duration _PERSON_RESUME_CONFIRM_DURATION =
+      Duration(milliseconds: 320);
+
+  <span class="k">bool get</span> isPaused =&gt; _isPaused;
+
+  <span class="c">/// Manually pause the exercise (e.g. user tapped pause button).</span>
+  <span class="k">void</span> manualPause() {
+    <span class="k">if</span> (exerciseState != ExerciseState.activated) <span class="k">return</span>;
+    _isPaused = true;
+    _manualPause = true;
+  }
+
+  <span class="c">/// Manually resume after a manual pause.</span>
+  <span class="k">void</span> manualResume() {
+    _isPaused = false;
+    _manualPause = false;
+    _resumePresenceSince = DateTime.now();
+    _personLostSince = null;
+    _resetPresenceDetectors();
+    unawaited(_personDetector.triggerCheck(reason: <span class="s">'manual_resume'</span>));
+  }
+
+  <span class="k">double get</span> personPresenceScore =&gt; _personDetector.presenceScore;
+
+  <span class="c">// Hold-still activation</span>
+  DateTime? _holdStillStartedAt;
+  <span class="k">static const</span> Duration HOLD_STILL_REQUIRED_DURATION = Duration(seconds: 3);
+
+  <span class="c">/// Progress 0.0–1.0 for hold-still countdown UI. Null if not in countdown.</span>
+  <span class="k">double</span>? <span class="k">get</span> activationProgress {
+    <span class="k">if</span> (exerciseState != ExerciseState.notActivated) <span class="k">return</span> null;
+    <span class="k">if</span> (!_personConfirmed) <span class="k">return</span> null;
+    <span class="k">if</span> (_holdStillStartedAt == null) <span class="k">return</span> null;
+    <span class="k">final</span> elapsed = frameTimestamp.difference(_holdStillStartedAt!);
+    <span class="k">return</span> (elapsed.inMilliseconds /
+            HOLD_STILL_REQUIRED_DURATION.inMilliseconds)
+        .clamp(0.0, 1.0);
+  }
+
+  ExerciseBase() {
+    poseSmoother = PoseSmoother(minCutoff: 0.5, beta: 0.005);
+  }</pre>
+    </div>
+  </div>
+  <div class="call eli">
+    <p class="ct">🧒 Like you’re five</p>
+    <p>This is the pause-and-presence brain’s memory. Four “since when?” timestamps:
+    <code>_personSeenSince</code> (when did a human first appear?), <code>_personLostSince</code> (when did
+    they vanish?), <code>_resumePresenceSince</code> (how long have they been back?), and
+    <code>_holdStillStartedAt</code> (when did they start holding the ready pose?). The three
+    <code>Duration</code> numbers are the patience timers: confirm a person after 0.5s, wait 0.9s before
+    auto-pausing when they leave, need 0.32s of “they’re back” before resuming.</p>
+  </div>
+  <div class="call idea">
+    <p class="ct">🧠 Two kinds of pause</p>
+    <p><code>_isPaused</code> = “are we paused?” <code>_manualPause</code> = “did the <em class="term">user</em>
+    tap pause (vs. they walked away)?” This split matters: if you walked away, standing back in frame
+    auto-resumes. If you <em class="term">tapped</em> pause, standing in frame must <strong>not</strong>
+    sneakily un-pause you — only tapping resume does. That’s why two booleans, not one.</p>
+  </div>
+  <div class="call eli">
+    <p class="ct">🧒 The constructor (L237–239)</p>
+    <p><code>ExerciseBase()</code> runs once when an exercise is created. It builds the jitter-remover with
+    two tuning knobs: <code>minCutoff</code> (baseline smoothing) and <code>beta</code> (how much to trust
+    fast movements). Low numbers = smoother but laggier.</p>
+  </div>
+</section>
+
+<!-- ============ 6 processPose ============ -->
+<section id="processpose">
+  <p class="kicker"><span class="n">06</span> The heartbeat <span class="range">· L243–354</span></p>
+  <h2><code>processPose()</code> — runs every frame</h2>
+  <p class="lead">The single most important method. The camera calls this ~30×/second with the fresh dots.
+  Everything the exercise “feels” flows through here. We’ll read it in two halves.</p>
+
+  <h3>6a · Time, smoothing, presence, and the early exits</h3>
+  <div class="code">
+    <div class="code-head"><span>processPose — part 1</span><b>L243–296</b></div>
+    <div class="code-body">
+<pre class="gut">243
+244
+245
+246
+247
+248
+249
+250
+251
+252
+253
+254
+255
+256
+257
+258
+259
+260
+261
+262
+263
+264
+265
+266
+267
+268
+269
+270
+271
+272
+273
+274
+275
+276
+277
+278
+279
+280
+281
+282
+283
+284
+285
+286
+287
+288
+289
+290
+291
+292
+293
+294
+295
+296</pre>
+<pre class="src">  List&lt;<span class="k">dynamic</span>&gt;? processPose(
+    Map&lt;PoseLandmarkType, PoseLandmark&gt; landmarks, {
+    InputImage? inputImage,
+    Size? imageSize,
+  }) {
+    <span class="k">final</span> now = DateTime.now(); <span class="c">// NOTE: redundant?</span>
+    <span class="k">if</span> (_lastFrameTime != null) {
+      <span class="k">final</span> deltaMs = now.difference(_lastFrameTime!).inMilliseconds;
+      <span class="k">if</span> (deltaMs &gt; 0) {
+        <span class="k">final</span> frameFps = 1000.0 / deltaMs; <span class="c">// NOTE: why</span>
+        _currentFps = _currentFps * 0.9 + frameFps * 0.1; <span class="c">// why?</span>
+      }
+    }
+    _lastFrameTime = now;
+    frameTimestamp = now; <span class="c">// for the person detection</span>
+
+    resultIssues.feedback.clear();
+
+    <span class="k">final</span> smoothedLandmarks = poseSmoother.smoothing(landmarks);
+
+    <span class="c">// Pose returned after a no-landmark run. Ask segmentation for a fresh frame
+    // before any paused/not-confirmed early return can block this path.</span>
+    <span class="k">if</span> (_wasNoLandmarks) {
+      unawaited(_personDetector.triggerCheck(reason: <span class="s">'pose_returned'</span>));
+      _wasNoLandmarks = false;
+    }
+
+    _syncPresenceState(hasPose: true);
+
+    <span class="c">// Person detection — only before activation</span>
+    <span class="k">if</span> (exerciseState == ExerciseState.notActivated &amp;&amp; !_personConfirmed) {
+      <span class="k">final</span> stableFor = _personSeenSince == null
+          ? 0
+          : frameTimestamp.difference(_personSeenSince!).inMilliseconds;
+      <span class="k">if</span> (isDebugModeActive) {
+        debugData[<span class="s">'personStableMs'</span>] = stableFor;
+      }
+
+      <span class="k">if</span> (!_personConfirmed) {
+        resultIssues.feedback[<span class="s">"System"</span>] =
+            <span class="s">"Đang tìm người... Vui lòng đứng trong khung hình."</span>;
+        <span class="k">return</span> [repCount, resultIssues.feedback];
+      }
+    }
+
+    <span class="c">// Presence re-check during active exercise</span>
+    <span class="k">if</span> (exerciseState == ExerciseState.activated) {
+      <span class="k">if</span> (_isPaused) {
+        unawaited(_personDetector.triggerCheck(reason: <span class="s">'paused_pose_present'</span>));
+        resultIssues.feedback[<span class="s">"System"</span>] =
+            <span class="s">"⏸ Tạm dừng — Quay lại khung hình để tiếp tục"</span>;
+        <span class="k">return</span> [repCount, resultIssues.feedback];
+      }
+    }</pre>
+    </div>
+  </div>
+  <div class="call eli">
+    <p class="ct">🧒 Like you’re five</p>
+    <p>Step by step: stamp the time → measure FPS → wipe the “this frame” mailbox → de-jitter the dots →
+    if dots just came back after being gone, poke the detector → update the presence brain. Then two
+    <strong>“stop early”</strong> gates: if we’re still hunting for a person, show “Đang tìm người…”
+    (“Looking for someone…”) and quit this frame; if we’re paused, show the pause banner and quit. No point
+    counting reps for someone who isn’t there.</p>
+  </div>
+  <div class="call idea">
+    <p class="ct">🔎 Deep dive: the “Person detection — only before activation” block (L273–286)</p>
+    <p>This is the <em class="term">“I haven’t confirmed a real person yet”</em> gate. Piece by piece:</p>
+    <p><strong>The outer <code>if</code></strong> — <code>notActivated &amp;&amp; !_personConfirmed</code>:
+    only run this while we’re still in setup <em class="term">and</em> we have <strong>not</strong> yet
+    confirmed a person. From §9, remember someone only becomes “confirmed” after the selfie-segmentation AI
+    has seen them <em class="term">continuously for 0.5s</em>. That half-second wait is deliberate: it stops a
+    one-frame flicker — a shadow, someone walking past — from falsely kicking off the exercise.</p>
+    <p><strong><code>stableFor</code></strong> — how many milliseconds the person has been continuously seen
+    so far (<code>now − _personSeenSince</code>, or <code>0</code> if nobody’s been seen yet). It’s purely a
+    <em class="term">debug readout</em>: the following line only stores it <code>if (isDebugModeActive)</code>,
+    so a developer can watch the number climb toward 500ms. In the shipped app, debug is off and these two
+    lines do nothing.</p>
+    <p><strong>The inner <code>if (!_personConfirmed)</code></strong> — show the Vietnamese status
+    <em class="term">“Đang tìm người… Vui lòng đứng trong khung hình”</em> (“Looking for someone… please
+    stand in the frame”) and <code>return</code> right away, bailing out of the entire frame. No reason to
+    detect orientation, run the state machine, or count reps when we’re not even sure a person is there.</p>
+  </div>
+  <div class="call tip">
+    <p class="ct">💡 A small redundancy in that block</p>
+    <p>The inner <code>if (!_personConfirmed)</code> is always true — the outer <code>if</code> already
+    guaranteed it, and nothing in between changes <code>_personConfirmed</code>. So the inner check could be
+    dropped and its body run directly. Harmless, but it makes the block look like it branches when it doesn’t.</p>
+  </div>
+  <div class="call idea">
+    <p class="ct">🔎 Why return <code>[repCount, resultIssues.feedback]</code> when repCount is just 0?</p>
+    <p>You caught something real: before the set starts, <code>repCount</code> is <code>0</code>, so why hand
+    it back? Because <code>processPose</code> keeps <strong>one uniform return shape on every frame</strong> —
+    always a 2-item list <code>[repCount, feedback]</code> (or the set summary once completed). The two
+    callers both lean on that fixed shape, but in different ways (verified in the app code):</p>
+    <ul>
+      <li><strong>The camera page</strong> (<code>active_exercise_page.dart</code>) checks
+      <code>result.first is int &amp;&amp; result[1] is Map</code> purely as a <em class="term">shape
+      guard</em>, then reads <code>result[1]</code> for feedback. It shows the rep number from
+      <code>exercise.repCount</code> directly — so here slot <code>[0]</code> is used only to
+      <em class="term">validate</em> that the return looks right.</li>
+      <li><strong>The other pipeline</strong> (<code>main.dart</code>) actually reads
+      <code>result[0] as int</code> as the live rep count every frame, comparing it to the previous value to
+      notice a completed rep.</li>
+    </ul>
+    <p>So the <code>repCount</code> here isn’t “logic” — it’s the <em class="term">honest current count,
+    which is 0</em>, handed back in the same slot every frame so a caller can blindly do
+    <code>reps = result[0]</code>, <code>feedback = result[1]</code> without ever branching on state. If the
+    idle path returned a different shape, every caller would have to special-case it. The UI shows that 0 as
+    your rep counter before you begin — which is correct.</p>
+  </div>
+  <div class="call tip">
+    <p class="ct">💡 A real inconsistency this reveals</p>
+    <p>The two callers read the result <em class="term">differently</em> — one trusts <code>result[0]</code>
+    for reps, the other ignores it and reads <code>exercise.repCount</code>. They agree today (slot 0
+    <em class="term">is</em> <code>exercise.repCount</code>), but nothing enforces that; picking one source
+    of truth for the rep count would remove the trap.</p>
+  </div>
+  <div class="call idea">
+    <p class="ct">🧠 That FPS line (L253)</p>
+    <p><code>_currentFps = _currentFps * 0.9 + frameFps * 0.1</code> is an <em class="term">exponential moving
+    average</em> — a “90% old, 10% new” blend so the FPS number glides instead of jumping around. Why care
+    about FPS at all? Because some exercises measure <em class="term">speed</em>, and speed only makes sense
+    if you know how much time each frame represents (see <code>fpsRatio</code>).</p>
+  </div>
+  <div class="call warn">
+    <p class="ct">⚠️ The <code>// NOTE: redundant?</code> / <code>// why?</code> breadcrumbs</p>
+    <p>Someone left three question-comments here (L248, L252, L255). Answers worth writing down so they stop
+    nagging: <code>now</code> is <strong>not</strong> redundant — it’s reused for both the FPS delta and
+    <code>frameTimestamp</code>, so it must be sampled once. <code>1000.0/deltaMs</code> converts
+    “milliseconds between frames” into “frames per second.” The <code>*0.9 + *0.1</code> is the smoothing
+    blend above. I’d replace the three comments with one real sentence explaining the EMA and delete the
+    doubt.</p>
+  </div>
+
+  <h3>6b · Trouble-detection, orientation, safety, then the state machine</h3>
+  <div class="code">
+    <div class="code-head"><span>processPose — part 2</span><b>L298–354</b></div>
+    <div class="code-body">
+<pre class="gut">298
+299
+300
+301
+302
+303
+304
+305
+306
+307
+308
+309
+310
+311
+312
+313
+314
+315
+316
+317
+318
+319
+320
+321
+322
+323
+324
+325
+326
+327
+328
+329
+330
+331
+332
+333
+334
+335
+336
+337
+338
+339
+340
+341
+342
+343
+344
+345
+346
+347
+348
+349
+350
+351
+352
+353
+354</pre>
+<pre class="src">    <span class="k">final</span> avgPosePresence = _computeAvgPresence(smoothedLandmarks);
+    <span class="k">final</span> poseLowPresence = avgPosePresence &lt; AVG_LOW_PRESENCE_THRESHOLD;
+    <span class="k">if</span> (exerciseState == ExerciseState.activated &amp;&amp;
+        poseLowPresence &amp;&amp;
+        !_wasPoseLowPresence) {
+      unawaited(_personDetector.triggerCheck(reason: <span class="s">'pose_low_presence'</span>));
+    }
+    _wasPoseLowPresence = poseLowPresence;
+
+    <span class="k">final</span> poseFrameEdgeRisk =
+        _isPoseFrameEdgeRisk(smoothedLandmarks, imageSize: imageSize);
+    <span class="k">if</span> (exerciseState == ExerciseState.activated &amp;&amp;
+        poseFrameEdgeRisk &amp;&amp;
+        !_wasPoseFrameEdgeRisk) {
+      unawaited(_personDetector.triggerCheck(reason: <span class="s">'pose_frame_edge'</span>));
+    }
+    _wasPoseFrameEdgeRisk = poseFrameEdgeRisk;
+
+    _posePresenceDetector.update(avgPosePresence);
+
+    <span class="c">// Trigger seg on anomaly transition (false -&gt; true).</span>
+    <span class="k">final</span> nowAnomaly = _posePresenceDetector.isAnomalyConfirmed;
+    <span class="k">if</span> (nowAnomaly &amp;&amp; !_wasPoseAnomaly) {
+      unawaited(_personDetector.triggerCheck(reason: <span class="s">'pose_anomaly'</span>));
+    }
+    _wasPoseAnomaly = nowAnomaly;
+
+    <span class="c">// Auto-detect orientation</span>
+    cameraFacing = detectCameraFacing(smoothedLandmarks);
+
+    <span class="c">// Safety check (subclass logic)</span>
+    <span class="k">final</span> safetyError = checkSafety(smoothedLandmarks);
+    <span class="k">if</span> (safetyError != null) {
+      resultIssues.feedback[<span class="s">"System"</span>] = safetyError;
+      <span class="k">return</span> [repCount, resultIssues.feedback];
+    }
+
+    <span class="c">// Calculate scale factor (shoulder-to-hip distance)</span>
+     scaleFactor = calScaleFactor(smoothedLandmarks);
+    <span class="c">// State machine</span>
+    checkExerciseState(smoothedLandmarks, exerciseState);
+
+    <span class="k">if</span> (exerciseState == ExerciseState.activated) {
+      checkingPose(smoothedLandmarks);
+      <span class="k">if</span> (exerciseState == ExerciseState.activated &amp;&amp; requestStop()) {
+        exerciseState = ExerciseState.completed;
+        onSetComplete();
+      }
+      <span class="k">return</span> exerciseState == ExerciseState.completed
+          ? getSetFeedback()
+          : getRepCountAndFeedback();
+    } <span class="k">else if</span> (exerciseState == ExerciseState.completed) {
+      <span class="k">return</span> getSetFeedback();
+    }
+
+    <span class="k">return</span> [repCount, resultIssues.feedback];
+  }</pre>
+    </div>
+  </div>
+  <div class="call eli">
+    <p class="ct">🧒 Like you’re five</p>
+    <p>Three “is the skeleton in trouble?” checks — dots too faint (<code>lowPresence</code>), dots near the
+    picture edge (<code>frameEdge</code>), or a weird presence pattern (<code>anomaly</code>). Each one, on
+    the <strong>moment it flips bad</strong>, pokes the person-detector to double-check. Then: figure out
+    front/side (<code>detectCameraFacing</code>), let the specific exercise veto for
+    <em class="term">safety</em>, compute how big you are on screen (<code>scaleFactor</code>), and finally
+    run the board-game logic (<code>checkExerciseState</code>). If we’re live, also check form
+    (<code>checkingPose</code>) and see if we hit the target (<code>requestStop</code>). Return either
+    “[reps, messages]” or, if the set just ended, the full summary.</p>
+  </div>
+  <div class="call warn">
+    <p class="ct">⚠️ Two small blemishes right here</p>
+    <p>• <strong>L336</strong> — <code>&nbsp;scaleFactor = …</code> has a stray leading space (odd indentation).
+    Cosmetic, but it’s the kind of thing that makes a diff noisy.<br>
+    • <strong>L338</strong> — there’s a trailing space after <code>checkExerciseState(...);</code>. Also
+    cosmetic. A formatter (<code>dart format</code>) would erase both in one pass.</p>
+  </div>
+  <div class="call idea">
+    <p class="ct">🧠 Why <code>unawaited(...)</code> everywhere?</p>
+    <p><code>triggerCheck</code> is asynchronous (it kicks off the segmentation AI, which takes time).
+    We do <strong>not</strong> want the heartbeat to stop and wait for it — that would freeze the frame.
+    <code>unawaited</code> says “fire it off and move on; I’m deliberately not waiting.” It also silences the
+    linter that would otherwise warn “you forgot to await this.”</p>
+  </div>
+</section>
+
+<!-- ============ 7 processNoPoseFrame ============ -->
+<section id="nopose">
+  <p class="kicker"><span class="n">07</span> The empty frame <span class="range">· L356–399</span></p>
+  <h2><code>processNoPoseFrame()</code> — when nobody’s detected</h2>
+  <p>The camera page calls <em class="term">this</em> instead of <code>processPose</code> when ML Kit found no
+  body at all in the frame.</p>
+  <div class="code">
+    <div class="code-head"><span>processNoPoseFrame</span><b>L356–399</b></div>
+    <div class="code-body">
+<pre class="gut">356
+357
+358
+359
+360
+361
+362
+363
+364
+365
+366
+367
+368
+369
+370
+371
+372
+373
+374
+375
+376
+377
+378
+379
+380
+381
+382
+383
+384
+385
+386
+387
+388
+389
+390
+391
+392
+393
+394
+395
+396
+397
+398
+399</pre>
+<pre class="src">  <span class="c">/// Called when no pose is detected in the current frame.</span>
+  Map&lt;String, String&gt; processNoPoseFrame() {
+    frameTimestamp = DateTime.now();
+    resultIssues.feedback.clear();
+
+    <span class="c">// Ask segmentation to catch up immediately when pose disappears but the
+    // cached segmentation state still says a person is present.</span>
+    <span class="k">final</span> hadLandmarksLastFrame = !_wasNoLandmarks;
+    <span class="k">if</span> (hadLandmarksLastFrame || _personDetector.personDetected) {
+      unawaited(
+        _personDetector.triggerCheck(
+          reason: hadLandmarksLastFrame
+              ? <span class="s">'no_landmarks'</span>
+              : <span class="s">'no_landmarks_stale_present'</span>,
+        ),
+      );
+    }
+    _wasNoLandmarks = true;
+    _wasPoseAnomaly =
+        false; <span class="c">// reset; if pose returns and is anomalous it'll re-trigger</span>
+    _wasPoseLowPresence = false;
+    _wasPoseFrameEdgeRisk = false;
+
+    _syncPresenceState(hasPose: false);
+
+
+    <span class="k">if</span> (exerciseState == ExerciseState.completed) {
+      <span class="k">return</span> {<span class="s">'Result'</span>: <span class="s">'Hoàn thành! $repCount reps'</span>};
+    }
+
+    <span class="k">if</span> (exerciseState == ExerciseState.notActivated) {
+      resultIssues.feedback[<span class="s">'System'</span>] = _personConfirmed
+          ? <span class="s">'Giữ toàn thân trong khung hình để bắt đầu.'</span>
+          : <span class="s">'Đang tìm người... Vui lòng đứng trong khung hình.'</span>;
+    } <span class="k">else if</span> (_isPaused || !_personDetector.personDetected) {
+      resultIssues.feedback[<span class="s">'System'</span>] =
+          <span class="s">'⏸ Tạm dừng — Quay lại khung hình để tiếp tục'</span>;
+    } <span class="k">else</span> {
+      resultIssues.feedback[<span class="s">'System'</span>] =
+          <span class="s">'Giữ toàn thân trong khung hình để AI theo dõi ổn định hơn.'</span>;
+    }
+
+    <span class="k">return</span> Map&lt;String, String&gt;.from(resultIssues.feedback);
+  }</pre>
+    </div>
+  </div>
+  <div class="call eli">
+    <p class="ct">🧒 Like you’re five</p>
+    <p>“No body found this frame.” It pokes the detector (a person might’ve just stepped out), resets the
+    trouble-flags, updates the presence brain with <code>hasPose: false</code>, then picks the right message:
+    finished? show the result. Still setting up? “stand in frame.” Mid-set but empty? that’s a pause →
+    “come back.” It never counts reps — there’s no body to judge.</p>
+  </div>
+  <div class="call tip">
+    <p class="ct">💡 Tiny thing</p>
+    <p>There’s a double blank line at L380–381. Trivial, but again <code>dart format</code> tidies it.</p>
+  </div>
+</section>
+
+<!-- ============ 8 detect lifecycle ============ -->
+<section id="detect-lifecycle">
+  <p class="kicker"><span class="n">08</span> Plumbing <span class="range">· L401–416</span></p>
+  <h2>Detection lifecycle hooks</h2>
+  <div class="code">
+    <div class="code-head"><span>runPersonDetection / disposeDetectors / createVoiceCoach</span><b>L401–416</b></div>
+    <div class="code-body">
+<pre class="gut">401
+402
+403
+404
+405
+406
+407
+408
+409
+410
+411
+412
+413
+414
+415
+416</pre>
+<pre class="src">  <span class="c">/// Async person detection — call from camera stream handler.</span>
+  Future&lt;<span class="k">void</span>&gt; runPersonDetection([InputImage? inputImage]) <span class="k">async</span> {
+    <span class="k">if</span> (exerciseState == ExerciseState.completed) <span class="k">return</span>;
+    <span class="k">await</span> _personDetector.detect(inputImage);
+  }
+
+  <span class="c">/// Free native resources on dispose.</span>
+  Future&lt;<span class="k">void</span>&gt; disposeDetectors() <span class="k">async</span> {
+    <span class="k">await</span> _personDetector.close();
+  }
+
+  ExerciseVoiceCoach? createVoiceCoach() =&gt; _GenericExerciseVoiceCoach();
+
+  <span class="c">/// Whether the generic coach may replay faults from the previous set while
+  /// preparing the next one.</span>
+  <span class="k">bool get</span> shouldReplayPreviousSetVoiceFaults =&gt; true;</pre>
+    </div>
+  </div>
+  <div class="call eli">
+    <p class="ct">🧒 Like you’re five</p>
+    <p><code>runPersonDetection</code> is the <em class="term">slow background job</em> that actually runs the
+    “is a human here?” AI on the raw camera image; the camera page calls it on its own schedule (not every
+    frame). <code>disposeDetectors</code> is cleanup when you leave the screen — “turn the AI off so it
+    doesn’t hog the camera.” <code>createVoiceCoach</code> is the factory: by default every exercise gets the
+    generic talking coach, but a specific exercise can override this to return its own (Squat returns
+    <code>SquatVoiceCoach()</code>).</p>
+  </div>
+</section>
+
+<!-- ============ 9 syncPresenceState ============ -->
+<section id="sync">
+  <p class="kicker"><span class="n">09</span> The pause brain <span class="range">· L420–469</span></p>
+  <h2><code>_syncPresenceState()</code> — arrivals, exits, auto-pause &amp; resume</h2>
+  <p class="lead">The trickiest logic in the file. It runs every frame and decides: is the person confirmed?
+  should we auto-pause? should we auto-resume? The rules differ by which state you’re in.</p>
+  <div class="code">
+    <div class="code-head"><span>_syncPresenceState</span><b>L420–469</b></div>
+    <div class="code-body">
+<pre class="gut">420
+421
+422
+423
+424
+425
+426
+427
+428
+429
+430
+431
+432
+433
+434
+435
+436
+437
+438
+439
+440
+441
+442
+443
+444
+445
+446
+447
+448
+449
+450
+451
+452
+453
+454
+455
+456
+457
+458
+459
+460
+461
+462
+463
+464
+465
+466
+467
+468
+469</pre>
+<pre class="src">  <span class="k">void</span> _syncPresenceState({<span class="k">required bool</span> hasPose}) {
+    <span class="k">final</span> now = frameTimestamp;
+    <span class="k">final</span> presentNow = _personDetector.personDetected;
+
+    <span class="k">if</span> (exerciseState == ExerciseState.notActivated) {
+      <span class="k">if</span> (!_personConfirmed) {
+        <span class="k">if</span> (presentNow) {
+          _personSeenSince ??= now;
+          <span class="k">if</span> (now.difference(_personSeenSince!) &gt;= _PERSON_CONFIRM_DURATION) {
+            _personConfirmed = true;
+          }
+        } <span class="k">else</span> {
+          _personSeenSince = null;
+        }
+      } <span class="k">else if</span> (!presentNow) {
+        _personConfirmed = false;
+        _personSeenSince = null;
+        _holdStillStartedAt = null;
+      }
+      <span class="k">return</span>;
+    }
+
+    <span class="k">if</span> (exerciseState != ExerciseState.activated) <span class="k">return</span>;
+
+    <span class="k">if</span> (presentNow) {
+      _personLostSince = null;
+      <span class="c">// A manual pause is held until the user taps resume — presence alone
+      // never clears it (otherwise standing in frame instantly un-pauses).</span>
+      <span class="k">if</span> (_isPaused &amp;&amp; !_manualPause) {
+        _resumePresenceSince ??= now;
+        <span class="k">if</span> (now.difference(_resumePresenceSince!) &gt;=
+            _PERSON_RESUME_CONFIRM_DURATION) {
+          _isPaused = false;
+          _resetPresenceDetectors();
+        }
+      } <span class="k">else</span> {
+        _resumePresenceSince = now;
+      }
+      <span class="k">return</span>;
+    }
+
+    _resumePresenceSince = null;
+    _personLostSince ??= now;
+    <span class="k">if</span> (!_isPaused &amp;&amp;
+        now.difference(_personLostSince!) &gt;= _PERSON_LOST_GRACE &amp;&amp;
+        !kDiagnosticMode) {
+      _isPaused = true;
+      _resetPresenceDetectors();
+    }
+  }</pre>
+    </div>
+  </div>
+  <div class="call eli">
+    <p class="ct">🧒 Like you’re five</p>
+    <p>Two worlds:</p>
+    <p><strong>Before the set (notActivated):</strong> if a human shows up, remember when
+    (<code>??=</code> means “only set this the first time”). Once they’ve been there 0.5s, mark them
+    <em class="term">confirmed</em>. If a confirmed person vanishes, un-confirm and forget the ready-pose
+    timer.</p>
+    <p><strong>During the set (activated):</strong> if present → clear the “lost” timer; and <strong>only if
+    this was an auto-pause</strong> (not a manual one), once they’ve stood there 0.32s, un-pause. If
+    absent → after a 0.9s grace period, auto-pause. The <code>??=</code> patterns make these “first moment”
+    stamps; the durations turn them into “held long enough” decisions.</p>
+  </div>
+  <div class="call idea">
+    <p class="ct">🧠 The <code>??=</code> operator, once and for all</p>
+    <p><code>_personSeenSince ??= now</code> means “if <code>_personSeenSince</code> is currently empty, set it
+    to now; otherwise leave it.” It’s how you record “<em class="term">when did this streak start?</em>” without
+    resetting it every frame. Subtracting that from “now” gives “how long has the streak lasted,” which is
+    then compared against a patience timer.</p>
+  </div>
+  <div class="call tip">
+    <p class="ct">💡 Refactor flag (architecture — discuss first)</p>
+    <p>This method, the four <code>_was…</code> flags, the pause booleans, and all the scattered
+    <code>triggerCheck</code> calls are really <strong>one job</strong>: “decide when a person is present and
+    when to poke segmentation.” It’s ~200 lines of a distinct responsibility living inside ExerciseBase. A
+    clean move is a <code>PresenceGate</code> collaborator that ExerciseBase owns and asks “present? pause?
+    resume?” — but because it touches the per-frame pipeline, that’s an ask-first change, not a drive-by.</p>
+  </div>
+</section>
+
+<!-- ============ 10 ORIENTATION ============ -->
+<section id="orientation">
+  <p class="kicker"><span class="n">10</span> Which way you face <span class="range">· L473–532</span></p>
+  <h2>Orientation detection</h2>
+  <div class="code">
+    <div class="code-head"><span>detectCameraFacing</span><b>L473–500</b></div>
+    <div class="code-body">
+<pre class="gut">473
+474
+475
+476
+477
+478
+479
+480
+481
+482
+483
+484
+485
+486
+487
+488
+489
+490
+491
+492
+493
+494
+495
+496
+497
+498
+499
+500</pre>
+<pre class="src">  CameraFacing detectCameraFacing(
+      Map&lt;PoseLandmarkType, PoseLandmark&gt; smoothedLandmarks) {
+    <span class="k">final</span> leftS = smoothedLandmarks[PoseLandmarkType.leftShoulder];
+    <span class="k">final</span> rightS = smoothedLandmarks[PoseLandmarkType.rightShoulder];
+    <span class="k">final</span> leftH = smoothedLandmarks[PoseLandmarkType.leftHip];
+
+    <span class="k">if</span> (leftS == null || rightS == null || leftH == null) {
+      <span class="k">return</span> CameraFacing.undefined;
+    }
+
+    <span class="k">final</span> shoulderWidth = (leftS.x - rightS.x);
+    <span class="k">final</span> torsoHeight = calculateDistance(leftS, leftH);
+
+    <span class="k">if</span> (torsoHeight &lt; 10) <span class="k">return</span> CameraFacing.undefined;
+
+    <span class="k">final</span> ratio = shoulderWidth.abs() / torsoHeight;
+    frontFacingRatio = ratio;
+
+    <span class="k">if</span> (ratio &gt; FRONT_FACING_SHOULDER_THRESHOLD) {
+      <span class="k">return</span> CameraFacing.front;
+    } <span class="k">else if</span> (ratio &lt; SIDE_FACING_SHOULDER_THRESHOLD) {
+      <span class="k">return</span> _isLeftSide(smoothedLandmarks)
+          ? CameraFacing.left
+          : CameraFacing.right;
+    } <span class="k">else</span> {
+      <span class="k">return</span> CameraFacing.angled;
+    }
+  }</pre>
+    </div>
+  </div>
+  <div class="call eli">
+    <p class="ct">🧒 Like you’re five</p>
+    <p>Measure how wide the shoulders look vs. how tall the torso is. Wide (ratio &gt; 0.57) → you’re
+    <em class="term">facing</em> the camera. Narrow (&lt; 0.35) → you’re <em class="term">sideways</em>, and
+    then a helper figures out left vs right. In between → angled. The <code>torsoHeight &lt; 10</code> guard
+    means “if you’re basically a dot, we can’t tell — say undefined.”</p>
+  </div>
+  <div class="code">
+    <div class="code-head"><span>_isLeftSide — voting by depth</span><b>L502–532</b></div>
+    <div class="code-body">
+<pre class="gut">502
+503
+504
+505
+506
+507
+508
+509
+510
+511
+512
+513
+514
+515
+516
+517
+518
+519
+520
+521
+522
+523
+524
+525
+526
+527
+528
+529
+530
+531
+532</pre>
+<pre class="src">  <span class="k">bool</span> _isLeftSide(Map&lt;PoseLandmarkType, PoseLandmark&gt;? smoothedLandmarks) {
+    <span class="k">if</span> (smoothedLandmarks == null) <span class="k">return</span> false;
+
+    <span class="k">const</span> pairs = [
+      [PoseLandmarkType.leftShoulder, PoseLandmarkType.rightShoulder],
+      [PoseLandmarkType.leftElbow, PoseLandmarkType.rightElbow],
+      [PoseLandmarkType.leftWrist, PoseLandmarkType.rightWrist],
+      [PoseLandmarkType.leftHip, PoseLandmarkType.rightHip],
+      [PoseLandmarkType.leftKnee, PoseLandmarkType.rightKnee],
+      [PoseLandmarkType.leftAnkle, PoseLandmarkType.rightAnkle],
+    ];
+
+    <span class="k">int</span> leftVotes = 0;
+    <span class="k">int</span> rightVotes = 0;
+    <span class="k">for</span> (<span class="k">final</span> pair <span class="k">in</span> pairs) {
+      <span class="k">final</span> leftLM = smoothedLandmarks[pair[0]];
+      <span class="k">final</span> rightLM = smoothedLandmarks[pair[1]];
+      <span class="k">if</span> (leftLM == null || rightLM == null) <span class="k">continue</span>;
+
+      <span class="k">final</span> zDiff = leftLM.z - rightLM.z;
+      <span class="k">double</span> threshold = 0.01;
+      <span class="k">if</span> (zDiff.abs() &gt; threshold) {
+        <span class="k">if</span> (zDiff &lt; 0) {
+          leftVotes++;
+        } <span class="k">else</span> {
+          rightVotes++;
+        }
+      }
+    }
+    <span class="k">return</span> leftRightDebouncer.update(leftVotes &gt;= rightVotes);
+  }</pre>
+    </div>
+  </div>
+  <div class="call eli">
+    <p class="ct">🧒 Like you’re five</p>
+    <p>When you stand sideways, one half of your body is <em class="term">closer</em> to the camera than the
+    other. Each dot’s <code>z</code> tells us near/far. So for six joint pairs, we vote: is the left one
+    closer or the right one? Majority wins. The <code>leftRightDebouncer</code> (needs 5 steady frames)
+    stops the label flickering left/right/left every frame.</p>
+  </div>
+  <div class="call tip">
+    <p class="ct">💡 Micro-nits</p>
+    <p><code>double threshold = 0.01</code> (L522) is declared inside the loop and never changes — make it a
+    named <code>const</code> (e.g. <code>_kSideDepthThreshold</code>) hoisted out. And on a tie
+    (<code>leftVotes == rightVotes</code>) it currently votes “left” (<code>&gt;=</code>). Probably fine, but
+    worth a one-line comment saying that tie-break is intentional.</p>
+  </div>
+</section>
+
+<!-- ============ 11 HELPERS ============ -->
+<section id="helpers">
+  <p class="kicker"><span class="n">11</span> The toolbox <span class="range">· L536–626</span></p>
+  <h2>Math &amp; frame helpers</h2>
+
+  <div class="code">
+    <div class="code-head"><span>calScaleFactor</span><b>L536–553</b></div>
+    <div class="code-body">
+<pre class="gut">536
+537
+538
+539
+540
+541
+542
+543
+544
+545
+546
+547
+548
+549
+550
+551
+552
+553</pre>
+<pre class="src">  <span class="k">double</span> calScaleFactor(
+      Map&lt;PoseLandmarkType, PoseLandmark&gt; smoothedLandmarks) {
+    <span class="k">final</span> ls = smoothedLandmarks[PoseLandmarkType.leftShoulder];
+    <span class="k">final</span> rs = smoothedLandmarks[PoseLandmarkType.rightShoulder];
+    <span class="k">final</span> lh = smoothedLandmarks[PoseLandmarkType.leftHip];
+    <span class="k">final</span> rh = smoothedLandmarks[PoseLandmarkType.rightHip];
+    <span class="k">if</span> (ls != null &amp;&amp; rs != null &amp;&amp; lh != null &amp;&amp; rh != null) {
+      <span class="k">final</span> shoulderMidX = (ls.x + rs.x) / 2;
+      <span class="k">final</span> shoulderMidY = (ls.y + rs.y) / 2;
+      <span class="k">final</span> hipMidX = (lh.x + rh.x) / 2;
+      <span class="k">final</span> hipMidY = (lh.y + rh.y) / 2;
+      <span class="k">final</span> dx = shoulderMidX - hipMidX;
+      <span class="k">final</span> dy = shoulderMidY - hipMidY;
+      <span class="k">final</span> scale = math.sqrt(dx * dx + dy * dy);
+      <span class="k">return</span> scale;
+    }
+    <span class="k">return</span> 1.0; <span class="c">// should we guard this, or just basically let it 1.0 like this?</span>
+  }</pre>
+    </div>
+  </div>
+  <div class="call eli">
+    <p class="ct">🧒 Like you’re five</p>
+    <p>How big are you on screen? Measure the distance from the middle of your shoulders to the middle of
+    your hips (Pythagoras: <code>√(dx² + dy²)</code>). Close to camera = big number, far = small. Exercises
+    divide their measurements by this so “a 30cm squat” looks the same whether you’re near or far.</p>
+  </div>
+  <div class="call warn">
+    <p class="ct">⚠️ The <code>return 1.0</code> fallback (and its worried comment)</p>
+    <p>If any of the four dots is missing this frame, it silently returns <code>1.0</code>. Since real scale
+    values aren’t near 1.0, a one-frame dropout can make every normalized measurement briefly
+    <em class="term">jump</em>, which can nudge a rep count or a form check. Safer: remember the last good
+    scale and reuse it when dots drop (<code>_lastScale ?? 1.0</code>), instead of snapping to 1.0. The
+    author already flagged this doubt in the comment — worth resolving.</p>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><span>_resetPresenceDetectors · getSideLandmark</span><b>L555–572</b></div>
+    <div class="code-body">
+<pre class="gut">555
+556
+557
+558
+559
+560
+561
+562
+563
+564
+565
+566
+567
+568
+569
+570
+571
+572</pre>
+<pre class="src">  <span class="k">void</span> _resetPresenceDetectors() {
+    _posePresenceDetector.reset();
+    _wasPoseAnomaly = false;
+    _wasPoseLowPresence = false;
+    _wasPoseFrameEdgeRisk = false;
+    _wasNoLandmarks = false;
+  }
+
+  PoseLandmark? getSideLandmark({
+    <span class="k">required</span> Map&lt;PoseLandmarkType, PoseLandmark&gt; landmarks,
+    <span class="k">required</span> PoseLandmarkType rightType,
+    <span class="k">required</span> PoseLandmarkType leftType,
+  }) {
+    <span class="k">if</span> (cameraFacing == CameraFacing.right) {
+      <span class="k">return</span> landmarks[rightType];
+    }
+    <span class="k">return</span> landmarks[leftType];
+  }</pre>
+    </div>
+  </div>
+  <div class="call eli">
+    <p class="ct">🧒 Like you’re five</p>
+    <p><code>getSideLandmark</code> is a huge convenience for side-view exercises: “give me whichever
+    shoulder/knee/etc is <em class="term">closest to the camera</em>.” If you’re turned right, use the right
+    one; otherwise use the left. ~30 exercise files lean on this so they don’t each re-implement it.</p>
+  </div>
+  <div class="call tip">
+    <p class="ct">💡 Worth confirming intent</p>
+    <p>Only <code>CameraFacing.right</code> returns the right landmark; <strong>everything else</strong>
+    (left, front, angled, undefined) returns the left. For a true left-side view that’s correct, but for
+    <code>front</code>/<code>undefined</code> it’s an arbitrary “default to left.” Likely fine (front-view
+    exercises don’t call this), but a one-line comment stating “non-right ⇒ left by design” would save the
+    next reader a double-take.</p>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><span>_computeAvgPresence · _isPoseFrameEdgeRisk · getters</span><b>L574–626</b></div>
+    <div class="code-body">
+<pre class="gut">574
+575
+576
+577
+578
+579
+580
+581
+582
+583
+584
+585
+586
+587
+588
+589
+590
+591
+592
+593
+594
+595
+596
+597
+598
+599
+600
+601
+602
+603
+604
+605
+606
+607
+608
+609
+610
+611
+612
+613
+614
+615
+616
+617
+618
+619
+620
+621
+622
+623
+624
+625
+626</pre>
+<pre class="src">  <span class="k">double</span> _computeAvgPresence(
+      Map&lt;PoseLandmarkType, PoseLandmark&gt; smoothedLandmarks) {
+    <span class="k">if</span> (smoothedLandmarks.isEmpty) <span class="k">return</span> 0.0;
+    <span class="k">double</span> totalPresence = 0.0;
+    <span class="k">for</span> (<span class="k">final</span> landmark <span class="k">in</span> smoothedLandmarks.values) {
+      totalPresence += landmark.presence;
+    }
+    <span class="k">return</span> totalPresence / smoothedLandmarks.length;
+  }
+
+  <span class="k">bool</span> _isPoseFrameEdgeRisk(
+    Map&lt;PoseLandmarkType, PoseLandmark&gt; smoothedLandmarks, {
+    <span class="k">required</span> Size? imageSize,
+  }) {
+    <span class="k">if</span> (imageSize == null || imageSize == Size.zero) <span class="k">return</span> false;
+    <span class="k">if</span> (imageSize.width &lt;= 0 || imageSize.height &lt;= 0) <span class="k">return</span> false;
+
+    <span class="k">final</span> marginX = imageSize.width * 0.04;
+    <span class="k">final</span> marginY = imageSize.height * 0.04;
+    <span class="k">var</span> visibleCount = 0;
+    <span class="k">var</span> edgeCount = 0;
+    <span class="k">var</span> outsideCount = 0;
+
+    <span class="k">for</span> (<span class="k">final</span> landmark <span class="k">in</span> smoothedLandmarks.values) {
+      <span class="k">if</span> (landmark.presence &lt; 0.25 &amp;&amp; landmark.visibility &lt; 0.25) {
+        <span class="k">continue</span>;
+      }
+      visibleCount += 1;
+
+      <span class="k">final</span> outside = landmark.x &lt; 0 ||
+          landmark.x &gt; imageSize.width ||
+          landmark.y &lt; 0 ||
+          landmark.y &gt; imageSize.height;
+      <span class="k">if</span> (outside) {
+        outsideCount += 1;
+        <span class="k">continue</span>;
+      }
+
+      <span class="k">if</span> (landmark.x &lt;= marginX ||
+          landmark.x &gt;= imageSize.width - marginX ||
+          landmark.y &lt;= marginY ||
+          landmark.y &gt;= imageSize.height - marginY) {
+        edgeCount += 1;
+      }
+    }
+
+    <span class="k">if</span> (visibleCount &lt; 8) <span class="k">return</span> false;
+    <span class="k">return</span> outsideCount &gt;= 2 || edgeCount &gt;= 5;
+  }
+
+  List&lt;<span class="k">dynamic</span>&gt; getRepCountAndFeedback() =&gt; [repCount, resultIssues.feedback];
+
+  List&lt;<span class="k">dynamic</span>&gt; getSetFeedback() =&gt; setFeedback;</pre>
+    </div>
+  </div>
+  <div class="call eli">
+    <p class="ct">🧒 Like you’re five</p>
+    <p><code>_computeAvgPresence</code> = “on average, how sure are we about all the dots?” (low = person half
+    gone). <code>_isPoseFrameEdgeRisk</code> = “are body parts hugging the picture’s border or spilling
+    off-screen?” It ignores near-invisible dots, needs at least 8 real ones to bother judging, and flags risk
+    if ≥2 parts are fully outside or ≥5 are within 4% of an edge. Both feed the “poke segmentation” triggers.
+    The last two one-liners are just how the UI asks for “[reps, messages]” or the final summary.</p>
+  </div>
+</section>
+
+<!-- ============ 12 STATE MACHINE ============ -->
+<section id="statemachine">
+  <p class="kicker"><span class="n">12</span> The board game <span class="range">· L630–671</span></p>
+  <h2><code>checkExerciseState()</code> — the activation countdown</h2>
+  <div class="code">
+    <div class="code-head"><span>checkExerciseState</span><b>L630–671</b></div>
+    <div class="code-body">
+<pre class="gut">630
+631
+632
+633
+634
+635
+636
+637
+638
+639
+640
+641
+642
+643
+644
+645
+646
+647
+648
+649
+650
+651
+652
+653
+654
+655
+656
+657
+658
+659
+660
+661
+662
+663
+664
+665
+666
+667
+668
+669
+670
+671</pre>
+<pre class="src">  <span class="k">void</span> checkExerciseState(Map&lt;PoseLandmarkType, PoseLandmark&gt; smoothedLandmarks,
+      ExerciseState currentState) {
+    <span class="k">switch</span> (currentState) {
+      <span class="k">case</span> ExerciseState.notActivated:
+        <span class="k">final</span> inPosition = isInStartPosition(smoothedLandmarks);
+        <span class="k">final</span> now = frameTimestamp;
+
+        <span class="k">if</span> (inPosition) {
+          _holdStillStartedAt ??= now;
+          <span class="k">final</span> elapsed = now.difference(_holdStillStartedAt!);
+          <span class="k">final</span> remaining = (HOLD_STILL_REQUIRED_DURATION.inMilliseconds -
+                  elapsed.inMilliseconds) /
+              1000.0;
+
+          <span class="k">if</span> (elapsed &gt;= HOLD_STILL_REQUIRED_DURATION) {
+            exerciseState = ExerciseState.activated;
+            _holdStillStartedAt = null;
+            _resetPresenceDetectors();
+            unawaited(_personDetector.useActivatedCadence());
+            onExerciseActivated();
+          } <span class="k">else</span> {
+            resultIssues.feedback[<span class="s">'System'</span>] =
+                <span class="s">'Giữ yên... ${remaining.clamp(0.0, 99.0).toStringAsFixed(0)}s'</span>;
+          }
+        } <span class="k">else</span> {
+          <span class="k">if</span> (_holdStillStartedAt != null) {}
+          _holdStillStartedAt = null;
+          resultIssues.feedback[<span class="s">'System'</span>] = <span class="s">'Vào tư thế và giữ yên để bắt đầu'</span>;
+        }
+        <span class="k">break</span>;
+
+      <span class="k">case</span> ExerciseState.activated:
+        <span class="k">if</span> (requestStop()) {
+          exerciseState = ExerciseState.completed;
+          onSetComplete();
+        }
+        <span class="k">break</span>;
+
+      <span class="k">case</span> ExerciseState.completed:
+        <span class="k">break</span>;
+    }
+  }</pre>
+    </div>
+  </div>
+  <div class="call eli">
+    <p class="ct">🧒 Like you’re five</p>
+    <p>The “ready… set… go!” logic. If you’re in the start pose, start a 3-second clock
+    (<code>??=</code> so it doesn’t restart every frame). Each frame show the countdown (“Giữ yên… 2s” =
+    “Hold still… 2s”). When 3s elapse: flip to <em class="term">activated</em>, reset the detectors, tell the
+    person-detector to speed up (<code>useActivatedCadence</code>), and fire the <code>onExerciseActivated</code>
+    hook (which starts the set stopwatch). If you break the pose, the clock resets to zero. Once activated,
+    the only job here is “did we hit the target? then complete.”</p>
+  </div>
+  <div class="call warn">
+    <p class="ct">⚠️ Dead code — remove it</p>
+    <p>Line 655: <code>if (_holdStillStartedAt != null) {}</code> — an <code>if</code> with an
+    <strong>empty body</strong>. It does literally nothing (the very next line nulls the field regardless).
+    It’s a leftover, probably from a deleted log/reset. Safe to delete the whole line; it only adds
+    confusion.</p>
+  </div>
+</section>
+
+<!-- ============ 13 ABSTRACT ============ -->
+<section id="abstract">
+  <p class="kicker"><span class="n">13</span> The blanks to fill <span class="range">· L677–707</span></p>
+  <h2>Abstract methods &amp; the UI bridge</h2>
+  <p>The “fill-in-the-blanks” list. Every concrete exercise <strong>must</strong> supply these (or, for the
+  ones with a default, may override them).</p>
+  <div class="code">
+    <div class="code-head"><span>lifecycle hooks + abstract contract + UI getters</span><b>L677–707</b></div>
+    <div class="code-body">
+<pre class="gut">677
+678
+679
+680
+681
+682
+683
+684
+685
+686
+687
+688
+689
+690
+691
+692
+693
+694
+695
+696
+697
+698
+699
+700
+701
+702
+703
+704
+705
+706
+707</pre>
+<pre class="src">  <span class="k">void</span> onExerciseActivated() {
+    _sessionStopwatch
+      ..reset()
+      ..start();
+  }
+
+  <span class="k">bool</span> requestStop();
+
+  String? checkSafety(Map&lt;PoseLandmarkType, PoseLandmark&gt; smoothedLandmarks);
+
+  <span class="k">void</span> checkingPose(Map&lt;PoseLandmarkType, PoseLandmark&gt; smoothedLandmarks);
+
+  <span class="c">/// Return true if user is in valid starting position.</span>
+  <span class="k">bool</span> isInStartPosition(Map&lt;PoseLandmarkType, PoseLandmark&gt; landmarks);
+
+  <span class="k">void</span> onSetComplete();
+
+  <span class="c">// --- UI Bridge ---</span>
+
+  String <span class="k">get</span> exerciseName;
+  String <span class="k">get</span> currentPhaseKey;
+  String <span class="k">get</span> currentPhaseLabel;
+
+  <span class="c">/// Live hold timer for exercises that require the user to hold a pose.
+  ///
+  /// Return null when the current phase is not an active hold so the camera UI
+  /// can hide the shared hold timer.</span>
+  <span class="k">double</span>? <span class="k">get</span> liveHoldSeconds =&gt; null;
+
+  <span class="c">/// Optional target used by the shared hold timer UI.</span>
+  <span class="k">double</span>? <span class="k">get</span> liveHoldTargetSeconds =&gt; null;
+}</pre>
+    </div>
+  </div>
+  <div class="call eli">
+    <p class="ct">🧒 Like you’re five</p>
+    <p>These are the blanks each exercise fills: <code>isInStartPosition</code> (“what does ‘ready’ look
+    like?”), <code>checkingPose</code> (“judge my form + count reps”), <code>requestStop</code> (“am I done?”),
+    <code>checkSafety</code> (“is anything dangerous? return a warning or null”), <code>onSetComplete</code>
+    (“wrap up the set”). No body here — just the promise. The getters at the bottom feed the on-screen labels
+    (exercise name, current phase). <code>liveHoldSeconds</code> defaults to <code>null</code> = “I’m not a
+    hold exercise,” which hides the hold timer; Plank/Cobra override it to show a live countdown.</p>
+  </div>
+  <div class="call idea">
+    <p class="ct">🧠 Why abstract is powerful here</p>
+    <p>Because these are declared but empty, Dart won’t let anyone create an exercise that forgets one —
+    it’s a <strong>compile error</strong> until every blank is filled. That’s the safety net that keeps 40+
+    exercises consistent with the shared pipeline above.</p>
+  </div>
+</section>
+
+<!-- ============ 14 HOLD ACC ============ -->
+<section id="hold">
+  <p class="kicker"><span class="n">14</span> A stopwatch helper <span class="range">· L710–773</span></p>
+  <h2><code>HoldSecondsAccumulator</code> — time spent good vs. faulting</h2>
+  <p>A standalone helper class (not part of ExerciseBase) used by ~11 hold-style exercises (Plank, Cobra,
+  Warrior…). It tallies “how many seconds did you hold correctly vs. while committing each fault.”</p>
+  <div class="code">
+    <div class="code-head"><span>class HoldSecondsAccumulator</span><b>L710–773</b></div>
+    <div class="code-body">
+<pre class="gut">710
+711
+712
+713
+714
+715
+716
+717
+718
+719
+720
+721
+722
+723
+724
+725
+726
+727
+728
+729
+730
+731
+732
+733
+734
+735
+736
+737
+738
+739
+740
+741
+742
+743
+744
+745
+746
+747
+748
+749
+750
+751
+752
+753
+754
+755
+756
+757
+758
+759
+760
+761
+762
+763
+764
+765
+766
+767
+768
+769
+770
+771
+772
+773</pre>
+<pre class="src"><span class="k">class</span> HoldSecondsAccumulator {
+  HoldSecondsAccumulator(Iterable&lt;String&gt; faultKeys) {
+    <span class="k">for</span> (<span class="k">final</span> key <span class="k">in</span> faultKeys) {
+      _faultSeconds[key] = 0.0;
+    }
+  }
+
+  <span class="k">static const int</span> minFrameDeltaMs = 10;
+  <span class="k">static const int</span> maxFrameDeltaMs = 250;
+
+  <span class="k">final</span> Map&lt;String, <span class="k">double</span>&gt; _faultSeconds = {};
+  <span class="k">double</span> _goodSeconds = 0.0;
+  <span class="k">int</span>? _lastHoldTickMs;
+
+  <span class="k">double get</span> goodSeconds =&gt; _goodSeconds;
+
+  <span class="k">double</span> faultSecondsFor(String key) =&gt; _faultSeconds[key] ?? 0.0;
+
+  <span class="k">void</span> reset() {
+    _goodSeconds = 0.0;
+    <span class="k">for</span> (<span class="k">final</span> key <span class="k">in</span> _faultSeconds.keys) {
+      _faultSeconds[key] = 0.0;
+    }
+    _lastHoldTickMs = null;
+  }
+
+  <span class="k">void</span> resetTick() {
+    _lastHoldTickMs = null;
+  }
+
+  <span class="k">void</span> accumulate({
+    <span class="k">required int</span> elapsedMs,
+    <span class="k">required</span> Map&lt;String, <span class="k">bool</span>&gt; faultingByKey,
+    Iterable&lt;String&gt;? goodBlockingKeys,
+  }) {
+    <span class="k">for</span> (<span class="k">final</span> key <span class="k">in</span> faultingByKey.keys) {
+      _faultSeconds.putIfAbsent(key, () =&gt; 0.0);
+    }
+
+    <span class="k">final</span> previous = _lastHoldTickMs;
+    _lastHoldTickMs = elapsedMs;
+    <span class="k">if</span> (previous == null) <span class="k">return</span>;
+
+    <span class="k">final</span> dtMs = elapsedMs - previous;
+    <span class="k">if</span> (dtMs &lt; minFrameDeltaMs || dtMs &gt; maxFrameDeltaMs) <span class="k">return</span>;
+
+    <span class="k">final</span> seconds = dtMs / 1000.0;
+    <span class="k">var</span> hasFault = false;
+    <span class="k">final</span> goodBlockingSet = goodBlockingKeys?.toSet();
+    <span class="k">var</span> hasGoodBlockingFault = false;
+    <span class="k">for</span> (<span class="k">final</span> entry <span class="k">in</span> faultingByKey.entries) {
+      <span class="k">if</span> (!entry.value) <span class="k">continue</span>;
+      hasFault = true;
+      <span class="k">if</span> (goodBlockingSet == null || goodBlockingSet.contains(entry.key)) {
+        hasGoodBlockingFault = true;
+      }
+      _faultSeconds[entry.key] = (_faultSeconds[entry.key] ?? 0.0) + seconds;
+    }
+
+    <span class="k">if</span> (!hasFault || !hasGoodBlockingFault) {
+      _goodSeconds += seconds;
+    }
+  }
+}</pre>
+    </div>
+  </div>
+  <div class="call eli">
+    <p class="ct">🧒 Like you’re five</p>
+    <p>Imagine holding a plank. Every frame you say “how long since last frame?” and this adds that sliver of
+    time to the right bucket: if your hips were sagging, add it to the “sag” fault bucket; if everything was
+    fine, add it to “good.” At the end you know “held 22s good, 4s with sagging hips.” The <code>10ms/250ms</code>
+    guard throws away impossibly-tiny or suspiciously-huge gaps (app hiccups) so they don’t pollute the tally.</p>
+  </div>
+  <div class="call idea">
+    <p class="ct">🧠 “goodBlocking” = which faults actually ruin the hold</p>
+    <p>Some faults are minor. <code>goodBlockingKeys</code> lets an exercise say “only <em class="term">these</em>
+    faults should stop me from earning ‘good’ seconds.” If you’re faulting but none of them are good-blocking,
+    you still bank the second as good. Neat little bit of grading nuance.</p>
+  </div>
+  <div class="call tip">
+    <p class="ct">💡 Placement</p>
+    <p>This class has zero dependency on ExerciseBase and 11 external users — a clean candidate to live in its
+    own file (<code>lib/exercise/hold_seconds_accumulator.dart</code>). Pure lift, no behavior change.</p>
+  </div>
+</section>
+
+<!-- ============ 15 VOICE ============ -->
+<section id="voice">
+  <p class="kicker"><span class="n">15</span> The talking trainer <span class="range">· L775–1661</span></p>
+  <h2>The voice-coach machinery — the elephant</h2>
+  <div class="call warn">
+    <p class="ct">⚠️ This is ~53% of the whole file</p>
+    <p>Lines 775–1661 are two private classes that have <strong>nothing structurally to do with the
+    exercise base</strong> — they’re the generic talking coach. Every other coach (Squat, Plank…) already
+    lives in <code>lib/services/*_voice_coach.dart</code>. This generic one is the odd one out sitting in the
+    base file. It’s the #1 refactor target: move it to <code>lib/services/generic_exercise_voice_coach.dart</code>.
+    Below I show its shape and the one method that matters, then honestly mark what I elided.</p>
+  </div>
+
+  <h3>15a · The asset player (a thin wrapper)</h3>
+  <div class="code">
+    <div class="code-head"><span>class _GenericAssetVoicePlayer</span><b>L775–793</b></div>
+    <div class="code-body">
+<pre class="gut">775
+776
+777
+778
+779
+780
+781
+782
+783
+784
+785
+786
+787
+788
+789
+790
+791
+792
+793</pre>
+<pre class="src"><span class="k">class</span> _GenericAssetVoicePlayer {
+  _GenericAssetVoicePlayer()
+      : _player = QueuedAssetVoicePlayer(
+          assetMap: GenericExerciseVoiceAssets.commonFiles,
+          assetSourcePrefix: GenericExerciseVoiceAssets.assetSourcePrefix,
+          assetBundlePrefix: GenericExerciseVoiceAssets.assetBundlePrefix,
+          assetResolver: GenericExerciseVoiceAssets.resolveAsset,
+          logTag: <span class="s">'GenericExerciseVoice'</span>,
+        );
+
+  <span class="k">final</span> QueuedAssetVoicePlayer _player;
+
+  Future&lt;<span class="k">void</span>&gt; speak(String text) =&gt; _player.speak(text);
+  Future&lt;<span class="k">void</span>&gt; waitUntilIdle({<span class="k">required</span> Duration timeout}) =&gt;
+      _player.waitUntilIdle(timeout: timeout);
+  <span class="k">void</span> clearQueue() =&gt; _player.clearQueue();
+  <span class="k">void</span> clearPendingButKeepCurrent() =&gt; _player.clearPendingButKeepCurrent();
+  <span class="k">void</span> dispose() =&gt; _player.dispose();
+}</pre>
+    </div>
+  </div>
+  <div class="call eli">
+    <p class="ct">🧒 Like you’re five</p>
+    <p>A little remote control for pre-recorded Vietnamese audio clips. <code>speak('common.ready')</code>
+    plays the “Sẵn sàng” clip. It queues clips so they don’t talk over each other, and
+    <code>clearPendingButKeepCurrent</code> means “let the current word finish but drop the backlog” (used
+    when a rep suddenly completes and older cues are now stale).</p>
+  </div>
+
+  <h3>15b · The coach’s memory, and <code>processFrame</code> — the one method that matters</h3>
+  <p>The coach keeps a pile of “have I said this yet?” flags and cooldown timers so it doesn’t nag. Then
+  <code>processFrame</code> decides, every frame, what (if anything) to say.</p>
+  <div class="code">
+    <div class="code-head"><span>_GenericExerciseVoiceCoach — fields</span><b>L795–814</b></div>
+    <div class="code-body">
+<pre class="gut">795
+796
+797
+798
+799
+800
+801
+802
+803
+804
+805
+806
+807
+808
+809
+810
+811
+812
+813
+814</pre>
+<pre class="src"><span class="k">class</span> _GenericExerciseVoiceCoach <span class="k">implements</span> ExerciseVoiceCoach {
+  <span class="k">static final</span> Map&lt;String, Map&lt;String, <span class="k">int</span>&gt;&gt; _previousSetFaultsBySlug = {};
+  <span class="k">static const int</span> _noCountCueCooldownMs = 1200;
+  <span class="k">static const int</span> _holdFaultCueCooldownMs = 2500;
+  <span class="k">static const int</span> _holdStallFramesBeforeCue = 4;
+  <span class="k">static const double</span> _holdProgressEpsilonSeconds = 0.05;
+
+  <span class="k">final</span> _GenericAssetVoicePlayer _voicePlayer = _GenericAssetVoicePlayer();
+  <span class="k">final</span> Map&lt;String, <span class="k">int</span>&gt; _setFaultCounts = {};
+
+  <span class="k">int</span> _lastRepCount = 0;
+  <span class="k">int</span> _lastNoCountCueAtMs = 0;
+  <span class="k">int</span> _lastHoldFaultCueAtMs = 0;
+  <span class="k">int</span> _holdStallFrames = 0;
+  <span class="k">int</span>? _lastOutcomeRepNumber;
+  <span class="k">double</span>? _lastLiveHoldSeconds;
+  <span class="k">bool</span> _didAnnounceReady = false;
+  <span class="k">bool</span> _didSpeakSetup = false;
+  <span class="k">bool</span> _didSpeakPreviousSetAdvice = false;
+  <span class="k">bool</span> _didAnnounceSetComplete = false;
+}</pre>
+    </div>
+    <div class="elide">… class body continues (processFrame + helpers) — shown next, closing brace is really at L1661 …</div>
+  </div>
+  <div class="call eli">
+    <p class="ct">🧒 Like you’re five</p>
+    <p>Notice <code>_previousSetFaultsBySlug</code> is <code>static</code> — it survives between exercises, so
+    the coach can say at the start of set 2: “last time your hips sagged, watch that.” The rest are “did I
+    already say hello?” flags and “don’t repeat within X ms” cooldowns so the trainer isn’t annoying.</p>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><span>processFrame — the decision tree</span><b>L816–947</b></div>
+    <div class="code-body">
+<pre class="gut">816
+817
+818
+819
+820
+821
+822
+823
+824
+825
+826
+827
+828
+829
+830
+831
+832
+833
+834
+835
+836
+837
+838
+839
+840
+841
+842
+843
+844
+845
+846
+847
+848
+849
+850
+851
+852
+853
+854
+855
+856
+857
+858
+859
+860
+861
+862
+863
+864
+865
+866
+867
+868
+869
+870
+871
+872
+873
+874
+875
+876
+877
+878
+879
+880
+881
+882
+883
+884
+885
+886
+887
+888
+889
+890
+891
+892
+893
+894
+895
+896
+897
+898
+899
+900
+901
+902
+903
+904
+905
+906
+907
+908
+909
+910
+911
+912
+913
+914
+915
+916
+917
+918
+919
+920
+921
+922
+923
+924
+925
+926
+927
+928
+929
+930
+931
+932
+933
+934
+935
+936
+937
+938
+939
+940
+941
+942
+943
+944
+945
+946
+947</pre>
+<pre class="src">  @override
+  <span class="k">void</span> processFrame({
+    <span class="k">required</span> ExerciseBase exercise,
+    <span class="k">required int</span> repCount,
+    <span class="k">required bool</span> hasPose,
+    <span class="k">required</span> Map&lt;String, String&gt; feedback,
+  }) {
+    <span class="k">final</span> script =
+        GenericExerciseVoiceAssets.scriptForExerciseName(exercise.exerciseName);
+    <span class="k">final</span> repIncreased = repCount &gt; _lastRepCount;
+    <span class="k">final</span> isHoldTimerExercise = exercise.liveHoldTargetSeconds != null;
+
+    <span class="k">if</span> (exercise.exerciseState == ExerciseState.completed) {
+      <span class="k">if</span> (!_didAnnounceSetComplete) {
+        _voicePlayer.clearPendingButKeepCurrent();
+        <span class="k">if</span> (repIncreased) {
+          <span class="k">final</span> completedRepLog = _latestRepLog(exercise, repCount);
+          <span class="k">final</span> latestRepLog = _latestRepLogAnyNumber(exercise);
+          <span class="k">if</span> (completedRepLog != null &amp;&amp;
+              completedRepLog.repNumber != _lastOutcomeRepNumber) {
+            _speakRepLogOutcome(
+              script: script,
+              repLog: completedRepLog,
+              includeCount: true,
+            );
+          } <span class="k">else if</span> (isHoldTimerExercise &amp;&amp;
+              latestRepLog != null &amp;&amp;
+              latestRepLog.repNumber != _lastOutcomeRepNumber) {
+            _speakRepLogOutcome(
+              script: script,
+              repLog: latestRepLog,
+              includeCount: false,
+            );
+          } <span class="k">else if</span> (completedRepLog == null &amp;&amp; latestRepLog == null) {
+            _speakUnknownRepOutcome(
+              script: script,
+              repCount: repCount,
+              feedback: feedback,
+            );
+          }
+        } <span class="k">else if</span> (isHoldTimerExercise) {
+          <span class="k">final</span> latestRepLog = _latestRepLogAnyNumber(exercise);
+          <span class="k">if</span> (latestRepLog != null &amp;&amp;
+              latestRepLog.repNumber != _lastOutcomeRepNumber) {
+            _speakRepLogOutcome(
+              script: script,
+              repLog: latestRepLog,
+              includeCount: false,
+            );
+          }
+        }
+        _voicePlayer.speak(<span class="s">'common.exercise_complete'</span>);
+        _previousSetFaultsBySlug[script.slug] = Map.of(_setFaultCounts);
+        _didAnnounceSetComplete = true;
+      }
+      _lastRepCount = repCount;
+      <span class="k">return</span>;
+    }
+
+    <span class="k">if</span> (exercise.exerciseState == ExerciseState.notActivated) {
+      _speakSetup(exercise, script);
+      _lastRepCount = repCount;
+      <span class="k">return</span>;
+    }
+
+    <span class="k">if</span> (exercise.exerciseState != ExerciseState.activated ||
+        exercise.isPaused ||
+        !hasPose) {
+      _lastRepCount = repCount;
+      _resetHoldProgressTracking();
+      <span class="k">return</span>;
+    }
+
+    <span class="k">if</span> (!_didAnnounceReady) {
+      _voicePlayer.speak(<span class="s">'common.ready'</span>);
+      _didAnnounceReady = true;
+      _speakPreviousSetAdviceIfNeeded(exercise, script);
+    }
+
+    <span class="k">if</span> (isHoldTimerExercise) {
+      _handleHoldTimerProgress(
+        script: script,
+        exercise: exercise,
+        feedback: feedback,
+      );
+
+      <span class="k">if</span> (repIncreased &amp;&amp; _latestRepLog(exercise, repCount) == null) {
+        _lastRepCount = repCount;
+        <span class="k">return</span>;
+      }
+    }
+
+    <span class="k">if</span> (!repIncreased &amp;&amp; _isNoCountFeedback(feedback)) {
+      <span class="k">final</span> nowMs = DateTime.now().millisecondsSinceEpoch;
+      <span class="k">if</span> (nowMs - _lastNoCountCueAtMs &gt;= _noCountCueCooldownMs) {
+        _voicePlayer.clearPendingButKeepCurrent();
+        _voicePlayer.speak(<span class="s">'common.no_count'</span>);
+        <span class="k">final</span> faultId = _faultIdForFeedback(script, feedback);
+        <span class="k">if</span> (faultId != null) {
+          _setFaultCounts[faultId] = (_setFaultCounts[faultId] ?? 0) + 1;
+          _voicePlayer.speak(script.faultKey(faultId));
+        } <span class="k">else if</span> (_feedbackIndicatesFault(feedback)) {
+          _voicePlayer.speak(<span class="s">'common.fix_pose'</span>);
+        }
+        _lastNoCountCueAtMs = nowMs;
+      }
+      _lastRepCount = repCount;
+      <span class="k">return</span>;
+    }
+
+    <span class="k">if</span> (repIncreased) {
+      <span class="k">final</span> completedRepLog = _latestRepLog(exercise, repCount);
+      _voicePlayer.clearPendingButKeepCurrent();
+      <span class="k">if</span> (completedRepLog != null) {
+        _speakRepLogOutcome(
+          script: script,
+          repLog: completedRepLog,
+          includeCount: true,
+        );
+      } <span class="k">else</span> {
+        _speakUnknownRepOutcome(
+          script: script,
+          repCount: repCount,
+          feedback: feedback,
+        );
+      }
+      _lastRepCount = repCount;
+      <span class="k">return</span>;
+    }
+
+    _lastRepCount = repCount;
+  }</pre>
+    </div>
+  </div>
+  <div class="call eli">
+    <p class="ct">🧒 Like you’re five</p>
+    <p>Read it as a top-to-bottom “what should I say right now?” checklist: <strong>Set done?</strong> say
+    the last rep’s outcome + “Hoàn thành bài tập,” and stash this set’s faults for next time.
+    <strong>Still setting up?</strong> say the setup instructions. <strong>Paused / no body?</strong> say
+    nothing. <strong>First live frame?</strong> say “Sẵn sàng” + replay last set’s advice.
+    <strong>A rep just completed?</strong> say the number and whether it was good or which fault it had.
+    <strong>A rep was rejected (“no count”)?</strong> say why, but no more than once every 1.2s. Each branch
+    ends with <code>return</code> so only one thing is said per frame.</p>
+  </div>
+
+  <h3>15c · What I elided, and why</h3>
+  <div class="call warn">
+    <p class="ct">⚠️ Honest disclosure of the ~430 lines not shown verbatim</p>
+    <p>Lines 949–1645 are helper methods that turn messy feedback text into an audio-clip id. I’m
+    summarizing rather than pasting all of it because it’s highly repetitive keyword-matching — but here’s
+    exactly what’s there so nothing is hidden:</p>
+    <ul>
+      <li><code>_handleHoldTimerProgress</code> (L949–999) — for holds, notices when your hold seconds
+      <em class="term">stall</em> and nudges you after 4 stalled frames.</li>
+      <li><code>_speakSetup / _speakUnknownRepOutcome / _speakRepLogOutcome / _speakFaultId /
+      _speakPreviousSetAdviceIfNeeded</code> (L1006–1087) — the actual “say this clip” routines.</li>
+      <li><code>_faultIdsForRepLog / _latestRepLog / _latestRepLogAnyNumber / _faultTypesFromLog /
+      _faultIdsForText / _faultIdForFeedback</code> (L1089–1168) — dig the fault out of the logged rep.</li>
+      <li><code>_looksLikeFaultText</code> (L1170–1239) — two big keyword lists (English + un-accented
+      Vietnamese) that guess “does this text describe a fault?”</li>
+      <li><code>_candidateFaultIds</code> (L1241–1449) — a ~200-line waterfall of
+      <code>if (text.contains('knee')) yield 'knee'…</code> mapping words to fault ids.</li>
+      <li><code>_candidateFaultIdsForKey</code> (L1451–1528) — a <code>switch</code> of known aliases
+      (<code>heel_lift → heel</code>, etc.).</li>
+      <li><code>_feedbackIndicatesFault / _isNoCountFeedback / _isNonFaultFeedbackKey / _normalizeFaultKey</code>
+      (L1530–1568) — small text tests.</li>
+      <li><code>_normalizeFaultText</code> (L1570–1645) — a ~70-entry table stripping Vietnamese accents
+      (<code>ắ→a</code>) so matching is accent-insensitive.</li>
+      <li><code>waitUntilIdle / dispose</code> (L1647–1660) — finish the contract.</li>
+    </ul>
+  </div>
+  <p>A representative slice, so you can see the texture of the elided part:</p>
+  <div class="code">
+    <div class="code-head"><span>_candidateFaultIds — excerpt (representative)</span><b>L1299–1320</b></div>
+    <div class="code-body">
+<pre class="gut">1299
+1300
+1301
+1302
+1303
+1304
+1305
+1306
+1307
+1308
+1309
+1310
+1311
+1312
+1313
+1314
+1315
+1316
+1317
+1318
+1319
+1320</pre>
+<pre class="src">    <span class="k">if</span> (text.contains(<span class="s">'heel'</span>) || text.contains(<span class="s">'got'</span>)) <span class="k">yield</span> <span class="s">'heel'</span>;
+    <span class="k">if</span> (text.contains(<span class="s">'knee'</span>) || text.contains(<span class="s">'goi'</span>)) {
+      <span class="k">yield</span> <span class="s">'knee'</span>;
+      <span class="k">yield</span> <span class="s">'knee_valgus'</span>;
+      <span class="k">yield</span> <span class="s">'knee_angle'</span>;
+      <span class="k">yield</span> <span class="s">'knee_extension'</span>;
+      <span class="k">yield</span> <span class="s">'knee_hover'</span>;
+      <span class="k">yield</span> <span class="s">'front_knee'</span>;
+      <span class="k">yield</span> <span class="s">'back_knee'</span>;
+      <span class="k">yield</span> <span class="s">'knees'</span>;
+    }
+    <span class="k">if</span> (text.contains(<span class="s">'arm'</span>) ||
+        text.contains(<span class="s">'wrist'</span>) ||
+        text.contains(<span class="s">'tay'</span>) ||
+        text.contains(<span class="s">'co tay'</span>)) {
+      <span class="k">yield</span> <span class="s">'arms'</span>;
+      <span class="k">yield</span> <span class="s">'arm_extension'</span>;
+      <span class="k">yield</span> <span class="s">'extension'</span>;
+      <span class="k">yield</span> <span class="s">'straight_arm'</span>;
+      <span class="k">yield</span> <span class="s">'hand'</span>;
+      <span class="k">yield</span> <span class="s">'wrist'</span>;
+    }</pre>
+    </div>
+  </div>
+  <div class="call tip">
+    <p class="ct">💡 The deeper suggestion</p>
+    <p>This whole text→fault-id guessing engine is <em class="term">brittle</em>: it re-derives structured
+    facts (which fault) from human-readable strings that were themselves generated from structured facts a
+    moment earlier. Every new fault means editing giant keyword lists in two languages. A sturdier design:
+    have each metric emit a <strong>stable fault id</strong> directly into the rep log, and let the coach look
+    up the clip by id — no string sniffing. That deletes ~400 of these lines. Bigger than a move, so it’s a
+    “when we touch voice next” item, not today.</p>
+  </div>
+</section>
+
+<!-- ============ 16 RECAP ============ -->
+<section id="recap">
+  <p class="kicker"><span class="n">16</span> The takeaways</p>
+  <h2>Suggestions, ranked</h2>
+  <p>Everything I flagged inline, in one place. Severity is about <em class="term">impact</em>, not effort.</p>
+  <table class="recap">
+    <thead><tr><th>#</th><th>Where</th><th>What</th><th>Severity</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><code>L775–1661</code></td><td>Move the ~890-line generic voice coach out to <code>services/generic_exercise_voice_coach.dart</code>. It’s 53% of the file and unrelated to the base. Keep the <code>ExerciseVoiceCoach</code> interface importable.</td><td class="sev med">structure</td></tr>
+      <tr><td>2</td><td><code>L420–469 + flags</code></td><td>Extract presence/pause/segmentation-trigger into a <code>PresenceGate</code> collaborator. ~200 lines, one responsibility. <strong>Ask-first</strong> — touches the frame pipeline.</td><td class="sev med">architecture</td></tr>
+      <tr><td>3</td><td><code>L552</code></td><td><code>calScaleFactor</code> returns <code>1.0</code> on any missing dot → measurements can jump for a frame. Reuse last good scale instead.</td><td class="sev hi">correctness</td></tr>
+      <tr><td>4</td><td><code>L655</code></td><td>Dead <code>if (_holdStillStartedAt != null) {}</code> with an empty body. Delete the line.</td><td class="sev lo">dead code</td></tr>
+      <tr><td>5</td><td><code>L1170–1449</code></td><td>Replace the string-sniffing fault engine with stable fault ids emitted by metrics. Deletes ~400 lines; kills a whole class of “new fault → edit keyword lists” bugs.</td><td class="sev med">design</td></tr>
+      <tr><td>6</td><td><code>L710–773</code></td><td>Lift <code>HoldSecondsAccumulator</code> to its own file — zero base coupling, 11 users.</td><td class="sev lo">structure</td></tr>
+      <tr><td>7</td><td><code>L248–255</code></td><td>Answer the <code>// NOTE: redundant? / why?</code> comments in one real sentence (it’s an FPS EMA; <code>now</code> is intentionally reused) and delete the doubt.</td><td class="sev lo">clarity</td></tr>
+      <tr><td>8</td><td><code>L18–19, 336, 338, 380</code></td><td>Whitespace/quote nits — run <code>dart format</code>; standardize on single-quote imports.</td><td class="sev lo">style</td></tr>
+      <tr><td>9</td><td><code>L522, L571</code></td><td>Hoist <code>threshold = 0.01</code> to a named const; add a one-line comment that <code>getSideLandmark</code> defaults non-right ⇒ left by design.</td><td class="sev lo">clarity</td></tr>
+    </tbody>
+  </table>
+  <div class="call idea">
+    <p class="ct">🧠 If you do them in order</p>
+    <p>#4, #6, #7, #8, #9 are safe, do-anytime cleanups. #1 is the big win (pure move, no behavior change).
+    #3 is the only genuine <em class="term">bug-ish</em> one. #2 and #5 are the real architecture — worth a
+    short design note and your sign-off before touching, since both live near the pipeline.</p>
+  </div>
+</section>
+
+<div class="foot">
+  ExerciseBase walkthrough · generated for review · lib/exercise/exercise_base.dart · Vika pose pipeline
+</div>
+
+</main>
+</div>
+
+<!-- ===== personal notes layer (private, saved in your browser only) ===== -->
+<button class="note-fab" id="noteFab" aria-label="Open your notes">🖊 Notes <span class="cnt" id="noteCount">0</span></button>
+<div class="note-pop" id="notePop"><button id="notePopBtn" type="button">🖊 Note this</button></div>
+<aside class="note-panel" id="notePanel" aria-label="Your private notes">
+  <div class="ph">
+    <div><h3>Your notes</h3><div class="sub">private · this browser only · not sent to the agent</div></div>
+    <button class="x" id="notePanelClose" type="button" aria-label="Close">&times;</button>
+  </div>
+  <div class="composer">
+    <div class="anchor" id="noteAnchor" hidden></div>
+    <textarea id="noteInput" placeholder="Type your note, then click outside the box (or press ⌘/Ctrl+Enter) to save…"></textarea>
+    <div class="crow">
+      <span class="chint" id="noteHint">Will attach to the section you're viewing</span>
+      <button class="addbtn" id="noteAdd" type="button">Add note</button>
+    </div>
+  </div>
+  <div class="storage-note" id="storageNote" hidden>⚠ This viewer blocks browser storage, so notes last only for this session — use “Download .md” to keep them.</div>
+  <div class="note-list" id="noteList"></div>
+  <div class="pf">
+    <button id="noteCopy" type="button">Copy all</button>
+    <button id="noteDownload" type="button">Download .md</button>
+    <button id="noteClear" type="button">Clear all</button>
+  </div>
+</aside>
+
+<script>
+// ===== personal notes layer: anchored, local-only, never sent to the agent =====
+(function () {
+  var KEY = 'vika-eb-notes-v1';
+  var NAMEKEY = 'VIKA_EB_NOTES::';
+  var REMOTE = 'http://127.0.0.1:4599/notes';
+  var localOk = true, remoteOk = false;
+  try { localStorage.setItem('vika-eb-t', '1'); localStorage.removeItem('vika-eb-t'); } catch (e) { localOk = false; }
+  function loadLocal() {
+    if (localOk) { try { var v = localStorage.getItem(KEY); if (v) return JSON.parse(v); } catch (e) {} }
+    try { if (window.name && window.name.indexOf(NAMEKEY) === 0) return JSON.parse(window.name.slice(NAMEKEY.length)); } catch (e) {}
+    return [];
+  }
+  var notes = loadLocal();
+
+  var fab = document.getElementById('noteFab');
+  var cnt = document.getElementById('noteCount');
+  var panel = document.getElementById('notePanel');
+  var list = document.getElementById('noteList');
+  var pop = document.getElementById('notePop');
+  var popBtn = document.getElementById('notePopBtn');
+  var input = document.getElementById('noteInput');
+  var anchorEl = document.getElementById('noteAnchor');
+  var hintEl = document.getElementById('noteHint');
+  var lastSel = null;
+  var pendingAnchor = null;
+
+  function mirrorLocal() {
+    var s = JSON.stringify(notes);
+    if (localOk) { try { localStorage.setItem(KEY, s); } catch (e) { localOk = false; } }
+    try { window.name = NAMEKEY + s; } catch (e) {}
+  }
+  function save() {
+    cnt.textContent = notes.length;
+    mirrorLocal();
+    if (remoteOk) {
+      try {
+        fetch(REMOTE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(notes) })
+          .catch(function () { remoteOk = false; updateStatus(); });
+      } catch (e) { remoteOk = false; }
+    }
+    updateStatus();
+  }
+  function updateStatus() {
+    var el = document.getElementById('storageNote'); if (!el) return;
+    if (remoteOk) {
+      el.hidden = false; el.className = 'storage-note ok';
+      el.textContent = '✓ Saved to disk — .lavish/exercise-base-notes.json (survives reloads & restarts while the notes server runs).';
+    } else if (localOk) {
+      el.hidden = true;
+    } else {
+      el.hidden = false; el.className = 'storage-note';
+      el.textContent = '⚠ The viewer blocks browser storage, so notes only survive reloads this session. To keep them for good: run the notes server (see chat) or use “Download .md”.';
+    }
+  }
+  function uid() { return 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function sectionOf(node) {
+    var el = node && node.nodeType === 3 ? node.parentElement : node;
+    while (el && !(el.tagName === 'SECTION' && el.id)) el = el.parentElement;
+    return el;
+  }
+  function titleOf(sec) {
+    if (!sec) return 'Document';
+    var h = sec.querySelector('h2');
+    return h ? h.textContent.trim() : sec.id;
+  }
+  function currentSection() {
+    var secs = document.querySelectorAll('main section[id]');
+    var mid = window.scrollY + window.innerHeight / 2, best = null;
+    secs.forEach(function (s) { if (mid >= s.offsetTop && mid < s.offsetTop + s.offsetHeight) best = s; });
+    return best || secs[0] || null;
+  }
+  function setAnchor(a) {
+    pendingAnchor = a;
+    if (a && a.quote) {
+      anchorEl.hidden = false; anchorEl.innerHTML = '';
+      var t = document.createElement('span');
+      t.textContent = '“' + a.quote.slice(0, 90) + (a.quote.length > 90 ? '…' : '') + '”';
+      var x = document.createElement('span'); x.className = 'axn'; x.textContent = '✕'; x.title = 'Remove anchor';
+      x.onclick = function () { setAnchor(null); };
+      anchorEl.appendChild(t); anchorEl.appendChild(x);
+      hintEl.textContent = 'Attaching to this selection';
+    } else {
+      anchorEl.hidden = true; anchorEl.innerHTML = '';
+      hintEl.textContent = "Will attach to the section you're viewing";
+    }
+  }
+  function addFromComposer() {
+    var body = input.value.trim();
+    if (!body) { input.focus(); return; }
+    var a = pendingAnchor, sec = a ? document.getElementById(a.sectionId) : currentSection();
+    var n = {
+      id: uid(),
+      sectionId: a ? a.sectionId : (sec ? sec.id : ''),
+      sectionTitle: a ? a.sectionTitle : (sec ? titleOf(sec) : 'Document'),
+      quote: a ? a.quote : '',
+      start: a && a.start != null ? a.start : null,
+      end: a && a.end != null ? a.end : null,
+      body: body, createdAt: Date.now()
+    };
+    notes.push(n); render(); try { applyAll(); } catch (e) {} save();
+    input.value = ''; setAnchor(null);
+  }
+
+  // ---- anchored highlighting (Google-Docs style: spans across tokens, numbered) ----
+  function offsetOf(section, node, nodeOffset) {
+    var r = document.createRange();
+    r.selectNodeContents(section);
+    try { r.setEnd(node, nodeOffset); } catch (e) { return 0; }
+    return r.toString().length;
+  }
+  function appendBadge(mark, num, id) {
+    var b = document.createElement('sup');
+    b.className = 'note-badge'; b.dataset.nid = id; b.textContent = num;
+    b.title = 'Note ' + num + ' — click to open';
+    if (mark.parentNode) mark.parentNode.insertBefore(b, mark.nextSibling);
+  }
+  function clearHighlights() {
+    document.querySelectorAll('.note-badge').forEach(function (b) { b.remove(); });
+    document.querySelectorAll('mark.note-hl').forEach(function (m) {
+      var p = m.parentNode; while (m.firstChild) p.insertBefore(m.firstChild, m); p.removeChild(m); p.normalize();
+    });
+  }
+  // Highlight a character range [start,end) within a section, wrapping every text
+  // node it crosses — this is what makes long, multi-<span> code selections show up.
+  function highlightRange(section, start, end, id, num) {
+    if (!section || start == null || end == null || end <= start) return false;
+    var w = document.createTreeWalker(section, NodeFilter.SHOW_TEXT, null), n, pos = 0, segs = [];
+    while ((n = w.nextNode())) {
+      var len = n.nodeValue.length, nodeStart = pos; pos += len;
+      if (pos <= start) continue;
+      if (nodeStart >= end) break;
+      if (n.parentElement && n.parentElement.closest('mark.note-hl')) continue;
+      var s = Math.max(0, start - nodeStart), e = Math.min(len, end - nodeStart);
+      if (e > s) segs.push({ node: n, s: s, e: e });
+    }
+    var made = 0, last = null;
+    segs.forEach(function (seg) {
+      var r = document.createRange(); r.setStart(seg.node, seg.s); r.setEnd(seg.node, seg.e);
+      var m = document.createElement('mark'); m.className = 'note-hl'; m.dataset.nid = id;
+      try { r.surroundContents(m); made++; last = m; } catch (e2) {}
+    });
+    if (made && last) appendBadge(last, num, id);
+    return made > 0;
+  }
+  // Fallback for old notes that only stored a quote (no offsets).
+  function highlightFirst(section, quote, id, num) {
+    if (!section || !quote) return false;
+    var w = document.createTreeWalker(section, NodeFilter.SHOW_TEXT, null), tn;
+    while ((tn = w.nextNode())) {
+      if (tn.parentElement && tn.parentElement.closest('mark.note-hl')) continue;
+      var i = tn.nodeValue.indexOf(quote);
+      if (i >= 0) {
+        var r = document.createRange(); r.setStart(tn, i); r.setEnd(tn, i + quote.length);
+        var m = document.createElement('mark'); m.className = 'note-hl'; m.dataset.nid = id;
+        try { r.surroundContents(m); appendBadge(m, num, id); return true; } catch (e) { return false; }
+      }
+    }
+    return false;
+  }
+  function applyAll() {
+    clearHighlights();
+    notes.forEach(function (n, i) {
+      var sec = document.getElementById(n.sectionId); if (!sec) return;
+      var ok = false;
+      if (n.start != null && n.end != null) ok = highlightRange(sec, n.start, n.end, n.id, i + 1);
+      if (!ok && n.quote) highlightFirst(sec, n.quote, n.id, i + 1);
+    });
+  }
+  // Two-way link: hovering text lights its card, hovering a card lights its text.
+  function setLinked(id, on) {
+    document.querySelectorAll('mark.note-hl[data-nid="' + id + '"], .note-badge[data-nid="' + id + '"]')
+      .forEach(function (el) { el.classList.toggle('hot', on); });
+    var card = list.querySelector('.note-card[data-nid="' + id + '"]');
+    if (card) card.classList.toggle('linked', on);
+  }
+
+  // ---- panel ----
+  function render() {
+    list.innerHTML = '';
+    if (!notes.length) {
+      var e = document.createElement('div'); e.className = 'note-empty';
+      e.innerHTML = 'No notes yet.<br>Type in the box above and hit <b>Add note</b>,<br>or select text/code and hit <b>🖊 Note this</b>.';
+      list.appendChild(e); return;
+    }
+    notes.slice().reverse().forEach(function (n) {
+      var num = notes.indexOf(n) + 1;
+      var card = document.createElement('div'); card.className = 'note-card'; card.dataset.nid = n.id;
+      card.onmouseenter = function () { setLinked(n.id, true); };
+      card.onmouseleave = function () { setLinked(n.id, false); };
+      var loc = document.createElement('span'); loc.className = 'loc'; loc.title = 'Jump to this spot';
+      var cn = document.createElement('span'); cn.className = 'cnum'; cn.textContent = num; loc.appendChild(cn);
+      loc.appendChild(document.createTextNode(' § ' + n.sectionTitle));
+      loc.onclick = function () { jump(n.id); }; card.appendChild(loc);
+      if (n.quote) { var q = document.createElement('div'); q.className = 'quote'; q.textContent = n.quote; card.appendChild(q); }
+      var body = document.createElement('div'); body.className = 'body' + (n.body ? '' : ' empty');
+      body.textContent = n.body || 'Empty — click Edit to write.'; card.appendChild(body);
+      var row = document.createElement('div'); row.className = 'row';
+      var ed = document.createElement('button'); ed.className = 'edit'; ed.textContent = 'Edit'; ed.onclick = function () { editCard(card, n); };
+      var dl = document.createElement('button'); dl.className = 'del'; dl.textContent = 'Delete';
+      dl.onclick = function () { notes = notes.filter(function (x) { return x.id !== n.id; }); render(); try { applyAll(); } catch (e) {} save(); };
+      row.appendChild(ed); row.appendChild(dl); card.appendChild(row);
+      list.appendChild(card);
+    });
+  }
+  function editCard(card, n) {
+    card.innerHTML = '';
+    var loc = document.createElement('span'); loc.className = 'loc'; loc.textContent = '§ ' + n.sectionTitle; card.appendChild(loc);
+    if (n.quote) { var q = document.createElement('div'); q.className = 'quote'; q.textContent = n.quote; card.appendChild(q); }
+    var ta = document.createElement('textarea'); ta.value = n.body || ''; ta.placeholder = 'Type your note…'; card.appendChild(ta);
+    var row = document.createElement('div'); row.className = 'row';
+    var sv = document.createElement('button'); sv.className = 'save'; sv.textContent = 'Save';
+    sv.onclick = function () { n.body = ta.value.trim(); save(); render(); };
+    row.appendChild(sv); card.appendChild(row);
+    ta.focus();
+    ta.addEventListener('keydown', function (e) { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') sv.click(); });
+  }
+  function openPanel() { panel.classList.add('open'); setTimeout(function () { if (input) input.focus(); }, 40); }
+  fab.onclick = function () {
+    panel.classList.toggle('open');
+    if (panel.classList.contains('open')) setTimeout(function () { if (input) input.focus(); }, 40);
+  };
+  document.getElementById('notePanelClose').onclick = function () { panel.classList.remove('open'); };
+  document.getElementById('noteAdd').onclick = addFromComposer;
+  input.addEventListener('keydown', function (e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); addFromComposer(); }
+  });
+  // Reliable path: lavish's annotate overlay can eat button clicks inside the iframe,
+  // but typing/blur are never intercepted — so save when the box loses focus.
+  input.addEventListener('blur', function () { if (input.value.trim()) addFromComposer(); });
+
+  function jump(id) {
+    var marks = document.querySelectorAll('mark.note-hl[data-nid="' + id + '"]');
+    var n = notes.find(function (x) { return x.id === id; });
+    var target = marks[0] || (n && document.getElementById(n.sectionId));
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    marks.forEach(function (m) { m.classList.remove('flash'); void m.offsetWidth; m.classList.add('flash'); });
+  }
+
+  // ---- selection popover ----
+  function hidePop() { pop.style.display = 'none'; }
+  document.addEventListener('mouseup', function () {
+    setTimeout(function () {
+      var s = document.getSelection();
+      if (!s || s.isCollapsed) { hidePop(); return; }
+      var txt = s.toString();
+      if (!txt.trim()) { hidePop(); return; }
+      var host = s.anchorNode && (s.anchorNode.nodeType === 3 ? s.anchorNode.parentElement : s.anchorNode);
+      if (!host || !host.closest('main')) { hidePop(); return; }
+      var range = s.getRangeAt(0);
+      var section = sectionOf(range.startContainer);
+      var start = 0, end = 0;
+      if (section) {
+        start = offsetOf(section, range.startContainer, range.startOffset);
+        end = offsetOf(section, range.endContainer, range.endOffset);
+        if (end < start) { var tmp = start; start = end; end = tmp; }
+      }
+      lastSel = { quote: txt.trim().slice(0, 2000), section: section, start: start, end: end };
+      var rect = range.getBoundingClientRect();
+      var cw = document.documentElement.clientWidth;
+      var x = Math.min(Math.max(64, rect.left + rect.width / 2), cw - 64);
+      pop.style.left = (window.scrollX + x) + 'px';
+      pop.style.top = (window.scrollY + Math.max(rect.top, 8)) + 'px';
+      pop.style.display = 'block';
+    }, 10);
+  });
+  document.addEventListener('scroll', hidePop, { passive: true });
+  popBtn.addEventListener('mousedown', function (e) {
+    e.preventDefault(); // fire before mouseup collapses the selection & hides the bubble
+    if (!lastSel) return;
+    var sec = lastSel.section;
+    setAnchor({ sectionId: sec ? sec.id : '', sectionTitle: titleOf(sec), quote: lastSel.quote, start: lastSel.start, end: lastSel.end });
+    openPanel(); hidePop();
+    var sel = window.getSelection(); if (sel) sel.removeAllRanges();
+  });
+
+  // click an existing highlight or its numbered badge -> open + focus its card
+  document.addEventListener('click', function (e) {
+    var m = e.target.closest && e.target.closest('mark.note-hl, .note-badge');
+    if (!m || !m.dataset.nid) return;
+    var id = m.dataset.nid;
+    openPanel(); render();
+    var card = list.querySelector('.note-card[data-nid="' + id + '"]');
+    if (card) {
+      card.scrollIntoView({ block: 'center' });
+      card.classList.add('active');
+      setTimeout(function () { card.classList.remove('active'); }, 1600);
+    }
+  });
+  // two-way hover linking (delegated so it survives re-highlighting)
+  document.addEventListener('mouseover', function (e) {
+    var m = e.target.closest && e.target.closest('mark.note-hl, .note-badge');
+    if (m && m.dataset.nid) setLinked(m.dataset.nid, true);
+  });
+  document.addEventListener('mouseout', function (e) {
+    var m = e.target.closest && e.target.closest('mark.note-hl, .note-badge');
+    if (m && m.dataset.nid) setLinked(m.dataset.nid, false);
+  });
+
+  // ---- export ----
+  function toMd() {
+    return '# ExerciseBase — my notes\n\n' + notes.map(function (n) {
+      return '## § ' + n.sectionTitle + '\n' + (n.quote ? '> ' + n.quote.replace(/\n/g, '\n> ') + '\n\n' : '') + (n.body || '') + '\n';
+    }).join('\n');
+  }
+  document.getElementById('noteCopy').onclick = function () { if (navigator.clipboard) navigator.clipboard.writeText(toMd()); };
+  document.getElementById('noteDownload').onclick = function () {
+    var b = new Blob([toMd()], { type: 'text/markdown' }), u = URL.createObjectURL(b);
+    var a = document.createElement('a'); a.href = u; a.download = 'exercise-base-notes.md'; a.click(); URL.revokeObjectURL(u);
+  };
+  document.getElementById('noteClear').onclick = function () {
+    if (confirm('Delete ALL your notes? This cannot be undone.')) { notes = []; save(); applyAll(); render(); }
+  };
+
+  render(); try { applyAll(); } catch (e) {} mirrorLocal(); cnt.textContent = notes.length; updateStatus();
+  // Reconcile with the durable disk server if it's running.
+  try {
+    fetch(REMOTE).then(function (r) { return r.ok ? r.json() : null; }).then(function (server) {
+      if (!Array.isArray(server)) return;
+      remoteOk = true;
+      if (server.length >= notes.length) {
+        notes = server; render(); try { applyAll(); } catch (e) {} cnt.textContent = notes.length;
+      } else {
+        save(); // local had more (edited while server was down) -> push it up
+      }
+      updateStatus();
+    }).catch(function () { remoteOk = false; updateStatus(); });
+  } catch (e) { updateStatus(); }
+})();
+</script>
+
+<script>
+// Scrollspy: highlight the current section in the TOC.
+(function () {
+  var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+  var map = {};
+  links.forEach(function (a) {
+    var id = a.getAttribute('href').slice(1);
+    var el = document.getElementById(id);
+    if (el) map[id] = a;
+  });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); });
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) {
+        links.forEach(function (l) { l.classList.remove('on'); });
+        var a = map[e.target.id];
+        if (a) a.classList.add('on');
+      }
+    });
+  }, { rootMargin: '0px 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { io.observe(s); });
+})();
+</script>
+</body>
+</html>
