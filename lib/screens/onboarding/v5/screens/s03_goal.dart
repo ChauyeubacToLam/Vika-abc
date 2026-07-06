@@ -150,9 +150,54 @@ class _S03GoalState extends State<S03Goal> {
         label: 'Tiếp tục',
         enabled: _canContinue,
         onTap: widget.onNext,
+        bottom: math.max(32, r.viewPadding.bottom + 12),
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
+          if (r.isTablet && r.size.width > r.size.height) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const V5ScreenHeader(
+                  eyebrow: 'Mục tiêu 4 tuần',
+                  title: 'Bạn muốn đạt\nđược gì?',
+                  size: V5HeaderSize.medium,
+                ),
+                SizedBox(height: majorGap),
+                Expanded(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(child: hero),
+                      SizedBox(width: majorGap),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          physics: const ClampingScrollPhysics(),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              goalGrid,
+                              SizedBox(height: majorGap),
+                              Text(
+                                'KINH NGHIỆM',
+                                style: V5.eyebrow(
+                                  context,
+                                  color: V5.inkSoft,
+                                ),
+                              ),
+                              SizedBox(height: minorGap),
+                              experienceSelector,
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          }
+
           if (r.size.width > r.size.height && constraints.maxHeight < 420) {
             return SingleChildScrollView(
               physics: const ClampingScrollPhysics(),

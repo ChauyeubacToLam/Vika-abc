@@ -21,6 +21,7 @@ import 'package:vika/screens/onboarding/v5/screens/s12_schedule.dart';
 import 'package:vika/screens/onboarding/v5/screens/s13_signup.dart';
 import 'package:vika/screens/onboarding/v5/screens/s15_journey.dart';
 import 'package:vika/screens/onboarding/v5/screens/s16_closer.dart';
+import 'package:vika/screens/onboarding/v5/v5_primitives.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -69,6 +70,45 @@ void main() {
 
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump(const Duration(milliseconds: 1600));
+    });
+  }
+
+  for (final size in <Size>[
+    const Size(1024, 768),
+    const Size(1194, 834),
+  ]) {
+    testWidgets('goal CTA stays visible on iPad landscape at $size',
+        (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      const bottomInset = 24.0;
+
+      final data = OnboardingData()
+        ..goal = 'health'
+        ..duration = '<6m';
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: MediaQueryData(
+              size: size,
+              viewPadding: const EdgeInsets.only(bottom: bottomInset),
+            ),
+            child: Scaffold(
+              body: S03Goal(data: data, onNext: () {}, onBack: () {}),
+            ),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 1600));
+
+      expect(tester.takeException(), isNull);
+      final cta = find.text('Tiếp tục');
+      expect(cta, findsOneWidget);
+      final rect = tester.getRect(find.byType(V5PillCTA));
+      expect(rect.top, greaterThanOrEqualTo(0));
+      expect(rect.bottom, lessThanOrEqualTo(size.height - bottomInset));
     });
   }
 }
