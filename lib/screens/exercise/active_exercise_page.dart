@@ -151,6 +151,12 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   bool _orientationPauseActive = false;
   bool _isLifecyclePaused = false;
   bool _resumeInitRequested = false;
+  // Last pause state pushed to the native pose channel via
+  // setDetectionInterval (null = never synced, forces the next
+  // _syncPoseThrottle() call to apply regardless of value — used after a
+  // fresh native session comes up, since the new session doesn't know the
+  // interval from before). See _syncPoseThrottle() for the full contract.
+  bool? _lastPoseThrottlePaused;
   VikaImageOrientation _currentOrientation = VikaImageOrientation.portrait;
   VikaImageOrientation? _lastSentOrientation;
   bool? _lastSentOrientationFrontCamera;
@@ -160,6 +166,12 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   int? _activeCameraInitGeneration;
   static const Duration _personDetectionInterval = Duration(milliseconds: 450);
   static const Duration _voiceCompletionTimeout = Duration(seconds: 5);
+  // Native pose-inference cadence while the exercise gate is paused (auto or
+  // manual). Lives here, not PersonDetectorConfig (lib/utils/person_detector
+  // .dart) — that class configures the segmentation channel, a deliberately
+  // separate cadence the ADR is explicit about not conflating with pose's.
+  static const Duration _pausedPoseDetectionInterval =
+      Duration(milliseconds: 1000);
 
   @override
   void initState() {
@@ -543,6 +555,10 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       if (!_orientationPauseActive) {
         widget.exercise.manualPause();
         _orientationPauseActive = true;
+        // Orientation-gate pause goes through the same manualPause() as the
+        // pause button — sync immediately, don't wait for _handleLandmarkEvent's
+        // per-frame check (which only runs once we get past this early return).
+        _syncPoseThrottle();
       }
       return true;
     }
@@ -559,6 +575,8 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
       _orientationPauseActive = false;
       if (!_isManualPause) {
         widget.exercise.manualResume();
+        // Same immediacy reasoning as the pause branch above.
+        _syncPoseThrottle();
       }
     }
     unawaited(_sendOrientationToNative());
@@ -624,6 +642,54 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     }
 
     await Future.wait(updates);
+  }
+
+  /// Keeps native pose-inference cadence aligned with the exercise's pause
+  /// state — ~1fps while paused, full rate otherwise. Mirrors
+  /// _sendOrientationToNative's dedup-by-last-value shape.
+  ///
+  /// Load-bearing: this is the ONLY place that reads widget.exercise.isPaused
+  /// to drive the channel, but it is called from several sites for different
+  /// reasons:
+  ///  - Right after every manualPause()/manualResume() call (button taps AND
+  ///    the orientation gate's own manualPause()/manualResume() in
+  ///    _syncOrientationGate — that gate also drives a "manual" pause from
+  ///    PresenceGate's point of view) — zero-latency response to a
+  ///    synchronous user/system action, no need to wait for the next frame.
+  ///  - Once per pose event, after processPose()/processNoPoseFrame(), to
+  ///    catch the gate's OWN auto-pause/auto-resume edges — those flip
+  ///    isPaused inside PresenceGate's internal confirm/grace/resume timers
+  ///    with no call site of their own, so a frame-based read is the only way
+  ///    to observe them. This works only because pose events keep arriving
+  ///    (~1fps) while throttled (see the ADR) — the auto-resume edge is still
+  ///    observed on schedule even mid-throttle.
+  ///  - Forced (via resetting _lastPoseThrottlePaused) right after a fresh
+  ///    native session comes up in _initCamera(), because a new session does
+  ///    not remember the interval from a torn-down one (lifecycle
+  ///    background/foreground while paused would otherwise leave the new
+  ///    session at native's full-rate default despite isPaused still true).
+  ///
+  /// Overlapping call sites are safe: this only calls the channel when the
+  /// paused flag actually flips (or was force-reset), and a redundant native
+  /// call is safe per the channel contract.
+  void _syncPoseThrottle() {
+    // _pipelineReady also requires the native session to actually be up
+    // (textureId set) — guards against premature calls from
+    // _syncOrientationGate(), which runs once before _initCamera() has
+    // called _poseChannel.initialize() (see there). That pre-init call is a
+    // no-op here; the forced resync after init succeeds (below) picks up
+    // whatever isPaused ended up being by then.
+    if (_runtime != _PoseRuntime.nativeMediaPipe || !_pipelineReady) return;
+    final paused = widget.exercise.isPaused;
+    if (paused == _lastPoseThrottlePaused) return;
+    _lastPoseThrottlePaused = paused;
+    unawaited(
+      _poseChannel
+          .setDetectionInterval(
+            paused ? _pausedPoseDetectionInterval.inMilliseconds : 0,
+          )
+          .catchError((Object _) {}),
+    );
   }
 
   Future<void> _applyDebugMode(DebugMode mode) async {
@@ -956,6 +1022,16 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
           _isCameraReady = true;
           _isInitializing = false;
         });
+        // Force-sync: a fresh native session starts at native's own default
+        // (full rate) and has no memory of the interval a torn-down session
+        // had. Reset the last-known value so _syncPoseThrottle() applies
+        // unconditionally — the case that matters is lifecycle background/
+        // foreground while paused (_pausePipelinesForLifecycle disposes the
+        // whole channel; the gate's isPaused survives untouched), where
+        // without this the new session would silently come back at full
+        // rate despite the exercise still being paused.
+        _lastPoseThrottlePaused = null;
+        _syncPoseThrottle();
       } on TimeoutException catch (_) {
         // Native side never responded. Surface an error so the user can
         // retry — don't auto-fallback to ML Kit on real device.
@@ -1089,7 +1165,29 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     );
   }
 
+  // TEMP(pose-throttle-verify): remove after device pass. Counts native pose
+  // events over 2s windows and prints the effective inference rate. Events
+  // only fire for frames the landmarker actually processed, so this rate IS
+  // the throttle's output — expect ~30/s active, ~1/s paused. Counted before
+  // the early-return guards below so no processed frame is missed.
+  int _poseEventCount = 0;
+  DateTime? _poseFpsWindowStart;
+
+  void _logPoseEventRate() {
+    _poseEventCount++;
+    final now = DateTime.now();
+    final windowStart = _poseFpsWindowStart ??= now;
+    final elapsed = now.difference(windowStart);
+    if (elapsed < const Duration(seconds: 2)) return;
+    final rate = _poseEventCount * 1000 / elapsed.inMilliseconds;
+    debugPrint('[Vika][pose-throttle] ${rate.toStringAsFixed(1)} events/s '
+        '(gate paused: ${widget.exercise.isPaused})');
+    _poseEventCount = 0;
+    _poseFpsWindowStart = now;
+  }
+
   Future<void> _handleLandmarkEvent(Map<String, dynamic> data) async {
+    _logPoseEventRate(); // TEMP(pose-throttle-verify)
     if (_isDisposed ||
         _isCompletingSet ||
         _didComplete ||
@@ -1138,6 +1236,12 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
         _feedback = widget.exercise.processNoPoseFrame();
         _processVoiceFrame(hasPose: false);
       }
+
+      // Auto-pause/auto-resume edge: processPose()/processNoPoseFrame() above
+      // just ran PresenceGate's internal timers, which is the ONLY place those
+      // edges fire (no call site to hook directly) — read isPaused now that
+      // it's current for this frame.
+      _syncPoseThrottle();
 
       if (!_isDisposed && mounted) {
         setState(() {});
@@ -2272,6 +2376,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
               onPause: () {
                 _isManualPause = true;
                 widget.exercise.manualPause();
+                _syncPoseThrottle();
                 setState(() {});
               },
               onFlipCamera: _demoPageIndex == 0 ? _toggleCamera : null,
@@ -2306,6 +2411,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
                   }
                   _isManualPause = false;
                   widget.exercise.manualResume();
+                  _syncPoseThrottle();
                   setState(() {});
                 },
                 onEnd: widget.onBack,
@@ -2484,13 +2590,13 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     }
     if (normalized.contains('tạm dừng') ||
         normalized.contains('quay lại khung hình')) {
-      return const _GuidanceCopy(
-        icon: Icons.pause_circle_filled_rounded,
-        kind: GuidanceGlyphKind.still,
-        title: 'Tạm dừng',
-        body: 'Đứng trong khung hình để tiếp tục.',
-        mode: SystemBannerMode.pause,
-      );
+      // Pause has ONE surface: the full IvoryPauseOverlay card ("Bạn ở đâu
+      // rồi?"), shown when exercise.isPaused. During the person-lost grace
+      // window the base still emits a "⏸ Tạm dừng" system string, but we
+      // deliberately render no banner for it — returning null here means the
+      // screen stays quiet through the grace, then the card takes over on the
+      // pause commit. Prevents the old two-step "banner → card" hand-off.
+      return null;
     }
     if (normalized.contains('phần trên cơ thể')) {
       return const _GuidanceCopy(

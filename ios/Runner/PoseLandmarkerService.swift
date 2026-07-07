@@ -26,6 +26,10 @@ final class PoseLandmarkerService: NSObject,
     private var currentSegmentationOrientation: UIImage.Orientation = .up
     private var currentOrientationCode: String?
     private var detectionEnabled = true
+    // 0 = full rate. >0 throttles ONLY the landmarker submit (pause ~1fps);
+    // the camera texture + segmentation feed stay per-frame. sessionQueue-owned,
+    // same as detectionEnabled, so reads in captureOutput never race the setter.
+    private var minDetectionIntervalMs = 0
     private var lastSubmittedTimestampMs = Int.min
     private var pendingFrames: [Int: FramePayload] = [:]
 
@@ -99,6 +103,13 @@ final class PoseLandmarkerService: NSObject,
     func stopDetection() {
         sessionQueue.async {
             self.detectionEnabled = false
+        }
+    }
+
+    func setDetectionInterval(_ minIntervalMs: Int) {
+        sessionQueue.async {
+            // Clamp negatives to full-rate so a bad arg can never wedge inference off.
+            self.minDetectionIntervalMs = max(0, minIntervalMs)
         }
     }
 
@@ -437,6 +448,22 @@ final class PoseLandmarkerService: NSObject,
             imageHeight: imageDimensions.height,
             orientation: currentSegmentationOrientation
         )
+
+        // Pause throttle: while minDetectionIntervalMs > 0, submit to the pose
+        // landmarker at most once per interval (~1fps on pause). This skip sits
+        // AFTER the segmentation feed on purpose — seg must keep seeing every
+        // frame so personDetected stays live and auto-resume can fire; only the
+        // landmarker path below is throttled. Skip BEFORE storePendingFrame (else
+        // pendingFrames leaks the never-submitted timestamp) and WITHOUT touching
+        // lastSubmittedTimestampMs (it marks the last *submitted* frame, so the
+        // interval measures from the real last submit). The Int.min guard skips
+        // the delta before any first submit — avoids overflow and always lets the
+        // first frame through.
+        if minDetectionIntervalMs > 0,
+           lastSubmittedTimestampMs != Int.min,
+           timestampMs - lastSubmittedTimestampMs < minDetectionIntervalMs {
+            return
+        }
 
         storePendingFrame(
             timestampMs: timestampMs,

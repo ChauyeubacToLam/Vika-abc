@@ -11,6 +11,18 @@ import 'dart:math' as math;
 
 import 'segmentation_channel.dart';
 
+/// Minimal interface for the person-presence signal. Extracted so PresenceGate
+/// can accept a fake in tests without touching platform channels.
+abstract interface class PosePresenceSource {
+  bool get personDetected;
+  double get presenceScore;
+  Future<bool> detect([Object? _]);
+  Future<void> triggerCheck({String reason = 'unknown'});
+  Future<void> useActivatedCadence();
+  Future<void> usePausedCadence();
+  Future<void> close();
+}
+
 class PersonDetectorConfig {
   /// Minimum percentage of frame pixels that must be "person" (0.0–1.0)
   static const double MIN_PERSON_RATIO = 0.03;
@@ -33,6 +45,14 @@ class PersonDetectorConfig {
   static const Duration ACTIVATED_PROCESS_INTERVAL =
       Duration(milliseconds: 8000);
 
+  /// Cadence while auto-paused (person walked away mid-set). A periodic 1s poll
+  /// re-confirms their return ~5x cheaper than the old per-frame triggerCheck
+  /// poke — which hit the 200ms cooldown = 5 samples/s — while still resuming in
+  /// ~1.3s (≤1s to next poll + PERSON_RESUME_CONFIRM 320ms). A *manual* pause
+  /// stays on the slow ACTIVATED baseline instead: presence can never clear a
+  /// manual pause, so there is nothing to sample for.
+  static const Duration PAUSED_PROCESS_INTERVAL = Duration(milliseconds: 1000);
+
   /// Coalesce simultaneous one-shot sample requests from multiple triggers.
   static const Duration REQUEST_SAMPLE_COOLDOWN = Duration(milliseconds: 200);
 
@@ -44,7 +64,7 @@ class PersonDetectorConfig {
   static const double SOFT_RATIO_SCORE_WEIGHT = 0.45;
 }
 
-class PersonDetector {
+class PersonDetector implements PosePresenceSource {
   final SegmentationChannel _channel;
   StreamSubscription<Map<String, dynamic>>? _subscription;
   bool _isStarted = false;
@@ -64,11 +84,12 @@ class PersonDetector {
   double smoothedSoftPersonRatio = 0.0;
 
   /// Blend of high-confidence body coverage and softer body coverage.
+  @override
   double presenceScore = 0.0;
 
   /// Whether a person was detected in the last processed frame
+  @override
   bool personDetected = false;
-  int segmentationEventCount = 0;
   DateTime? _lastSegmentationEventAt;
   bool _smoothedInitialized = false;
 
@@ -114,6 +135,7 @@ class PersonDetector {
 
   /// Returns the cached native segmentation state.
   /// The optional argument keeps existing call sites source-compatible.
+  @override
   Future<bool> detect([Object? _]) async {
     if (!_isStarted && !_isClosed) {
       await _initialize();
@@ -130,12 +152,23 @@ class PersonDetector {
     );
   }
 
+  @override
   Future<void> useActivatedCadence() async {
     if (!_isStarted && !_isClosed) {
       await _initialize();
     }
     await _configureMinProcessInterval(
       PersonDetectorConfig.ACTIVATED_PROCESS_INTERVAL,
+    );
+  }
+
+  @override
+  Future<void> usePausedCadence() async {
+    if (!_isStarted && !_isClosed) {
+      await _initialize();
+    }
+    await _configureMinProcessInterval(
+      PersonDetectorConfig.PAUSED_PROCESS_INTERVAL,
     );
   }
 
@@ -169,6 +202,7 @@ class PersonDetector {
   ///
   /// Self-rate-limited at 200ms to prevent thrashing if multiple triggers
   /// fire simultaneously.
+  @override
   Future<void> triggerCheck({String reason = 'unknown'}) async {
     if (_isClosed || !_isStarted) return;
 
@@ -189,6 +223,13 @@ class PersonDetector {
     }
   }
 
+  /// Fired once per native segmentation sample. Turns two raw mask ratios into
+  /// a smoothed [presenceScore] and a debounced [personDetected] boolean.
+  ///
+  /// Two kinds of ratio arrive from native:
+  /// - personRatio: fraction of frame pixels that are person at HIGH confidence.
+  /// - softPersonRatio: same, but at a LOWER confidence threshold — catches a
+  ///   noisy/backlit body the strict mask misses, so it's kept as a fallback.
   void _handleSegmentationEvent(Map<String, dynamic> event) {
     final personRatio = (event['personRatio'] as num?)?.toDouble();
     final softRatio = (event['softPersonRatio'] as num?)?.toDouble();
@@ -198,14 +239,18 @@ class PersonDetector {
 
     lastPersonRatio = personRatio;
     lastSoftPersonRatio = softRatio;
-    segmentationEventCount += 1;
     _lastSegmentationEventAt = DateTime.now();
 
+    // Instantaneous (un-smoothed) evidence for THIS frame. Soft ratio is
+    // discounted by SOFT_RATIO_SCORE_WEIGHT (0.45) so weak-confidence pixels
+    // never count as strongly as high-confidence ones.
     final currentScore = math.max(
       lastPersonRatio,
       lastSoftPersonRatio * PersonDetectorConfig.SOFT_RATIO_SCORE_WEIGHT,
     );
 
+    // EMA smoothing (alpha 0.30) damps single-frame mask noise. First sample has
+    // no history, so seed the smoothed values with the raw ones.
     if (!_smoothedInitialized) {
       smoothedPersonRatio = lastPersonRatio;
       smoothedSoftPersonRatio = lastSoftPersonRatio;
@@ -220,11 +265,18 @@ class PersonDetector {
           (lastSoftPersonRatio * PersonDetectorConfig.RATIO_SMOOTHING_ALPHA);
     }
 
+    // Smoothed evidence — the stable value UI/business logic reads.
     presenceScore = math.max(
       smoothedPersonRatio,
       smoothedSoftPersonRatio * PersonDetectorConfig.SOFT_RATIO_SCORE_WEIGHT,
     );
 
+    // --- Detection decision: two instant escape hatches, then hysteresis. ---
+
+    // (1) Instant-leave: near-empty frame. Trust the un-smoothed signal so we
+    // drop immediately, and RESET the smoothed history to raw — otherwise a long
+    // run of high presence would keep presenceScore "warm" for several frames
+    // after the person is already gone.
     if (currentScore < PersonDetectorConfig.MIN_PERSON_RATIO_EXIT) {
       smoothedPersonRatio = lastPersonRatio;
       smoothedSoftPersonRatio = lastSoftPersonRatio;
@@ -233,11 +285,16 @@ class PersonDetector {
       return;
     }
 
+    // (2) Instant-enter: clearly a person this frame → detected, no waiting.
     if (currentScore >= PersonDetectorConfig.MIN_PERSON_RATIO) {
       personDetected = true;
       return;
     }
 
+    // (3) Ambiguous middle (EXIT ≤ currentScore < ENTER): decide on the SMOOTHED
+    // score with a two-threshold hysteresis band so the state can't flicker at
+    // the boundary. Already in? hold until it falls below EXIT (0.02). Out?
+    // don't flip until it clears the higher ENTER bar (0.03).
     if (personDetected) {
       personDetected =
           presenceScore >= PersonDetectorConfig.MIN_PERSON_RATIO_EXIT;
@@ -247,6 +304,7 @@ class PersonDetector {
   }
 
   /// Free native resources. Call when exercise is activated or app disposes.
+  @override
   Future<void> close() async {
     _isClosed = true;
     await _subscription?.cancel();

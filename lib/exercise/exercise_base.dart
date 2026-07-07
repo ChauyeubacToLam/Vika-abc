@@ -12,17 +12,17 @@ import 'package:vika/pose/vika_pose_landmark.dart';
 import 'package:vika/pose/vika_image_orientation.dart';
 export 'package:vika/pose/vika_image_orientation.dart';
 import 'package:vika/utils/debouncer.dart';
-import 'package:vika/utils/person_detector.dart';
 import '../utils/pose_smoother.dart';
 import '../utils/pose_math_helpers.dart';
-import "../utils/frame_buffer.dart";
-import "../utils/exercise_logger.dart";
+import '../utils/frame_buffer.dart';
+import '../utils/exercise_logger.dart';
+export 'package:vika/utils/hold_seconds_accumulator.dart';
 import '../debug/debug_types.dart';
 import '../services/generic_exercise_voice_assets.dart';
 import '../services/queued_asset_voice_player.dart';
 import '../services/viettel_tts_service.dart';
-import '../pose/presence_anomaly_detector.dart';
 import 'dart:math' as math;
+import 'presence_gate.dart';
 import 'dart:async';
 import 'dart:ui' show Size;
 
@@ -31,13 +31,22 @@ import 'dart:ui' show Size;
 const double FRONT_FACING_SHOULDER_THRESHOLD = 0.57;
 const double SIDE_FACING_SHOULDER_THRESHOLD = 0.35;
 
+/// Min |z-gap| between a left/right landmark pair before it counts as a vote
+/// for one side. Below this the pair is treated as ambiguous (near-frontal
+/// camera) and skipped in _isLeftSide().
+const double SIDE_VOTE_Z_THRESHOLD = 0.01;
+
+/// Adaptation rate for scaleFactor EMA while the exercise is activated.
+/// At 0.1, a genuine mid-set camera shift converges in ~1-2 s; a single
+/// occluded frame contributes ≤10 % → spike-resistant. Final value is set
+/// during the curl_up device pass (see ADR + spec).
+const double SCALE_EMA_ALPHA = 0.1;
+
 // --- Enums ---
 
 enum ExerciseState { notActivated, activated, completed }
 
 enum CameraFacing { front, left, right, angled, undefined }
-
-enum AngleChange { increasing, decreasing, stable }
 
 abstract class ExerciseVoiceCoach {
   void processFrame({
@@ -91,10 +100,6 @@ abstract class ExerciseBase {
   /// occluded landmarks such as the back leg in side-view squats.
   static const double MIN_PRESENCE = 0.7;
 
-  /// Average presence below this threshold may indicate a faulty pose or that the
-  /// person is not fully in frame.
-  static const double AVG_LOW_PRESENCE_THRESHOLD = 0.35;
-
   /// Probability the landmark is unoccluded given that it exists.
   /// Used only as a secondary gate to reject fully extrapolated landmarks.
   static const double MIN_VISIBILITY = 0.3;
@@ -129,14 +134,6 @@ abstract class ExerciseBase {
     if (supportsLandscape && !supportsPortrait) return 'common.ngang_intro';
     return supportsPortrait ? 'common.thang_intro' : 'common.ngang_intro';
   }
-
-  // Trigger segmentation
-  bool _wasPoseAnomaly = false;
-  bool _wasPoseFrameEdgeRisk = false;
-  bool _wasPoseLowPresence = false;
-  bool _wasNoLandmarks = false;
-  final PresenceAnomalyDetector _posePresenceDetector =
-      PresenceAnomalyDetector();
 
   static bool isLandmarkConfident(PoseLandmark landmark) {
     return landmark.presence >= MIN_PRESENCE &&
@@ -181,45 +178,22 @@ abstract class ExerciseBase {
   double get currentFps => _currentFps;
   double get fpsRatio => _currentFps / 30.0;
 
-  // Person detection (selfie segmentation)
-  final PersonDetector _personDetector = PersonDetector();
-  bool _personConfirmed = false;
-  DateTime? _personSeenSince;
-  DateTime? _personLostSince;
-  DateTime? _resumePresenceSince;
+  // Presence / auto-pause / segmentation-trigger gate.
+  final PresenceGate _gate = PresenceGate(diagnosticMode: kDiagnosticMode);
 
-  bool _isPaused = false;
-
-  /// True when the current pause was triggered by the user tapping the pause
-  /// button (as opposed to the person walking out of frame). A manual pause is
-  /// never auto-resumed by presence detection — only [manualResume] clears it.
-  bool _manualPause = false;
-
-  static const Duration _PERSON_CONFIRM_DURATION = Duration(milliseconds: 500);
-  static const Duration _PERSON_LOST_GRACE = Duration(milliseconds: 900);
-  static const Duration _PERSON_RESUME_CONFIRM_DURATION =
-      Duration(milliseconds: 320);
-
-  bool get isPaused => _isPaused;
+  bool get isPaused => _gate.isPaused;
 
   /// Manually pause the exercise (e.g. user tapped pause button).
+  /// Allowed in any state — pausing pre-activation is odd but harmless, and
+  /// the pause overlay always exposes a resume button so nobody gets stuck.
   void manualPause() {
-    if (exerciseState != ExerciseState.activated) return;
-    _isPaused = true;
-    _manualPause = true;
+    _gate.manualPause();
   }
 
   /// Manually resume after a manual pause.
-  void manualResume() {
-    _isPaused = false;
-    _manualPause = false;
-    _resumePresenceSince = DateTime.now();
-    _personLostSince = null;
-    _resetPresenceDetectors();
-    unawaited(_personDetector.triggerCheck(reason: 'manual_resume'));
-  }
+  void manualResume() => _gate.manualResume(DateTime.now());
 
-  double get personPresenceScore => _personDetector.presenceScore;
+  double get personPresenceScore => _gate.presenceScore;
 
   // Hold-still activation
   DateTime? _holdStillStartedAt;
@@ -228,7 +202,7 @@ abstract class ExerciseBase {
   /// Progress 0.0–1.0 for hold-still countdown UI. Null if not in countdown.
   double? get activationProgress {
     if (exerciseState != ExerciseState.notActivated) return null;
-    if (!_personConfirmed) return null;
+    if (!_gate.personConfirmed) return null;
     if (_holdStillStartedAt == null) return null;
     final elapsed = frameTimestamp.difference(_holdStillStartedAt!);
     return (elapsed.inMilliseconds /
@@ -240,6 +214,32 @@ abstract class ExerciseBase {
     poseSmoother = PoseSmoother(minCutoff: 0.5, beta: 0.005);
   }
 
+  /// Maps the base's [ExerciseState] to the gate's [GatePhase] on each call.
+  /// The gate defines its own phase enum (not this one) so it stays free of any
+  /// exercise_base import — that's what breaks the otherwise-circular dependency.
+  GatePhase get _gatePhase {
+    switch (exerciseState) {
+      case ExerciseState.notActivated:
+        return GatePhase.seeking;
+      case ExerciseState.activated:
+        return GatePhase.active;
+      case ExerciseState.completed:
+        return GatePhase.done;
+    }
+  }
+
+  /// Turns a gate block reason into the user-facing Vietnamese line. All copy
+  /// lives here in the base, never in the gate — the gate is UI-language-free
+  /// and returns enums only, so wording changes touch exactly one place.
+  String _systemStringForBlock(GateBlock block) {
+    switch (block) {
+      case GateBlock.searching:
+        return 'Đang tìm người... Vui lòng đứng trong khung hình.';
+      case GateBlock.paused:
+        return '⏸ Tạm dừng — Quay lại khung hình để tiếp tục';
+    }
+  }
+
   // --- Main Pipeline ---
 
   List<dynamic>? processPose(
@@ -247,84 +247,47 @@ abstract class ExerciseBase {
     InputImage? inputImage,
     Size? imageSize,
   }) {
-    final now = DateTime.now(); // NOTE: redundant?
+    // One wall-clock read per frame. `now` drives the FPS delta below;
+    // `frameTimestamp` is the canonical frame clock every downstream stage reads
+    // (gate confirm/pause timers, hold-still countdown, scale EMA). Same instant
+    // by design — never call DateTime.now() again mid-frame or the timers desync.
+    final now = DateTime.now();
     if (_lastFrameTime != null) {
       final deltaMs = now.difference(_lastFrameTime!).inMilliseconds;
       if (deltaMs > 0) {
-        final frameFps = 1000.0 / deltaMs; // NOTE: why
-        _currentFps = _currentFps * 0.9 + frameFps * 0.1; // why?
+        // Smoothed FPS = exponential moving average (90% history, 10% newest) so
+        // a single slow frame doesn't jerk the value. fpsRatio (currentFps / 30)
+        // then time-scales motion thresholds — e.g. glute_bridge multiplies its
+        // rep velocity by fpsRatio so fast and slow devices count reps alike.
+        final frameFps = 1000.0 / deltaMs;
+        _currentFps = _currentFps * 0.9 + frameFps * 0.1;
       }
     }
     _lastFrameTime = now;
-    frameTimestamp = now; // for the person detection
+    frameTimestamp = now;
 
     resultIssues.feedback.clear();
 
     final smoothedLandmarks = poseSmoother.smoothing(landmarks);
 
-    // Pose returned after a no-landmark run. Ask segmentation for a fresh frame
-    // before any paused/not-confirmed early return can block this path.
-    if (_wasNoLandmarks) {
-      unawaited(_personDetector.triggerCheck(reason: 'pose_returned'));
-      _wasNoLandmarks = false;
+    // Presence gate: one call per frame owns "is a real person reliably in
+    // frame, should we auto-pause, when to poke segmentation." It returns a
+    // verdict; the base only acts on it and never reaches into gate internals.
+    final verdict = _gate.onPose(
+      now: frameTimestamp,
+      phase: _gatePhase,
+      landmarks: smoothedLandmarks,
+      imageSize: imageSize,
+    );
+    // The one cross-boundary coupling: when a confirmed person drops out during
+    // seeking, the hold-still countdown (base-owned state) must reset too.
+    if (verdict.personLostNow) _holdStillStartedAt = null;
+    // proceed=false → gate blocked this frame (searching or paused). Base owns
+    // the Vietnamese copy; the gate only names the reason via an enum.
+    if (!verdict.proceed) {
+      resultIssues.feedback['System'] = _systemStringForBlock(verdict.block!);
+      return [repCount, resultIssues.feedback];
     }
-
-    _syncPresenceState(hasPose: true);
-
-    // Person detection — only before activation
-    if (exerciseState == ExerciseState.notActivated && !_personConfirmed) {
-      final stableFor = _personSeenSince == null
-          ? 0
-          : frameTimestamp.difference(_personSeenSince!).inMilliseconds;
-      if (isDebugModeActive) {
-        debugData['personStableMs'] = stableFor;
-      }
-
-      if (!_personConfirmed) {
-        resultIssues.feedback["System"] =
-            "Đang tìm người... Vui lòng đứng trong khung hình.";
-        _populateBaseDebugData();
-        return [repCount, resultIssues.feedback];
-      }
-    }
-
-    // Presence re-check during active exercise
-    if (exerciseState == ExerciseState.activated) {
-      if (_isPaused) {
-        unawaited(_personDetector.triggerCheck(reason: 'paused_pose_present'));
-        resultIssues.feedback["System"] =
-            "⏸ Tạm dừng — Quay lại khung hình để tiếp tục";
-        _populateBaseDebugData();
-        return [repCount, resultIssues.feedback];
-      }
-    }
-
-    final avgPosePresence = _computeAvgPresence(smoothedLandmarks);
-    final poseLowPresence = avgPosePresence < AVG_LOW_PRESENCE_THRESHOLD;
-    if (exerciseState == ExerciseState.activated &&
-        poseLowPresence &&
-        !_wasPoseLowPresence) {
-      unawaited(_personDetector.triggerCheck(reason: 'pose_low_presence'));
-    }
-    _wasPoseLowPresence = poseLowPresence;
-
-    final poseFrameEdgeRisk =
-        _isPoseFrameEdgeRisk(smoothedLandmarks, imageSize: imageSize);
-    if (exerciseState == ExerciseState.activated &&
-        poseFrameEdgeRisk &&
-        !_wasPoseFrameEdgeRisk) {
-      unawaited(_personDetector.triggerCheck(reason: 'pose_frame_edge'));
-    }
-    _wasPoseFrameEdgeRisk = poseFrameEdgeRisk;
-
-    _posePresenceDetector.update(avgPosePresence);
-
-    // Trigger seg on anomaly transition (false -> true).
-    final nowAnomaly = _posePresenceDetector.isAnomalyConfirmed;
-    if (nowAnomaly && !_wasPoseAnomaly) {
-      unawaited(_personDetector.triggerCheck(reason: 'pose_anomaly'));
-    }
-    _wasPoseAnomaly = nowAnomaly;
 
     // Auto-detect orientation
     cameraFacing = detectCameraFacing(smoothedLandmarks);
@@ -333,17 +296,16 @@ abstract class ExerciseBase {
     final safetyError = checkSafety(smoothedLandmarks);
     if (safetyError != null) {
       resultIssues.feedback["System"] = safetyError;
-      _populateBaseDebugData();
       return [repCount, resultIssues.feedback];
     }
 
-    // Calculate scale factor (shoulder-to-hip distance)
-     scaleFactor = calScaleFactor(smoothedLandmarks);
+    // Calibrate scale factor (shoulder-to-hip distance). Must stay here, before
+    // checkExerciseState, so isInStartPosition reads a fresh value on this frame
+    // (glute_bridge's start check consumes scaleFactor — moving this write after
+    // that call would deadlock the hold gate at scaleFactor = 1.0 forever).
+    _updateScaleFactor(smoothedLandmarks);
     // State machine
     checkExerciseState(smoothedLandmarks, exerciseState);
-
-    _populateBaseDebugData();
- 
 
     if (exerciseState == ExerciseState.activated) {
       checkingPose(smoothedLandmarks);
@@ -361,42 +323,26 @@ abstract class ExerciseBase {
     return [repCount, resultIssues.feedback];
   }
 
-  /// Called when no pose is detected in the current frame.
+  /// Called when ML Kit returns no skeleton this frame (person out of view,
+  /// too dark, mid-transition). Still drives the gate: presence is decided by
+  /// the segmentation detector's cached state, NOT by whether pose landmarks
+  /// exist, so confirm/pause timers must keep ticking even with no skeleton.
   Map<String, String> processNoPoseFrame() {
     frameTimestamp = DateTime.now();
     resultIssues.feedback.clear();
 
-    // Ask segmentation to catch up immediately when pose disappears but the
-    // cached segmentation state still says a person is present.
-    final hadLandmarksLastFrame = !_wasNoLandmarks;
-    if (hadLandmarksLastFrame || _personDetector.personDetected) {
-      unawaited(
-        _personDetector.triggerCheck(
-          reason: hadLandmarksLastFrame
-              ? 'no_landmarks'
-              : 'no_landmarks_stale_present',
-        ),
-      );
-    }
-    _wasNoLandmarks = true;
-    _wasPoseAnomaly =
-        false; // reset; if pose returns and is anomalous it'll re-trigger
-    _wasPoseLowPresence = false;
-    _wasPoseFrameEdgeRisk = false;
-
-    _syncPresenceState(hasPose: false);
-    _populateBaseDebugData();
-
+    final verdict = _gate.onNoPose(now: frameTimestamp, phase: _gatePhase);
+    if (verdict.personLostNow) _holdStillStartedAt = null;
 
     if (exerciseState == ExerciseState.completed) {
       return {'Result': 'Hoàn thành! $repCount reps'};
     }
 
     if (exerciseState == ExerciseState.notActivated) {
-      resultIssues.feedback['System'] = _personConfirmed
+      resultIssues.feedback['System'] = _gate.personConfirmed
           ? 'Giữ toàn thân trong khung hình để bắt đầu.'
           : 'Đang tìm người... Vui lòng đứng trong khung hình.';
-    } else if (_isPaused || !_personDetector.personDetected) {
+    } else if (_gate.isPaused || !_gate.personDetected) {
       resultIssues.feedback['System'] =
           '⏸ Tạm dừng — Quay lại khung hình để tiếp tục';
     } else {
@@ -410,13 +356,11 @@ abstract class ExerciseBase {
   /// Async person detection — call from camera stream handler.
   Future<void> runPersonDetection([InputImage? inputImage]) async {
     if (exerciseState == ExerciseState.completed) return;
-    await _personDetector.detect(inputImage);
+    await _gate.runDetection(inputImage);
   }
 
   /// Free native resources on dispose.
-  Future<void> disposeDetectors() async {
-    await _personDetector.close();
-  }
+  Future<void> disposeDetectors() async => _gate.close();
 
   ExerciseVoiceCoach? createVoiceCoach() => _GenericExerciseVoiceCoach();
 
@@ -424,62 +368,7 @@ abstract class ExerciseBase {
   /// preparing the next one.
   bool get shouldReplayPreviousSetVoiceFaults => true;
 
-  void _populateBaseDebugData() {
-    // debugData['exerciseState'] = exerciseState.toString().split('.').last;
-    // debugData['cameraFacing'] = cameraFacing.toString().split('.').last;
-    // debugData['personConfirmed'] = _personConfirmed;
-  }
-
-  void _syncPresenceState({required bool hasPose}) {
-    final now = frameTimestamp;
-    final presentNow = _personDetector.personDetected;
-
-    if (exerciseState == ExerciseState.notActivated) {
-      if (!_personConfirmed) {
-        if (presentNow) {
-          _personSeenSince ??= now;
-          if (now.difference(_personSeenSince!) >= _PERSON_CONFIRM_DURATION) {
-            _personConfirmed = true;
-          }
-        } else {
-          _personSeenSince = null;
-        }
-      } else if (!presentNow) {
-        _personConfirmed = false;
-        _personSeenSince = null;
-        _holdStillStartedAt = null;
-      }
-      return;
-    }
-
-    if (exerciseState != ExerciseState.activated) return;
-
-    if (presentNow) {
-      _personLostSince = null;
-      // A manual pause is held until the user taps resume — presence alone
-      // never clears it (otherwise standing in frame instantly un-pauses).
-      if (_isPaused && !_manualPause) {
-        _resumePresenceSince ??= now;
-        if (now.difference(_resumePresenceSince!) >=
-            _PERSON_RESUME_CONFIRM_DURATION) {
-          _isPaused = false;
-          _resetPresenceDetectors();
-        }
-      } else {
-        _resumePresenceSince = now;
-      }
-      return;
-    }
-
-    _resumePresenceSince = null;
-    _personLostSince ??= now;
-    if (!_isPaused &&
-        now.difference(_personLostSince!) >= _PERSON_LOST_GRACE &&
-        !kDiagnosticMode) {
-      _isPaused = true;
-      _resetPresenceDetectors();
-    }
-  }
+  
 
   // --- Orientation Detection ---
 
@@ -532,8 +421,7 @@ abstract class ExerciseBase {
       if (leftLM == null || rightLM == null) continue;
 
       final zDiff = leftLM.z - rightLM.z;
-      double threshold = 0.01;
-      if (zDiff.abs() > threshold) {
+      if (zDiff.abs() > SIDE_VOTE_Z_THRESHOLD) {
         if (zDiff < 0) {
           leftVotes++;
         } else {
@@ -546,33 +434,81 @@ abstract class ExerciseBase {
 
   // --- Helpers ---
 
-  double calScaleFactor(
+  /// Two-state calibration write.
+  ///
+  /// - notActivated: hard-write the current confident measurement each frame.
+  ///   isInStartPosition needs a real scaleFactor on the very first frame it
+  ///   runs (glute_bridge deadlocks otherwise); writing every confident frame
+  ///   gives it that, and the final hard-write at activation seeds the EMA.
+  /// - activated: slow EMA (SCALE_EMA_ALPHA = 0.1). Adapts to genuine mid-set
+  ///   repositioning over ~1-2 s while refusing to spike on a single occluded
+  ///   frame (that frame contributes ≤10 %).
+  /// - completed: no-op — nothing reads scaleFactor post-set.
+  ///
+  /// Bad frames (null from _rawScale) never write in either state, so
+  /// reuse-last-good is automatic and requires no extra flag or fallback.
+  void _updateScaleFactor(
       Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
+    final raw = _rawScale(smoothedLandmarks);
+    if (raw == null) return; // not measurable this frame → keep prior value
+    if (exerciseState == ExerciseState.notActivated) {
+      scaleFactor = raw;
+    } else if (exerciseState == ExerciseState.activated) {
+      scaleFactor = SCALE_EMA_ALPHA * raw + (1 - SCALE_EMA_ALPHA) * scaleFactor;
+    }
+  }
+
+  /// Side-aware shoulder→hip pixel distance, gated on isLandmarkConfident.
+  ///
+  /// PoseSmoother keeps every ML Kit landmark key — an occluded landmark
+  /// arrives as a low-confidence entry with kept/hallucinated coordinates, not
+  /// as a missing key. Gating on isLandmarkConfident (not != null) is what
+  /// blocks the hallucinated far-side hip that was producing the 1.0-spike bug.
+  ///
+  /// - Side-facing (left/right): camera-side pair only. Requesting both sides
+  ///   would always return null for glute bridge and curl-up whose far side is
+  ///   legitimately occluded.
+  /// - Front/angled/undefined: midpoints of both shoulders and both hips; all
+  ///   four must be confident or the frame is skipped.
+  ///
+  /// Returns null when landmarks aren't confidently measurable this frame.
+  double? _rawScale(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
+    if (cameraFacing == CameraFacing.left ||
+        cameraFacing == CameraFacing.right) {
+      final s = getSideLandmark(
+        landmarks: smoothedLandmarks,
+        rightType: PoseLandmarkType.rightShoulder,
+        leftType: PoseLandmarkType.leftShoulder,
+      );
+      final h = getSideLandmark(
+        landmarks: smoothedLandmarks,
+        rightType: PoseLandmarkType.rightHip,
+        leftType: PoseLandmarkType.leftHip,
+      );
+      if (s == null || h == null) return null;
+      if (!isLandmarkConfident(s) || !isLandmarkConfident(h)) return null;
+      return calculateDistance(s, h); // pose_math_helpers.dart, takes dynamic
+    }
+    // front / angled / undefined: midpoints — all four landmarks required
     final ls = smoothedLandmarks[PoseLandmarkType.leftShoulder];
     final rs = smoothedLandmarks[PoseLandmarkType.rightShoulder];
     final lh = smoothedLandmarks[PoseLandmarkType.leftHip];
     final rh = smoothedLandmarks[PoseLandmarkType.rightHip];
-    if (ls != null && rs != null && lh != null && rh != null) {
-      final shoulderMidX = (ls.x + rs.x) / 2;
-      final shoulderMidY = (ls.y + rs.y) / 2;
-      final hipMidX = (lh.x + rh.x) / 2;
-      final hipMidY = (lh.y + rh.y) / 2;
-      final dx = shoulderMidX - hipMidX;
-      final dy = shoulderMidY - hipMidY;
-      final scale = math.sqrt(dx * dx + dy * dy);
-      return scale;
+    if (ls == null || rs == null || lh == null || rh == null) return null;
+    if (!isLandmarkConfident(ls) || !isLandmarkConfident(rs) ||
+        !isLandmarkConfident(lh) || !isLandmarkConfident(rh)) {
+      return null;
     }
-    return 1.0; // should we guard this, or just basically let it 1.0 like this?
+    // Midpoints aren't PoseLandmark objects, so calculateDistance can't be used;
+    // inline the same sqrt formula it uses.
+    final dx = (ls.x + rs.x) / 2 - (lh.x + rh.x) / 2;
+    final dy = (ls.y + rs.y) / 2 - (lh.y + rh.y) / 2;
+    return math.sqrt(dx * dx + dy * dy);
   }
 
-  void _resetPresenceDetectors() {
-    _posePresenceDetector.reset();
-    _wasPoseAnomaly = false;
-    _wasPoseLowPresence = false;
-    _wasPoseFrameEdgeRisk = false;
-    _wasNoLandmarks = false;
-  }
-
+  /// Returns the landmark on the camera-facing side. Only an explicit `right`
+  /// facing returns the right landmark; every other facing (left/front/angled/
+  /// undefined) falls through to the left landmark by design.
   PoseLandmark? getSideLandmark({
     required Map<PoseLandmarkType, PoseLandmark> landmarks,
     required PoseLandmarkType rightType,
@@ -584,78 +520,9 @@ abstract class ExerciseBase {
     return landmarks[leftType];
   }
 
-  double _computeAvgPresence(
-      Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
-    if (smoothedLandmarks.isEmpty) return 0.0;
-    double totalPresence = 0.0;
-    for (final landmark in smoothedLandmarks.values) {
-      totalPresence += landmark.presence;
-    }
-    return totalPresence / smoothedLandmarks.length;
-  }
-
-  bool _isPoseFrameEdgeRisk(
-    Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks, {
-    required Size? imageSize,
-  }) {
-    if (imageSize == null || imageSize == Size.zero) return false;
-    if (imageSize.width <= 0 || imageSize.height <= 0) return false;
-
-    final marginX = imageSize.width * 0.04;
-    final marginY = imageSize.height * 0.04;
-    var visibleCount = 0;
-    var edgeCount = 0;
-    var outsideCount = 0;
-
-    for (final landmark in smoothedLandmarks.values) {
-      if (landmark.presence < 0.25 && landmark.visibility < 0.25) {
-        continue;
-      }
-      visibleCount += 1;
-
-      final outside = landmark.x < 0 ||
-          landmark.x > imageSize.width ||
-          landmark.y < 0 ||
-          landmark.y > imageSize.height;
-      if (outside) {
-        outsideCount += 1;
-        continue;
-      }
-
-      if (landmark.x <= marginX ||
-          landmark.x >= imageSize.width - marginX ||
-          landmark.y <= marginY ||
-          landmark.y >= imageSize.height - marginY) {
-        edgeCount += 1;
-      }
-    }
-
-    if (visibleCount < 8) return false;
-    return outsideCount >= 2 || edgeCount >= 5;
-  }
-
   List<dynamic> getRepCountAndFeedback() => [repCount, resultIssues.feedback];
 
   List<dynamic> getSetFeedback() => setFeedback;
-
-  /// Hook for unifying voice feedback on rep completion
-  void speakRepCompletion({
-    required String? nextPhaseVoice,
-    required bool correctForm,
-    bool countRep = true,
-  }) {
-    if (countRep) {
-      ttsService.speak(repCount.toString());
-    }
-
-    if (correctForm) {
-      ttsService.speak("Tốt lắm");
-    }
-
-    if (!requestStop() && nextPhaseVoice != null) {
-      ttsService.speak(nextPhaseVoice);
-    }
-  }
 
   // --- State Machine (Hold-Still Activation) ---
 
@@ -676,15 +543,13 @@ abstract class ExerciseBase {
           if (elapsed >= HOLD_STILL_REQUIRED_DURATION) {
             exerciseState = ExerciseState.activated;
             _holdStillStartedAt = null;
-            _resetPresenceDetectors();
-            unawaited(_personDetector.useActivatedCadence());
+            _gate.onActivated();
             onExerciseActivated();
           } else {
             resultIssues.feedback['System'] =
                 'Giữ yên... ${remaining.clamp(0.0, 99.0).toStringAsFixed(0)}s';
           }
         } else {
-          if (_holdStillStartedAt != null) {}
           _holdStillStartedAt = null;
           resultIssues.feedback['System'] = 'Vào tư thế và giữ yên để bắt đầu';
         }
@@ -737,178 +602,6 @@ abstract class ExerciseBase {
 
   /// Optional target used by the shared hold timer UI.
   double? get liveHoldTargetSeconds => null;
-}
-
-class HoldSecondsAccumulator {
-  HoldSecondsAccumulator(Iterable<String> faultKeys) {
-    for (final key in faultKeys) {
-      _faultSeconds[key] = 0.0;
-    }
-  }
-
-  static const int minFrameDeltaMs = 10;
-  static const int maxFrameDeltaMs = 250;
-
-  final Map<String, double> _faultSeconds = {};
-  double _goodSeconds = 0.0;
-  int? _lastHoldTickMs;
-
-  double get goodSeconds => _goodSeconds;
-
-  double faultSecondsFor(String key) => _faultSeconds[key] ?? 0.0;
-
-  void reset() {
-    _goodSeconds = 0.0;
-    for (final key in _faultSeconds.keys) {
-      _faultSeconds[key] = 0.0;
-    }
-    _lastHoldTickMs = null;
-  }
-
-  void resetTick() {
-    _lastHoldTickMs = null;
-  }
-
-  void accumulate({
-    required int elapsedMs,
-    required Map<String, bool> faultingByKey,
-    Iterable<String>? goodBlockingKeys,
-  }) {
-    for (final key in faultingByKey.keys) {
-      _faultSeconds.putIfAbsent(key, () => 0.0);
-    }
-
-    final previous = _lastHoldTickMs;
-    _lastHoldTickMs = elapsedMs;
-    if (previous == null) return;
-
-    final dtMs = elapsedMs - previous;
-    if (dtMs < minFrameDeltaMs || dtMs > maxFrameDeltaMs) return;
-
-    final seconds = dtMs / 1000.0;
-    var hasFault = false;
-    final goodBlockingSet = goodBlockingKeys?.toSet();
-    var hasGoodBlockingFault = false;
-    for (final entry in faultingByKey.entries) {
-      if (!entry.value) continue;
-      hasFault = true;
-      if (goodBlockingSet == null || goodBlockingSet.contains(entry.key)) {
-        hasGoodBlockingFault = true;
-      }
-      _faultSeconds[entry.key] = (_faultSeconds[entry.key] ?? 0.0) + seconds;
-    }
-
-    if (!hasFault || !hasGoodBlockingFault) {
-      _goodSeconds += seconds;
-    }
-  }
-}
-
-// ignore: unused_element
-class _PhaseInstructionVoiceCoach implements ExerciseVoiceCoach {
-  static const int _phaseCueMinGapMs = 450;
-
-  String? _lastPhasePhrase;
-  int _lastPhaseCueAtMs = 0;
-  int _lastRepCount = 0;
-  bool _didAnnounceReady = false;
-  bool _didAnnounceSetComplete = false;
-
-  @override
-  void processFrame({
-    required ExerciseBase exercise,
-    required int repCount,
-    required bool hasPose,
-    required Map<String, String> feedback,
-  }) {
-    final nowMs = DateTime.now().millisecondsSinceEpoch;
-    final repIncreased = repCount > _lastRepCount;
-
-    if (exercise.exerciseState == ExerciseState.completed) {
-      if (repIncreased) {
-        exercise.ttsService.clearPendingButKeepCurrent();
-        exercise.ttsService.speak('$repCount');
-      }
-      if (!_didAnnounceSetComplete) {
-        exercise.ttsService.clearPendingButKeepCurrent();
-        exercise.ttsService.speak('Hoàn thành bài tập');
-        _didAnnounceSetComplete = true;
-      }
-      _lastPhasePhrase = null;
-      _lastRepCount = repCount;
-      return;
-    }
-
-    if (exercise.exerciseState != ExerciseState.activated ||
-        exercise.isPaused ||
-        !hasPose) {
-      _lastPhasePhrase = null;
-      _lastRepCount = repCount;
-      return;
-    }
-
-    if (!_didAnnounceReady) {
-      exercise.ttsService.speak('Sẵn sàng');
-      _didAnnounceReady = true;
-    }
-
-    if (repIncreased) {
-      exercise.ttsService.clearPendingButKeepCurrent();
-      exercise.ttsService.speak('$repCount');
-      _lastRepCount = repCount;
-      _lastPhasePhrase = null;
-      return;
-    }
-
-    final phasePhrase = _phasePhraseFor(exercise);
-    if (phasePhrase == null || phasePhrase == _lastPhasePhrase) {
-      _lastRepCount = repCount;
-      return;
-    }
-
-    if (nowMs - _lastPhaseCueAtMs >= _phaseCueMinGapMs) {
-      exercise.ttsService.speak(phasePhrase);
-      _lastPhasePhrase = phasePhrase;
-      _lastPhaseCueAtMs = nowMs;
-    }
-    _lastRepCount = repCount;
-  }
-
-  String? _phasePhraseFor(ExerciseBase exercise) {
-    final phaseInstructions =
-        exercise.resultIssues.instructions[exercise.currentPhaseKey];
-    final status = phaseInstructions?['Status'];
-    final phrase =
-        status == null || status.isEmpty ? exercise.currentPhaseLabel : status;
-    return _normalizePhrase(phrase);
-  }
-
-  String? _normalizePhrase(String phrase) {
-    final value = phrase.trim();
-    if (value.isEmpty) return null;
-
-    if (value.contains('Going Down')) return 'Xuống';
-    if (value.contains('Push Up') || value.contains('Đứng lên')) {
-      return 'Đứng lên';
-    }
-    if (value.contains('Hold') || value.contains('Giữ')) return 'Giữ';
-    if (value.contains('Sẵn sàng')) return 'Sẵn sàng';
-    if (value.contains('Vào tư thế') || value.contains('giữ yên')) return null;
-
-    return value;
-  }
-
-  @override
-  Future<void> waitUntilIdle({
-    Duration timeout = const Duration(seconds: 4),
-  }) {
-    return Future<void>.value();
-  }
-
-  @override
-  void dispose() {
-    _lastPhasePhrase = null;
-  }
 }
 
 class _GenericAssetVoicePlayer {

@@ -134,7 +134,7 @@ The existing UI labels were not renamed, to avoid widening the UI change.
 
 Migration: `supabase/migrations/20260518_recommendation_v44.sql`
 
-Production schema reference: `docs/supabase_schema_reference_v4_4.md`
+Production schema reference: `docs/reference/supabase-schema/supabase_schema_reference_v4_4.md`
 
 Forward policy fix: `supabase/migrations/202605181630_recommendations_log_client_generation_policy.sql`
 

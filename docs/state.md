@@ -6,6 +6,12 @@ owning reference doc. This file is overdue for a hygiene pass (compressed histor
 prune stale/shipped items at the next checkpoint.
 
 ## Now
+**In-flight (2026-07-05):** `PresenceGate` extraction from `ExerciseBase` — SHIPPED. `lib/exercise/presence_gate.dart` (new), `exercise_base.dart` collapsed by ~200 lines, `PosePresenceSource` interface on `PersonDetector`, 22 gate unit tests green. `flutter analyze` clean; 7 pre-existing suite failures unchanged. Pending: device smoke (hold-still 3s, walk out → auto-pause, walk back → auto-resume, tap pause → stays). ScaleFactor spec (docs/reference/scale-factor/scale_factor_calibration_spec.md) still implementation-pending.
+
+**Cleanup pass (2026-07-06):** presence-pipeline review (docs/reference/presence-gate/presence-pipeline-explained.html) actioned — worklist at docs/reference/presence-gate/presence-gate-worklist.md. Done: confirm-duration standardized to 900ms (code + tests aligned, other agent); manualPause guard removed (pause allowed pre-activation, resume always reachable via pause overlay); ANOMALY_DELTA doc drift fixed 0.20→0.15; edge-risk magic numbers promoted to `_FRAME_EDGE_*` consts; debug `personStableMs` wiring dropped; `runDetection` retyped `Object?`→`InputImage?`. New debug-only contract guard in `pose_landmarker_adapter.dart` warns once if native ever omits `presence` (the field the whole presence≠visibility distinction rests on). REJECTED: side-aware `_computeAvgPresence` (Fable-confirmed — it averages `presence` which stays 0.988+ on occluded joints, so no side-view drag; switching to visibility would create misfires + re-baseline the anomaly detector). Rationale → decisions.md 07-06. 22 gate tests green, `dart analyze` clean; not device-tested this pass.
+
+**In-flight (2026-07-06):** Pose-throttle-while-paused (ADR in decisions.md 07-06, Option A): new native `setDetectionInterval` drops pose inference to ~1fps during pause, full rate on resume; segmentation feed and camera untouched. Implemented 07-06 (Opus → iOS native, Sonnet → Dart wiring; Fable cross-checked both halves, analyze clean + 22 gate tests green). Sonnet additions beyond spec: orientation-gate manualPause path also throttles; lifecycle re-init force-resyncs the interval (fresh native session forgets it). Pending: Nam line-review, device smoke + thermal/battery pass across a 2-3min pause, canonical-numbers row on ship.
+
 **Last checkpoint:** July 2, 2026 (Progress tab v2 cinematic redesign + Active exercise v9 two-page
 swipe redesign, both discovered SHIPPED via local codebase check, previously undocumented). Both live
 in the local repo (progress_screen.dart mtime 07-01; active_exercise_page.dart mtime 07-01 23:43) but
@@ -128,7 +134,7 @@ composite 0-105) built + reviewed (05-31); summary restructured reward-only (06-
 two-pillar coach WIRED + frozen (06-02). Per-exercise PB rekeyed off persisted exerciseKey.
 
 **Focus this week:** UI launch-prep, page-by-page. Profile DONE. Progress v2 SHIPPED (device-verify
-pending). Report-builder layer CLOSED (surya flow-aware builder pending, Nam T1/T2 + doctor pain-map
+pending). Report-builder layer CLOSED (surya flow-aware builder pending, Nam owns core + doctor pain-map
 review). Onboarding home level scorer + wall push-up assessment DONE. Squat-reference audit fixes
 SHIPPED. Exercise world-class pass across 7 form-checked exercises. Squat anti-cheat DONE (ROM gate 36,
 direction-based SM, baseline-relative DepthMetric). Push-up full interpreter implemented, thresholds
@@ -154,7 +160,7 @@ PostHog EU. Also TestFlight verification + team install validation.
    Detail + rejected alts -> Decision Log 06-05.
 5. Progress page (Tiến bộ) v2, SHIPPED, not device-verified (confirmed 07-02). Trajectory line +
    milestone rail + ranked insights all wired; gauge direction chip REMOVED (supersedes 06-21 Canonical
-   decision). Nam to: draft period-ranker scoring (T1/T2, Theil-Sen slope, >=3 gate), refine VN copy,
+   decision). Nam to: draft period-ranker scoring (core, Theil-Sen slope, >=3 gate), refine VN copy,
    set MIN_IMPROVEMENT_SLOPE + trajectory "high" cutoff, device-smoke pain feature. Ranked insights
    renders guided-empty until per-exercise builders land (data dependency). Detail -> Progress
    Experience doc.
@@ -235,7 +241,7 @@ vinafit-survey-analysis.docx.
 Tech: Nam (founder/CTO), Anh Doan (voice + exercise specs), 3 exercise devs. 1 tester acting as PT for
 threshold review. Mac teammate runs Codemagic CI / iOS builds. Exercise build + calibrate lane: Kiet (HW
 track: push-up + ~22 camera exercises) + Khanh (yoga track: Sun Salutation chain), dev-led, target 6/19;
-interpreter logic changes route through Nam (T1). Business: Kiet (business/legal lead, DPO), Ha
+interpreter logic changes route through Nam (core). Business: Kiet (business/legal lead, DPO), Ha
 (marketing), +3. Ops: Khanh (PM, ASC Admin + shared Apple ID). Comp: unpaid, plan to pay from PRO
 revenue ~6mo in. Equity deferred.
 

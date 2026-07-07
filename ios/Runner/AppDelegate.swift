@@ -107,6 +107,12 @@ import Flutter
                 self.poseService?.stopDetection()
                 result(nil)
 
+            case "setDetectionInterval":
+                let args = call.arguments as? [String: Any]
+                let minDetectionIntervalMs = (args?["minDetectionIntervalMs"] as? Int) ?? 0
+                self.poseService?.setDetectionInterval(minDetectionIntervalMs)
+                result(nil)
+
             case "setOrientation":
                 let args = call.arguments as? [String: Any]
                 guard let orientation = args?["orientation"] as? String else {

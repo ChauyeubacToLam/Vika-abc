@@ -62,4 +62,17 @@ class PoseLandmarkerChannel {
 
   Future<void> switchCamera() =>
       _methodChannel.invokeMethod<void>('switchCamera');
+
+  /// Throttles (or restores) native pose-landmarker inference cadence.
+  /// `minDetectionIntervalMs` 0 = full rate; >0 = minimum gap between
+  /// processed frames (native drops frames arriving inside that window).
+  /// Redundant/repeated calls are safe — native applies this on its session
+  /// queue. See ADR "Pose inference throttles to ~1fps while paused"
+  /// (docs/decisions.md, 2026-07-06): the exercise gate pauses (auto or
+  /// manual) throttle pose to ~1fps here while segmentation cadence
+  /// (PersonDetectorConfig, a separate channel) is untouched.
+  Future<void> setDetectionInterval(int minDetectionIntervalMs) =>
+      _methodChannel.invokeMethod<void>('setDetectionInterval', <String, dynamic>{
+        'minDetectionIntervalMs': minDetectionIntervalMs,
+      });
 }

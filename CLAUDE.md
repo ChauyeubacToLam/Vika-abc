@@ -39,22 +39,19 @@ differently, flag dead code don't delete it unless asked.
 - Light (specific screen/widget, debug, defined task): one-line restate, go.
 - Direct (quick fact, error explanation, small fix): just answer.
 
-## Delegation (T1-T4, set by whose muscle the work builds)
-- T1 = mine solo. Core algorithms, scoring math, CV/state-machine logic, anti-cheat gates. You review
-  and stress-test, never write the paste-ready core body. (native/platform plumbing is the exception.)
-- T2 = I draft, you pressure-test. I bring transitions/thresholds/structure; you attack edge cases,
-  tradeoffs, keep-vs-cut, test shape. Guide actively, just withhold the finished core.
-- T3 = you draft. UI/Flutter, locked patterns, mechanical transcription of a formula I already
-  authored against a known-good in-repo reference. Line-by-line recheck is mandatory.
-- T4 = you execute. Docs, glue, research, non-core plumbing.
-Debug first pass: I bring a written hypothesis; you sharpen my understanding, not hand the fix.
-Urgency override: explicit "ship it", you write it, annotate the concept, note the learning debt.
-
-Example:
-Me: "Just write the rep-counting state machine for Cobra, I'll plug it in."
-You: "That's T1, the state machine is the CS muscle. Send me your transition logic (directions +
-thresholds) and I'll stress-test it. Time-boxed? Say 'ship it' and I'll write it with annotations +
-a logged learning debt."
+## Delegation (you write code, I review every line)
+You write all code, including the core: algorithms, scoring math, CV/state-machine logic, anti-cheat
+gates. My job is to read every line you produce, actually understand it, and fix what's wrong. I own
+correctness, you own the draft. No more withholding core bodies.
+Write for review, not just for green tests. Two intensities:
+- Core (algorithms, scoring, CV, state machines, anti-cheat): annotate the concept and the why
+  inline, flag the assumptions and the lines most likely wrong, say what to stress-test. This is what
+  I read hardest, so make every line legible.
+- Glue, UI/Flutter, docs, plumbing: match existing patterns, light annotation, flag only what's worth
+  a second look.
+"ship it" = skip the teaching annotations, working code now, I'll review it later; flag it as review debt.
+Still surface 2+ interpretations, tradeoffs, and simpler paths before committing to one, same as always.
+Debug: I diagnose and write the fix, you review it like any other code.
 
 ## Grounding (before you answer)
 Any Vika-specific question about architecture, a number, status, a screen, an algorithm, or a shipped
@@ -117,7 +114,7 @@ Vietnamese-market considerations) before any code. File it in docs/decisions.md.
 
 ## Deliverables
 - UI/Flutter: follow the Premium Ivory design system (Part 2).
-- Core logic (T1/T2): no scaffolding, signatures, or paste-ready bodies. Urgency override only.
+- Core logic: full working implementation, heavily annotated so I can review every line.
 - Research: structured .docx, citations, confidence levels, explicit detection limits.
 - Docs: structured headers, tables for thresholds, prose for explanation.
 

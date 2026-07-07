@@ -6,10 +6,10 @@ Purpose: Replace every remaining mock/hardcoded UI surface with real Supabase-ba
 
 This spec builds on:
 
-- `docs/ui-hardcoded-logic-report.md`
-- `docs/supabase_schema_reference_v4_4.md`
-- `docs/recommendation_engine_v4_4_report.md`
-- `docs/PREMIUM_IVORY_WIRING.md`
+- `docs/archive/ui-hardcoded-logic-report.md`
+- `docs/reference/supabase-schema/supabase_schema_reference_v4_4.md`
+- `docs/reference/recommendation-engine/recommendation_engine_v4_4_report.md`
+- `docs/reference/ui/PREMIUM_IVORY_WIRING.md`
 - Existing services in `lib/services/session_persistence.dart`, `lib/services/recommendation/*`, `lib/services/onboarding_persistence.dart`, and `lib/services/issues_service.dart`
 
 ## Executive Summary
@@ -42,7 +42,7 @@ Widgets should stay almost boring. The intelligence belongs in services, mappers
 
 ### Supabase Tables Already Documented
 
-From `docs/supabase_schema_reference_v4_4.md`:
+From `docs/reference/supabase-schema/supabase_schema_reference_v4_4.md`:
 
 - `recommendations_log`
   - Active plan = latest row for user where `plan_completed_at IS NULL`, ordered by `generated_at`.

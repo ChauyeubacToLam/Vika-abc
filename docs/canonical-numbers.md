@@ -38,7 +38,7 @@ Last reviewed: July 2, 2026.
 | Level boundaries | 1.7 / 2.3, RETIRED for home (06-15) | Old home composite boundaries. Home now duration-banded. Yoga uses >=0.75 / >=0.55 on its own 0-1.2 scale. |
 | Squat depth weight | 40% | Heaviest feature |
 | Training history weight | 25% | Self-report unreliable |
-| ExerciseBase.MIN_PRESENCE | 0.7 | Per-landmark presence >= 0.7. Presence = probability landmark exists; stays 0.99+ for legitimately occluded landmarks (back leg in side-view squats). Replaces old MIN_CONFIDENCE post-filter. Confirmed 05-06 PM (empty room 14.7s zero hallucinations + side-view squat presence 0.988+). |
+| ExerciseBase.MIN_PRESENCE | 0.7 | Per-landmark presence >= 0.7. Presence = probability landmark exists; stays 0.99+ for legitimately occluded landmarks (back leg in side-view squats). Replaces old MIN_CONFIDENCE post-filter. Confirmed 05-06 PM (empty room 14.7s zero hallucinations + side-view squat presence 0.988+). Channel contract: presence must arrive from native (pose_landmarker_adapter.dart); the adapter's fallback to visibility silently conflates the two if native ever omits it — debug-guarded 2026-07-06 (see decisions.md). |
 | ExerciseBase.MIN_VISIBILITY | 0.3 | Per-landmark visibility >= 0.3. Visibility = probability landmark unoccluded given it exists. Noisy (0.34-0.95 on back leg), kept permissive, only rejects fully extrapolated landmarks. ML Kit fallback duplicates likelihood into both fields. |
 | ExerciseBase.kDiagnosticMode | false (default) | True ONLY for diagnostic collection. Bypasses auto-pause + pose backpressure. NEVER ship true. |
 | PersonDetectorConfig.MIN_PERSON_RATIO (entry) | 0.03 (was 0.5 pre-2a) | Native aggregate ratios distribute lower than old Flutter ML Kit JPEG path. |
@@ -49,10 +49,11 @@ Last reviewed: July 2, 2026.
 | PersonDetectorConfig.SOFT_RATIO_SCORE_WEIGHT | 0.45 | Soft mask fallback weight in score blend |
 | PersonDetectorConfig.SEARCH_PROCESS_INTERVAL | 2000ms | Native segmentation cadence pre-activation |
 | PersonDetectorConfig.ACTIVATED_PROCESS_INTERVAL | 8000ms | Cadence post-activation; pose triggers one-shot samples via triggerCheck |
+| PersonDetectorConfig.PAUSED_PROCESS_INTERVAL | 1000ms | Cadence while auto-paused (person walked away). Periodic 1s poll re-confirms return ~5x cheaper than the removed per-frame poke (which hit the 200ms cooldown = 5 samples/s); resume ~1.3s. Manual pause stays on the 8s baseline (presence can't clear it). |
 | PersonDetectorConfig.REQUEST_SAMPLE_COOLDOWN | 200ms | triggerCheck self-rate-limit |
 | HYBRID trigger: pose_low_presence | 0.35 (avg presence absolute, tune from beta) | Fires recheck when frame-level avg presence drops below. Was 0.55 (over-aggressive on push-up close framing). |
 | HYBRID trigger: pose_frame_edge | marginX/Y = 4% of image; fires on 2+ landmarks outside OR 5+ at edge (visibleCount >= 8 floor) | Detects landmarks drifting to frame boundary |
-| PresenceAnomalyDetector | LONG_WINDOW=60 frames (~2s), SHORT_WINDOW=10 frames (~0.3s), ANOMALY_DELTA=0.20, CONFIRM_FRAMES=3 | Dual-window anomaly on avg presence, self-calibrating per exercise. Verify exact values against impl. |
+| PresenceAnomalyDetector | LONG_WINDOW=60 frames (~2s), SHORT_WINDOW=10 frames (~0.3s), ANOMALY_DELTA=0.15, CONFIRM_FRAMES=3 | Dual-window anomaly on avg presence, self-calibrating per exercise. Confirmed against impl (presence_anomaly_detector.dart defaults). |
 | Production flip checklist (before any release commit) | kDiagnosticMode=false AND SEGMENT_REQUEST_FILE_LOG_ENABLED=false | Both bypass/heavy-IO; must be off in prod. |
 | Visibility populates on iOS native | Yes, occlusion estimate (0.34-1.00 typical) | Empirical 05-06 PM. Drops to ~0.5 on occluded back-leg. Wrong knob for existence filtering. |
 | Presence populates on iOS native | Yes, existence estimate (0.988+ tracked, drops fast when missing) | Empirical 05-06 PM. Right signal for HYBRID trigger + post-filter. |

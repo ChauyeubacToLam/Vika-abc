@@ -23,9 +23,19 @@ Fresh-MacBook runbook: toolchain (FVM/Flutter, Xcode, pods), clone, gitignored s
 the per-machine Claude Code agent-memory symlink. Plain markdown so it reads on a bare machine.
 
 ## reference/
-Durable system-design docs, kept next to the code they describe. Current set: Supabase schema, push-up
-anti-cheat (also the first exercise-build skill exemplar), recommendation engine, ui-real-logic spec,
-Premium Ivory wiring. Some are UNVERIFIED, confirm against code before trusting.
+Durable system-design docs, one folder per topic. Each folder holds that topic's markdown spec/report
+and its lavish HTML explainer together (a spec and its walkthrough live side by side, not dumped flat).
+Current folders: `agent-memory/`, `exercise-base/`, `presence-gate/` (spec + pipeline walkthrough),
+`push-up/` (anti-cheat; also the first exercise-build skill exemplar), `recommendation-engine/`,
+`scale-factor/`, `supabase-schema/`, `ui/` (Premium Ivory wiring + ui-real-logic spec). A new reference
+doc goes in the matching topic folder — create one if none fits. Some are UNVERIFIED, confirm against
+code before trusting.
+
+**Scope — core/archetype references only, not every leaf feature.** Document the mechanics that
+generalize, not one doc per instance. For exercises that means the *archetypes* — how a rep-based
+exercise works, how a hold-based exercise works — NOT a reference doc for each individual exercise
+(squat, glute bridge, …); those are leaves of an archetype already covered. Same test for any topic:
+if a doc only re-describes one leaf of a pattern already documented here, it doesn't earn a folder.
 
 ## archive/
 Superseded material kept for provenance, not active truth: old agent task reports, and the original
