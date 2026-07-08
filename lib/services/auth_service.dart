@@ -23,32 +23,166 @@ class AuthService {
 
   final SupabaseClient _supabase;
 
-  static const String _magicLinkRedirectUrl =
-      'com.vikavn.app://login-callback';
+  // Deep link the auth emails redirect back into. Used by the email-confirmation
+  // (sign-up) and password-reset flows below — and by the inactive magic-link
+  // flow when it's restored.
+  static const String _emailRedirectUrl = 'com.vikavn.app://login-callback';
 
   User? get currentUser => _supabase.auth.currentUser;
   Stream<AuthState> get onAuthStateChange => _supabase.auth.onAuthStateChange;
 
-  Future<void> signInWithMagicLink(String email) async {
+  // ── Magic-link sign-in (INACTIVE) ──────────────────────────────────────────
+  // Temporarily disabled in favour of email + password (below). Kept, not
+  // deleted: to restore, un-comment this method and re-wire the callers in
+  // login_screen.dart / s13_signup.dart. The `_emailRedirectUrl` callback is
+  // already registered, so no extra setup is needed.
+  //
+  // Future<void> signInWithMagicLink(String email) async {
+  //   try {
+  //     await _clearInteractiveAuthState();
+  //
+  //     await _supabase.auth.signInWithOtp(
+  //       email: email,
+  //       emailRedirectTo: _emailRedirectUrl,
+  //     );
+  //   } on AuthException catch (error) {
+  //     throw Exception(
+  //       _translateAuthException(
+  //         error,
+  //         fallback: 'Không thể gửi link đăng nhập lúc này. Vui lòng thử lại.',
+  //       ),
+  //     );
+  //   } catch (error) {
+  //     throw Exception(
+  //       _translateGenericException(
+  //         error,
+  //         fallback: 'Không thể gửi link đăng nhập lúc này. Vui lòng thử lại.',
+  //       ),
+  //     );
+  //   }
+  // }
+
+  Future<AuthResponse> signInWithEmailPassword({
+    required String email,
+    required String password,
+  }) async {
     try {
       await _clearInteractiveAuthState();
 
-      await _supabase.auth.signInWithOtp(
-        email: email,
-        emailRedirectTo: _magicLinkRedirectUrl,
+      return await _supabase.auth.signInWithPassword(
+        email: email.trim(),
+        password: password,
       );
     } on AuthException catch (error) {
       throw Exception(
         _translateAuthException(
           error,
-          fallback: 'Không thể gửi link đăng nhập lúc này. Vui lòng thử lại.',
+          fallback: 'Không thể đăng nhập lúc này. Vui lòng thử lại.',
         ),
       );
     } catch (error) {
       throw Exception(
         _translateGenericException(
           error,
-          fallback: 'Không thể gửi link đăng nhập lúc này. Vui lòng thử lại.',
+          fallback: 'Không thể đăng nhập lúc này. Vui lòng thử lại.',
+        ),
+      );
+    }
+  }
+
+  /// Creates an email + password account.
+  ///
+  /// With email confirmation ON in Supabase, [AuthResponse.session] comes back
+  /// null and a confirmation link is emailed to [email]; the session then
+  /// arrives on [onAuthStateChange] once the user taps that link (deep-linked
+  /// back via [_emailRedirectUrl]). Callers should branch on `session == null`
+  /// to show a "check your email" state.
+  Future<AuthResponse> signUpWithEmailPassword({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      await _clearInteractiveAuthState();
+
+      final response = await _supabase.auth.signUp(
+        email: email.trim(),
+        password: password,
+        emailRedirectTo: _emailRedirectUrl,
+      );
+
+      // Supabase returns a user with an EMPTY identities list when the email is
+      // already registered (it won't leak that the account exists). Turn that
+      // into a friendly "please sign in" instead of a silent no-op.
+      final identities = response.user?.identities;
+      if (identities != null && identities.isEmpty) {
+        throw Exception(
+          'Email này đã được đăng ký. Hãy đăng nhập bằng mật khẩu của bạn.',
+        );
+      }
+
+      return response;
+    } on AuthException catch (error) {
+      throw Exception(
+        _translateAuthException(
+          error,
+          fallback: 'Không thể tạo tài khoản lúc này. Vui lòng thử lại.',
+        ),
+      );
+    } catch (error) {
+      throw Exception(
+        _translateGenericException(
+          error,
+          fallback: 'Không thể tạo tài khoản lúc này. Vui lòng thử lại.',
+        ),
+      );
+    }
+  }
+
+  Future<void> sendPasswordReset(String email) async {
+    try {
+      await _supabase.auth.resetPasswordForEmail(
+        email.trim(),
+        redirectTo: _emailRedirectUrl,
+      );
+    } on AuthException catch (error) {
+      throw Exception(
+        _translateAuthException(
+          error,
+          fallback: 'Không thể gửi email đặt lại mật khẩu. Vui lòng thử lại.',
+        ),
+      );
+    } catch (error) {
+      throw Exception(
+        _translateGenericException(
+          error,
+          fallback: 'Không thể gửi email đặt lại mật khẩu. Vui lòng thử lại.',
+        ),
+      );
+    }
+  }
+
+  /// Sets (or changes) the signed-in user's password. Works for an account
+  /// created via an OAuth provider (Google/Apple) that has no password yet — it
+  /// adds one to the SAME account, after which email + password signs into that
+  /// same account. Requires a live session: the user is signed in, or is in a
+  /// password-recovery session opened from a reset link.
+  Future<UserResponse> setPassword(String newPassword) async {
+    try {
+      return await _supabase.auth.updateUser(
+        UserAttributes(password: newPassword),
+      );
+    } on AuthException catch (error) {
+      throw Exception(
+        _translateAuthException(
+          error,
+          fallback: 'Không thể đặt mật khẩu lúc này. Vui lòng thử lại.',
+        ),
+      );
+    } catch (error) {
+      throw Exception(
+        _translateGenericException(
+          error,
+          fallback: 'Không thể đặt mật khẩu lúc này. Vui lòng thử lại.',
         ),
       );
     }
@@ -334,6 +468,41 @@ class AuthService {
 
     if (message.contains('network') || message.contains('socket')) {
       return 'Không thể kết nối mạng. Vui lòng kiểm tra kết nối rồi thử lại.';
+    }
+
+    if (message.contains('invalid login credentials') ||
+        message.contains('invalid_credentials')) {
+      return 'Email hoặc mật khẩu không đúng.';
+    }
+
+    if (message.contains('email not confirmed') ||
+        message.contains('email_not_confirmed')) {
+      return 'Email chưa được xác nhận. Hãy mở email và nhấn liên kết kích hoạt.';
+    }
+
+    if (message.contains('already registered') ||
+        message.contains('already been registered') ||
+        (message.contains('user') && message.contains('already'))) {
+      return 'Email này đã được đăng ký. Hãy đăng nhập.';
+    }
+
+    if (message.contains('different from the old') ||
+        message.contains('should be different')) {
+      return 'Mật khẩu mới phải khác mật khẩu hiện tại.';
+    }
+
+    if (message.contains('reauthentication')) {
+      return 'Vì lý do bảo mật, hãy đăng nhập lại trước khi đổi mật khẩu.';
+    }
+
+    if (message.contains('password') &&
+        (message.contains('at least') ||
+            message.contains('weak') ||
+            message.contains('length') ||
+            message.contains('char') ||
+            (message.contains('should be') &&
+                !message.contains('different')))) {
+      return 'Mật khẩu chưa đủ mạnh. Hãy dùng tối thiểu 8 ký tự.';
     }
 
     if (message.contains('email') && message.contains('invalid')) {
