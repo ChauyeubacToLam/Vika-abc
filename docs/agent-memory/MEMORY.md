@@ -7,3 +7,5 @@ Routing + conventions: see CLAUDE.md § "Agent memory".
 - [Learning docs use lavish HTML](learning-docs-use-lavish-html.md) — plans / reports / codebase walkthroughs go to lavish HTML (verbatim code + ELI5 + suggestions), not MD
 - [Lavish review workflow](lavish-review-workflow.md) — launch session+chat+notepad cleanly first try; notes-server on :4599; the FAB-outside-body corruption gotcha
 - [Reveal diff after edits](reveal-diff-after-edits.md) — after every editing turn, hand Nam a clean isolated diff + a "Changes this turn" changelog; raw git diff is contaminated by prior WIP
+- [Research runs use Sonnet](research-runs-use-sonnet.md) — web research = one capped background Sonnet agent, never the deep-research workflow / Fable fan-outs
+- [Humanlike cadence is stochastic](humanlike-cadence-is-stochastic.md) — no fixed-interval cooldowns for user-facing behavior; probability + hunger shaping, deterministic only for causality/structure/safety

@@ -14,6 +14,49 @@ Alternatives considered: <what we rejected and why>
 
 ---
 
+## 2026-07-07 · Voice coach: one policy module, stochastic PT cadence, personality scalar
+Status: active (behavior spec approved by Nam 07-07; implementation pending — spec at
+docs/reference/voice-coach/voice-behavior-spec.md, research at voice-research-rules.md same folder)
+Decision: All exercise voice goes through one policy module with a single entry point —
+say(type, content, context) — plus per-exercise voice DATA only (script: intro keys, fault-id→cue
+map, praise pool; evolved from scriptsByExerciseName, keyed by slug not display name). The module
+owns whether/when/how a cue plays via one policy table keyed by CueType (safety, instruction,
+count, noCount, praise, correction, hustle). Cadence is stochastic: optional cues fire on per-event
+probability draws with hunger shaping (base chance + bonus per silent eligible rep + relief-valve
+backstop), never fixed counters. Effective chance = (base + hunger) × personality — a tunable
+coach-chattiness scalar (0.5–1.5, v1 ships 1.0) that also scales hunger accrual, clamps at caps,
+composes with the provisional skill-fade multipliers, and never touches hard rules or relief valves
+(safety always; setup/complete once; rep-1 + final-2 count anchors, never skip two counts,
+non-verbal tick on skipped counts; first occurrence of a fault-id always cued; never praise
+consecutive reps; one outcome cue per rep, correction > praise > hustle; hustle ≤1/set; no-count
+always informs, switching to help after 2 consecutive). ExerciseBase emits the events (rep counted
+with faults, state change, phase change, safety); the 8 dedicated coach classes + inline BirdDog
+coach + orphaned LegRaise coach + per-exercise player wrappers + the unused ExerciseBase.ttsService
+field get deleted; ViettelTTSService survives only as the TTS fallback inside content resolution
+(surya's dynamic lines). Migration order: generic coach first (~35 exercises), then squat + the 6
+dedicated coaches, then surya.
+Why: voice logic was 11 coach classes across 4 patterns, 2 playback engines, throttle constants
+scattered per coach (250/350/2500 ms), no event model (per-frame state diffing), squat
+string-sniffing Vietnamese status text. Verified research (voice-research-rules.md): real coaches
+default to silence (silent monitoring ~22% of behavior, their most common act), praise
+intermittently (variable-ratio, ~30-50% of clean reps), correct only on bandwidth crossings, and
+concentrate dense feedback post-set; every-rep feedback was the worst schedule for retention. Fixed
+cooldowns are learnable rhythms = robotic (Nam 07-07: "nothing in real life is predictive as
+cooldown every 3 reps"); hunger-shaped draws give an average cadence with no pattern. The
+personality scalar keeps reference numbers fixed in the spec while making chattiness tunable per
+persona/user later. VN-market: warm encouraging tone, corrections say what TO do, and thinned
+counting keeps trust via anchors + tick (users mid-set can't see the screen; the count proves the
+CV counter registered).
+Alternatives considered: (a) central policy layer but keep the 11 coaches routing through it —
+ships randomness fastest, keeps per-exercise setup + string-sniffing, rejected; (b) push structured
+fault-ids up from metrics for mid-rep bandwidth cueing — conflicts with the post-rep-coaching
+guardrail (real-time = safety only) and stays deferred, same deferral as the presence-gate entry.
+Supersedes: canonical-numbers.md "Coaching & Adaptation" rows "Cooldowns: corrective 3 reps /
+positive 1 rep" and "Voice priority queue: 5 layers" — aspirational values that never existed in
+code; both rows now point at the behavior spec.
+
+---
+
 ## 2026-07-06 · docs/reference/ organized into per-topic folders
 Status: active (supersedes the flat "build the lavish HTML at docs/reference/<name>.html next to its
 .md" convention recorded in the learning-docs-use-lavish-html memory note, 2026-07-05)

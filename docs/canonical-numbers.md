@@ -99,8 +99,7 @@ with a pixel floor for close framings.
 | Coach text trend window | 3-5 sets, ups vs downs |
 | Praise ladder | 6 tiers (see Report Builder doc) |
 | Comparison ladder | 13 tiers, banner never empty |
-| Cooldowns | corrective 3 reps, positive 1 rep |
-| Voice priority queue | 5 layers |
+| Voice cue cadence / cooldowns / priority | Stochastic, no fixed values — see docs/reference/voice-coach/voice-behavior-spec.md (ADD 2026-07-07; supersedes the never-shipped "corrective 3 reps / positive 1 rep" + "5-layer queue") |
 
 ## Active Exercise Screen v8 (May 1, 2026)
 Note (05-30): the live form-score ARC was removed (replaced by positive-additive ambient feedback). The
