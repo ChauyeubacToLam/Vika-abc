@@ -19,8 +19,10 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   late final TextEditingController _emailController;
+  late final TextEditingController _passwordController;
   late final AuthService _authService;
   bool _busy = false;
+  bool _isSignUp = false;
   String? _notice;
 
   bool get _validEmail {
@@ -28,19 +30,30 @@ class _LoginScreenState extends State<LoginScreen> {
     return email.contains('@') && email.contains('.');
   }
 
+  // Sign-in accepts any non-empty password (the server is the source of truth);
+  // sign-up mirrors Supabase's minimum so we fail fast before a round-trip.
+  bool get _validPassword {
+    final length = _passwordController.text.length;
+    return _isSignUp ? length >= 8 : length >= 1;
+  }
+
+  bool get _canSubmit => _validEmail && _validPassword && !_busy;
+
   @override
   void initState() {
     super.initState();
     _emailController = TextEditingController();
+    _passwordController = TextEditingController();
     _authService = AuthService();
-    _emailController.addListener(_handleEmailChanged);
+    _emailController.addListener(_handleFieldChanged);
+    _passwordController.addListener(_handleFieldChanged);
   }
 
-  // The CTA's enabled state listens to the controller directly (see the
+  // The CTA's enabled state listens to the controllers directly (see the
   // AnimatedBuilder in build), so typing must NOT setState the whole screen.
   // The only screen-level state a keystroke can touch is dismissing a stale
   // notice — and only when one is actually showing.
-  void _handleEmailChanged() {
+  void _handleFieldChanged() {
     if (_notice != null) {
       setState(() => _notice = null);
     }
@@ -49,6 +62,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void dispose() {
     _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -122,24 +136,77 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
-  Future<void> _sendMagicLink() async {
-    if (!_validEmail || _busy) return;
+  Future<void> _submit() async {
+    if (!_canSubmit) return;
     final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    final signUp = _isSignUp;
     setState(() {
       _busy = true;
       _notice = null;
     });
     try {
-      await _authService.signInWithMagicLink(email);
-      if (!mounted) return;
-      await Navigator.of(context).pushNamed(
-        '/magic-link-sent',
-        arguments: email,
-      );
+      if (signUp) {
+        final response = await _authService.signUpWithEmailPassword(
+          email: email,
+          password: password,
+        );
+        if (!mounted) return;
+        if (response.session == null) {
+          // Email confirmation is on: no session yet. Point the user at their
+          // inbox and drop them onto the sign-in tab for when they return.
+          setState(() {
+            _isSignUp = false;
+            _notice =
+                'Đã gửi email xác nhận đến $email. Mở email, nhấn liên kết kích hoạt rồi đăng nhập.';
+          });
+        } else {
+          setState(() => _notice = 'Tạo tài khoản thành công.');
+        }
+      } else {
+        await _authService.signInWithEmailPassword(
+          email: email,
+          password: password,
+        );
+        // On success the app entry gate reacts to the auth stream and routes
+        // away; this notice is only a brief fallback.
+        if (mounted) setState(() => _notice = 'Đăng nhập thành công.');
+      }
     } catch (error) {
       _showError(_friendlyError(
         error,
-        fallback: 'Không gửi được link. Vui lòng thử lại.',
+        fallback: signUp
+            ? 'Không tạo được tài khoản. Vui lòng thử lại.'
+            : 'Đăng nhập không thành công. Vui lòng thử lại.',
+      ));
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
+  Future<void> _forgotPassword() async {
+    if (_busy) return;
+    final email = _emailController.text.trim();
+    if (!_validEmail) {
+      _showError('Nhập email của bạn trước khi đặt lại mật khẩu.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _notice = null;
+    });
+    try {
+      await _authService.sendPasswordReset(email);
+      if (mounted) {
+        setState(() =>
+            _notice = 'Đã gửi email đặt lại mật khẩu đến $email.');
+      }
+    } catch (error) {
+      _showError(_friendlyError(
+        error,
+        fallback: 'Không gửi được email đặt lại mật khẩu. Vui lòng thử lại.',
       ));
     } finally {
       if (mounted) {
@@ -198,12 +265,14 @@ class _LoginScreenState extends State<LoginScreen> {
       // Pinned send button. Only this rebuilds as you type — it listens to the
       // controller, so keystrokes never touch the rest of the screen.
       footer: AnimatedBuilder(
-        animation: _emailController,
-        builder: (context, _) => _MagicLinkCta(
-          label: _busy ? 'Đang xử lý…' : 'Gửi link đăng nhập',
-          disabledLabel: 'Nhập email để nhận link',
-          enabled: _validEmail && !_busy,
-          onTap: _sendMagicLink,
+        animation: Listenable.merge([_emailController, _passwordController]),
+        builder: (context, _) => _AuthSubmitCta(
+          label: _isSignUp
+              ? (_busy ? 'Đang tạo…' : 'Tạo tài khoản')
+              : (_busy ? 'Đang xử lý…' : 'Đăng nhập'),
+          disabledLabel: 'Nhập email và mật khẩu',
+          enabled: _canSubmit,
+          onTap: _submit,
         ),
       ),
       child: Center(
@@ -216,8 +285,8 @@ class _LoginScreenState extends State<LoginScreen> {
               _LoginTopBar(onBack: _handleBack),
               SizedBox(height: r.pick(cozy: V5.space28, short: V5.space16)),
               V5ScreenHeader(
-                eyebrow: 'Đăng nhập',
-                title: 'Chào mừng\ntrở lại.',
+                eyebrow: _isSignUp ? 'Tạo tài khoản' : 'Đăng nhập',
+                title: _isSignUp ? 'Bắt đầu\nvới Vika.' : 'Chào mừng\ntrở lại.',
                 size: compact ? V5HeaderSize.medium : V5HeaderSize.large,
               ),
               SizedBox(height: r.pick(cozy: V5.space20, short: V5.space14)),
@@ -249,7 +318,22 @@ class _LoginScreenState extends State<LoginScreen> {
               const _OrDivider(),
               SizedBox(height: r.pick(cozy: V5.space16, short: V5.space12)),
               V5FadeIn(
-                delay: const Duration(milliseconds: 300),
+                delay: const Duration(milliseconds: 280),
+                slideY: 8,
+                child: AuthModeToggle(
+                  mode: _isSignUp ? AuthMode.signUp : AuthMode.signIn,
+                  enabled: !_busy,
+                  onChanged: (mode) {
+                    setState(() {
+                      _isSignUp = mode == AuthMode.signUp;
+                      _notice = null;
+                    });
+                  },
+                ),
+              ),
+              SizedBox(height: r.pick(cozy: V5.space12, short: V5.space10)),
+              V5FadeIn(
+                delay: const Duration(milliseconds: 320),
                 slideY: 8,
                 child: AuthEmailField(
                   controller: _emailController,
@@ -258,6 +342,34 @@ class _LoginScreenState extends State<LoginScreen> {
                   onChanged: (_) {},
                 ),
               ),
+              const SizedBox(height: V5.space10),
+              V5FadeIn(
+                delay: const Duration(milliseconds: 360),
+                slideY: 8,
+                child: AuthPasswordField(
+                  controller: _passwordController,
+                  onChanged: (_) {},
+                  onSubmitted: (_) {
+                    if (_canSubmit) _submit();
+                  },
+                  hintText:
+                      _isSignUp ? 'Tối thiểu 8 ký tự' : 'Mật khẩu của bạn',
+                ),
+              ),
+              if (!_isSignUp) ...[
+                const SizedBox(height: V5.space8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _busy ? null : _forgotPassword,
+                    child: Text(
+                      'Quên mật khẩu?',
+                      style: V5.bodySm(context, color: V5.yellowDeep),
+                    ),
+                  ),
+                ),
+              ],
               if (_notice != null) ...[
                 const SizedBox(height: V5.space10),
                 Text(
@@ -356,8 +468,8 @@ class _OrDivider extends StatelessWidget {
 /// Inline send button — visually identical to [V5PillCTA] but laid out in a
 /// Column (not Positioned), so it can pin to the bottom of the keyboard-aware
 /// layout. Ink pill with a yellow arrow disc; disabled = outlined ghost.
-class _MagicLinkCta extends StatefulWidget {
-  const _MagicLinkCta({
+class _AuthSubmitCta extends StatefulWidget {
+  const _AuthSubmitCta({
     required this.label,
     required this.disabledLabel,
     required this.enabled,
@@ -370,10 +482,10 @@ class _MagicLinkCta extends StatefulWidget {
   final VoidCallback onTap;
 
   @override
-  State<_MagicLinkCta> createState() => _MagicLinkCtaState();
+  State<_AuthSubmitCta> createState() => _AuthSubmitCtaState();
 }
 
-class _MagicLinkCtaState extends State<_MagicLinkCta> {
+class _AuthSubmitCtaState extends State<_AuthSubmitCta> {
   bool _pressed = false;
 
   @override

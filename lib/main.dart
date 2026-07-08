@@ -21,6 +21,7 @@ import 'debug/debug_types.dart';
 import 'exercise/exercise_base.dart';
 import 'models/exercise_definition.dart';
 import 'screens/auth/login_screen.dart';
+import 'screens/auth/reset_password_screen.dart';
 import 'screens/auth/magic_link_sent_screen.dart';
 import 'screens/exercise/exercise_launch_args.dart';
 import 'screens/exercise/exercise_experience_screen.dart';
@@ -417,7 +418,7 @@ Future<bool> isOnboardingComplete() async {
    UI REP LOG — For debug panel display only. Not the data pipeline.
    ========================================================================= */
 
-enum _AppEntryState { onboarding, login, home, loading }
+enum _AppEntryState { onboarding, login, resetPassword, home, loading }
 
 class UIRepLog {
   final int repNumber;
@@ -740,9 +741,14 @@ class _AppEntryGateState extends State<AppEntryGate> {
     }
 
     switch (data.event.name) {
+      case 'passwordRecovery':
+        // Opened from a password-reset email link. The SDK has a temporary
+        // recovery session now, but the user hasn't chosen a password yet —
+        // route to the reset screen instead of falling through to home.
+        _setEntryState(_AppEntryState.resetPassword);
+        break;
       case 'signedIn':
       case 'initialSession':
-      case 'passwordRecovery':
       case 'userUpdated':
       case 'mfaChallengeVerified':
         // Return-user login / app-startup resolution. (Mid-onboarding
@@ -820,6 +826,12 @@ class _AppEntryGateState extends State<AppEntryGate> {
       case _AppEntryState.login:
         return LoginScreen(
           onBack: () => _setEntryState(_AppEntryState.onboarding),
+        );
+      case _AppEntryState.resetPassword:
+        return ResetPasswordScreen(
+          // Password saved: the recovery session is now a full one. Resolve the
+          // entry state to route on into the app.
+          onCompleted: _quietResolveEntryState,
         );
       case _AppEntryState.home:
         return const MainShell();

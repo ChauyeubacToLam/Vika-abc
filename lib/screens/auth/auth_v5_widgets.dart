@@ -246,40 +246,9 @@ class _AuthEmailFieldState extends State<AuthEmailField> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Text(
-                'EMAIL',
-                style: V5.eyebrow(context, color: V5.inkFaint),
-              ),
-              const Spacer(),
-              if (!dense)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: V5.yellowSoft,
-                    borderRadius: BorderRadius.circular(V5.radiusFull),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.mail_outline_rounded,
-                        size: 11,
-                        color: V5.yellowDeep,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'LINK ĐĂNG NHẬP',
-                        style: V5
-                            .eyebrow(context, color: V5.yellowDeep)
-                            .copyWith(letterSpacing: 1.0),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
+          Text(
+            'EMAIL',
+            style: V5.eyebrow(context, color: V5.inkFaint),
           ),
           const SizedBox(height: 6),
           // Focus on touch-down (via a non-arena Listener, so it doesn't
@@ -317,6 +286,194 @@ class _AuthEmailFieldState extends State<AuthEmailField> {
                 ),
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Which email flow the sign-in surfaces are showing: log into an existing
+/// account, or create a new one. Shared by the standalone [LoginScreen] and the
+/// onboarding S13 sign-in so both read identically.
+enum AuthMode { signIn, signUp }
+
+/// Segmented pill toggling [AuthMode]. Active segment = ink fill + cream label.
+class AuthModeToggle extends StatelessWidget {
+  const AuthModeToggle({
+    super.key,
+    required this.mode,
+    required this.onChanged,
+    this.enabled = true,
+  });
+
+  final AuthMode mode;
+  final ValueChanged<AuthMode> onChanged;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: V5.surface,
+        borderRadius: BorderRadius.circular(V5.radiusFull),
+        border: Border.all(color: V5.border),
+        boxShadow: V5.elevation1,
+      ),
+      child: Row(
+        children: [
+          _segment(context, 'Đăng nhập', AuthMode.signIn),
+          _segment(context, 'Tạo tài khoản', AuthMode.signUp),
+        ],
+      ),
+    );
+  }
+
+  Widget _segment(BuildContext context, String label, AuthMode value) {
+    final active = mode == value;
+    return Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: enabled && !active ? () => onChanged(value) : null,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: V5.curveSharp,
+          height: 38,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: active ? V5.ink : Colors.transparent,
+            borderRadius: BorderRadius.circular(V5.radiusFull),
+          ),
+          child: Text(
+            label,
+            style: V5.text(
+              context,
+              size: 13,
+              weight: FontWeight.w700,
+              color: active ? V5.invInk : V5.inkSoft,
+              letterSpacing: 0,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Obscured password input matching [AuthEmailField]'s framed style, with an
+/// inline show/hide toggle. Shared by the standalone login and onboarding S13.
+class AuthPasswordField extends StatefulWidget {
+  const AuthPasswordField({
+    super.key,
+    required this.controller,
+    required this.onChanged,
+    this.onSubmitted,
+    this.label = 'MẬT KHẨU',
+    this.hintText = 'Tối thiểu 8 ký tự',
+    this.textInputAction = TextInputAction.done,
+  });
+
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final ValueChanged<String>? onSubmitted;
+  final String label;
+  final String hintText;
+  final TextInputAction textInputAction;
+
+  @override
+  State<AuthPasswordField> createState() => _AuthPasswordFieldState();
+}
+
+class _AuthPasswordFieldState extends State<AuthPasswordField> {
+  final FocusNode _focusNode = FocusNode();
+  bool _obscured = true;
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dense = MediaQuery.sizeOf(context).height < 640;
+    return Container(
+      padding: EdgeInsets.fromLTRB(16, dense ? 8 : 12, 8, dense ? 8 : 12),
+      decoration: BoxDecoration(
+        color: V5.surface,
+        border: Border.all(color: V5.border),
+        borderRadius: BorderRadius.circular(V5.radiusMd),
+        boxShadow: V5.elevation1,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Text(
+              widget.label,
+              style: V5.eyebrow(context, color: V5.inkFaint),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
+                // Same touch-down focus workaround as [AuthEmailField] — dodges
+                // the RenderEditable.selectWord crash on an unfocused field.
+                child: Listener(
+                  onPointerDown: (_) {
+                    if (!_focusNode.hasFocus) _focusNode.requestFocus();
+                  },
+                  child: TextField(
+                    controller: widget.controller,
+                    focusNode: _focusNode,
+                    obscureText: _obscured,
+                    enableSuggestions: false,
+                    autocorrect: false,
+                    keyboardType: TextInputType.visiblePassword,
+                    textInputAction: widget.textInputAction,
+                    onChanged: widget.onChanged,
+                    onSubmitted: widget.onSubmitted,
+                    cursorColor: V5.yellow,
+                    style: V5.text(
+                      context,
+                      size: 15,
+                      weight: FontWeight.w600,
+                      color: V5.ink,
+                      letterSpacing: -0.1,
+                    ),
+                    decoration: InputDecoration(
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                      hintText: widget.hintText,
+                      hintStyle: V5.text(
+                        context,
+                        size: 15,
+                        weight: FontWeight.w600,
+                        color: V5.inkFaint,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => setState(() => _obscured = !_obscured),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  child: Icon(
+                    _obscured
+                        ? Icons.visibility_off_rounded
+                        : Icons.visibility_rounded,
+                    size: 18,
+                    color: V5.inkFaint,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

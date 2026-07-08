@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vika/screens/auth/auth_v5_widgets.dart';
 import 'package:vika/screens/auth/reviewer_demo_gate.dart';
 import 'package:vika/services/auth_service.dart';
 
@@ -44,9 +45,13 @@ class S13Signup extends StatefulWidget {
 
 class _S13SignupState extends State<S13Signup> {
   late final TextEditingController _emailController;
+  late final TextEditingController _passwordController;
   late final AuthService _authService;
   StreamSubscription<AuthState>? _authSubscription;
   bool _busy = false;
+  // Onboarding ends in account creation, so default to sign-up; returning users
+  // can flip the toggle to sign in.
+  bool _isSignUp = true;
   String? _notice;
   bool _advancing = false;
   bool _acceptAuthEvents = false;
@@ -57,10 +62,19 @@ class _S13SignupState extends State<S13Signup> {
     return email.contains('@') && email.contains('.');
   }
 
+  // Sign-up mirrors Supabase's minimum length; sign-in defers to the server.
+  bool get _validPassword {
+    final length = _passwordController.text.length;
+    return _isSignUp ? length >= 8 : length >= 1;
+  }
+
+  bool get _canSubmit => _validEmail && _validPassword && !_busy;
+
   @override
   void initState() {
     super.initState();
     _emailController = TextEditingController(text: widget.data.email ?? '');
+    _passwordController = TextEditingController();
     _authService = AuthService();
     _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen(
       _handleAuthStateChange,
@@ -121,6 +135,7 @@ class _S13SignupState extends State<S13Signup> {
   void dispose() {
     _authSubscription?.cancel();
     _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -244,23 +259,45 @@ class _S13SignupState extends State<S13Signup> {
     );
   }
 
-  Future<void> _magicLink() async {
-    if (!_validEmail || _busy) return;
+  Future<void> _submitEmailAuth() async {
+    if (!_canSubmit) return;
     final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    final signUp = _isSignUp;
     _beginAuthAttempt('email');
     try {
       widget.data.email = email;
-      await _authService.signInWithMagicLink(email);
-      if (mounted) {
-        setState(() => _notice = 'Đã gửi link đăng nhập đến $email');
+      if (signUp) {
+        final response = await _authService.signUpWithEmailPassword(
+          email: email,
+          password: password,
+        );
+        if (response.session != null) {
+          // Confirmation off (session already live) — advance immediately.
+          await _advanceIfAuthenticated(expectedProvider: 'email');
+        } else if (mounted) {
+          // Confirmation email sent. Leave _acceptAuthEvents armed so the
+          // deep-link `signedIn` (when the user taps the link) advances us —
+          // exactly how the old magic-link flow behaved.
+          setState(() => _notice =
+              'Đã gửi email xác nhận đến $email. Mở email, nhấn liên kết để kích hoạt tài khoản.');
+        }
+      } else {
+        await _authService.signInWithEmailPassword(
+          email: email,
+          password: password,
+        );
+        await _advanceIfAuthenticated(expectedProvider: 'email');
       }
     } catch (e) {
-      _showError(
-          _friendlyError(e, fallback: 'Chưa gửi được link. Vui lòng thử lại.'));
+      _showError(_friendlyError(e,
+          fallback: signUp
+              ? 'Chưa tạo được tài khoản. Vui lòng thử lại.'
+              : 'Đăng nhập không thành công. Vui lòng thử lại.'));
       _acceptAuthEvents = false;
       _pendingProvider = null;
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted && !_advancing) setState(() => _busy = false);
     }
   }
 
@@ -295,11 +332,13 @@ class _S13SignupState extends State<S13Signup> {
     // first scroll child (not as a fixed overlay), so SafeArea keeps it clear of
     // the status bar and it scrolls naturally when the keyboard lifts the form.
     return V5KeyboardForm(
-      footer: _InlineMagicLinkCta(
-        label: _busy ? 'Đang xử lý...' : 'Gửi link đăng nhập',
-        disabledLabel: 'Nhập email hoặc liên kết tài khoản',
-        enabled: _validEmail && !_busy,
-        onTap: _magicLink,
+      footer: _InlineAuthCta(
+        label: _busy
+            ? 'Đang xử lý...'
+            : (_isSignUp ? 'Tạo tài khoản' : 'Đăng nhập'),
+        disabledLabel: 'Nhập email và mật khẩu',
+        enabled: _canSubmit,
+        onTap: _submitEmailAuth,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -341,12 +380,32 @@ class _S13SignupState extends State<S13Signup> {
             const _AccountValueStrip(),
           ],
           SizedBox(height: veryCompact ? V5.space8 : V5.space12),
+          AuthModeToggle(
+            mode: _isSignUp ? AuthMode.signUp : AuthMode.signIn,
+            enabled: !_busy,
+            onChanged: (mode) {
+              setState(() {
+                _isSignUp = mode == AuthMode.signUp;
+                _notice = null;
+              });
+            },
+          ),
+          SizedBox(height: veryCompact ? V5.space8 : V5.space10),
           _EmailField(
             controller: _emailController,
             onChanged: (v) {
               widget.data.email = v;
               setState(() {});
             },
+          ),
+          const SizedBox(height: V5.space8),
+          AuthPasswordField(
+            controller: _passwordController,
+            onChanged: (_) => setState(() {}),
+            onSubmitted: (_) {
+              if (_canSubmit) _submitEmailAuth();
+            },
+            hintText: _isSignUp ? 'Tối thiểu 8 ký tự' : 'Mật khẩu của bạn',
           ),
           const SizedBox(height: V5.space8),
           if (_notice != null) _NoticeBanner(message: _notice!),
@@ -448,8 +507,8 @@ class _OnboardingChrome extends StatelessWidget {
 /// Inline send button — visually identical to [V5PillCTA] but laid out in a
 /// Column (not Positioned), so it can pin to the bottom of the keyboard-aware
 /// layout. Matches the standalone LoginScreen's CTA exactly.
-class _InlineMagicLinkCta extends StatefulWidget {
-  const _InlineMagicLinkCta({
+class _InlineAuthCta extends StatefulWidget {
+  const _InlineAuthCta({
     required this.label,
     required this.disabledLabel,
     required this.enabled,
@@ -462,10 +521,10 @@ class _InlineMagicLinkCta extends StatefulWidget {
   final VoidCallback onTap;
 
   @override
-  State<_InlineMagicLinkCta> createState() => _InlineMagicLinkCtaState();
+  State<_InlineAuthCta> createState() => _InlineAuthCtaState();
 }
 
-class _InlineMagicLinkCtaState extends State<_InlineMagicLinkCta> {
+class _InlineAuthCtaState extends State<_InlineAuthCta> {
   bool _pressed = false;
 
   @override
@@ -1104,37 +1163,9 @@ class _EmailField extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Text(
-                'EMAIL',
-                style: V5.eyebrow(context, color: V5.inkFaint),
-              ),
-              const Spacer(),
-              if (!dense)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: V5.yellowSoft,
-                    borderRadius: BorderRadius.circular(V5.radiusFull),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.mail_outline_rounded,
-                          size: 11, color: V5.yellowDeep),
-                      const SizedBox(width: 4),
-                      Text(
-                        'LINK ĐĂNG NHẬP',
-                        style: V5
-                            .eyebrow(context, color: V5.yellowDeep)
-                            .copyWith(letterSpacing: 1.0),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
+          Text(
+            'EMAIL',
+            style: V5.eyebrow(context, color: V5.inkFaint),
           ),
           const SizedBox(height: 6),
           TextField(

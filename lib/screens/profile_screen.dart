@@ -26,6 +26,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../data/profile_goal_quote.dart';
 import '../data/profile_mock.dart';
 import '../services/analytics_service.dart';
+import '../services/auth_service.dart';
 import '../services/data_export_service.dart';
 import '../services/recommendation/recommendation_service.dart';
 import '../services/session_persistence.dart';
@@ -38,6 +39,7 @@ import '../widgets/profile/body_card.dart';
 import '../widgets/profile/body_edit_sheet.dart';
 import '../widgets/profile/goal_card.dart';
 import '../widgets/profile/goal_edit_sheet.dart';
+import '../widgets/profile/set_password_sheet.dart';
 import '../widgets/profile/profile_stage_hero.dart';
 import '../widgets/profile/settings_group.dart';
 
@@ -60,6 +62,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final ScrollController _scrollController = ScrollController();
   final _profileService = UserProfileService();
+  final _authService = AuthService();
   final _sessions = SessionPersistence();
   final _recommendations = RecommendationService();
   bool _showStickyBar = false;
@@ -254,6 +257,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ? 'Đã lưu. Kiểm tra hộp thư email mới để xác nhận.'
                 : 'Đã cập nhật hồ sơ.',
           ),
+        ),
+      );
+  }
+
+  // ─── Set / change password ────────────────────────────────────────────
+  // Attaches an email + password to the account (works for a Google/Apple
+  // account that has none yet) or changes an existing one — via updateUser().
+  Future<void> _openSetPasswordSheet() async {
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => SetPasswordSheet(
+        onSave: (password) async {
+          try {
+            await _authService.setPassword(password);
+            return null;
+          } catch (e) {
+            return e.toString().replaceFirst('Exception: ', '').trim();
+          }
+        },
+      ),
+    );
+    if (!mounted || saved != true) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Đã đặt mật khẩu. Bạn có thể đăng nhập bằng email.'),
         ),
       );
   }
@@ -752,6 +784,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 sub: profile!.email,
                                 showChevron: false,
                               ),
+                            SettingRow(
+                              icon: Icons.lock_outline_rounded,
+                              label: 'Mật khẩu',
+                              sub: 'Đặt hoặc đổi mật khẩu đăng nhập email',
+                              onTap: _openSetPasswordSheet,
+                            ),
                             SettingRow(
                               icon: Icons.logout_rounded,
                               label: 'Đăng xuất',
