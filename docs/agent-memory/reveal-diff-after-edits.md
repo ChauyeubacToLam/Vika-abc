@@ -25,8 +25,13 @@ reviews before committing anyway. The stricter per-turn isolation (step 2) is op
    uncommitted work by running `git add -A` to stage a baseline **before** editing. Then this turn's
    edits are the unstaged "Changes" group + gutter bars. (Must be done *before* editing; can't isolate
    retroactively.)
-3. **Offer a checkpoint commit** at the start of a code task when the tree is dirty — a clean tree
-   makes `git diff HEAD` = exactly my delta. Commits need Nam's ok (CLAUDE.md § Ask first).
+3. **Commit separable chunks (Nam, 2026-07-09).** When a chunk of work is self-contained and done,
+   commit it (with Nam's ok) BEFORE starting the next task, so the next task's diff isn't polluted by
+   the previous one and Nam reviews the next chunk cleanly. Also offer a checkpoint commit at the start
+   of a code task when the tree is already dirty — a clean tree makes `git diff HEAD` = exactly my
+   delta. Commits need Nam's ok (CLAUDE.md § Ask first); branch first if on the default branch.
+   Corollary: do NOT paste diffs into chat (see top of this note) — the commit + Source Control IS the
+   review surface.
 4. **Tell him where to look**, and flag honestly: if some edits landed in an already-dirty tracked
    file (this repo often has WIP in `person_detector.dart`, `decisions.md`), say those show *mixed*
    with prior work; untracked-new and clean-since-HEAD files show cleanly.

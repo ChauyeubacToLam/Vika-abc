@@ -6,45 +6,23 @@ Design / how-it-works -> the owning reference doc. If this file only grows, it's
 
 ## Now
 
-**Voice coach — glute-bridge first on-device test (2026-07-08).** Behavior locked 07-08 (decisions.md
-07-08; lavish review docs/reference/voice-coach/glute-bridge-voice-review.html, notes threaded in
-.lavish/lavish-notes.json). Codex implements, **glute-bridge scope only**: snake_case the 4 metric
-`type`s + align faultIds; 3-way rep classifier (correction / NEW `soft` cue / praise) with praise gated
-on truly-clean; first fault 100% then escalate; count base 0.50 / step ~0.10 / cap 1.0 (both relief
-valves removed); praise keeps hunger+cap+never-twice, base ~0.45-0.50, D8 multiplier deleted; hustle off.
-- Post first device-test (07-08): praise-on-clean + hustle-off confirmed working as designed; the "dead"
-  feel was missing audio, not logic.
-- Audio follow-ups: (1) DONE renamed 3 correction files to the `<slug>/<faultId>.mp3` convention
-  (`speed_control`/`neck_head`/`hyperextension`) so all 5 correction lines resolve; convention documented
-  in `audio-naming-convention.md`. (2) record 7 lines = 5 glute soft cues + `common.great_1/2` [Anh Doan,
-  list in missing-audio.md]. (3) setup/orientation/ready cues deferred to the fleet migration.
-- **v1 voice checkpoint committed (07-08).** Snapshot of the working glute-bridge state for tomorrow's
-  code review. Included a real bugfix: `generic_exercise_voice_assets.dart` did NOT compile — a stale
-  `_faultLineAlias` helper (the abandoned alias approach, `speed_control`->`speed.mp3` etc.) had mangled
-  the class braces (extra `}` orphaned every later method) AND pointed at the files we renamed away.
-  Deleted it; `resolveAsset`'s default `<slug>/<id>.mp3` now resolves correctly. analyze clean, 33 voice
-  tests green.
-- **Re-mappings (Nam 07-08), resolve earlier confusion:** (a) behavior-spec "safety fires immediately"
-  = the `correct` cue (renaming -> `criticalFault`) firing REAL-TIME; there is no separate injury cue, so
-  `CueType.safety` is vestigial (only the landmark/tracking `checkSafety` is "safety" in code). (b)
-  "first fault always cued" belongs to the post-rep REMINDER feature (parked), not the criticalFault cue;
-  `firstOccurrenceCertain` left on criticalFault for now, revisit with the reminder.
-- **Decided this session, not yet built:** (1) correct + soft fire REAL-TIME (mid-rep, off the
-  `resultIssues.instructions` map — the only mid-rep fault signal), superseding rep-completion timing.
-  (2) DELETE fleet-wide the 3 rejected rules still in the policy — D8 praise scaling, count relief valve,
-  correct relief valve (Nam: "just delete it"); reviewed-code tomorrow, kept out of the v1 checkpoint as
-  it changes 9 exercises. (3) Naming rename (Nam's OK pending): `correct`->`criticalFault`,
-  `soft`->`softFault`, `instruction`->`setup`, `resultIssues.instructions`->`liveReminders` (kills the
-  name collision). Codex does the rename once confirmed.
-- **Parked for tomorrow's rep-based review:** final-2-reps-always-counted (real decision 07-07 +
-  behavior-spec, NOT in code; blocked on plumbing the rep target from the screen into the coach — no
-  target exists in ExerciseBase); non-verbal tick on skipped counts (decided, never built); `noCount`
-  cue type + behavior (bundled with the post-rep reminder decision); the post-rep reminder behavior
-  itself (REPLACES vs COMPLEMENTS correct/soft; reuse loose `assets/audio/*.mp3` — cham_lai,
-  nang_hong_cao_hon, khong_keo_co, siet_co_bung — vs record exact lines).
-- Audio still pending: record 7 lines = 5 glute soft cues + `common.great_1/2` [Anh Doan, missing-audio.md].
-- Deferred (post device-confirm): per-rep speak-only-top-priority-fault; grind-triggered hustle; fleet
-  rollout to the other ~35 exercises.
+**Voice coach — glute-bridge pilot; real-time critical/soft is next (2026-07-09).** Decisions:
+decisions.md 07-07/07-08/07-09; behavior spec docs/reference/voice-coach/voice-behavior-spec.md v1.3;
+real-time design docs/reference/voice-coach/realtime-cue-design.html (Nam-reviewed 07-09). Glute-bridge
+scope; fleet rollout deferred.
+- SHIPPED (in code, glute pilot; analyze + 33 voice tests green): snake_case metric fault ids + 3-way
+  classifier (criticalFault / softFault / praise, praise gated on truly-clean); first-fault 100% then
+  escalate; count 0.50/0.10/cap 1.0 no-relief-valve; praise 0.50 + D8 off; hustle off; targetReps on
+  ExerciseBase; cue-type rename (correct->criticalFault, soft->softFault, instruction->setup).
+- DESIGNED, Codex-pending (glute scope): (1) critical/soft fire REAL-TIME off a NEW read-only
+  `ExerciseBase.liveFaults` getter — continuous faults mid-rep, peak faults at rep-end via RepLog;
+  (2) final-2-reps count anchor (unblocked now targetReps exists); (3) setup-layer voice (setup intro /
+  ready / set-complete — audio already recorded, adapter never emits it). OPEN build detail: peak faults
+  = next-rep guidance; coordinate with the parked post-rep-instructions feature to avoid double-speak.
+- PARKED: no-count cue type + behavior; post-rep/next-rep reminder (REPLACES vs COMPLEMENTS critical/
+  soft); non-verbal tick on skipped counts; hustle behavior (Nam + Fable re-deciding); fleet-wide delete
+  of the 3 rejected rules from kDefaultTuning; fleet rollout (~35 exercises); per-rep speak-only-top-fault.
+- Audio pending [Anh Doan, missing-audio.md]: 5 glute soft cues (`<id>_soft`) + `common.great_1/2`.
 
 **PresenceGate extraction (2026-07-05): SHIPPED, device smoke pending.** `lib/exercise/presence_gate.dart`
 extracted from `ExerciseBase` (~200 lines lighter), `PosePresenceSource` on `PersonDetector`, 22 gate

@@ -14,6 +14,83 @@ Alternatives considered: <what we rejected and why>
 
 ---
 
+## 2026-07-09 · Voice coach: cue-type rename for clarity (criticalFault / softFault / setup)
+Status: active — applied this session (contained scope); analyze + 33 voice tests green.
+Decision: Rename CueType members for legibility: `correct`->`criticalFault`, `soft`->`softFault`,
+`instruction`->`setup` (+ the matching VoicePolicy methods, tuning maps, glute/squat scripts, voice tests).
+NOT renamed: `resultIssues.instructions` (the mid-rep UI / live-fault signal) — deferred, fleet-wide blast radius.
+Why: Nam kept conflating the types during the glute-bridge review — "correct" read as "the clean/correct cue",
+and "instruction" was ambiguous between setup copy and the live-fault channel. Names now state intent:
+criticalFault = a fault with `affectsForm==true` (this IS the "safety fires immediately" cue; there is no
+separate injury cue), softFault = a non-critical measured fault, setup = deterministic setup/ready/complete copy.
+Alternatives considered: full rename incl. `resultIssues.instructions`->`liveReminders` — rejected for now
+(fleet-wide, out of glute-bridge scope; do it in a later dedicated pass).
+
+---
+
+## 2026-07-09 · Voice coach: critical/soft fire real-time off a generic liveFaults surface (glute-bridge)
+Status: active — design locked with Nam 07-09 via lavish `docs/reference/voice-coach/realtime-cue-design.html`;
+Codex to implement, glute-bridge scope. Supersedes the post-rep-batched critical/soft timing (07-07 spec) for
+glute bridge.
+Decision: criticalFault + softFault fire the instant a fault is KNOWN, not batched at rep-completion.
+- Signal: a new read-only `List<FaultRecord> get liveFaults` on `ExerciseBase` (default `const []`; GluteBridge
+  overrides to expose its metrics' current faults). Read `FaultRecord` (id + `affectsForm`) directly — NOT the
+  coarse `resultIssues.instructions` UI-string map (no affectsForm, ad-hoc PascalCase keys) — so critical-vs-soft
+  stays correct. [Nam Q3: the one additive base getter is acceptable — the same "zero new ExerciseBase surface"
+  relaxation already taken for the target fields in the entry below.]
+- Adapter: each frame, drain NEW liveFaults -> criticalFault (affectsForm, always / first-occurrence-certain) or
+  softFault (hunger+base, real-time [Nam Q1=A]); dedup per rep so a fault never speaks twice. Count + praise stay
+  post-rep (rep number and "clean == no fault all rep" are only knowable then). Faults detected during the
+  bottom/setup phase (e.g. neck-lift) ARE spoken [Nam Q2=yes].
+- Timing split: continuous faults (hyperextension, neck-lift) surface mid-rep -> real-time; peak faults
+  (insufficient hip-extension, knee severity, speed) are only knowable at rep-end and the metrics clear their
+  `faults` before the coach frame runs, so they fire via RepLog at rep-completion.
+- OPEN build detail (Nam 07-09): a peak fault can't be acted on in its own rep, so treat it as NEXT-REP guidance,
+  not an urgent correction; and when the parked post-rep-instructions feature lands, route peak faults THERE and
+  drop the rep-end firing so the same fault is never spoken twice. Resolve the delivery shape when writing the
+  Codex prompt.
+Why: the only place a fault is known mid-rep is the moment its metric detects it; "fire the instant known" =
+real-time for continuous faults, rep-end for peak. Honest realization of the 07-08 "correct + soft fire
+real-time" decision given the true shape of the mid-rep signal.
+Alternatives considered: (a) keep post-rep batching — rejected, corrections land too late to act on; (b) drive
+off `resultIssues.instructions` coarsely — rejected (no affectsForm, ad-hoc keys, misses peak faults);
+(c) enrich the metrics to push structured live faults — unnecessary, the getter exposes what metrics already
+accumulate in their `faults` list.
+
+---
+
+## 2026-07-09 · ExerciseBase carries the per-set target(s); voice reads them from the base
+Status: active (glute-bridge scope; extends the 07-08 glute-bridge voice lock). Relaxes the 07-07
+"zero new ExerciseBase surface" guardrail for the target fields only.
+Decision: ExerciseBase gains two optional fields, `targetReps` and `targetSeconds`, injected via its
+constructor (`ExerciseBase({this.targetReps, this.targetSeconds})`). Both independent + nullable so
+the base covers every modality: reps-only (targetReps set), hold-only (targetSeconds set), mixed
+(both set, e.g. N reps each held M seconds). A subclass forwards whatever target(s) it takes via
+`super(...)`. Glute bridge (pure reps) now does `super(targetReps: maxRep)` and feeds its
+PolicyVoiceCoach from the base field (`targetReps: targetReps`), which activates the coach's existing
+`_isFinalReps` final-rep awareness (the flag rides in every cue's CueContext, not just hustle).
+Why: PolicyVoiceCoach was written to accept `targetReps` but was never fed it (its own doc comment
+names the gap: "no target rep count anywhere in ExerciseBase"). Putting the target on the base lets
+ANY consumer read it polymorphically instead of downcasting to the concrete exercise
+(GluteBridge.maxRep). Nam's call to keep BOTH targets on the base rather than a single reps-XOR-seconds
+target, because some exercises are genuinely mixed (reps each held N seconds) and need both.
+No audible change yet: glute bridge's hustlePool is `[]` and hustle tuning 0.0 (both deliberate per
+07-08 "hustle OFF, grind-triggered later"). This wires the signal, not a new spoken line.
+Supersedes: the 07-07 stance that target rep count stays OUT of ExerciseBase (coach fed only from a
+launch-screen constructor arg, to honor "zero pipeline changes"). That guardrail is intentionally
+relaxed for these two fields.
+Deferred: squat still feeds its coach `targetReps: maxRep` directly (not via super/base), migrate it
+to the base-forwarding pattern later; hold-based exercises forward `super(targetSeconds:)` next; mixed
+last (needs `_resolveVolume` + the factory to carry BOTH values — today they collapse to one via the
+`isHold` bool).
+Flags: landed as a hand edit by Opus, which conflicts with the Opus-designs / Codex-implements rule
+(see the pending CLAUDE.md §Delegation reconciliation). Kept per Nam ("it's fine, glute bridge only").
+The exercise-base lavish walkthrough (docs/reference/exercise-base/exercise-base-explained.html) is
+now stale on the constructor + core-state fields and its gutter line numbers below §5a (code shifted
+~16 lines); sync deferred until the hold/mixed steps land to avoid re-churning it twice.
+
+---
+
 ## 2026-07-08 · Voice coach: glute-bridge-first behavior lock (soft cue, deterministic first fault, count/praise retune)
 Status: active (locked with Nam 07-08 via the lavish review docs/reference/voice-coach/glute-bridge-voice-review.html; refines the 07-07 entry's ship-day defaults). Implementation: Codex, glute-bridge scope only.
 Decision: Wire glute bridge end-to-end as the first on-device voice test, and lock the behavior below (glute-bridge scope only; other exercises untouched until device-confirmed).

@@ -1,0 +1,920 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Real-time critical/soft cueing — design for review · Vika</title>
+<style>
+:root{
+  --ink:#1F1812; --ink-soft:#4A4031; --muted:#8a7c63;
+  --page:#F1E9D9; --raised:#FBF7EE; --line:#E4DAC5; --line-soft:#EEE6D5;
+  --yellow:#FFB701;
+  --code-bg:#211A12; --code-fg:#EDE3CE; --code-dim:#9A8C71; --code-ln:#6B5D45; --code-rule:#37291a;
+  --tip:#2E6E63; --tip-bg:#E9F1EE; --tip-line:#BFDBD3;
+  --warn:#A2472B; --warn-bg:#F7EAE2; --warn-line:#E7C6B6;
+  --idea:#8A6608; --idea-bg:#FBF0D6; --idea-line:#EBD69E;
+  --mono:"JetBrains Mono","SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;overflow-x:clip;background:var(--page);color:var(--ink);font-family:var(--sans);line-height:1.62;
+  -webkit-font-smoothing:antialiased;font-size:16px}
+a{color:inherit}
+h1,h2,h3{line-height:1.18;text-wrap:balance;font-weight:800;letter-spacing:-.01em}
+code{font-family:var(--mono);overflow-wrap:anywhere}
+.gl{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:20px 0}
+.gl>div{min-width:0;background:var(--raised);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:14px}
+.gl b{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px;color:var(--ink)}
+.wrap{max-width:1160px;margin:0 auto;display:grid;grid-template-columns:238px minmax(0,1fr);
+  gap:48px;padding:0 28px 120px}
+header.hero{padding:56px 28px 40px;
+  background:radial-gradient(120% 140% at 12% 0%,#2b2117 0%,#1c150e 60%,#160f09 100%);
+  color:#F3ECDD;position:relative;overflow:hidden}
+header.hero::after{content:"";position:absolute;inset:0;opacity:.05;pointer-events:none;
+  background-image:repeating-linear-gradient(0deg,#fff 0 1px,transparent 1px 3px)}
+.hero-in{max-width:1104px;margin:0 auto;position:relative}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.24em;text-transform:uppercase;
+  color:var(--yellow);margin:0 0 14px}
+header.hero h1{font-size:clamp(30px,5vw,48px);margin:0 0 14px;color:#FBF7EE}
+header.hero h1 .u{background:linear-gradient(transparent 68%,rgba(255,183,1,.42) 0);padding:0 2px}
+header.hero p.lede{font-size:18px;max-width:74ch;color:#D9CFBD;margin:0 0 26px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-family:var(--mono);font-size:12px;padding:6px 11px;border-radius:999px;
+  border:1px solid rgba(255,255,255,.16);color:#E8DFCD;background:rgba(255,255,255,.04)}
+.chip b{color:var(--yellow);font-weight:600}
+nav.toc{position:sticky;top:0;align-self:start;max-height:100vh;overflow:auto;padding:34px 0;font-size:13.5px}
+nav.toc .lbl{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--muted);margin:0 0 12px}
+nav.toc ol{list-style:none;margin:0;padding:0;counter-reset:toc}
+nav.toc li{counter-increment:toc;margin:1px 0}
+nav.toc a{display:flex;gap:9px;text-decoration:none;color:var(--ink-soft);padding:5px 10px;
+  border-radius:7px;border-left:2px solid transparent}
+nav.toc a:before{content:counter(toc,decimal-leading-zero);font-family:var(--mono);font-size:11px;
+  color:var(--muted);padding-top:2px}
+nav.toc a:hover{background:var(--line-soft)}
+main{min-width:0;padding-top:20px}
+section{scroll-margin-top:20px;padding:30px 0;border-top:1px solid var(--line)}
+section:first-of-type{border-top:0}
+.kicker{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--yellow);font-weight:600;margin:0 0 6px;display:flex;align-items:center;gap:10px}
+.kicker .n{color:var(--muted)}
+h2{font-size:clamp(22px,3.2vw,30px);margin:0 0 8px}
+h3{font-size:18px;margin:28px 0 6px;font-weight:700}
+h3 .tag{font-family:var(--mono);font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;
+  vertical-align:middle;margin-left:8px;letter-spacing:.04em}
+.tag.crit{background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-line)}
+.tag.high{background:var(--idea-bg);color:var(--idea);border:1px solid var(--idea-line)}
+.tag.med{background:var(--tip-bg);color:var(--tip);border:1px solid var(--tip-line)}
+p{margin:12px 0;max-width:76ch}
+.lead{font-size:17px;color:var(--ink-soft)}
+strong{font-weight:700}
+em.term{font-style:normal;font-weight:700;color:var(--ink);
+  background:linear-gradient(transparent 70%,rgba(255,183,1,.34) 0);padding:0 1px}
+ul,ol.steps{max-width:76ch;padding-left:20px}
+li{margin:5px 0}
+.code{border-radius:12px;overflow:hidden;background:var(--code-bg);margin:18px 0;
+  box-shadow:0 1px 0 rgba(0,0,0,.04),0 14px 30px -22px rgba(31,24,18,.5)}
+.code-head{font-family:var(--mono);font-size:11.5px;color:var(--code-dim);padding:9px 14px;
+  border-bottom:1px solid var(--code-rule);letter-spacing:.03em;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.code-head span{min-width:0;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+.code-head b{color:var(--yellow);font-weight:600;flex:none}
+.code-body{overflow-x:auto}
+.src{padding:14px 20px 16px;color:var(--code-fg);white-space:pre;margin:0;min-width:max-content;
+  font-family:var(--mono);font-size:12.5px;line-height:1.72}
+.src .c{color:var(--code-dim);font-style:italic}
+.src .k{color:#E7A93A}
+.src .s{color:#9FBE7E}
+.src .bad{background:rgba(162,71,43,.36);border-radius:3px;padding:0 2px}
+.src .good{background:rgba(46,110,99,.32);border-radius:3px;padding:0 2px}
+.call{border-radius:11px;padding:15px 17px 15px 16px;margin:16px 0;border:1px solid;border-left-width:4px;font-size:15px}
+.call p{margin:7px 0;max-width:none}
+.call .ct{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+  font-weight:700;display:flex;align-items:center;gap:8px;margin:0 0 4px}
+.call.eli{background:var(--raised);border-color:var(--line);border-left-color:var(--yellow)}
+.call.eli .ct{color:var(--idea)}
+.call.tip{background:var(--tip-bg);border-color:var(--tip-line);border-left-color:var(--tip)}
+.call.tip .ct{color:var(--tip)}
+.call.warn{background:var(--warn-bg);border-color:var(--warn-line);border-left-color:var(--warn)}
+.call.warn .ct{color:var(--warn)}
+.call.idea{background:var(--idea-bg);border-color:var(--idea-line);border-left-color:var(--idea)}
+.call.idea .ct{color:var(--idea)}
+.call code{font-size:13px;background:rgba(0,0,0,.06);padding:1px 5px;border-radius:5px}
+.chain{margin:22px 0;border:1px solid var(--line);border-radius:14px;background:var(--raised);overflow:hidden;counter-reset:ch}
+.chain .row{display:grid;grid-template-columns:54px 1fr;border-top:1px solid var(--line-soft)}
+.chain .row:first-child{border-top:0}
+.chain .row .num{counter-increment:ch;font-family:var(--mono);font-size:12px;color:var(--muted);
+  display:flex;align-items:flex-start;justify-content:center;padding:14px 0;background:#fff;border-right:1px solid var(--line-soft)}
+.chain .row .num:before{content:counter(ch,decimal-leading-zero)}
+.chain .row .body{padding:12px 16px}
+.chain .row .body b{font-family:var(--mono);font-size:13px}
+.chain .row .body .d{font-size:14px;color:var(--ink-soft);margin-top:2px}
+.tbl{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:18px 0}
+.recap{width:100%;border-collapse:collapse;font-size:14.5px;background:var(--raised);
+  border:1px solid var(--line);border-radius:12px;overflow:hidden;table-layout:fixed;min-width:640px}
+.recap th,.recap td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line-soft);
+  vertical-align:top;word-break:break-word;overflow-wrap:anywhere}
+.recap th{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:#fff}
+.recap tr:last-child td{border-bottom:0}
+.recap td code,.recap th code{font-size:12.5px;background:var(--line-soft);padding:1px 5px;border-radius:5px;
+  white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+.recap .y{color:var(--tip);font-weight:700}.recap .n{color:var(--warn);font-weight:700}
+.q{background:var(--raised);border:1px solid var(--line);border-left:4px solid var(--yellow);
+  border-radius:11px;padding:16px 18px;margin:16px 0}
+.q .qn{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--idea);font-weight:700;margin:0 0 4px}
+.q h3{margin:2px 0 8px}
+.opt{display:grid;grid-template-columns:auto 1fr;gap:8px 12px;margin:10px 0 0;font-size:14.5px}
+.opt .k{font-family:var(--mono);font-weight:700;color:var(--ink);background:var(--line-soft);border-radius:6px;padding:1px 8px;height:fit-content}
+.rec{color:var(--tip);font-weight:700}
+.foot{grid-column:1/-1;margin-top:40px;padding-top:22px;border-top:1px solid var(--line);
+  color:var(--muted);font-size:13.5px;font-family:var(--mono)}
+@media(max-width:900px){
+  .wrap{grid-template-columns:1fr;gap:0;padding:0 18px 80px}
+  nav.toc{position:static;max-height:none;padding:22px 0;border-bottom:1px solid var(--line);margin-bottom:8px}
+  nav.toc ol{columns:2;gap:8px}
+  header.hero{padding:44px 18px 32px}
+}
+/* ===== personal notes layer ===== */
+mark.note-hl{background:rgba(255,183,1,.20);border-bottom:2px solid rgba(255,183,1,.7);border-radius:2px;
+  cursor:pointer;color:inherit;padding:0 .5px;transition:background .12s ease}
+mark.note-hl.hot{background:rgba(255,183,1,.45)}
+mark.note-hl.flash{animation:noteflash 1.2s ease}
+@keyframes noteflash{0%,100%{background-color:rgba(255,183,1,.20)}30%{background-color:rgba(255,183,1,.62)}}
+.note-badge{display:inline-flex;align-items:center;justify-content:center;min-width:14px;height:14px;padding:0 3px;
+  margin:0 1px 0 2px;font-family:var(--sans);font-size:9px;font-weight:800;line-height:1;vertical-align:super;
+  background:var(--ink);color:#FBF7EE;border-radius:7px;cursor:pointer;user-select:none;transition:background .12s ease}
+.note-badge.hot{background:var(--yellow);color:var(--ink)}
+.note-card{transition:box-shadow .12s ease,border-color .12s ease}
+.note-card.linked{border-color:var(--yellow);box-shadow:0 0 0 2px rgba(255,183,1,.28)}
+.note-card.active{border-color:var(--yellow);box-shadow:0 0 0 3px rgba(255,183,1,.42)}
+.note-card .cnum{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;
+  background:var(--ink);color:#FBF7EE;border-radius:8px;font-size:10px;font-weight:800;margin-right:7px;vertical-align:middle}
+.note-fab{position:fixed;right:22px;bottom:22px;z-index:50;display:flex;align-items:center;gap:9px;
+  background:var(--ink);color:#FBF7EE;border:none;border-radius:999px;padding:12px 17px;cursor:pointer;
+  font-family:var(--sans);font-weight:600;font-size:14px;box-shadow:0 10px 26px -10px rgba(31,24,18,.55)}
+.note-fab:hover{background:#332619}
+.note-fab .cnt{font-family:var(--mono);font-size:12px;background:var(--yellow);color:var(--ink);
+  border-radius:999px;padding:1px 8px;min-width:20px;text-align:center}
+.note-pop{position:absolute;z-index:60;transform:translate(-50%,-100%);margin-top:-9px;display:none;
+  background:var(--ink);border-radius:9px;padding:5px;box-shadow:0 12px 30px -12px rgba(0,0,0,.5)}
+.note-pop button{background:var(--yellow);color:var(--ink);border:none;border-radius:6px;
+  padding:7px 12px;font-family:var(--sans);font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap}
+.note-pop:after{content:"";position:absolute;left:50%;top:100%;transform:translateX(-50%);
+  border:6px solid transparent;border-top-color:var(--ink)}
+.note-panel{position:fixed;top:0;right:0;height:100%;width:min(380px,92vw);z-index:70;background:var(--raised);
+  border-left:1px solid var(--line);box-shadow:-18px 0 40px -30px rgba(31,24,18,.5);display:flex;flex-direction:column;
+  opacity:0;visibility:hidden;transform:translateY(6px);transition:opacity .18s ease,transform .18s ease,visibility .18s}
+.note-panel.open{opacity:1;visibility:visible;transform:none}
+.note-panel .ph{padding:18px 18px 14px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.note-panel .ph h3{margin:0;font-size:17px;font-weight:800}
+.note-panel .ph .sub{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.03em}
+.note-panel .x{background:none;border:none;font-size:24px;line-height:1;cursor:pointer;color:var(--muted)}
+.newbtn{background:var(--ink);color:#FBF7EE;border:none;border-radius:8px;padding:7px 12px;font-family:var(--sans);font-weight:700;font-size:12.5px;cursor:pointer;white-space:nowrap}
+.composer{padding:12px 14px;border-bottom:1px solid var(--line);background:#fff}
+.composer .anchor{font-family:var(--mono);font-size:11px;color:var(--tip);background:var(--tip-bg);
+  border:1px solid var(--tip-line);border-radius:7px;padding:5px 8px;margin-bottom:8px;display:flex;gap:6px;align-items:center;overflow:hidden}
+.composer .anchor span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.composer .anchor .axn{margin-left:auto;cursor:pointer;font-weight:700;flex:none}
+.composer textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:9px;
+  font-family:var(--sans);font-size:15px;padding:10px;resize:vertical;min-height:82px;background:#fff;color:var(--ink)}
+.composer textarea:focus{outline:2px solid var(--yellow);outline-offset:0;border-color:transparent}
+.composer .crow{display:flex;flex-direction:column;align-items:stretch;gap:7px;margin-top:8px}
+.composer .chint{font-size:11.5px;color:var(--muted)}
+.composer .addbtn{display:block;width:100%;background:var(--ink);color:#FBF7EE;border:none;border-radius:9px;
+  padding:12px 16px;font-family:var(--sans);font-weight:700;font-size:15px;cursor:pointer}
+.composer .addbtn:hover{background:#332619}
+.storage-note{margin:0;padding:9px 14px;background:var(--warn-bg);border-bottom:1px solid var(--warn-line);
+  color:var(--warn);font-size:12px;line-height:1.5}
+.storage-note.ok{background:var(--tip-bg);border-bottom-color:var(--tip-line);color:var(--tip)}
+.note-list{flex:1;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:12px}
+.note-empty{color:var(--muted);font-size:14px;text-align:center;padding:40px 14px;line-height:1.7}
+.note-empty b{color:var(--ink)}
+.note-card{background:#fff;border:1px solid var(--line);border-radius:11px;padding:12px 13px}
+.note-card .loc{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--tip);font-weight:700;cursor:pointer;margin-bottom:6px;display:inline-block}
+.note-card .quote{font-size:12px;color:var(--ink-soft);border-left:3px solid var(--line);padding:2px 0 2px 9px;
+  margin:0 0 8px;font-family:var(--mono);white-space:pre-wrap;word-break:break-word;max-height:74px;overflow:auto}
+.note-card .body{font-size:14.5px;white-space:pre-wrap;word-break:break-word}
+.note-card .body.empty{color:var(--muted);font-style:italic}
+.note-card textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;font-family:var(--sans);
+  font-size:14.5px;padding:8px;resize:vertical;min-height:66px;background:#fff;color:var(--ink)}
+.note-card .row{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
+.note-card .row button{border:none;border-radius:7px;padding:6px 11px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:var(--sans)}
+.note-card .save{background:var(--ink);color:#FBF7EE}
+.note-card .edit{background:var(--line-soft);color:var(--ink-soft)}
+.note-card .del{background:var(--warn-bg);color:var(--warn)}
+.note-card .reply{background:var(--tip-bg);color:var(--tip)}
+.note-card .replies{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+.note-thread{border-left:3px solid var(--line);padding:5px 0 5px 10px}
+.note-thread .who{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:3px;font-weight:700}
+.note-thread .txt{font-size:13.5px;white-space:pre-wrap;word-break:break-word}
+.note-thread.agent{border-left-color:var(--yellow)}
+.note-thread.agent .who{color:var(--idea)}
+.reply-box{margin-top:9px}
+.reply-box textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;
+  font-family:var(--sans);font-size:14px;padding:8px;resize:vertical;min-height:52px;background:#fff;color:var(--ink)}
+.reply-box textarea:focus{outline:2px solid var(--yellow);outline-offset:0;border-color:transparent}
+.note-panel .pf{padding:11px 14px;border-top:1px solid var(--line);display:flex;gap:8px}
+.note-panel .pf button{flex:1;border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans);color:var(--ink-soft)}
+.note-panel .pf button:hover{background:var(--line-soft)}
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-in">
+    <p class="eyebrow">Technical design · voice-coach · glute-bridge scope · 2026-07-09</p>
+    <h1>Real-time <span class="u">critical / soft</span> cueing</h1>
+    <p class="lede">The decision is locked: corrections fire the instant a fault is known, not batched at
+      rep-completion. This is the <em>how</em> — the one signal we read, the timing trap that shapes it, and
+      the adapter logic — for you to poke holes in before Codex builds it.</p>
+    <div class="chips">
+      <span class="chip">scope <b>glute bridge only</b></span>
+      <span class="chip">critical <b>always fires</b></span>
+      <span class="chip">soft <b>hunger + base</b></span>
+      <span class="chip">count + praise <b>stay post-rep</b></span>
+      <span class="chip">rename <b>already applied</b></span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+<nav class="toc">
+  <p class="lbl">Design</p>
+  <ol>
+    <li><a href="#goal">Goal &amp; what's locked</a></li>
+    <li><a href="#today">How it fires today</a></li>
+    <li><a href="#wrongsignal">Why not the instructions map</a></li>
+    <li><a href="#signal">The signal: liveFaults</a></li>
+    <li><a href="#timing">The timing trap</a></li>
+    <li><a href="#adapter">Adapter logic</a></li>
+    <li><a href="#blast">Blast radius</a></li>
+    <li><a href="#questions">Your call</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<!-- 1 -->
+<section id="goal">
+  <p class="kicker"><span class="n">01</span> The ask</p>
+  <h2>Goal &amp; what's already locked</h2>
+  <p class="lead">Make critical and soft form faults fire in real time — the instant the metric detects them,
+    mid-rep — superseding today's fire-everything-at-rep-completion. This is the 07-08 decision
+    (<code>state.md</code>: "correct + soft fire REAL-TIME off the mid-rep signal, superseding rep-completion
+    timing"), scoped to glute bridge.</p>
+  <div class="gl">
+    <div><b>Locked · timing</b>Critical fault = fires immediately, <em>always</em> (first occurrence certain).
+      This IS "safety fires immediately" — there is no separate injury cue.</div>
+    <div><b>Locked · soft</b>Soft fault = fires in real time too, but probabilistic: hunger + base (not
+      deterministic, not first-occurrence-certain).</div>
+    <div><b>Unchanged</b>Count + praise stay post-rep (only knowable at rep-end: the rep number, and
+      "clean = no fault all rep"). Rename to <code>criticalFault</code> / <code>softFault</code> /
+      <code>setup</code> is done + green.</div>
+  </div>
+  <p>This doc designs only the real-time core. The two mechanical stages that ship alongside it —
+    final-2-reps-always-counted, and the setup/ready/complete voice layer — go straight into the Codex prompt;
+    they need no design review.</p>
+</section>
+
+<!-- 2 -->
+<section id="today">
+  <p class="kicker"><span class="n">02</span> Current state</p>
+  <h2>How critical/soft fire today — batched, at rep-completion</h2>
+  <p>The adapter reacts only when <code>repCount</code> increments. It reads the just-written
+    <code>RepLog</code>, classifies the whole rep, and speaks one outcome cue. Accurate, but a full rep late.</p>
+  <div class="code">
+    <div class="code-head"><span>lib/voice/policy_voice_coach.dart — _handleRepLanded (today)</span><b>the 3-way branch</b></div>
+    <div class="code-body"><pre class="src"><span class="c">// fires only on repCount++, off RepLog.data['fault_types'] + correctForm</span>
+<span class="k">if</span> (correctionIds.isNotEmpty) {          <span class="c">// !correctForm -> a critical fault</span>
+  <span class="k">for</span> (<span class="k">final</span> id <span class="k">in</span> correctionIds)
+    _coach.say(CueType.criticalFault, VoiceContent.key(script.faultKey(id)), ctx…);
+} <span class="k">else if</span> (usesSoftClassifier &amp;&amp; faultIds.isNotEmpty) {  <span class="c">// correctForm but minor faults</span>
+  <span class="k">for</span> (<span class="k">final</span> id <span class="k">in</span> faultIds)
+    _coach.say(CueType.softFault, VoiceContent.pool(script.softPoolFor(id)), ctx…);
+} <span class="k">else</span> {
+  _coach.say(CueType.praise, VoiceContent.pool(script.praisePool), ctx);  <span class="c">// truly clean</span>
+}</pre></div>
+  </div>
+  <div class="call eli"><p class="ct">🧒 what changes</p>
+    <p>Today: "rep ended → look back → say the fault." Target: "fault detected mid-rep → say it now." The
+      count and the praise still happen at rep-end (nothing else knows the rep number, or that the whole rep
+      stayed clean). Only the two <em>fault</em> cues move earlier.</p></div>
+</section>
+
+<!-- 3 -->
+<section id="wrongsignal">
+  <p class="kicker"><span class="n">03</span> The tempting wrong turn</p>
+  <h2>Why we do <em>not</em> read <code>resultIssues.instructions</code></h2>
+  <p>The obvious mid-rep signal is the on-screen instruction map the metrics write to. It's the wrong currency
+    for a <em>typed</em> cue, for three reasons — all verified in the glute-bridge metrics:</p>
+  <div class="tbl"><table class="recap">
+    <colgroup><col style="width:26%"><col style="width:20%"><col style="width:30%"><col style="width:24%"></colgroup>
+    <tr><th>Fault</th><th>Known when</th><th>In instructions map?</th><th>Carries critical/soft?</th></tr>
+    <tr><td>hyperextension</td><td>continuous (ascend/top)</td><td class="y">yes — key <code>'HipExt'</code></td><td class="n">no</td></tr>
+    <tr><td>neck-lift</td><td>continuous (all phases)</td><td class="y">yes — key <code>'NeckHead'</code></td><td class="n">no</td></tr>
+    <tr><td>knee-angle hint</td><td><b>bottom / setup only</b></td><td class="y">yes — <code>'KneeAngle'</code> — but it's a <em>setup</em> hint, not a rep fault</td><td class="n">no</td></tr>
+    <tr><td>insufficient hip-extension</td><td><b>peak (rep end)</b></td><td class="n">no</td><td>—</td></tr>
+    <tr><td>knee severity (err vs warn)</td><td><b>peak (rep end)</b></td><td class="n">no</td><td>—</td></tr>
+    <tr><td>speed control</td><td><b>peak (rep end)</b></td><td class="n">no</td><td>—</td></tr>
+  </table></div>
+  <ol class="steps">
+    <li><strong>No <code>affectsForm</code>.</strong> The map is <code>phase → type → message</code> (all strings).
+      From it you cannot tell a <code>criticalFault</code> from a <code>softFault</code> — and the same metric
+      flips between them by severity (knee &lt;60° critical, warning soft).</li>
+    <li><strong>Ad-hoc keys.</strong> <code>'HipExt'</code>, not <code>hyperextension</code> — a third casing
+      variant of the F1 trap.</li>
+    <li><strong>Most faults aren't in it.</strong> Three of six are peak-measured and simply don't exist until
+      the top/end of the rep.</li>
+  </ol>
+  <div class="call idea"><p class="ct">📝 your note — the ad-hoc keys &amp; snake_case</p>
+    <p>Exactly, and it's the reason we don't read this channel. Those keys (<code>'HipExt'</code> …) only ever
+      mattered when the coach matched RepLog fault ids through <code>script.faultIds</code> — the F1 casing
+      trap. This design reads <code>FaultRecord.type</code> instead (already snake_case), so their casing is
+      now a <em>display-layer</em> tidiness issue, not a correctness one — nothing the coach ever touches.
+      Snake-casing them (rename the four <code>addInstruction</code> type strings) is a cheap, isolated
+      cleanup, but it's out of this scope. <strong>My call:</strong> leave them for now, log a follow-up to
+      fold into a "snake_case the whole vocabulary" pass — not bundled into the real-time change, so this
+      diff stays about one thing.</p></div>
+</section>
+
+<!-- 4 -->
+<section id="signal">
+  <p class="kicker"><span class="n">04</span> The proposal</p>
+  <h2>Read the metrics' own <code>FaultRecord</code>s, via one generic getter</h2>
+  <p>The metrics already build the exact structured object we need — <code>FaultRecord</code> (id +
+    <code>affectsForm</code> + <code>voiceMessage</code> + <code>priority</code>) — and stash it in their
+    <code>faults</code> list <em>the instant they detect</em>. We just expose that generically so the
+    exercise-agnostic adapter can read it.</p>
+  <div class="code">
+    <div class="code-head"><span>lib/exercise/exercise_base.dart — new, additive</span><b>default empty</b></div>
+    <div class="code-body"><pre class="src"><span class="c">/// Faults known SO FAR in the rep-in-progress, the instant a metric detects</span>
+<span class="c">/// them. Default empty: an exercise that hasn't opted in simply never fires a</span>
+<span class="c">/// real-time cue and keeps the post-rep RepLog path. Read-only; no pipeline change.</span>
+<span class="k">List</span>&lt;FaultRecord&gt; <span class="k">get</span> liveFaults =&gt; <span class="k">const</span> [];</pre></div>
+  </div>
+  <div class="code">
+    <div class="code-head"><span>lib/exercise/glute bridge/glute_bridge.dart — override</span><b>glute-bridge scope</b></div>
+    <div class="code-body"><pre class="src"><span class="c">// The metrics' own live accumulation. Continuous faults (hyperext, neck) appear</span>
+<span class="c">// here mid-rep; each is added once per rep and cleared at rep boundary by</span>
+<span class="c">// resetAndCountFault(). See the timing note (§05) for peak faults.</span>
+@override
+<span class="k">List</span>&lt;FaultRecord&gt; <span class="k">get</span> liveFaults =&gt; [<span class="k">for</span> (<span class="k">final</span> m <span class="k">in</span> _metrics) ...m.faults];</pre></div>
+  </div>
+  <div class="call tip"><p class="ct">✔ why this beats a static key→type map</p>
+    <p><code>FaultRecord</code> carries <code>affectsForm</code>, so critical-vs-soft is read straight off the
+      fault, not guessed from a metric name — and it handles the severity-varying metrics (knee, hip-ext)
+      correctly. It's also the same currency the post-rep path already uses, so both channels agree on
+      fault ids.</p></div>
+</section>
+
+<!-- 5 -->
+<section id="timing">
+  <p class="kicker"><span class="n">05</span> The subtlety that shapes everything</p>
+  <h2>Peak faults are gone before the coach runs</h2>
+  <p>The voice frame runs <em>after</em> the exercise has processed the pose. On the rep-completing frame the
+    exercise does all of this, in order, inside <code>_onRepCompleted</code> — and the last step wipes the
+    metrics:</p>
+  <div class="chain">
+    <div class="row"><div class="num"></div><div class="body"><b>repCount += 1</b><div class="d">the rep is now "landed"</div></div></div>
+    <div class="row"><div class="num"></div><div class="body"><b>checkRepCompletion()</b><div class="d">peak faults (hip-ext, knee, speed) get added to <code>metric.faults</code></div></div></div>
+    <div class="row"><div class="num"></div><div class="body"><b>addRepLog(...)</b><div class="d">RepLog captures ALL faults (continuous + peak) — this is the durable record</div></div></div>
+    <div class="row"><div class="num"></div><div class="body"><b>resetAndCountFault()</b><div class="d">clears <code>metric.faults</code> → <code>liveFaults</code> is now empty</div></div></div>
+  </div>
+  <p><em>Then</em> <code>coach.processFrame</code> runs. So on the completing frame, <code>liveFaults</code> is
+    already empty — the peak faults only ever existed for a few lines inside the exercise. The consequence:</p>
+  <div class="tbl"><table class="recap">
+    <colgroup><col style="width:34%"><col style="width:33%"><col style="width:33%"></colgroup>
+    <tr><th>Fault kind</th><th>Fires via</th><th>When it's heard</th></tr>
+    <tr><td><b>Continuous</b> — hyperext, neck</td><td class="y"><code>liveFaults</code> (real-time)</td><td>mid-rep, the instant detected</td></tr>
+    <tr><td><b>Peak</b> — hip-ext, knee, speed</td><td><code>RepLog</code> (post-rep, as today)</td><td>at rep-completion</td></tr>
+  </table></div>
+  <div class="call idea"><p class="ct">💡 this is the honest reading of "real-time"</p>
+    <p>"Fire the instant it's <em>known</em>." A peak fault is not knowable before the peak, so it can't fire
+      earlier — it lands at rep-end and that's correct, not a compromise. The win is that the continuous
+      faults (the ones you <em>can</em> fix mid-rep — "đừng ưỡn lưng", "đặt đầu xuống") now fire while the
+      user can still act on them. The hybrid isn't a workaround; it's the shape of the problem.</p></div>
+</section>
+
+<!-- 6 -->
+<section id="adapter">
+  <p class="kicker"><span class="n">06</span> The logic</p>
+  <h2>What the adapter does each frame</h2>
+  <p>Two paths, one shared per-rep memory so a fault never speaks twice. The order matters.</p>
+  <div class="chain">
+    <div class="row"><div class="num"></div><div class="body"><b>A · every activated frame — drain liveFaults</b>
+      <div class="d">For each fault in <code>exercise.liveFaults</code> whose <code>type</code> is not yet in
+      <code>_spokenThisRep</code>: say <code>criticalFault</code> if <code>affectsForm</code>, else
+      <code>softFault</code>; add the type to <code>_spokenThisRep</code>. Uses rep-in-progress number
+      (<code>repCount + 1</code>).</div></div></div>
+    <div class="row"><div class="num"></div><div class="body"><b>B · on repCount++ — the rep-landed path</b>
+      <div class="d">(1) <code>count</code> as today. (2) For each RepLog fault <em>not</em> already in
+      <code>_spokenThisRep</code> → say it now (this is where the peak faults land). (3) If the rep saw
+      <em>zero</em> faults (nothing spoken, RepLog clean) → <code>praise</code>.</div></div></div>
+    <div class="row"><div class="num"></div><div class="body"><b>C · rep boundary — reset per-rep memory</b>
+      <div class="d">Clear <code>_spokenThisRep</code> when the rep number advances, so next rep starts fresh.
+      Cross-rep fault persistence (for critical escalation) keeps its own <code>_faultFirstSeenRep</code>
+      map, as today.</div></div></div>
+  </div>
+  <div class="call warn"><p class="ct">⚠ the two things I'd get wrong first — flagging for review</p>
+    <p><b>Rep numbering.</b> A live fault fires while <code>repCount</code> is still the <em>previous</em>
+      value, so the cue's <code>repNumber</code> must be <code>repCount + 1</code> — otherwise the policy's
+      one-outcome-per-rep guard (<code>_lastOutcomeRep</code>) won't line up with the count/praise that fire
+      at rep-end on the same rep, and a faulted rep could still get praised.</p>
+    <p><b>Order within the frame.</b> Path A must run before path B on the completing frame, so a continuous
+      fault already spoken live isn't re-spoken from the RepLog. <code>_spokenThisRep</code> is the dedup.</p>
+  </div>
+  <div class="call eli"><p class="ct">🧒 the whole thing in one line</p>
+    <p>"Say a fault the moment a metric sees it; remember you said it; at rep-end, mop up any fault that was
+      only knowable at the end; and if nothing at all went wrong, praise."</p></div>
+</section>
+
+<!-- 7 -->
+<section id="blast">
+  <p class="kicker"><span class="n">07</span> Scope</p>
+  <h2>What Codex touches — and doesn't</h2>
+  <div class="tbl"><table class="recap">
+    <colgroup><col style="width:40%"><col style="width:60%"></colgroup>
+    <tr><th>File</th><th>Change</th></tr>
+    <tr><td><code>exercise_base.dart</code></td><td>+ <code>List&lt;FaultRecord&gt; get liveFaults =&gt; const [];</code> (one additive getter)</td></tr>
+    <tr><td><code>glute bridge/glute_bridge.dart</code></td><td>override <code>liveFaults</code> to expose its metrics' faults</td></tr>
+    <tr><td><code>policy_voice_coach.dart</code></td><td>the real work: paths A/B/C above; move critical/soft off <code>_handleRepLanded</code>'s batch, keep count + praise there</td></tr>
+    <tr><td><code>test/voice/…</code></td><td>new: live fault fires mid-rep; peak fault fires at rep-end; no double-speak; faulted rep isn't praised</td></tr>
+  </table></div>
+  <div class="call tip"><p class="ct">✔ untouched</p>
+    <p>No metric edits. No <code>resultIssues</code> / UI change. No pose/frame pipeline change. The one
+      base-class addition is a read-only getter defaulting to empty, so every non-glute exercise behaves
+      exactly as before.</p></div>
+</section>
+
+<!-- 8 -->
+<section id="questions">
+  <p class="kicker"><span class="n">08</span> Your call</p>
+  <h2>Open questions before Codex builds</h2>
+  <p>Everything above I'm confident in. These three I want your ruling on — annotate or reply.</p>
+
+  <div class="q">
+    <p class="qn">Q1 · soft mid-rep</p>
+    <h3>Soft faults fire mid-rep — is that the UX you want?</h3>
+    <p>You said "both real-time." A critical mid-rep cue ("đừng ưỡn lưng") is clearly useful while moving. A
+      <em>soft</em> one ("nâng hông cao hơn chút") interrupts the rep for a non-urgent nudge. Confirm:</p>
+    <div class="opt">
+      <span class="k">A</span><span><span class="rec">Soft fires real-time too</span>, as decided — hunger+base keeps it sparse. (Your stated call.)</span>
+      <span class="k">B</span><span>Critical real-time, soft stays post-rep — real-time reserved for what you can act on immediately.</span>
+    </div>
+  </div>
+
+  <div class="q">
+    <p class="qn">Q2 · faults during the bottom/setup phase</p>
+    <h3>Neck-lift is detected even while lying at the bottom. Speak it then?</h3>
+    <p>The neck metric runs in <code>onBottomFrame</code> too, so a lifted head between reps shows up in
+      <code>liveFaults</code> during the bottom phase (no rep in progress yet).</p>
+    <div class="opt">
+      <span class="k">A</span><span><span class="rec">Speak it</span> — a lifted head during setup is worth a nudge; feels attentive.</span>
+      <span class="k">B</span><span>Suppress until the concentric starts — only cue faults during an actual rep.</span>
+    </div>
+  </div>
+
+  <div class="q">
+    <p class="qn">Q3 · the one base-class addition</p>
+    <h3>Is the <code>liveFaults</code> getter on <code>ExerciseBase</code> acceptable?</h3>
+    <p>D1's rule was "zero changes to the pipeline." This adds a read-only getter (default empty) — not a
+      frame-flow change, but it is new base surface. My read: it's the minimum honest way to give the generic
+      coach a typed mid-rep signal, and it's inert for every exercise that doesn't override it. Veto if you'd
+      rather keep the signal entirely inside glute bridge (would mean a glute-specific coach subclass instead).</p>
+  </div>
+</section>
+
+<div class="foot">
+  Real-time critical/soft cueing — technical design · glute-bridge scope · 2026-07-09 ·
+  reviewed against lib/voice/*, lib/exercise/glute bridge/*, exercise_base.dart · pairs with decisions.md 07-08.
+</div>
+
+</main>
+</div>
+<!-- ===== personal notes layer (private, saved to .lavish via the notes server) ===== -->
+<button class="note-fab" id="noteFab" aria-label="Open your notes">🖊 Notes <span class="cnt" id="noteCount">0</span></button>
+<div class="note-pop" id="notePop"><button id="notePopBtn" type="button">🖊 Note this</button></div>
+<aside class="note-panel" id="notePanel" aria-label="Your private notes">
+  <div class="ph">
+    <div><h3>Your notes</h3><div class="sub">private · saved to .lavish/lavish-notes.json</div></div>
+    <button class="x" id="notePanelClose" type="button" aria-label="Close">&times;</button>
+  </div>
+  <div class="composer">
+    <div class="anchor" id="noteAnchor" hidden></div>
+    <textarea id="noteInput" placeholder="Type your note, then click outside the box (or press ⌘/Ctrl+Enter) to save…"></textarea>
+    <div class="crow">
+      <span class="chint" id="noteHint">Will attach to the section you're viewing</span>
+      <button class="addbtn" id="noteAdd" type="button">Add note</button>
+    </div>
+  </div>
+  <div class="storage-note" id="storageNote" hidden></div>
+  <div class="note-list" id="noteList"></div>
+  <div class="pf">
+    <button id="noteCopy" type="button">Copy all</button>
+    <button id="noteDownload" type="button">Download .md</button>
+    <button id="noteClear" type="button">Clear all</button>
+  </div>
+</aside>
+
+<script>
+// ===== personal notes layer: anchored, local + disk-backed, never auto-sent to the agent =====
+(function () {
+  var KEY = 'vika-rtcue-notes-v1';
+  var NAMEKEY = 'VIKA_RTCUE_NOTES::';
+  var DOC = encodeURIComponent(document.title);
+  var REMOTE = 'http://127.0.0.1:4599/notes?doc=' + DOC;
+  var localOk = true, remoteOk = false;
+  try { localStorage.setItem('vika-gbvc-t', '1'); localStorage.removeItem('vika-gbvc-t'); } catch (e) { localOk = false; }
+  function loadLocal() {
+    if (localOk) { try { var v = localStorage.getItem(KEY); if (v) return JSON.parse(v); } catch (e) {} }
+    try { if (window.name && window.name.indexOf(NAMEKEY) === 0) return JSON.parse(window.name.slice(NAMEKEY.length)); } catch (e) {}
+    return [];
+  }
+  var notes = loadLocal();
+
+  var fab = document.getElementById('noteFab');
+  var cnt = document.getElementById('noteCount');
+  var panel = document.getElementById('notePanel');
+  var list = document.getElementById('noteList');
+  var pop = document.getElementById('notePop');
+  var popBtn = document.getElementById('notePopBtn');
+  var input = document.getElementById('noteInput');
+  var anchorEl = document.getElementById('noteAnchor');
+  var hintEl = document.getElementById('noteHint');
+  var lastSel = null;
+  var pendingAnchor = null;
+
+  function mirrorLocal() {
+    var s = JSON.stringify(notes);
+    if (localOk) { try { localStorage.setItem(KEY, s); } catch (e) { localOk = false; } }
+    try { window.name = NAMEKEY + s; } catch (e) {}
+  }
+  function save() {
+    cnt.textContent = notes.length;
+    mirrorLocal();
+    if (remoteOk) {
+      try {
+        fetch(REMOTE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(notes) })
+          .catch(function () { remoteOk = false; updateStatus(); });
+      } catch (e) { remoteOk = false; }
+    }
+    updateStatus();
+  }
+  function updateStatus() {
+    var el = document.getElementById('storageNote'); if (!el) return;
+    if (remoteOk) {
+      el.hidden = false; el.className = 'storage-note ok';
+      el.textContent = '✓ Saved to disk — .lavish/lavish-notes.json (survives reloads & restarts while the notes server runs).';
+    } else if (localOk) {
+      el.hidden = true;
+    } else {
+      el.hidden = false; el.className = 'storage-note';
+      el.textContent = '⚠ The viewer blocks browser storage, so notes only survive reloads this session. Run the notes server or use “Download .md”.';
+    }
+  }
+  function uid() { return 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function sectionOf(node) {
+    var el = node && node.nodeType === 3 ? node.parentElement : node;
+    while (el && !(el.tagName === 'SECTION' && el.id)) el = el.parentElement;
+    return el;
+  }
+  function titleOf(sec) {
+    if (!sec) return 'Document';
+    var h = sec.querySelector('h2');
+    return h ? h.textContent.trim() : sec.id;
+  }
+  function currentSection() {
+    var secs = document.querySelectorAll('main section[id]');
+    var mid = window.scrollY + window.innerHeight / 2, best = null;
+    secs.forEach(function (s) { if (mid >= s.offsetTop && mid < s.offsetTop + s.offsetHeight) best = s; });
+    return best || secs[0] || null;
+  }
+  function setAnchor(a) {
+    pendingAnchor = a;
+    if (a && a.quote) {
+      anchorEl.hidden = false; anchorEl.innerHTML = '';
+      var t = document.createElement('span');
+      t.textContent = '“' + a.quote.slice(0, 90) + (a.quote.length > 90 ? '…' : '') + '”';
+      var x = document.createElement('span'); x.className = 'axn'; x.textContent = '✕'; x.title = 'Remove anchor';
+      x.onclick = function () { setAnchor(null); };
+      anchorEl.appendChild(t); anchorEl.appendChild(x);
+      hintEl.textContent = 'Attaching to this selection';
+    } else {
+      anchorEl.hidden = true; anchorEl.innerHTML = '';
+      hintEl.textContent = "Will attach to the section you're viewing";
+    }
+  }
+  function addFromComposer() {
+    var body = input.value.trim();
+    if (!body) { input.focus(); return; }
+    var a = pendingAnchor, sec = a ? document.getElementById(a.sectionId) : currentSection();
+    var n = {
+      id: uid(),
+      sectionId: a ? a.sectionId : (sec ? sec.id : ''),
+      sectionTitle: a ? a.sectionTitle : (sec ? titleOf(sec) : 'Document'),
+      quote: a ? a.quote : '',
+      start: a && a.start != null ? a.start : null,
+      end: a && a.end != null ? a.end : null,
+      body: body, createdAt: Date.now()
+    };
+    notes.push(n); render(); try { applyAll(); } catch (e) {} save();
+    input.value = ''; setAnchor(null);
+  }
+
+  // ---- anchored highlighting (spans across tokens, numbered) ----
+  function offsetOf(section, node, nodeOffset) {
+    var r = document.createRange();
+    r.selectNodeContents(section);
+    try { r.setEnd(node, nodeOffset); } catch (e) { return 0; }
+    return r.toString().length;
+  }
+  function appendBadge(mark, num, id) {
+    var b = document.createElement('sup');
+    b.className = 'note-badge'; b.dataset.nid = id; b.textContent = num;
+    b.title = 'Note ' + num + ' — click to open';
+    if (mark.parentNode) mark.parentNode.insertBefore(b, mark.nextSibling);
+  }
+  function clearHighlights() {
+    document.querySelectorAll('.note-badge').forEach(function (b) { b.remove(); });
+    document.querySelectorAll('mark.note-hl').forEach(function (m) {
+      var p = m.parentNode; while (m.firstChild) p.insertBefore(m.firstChild, m); p.removeChild(m); p.normalize();
+    });
+  }
+  function highlightRange(section, start, end, id, num) {
+    if (!section || start == null || end == null || end <= start) return false;
+    var w = document.createTreeWalker(section, NodeFilter.SHOW_TEXT, null), n, pos = 0, segs = [];
+    while ((n = w.nextNode())) {
+      var len = n.nodeValue.length, nodeStart = pos; pos += len;
+      if (pos <= start) continue;
+      if (nodeStart >= end) break;
+      if (n.parentElement && n.parentElement.closest('mark.note-hl')) continue;
+      var s = Math.max(0, start - nodeStart), e = Math.min(len, end - nodeStart);
+      if (e > s) segs.push({ node: n, s: s, e: e });
+    }
+    var made = 0, last = null;
+    segs.forEach(function (seg) {
+      var r = document.createRange(); r.setStart(seg.node, seg.s); r.setEnd(seg.node, seg.e);
+      var m = document.createElement('mark'); m.className = 'note-hl'; m.dataset.nid = id;
+      try { r.surroundContents(m); made++; last = m; } catch (e2) {}
+    });
+    if (made && last) appendBadge(last, num, id);
+    return made > 0;
+  }
+  function highlightFirst(section, quote, id, num) {
+    if (!section || !quote) return false;
+    var w = document.createTreeWalker(section, NodeFilter.SHOW_TEXT, null), tn;
+    while ((tn = w.nextNode())) {
+      if (tn.parentElement && tn.parentElement.closest('mark.note-hl')) continue;
+      var i = tn.nodeValue.indexOf(quote);
+      if (i >= 0) {
+        var r = document.createRange(); r.setStart(tn, i); r.setEnd(tn, i + quote.length);
+        var m = document.createElement('mark'); m.className = 'note-hl'; m.dataset.nid = id;
+        try { r.surroundContents(m); appendBadge(m, num, id); return true; } catch (e) { return false; }
+      }
+    }
+    return false;
+  }
+  function applyAll() {
+    clearHighlights();
+    notes.forEach(function (n, i) {
+      var sec = document.getElementById(n.sectionId); if (!sec) return;
+      var ok = false;
+      if (n.start != null && n.end != null) ok = highlightRange(sec, n.start, n.end, n.id, i + 1);
+      if (!ok && n.quote) highlightFirst(sec, n.quote, n.id, i + 1);
+    });
+  }
+  function setLinked(id, on) {
+    document.querySelectorAll('mark.note-hl[data-nid="' + id + '"], .note-badge[data-nid="' + id + '"]')
+      .forEach(function (el) { el.classList.toggle('hot', on); });
+    var card = list.querySelector('.note-card[data-nid="' + id + '"]');
+    if (card) card.classList.toggle('linked', on);
+  }
+
+  // ---- panel ----
+  function render() {
+    list.innerHTML = '';
+    if (!notes.length) {
+      var e = document.createElement('div'); e.className = 'note-empty';
+      e.innerHTML = 'No notes yet.<br>Type in the box above and hit <b>Add note</b>,<br>or select text/code and hit <b>🖊 Note this</b>.';
+      list.appendChild(e); return;
+    }
+    notes.slice().reverse().forEach(function (n) {
+      var num = notes.indexOf(n) + 1;
+      var card = document.createElement('div'); card.className = 'note-card'; card.dataset.nid = n.id;
+      card.onmouseenter = function () { setLinked(n.id, true); };
+      card.onmouseleave = function () { setLinked(n.id, false); };
+      var loc = document.createElement('span'); loc.className = 'loc'; loc.title = 'Jump to this spot';
+      var cn = document.createElement('span'); cn.className = 'cnum'; cn.textContent = num; loc.appendChild(cn);
+      loc.appendChild(document.createTextNode(' § ' + n.sectionTitle));
+      loc.onclick = function () { jump(n.id); }; card.appendChild(loc);
+      if (n.quote) { var q = document.createElement('div'); q.className = 'quote'; q.textContent = n.quote; card.appendChild(q); }
+      var body = document.createElement('div'); body.className = 'body' + (n.body ? '' : ' empty');
+      body.textContent = n.body || 'Empty — click Edit to write.'; card.appendChild(body);
+      if (n.replies && n.replies.length) {
+        var thread = document.createElement('div'); thread.className = 'replies';
+        n.replies.forEach(function (rp) {
+          var t = document.createElement('div');
+          t.className = 'note-thread' + (rp.author === 'agent' ? ' agent' : '');
+          var who = document.createElement('div'); who.className = 'who';
+          who.textContent = rp.author === 'agent' ? '↳ Claude' : '↳ You';
+          var tx = document.createElement('div'); tx.className = 'txt'; tx.textContent = rp.body;
+          t.appendChild(who); t.appendChild(tx); thread.appendChild(t);
+        });
+        card.appendChild(thread);
+      }
+      var row = document.createElement('div'); row.className = 'row';
+      var rb = document.createElement('button'); rb.className = 'reply'; rb.textContent = 'Reply'; rb.onclick = function () { replyCard(card, n); };
+      var ed = document.createElement('button'); ed.className = 'edit'; ed.textContent = 'Edit'; ed.onclick = function () { editCard(card, n); };
+      var dl = document.createElement('button'); dl.className = 'del'; dl.textContent = 'Delete';
+      dl.onclick = function () { notes = notes.filter(function (x) { return x.id !== n.id; }); render(); try { applyAll(); } catch (e) {} save(); };
+      row.appendChild(rb); row.appendChild(ed); row.appendChild(dl); card.appendChild(row);
+      list.appendChild(card);
+    });
+  }
+  function editCard(card, n) {
+    card.innerHTML = '';
+    var loc = document.createElement('span'); loc.className = 'loc'; loc.textContent = '§ ' + n.sectionTitle; card.appendChild(loc);
+    if (n.quote) { var q = document.createElement('div'); q.className = 'quote'; q.textContent = n.quote; card.appendChild(q); }
+    var ta = document.createElement('textarea'); ta.value = n.body || ''; ta.placeholder = 'Type your note…'; card.appendChild(ta);
+    var row = document.createElement('div'); row.className = 'row';
+    var sv = document.createElement('button'); sv.className = 'save'; sv.textContent = 'Save';
+    sv.onclick = function () { n.body = ta.value.trim(); save(); render(); };
+    row.appendChild(sv); card.appendChild(row);
+    ta.focus();
+    ta.addEventListener('keydown', function (e) { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') sv.click(); });
+  }
+  // Reply to a note: threads under it (author 'nam'); the agent writes replies with
+  // author 'agent' straight to the notes-server, and live-sync below surfaces them.
+  function replyCard(card, n) {
+    if (card.querySelector('.reply-box')) { card.querySelector('.reply-box textarea').focus(); return; }
+    var box = document.createElement('div'); box.className = 'reply-box';
+    var ta = document.createElement('textarea'); ta.placeholder = 'Reply to this note…'; box.appendChild(ta);
+    var row = document.createElement('div'); row.className = 'row';
+    var sv = document.createElement('button'); sv.className = 'save'; sv.textContent = 'Send reply';
+    var cx = document.createElement('button'); cx.className = 'edit'; cx.textContent = 'Cancel';
+    sv.onclick = function () {
+      var t = ta.value.trim(); if (!t) { ta.focus(); return; }
+      n.replies = n.replies || []; n.replies.push({ author: 'nam', body: t, createdAt: Date.now() });
+      save(); render(); try { applyAll(); } catch (e) {}
+    };
+    cx.onclick = function () { box.remove(); };
+    row.appendChild(sv); row.appendChild(cx); box.appendChild(row);
+    card.appendChild(box); ta.focus();
+    ta.addEventListener('keydown', function (e) { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') sv.click(); });
+  }
+  function openPanel() { panel.classList.add('open'); setTimeout(function () { if (input) input.focus(); }, 40); }
+  fab.onclick = function () {
+    panel.classList.toggle('open');
+    if (panel.classList.contains('open')) setTimeout(function () { if (input) input.focus(); }, 40);
+  };
+  document.getElementById('notePanelClose').onclick = function () { panel.classList.remove('open'); };
+  document.getElementById('noteAdd').onclick = addFromComposer;
+  input.addEventListener('keydown', function (e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); addFromComposer(); }
+  });
+  input.addEventListener('blur', function () { if (input.value.trim()) addFromComposer(); });
+
+  function jump(id) {
+    var marks = document.querySelectorAll('mark.note-hl[data-nid="' + id + '"]');
+    var n = notes.find(function (x) { return x.id === id; });
+    var target = marks[0] || (n && document.getElementById(n.sectionId));
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    marks.forEach(function (m) { m.classList.remove('flash'); void m.offsetWidth; m.classList.add('flash'); });
+  }
+
+  // ---- selection popover ----
+  function hidePop() { pop.style.display = 'none'; }
+  document.addEventListener('mouseup', function () {
+    setTimeout(function () {
+      var s = document.getSelection();
+      if (!s || s.isCollapsed) { hidePop(); return; }
+      var txt = s.toString();
+      if (!txt.trim()) { hidePop(); return; }
+      var host = s.anchorNode && (s.anchorNode.nodeType === 3 ? s.anchorNode.parentElement : s.anchorNode);
+      if (!host || !host.closest('main')) { hidePop(); return; }
+      var range = s.getRangeAt(0);
+      var section = sectionOf(range.startContainer);
+      var start = 0, end = 0;
+      if (section) {
+        start = offsetOf(section, range.startContainer, range.startOffset);
+        end = offsetOf(section, range.endContainer, range.endOffset);
+        if (end < start) { var tmp = start; start = end; end = tmp; }
+      }
+      lastSel = { quote: txt.trim().slice(0, 2000), section: section, start: start, end: end };
+      var rect = range.getBoundingClientRect();
+      var cw = document.documentElement.clientWidth;
+      var x = Math.min(Math.max(64, rect.left + rect.width / 2), cw - 64);
+      pop.style.left = (window.scrollX + x) + 'px';
+      pop.style.top = (window.scrollY + Math.max(rect.top, 8)) + 'px';
+      pop.style.display = 'block';
+    }, 10);
+  });
+  document.addEventListener('scroll', hidePop, { passive: true });
+  popBtn.addEventListener('mousedown', function (e) {
+    e.preventDefault();
+    if (!lastSel) return;
+    var sec = lastSel.section;
+    setAnchor({ sectionId: sec ? sec.id : '', sectionTitle: titleOf(sec), quote: lastSel.quote, start: lastSel.start, end: lastSel.end });
+    openPanel(); hidePop();
+    var sel = window.getSelection(); if (sel) sel.removeAllRanges();
+  });
+
+  document.addEventListener('click', function (e) {
+    var m = e.target.closest && e.target.closest('mark.note-hl, .note-badge');
+    if (!m || !m.dataset.nid) return;
+    var id = m.dataset.nid;
+    openPanel(); render();
+    var card = list.querySelector('.note-card[data-nid="' + id + '"]');
+    if (card) {
+      card.scrollIntoView({ block: 'center' });
+      card.classList.add('active');
+      setTimeout(function () { card.classList.remove('active'); }, 1600);
+    }
+  });
+  document.addEventListener('mouseover', function (e) {
+    var m = e.target.closest && e.target.closest('mark.note-hl, .note-badge');
+    if (m && m.dataset.nid) setLinked(m.dataset.nid, true);
+  });
+  document.addEventListener('mouseout', function (e) {
+    var m = e.target.closest && e.target.closest('mark.note-hl, .note-badge');
+    if (m && m.dataset.nid) setLinked(m.dataset.nid, false);
+  });
+
+  // ---- export ----
+  function toMd() {
+    return '# Glute Bridge × Voice Coach — my notes\n\n' + notes.map(function (n) {
+      var s = '## § ' + n.sectionTitle + '\n' + (n.quote ? '> ' + n.quote.replace(/\n/g, '\n> ') + '\n\n' : '') + (n.body || '') + '\n';
+      if (n.replies && n.replies.length) {
+        s += n.replies.map(function (rp) { return '\n**' + (rp.author === 'agent' ? 'Claude' : 'You') + ':** ' + rp.body; }).join('\n') + '\n';
+      }
+      return s;
+    }).join('\n');
+  }
+  document.getElementById('noteCopy').onclick = function () { if (navigator.clipboard) navigator.clipboard.writeText(toMd()); };
+  document.getElementById('noteDownload').onclick = function () {
+    var b = new Blob([toMd()], { type: 'text/markdown' }), u = URL.createObjectURL(b);
+    var a = document.createElement('a'); a.href = u; a.download = 'glute-bridge-voice-review-notes.md'; a.click(); URL.revokeObjectURL(u);
+  };
+  document.getElementById('noteClear').onclick = function () {
+    if (confirm('Delete ALL your notes? This cannot be undone.')) { notes = []; save(); applyAll(); render(); }
+  };
+
+  render(); try { applyAll(); } catch (e) {} mirrorLocal(); cnt.textContent = notes.length; updateStatus();
+  try {
+    fetch(REMOTE).then(function (r) { return r.ok ? r.json() : null; }).then(function (server) {
+      if (!Array.isArray(server)) return;
+      remoteOk = true;
+      if (server.length >= notes.length) {
+        notes = server; render(); try { applyAll(); } catch (e) {} cnt.textContent = notes.length;
+      } else {
+        save();
+      }
+      updateStatus();
+    }).catch(function () { remoteOk = false; updateStatus(); });
+  } catch (e) { updateStatus(); }
+
+  // Live sync: pull agent replies / new notes from the disk server without a reload,
+  // so a "↳ Claude" reply appears within a few seconds. Skips while an edit or reply
+  // box is open so it never clobbers something you're mid-typing.
+  var lastServerJson = JSON.stringify(notes);
+  setInterval(function () {
+    if (!remoteOk) return;
+    if (panel.querySelector('.note-card textarea') || panel.querySelector('.reply-box')) return;
+    fetch(REMOTE).then(function (r) { return r.ok ? r.json() : null; }).then(function (server) {
+      if (!Array.isArray(server)) return;
+      var sj = JSON.stringify(server);
+      if (sj === lastServerJson) return;
+      lastServerJson = sj;
+      notes = server; render(); try { applyAll(); } catch (e) {} cnt.textContent = notes.length;
+    }).catch(function () {});
+  }, 4000);
+})();
+</script>
+
+<script>
+// Scrollspy: highlight the current section in the TOC.
+(function () {
+  var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+  var map = {};
+  links.forEach(function (a) {
+    var id = a.getAttribute('href').slice(1);
+    var el = document.getElementById(id);
+    if (el) map[id] = a;
+  });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); });
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) {
+        links.forEach(function (l) { l.classList.remove('on'); });
+        var a = map[e.target.id];
+        if (a) a.classList.add('on');
+      }
+    });
+  }, { rootMargin: '0px 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { io.observe(s); });
+})();
+</script>
+</body>
+</html>

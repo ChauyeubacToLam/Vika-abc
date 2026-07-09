@@ -41,3 +41,10 @@ them — no alias code, no re-recording. See `audio-naming-convention.md`.
 
 Content unchanged by the rename — sanity-check on next listen that each spoken line still fits
 its renamed key.
+
+## NOT missing — recorded, pending wiring (not a recording task)
+
+The setup-layer cues already have audio; they're just not emitted by the coach yet (the adapter never
+calls `say(CueType.setup, …)`). This is Codex wiring work (decisions.md 07-09 setup layer), NOT an
+Anh Doan recording gap: `glute_bridge.setup_position`, `glute_bridge.active_intro`, `common.ready`,
+`common.set_complete` all resolve to shipped files.

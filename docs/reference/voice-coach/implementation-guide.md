@@ -8,6 +8,13 @@ file to open — **read the real file and match it; do not invent signatures.**
 Owner reviewed the design and locked the decisions below. Build in the staged order in §9;
 each stage must leave `flutter analyze` and `flutter test` green.
 
+> **Superseded in part (2026-07-09) — read these FIRST, they win on any conflict.** This guide is the
+> ORIGINAL migration (done). The glute-bridge pilot then refined it: decisions.md 07-08 (soft cue,
+> first-fault 100%, count cap-1.0/no-relief-valve, hustle off, snake_case fault ids) + 07-09 (cue-type
+> rename `correct`->`criticalFault` / `soft`->`softFault` / `instruction`->`setup`; critical/soft fire
+> REAL-TIME off a new `ExerciseBase.liveFaults` getter, not post-rep); behavior-spec.md v1.3;
+> realtime-cue-design.html. Where this guide's names / numbers / timing conflict with those, those win.
+
 ---
 
 ## 0. Locked decisions (do not re-litigate)

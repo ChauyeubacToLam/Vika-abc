@@ -32,5 +32,7 @@ Notes / quirks (honest, not aspirational):
 ## For future glute-bridge audio
 Put fault/correction lines in `assets/audio/glute_bridge/` named `<faultId>.mp3`, where `<faultId>`
 is exactly the metric's `type` string: `hip_extension`, `hyperextension`, `knee_angle`,
-`speed_control`, `neck_head`. Soft cues add `_soft`. (Instruction-cue key shape is TBD — pending
-the live-instruction voice wiring decision; see `state.md` in-flight.)
+`speed_control`, `neck_head`. Soft cues add `_soft`. Setup-layer cues (the `setup` cue type, renamed
+from `instruction` on 07-09) already have a documented key shape — `<slug>.setup_position` /
+`.active_intro` etc. per the table above — and recorded audio; only the coach wiring is pending (Codex,
+decisions.md 07-09 setup layer).
