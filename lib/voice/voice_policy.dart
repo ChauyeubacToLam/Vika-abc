@@ -27,11 +27,11 @@ enum CueMode {
 
   /// Escalates with how long a fault has persisted; a relief valve forces
   /// a near-certain cue past a persistence threshold. Used by
-  /// [CueType.correct].
+  /// [CueType.criticalFault].
   correction,
 
   /// The bare hunger-scaled roll with no extra hard rules layered on top.
-  /// Used by [CueType.instruction].
+  /// Used by [CueType.setup].
   base,
 
   /// Rolled, but perishable: [CueType.phase] drops rather than queues late
@@ -63,7 +63,7 @@ class CueTuning {
   /// Probability when hunger/persistence is zero.
   final double base;
 
-  /// Added per unit of hunger (silence), or — for [CueType.correct] only —
+  /// Added per unit of hunger (silence), or — for [CueType.criticalFault] only —
   /// per unit of `ctx.faultPersistence`.
   final double step;
 
@@ -72,7 +72,7 @@ class CueTuning {
 
   /// Relief valve: once the cue's silence streak reaches this, it fires
   /// near-certainly instead of rolling. The streak source differs by type:
-  /// [CueType.correct] reads `ctx.faultPersistence` (adapter-computed),
+  /// [CueType.criticalFault] reads `ctx.faultPersistence` (adapter-computed),
   /// [CueType.count] reads the policy-internal idle counter. Left at
   /// [_noRelief] for every other type, which has no relief valve.
   ///
@@ -111,7 +111,7 @@ class CueTuning {
 /// as the dispatch key.
 const Map<CueType, CueTuning> kDefaultTuning = {
   CueType.safety: CueTuning(CueMode.always),
-  CueType.instruction: CueTuning(CueMode.base, base: 1.0),
+  CueType.setup: CueTuning(CueMode.base, base: 1.0),
   // cap 0.90, not 1.0: with cap 1.0 the hunger step made the roll CERTAIN
   // after just 2 silent counts — a learnable "quiet twice → next always
   // counts" rhythm (Nam heard it as alternating even numbers). Every middle
@@ -126,7 +126,7 @@ const Map<CueType, CueTuning> kDefaultTuning = {
   ),
   CueType.praise:
       CueTuning(CueMode.variableRatio, base: 0.35, step: 0.10, cap: 0.85),
-  CueType.correct: CueTuning(
+  CueType.criticalFault: CueTuning(
     CueMode.correction,
     base: 0.25,
     step: 0.30,
@@ -153,7 +153,7 @@ double _clampD(double v, double lo, double hi) =>
 ///   `faultPersistence`) is comparable to the same value the escalation
 ///   uses. The internal hunger map is still updated for `correct`'s key on
 ///   every silent call (uniform `decide()` bookkeeping) but is not
-///   consulted by `_correct` itself.
+///   consulted by `_criticalFault` itself.
 /// - `CueMode.base` (instruction) has no described behaviour in the
 ///   guide's per-mode bullet list. Interpreted as the bare `_p` roll using
 ///   the policy-internal per-content hunger, no extra hard rules — the
@@ -226,9 +226,9 @@ class VoicePolicy {
   /// about one fault never raises the odds for another; every other type
   /// collapses to a single per-set counter.
   String _key(CueType type, CueContext ctx) {
-    return (type == CueType.correct ||
-            type == CueType.soft ||
-            type == CueType.instruction)
+    return (type == CueType.criticalFault ||
+            type == CueType.softFault ||
+            type == CueType.setup)
         ? '${type.name}:${ctx.contentKey}'
         : type.name;
   }
@@ -237,8 +237,8 @@ class VoicePolicy {
     _idle[key] = 0;
     if (type == CueType.praise) _lastPraiseRep = repNumber;
     if (type == CueType.praise ||
-        type == CueType.correct ||
-        type == CueType.soft ||
+        type == CueType.criticalFault ||
+        type == CueType.softFault ||
         type == CueType.hustle) {
       _lastOutcomeRep = repNumber;
     }
@@ -254,16 +254,16 @@ class VoicePolicy {
     switch (type) {
       case CueType.safety:
         return true; // Always, highest priority, bypasses hunger.
-      case CueType.instruction:
-        return _instruction(ctx);
+      case CueType.setup:
+        return _setup(ctx);
       case CueType.count:
         return _count(ctx);
       case CueType.praise:
         return _praise(ctx);
-      case CueType.correct:
-        return _correct(ctx);
-      case CueType.soft:
-        return _soft(ctx);
+      case CueType.criticalFault:
+        return _criticalFault(ctx);
+      case CueType.softFault:
+        return _softFault(ctx);
       case CueType.hustle:
         return _hustle(ctx);
       case CueType.phase:
@@ -271,9 +271,9 @@ class VoicePolicy {
     }
   }
 
-  bool _instruction(CueContext ctx) {
-    final t = tuning[CueType.instruction]!;
-    final idle = _idle[_key(CueType.instruction, ctx)] ?? 0;
+  bool _setup(CueContext ctx) {
+    final t = tuning[CueType.setup]!;
+    final idle = _idle[_key(CueType.setup, ctx)] ?? 0;
     return _rng.nextDouble() < _p(t, idle);
   }
 
@@ -286,7 +286,7 @@ class VoicePolicy {
       // solely so a set can never go essentially uncounted; at 6 straight
       // silent counts it can't bind more than once in a typical set, so it
       // can't create a learnable rhythm. Deliberately consumes no roll,
-      // like _correct's valve, so transcripts stay reproducible.
+      // like _criticalFault's valve, so transcripts stay reproducible.
       return true;
     }
     return _rng.nextDouble() < _p(t, idle);
@@ -314,11 +314,11 @@ class VoicePolicy {
     return _rng.nextDouble() < scaled;
   }
 
-  bool _correct(CueContext ctx) {
+  bool _criticalFault(CueContext ctx) {
     if (_lastOutcomeRep == ctx.repNumber) {
       return false; // At most one outcome cue per rep.
     }
-    final t = tuning[CueType.correct]!;
+    final t = tuning[CueType.criticalFault]!;
     if (t.firstOccurrenceCertain && ctx.faultPersistence == 0) {
       return true;
     }
@@ -330,13 +330,13 @@ class VoicePolicy {
     return _rng.nextDouble() < _p(t, ctx.faultPersistence);
   }
 
-  bool _soft(CueContext ctx) {
+  bool _softFault(CueContext ctx) {
     if (_lastOutcomeRep == ctx.repNumber) {
       return false; // At most one outcome cue per rep.
     }
-    final t = tuning[CueType.soft];
+    final t = tuning[CueType.softFault];
     if (t == null) return false;
-    final idle = _idle[_key(CueType.soft, ctx)] ?? 0;
+    final idle = _idle[_key(CueType.softFault, ctx)] ?? 0;
     return _rng.nextDouble() < _p(t, idle);
   }
 

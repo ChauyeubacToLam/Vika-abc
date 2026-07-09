@@ -61,7 +61,9 @@ void main() {
       const ['glute_bridge.hip_extension_soft'],
     );
     expect(policyCoach.script.hustlePool, isEmpty);
-    expect(policyCoach.targetReps, isNull);
+    // Glute bridge forwards maxRep -> targetReps (so final-rep awareness works);
+    // hustle stays off via the empty hustlePool + zero tuning, not a null target.
+    expect(policyCoach.targetReps, 3);
   });
 
   // Hold exercises use the time-based bundle at factory time. The hold target
@@ -298,14 +300,14 @@ VoicePolicy _outcomeAlwaysPolicy() {
         cap: 1.0,
         scalePraiseByFormScore: false,
       ),
-      CueType.correct: const CueTuning(
+      CueType.criticalFault: const CueTuning(
         CueMode.correction,
         base: 0.0,
         step: 0.0,
         cap: 0.0,
         firstOccurrenceCertain: true,
       ),
-      CueType.soft: const CueTuning(CueMode.variableRatio, base: 1.0, cap: 1.0),
+      CueType.softFault: const CueTuning(CueMode.variableRatio, base: 1.0, cap: 1.0),
       CueType.hustle: const CueTuning(CueMode.perishable, base: 0.0, cap: 0.0),
       CueType.phase: const CueTuning(CueMode.perishable, base: 0.0, cap: 0.0),
     },

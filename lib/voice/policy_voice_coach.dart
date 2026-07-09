@@ -148,7 +148,7 @@ class PolicyVoiceCoach implements ExerciseVoiceCoach {
         );
         final persistence = repCount - firstSeenRep;
         _coach.say(
-          CueType.correct,
+          CueType.criticalFault,
           VoiceContent.key(script.faultKey(id)),
           baseCtx.copyWith(contentKey: id, faultPersistence: persistence),
         );
@@ -161,7 +161,7 @@ class PolicyVoiceCoach implements ExerciseVoiceCoach {
         final softPool = script.softPoolFor(id);
         if (softPool.isEmpty) continue;
         _coach.say(
-          CueType.soft,
+          CueType.softFault,
           VoiceContent.pool(softPool),
           baseCtx.copyWith(contentKey: id),
         );

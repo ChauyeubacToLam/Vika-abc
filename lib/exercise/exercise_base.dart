@@ -99,6 +99,22 @@ abstract class ExerciseBase {
   late PoseSmoother poseSmoother;
   int repCount = 0;
 
+  /// The per-set target(s) this exercise was launched with, injected at
+  /// construction by the launch screen's resolved volume (prescription >
+  /// catalog > floor — see `_ExerciseExperienceSpec._resolveVolume`). Kept on
+  /// the base so any consumer can read them polymorphically WITHOUT downcasting
+  /// to a concrete subclass; the voice coach uses [targetReps] to know when a
+  /// set is nearly done (final-rep awareness).
+  ///
+  /// Both are independent and optional so the base covers every modality:
+  ///   reps only  -> targetReps set,    targetSeconds null
+  ///   hold only  -> targetReps null,   targetSeconds set
+  ///   mixed      -> both set (e.g. N reps each held M seconds)
+  /// A subclass forwards whatever target(s) it takes via `super(...)`. Left
+  /// null for exercises not yet migrated — a null target simply means "unknown".
+  final int? targetReps;
+  final int? targetSeconds;
+
   /// Probability the landmark actually exists in the predicted skeleton.
   /// Drops cleanly when a person leaves frame; stays high for legitimately
   /// occluded landmarks such as the back leg in side-view squats.
@@ -214,7 +230,7 @@ abstract class ExerciseBase {
         .clamp(0.0, 1.0);
   }
 
-  ExerciseBase() {
+  ExerciseBase({this.targetReps, this.targetSeconds}) {
     poseSmoother = PoseSmoother(minCutoff: 0.5, beta: 0.005);
   }
 

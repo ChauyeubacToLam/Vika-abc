@@ -77,7 +77,10 @@ enum GluteBridgeState {
 class GluteBridge extends ExerciseBase with SideTrackedExerciseMixin {
   final int maxRep;
 
-  GluteBridge({required this.maxRep});
+  // Glute Bridge is pure reps, so its one target (maxRep) is forwarded to the
+  // base's targetReps; targetSeconds stays null. The base field is what the
+  // voice coach reads, so it never has to know this is a GluteBridge.
+  GluteBridge({required this.maxRep}) : super(targetReps: maxRep);
 
   static const List<String> _voiceFaultIds = [
     'hip_extension',
@@ -110,14 +113,14 @@ class GluteBridge extends ExerciseBase with SideTrackedExerciseMixin {
       cap: 0.85,
       scalePraiseByFormScore: false,
     ),
-    CueType.correct: CueTuning(
+    CueType.criticalFault: CueTuning(
       CueMode.correction,
       base: 0.25,
       step: 0.30,
       cap: 0.85,
       firstOccurrenceCertain: true,
     ),
-    CueType.soft: CueTuning(
+    CueType.softFault: CueTuning(
       CueMode.variableRatio,
       base: 0.20,
       step: 0.08,
@@ -219,6 +222,10 @@ class GluteBridge extends ExerciseBase with SideTrackedExerciseMixin {
     );
     return PolicyVoiceCoach(
       script: script,
+      // Feed the coach the base-level target (forwarded from maxRep above).
+      // This closes the "no target rep count in ExerciseBase" gap the coach's
+      // doc comment calls out, so its final-rep awareness (isFinalReps) works.
+      targetReps: targetReps,
       coach: VoiceCoach(
         sink: AssetVoiceSink(),
         policy: VoicePolicy(tuning: _voiceTuning),

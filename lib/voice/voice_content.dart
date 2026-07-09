@@ -12,24 +12,30 @@ library;
 /// `VoicePolicy` applies (see `voice_policy.dart`).
 enum CueType {
   /// The rep/hold counter ("Một", "Hai", ...). Not an "outcome" cue — it
-  /// may co-occur with a [praise] or [correct] cue on the same rep.
+  /// may co-occur with a [praise] or [criticalFault] cue on the same rep.
   count,
 
   /// Clean-rep acknowledgement ("Tốt lắm!"). Variable-ratio, never twice
   /// in a row, at most one outcome cue per rep.
   praise,
 
-  /// A detected form fault. Escalates with how long the fault has
-  /// persisted; a relief valve stops a persistent fault from ever going
-  /// uncorrected forever.
-  correct,
+  /// A critical form fault (a fault whose `affectsForm` is true) — the
+  /// real-time "fires immediately" cue. First occurrence in a rep is
+  /// certain; persistence escalates. This IS what the behaviour spec calls
+  /// "safety fires immediately": there is no separate injury cue, the
+  /// critical fault is it.
+  criticalFault,
 
-  /// A non-critical measured fault. Warmer than [correct], still honest:
-  /// the rep is not praised as clean, but the user gets a light nudge.
-  soft,
+  /// A non-critical measured fault (`affectsForm` false). Warmer than
+  /// [criticalFault], still honest: the rep is not praised as clean, but the
+  /// user gets a light nudge. Hunger + base probability, never
+  /// first-occurrence-deterministic.
+  softFault,
 
-  /// Deterministic setup / ready / rest copy.
-  instruction,
+  /// Deterministic structure copy: setup intro, ready, rest, set-complete.
+  /// Always eligible to speak; the adapter latches each moment so it fires
+  /// exactly once (behaviour spec hard-rule #2).
+  setup,
 
   /// Sparse effort push, only on the final reps of a set, at most once.
   hustle,
@@ -78,9 +84,9 @@ class CueContext {
   /// the policy never tracks this itself.
   final int faultPersistence;
 
-  /// The specific fault/metric id (for `correct`/`instruction`) — this is
-  /// the hunger key, so staying silent about one fault never raises the
-  /// odds for another.
+  /// The specific fault/metric id (for `criticalFault`/`softFault`/`setup`)
+  /// — this is the hunger key, so staying silent about one fault never
+  /// raises the odds for another.
   final String contentKey;
 
   /// True if the sink is already playing/queued. Perishable cues

@@ -53,14 +53,14 @@ Map<CueType, CueTuning> _gluteBridgePilotTuning() => {
         cap: 0.85,
         scalePraiseByFormScore: false,
       ),
-      CueType.correct: const CueTuning(
+      CueType.criticalFault: const CueTuning(
         CueMode.correction,
         base: 0.25,
         step: 0.30,
         cap: 0.85,
         firstOccurrenceCertain: true,
       ),
-      CueType.soft: const CueTuning(
+      CueType.softFault: const CueTuning(
         CueMode.variableRatio,
         base: 0.20,
         step: 0.08,
@@ -174,7 +174,7 @@ void main() {
       );
       expect(
         policy.decide(
-          CueType.correct,
+          CueType.criticalFault,
           const CueContext(repNumber: 3, contentKey: 'heel'),
         ),
         isFalse,
@@ -250,7 +250,7 @@ void main() {
       final policy = VoicePolicy(random: _ScriptedRandom([0.30]));
       expect(
         policy.decide(
-          CueType.correct,
+          CueType.criticalFault,
           const CueContext(
             repNumber: 1,
             faultPersistence: 0,
@@ -263,7 +263,7 @@ void main() {
       final policy2 = VoicePolicy(random: _ScriptedRandom([0.30]));
       expect(
         policy2.decide(
-          CueType.correct,
+          CueType.criticalFault,
           const CueContext(
             repNumber: 1,
             faultPersistence: 1,
@@ -280,7 +280,7 @@ void main() {
       final policy = VoicePolicy(random: _ScriptedRandom([0.99]));
       expect(
         policy.decide(
-          CueType.correct,
+          CueType.criticalFault,
           const CueContext(
             repNumber: 1,
             faultPersistence: 4,
@@ -302,7 +302,7 @@ void main() {
       );
       expect(
         policy.decide(
-          CueType.correct,
+          CueType.criticalFault,
           const CueContext(
             repNumber: 1,
             faultPersistence: 99,
@@ -320,7 +320,7 @@ void main() {
         random: _ScriptedRandom([0.99]),
         tuning: {
           ...kDefaultTuning,
-          CueType.correct: const CueTuning(
+          CueType.criticalFault: const CueTuning(
             CueMode.correction,
             base: 0.0,
             step: 0.0,
@@ -332,7 +332,7 @@ void main() {
 
       expect(
         policy.decide(
-          CueType.correct,
+          CueType.criticalFault,
           const CueContext(
             repNumber: 1,
             faultPersistence: 0,
@@ -345,7 +345,7 @@ void main() {
       );
       expect(
         policy.decide(
-          CueType.correct,
+          CueType.criticalFault,
           const CueContext(
             repNumber: 2,
             faultPersistence: 1,
@@ -367,7 +367,7 @@ void main() {
 
       expect(
         policy.decide(
-          CueType.soft,
+          CueType.softFault,
           const CueContext(repNumber: 1, contentKey: 'hip_extension'),
         ),
         isFalse,
@@ -382,14 +382,14 @@ void main() {
 
       expect(
         policy.decide(
-          CueType.soft,
+          CueType.softFault,
           const CueContext(repNumber: 1, contentKey: 'hip_extension'),
         ),
         isTrue,
       );
       expect(
         policy.decide(
-          CueType.correct,
+          CueType.criticalFault,
           const CueContext(
             repNumber: 1,
             faultPersistence: 0,
@@ -413,7 +413,7 @@ void main() {
         // (all miss a 0.50 roll), idle 3 -> 0.6 (hits).
         final tuning = {
           ...kDefaultTuning,
-          CueType.instruction: const CueTuning(
+          CueType.setup: const CueTuning(
             CueMode.base,
             base: 0.0,
             step: 0.20,
@@ -427,28 +427,28 @@ void main() {
 
         expect(
           policy.decide(
-            CueType.instruction,
+            CueType.setup,
             const CueContext(repNumber: 1, contentKey: 'setup_a'),
           ),
           isFalse,
         );
         expect(
           policy.decide(
-            CueType.instruction,
+            CueType.setup,
             const CueContext(repNumber: 2, contentKey: 'setup_a'),
           ),
           isFalse,
         );
         expect(
           policy.decide(
-            CueType.instruction,
+            CueType.setup,
             const CueContext(repNumber: 3, contentKey: 'setup_a'),
           ),
           isFalse,
         );
         expect(
           policy.decide(
-            CueType.instruction,
+            CueType.setup,
             const CueContext(repNumber: 4, contentKey: 'setup_a'),
           ),
           isTrue,
@@ -457,7 +457,7 @@ void main() {
 
         expect(
           policy.decide(
-            CueType.instruction,
+            CueType.setup,
             const CueContext(repNumber: 5, contentKey: 'setup_b'),
           ),
           isFalse,
@@ -484,7 +484,7 @@ void main() {
           random: _ScriptedRandom([0.90, 0.90, 0.90, 0.20]),
         );
         hammered.decide(
-          CueType.correct,
+          CueType.criticalFault,
           const CueContext(
             repNumber: 1,
             faultPersistence: 0,
@@ -492,7 +492,7 @@ void main() {
           ),
         );
         hammered.decide(
-          CueType.correct,
+          CueType.criticalFault,
           const CueContext(
             repNumber: 2,
             faultPersistence: 1,
@@ -500,19 +500,19 @@ void main() {
           ),
         );
         hammered.decide(
-          CueType.correct,
+          CueType.criticalFault,
           const CueContext(
             repNumber: 3,
             faultPersistence: 2,
             contentKey: 'faultA',
           ),
         );
-        final hammeredResult = hammered.decide(CueType.correct, ctxB);
+        final hammeredResult = hammered.decide(CueType.criticalFault, ctxB);
 
         // A fresh policy asked about fault B with the same final roll and
         // no fault-A history at all.
         final fresh = VoicePolicy(random: _ScriptedRandom([0.20]));
-        final freshResult = fresh.decide(CueType.correct, ctxB);
+        final freshResult = fresh.decide(CueType.criticalFault, ctxB);
 
         expect(hammeredResult, isTrue); // 0.20 hits the 25% base tier.
         expect(
@@ -532,7 +532,7 @@ void main() {
       // clamping — the roll must still cap at exactly 0.5.
       final tuning = {
         ...kDefaultTuning,
-        CueType.instruction: const CueTuning(
+        CueType.setup: const CueTuning(
           CueMode.base,
           base: 0.0,
           step: 1.0,
@@ -547,14 +547,14 @@ void main() {
       );
       expect(
         justUnderCap.decide(
-          CueType.instruction,
+          CueType.setup,
           const CueContext(repNumber: 1, contentKey: 'x'),
         ),
         isFalse,
       );
       expect(
         justUnderCap.decide(
-          CueType.instruction,
+          CueType.setup,
           const CueContext(repNumber: 2, contentKey: 'x'),
         ),
         isTrue,
@@ -568,14 +568,14 @@ void main() {
       );
       expect(
         justOverCap.decide(
-          CueType.instruction,
+          CueType.setup,
           const CueContext(repNumber: 1, contentKey: 'x'),
         ),
         isFalse,
       );
       expect(
         justOverCap.decide(
-          CueType.instruction,
+          CueType.setup,
           const CueContext(repNumber: 2, contentKey: 'x'),
         ),
         isFalse,
@@ -606,7 +606,7 @@ void main() {
       );
       expect(
         quietCorrect.decide(
-          CueType.correct,
+          CueType.criticalFault,
           const CueContext(
             repNumber: 1,
             faultPersistence: 4,
@@ -793,7 +793,7 @@ void main() {
         if (clean) {
           results.add(policy.decide(CueType.praise, ctx));
         } else {
-          results.add(policy.decide(CueType.correct, ctx));
+          results.add(policy.decide(CueType.criticalFault, ctx));
         }
         if (isFinalReps) {
           results.add(policy.decide(CueType.hustle, ctx));

@@ -38,7 +38,72 @@ praise that isn't guaranteed sustains effort-seeking longer than praise you can 
 | Post-set summary content | Concentrate the densest, most specific feedback at set-end: the single dominant fault to fix next set + a rep-count/highlight, not a recitation of every issue from every rep | High | Summary-KR literature: 5-trial summary block outperformed 1/10/15-trial blocks (inverted-U), and summary/terminal feedback beat per-trial feedback in the same retention studies above |
 | Tone / cultural calibration | Warm, encouraging phrasing always; avoid direct/blunt criticism, especially of a "you failed" framing | Low-Med (no sport-specific Vietnamese study found; extrapolated from general workplace/communication research) | General literature on Vietnamese/high-context communication favoring indirectness and face-saving; matches existing Vika product voice guideline (never drill-sergeant) |
 
-## 3. Verification notes
+## 3. Hustle/encouragement deep-dive (2026-07-09 run)
+
+Targeted follow-up run for the hustle-cue redesign (the once-per-set final-rep push was rejected
+2026-07-08 as robotic; see decisions.md). Single-pass capped Sonnet run, ~10 searches / 9 fetches;
+claims carry the run's own confidence tags and were NOT independently re-verified — treat High tags
+here as "peer-reviewed source fetched by the agent", one notch below §4's confirmed claims.
+
+### Efficacy + mechanism of verbal encouragement
+
+- Verbal feedback beats no feedback in acute resistance-exercise performance: Hedges' g = 0.47
+  (95% CI 0.22–0.71) across 13 studies; combined (visual+verbal) feedback ≈ 8.4% barbell-velocity
+  improvement. High — 2023 systematic review/meta-analysis, PMC10432365.
+- The effect is in-the-moment, not learned: "when feedback is taken away, performance immediately
+  returns to non-feedback levels." Per-rep feedback beats end-of-set feedback. High — same review.
+- Frequency floor: encouragement every 20s and 60s improved all outcomes in a treadmill-to-exhaustion
+  test (VO2max, time-to-exhaustion, lactate, RER, RPE); every 180s was statistically indistinguishable
+  from no encouragement. No within-session habituation observed. High for the finding, caveat: single-
+  session endurance protocol, not resistance training — PubMed 12003280.
+- Peer encouragement outperformed coach encouragement in a CrossFit study (+3–6.7% on 1RMs and time
+  trials, r=0.64–0.84) — supports "training partner" register over "drill sergeant". Med — single
+  study, PMC10975230.
+- Within-set PLACEMENT (near-failure vs spread) is unstudied — the literature covers presence and
+  frequency only. The grind-trigger hypothesis is coherent with practitioner cueing norms (Med) but
+  is not itself an effect-size-backed finding.
+
+### Grind detection via rep slowdown (VBT proxy)
+
+- Within-set barbell velocity loss by proximity to failure (bench press): to-failure −22%,
+  1-RIR −9%, 3-RIR −6% from first to final rep. High — PMC9908800.
+- Absolute velocity-at-RIR benchmarks exist (~0.27 m/s ≈ 2 RIR bench) but are lift- and load-specific;
+  authors explicitly flag non-generalizability. High for bench, not portable — PMC11934800.
+- Velocity-loss failure proxies are noisy even with a transducer: one secondary-source claim that 40%
+  VL reached true failure only ~56% of the time. Low — not independently verified.
+- DERIVED, PROVISIONAL (ours, not a citation): treating pose-derived rep duration as inverse velocity,
+  the numbers translate to roughly +6–10% longer rep ≈ 3 RIR, +10–15% ≈ 1 RIR, +25–30% ≈ near-failure.
+  No study measured rep-duration slowdown from pose/bodyweight data; for bodyweight moves (glute
+  bridge) "failure" is closer to form breakdown than bar-speed collapse. Calibrate against our own
+  ExerciseLogger rep durations before encoding any threshold. Low.
+
+### Phrasing + escalation near failure
+
+- Practitioner consensus (Starting Strength / NSCA coaching-education): grind-rep cues must be short,
+  loud, imperative — "the heavier the weight, the louder the cue"; long phrasing doesn't get processed
+  under load. Med — coaching-education sources, not controlled studies.
+- Selective delivery is the mark of skilled coaching: "great coaches don't react to every rep";
+  one cue at a time. Low-Med — practitioner opinion.
+- Countdown framing ("two more, last one") is recognized practice for final reps but overuse pulls
+  attention into anxious counting. Low-Med.
+- No controlled study isolates escalation mechanics (loudness, name-use, imperative form) — inherited
+  coaching craft, don't present as evidence-backed.
+
+### Vietnamese / SEA coaching style
+
+Nothing found (two targeted searches). Only generic SEA communication-style literature (indirectness,
+face-saving — not fitness-specific). Stays a design judgment under the existing warm-encouraging
+guardrail; no evidence base exists to cite.
+
+### Detection limits (pose-only, no bar velocity / HR)
+
+- CAN honor: per-grinding-rep firing frequency; relative rep-duration slowdown as a grind proxy
+  (direction well-established); short/imperative/escalating phrasing.
+- CANNOT honor: validated duration thresholds (all numbers are loaded-barbell LPT data); within-set
+  placement evidence (doesn't exist); physiological corroboration of effort — any grind threshold is
+  a proxy with unknown false-positive/negative rate.
+
+## 4. Verification notes
 
 - Claim 1 (silent monitoring 21.99%, most frequent behavior) — **confirmed**, exact figure matches source (PubMed 12173963).
 - Claim 2 (hustle 11.12%, 3rd most frequent) — **confirmed** in the same fetch; management/organization was actually 2nd (14.62%), ahead of hustle.

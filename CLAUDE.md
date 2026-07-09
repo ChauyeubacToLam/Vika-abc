@@ -39,19 +39,21 @@ differently, flag dead code don't delete it unless asked.
 - Light (specific screen/widget, debug, defined task): one-line restate, go.
 - Direct (quick fact, error explanation, small fix): just answer.
 
-## Delegation (you write code, I review every line)
-You write all code, including the core: algorithms, scoring math, CV/state-machine logic, anti-cheat
-gates. My job is to read every line you produce, actually understand it, and fix what's wrong. I own
-correctness, you own the draft. No more withholding core bodies.
-Write for review, not just for green tests. Two intensities:
-- Core (algorithms, scoring, CV, state machines, anti-cheat): annotate the concept and the why
-  inline, flag the assumptions and the lines most likely wrong, say what to stress-test. This is what
-  I read hardest, so make every line legible.
-- Glue, UI/Flutter, docs, plumbing: match existing patterns, light annotation, flag only what's worth
-  a second look.
-"ship it" = skip the teaching annotations, working code now, I'll review it later; flag it as review debt.
+## Delegation (Codex writes code, you design it, I review every line)
+Codex implements; you (Opus) design the how and hand it over; I review every line. Fable frames the
+what, you turn it into an annotated design (lavish) + a Codex spec, Codex writes the Dart. You do NOT
+draft production code, tokens are tight, UNLESS I explicitly say "you write this" for a specific
+change (an ambiguous "make change X" is not that; default to spec-for-Codex, ask if unsure). I own
+correctness; you own the design and its review-legibility.
+Design for review, not for green tests. Two intensities on what you produce:
+- Core (algorithms, scoring, CV, state machines, anti-cheat): spell out the concept and the why, name
+  the assumptions and the lines most likely wrong, say what to stress-test. This is what I read
+  hardest, so make the design legible.
+- Glue, UI/Flutter, docs, plumbing: point Codex at the existing pattern, light annotation, flag only
+  what's worth a second look.
+"ship it" = minimal design annotation, get Codex moving now, I review later; flag it as review debt.
 Still surface 2+ interpretations, tradeoffs, and simpler paths before committing to one, same as always.
-Debug: I diagnose and write the fix, you review it like any other code.
+Debug: I diagnose, the fix goes to Codex as a spec, I review it.
 
 ## Grounding (before you answer)
 Any Vika-specific question about architecture, a number, status, a screen, an algorithm, or a shipped
@@ -134,7 +136,7 @@ Vietnamese-market considerations) before any code. File it in docs/decisions.md.
 
 ## Deliverables
 - UI/Flutter: follow the Premium Ivory design system (Part 2).
-- Core logic: full working implementation, heavily annotated so I can review every line.
+- Core logic: annotated design (concept + why + risks) in lavish + a Codex spec, not the Dart itself.
 - Research: structured .docx, citations, confidence levels, explicit detection limits.
 - Docs: structured headers, tables for thresholds, prose for explanation.
 
