@@ -20,6 +20,12 @@ class GenericExerciseVoiceAssets {
     'common.good_2': 'common/good_2.mp3',
     'common.good_3': 'common/good_3.mp3',
     'common.good_4': 'common/good_4.mp3',
+    // Squat's PolicyVoiceCoach phase cues are phrase keys, not '<slug>.<id>'.
+    // Keep them in the shared map so the new sink can play the already-shipped
+    // squat WAVs without keeping the legacy SquatVoiceCoach player wrapper.
+    'Xuống': 'squat/xuong.wav',
+    'Giữ': 'squat/giu.wav',
+    'Đứng lên': 'squat/dung_len.wav',
     '1': 'common/count_1.mp3',
     '2': 'common/count_2.mp3',
     '3': 'common/count_3.mp3',
@@ -82,7 +88,13 @@ class GenericExerciseVoiceAssets {
     ),
     'Glute Bridge': GenericExerciseVoiceScript(
       slug: 'glute_bridge',
-      faultIds: ['hip_extension', 'lumbar', 'knee_angle', 'neck', 'speed'],
+      faultIds: [
+        'hip_extension',
+        'hyperextension',
+        'knee_angle',
+        'speed_control',
+        'neck_head',
+      ],
     ),
     'McGill Curl-up': GenericExerciseVoiceScript(
       slug: 'curl_up',
@@ -319,7 +331,12 @@ class GenericExerciseVoiceAssets {
 
   static String? resolveAsset(String key) {
     final value = key.trim();
-    if (value.isEmpty || value.startsWith('common.')) return null;
+    if (value.isEmpty) return null;
+    // Some logical keys are exact shared/phrase keys. Check them before the
+    // '<slug>.<id>' resolver below, otherwise squat phase cues would no-op.
+    final commonFile = commonFiles[value];
+    if (commonFile != null) return commonFile;
+    if (value.startsWith('common.')) return null;
 
     final dotIndex = value.indexOf('.');
     if (dotIndex <= 0 || dotIndex >= value.length - 1) return null;

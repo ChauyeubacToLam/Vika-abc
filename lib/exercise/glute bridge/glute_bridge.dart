@@ -8,6 +8,11 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../exercise_base.dart';
 import '../side_tracked_exercise_mixin.dart';
 import '../../utils/exercise_logger.dart';
+import '../../voice/policy_voice_coach.dart';
+import '../../voice/voice_coach.dart';
+import '../../voice/voice_content.dart';
+import '../../voice/voice_policy.dart';
+import '../../voice/voice_sink.dart';
 import 'metrics/glute_bridge_metric_base.dart';
 import 'metrics/glute_bridge_hip_extension.dart';
 import 'metrics/glute_bridge_knee_angle.dart';
@@ -73,6 +78,53 @@ class GluteBridge extends ExerciseBase with SideTrackedExerciseMixin {
   final int maxRep;
 
   GluteBridge({required this.maxRep});
+
+  static const List<String> _voiceFaultIds = [
+    'hip_extension',
+    'hyperextension',
+    'knee_angle',
+    'speed_control',
+    'neck_head',
+  ];
+
+  static const Map<String, List<String>> _softCuePools = {
+    'hip_extension': ['glute_bridge.hip_extension_soft'],
+    'hyperextension': ['glute_bridge.hyperextension_soft'],
+    'knee_angle': ['glute_bridge.knee_angle_soft'],
+    'speed_control': ['glute_bridge.speed_control_soft'],
+    'neck_head': ['glute_bridge.neck_head_soft'],
+  };
+
+  static final Map<CueType, CueTuning> _voiceTuning = {
+    ...kDefaultTuning,
+    CueType.count: CueTuning(
+      CueMode.always,
+      base: 0.50,
+      step: 0.10,
+      cap: 1.0,
+    ),
+    CueType.praise: CueTuning(
+      CueMode.variableRatio,
+      base: 0.50,
+      step: 0.10,
+      cap: 0.85,
+      scalePraiseByFormScore: false,
+    ),
+    CueType.correct: CueTuning(
+      CueMode.correction,
+      base: 0.25,
+      step: 0.30,
+      cap: 0.85,
+      firstOccurrenceCertain: true,
+    ),
+    CueType.soft: CueTuning(
+      CueMode.variableRatio,
+      base: 0.20,
+      step: 0.08,
+      cap: 0.55,
+    ),
+    CueType.hustle: CueTuning(CueMode.perishable, base: 0.0, cap: 0.0),
+  };
 
   GluteBridgeState gluteState = GluteBridgeState.bottom;
   GluteBridgeState previousGluteState = GluteBridgeState.bottom;
@@ -153,6 +205,26 @@ class GluteBridge extends ExerciseBase with SideTrackedExerciseMixin {
      ----------------------------------------------------------------------- */
   @override
   String get exerciseName => 'Glute Bridge';
+
+  @override
+  ExerciseVoiceCoach? createVoiceCoach() {
+    final script = VoiceScript.from(
+      VoiceDefaults.repBased,
+      slug: 'glute_bridge',
+      faultIds: _voiceFaultIds,
+      softCuePools: _softCuePools,
+      // Hustle is intentionally off for the first device pass; the useful
+      // future version should be grind-triggered, not final-rep-positioned.
+      hustlePool: const [],
+    );
+    return PolicyVoiceCoach(
+      script: script,
+      coach: VoiceCoach(
+        sink: AssetVoiceSink(),
+        policy: VoicePolicy(tuning: _voiceTuning),
+      ),
+    );
+  }
 
   // Glute Bridge starts from a floor setup that can take time to settle.
   // Replaying old faults here sounds like a fault from the current set before

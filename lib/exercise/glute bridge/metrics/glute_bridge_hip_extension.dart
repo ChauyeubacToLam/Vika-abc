@@ -100,7 +100,7 @@ class HipExtensionMetric extends GluteBridgeMetricBase {
       if (!_hyperextFaultAdded) {
         _faults.add(FaultRecord(
           phase: ctx.state.toString().split('.').last,
-          type: 'Hyperextension',
+          type: 'hyperextension',
           message: 'Không ưỡn lưng — ép lưng vào sàn',
           affectsForm: true,
         ));
@@ -132,7 +132,7 @@ class HipExtensionMetric extends GluteBridgeMetricBase {
         !_hyperextFaultAdded) {
       _faults.add(FaultRecord(
         phase: 'topHold',
-        type: 'Hyperextension',
+        type: 'hyperextension',
         message: 'Không ưỡn lưng — ép lưng vào sàn',
         affectsForm: true,
       ));
@@ -143,7 +143,7 @@ class HipExtensionMetric extends GluteBridgeMetricBase {
       final bool isError = peakAngle < HipExtensionConfig.WARNING_MIN_ANGLE;
       _faults.add(FaultRecord(
         phase: 'topHold',
-        type: 'HipExtension',
+        type: 'hip_extension',
         message: isError
             ? 'Nâng hông cao hơn — co mông tối đa'
             : 'Cố gắng nâng hông thêm một chút',

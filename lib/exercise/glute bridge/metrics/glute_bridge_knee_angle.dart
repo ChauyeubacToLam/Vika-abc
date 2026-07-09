@@ -117,7 +117,7 @@ class KneeAngleMetric extends GluteBridgeMetricBase {
       // Error: legs nearly straight — pure hamstring.
       _faults.add(FaultRecord(
         phase: 'topHold',
-        type: 'KneeAngle',
+        type: 'knee_angle',
         message: 'Di chân ra xa hông hơn — duỗi gối nhiều hơn',
         affectsForm: true,
       ));
@@ -125,7 +125,7 @@ class KneeAngleMetric extends GluteBridgeMetricBase {
       // Warning: 60–80° — hamstring cramp zone.
       _faults.add(FaultRecord(
         phase: 'topHold',
-        type: 'KneeAngle',
+        type: 'knee_angle',
         message: 'Di chân ra xa hông thêm để giảm áp lực hamstring',
         affectsForm: false,
       ));
@@ -133,7 +133,7 @@ class KneeAngleMetric extends GluteBridgeMetricBase {
       // Too close to hips (>140°) — loss of tension.
       _faults.add(FaultRecord(
         phase: 'topHold',
-        type: 'KneeAngle',
+        type: 'knee_angle',
         message: 'Di chân ra xa hông hơn một chút',
         affectsForm: false,
       ));

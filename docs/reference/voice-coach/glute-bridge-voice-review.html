@@ -1,0 +1,1618 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glute Bridge × Voice Coach — code + intent review · Vika</title>
+<style>
+:root{
+  --ink:#1F1812; --ink-soft:#4A4031; --muted:#8a7c63;
+  --page:#F1E9D9; --raised:#FBF7EE; --line:#E4DAC5; --line-soft:#EEE6D5;
+  --yellow:#FFB701;
+  --code-bg:#211A12; --code-fg:#EDE3CE; --code-dim:#9A8C71; --code-ln:#6B5D45; --code-rule:#37291a;
+  --tip:#2E6E63; --tip-bg:#E9F1EE; --tip-line:#BFDBD3;
+  --warn:#A2472B; --warn-bg:#F7EAE2; --warn-line:#E7C6B6;
+  --idea:#8A6608; --idea-bg:#FBF0D6; --idea-line:#EBD69E;
+  --mono:"JetBrains Mono","SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--page);color:var(--ink);font-family:var(--sans);line-height:1.62;
+  -webkit-font-smoothing:antialiased;font-size:16px}
+a{color:inherit}
+h1,h2,h3{line-height:1.18;text-wrap:balance;font-weight:800;letter-spacing:-.01em}
+code{font-family:var(--mono)}
+.wrap{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:256px minmax(0,1fr);
+  gap:52px;padding:0 28px 120px}
+/* ---- Top hero ---- */
+header.hero{padding:56px 28px 40px;
+  background:radial-gradient(120% 140% at 12% 0%,#2b2117 0%,#1c150e 60%,#160f09 100%);
+  color:#F3ECDD;position:relative;overflow:hidden}
+header.hero::after{content:"";position:absolute;inset:0;opacity:.05;pointer-events:none;
+  background-image:repeating-linear-gradient(0deg,#fff 0 1px,transparent 1px 3px)}
+.hero-in{max-width:1144px;margin:0 auto;position:relative}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.24em;text-transform:uppercase;
+  color:var(--yellow);margin:0 0 14px}
+header.hero h1{font-size:clamp(30px,5vw,50px);margin:0 0 14px;color:#FBF7EE}
+header.hero h1 .u{background:linear-gradient(transparent 68%,rgba(255,183,1,.42) 0);padding:0 2px}
+header.hero p.lede{font-size:18px;max-width:74ch;color:#D9CFBD;margin:0 0 26px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-family:var(--mono);font-size:12px;padding:6px 11px;border-radius:999px;
+  border:1px solid rgba(255,255,255,.16);color:#E8DFCD;background:rgba(255,255,255,.04)}
+.chip b{color:var(--yellow);font-weight:600}
+/* ---- TOC ---- */
+nav.toc{position:sticky;top:0;align-self:start;max-height:100vh;overflow:auto;
+  padding:34px 0;font-size:13.5px}
+nav.toc .lbl{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--muted);margin:0 0 12px}
+nav.toc ol{list-style:none;margin:0;padding:0;counter-reset:toc}
+nav.toc li{counter-increment:toc;margin:1px 0}
+nav.toc a{display:flex;gap:9px;text-decoration:none;color:var(--ink-soft);padding:5px 10px;
+  border-radius:7px;border-left:2px solid transparent}
+nav.toc a:before{content:counter(toc,decimal-leading-zero);font-family:var(--mono);font-size:11px;
+  color:var(--muted);padding-top:2px}
+nav.toc a:hover{background:var(--line-soft)}
+nav.toc a.on{background:#fff;border-left-color:var(--yellow);color:var(--ink);font-weight:600}
+/* ---- Main ---- */
+main{min-width:0;padding-top:20px}
+section{scroll-margin-top:20px;padding:30px 0;border-top:1px solid var(--line)}
+section:first-of-type{border-top:0}
+.kicker{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--yellow);font-weight:600;margin:0 0 6px;display:flex;align-items:center;gap:10px}
+.kicker .n{color:var(--muted)}
+h2{font-size:clamp(22px,3.2vw,30px);margin:0 0 8px}
+h3{font-size:18px;margin:28px 0 6px;font-weight:700}
+h3 .tag{font-family:var(--mono);font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;
+  vertical-align:middle;margin-left:8px;letter-spacing:.04em}
+.tag.crit{background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-line)}
+.tag.high{background:var(--idea-bg);color:var(--idea);border:1px solid var(--idea-line)}
+.tag.med{background:var(--tip-bg);color:var(--tip);border:1px solid var(--tip-line)}
+.tag.ok{background:var(--tip-bg);color:var(--tip);border:1px solid var(--tip-line)}
+p{margin:12px 0;max-width:74ch}
+.lead{font-size:17px;color:var(--ink-soft)}
+strong{font-weight:700}
+em.term{font-style:normal;font-weight:700;color:var(--ink);
+  background:linear-gradient(transparent 70%,rgba(255,183,1,.34) 0);padding:0 1px}
+ul,ol.steps{max-width:74ch;padding-left:20px}
+li{margin:5px 0}
+kbd{font-family:var(--mono);font-size:12px;background:var(--line-soft);border:1px solid var(--line);
+  border-radius:5px;padding:1px 6px;color:var(--ink-soft)}
+/* ---- code ---- */
+.code{border-radius:12px;overflow:hidden;background:var(--code-bg);margin:18px 0;
+  box-shadow:0 1px 0 rgba(0,0,0,.04),0 14px 30px -22px rgba(31,24,18,.5)}
+.code-head{font-family:var(--mono);font-size:11.5px;color:var(--code-dim);padding:9px 14px;
+  border-bottom:1px solid var(--code-rule);letter-spacing:.03em;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.code-head span{min-width:0;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+.code-head b{color:var(--yellow);font-weight:600;flex:none}
+.code-body{overflow-x:auto}
+.src{padding:14px 20px 16px;color:var(--code-fg);white-space:pre;margin:0;min-width:max-content;
+  font-family:var(--mono);font-size:12.5px;line-height:1.72}
+.src .c{color:var(--code-dim);font-style:italic}
+.src .k{color:#E7A93A}
+.src .s{color:#9FBE7E}
+.src .bad{background:rgba(162,71,43,.36);border-radius:3px;padding:0 2px}
+.src .good{background:rgba(46,110,99,.32);border-radius:3px;padding:0 2px}
+/* ---- callouts ---- */
+.call{border-radius:11px;padding:15px 17px 15px 16px;margin:16px 0;border:1px solid;
+  border-left-width:4px;font-size:15px}
+.call p{margin:7px 0;max-width:none}
+.call .ct{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+  font-weight:700;display:flex;align-items:center;gap:8px;margin:0 0 4px}
+.call.eli{background:var(--raised);border-color:var(--line);border-left-color:var(--yellow)}
+.call.eli .ct{color:var(--idea)}
+.call.tip{background:var(--tip-bg);border-color:var(--tip-line);border-left-color:var(--tip)}
+.call.tip .ct{color:var(--tip)}
+.call.warn{background:var(--warn-bg);border-color:var(--warn-line);border-left-color:var(--warn)}
+.call.warn .ct{color:var(--warn)}
+.call.idea{background:var(--idea-bg);border-color:var(--idea-line);border-left-color:var(--idea)}
+.call.idea .ct{color:var(--idea)}
+.call code{font-size:13px;background:rgba(0,0,0,.06);padding:1px 5px;border-radius:5px}
+/* ---- legend / chain ---- */
+.legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:22px 0}
+.legend div{background:var(--raised);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:14px}
+.legend b{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px;color:var(--ink)}
+.chain{margin:22px 0;border:1px solid var(--line);border-radius:14px;background:var(--raised);overflow:hidden;counter-reset:ch}
+.chain .row{display:grid;grid-template-columns:54px 1fr;border-top:1px solid var(--line-soft)}
+.chain .row:first-child{border-top:0}
+.chain .row .num{counter-increment:ch;font-family:var(--mono);font-size:12px;color:var(--muted);
+  display:flex;align-items:flex-start;justify-content:center;padding:14px 0;background:#fff;border-right:1px solid var(--line-soft)}
+.chain .row .num:before{content:counter(ch,decimal-leading-zero)}
+.chain .row .body{padding:12px 16px}
+.chain .row .body b{font-family:var(--mono);font-size:13px}
+.chain .row .body .d{font-size:14px;color:var(--ink-soft);margin-top:2px}
+.chain .row.dead .num{background:var(--warn-bg);color:var(--warn)}
+.chain .row.dead .body b{color:var(--warn)}
+/* recap table */
+.tbl{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:18px 0}
+.recap{width:100%;border-collapse:collapse;margin:18px 0;font-size:14.5px;background:var(--raised);
+  border:1px solid var(--line);border-radius:12px;overflow:hidden;table-layout:fixed}
+.tbl .recap{margin:0;min-width:560px}
+.recap th,.recap td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line-soft);
+  vertical-align:top;word-break:break-word;overflow-wrap:anywhere}
+.recap th{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:#fff}
+.recap tr:last-child td{border-bottom:0}
+.recap .sev{font-family:var(--mono);font-size:11px;font-weight:700;white-space:nowrap}
+.recap .sev.hi{color:var(--warn)} .recap .sev.med{color:var(--idea)} .recap .sev.lo{color:var(--tip)}
+.recap td code,.recap th code{font-size:12.5px;background:var(--line-soft);padding:1px 5px;border-radius:5px;
+  white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+.foot{grid-column:1/-1;margin-top:40px;padding-top:22px;border-top:1px solid var(--line);
+  color:var(--muted);font-size:13.5px;font-family:var(--mono)}
+@media(max-width:900px){
+  .wrap{grid-template-columns:1fr;gap:0;padding:0 18px 80px}
+  nav.toc{position:static;max-height:none;height:auto;padding:22px 0;border-bottom:1px solid var(--line);margin-bottom:8px}
+  nav.toc ol{columns:2;gap:8px}
+  header.hero{padding:44px 18px 32px}
+  .note-fab{right:14px;bottom:14px}
+}
+/* ===== personal notes layer ===== */
+mark.note-hl{background:rgba(255,183,1,.20);border-bottom:2px solid rgba(255,183,1,.7);border-radius:2px;
+  cursor:pointer;color:inherit;padding:0 .5px;transition:background .12s ease}
+mark.note-hl.hot{background:rgba(255,183,1,.45)}
+mark.note-hl.flash{animation:noteflash 1.2s ease}
+@keyframes noteflash{0%,100%{background-color:rgba(255,183,1,.20)}30%{background-color:rgba(255,183,1,.62)}}
+.note-badge{display:inline-flex;align-items:center;justify-content:center;min-width:14px;height:14px;padding:0 3px;
+  margin:0 1px 0 2px;font-family:var(--sans);font-size:9px;font-weight:800;line-height:1;vertical-align:super;
+  background:var(--ink);color:#FBF7EE;border-radius:7px;cursor:pointer;user-select:none;transition:background .12s ease}
+.note-badge.hot{background:var(--yellow);color:var(--ink)}
+.note-card{transition:box-shadow .12s ease,border-color .12s ease}
+.note-card.linked{border-color:var(--yellow);box-shadow:0 0 0 2px rgba(255,183,1,.28)}
+.note-card.active{border-color:var(--yellow);box-shadow:0 0 0 3px rgba(255,183,1,.42)}
+.note-card .cnum{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;
+  background:var(--ink);color:#FBF7EE;border-radius:8px;font-size:10px;font-weight:800;margin-right:7px;vertical-align:middle}
+.note-fab{position:fixed;right:22px;bottom:22px;z-index:50;display:flex;align-items:center;gap:9px;
+  background:var(--ink);color:#FBF7EE;border:none;border-radius:999px;padding:12px 17px;cursor:pointer;
+  font-family:var(--sans);font-weight:600;font-size:14px;box-shadow:0 10px 26px -10px rgba(31,24,18,.55)}
+.note-fab:hover{background:#332619}
+.note-fab .cnt{font-family:var(--mono);font-size:12px;background:var(--yellow);color:var(--ink);
+  border-radius:999px;padding:1px 8px;min-width:20px;text-align:center}
+.note-pop{position:absolute;z-index:60;transform:translate(-50%,-100%);margin-top:-9px;display:none;
+  background:var(--ink);border-radius:9px;padding:5px;box-shadow:0 12px 30px -12px rgba(0,0,0,.5)}
+.note-pop button{background:var(--yellow);color:var(--ink);border:none;border-radius:6px;
+  padding:7px 12px;font-family:var(--sans);font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap}
+.note-pop:after{content:"";position:absolute;left:50%;top:100%;transform:translateX(-50%);
+  border:6px solid transparent;border-top-color:var(--ink)}
+.note-panel{position:fixed;top:0;right:0;height:100%;width:min(380px,92vw);z-index:70;background:var(--raised);
+  border-left:1px solid var(--line);box-shadow:-18px 0 40px -30px rgba(31,24,18,.5);display:flex;flex-direction:column;
+  opacity:0;visibility:hidden;transform:translateY(6px);transition:opacity .18s ease,transform .18s ease,visibility .18s}
+.note-panel.open{opacity:1;visibility:visible;transform:none}
+.note-panel .ph{padding:18px 18px 14px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.note-panel .ph h3{margin:0;font-size:17px;font-weight:800}
+.note-panel .ph .sub{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.03em}
+.note-panel .x{background:none;border:none;font-size:24px;line-height:1;cursor:pointer;color:var(--muted)}
+.newbtn{background:var(--ink);color:#FBF7EE;border:none;border-radius:8px;padding:7px 12px;font-family:var(--sans);font-weight:700;font-size:12.5px;cursor:pointer;white-space:nowrap}
+.composer{padding:12px 14px;border-bottom:1px solid var(--line);background:#fff}
+.composer .anchor{font-family:var(--mono);font-size:11px;color:var(--tip);background:var(--tip-bg);
+  border:1px solid var(--tip-line);border-radius:7px;padding:5px 8px;margin-bottom:8px;display:flex;gap:6px;align-items:center;overflow:hidden}
+.composer .anchor span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.composer .anchor .axn{margin-left:auto;cursor:pointer;font-weight:700;flex:none}
+.composer textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:9px;
+  font-family:var(--sans);font-size:15px;padding:10px;resize:vertical;min-height:82px;background:#fff;color:var(--ink)}
+.composer textarea:focus{outline:2px solid var(--yellow);outline-offset:0;border-color:transparent}
+.composer .crow{display:flex;flex-direction:column;align-items:stretch;gap:7px;margin-top:8px}
+.composer .chint{font-size:11.5px;color:var(--muted)}
+.composer .addbtn{display:block;width:100%;background:var(--ink);color:#FBF7EE;border:none;border-radius:9px;
+  padding:12px 16px;font-family:var(--sans);font-weight:700;font-size:15px;cursor:pointer}
+.composer .addbtn:hover{background:#332619}
+.storage-note{margin:0;padding:9px 14px;background:var(--warn-bg);border-bottom:1px solid var(--warn-line);
+  color:var(--warn);font-size:12px;line-height:1.5}
+.storage-note.ok{background:var(--tip-bg);border-bottom-color:var(--tip-line);color:var(--tip)}
+.note-list{flex:1;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:12px}
+.note-empty{color:var(--muted);font-size:14px;text-align:center;padding:40px 14px;line-height:1.7}
+.note-empty b{color:var(--ink)}
+.note-card{background:#fff;border:1px solid var(--line);border-radius:11px;padding:12px 13px}
+.note-card .loc{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--tip);font-weight:700;cursor:pointer;margin-bottom:6px;display:inline-block}
+.note-card .quote{font-size:12px;color:var(--ink-soft);border-left:3px solid var(--line);padding:2px 0 2px 9px;
+  margin:0 0 8px;font-family:var(--mono);white-space:pre-wrap;word-break:break-word;max-height:74px;overflow:auto}
+.note-card .body{font-size:14.5px;white-space:pre-wrap;word-break:break-word}
+.note-card .body.empty{color:var(--muted);font-style:italic}
+.note-card textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;font-family:var(--sans);
+  font-size:14.5px;padding:8px;resize:vertical;min-height:66px;background:#fff;color:var(--ink)}
+.note-card .row{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
+.note-card .row button{border:none;border-radius:7px;padding:6px 11px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:var(--sans)}
+.note-card .save{background:var(--ink);color:#FBF7EE}
+.note-card .edit{background:var(--line-soft);color:var(--ink-soft)}
+.note-card .del{background:var(--warn-bg);color:var(--warn)}
+.note-card .reply{background:var(--tip-bg);color:var(--tip)}
+.note-card .replies{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+.note-thread{border-left:3px solid var(--line);padding:5px 0 5px 10px}
+.note-thread .who{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:3px;font-weight:700}
+.note-thread .txt{font-size:13.5px;white-space:pre-wrap;word-break:break-word}
+.note-thread.agent{border-left-color:var(--yellow)}
+.note-thread.agent .who{color:var(--idea)}
+.reply-box{margin-top:9px}
+.reply-box textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;
+  font-family:var(--sans);font-size:14px;padding:8px;resize:vertical;min-height:52px;background:#fff;color:var(--ink)}
+.reply-box textarea:focus{outline:2px solid var(--yellow);outline-offset:0;border-color:transparent}
+.note-panel .pf{padding:11px 14px;border-top:1px solid var(--line);display:flex;gap:8px}
+.note-panel .pf button{flex:1;border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans);color:var(--ink-soft)}
+.note-panel .pf button:hover{background:var(--line-soft)}
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-in">
+    <p class="eyebrow">Code + intent review · voice-coach migration · 2026-07-08</p>
+    <h1>Glute Bridge <span class="u">×</span> the new Voice Coach</h1>
+    <p class="lede">Follow one glute-bridge rep from the state machine all the way to a spoken cue,
+      through the five brand-new <code>lib/voice/</code> files. Every block is here verbatim, in plain
+      English, with an honest verdict. The headline up front: as wired today, glute bridge speaks
+      <strong>only counts and praise</strong> — its corrections are silently dead, and it will occasionally
+      praise a rep the system measured as bad. Details below.</p>
+    <div class="chips">
+      <span class="chip"><b>5</b> new voice files</span>
+      <span class="chip"><b>1</b> critical finding</span>
+      <span class="chip"><b>glue</b> glute bridge ↔ PolicyVoiceCoach</span>
+      <span class="chip"><b>Dart</b> / Flutter</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc" aria-label="Contents">
+  <p class="lbl">On this page</p>
+  <ol>
+    <li><a href="#tldr">TL;DR — what glute bridge says</a></li>
+    <li><a href="#cast">The cast — 5 files, 1 seam</a></li>
+    <li><a href="#chain">The whole chain, one rep</a></li>
+    <li><a href="#wiring">The wiring — createVoiceCoach()</a></li>
+    <li><a href="#adapter">The adapter — diff &amp; emit</a></li>
+    <li><a href="#f1">🔴 The fault-id mismatch</a></li>
+    <li><a href="#brain">The brain — VoicePolicy</a></li>
+    <li><a href="#intent">Intent review vs the spec</a></li>
+    <li><a href="#content">Content, resolution &amp; the sink</a></li>
+    <li><a href="#deadflags">Dead flags &amp; lost intent</a></li>
+    <li><a href="#ledger">Findings ledger</a></li>
+    <li><a href="#device">What to check on device</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<!-- ============================================================= -->
+<section id="tldr">
+  <p class="kicker"><span class="n">01</span> TL;DR</p>
+  <h2>What glute bridge actually says today</h2>
+  <p class="lead">Before any code: here is the net behaviour once you strip away the machinery. This is
+    what you would hear if you did a glute-bridge set on device right now, on this branch.</p>
+
+  <div class="legend">
+    <div><b>Count ✅ works</b>“Một… Hai… Ba…” — the landed rep number, stochastically thinned by the
+      policy. This path is correct and tested.</div>
+    <div><b>Praise ⚠ fires too freely</b>“Tốt lắm!” on clean reps — good. But it also fires on
+      <em class="term">bad-form</em> reps (~1 in 5), because corrections get mis-filtered into the
+      praise branch. Data-honesty leak.</div>
+    <div><b>Correction 🔴 never fires</b>Not once, for any glute-bridge fault. The fault ids the rep
+      logs and the fault ids the voice script expects don’t match, so every fault is dropped.</div>
+    <div><b>Hustle ⛔ off</b>The finish-line “Cố lên!” never fires — the base factory doesn’t pass a
+      rep target, so the policy can’t tell it’s the final reps.</div>
+    <div><b>Phase ⛔ none</b>Glute bridge ships no phase cues (only squat wired those), so no
+      “Nâng hông / Giữ / Hạ xuống” voice.</div>
+    <div><b>Setup / safety / set-complete ⛔ unwired</b>The adapter never emits <code>instruction</code>
+      or <code>safety</code> cues at all, for any exercise yet. All the on-screen setup coaching stays
+      silent.</div>
+  </div>
+
+  <div class="call warn">
+    <p class="ct">🔴 The one that matters</p>
+    <p>Glute bridge’s per-rep fault types are <strong>PascalCase metric names</strong>
+      (<code>HipExtension</code>, <code>SpeedControl</code>, <code>KneeAngle</code>, <code>NeckHead</code>,
+      <code>Hyperextension</code>). The voice script’s <code>faultIds</code> are
+      <strong>snake_case</strong> (<code>hip_extension</code>, <code>speed</code>, <code>knee_angle</code>,
+      <code>neck</code>, <code>lumbar</code>). The new adapter matches them with a plain
+      <code>contains</code> — <strong>zero overlap</strong> → no corrections, and faulty reps fall through
+      to praise. The old coach had a normalization layer that bridged this; the migration dropped it.
+      Full breakdown in <a href="#f1">§06</a>.</p>
+  </div>
+
+  <div class="call idea">
+    <p class="ct">💡 How to read this doc</p>
+    <p>Each code block is verbatim from the repo (file + line range in the dark header). Yellow
+      <span style="background:rgba(255,183,1,.28);padding:0 3px;border-radius:3px">highlight</span> in code =
+      the exact line a finding lives on. <strong>ELI5</strong> = plain-English translation.
+      <strong>Verdict</strong> = my review call. Select any text and hit <kbd>🖊 Note this</kbd> to pin your
+      own reactions — they save to disk and I can read them back.</p>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<section id="cast">
+  <p class="kicker"><span class="n">02</span> Orientation</p>
+  <h2>The cast — five new files, one seam</h2>
+  <p>The whole feature is a clean pipeline: an <strong>adapter</strong> turns per-frame camera state into
+    discrete “cue requests”, a <strong>brain</strong> decides whether each one speaks, a
+    <strong>façade</strong> picks the exact words, and a <strong>sink</strong> makes the sound. Data lives
+    apart from logic. Here is who owns what.</p>
+
+  <table class="recap">
+    <tr><th>File</th><th>Role</th><th>Owns</th><th>Pure?</th></tr>
+    <tr><td><code>voice_content.dart</code></td><td>Data layer</td>
+      <td><code>CueType</code>, <code>CueContext</code>, <code>VoiceLib</code> (the line catalog),
+        <code>VoiceScript</code> (per-exercise footprint)</td><td>Yes — no I/O</td></tr>
+    <tr><td><code>voice_policy.dart</code></td><td>The brain</td>
+      <td><em>Whether</em> a cue speaks: hunger, hard rules, relief valves. Deterministic given an injected
+        <code>Random</code>+clock</td><td>Yes — no I/O</td></tr>
+    <tr><td><code>voice_coach.dart</code></td><td>The façade</td>
+      <td><em>What</em> to say: pool pick with no immediate repeat, the D8 <code>praiseBig</code> bias</td>
+      <td>Almost — fires at the sink</td></tr>
+    <tr><td><code>voice_sink.dart</code></td><td>The sound</td>
+      <td>Logical key → asset path (the swappable <code>VoiceSet</code> seam), plays the clip, safe no-op
+        on missing audio</td><td>No — the only audio I/O</td></tr>
+    <tr><td><code>policy_voice_coach.dart</code></td><td>The adapter</td>
+      <td>The whole reason the camera pipeline is untouched: it <em>diffs</em> frame-to-frame state and
+        turns rep-landings / faults / phase-changes into cue requests</td><td>No — holds prior-frame state</td></tr>
+  </table>
+
+  <div class="call eli">
+    <p class="ct">🧒 ELI5</p>
+    <p>Think of a real PT. The <strong>adapter</strong> is the PT’s eyes — it notices “a rep just finished,
+      and the hips didn’t come up high enough.” The <strong>brain</strong> is the PT’s judgement — “do I
+      say something this rep, or let it slide and watch?” The <strong>façade</strong> is word choice —
+      “Tốt” vs “Tốt lắm!”. The <strong>sink</strong> is the mouth. Splitting them means you can make the PT
+      chattier, or swap their voice, without touching the eyes.</p>
+  </div>
+
+  <div class="call tip">
+    <p class="ct">✔ Verdict — the architecture is genuinely good</p>
+    <p>This separation is the strongest part of the work. The brain is pure and unit-tested to the
+      behaviour (not the numbers), the data is a flat catalog, and the adapter honours the “zero pipeline
+      changes” guardrail (decision D1). My findings below are almost all about the <em>seam</em> between
+      this new system and the existing exercise code — not the system’s own design.</p>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<section id="chain">
+  <p class="kicker"><span class="n">03</span> The path</p>
+  <h2>One glute-bridge rep, end to end</h2>
+  <p>Here is the exact journey of a single completed rep from the state machine to a sound. Rows in
+    <span style="color:var(--warn);font-weight:700">red</span> are where the chain breaks for glute bridge
+    specifically.</p>
+
+  <div class="chain">
+    <div class="row"><div class="num"></div><div class="body">
+      <b>GluteBridge._onRepCompleted()</b>
+      <div class="d">Descent hits bottom → <code>repCount += 1</code>, metrics evaluated, and a
+        <code>RepLog</code> is written with <code>fault_types: [...]</code> — the PascalCase metric names.</div></div></div>
+    <div class="row"><div class="num"></div><div class="body">
+      <b>active_exercise_page._processVoiceFrame()</b>
+      <div class="d">Every frame calls <code>coach.processFrame(exercise, repCount, hasPose, feedback)</code>.
+        The coach is a <code>PolicyVoiceCoach</code> built by the base factory.</div></div></div>
+    <div class="row"><div class="num"></div><div class="body">
+      <b>PolicyVoiceCoach.processFrame()</b>
+      <div class="d">Sees <code>repCount</code> went up → <code>_handleRepLanded()</code>. Reads the latest
+        <code>RepLog</code>, extracts fault ids.</div></div></div>
+    <div class="row dead"><div class="num"></div><div class="body">
+      <b>_faultIdsFor() — THE BREAK</b>
+      <div class="d">Filters <code>fault_types</code> against <code>script.faultIds</code> with a plain
+        <code>contains</code>. PascalCase vs snake_case → <strong>always empty</strong>. Every fault
+        vanishes here.</div></div></div>
+    <div class="row"><div class="num"></div><div class="body">
+      <b>say(count) ✅ &nbsp;/&nbsp; say(praise) ⚠</b>
+      <div class="d">Because faults are empty, the rep looks <em>clean</em>: count fires (good), and the
+        <em>praise</em> branch runs — even on a bad rep. Correction’s <code>say()</code> is never called.</div></div></div>
+    <div class="row"><div class="num"></div><div class="body">
+      <b>VoicePolicy.decide()</b>
+      <div class="d">The brain rolls the dice for count/praise. Works perfectly — it just never receives a
+        <code>correct</code> request to reason about.</div></div></div>
+    <div class="row"><div class="num"></div><div class="body">
+      <b>VoiceCoach._resolveKey() → AssetVoiceSink.playKey()</b>
+      <div class="d">Pick a variation, resolve the logical key to an mp3, play it. Missing audio = silent
+        no-op (never throws).</div></div></div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<section id="wiring">
+  <p class="kicker"><span class="n">04</span> The seam</p>
+  <h2>The wiring — how glute bridge gets its coach</h2>
+  <p>Glute bridge does <strong>not</strong> override <code>createVoiceCoach()</code>. So it inherits the
+    base factory. This is the single most important block for the review, because every glue decision for
+    glute bridge is made here — and two of them are wrong or incomplete.</p>
+
+  <div class="code">
+    <div class="code-head"><span>lib/exercise/exercise_base.dart — the inherited factory</span><b>L369–387</b></div>
+    <div class="code-body"><pre class="src"><span class="k">ExerciseVoiceCoach</span>? createVoiceCoach() {
+  <span class="c">// Keep the same per-exercise footprint the legacy generic coach used:</span>
+  <span class="c">// both script types map fault ids to '&lt;slug&gt;.&lt;id&gt;' asset keys.</span>
+  <span class="k">final</span> legacy =
+      GenericExerciseVoiceAssets.scriptForExerciseName(exerciseName);
+  <span class="k">final</span> bundle = liveHoldTargetSeconds != <span class="k">null</span>
+      ? VoiceDefaults.timeBased
+      : VoiceDefaults.repBased;
+  <span class="k">final</span> script = VoiceScript.from(
+    bundle,
+    slug: legacy.slug,
+    <span class="bad">faultIds: legacy.faultIds,</span>          <span class="c">// &lt;- ['hip_extension','lumbar','knee_angle','neck','speed']</span>
+  );
+  <span class="k">return</span> PolicyVoiceCoach(
+    script: script,
+    coach: VoiceCoach(sink: AssetVoiceSink()),
+    <span class="bad">// no targetReps: passed  -&gt; hustle can never fire</span>
+    countsByRepNumber: liveHoldTargetSeconds == <span class="k">null</span>,   <span class="c">// true for glute bridge</span>
+  );
+}</pre></div>
+  </div>
+
+  <div class="call eli">
+    <p class="ct">🧒 ELI5</p>
+    <p>“When the exercise page opens, build a talking coach. Reuse the exercise’s existing footprint (its
+      slug and its list of fault names) from the old lookup table. If it’s a timed hold, use time-based
+      counting; otherwise count reps. Then hand that to the new policy coach.” For glute bridge:
+      <code>liveHoldTargetSeconds</code> is null → rep-based, counts by rep number. Confirmed by the wiring
+      test.</p>
+  </div>
+
+  <div class="call warn">
+    <p class="ct">⚠ Verdict — two problems seeded right here</p>
+    <p><strong>(1) The faultIds are the wrong vocabulary.</strong> <code>legacy.faultIds</code> for “Glute
+      Bridge” is <code>['hip_extension', 'lumbar', 'knee_angle', 'neck', 'speed']</code> — but those never
+      match what the rep log actually records (see <a href="#f1">§06</a>). The comment claims “keep the same
+      footprint,” but the old coach <em>normalized</em> before comparing; copying just the id list without
+      the normalizer is what breaks it.</p>
+    <p><strong>(2) <code>targetReps</code> is never passed.</strong> Only squat’s override passes it. Glute
+      bridge knows its <code>maxRep</code>, but the base factory has no access to it (there’s no
+      <code>maxRep</code> on <code>ExerciseBase</code>). So <code>isFinalReps</code> is always false and the
+      hustle cue is dead for every generic exercise. Defensible as staging, but worth a decision: thread a
+      rep target through, or accept “no finish-line push” for non-squat exercises.</p>
+  </div>
+
+  <p>Compare squat’s override, which is the “fully wired” reference. It adds exactly the two things the base
+    omits — <code>phaseCues</code> and <code>targetReps</code>:</p>
+
+  <div class="code">
+    <div class="code-head"><span>lib/exercise/squat/squat.dart — the stage-3 pilot, for contrast</span><b>L214–239</b></div>
+    <div class="code-body"><pre class="src">@override
+<span class="k">ExerciseVoiceCoach</span>? createVoiceCoach() {
+  <span class="k">final</span> legacy =
+      GenericExerciseVoiceAssets.scriptForExerciseName(exerciseName);
+  <span class="k">final</span> script = VoiceScript.from(
+    VoiceDefaults.repBased,
+    slug: legacy.slug,
+    faultIds: legacy.faultIds,
+    <span class="good">phaseCues: const {</span>                <span class="c">// glute bridge has NONE of this</span>
+      <span class="s">'descending'</span>: <span class="s">'Xuống'</span>,
+      <span class="s">'bottom'</span>: <span class="s">'Giữ'</span>,
+      <span class="s">'ascending'</span>: <span class="s">'Đứng lên'</span>,
+    },
+  );
+  <span class="k">return</span> PolicyVoiceCoach(
+    script: script,
+    coach: VoiceCoach(sink: AssetVoiceSink()),
+    <span class="good">targetReps: maxRep,</span>              <span class="c">// glute bridge does NOT pass this</span>
+  );
+}</pre></div>
+  </div>
+
+  <div class="call idea">
+    <p class="ct">💡 Note the asymmetry</p>
+    <p>Squat is a hand-tuned override; glute bridge rides the generic base. That’s fine <em>if</em> the
+      generic base is correct — but the base is where the faultId mismatch and the missing rep-target both
+      live. Fixing the base fixes every generic rep exercise at once (bird dog, push up, lunge, curl-up…),
+      which is a much higher-leverage fix than patching glute bridge alone.</p>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<section id="adapter">
+  <p class="kicker"><span class="n">05</span> The adapter</p>
+  <h2>PolicyVoiceCoach — diff the frame, emit the cues</h2>
+  <p>This is the class that lets the camera pipeline stay untouched. It implements the exact old
+    <code>ExerciseVoiceCoach</code> interface and holds prior-frame state so it can tell “a rep just landed”
+    from “same frame as before.” First, the per-frame entry point:</p>
+
+  <div class="code">
+    <div class="code-head"><span>lib/voice/policy_voice_coach.dart — processFrame</span><b>L72–109</b></div>
+    <div class="code-body"><pre class="src">@override
+<span class="k">void</span> processFrame({
+  <span class="k">required</span> ExerciseBase exercise,
+  <span class="k">required</span> <span class="k">int</span> repCount,
+  <span class="k">required</span> <span class="k">bool</span> hasPose,
+  <span class="k">required</span> Map&lt;String, String&gt; feedback,   <span class="c">// &lt;- never read (see verdict)</span>
+}) {
+  <span class="k">final</span> state = exercise.exerciseState;
+  <span class="k">final</span> justActivated = state == ExerciseState.activated &amp;&amp;
+      _lastExerciseState != ExerciseState.activated;
+  <span class="k">if</span> (justActivated || !_hasBegunSet) {
+    _coach.beginSet();                 <span class="c">// wipe hunger + diff state</span>
+    _faultFirstSeenRep.clear();
+    _lastPhaseCue = <span class="k">null</span>;
+    _hasBegunSet = <span class="k">true</span>;
+  }
+  _lastExerciseState = state;
+
+  <span class="c">// TODO(wiring): ExerciseBase exposes no structured safety-event signal ...</span>
+
+  <span class="k">if</span> (state != ExerciseState.activated || exercise.isPaused || !hasPose) {
+    _lastRepCount = repCount;
+    <span class="k">return</span>;
+  }
+
+  <span class="k">final</span> repIncreased = repCount &gt; _lastRepCount;
+  <span class="k">if</span> (repIncreased) {
+    _handleRepLanded(exercise: exercise, repCount: repCount);
+  }
+  _maybeSpeakPhaseCue(exercise: exercise, repCount: repCount);
+  _lastRepCount = repCount;
+}</pre></div>
+  </div>
+
+  <div class="call eli">
+    <p class="ct">🧒 ELI5</p>
+    <p>“Every frame: if we just started a set, reset everything. If we’re not actively exercising, do
+      nothing. If the rep counter ticked up since last frame, react to that finished rep. Then maybe say a
+      movement cue.” The clever bit is <code>repIncreased</code> — it turns a per-frame stream into discrete
+      “a rep happened” events without the exercise having to fire callbacks.</p>
+  </div>
+
+  <div class="call tip">
+    <p class="ct">✔ Verdict — the diff loop is solid</p>
+    <p>Activation-edge detection (<code>justActivated</code>), the paused/no-pose guard, and updating
+      <code>_lastRepCount</code> on <em>every</em> return path (so a paused rep doesn’t double-count on
+      resume) are all correct. For glute bridge, <code>_maybeSpeakPhaseCue</code> is a no-op because the
+      script has no <code>phaseCues</code> — so this reduces to “react to landed reps.”</p>
+  </div>
+
+  <p>Now the heart of it — what happens when a rep lands. I’ve trimmed to the decision logic:</p>
+
+  <div class="code">
+    <div class="code-head"><span>lib/voice/policy_voice_coach.dart — _handleRepLanded (trimmed)</span><b>L111–187</b></div>
+    <div class="code-body"><pre class="src"><span class="k">void</span> _handleRepLanded({required ExerciseBase exercise, required <span class="k">int</span> repCount}) {
+  <span class="k">final</span> repLog = _latestRepLog(exercise, repCount);
+  <span class="bad">final faultIds = _faultIdsFor(repLog);</span>     <span class="c">// &lt;- returns [] for glute bridge, always</span>
+  <span class="k">final</span> clean = faultIds.isEmpty;                <span class="c">// &lt;- so 'clean' is ALWAYS true</span>
+  <span class="k">final</span> isFinalReps = _isFinalReps(repCount);    <span class="c">// &lt;- always false (no targetReps)</span>
+
+  <span class="bad">final formScore = (repLog?.correctForm ?? true) ? 1.0 : 0.0;</span>
+
+  <span class="k">final</span> baseCtx = CueContext(
+    repNumber: repCount, isFinalReps: isFinalReps,
+    clean: clean, formScore: formScore,
+  );
+
+  <span class="k">final</span> countContent = countsByRepNumber
+      ? VoiceContent.key(repCount.toString())     <span class="c">// glute bridge: speak the rep number</span>
+      : VoiceContent.pool(script.countPool);
+  _coach.say(CueType.count, countContent, baseCtx);   <span class="good">// ✅ this works</span>
+
+  <span class="k">if</span> (faultIds.isNotEmpty) {                     <span class="c">// &lt;- NEVER entered for glute bridge</span>
+    <span class="k">for</span> (<span class="k">final</span> id <span class="k">in</span> faultIds) {
+      <span class="k">final</span> firstSeenRep = _faultFirstSeenRep.putIfAbsent(id, () =&gt; repCount);
+      <span class="k">final</span> persistence = repCount - firstSeenRep;
+      _coach.say(CueType.correct,
+          VoiceContent.key(script.faultKey(id)),
+          baseCtx.copyWith(contentKey: id, faultPersistence: persistence));
+    }
+    _faultFirstSeenRep.removeWhere((id, _) =&gt; !faultIds.contains(id));
+  } <span class="k">else</span> {                                       <span class="c">// &lt;- ALWAYS taken, even on bad reps</span>
+    _faultFirstSeenRep.clear();
+    <span class="bad">_coach.say(CueType.praise, VoiceContent.pool(script.praisePool), baseCtx);</span>
+  }
+
+  <span class="k">if</span> (isFinalReps) {                             <span class="c">// &lt;- never true for glute bridge</span>
+    _coach.say(CueType.hustle, VoiceContent.pool(script.hustlePool), baseCtx);
+  }
+}</pre></div>
+  </div>
+
+  <div class="call eli">
+    <p class="ct">🧒 ELI5</p>
+    <p>“A rep landed. Figure out its faults. Always try a count. If there are faults, say a correction for
+      each; otherwise say a praise. If it’s a finish-line rep, try a hustle.” The whole thing hinges on one
+      line: <code>faultIds = _faultIdsFor(repLog)</code>. If that returns an empty list, the exercise looks
+      flawless to the coach — count + praise, no correction, ever.</p>
+  </div>
+
+  <div class="call warn">
+    <p class="ct">⚠ Verdict — the design here is right; the input to it is poisoned</p>
+    <p>The logic is exactly what the spec asks for: count, then <em>one</em> outcome (correct-or-praise),
+      then maybe hustle. The persistence tracking via <code>_faultFirstSeenRep</code> is also correct — it
+      resets when a fault disappears, so <code>faultPersistence</code> is a true consecutive-streak count.
+      <strong>But</strong> because <code>_faultIdsFor</code> returns empty for glute bridge, this whole
+      block collapses to “count + praise,” and the <code>else</code> praise branch runs on genuinely bad
+      reps. The <code>formScore = ... ? 1.0 : 0.0</code> line is the <em>only</em> thing partially masking
+      it — see the next section for why that’s a fragile safety net, not a fix.</p>
+  </div>
+
+  <div class="call warn">
+    <p class="ct">⚠ Your catch (note on the fault loop) — the voiced correction isn’t chosen by priority</p>
+    <p><strong>“So we say all the corrections? I think it should be the most important one → most severe.”</strong>
+      Right instinct, and half-handled: it does <em>not</em> say all. The loop calls <code>say(correct)</code>
+      once per fault, but the policy’s one-outcome-cue-per-rep guard means the <em>first</em> fault that wins
+      its dice roll speaks and the rest are blocked — so it’s ≤1 correction per rep.
+      <strong>But which one wins is iteration-order + dice, not priority.</strong>
+      <code>fault_types</code> is a bare <code>allFaults.map((f) =&gt; f.type).toSet().toList()</code>, so
+      <code>FaultRecord.priority</code> is thrown away <em>before</em> it ever reaches the coach. The metrics
+      <em>have</em> priority — glute bridge already sorts by it for the on-screen <code>topFault</code> — the
+      voice path just can’t see it. So the spec’s “only the highest-priority one speaks” is unmet.
+      <strong>Fix it together with F1:</strong> when you rewrite the RepLog fault list, emit it
+      <em>priority-sorted</em> (or log priority next to type) and have the adapter voice only the first entry.
+      Logged as <strong>F1b</strong>.</p>
+  </div>
+
+  <div class="call idea">
+    <p class="ct">💡 Quick clarify (note on the <code>isFinalReps</code> block)</p>
+    <p><strong>“So the praise is only for the last rep?”</strong> No — praise fires on <em>any</em> clean rep
+      (the <code>else</code> branch a few lines up). The <code>if (isFinalReps)</code> block is a
+      <em>separate, additional</em> cue: the finish-line hustle (“Cố lên!”), which for glute bridge never runs
+      anyway (no <code>targetReps</code> — F2). So: <strong>praise = every clean rep; hustle = only the final
+      rep or two</strong>, and only once a rep target is wired in.</p>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<section id="f1">
+  <p class="kicker"><span class="n">06</span> The critical finding</p>
+  <h2>🔴 The fault-id mismatch — corrections can’t fire</h2>
+  <p class="lead">This is the finding to read twice. It’s a single-line filter with a vocabulary mismatch on
+    either side of it, and it silently kills the entire correction feature for glute bridge (and, I suspect,
+    most generic exercises).</p>
+
+  <h3>Side A — what the rep log records</h3>
+  <p>When a glute-bridge rep completes, the fault types written to the log come straight from each metric’s
+    <code>FaultRecord.type</code> — and those are <strong>PascalCase class-ish names</strong>:</p>
+
+  <div class="code">
+    <div class="code-head"><span>lib/exercise/glute bridge/glute_bridge.dart — the RepLog write</span><b>L634–643</b></div>
+    <div class="code-body"><pre class="src">logger.addRepLog(RepLog(
+  correctForm: correctForm,
+  repNumber: repCount,
+  data: {
+    <span class="s">"peak_hip_extension_angle"</span>: _peakShoulderHipKneeAngle ?? 0.0,
+    <span class="s">"peak_normalized_hip_deviation"</span>: _peakNormalizedDeviation ?? 0.0,
+    <span class="s">"peak_knee_angle"</span>: _peakKneeAngle ?? 0.0,
+    <span class="bad">"fault_types": allFaults.map((f) =&gt; f.type).toSet().toList(),</span>
+  },
+));</pre></div>
+  </div>
+
+  <p>And the <code>f.type</code> strings each metric emits (verbatim from the metric files):</p>
+  <table class="recap">
+    <tr><th>Metric file</th><th><code>FaultRecord.type</code> emitted</th><th>affectsForm?</th></tr>
+    <tr><td><code>glute_bridge_hip_extension.dart</code></td><td><code>'Hyperextension'</code>, <code>'HipExtension'</code></td><td>true / true (error) or false (warning)</td></tr>
+    <tr><td><code>glute_bridge_knee_angle.dart</code></td><td><code>'KneeAngle'</code></td><td>true (&lt;50°) or false</td></tr>
+    <tr><td><code>glute_bridge_speed_control.dart</code></td><td><code>'SpeedControl'</code></td><td>true or false</td></tr>
+    <tr><td><code>glute_bridge_neck_head.dart</code></td><td><code>'NeckHead'</code></td><td>false</td></tr>
+  </table>
+
+  <h3>Side B — what the voice script expects</h3>
+  <p>The <code>faultIds</code> handed to the coach come from the legacy lookup for “Glute Bridge” — all
+    <strong>snake_case</strong>, and not even a spelling-match for the metric names:</p>
+
+  <div class="code">
+    <div class="code-head"><span>lib/services/generic_exercise_voice_assets.dart</span><b>L89–92</b></div>
+    <div class="code-body"><pre class="src"><span class="s">'Glute Bridge'</span>: GenericExerciseVoiceScript(
+  slug: <span class="s">'glute_bridge'</span>,
+  <span class="bad">faultIds: [<span class="s">'hip_extension'</span>, <span class="s">'lumbar'</span>, <span class="s">'knee_angle'</span>, <span class="s">'neck'</span>, <span class="s">'speed'</span>],</span>
+),</pre></div>
+  </div>
+
+  <div class="call tip">
+    <p class="ct">✅ Decided (2026-07-08) — “what is this list doing? if it’s only to recheck the replog, remove it”</p>
+    <p><strong>Confirmed, and yes — remove it.</strong> I grepped every read of <code>.faultIds</code> (the
+      list) in <code>lib/</code>: in the <em>new</em> system it’s read in <em>exactly one place</em>, the
+      <code>_faultIdsFor</code> gate below (<code>policy_voice_coach.dart:218</code>). The audio key is built
+      by <code>faultKey(id)</code> from the <em>individual</em> id off the replog
+      (<code>voice_content.dart:269</code>) — it never consults the list. As a gate it’s pure redundancy, and
+      it’s the exact line that kills every glute-bridge correction today. Drop it; use whatever the replog
+      carries. (The two other reads are inside the old <code>_GenericExerciseVoiceCoach</code>, which stage 5
+      deletes.)</p>
+    <p><strong>One coupling, don’t miss it:</strong> “use whatever’s in the replog” only produces the
+      <em>right</em> audio key because you’re also renaming the metric <code>type</code>s to snake_case (your
+      option-A call, §06). Raw replog + no rename → <code>faultKey</code> spits out
+      <code>glute_bridge.HipExtension</code>, still no matching asset. The two changes are one change: rename
+      the four metric <code>type</code>s to snake_case <em>and</em> delete the filter — together they make
+      corrections fire with the correct keys.</p>
+    <p><strong>One job not to lose:</strong> in the old coach the list’s <em>order was the priority</em> —
+      <code>script.faultIds.firstWhere(detected.contains)</code> (<code>exercise_base.dart:911</code>) spoke
+      the earliest-declared fault, so if hip and neck both faulted it said the hip. If you just speak raw
+      replog order you drop that (<strong>F1b</strong>). Clean replacement: sort the replog faults by
+      <code>FaultRecord.priority</code> (metrics already carry it; glute bridge already uses it for the
+      on-screen <code>topFault</code>) and speak only the first — which also answers your other note “say the
+      most important one, not all.” One move retires the filter <em>and</em> restores priority.</p>
+  </div>
+
+  <h3>The filter that assumes they’re the same vocabulary</h3>
+  <div class="code">
+    <div class="code-head"><span>lib/voice/policy_voice_coach.dart — _faultIdsFor</span><b>L210–223</b></div>
+    <div class="code-body"><pre class="src">List&lt;String&gt; _faultIdsFor(RepLog? repLog) {
+  <span class="k">if</span> (repLog == <span class="k">null</span> || repLog.correctForm) <span class="k">return</span> const [];  <span class="c">// warnings-only reps exit here</span>
+  <span class="k">final</span> raw = repLog.data[<span class="s">'fault_types'</span>];
+  <span class="k">if</span> (raw is! Iterable) <span class="k">return</span> const [];
+  <span class="k">final</span> ids = &lt;String&gt;[];
+  <span class="k">for</span> (<span class="k">final</span> item <span class="k">in</span> raw) {
+    <span class="k">final</span> id = item.toString().trim();          <span class="c">// 'HipExtension' — NOT normalized</span>
+    <span class="k">if</span> (id.isEmpty) <span class="k">continue</span>;
+    <span class="bad">if (script.faultIds.isEmpty || script.faultIds.contains(id)) {</span>  <span class="c">// contains('HipExtension') == false</span>
+      ids.add(id);
+    }
+  }
+  <span class="k">return</span> ids;                                     <span class="c">// -&gt; [] for every glute-bridge fault</span>
+}</pre></div>
+  </div>
+
+  <div class="call warn">
+    <p class="ct">🔴 Finding F1 — the exact failure, step by step</p>
+    <p><strong>Given:</strong> a rep with a hard hip-extension fault →
+      <code>correctForm == false</code>, <code>fault_types == ['HipExtension']</code>.</p>
+    <p><strong>Then:</strong> <code>_faultIdsFor</code> passes the first guard (not <code>correctForm</code>),
+      reads <code>'HipExtension'</code>, checks <code>['hip_extension',…].contains('HipExtension')</code> →
+      <strong>false</strong> → returns <code>[]</code>.</p>
+    <p><strong>So back in <code>_handleRepLanded</code>:</strong> <code>faultIds.isEmpty</code> → the
+      <code>else</code> branch runs → <code>say(CueType.praise, …)</code> on a bad-form rep. Correction’s
+      <code>say()</code> is never reached. <code>formScore</code> is <code>0.0</code> (because
+      <code>correctForm</code> is false), which damps the praise roll to ~0.6× and blocks
+      <code>praiseBig</code> — so it’s a muted “Tốt,” roughly a 1-in-5 chance, not a gushing “Xuất sắc!”.
+      But it is still praise on a rep the system flagged as wrong. That violates the data-honesty guardrail
+      and hard-rule #10 (“every cue backed by a measurement”).</p>
+    <p><strong>Net for glute bridge:</strong> corrections never fire; a fraction of bad reps get quietly
+      praised; all four form metrics are voice-invisible.</p>
+  </div>
+
+  <h3>Why it worked before — the normalizer the migration dropped</h3>
+  <p>The old <code>_GenericExerciseVoiceCoach</code> didn’t compare raw strings. It ran each fault type
+    through a normalization + candidate-id layer that mapped free text to snake_case ids:</p>
+
+  <div class="code">
+    <div class="code-head"><span>lib/exercise/exercise_base.dart — the OLD coach’s bridge (still present, now unused for this)</span><b>L982–995</b></div>
+    <div class="code-body"><pre class="src">Iterable&lt;String&gt; _faultIdsForText(GenericExerciseVoiceScript script, String text) sync* {
+  <span class="k">final</span> normalizedKey = _normalizeFaultKey(text);
+  <span class="k">for</span> (<span class="k">final</span> candidate <span class="k">in</span> _candidateFaultIdsForKey(normalizedKey)) {
+    <span class="k">if</span> (script.hasFault(candidate)) <span class="k">yield</span> candidate;     <span class="c">// 'knee' -&gt; 'knee_angle' ✓</span>
+  }
+  <span class="k">final</span> normalizedText = _normalizeFaultText(text);
+  <span class="k">for</span> (<span class="k">final</span> candidate <span class="k">in</span> _candidateFaultIds(normalizedText)) {
+    <span class="k">if</span> (script.hasFault(candidate)) <span class="k">yield</span> candidate;     <span class="c">// 'speed' -&gt; 'speed' ✓, 'neck' -&gt; 'neck' ✓</span>
+  }
+}</pre></div>
+  </div>
+
+  <div class="call idea">
+    <p class="ct">💡 What that normalizer actually resolved for glute bridge</p>
+    <p>I traced <code>_candidateFaultIds</code> for the four metric names. It would have matched:
+      <code>HipExtension → hip_extension</code> (the <code>text.contains('hip')</code> branch yields
+      <code>hip_extension</code>), <code>KneeAngle → knee_angle</code>, <code>SpeedControl → speed</code>
+      (the tempo/speed branch), <code>NeckHead → neck</code>. That’s <strong>4 of 5</strong> ids bridged.
+      (<code>Hyperextension</code> was the one likely gap even in the old path.) The new adapter bridges
+      <strong>zero</strong>. This is a clean regression, not a pre-existing bug — the correction feature
+      demonstrably worked for glute bridge before and doesn’t now.</p>
+  </div>
+
+  <div class="call tip">
+    <p class="ct">✅ Decided with Nam — 2026-07-08 (live notes)</p>
+    <p><strong>Your question, anchored on <code>faultIds</code>:</strong> “what else are we using these
+      fault ids for? if it’s just for checking then it’s redundant — just use whatever’s in the replog.”
+      <strong>Verified — you’re right.</strong> In the new coach, <code>script.faultIds</code> (the list) is
+      read in <em>exactly one place</em>: the <code>contains</code> gate in <code>_faultIdsFor</code> above.
+      <code>faultKey(id)</code> formats the <em>individual</em> id (<code>'$slug.$id'</code>) — it never
+      touches the list. So as a filter it is redundant: drop it and let whatever the RepLog carries flow
+      straight to the audio key. (Its only side job — hiding faults with no recorded audio — is already
+      covered downstream by the sink’s safe no-op, §09.)</p>
+    <p>For completeness, the three options I’d have weighed — before you called it:</p>
+    <ul>
+      <li><strong>A — one vocabulary at the source.</strong> Make the metrics emit snake_case
+        <code>type</code> strings that equal the voice <code>faultIds</code>. Cleanest long-term (single
+        source of truth), but <code>f.type</code> is <em>also</em> used as the on-screen feedback key
+        (<code>resultIssues.feedback[topFault.type]</code>) and the <code>setFeedback</code> map key, so it’s
+        not a voice-only change.</li>
+      <li><strong>B — carry an explicit map in <code>VoiceScript</code>.</strong> A
+        <code>{typeString → faultId}</code> table per exercise. Localises the change to the voice layer, no
+        ripple, but it’s another thing to keep in sync per exercise.</li>
+      <li><strong>C — restore normalization in the adapter.</strong> Port the old
+        <code>_candidateFaultIds</code> logic into <code>_faultIdsFor</code>. Zero data changes, but it
+        re-imports the fuzzy-matching complexity the new design was trying to delete.</li>
+    </ul>
+    <p><strong>Your call:</strong> option <strong>A</strong> — snake_case everywhere (your convention).
+      Rename the four metrics’ <code>type</code> strings to <code>hip_extension</code> /
+      <code>hyperextension</code> / <code>knee_angle</code> / <code>speed_control</code> /
+      <code>neck_head</code> so they equal the audio keys, and <strong>delete the <code>faultIds</code>
+      filter</strong> (or leave it empty) so the RepLog ids flow through untouched.
+      <strong>Scoped to glute bridge only</strong> for now — it’s the test exercise; the rest of the fleet
+      waits (your note on §04). One thing to eyeball while renaming <code>type</code>: it’s also the
+      on-screen feedback key (<code>resultIssues.feedback[topFault.type]</code>) and the
+      <code>setFeedback</code> history key, so glance at anything reading those literal strings before you
+      flip them — but by your convention they should be snake_case too, so it’s consistency, not risk.</p>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<section id="brain">
+  <p class="kicker"><span class="n">07</span> The brain</p>
+  <h2>VoicePolicy — where “not predictive” is actually built</h2>
+  <p>Even though glute bridge only exercises the count and praise paths today, the brain is worth reviewing
+    because it’s what shapes <em>every</em> cue once F1 is fixed. It’s pure and deterministic given an
+    injected <code>Random</code>. Three pieces matter most: the hunger formula, the count cap story, and
+    the relief valves.</p>
+
+  <div class="code">
+    <div class="code-head"><span>lib/voice/voice_policy.dart — the hunger formula &amp; the count rule</span><b>L237–280</b></div>
+    <div class="code-body"><pre class="src"><span class="c">// scale: (base + step·idle) · personality, clamped by cap.</span>
+<span class="k">double</span> _p(CueTuning t, <span class="k">int</span> idle) =&gt;
+    _clampD((t.base + t.step * idle) * personality, 0.0, t.cap);
+
+<span class="k">bool</span> _count(CueContext ctx) {
+  <span class="k">if</span> (ctx.repNumber &lt;= 1) <span class="k">return</span> <span class="k">true</span>;      <span class="c">// Rep 1 always fires — the anchor.</span>
+  <span class="k">final</span> t = tuning[CueType.count]!;
+  <span class="k">final</span> idle = _idle[_key(CueType.count, ctx)] ?? 0;
+  <span class="good">if (idle &gt;= t.reliefAfter) {              // 6 straight silent counts</span>
+    <span class="k">return</span> <span class="k">true</span>;                          <span class="c">// uncounted-set guard, consumes no roll</span>
+  }
+  <span class="k">return</span> _rng.nextDouble() &lt; _p(t, idle);   <span class="c">// middle reps: ~70%, +15/skip, capped 0.90</span>
+}</pre></div>
+  </div>
+
+  <div class="call eli">
+    <p class="ct">🧒 ELI5</p>
+    <p>“Hunger” = how many times in a row this cue <em>could</em> have spoken but didn’t. The longer the
+      silence, the higher the odds next time — so the coach never goes weirdly quiet, but it’s never on a
+      fixed timer either. Rep 1 always counts (proof the counter works). Middle reps are a real coin-flip
+      that gets more likely the longer you’ve gone silent, but it’s <strong>capped below certainty</strong>
+      so you can never learn “it went quiet twice, so the next one always counts.”</p>
+  </div>
+
+  <div class="call tip">
+    <p class="ct">✔ Verdict — the count cap story is the best-defended code in the feature</p>
+    <p>The <code>cap: 0.90</code> (not 1.0) and the <code>reliefAfter: 6</code> both have inline comments
+      tying them to your 2026-07-08 call that “caps/floors are saturation guards, not schedulers.” The test
+      <code>roll saturates below certainty</code> pins exactly the bug you heard on device (the alternating
+      even-number rhythm). This matches the humanlike-cadence-is-stochastic memory precisely. No change
+      needed — just confirming the intent survived into code.</p>
+  </div>
+
+  <p>The praise path carries the D8 “praise ∝ quality” logic — the piece that interacts with glute bridge’s
+    poisoned <code>formScore</code>:</p>
+
+  <div class="code">
+    <div class="code-head"><span>lib/voice/voice_policy.dart — _praise (D8 scaling)</span><b>L282–300</b></div>
+    <div class="code-body"><pre class="src"><span class="k">bool</span> _praise(CueContext ctx) {
+  <span class="k">if</span> (_lastPraiseRep == ctx.repNumber - 1) <span class="k">return</span> <span class="k">false</span>;  <span class="c">// never twice in a row</span>
+  <span class="k">if</span> (_lastOutcomeRep == ctx.repNumber) <span class="k">return</span> <span class="k">false</span>;     <span class="c">// one outcome cue per rep</span>
+  <span class="k">final</span> t = tuning[CueType.praise]!;
+  <span class="k">final</span> idle = _idle[_key(CueType.praise, ctx)] ?? 0;
+  <span class="k">final</span> roll = _p(t, idle);
+  <span class="k">final</span> formScore = _clampD(ctx.formScore, 0.0, 1.0);
+  <span class="bad">final scaled = _clampD(roll * (0.6 + 0.4 * formScore), 0.0, t.cap);</span>
+  <span class="k">return</span> _rng.nextDouble() &lt; scaled;
+}</pre></div>
+  </div>
+
+  <div class="call warn">
+    <p class="ct">⚠ Verdict — this is the only thing standing between F1 and a real embarrassment</p>
+    <p>On a bad glute-bridge rep, <code>formScore</code> is 0.0, so <code>scaled = roll * 0.6</code> — praise
+      is damped but <strong>not silenced</strong> (by design: even a so-so rep should occasionally get a
+      “nice”). That means the F1 bug doesn’t praise <em>every</em> bad rep, only ~60% as often as a clean
+      one. It’s a coincidental cushion, not a guard. Once F1 is fixed, bad reps take the correction branch
+      and never reach <code>_praise</code> at all, so this cushion stops mattering — which is the right
+      end state. Don’t “fix” F1 by hardening this; fix the fault vocabulary.</p>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<section id="intent">
+  <p class="kicker"><span class="n">08</span> Intent review</p>
+  <h2>Where the code and the behaviour spec disagree</h2>
+  <p>Code review asks “does it do what it says.” Intent review asks “does what it says match what we
+    <em>decided</em>.” I read the behaviour spec against the policy. One real divergence, one coupling worth
+    a conscious decision.</p>
+
+  <h3>Spec hard-rule #5 says “first fault is always cued.” The code rolls 25%. <span class="tag high">divergence</span></h3>
+  <p>The behaviour spec (principle 3: “deterministic is reserved for causality”) lists as a
+    <strong>hard rule</strong>: “First occurrence of a fault-id in a set: always cue it (deterministic —
+    causal response).” But <code>_correct</code> has no first-occurrence branch:</p>
+
+  <div class="code">
+    <div class="code-head"><span>lib/voice/voice_policy.dart — _correct</span><b>L302–313</b></div>
+    <div class="code-body"><pre class="src"><span class="k">bool</span> _correct(CueContext ctx) {
+  <span class="k">if</span> (_lastOutcomeRep == ctx.repNumber) <span class="k">return</span> <span class="k">false</span>;   <span class="c">// one outcome cue per rep</span>
+  <span class="k">final</span> t = tuning[CueType.correct]!;
+  <span class="k">if</span> (ctx.faultPersistence &gt;= t.reliefAfter) {           <span class="c">// relief valve at persistence 4</span>
+    <span class="k">return</span> <span class="k">true</span>;
+  }
+  <span class="bad">return _rng.nextDouble() &lt; _p(t, ctx.faultPersistence);</span>  <span class="c">// persistence 0 -&gt; base 0.25</span>
+}</pre></div>
+  </div>
+
+  <div class="call warn">
+    <p class="ct">⚠ Finding — first fault has a 75% chance of silence, not 0%</p>
+    <p>On first sighting, the adapter passes <code>faultPersistence: 0</code>, so <code>_p</code> = the base
+      0.25. That means the <em>first</em> time you break form, the coach stays quiet 3 times out of 4 — the
+      opposite of the spec’s “react to something the user just did, always.” The implementation-guide’s §4
+      quietly replaced “first always” with “25→55→85 by persistence,” and the code followed the guide, not
+      the spec. Someone (you) needs to decide which is canon: is the causal first-reaction a locked
+      principle, or did that soften on purpose? If it’s locked, <code>_correct</code> needs a
+      <code>faultPersistence == 0 → return true</code> line (respecting the one-outcome-per-rep guard).</p>
+  </div>
+
+  <h3>affectsForm does double duty — safety-ish cues can’t speak <span class="tag med">coupling</span></h3>
+  <p><strong>Your note — “should [it] gate on correctForm?”</strong> It already does, and that gate is
+    exactly the coupling worth a conscious call. <code>_faultIdsFor</code> exits early on
+    <code>repLog.correctForm</code>. And
+    <code>correctForm = !allFaults.any((f) =&gt; f.affectsForm)</code>. So a rep whose only fault is
+    <code>affectsForm: false</code> — e.g. <strong>NeckHead</strong> (cervical strain, an injury cue) or a
+    speed/knee <em>warning</em> — is treated as fully clean, exits before any correction is considered, and
+    gets the praise branch.</p>
+
+  <div class="call idea">
+    <p class="ct">💡 Verdict — probably fine, but make it a conscious choice</p>
+    <p>This aligns with the spec’s bandwidth principle (“minor wobble inside tolerance = silence”), so it’s
+      defensible. But note the consequence: even <em>after</em> F1 is fixed, NeckHead will never be voiced,
+      because it never flips <code>correctForm</code>. If “đặt đầu xuống sàn” is something you want spoken
+      (it’s injury-adjacent, though not acute safety), then <code>affectsForm</code> is the wrong gate for
+      voice eligibility — voice should key off “is there a fault with audio,” not “did the rep score as
+      good form.” Two different questions currently answered by one flag.</p>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<section id="content">
+  <p class="kicker"><span class="n">09</span> Words &amp; sound</p>
+  <h2>Content resolution and the sink</h2>
+  <p>Two short blocks to close the loop: how the façade picks the exact words, and how the sink turns a
+    logical key into a sound (and fails safe when the audio isn’t recorded yet).</p>
+
+  <div class="code">
+    <div class="code-head"><span>lib/voice/voice_coach.dart — _resolveKey (pool pick + praiseBig bias)</span><b>L61–97</b></div>
+    <div class="code-body"><pre class="src"><span class="k">String</span>? _resolveKey(CueType type, VoiceContent content, CueContext ctx) {
+  <span class="k">var</span> pool = content.keys;
+  <span class="k">if</span> (pool.length == 1) {                          <span class="c">// a single key with registered variations</span>
+    <span class="k">final</span> variations = VoiceLib.variations[pool.first];
+    <span class="k">if</span> (variations != <span class="k">null</span> &amp;&amp; variations.isNotEmpty) pool = variations;
+  }
+  <span class="k">if</span> (type == CueType.praise &amp;&amp;
+      ctx.formScore &gt;= _praiseBigFormScoreThreshold &amp;&amp;   <span class="c">// 0.85</span>
+      VoiceLib.praiseBig.isNotEmpty &amp;&amp;
+      _rng.nextDouble() &lt; _praiseBigBias) {              <span class="c">// 50%</span>
+    pool = VoiceLib.praiseBig;                          <span class="c">// "Xuất sắc!" on standout reps</span>
+  }
+  <span class="c">// ... pick at random, avoiding the immediately-previous key for this pool ...</span>
+}</pre></div>
+  </div>
+
+  <div class="call eli">
+    <p class="ct">🧒 ELI5</p>
+    <p>“If the caller gave one key that has a family of phrasings, treat it as the family. If this is a
+      praise on a really clean rep, flip a coin to upgrade ‘Tốt’ → ‘Tốt lắm!’. Then pick a line, but not the
+      same one you just said.” The no-immediate-repeat is per-pool, so counts and praises don’t interfere.</p>
+  </div>
+
+  <div class="call tip">
+    <p class="ct">✔ Verdict — correct, and the glute-bridge tie-in</p>
+    <p>Because glute-bridge praise only ever fires with <code>formScore</code> either 1.0 (clean) or 0.0
+      (the F1-mislabeled bad reps), the <code>praiseBig</code> upgrade only triggers on genuinely clean reps
+      — so at least the <em>gushing</em> praise is honest even with F1 present. Small mercy.</p>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><span>lib/voice/voice_sink.dart — AssetVoiceSink.playKey (safe no-op)</span><b>L105–136</b></div>
+    <div class="code-body"><pre class="src">@override
+Future&lt;<span class="k">void</span>&gt; playKey(String logicalKey) <span class="k">async</span> {
+  <span class="k">final</span> resolved = voiceSet.resolve(logicalKey);
+  <span class="good">if (resolved == null) {                    // no asset recorded for this key</span>
+    debugPrint(<span class="s">'[VoiceSink:...] no asset mapped for "$logicalKey" — skipping'</span>);
+    _missingKeys.add(logicalKey);              <span class="c">// live missing-audio checklist</span>
+    <span class="k">return</span>;                                   <span class="c">// never throws</span>
+  }
+  _busy = <span class="k">true</span>;
+  unawaited(_player.waitUntilIdle(timeout: const Duration(seconds: 30)).then((_) {
+    _busy = <span class="k">false</span>;
+  }));
+  <span class="k">await</span> _player.speak(logicalKey);
+}</pre></div>
+  </div>
+
+  <div class="call idea">
+    <p class="ct">💡 Verdict — the no-op is load-bearing, and it hides F1 from crashing but not from failing</p>
+    <p>The safe no-op is why the app ships green while audio is incomplete — good. But it also means F1
+      produces <strong>no error, no crash, no log noise you’d notice</strong> — corrections just silently
+      never happen. If you want an early-warning tripwire, <code>missingKeysSeen</code> is already tracked;
+      surfacing it in debug mode (or asserting it’s empty in an integration test) would have caught F1 the
+      moment a fault fired with an unmapped key. One caveat on <code>_busy</code>: overlapping
+      <code>playKey</code> calls each register their own <code>waitUntilIdle</code> callback, so
+      <code>isBusy</code> reflects “the player is idle,” not “my specific clip finished” — fine for the
+      perishable-cue gate it feeds, just don’t lean on it for precise sequencing.</p>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<section id="deadflags">
+  <p class="kicker"><span class="n">10</span> Loose ends</p>
+  <h2>Dead flags &amp; silently-lost intent</h2>
+  <p>Two smaller things specific to glute bridge that a reader would miss unless they cross-referenced the
+    old coach.</p>
+
+  <h3>Glute bridge’s thoughtful “don’t replay stale faults” override is now dead code <span class="tag med">lost intent</span></h3>
+  <div class="code">
+    <div class="code-head"><span>lib/exercise/glute bridge/glute_bridge.dart</span><b>L157–161</b></div>
+    <div class="code-body"><pre class="src"><span class="c">// Glute Bridge starts from a floor setup that can take time to settle.</span>
+<span class="c">// Replaying old faults here sounds like a fault from the current set before</span>
+<span class="c">// the user has completed any movement.</span>
+@override
+<span class="bad">bool get shouldReplayPreviousSetVoiceFaults =&gt; false;</span></pre></div>
+  </div>
+  <div class="call warn">
+    <p class="ct">⚠ Verdict — the flag is real intent, but nothing reads it anymore</p>
+    <p><code>shouldReplayPreviousSetVoiceFaults</code> is only consulted by the <em>old</em>
+      <code>_GenericExerciseVoiceCoach._speakPreviousSetAdviceIfNeeded</code>. <code>PolicyVoiceCoach</code>
+      never reads it. So this override is a no-op today. The net effect is “correct by accident” (the new
+      coach doesn’t replay anything, which is what this wanted), but the <em>intent</em> — “on the floor,
+      don’t let last set’s faults leak into this one’s setup” — is now unenforced and will silently not
+      apply if/when advice-replay gets wired into the new coach. Worth a <code>// TODO</code> or a test so
+      the intent isn’t lost when stage-3/4 lands.</p>
+  </div>
+
+  <h3>Cues defined but never emitted by the adapter <span class="tag med">unwired</span></h3>
+  <p><code>CueType.instruction</code> and <code>CueType.safety</code> exist in the enum and have full policy
+    bodies, but <code>PolicyVoiceCoach</code> <strong>never calls <code>say()</code> with either</strong>.
+    So the spec’s deterministic structure (setup intro, ready, rest, set-complete, no-count help; hard-rules
+    #1, #2, #9) and all safety voice are unimplemented in the new path. The squat override’s comment says
+    this is deliberate staging (“leaving setup/complete silent until the later instruction wiring stage”).
+    Fair — but for glute bridge <em>today</em> it means the rich on-screen setup coaching
+    (<code>KneeAngle</code>, <code>NeckHead</code>, <code>HipExtension</code> instructions) is entirely
+    voice-silent, where the old generic coach spoke a setup intro and replayed prior-set advice. It’s the
+    single biggest behavioural delta of the migration; just naming it so it’s a known gap, not a surprise.</p>
+</section>
+
+<!-- ============================================================= -->
+<section id="ledger">
+  <p class="kicker"><span class="n">11</span> Summary</p>
+  <h2>Findings ledger</h2>
+  <p>Ranked by how much they hurt the on-device experience for glute bridge. Nothing here crashes — every
+    failure is silent, which is exactly why they need eyes.</p>
+
+  <div class="tbl">
+  <table class="recap">
+    <colgroup><col style="width:6%"><col style="width:12%"><col style="width:34%"><col style="width:26%"><col style="width:22%"></colgroup>
+    <tr><th>#</th><th>Sev</th><th>Finding</th><th>Where</th><th>Direction (your call)</th></tr>
+    <tr>
+      <td>F1</td><td class="sev hi">CRITICAL</td>
+      <td>Fault-id casing/vocabulary mismatch → corrections never fire; bad reps mislabeled clean and
+        occasionally praised. A regression from the old normalizer.</td>
+      <td><code>policy_voice_coach.dart:210</code> vs metric <code>type</code> strings + <code>generic_exercise_voice_assets.dart:91</code></td>
+      <td><strong>Decided (A):</strong> snake_case metric <code>type</code> strings + drop the redundant
+        <code>faultIds</code> filter. Glute bridge only for now.</td>
+    </tr>
+    <tr>
+      <td>F1b</td><td class="sev hi">HIGH</td>
+      <td>Voiced correction isn’t priority-chosen (your catch): <code>fault_types</code> is an unordered
+        set, so <code>FaultRecord.priority</code> is lost before the coach. ≤1 fires (policy guard), but the
+        winner is iteration-order + dice, not severity.</td>
+      <td><code>glute_bridge.dart:641</code> + <code>policy_voice_coach.dart:157</code></td>
+      <td>Emit RepLog faults priority-sorted (or log priority); adapter voices only the first. Fix with F1.</td>
+    </tr>
+    <tr>
+      <td>F2</td><td class="sev hi">HIGH</td>
+      <td>Hustle dead for glute bridge (and all generic reps): base factory passes no <code>targetReps</code>,
+        so <code>isFinalReps</code> is always false.</td>
+      <td><code>exercise_base.dart:382</code></td>
+      <td>Thread a rep target through the base factory, or accept no finish-line push off-squat.</td>
+    </tr>
+    <tr>
+      <td>F3</td><td class="sev hi">HIGH</td>
+      <td>No <code>instruction</code>/<code>safety</code>/set-complete cues emitted at all → glute bridge lost
+        setup voice + advice replay vs the old coach. (Staged, but live today.)</td>
+      <td><code>policy_voice_coach.dart</code> (never calls those)</td>
+      <td>Confirm it’s intended staging; track the gap so it isn’t forgotten.</td>
+    </tr>
+    <tr>
+      <td>F4</td><td class="sev med">MEDIUM</td>
+      <td>Spec hard-rule #5 (“first fault always cued”) unimplemented; first fault is a 25% roll. Code
+        followed the guide, not the behaviour spec.</td>
+      <td><code>voice_policy.dart:302</code></td>
+      <td>Decide canon: if causal-first is locked, add <code>persistence==0 → true</code>.</td>
+    </tr>
+    <tr>
+      <td>F5</td><td class="sev med">MEDIUM</td>
+      <td><code>shouldReplayPreviousSetVoiceFaults => false</code> override is now dead; the floor-setup
+        intent is unenforced.</td>
+      <td><code>glute_bridge.dart:160</code></td>
+      <td>TODO + test, or re-wire when advice-replay returns.</td>
+    </tr>
+    <tr>
+      <td>F6</td><td class="sev med">MEDIUM</td>
+      <td><code>affectsForm</code> gates both form-score and voice-eligibility → NeckHead (injury cue) &amp;
+        warnings never voiced, even after F1.</td>
+      <td><code>policy_voice_coach.dart:211</code> + <code>glute_bridge.dart:602</code></td>
+      <td>Decide if voice should key off “has audio-backed fault” vs “rep scored bad.”</td>
+    </tr>
+    <tr>
+      <td>F7</td><td class="sev lo">LOW</td>
+      <td>Stale doc comment: <code>PolicyVoiceCoach</code> header says “Stage 1 only… nothing calls it… the
+        legacy generic coach is still returned.” It <em>is</em> wired now.</td>
+      <td><code>policy_voice_coach.dart:8–11</code></td>
+      <td>Update the comment so the next reader isn’t misled.</td>
+    </tr>
+    <tr>
+      <td>F8</td><td class="sev lo">LOW</td>
+      <td><code>processFrame(feedback:)</code> is passed but never read by the adapter (interface-required).</td>
+      <td><code>policy_voice_coach.dart:77</code></td>
+      <td>Harmless; note it so it isn’t mistaken for a live input.</td>
+    </tr>
+    <tr>
+      <td>F9</td><td class="sev lo">LOW</td>
+      <td>Rep-number count assets exist only for 1–30; a set past 30 reps counts silently. Not a glute
+        concern at typical rep targets.</td>
+      <td><code>generic_exercise_voice_assets.dart:29–58</code></td>
+      <td>Fine to ignore unless any exercise targets &gt;30.</td>
+    </tr>
+  </table>
+  </div>
+
+  <div class="call idea">
+    <p class="ct">💡 Scope — your call: glute bridge first</p>
+    <p>You want glute bridge wired now (it’s the exercise you’re testing on), the fleet later. So: rename
+      glute bridge’s metric <code>type</code> strings to snake_case, drop the <code>faultIds</code> filter,
+      and confirm on device. Worth knowing the same mismatch almost certainly kills corrections for every
+      other generic rep exercise whose metric types are PascalCase (push up, lunge, bird dog, curl-up…) — so
+      when you come back for the fleet it’s the identical fix per exercise, or promote it to the seam once
+      the whole vocabulary is snake_case.</p>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<section id="device">
+  <p class="kicker"><span class="n">12</span> Verify</p>
+  <h2>What I’d check on device, and open questions for you</h2>
+  <p>The failures are all silent, so a code read isn’t enough — here’s the shortest path to confirming them
+    for real.</p>
+  <ol class="steps">
+    <li><strong>Confirm F1 live:</strong> do a glute-bridge set with a deliberate low bridge (hip-extension
+      fault) every rep. Expected on this branch: you hear counts + the occasional “Tốt,” and
+      <strong>never</strong> a correction. Then check <code>AssetVoiceSink.missingKeysSeen</code> /
+      <code>debugPrint</code> — it should be empty, proving the correction never even <em>tried</em> to play
+      (the fault was dropped before resolution, not after).</li>
+    <li><strong>Confirm the fleet blast radius:</strong> repeat for push up (a PascalCase-type exercise) vs
+      any exercise whose metric types already happen to be snake_case. That tells you whether F1 is
+      glute-bridge-specific or fleet-wide, which decides fix shape.</li>
+    <li><strong>Decide F4:</strong> is “first fault always cued” a locked principle or a softened one? This
+      changes whether the correction curve starts at 0.25 or 1.0 on rep one.</li>
+    <li><strong>Decide the F1 fix shape (A/B/C in §06)</strong> — the only one with ripple beyond voice is A.</li>
+  </ol>
+
+  <div class="call tip">
+    <p class="ct">✔ The part that’s genuinely good, restated</p>
+    <p>None of this is an indictment of the design. The brain, the data catalog, the sink seam, and the
+      diff-based adapter are clean, well-commented, and honour your locked decisions (D1 zero-pipeline-change,
+      the count-cap anti-metronome call, per-fault hunger independence). The findings are concentrated in one
+      place — the <em>seam</em> where the new system meets the old fault vocabulary — and F1 is the linchpin.
+      Fix that, decide F2–F4, and glute bridge goes from “counts + accidental praise” to a real coach.</p>
+  </div>
+</section>
+
+<div class="foot">
+  Glute Bridge × Voice Coach — code + intent review · branch <code>main</code> · 2026-07-08 ·
+  files: lib/voice/*.dart, lib/exercise/glute bridge/*, exercise_base.dart · your notes save to
+  .lavish/lavish-notes.json
+</div>
+
+</main>
+</div>
+
+<!-- ===== personal notes layer (private, saved to .lavish via the notes server) ===== -->
+<button class="note-fab" id="noteFab" aria-label="Open your notes">🖊 Notes <span class="cnt" id="noteCount">0</span></button>
+<div class="note-pop" id="notePop"><button id="notePopBtn" type="button">🖊 Note this</button></div>
+<aside class="note-panel" id="notePanel" aria-label="Your private notes">
+  <div class="ph">
+    <div><h3>Your notes</h3><div class="sub">private · saved to .lavish/lavish-notes.json</div></div>
+    <button class="x" id="notePanelClose" type="button" aria-label="Close">&times;</button>
+  </div>
+  <div class="composer">
+    <div class="anchor" id="noteAnchor" hidden></div>
+    <textarea id="noteInput" placeholder="Type your note, then click outside the box (or press ⌘/Ctrl+Enter) to save…"></textarea>
+    <div class="crow">
+      <span class="chint" id="noteHint">Will attach to the section you're viewing</span>
+      <button class="addbtn" id="noteAdd" type="button">Add note</button>
+    </div>
+  </div>
+  <div class="storage-note" id="storageNote" hidden></div>
+  <div class="note-list" id="noteList"></div>
+  <div class="pf">
+    <button id="noteCopy" type="button">Copy all</button>
+    <button id="noteDownload" type="button">Download .md</button>
+    <button id="noteClear" type="button">Clear all</button>
+  </div>
+</aside>
+
+<script>
+// ===== personal notes layer: anchored, local + disk-backed, never auto-sent to the agent =====
+(function () {
+  var KEY = 'vika-gbvc-notes-v1';
+  var NAMEKEY = 'VIKA_GBVC_NOTES::';
+  var DOC = encodeURIComponent(document.title);
+  var REMOTE = 'http://127.0.0.1:4599/notes?doc=' + DOC;
+  var localOk = true, remoteOk = false;
+  try { localStorage.setItem('vika-gbvc-t', '1'); localStorage.removeItem('vika-gbvc-t'); } catch (e) { localOk = false; }
+  function loadLocal() {
+    if (localOk) { try { var v = localStorage.getItem(KEY); if (v) return JSON.parse(v); } catch (e) {} }
+    try { if (window.name && window.name.indexOf(NAMEKEY) === 0) return JSON.parse(window.name.slice(NAMEKEY.length)); } catch (e) {}
+    return [];
+  }
+  var notes = loadLocal();
+
+  var fab = document.getElementById('noteFab');
+  var cnt = document.getElementById('noteCount');
+  var panel = document.getElementById('notePanel');
+  var list = document.getElementById('noteList');
+  var pop = document.getElementById('notePop');
+  var popBtn = document.getElementById('notePopBtn');
+  var input = document.getElementById('noteInput');
+  var anchorEl = document.getElementById('noteAnchor');
+  var hintEl = document.getElementById('noteHint');
+  var lastSel = null;
+  var pendingAnchor = null;
+
+  function mirrorLocal() {
+    var s = JSON.stringify(notes);
+    if (localOk) { try { localStorage.setItem(KEY, s); } catch (e) { localOk = false; } }
+    try { window.name = NAMEKEY + s; } catch (e) {}
+  }
+  function save() {
+    cnt.textContent = notes.length;
+    mirrorLocal();
+    if (remoteOk) {
+      try {
+        fetch(REMOTE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(notes) })
+          .catch(function () { remoteOk = false; updateStatus(); });
+      } catch (e) { remoteOk = false; }
+    }
+    updateStatus();
+  }
+  function updateStatus() {
+    var el = document.getElementById('storageNote'); if (!el) return;
+    if (remoteOk) {
+      el.hidden = false; el.className = 'storage-note ok';
+      el.textContent = '✓ Saved to disk — .lavish/lavish-notes.json (survives reloads & restarts while the notes server runs).';
+    } else if (localOk) {
+      el.hidden = true;
+    } else {
+      el.hidden = false; el.className = 'storage-note';
+      el.textContent = '⚠ The viewer blocks browser storage, so notes only survive reloads this session. Run the notes server or use “Download .md”.';
+    }
+  }
+  function uid() { return 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function sectionOf(node) {
+    var el = node && node.nodeType === 3 ? node.parentElement : node;
+    while (el && !(el.tagName === 'SECTION' && el.id)) el = el.parentElement;
+    return el;
+  }
+  function titleOf(sec) {
+    if (!sec) return 'Document';
+    var h = sec.querySelector('h2');
+    return h ? h.textContent.trim() : sec.id;
+  }
+  function currentSection() {
+    var secs = document.querySelectorAll('main section[id]');
+    var mid = window.scrollY + window.innerHeight / 2, best = null;
+    secs.forEach(function (s) { if (mid >= s.offsetTop && mid < s.offsetTop + s.offsetHeight) best = s; });
+    return best || secs[0] || null;
+  }
+  function setAnchor(a) {
+    pendingAnchor = a;
+    if (a && a.quote) {
+      anchorEl.hidden = false; anchorEl.innerHTML = '';
+      var t = document.createElement('span');
+      t.textContent = '“' + a.quote.slice(0, 90) + (a.quote.length > 90 ? '…' : '') + '”';
+      var x = document.createElement('span'); x.className = 'axn'; x.textContent = '✕'; x.title = 'Remove anchor';
+      x.onclick = function () { setAnchor(null); };
+      anchorEl.appendChild(t); anchorEl.appendChild(x);
+      hintEl.textContent = 'Attaching to this selection';
+    } else {
+      anchorEl.hidden = true; anchorEl.innerHTML = '';
+      hintEl.textContent = "Will attach to the section you're viewing";
+    }
+  }
+  function addFromComposer() {
+    var body = input.value.trim();
+    if (!body) { input.focus(); return; }
+    var a = pendingAnchor, sec = a ? document.getElementById(a.sectionId) : currentSection();
+    var n = {
+      id: uid(),
+      sectionId: a ? a.sectionId : (sec ? sec.id : ''),
+      sectionTitle: a ? a.sectionTitle : (sec ? titleOf(sec) : 'Document'),
+      quote: a ? a.quote : '',
+      start: a && a.start != null ? a.start : null,
+      end: a && a.end != null ? a.end : null,
+      body: body, createdAt: Date.now()
+    };
+    notes.push(n); render(); try { applyAll(); } catch (e) {} save();
+    input.value = ''; setAnchor(null);
+  }
+
+  // ---- anchored highlighting (spans across tokens, numbered) ----
+  function offsetOf(section, node, nodeOffset) {
+    var r = document.createRange();
+    r.selectNodeContents(section);
+    try { r.setEnd(node, nodeOffset); } catch (e) { return 0; }
+    return r.toString().length;
+  }
+  function appendBadge(mark, num, id) {
+    var b = document.createElement('sup');
+    b.className = 'note-badge'; b.dataset.nid = id; b.textContent = num;
+    b.title = 'Note ' + num + ' — click to open';
+    if (mark.parentNode) mark.parentNode.insertBefore(b, mark.nextSibling);
+  }
+  function clearHighlights() {
+    document.querySelectorAll('.note-badge').forEach(function (b) { b.remove(); });
+    document.querySelectorAll('mark.note-hl').forEach(function (m) {
+      var p = m.parentNode; while (m.firstChild) p.insertBefore(m.firstChild, m); p.removeChild(m); p.normalize();
+    });
+  }
+  function highlightRange(section, start, end, id, num) {
+    if (!section || start == null || end == null || end <= start) return false;
+    var w = document.createTreeWalker(section, NodeFilter.SHOW_TEXT, null), n, pos = 0, segs = [];
+    while ((n = w.nextNode())) {
+      var len = n.nodeValue.length, nodeStart = pos; pos += len;
+      if (pos <= start) continue;
+      if (nodeStart >= end) break;
+      if (n.parentElement && n.parentElement.closest('mark.note-hl')) continue;
+      var s = Math.max(0, start - nodeStart), e = Math.min(len, end - nodeStart);
+      if (e > s) segs.push({ node: n, s: s, e: e });
+    }
+    var made = 0, last = null;
+    segs.forEach(function (seg) {
+      var r = document.createRange(); r.setStart(seg.node, seg.s); r.setEnd(seg.node, seg.e);
+      var m = document.createElement('mark'); m.className = 'note-hl'; m.dataset.nid = id;
+      try { r.surroundContents(m); made++; last = m; } catch (e2) {}
+    });
+    if (made && last) appendBadge(last, num, id);
+    return made > 0;
+  }
+  function highlightFirst(section, quote, id, num) {
+    if (!section || !quote) return false;
+    var w = document.createTreeWalker(section, NodeFilter.SHOW_TEXT, null), tn;
+    while ((tn = w.nextNode())) {
+      if (tn.parentElement && tn.parentElement.closest('mark.note-hl')) continue;
+      var i = tn.nodeValue.indexOf(quote);
+      if (i >= 0) {
+        var r = document.createRange(); r.setStart(tn, i); r.setEnd(tn, i + quote.length);
+        var m = document.createElement('mark'); m.className = 'note-hl'; m.dataset.nid = id;
+        try { r.surroundContents(m); appendBadge(m, num, id); return true; } catch (e) { return false; }
+      }
+    }
+    return false;
+  }
+  function applyAll() {
+    clearHighlights();
+    notes.forEach(function (n, i) {
+      var sec = document.getElementById(n.sectionId); if (!sec) return;
+      var ok = false;
+      if (n.start != null && n.end != null) ok = highlightRange(sec, n.start, n.end, n.id, i + 1);
+      if (!ok && n.quote) highlightFirst(sec, n.quote, n.id, i + 1);
+    });
+  }
+  function setLinked(id, on) {
+    document.querySelectorAll('mark.note-hl[data-nid="' + id + '"], .note-badge[data-nid="' + id + '"]')
+      .forEach(function (el) { el.classList.toggle('hot', on); });
+    var card = list.querySelector('.note-card[data-nid="' + id + '"]');
+    if (card) card.classList.toggle('linked', on);
+  }
+
+  // ---- panel ----
+  function render() {
+    list.innerHTML = '';
+    if (!notes.length) {
+      var e = document.createElement('div'); e.className = 'note-empty';
+      e.innerHTML = 'No notes yet.<br>Type in the box above and hit <b>Add note</b>,<br>or select text/code and hit <b>🖊 Note this</b>.';
+      list.appendChild(e); return;
+    }
+    notes.slice().reverse().forEach(function (n) {
+      var num = notes.indexOf(n) + 1;
+      var card = document.createElement('div'); card.className = 'note-card'; card.dataset.nid = n.id;
+      card.onmouseenter = function () { setLinked(n.id, true); };
+      card.onmouseleave = function () { setLinked(n.id, false); };
+      var loc = document.createElement('span'); loc.className = 'loc'; loc.title = 'Jump to this spot';
+      var cn = document.createElement('span'); cn.className = 'cnum'; cn.textContent = num; loc.appendChild(cn);
+      loc.appendChild(document.createTextNode(' § ' + n.sectionTitle));
+      loc.onclick = function () { jump(n.id); }; card.appendChild(loc);
+      if (n.quote) { var q = document.createElement('div'); q.className = 'quote'; q.textContent = n.quote; card.appendChild(q); }
+      var body = document.createElement('div'); body.className = 'body' + (n.body ? '' : ' empty');
+      body.textContent = n.body || 'Empty — click Edit to write.'; card.appendChild(body);
+      if (n.replies && n.replies.length) {
+        var thread = document.createElement('div'); thread.className = 'replies';
+        n.replies.forEach(function (rp) {
+          var t = document.createElement('div');
+          t.className = 'note-thread' + (rp.author === 'agent' ? ' agent' : '');
+          var who = document.createElement('div'); who.className = 'who';
+          who.textContent = rp.author === 'agent' ? '↳ Claude' : '↳ You';
+          var tx = document.createElement('div'); tx.className = 'txt'; tx.textContent = rp.body;
+          t.appendChild(who); t.appendChild(tx); thread.appendChild(t);
+        });
+        card.appendChild(thread);
+      }
+      var row = document.createElement('div'); row.className = 'row';
+      var rb = document.createElement('button'); rb.className = 'reply'; rb.textContent = 'Reply'; rb.onclick = function () { replyCard(card, n); };
+      var ed = document.createElement('button'); ed.className = 'edit'; ed.textContent = 'Edit'; ed.onclick = function () { editCard(card, n); };
+      var dl = document.createElement('button'); dl.className = 'del'; dl.textContent = 'Delete';
+      dl.onclick = function () { notes = notes.filter(function (x) { return x.id !== n.id; }); render(); try { applyAll(); } catch (e) {} save(); };
+      row.appendChild(rb); row.appendChild(ed); row.appendChild(dl); card.appendChild(row);
+      list.appendChild(card);
+    });
+  }
+  function editCard(card, n) {
+    card.innerHTML = '';
+    var loc = document.createElement('span'); loc.className = 'loc'; loc.textContent = '§ ' + n.sectionTitle; card.appendChild(loc);
+    if (n.quote) { var q = document.createElement('div'); q.className = 'quote'; q.textContent = n.quote; card.appendChild(q); }
+    var ta = document.createElement('textarea'); ta.value = n.body || ''; ta.placeholder = 'Type your note…'; card.appendChild(ta);
+    var row = document.createElement('div'); row.className = 'row';
+    var sv = document.createElement('button'); sv.className = 'save'; sv.textContent = 'Save';
+    sv.onclick = function () { n.body = ta.value.trim(); save(); render(); };
+    row.appendChild(sv); card.appendChild(row);
+    ta.focus();
+    ta.addEventListener('keydown', function (e) { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') sv.click(); });
+  }
+  // Reply to a note: threads under it (author 'nam'); the agent writes replies with
+  // author 'agent' straight to the notes-server, and live-sync below surfaces them.
+  function replyCard(card, n) {
+    if (card.querySelector('.reply-box')) { card.querySelector('.reply-box textarea').focus(); return; }
+    var box = document.createElement('div'); box.className = 'reply-box';
+    var ta = document.createElement('textarea'); ta.placeholder = 'Reply to this note…'; box.appendChild(ta);
+    var row = document.createElement('div'); row.className = 'row';
+    var sv = document.createElement('button'); sv.className = 'save'; sv.textContent = 'Send reply';
+    var cx = document.createElement('button'); cx.className = 'edit'; cx.textContent = 'Cancel';
+    sv.onclick = function () {
+      var t = ta.value.trim(); if (!t) { ta.focus(); return; }
+      n.replies = n.replies || []; n.replies.push({ author: 'nam', body: t, createdAt: Date.now() });
+      save(); render(); try { applyAll(); } catch (e) {}
+    };
+    cx.onclick = function () { box.remove(); };
+    row.appendChild(sv); row.appendChild(cx); box.appendChild(row);
+    card.appendChild(box); ta.focus();
+    ta.addEventListener('keydown', function (e) { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') sv.click(); });
+  }
+  function openPanel() { panel.classList.add('open'); setTimeout(function () { if (input) input.focus(); }, 40); }
+  fab.onclick = function () {
+    panel.classList.toggle('open');
+    if (panel.classList.contains('open')) setTimeout(function () { if (input) input.focus(); }, 40);
+  };
+  document.getElementById('notePanelClose').onclick = function () { panel.classList.remove('open'); };
+  document.getElementById('noteAdd').onclick = addFromComposer;
+  input.addEventListener('keydown', function (e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); addFromComposer(); }
+  });
+  input.addEventListener('blur', function () { if (input.value.trim()) addFromComposer(); });
+
+  function jump(id) {
+    var marks = document.querySelectorAll('mark.note-hl[data-nid="' + id + '"]');
+    var n = notes.find(function (x) { return x.id === id; });
+    var target = marks[0] || (n && document.getElementById(n.sectionId));
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    marks.forEach(function (m) { m.classList.remove('flash'); void m.offsetWidth; m.classList.add('flash'); });
+  }
+
+  // ---- selection popover ----
+  function hidePop() { pop.style.display = 'none'; }
+  document.addEventListener('mouseup', function () {
+    setTimeout(function () {
+      var s = document.getSelection();
+      if (!s || s.isCollapsed) { hidePop(); return; }
+      var txt = s.toString();
+      if (!txt.trim()) { hidePop(); return; }
+      var host = s.anchorNode && (s.anchorNode.nodeType === 3 ? s.anchorNode.parentElement : s.anchorNode);
+      if (!host || !host.closest('main')) { hidePop(); return; }
+      var range = s.getRangeAt(0);
+      var section = sectionOf(range.startContainer);
+      var start = 0, end = 0;
+      if (section) {
+        start = offsetOf(section, range.startContainer, range.startOffset);
+        end = offsetOf(section, range.endContainer, range.endOffset);
+        if (end < start) { var tmp = start; start = end; end = tmp; }
+      }
+      lastSel = { quote: txt.trim().slice(0, 2000), section: section, start: start, end: end };
+      var rect = range.getBoundingClientRect();
+      var cw = document.documentElement.clientWidth;
+      var x = Math.min(Math.max(64, rect.left + rect.width / 2), cw - 64);
+      pop.style.left = (window.scrollX + x) + 'px';
+      pop.style.top = (window.scrollY + Math.max(rect.top, 8)) + 'px';
+      pop.style.display = 'block';
+    }, 10);
+  });
+  document.addEventListener('scroll', hidePop, { passive: true });
+  popBtn.addEventListener('mousedown', function (e) {
+    e.preventDefault();
+    if (!lastSel) return;
+    var sec = lastSel.section;
+    setAnchor({ sectionId: sec ? sec.id : '', sectionTitle: titleOf(sec), quote: lastSel.quote, start: lastSel.start, end: lastSel.end });
+    openPanel(); hidePop();
+    var sel = window.getSelection(); if (sel) sel.removeAllRanges();
+  });
+
+  document.addEventListener('click', function (e) {
+    var m = e.target.closest && e.target.closest('mark.note-hl, .note-badge');
+    if (!m || !m.dataset.nid) return;
+    var id = m.dataset.nid;
+    openPanel(); render();
+    var card = list.querySelector('.note-card[data-nid="' + id + '"]');
+    if (card) {
+      card.scrollIntoView({ block: 'center' });
+      card.classList.add('active');
+      setTimeout(function () { card.classList.remove('active'); }, 1600);
+    }
+  });
+  document.addEventListener('mouseover', function (e) {
+    var m = e.target.closest && e.target.closest('mark.note-hl, .note-badge');
+    if (m && m.dataset.nid) setLinked(m.dataset.nid, true);
+  });
+  document.addEventListener('mouseout', function (e) {
+    var m = e.target.closest && e.target.closest('mark.note-hl, .note-badge');
+    if (m && m.dataset.nid) setLinked(m.dataset.nid, false);
+  });
+
+  // ---- export ----
+  function toMd() {
+    return '# Glute Bridge × Voice Coach — my notes\n\n' + notes.map(function (n) {
+      var s = '## § ' + n.sectionTitle + '\n' + (n.quote ? '> ' + n.quote.replace(/\n/g, '\n> ') + '\n\n' : '') + (n.body || '') + '\n';
+      if (n.replies && n.replies.length) {
+        s += n.replies.map(function (rp) { return '\n**' + (rp.author === 'agent' ? 'Claude' : 'You') + ':** ' + rp.body; }).join('\n') + '\n';
+      }
+      return s;
+    }).join('\n');
+  }
+  document.getElementById('noteCopy').onclick = function () { if (navigator.clipboard) navigator.clipboard.writeText(toMd()); };
+  document.getElementById('noteDownload').onclick = function () {
+    var b = new Blob([toMd()], { type: 'text/markdown' }), u = URL.createObjectURL(b);
+    var a = document.createElement('a'); a.href = u; a.download = 'glute-bridge-voice-review-notes.md'; a.click(); URL.revokeObjectURL(u);
+  };
+  document.getElementById('noteClear').onclick = function () {
+    if (confirm('Delete ALL your notes? This cannot be undone.')) { notes = []; save(); applyAll(); render(); }
+  };
+
+  render(); try { applyAll(); } catch (e) {} mirrorLocal(); cnt.textContent = notes.length; updateStatus();
+  try {
+    fetch(REMOTE).then(function (r) { return r.ok ? r.json() : null; }).then(function (server) {
+      if (!Array.isArray(server)) return;
+      remoteOk = true;
+      if (server.length >= notes.length) {
+        notes = server; render(); try { applyAll(); } catch (e) {} cnt.textContent = notes.length;
+      } else {
+        save();
+      }
+      updateStatus();
+    }).catch(function () { remoteOk = false; updateStatus(); });
+  } catch (e) { updateStatus(); }
+
+  // Live sync: pull agent replies / new notes from the disk server without a reload,
+  // so a "↳ Claude" reply appears within a few seconds. Skips while an edit or reply
+  // box is open so it never clobbers something you're mid-typing.
+  var lastServerJson = JSON.stringify(notes);
+  setInterval(function () {
+    if (!remoteOk) return;
+    if (panel.querySelector('.note-card textarea') || panel.querySelector('.reply-box')) return;
+    fetch(REMOTE).then(function (r) { return r.ok ? r.json() : null; }).then(function (server) {
+      if (!Array.isArray(server)) return;
+      var sj = JSON.stringify(server);
+      if (sj === lastServerJson) return;
+      lastServerJson = sj;
+      notes = server; render(); try { applyAll(); } catch (e) {} cnt.textContent = notes.length;
+    }).catch(function () {});
+  }, 4000);
+})();
+</script>
+
+<script>
+// Scrollspy: highlight the current section in the TOC.
+(function () {
+  var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+  var map = {};
+  links.forEach(function (a) {
+    var id = a.getAttribute('href').slice(1);
+    var el = document.getElementById(id);
+    if (el) map[id] = a;
+  });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); });
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) {
+        links.forEach(function (l) { l.classList.remove('on'); });
+        var a = map[e.target.id];
+        if (a) a.classList.add('on');
+      }
+    });
+  }, { rootMargin: '0px 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { io.observe(s); });
+})();
+</script>
+</body>
+</html>

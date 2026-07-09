@@ -101,6 +101,17 @@ with a pixel floor for close framings.
 | Comparison ladder | 13 tiers, banner never empty |
 | Voice cue cadence / cooldowns / priority | Stochastic, no fixed values — see docs/reference/voice-coach/voice-behavior-spec.md (ADD 2026-07-07; supersedes the never-shipped "corrective 3 reps / positive 1 rep" + "5-layer queue") |
 
+Glute Bridge voice pilot tuning (07-08 device-test default; tune on device, shapes locked in
+docs/decisions.md):
+
+| Cue | Value |
+|---|---|
+| Count | base 0.50, hunger +0.10, cap 1.0, rep 1 always, no relief valve |
+| Praise | base 0.50, hunger +0.10, cap 0.85, never twice in a row, no formScore probability multiplier |
+| Correct | base 0.25, persistence +0.30, cap 0.85, first occurrence certain, no relief valve |
+| Soft | base 0.20, hunger +0.08, cap 0.55, not first-occurrence deterministic |
+| Hustle | off |
+
 ## Active Exercise Screen v8 (May 1, 2026)
 Note (05-30): the live form-score ARC was removed (replaced by positive-additive ambient feedback). The
 >=75 / 60-74 / <60 thresholds + color tokens below REMAIN the canonical form-score band scheme, now also

@@ -108,7 +108,7 @@ class NeckHeadMetric extends GluteBridgeMetricBase {
       if (!_faultAdded) {
         _faults.add(FaultRecord(
           phase: ctx.state.toString().split('.').last,
-          type: 'NeckHead',
+          type: 'neck_head',
           message: 'Giữ đầu và cổ trên sàn khi thực hiện bài tập',
           affectsForm: false,
         ));

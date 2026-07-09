@@ -141,7 +141,7 @@ main code{overflow-wrap:anywhere;background:var(--line-soft);padding:1px 5px;bor
       <span class="chip"><b>2 engines</b> → 1 sink</span>
       <span class="chip"><b>per-exercise</b> → data only</span>
       <span class="chip"><b>cadence</b> → stochastic + tunable</span>
-      <span class="chip"><b>status</b> PROPOSED · nothing written yet</span>
+      <span class="chip"><b>status</b> LOCKED · core being built</span>
     </div>
   </div>
 </header>
@@ -167,6 +167,21 @@ main code{overflow-wrap:anywhere;background:var(--line-soft);padding:1px 5px;bor
 </nav>
 
 <main>
+
+<!-- ============ ADDENDUM · DECISIONS LOCKED ============ -->
+<div class="call" style="border:1px solid var(--tip);border-left:4px solid var(--tip)">
+  <p class="ct">✅ Decisions locked — 2026-07-07 · this addendum supersedes the draft below where they differ</p>
+  <p>Build spec / source of truth for implementation: <code>docs/reference/voice-coach/implementation-guide.md</code>.
+  The sketches below are kept for rationale; where a code block predates a note, this addendum wins.</p>
+  <ul>
+    <li><b>D1 — keep the adapter.</b> <code>PolicyVoiceCoach</code> diffs <code>processFrame</code> state; zero change to the exercise/camera pipeline.</li>
+    <li><b>Hunger is per-content.</b> <code>correct</code>/<code>instruction</code> accumulate hunger keyed by <em class="term">fault id</em> (heel-rise ≠ raise-trunk); <code>praise</code>/<code>count</code>/<code>hustle</code> stay per-type. (§04)</li>
+    <li><b>Content = flat catalog + modality bundles, one file.</b> <code>VoiceLib</code> holds every reusable pool; <code>VoiceDefaults.repBased</code>/<code>timeBased</code> bundle the modality-correct count+hustle — both live in <code>voice_content.dart</code>. Scripts reference pools; nothing is retyped. A key may expand to variations (random pick). (§03, §08)</li>
+    <li><b>One voice system, named &amp; swappable.</b> Viettel removed; a single asset sink behind a <code>VoiceSet</code> seam (<code>vika_v1</code>). A future voice = a name swap, not a code change. (§06)</li>
+    <li><b>D8 in.</b> Cleaner rep → higher praise odds + bias toward the bigger praise line ("Tốt lắm!" vs "Tốt").</li>
+    <li><b>Build order:</b> core (wired to nothing) → generic default → per-exercise → surya (record clips) → delete Viettel/<code>ttsService</code>. A running <code>missing-audio.md</code> tracks keys still to record; the sink no-ops safely until they exist.</li>
+  </ul>
+</div>
 
 <!-- ============ 0 ORIENTATION ============ -->
 <section id="orient">
@@ -386,7 +401,7 @@ main code{overflow-wrap:anywhere;background:var(--line-soft);padding:1px 5px;bor
 8</div><pre class="src"><span class="c">// A clean rep just landed. The coach decides if this one earns a "nice".</span>
 coach.say(
   CueType.praise,
-  VoiceContent.pool([<span class="s">'common.correct'</span>, <span class="s">'common.good_1'</span>, <span class="s">'common.good_2'</span>]),
+  VoiceContent.pool(VoiceLib.praise),   <span class="c">// from the shared catalog, not an inline list</span>
   CueContext(repNumber: 7),
 );
 <span class="c">// Maybe it speaks. Maybe not. The caller doesn't know and doesn't care.</span>
@@ -549,7 +564,7 @@ coach.say(
   <span class="k">final</span> Map&lt;CueType, CueTuning&gt; tuning;
 
   <span class="c">// --- per-set memory. beginSet() clears all of it. ---</span>
-  <span class="k">final</span> Map&lt;CueType, <span class="t">int</span>&gt; _idle = {}; <span class="c">// eligible-but-silent reps, per type = "hunger"</span>
+  <span class="k">final</span> Map&lt;CueType, <span class="t">int</span>&gt; _idle = {}; <span class="c">// hunger; correct/instruction keyed per fault id (see addendum), others per type</span>
   <span class="t">int</span> _lastPraiseRep = -2;   <span class="c">// hard rule: never praise two in a row</span>
   <span class="t">int</span> _lastUncountedRep = -1; <span class="c">// hard rule: never skip two counts</span>
   <span class="t">int</span> _lastOutcomeRep = -1;   <span class="c">// hard rule: one outcome cue (praise|correction|hustle) / rep</span>
@@ -1042,7 +1057,7 @@ QueueMode _queueFor(CueType type) {
   <span class="k">final</span> List&lt;String&gt; hustlePool;              <span class="c">// NEW: 'Cố lên!', 'Một cái nữa!'</span>
   <span class="k">final</span> Map&lt;String, String&gt; phaseCues;        <span class="c">// NEW: phaseKey → movement cue</span>
   <span class="k">const</span> VoiceScript({<span class="k">required</span> <span class="k">this</span>.slug, <span class="k">this</span>.faultIds = <span class="k">const</span> [],
-    <span class="k">this</span>.praisePool = <span class="k">const</span> [<span class="s">'common.correct'</span>, <span class="s">'common.good_1'</span>, <span class="s">'common.good_2'</span>],
+    <span class="k">this</span>.praisePool = VoiceLib.praise,   <span class="c">// default from catalog; bundle or per-exercise can override</span>
     <span class="k">this</span>.hustlePool = <span class="k">const</span> [], <span class="k">this</span>.phaseCues = <span class="k">const</span> {}});
 
   String faultKey(String id) =&gt; <span class="s">'$slug.$id'</span>;   <span class="c">// unchanged from today</span>

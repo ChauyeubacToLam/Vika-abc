@@ -163,7 +163,7 @@ class SpeedControlMetric extends GluteBridgeMetricBase {
       if (_peakDescentVelocity >= SpeedControlConfig.RAPID_VELOCITY_ERROR) {
         _faults.add(FaultRecord(
           phase: 'descending',
-          type: 'SpeedControl',
+          type: 'speed_control',
           message: 'Hạ hông quá nhanh — siết cơ lõi để kiểm soát',
           affectsForm: true,
         ));
@@ -171,7 +171,7 @@ class SpeedControlMetric extends GluteBridgeMetricBase {
       } else if (_liveInstructionShown) {
         _faults.add(FaultRecord(
           phase: 'descending',
-          type: 'SpeedControl',
+          type: 'speed_control',
           message: 'Kiểm soát tốc độ hạ hông để bảo vệ lưng',
           affectsForm: false,
         ));
@@ -195,7 +195,7 @@ class SpeedControlMetric extends GluteBridgeMetricBase {
       // to avoid double-faulting the same descent.
       _faults.add(FaultRecord(
         phase: 'descending',
-        type: 'SpeedControl',
+        type: 'speed_control',
         message: 'Hạ hông chậm lại — mục tiêu kiểm soát gấp đôi thời gian nâng',
         affectsForm: false, // informational pacing cue
       ));

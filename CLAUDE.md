@@ -61,12 +61,32 @@ Conflict: canonical-numbers > state.md > reference docs. Conflict, stop and flag
 "Did we decide / try / discuss X": check docs/decisions.md, then git log, then conversation_search,
 then say "no record." Never claim no record without checking.
 
-## Writing docs (one fact, one place)
+## Writing docs (one fact, one place, never stale)
 Numbers, docs/canonical-numbers.md. Status/todos/blockers, docs/state.md. Decisions + rationale,
 docs/decisions.md (append-only, mark superseded, never delete). Design/algorithm/schema, the owning
 docs/reference/ doc. grep for a fact before writing it; update in place, never a second copy.
-docs/state.md is a living snapshot, NOT an append log: date items, move shipped out, delete stale.
-If it only grows, it's rotting.
+Freshness is not optional. A cold thread reads docs/state.md + docs/agent-memory/MEMORY.md verbatim at
+session start; they set its baseline IQ. Keep them true:
+- Close the loop the SAME turn. The turn you decide something (or make any doc go stale), propagate
+  before you end it: decisions.md (append + mark the superseded entry), canonical-numbers.md if a number
+  moved, the owning reference doc, and state.md's snapshot, then delete what it superseded in the same
+  edit. A decision isn't done until every surface showing the old version is updated or repointed.
+  Half-propagated is the drift a fresh thread inherits. It costs extra tokens; Nam has signed off, do it.
+- Inbound changes fire the loop too, not just chat decisions. When a change lands from OUTSIDE this chat
+  (a Codex implementation, a Sonnet report, a diff or status Nam hands you, any codebase change you
+  notice), treat it as a freshness event: go READ what actually changed in the code, then reconcile every
+  doc it touches the same turn (state.md shipped-vs-pending, the owning reference doc, canonical-numbers if
+  a number moved, the lavish walkthrough per the code-sync rule). The arriving change IS the signal, don't
+  wait to be told the docs went stale. Verify against the code, never just transcribe the report's claims.
+- state.md is a snapshot, not a log. "Now" = only genuinely in-flight work, every item dated.
+  Shipped/resolved gets DELETED (its why lives in decisions.md), never moved to a "compressed history".
+  RESOLVED leaves the blockers list. Prune on sight, don't wait for a checkpoint that never comes.
+- No unclarified context, ever. No raw transcription, scratch, or half-thoughts in a committed doc.
+  Open/provisional items must say so (provisional, OPEN fork) so a fresh reader never mistakes an open
+  question for settled fact.
+- Lavish HTML mirrors CURRENT CODE, not decisions. Don't touch it during review/decision-making (it is
+  Nam's read-only surface, see agent-memory). When the CODE it explains actually lands, sync the lavish
+  doc so it stays a true walkthrough of what's running.
 
 ## Agent memory (shared across every agent)
 docs/agent-memory/ is the cross-agent memory store. Every agent (Claude Code, Codex, whatever runs

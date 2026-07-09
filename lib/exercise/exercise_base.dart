@@ -21,6 +21,10 @@ import '../debug/debug_types.dart';
 import '../services/generic_exercise_voice_assets.dart';
 import '../services/queued_asset_voice_player.dart';
 import '../services/viettel_tts_service.dart';
+import '../voice/policy_voice_coach.dart';
+import '../voice/voice_coach.dart';
+import '../voice/voice_content.dart';
+import '../voice/voice_sink.dart';
 import 'dart:math' as math;
 import 'presence_gate.dart';
 import 'dart:async';
@@ -362,13 +366,29 @@ abstract class ExerciseBase {
   /// Free native resources on dispose.
   Future<void> disposeDetectors() async => _gate.close();
 
-  ExerciseVoiceCoach? createVoiceCoach() => _GenericExerciseVoiceCoach();
+  ExerciseVoiceCoach? createVoiceCoach() {
+    // Keep the same per-exercise footprint the legacy generic coach used:
+    // both script types map fault ids to '<slug>.<id>' asset keys.
+    final legacy =
+        GenericExerciseVoiceAssets.scriptForExerciseName(exerciseName);
+    final bundle = liveHoldTargetSeconds != null
+        ? VoiceDefaults.timeBased
+        : VoiceDefaults.repBased;
+    final script = VoiceScript.from(
+      bundle,
+      slug: legacy.slug,
+      faultIds: legacy.faultIds,
+    );
+    return PolicyVoiceCoach(
+      script: script,
+      coach: VoiceCoach(sink: AssetVoiceSink()),
+      countsByRepNumber: liveHoldTargetSeconds == null,
+    );
+  }
 
   /// Whether the generic coach may replay faults from the previous set while
   /// preparing the next one.
   bool get shouldReplayPreviousSetVoiceFaults => true;
-
-  
 
   // --- Orientation Detection ---
 
@@ -624,6 +644,7 @@ class _GenericAssetVoicePlayer {
   void dispose() => _player.dispose();
 }
 
+// ignore: unused_element
 class _GenericExerciseVoiceCoach implements ExerciseVoiceCoach {
   static final Map<String, Map<String, int>> _previousSetFaultsBySlug = {};
   static const int _noCountCueCooldownMs = 1200;

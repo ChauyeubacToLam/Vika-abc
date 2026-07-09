@@ -1165,29 +1165,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     );
   }
 
-  // TEMP(pose-throttle-verify): remove after device pass. Counts native pose
-  // events over 2s windows and prints the effective inference rate. Events
-  // only fire for frames the landmarker actually processed, so this rate IS
-  // the throttle's output — expect ~30/s active, ~1/s paused. Counted before
-  // the early-return guards below so no processed frame is missed.
-  int _poseEventCount = 0;
-  DateTime? _poseFpsWindowStart;
-
-  void _logPoseEventRate() {
-    _poseEventCount++;
-    final now = DateTime.now();
-    final windowStart = _poseFpsWindowStart ??= now;
-    final elapsed = now.difference(windowStart);
-    if (elapsed < const Duration(seconds: 2)) return;
-    final rate = _poseEventCount * 1000 / elapsed.inMilliseconds;
-    debugPrint('[Vika][pose-throttle] ${rate.toStringAsFixed(1)} events/s '
-        '(gate paused: ${widget.exercise.isPaused})');
-    _poseEventCount = 0;
-    _poseFpsWindowStart = now;
-  }
-
   Future<void> _handleLandmarkEvent(Map<String, dynamic> data) async {
-    _logPoseEventRate(); // TEMP(pose-throttle-verify)
     if (_isDisposed ||
         _isCompletingSet ||
         _didComplete ||

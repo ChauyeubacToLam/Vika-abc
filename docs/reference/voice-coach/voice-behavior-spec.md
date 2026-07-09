@@ -1,7 +1,9 @@
 # Voice Coach — Behavior Spec (v1, draft for Nam's review)
 
-Status: v1.1 — reviewed by Nam 2026-07-07, approved with one addition (coach-personality scalar,
-below). Numbers stay open for feel-tuning. Behavior only — implementation doc comes later (Opus + lavish).
+Status: v1.2 — reviewed by Nam 2026-07-07, approved with one addition (coach-personality scalar,
+below). 2026-07-08: count floor loosened (Nam) — caps/floors are saturation guards, not schedulers;
+see principle 2 corollary and the rep-count rules. Numbers stay open for feel-tuning. Behavior only —
+implementation doc comes later (Opus + lavish).
 Research backing: [voice-research-rules.md](voice-research-rules.md) (same folder).
 Decision record: docs/decisions.md, 2026-07-07 voice-coach entry.
 
@@ -12,6 +14,11 @@ Decision record: docs/decisions.md, 2026-07-07 voice-coach entry.
 2. **No metronomes.** Nothing optional fires on a fixed counter ("every 3 reps") — every optional
    cue is a fresh probability draw, shaped by hunger (see model below). Gaps between cues vary
    naturally around an average; there is no learnable pattern within a set or across sets.
+   Corollary (Nam, 2026-07-08): **hard floors and caps are saturation guards, not schedulers.**
+   Size them at the degenerate edge — the pathological case they exist to prevent (a whole set
+   uncounted, a cue on every rep) — never tight enough to bind on a typical set. A limit that
+   binds every set IS a metronome: the original count floor forced a count after at most 2 silent
+   reps, which produced an audible alternating rhythm ("bốn... sáu... tám... mười").
 3. **Deterministic is reserved for causality and structure.** Safety alerts, setup instructions,
    set completion, and the *first* reaction to a new fault are reliable — reacting to something the
    user just did feels human; firing on a schedule feels robotic. Randomness applies to cadence,
@@ -67,8 +74,12 @@ the guidance-hypothesis concern about constant voice).
 
 - **Always counted (anchors):** rep 1 (proof the counter works), and the last 2 reps of the target
   (finish energy: "chín... mười!").
-- **Middle reps:** counted with ~70% chance, hunger +15%/skipped rep.
-- **Hard rule:** never skip two counts in a row.
+- **Middle reps:** counted with ~70% chance, hunger +15%/skipped rep, **capped at 90%** — no
+  skip streak may ever make the next count a certainty the user can learn.
+- **Relief valve (supersedes "never skip two counts in a row", 2026-07-08):** a count is forced
+  only after **6 consecutive silent counts**. That guard exists solely so a set never goes
+  essentially uncounted; sized per principle 2's corollary so it cannot shape rhythm. The old
+  2-skip floor was tight enough to bind every set and produced an alternating even-number pattern.
 - **Skipped counts still tick:** a soft non-verbal tick marks the rep, so the user never wonders
   whether the rep registered. Voice is thinned; registration feedback is not.
 
@@ -136,7 +147,7 @@ this is already the interpreter's job, unchanged.)
 |---|---|
 | 1 | Safety always speaks, immediately |
 | 2 | Setup / ready / set-complete exactly once, always |
-| 3 | Rep 1 and last 2 reps always counted; never skip two counts in a row |
+| 3 | Rep 1 and last 2 reps always counted; count forced only after 6 consecutive silent counts (middle-rep roll capped at 90%, never certain) |
 | 4 | Skipped counts still get a non-verbal tick |
 | 5 | First occurrence of a fault-id in a set always cued |
 | 6 | Never praise two consecutive reps |

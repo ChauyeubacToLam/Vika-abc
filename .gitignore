@@ -69,6 +69,9 @@ app.*.map.json
 # Agent memory: shared notes are committed; private-* notes stay local (personal/sensitive)
 docs/agent-memory/private-*.md
 
+# Scratch: throwaway work orders / Codex handoff specs — never committed
+docs/scratch/
+
 # Environment & secrets (if you add any later)
 .env
 .env.*

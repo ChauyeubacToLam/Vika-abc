@@ -15,7 +15,11 @@ import 'metrics/trunk_lean_metric.dart';
 import 'metrics/heel_rise_metric.dart';
 import 'metrics/tempo_metric.dart';
 import 'metrics/hip_shoulder_sync.dart';
-import '../../services/squat_voice_coach.dart';
+import '../../services/generic_exercise_voice_assets.dart';
+import '../../voice/policy_voice_coach.dart';
+import '../../voice/voice_coach.dart';
+import '../../voice/voice_content.dart';
+import '../../voice/voice_sink.dart';
 
 // --- Config ---
 
@@ -199,8 +203,40 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
   @override
   String get exerciseName => 'Squat';
 
+  /// Squat pilot for the shared voice policy.
+  ///
+  /// The old [SquatVoiceCoach] did three jobs at once: phase cues,
+  /// post-rep count/praise/correct lines, and setup/complete structure.
+  /// This factory now hands the first two jobs to [PolicyVoiceCoach] while
+  /// deliberately leaving setup/complete silent until the later instruction
+  /// wiring stage.
   @override
-  ExerciseVoiceCoach? createVoiceCoach() => SquatVoiceCoach();
+  ExerciseVoiceCoach? createVoiceCoach() {
+    // Reuse the legacy footprint instead of hardcoding squat's slug/fault ids.
+    // That keeps fault audio keys identical: e.g. depth -> squat.depth.
+    final legacy =
+        GenericExerciseVoiceAssets.scriptForExerciseName(exerciseName);
+    final script = VoiceScript.from(
+      VoiceDefaults.repBased,
+      slug: legacy.slug,
+      faultIds: legacy.faultIds,
+      // PolicyVoiceCoach reads exercise.currentPhaseKey each frame. For squat
+      // that key is the SquatState enum name, so this map translates movement
+      // state into the logical audio key the sink should play.
+      phaseCues: const {
+        'descending': 'Xuống',
+        'bottom': 'Giữ',
+        'ascending': 'Đứng lên',
+      },
+    );
+    return PolicyVoiceCoach(
+      script: script,
+      coach: VoiceCoach(sink: AssetVoiceSink()),
+      // Lets VoicePolicy consider final-rep hustle. Missing hustle audio still
+      // safe-no-ops in the sink until those clips exist.
+      targetReps: maxRep,
+    );
+  }
 
   @override
   String get currentPhaseKey => squatState.toString().split('.').last;
