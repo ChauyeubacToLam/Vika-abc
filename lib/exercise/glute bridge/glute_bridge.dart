@@ -203,6 +203,10 @@ class GluteBridge extends ExerciseBase with SideTrackedExerciseMixin {
           ? (frameTimestampMs - _topHoldStartMs!) / 1000.0
           : null;
 
+  @override
+  List<FaultRecord> get liveFaults =>
+      [for (final metric in _metrics) ...metric.faults];
+
   /* -----------------------------------------------------------------------
      UI BRIDGE
      ----------------------------------------------------------------------- */
@@ -228,6 +232,8 @@ class GluteBridge extends ExerciseBase with SideTrackedExerciseMixin {
       targetReps: targetReps,
       coach: VoiceCoach(
         sink: AssetVoiceSink(),
+        // Collision gap + outcome cap are policy-level (one place to tune,
+        // inherited by every exercise) — not passed per-exercise (Nam 07-09).
         policy: VoicePolicy(tuning: _voiceTuning),
       ),
     );
@@ -698,8 +704,16 @@ class GluteBridge extends ExerciseBase with SideTrackedExerciseMixin {
 
     // Build fault map for set history.
     final faultMap = <String, Map<String, String>>{};
+    final faultAffectsForm = <String, bool>{};
+    final faultPriorities = <String, int>{};
     for (final fault in allFaults) {
       faultMap.putIfAbsent(fault.phase, () => {})[fault.type] = fault.message;
+      faultAffectsForm[fault.type] =
+          (faultAffectsForm[fault.type] ?? false) || fault.affectsForm;
+      final previousPriority = faultPriorities[fault.type];
+      if (previousPriority == null || fault.priority < previousPriority) {
+        faultPriorities[fault.type] = fault.priority;
+      }
     }
     setFeedback.add({correctForm: faultMap});
 
@@ -718,6 +732,8 @@ class GluteBridge extends ExerciseBase with SideTrackedExerciseMixin {
         "peak_normalized_hip_deviation": _peakNormalizedDeviation ?? 0.0,
         "peak_knee_angle": _peakKneeAngle ?? 0.0,
         "fault_types": allFaults.map((f) => f.type).toSet().toList(),
+        "fault_affects_form": faultAffectsForm,
+        "fault_priorities": faultPriorities,
       },
     ));
 

@@ -1,8 +1,10 @@
 import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:vika/exercise/Cobra/cobra.dart';
 import 'package:vika/exercise/exercise_base.dart';
+import 'package:vika/exercise/fault_record.dart';
 import 'package:vika/exercise/glute bridge/glute_bridge.dart';
 import 'package:vika/exercise/lunge/lunge.dart';
 import 'package:vika/exercise/squat/squat.dart';
@@ -201,6 +203,185 @@ void main() {
     );
   });
 
+  test('live faults fire mid-rep and are not duplicated at rep end', () async {
+    final sink = _RecordingVoiceSink();
+    final exercise = _VoiceTestExercise(targetReps: 3)
+      ..exerciseState = ExerciseState.activated;
+    final coach = PolicyVoiceCoach(
+      script: _gluteBridgePilotScript(),
+      coach: VoiceCoach(
+        sink: sink,
+        policy: _outcomeAlwaysPolicy(),
+        random: _ScriptedRandom([0.99]),
+      ),
+      targetReps: 3,
+    );
+    addTearDown(coach.dispose);
+
+    exercise.live = [
+      FaultRecord(
+        phase: 'topHold',
+        type: 'hyperextension',
+        message: 'Không ưỡn lưng',
+        affectsForm: true,
+        priority: 1,
+      ),
+    ];
+    coach.processFrame(
+      exercise: exercise,
+      repCount: 0,
+      hasPose: true,
+      feedback: const {},
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    exercise
+      ..live = const []
+      ..logger.addRepLog(
+        RepLog(
+          repNumber: 1,
+          correctForm: false,
+          data: const {
+            'fault_types': ['hyperextension'],
+            'fault_affects_form': {'hyperextension': true},
+            'fault_priorities': {'hyperextension': 1},
+          },
+        ),
+      );
+    coach.processFrame(
+      exercise: exercise,
+      repCount: 1,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    expect(
+      sink.keys.where((key) => key == 'glute_bridge.hyperextension'),
+      hasLength(1),
+    );
+  });
+
+  test('blocked live critical keeps first-occurrence credit next rep',
+      () async {
+    var now = 0;
+    final sink = _RecordingVoiceSink();
+    final exercise = _VoiceTestExercise(targetReps: 3)
+      ..exerciseState = ExerciseState.activated;
+    final coach = PolicyVoiceCoach(
+      script: _gluteBridgePilotScript(),
+      coach: VoiceCoach(
+        sink: sink,
+        policy: VoicePolicy(
+          random: _ScriptedRandom([0.99]),
+          clockMs: () => now,
+          tuning: {
+            ...kDefaultTuning,
+            CueType.count: const CueTuning(CueMode.always, base: 0.0, cap: 0.0),
+            CueType.criticalFault: const CueTuning(
+              CueMode.correction,
+              base: 0.0,
+              step: 0.0,
+              cap: 0.0,
+              firstOccurrenceCertain: true,
+            ),
+            CueType.softFault:
+                const CueTuning(CueMode.variableRatio, base: 0.0, cap: 0.0),
+            CueType.praise:
+                const CueTuning(CueMode.variableRatio, base: 0.0, cap: 0.0),
+            CueType.hustle:
+                const CueTuning(CueMode.perishable, base: 0.0, cap: 0.0),
+            CueType.phase:
+                const CueTuning(CueMode.perishable, base: 0.0, cap: 0.0),
+          },
+          outcomeCollisionGapMs: 500,
+          maxOutcomeCuesPerRep: 2,
+        ),
+        random: _ScriptedRandom([0.99]),
+      ),
+      targetReps: 3,
+    );
+    addTearDown(coach.dispose);
+
+    exercise.live = [
+      FaultRecord(
+        phase: 'ascending',
+        type: 'hyperextension',
+        message: 'Không ưỡn lưng',
+        affectsForm: true,
+      ),
+    ];
+    coach.processFrame(
+      exercise: exercise,
+      repCount: 0,
+      hasPose: true,
+      feedback: const {},
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    now = 100;
+    exercise.live = [
+      FaultRecord(
+        phase: 'descending',
+        type: 'neck_head',
+        message: 'Thả đầu xuống',
+        affectsForm: true,
+      ),
+    ];
+    coach.processFrame(
+      exercise: exercise,
+      repCount: 0,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    expect(sink.keys, contains('glute_bridge.hyperextension'));
+    expect(sink.keys, isNot(contains('glute_bridge.neck_head')));
+
+    exercise
+      ..live = const []
+      ..logger.addRepLog(
+        RepLog(
+          repNumber: 1,
+          correctForm: false,
+          data: const {
+            'fault_types': ['hyperextension', 'neck_head'],
+            'fault_affects_form': {
+              'hyperextension': true,
+              'neck_head': true,
+            },
+          },
+        ),
+      );
+    coach.processFrame(
+      exercise: exercise,
+      repCount: 1,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    now = 600;
+    exercise.live = [
+      FaultRecord(
+        phase: 'ascending',
+        type: 'neck_head',
+        message: 'Thả đầu xuống',
+        affectsForm: true,
+      ),
+    ];
+    coach.processFrame(
+      exercise: exercise,
+      repCount: 1,
+      hasPose: true,
+      feedback: const {},
+    );
+
+    expect(
+      sink.keys.where((key) => key == 'glute_bridge.neck_head'),
+      hasLength(1),
+      reason: 'blocked rep-1 attempt must not turn rep 2 into persistence=1',
+    );
+  });
+
   test('scripts without soft pools keep the existing 2-way classifier', () {
     expect(
       _spokenOutcomeKeys(
@@ -307,7 +488,8 @@ VoicePolicy _outcomeAlwaysPolicy() {
         cap: 0.0,
         firstOccurrenceCertain: true,
       ),
-      CueType.softFault: const CueTuning(CueMode.variableRatio, base: 1.0, cap: 1.0),
+      CueType.softFault:
+          const CueTuning(CueMode.variableRatio, base: 1.0, cap: 1.0),
       CueType.hustle: const CueTuning(CueMode.perishable, base: 0.0, cap: 0.0),
       CueType.phase: const CueTuning(CueMode.perishable, base: 0.0, cap: 0.0),
     },
@@ -354,4 +536,39 @@ class _RecordingVoiceSink implements VoiceSink {
 
   @override
   void dispose() {}
+}
+
+class _VoiceTestExercise extends ExerciseBase {
+  _VoiceTestExercise({super.targetReps});
+
+  List<FaultRecord> live = const [];
+
+  @override
+  List<FaultRecord> get liveFaults => live;
+
+  @override
+  String get exerciseName => 'Glute Bridge';
+
+  @override
+  String get currentPhaseKey => 'test';
+
+  @override
+  String get currentPhaseLabel => 'Test';
+
+  @override
+  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) =>
+      null;
+
+  @override
+  void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {}
+
+  @override
+  bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) =>
+      false;
+
+  @override
+  void onSetComplete() {}
+
+  @override
+  bool requestStop() => false;
 }

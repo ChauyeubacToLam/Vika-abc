@@ -26,6 +26,7 @@ import '../voice/voice_coach.dart';
 import '../voice/voice_content.dart';
 import '../voice/voice_sink.dart';
 import 'dart:math' as math;
+import 'fault_record.dart';
 import 'presence_gate.dart';
 import 'dart:async';
 import 'dart:ui' show Size;
@@ -531,8 +532,10 @@ abstract class ExerciseBase {
     final lh = smoothedLandmarks[PoseLandmarkType.leftHip];
     final rh = smoothedLandmarks[PoseLandmarkType.rightHip];
     if (ls == null || rs == null || lh == null || rh == null) return null;
-    if (!isLandmarkConfident(ls) || !isLandmarkConfident(rs) ||
-        !isLandmarkConfident(lh) || !isLandmarkConfident(rh)) {
+    if (!isLandmarkConfident(ls) ||
+        !isLandmarkConfident(rs) ||
+        !isLandmarkConfident(lh) ||
+        !isLandmarkConfident(rh)) {
       return null;
     }
     // Midpoints aren't PoseLandmark objects, so calculateDistance can't be used;
@@ -638,6 +641,11 @@ abstract class ExerciseBase {
 
   /// Optional target used by the shared hold timer UI.
   double? get liveHoldTargetSeconds => null;
+
+  /// Faults known so far in the rep-in-progress, exposed the instant a
+  /// metric detects them. Exercises that do not opt in keep the post-rep
+  /// RepLog voice path.
+  List<FaultRecord> get liveFaults => const [];
 }
 
 class _GenericAssetVoicePlayer {

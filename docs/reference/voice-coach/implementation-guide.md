@@ -12,8 +12,9 @@ each stage must leave `flutter analyze` and `flutter test` green.
 > ORIGINAL migration (done). The glute-bridge pilot then refined it: decisions.md 07-08 (soft cue,
 > first-fault 100%, count cap-1.0/no-relief-valve, hustle off, snake_case fault ids) + 07-09 (cue-type
 > rename `correct`->`criticalFault` / `soft`->`softFault` / `instruction`->`setup`; critical/soft fire
-> REAL-TIME off a new `ExerciseBase.liveFaults` getter, not post-rep); behavior-spec.md v1.3;
-> realtime-cue-design.html. Where this guide's names / numbers / timing conflict with those, those win.
+> REAL-TIME off `ExerciseBase.liveFaults`; final-2 count anchor; per-MOMENT outcome exclusivity with a
+> critical-only second slot and audio-end collision gap); behavior-spec.md v1.4; realtime-cue-design.html.
+> Where this guide's names / numbers / timing conflict with those, those win.
 
 ---
 

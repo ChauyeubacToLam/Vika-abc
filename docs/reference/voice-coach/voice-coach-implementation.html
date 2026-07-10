@@ -202,11 +202,14 @@ main code{overflow-wrap:anywhere;background:var(--line-soft);padding:1px 5px;bor
     the whole point, and it's the part we're building carefully.</p>
   </div>
 
-  <p>The behavior this implements was approved in the
+  <p>The behavior this originally proposed was approved in the
   <a href="voice-behavior-spec.html">voice behavior spec</a> and recorded in the
-  <code>2026-07-07</code> entry of <code>docs/decisions.md</code>. This doc is the <em class="term">how</em>:
-  proposed classes, the cadence math, the file-by-file change list, and the handful of calls I need from you
-  at the end. Nothing here is written to the codebase yet.</p>
+  <code>2026-07-07</code> entry of <code>docs/decisions.md</code>. The migration has since landed, and the
+  glute-bridge pilot was refined on <code>2026-07-08</code>/<code>2026-07-09</code>: cue types were renamed,
+  critical/soft now fire through <code>ExerciseBase.liveFaults</code>, final-2 reps are count anchors, and
+  outcome exclusivity is per-moment with a critical-only second slot plus an audio-end collision gap. Read
+  <code>voice-behavior-spec.md</code> + <code>realtime-cue-design.html</code> as the current truth where old
+  snippets below still show the original per-rep sketch.</p>
 
   <div class="legend">
     <div><b style="color:var(--ink)">One entry point</b><code>say(type, content, ctx)</code> — fire and forget. The caller never decides whether it plays.</div>

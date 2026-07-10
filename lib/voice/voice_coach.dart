@@ -42,12 +42,28 @@ class VoiceCoach {
   bool get isBusy => _sink.isBusy;
 
   /// The brain decides if/when; if it says yes, resolve *what* to say and
-  /// fire-and-forget it to the sink.
-  void say(CueType type, VoiceContent content, CueContext ctx) {
-    if (!_policy.decide(type, ctx)) return;
+  /// fire-and-forget it to the sink. Returns true only when the cue was
+  /// accepted and dispatched, so adapters can mark "spoken" state without
+  /// spending blocked attempts.
+  bool say(CueType type, VoiceContent content, CueContext ctx) {
+    if (content.keys.isEmpty) return false;
+    if (!_policy.decide(type, ctx)) return false;
     final key = _resolveKey(type, content, ctx);
-    if (key == null) return;
+    if (key == null) {
+      if (_isOutcomeCue(type)) {
+        _policy.markOutcomeAudioEnded();
+      }
+      return false;
+    }
     unawaited(_sink.playKey(key));
+    if (_isOutcomeCue(type)) {
+      unawaited(
+        _sink.waitUntilIdle().then((_) {
+          _policy.markOutcomeAudioEnded();
+        }),
+      );
+    }
+    return true;
   }
 
   Future<void> waitUntilIdle() => _sink.waitUntilIdle();
@@ -57,6 +73,13 @@ class VoiceCoach {
   /// Delegates to the policy — call at the start of every set to wipe
   /// hunger and all hard-rule memory (see [VoicePolicy.beginSet]).
   void beginSet() => _policy.beginSet();
+
+  bool _isOutcomeCue(CueType type) {
+    return type == CueType.praise ||
+        type == CueType.criticalFault ||
+        type == CueType.softFault ||
+        type == CueType.hustle;
+  }
 
   String? _resolveKey(CueType type, VoiceContent content, CueContext ctx) {
     var pool = content.keys;

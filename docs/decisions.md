@@ -14,6 +14,42 @@ Alternatives considered: <what we rejected and why>
 
 ---
 
+## 2026-07-09 · Voice coach: outcome exclusivity is per-MOMENT, not per-rep (critical second slot + collision gap)
+Status: active — decided with Nam 07-09 (chat), implemented for the glute pilot. Refines the 07-08
+glute-bridge lock's "max one outcome cue per rep" clause (spec hard rule 7 / principle 4).
+Decision: "max one outcome cue per rep" becomes "max one outcome cue per MOMENT":
+- A second outcome cue may voice within the same rep only if ALL of: it is a `criticalFault` (safety class —
+  softFault/praise/hustle stay strictly one-per-rep); it is a DIFFERENT fault than anything already voiced
+  this rep (same fault never re-voices in-rep — cross-rep persistence escalation owns repeats); the collision
+  gap has passed; and fewer than 2 outcome cues have voiced this rep (saturation cap).
+- Collision gap: an outcome cue may not start until the previous outcome cue's audio ENDED + ~0.5s silence
+  (cooldown = line length + buffer, so long lines can't chain). Applies to outcome-after-outcome adjacency
+  across rep boundaries too. Numbers (0.5s, cap 2) tune-on-device; shape locked.
+- Blocked ≠ spent: a critical suppressed by gap/cap keeps its first-occurrence credit (next occurrence still
+  fires deterministically — hard rule 5 bends for a moment, never silently breaks) and still counts in the
+  post-set summary. v1 drops the blocked line (perishable), no delayed replay.
+- Scope: this is the system's ONLY time cooldown. No global cooldown — count+outcome pairing is designed
+  co-occurrence (principle 4), setup/set-complete are exactly-once hard rules, praise/soft/hustle are already
+  spaced by rep cadence, and QueuedAssetVoicePlayer already serializes all audio.
+Why: hard rule 7 was written in the post-rep era when every outcome cue fired at the same instant (the rep
+boundary), so "one per rep" really meant "one per moment". Real-time firing (07-09) made the rep the wrong
+time quantum: knees-cue on the raise + neck-cue on the lower of one glute-bridge rep is normal coaching (a
+real PT coaches the up and the down), not nagging. Nagging = the same fault repeated, or lines chained without
+air — each gets its own guard (in-rep fault dedup; audio-end+buffer gap). Cap 2 is sized at the degenerate
+edge — ~1.5s lines + 0.5s gap in a 3–5s rep physically fits at most 2 — so it almost never binds (saturation
+guards, not schedulers).
+Alternatives considered: (a) keep strict one-per-rep — rejected, drops a legitimate second fault for an
+artifact of the old post-rep batching; (b) system-wide cooldown — rejected, breaks count+outcome pairing,
+threatens exactly-once setup cues, and duplicates rep-cadence spacing (a limit that binds every set is a
+metronome); (c) gap measured from cue TRIGGER time — rejected, long lines would still chain (measure from
+audio end).
+Implementation seam: `_lastOutcomeRep` in lib/voice/voice_policy.dart became a last-outcome-audio-end
+timestamp + per-rep voiced-outcome count. `VoiceCoach` stamps the policy when the sink reports idle after
+an accepted outcome cue; this is exact for the current serialized outcome flow and conservative if a later
+non-outcome line ever queues behind it.
+
+---
+
 ## 2026-07-09 · Voice coach: cue-type rename for clarity (criticalFault / softFault / setup)
 Status: active — applied this session (contained scope); analyze + 33 voice tests green.
 Decision: Rename CueType members for legibility: `correct`->`criticalFault`, `soft`->`softFault`,
@@ -30,7 +66,7 @@ Alternatives considered: full rename incl. `resultIssues.instructions`->`liveRem
 
 ## 2026-07-09 · Voice coach: critical/soft fire real-time off a generic liveFaults surface (glute-bridge)
 Status: active — design locked with Nam 07-09 via lavish `docs/reference/voice-coach/realtime-cue-design.html`;
-Codex to implement, glute-bridge scope. Supersedes the post-rep-batched critical/soft timing (07-07 spec) for
+implemented for the glute pilot. Supersedes the post-rep-batched critical/soft timing (07-07 spec) for
 glute bridge.
 Decision: criticalFault + softFault fire the instant a fault is KNOWN, not batched at rep-completion.
 - Signal: a new read-only `List<FaultRecord> get liveFaults` on `ExerciseBase` (default `const []`; GluteBridge
@@ -45,10 +81,9 @@ Decision: criticalFault + softFault fire the instant a fault is KNOWN, not batch
 - Timing split: continuous faults (hyperextension, neck-lift) surface mid-rep -> real-time; peak faults
   (insufficient hip-extension, knee severity, speed) are only knowable at rep-end and the metrics clear their
   `faults` before the coach frame runs, so they fire via RepLog at rep-completion.
-- OPEN build detail (Nam 07-09): a peak fault can't be acted on in its own rep, so treat it as NEXT-REP guidance,
-  not an urgent correction; and when the parked post-rep-instructions feature lands, route peak faults THERE and
-  drop the rep-end firing so the same fault is never spoken twice. Resolve the delivery shape when writing the
-  Codex prompt.
+- Peak faults: a peak fault can't be acted on in its own rep, so the implementation fires it at rep-end
+  via RepLog as NEXT-REP guidance, not an urgent mid-rep correction. When the parked post-rep-instructions
+  feature lands, route peak faults THERE and drop the rep-end firing so the same fault is never spoken twice.
 Why: the only place a fault is known mid-rep is the moment its metric detects it; "fire the instant known" =
 real-time for continuous faults, rep-end for peak. Honest realization of the 07-08 "correct + soft fire
 real-time" decision given the true shape of the mid-rep signal.

@@ -165,14 +165,12 @@ class VoicePolicy {
     int Function()? clockMs,
     this.personality = 1.0,
     this.tuning = kDefaultTuning,
+    this.outcomeCollisionGapMs = 500,
+    this.maxOutcomeCuesPerRep = 2,
   })  : _rng = random ?? Random(),
         _clockMs = clockMs ?? _wallClockMs;
 
   final Random _rng;
-  // Reserved for future latency-aware rules (e.g. cooldowns keyed on wall
-  // time rather than rep count); no current rule reads it, but it's part
-  // of the locked constructor shape ("injected Random + clock") and tests
-  // rely on being able to inject a fake clock even before any rule reads it.
   final int Function() _clockMs;
 
   /// Current policy-clock time in epoch milliseconds — real wall clock in
@@ -186,6 +184,18 @@ class VoicePolicy {
 
   final Map<CueType, CueTuning> tuning;
 
+  /// Minimum silence (ms) after the previous outcome cue's audio ended before
+  /// another outcome may start — the system's only time cooldown, measured
+  /// from audio end so long lines can't chain. Policy-level: every exercise
+  /// inherits this one default, it is NOT tuned per exercise (Nam 2026-07-09).
+  /// Tests may inject their own for determinism.
+  final int outcomeCollisionGapMs;
+
+  /// Saturation cap for outcome cues in a single rep (the per-MOMENT rule's
+  /// hard ceiling; the 2nd slot is criticalFault-only). Policy-level default —
+  /// one place to tune, inherited by every exercise (Nam 2026-07-09).
+  final int maxOutcomeCuesPerRep;
+
   static int _wallClockMs() => DateTime.now().millisecondsSinceEpoch;
 
   // --- per-set memory. beginSet() clears all of it. ----------------------
@@ -197,15 +207,33 @@ class VoicePolicy {
   final Map<String, int> _idle = {};
 
   int _lastPraiseRep = -2;
-  int _lastOutcomeRep = -1;
   bool _hustledThisSet = false;
+  int? _lastOutcomeAudioEndMs;
+  bool _outcomeAudioPending = false;
+  int _outcomeRepNumber = -1;
+  int _outcomesThisRep = 0;
+  final Set<String> _outcomeFaultKeysThisRep = <String>{};
+
+  int? get lastOutcomeAudioEndMs => _lastOutcomeAudioEndMs;
 
   /// Call at the start of every set: wipes hunger and all hard-rule memory.
   void beginSet() {
     _idle.clear();
     _lastPraiseRep = -2;
-    _lastOutcomeRep = -1;
     _hustledThisSet = false;
+    _lastOutcomeAudioEndMs = null;
+    _outcomeAudioPending = false;
+    _outcomeRepNumber = -1;
+    _outcomesThisRep = 0;
+    _outcomeFaultKeysThisRep.clear();
+  }
+
+  /// Called by [VoiceCoach] when the sink reports that the accepted outcome
+  /// cue's audio has finished. This is the clock edge used by the collision
+  /// gap, deliberately measured from audio end rather than trigger time.
+  void markOutcomeAudioEnded([int? endedMs]) {
+    _outcomeAudioPending = false;
+    _lastOutcomeAudioEndMs = endedMs ?? nowMs;
   }
 
   /// The one entry point. Given a cue request, decide whether it speaks
@@ -214,7 +242,7 @@ class VoicePolicy {
     final speak = _shouldSpeak(type, ctx);
     final key = _key(type, ctx);
     if (speak) {
-      _onSpoke(type, ctx.repNumber, key);
+      _onSpoke(type, ctx, key);
     } else {
       _idle[key] = (_idle[key] ?? 0) + 1;
     }
@@ -233,16 +261,68 @@ class VoicePolicy {
         : type.name;
   }
 
-  void _onSpoke(CueType type, int repNumber, String key) {
+  void _onSpoke(CueType type, CueContext ctx, String key) {
     _idle[key] = 0;
-    if (type == CueType.praise) _lastPraiseRep = repNumber;
-    if (type == CueType.praise ||
-        type == CueType.criticalFault ||
-        type == CueType.softFault ||
-        type == CueType.hustle) {
-      _lastOutcomeRep = repNumber;
+    if (type == CueType.praise) _lastPraiseRep = ctx.repNumber;
+    if (_isOutcomeCue(type)) {
+      _recordOutcome(type, ctx);
     }
     if (type == CueType.hustle) _hustledThisSet = true;
+  }
+
+  bool _isOutcomeCue(CueType type) {
+    return type == CueType.praise ||
+        type == CueType.criticalFault ||
+        type == CueType.softFault ||
+        type == CueType.hustle;
+  }
+
+  void _recordOutcome(CueType type, CueContext ctx) {
+    _syncOutcomeRep(ctx.repNumber);
+    _outcomesThisRep++;
+    _outcomeAudioPending = true;
+    if ((type == CueType.criticalFault || type == CueType.softFault) &&
+        ctx.contentKey.isNotEmpty) {
+      _outcomeFaultKeysThisRep.add(ctx.contentKey);
+    }
+  }
+
+  void _syncOutcomeRep(int repNumber) {
+    if (_outcomeRepNumber == repNumber) return;
+    _outcomeRepNumber = repNumber;
+    _outcomesThisRep = 0;
+    _outcomeFaultKeysThisRep.clear();
+  }
+
+  bool _canStartOutcome(CueType type, CueContext ctx) {
+    _syncOutcomeRep(ctx.repNumber);
+
+    if (_outcomeAudioPending) {
+      return false;
+    }
+
+    final lastEnd = _lastOutcomeAudioEndMs;
+    if (lastEnd != null && nowMs < lastEnd + outcomeCollisionGapMs) {
+      return false;
+    }
+
+    if (_outcomesThisRep == 0) {
+      return true;
+    }
+
+    if (type != CueType.criticalFault) {
+      return false;
+    }
+    if (_outcomesThisRep >= maxOutcomeCuesPerRep) {
+      return false;
+    }
+
+    final contentKey = ctx.contentKey;
+    if (contentKey.isEmpty || _outcomeFaultKeysThisRep.contains(contentKey)) {
+      return false;
+    }
+
+    return true;
   }
 
   /// scale: `(base + step·idle) · personality`, clamped by `cap`. The
@@ -279,6 +359,7 @@ class VoicePolicy {
 
   bool _count(CueContext ctx) {
     if (ctx.repNumber <= 1) return true; // Rep 1 always fires — the anchor.
+    if (ctx.isFinalReps) return true; // Finish anchor: last 2 reps always.
     final t = tuning[CueType.count]!;
     final idle = _idle[_key(CueType.count, ctx)] ?? 0;
     if (idle >= t.reliefAfter) {
@@ -298,8 +379,8 @@ class VoicePolicy {
     if (_lastPraiseRep == ctx.repNumber - 1) {
       return false; // Never twice in a row.
     }
-    if (_lastOutcomeRep == ctx.repNumber) {
-      return false; // At most one outcome cue per rep.
+    if (!_canStartOutcome(CueType.praise, ctx)) {
+      return false;
     }
     final t = tuning[CueType.praise]!;
     final idle = _idle[_key(CueType.praise, ctx)] ?? 0;
@@ -315,8 +396,8 @@ class VoicePolicy {
   }
 
   bool _criticalFault(CueContext ctx) {
-    if (_lastOutcomeRep == ctx.repNumber) {
-      return false; // At most one outcome cue per rep.
+    if (!_canStartOutcome(CueType.criticalFault, ctx)) {
+      return false;
     }
     final t = tuning[CueType.criticalFault]!;
     if (t.firstOccurrenceCertain && ctx.faultPersistence == 0) {
@@ -331,8 +412,8 @@ class VoicePolicy {
   }
 
   bool _softFault(CueContext ctx) {
-    if (_lastOutcomeRep == ctx.repNumber) {
-      return false; // At most one outcome cue per rep.
+    if (!_canStartOutcome(CueType.softFault, ctx)) {
+      return false;
     }
     final t = tuning[CueType.softFault];
     if (t == null) return false;
@@ -342,8 +423,8 @@ class VoicePolicy {
 
   bool _hustle(CueContext ctx) {
     if (_hustledThisSet) return false; // At most one per set.
-    if (_lastOutcomeRep == ctx.repNumber) {
-      return false; // At most one outcome cue per rep.
+    if (!_canStartOutcome(CueType.hustle, ctx)) {
+      return false;
     }
     if (!ctx.isFinalReps) return false; // Only eligible on the final reps.
     final t = tuning[CueType.hustle]!;

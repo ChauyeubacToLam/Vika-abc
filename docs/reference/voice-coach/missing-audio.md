@@ -45,6 +45,8 @@ its renamed key.
 ## NOT missing — recorded, pending wiring (not a recording task)
 
 The setup-layer cues already have audio; they're just not emitted by the coach yet (the adapter never
-calls `say(CueType.setup, …)`). This is Codex wiring work (decisions.md 07-09 setup layer), NOT an
-Anh Doan recording gap: `glute_bridge.setup_position`, `glute_bridge.active_intro`, `common.ready`,
-`common.set_complete` all resolve to shipped files.
+calls `say(CueType.setup, …)`). This is wiring work, NOT an Anh Doan recording gap:
+`glute_bridge.setup_position`, `glute_bridge.active_intro`, `common.ready`, `common.set_complete` all
+resolve to shipped files (verified 07-09). Wiring **DEFERRED** (Nam 07-09) to a next-thread pass that
+designs the whole instruction cluster together (setup + post-rep instructions + hustle) — not the
+current Codex real-time pass.

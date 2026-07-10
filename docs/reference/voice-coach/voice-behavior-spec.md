@@ -1,12 +1,13 @@
 # Voice Coach — Behavior Spec (v1, draft for Nam's review)
 
-Status: v1.3 — reviewed by Nam 2026-07-07 (personality scalar), refined 2026-07-08 (glute-bridge
-behavior lock), 2026-07-09 (cue-type rename + real-time critical/soft). Numbers stay open for
-feel-tuning; shapes locked. Glute bridge is the in-code pilot; real-time firing is designed and
-Codex-pending.
+Status: v1.4 — reviewed by Nam 2026-07-07 (personality scalar), refined 2026-07-08 (glute-bridge
+behavior lock), 2026-07-09 (cue-type rename + real-time critical/soft + per-moment outcome
+exclusivity). Numbers stay open for feel-tuning; shapes locked. Glute bridge is the in-code pilot;
+real-time firing and the collision gap are implemented for the glute pilot.
 07-09 folded in: cue types renamed `criticalFault`/`softFault`/`setup`; NEW `softFault` (non-critical)
 bucket; count finalized to cap-1.0 / no-discrete-relief-valve; `criticalFault` + `softFault` fire
-REAL-TIME (the instant a fault is known), not post-rep.
+REAL-TIME (the instant a fault is known), not post-rep; outcome exclusivity relaxed to per-MOMENT
+(critical-only second slot in-rep + audio-end+0.5s collision gap, cap 2/rep).
 Research backing: [voice-research-rules.md](voice-research-rules.md) (same folder).
 Decision record: docs/decisions.md — 2026-07-07, 07-08, and 07-09 voice-coach entries.
 Real-time design: [realtime-cue-design.html](realtime-cue-design.html) (same folder).
@@ -27,8 +28,11 @@ Real-time design: [realtime-cue-design.html](realtime-cue-design.html) (same fol
    set completion, and the *first* reaction to a new fault are reliable — reacting to something the
    user just did feels human; firing on a schedule feels robotic. Randomness applies to cadence,
    never to whether the coach responds to a real event at all.
-4. **One voice moment per rep, max.** A count may pair with ONE outcome word (praise/correction/
-   hustle). Never two outcome cues on the same rep.
+4. **One outcome cue per MOMENT.** A count may pair with ONE outcome word (praise/correction/
+   hustle); never two outcome lines at the same instant. (Amended 2026-07-09: was "per rep, max" —
+   a leftover from post-rep batching, when every outcome cue fired at the rep boundary and per-rep
+   WAS per-moment. A second `criticalFault` on a different fault may voice later in the same rep,
+   after the collision gap — see the criticalFault rules.)
 5. **Data honesty.** Every cue maps to something measured this set. No generic filler.
 6. **Tone: warm Vietnamese, never drill-sergeant.** Corrections say what TO do ("hạ thấp hơn"),
    not what failed.
@@ -81,7 +85,7 @@ Counting is registration + pacing info, but it does not need to be every rep (Na
 the guidance-hypothesis concern about constant voice).
 
 - **Always counted (anchors):** rep 1 (proof the counter works), and the last 2 reps of the target
-  (finish energy: "chín... mười!"). [The final-2 anchor is locked but NOT yet in code — pending, 07-09.]
+  (finish energy: "chín... mười!"). Implemented for the glute pilot.
 - **Middle reps:** a real probability draw with hunger climbing per skipped count. Glute-bridge pilot:
   base 0.50, hunger +0.10, **cap 1.0** with a small step, so certainty is only reached after ~5
   straight silent counts.
@@ -112,10 +116,23 @@ the guidance-hypothesis concern about constant voice).
   (principle 3). (`firstOccurrenceCertain`.)
 - **Same fault persists:** re-cue with rising pressure — persistence escalates ~25→55→85%. No discrete
   relief valve (redundant once first=100%). Phrasing firms with persistence, tone stays warm.
-- **Peak faults = next-rep guidance (OPEN, Nam 07-09):** a peak fault can't be acted on in its own
-  rep, so it's framed as "do it right next rep." When the parked post-rep-instructions feature lands,
-  peak faults route THERE and the rep-end firing is dropped (no double-speak). Delivery TBD at build.
-- **Multiple faults on one rep:** only the highest-priority one speaks; the rest wait for the summary.
+- **Peak faults = next-rep guidance:** a peak fault can't be acted on in its own rep, so it fires at
+  rep-end via RepLog for now and is framed as "do it right next rep." When the parked post-rep-
+  instructions feature lands, peak faults route THERE and the rep-end firing is dropped (no double-speak).
+- **Multiple faults on one rep (revised 2026-07-09, supersedes "only the highest-priority one
+  speaks"):** exclusivity is per-MOMENT, not per-rep. At one moment, highest priority wins as before.
+  A SECOND outcome cue may voice later in the same rep iff ALL of: it is a `criticalFault` (safety
+  class — soft/praise/hustle never get the second slot); it is a different fault than anything
+  already voiced this rep (same fault never re-voices in-rep; cross-rep persistence owns repeats);
+  the collision gap has passed; and fewer than 2 outcome cues have voiced this rep. E.g. glute
+  bridge: "knees wider" on the raise, "neck down" on the lower — normal coaching, not nagging.
+- **Collision gap (the system's ONLY time cooldown):** an outcome cue may not start until the
+  previous outcome cue's audio ENDED + ~0.5s silence (cooldown = line length + buffer, so long
+  lines can't chain). Applies to outcome-after-outcome adjacency across rep boundaries too. Nothing
+  else needs one: count/setup fire at structural moments, and the sink already serializes audio.
+- **Blocked ≠ spent:** a critical suppressed by the gap or the cap-2 keeps its first-occurrence
+  credit (its next occurrence still fires deterministically) and still counts in the post-set
+  summary. v1 drops the blocked line (perishable); no delayed replay.
 
 ### Soft fault (`softFault`) — non-critical nudge, real-time, hunger-shaped
 NEW 2026-07-09 — the 3-way classifier's middle bucket. A soft fault = a measured fault with
@@ -143,9 +160,10 @@ praised as clean (data honesty) nor scolded like a critical one.
 
 ## Stacking order within one rep-moment
 
-count (maybe) → then at most one outcome cue per rep: **criticalFault > softFault > praise > hustle**
-(if several are eligible, higher wins; the others simply don't happen — no queueing of stale
-compliments). Count is not an outcome cue and may co-occur.
+count (maybe) → then at most one outcome cue per MOMENT: **criticalFault > softFault > praise > hustle**
+(if several are eligible at the same moment, higher wins; the others simply don't happen — no queueing
+of stale compliments). Count is not an outcome cue and may co-occur. Later in the same rep one more
+`criticalFault` may voice under the second-slot rules (different fault, collision gap, ≤2 per rep).
 
 ## Fade (provisional — phase 2, needs per-user skill state)
 
@@ -170,9 +188,9 @@ this is already the interpreter's job, unchanged.)
 | 2 | Setup / ready / set-complete exactly once, always (`setup`) |
 | 3 | Rep 1 and last 2 reps always counted; middle reps a real draw, hunger climbs to cap-1.0 saturation (no discrete relief valve) |
 | 4 | Skipped counts still get a non-verbal tick (decided, not built) |
-| 5 | First occurrence of a fault in a set is cued deterministically (100%) |
+| 5 | First occurrence of a fault in a set is cued deterministically (100%); a fire blocked by the collision gap/cap keeps the credit — next occurrence is still deterministic |
 | 6 | Never praise two consecutive reps |
-| 7 | Max one outcome cue per rep; `criticalFault` > `softFault` > praise > hustle |
+| 7 | Max one outcome cue per MOMENT (`criticalFault` > `softFault` > praise > hustle); a 2nd in-rep cue only as a `criticalFault` on a different fault, ≥0.5s after the previous outcome line's audio ends, ≤2 voiced outcome cues per rep |
 | 8 | Hustle OFF (behavior TBD — Nam + Fable); when enabled: max once per set, never alongside a fault cue |
 | 9 | After 2 consecutive no-counts, switch to help, don't repeat the failure line (parked) |
 | 10 | Every cue is backed by a measurement from this set |
@@ -207,3 +225,5 @@ Run the same set again → different transcript. That's the point.
 - Fade multipliers ×1.3 / ×0.7 — provisional, phase 2 anyway.
 - Personality scalar range 0.5–1.5 — bounds are a guess; too-low values may starve praise entirely
   on short sets even with the relief valves.
+- Collision gap 0.5s post-audio + cap 2 outcome cues/rep — buffer is pure feel, tune on device; the
+  cap should essentially never bind on a real set (if it does, the gap is too small).

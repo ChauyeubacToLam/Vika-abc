@@ -6,22 +6,24 @@ Design / how-it-works -> the owning reference doc. If this file only grows, it's
 
 ## Now
 
-**Voice coach — glute-bridge pilot; real-time critical/soft is next (2026-07-09).** Decisions:
-decisions.md 07-07/07-08/07-09; behavior spec docs/reference/voice-coach/voice-behavior-spec.md v1.3;
+**Voice coach — glute-bridge pilot; real-time critical/soft shipped (2026-07-09).** Decisions:
+decisions.md 07-07/07-08/07-09; behavior spec docs/reference/voice-coach/voice-behavior-spec.md v1.4;
 real-time design docs/reference/voice-coach/realtime-cue-design.html (Nam-reviewed 07-09). Glute-bridge
 scope; fleet rollout deferred.
-- SHIPPED (in code, glute pilot; analyze + 33 voice tests green): snake_case metric fault ids + 3-way
-  classifier (criticalFault / softFault / praise, praise gated on truly-clean); first-fault 100% then
-  escalate; count 0.50/0.10/cap 1.0 no-relief-valve; praise 0.50 + D8 off; hustle off; targetReps on
-  ExerciseBase; cue-type rename (correct->criticalFault, soft->softFault, instruction->setup).
-- DESIGNED, Codex-pending (glute scope): (1) critical/soft fire REAL-TIME off a NEW read-only
-  `ExerciseBase.liveFaults` getter — continuous faults mid-rep, peak faults at rep-end via RepLog;
-  (2) final-2-reps count anchor (unblocked now targetReps exists); (3) setup-layer voice (setup intro /
-  ready / set-complete — audio already recorded, adapter never emits it). OPEN build detail: peak faults
-  = next-rep guidance; coordinate with the parked post-rep-instructions feature to avoid double-speak.
-- PARKED: no-count cue type + behavior; post-rep/next-rep reminder (REPLACES vs COMPLEMENTS critical/
-  soft); non-verbal tick on skipped counts; hustle behavior (Nam + Fable re-deciding); fleet-wide delete
-  of the 3 rejected rules from kDefaultTuning; fleet rollout (~35 exercises); per-rep speak-only-top-fault.
+- SHIPPED (in code, glute pilot; analyze clean + 43 voice tests green): snake_case metric fault ids +
+  3-way classifier (criticalFault / softFault / praise, praise gated on truly-clean); first-fault 100%
+  then escalate; count 0.50/0.10/cap 1.0 no-relief-valve + final-2-reps anchor; praise 0.50 + D8 off;
+  hustle off; targetReps on ExerciseBase; cue-type rename (correct->criticalFault, soft->softFault,
+  instruction->setup); real-time critical/soft off `ExerciseBase.liveFaults`; per-MOMENT outcome
+  exclusivity (critical-only second slot, different fault, ≥0.5s after previous outcome audio ends, cap
+  2/rep, blocked fire keeps first-occurrence credit). Peak faults fire at rep-end via RepLog as
+  next-rep guidance until the post-rep-instructions feature takes over.
+- PARKED — next thread designs the instruction/structure cluster together (Nam + Fable): setup-layer
+  voice wiring (setup intro / ready / set-complete — audio recorded + resolves, verified 07-09, just
+  unwired) + post-rep/next-rep reminder (REPLACES vs COMPLEMENTS critical/soft) + hustle behavior
+  (trigger TBD). Also parked: no-count cue type + behavior; non-verbal tick on skipped counts;
+  fleet-wide delete of the 3 rejected rules from kDefaultTuning; fleet rollout (~35 exercises); per-rep
+  speak-only-top-fault.
 - Audio pending [Anh Doan, missing-audio.md]: 5 glute soft cues (`<id>_soft`) + `common.great_1/2`.
 
 **PresenceGate extraction (2026-07-05): SHIPPED, device smoke pending.** `lib/exercise/presence_gate.dart`

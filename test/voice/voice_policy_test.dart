@@ -6,11 +6,14 @@
 // valves, per-fault independence, personality bounds, reproducibility),
 // not the exact tuned probabilities (those are expected to move on device).
 
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vika/voice/voice_coach.dart';
 import 'package:vika/voice/voice_content.dart';
 import 'package:vika/voice/voice_policy.dart';
+import 'package:vika/voice/voice_sink.dart';
 
 /// A [Random] that plays back a fixed script of `nextDouble()` results
 /// instead of actually being random — this is what makes probability
@@ -36,6 +39,46 @@ class _ScriptedRandom implements Random {
 
   @override
   bool nextBool() => false;
+}
+
+class _GateableVoiceSink implements VoiceSink {
+  final List<String> keys = [];
+  Completer<void>? _idleCompleter;
+  bool _busy = false;
+
+  @override
+  bool get isBusy => _busy;
+
+  @override
+  Future<void> playKey(String logicalKey) async {
+    keys.add(logicalKey);
+    _busy = true;
+    _idleCompleter ??= Completer<void>();
+  }
+
+  void finishCurrentLine() {
+    _busy = false;
+    final completer = _idleCompleter;
+    _idleCompleter = null;
+    if (completer != null && !completer.isCompleted) {
+      completer.complete();
+    }
+  }
+
+  @override
+  Future<void> waitUntilIdle() {
+    return _idleCompleter?.future ?? Future<void>.value();
+  }
+
+  @override
+  Future<void> stop() async {
+    finishCurrentLine();
+  }
+
+  @override
+  void dispose() {
+    finishCurrentLine();
+  }
 }
 
 Map<CueType, CueTuning> _gluteBridgePilotTuning() => {
@@ -69,17 +112,36 @@ Map<CueType, CueTuning> _gluteBridgePilotTuning() => {
       CueType.hustle: const CueTuning(CueMode.perishable, base: 0.0, cap: 0.0),
     };
 
+VoicePolicy _gluteBridgePilotPolicy({
+  Random? random,
+  int Function()? clockMs,
+}) {
+  return VoicePolicy(
+    random: random,
+    clockMs: clockMs,
+    tuning: _gluteBridgePilotTuning(),
+    outcomeCollisionGapMs: 500,
+    maxOutcomeCuesPerRep: 2,
+  );
+}
+
 void main() {
   group('praise', () {
     test('never fires twice in a row, even with a favourable roll', () {
       // 0.0 is below every positive probability this policy will ever
       // compute, i.e. "always take it if the hard rules allow it".
-      final policy = VoicePolicy(random: _ScriptedRandom([0.0]));
+      // gap 0 isolates the never-twice hard rule from the (now-default)
+      // collision gap, which has its own coverage in the per-moment group.
+      final policy = VoicePolicy(
+        random: _ScriptedRandom([0.0]),
+        outcomeCollisionGapMs: 0,
+      );
 
       expect(
         policy.decide(CueType.praise, const CueContext(repNumber: 5)),
         isTrue,
       );
+      policy.markOutcomeAudioEnded();
       expect(
         policy.decide(CueType.praise, const CueContext(repNumber: 6)),
         isFalse,
@@ -141,15 +203,19 @@ void main() {
     });
 
     test('glute bridge pilot still never praises twice in a row', () {
+      // gap 0 isolates the never-twice hard rule from the collision gap
+      // (the gap has its own coverage in the per-moment group below).
       final policy = VoicePolicy(
         random: _ScriptedRandom([0.0]),
         tuning: _gluteBridgePilotTuning(),
+        outcomeCollisionGapMs: 0,
       );
 
       expect(
         policy.decide(CueType.praise, const CueContext(repNumber: 1)),
         isTrue,
       );
+      policy.markOutcomeAudioEnded();
       expect(
         policy.decide(CueType.praise, const CueContext(repNumber: 2)),
         isFalse,
@@ -161,7 +227,7 @@ void main() {
     });
   });
 
-  group('one outcome cue per rep', () {
+  group('per-moment outcome exclusivity', () {
     test('praise firing blocks correct and hustle on the same rep', () {
       final policy = VoicePolicy(random: _ScriptedRandom([0.0]));
 
@@ -199,6 +265,222 @@ void main() {
         policy.decide(CueType.praise, ctx),
         isTrue,
         reason: 'count claiming the rep must not block praise on it',
+      );
+    });
+
+    test('second different critical can speak after the collision gap', () {
+      var now = 0;
+      final policy = _gluteBridgePilotPolicy(
+        random: _ScriptedRandom([0.99]),
+        clockMs: () => now,
+      );
+
+      expect(
+        policy.decide(
+          CueType.criticalFault,
+          const CueContext(repNumber: 1, contentKey: 'hyperextension'),
+        ),
+        isTrue,
+      );
+      policy.markOutcomeAudioEnded(1000);
+
+      now = 1499;
+      expect(
+        policy.decide(
+          CueType.criticalFault,
+          const CueContext(repNumber: 1, contentKey: 'neck_head'),
+        ),
+        isFalse,
+        reason: 'gap is measured from the previous outcome audio end',
+      );
+
+      now = 1500;
+      expect(
+        policy.decide(
+          CueType.criticalFault,
+          const CueContext(repNumber: 1, contentKey: 'neck_head'),
+        ),
+        isTrue,
+      );
+    });
+
+    test('soft fault never takes the second slot', () {
+      var now = 0;
+      final policy = _gluteBridgePilotPolicy(
+        random: _ScriptedRandom([0.0]),
+        clockMs: () => now,
+      );
+
+      expect(
+        policy.decide(
+          CueType.criticalFault,
+          const CueContext(repNumber: 1, contentKey: 'hyperextension'),
+        ),
+        isTrue,
+      );
+      policy.markOutcomeAudioEnded(0);
+      now = 500;
+
+      expect(
+        policy.decide(
+          CueType.softFault,
+          const CueContext(repNumber: 1, contentKey: 'hip_extension'),
+        ),
+        isFalse,
+      );
+    });
+
+    test('same fault never revoices inside one rep', () {
+      var now = 0;
+      final policy = _gluteBridgePilotPolicy(
+        random: _ScriptedRandom([0.0]),
+        clockMs: () => now,
+      );
+
+      expect(
+        policy.decide(
+          CueType.criticalFault,
+          const CueContext(repNumber: 1, contentKey: 'hyperextension'),
+        ),
+        isTrue,
+      );
+      policy.markOutcomeAudioEnded(0);
+      now = 500;
+
+      expect(
+        policy.decide(
+          CueType.criticalFault,
+          const CueContext(repNumber: 1, contentKey: 'hyperextension'),
+        ),
+        isFalse,
+      );
+    });
+
+    test('cap 2 binds a third would-be critical in one rep', () {
+      var now = 0;
+      final policy = _gluteBridgePilotPolicy(
+        random: _ScriptedRandom([0.99]),
+        clockMs: () => now,
+      );
+
+      expect(
+        policy.decide(
+          CueType.criticalFault,
+          const CueContext(repNumber: 1, contentKey: 'hyperextension'),
+        ),
+        isTrue,
+      );
+      policy.markOutcomeAudioEnded(0);
+      now = 500;
+      expect(
+        policy.decide(
+          CueType.criticalFault,
+          const CueContext(repNumber: 1, contentKey: 'neck_head'),
+        ),
+        isTrue,
+      );
+      policy.markOutcomeAudioEnded(500);
+      now = 1000;
+
+      expect(
+        policy.decide(
+          CueType.criticalFault,
+          const CueContext(repNumber: 1, contentKey: 'knee_angle'),
+        ),
+        isFalse,
+      );
+    });
+
+    test('blocked critical keeps first-occurrence certainty', () {
+      var now = 0;
+      final policy = _gluteBridgePilotPolicy(
+        random: _ScriptedRandom([0.99]),
+        clockMs: () => now,
+      );
+
+      expect(
+        policy.decide(
+          CueType.criticalFault,
+          const CueContext(repNumber: 1, contentKey: 'hyperextension'),
+        ),
+        isTrue,
+      );
+      expect(
+        policy.decide(
+          CueType.criticalFault,
+          const CueContext(repNumber: 1, contentKey: 'neck_head'),
+        ),
+        isFalse,
+        reason: 'audio is still pending, so this is blocked, not spent',
+      );
+      policy.markOutcomeAudioEnded(0);
+      now = 500;
+
+      expect(
+        policy.decide(
+          CueType.criticalFault,
+          const CueContext(repNumber: 1, contentKey: 'neck_head'),
+        ),
+        isTrue,
+        reason: 'ctx still says persistence 0, so firstOccurrenceCertain wins',
+      );
+    });
+
+    test('coach stamps the gap from audio end, not trigger time', () async {
+      var now = 0;
+      final sink = _GateableVoiceSink();
+      final policy = _gluteBridgePilotPolicy(
+        random: _ScriptedRandom([0.99]),
+        clockMs: () => now,
+      );
+      final coach = VoiceCoach(
+        sink: sink,
+        policy: policy,
+        random: _ScriptedRandom([0.0]),
+      );
+      addTearDown(coach.dispose);
+
+      expect(
+        coach.say(
+          CueType.criticalFault,
+          VoiceContent.key('glute_bridge.hyperextension'),
+          const CueContext(repNumber: 1, contentKey: 'hyperextension'),
+        ),
+        isTrue,
+      );
+
+      now = 10000;
+      expect(
+        coach.say(
+          CueType.criticalFault,
+          VoiceContent.key('glute_bridge.neck_head'),
+          const CueContext(repNumber: 1, contentKey: 'neck_head'),
+        ),
+        isFalse,
+        reason: 'the first line has not ended, even though trigger time is old',
+      );
+
+      sink.finishCurrentLine();
+      await Future<void>.delayed(Duration.zero);
+
+      now = 10499;
+      expect(
+        coach.say(
+          CueType.criticalFault,
+          VoiceContent.key('glute_bridge.neck_head'),
+          const CueContext(repNumber: 1, contentKey: 'neck_head'),
+        ),
+        isFalse,
+      );
+
+      now = 10500;
+      expect(
+        coach.say(
+          CueType.criticalFault,
+          VoiceContent.key('glute_bridge.neck_head'),
+          const CueContext(repNumber: 1, contentKey: 'neck_head'),
+        ),
+        isTrue,
       );
     });
   });
@@ -624,6 +906,34 @@ void main() {
       expect(
         policy.decide(CueType.count, const CueContext(repNumber: 1)),
         isTrue,
+      );
+    });
+
+    test('final two reps always fire when the adapter marks them final', () {
+      final policy = VoicePolicy(random: _ScriptedRandom([0.999]));
+
+      expect(
+        policy.decide(
+          CueType.count,
+          const CueContext(repNumber: 9, isFinalReps: true),
+        ),
+        isTrue,
+      );
+      expect(
+        policy.decide(
+          CueType.count,
+          const CueContext(repNumber: 10, isFinalReps: true),
+        ),
+        isTrue,
+      );
+    });
+
+    test('null target means no final-two anchor reaches the policy', () {
+      final policy = VoicePolicy(random: _ScriptedRandom([0.999]));
+
+      expect(
+        policy.decide(CueType.count, const CueContext(repNumber: 9)),
+        isFalse,
       );
     });
 

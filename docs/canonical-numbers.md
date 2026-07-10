@@ -106,15 +106,16 @@ docs/decisions.md). 07-09: cue types renamed (`criticalFault`/`softFault`/`setup
 
 | Cue | Value |
 |---|---|
-| Count | base 0.50, hunger +0.10, cap 1.0, rep 1 always, no relief valve. final-2-reps anchor PENDING (07-09, not built) |
+| Count | base 0.50, hunger +0.10, cap 1.0, rep 1 always, final 2 reps always, no relief valve |
 | Praise | base 0.50, hunger +0.10, cap 0.85, never twice in a row, no formScore probability multiplier |
 | Critical fault (`criticalFault`) | base 0.25, persistence +0.30, cap 0.85, first occurrence certain, no relief valve |
 | Soft fault (`softFault`) | base 0.20, hunger +0.08, cap 0.55, not first-occurrence deterministic |
 | Hustle | off |
+| Outcome collision guard | 2nd in-rep outcome cue: `criticalFault` only, different fault, ≥0.5s after previous outcome line's audio ENDS, max 2 voiced outcome cues/rep; the system's only time cooldown |
 
 Timing (07-09 — behavior, not numbers; see decisions.md + voice-coach/realtime-cue-design.html): `criticalFault`
 + `softFault` fire REAL-TIME off `ExerciseBase.liveFaults` the instant a fault is known, not batched at
-rep-completion; count + praise stay post-rep. Codex to implement, glute-bridge scope.
+rep-completion; count + praise stay post-rep. Implemented for glute-bridge scope.
 
 ## Active Exercise Screen v8 (May 1, 2026)
 Note (05-30): the live form-score ARC was removed (replaced by positive-additive ambient feedback). The
