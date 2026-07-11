@@ -16,7 +16,7 @@ bool _showFacebookTile = false;
 
 /// App Review safe Sign in with Apple control.
 ///
-/// The logo file is the unmodified left aligned white medium artwork from
+/// The logo file is the unmodified left aligned black medium artwork from
 /// Apple Design Resources. Its height always matches the button height, and
 /// the title is one of the three variants allowed by Apple's HIG.
 class V5SignInWithAppleButton extends StatefulWidget {
@@ -27,9 +27,9 @@ class V5SignInWithAppleButton extends StatefulWidget {
     this.height = 52,
   });
 
-  static const title = 'Continue with Apple';
+  static const title = 'Sign in with Apple';
   static const officialLogoAsset =
-      'assets/brands/apple_siwa_left_aligned_white_medium.svg';
+      'assets/brands/apple_siwa_left_aligned_black_medium.svg';
   static const officialLogoKey = Key('official_apple_sign_in_logo');
 
   final VoidCallback? onPressed;
@@ -113,46 +113,48 @@ class _V5SignInWithAppleButtonState extends State<V5SignInWithAppleButton> {
                 borderRadius: BorderRadius.circular(V5.radiusSm),
                 boxShadow: V5.elevation1,
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(V5.radiusSm),
-                child: ColoredBox(
-                  color: Colors.black,
-                  child: SizedBox(
-                    height: widget.height,
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: SvgPicture.asset(
-                            V5SignInWithAppleButton.officialLogoAsset,
-                            key: V5SignInWithAppleButton.officialLogoKey,
-                            height: widget.height,
-                            fit: BoxFit.fitHeight,
-                          ),
+              child: Material(
+                color: Colors.white,
+                clipBehavior: Clip.antiAlias,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(V5.radiusSm),
+                  side: const BorderSide(color: Colors.black, width: 1),
+                ),
+                child: SizedBox(
+                  height: widget.height,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: SvgPicture.asset(
+                          V5SignInWithAppleButton.officialLogoAsset,
+                          key: V5SignInWithAppleButton.officialLogoKey,
+                          height: widget.height,
+                          fit: BoxFit.fitHeight,
                         ),
-                        Center(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 40),
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                V5SignInWithAppleButton.title,
-                                maxLines: 1,
-                                style: TextStyle(
-                                  fontFamily: '.SF Pro Text',
-                                  fontSize: widget.height * 0.43,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.white,
-                                  height: 1,
-                                  letterSpacing: -0.2,
-                                ),
+                      ),
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 40),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              V5SignInWithAppleButton.title,
+                              maxLines: 1,
+                              style: TextStyle(
+                                fontFamily: '.SF Pro Text',
+                                fontSize: widget.height * 0.43,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.black,
+                                height: 1,
+                                letterSpacing: -0.2,
                               ),
                             ),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -173,6 +175,9 @@ class AuthProviderRail extends StatelessWidget {
     required this.onFacebook,
     this.onAppleHoldComplete,
   });
+
+  static const googleTitle = 'Sign in with Google';
+  static const googleButtonKey = Key('sign_in_with_google_button');
 
   final bool busy;
   final VoidCallback onApple;
@@ -202,12 +207,13 @@ class AuthProviderRail extends StatelessWidget {
               children: [
                 Expanded(
                   child: _AuthProviderTile(
-                    label: 'Google',
-                    background: V5.surface,
-                    foreground: V5.ink,
-                    icon: const V5GoogleMark(size: 18),
+                    key: googleButtonKey,
+                    label: googleTitle,
+                    background: Colors.white,
+                    foreground: Color(0xFF1F1F1F),
+                    icon: const V5GoogleMark(size: 20),
                     onTap: busy ? null : onGoogle,
-                    border: V5.borderHi,
+                    border: const Color(0xFF747775),
                   ),
                 ),
                 if (_showFacebookTile) ...[
@@ -234,6 +240,7 @@ class AuthProviderRail extends StatelessWidget {
 
 class _AuthProviderTile extends StatefulWidget {
   const _AuthProviderTile({
+    super.key,
     required this.label,
     required this.background,
     required this.foreground,
@@ -274,7 +281,6 @@ class _AuthProviderTileState extends State<_AuthProviderTile> {
   @override
   Widget build(BuildContext context) {
     final enabled = widget.onTap != null;
-    final dense = MediaQuery.sizeOf(context).height < 640;
     return GestureDetector(
       onTap: enabled ? widget.onTap : null,
       onTapDown: enabled ? _handleTapDown : null,
@@ -290,27 +296,40 @@ class _AuthProviderTileState extends State<_AuthProviderTile> {
           child: Container(
             decoration: BoxDecoration(
               color: widget.background,
-              borderRadius: BorderRadius.circular(V5.radiusMd),
+              borderRadius: BorderRadius.circular(V5.radiusSm),
               border: widget.border == null
                   ? null
                   : Border.all(color: widget.border!),
               boxShadow: V5.elevation1,
             ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+            child: Stack(
+              fit: StackFit.expand,
               children: [
-                widget.icon,
-                SizedBox(height: dense ? 4 : 6),
-                Text(
-                  widget.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: V5.text(
-                    context,
-                    size: dense ? 10.5 : 11.5,
-                    weight: FontWeight.w800,
-                    color: widget.foreground,
-                    letterSpacing: 0,
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 16),
+                    child: widget.icon,
+                  ),
+                ),
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 48),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        widget.label,
+                        maxLines: 1,
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: widget.foreground,
+                          height: 20 / 14,
+                          letterSpacing: 0,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ],

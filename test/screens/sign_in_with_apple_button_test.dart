@@ -6,9 +6,10 @@ import 'package:vika/screens/auth/auth_v5_widgets.dart';
 import 'package:vika/screens/auth/reviewer_demo_gate.dart';
 
 void main() {
-  testWidgets('Apple button uses official artwork and an approved title',
+  testWidgets('provider buttons are balanced and use approved action titles',
       (tester) async {
     var appleTaps = 0;
+    var googleTaps = 0;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -19,7 +20,7 @@ void main() {
               child: AuthProviderRail(
                 busy: false,
                 onApple: () => appleTaps++,
-                onGoogle: () {},
+                onGoogle: () => googleTaps++,
                 onFacebook: () {},
               ),
             ),
@@ -30,24 +31,33 @@ void main() {
     await tester.pump();
 
     expect(find.text(V5SignInWithAppleButton.title), findsOneWidget);
+    expect(find.text(AuthProviderRail.googleTitle), findsOneWidget);
     expect(
       find.byKey(V5SignInWithAppleButton.officialLogoKey),
       findsOneWidget,
     );
 
-    final size = tester.getSize(find.byType(V5SignInWithAppleButton));
-    expect(size.width, greaterThanOrEqualTo(140));
-    expect(size.height, greaterThanOrEqualTo(44));
+    final appleSize = tester.getSize(find.byType(V5SignInWithAppleButton));
+    final googleSize = tester.getSize(
+      find.byKey(AuthProviderRail.googleButtonKey),
+    );
+    expect(appleSize.width, greaterThanOrEqualTo(140));
+    expect(appleSize.height, greaterThanOrEqualTo(44));
+    expect(googleSize, appleSize);
 
     final officialArtwork = await rootBundle.loadString(
       V5SignInWithAppleButton.officialLogoAsset,
     );
-    expect(officialArtwork, contains('Left White Logo Medium'));
+    expect(officialArtwork, contains('Left Black Logo Medium'));
     expect(officialArtwork, contains('width="31px" height="44px"'));
 
     await tester.tap(find.text(V5SignInWithAppleButton.title));
     await tester.pump();
     expect(appleTaps, 1);
+
+    await tester.tap(find.text(AuthProviderRail.googleTitle));
+    await tester.pump();
+    expect(googleTaps, 1);
     expect(tester.takeException(), isNull);
   });
 
