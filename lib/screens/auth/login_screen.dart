@@ -9,9 +9,13 @@ import 'auth_v5_widgets.dart';
 import 'reviewer_demo_gate.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, this.onBack});
+  const LoginScreen({super.key, this.onBack, this.authService});
 
   final VoidCallback? onBack;
+
+  /// Injectable for tests/previews; production passes nothing and the screen
+  /// builds its own [AuthService] (which binds to the Supabase singleton).
+  final AuthService? authService;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -44,7 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
     super.initState();
     _emailController = TextEditingController();
     _passwordController = TextEditingController();
-    _authService = AuthService();
+    _authService = widget.authService ?? AuthService();
     _emailController.addListener(_handleFieldChanged);
     _passwordController.addListener(_handleFieldChanged);
   }

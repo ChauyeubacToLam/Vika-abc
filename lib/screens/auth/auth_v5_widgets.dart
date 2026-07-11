@@ -14,11 +14,35 @@ import 'reviewer_demo_gate.dart';
 // flagged as dead_code while the flag is false; OAuth wiring stays intact.)
 bool _showFacebookTile = false;
 
-/// App Review safe Sign in with Apple control.
+// Every social sign-in tile shares one chrome so the row reads as a single
+// control group. Apple's HIG explicitly allows a logo-only Sign in with Apple
+// button "to align logos across multiple sign-in buttons"; the one hard rule is
+// that it must be no smaller than the others — enforced by the equal Expanded
+// tiles in [AuthProviderRail]. See docs/apple_review_guide_final.md.
+//
+// Render heights are tuned so each official mark reads at the same optical size
+// (~20pt) despite very different artwork view boxes.
+const _appleLogoRenderHeight = 30.0;
+const _googleLogoRenderHeight = 24.0;
+const _facebookLogoRenderHeight = 22.0;
+
+/// Shared chrome for every provider tile: a warm raised card with a soft
+/// outline, so Apple / Google / Facebook are visually identical (equal size =
+/// Apple's prominence rule) and rhyme with the email fields below.
+BoxDecoration _providerTileDecoration() => BoxDecoration(
+      color: V5.surfaceRaised,
+      borderRadius: BorderRadius.circular(V5.radiusMd),
+      border: Border.all(color: V5.borderHi),
+      boxShadow: V5.elevation1,
+    );
+
+/// App Review safe, logo-only Sign in with Apple control.
 ///
-/// The logo file is the unmodified left aligned black medium artwork from
-/// Apple Design Resources. Its height always matches the button height, and
-/// the title is one of the three variants allowed by Apple's HIG.
+/// The artwork is Apple's own logo path (unmodified) from the official Sign in
+/// with Apple design resources, framed 1:1 — the form Apple sanctions for a
+/// logo-only button used to "align logos across multiple sign-in buttons". It
+/// carries an accessibility [title] label for VoiceOver and is laid out at the
+/// same size as the Google tile, so it is never the smaller button.
 class V5SignInWithAppleButton extends StatefulWidget {
   const V5SignInWithAppleButton({
     super.key,
@@ -28,9 +52,9 @@ class V5SignInWithAppleButton extends StatefulWidget {
   });
 
   static const title = 'Sign in with Apple';
-  static const officialLogoAsset =
-      'assets/brands/apple_siwa_left_aligned_black_medium.svg';
+  static const officialLogoAsset = 'assets/brands/apple_logo_only_black.svg';
   static const officialLogoKey = Key('official_apple_sign_in_logo');
+  static const iconSlotKey = Key('sign_in_with_apple_icon_slot');
 
   final VoidCallback? onPressed;
   final VoidCallback? onHoldComplete;
@@ -107,54 +131,17 @@ class _V5SignInWithAppleButtonState extends State<V5SignInWithAppleButton> {
           child: AnimatedScale(
             duration: const Duration(milliseconds: 140),
             curve: V5.curveSharp,
-            scale: _pressed ? 0.98 : 1,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(V5.radiusSm),
-                boxShadow: V5.elevation1,
-              ),
-              child: Material(
-                color: Colors.white,
-                clipBehavior: Clip.antiAlias,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(V5.radiusSm),
-                  side: const BorderSide(color: Colors.black, width: 1),
-                ),
+            scale: _pressed ? 0.97 : 1,
+            child: Container(
+              height: widget.height,
+              decoration: _providerTileDecoration(),
+              child: Center(
                 child: SizedBox(
-                  height: widget.height,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: SvgPicture.asset(
-                          V5SignInWithAppleButton.officialLogoAsset,
-                          key: V5SignInWithAppleButton.officialLogoKey,
-                          height: widget.height,
-                          fit: BoxFit.fitHeight,
-                        ),
-                      ),
-                      Center(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 40),
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              V5SignInWithAppleButton.title,
-                              maxLines: 1,
-                              style: TextStyle(
-                                fontFamily: '.SF Pro Text',
-                                fontSize: widget.height * 0.43,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.black,
-                                height: 1,
-                                letterSpacing: -0.2,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                  key: V5SignInWithAppleButton.iconSlotKey,
+                  child: SvgPicture.asset(
+                    V5SignInWithAppleButton.officialLogoAsset,
+                    key: V5SignInWithAppleButton.officialLogoKey,
+                    height: _appleLogoRenderHeight,
                   ),
                 ),
               ),
@@ -178,6 +165,7 @@ class AuthProviderRail extends StatelessWidget {
 
   static const googleTitle = 'Sign in with Google';
   static const googleButtonKey = Key('sign_in_with_google_button');
+  static const googleIconSlotKey = Key('sign_in_with_google_icon_slot');
 
   final bool busy;
   final VoidCallback onApple;
@@ -191,70 +179,67 @@ class AuthProviderRail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dense = MediaQuery.sizeOf(context).height < 640;
-    final providerHeight = dense ? 48.0 : 52.0;
+    final tileHeight = dense ? 52.0 : 58.0;
+    // One row of equal-width tiles. Equal Expanded slots guarantee the Sign in
+    // with Apple button is never smaller than Google/Facebook — Apple's HIG
+    // prominence rule — and keep the whole group above the fold.
     return SizedBox(
-      height: providerHeight * 2 + V5.space8,
-      child: Column(
+      height: tileHeight,
+      child: Row(
         children: [
-          V5SignInWithAppleButton(
-            height: providerHeight,
-            onPressed: busy ? null : onApple,
-            onHoldComplete: busy ? null : onAppleHoldComplete,
-          ),
-          const SizedBox(height: V5.space8),
           Expanded(
-            child: Row(
-              children: [
-                Expanded(
-                  child: _AuthProviderTile(
-                    key: googleButtonKey,
-                    label: googleTitle,
-                    background: Colors.white,
-                    foreground: Color(0xFF1F1F1F),
-                    icon: const V5GoogleMark(size: 20),
-                    onTap: busy ? null : onGoogle,
-                    border: const Color(0xFF747775),
-                  ),
-                ),
-                if (_showFacebookTile) ...[
-                  const SizedBox(width: V5.space8),
-                  Expanded(
-                    child: _AuthProviderTile(
-                      label: 'Facebook',
-                      background: V5.surface,
-                      foreground: V5.ink,
-                      icon: const V5FacebookMark(size: 18),
-                      onTap: busy ? null : onFacebook,
-                      border: V5.borderHi,
-                    ),
-                  ),
-                ],
-              ],
+            child: V5SignInWithAppleButton(
+              height: tileHeight,
+              onPressed: busy ? null : onApple,
+              onHoldComplete: busy ? null : onAppleHoldComplete,
             ),
           ),
+          const SizedBox(width: V5.space10),
+          Expanded(
+            child: _AuthProviderTile(
+              key: googleButtonKey,
+              height: tileHeight,
+              semanticsLabel: googleTitle,
+              icon: const V5GoogleMark(size: _googleLogoRenderHeight),
+              iconSlotKey: googleIconSlotKey,
+              onTap: busy ? null : onGoogle,
+            ),
+          ),
+          if (_showFacebookTile) ...[
+            const SizedBox(width: V5.space10),
+            Expanded(
+              child: _AuthProviderTile(
+                height: tileHeight,
+                semanticsLabel: 'Đăng nhập với Facebook',
+                icon: const V5FacebookMark(size: _facebookLogoRenderHeight),
+                onTap: busy ? null : onFacebook,
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 }
 
+/// A logo-only provider tile (Google, Facebook). Shares [_providerTileDecoration]
+/// with the Apple button so the row reads as one control group, and carries a
+/// [semanticsLabel] so VoiceOver still announces the provider.
 class _AuthProviderTile extends StatefulWidget {
   const _AuthProviderTile({
     super.key,
-    required this.label,
-    required this.background,
-    required this.foreground,
+    required this.height,
+    required this.semanticsLabel,
     required this.icon,
     required this.onTap,
-    this.border,
+    this.iconSlotKey,
   });
 
-  final String label;
-  final Color background;
-  final Color foreground;
+  final double height;
+  final String semanticsLabel;
   final Widget icon;
   final VoidCallback? onTap;
-  final Color? border;
+  final Key? iconSlotKey;
 
   @override
   State<_AuthProviderTile> createState() => _AuthProviderTileState();
@@ -281,58 +266,32 @@ class _AuthProviderTileState extends State<_AuthProviderTile> {
   @override
   Widget build(BuildContext context) {
     final enabled = widget.onTap != null;
-    return GestureDetector(
-      onTap: enabled ? widget.onTap : null,
-      onTapDown: enabled ? _handleTapDown : null,
-      onTapUp: enabled ? _handleTapUp : null,
-      onTapCancel: enabled ? _handleTapCancel : null,
-      child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 160),
-        opacity: enabled ? 1 : 0.48,
-        child: AnimatedScale(
-          duration: const Duration(milliseconds: 140),
-          curve: V5.curveSharp,
-          scale: _pressed ? 0.97 : 1.0,
-          child: Container(
-            decoration: BoxDecoration(
-              color: widget.background,
-              borderRadius: BorderRadius.circular(V5.radiusSm),
-              border: widget.border == null
-                  ? null
-                  : Border.all(color: widget.border!),
-              boxShadow: V5.elevation1,
-            ),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 16),
-                    child: widget.icon,
-                  ),
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: widget.semanticsLabel,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: enabled ? widget.onTap : null,
+        onTapDown: enabled ? _handleTapDown : null,
+        onTapUp: enabled ? _handleTapUp : null,
+        onTapCancel: enabled ? _handleTapCancel : null,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 160),
+          opacity: enabled ? 1 : 0.48,
+          child: AnimatedScale(
+            duration: const Duration(milliseconds: 140),
+            curve: V5.curveSharp,
+            scale: _pressed ? 0.97 : 1.0,
+            child: Container(
+              height: widget.height,
+              decoration: _providerTileDecoration(),
+              child: Center(
+                child: SizedBox(
+                  key: widget.iconSlotKey,
+                  child: widget.icon,
                 ),
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 48),
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        widget.label,
-                        maxLines: 1,
-                        style: TextStyle(
-                          fontFamily: 'Roboto',
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: widget.foreground,
-                          height: 20 / 14,
-                          letterSpacing: 0,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),

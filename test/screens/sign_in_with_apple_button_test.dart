@@ -6,60 +6,80 @@ import 'package:vika/screens/auth/auth_v5_widgets.dart';
 import 'package:vika/screens/auth/reviewer_demo_gate.dart';
 
 void main() {
-  testWidgets('provider buttons are balanced and use approved action titles',
-      (tester) async {
-    var appleTaps = 0;
-    var googleTaps = 0;
+  testWidgets(
+    'Apple and Google are logo-only tiles, equal in size, and tappable',
+    (tester) async {
+      var appleTaps = 0;
+      var googleTaps = 0;
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: Center(
-            child: SizedBox(
-              width: 342,
-              child: AuthProviderRail(
-                busy: false,
-                onApple: () => appleTaps++,
-                onGoogle: () => googleTaps++,
-                onFacebook: () {},
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 342,
+                child: AuthProviderRail(
+                  busy: false,
+                  onApple: () => appleTaps++,
+                  onGoogle: () => googleTaps++,
+                  onFacebook: () {},
+                ),
               ),
             ),
           ),
         ),
-      ),
-    );
-    await tester.pump();
+      );
+      await tester.pump();
 
-    expect(find.text(V5SignInWithAppleButton.title), findsOneWidget);
-    expect(find.text(AuthProviderRail.googleTitle), findsOneWidget);
-    expect(
-      find.byKey(V5SignInWithAppleButton.officialLogoKey),
-      findsOneWidget,
-    );
+      // Logo-only: neither provider shows a visible text label anymore.
+      expect(find.text(V5SignInWithAppleButton.title), findsNothing);
+      expect(find.text(AuthProviderRail.googleTitle), findsNothing);
+      expect(
+        find.byKey(V5SignInWithAppleButton.officialLogoKey),
+        findsOneWidget,
+      );
+      expect(find.byKey(AuthProviderRail.googleIconSlotKey), findsOneWidget);
 
-    final appleSize = tester.getSize(find.byType(V5SignInWithAppleButton));
-    final googleSize = tester.getSize(
-      find.byKey(AuthProviderRail.googleButtonKey),
-    );
-    expect(appleSize.width, greaterThanOrEqualTo(140));
-    expect(appleSize.height, greaterThanOrEqualTo(44));
-    expect(googleSize, appleSize);
+      // Apple keeps an accessibility label, so VoiceOver announces it and the
+      // control stays identifiable as Sign in with Apple despite having no text.
+      expect(
+        find.byWidgetPredicate(
+          (w) =>
+              w is Semantics &&
+              w.properties.label == V5SignInWithAppleButton.title,
+        ),
+        findsOneWidget,
+      );
 
-    final officialArtwork = await rootBundle.loadString(
-      V5SignInWithAppleButton.officialLogoAsset,
-    );
-    expect(officialArtwork, contains('Left Black Logo Medium'));
-    expect(officialArtwork, contains('width="31px" height="44px"'));
+      // Apple's one hard rule: the Sign in with Apple button must be no smaller
+      // than the other providers. Equal Expanded tiles => identical size.
+      final appleSize = tester.getSize(find.byType(V5SignInWithAppleButton));
+      final googleSize = tester.getSize(
+        find.byKey(AuthProviderRail.googleButtonKey),
+      );
+      expect(appleSize.height, greaterThanOrEqualTo(44));
+      expect(googleSize, appleSize);
 
-    await tester.tap(find.text(V5SignInWithAppleButton.title));
-    await tester.pump();
-    expect(appleTaps, 1);
+      // The artwork is Apple's own logo path, unmodified, framed 1:1. Pinning
+      // the exact official path guards against a future swap to fake artwork —
+      // the reason the App Store rejected the previous build (Guideline 4).
+      final artwork = await rootBundle.loadString(
+        V5SignInWithAppleButton.officialLogoAsset,
+      );
+      expect(artwork, contains('M15.7099491,14.8846154')); // official leaf path
+      expect(artwork, contains('M12.6902416,29.5')); // official body path
+      expect(artwork, contains('#000000')); // Apple black, not recoloured
 
-    await tester.tap(find.text(AuthProviderRail.googleTitle));
-    await tester.pump();
-    expect(googleTaps, 1);
-    expect(tester.takeException(), isNull);
-  });
+      await tester.tap(find.byType(V5SignInWithAppleButton));
+      await tester.pump();
+      expect(appleTaps, 1);
+
+      await tester.tap(find.byKey(AuthProviderRail.googleButtonKey));
+      await tester.pump();
+      expect(googleTaps, 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('reviewer hold remains separate from a normal Apple tap',
       (tester) async {
