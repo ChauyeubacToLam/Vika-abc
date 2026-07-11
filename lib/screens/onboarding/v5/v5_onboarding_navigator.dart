@@ -30,6 +30,7 @@ import 'screens/s12_schedule.dart';
 import 'screens/s13_signup.dart';
 import 'screens/s15_journey.dart';
 import 'screens/s16_closer.dart';
+import 'incomplete_onboarding_notice.dart';
 import 'v5_theme.dart';
 
 /// 17-screen v5 onboarding host. Owns [OnboardingData], threads next/back,
@@ -40,6 +41,7 @@ class V5OnboardingNavigator extends StatefulWidget {
     super.key,
     required this.onRequestLogin,
     this.onSignupAuthStarted,
+    this.resumeIncompleteOnboardingAfterLogin = false,
   });
 
   final VoidCallback onRequestLogin;
@@ -48,14 +50,20 @@ class V5OnboardingNavigator extends StatefulWidget {
   /// app entry gate can stand down and let this navigator own the flow.
   final VoidCallback? onSignupAuthStarted;
 
+  /// Starts an authenticated account with an unfinished profile at S02 and
+  /// explains why the remaining onboarding answers are needed for its plan.
+  /// This is reserved for the transition from the standalone login screen.
+  final bool resumeIncompleteOnboardingAfterLogin;
+
   @override
   State<V5OnboardingNavigator> createState() => _V5OnboardingNavigatorState();
 }
 
 class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
-  final PageController _pc = PageController();
+  late final PageController _pc;
   final OnboardingData _data = OnboardingData();
-  int _page = 0;
+  late int _page;
+  bool _resumeNoticeScheduled = false;
   bool _completing = false;
   bool _onboardingSignalsPersisted = false;
   Future<PlanSnapshot?>? _onboardingPlanFuture;
@@ -88,7 +96,34 @@ class _V5OnboardingNavigatorState extends State<V5OnboardingNavigator> {
   @override
   void initState() {
     super.initState();
+    _page = widget.resumeIncompleteOnboardingAfterLogin ? 1 : 0;
+    _pc = PageController(initialPage: _page);
     unawaited(OrientationLock.portraitOnly());
+    _scheduleResumeNotice();
+  }
+
+  @override
+  void didUpdateWidget(covariant V5OnboardingNavigator oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.resumeIncompleteOnboardingAfterLogin &&
+        widget.resumeIncompleteOnboardingAfterLogin) {
+      _scheduleResumeNotice();
+    }
+  }
+
+  void _scheduleResumeNotice() {
+    if (!widget.resumeIncompleteOnboardingAfterLogin ||
+        _resumeNoticeScheduled) {
+      return;
+    }
+    _resumeNoticeScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      if (_pc.hasClients && _page != 1) {
+        _pc.jumpToPage(1);
+      }
+      await showIncompleteOnboardingNotice(context);
+    });
   }
 
   @override

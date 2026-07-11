@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../onboarding/v5/v5_primitives.dart';
 import '../onboarding/v5/v5_theme.dart';
@@ -13,111 +14,40 @@ import 'reviewer_demo_gate.dart';
 // flagged as dead_code while the flag is false; OAuth wiring stays intact.)
 bool _showFacebookTile = false;
 
-class AuthProviderRail extends StatelessWidget {
-  const AuthProviderRail({
+/// App Review safe Sign in with Apple control.
+///
+/// The logo file is the unmodified left aligned white medium artwork from
+/// Apple Design Resources. Its height always matches the button height, and
+/// the title is one of the three variants allowed by Apple's HIG.
+class V5SignInWithAppleButton extends StatefulWidget {
+  const V5SignInWithAppleButton({
     super.key,
-    required this.busy,
-    required this.onApple,
-    required this.onGoogle,
-    required this.onFacebook,
-    this.onAppleHoldComplete,
-  });
-
-  final bool busy;
-  final VoidCallback onApple;
-  final VoidCallback onGoogle;
-  final VoidCallback onFacebook;
-
-  /// Optional silent press-and-hold on the Apple tile (5s, no visible hint) for
-  /// the reviewer-access gate. A normal tap still triggers [onApple] unchanged.
-  final VoidCallback? onAppleHoldComplete;
-
-  @override
-  Widget build(BuildContext context) {
-    final dense = MediaQuery.sizeOf(context).height < 640;
-    return SizedBox(
-      height: dense ? 58 : 68,
-      // Uniform light tiles — the authentic brand logos (colourful Google G,
-      // blue Facebook f, ink Apple) are drawn for a light surface, and the even
-      // rail reads cleaner and more premium than three differently-coloured
-      // buttons.
-      child: Row(
-        children: [
-          Expanded(
-            child: _AuthProviderTile(
-              label: 'Apple',
-              background: V5.surface,
-              foreground: V5.ink,
-              icon: const V5AppleMark(size: 18),
-              onTap: busy ? null : onApple,
-              onHoldComplete: busy ? null : onAppleHoldComplete,
-              border: V5.borderHi,
-            ),
-          ),
-          const SizedBox(width: V5.space8),
-          Expanded(
-            child: _AuthProviderTile(
-              label: 'Google',
-              background: V5.surface,
-              foreground: V5.ink,
-              icon: const V5GoogleMark(size: 18),
-              onTap: busy ? null : onGoogle,
-              border: V5.borderHi,
-            ),
-          ),
-          if (_showFacebookTile) ...[
-            const SizedBox(width: V5.space8),
-            Expanded(
-              child: _AuthProviderTile(
-                label: 'Facebook',
-                background: V5.surface,
-                foreground: V5.ink,
-                icon: const V5FacebookMark(size: 18),
-                onTap: busy ? null : onFacebook,
-                border: V5.borderHi,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _AuthProviderTile extends StatefulWidget {
-  const _AuthProviderTile({
-    required this.label,
-    required this.background,
-    required this.foreground,
-    required this.icon,
-    required this.onTap,
-    this.border,
+    required this.onPressed,
     this.onHoldComplete,
+    this.height = 52,
   });
 
-  final String label;
-  final Color background;
-  final Color foreground;
-  final Widget icon;
-  final VoidCallback? onTap;
-  final Color? border;
+  static const title = 'Continue with Apple';
+  static const officialLogoAsset =
+      'assets/brands/apple_siwa_left_aligned_white_medium.svg';
+  static const officialLogoKey = Key('official_apple_sign_in_logo');
 
-  /// Fires after a [reviewerHoldDuration] silent press-and-hold (no visible
-  /// hint). A normal tap still triggers [onTap] unchanged; the hold timer is
-  /// cancelled on tap-up/cancel so a quick tap never fires this.
+  final VoidCallback? onPressed;
   final VoidCallback? onHoldComplete;
+  final double height;
 
   @override
-  State<_AuthProviderTile> createState() => _AuthProviderTileState();
+  State<V5SignInWithAppleButton> createState() =>
+      _V5SignInWithAppleButtonState();
 }
 
-class _AuthProviderTileState extends State<_AuthProviderTile> {
+class _V5SignInWithAppleButtonState extends State<V5SignInWithAppleButton> {
   Timer? _holdTimer;
   bool _pressed = false;
   bool _suppressNextTap = false;
 
   void _handleTapDown(TapDownDetails details) {
-    if (widget.onTap == null) return;
+    if (widget.onPressed == null) return;
     setState(() => _pressed = true);
     if (widget.onHoldComplete == null) return;
 
@@ -149,7 +79,7 @@ class _AuthProviderTileState extends State<_AuthProviderTile> {
       _suppressNextTap = false;
       return;
     }
-    widget.onTap?.call();
+    widget.onPressed?.call();
   }
 
   @override
@@ -160,10 +90,193 @@ class _AuthProviderTileState extends State<_AuthProviderTile> {
 
   @override
   Widget build(BuildContext context) {
+    final enabled = widget.onPressed != null;
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: V5SignInWithAppleButton.title,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: enabled ? _handleTap : null,
+        onTapDown: enabled ? _handleTapDown : null,
+        onTapUp: enabled ? _handleTapUp : null,
+        onTapCancel: enabled ? _handleTapCancel : null,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 160),
+          opacity: enabled ? 1 : 0.48,
+          child: AnimatedScale(
+            duration: const Duration(milliseconds: 140),
+            curve: V5.curveSharp,
+            scale: _pressed ? 0.98 : 1,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(V5.radiusSm),
+                boxShadow: V5.elevation1,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(V5.radiusSm),
+                child: ColoredBox(
+                  color: Colors.black,
+                  child: SizedBox(
+                    height: widget.height,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: SvgPicture.asset(
+                            V5SignInWithAppleButton.officialLogoAsset,
+                            key: V5SignInWithAppleButton.officialLogoKey,
+                            height: widget.height,
+                            fit: BoxFit.fitHeight,
+                          ),
+                        ),
+                        Center(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 40),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                V5SignInWithAppleButton.title,
+                                maxLines: 1,
+                                style: TextStyle(
+                                  fontFamily: '.SF Pro Text',
+                                  fontSize: widget.height * 0.43,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.white,
+                                  height: 1,
+                                  letterSpacing: -0.2,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class AuthProviderRail extends StatelessWidget {
+  const AuthProviderRail({
+    super.key,
+    required this.busy,
+    required this.onApple,
+    required this.onGoogle,
+    required this.onFacebook,
+    this.onAppleHoldComplete,
+  });
+
+  final bool busy;
+  final VoidCallback onApple;
+  final VoidCallback onGoogle;
+  final VoidCallback onFacebook;
+
+  /// Optional silent press-and-hold on the Apple tile (5s, no visible hint) for
+  /// the reviewer-access gate. A normal tap still triggers [onApple] unchanged.
+  final VoidCallback? onAppleHoldComplete;
+
+  @override
+  Widget build(BuildContext context) {
+    final dense = MediaQuery.sizeOf(context).height < 640;
+    final providerHeight = dense ? 48.0 : 52.0;
+    return SizedBox(
+      height: providerHeight * 2 + V5.space8,
+      child: Column(
+        children: [
+          V5SignInWithAppleButton(
+            height: providerHeight,
+            onPressed: busy ? null : onApple,
+            onHoldComplete: busy ? null : onAppleHoldComplete,
+          ),
+          const SizedBox(height: V5.space8),
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                  child: _AuthProviderTile(
+                    label: 'Google',
+                    background: V5.surface,
+                    foreground: V5.ink,
+                    icon: const V5GoogleMark(size: 18),
+                    onTap: busy ? null : onGoogle,
+                    border: V5.borderHi,
+                  ),
+                ),
+                if (_showFacebookTile) ...[
+                  const SizedBox(width: V5.space8),
+                  Expanded(
+                    child: _AuthProviderTile(
+                      label: 'Facebook',
+                      background: V5.surface,
+                      foreground: V5.ink,
+                      icon: const V5FacebookMark(size: 18),
+                      onTap: busy ? null : onFacebook,
+                      border: V5.borderHi,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AuthProviderTile extends StatefulWidget {
+  const _AuthProviderTile({
+    required this.label,
+    required this.background,
+    required this.foreground,
+    required this.icon,
+    required this.onTap,
+    this.border,
+  });
+
+  final String label;
+  final Color background;
+  final Color foreground;
+  final Widget icon;
+  final VoidCallback? onTap;
+  final Color? border;
+
+  @override
+  State<_AuthProviderTile> createState() => _AuthProviderTileState();
+}
+
+class _AuthProviderTileState extends State<_AuthProviderTile> {
+  bool _pressed = false;
+
+  void _handleTapDown(TapDownDetails details) {
+    if (widget.onTap == null) return;
+    setState(() => _pressed = true);
+  }
+
+  void _handleTapUp(TapUpDetails details) {
+    if (!mounted) return;
+    setState(() => _pressed = false);
+  }
+
+  void _handleTapCancel() {
+    if (!mounted) return;
+    setState(() => _pressed = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final enabled = widget.onTap != null;
     final dense = MediaQuery.sizeOf(context).height < 640;
     return GestureDetector(
-      onTap: enabled ? _handleTap : null,
+      onTap: enabled ? widget.onTap : null,
       onTapDown: enabled ? _handleTapDown : null,
       onTapUp: enabled ? _handleTapUp : null,
       onTapCancel: enabled ? _handleTapCancel : null,

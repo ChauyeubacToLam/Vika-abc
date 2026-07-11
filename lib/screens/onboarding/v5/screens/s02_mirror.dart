@@ -390,18 +390,18 @@ class _StorySelectPill extends StatelessWidget {
             color: marked ? V5.yellowInk : V5.yellow,
           ),
           const SizedBox(width: V5.space8),
-          Text(
-            marked
-                ? 'Đã chọn'
-                : (isLast ? 'Chọn điều này' : 'Chọn nếu đúng với bạn'),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: V5
-                .titleSm(
-                  context,
-                  color: marked ? V5.yellowInk : V5.invInk,
-                )
-                .copyWith(height: 1),
+          Flexible(
+            child: Text(
+              marked ? 'Đã chọn' : (isLast ? 'Chọn điều này' : 'Đúng với tôi'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: V5
+                  .titleSm(
+                    context,
+                    color: marked ? V5.yellowInk : V5.invInk,
+                  )
+                  .copyWith(height: 1),
+            ),
           ),
         ],
       ),

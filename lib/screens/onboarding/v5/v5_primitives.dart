@@ -1891,11 +1891,10 @@ class _BodyDiagramPainter extends CustomPainter {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// BRAND MARKS — Google / Apple / Facebook for social signin.
+// BRAND MARKS — Google / Facebook for social signin.
 //
-// All three load their authentic brand logos from the SVG assets in
-// assets/brands/. Apple is a single monochrome path tinted to ink; Google
-// and Facebook keep their native brand colors.
+// Apple uses the dedicated HIG-compliant control in auth_v5_widgets.dart.
+// The remaining providers keep their native brand colors.
 // ═══════════════════════════════════════════════════════════════
 
 class V5GoogleMark extends StatelessWidget {
@@ -1919,19 +1918,5 @@ class V5FacebookMark extends StatelessWidget {
         'assets/brands/facebook.svg',
         width: size,
         height: size,
-      );
-}
-
-class V5AppleMark extends StatelessWidget {
-  const V5AppleMark({super.key, this.size = 18, this.color = V5.ink});
-  final double size;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => SvgPicture.asset(
-        'assets/brands/apple.svg',
-        // The Apple glyph is portrait; size by height and let width follow.
-        height: size + 2,
-        colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
       );
 }

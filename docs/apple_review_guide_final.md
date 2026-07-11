@@ -17,11 +17,16 @@ Vika provides general fitness guidance and technique feedback for informational 
 
 2.1 Demo account access
 
-The app uses social sign in only. Apple and Google are available, so there is no reviewer username and password. A preloaded demo account is provided so reviewers can see the Plan, Progress, streak, and workout history immediately.
+The app now supports email and password sign in, in addition to Apple and Google, so a dedicated reviewer account is provided:
 
-To open the demo account, reach a sign in screen. This can be done by completing onboarding until the screen titled "Lộ trình đã sẵn sàng." (Your plan is ready), or by tapping "Đã có tài khoản? Đăng nhập" (Already have an account? Log in) at the bottom of the first welcome screen. On that sign in screen, press and hold the "Apple" button for a full 5 seconds. A normal quick tap starts the standard Sign in with Apple flow, but the long hold opens reviewer access. When the dialog titled "Reviewer access" appears, enter access code "6886" and tap "Continue". A read only preview of the seeded plan opens. Tap "Enter app" to reach the Home tab of the demo account.
+Email: ducnam883@gmail.com
+Password: Anhlaso1@
 
-The preview screen is intentionally simple. It states that it is a reviewer preview, shows a read only badge, and displays the seeded plan without generating new data. It helps confirm that the access code has been accepted before the main app opens. After the reviewer taps "Enter app", the app uses the same navigation and screens as a normal account. The seeded account is not a mock page only. It is a real app state with stored workout sessions, form scores, streak data, and plan progress.
+This account is preloaded and seeded, so reviewers can see the Plan, Progress, streak, and workout history immediately.
+
+To sign in, reach a sign in screen. The fastest way is to tap "Đã có tài khoản? Đăng nhập" (Already have an account? Log in) at the bottom of the first welcome screen, which opens the login screen directly in sign in mode. You can also complete onboarding until the screen titled "Lộ trình đã sẵn sàng." (Your plan is ready). On the sign in screen, make sure the toggle at the top of the email form is set to "Đăng nhập" (Log in) and not "Tạo tài khoản" (Create account). Enter the email above in the "EMAIL" field and the password in the "MẬT KHẨU" (Password) field, then tap the "Đăng nhập" (Log in) button at the bottom. The app signs in and opens the Home tab of the reviewer account.
+
+This is a real account, not a mock page. It holds stored workout sessions, form scores, streak data, and plan progress, and it uses the same navigation and screens as any normal account, so every data rich screen is populated from the first view.
 
 The demo account contains about six weeks of seeded workout history. It is intended for review of data rich screens only. Account deletion can be tested, but it should be tested last because deleting the seeded account also removes the seeded workout history used for Plan, Progress, streak, and workout history review.
 
@@ -31,7 +36,7 @@ Vika has no in app purchases and no subscriptions. All content is free and unloc
 
 2.3 Guideline sensitive items
 
-Sign in with Apple is offered next to Google on the sign in screen. Account deletion is inside "Hồ sơ" (Profile), then "CÀI ĐẶT" (Settings), then the "Tài khoản" (Account) group, then "Xóa tài khoản" (Delete account). Data export is inside Profile, Settings, the "Quyền riêng tư" (Privacy) group, then "Xuất dữ liệu của bạn" (Export your data). Analytics are optional and can be turned off through the toggle "Chia sẻ dữ liệu sử dụng ẩn danh" (Share anonymous usage data). The age gate appears on the privacy and consent screen during onboarding before the user agrees to the policy, and again on the body metrics screen where users below 16 are blocked. Camera permission is requested at the start of an exercise, and the camera tracking can be tested quickly with the Squat exercise from Explore.
+Sign in with Apple is offered next to Google on the sign in screen, and email and password sign in is available in the form below them. Account deletion is inside "Hồ sơ" (Profile), then "CÀI ĐẶT" (Settings), then the "Tài khoản" (Account) group, then "Xóa tài khoản" (Delete account). Data export is inside Profile, Settings, the "Quyền riêng tư" (Privacy) group, then "Xuất dữ liệu của bạn" (Export your data). Analytics are optional and can be turned off through the toggle "Chia sẻ dữ liệu sử dụng ẩn danh" (Share anonymous usage data). The age gate appears on the privacy and consent screen during onboarding before the user agrees to the policy, and again on the body metrics screen where users below 16 are blocked. Camera permission is requested at the start of an exercise, and the camera tracking can be tested quickly with the Squat exercise from Explore.
 
 These checks can be reviewed independently. The reviewer does not need to complete several weeks of training before reaching them. We recommend using the demo account for Plan, Progress, and workout history. If account deletion is tested, please test it at the end because the seeded review data will be removed after deletion. Data export, analytics opt out, privacy text, age gate, and Sign in with Apple can be checked in one short pass through onboarding and Profile.
 
@@ -39,7 +44,7 @@ These checks can be reviewed independently. The reviewer does not need to comple
 
 Onboarding can be reviewed without signing in. The arrow in the top left moves back, and the button at the bottom moves forward. The screen order below is the actual order in the app.
 
-Screen 1 is Welcome. It shows the VIKA wordmark and introduces the product. Tap "Bắt đầu hành trình" (Start the journey) to begin. The same screen also has "Đã có tài khoản? Đăng nhập" (Already have an account? Log in), which opens the standalone login screen. The 5 second reviewer hold on the Apple button also works there.
+Screen 1 is Welcome. It shows the VIKA wordmark and introduces the product. Tap "Bắt đầu hành trình" (Start the journey) to begin. The same screen also has "Đã có tài khoản? Đăng nhập" (Already have an account? Log in), which opens the standalone login screen where the reviewer account email and password can be entered directly.
 
 Screen 2 is "Bạn thấy mình ở đâu?" (Where do you see yourself?). It shows swipeable cards about common training frustrations, such as following videos without knowing whether the movement is correct. Tap at least one card, then continue. This screen explains the problem Vika is designed to solve. The choice does not change the final plan.
 
@@ -69,7 +74,7 @@ Screen 11 is Body metrics. The eyebrow is "Thông số cơ thể" (Body metrics)
 
 Screen 12 is Schedule. The eyebrow is "Lịch tập" (Training schedule), and the headline is "Bạn thường tập lúc nào?" (When do you usually train?). A weekly grid shows days from "T2" to "CN" (Monday to Sunday) and time options "Sáng" (Morning), "Chiều" (Afternoon), and "Tối" (Evening). Three afternoon slots are selected by default. At least two slots are required, so the user can continue immediately or adjust the grid.
 
-Screen 13 is Sign in. The headline is "Lộ trình đã sẵn sàng." (Your plan is ready). The options shown are Apple, Google, and an email login link. A normal tap starts the standard provider sign in. To open the demo account, press and hold Apple for 5 seconds, enter code "6886", and tap "Continue", as described in section 2.1.
+Screen 13 is Sign in. The headline is "Lộ trình đã sẵn sàng." (Your plan is ready). The screen offers Apple and Google sign in, plus an email and password form with a toggle between "Đăng nhập" (Log in) and "Tạo tài khoản" (Create account). A normal tap on Apple or Google starts that provider's sign in. To open the reviewer account, set the toggle to "Đăng nhập" (Log in), enter the email and password from section 2.1 in the "EMAIL" and "MẬT KHẨU" (Password) fields, then tap "Đăng nhập" (Log in).
 
 4. Main tabs and seeded data
 
@@ -131,7 +136,7 @@ The fourth check is to do the squats directly. Place the phone upright so the fr
 
 Privacy is built around on device analysis. MediaPipe runs locally on the iPhone. Camera frames and video are not uploaded, not stored remotely, and not sent to Google or any other service for processing. The app stores training results such as rep count, form score, and workout history. Usage analytics are optional and can be turned off in Profile under the Privacy group.
 
-The app supports Apple and Google sign in. Apple is shown next to Google on the sign in screen. The app also includes data export and account deletion. To delete an account, open "Hồ sơ" (Profile), then "CÀI ĐẶT" (Settings), then "Tài khoản" (Account), then "Xóa tài khoản" (Delete account). A confirmation dialog titled "Xóa tài khoản?" (Delete account?) explains that all data will be permanently deleted and cannot be recovered. Confirming with "Xóa vĩnh viễn" (Delete permanently) deletes the account on the server and returns the app to onboarding.
+The app supports Apple sign in, Google sign in, and email and password sign in. Apple is shown next to Google on the sign in screen, with the email and password form below them. The app also includes data export and account deletion. To delete an account, open "Hồ sơ" (Profile), then "CÀI ĐẶT" (Settings), then "Tài khoản" (Account), then "Xóa tài khoản" (Delete account). A confirmation dialog titled "Xóa tài khoản?" (Delete account?) explains that all data will be permanently deleted and cannot be recovered. Confirming with "Xóa vĩnh viễn" (Delete permanently) deletes the account on the server and returns the app to onboarding.
 
 Data export is in Profile, Settings, the Privacy group, then "Xuất dữ liệu của bạn" (Export your data). It creates a JSON file and opens the iOS share sheet. The email row in the Account group is display only. Sign out is also available in the same Account group.
 

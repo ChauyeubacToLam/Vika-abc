@@ -629,6 +629,7 @@ class _AppEntryGateState extends State<AppEntryGate> {
   StreamSubscription<AuthState>? _authSubscription;
   late _AppEntryState _entryState;
   bool _ensuredPlanForSession = false;
+  bool _resumeIncompleteOnboardingAfterLogin = false;
 
   /// Set while the in-onboarding signup (S13) is driving a sign-in attempt.
   /// While true, the global gate ignores the entire auth stream so it can't
@@ -748,6 +749,13 @@ class _AppEntryGateState extends State<AppEntryGate> {
         _setEntryState(_AppEntryState.resetPassword);
         break;
       case 'signedIn':
+        // A successful sign-in from the standalone login should explain why an
+        // unfinished account continues onboarding, regardless of provider.
+        if (_entryState == _AppEntryState.login) {
+          _resumeIncompleteOnboardingAfterLogin = true;
+        }
+        _quietResolveEntryState();
+        break;
       case 'initialSession':
       case 'userUpdated':
       case 'mfaChallengeVerified':
@@ -757,9 +765,11 @@ class _AppEntryGateState extends State<AppEntryGate> {
         _quietResolveEntryState();
         break;
       case 'signedOut':
+        _resumeIncompleteOnboardingAfterLogin = false;
         _setEntryState(_AppEntryState.login);
         break;
       case 'userDeleted':
+        _resumeIncompleteOnboardingAfterLogin = false;
         _setEntryState(_AppEntryState.onboarding);
         break;
       case 'tokenRefreshed':
@@ -786,6 +796,7 @@ class _AppEntryGateState extends State<AppEntryGate> {
 
     final complete = await isOnboardingComplete();
     if (complete) {
+      _resumeIncompleteOnboardingAfterLogin = false;
       _ensurePlanForSignedInUser();
     }
     final target = complete ? _AppEntryState.home : _AppEntryState.onboarding;
@@ -815,17 +826,23 @@ class _AppEntryGateState extends State<AppEntryGate> {
     switch (_entryState) {
       case _AppEntryState.onboarding:
         return V5OnboardingNavigator(
+          resumeIncompleteOnboardingAfterLogin:
+              _resumeIncompleteOnboardingAfterLogin,
           onSignupAuthStarted: () => _onboardingOwnsAuth = true,
           onRequestLogin: () {
             // Leaving onboarding for the standalone login: release the claim
             // so the gate governs the return-user sign-in normally.
             _onboardingOwnsAuth = false;
+            _resumeIncompleteOnboardingAfterLogin = false;
             _setEntryState(_AppEntryState.login);
           },
         );
       case _AppEntryState.login:
         return LoginScreen(
-          onBack: () => _setEntryState(_AppEntryState.onboarding),
+          onBack: () {
+            _resumeIncompleteOnboardingAfterLogin = false;
+            _setEntryState(_AppEntryState.onboarding);
+          },
         );
       case _AppEntryState.resetPassword:
         return ResetPasswordScreen(
