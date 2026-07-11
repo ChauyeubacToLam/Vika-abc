@@ -53,6 +53,128 @@ enum ExerciseState { notActivated, activated, completed }
 
 enum CameraFacing { front, left, right, angled, undefined }
 
+enum GuidanceClass {
+  phoneLandscape,
+  phonePortrait,
+  turnSide,
+  faceCamera,
+  bodyInFrame,
+  lighting,
+  searching,
+  paused,
+  resume,
+  setupPosition,
+  holdStill,
+}
+
+class GuidanceSignal {
+  const GuidanceSignal(
+    this.kind, {
+    this.title,
+    this.body,
+  });
+
+  const GuidanceSignal.phoneLandscape()
+      : this(
+          GuidanceClass.phoneLandscape,
+          title: 'Xoay ngang máy',
+          body: 'Bài này cần điện thoại nằm ngang để AI thấy rõ toàn thân bạn.',
+        );
+
+  const GuidanceSignal.phonePortrait()
+      : this(
+          GuidanceClass.phonePortrait,
+          title: 'Xoay dọc máy',
+          body: 'Bài này cần màn hình dọc để AI theo dõi ổn định hơn.',
+        );
+
+  const GuidanceSignal.turnSide({String? title, String? body})
+      : this(
+          GuidanceClass.turnSide,
+          title: title,
+          body: body,
+        );
+
+  const GuidanceSignal.faceCamera({String? title, String? body})
+      : this(
+          GuidanceClass.faceCamera,
+          title: title,
+          body: body,
+        );
+
+  const GuidanceSignal.bodyInFrame({String? title, String? body})
+      : this(
+          GuidanceClass.bodyInFrame,
+          title: title,
+          body: body,
+        );
+
+  const GuidanceSignal.lighting({String? title, String? body})
+      : this(
+          GuidanceClass.lighting,
+          title: title,
+          body: body,
+        );
+
+  const GuidanceSignal.searching()
+      : this(
+          GuidanceClass.searching,
+          title: 'Đang tìm người',
+          body: 'Đứng trong khung hình để bắt đầu.',
+        );
+
+  const GuidanceSignal.paused()
+      : this(
+          GuidanceClass.paused,
+          title: 'Tạm dừng',
+          body: 'Quay lại khung hình để tiếp tục nhé.',
+        );
+
+  const GuidanceSignal.resume()
+      : this(
+          GuidanceClass.resume,
+          title: 'Oke',
+          body: 'Tiếp tục nhé.',
+        );
+
+  const GuidanceSignal.setupPosition({String? title, String? body})
+      : this(
+          GuidanceClass.setupPosition,
+          title: title,
+          body: body,
+        );
+
+  const GuidanceSignal.holdStill({String? title, String? body})
+      : this(
+          GuidanceClass.holdStill,
+          title: title,
+          body: body,
+        );
+
+  final GuidanceClass kind;
+  final String? title;
+  final String? body;
+
+  String get feedbackMessage {
+    final copy = body ?? title;
+    if (copy != null && copy.isNotEmpty) return copy;
+    return switch (kind) {
+      GuidanceClass.phoneLandscape => 'Xoay ngang máy.',
+      GuidanceClass.phonePortrait => 'Xoay dọc máy.',
+      GuidanceClass.turnSide => 'Quay nghiêng người với camera.',
+      GuidanceClass.faceCamera => 'Quay mặt về camera.',
+      GuidanceClass.bodyInFrame => 'Giữ cơ thể trong khung hình.',
+      GuidanceClass.lighting => 'Đứng chỗ sáng hơn để AI nhận diện rõ hơn.',
+      GuidanceClass.searching =>
+        'Đang tìm người... Vui lòng đứng trong khung hình.',
+      GuidanceClass.paused => 'Tạm dừng - quay lại khung hình để tiếp tục.',
+      GuidanceClass.resume => 'Oke, tiếp tục nhé.',
+      GuidanceClass.setupPosition => 'Vào tư thế và giữ yên để bắt đầu.',
+      GuidanceClass.holdStill => 'Giữ yên để bắt đầu.',
+    };
+  }
+}
+
 abstract class ExerciseVoiceCoach {
   void processFrame({
     required ExerciseBase exercise,
@@ -74,16 +196,15 @@ abstract class ExerciseVoiceCoach {
 
 class ResultIssues {
   Map<String, String> feedback = {};
-  Map<String, Map<String, String>> instructions = {};
+  Map<String, String> phaseStatus = {};
 
-  void addInstruction(String phase, String type, String message) {
-    instructions.putIfAbsent(phase, () => {});
-    instructions[phase]![type] = message;
+  void setPhaseStatus(String phase, String message) {
+    phaseStatus[phase] = message;
   }
 
   void clear() {
     feedback.clear();
-    instructions.clear();
+    phaseStatus.clear();
   }
 }
 
@@ -99,6 +220,7 @@ abstract class ExerciseBase {
   // Core state
   late PoseSmoother poseSmoother;
   int repCount = 0;
+  bool _reactivatingAfterPause = false;
 
   /// The per-set target(s) this exercise was launched with, injected at
   /// construction by the launch screen's resolved volume (prescription >
@@ -134,6 +256,20 @@ abstract class ExerciseBase {
   /// When false, all paths fall through to portrait behavior identical to
   /// pre-spec production.
   static const bool kLandscapeRotationEnabled = true;
+
+  /// Feel-tune window that suppresses in-position-fixable guidance VOICE while
+  /// the user settles (fallback width when no intro audio played; otherwise the
+  /// adapter pins/closes the window around the intro's actual duration). The
+  /// UI is never grace-gated — signage renders live from frame one. Phone
+  /// orientation, searching, pause/resume, and setup states are intentionally
+  /// outside this set and speak from frame one too.
+  static const int kGuidanceSignalGraceMs = 3500;
+  static const Set<GuidanceClass> kGuidanceSignalGraceClasses = <GuidanceClass>{
+    GuidanceClass.bodyInFrame,
+    GuidanceClass.lighting,
+    GuidanceClass.turnSide,
+    GuidanceClass.faceCamera,
+  };
 
   /// Device orientations under which this exercise is designed to work.
   /// Defaults to portrait. Floor, prone, and seated exercises should override
@@ -178,6 +314,8 @@ abstract class ExerciseBase {
 
   List<Map<bool, Map<String, Map<String, String>>>> setFeedback = [];
   ResultIssues resultIssues = ResultIssues();
+  GuidanceSignal? guidanceSignal;
+  int? _guidanceGraceStartedAtMs;
 
   ExerciseState exerciseState = ExerciseState.notActivated;
   CameraFacing cameraFacing = CameraFacing.front;
@@ -199,10 +337,14 @@ abstract class ExerciseBase {
   double get currentFps => _currentFps;
   double get fpsRatio => _currentFps / 30.0;
 
-  // Presence / auto-pause / segmentation-trigger gate.
-  final PresenceGate _gate = PresenceGate(diagnosticMode: kDiagnosticMode);
+  // Presence / auto-pause / segmentation-trigger gate. Injectable for tests
+  // only (same pattern as PresenceGate's own injectable detector) — the
+  // resume-re-hold regression suite needs to drive processPose without the
+  // real PersonDetector/ML Kit plumbing.
+  final PresenceGate _gate;
 
   bool get isPaused => _gate.isPaused;
+  bool get isReactivatingAfterPause => _reactivatingAfterPause;
 
   /// Manually pause the exercise (e.g. user tapped pause button).
   /// Allowed in any state — pausing pre-activation is odd but harmless, and
@@ -212,7 +354,10 @@ abstract class ExerciseBase {
   }
 
   /// Manually resume after a manual pause.
-  void manualResume() => _gate.manualResume(DateTime.now());
+  void manualResume() {
+    _gate.manualResume(DateTime.now());
+    _beginPauseReactivationIfNeeded();
+  }
 
   double get personPresenceScore => _gate.presenceScore;
 
@@ -231,7 +376,22 @@ abstract class ExerciseBase {
         .clamp(0.0, 1.0);
   }
 
-  ExerciseBase({this.targetReps, this.targetSeconds}) {
+  /// Elapsed milliseconds of the in-progress activation hold, or null when no
+  /// hold is underway (not in `notActivated`, or the user is not yet holding a
+  /// valid start position). Read-only window the voice coach needs to sync the
+  /// voiced activation countdown to the 3s hold — it does not gate on
+  /// `personConfirmed` the way [activationProgress] does, because the countdown
+  /// keys off the same `_holdStillStartedAt` clock the state machine activates
+  /// on, not the UI's presence-confirmed progress ring.
+  int? get holdStillElapsedMs {
+    if (exerciseState != ExerciseState.notActivated) return null;
+    final startedAt = _holdStillStartedAt;
+    if (startedAt == null) return null;
+    return frameTimestamp.difference(startedAt).inMilliseconds;
+  }
+
+  ExerciseBase({this.targetReps, this.targetSeconds, PresenceGate? gate})
+      : _gate = gate ?? PresenceGate(diagnosticMode: kDiagnosticMode) {
     poseSmoother = PoseSmoother(minCutoff: 0.5, beta: 0.005);
   }
 
@@ -249,16 +409,60 @@ abstract class ExerciseBase {
     }
   }
 
-  /// Turns a gate block reason into the user-facing Vietnamese line. All copy
-  /// lives here in the base, never in the gate — the gate is UI-language-free
-  /// and returns enums only, so wording changes touch exactly one place.
-  String _systemStringForBlock(GateBlock block) {
+  /// Turns a gate block reason into typed guidance. All copy lives here in the
+  /// base, never in the gate — the gate is UI-language-free and returns enums
+  /// only, so wording changes touch exactly one place.
+  GuidanceSignal _guidanceSignalForBlock(GateBlock block) {
     switch (block) {
       case GateBlock.searching:
-        return 'Đang tìm người... Vui lòng đứng trong khung hình.';
+        return const GuidanceSignal.searching();
       case GateBlock.paused:
-        return '⏸ Tạm dừng — Quay lại khung hình để tiếp tục';
+        return const GuidanceSignal.paused();
     }
+  }
+
+  void publishGuidanceSignal(
+    GuidanceSignal signal, {
+    bool publishFeedback = true,
+  }) {
+    guidanceSignal = signal;
+    if (publishFeedback) {
+      resultIssues.feedback['System'] = signal.feedbackMessage;
+    }
+  }
+
+  void clearGuidanceSignal({bool clearFeedback = false}) {
+    guidanceSignal = null;
+    if (clearFeedback) {
+      resultIssues.feedback.remove('System');
+    }
+  }
+
+  void beginGuidanceSignalGrace({required int nowMs}) {
+    _guidanceGraceStartedAtMs = nowMs;
+    // Live seam: the voice adapter pins this window to `now` each frame while
+    // the setup-intro audio plays, then CLOSES it at intro-audio-end via
+    // [endGuidanceSignalGrace] — the window's width is the intro's duration.
+  }
+
+  /// Closes the voice-grace window immediately (intro-audio-end: no settle
+  /// tail; the safety latch's ~1s enter debounce is the only residual delay).
+  /// Backdates the anchor rather than nulling it — a null anchor would be
+  /// re-seeded by [_ensureGuidanceSignalGraceStarted] next frame, silently
+  /// restarting a fresh window.
+  void endGuidanceSignalGrace({required int nowMs}) {
+    _guidanceGraceStartedAtMs = nowMs - kGuidanceSignalGraceMs;
+  }
+
+  void _ensureGuidanceSignalGraceStarted() {
+    _guidanceGraceStartedAtMs ??= frameTimestampMs;
+  }
+
+  bool isGuidanceGraceActive(GuidanceClass kind) {
+    if (!kGuidanceSignalGraceClasses.contains(kind)) return false;
+    final startedAt = _guidanceGraceStartedAtMs;
+    if (startedAt == null) return false;
+    return frameTimestampMs - startedAt < kGuidanceSignalGraceMs;
   }
 
   // --- Main Pipeline ---
@@ -286,8 +490,10 @@ abstract class ExerciseBase {
     }
     _lastFrameTime = now;
     frameTimestamp = now;
+    _ensureGuidanceSignalGraceStarted();
 
     resultIssues.feedback.clear();
+    clearGuidanceSignal();
 
     final smoothedLandmarks = poseSmoother.smoothing(landmarks);
 
@@ -303,10 +509,26 @@ abstract class ExerciseBase {
     // The one cross-boundary coupling: when a confirmed person drops out during
     // seeking, the hold-still countdown (base-owned state) must reset too.
     if (verdict.personLostNow) _holdStillStartedAt = null;
+    final reactivationAlreadyPending = _reactivatingAfterPause;
+    // Re-hold is demanded ONLY on the gate's one-frame resume edge (manual or
+    // auto — both set it). Calling this unconditionally demoted EVERY
+    // activated frame back to notActivated: activate → demote → re-hold →
+    // 3-2-1 → activate → demote… the infinite countdown loop Nam hit on
+    // device (07-11).
+    final startedReactivation =
+        verdict.resumedNow ? _beginPauseReactivationIfNeeded() : false;
+    if (verdict.resumedNow &&
+        !startedReactivation &&
+        !reactivationAlreadyPending) {
+      publishGuidanceSignal(
+        const GuidanceSignal.resume(),
+        publishFeedback: false,
+      );
+    }
     // proceed=false → gate blocked this frame (searching or paused). Base owns
     // the Vietnamese copy; the gate only names the reason via an enum.
     if (!verdict.proceed) {
-      resultIssues.feedback['System'] = _systemStringForBlock(verdict.block!);
+      publishGuidanceSignal(_guidanceSignalForBlock(verdict.block!));
       return [repCount, resultIssues.feedback];
     }
 
@@ -314,9 +536,9 @@ abstract class ExerciseBase {
     cameraFacing = detectCameraFacing(smoothedLandmarks);
 
     // Safety check (subclass logic)
-    final safetyError = checkSafety(smoothedLandmarks);
-    if (safetyError != null) {
-      resultIssues.feedback["System"] = safetyError;
+    final safetySignal = checkSafety(smoothedLandmarks);
+    if (safetySignal != null) {
+      publishGuidanceSignal(safetySignal);
       return [repCount, resultIssues.feedback];
     }
 
@@ -350,25 +572,42 @@ abstract class ExerciseBase {
   /// exist, so confirm/pause timers must keep ticking even with no skeleton.
   Map<String, String> processNoPoseFrame() {
     frameTimestamp = DateTime.now();
+    _ensureGuidanceSignalGraceStarted();
     resultIssues.feedback.clear();
+    clearGuidanceSignal();
 
     final verdict = _gate.onNoPose(now: frameTimestamp, phase: _gatePhase);
     if (verdict.personLostNow) _holdStillStartedAt = null;
+    // The gate's resume edge is one-frame and CONSUMED by whichever verdict
+    // reads it. A resume landing on a no-pose frame (user taps resume, then
+    // walks into frame) must still demand the re-hold, or the edge is eaten
+    // and the set continues without one. No resume line here: the
+    // seeking-guidance below (searching/body-in-frame) is the audible
+    // feedback in this state, and the re-hold countdown follows.
+    if (verdict.resumedNow) _beginPauseReactivationIfNeeded();
 
     if (exerciseState == ExerciseState.completed) {
       return {'Result': 'Hoàn thành! $repCount reps'};
     }
 
     if (exerciseState == ExerciseState.notActivated) {
-      resultIssues.feedback['System'] = _gate.personConfirmed
-          ? 'Giữ toàn thân trong khung hình để bắt đầu.'
-          : 'Đang tìm người... Vui lòng đứng trong khung hình.';
+      publishGuidanceSignal(
+        _gate.personConfirmed
+            ? const GuidanceSignal.bodyInFrame(
+                title: 'Chỉnh khung hình',
+                body: 'Giữ toàn thân trong khung hình để bắt đầu.',
+              )
+            : const GuidanceSignal.searching(),
+      );
     } else if (_gate.isPaused || !_gate.personDetected) {
-      resultIssues.feedback['System'] =
-          '⏸ Tạm dừng — Quay lại khung hình để tiếp tục';
+      publishGuidanceSignal(const GuidanceSignal.paused());
     } else {
-      resultIssues.feedback['System'] =
-          'Giữ toàn thân trong khung hình để AI theo dõi ổn định hơn.';
+      publishGuidanceSignal(
+        const GuidanceSignal.bodyInFrame(
+          title: 'Chỉnh khung hình',
+          body: 'Giữ toàn thân trong khung hình để AI theo dõi ổn định hơn.',
+        ),
+      );
     }
 
     return Map<String, String>.from(resultIssues.feedback);
@@ -565,6 +804,15 @@ abstract class ExerciseBase {
 
   // --- State Machine (Hold-Still Activation) ---
 
+  bool _beginPauseReactivationIfNeeded() {
+    if (exerciseState != ExerciseState.activated) return false;
+    exerciseState = ExerciseState.notActivated;
+    _holdStillStartedAt = null;
+    _reactivatingAfterPause = true;
+    onPauseReactivationStarted();
+    return true;
+  }
+
   void checkExerciseState(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks,
       ExerciseState currentState) {
     switch (currentState) {
@@ -580,17 +828,34 @@ abstract class ExerciseBase {
               1000.0;
 
           if (elapsed >= HOLD_STILL_REQUIRED_DURATION) {
+            final reactivatedAfterPause = _reactivatingAfterPause;
             exerciseState = ExerciseState.activated;
             _holdStillStartedAt = null;
+            _reactivatingAfterPause = false;
             _gate.onActivated();
-            onExerciseActivated();
+            beginGuidanceSignalGrace(nowMs: frameTimestampMs);
+            if (reactivatedAfterPause) {
+              onExerciseReactivatedAfterPause();
+            } else {
+              onExerciseActivated();
+            }
           } else {
-            resultIssues.feedback['System'] =
-                'Giữ yên... ${remaining.clamp(0.0, 99.0).toStringAsFixed(0)}s';
+            publishGuidanceSignal(
+              GuidanceSignal.holdStill(
+                title: 'Giữ yên',
+                body:
+                    'Giữ yên... ${remaining.clamp(0.0, 99.0).toStringAsFixed(0)}s',
+              ),
+            );
           }
         } else {
           _holdStillStartedAt = null;
-          resultIssues.feedback['System'] = 'Vào tư thế và giữ yên để bắt đầu';
+          publishGuidanceSignal(
+            const GuidanceSignal.setupPosition(
+              title: 'Vào vị trí',
+              body: 'Vào tư thế và giữ yên để bắt đầu.',
+            ),
+          );
         }
         break;
 
@@ -616,9 +881,22 @@ abstract class ExerciseBase {
       ..start();
   }
 
+  /// Resume re-hold entered `notActivated`: subclasses can reset transient
+  /// in-progress phase state, but must preserve completed reps and logs.
+  void onPauseReactivationStarted() {}
+
+  /// The resume re-hold completed. Keep set progress intact; this is not a new
+  /// set activation and must not call subclasses' initial set reset path.
+  void onExerciseReactivatedAfterPause() {
+    if (!_sessionStopwatch.isRunning) {
+      _sessionStopwatch.start();
+    }
+  }
+
   bool requestStop();
 
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks);
+  GuidanceSignal? checkSafety(
+      Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks);
 
   void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks);
 

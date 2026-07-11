@@ -64,8 +64,7 @@ class BackStraightMetric extends WarriorOneMetricBase {
           'Lưng đang bị gù! Mở rộng ngực và vươn thẳng lưng lên nhé.';
 
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction('hold', 'back_straight',
-            'Lưng đang bị gù! Mở rộng ngực, thu cằm lại và vươn thẳng lưng lên nhé.');
+        // Legacy UI instruction copy: Lưng đang bị gù! Mở rộng ngực, thu cằm lại và vươn thẳng lưng lên nhé.
         _instructionSet = true;
       }
 

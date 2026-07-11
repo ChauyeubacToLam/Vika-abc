@@ -72,8 +72,7 @@ class ShoulderShrugMetric extends WallPushUpMetricBase {
     if (errorConfirmed) {
       ctx.resultIssues.feedback['Shoulders'] = 'Hạ vai xuống, đừng nhún vai!';
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction(
-            'standing', 'Shoulders', 'Hạ vai xuống — đừng nhún vai lên tai.');
+        // Legacy UI instruction copy: Hạ vai xuống — đừng nhún vai lên tai.
         _instructionSet = true;
       }
       _logFault(phase, 'Nhún vai quá mức',
@@ -81,8 +80,7 @@ class ShoulderShrugMetric extends WallPushUpMetricBase {
     } else if (warningConfirmed) {
       ctx.resultIssues.feedback['Shoulders'] = 'Vai hơi nhún, thả vai xuống.';
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction(
-            'standing', 'Shoulders', 'Vai hơi nhún — thả lỏng vai xuống.');
+        // Legacy UI instruction copy: Vai hơi nhún — thả lỏng vai xuống.
         _instructionSet = true;
       }
       _logFault(phase, 'Vai hơi nhún',

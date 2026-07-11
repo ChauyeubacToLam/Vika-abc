@@ -31,7 +31,7 @@ class RepContext {
   final PlankState plankState;
   final int frameTimestamp;
 
-  /// Shared result container — metrics write feedback + instructions here.
+  /// Shared result container — metrics write feedback here.
   final ResultIssues resultIssues;
 
   RepContext({

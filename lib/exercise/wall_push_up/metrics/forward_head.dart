@@ -64,16 +64,14 @@ class ForwardHeadMetric extends WallPushUpMetricBase {
       if (deviation > ForwardHeadConfig.ERROR_DEVIATION) {
         ctx.resultIssues.feedback['Head'] = 'Kéo cằm về, giữ đầu thẳng.';
         if (!_instructionSet) {
-          ctx.resultIssues.addInstruction(
-              'standing', 'Head', 'Kéo cằm về sau — giữ đầu thẳng hàng.');
+          // Legacy UI instruction copy: Kéo cằm về sau — giữ đầu thẳng hàng.
           _instructionSet = true;
         }
         _logFault(phase, 'Đầu đưa về trước nhiều', voiceMessage: 'Kéo cằm về');
       } else {
         ctx.resultIssues.feedback['Head'] = 'Đầu hơi đưa về trước.';
         if (!_instructionSet) {
-          ctx.resultIssues.addInstruction(
-              'standing', 'Head', 'Đầu hơi đưa về trước — giữ thẳng hàng.');
+          // Legacy UI instruction copy: Đầu hơi đưa về trước — giữ thẳng hàng.
           _instructionSet = true;
         }
         _logFault(phase, 'Đầu hơi đưa về trước', voiceMessage: 'Kéo cằm về');

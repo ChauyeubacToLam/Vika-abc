@@ -3,7 +3,7 @@
 
    Each metric is a self-contained unit that:
    - Receives frame data via update() (active rep) or onRestingFrame() (between reps)
-   - Writes feedback + instructions to ctx.resultIssues
+   - Writes feedback to ctx.resultIssues
    - Logs faults into its own fault list
    - Resets cleanly between reps
 
@@ -16,10 +16,8 @@
    Data flow:
    - feedback{}  → cleared every frame in checkingPose()
                   → metrics write live cards here (Range, Neck, Knee)
-   - instructions{phase → {type → message}}
                   → coaching from rep evaluation or per-frame faults
                   → cleared when new rep begins (resting → ascending)
-                  → UI reads instructions[currentPhase] for coaching chips
 
    Why curl-up has onRestingFrame:
    Unlike squat, curl-up uses PERSONAL BASELINES for two metrics (trunk
@@ -82,7 +80,7 @@ class RepContext {
   final double hipY;
   final double kneeY;
 
-  /// Shared result container — metrics write feedback + instructions here.
+  /// Shared result container — metrics write feedback here.
   final ResultIssues resultIssues;
 
   RepContext({
@@ -132,7 +130,7 @@ abstract class CurlUpMetricBase {
   int faultsCount = 0;
 
   /// Called every frame during an active rep (curlUpState != resting).
-  /// Writes feedback + instructions directly to ctx.resultIssues.
+  /// Writes feedback directly to ctx.resultIssues.
   void update(RepContext ctx);
 
   /// Faults accumulated this rep. CurlUp reads these when rep completes.

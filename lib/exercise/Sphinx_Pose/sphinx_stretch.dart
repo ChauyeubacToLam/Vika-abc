@@ -64,14 +64,14 @@ class SphinxStretch extends ExerciseBase {
   double? get liveHoldTargetSeconds => maxSeconds.toDouble();
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.left &&
         cameraFacing != CameraFacing.right) {
-      return "Vui lòng đặt camera quay ngang hông (Side View).";
+      return const GuidanceSignal.turnSide();
     }
 
     if (!_selectTrackedSide(landmarks)) {
-      return "Cơ thể chưa nằm trọn trong khung hình hoặc ánh sáng yếu.";
+      return const GuidanceSignal.bodyInFrame();
     }
 
     final req = isLeftTracked
@@ -89,7 +89,7 @@ class SphinxStretch extends ExerciseBase {
     for (final type in req) {
       if (landmarks[type] == null ||
           !ExerciseBase.isLandmarkConfident(landmarks[type]!)) {
-        return "Cơ thể chưa nằm trọn trong khung hình hoặc ánh sáng yếu.";
+        return const GuidanceSignal.bodyInFrame();
       }
     }
     return null;

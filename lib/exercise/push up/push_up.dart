@@ -243,20 +243,19 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
   // --- Safety Checks ---
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing == CameraFacing.front) {
-      return "⚠️ Xin hãy quay nghiêng để theo dõi tư thế Push Up";
+      return const GuidanceSignal.turnSide();
     }
 
     final lm = getSideTrackedLandmarks(landmarks);
     if (lm == null) {
-      return "⚠️ Đảm bảo vai, tay, hông, gối và cổ chân đều trong khung hình";
+      return const GuidanceSignal.bodyInFrame();
     }
 
     final allConfident = lm.values
         .every((landmark) => ExerciseBase.isLandmarkConfident(landmark));
-    if (!allConfident)
-      return "⚠️ Hình ảnh không rõ. Điều chỉnh ánh sáng hoặc vị trí";
+    if (!allConfident) return const GuidanceSignal.lighting();
 
     return null;
   }
@@ -557,7 +556,7 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
       _lastRejectType = 'none';
       _resetRepTelemetry();
       _resetGuardDebouncers();
-      resultIssues.instructions.clear();
+      resultIssues.phaseStatus.clear();
     } else if (newState == PushUpState.bottom) {
       _reachedBottomThisRep = true;
       if (!_kneeMovedThisRep) {
@@ -576,16 +575,16 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
   void _updatePhaseInstructions() {
     switch (pushUpState) {
       case PushUpState.plank:
-        resultIssues.addInstruction('plank', 'Status', 'Xuống');
+        resultIssues.setPhaseStatus('plank', 'Xuống');
         break;
       case PushUpState.descending:
-        resultIssues.addInstruction('descending', 'Status', 'Đang xuống...');
+        resultIssues.setPhaseStatus('descending', 'Đang xuống...');
         break;
       case PushUpState.bottom:
-        resultIssues.addInstruction('bottom', 'Status', 'Đẩy lên!');
+        resultIssues.setPhaseStatus('bottom', 'Đẩy lên!');
         break;
       case PushUpState.ascending:
-        resultIssues.addInstruction('ascending', 'Status', 'Đang đẩy lên!');
+        resultIssues.setPhaseStatus('ascending', 'Đang đẩy lên!');
         break;
     }
   }
@@ -687,11 +686,6 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
         debugData['reject'] = _repRejectType ?? _lastRejectType;
       }
       resultIssues.feedback['Form'] = status.reason ?? 'Giữ đúng tư thế';
-      resultIssues.addInstruction(
-        currentPhaseKey,
-        status.type,
-        status.reason ?? 'Giữ đúng tư thế push-up',
-      );
     }
   }
 

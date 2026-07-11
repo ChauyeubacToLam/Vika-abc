@@ -113,16 +113,14 @@ class ArmExtensionMetric extends JJMetricBase {
     if (_elevationDebouncer.update(lowArms)) {
       ctx.resultIssues.feedback['Arms'] = 'Vươn tay cao hơn!';
       if (!_elevationInstructionSet) {
-        ctx.resultIssues.addInstruction(
-            'closed', 'Arms elevation', 'Lần sau, vươn tay thật cao qua đầu!');
+        // Legacy UI instruction copy: Lần sau, vươn tay thật cao qua đầu!
         _elevationInstructionSet = true;
       }
       _logFault('OPEN', 'Tay chưa đủ cao');
     } else if (mediumArms) {
       ctx.resultIssues.feedback['Arms'] = 'Đưa tay cao hơn!';
       if (!_elevationInstructionSet) {
-        ctx.resultIssues.addInstruction(
-            'closed', 'Arms elevation', 'Đưa tay cao hơn lần sau!');
+        // Legacy UI instruction copy: Đưa tay cao hơn lần sau!
         _elevationInstructionSet = true;
       }
     } else {
@@ -138,8 +136,7 @@ class ArmExtensionMetric extends JJMetricBase {
       if (_elbowDebouncer.update(bentElbow)) {
         ctx.resultIssues.feedback['Arms'] = 'Duỗi thẳng tay!';
         if (!_elbowInstructionSet) {
-          ctx.resultIssues.addInstruction(
-              'closed', 'Arms elbow', 'Duỗi thẳng khuỷu tay lần sau!');
+          // Legacy UI instruction copy: Duỗi thẳng khuỷu tay lần sau!
           _elbowInstructionSet = true;
         }
         _logFault('OPEN', 'Khuỷu tay gập nhiều');

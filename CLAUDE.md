@@ -221,7 +221,8 @@ orientation), OrientationLock.
 ### Interpreter + voice
 lib/interpreter/ analyzes logged data post-set for form issues + coaching (squats only:
 SquatInterpreter). Voice: SquatVoiceCoach + QueuedAssetVoicePlayer for real-time TTS; ViettelTtsService
-for cloud Vietnamese lines; assets in assets/voice/.
+for cloud Vietnamese lines; audio assets in assets/audio/ (verified 2026-07-10:
+GenericExerciseVoiceAssets.assetBundlePrefix = 'assets/audio').
 
 ## Key patterns
 No external state management (StatefulWidgets + local state + direct mutation). Camera facing

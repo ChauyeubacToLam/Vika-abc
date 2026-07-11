@@ -28,7 +28,6 @@ class CossackKneeValgusMetric extends CossackMetricBase {
     if (isValgus) {
       const message = 'Đẩy đầu gối ra ngoài, đừng để gối chụm vào trong.';
       ctx.resultIssues.feedback['knee_valgus'] = message;
-      ctx.resultIssues.addInstruction(ctx.state.name, 'knee_valgus', message);
       addFault(
         FaultRecord(
           type: 'knee_valgus',

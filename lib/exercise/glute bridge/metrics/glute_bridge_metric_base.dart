@@ -62,7 +62,7 @@ class RepContext {
   /// Hip y at the calibrated bottom position (captured during hold-still).
   final double baselineHipY;
 
-  /// Shared result container — metrics write feedback + instructions here.
+  /// Shared result container — metrics write feedback here.
   final ResultIssues resultIssues;
 
   const RepContext({

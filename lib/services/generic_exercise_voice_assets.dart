@@ -8,6 +8,15 @@ class GenericExerciseVoiceAssets {
     'common.ready': 'common/ready.mp3',
     'common.start': 'common/start.mp3',
     'common.keep_full_body': 'common/keep_full_body.mp3',
+    'common.side_orientation': 'common/side_orientation.mp3',
+    // Phone-orientation rotate prompts (ruled 07-11, device-driven): voice
+    // parity with the rotate signage. Files present in tree 07-11; Nam can
+    // still listen-check wording/intonation.
+    'common.rotate_landscape': 'common/rotate_landscape.mp3',
+    'common.rotate_portrait': 'common/rotate_portrait.mp3',
+    'common.body_in_frame': 'common/body_in_frame.mp3',
+    'common.paused': 'common/paused.mp3',
+    'common.resume': 'common/resume.mp3',
     'common.hold_still': 'common/hold_still.mp3',
     'common.no_count': 'common/no_count.mp3',
     'common.fix_pose': 'common/fix_form.mp3',
@@ -20,6 +29,14 @@ class GenericExerciseVoiceAssets {
     'common.good_2': 'common/good_2.mp3',
     'common.good_3': 'common/good_3.mp3',
     'common.good_4': 'common/good_4.mp3',
+    'common.great_1': 'common/great_1.mp3',
+    'common.great_2': 'common/great_2.mp3',
+    // Hustle / effort push (enabled 07-11). COMMON — encouragement is about
+    // the session, not the movement. `push` is the generic mid-set push;
+    // `one_more_rep` is the target-proven final-rep line. Files present in
+    // tree 07-11; Nam can still listen-check wording/intonation.
+    'common.push': 'common/push.mp3',
+    'common.one_more_rep': 'common/one_more_rep.mp3',
     // Squat's PolicyVoiceCoach phase cues are phrase keys, not '<slug>.<id>'.
     // Keep them in the shared map so the new sink can play the already-shipped
     // squat WAVs without keeping the legacy SquatVoiceCoach player wrapper.

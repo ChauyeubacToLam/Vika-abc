@@ -118,12 +118,12 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
   }
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing == CameraFacing.front) {
-      return "⚠️ Bài tập này yêu cầu quay mặt ngang hông (Side Camera).";
+      return const GuidanceSignal.turnSide();
     }
     final req = getSideTrackedLandmarks(landmarks);
-    if (req == null) return "⚠️ Không thấy rõ cơ thể. Hãy điều chỉnh góc máy.";
+    if (req == null) return const GuidanceSignal.bodyInFrame();
     return null;
   }
 
@@ -200,15 +200,15 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
       resultIssues.feedback['Support'] =
           'Giữ bàn tay và bàn chân chống trên sàn.';
     } else if (tricepState == TricepDipState.descending) {
-      resultIssues.addInstruction('descending', 'Status',
-          'Hạ mông chạm sàn để sẵn sàng nhịp tiếp theo.');
+      resultIssues.setPhaseStatus(
+          'descending', 'Hạ mông chạm sàn để sẵn sàng nhịp tiếp theo.');
     } else if (tricepState == TricepDipState.bottom) {
-      resultIssues.addInstruction('bottom', 'Status', 'Tốt! Hạ mông xuống.');
+      resultIssues.setPhaseStatus('bottom', 'Tốt! Hạ mông xuống.');
     } else if (tricepState == TricepDipState.ascending) {
-      resultIssues.addInstruction('ascending', 'Status', 'Nhấc mông lên!');
+      resultIssues.setPhaseStatus('ascending', 'Nhấc mông lên!');
     } else {
-      resultIssues.addInstruction(
-          'setup_top', 'Status', 'Giữ tay và chân chống sàn, nhấc mông lên.');
+      resultIssues.setPhaseStatus(
+          'setup_top', 'Giữ tay và chân chống sàn, nhấc mông lên.');
     }
   }
 
@@ -253,7 +253,7 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
 
     if (newState == TricepDipState.ascending &&
         previousTricepState == TricepDipState.setup_top) {
-      resultIssues.instructions.clear();
+      resultIssues.phaseStatus.clear();
     }
   }
 

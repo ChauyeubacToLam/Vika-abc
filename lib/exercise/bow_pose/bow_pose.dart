@@ -157,10 +157,10 @@ class BowPose extends ExerciseBase {
   }
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.left &&
         cameraFacing != CameraFacing.right) {
-      return "⚠️ Vui lòng quay ngang điện thoại để AI nhìn rõ độ cong lưng.";
+      return const GuidanceSignal.turnSide();
     }
     return null;
   }
@@ -293,13 +293,13 @@ class BowPose extends ExerciseBase {
 
     // UI Coaching State
     if (bowPoseState == BowPoseState.setup)
-      resultIssues.addInstruction('setup', 'Status', 'Gập gối');
+      resultIssues.setPhaseStatus('setup', 'Gập gối');
     else if (bowPoseState == BowPoseState.ascending)
-      resultIssues.addInstruction('ascending', 'Status', 'Lên cung');
+      resultIssues.setPhaseStatus('ascending', 'Lên cung');
     else if (bowPoseState == BowPoseState.hold)
-      resultIssues.addInstruction('hold', 'Status', 'Giữ tĩnh');
+      resultIssues.setPhaseStatus('hold', 'Giữ tĩnh');
     else if (bowPoseState == BowPoseState.descending)
-      resultIssues.addInstruction('descending', 'Status', 'Hạ xuống');
+      resultIssues.setPhaseStatus('descending', 'Hạ xuống');
   }
 
   void _updateStateMachine(RepContext ctx, int now) {
@@ -344,7 +344,7 @@ class BowPose extends ExerciseBase {
     previousState = bowPoseState;
     bowPoseState = newState;
 
-    if (newState == BowPoseState.setup) resultIssues.instructions.clear();
+    if (newState == BowPoseState.setup) resultIssues.phaseStatus.clear();
     if (newState == BowPoseState.hold || previousState == BowPoseState.hold) {
       _holdSeconds.resetTick();
     }

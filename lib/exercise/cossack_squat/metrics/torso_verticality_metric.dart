@@ -21,7 +21,6 @@ class CossackTorsoVerticalityMetric extends CossackMetricBase {
     if (ctx.torsoAngle > MAX_TORSO_FORWARD_LEAN) {
       const message = 'Nâng ngực lên, giữ thân trên thẳng hơn.';
       ctx.resultIssues.feedback['torso'] = message;
-      ctx.resultIssues.addInstruction(ctx.state.name, 'torso', message);
       addFault(
         FaultRecord(
           type: 'torso_lean',

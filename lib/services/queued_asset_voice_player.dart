@@ -132,6 +132,12 @@ class QueuedAssetVoicePlayer {
     }
     debugPrint('[$logTag] queue cleared');
     _notifyIdleWaitersIfNeeded();
+    // Re-kick the pump: a speak() that arrived during the await above saw
+    // _isClearingQueue true and enqueued WITHOUT kicking (its
+    // `!_isPlaying && !_isClearingQueue` guard), so its line would otherwise
+    // sit silent until the next speak(). _processQueue's own entry guards
+    // make this a no-op when nothing is pending — FIFO semantics unchanged.
+    unawaited(_processQueue());
   }
 
   void clearPendingButKeepCurrent() {

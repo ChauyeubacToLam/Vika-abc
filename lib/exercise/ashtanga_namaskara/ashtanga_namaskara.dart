@@ -171,20 +171,20 @@ class AshtangaNamaskara extends ExerciseBase {
   }
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.left &&
         cameraFacing != CameraFacing.right) {
-      return '⚠️ Xin hãy quay nghiêng để theo dõi tư thế Ashtanga';
+      return const GuidanceSignal.turnSide();
     }
 
     final body = _resolveSideLandmarks(landmarks);
     if (body == null) {
-      return '⚠️ Đảm bảo vai, hông, gối và cổ chân trong khung hình';
+      return const GuidanceSignal.bodyInFrame();
     }
 
     final required = [body.shoulder, body.hip, body.knee, body.ankle];
     if (!required.every(ExerciseBase.isLandmarkConfident)) {
-      return '⚠️ Hình ảnh không rõ. Điều chỉnh ánh sáng hoặc vị trí';
+      return const GuidanceSignal.lighting();
     }
 
     return null;
@@ -263,20 +263,12 @@ class AshtangaNamaskara extends ExerciseBase {
   void _updateEffectivenessFeedback(AshtangaContext ctx) {
     if (!ctx.kneesGrounded) {
       resultIssues.feedback['Knees'] = 'Hạ gối xuống sàn trước';
-      resultIssues.addInstruction(
-        ctx.state.name,
-        'kneesGrounded',
-        'Hạ gối xuống sàn trước, rồi mới hạ ngực.',
-      );
+      // Legacy UI instruction copy: Hạ gối xuống sàn trước, rồi mới hạ ngực.
     }
 
     if (!ctx.chestLow) {
       resultIssues.feedback['Chest'] = 'Hạ ngực xuống sát sàn nhé';
-      resultIssues.addInstruction(
-        ctx.state.name,
-        'chestDescent',
-        'Hạ ngực xuống thấp hơn, giữ hông vẫn cao.',
-      );
+      // Legacy UI instruction copy: Hạ ngực xuống thấp hơn, giữ hông vẫn cao.
     } else {
       resultIssues.feedback['Chest'] = 'Ngực hạ thấp tốt ✓';
     }
@@ -287,34 +279,25 @@ class AshtangaNamaskara extends ExerciseBase {
       final holdSecs = _currentHoldSeconds();
       final remaining = (AshtangaConfig.MICRO_HOLD_DURATION - holdSecs)
           .clamp(0.0, AshtangaConfig.MICRO_HOLD_DURATION);
-      resultIssues.addInstruction(
-        'holding',
-        'Status',
-        'Giữ! ${remaining.toStringAsFixed(1)}s',
-      );
+      resultIssues.setPhaseStatus(
+          'holding', 'Giữ! ${remaining.toStringAsFixed(1)}s');
       debugData['holdProgress'] =
           (holdSecs / AshtangaConfig.MICRO_HOLD_DURATION).clamp(0.0, 1.0);
     }
 
     if (ashtangaState == AshtangaState.recognized) {
-      resultIssues.addInstruction(
-        'recognized',
-        'Status',
-        'Đã nhận tư thế Ashtanga',
-      );
+      resultIssues.setPhaseStatus('recognized', 'Đã nhận tư thế Ashtanga');
     }
 
     if (ashtangaState == AshtangaState.exit && _exitStartMs != null) {
       final elapsed = (frameTimestampMs - _exitStartMs!) / 1000.0;
       final remaining = (AshtangaConfig.EXIT_DURATION - elapsed)
           .clamp(0.0, AshtangaConfig.EXIT_DURATION);
-      resultIssues.addInstruction(
-        'exit',
-        'Status',
-        repCount >= maxRep
-            ? 'Hoàn tất'
-            : 'Thoát tư thế ${remaining.toStringAsFixed(1)}s',
-      );
+      resultIssues.setPhaseStatus(
+          'exit',
+          repCount >= maxRep
+              ? 'Hoàn tất'
+              : 'Thoát tư thế ${remaining.toStringAsFixed(1)}s');
     }
   }
 
@@ -393,7 +376,7 @@ class AshtangaNamaskara extends ExerciseBase {
         _exitStartMs = null;
         _exitShouldCount = false;
         _exitRejectReason = null;
-        resultIssues.instructions.clear();
+        resultIssues.phaseStatus.clear();
         break;
       case AshtangaState.holding:
         _holdStartMs = timestampMs;
@@ -401,7 +384,7 @@ class AshtangaNamaskara extends ExerciseBase {
         _exitStartMs = null;
         _exitShouldCount = false;
         _exitRejectReason = null;
-        resultIssues.instructions.clear();
+        resultIssues.phaseStatus.clear();
         break;
       case AshtangaState.exit:
         _exitStartMs = timestampMs;
@@ -523,11 +506,8 @@ class AshtangaNamaskara extends ExerciseBase {
       for (final metric in _metrics) {
         metric.reset();
       }
-      resultIssues.addInstruction(
-        'entry',
-        'Status',
-        'Mất mốc cơ thể, vào lại tư thế 8 điểm chạm trước khi giữ.',
-      );
+      resultIssues.setPhaseStatus(
+          'entry', 'Mất mốc cơ thể, vào lại tư thế 8 điểm chạm trước khi giữ.');
     }
     return super.processNoPoseFrame();
   }

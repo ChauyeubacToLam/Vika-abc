@@ -3,7 +3,7 @@
 
    Each metric is a self-contained unit that:
    - Receives frame data via update()
-   - Writes feedback + instructions to ctx.resultIssues
+   - Writes feedback to ctx.resultIssues
    - Logs faults into its own fault list
    - Resets cleanly between holds
 
@@ -16,10 +16,8 @@
    Data flow:
    - feedback{}  → cleared every frame in processFrame()
                   → metrics write live cards here (Spine, Shoulder, Leg, etc.)
-   - instructions{phase → {type → message}}
                   → coaching from evaluateHold() or per-frame faults
                   → cleared when new hold begins (ENTRY → HOLD)
-                  → UI reads instructions[currentPhase] for coaching chips
 
    Pattern mirrors warrior_one_metric_base.dart (hold-based state machine).
    ========================================================================= */
@@ -70,7 +68,7 @@ class HoldContext {
   /// Frame timestamp (millisecondsSinceEpoch).
   final int frameTimestamp;
 
-  /// Shared result container — metrics write feedback + instructions here.
+  /// Shared result container — metrics write feedback here.
   final ResultIssues resultIssues;
 
   HoldContext({
@@ -109,7 +107,7 @@ abstract class DownwardDogMetricBase {
   int faultsCount = 0;
 
   /// Called every frame during HOLD state.
-  /// Writes feedback + instructions directly to ctx.resultIssues.
+  /// Writes feedback directly to ctx.resultIssues.
   void update(HoldContext ctx);
 
   /// Faults accumulated this hold. DownwardDog reads these when hold ends.

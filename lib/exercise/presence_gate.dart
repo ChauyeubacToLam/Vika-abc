@@ -49,12 +49,16 @@ class GateVerdict {
     required this.block,
     required this.personLostNow,
     required this.personStableMs,
+    this.pausedNow = false,
+    this.resumedNow = false,
   });
 
   final bool proceed;
   final GateBlock? block;
   final bool personLostNow;
   final int personStableMs;
+  final bool pausedNow;
+  final bool resumedNow;
 }
 
 // ---------------------------------------------------------------------------
@@ -97,6 +101,7 @@ class PresenceGate {
   DateTime? _personLostSince;
   DateTime? _resumePresenceSince;
   bool _isPaused = false;
+  bool _resumeEdgePending = false;
 
   // True when _isPaused was set by the user tapping pause (not auto-pause).
   // A manual pause is never cleared by presence alone — only manualResume().
@@ -116,10 +121,14 @@ class PresenceGate {
 
   // Frame-edge risk (pose_frame_edge trigger): a person is likely partially
   // cropped when enough visible joints sit at or over the frame boundary.
-  static const double _FRAME_EDGE_MARGIN_RATIO = 0.04; // "near edge" band per axis
-  static const int _FRAME_EDGE_MIN_VISIBLE = 8; // need this many visible joints to judge
-  static const int _FRAME_EDGE_OUTSIDE_COUNT = 2; // >= this many fully outside => risk
-  static const int _FRAME_EDGE_NEAR_EDGE_COUNT = 5; // >= this many within margin => risk
+  static const double _FRAME_EDGE_MARGIN_RATIO =
+      0.04; // "near edge" band per axis
+  static const int _FRAME_EDGE_MIN_VISIBLE =
+      8; // need this many visible joints to judge
+  static const int _FRAME_EDGE_OUTSIDE_COUNT =
+      2; // >= this many fully outside => risk
+  static const int _FRAME_EDGE_NEAR_EDGE_COUNT =
+      5; // >= this many within margin => risk
 
   // ---------------------------------------------------------------------------
   // Read-only surface for ExerciseBase getters
@@ -156,12 +165,15 @@ class PresenceGate {
     // Step 2: Sync presence state. Capture the was→now confirmed transition
     // to produce personLostNow without ExerciseBase needing a back-reference.
     final wasConfirmed = _personConfirmed;
+    final wasPaused = _isPaused;
     _syncPresence(now: now, phase: phase);
     // personLostNow is seeking-only; active/done never clear _holdStillStartedAt.
     final personLostNow =
         phase == GatePhase.seeking && wasConfirmed && !_personConfirmed;
 
     // Step 3: Block decisions.
+    final pausedNow = _consumePauseEdge(wasPaused: wasPaused);
+    final resumedNow = _consumeResumeEdge();
     if (phase == GatePhase.seeking && !_personConfirmed) {
       final stableMs = _personSeenSince == null
           ? 0
@@ -171,6 +183,8 @@ class PresenceGate {
         block: GateBlock.searching,
         personLostNow: personLostNow,
         personStableMs: stableMs,
+        pausedNow: pausedNow,
+        resumedNow: resumedNow,
       );
     }
     if (phase == GatePhase.active && _isPaused) {
@@ -183,6 +197,8 @@ class PresenceGate {
         block: GateBlock.paused,
         personLostNow: false,
         personStableMs: 0,
+        pausedNow: pausedNow,
+        resumedNow: resumedNow,
       );
     }
 
@@ -219,8 +235,11 @@ class PresenceGate {
     return GateVerdict(
       proceed: true,
       block: null,
-      personLostNow: personLostNow, // always false when proceed=true (see above)
+      personLostNow:
+          personLostNow, // always false when proceed=true (see above)
       personStableMs: 0,
+      pausedNow: pausedNow,
+      resumedNow: resumedNow,
     );
   }
 
@@ -248,15 +267,20 @@ class PresenceGate {
     _wasPoseFrameEdgeRisk = false;
 
     final wasConfirmed = _personConfirmed;
+    final wasPaused = _isPaused;
     _syncPresence(now: now, phase: phase);
     final personLostNow =
         phase == GatePhase.seeking && wasConfirmed && !_personConfirmed;
+    final pausedNow = _consumePauseEdge(wasPaused: wasPaused);
+    final resumedNow = _consumeResumeEdge();
 
     return GateVerdict(
       proceed: true,
       block: null,
       personLostNow: personLostNow,
       personStableMs: 0,
+      pausedNow: pausedNow,
+      resumedNow: resumedNow,
     );
   }
 
@@ -289,6 +313,7 @@ class PresenceGate {
   void manualResume(DateTime now) {
     _isPaused = false;
     _manualPause = false;
+    _resumeEdgePending = true;
     _resumePresenceSince = now;
     _personLostSince = null;
     _resetTroubleDetectors();
@@ -342,6 +367,7 @@ class PresenceGate {
         if (now.difference(_resumePresenceSince!) >=
             _PERSON_RESUME_CONFIRM_DURATION) {
           _isPaused = false;
+          _resumeEdgePending = true;
           _resetTroubleDetectors();
           // Auto-resume edge: back to the cheap 8s activated baseline (one-shot
           // triggers handle anomalies from here). Undoes the 1s paused cadence.
@@ -366,6 +392,16 @@ class PresenceGate {
       // (the !_isPaused guard means a manual pause never re-enters this branch).
       unawaited(_detector.usePausedCadence());
     }
+  }
+
+  bool _consumePauseEdge({required bool wasPaused}) {
+    return !wasPaused && _isPaused && !_manualPause;
+  }
+
+  bool _consumeResumeEdge() {
+    final edge = _resumeEdgePending;
+    _resumeEdgePending = false;
+    return edge;
   }
 
   /// Resets anomaly detector and edge-trigger flags.

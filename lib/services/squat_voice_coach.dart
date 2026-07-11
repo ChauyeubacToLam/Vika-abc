@@ -118,8 +118,7 @@ class SquatVoiceCoach implements ExerciseVoiceCoach {
       return;
     }
 
-    final phaseInstr = exercise.resultIssues.instructions[currentPhaseKey];
-    final statusText = phaseInstr?['Status'];
+    final statusText = exercise.resultIssues.phaseStatus[currentPhaseKey];
     final phasePhrase = _effectivePhasePhrase(
       statusText,
       exercise: exercise,

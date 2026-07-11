@@ -12,10 +12,8 @@
    Data flow:
    - feedback{}  → cleared every frame in processPose()
                   → metrics write live cards here (Back, Depth, Tempo)
-   - instructions{phase → {type → message}}
                   → coaching from per-frame faults or rep evaluation
                   → cleared when new rep begins (plank → descending)
-                  → UI reads instructions[currentPhase] for coaching chips
    ========================================================================= */
 
 import '../push_up.dart';
@@ -44,7 +42,7 @@ class RepContext {
   final PushUpState pushUpState;
   final int frameTimestamp; // millisecondsSinceEpoch
 
-  /// Shared result container — metrics write feedback + instructions here.
+  /// Shared result container — metrics write feedback here.
   final ResultIssues resultIssues;
 
   RepContext({
@@ -69,7 +67,7 @@ abstract class PushUpMetricBase with FaultMetricDebugSource {
   int faultsCount = 0;
 
   /// Called every frame during an active rep (pushUpState != plank).
-  /// Writes feedback + instructions directly to ctx.resultIssues.
+  /// Writes feedback directly to ctx.resultIssues.
   void update(RepContext ctx);
 
   /// Faults accumulated this rep.

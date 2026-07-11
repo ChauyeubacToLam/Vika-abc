@@ -55,10 +55,7 @@ class KneeSeparationMetric extends ButterflyMetricBase {
       ctx.resultIssues.feedback['Knee'] = 'Lệch gối!';
 
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction(
-            ctx.currentState.toString().split('.').last,
-            'Knee',
-            'Ép đều hai gối, đừng để một bên cao một bên thấp!');
+        // Legacy UI instruction copy: Ép đều hai gối, đừng để một bên cao một bên thấp!
         _instructionSet = true;
       }
       _logFault(phase, 'Hai gối không đều (Asymmetry)');

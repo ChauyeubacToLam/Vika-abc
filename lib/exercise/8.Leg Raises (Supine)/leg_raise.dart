@@ -77,10 +77,11 @@ class LegRaise extends ExerciseBase {
   }
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
+  GuidanceSignal? checkSafety(
+      Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
     if (cameraFacing != CameraFacing.left &&
         cameraFacing != CameraFacing.right) {
-      return 'Hãy đặt camera ngang bên hông để theo dõi Leg Raises.';
+      return const GuidanceSignal.turnSide();
     }
 
     bool sideVisible(
@@ -112,7 +113,7 @@ class LegRaise extends ExerciseBase {
       PoseLandmarkType.rightAnkle,
     );
     if (!hasLeft && !hasRight) {
-      return 'Giữ vai, hông, gối và cổ chân rõ trong khung hình.';
+      return const GuidanceSignal.bodyInFrame();
     }
     return null;
   }
@@ -375,8 +376,7 @@ class LegRaise extends ExerciseBase {
     final angles = _calculateStrictAngles(landmarks);
     if (!angles.isValid) {
       resultIssues.feedback['Error'] = 'Không nhìn rõ người';
-      resultIssues.addInstruction(
-          'BLOCK', 'Error', 'Hãy nằm vào giữa khung hình!');
+      // Legacy UI instruction copy: Hãy nằm vào giữa khung hình!
       return;
     }
 
@@ -433,7 +433,7 @@ class LegRaise extends ExerciseBase {
       debugData.addAll(metric.debugData);
     }
 
-    resultIssues.addInstruction(state.name, 'Status', currentPhaseLabel);
+    resultIssues.setPhaseStatus(state.name, currentPhaseLabel);
   }
 
   void _updateStateMachine(LegRaiseRepContext ctx) {
@@ -448,8 +448,7 @@ class LegRaise extends ExerciseBase {
         _transitionState(LegRaiseState.lying, now);
       }
       ctx.resultIssues.feedback['Error'] = 'Lưng không chạm sàn';
-      ctx.resultIssues
-          .addInstruction('BLOCK', 'Error', 'Hãy nằm sát lưng xuống sàn!');
+      // Legacy UI instruction copy: Hãy nằm sát lưng xuống sàn!
       _raisingDebouncer.update(false); // Reset debouncer
       return;
     }

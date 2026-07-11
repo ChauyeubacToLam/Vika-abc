@@ -58,11 +58,7 @@ class PostureStackMetric extends PrayerPoseMetricBase {
       ctx.resultIssues.feedback['Posture'] =
           'Đưa đầu nhẹ về sau, mở ngực ra nhé';
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction(
-          'holding',
-          'postureStack',
-          'Nhẹ nhàng đưa đầu về sau cho thẳng cổ, ngực mở ra nhé.',
-        );
+        // Legacy UI instruction copy: Nhẹ nhàng đưa đầu về sau cho thẳng cổ, ngực mở ra nhé.
         _instructionSet = true;
       }
       _logFault(ctx.state.name, 'Forward-head posture', 'PostureStack');

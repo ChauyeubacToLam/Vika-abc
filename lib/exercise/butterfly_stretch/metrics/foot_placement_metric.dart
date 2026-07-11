@@ -54,11 +54,7 @@ class FootPlacementMetric extends ButterflyMetricBase {
       _isFaultingNow = true;
       ctx.resultIssues.feedback['Foot'] = 'Kéo gót chân lại gần hông!';
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction(
-          ctx.currentState.toString().split('.').last,
-          'Foot',
-          'Kéo hai gót chân lại gần hông trước khi giữ tư thế.',
-        );
+        // Legacy UI instruction copy: Kéo hai gót chân lại gần hông trước khi giữ tư thế.
         _instructionSet = true;
       }
       _logFault(phase, 'Gót chân đặt quá xa hông');

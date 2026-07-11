@@ -123,9 +123,9 @@ class StepBackBurpee extends ExerciseBase {
   }
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing == CameraFacing.front) {
-      return "⚠️ Vui lòng quay ngang người. Góc ngang là BẮT BUỘC để AI bảo vệ cột sống của bạn!";
+      return const GuidanceSignal.turnSide();
     }
     return null;
   }

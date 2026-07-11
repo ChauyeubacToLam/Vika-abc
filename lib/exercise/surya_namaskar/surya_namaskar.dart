@@ -266,17 +266,17 @@ class SuryaNamaskarExercise extends ExerciseBase {
   bool requestStop() => _setComplete;
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.left &&
         cameraFacing != CameraFacing.right) {
-      return '⚠️ Xin hãy quay nghiêng để tập Chào Mặt Trời';
+      return const GuidanceSignal.turnSide();
     }
 
     if (exerciseState == ExerciseState.notActivated) {
       final visibility = _strictStartVisibilityGate(landmarks);
       debugData.addAll(visibility.debugData);
       if (!visibility.ready) {
-        return '⚠️ Chỉnh camera để thấy rõ cằm, vai, khuỷu tay, cổ tay, hông, gối và cổ chân.';
+        return const GuidanceSignal.bodyInFrame();
       }
     }
 
@@ -285,7 +285,7 @@ class SuryaNamaskarExercise extends ExerciseBase {
         landmarks[PoseLandmarkType.leftHip] != null &&
         landmarks[PoseLandmarkType.rightHip] != null;
     if (!hasCoreLandmarks) {
-      return '⚠️ Giữ toàn thân trong khung hình để tập liên tục';
+      return const GuidanceSignal.bodyInFrame();
     }
 
     return null;
@@ -437,7 +437,7 @@ class SuryaNamaskarExercise extends ExerciseBase {
     if (_poseIndex < 0) _startRound(frameTimestampMs);
     if (_poseIndex >= _steps.length) return;
 
-    resultIssues.instructions.clear();
+    resultIssues.phaseStatus.clear();
 
     final step = _steps[_poseIndex];
     final nowMs = frameTimestampMs;
@@ -699,7 +699,6 @@ class SuryaNamaskarExercise extends ExerciseBase {
 
     final message = safety.message ?? 'Cẩn thận, dừng lại và ổn định tư thế.';
     resultIssues.feedback['System'] = '⚠️ $message';
-    resultIssues.addInstruction(currentPhaseKey, 'Safety', message);
     ttsService.clearQueue();
     ttsService.speak(message);
 
@@ -788,12 +787,7 @@ class SuryaNamaskarExercise extends ExerciseBase {
         ? 'Giữ! ${remainingSec!.toStringAsFixed(1)}s · ${step.number}/12'
         : 'Vào ${step.shortName} · ${step.number}/12';
 
-    resultIssues.addInstruction(step.phaseKey, 'Status', status);
-    resultIssues.addInstruction(
-      step.phaseKey,
-      'Cue',
-      hint == null || hint.isEmpty ? step.voiceCue : hint,
-    );
+    resultIssues.setPhaseStatus(step.phaseKey, status);
 
     resultIssues.feedback['Flow'] =
         '${step.number}/12 · ${step.shortName} · ${step.breath}';

@@ -19,6 +19,7 @@ import '../../services/generic_exercise_voice_assets.dart';
 import '../../voice/policy_voice_coach.dart';
 import '../../voice/voice_coach.dart';
 import '../../voice/voice_content.dart';
+import '../../voice/voice_policy.dart';
 import '../../voice/voice_sink.dart';
 
 // --- Config ---
@@ -220,6 +221,7 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
       VoiceDefaults.repBased,
       slug: legacy.slug,
       faultIds: legacy.faultIds,
+      hustlePool: const [],
       // PolicyVoiceCoach reads exercise.currentPhaseKey each frame. For squat
       // that key is the SquatState enum name, so this map translates movement
       // state into the logical audio key the sink should play.
@@ -231,9 +233,18 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
     );
     return PolicyVoiceCoach(
       script: script,
-      coach: VoiceCoach(sink: AssetVoiceSink()),
-      // Lets VoicePolicy consider final-rep hustle. Missing hustle audio still
-      // safe-no-ops in the sink until those clips exist.
+      coach: VoiceCoach(
+        sink: AssetVoiceSink(),
+        policy: VoicePolicy(
+          tuning: {
+            ...kDefaultTuning,
+            CueType.hustle:
+                const CueTuning(CueMode.perishable, base: 0.0, cap: 0.0),
+          },
+        ),
+      ),
+      // Final-rep awareness stays for count anchors. Hustle remains neutralized
+      // by the empty pool, zero tuning, and absent effortPhaseKeys.
       targetReps: maxRep,
     );
   }
@@ -341,17 +352,17 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
   // Requires side-facing camera and all key landmarks visible with high confidence.
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing == CameraFacing.front) {
-      return "⚠️ Please turn to the side for better tracking for Squat";
+      return const GuidanceSignal.turnSide();
     }
 
     final requiredLandmarks = getSideTrackedLandmarks(landmarks);
-    if (requiredLandmarks == null) return "⚠️ Body not fully visible.";
+    if (requiredLandmarks == null) return const GuidanceSignal.bodyInFrame();
 
     final allConfident = requiredLandmarks.values
         .every((lm) => ExerciseBase.isLandmarkConfident(lm));
-    if (!allConfident) return "⚠️ Adjust lighting/position.";
+    if (!allConfident) return const GuidanceSignal.lighting();
 
     return null;
   }
@@ -443,7 +454,7 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
       }
     }
 
-    // 8. Phase-specific UI instructions
+    // 8. Phase-specific UI status
     _updatePhaseInstructions(now);
   }
 
@@ -475,8 +486,8 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
       if (calibratedCleanRep) {
         allFaults.clear();
         resultIssues.feedback.clear();
-        resultIssues.instructions.clear();
-        resultIssues.addInstruction('standing', 'Status', standingStatus);
+        resultIssues.phaseStatus.clear();
+        resultIssues.setPhaseStatus('standing', standingStatus);
       }
 
       // Determine rep quality
@@ -629,28 +640,27 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
     switch (squatState) {
       case SquatState.standing:
         // Anticipatory cue: while standing, guide user to start the next rep.
-        resultIssues.addInstruction('standing', 'Status', standingStatus);
+        resultIssues.setPhaseStatus('standing', standingStatus);
         break;
       case SquatState.descending:
         // Keep the on-screen cue aligned with the current motion.
         // Voice should only say "Giữ" after the user actually reaches bottom.
-        resultIssues.addInstruction('descending', 'Status', descendingStatus);
+        resultIssues.setPhaseStatus('descending', descendingStatus);
         break;
       case SquatState.bottom:
         final remaining = tempoMetric.bottomHoldRemaining(now);
         final progress = tempoMetric.bottomHoldProgress(now);
         if (!hasCompletedBottomHold && remaining != null) {
-          resultIssues.addInstruction(
-              'bottom', 'Status', bottomHoldStatus(remaining));
+          resultIssues.setPhaseStatus('bottom', bottomHoldStatus(remaining));
         } else {
           // Anticipatory cue: when hold is complete, tell user to go up.
-          resultIssues.addInstruction('bottom', 'Status', ascendingStatus);
+          resultIssues.setPhaseStatus('bottom', ascendingStatus);
         }
         if (progress != null) debugData['bottomHoldProgress'] = progress;
         break;
       case SquatState.ascending:
         // The ascent cue should stay consistent with the main voice flow.
-        resultIssues.addInstruction('ascending', 'Status', ascendingStatus);
+        resultIssues.setPhaseStatus('ascending', ascendingStatus);
         break;
     }
   }
@@ -709,7 +719,7 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
 
     if (newState == SquatState.descending) {
       _reachedBottomThisRep = false;
-      resultIssues.instructions.clear();
+      resultIssues.phaseStatus.clear();
     } else if (newState == SquatState.bottom) {
       _reachedBottomThisRep = true;
     }

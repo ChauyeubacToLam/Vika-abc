@@ -32,11 +32,7 @@ class SpinalAlignmentMetric extends SeatedForwardMetricBase {
       _isFaultingNow = true;
       ctx.resultIssues.feedback['Spine'] = 'Thẳng lưng lên!';
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction(
-          ctx.state.name,
-          'Spine',
-          'Lưng đang bị gù. Hãy kê cao mông (ngồi lên đệm), ưu tiên co nhẹ gối để bụng chạm đùi thay vì cố vươn tay chạm chân.',
-        );
+        // Legacy UI instruction copy: Lưng đang bị gù. Hãy kê cao mông (ngồi lên đệm), ưu tiên co nhẹ gối để bụng chạm đùi thay vì cố vươn tay chạm chân.
         _instructionSet = true;
       }
       _logFault(ctx.state.name, 'Ưỡn ngực, vươn dài lưng ra');

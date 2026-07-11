@@ -163,10 +163,10 @@ class JumpSquat extends ExerciseBase {
   }
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.left &&
         cameraFacing != CameraFacing.right) {
-      return "⚠️ Hãy quay ngang người để AI đánh giá độ cong của lưng!";
+      return const GuidanceSignal.turnSide();
     }
     return null;
   }
@@ -293,8 +293,7 @@ class JumpSquat extends ExerciseBase {
         resultIssues.feedback['Result'] = 'Không tính rep';
         resultIssues.feedback['too_fast'] =
             'Chuyển động quá nhanh, AI không xác nhận được rep.';
-        resultIssues.addInstruction(
-            currentPhaseKey, 'too_fast', 'Làm chậm lại và nhảy rõ hơn');
+        // Legacy UI instruction copy: Làm chậm lại và nhảy rõ hơn
         for (final metric in _metrics) metric.reset();
       }
 
@@ -308,11 +307,11 @@ class JumpSquat extends ExerciseBase {
 
     // UI Status Instructions
     if (jumpSquatState == JumpSquatState.squatting)
-      resultIssues.addInstruction('squatting', 'Status', 'Gồng nén lấy đà!');
+      resultIssues.setPhaseStatus('squatting', 'Gồng nén lấy đà!');
     if (jumpSquatState == JumpSquatState.airborne)
-      resultIssues.addInstruction('airborne', 'Status', 'Bay lên!');
+      resultIssues.setPhaseStatus('airborne', 'Bay lên!');
     if (jumpSquatState == JumpSquatState.landing)
-      resultIssues.addInstruction('landing', 'Status', 'Trùng gối ngay!');
+      resultIssues.setPhaseStatus('landing', 'Trùng gối ngay!');
   }
 
   // --- High-Speed State Machine ---
@@ -427,10 +426,7 @@ class JumpSquat extends ExerciseBase {
     for (final fault in sorted) {
       final key = _feedbackKeyForFault(fault);
       final message = fault.voiceMessage ?? fault.message;
-      final phase =
-          fault.phase == 'REP_COMPLETE' ? currentPhaseKey : fault.phase;
       resultIssues.feedback[key] = message;
-      resultIssues.addInstruction(phase, key, fault.message);
     }
   }
 
@@ -460,7 +456,7 @@ class JumpSquat extends ExerciseBase {
     jumpSquatState = newState;
 
     if (newState == JumpSquatState.squatting) {
-      resultIssues.instructions.clear();
+      resultIssues.phaseStatus.clear();
     }
 
     for (final metric in _metrics) {

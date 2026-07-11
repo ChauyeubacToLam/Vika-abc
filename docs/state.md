@@ -6,36 +6,46 @@ Design / how-it-works -> the owning reference doc. If this file only grows, it's
 
 ## Now
 
-**Voice coach — glute-bridge pilot; real-time critical/soft shipped (2026-07-09).** Decisions:
-decisions.md 07-07/07-08/07-09; behavior spec docs/reference/voice-coach/voice-behavior-spec.md v1.4;
-real-time design docs/reference/voice-coach/realtime-cue-design.html (Nam-reviewed 07-09). Glute-bridge
-scope; fleet rollout deferred.
-- SHIPPED (in code, glute pilot; analyze clean + 43 voice tests green): snake_case metric fault ids +
-  3-way classifier (criticalFault / softFault / praise, praise gated on truly-clean); first-fault 100%
-  then escalate; count 0.50/0.10/cap 1.0 no-relief-valve + final-2-reps anchor; praise 0.50 + D8 off;
-  hustle off; targetReps on ExerciseBase; cue-type rename (correct->criticalFault, soft->softFault,
-  instruction->setup); real-time critical/soft off `ExerciseBase.liveFaults`; per-MOMENT outcome
-  exclusivity (critical-only second slot, different fault, ≥0.5s after previous outcome audio ends, cap
-  2/rep, blocked fire keeps first-occurrence credit). Peak faults fire at rep-end via RepLog as
-  next-rep guidance until the post-rep-instructions feature takes over.
-- PARKED — next thread designs the instruction/structure cluster together (Nam + Fable): setup-layer
-  voice wiring (setup intro / ready / set-complete — audio recorded + resolves, verified 07-09, just
-  unwired) + post-rep/next-rep reminder (REPLACES vs COMPLEMENTS critical/soft) + hustle behavior
-  (trigger TBD). Also parked: no-count cue type + behavior; non-verbal tick on skipped counts;
-  fleet-wide delete of the 3 rejected rules from kDefaultTuning; fleet rollout (~35 exercises); per-rep
-  speak-only-top-fault.
-- Audio pending [Anh Doan, missing-audio.md]: 5 glute soft cues (`<id>_soft`) + `common.great_1/2`.
+**Voice coach — glute-bridge pilot: COMPLETE (07-11), device-approved, UNCOMMITTED.**
+Nam device-tested the full glute bridge 07-11: "good enough, call it done." All behavior landed and
+green (analyze clean; voice + exercise suites ~241 green). The "why" for every call lives in
+decisions.md (07-07 → 07-11 voice entries); behavior in voice-behavior-spec.md; numbers in
+canonical-numbers.md § Glute Bridge; audio all recorded + resolving (missing-audio.md — no gap).
+Scope shipped this pilot: 3-way classifier + real-time critical/soft + per-MOMENT exclusivity;
+next-rep reminder (neck_head + hyperextension, wins the commit-edge slot over the re-correction);
+count = REGISTRATION (every landed rep, deterministic, personality-immune); setup/tracking-safety
+VOICE channel (typed `GuidanceSignal`, one producer / two renderers) incl. phone-orientation rotate
+prompts; setup-instruction cluster (per-set intro, voiced một-hai-ba activation countdown, ready,
+set-complete, stuck-user re-tell, holdStill lineless); hustle (hesitation-armed, stochastic post-fire
+backoff); resume re-hold; non-neck glute metric tightening (neck_head left sensitive per Nam's fence).
+Device-log observability across all cues (`[Voice]` / `[VoiceGuard]` / `[VoiceSetup]` / `[VoiceCount]`).
+- **NEXT: Nam line-reviews + commits the whole stack.** Nothing from this session is committed — the
+  entire voice pilot is in the working tree (last commit predates it). This is the one blocking step to
+  "done."
+- **OPEN (non-blocking):** (a) hustle uses a stochastic post-fire backoff (`postFireIdlePenalty: 2`),
+  NOT a hard rep cooldown — Codex's deliberate anti-metronome call, ~10% back-to-back vs 0%; Nam to
+  confirm or override (decisions.md 07-11 "hustle backoff + metric tightening"). (b) praise relief valve
+  — spec'd, never built; Nam to drop-from-spec or build. (c) watch the tightened non-neck metrics for
+  over-firing on the next device run before tightening further.
+- **PARKED (post-pilot):** fleet rollout (~35 exercises); delete the 2 remaining rejected
+  `kDefaultTuning` rows (criticalFault relief-4, praise 0.35 + D8 — count row already fixed); no-count
+  cue type + behavior; per-rep speak-only-top-fault; multi-set intro dedupe (intro once per exercise).
+- **Device residual** (from the 07-10 UI-instruction removal): plank rest-ring/hold-cue visuals → next device smoke.
 
 **PresenceGate extraction (2026-07-05): SHIPPED, device smoke pending.** `lib/exercise/presence_gate.dart`
-extracted from `ExerciseBase` (~200 lines lighter), `PosePresenceSource` on `PersonDetector`, 22 gate
-tests green, analyze clean. Pending: device smoke (hold-still 3s, walk-out auto-pause, walk-back
-auto-resume, tap-pause stays). ScaleFactor spec (docs/reference/scale-factor/) still impl-pending.
+extracted from `ExerciseBase` (~200 lines lighter), `PosePresenceSource` on `PersonDetector`, analyze
+clean. DRIFT (07-09): 2 seeking-confirm gate tests (+ ~6 workout_summary widget tests) FAIL on clean
+HEAD — reproduced in an isolated worktree, so NOT caused by the 07-09 voice work; possibly
+timing-sensitive; triage owner needed. Pending: device smoke (hold-still 3s, walk-out auto-pause,
+walk-back auto-resume, tap-pause stays). ScaleFactor spec (docs/reference/scale-factor/) still
+impl-pending.
 
 **Pose-throttle-while-paused (2026-07-06): implemented (ADR decisions.md 07-06, Option A), review pending.**
 Native `setDetectionInterval` drops pose inference to ~1fps during pause, full rate on resume; segmentation
-+ camera untouched. Orientation-gate manualPause also throttles; lifecycle re-init force-resyncs the
-interval. Pending: Nam line-review, device smoke + thermal/battery over a 2-3min pause, canonical-numbers
-row on ship.
+and camera untouched. Orientation gate is no longer a pause path: wrong phone orientation blocks exercise
+processing with setup guidance and keeps the rotate signage visible instead of showing the pause panel.
+Lifecycle re-init force-resyncs the interval. Pending: Nam line-review, device smoke + thermal/battery over
+a 2-3min pause, canonical-numbers row on ship.
 
 **Progress tab v2 + Active exercise v9 (2026-07-02): SHIPPED in repo, NOT device-tested.** Progress v2:
 ĐIỂM FORM gauge = scoped-average only (direction chip removed, supersedes 06-21). Active v9: PageView
@@ -67,8 +77,7 @@ Progress Experience + Exercise Experience reference docs. Pending: device verify
 - **iOS build 4 validation** (Xcode unblocked 07-02; was a stale process, a Mac reset fixed it, NOT the
   latent Xcode-26 FLUTTER_BUILD_DIR bug which can still recur). Rebuild + push build 4, confirm FPS cap
   ships at 24 (vs no-op 30), run 10-min Allocations + thermal over a 20-min session to confirm/refute the
-  unmeasured native CVPixelBuffer leak, device-check resume-mid-rep + rapid bg/fg.
-- **Voice phrase list not finalized** (feeds the current voice work).
+  unmeasured native CVPixelBuffer leak, device-check resume re-hold mid-rep + rapid bg/fg.
 - **Push-up interpreter**: implemented + landscape, anti-cheat thresholds provisional; separation test +
   calibration inside the Kiet-led HW track. Numbers -> Canonical.
 - **Doctor sign-off pending** (06-13): canonical 7-zone pain vocab, fork pain->yoga/home weights, S09

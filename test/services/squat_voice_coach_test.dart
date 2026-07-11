@@ -48,11 +48,8 @@ void main() {
     final coach = SquatVoiceCoach(ttsService: player);
     final squat = Squat(maxRep: 15)..exerciseState = ExerciseState.activated;
 
-    squat.resultIssues.addInstruction(
-      squat.currentPhaseKey,
-      'Status',
-      Squat.standingStatus,
-    );
+    squat.resultIssues
+        .setPhaseStatus(squat.currentPhaseKey, Squat.standingStatus);
 
     coach.processFrame(
       exercise: squat,
@@ -79,11 +76,8 @@ void main() {
     final coach = SquatVoiceCoach(ttsService: player);
     final squat = Squat(maxRep: 15)..exerciseState = ExerciseState.activated;
 
-    squat.resultIssues.addInstruction(
-      squat.currentPhaseKey,
-      'Status',
-      Squat.standingStatus,
-    );
+    squat.resultIssues
+        .setPhaseStatus(squat.currentPhaseKey, Squat.standingStatus);
 
     coach.processFrame(
       exercise: squat,
@@ -113,11 +107,8 @@ void main() {
     final coach = SquatVoiceCoach(ttsService: player);
     final squat = Squat(maxRep: 15)..exerciseState = ExerciseState.activated;
 
-    squat.resultIssues.addInstruction(
-      squat.currentPhaseKey,
-      'Status',
-      Squat.standingStatus,
-    );
+    squat.resultIssues
+        .setPhaseStatus(squat.currentPhaseKey, Squat.standingStatus);
 
     coach.processFrame(
       exercise: squat,
@@ -162,11 +153,8 @@ void main() {
     final coach = SquatVoiceCoach(ttsService: player);
     final squat = Squat(maxRep: 15)..exerciseState = ExerciseState.activated;
 
-    squat.resultIssues.addInstruction(
-      squat.currentPhaseKey,
-      'Status',
-      Squat.standingStatus,
-    );
+    squat.resultIssues
+        .setPhaseStatus(squat.currentPhaseKey, Squat.standingStatus);
 
     coach.processFrame(
       exercise: squat,
@@ -191,12 +179,9 @@ void main() {
     );
     squat.squatState = SquatState.bottom;
     squat.frameTimestamp = DateTime.fromMillisecondsSinceEpoch(650);
-    squat.resultIssues.instructions.clear();
-    squat.resultIssues.addInstruction(
-      squat.currentPhaseKey,
-      'Status',
-      Squat.ascendingStatus,
-    );
+    squat.resultIssues.phaseStatus.clear();
+    squat.resultIssues
+        .setPhaseStatus(squat.currentPhaseKey, Squat.ascendingStatus);
 
     await Future<void>.delayed(const Duration(milliseconds: 275));
 
@@ -224,11 +209,8 @@ void main() {
     final coach = SquatVoiceCoach(ttsService: player);
     final squat = Squat(maxRep: 15)..exerciseState = ExerciseState.activated;
 
-    squat.resultIssues.addInstruction(
-      squat.currentPhaseKey,
-      'Status',
-      Squat.standingStatus,
-    );
+    squat.resultIssues
+        .setPhaseStatus(squat.currentPhaseKey, Squat.standingStatus);
 
     coach.processFrame(
       exercise: squat,
@@ -244,12 +226,9 @@ void main() {
     );
     squat.squatState = SquatState.bottom;
     squat.frameTimestamp = DateTime.fromMillisecondsSinceEpoch(650);
-    squat.resultIssues.instructions.clear();
-    squat.resultIssues.addInstruction(
-      squat.currentPhaseKey,
-      'Status',
-      Squat.bottomHoldStatus(0.1),
-    );
+    squat.resultIssues.phaseStatus.clear();
+    squat.resultIssues
+        .setPhaseStatus(squat.currentPhaseKey, Squat.bottomHoldStatus(0.1));
 
     await Future<void>.delayed(const Duration(milliseconds: 275));
 
@@ -276,11 +255,8 @@ void main() {
     final coach = SquatVoiceCoach(ttsService: player);
     final squat = Squat(maxRep: 15)..exerciseState = ExerciseState.activated;
 
-    squat.resultIssues.addInstruction(
-      squat.currentPhaseKey,
-      'Status',
-      Squat.standingStatus,
-    );
+    squat.resultIssues
+        .setPhaseStatus(squat.currentPhaseKey, Squat.standingStatus);
 
     coach.processFrame(
       exercise: squat,
@@ -310,12 +286,9 @@ void main() {
     );
     squat.squatState = SquatState.ascending;
     squat.frameTimestamp = DateTime.fromMillisecondsSinceEpoch(300);
-    squat.resultIssues.instructions.clear();
-    squat.resultIssues.addInstruction(
-      squat.currentPhaseKey,
-      'Status',
-      Squat.ascendingStatus,
-    );
+    squat.resultIssues.phaseStatus.clear();
+    squat.resultIssues
+        .setPhaseStatus(squat.currentPhaseKey, Squat.ascendingStatus);
 
     await Future<void>.delayed(const Duration(milliseconds: 275));
 
@@ -340,11 +313,8 @@ void main() {
     final coach = SquatVoiceCoach(ttsService: player);
     final squat = Squat(maxRep: 15)..exerciseState = ExerciseState.activated;
 
-    squat.resultIssues.addInstruction(
-      squat.currentPhaseKey,
-      'Status',
-      Squat.standingStatus,
-    );
+    squat.resultIssues
+        .setPhaseStatus(squat.currentPhaseKey, Squat.standingStatus);
 
     coach.processFrame(
       exercise: squat,
@@ -392,11 +362,8 @@ void main() {
     final coach = SquatVoiceCoach(ttsService: player);
     final squat = Squat(maxRep: 15)..exerciseState = ExerciseState.activated;
 
-    squat.resultIssues.addInstruction(
-      squat.currentPhaseKey,
-      'Status',
-      Squat.standingStatus,
-    );
+    squat.resultIssues
+        .setPhaseStatus(squat.currentPhaseKey, Squat.standingStatus);
 
     coach.processFrame(
       exercise: squat,
@@ -424,11 +391,8 @@ void main() {
     final coach = SquatVoiceCoach(ttsService: player);
     final squat = Squat(maxRep: 15)..exerciseState = ExerciseState.activated;
 
-    squat.resultIssues.addInstruction(
-      squat.currentPhaseKey,
-      'Status',
-      Squat.standingStatus,
-    );
+    squat.resultIssues
+        .setPhaseStatus(squat.currentPhaseKey, Squat.standingStatus);
 
     coach.processFrame(
       exercise: squat,
@@ -482,7 +446,7 @@ void main() {
   test('Squat does not count a new rep after the set is completed', () {
     final player = _FakeSquatVoicePlayer();
     final coach = SquatVoiceCoach(ttsService: player);
-    final squat = Squat(maxRep: 15);
+    final squat = Squat(maxRep: 15)..exerciseState = ExerciseState.activated;
 
     coach.processFrame(
       exercise: squat,
@@ -516,11 +480,8 @@ void main() {
     final coach = SquatVoiceCoach(ttsService: player);
     final squat = Squat(maxRep: 15)..exerciseState = ExerciseState.activated;
 
-    squat.resultIssues.addInstruction(
-      squat.currentPhaseKey,
-      'Status',
-      Squat.standingStatus,
-    );
+    squat.resultIssues
+        .setPhaseStatus(squat.currentPhaseKey, Squat.standingStatus);
 
     coach.processFrame(
       exercise: squat,
@@ -536,12 +497,9 @@ void main() {
     );
     squat.squatState = SquatState.bottom;
     squat.frameTimestamp = DateTime.fromMillisecondsSinceEpoch(650);
-    squat.resultIssues.instructions.clear();
-    squat.resultIssues.addInstruction(
-      squat.currentPhaseKey,
-      'Status',
-      Squat.bottomHoldStatus(0.1),
-    );
+    squat.resultIssues.phaseStatus.clear();
+    squat.resultIssues
+        .setPhaseStatus(squat.currentPhaseKey, Squat.bottomHoldStatus(0.1));
 
     await Future<void>.delayed(const Duration(milliseconds: 275));
 

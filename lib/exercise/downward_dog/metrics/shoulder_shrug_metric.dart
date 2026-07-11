@@ -129,11 +129,7 @@ class ShoulderShrugMetric extends DownwardDogMetricBase {
       ctx.resultIssues.feedback['shoulder_shrug'] =
           'Đẩy vai ra xa tai nhé, thả lỏng cổ.';
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction(
-          'hold',
-          'shoulder_shrug',
-          'Đẩy vai ra xa tai nhé, thả lỏng cổ.',
-        );
+        // Legacy UI instruction copy: Đẩy vai ra xa tai nhé, thả lỏng cổ.
         _instructionSet = true;
       }
       _logFault('HOLD', 'Shoulders shrugging toward ears');

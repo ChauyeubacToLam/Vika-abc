@@ -28,7 +28,7 @@ class LungeRepContext {
   final double leadKneeY;
   final double leadHipY;
 
-  /// Shared result container — metrics write feedback + instructions here.
+  /// Shared result container — metrics write feedback here.
   final ResultIssues resultIssues;
 
   LungeRepContext({
@@ -57,7 +57,7 @@ abstract class LungeMetricBase with FaultMetricDebugSource {
   String get name;
 
   /// Called every frame during an active rep (lungeState != standing).
-  /// Writes feedback + instructions directly to ctx.resultIssues.
+  /// Writes feedback directly to ctx.resultIssues.
   void update(LungeRepContext ctx);
 
   /// Faults accumulated this rep. Lunge reads these when rep completes.

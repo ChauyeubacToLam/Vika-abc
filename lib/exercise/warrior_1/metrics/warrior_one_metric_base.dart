@@ -61,7 +61,7 @@ class HoldContext {
   final double? trunkBaseline; // shoulder-hip vertical angle at hold-still
   final double? cervicalBaseline; // ear-shoulder-hip angle at hold-still
 
-  /// Shared result container — metrics write feedback + instructions here.
+  /// Shared result container — metrics write feedback here.
   final ResultIssues resultIssues;
 
   HoldContext({

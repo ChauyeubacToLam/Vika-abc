@@ -72,8 +72,7 @@ class ElbowFlareMetric extends WallPushUpMetricBase {
       if (shoulderArmAngle > ElbowFlareConfig.ERROR_MIN) {
         ctx.resultIssues.feedback['Arms'] = 'Ép khuỷu tay sát người hơn!';
         if (!_instructionSet) {
-          ctx.resultIssues.addInstruction(
-              'standing', 'Arms', 'Khuỷu tay mở quá rộng — ép sát người lại!');
+          // Legacy UI instruction copy: Khuỷu tay mở quá rộng — ép sát người lại!
           _instructionSet = true;
         }
         _logFault(phase, 'Khuỷu tay mở rộng — hại vai',
@@ -81,8 +80,7 @@ class ElbowFlareMetric extends WallPushUpMetricBase {
       } else {
         ctx.resultIssues.feedback['Arms'] = 'Khuỷu tay hơi mở rộng.';
         if (!_instructionSet) {
-          ctx.resultIssues.addInstruction(
-              'standing', 'Arms', 'Khuỷu tay hơi rộng — giữ sát người.');
+          // Legacy UI instruction copy: Khuỷu tay hơi rộng — giữ sát người.
           _instructionSet = true;
         }
         _logFault(phase, 'Khuỷu tay hơi rộng',

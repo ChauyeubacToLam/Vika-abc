@@ -35,11 +35,7 @@ class KneeExtensionMetric extends SeatedForwardMetricBase {
       _isFaultingNow = true;
       ctx.resultIssues.feedback['Knee'] = 'Thẳng gối ra!';
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction(
-          ctx.state.name,
-          'Knee',
-          'Gối co quá nhiều. Hãy gập người từ hông, giữ lưng thẳng và ép nhẹ gối xuống.',
-        );
+        // Legacy UI instruction copy: Gối co quá nhiều. Hãy gập người từ hông, giữ lưng thẳng và ép nhẹ gối xuống.
         _instructionSet = true;
       }
       _logFault(ctx.state.name, 'Ép thẳng đầu gối xuống');

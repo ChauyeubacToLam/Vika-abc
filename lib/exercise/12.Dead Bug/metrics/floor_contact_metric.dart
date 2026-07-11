@@ -39,11 +39,7 @@ class FloorContactMetric extends DeadBugMetricBase {
     if (_faultDebouncer.update(maxAngle >= _floorContactAngle)) {
       ctx.resultIssues.feedback['Floor'] = 'Đừng để tay hoặc chân chạm sàn.';
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction(
-          ctx.state.name,
-          'Floor',
-          'Hạ tay/chân gần sàn nhưng giữ lơ lửng, không chạm sàn.',
-        );
+        // Legacy UI instruction copy: Hạ tay/chân gần sàn nhưng giữ lơ lửng, không chạm sàn.
         _instructionSet = true;
       }
       if (!_faults.any((f) => f.type == 'FloorContact')) {

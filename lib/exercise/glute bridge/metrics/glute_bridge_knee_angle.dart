@@ -18,27 +18,27 @@
      • Setup phase (during bottom state, before any rep) → coaching instruction.
      • Per-rep at top hold (knee angle captured at peak hip position).
 
-   Threshold Table — Vietnamese-adjusted (90-130° sweet spot unchanged, shorter
-   femurs naturally produce more acute angles which already FAVORS glutes):
+   Threshold Table — Vietnamese-adjusted (tightened 07-11 toward the 90-130°
+   glute-biased sweet spot; shorter femurs naturally produce more acute angles
+   which already FAVORS glutes):
 
-     Good  (glute-biased)  :  90–130°  affectsForm = false
-     Acceptable            :  80–90°   OR  130–140°  affectsForm = false
-     Warning               :  60–80°   (hamstring cramp risk)  affectsForm = false
-     Error                 :  < 60°    (pure hamstring)        affectsForm = true
+     Good  (glute-biased)  :  85–135°  affectsForm = false
+     Acceptable            :  135–145°  affectsForm = false
+     Warning               :  55–85°   OR  >145°  affectsForm = false
+     Error                 :  < 55°    (pure hamstring)        affectsForm = true
    ========================================================================= */
 
 import 'glute_bridge_metric_base.dart';
 import '../glute_bridge.dart';
 
 class KneeAngleConfig {
-  static const double GOOD_MIN = 80.0;
-  static const double GOOD_MAX = 140.0;
+  static const double GOOD_MIN = 85.0;
+  static const double GOOD_MAX = 135.0;
 
-  static const double ACCEPTABLE_LOWER_MIN = 70.0; // 80–90 range
-  // lower bound for "acceptable upper" = GOOD_MAX (130), upper bound = 140
-  static const double ACCEPTABLE_UPPER_MAX = 150.0;
+  // lower bound for "acceptable upper" = GOOD_MAX (135), upper bound = 145
+  static const double ACCEPTABLE_UPPER_MAX = 145.0;
 
-  static const double WARNING_MIN = 50.0; // 60–80 range
+  static const double WARNING_MIN = 55.0; // 55–75 range
   // Below WARNING_MIN → affectsForm = true (error)
 }
 
@@ -69,26 +69,22 @@ class KneeAngleMetric extends GluteBridgeMetricBase {
     final double angle = ctx.kneeAngle!;
     _debugData['kneeAngle'] = angle.toStringAsFixed(1);
 
-    String? msg;
     if (angle >= KneeAngleConfig.GOOD_MIN &&
         angle <= KneeAngleConfig.GOOD_MAX) {
-      // Perfect — no instruction needed, just show a positive cue once.
-      msg = 'Tư thế chân tốt!';
+      // Legacy UI instruction copy: Tư thế chân tốt!
       _setupInstructionShown = true;
     } else if (angle > KneeAngleConfig.GOOD_MAX) {
       // Feet too far from hips.
-      msg = 'Di chân lại gần hông hơn để kích hoạt mông';
+      // Legacy UI instruction copy: Di chân lại gần hông hơn để kích hoạt mông
       _setupInstructionShown = true;
     } else if (angle >= KneeAngleConfig.WARNING_MIN) {
       // Feet too close to hips.
-      msg = 'Di chân ra xa hông hơn một chút';
+      // Legacy UI instruction copy: Di chân ra xa hông hơn một chút
       _setupInstructionShown = true;
     } else {
       // Error level — feet very close.
-      msg = 'Di chân ra xa hông đi';
+      // Legacy UI instruction copy: Di chân ra xa hông đi
     }
-
-    ctx.resultIssues.addInstruction('bottom', 'KneeAngle', msg);
   }
 
   /* -----------------------------------------------------------------------
@@ -122,7 +118,7 @@ class KneeAngleMetric extends GluteBridgeMetricBase {
         affectsForm: true,
       ));
     } else if (kneeAngle < KneeAngleConfig.GOOD_MIN) {
-      // Warning: 60–80° — hamstring cramp zone.
+      // Warning: 55–85° — hamstring cramp zone.
       _faults.add(FaultRecord(
         phase: 'topHold',
         type: 'knee_angle',
@@ -130,15 +126,17 @@ class KneeAngleMetric extends GluteBridgeMetricBase {
         affectsForm: false,
       ));
     } else if (kneeAngle > KneeAngleConfig.ACCEPTABLE_UPPER_MAX) {
-      // Too close to hips (>140°) — loss of tension.
+      // Feet too far from hips (>145°, knee too open) — hamstring bias, glute
+      // tension drops. Correction is move feet CLOSER (matches onBottomFrame's
+      // >135 branch); the old copy said "ra xa" which pushed the wrong way.
       _faults.add(FaultRecord(
         phase: 'topHold',
         type: 'knee_angle',
-        message: 'Di chân ra xa hông hơn một chút',
+        message: 'Di chân lại gần hông một chút',
         affectsForm: false,
       ));
     }
-    // 90–130° = good, 80–90° and 130–140° = acceptable → no fault.
+    // 85–135° = good and 135–145° = acceptable → no fault.
   }
 
   /* -----------------------------------------------------------------------

@@ -154,10 +154,10 @@ class Plank extends ExerciseBase {
   // --- Safety Checks ---
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.left &&
         cameraFacing != CameraFacing.right) {
-      return "Xin hãy quay nghiêng để theo dõi tư thế Plank";
+      return const GuidanceSignal.turnSide();
     }
 
     PoseLandmark? shoulder = getSideLandmark(
@@ -178,13 +178,13 @@ class Plank extends ExerciseBase {
         leftType: PoseLandmarkType.leftKnee);
 
     if (shoulder == null || hip == null || ear == null || knee == null) {
-      return "⚠️ Đảm bảo phần trên cơ thể trong khung hình";
+      return const GuidanceSignal.bodyInFrame();
     }
 
     if (!ExerciseBase.isLandmarkConfident(shoulder) ||
         !ExerciseBase.isLandmarkConfident(hip) ||
         !ExerciseBase.isLandmarkConfident(ear)) {
-      return "⚠️ Hình ảnh không rõ. Điều chỉnh ánh sáng hoặc vị trí";
+      return const GuidanceSignal.lighting();
     }
 
     PoseLandmark? ankle = getSideLandmark(
@@ -196,7 +196,7 @@ class Plank extends ExerciseBase {
         ExerciseBase.isLandmarkConfident(ankle) &&
         ExerciseBase.isLandmarkConfident(knee);
     if (!_ankleAvailable) {
-      return "Giữ cả cổ chân trong khung hình để kiểm tra gối.";
+      return const GuidanceSignal.bodyInFrame();
     }
 
     return null;
@@ -256,8 +256,8 @@ class Plank extends ExerciseBase {
       final restRemaining = (PlankConfig.REST_DURATION - restElapsed)
           .clamp(0.0, PlankConfig.REST_DURATION);
 
-      resultIssues.addInstruction(
-          'resting', 'Status', 'Nghỉ ${restRemaining.toStringAsFixed(1)}s');
+      resultIssues.setPhaseStatus(
+          'resting', 'Nghỉ ${restRemaining.toStringAsFixed(1)}s');
       debugData['restRemaining'] = restRemaining.toStringAsFixed(1);
     }
 
@@ -288,8 +288,8 @@ class Plank extends ExerciseBase {
         _spoken5 = true;
       }
 
-      resultIssues.addInstruction(
-          'holding', 'Status', 'Giữ! ${remaining.toStringAsFixed(1)}s');
+      resultIssues.setPhaseStatus(
+          'holding', 'Giữ! ${remaining.toStringAsFixed(1)}s');
       debugData['holdProgress'] =
           (holdSecs / PlankConfig.HOLD_DURATION).clamp(0.0, 1.0);
     } else {
@@ -360,7 +360,7 @@ class Plank extends ExerciseBase {
         _holdSeconds.resetTick();
         _holdStartMs = timestampMs;
         _restStartMs = null;
-        resultIssues.instructions.clear();
+        resultIssues.phaseStatus.clear();
         _spoken10 = false;
         _spoken5 = false;
         break;

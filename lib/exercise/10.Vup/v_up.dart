@@ -114,7 +114,8 @@ class VUp extends ExerciseBase with SideTrackedExerciseMixin {
   }
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
+  GuidanceSignal? checkSafety(
+      Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
     return null;
   }
 
@@ -175,8 +176,7 @@ class VUp extends ExerciseBase with SideTrackedExerciseMixin {
     final profile = _calculatePoseProfile(landmarks, tracked);
     if (profile == null) {
       resultIssues.feedback['Error'] = 'Không nhìn rõ toàn thân';
-      resultIssues.addInstruction('BLOCK', 'Error',
-          'Giữ vai, tay, hông, gối và cổ chân trong khung hình.');
+      // Legacy UI instruction copy: Giữ vai, tay, hông, gối và cổ chân trong khung hình.
       return;
     }
 
@@ -234,7 +234,7 @@ class VUp extends ExerciseBase with SideTrackedExerciseMixin {
       for (final metric in _metrics) metric.update(metricCtx);
     }
 
-    resultIssues.addInstruction(state.name, 'Status', currentPhaseLabel);
+    resultIssues.setPhaseStatus(state.name, currentPhaseLabel);
   }
 
   bool _updateStateMachine(VUpRepContext ctx) {
@@ -249,8 +249,7 @@ class VUp extends ExerciseBase with SideTrackedExerciseMixin {
         _readyLyingDebouncer.update(false);
         if (!_repReadyFromFlatBaseline &&
             ctx.shoulderHipAnkleAngle < VUpConfig.RISING_ANGLE) {
-          resultIssues.addInstruction('STRICT', 'Error',
-              'Nằm duỗi thẳng và giữ ổn định trước khi bắt đầu.');
+          // Legacy UI instruction copy: Nằm duỗi thẳng và giữ ổn định trước khi bắt đầu.
         }
       }
     } else {
@@ -395,7 +394,6 @@ class VUp extends ExerciseBase with SideTrackedExerciseMixin {
 
   void _rejectRepAttempt(String message) {
     resultIssues.feedback['Result'] = 'Không tính rep';
-    resultIssues.addInstruction('STRICT', 'Error', message);
     _resetRepAttempt(clearBaseline: true);
     for (final metric in _metrics) metric.reset();
   }

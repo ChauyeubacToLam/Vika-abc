@@ -5,7 +5,7 @@
    
    Each metric is a self-contained unit that:
    - Receives frame data via update()
-   - Writes feedback + instructions to ctx.resultIssues
+   - Writes feedback to ctx.resultIssues
    - Logs faults into its own fault list
    - Resets cleanly between reps
    
@@ -21,10 +21,8 @@
    Data flow:
    - feedback{}  → cleared every frame in processPose()
                   → metrics write live cards here (Arms, Legs, Tempo)
-   - instructions{phase → {type → message}}
                   → coaching from evaluateRep() or per-frame faults
                   → cleared when new rep begins (open → closed transition)
-                  → UI reads instructions[currentPhase] for coaching chips
    ========================================================================= */
 
 import '../jumping_jack.dart';
@@ -69,7 +67,7 @@ class RepContext {
   /// Shoulder width in pixels — used as scale factor for front view.
   final double? scaleFactor;
 
-  /// Shared result container — metrics write feedback + instructions here.
+  /// Shared result container — metrics write feedback here.
   final ResultIssues resultIssues;
 
   RepContext({
@@ -97,7 +95,7 @@ abstract class JJMetricBase with FaultMetricDebugSource {
   String get name;
 
   /// Called every frame during an active rep.
-  /// Writes feedback + instructions directly to ctx.resultIssues.
+  /// Writes feedback directly to ctx.resultIssues.
   void update(RepContext ctx);
 
   /// Faults accumulated this rep. JumpingJack reads these when rep completes.

@@ -76,13 +76,13 @@ class Superman extends ExerciseBase {
   double? get liveHoldTargetSeconds => SupermanConfig.HOLD_MIN_MS / 1000.0;
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.left &&
         cameraFacing != CameraFacing.right) {
-      return "Hãy quay ngang người theo đúng tay vươn.";
+      return const GuidanceSignal.turnSide();
     }
     if (_getLandmarks(landmarks) == null) {
-      return 'Giữ vai, hông, cổ tay và cổ chân rõ trong khung hình.';
+      return const GuidanceSignal.bodyInFrame();
     }
     return null;
   }
@@ -298,18 +298,15 @@ class Superman extends ExerciseBase {
     }
 
     if (superState == SupermanState.setup) {
-      resultIssues.addInstruction('setup', 'Status', 'Nằm sấp, duỗi tay chân');
+      resultIssues.setPhaseStatus('setup', 'Nằm sấp, duỗi tay chân');
     } else if (superState == SupermanState.lifting) {
-      resultIssues.addInstruction('lifting', 'Status', 'Nâng tay chân lên');
+      resultIssues.setPhaseStatus('lifting', 'Nâng tay chân lên');
     } else if (superState == SupermanState.hold) {
       final holdSeconds = holdMetric.currentHoldSeconds(now);
-      resultIssues.addInstruction(
-        'hold',
-        'Status',
-        'Giữ ${holdSeconds.toStringAsFixed(1)}s',
-      );
+      resultIssues.setPhaseStatus(
+          'hold', 'Giữ ${holdSeconds.toStringAsFixed(1)}s');
     } else if (superState == SupermanState.lowering) {
-      resultIssues.addInstruction('lowering', 'Status', 'Hạ chậm xuống');
+      resultIssues.setPhaseStatus('lowering', 'Hạ chậm xuống');
     }
   }
 

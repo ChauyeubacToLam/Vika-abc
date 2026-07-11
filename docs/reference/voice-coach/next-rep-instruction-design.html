@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Next-rep instruction · design for review · Vika</title>
+<style>
+:root{
+  --ink:#1F1812; --ink-soft:#4A4031; --muted:#8a7c63;
+  --page:#F1E9D9; --raised:#FBF7EE; --line:#E4DAC5; --line-soft:#EEE6D5;
+  --yellow:#FFB701;
+  --code-bg:#211A12; --code-fg:#EDE3CE; --code-dim:#9A8C71; --code-rule:#37291a;
+  --tip:#2E6E63; --tip-bg:#E9F1EE; --tip-line:#BFDBD3;
+  --warn:#A2472B; --warn-bg:#F7EAE2; --warn-line:#E7C6B6;
+  --idea:#8A6608; --idea-bg:#FBF0D6; --idea-line:#EBD69E;
+  --mono:"JetBrains Mono","SF Mono",Menlo,Consolas,monospace;
+  --sans:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font-family:var(--sans);line-height:1.62;font-size:16px;-webkit-font-smoothing:antialiased}
+code{font-family:var(--mono);overflow-wrap:anywhere;font-size:.92em}
+h1,h2,h3{line-height:1.18;font-weight:800;letter-spacing:-.01em}
+header.hero{padding:56px 28px 40px;background:radial-gradient(120% 140% at 12% 0%,#2b2117 0%,#1c150e 60%,#160f09 100%);color:#F3ECDD}
+.hero-in{max-width:900px;margin:0 auto}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:var(--yellow);margin:0 0 14px}
+header.hero h1{font-size:clamp(28px,5vw,44px);margin:0 0 14px;color:#FBF7EE}
+header.hero h1 .u{background:linear-gradient(transparent 68%,rgba(255,183,1,.42) 0);padding:0 2px}
+header.hero p.lede{font-size:17px;max-width:74ch;color:#D9CFBD;margin:0 0 26px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-family:var(--mono);font-size:12px;padding:6px 11px;border-radius:999px;border:1px solid rgba(255,255,255,.16);color:#E8DFCD;background:rgba(255,255,255,.04)}
+.chip b{color:var(--yellow);font-weight:600}
+main{max-width:900px;margin:0 auto;padding:8px 28px 120px}
+section{padding:30px 0;border-top:1px solid var(--line)}
+section:first-of-type{border-top:0}
+.kicker{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+h2{font-size:24px;margin:0 0 14px}
+h3{font-size:17px;margin:22px 0 8px}
+p{margin:10px 0;max-width:78ch}
+table{border-collapse:collapse;width:100%;margin:14px 0;font-size:14px;background:var(--raised)}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;background:var(--line-soft)}
+.code{margin:16px 0;border-radius:10px;overflow:hidden;border:1px solid var(--code-rule)}
+.code-head{font-family:var(--mono);font-size:12px;color:var(--code-dim);background:#191209;padding:8px 14px;border-bottom:1px solid var(--code-rule)}
+.code-body{background:var(--code-bg);color:var(--code-fg);padding:14px 16px;overflow-x:auto}
+.code-body pre{margin:0;font-family:var(--mono);font-size:13px;line-height:1.55}
+.call{border-radius:10px;padding:12px 16px;margin:16px 0;font-size:14.5px;border:1px solid}
+.call b.t{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px}
+.call.tip{background:var(--tip-bg);border-color:var(--tip-line)} .call.tip b.t{color:var(--tip)}
+.call.warn{background:var(--warn-bg);border-color:var(--warn-line)} .call.warn b.t{color:var(--warn)}
+.call.idea{background:var(--idea-bg);border-color:var(--idea-line)} .call.idea b.t{color:var(--idea)}
+.gl{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:20px 0}
+.gl>div{background:var(--raised);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:14px}
+.gl b{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px}
+.vn{font-style:italic}
+ul{max-width:78ch}
+li{margin:6px 0}
+</style>
+</head>
+<body>
+<header class="hero"><div class="hero-in">
+  <p class="eyebrow">Voice coach · design for review · 2026-07-09 · rev 2 — code sync 2026-07-10</p>
+  <h1>Next-rep instruction: <span class="u">correct mid-rep, remind at the next attempt</span></h1>
+  <p class="lede">The voice twin of the UI's <code>addInstruction</code> layer. A continuous critical
+  fault cued real-time in rep N earns one short feedforward reminder at the moment the user commits to
+  rep N+1 — then the coach goes quiet and watches. Shape locked by Nam 07-09; code landed 2026-07-10
+  with glute reminder pools empty, so Stage A is wired but silent. Drafted by Fable (Opus
+  session-limited); same review bar applies.</p>
+  <div class="chips">
+    <span class="chip">scope <b>continuous criticals only</b></span>
+    <span class="chip">moment <b>rep-start commit edge</b></span>
+    <span class="chip">peak faults <b>excluded</b></span>
+    <span class="chip">vs hustle <b>reminder wins</b></span>
+    <span class="chip">code <b>landed 07-10</b></span>
+    <span class="chip">confirm-after-fix <b>deferred</b></span>
+    <span class="chip">pilot faults <b>2 — hyperextension + neck_head (flipped in review)</b></span>
+    <span class="chip">UI addInstruction <b>DELETE (review) — voice-only</b></span>
+  </div>
+</div></header>
+<main>
+
+<section>
+  <p class="kicker">01 · Locked shape</p>
+  <h2>What is already decided (do not re-open)</h2>
+  <p>decisions.md 2026-07-09 "Next-rep instruction layer" + the LOCKED stub in voice-behavior-spec.md:</p>
+  <ul>
+    <li>A <b>continuous critical</b> fault (live-emitted, <code>affectsForm: true</code>) that occurred in
+      rep N earns a ≤7-word <b>feedforward</b> reminder at rep N+1's <b>commit edge</b> — the state-machine
+      transition out of rest into the rep's first movement phase. Glute: <code>bottom→ascending</code> and the
+      <code>descending→ascending</code> fast-path.</li>
+    <li><b>Peak faults excluded</b> — their rep-end line already IS next-rep guidance.</li>
+    <li>Outcome-class cue: collision gap, cap-2/rep, blocked ≠ spent, carries the fault's
+      <code>contentKey</code>. <b>Reminder outranks hustle</b> when both arm at one moment.</li>
+    <li>Rep-start and hustle's effort-phase entry are <b>two declared moments</b> that coincide on glute
+      and share plumbing there; squat would separate them.</li>
+    <li>Confirm-after-fix: deferred. Numbers: open, feel-tune. Research: voice-research-rules.md §3b.</li>
+  </ul>
+</section>
+
+<section>
+  <p class="kicker">02 · Ground truth</p>
+  <h2>Eligible faults — verified in code, then amended by Nam's review</h2>
+  <p>As classified today the pilot has exactly ONE eligible fault (hyperextension). In review Nam
+  flipped <code>neck_head</code> to critical (Q1) — after that lands, the pilot has TWO. Emission map
+  for all five glute faults, read from the metric sources:</p>
+  <table>
+    <tr><th>fault id</th><th>emitted</th><th>affectsForm</th><th>classifier</th><th>reminder-eligible?</th></tr>
+    <tr><td><code>hyperextension</code></td><td>LIVE, mid-rep, debounced, once/rep (hip_extension metric, <code>update()</code>)</td><td><b>true</b></td><td>critical</td><td><b>YES — the only one</b></td></tr>
+    <tr><td><code>neck_head</code></td><td>LIVE, once/rep</td><td><b>false today → TRUE (Nam, 07-09 review)</b></td><td>soft → critical</td><td><b>YES after the flip</b></td></tr>
+    <tr><td><code>hip_extension</code></td><td>rep-end (peak snapshot)</td><td>true &lt;138° / false 138–150°</td><td>peak</td><td>no (excluded)</td></tr>
+    <tr><td><code>knee_angle</code></td><td>rep-end (peak)</td><td>true &lt;60° / false</td><td>peak</td><td>no</td></tr>
+    <tr><td><code>speed_control</code></td><td>rep-end (eccentric ratio; live path removed — "Handled in checkRepCompletion now")</td><td>true / false</td><td>peak</td><td>no</td></tr>
+  </table>
+  <div class="call tip"><b class="t">Resolved in review (Q1)</b>
+  <code>glute_bridge_neck_head.dart:106-113</code> hard-coded <code>affectsForm: false</code> while its own
+  comment said "injury-risk". Nam flipped it: <b>neck_head becomes critical</b>. Consequences beyond the
+  reminder (spelled out in Risks): it now fires real-time as a criticalFault, reps with a lifted head stop
+  counting as clean, and the pending <code>neck_head_soft</code> recording goes on hold.</div>
+  <div class="call warn"><b class="t">Review decision — the UI instruction layer DIES; voice replaces it</b>
+  Nam, lavish review 07-09: a user mid-exercise cannot look at the screen, so the on-screen
+  <code>addInstruction</code> text is worthless where it matters. Decision: DELETE the
+  <code>ExerciseBase.instructions</code> map + <code>addInstruction()</code> + every metric-fault call site
+  and UI consumer. Sequenced (chat, same day) as its own FIRST Codex task
+  (<code>docs/scratch/ui-instructions-removal-codex-spec.md</code>) before this feature. Audit nuance
+  (verified, not guessed): the metric-fault instructions are ALREADY invisible in v9 — the page only reads
+  the map's <code>'Status'</code> type, which is a live hold/rest UI protocol (rest-ring "Nghỉ" parse,
+  hold/release cue verbs) and migrates to a dedicated phase-status surface before the map dies;
+  <code>resultIssues.feedback</code> stays untouched (System = safety UI; non-System entries feed the
+  legacy fleet voice coach). The instruction concept lives ONLY in the voice coach from now on — this
+  reminder layer IS that method. The broader "delayed UI display" question is a separate later task. The
+  metrics' VN instruction strings survive as wording-reference comments, then go.</div>
+  <p>The now-dead UI path is still the best evidence for the design — the hyperextension live path
+  <b>already produced the exact instruction behavior Nam described</b>, phase-keyed to
+  <code>'bottom'</code>, i.e. the between-reps moment. The voice reminder replaces this verbatim block:</p>
+  <div class="code"><div class="code-head">lib/exercise/glute bridge/metrics/glute_bridge_hip_extension.dart:88-108 (verbatim)</div>
+  <div class="code-body"><pre>if (_hyperextDebouncer.update(isHyperextending)) {
+  // Live coaching instruction — shown once until rep resets.
+  if (!_hyperextInstructionSet) {
+    ctx.resultIssues.addInstruction(
+      'bottom',
+      'HipExt',
+      'Đừng ưỡn lưng! Siết cơ bụng và ép lưng vào sàn',
+    );
+    _hyperextInstructionSet = true;
+  }
+  // Fault — recorded once per rep.
+  if (!_hyperextFaultAdded) {
+    _faults.add(FaultRecord(
+      phase: ctx.state.toString().split('.').last,
+      type: 'hyperextension',
+      message: 'Không ưỡn lưng — ép lưng vào sàn',
+      affectsForm: true,
+    ));</pre></div></div>
+  <p><b>ELI5:</b> the app already writes a "remember for next time" note on screen when your lower back
+  arches. This feature reads the same event and says a short version of that note out loud, right as you
+  start the next rep — like the PT who tapped your stomach mid-rep and then says "belly tight this one"
+  as you go again.</p>
+</section>
+
+<section>
+  <p class="kicker">03 · The moment</p>
+  <h2>Detecting the commit edge — no new plumbing class</h2>
+  <p>The adapter already reads <code>exercise.currentPhaseKey</code> every frame to fire phase cues
+  (<code>policy_voice_coach.dart:333-343</code>, <code>_maybeSpeakPhaseCue</code>). The commit edge is one
+  new observation on the same signal: the phase key transitions <b>into a declared rep-start key</b> from
+  any non-rep-start key.</p>
+  <div class="code"><div class="code-head">declaration — mirrors hustle's VoiceScript.effortPhaseKeys precedent (07-09 review Q4)</div>
+  <div class="code-body"><pre>// VoiceScript (lib/voice/voice_content.dart) — content layer owns phase semantics
+final Set&lt;String&gt; repStartPhaseKeys;   // glute_bridge: {'ascending'}
+// hustle already declares: effortPhaseKeys // glute_bridge: {'ascending'} — same set, SHARED edge
+// squat later: repStartPhaseKeys {'descending'}, effortPhaseKeys {'ascending'} — moments separate</pre></div></div>
+  <p>One adapter-level edge detector (previous frame's key vs this frame's) emits "rep attempt started".
+  Both the reminder and hustle consume that event where their declared sets match the entered key. On
+  glute the two sets are identical, so it is literally one edge feeding two cues; on squat they diverge
+  with zero rework. This is the "share plumbing where they coincide, stay two declared moments" call from
+  decisions.md.</p>
+  <div class="call tip"><b class="t">Why the fast-path matters</b>
+  <code>glute_bridge.dart</code>'s descending state can exit straight into ascending
+  (<code>_onRepCompleted → transition(ascending)</code>) — no bottom at all. On that path rep-land (count +
+  rep N's outcome cues) and the commit edge land on the same instant. The adapter processes rep-land first;
+  by the time the reminder rolls, <code>_outcomeAudioPending</code> / the collision gap usually block it →
+  it drops. That is CORRECT behavior, not a bug: one moment, one outcome (principle 4). The reminder is
+  perishable at its edge; its eligibility survives to the next edge (blocked ≠ spent).</div>
+</section>
+
+<section>
+  <p class="kicker">04 · Eligibility & cadence</p>
+  <h2>When it may speak, and how often it does</h2>
+  <h3>Eligibility (deterministic, adapter-owned)</h3>
+  <ul>
+    <li>Fault was <b>detected in rep N</b> (the immediately previous rep) — detected means the live
+      critical was SEEN (<code>_seenFaultTypesThisRep</code>), whether or not its real-time line actually
+      voiced (a gap-blocked correction still earns the reminder; blocked ≠ spent).</li>
+    <li>Fault is a live-emitted critical (<code>affectsForm == true</code>) with a mapped reminder line.</li>
+    <li>Fault absent in rep N → <b>hard stop</b>, no draw at all. Silence owns solved problems (§3b: don't
+      narrate a fixed fault). This is the auto-taper — no explicit decay schedule needed.</li>
+    <li>Max <b>1 reminder per rep</b>, always the set's highest-priority eligible fault
+      (<code>_faultPriorityFor</code> order, same as corrections).</li>
+  </ul>
+  <h3>Cadence (probabilistic, policy-owned) — reuses the correction machinery wholesale</h3>
+  <p>The reminder's shape IS <code>CueMode.correction</code>: first-of-streak deterministic, then an
+  escalating roll, per-fault hunger key. No new policy mechanism — a new <code>CueType.reminder</code>
+  dispatching to the existing <code>_criticalFault</code>-style body with its own tuning row:</p>
+  <div class="code"><div class="code-head">proposed tuning (glute pilot) — ALL numbers feel-tune, flagged for Nam</div>
+  <div class="code-body"><pre>CueType.reminder: CueTuning(
+  CueMode.correction,
+  base: 0.30,   // second consecutive reminder for a persisting fault: quiet-ish
+  step: 0.15,   // climbs while the fault keeps recurring un-reminded
+  cap:  0.65,   // BELOW criticalFault's 0.85 — the mid-rep re-correction still exists;
+                // the reminder is the follow-through, not the main channel
+  firstOccurrenceCertain: true,  // streak's FIRST reminder always fires (principle 3:
+)                                // it's the causal follow-through of the correction)</pre></div></div>
+  <p><code>ctx.faultPersistence</code> carries the <b>reminder streak</b> (how many commit edges this
+  uninterrupted fault-run has already been reminded at), exactly parallel to how corrections pass
+  persistence today. Personality scales it like everything else; hard rules stay immune.</p>
+  <p><b>Expected feel</b> (10-rep set, hyperextension on reps 3-6): mid-rep correction rep 3 (first
+  occurrence, 100%) → reminder at rep 4's raise ("lần này siết bụng…", streak-first, 100%) → rep 5 raise:
+  roll 30%, likely silent — mid-rep escalation may re-cue instead → rep 6 raise: roll 45% → rep 7 clean →
+  silence, forever, until the fault returns. Never two fault lines at one moment; never the same fault
+  twice within a rep (the contentKey rule blocks it for free).</p>
+  <h3>Slotting</h3>
+  <ul>
+    <li>Outcome-class: registers in <code>_canStartOutcome</code>, subject to collision gap + cap-2.</li>
+    <li>Never the second in-rep slot (that stays <code>criticalFault</code>-only, unchanged).</li>
+    <li>At the commit edge its only rival is hustle → <b>reminder checks first</b>; if it speaks, hustle's
+      own <code>_canStartOutcome</code> blocks on pending audio. Implements "reminder outranks hustle" with
+      zero new priority machinery.</li>
+    <li>Phase cues at the same edge: unchanged — they are perishable non-outcome and drop if the sink is
+      busy; check reminder before the phase cue so the outcome wins the breath.</li>
+  </ul>
+</section>
+
+<section>
+  <p class="kicker">05 · State split</p>
+  <h2>Who remembers what</h2>
+  <div class="gl">
+    <div><b>Adapter (PolicyVoiceCoach)</b>previous phase key (edge detection); per-fault reminder streak +
+      "seen in prev rep" set — extends the existing <code>_faultFirstSeenRep</code> /
+      <code>_seenFaultTypesThisRep</code> bookkeeping, cleared in <code>beginSet</code>/<code>_startTrackingRep</code>
+      exactly like today.</div>
+    <div><b>Policy (VoicePolicy)</b>the roll + outcome bookkeeping only — new enum value, tuning row,
+      dispatch case, <code>_isOutcomeCue</code> inclusion. Hunger via the existing per-content
+      <code>_idle</code> map, key <code>reminder:&lt;faultId&gt;</code> (the locked per-fault keying rule).</div>
+    <div><b>Content (VoiceScript)</b><code>repStartPhaseKeys</code> declaration + reminder line pool keyed
+      by fault id. Audio naming: <code>&lt;slug&gt;.&lt;id&gt;_reminder</code> → pilot:
+      <code>glute_bridge.hyperextension_reminder</code> + <code>glute_bridge.neck_head_reminder</code>
+      (post-flip).</div>
+  </div>
+</section>
+
+<section>
+  <p class="kicker">06 · Content</p>
+  <h2>The line itself — proposal for Nam</h2>
+  <p>Constraints from research + guardrails: ≤7 words, feedforward ("what to do THIS rep"), positive
+  framing (no "đừng"-negation — it summons the wrong image, §3b), warm, never drill-sergeant. Derived from
+  the existing UI instruction's content:</p>
+  <table>
+    <tr><th>fault</th><th>line</th><th>status</th><th>note</th></tr>
+    <tr><td><code>hyperextension</code></td><td class="vn">"Lần này siết bụng, lưng sát sàn nhé"</td><td><b>APPROVED (Q4: "go with A")</b></td><td>explicit "this time" feedforward frame + both action cues</td></tr>
+    <tr><td><code>neck_head</code></td><td class="vn">"Lần này giữ đầu trên sàn nhé"</td><td><b>APPROVED (Nam 07-09)</b></td><td>mirrors the approved A pattern; derived from the metric's own message ("Giữ đầu và cổ trên sàn…") + the dying UI instruction ("Đặt đầu xuống sàn — tránh căng cơ cổ")</td></tr>
+  </table>
+  <p>Estimated audio ≈ 1.3–1.7s at the existing lines' speaking rate — fits inside a raise. Both keys
+  added to missing-audio.md (hyperextension approved; neck_head marked pending wording OK).</p>
+</section>
+
+<section>
+  <p class="kicker">07 · Risks</p>
+  <h2>Lines most likely wrong + what to stress-test</h2>
+  <ul>
+    <li><b>Streak-first deterministic (the 100%) is my strongest assumption.</b> It reads as principle-3
+      causality to me, but it is also the difference between "coach follows through" and "coach always
+      nags twice per new fault" (mid-rep line + next-raise line ≈ 4-6s apart). If device feel says naggy,
+      the one-line fix is <code>firstOccurrenceCertain: false</code>, base ~0.6. Nam decides on device.</li>
+    <li><b>Cap 0.65 vs the mid-rep escalation running in parallel.</b> Both channels track the same fault;
+      worst case alternates correction/reminder/correction across reps. The collision gap and same-fault
+      in-rep block bound it, but the combined per-fault talk rate is untested — watch total lines per
+      persisting fault across a 10-rep set (should be ≲4).</li>
+    <li><b>Edge detection vs debouncers.</b> <code>_ascendDebouncer</code> delays the ascending transition a
+      few frames; the reminder therefore starts slightly INTO the raise. Fine for hyperextension (a
+      bottom/lower-phase fault — the cue still precedes it). Wrong only if a future exercise has a fault in
+      the first ~300ms of its first phase; note it in the fleet rollout checklist, ignore for the pilot.</li>
+    <li><b>Fast-path starvation.</b> A user who never pauses at bottom may have most reminders gap-blocked
+      by rep-land audio. Acceptable (their reps are continuous, the mid-rep channel still corrects), but
+      verify on device that SOME reminders land at real tempo — if ~none do, revisit priorities at the
+      coincident moment, don't lengthen the gap.</li>
+    <li><b>NEW (post-review) — the neck_head flip is a scoring change, not just a voice change.</b> With
+      <code>affectsForm: true</code>, a lifted head makes the rep not-clean: praise dries up for
+      head-lifters, form scores drop, and the fault fires real-time as a deterministic-first criticalFault
+      using the EXISTING 4.4s <code>neck_head.mp3</code> — the longest line in the set, now on the most
+      reliable trigger. Works, but consider a shorter re-record soon. The pending
+      <code>neck_head_soft</code> recording goes on hold (soft path unreachable after the flip).</li>
+    <li><b>NEW (post-review) — the addInstruction deletion sweep is fleet-wide.</b> ~13 files across six
+      exercises plus the UI consumer (<code>active_exercise_page.dart</code>) and the base mechanism.
+      Mechanical, but it crosses exercise lanes (curl_up etc.) — analyze + full test run gate it, and the
+      removed VN strings should be captured in the owning exercises' voice line references before
+      deletion.</li>
+  </ul>
+  <p><b>Device stress-tests:</b> (1) continuous-tempo 10-rep set with forced hyperextension every rep —
+  count total voiced lines for the fault, check ≤~4 and never two in one breath; (2) rest-at-bottom set —
+  reminder must land right as the raise starts, not during the rest; (3) fault on final rep — no reminder
+  after set-complete (no commit edge exists; verify no stray fire); (4) fix-after-reminder — rep goes
+  clean → verify total silence about the fault from then on; (5) pool-empty wiring (stage A) — zero
+  audible change vs today.</p>
+</section>
+
+<section>
+  <p class="kicker">08 · Open questions</p>
+  <h2>All four RESOLVED in Nam's lavish review (07-09)</h2>
+  <ul>
+    <li><b>Q1 — neck_head reclassification: FLIP to critical.</b> ("You can flip it to true, actually I
+      don't really care that much.") Consequences documented in Risks.</li>
+    <li><b>Q2 — streak-first 100%: YES.</b> Ship deterministic; revisit on device feel.</li>
+    <li><b>Q3 — name: <code>CueType.reminder</code>. YES.</b></li>
+    <li><b>Q4 — line wording: option A.</b> ("Yes, this makes sense, just go with A.")</li>
+  </ul>
+  <p><b>Plus one decision the questions didn't ask (review note 1):</b> the UI
+  <code>addInstruction</code> layer is deleted — instructions are voice-only via this layer (§02 warn
+  callout). The wider "delayed UI display" idea is a separate later task.</p>
+  <p><b>Nothing remains open.</b> The <code>neck_head</code> wording was approved in chat (same day) —
+  both reminder lines are recordable (missing-audio.md). Implementation status 2026-07-10: task 1
+  UI instruction-layer removal and task 2 reminder wiring both landed; glute reminder pools remain
+  empty until audio lands.</p>
+</section>
+
+</main>
+</body>
+</html>

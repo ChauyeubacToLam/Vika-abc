@@ -98,8 +98,7 @@ class CervicalSafetyMetric extends WarriorOneMetricBase {
       ctx.resultIssues.feedback['cervical_danger'] =
           'Cẩn thận cổ nhé! Nhìn thẳng hoặc hơi lên thôi. Không ngửa đầu ra sau.';
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction('hold', 'cervical_danger',
-            'Cẩn thận cổ nhé! Nhìn thẳng hoặc hơi lên thôi. Không ngửa đầu ra sau.');
+        // Legacy UI instruction copy: Cẩn thận cổ nhé! Nhìn thẳng hoặc hơi lên thôi. Không ngửa đầu ra sau.
         _instructionSet = true;
       }
       _logFault(phase, 'Head thrown back (cervical hyperextension)',

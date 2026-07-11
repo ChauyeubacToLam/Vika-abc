@@ -178,9 +178,9 @@ class Lunge extends ExerciseBase {
   // --- Safety Checks ---
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing == CameraFacing.front) {
-      return "⚠️ Hãy quay sang bên để theo dõi Lunge tốt hơn";
+      return const GuidanceSignal.turnSide();
     }
 
     // Lunge needs BOTH sides (unlike squat which uses getSideLandmark)
@@ -209,7 +209,7 @@ class Lunge extends ExerciseBase {
         rightFoot == null ||
         leftHeel == null ||
         rightHeel == null) {
-      return "⚠️ Không thấy toàn bộ cơ thể.";
+      return const GuidanceSignal.bodyInFrame();
     }
 
     final allLandmarks = [
@@ -228,7 +228,7 @@ class Lunge extends ExerciseBase {
     ];
 
     if (allLandmarks.any((l) => !ExerciseBase.isLandmarkConfident(l))) {
-      return "⚠️ Điều chỉnh ánh sáng/vị trí.";
+      return const GuidanceSignal.lighting();
     }
 
     return null;
@@ -454,11 +454,11 @@ class Lunge extends ExerciseBase {
     }
 
     if (lungeState == LungeState.descending) {
-      resultIssues.addInstruction('descending', 'Status', 'Đang xuống...');
+      resultIssues.setPhaseStatus('descending', 'Đang xuống...');
     } else if (lungeState == LungeState.bottom) {
-      resultIssues.addInstruction('bottom', 'Status', 'Đứng lên!');
+      resultIssues.setPhaseStatus('bottom', 'Đứng lên!');
     } else if (lungeState == LungeState.ascending) {
-      resultIssues.addInstruction('ascending', 'Status', 'Đẩy lên!');
+      resultIssues.setPhaseStatus('ascending', 'Đẩy lên!');
     }
   }
 
@@ -584,7 +584,7 @@ class Lunge extends ExerciseBase {
         previousLungeState == LungeState.standing) {
       _leadLegLocked = true;
       _reachedBottomThisRep = false;
-      resultIssues.instructions.clear();
+      resultIssues.phaseStatus.clear();
     } else if (newState == LungeState.bottom) {
       _reachedBottomThisRep = true;
     } else if (newState == LungeState.standing) {

@@ -56,11 +56,7 @@ class NeckShoulderMetric extends SphinxMetricBase {
     if (_isShrug) {
       ctx.resultIssues.feedback['Neck'] = 'Thẳng vai!';
       if (!_shrugInstructionSet) {
-        ctx.resultIssues.addInstruction(
-          'isometricHold',
-          'Neck',
-          'Bạn đang rụt vai gần tai. Hãy hạ vai xuống để tránh mỏi vai gáy.',
-        );
+        // Legacy UI instruction copy: Bạn đang rụt vai gần tai. Hãy hạ vai xuống để tránh mỏi vai gáy.
         _shrugInstructionSet = true;
       }
       _logFault(ctx.state.name, 'NeckShrug', 'Lỗi rụt vai', 'Thẳng vai ra',
@@ -87,11 +83,7 @@ class NeckShoulderMetric extends SphinxMetricBase {
     if (_isHyper) {
       ctx.resultIssues.feedback['Neck'] = 'Hạ cằm xuống!';
       if (!_hyperInstructionSet) {
-        ctx.resultIssues.addInstruction(
-          'isometricHold',
-          'NeckHyper',
-          'Cổ đang ngửa quá mức. Thu nhẹ cằm lại, nhìn chéo xuống sàn phía trước.',
-        );
+        // Legacy UI instruction copy: Cổ đang ngửa quá mức. Thu nhẹ cằm lại, nhìn chéo xuống sàn phía trước.
         _hyperInstructionSet = true;
       }
       _logFault(

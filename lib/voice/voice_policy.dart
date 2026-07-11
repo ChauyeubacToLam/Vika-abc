@@ -25,18 +25,17 @@ enum CueMode {
   /// [CueType.praise].
   variableRatio,
 
-  /// Escalates with how long a fault has persisted; a relief valve forces
-  /// a near-certain cue past a persistence threshold. Used by
-  /// [CueType.criticalFault].
+  /// Escalates with how long a fault/reminder streak has persisted; a relief
+  /// valve may force a near-certain cue past a persistence threshold. Used by
+  /// [CueType.criticalFault] and [CueType.reminder].
   correction,
 
   /// The bare hunger-scaled roll with no extra hard rules layered on top.
   /// Used by [CueType.setup].
   base,
 
-  /// Rolled, but perishable: [CueType.phase] drops rather than queues late
-  /// if the sink is busy; [CueType.hustle] is additionally capped to one
-  /// per set and only eligible on the final reps.
+  /// Rolled, but perishable: [CueType.phase] and [CueType.hustle] drop
+  /// rather than queue late if the sink is busy.
   perishable,
 }
 
@@ -52,6 +51,7 @@ class CueTuning {
     this.reliefAfter = _noRelief,
     this.firstOccurrenceCertain = false,
     this.scalePraiseByFormScore = true,
+    this.postFireIdlePenalty = 0,
   });
 
   /// Sentinel meaning "no relief valve for this type" — a persistence/idle
@@ -72,8 +72,9 @@ class CueTuning {
 
   /// Relief valve: once the cue's silence streak reaches this, it fires
   /// near-certainly instead of rolling. The streak source differs by type:
-  /// [CueType.criticalFault] reads `ctx.faultPersistence` (adapter-computed),
-  /// [CueType.count] reads the policy-internal idle counter. Left at
+  /// [CueType.criticalFault] and [CueType.reminder] read
+  /// `ctx.faultPersistence` (adapter-computed), [CueType.count] reads the
+  /// policy-internal idle counter. Left at
   /// [_noRelief] for every other type, which has no relief valve.
   ///
   /// Sizing rule (Nam, 2026-07-08): a relief valve is a saturation guard,
@@ -90,13 +91,19 @@ class CueTuning {
   /// Legacy D8 praise scaling. Kept on by default to avoid changing other
   /// exercises while Glute Bridge removes the multiplier locally.
   final bool scalePraiseByFormScore;
+
+  /// Optional stochastic backoff after a cue speaks. A value of 2 starts the
+  /// next eligible roll two hunger steps below baseline, then normal silent
+  /// attempts climb it back. This is deliberately not a fixed cooldown.
+  final int postFireIdlePenalty;
 }
 
-/// Ship-day defaults (design doc decision D2): praise 35% base / +10 per
-/// idle rep / capped at 85%; count anchors rep 1 then rolls ~70% on the
-/// middles, saturating at 90% — never certainty — with a relief valve only
-/// after 6 straight silent counts; correction escalates 25 → 55 → 85 by fault persistence with a
-/// relief valve past 3 persisted reps; hustle a flat 50%, capped at 50;
+/// Current fleet defaults: count is deterministic registration feedback; praise
+/// is a 35% base / +10 per idle rep / capped at 85%; correction escalates
+/// 25 → 55 → 85 by fault persistence with a relief valve past 3 persisted reps;
+/// reminder is quieter and only speaks where an exercise declares rep-start
+/// phase keys; hustle is adapter-armed, persistence-shaped, and may apply a
+/// post-fire negative-hunger backoff when an exercise enables it;
 /// phase anchors reps 1-2, then tapers to a flat rolled rate and still drops
 /// if the sink is busy; safety unconditional; instruction a flat, always-on
 /// base roll. Tune the numbers on device — the shape is what's locked, not
@@ -112,18 +119,13 @@ class CueTuning {
 const Map<CueType, CueTuning> kDefaultTuning = {
   CueType.safety: CueTuning(CueMode.always),
   CueType.setup: CueTuning(CueMode.base, base: 1.0),
-  // cap 0.90, not 1.0: with cap 1.0 the hunger step made the roll CERTAIN
-  // after just 2 silent counts — a learnable "quiet twice → next always
-  // counts" rhythm (Nam heard it as alternating even numbers). Every middle
-  // rep must stay a real draw; only the reliefAfter guard may force one,
-  // and it is sized so it can't shape rhythm (see CueTuning.reliefAfter).
-  CueType.count: CueTuning(
-    CueMode.always,
-    base: 0.70,
-    step: 0.15,
-    cap: 0.90,
-    reliefAfter: 6,
-  ),
+  // COUNT = REGISTRATION (re-ruled 07-11, decisions.md "Count = registration"):
+  // every landed rep is counted, deterministically and personality-immune —
+  // the spoken number is the user's only proof the rep registered (they don't
+  // watch the screen). Supersedes both prior thinning shapes (07-07
+  // cap-0.90/relief-6 and the 07-08 pilot 0.50/+0.10). base 1.0 short-circuits
+  // the roll in _count; re-thinning an exercise means an explicit base < 1.0.
+  CueType.count: CueTuning(CueMode.always, base: 1.0),
   CueType.praise:
       CueTuning(CueMode.variableRatio, base: 0.35, step: 0.10, cap: 0.85),
   CueType.criticalFault: CueTuning(
@@ -133,7 +135,14 @@ const Map<CueType, CueTuning> kDefaultTuning = {
     cap: 0.85,
     reliefAfter: 4,
   ),
-  CueType.hustle: CueTuning(CueMode.perishable, base: 0.50, cap: 0.50),
+  CueType.reminder:
+      CueTuning(CueMode.correction, base: 0.20, step: 0.10, cap: 0.50),
+  CueType.hustle: CueTuning(
+    CueMode.perishable,
+    base: 0.50,
+    cap: 0.50,
+    postFireIdlePenalty: 2,
+  ),
   CueType.phase: CueTuning(CueMode.perishable, base: 0.45, cap: 1.0),
 };
 
@@ -145,15 +154,15 @@ double _clampD(double v, double lo, double hi) =>
 /// makes where the guide's prose and its illustrative code sketch diverge
 /// (all flagged explicitly so a reviewer can revisit them):
 ///
-/// - `correct`'s escalating probability reads `ctx.faultPersistence`
+/// - `correct`/`reminder` escalating probability reads `ctx.faultPersistence`
 ///   (adapter-computed, survives across silent reps) as the "idle" input
 ///   to [_p] — not the policy-internal per-key hunger counter. The prose
 ///   is explicit ("probability escalates with ctx.faultPersistence") and
 ///   this is the only way `reliefAfter` (also stated in terms of
 ///   `faultPersistence`) is comparable to the same value the escalation
-///   uses. The internal hunger map is still updated for `correct`'s key on
-///   every silent call (uniform `decide()` bookkeeping) but is not
-///   consulted by `_criticalFault` itself.
+///   uses. The internal hunger map is still updated for `correct`/`reminder`
+///   keys on every silent call (uniform `decide()` bookkeeping) but is not
+///   consulted by those correction-shaped bodies.
 /// - `CueMode.base` (instruction) has no described behaviour in the
 ///   guide's per-mode bullet list. Interpreted as the bare `_p` roll using
 ///   the policy-internal per-content hunger, no extra hard rules — the
@@ -201,13 +210,12 @@ class VoicePolicy {
   // --- per-set memory. beginSet() clears all of it. ----------------------
 
   /// Hunger: how many times in a row a given key was eligible but stayed
-  /// silent. Keyed per-content for correct/instruction, per-type for
+  /// silent. Keyed per-content for correct/soft/reminder/setup, per-type for
   /// everything else — see [_key]. This is the locked mechanism that keeps
   /// silence on one fault from raising the odds for another.
   final Map<String, int> _idle = {};
 
   int _lastPraiseRep = -2;
-  bool _hustledThisSet = false;
   int? _lastOutcomeAudioEndMs;
   bool _outcomeAudioPending = false;
   int _outcomeRepNumber = -1;
@@ -216,11 +224,24 @@ class VoicePolicy {
 
   int? get lastOutcomeAudioEndMs => _lastOutcomeAudioEndMs;
 
+  /// WHY the most recent [decide] said yes/no — set by every decision body,
+  /// read by `VoiceCoach.say`'s device log so a transcript explains itself
+  /// (anchor vs roll vs gap vs cap). Debug observability only: never read by
+  /// any decision logic, so the policy stays pure.
+  String lastReason = '';
+
+  /// Roll helper that also records the reason string. [tag] names the cue
+  /// body, [extra] carries body-specific context (idle/persistence).
+  bool _rollWithReason(String tag, double p, {String extra = ''}) {
+    final hit = _rng.nextDouble() < p;
+    lastReason = '$tag p=${p.toStringAsFixed(2)}$extra ${hit ? 'HIT' : 'miss'}';
+    return hit;
+  }
+
   /// Call at the start of every set: wipes hunger and all hard-rule memory.
   void beginSet() {
     _idle.clear();
     _lastPraiseRep = -2;
-    _hustledThisSet = false;
     _lastOutcomeAudioEndMs = null;
     _outcomeAudioPending = false;
     _outcomeRepNumber = -1;
@@ -249,31 +270,33 @@ class VoicePolicy {
     return speak;
   }
 
-  /// The locked per-fault hunger key: correct/soft/instruction hunger is scoped
-  /// to the specific fault/metric (`ctx.contentKey`) so staying silent
+  /// The locked per-fault hunger key: correct/soft/reminder/setup hunger is
+  /// scoped to the specific fault/metric (`ctx.contentKey`) so staying silent
   /// about one fault never raises the odds for another; every other type
   /// collapses to a single per-set counter.
   String _key(CueType type, CueContext ctx) {
     return (type == CueType.criticalFault ||
             type == CueType.softFault ||
+            type == CueType.reminder ||
             type == CueType.setup)
         ? '${type.name}:${ctx.contentKey}'
         : type.name;
   }
 
   void _onSpoke(CueType type, CueContext ctx, String key) {
-    _idle[key] = 0;
+    final postFireIdlePenalty = tuning[type]?.postFireIdlePenalty ?? 0;
+    _idle[key] = postFireIdlePenalty > 0 ? -postFireIdlePenalty : 0;
     if (type == CueType.praise) _lastPraiseRep = ctx.repNumber;
     if (_isOutcomeCue(type)) {
       _recordOutcome(type, ctx);
     }
-    if (type == CueType.hustle) _hustledThisSet = true;
   }
 
   bool _isOutcomeCue(CueType type) {
     return type == CueType.praise ||
         type == CueType.criticalFault ||
         type == CueType.softFault ||
+        type == CueType.reminder ||
         type == CueType.hustle;
   }
 
@@ -281,7 +304,9 @@ class VoicePolicy {
     _syncOutcomeRep(ctx.repNumber);
     _outcomesThisRep++;
     _outcomeAudioPending = true;
-    if ((type == CueType.criticalFault || type == CueType.softFault) &&
+    if ((type == CueType.criticalFault ||
+            type == CueType.softFault ||
+            type == CueType.reminder) &&
         ctx.contentKey.isNotEmpty) {
       _outcomeFaultKeysThisRep.add(ctx.contentKey);
     }
@@ -298,11 +323,14 @@ class VoicePolicy {
     _syncOutcomeRep(ctx.repNumber);
 
     if (_outcomeAudioPending) {
+      lastReason = 'outcome-audio-still-playing';
       return false;
     }
 
     final lastEnd = _lastOutcomeAudioEndMs;
     if (lastEnd != null && nowMs < lastEnd + outcomeCollisionGapMs) {
+      lastReason =
+          'collision-gap (${lastEnd + outcomeCollisionGapMs - nowMs}ms left)';
       return false;
     }
 
@@ -311,14 +339,17 @@ class VoicePolicy {
     }
 
     if (type != CueType.criticalFault) {
+      lastReason = 'second-outcome-slot-is-critical-only';
       return false;
     }
     if (_outcomesThisRep >= maxOutcomeCuesPerRep) {
+      lastReason = 'outcome-cap-$maxOutcomeCuesPerRep-reached-this-rep';
       return false;
     }
 
     final contentKey = ctx.contentKey;
     if (contentKey.isEmpty || _outcomeFaultKeysThisRep.contains(contentKey)) {
+      lastReason = 'same-fault-already-voiced-this-rep';
       return false;
     }
 
@@ -326,13 +357,15 @@ class VoicePolicy {
   }
 
   /// scale: `(base + step·idle) · personality`, clamped by `cap`. The
-  /// heart of "hunger" — shared by every mode that rolls a die.
+  /// heart of "hunger" — shared by every mode that rolls a die. `idle` may be
+  /// negative for post-fire stochastic backoff.
   double _p(CueTuning t, int idle) =>
       _clampD((t.base + t.step * idle) * personality, 0.0, t.cap);
 
   bool _shouldSpeak(CueType type, CueContext ctx) {
     switch (type) {
       case CueType.safety:
+        lastReason = 'safety-always';
         return true; // Always, highest priority, bypasses hunger.
       case CueType.setup:
         return _setup(ctx);
@@ -344,6 +377,8 @@ class VoicePolicy {
         return _criticalFault(ctx);
       case CueType.softFault:
         return _softFault(ctx);
+      case CueType.reminder:
+        return _reminder(ctx);
       case CueType.hustle:
         return _hustle(ctx);
       case CueType.phase:
@@ -354,29 +389,58 @@ class VoicePolicy {
   bool _setup(CueContext ctx) {
     final t = tuning[CueType.setup]!;
     final idle = _idle[_key(CueType.setup, ctx)] ?? 0;
-    return _rng.nextDouble() < _p(t, idle);
+    // PERSONALITY-IMMUNE (hard rule 2): setup cues are structural — intro /
+    // activation countdown / ready / set-complete fire exactly once at their
+    // moment, always. A quiet coach (personality 0.5) must not coin-flip the
+    // setup intro, so the scalar is deliberately left out of this one body;
+    // tests still silence the channel by zeroing base/cap.
+    final p = _clampD(t.base + t.step * idle, 0.0, t.cap);
+    // At the saturated base 1.0 the roll is a foregone conclusion.
+    // Short-circuit it so a deterministic cue never spends a draw from the
+    // shared RNG — that keeps the stochastic cadence of the probabilistic
+    // cues (and every scripted-random test) reproducible.
+    if (p >= 1.0) {
+      lastReason = 'setup-deterministic';
+      return true;
+    }
+    return _rollWithReason('setup-roll', p);
   }
 
   bool _count(CueContext ctx) {
-    if (ctx.repNumber <= 1) return true; // Rep 1 always fires — the anchor.
-    if (ctx.isFinalReps) return true; // Finish anchor: last 2 reps always.
+    if (ctx.repNumber <= 1) {
+      lastReason = 'count-rep1-anchor';
+      return true; // Rep 1 always fires — the anchor.
+    }
+    if (ctx.isFinalReps) {
+      lastReason = 'count-final-anchor';
+      return true; // Finish anchor: last 2 reps always.
+    }
     final t = tuning[CueType.count]!;
     final idle = _idle[_key(CueType.count, ctx)] ?? 0;
     if (idle >= t.reliefAfter) {
-      // Relief valve — the ONLY deterministic path after rep 1. Exists
-      // solely so a set can never go essentially uncounted; at 6 straight
-      // silent counts it can't bind more than once in a typical set, so it
-      // can't create a learnable rhythm. Deliberately consumes no roll,
-      // like _criticalFault's valve, so transcripts stay reproducible.
+      lastReason = 'count-relief-valve';
       return true;
     }
-    return _rng.nextDouble() < _p(t, idle);
+    // REGISTRATION, not chatter (re-ruled 07-11): users don't watch the
+    // screen, so the spoken number is the only proof a rep landed — a silent
+    // rep is ambiguous between "counted but quiet" and "didn't register".
+    // The fleet default is therefore base 1.0 (every landed rep is counted)
+    // and the computation is PERSONALITY-IMMUNE like _setup — a quiet coach
+    // must not thin the trust signal. The roll machinery below survives only
+    // for explicit re-thinning configs (base < 1.0), e.g. tests.
+    final p = _clampD(t.base + t.step * idle, 0.0, t.cap);
+    if (p >= 1.0) {
+      lastReason = 'count-registration-deterministic';
+      return true;
+    }
+    return _rollWithReason('count-roll', p, extra: ' idle=$idle');
     // Count is not an outcome cue: it never reads/writes _lastOutcomeRep,
     // so it may freely co-occur with a praise/correct cue on the same rep.
   }
 
   bool _praise(CueContext ctx) {
     if (_lastPraiseRep == ctx.repNumber - 1) {
+      lastReason = 'praise-never-twice-in-a-row';
       return false; // Never twice in a row.
     }
     if (!_canStartOutcome(CueType.praise, ctx)) {
@@ -392,7 +456,7 @@ class VoicePolicy {
             t.cap,
           )
         : roll;
-    return _rng.nextDouble() < scaled;
+    return _rollWithReason('praise-roll', scaled, extra: ' idle=$idle');
   }
 
   bool _criticalFault(CueContext ctx) {
@@ -401,14 +465,20 @@ class VoicePolicy {
     }
     final t = tuning[CueType.criticalFault]!;
     if (t.firstOccurrenceCertain && ctx.faultPersistence == 0) {
+      lastReason = 'critical-first-occurrence-certain';
       return true;
     }
     if (ctx.faultPersistence >= t.reliefAfter) {
       // Relief valve: never let a persistent, unaddressed fault go silent
       // forever. Near-certain and personality-immune by design.
+      lastReason = 'critical-persistence-relief-valve';
       return true;
     }
-    return _rng.nextDouble() < _p(t, ctx.faultPersistence);
+    return _rollWithReason(
+      'critical-roll',
+      _p(t, ctx.faultPersistence),
+      extra: ' persist=${ctx.faultPersistence}',
+    );
   }
 
   bool _softFault(CueContext ctx) {
@@ -416,27 +486,57 @@ class VoicePolicy {
       return false;
     }
     final t = tuning[CueType.softFault];
-    if (t == null) return false;
+    if (t == null) {
+      lastReason = 'soft-no-tuning-configured';
+      return false;
+    }
     final idle = _idle[_key(CueType.softFault, ctx)] ?? 0;
-    return _rng.nextDouble() < _p(t, idle);
+    return _rollWithReason('soft-roll', _p(t, idle), extra: ' idle=$idle');
+  }
+
+  bool _reminder(CueContext ctx) {
+    if (!_canStartOutcome(CueType.reminder, ctx)) {
+      return false;
+    }
+    final t = tuning[CueType.reminder]!;
+    if (t.firstOccurrenceCertain && ctx.faultPersistence == 0) {
+      lastReason = 'reminder-streak-first-deterministic';
+      return true;
+    }
+    if (ctx.faultPersistence >= t.reliefAfter) {
+      lastReason = 'reminder-persistence-relief-valve';
+      return true;
+    }
+    return _rollWithReason(
+      'reminder-roll',
+      _p(t, ctx.faultPersistence),
+      extra: ' streak=${ctx.faultPersistence}',
+    );
   }
 
   bool _hustle(CueContext ctx) {
-    if (_hustledThisSet) return false; // At most one per set.
     if (!_canStartOutcome(CueType.hustle, ctx)) {
       return false;
     }
-    if (!ctx.isFinalReps) return false; // Only eligible on the final reps.
+    if (ctx.sinkBusy) {
+      lastReason = 'hustle-perishable-sink-busy';
+      return false; // Perishable: drop, don't queue late.
+    }
     final t = tuning[CueType.hustle]!;
-    return _rng.nextDouble() < _p(t, 0);
+    final idle = _idle[_key(CueType.hustle, ctx)] ?? 0;
+    return _rollWithReason('hustle-roll', _p(t, idle), extra: ' idle=$idle');
   }
 
   bool _phase(CueContext ctx) {
-    if (ctx.sinkBusy) return false; // Perishable: drop, don't queue late.
+    if (ctx.sinkBusy) {
+      lastReason = 'phase-perishable-sink-busy';
+      return false; // Perishable: drop, don't queue late.
+    }
     if (ctx.repNumber <= 2) {
+      lastReason = 'phase-early-rep-anchor';
       return true; // Early reps teach the movement rhythm.
     }
     final t = tuning[CueType.phase]!;
-    return _rng.nextDouble() < _p(t, 0);
+    return _rollWithReason('phase-roll', _p(t, 0));
   }
 }

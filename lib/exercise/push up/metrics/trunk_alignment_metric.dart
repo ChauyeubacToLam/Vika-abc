@@ -93,8 +93,7 @@ class TrunkAlignmentMetric extends PushUpMetricBase {
       if (isSagCritical) {
         ctx.resultIssues.feedback['Back'] = 'DỪNG LẠI! Lưng võng quá nhiều!';
         if (!_sagInstructionSet) {
-          ctx.resultIssues.addInstruction(
-              'plank', 'Back', 'Lưng võng nguy hiểm — siết cơ bụng mạnh hơn!');
+          // Legacy UI instruction copy: Lưng võng nguy hiểm — siết cơ bụng mạnh hơn!
           _sagInstructionSet = true;
         }
         _logFault(phase, 'Lưng võng quá mức — nguy hiểm',
@@ -102,16 +101,14 @@ class TrunkAlignmentMetric extends PushUpMetricBase {
       } else if (isSagError) {
         ctx.resultIssues.feedback['Back'] = 'Hông hơi võng — siết cơ bụng!';
         if (!_sagInstructionSet) {
-          ctx.resultIssues.addInstruction(
-              'plank', 'Back', 'Hông hơi võng — gồng bụng nhiều hơn!');
+          // Legacy UI instruction copy: Hông hơi võng — gồng bụng nhiều hơn!
           _sagInstructionSet = true;
         }
         _logFault(phase, 'Hông hơi võng', voiceMessage: 'Siết cơ bụng');
       } else {
         ctx.resultIssues.feedback['Back'] = 'Gồng cơ bụng!';
         if (!_sagInstructionSet) {
-          ctx.resultIssues.addInstruction(
-              'plank', 'Back', 'Gồng bụng lại, giữ thân thẳng!');
+          // Legacy UI instruction copy: Gồng bụng lại, giữ thân thẳng!
           _sagInstructionSet = true;
         }
         _logFault(phase, 'Hông hơi chùng', voiceMessage: 'Siết cơ bụng');
@@ -122,16 +119,14 @@ class TrunkAlignmentMetric extends PushUpMetricBase {
       if (isPikeError) {
         ctx.resultIssues.feedback['Back'] = 'Hông quá cao! Giữ người thẳng.';
         if (!_pikeInstructionSet) {
-          ctx.resultIssues.addInstruction(
-              'plank', 'Back', 'Hạ hông xuống, giữ thân thẳng!');
+          // Legacy UI instruction copy: Hạ hông xuống, giữ thân thẳng!
           _pikeInstructionSet = true;
         }
         _logFault(phase, 'Hông quá cao', voiceMessage: 'Hạ hông xuống');
       } else {
         ctx.resultIssues.feedback['Back'] = 'Hạ hông xuống một chút!';
         if (!_pikeInstructionSet) {
-          ctx.resultIssues.addInstruction(
-              'plank', 'Back', 'Hông hơi cao — hạ thấp một chút!');
+          // Legacy UI instruction copy: Hông hơi cao — hạ thấp một chút!
           _pikeInstructionSet = true;
         }
         _logFault(phase, 'Hông hơi cao', voiceMessage: 'Hạ hông xuống');

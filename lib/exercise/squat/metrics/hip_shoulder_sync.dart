@@ -203,7 +203,6 @@ class HipShoulderSyncMetric extends SquatMetricBase {
   void _maybeSetInstruction(RepContext ctx, String message) {
     if (_instructionSet) return;
     _instructionSet = true;
-    ctx.resultIssues.addInstruction('standing', 'Sync', message);
   }
 
   @override

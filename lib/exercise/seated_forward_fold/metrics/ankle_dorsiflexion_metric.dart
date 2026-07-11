@@ -33,11 +33,7 @@ class AnkleDorsiflexionMetric extends SeatedForwardMetricBase {
       _isFaultingNow = true;
       ctx.resultIssues.feedback['Ankle'] = 'Bẻ gập mũi chân!';
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction(
-          ctx.state.name,
-          'Ankle',
-          'Mũi chân đang bị duỗi. Hãy hướng mũi chân lên trần nhà để kéo căng tối đa chuỗi cơ mặt sau.',
-        );
+        // Legacy UI instruction copy: Mũi chân đang bị duỗi. Hãy hướng mũi chân lên trần nhà để kéo căng tối đa chuỗi cơ mặt sau.
         _instructionSet = true;
       }
       _logFault(ctx.state.name, 'Bẻ gập mũi chân hướng lên trần');

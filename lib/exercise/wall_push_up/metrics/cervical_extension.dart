@@ -73,16 +73,14 @@ class CervicalExtensionMetric extends WallPushUpMetricBase {
       if (deviation > CervicalExtensionConfig.ERROR_DEVIATION) {
         ctx.resultIssues.feedback['Neck'] = 'Giữ cổ thẳng, nhìn về phía trước.';
         if (!_instructionSet) {
-          ctx.resultIssues.addInstruction('standing', 'Neck',
-              'Đừng ngửa đầu nhìn lên tường — giữ cổ thẳng.');
+          // Legacy UI instruction copy: Đừng ngửa đầu nhìn lên tường — giữ cổ thẳng.
           _instructionSet = true;
         }
         _logFault(phase, 'Ngửa cổ nhìn lên', voiceMessage: 'Giữ cổ thẳng');
       } else {
         ctx.resultIssues.feedback['Neck'] = 'Đừng ngửa đầu lên nhìn tường.';
         if (!_instructionSet) {
-          ctx.resultIssues.addInstruction(
-              'standing', 'Neck', 'Cổ hơi ngửa — nhìn về phía trước.');
+          // Legacy UI instruction copy: Cổ hơi ngửa — nhìn về phía trước.
           _instructionSet = true;
         }
         _logFault(phase, 'Cổ hơi ngửa', voiceMessage: 'Giữ cổ thẳng');

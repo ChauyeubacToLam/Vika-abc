@@ -115,14 +115,15 @@ class HighPlank extends ExerciseBase {
   double? get liveHoldTargetSeconds => maxSeconds.toDouble();
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
+  GuidanceSignal? checkSafety(
+      Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
     if (cameraFacing != CameraFacing.left &&
         cameraFacing != CameraFacing.right) {
-      return 'Vui lòng quay ngang người 100% với camera!';
+      return const GuidanceSignal.turnSide();
     }
     final lm = _getLandmarks(smoothedLandmarks);
     if (lm == null || !lm.values.every(ExerciseBase.isLandmarkConfident)) {
-      return 'Giữ vai, tay, hông, gối và cổ chân rõ trong khung hình.';
+      return const GuidanceSignal.bodyInFrame();
     }
     return null;
   }
@@ -411,7 +412,7 @@ class HighPlank extends ExerciseBase {
 
     repCount = timerMetric.totalHoldingTimeMs ~/ 1000;
 
-    resultIssues.addInstruction(state.name, 'Status', currentPhaseLabel);
+    resultIssues.setPhaseStatus(state.name, currentPhaseLabel);
   }
 
   int get _targetTimeMs => maxSeconds * 1000;

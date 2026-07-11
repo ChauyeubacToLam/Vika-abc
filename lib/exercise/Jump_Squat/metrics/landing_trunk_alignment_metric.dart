@@ -40,7 +40,6 @@ class LandingTrunkAlignmentMetric extends JumpSquatMetricBase {
       if (ctx.trunkVerticalAngle > TrunkLandingConfig.MAX_LEAN_ANGLE) {
         const message = 'Nâng ngực lên, đừng rạp lưng khi tiếp đất.';
         ctx.resultIssues.feedback['trunk'] = message;
-        ctx.resultIssues.addInstruction('landing', 'trunk', message);
       }
     }
   }

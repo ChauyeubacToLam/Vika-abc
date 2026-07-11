@@ -173,10 +173,10 @@ class JumpingJack extends ExerciseBase {
   // --- Safety Checks (requires front view) ---
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing == CameraFacing.left ||
         cameraFacing == CameraFacing.right) {
-      return "⚠️ Xin hãy quay mặt về phía camera để theo dõi Nhảy Dạng";
+      return const GuidanceSignal.faceCamera();
     }
 
     final leftShoulder = landmarks[PoseLandmarkType.leftShoulder];
@@ -200,7 +200,7 @@ class JumpingJack extends ExerciseBase {
         rightHip == null ||
         leftAnkle == null ||
         rightAnkle == null) {
-      return "⚠️ Đảm bảo toàn thân trong khung hình";
+      return const GuidanceSignal.bodyInFrame();
     }
 
     if (!ExerciseBase.isLandmarkConfident(leftShoulder) ||
@@ -209,7 +209,7 @@ class JumpingJack extends ExerciseBase {
         !ExerciseBase.isLandmarkConfident(rightWrist) ||
         !ExerciseBase.isLandmarkConfident(leftAnkle) ||
         !ExerciseBase.isLandmarkConfident(rightAnkle)) {
-      return "⚠️ Hình ảnh không rõ. Điều chỉnh ánh sáng hoặc vị trí";
+      return const GuidanceSignal.lighting();
     }
 
     return null;
@@ -366,9 +366,9 @@ class JumpingJack extends ExerciseBase {
     }
 
     if (jjState == JJState.closed) {
-      resultIssues.addInstruction('closed', 'Status', 'Vào');
+      resultIssues.setPhaseStatus('closed', 'Vào');
     } else if (jjState == JJState.open) {
-      resultIssues.addInstruction('open', 'Status', 'Mở rộng!');
+      resultIssues.setPhaseStatus('open', 'Mở rộng!');
     }
   }
 
@@ -424,7 +424,7 @@ class JumpingJack extends ExerciseBase {
     jjState = newState;
 
     if (newState == JJState.open && previousJJState == JJState.closed) {
-      resultIssues.instructions.clear();
+      resultIssues.phaseStatus.clear();
     }
 
     for (final metric in _metrics) {

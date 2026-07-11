@@ -215,9 +215,9 @@ class ButterflyStretch extends ExerciseBase {
   }
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.front) {
-      return _safetyError("Vui lòng đặt điện thoại chính diện.");
+      return _safetyError(const GuidanceSignal.faceCamera());
     }
     final requiredLandmarks = [
       PoseLandmarkType.leftKnee,
@@ -234,8 +234,7 @@ class ButterflyStretch extends ExerciseBase {
     for (final type in requiredLandmarks) {
       final landmark = landmarks[type];
       if (landmark == null || !ExerciseBase.isLandmarkConfident(landmark)) {
-        return _safetyError(
-            "Các điểm khớp bị khuất. Hãy ngồi trọn trong khung hình.");
+        return _safetyError(const GuidanceSignal.bodyInFrame());
       }
     }
     return null;
@@ -430,10 +429,10 @@ class ButterflyStretch extends ExerciseBase {
     return math.sqrt(dx * dx + dy * dy);
   }
 
-  String _safetyError(String message) {
+  GuidanceSignal _safetyError(GuidanceSignal signal) {
     _lastFrameTimeMs = frameTimestampMs;
     _holdSeconds.resetTick();
-    return message;
+    return signal;
   }
 
   /// Duy nhất nơi ghi feedback['Thời gian'] — không còn HoldDurationMetric ghi đè.
@@ -447,18 +446,16 @@ class ButterflyStretch extends ExerciseBase {
   void _updatePhaseInstructions() {
     switch (stretchState) {
       case ButterflyState.setup:
-        resultIssues.addInstruction(
-            'setup', 'Trạng thái', 'Chụm hai lòng bàn chân');
+        // Legacy UI instruction copy: Chụm hai lòng bàn chân
         break;
       case ButterflyState.stretching:
-        resultIssues.addInstruction(
-            'stretching', 'Trạng thái', 'Ép gối xuống từ từ');
+        // Legacy UI instruction copy: Ép gối xuống từ từ
         break;
       case ButterflyState.isometric_hold:
-        resultIssues.addInstruction('hold', 'Trạng thái', 'Giữ nguyên ở đây!');
+        // Legacy UI instruction copy: Giữ nguyên ở đây!
         break;
       case ButterflyState.release:
-        resultIssues.addInstruction('release', 'Trạng thái', 'Thả lỏng');
+        // Legacy UI instruction copy: Thả lỏng
         break;
     }
   }

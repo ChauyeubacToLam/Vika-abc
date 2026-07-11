@@ -67,15 +67,15 @@ class SeatedForwardFold extends ExerciseBase {
   }
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (!_updateTrackedSide()) {
-      return 'Vui lòng đặt camera quay ngang hông (Side View).';
+      return const GuidanceSignal.turnSide();
     }
 
     for (final type in _requiredLandmarks) {
       final landmark = landmarks[type];
       if (landmark == null || !ExerciseBase.isLandmarkConfident(landmark)) {
-        return 'Các điểm khớp bị khuất. Hãy ngồi trọn trong khung hình.';
+        return const GuidanceSignal.bodyInFrame();
       }
     }
     return null;

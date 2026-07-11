@@ -5,7 +5,7 @@
  
    Mirrors the Push-Up implementation (lib/exercise/push up/) exactly:
    same ExerciseBase contract, same getSideLandmark(), same debouncer,
-   same RepContext + MetricBase split, same feedback/instructions channels.
+   same RepContext + MetricBase split, same feedback channel.
  
    This single file holds "the rest" (per Nam's instruction):
      - WallPushUpConfig          (thresholds)
@@ -135,7 +135,7 @@ class RepContext {
   final WallPushUpState state;
   final int frameTimestamp; // ms
 
-  /// Shared result container — metrics write feedback + instructions here.
+  /// Shared result container — metrics write feedback here.
   final ResultIssues resultIssues;
 
   RepContext({
@@ -290,8 +290,7 @@ class TempoMetric extends WallPushUpMetricBase {
         affectsForm: false, // safe at wall push-up load, just less effective
         voiceMessage: 'Chậm lại',
       ));
-      ctx.resultIssues.addInstruction(
-          'standing', 'Tempo', 'Hạ người chậm hơn, kiểm soát tốc độ.');
+      // Legacy UI instruction copy: Hạ người chậm hơn, kiểm soát tốc độ.
     }
     _debugData['tempoResult'] = _faults.isEmpty ? 'good' : 'fast';
   }
@@ -607,10 +606,10 @@ class WallPushUp extends ExerciseBase {
   // --- Safety Checks ---
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.left &&
         cameraFacing != CameraFacing.right) {
-      return "⚠️ Xin hãy quay nghiêng để theo dõi tư thế Wall Push Up";
+      return const GuidanceSignal.turnSide();
     }
 
     final shoulder = getSideLandmark(
@@ -631,14 +630,14 @@ class WallPushUp extends ExerciseBase {
         leftType: PoseLandmarkType.leftHip);
 
     if (shoulder == null || elbow == null || wrist == null || hip == null) {
-      return "⚠️ Đảm bảo phần trên cơ thể trong khung hình";
+      return const GuidanceSignal.bodyInFrame();
     }
 
     if (!ExerciseBase.isLandmarkConfident(shoulder) ||
         !ExerciseBase.isLandmarkConfident(elbow) ||
         !ExerciseBase.isLandmarkConfident(wrist) ||
         !ExerciseBase.isLandmarkConfident(hip)) {
-      return "⚠️ Hình ảnh không rõ. Điều chỉnh ánh sáng hoặc vị trí";
+      return const GuidanceSignal.lighting();
     }
 
     return null;
@@ -893,8 +892,7 @@ class WallPushUp extends ExerciseBase {
         _trunkInclinationInvalidThisRep = true;
         resultIssues.feedback['Setup'] =
             'Giữ người nghiêng vào tường, không hạ xuống như chống đẩy sàn.';
-        resultIssues.addInstruction('standing', 'Setup',
-            'Đứng nghiêng người vào tường; vai, hông và chân tạo một đường chéo rõ.');
+        // Legacy UI instruction copy: Đứng nghiêng người vào tường; vai, hông và chân tạo một đường chéo rõ.
       }
 
       for (final metric in _metrics) {
@@ -920,11 +918,11 @@ class WallPushUp extends ExerciseBase {
 
     // Phase status chips.
     if (wallPushUpState == WallPushUpState.descending) {
-      resultIssues.addInstruction('descending', 'Status', 'Đang hạ...');
+      resultIssues.setPhaseStatus('descending', 'Đang hạ...');
     } else if (wallPushUpState == WallPushUpState.bottom) {
-      resultIssues.addInstruction('bottom', 'Status', 'Đẩy ra!');
+      resultIssues.setPhaseStatus('bottom', 'Đẩy ra!');
     } else if (wallPushUpState == WallPushUpState.ascending) {
-      resultIssues.addInstruction('ascending', 'Status', 'Đang đẩy ra!');
+      resultIssues.setPhaseStatus('ascending', 'Đang đẩy ra!');
     }
   }
 
@@ -936,11 +934,9 @@ class WallPushUp extends ExerciseBase {
     debugData['minElbow'] = min.toStringAsFixed(1);
 
     if (min > WallPushUpConfig.DEPTH_SHALLOW_MAX) {
-      ctx.resultIssues.addInstruction('standing', 'Depth',
-          'Cố gắng hạ người thấp hơn, khuỷu tay gập 90 độ.');
+      // Legacy UI instruction copy: Cố gắng hạ người thấp hơn, khuỷu tay gập 90 độ.
     } else if (min > WallPushUpConfig.DEPTH_GOOD_MAX) {
-      ctx.resultIssues
-          .addInstruction('standing', 'Depth', 'Thử xuống sâu hơn một chút!');
+      // Legacy UI instruction copy: Thử xuống sâu hơn một chút!
     }
   }
 
@@ -952,11 +948,9 @@ class WallPushUp extends ExerciseBase {
     debugData['peakElbow'] = peak.toStringAsFixed(1);
 
     if (peak < WallPushUpConfig.LOCKOUT_WARN_MIN) {
-      ctx.resultIssues.addInstruction(
-          'standing', 'Lockout', 'Đẩy tay thẳng ra hết cỡ, khóa khuỷu tay.');
+      // Legacy UI instruction copy: Đẩy tay thẳng ra hết cỡ, khóa khuỷu tay.
     } else if (peak < WallPushUpConfig.LOCKOUT_GOOD_MIN) {
-      ctx.resultIssues.addInstruction(
-          'standing', 'Lockout', 'Duỗi thẳng tay hết cỡ ở lần sau!');
+      // Legacy UI instruction copy: Duỗi thẳng tay hết cỡ ở lần sau!
     }
   }
 
@@ -1034,7 +1028,7 @@ class WallPushUp extends ExerciseBase {
     // Clear old coaching at the start of a new rep.
     if (newState == WallPushUpState.descending &&
         previousWallPushUpState == WallPushUpState.standing) {
-      resultIssues.instructions.clear();
+      resultIssues.phaseStatus.clear();
     }
 
     for (final metric in _metrics) {

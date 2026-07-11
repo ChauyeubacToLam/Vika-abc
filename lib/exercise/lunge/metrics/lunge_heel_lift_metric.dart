@@ -64,11 +64,7 @@ class LungeHeelLiftMetric extends LungeMetricBase {
       ctx.resultIssues.feedback['Feet'] = 'Giữ gót chân chạm sàn!';
 
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction(
-          'standing',
-          'Feet',
-          'Gót chân trước đang nhấc lên. Hãy dồn lực đều vào cả bàn chân để bảo vệ khớp gối.',
-        );
+        // Legacy UI instruction copy: Gót chân trước đang nhấc lên. Hãy dồn lực đều vào cả bàn chân để bảo vệ khớp gối.
         _instructionSet = true;
       }
       _logFault(phase, 'Keep your heel down!', voiceMessage: 'Giữ gót chân');
@@ -79,11 +75,7 @@ class LungeHeelLiftMetric extends LungeMetricBase {
       ctx.resultIssues.feedback['Feet'] = 'Gót hơi nhấc — ấn gót xuống';
 
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction(
-          'standing',
-          'Feet',
-          'Gót chân trước đang nhấc lên. Hãy dồn lực đều vào cả bàn chân để bảo vệ khớp gối.',
-        );
+        // Legacy UI instruction copy: Gót chân trước đang nhấc lên. Hãy dồn lực đều vào cả bàn chân để bảo vệ khớp gối.
         _instructionSet = true;
       }
       _logFault(phase, 'Heel slightly lifting', voiceMessage: 'Giữ gót chân');

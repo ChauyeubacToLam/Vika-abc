@@ -82,13 +82,14 @@ class MountainClimber extends ExerciseBase {
   // ---------------------------------------------------------------------------
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
+  GuidanceSignal? checkSafety(
+      Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
     if (cameraFacing != CameraFacing.left &&
         cameraFacing != CameraFacing.right) {
-      return 'Vui lòng quay ngang người 100% với camera!';
+      return const GuidanceSignal.turnSide();
     }
     if (_extractLandmarks(smoothedLandmarks) == null) {
-      return 'Giữ vai, tay, hông, gối và cổ chân rõ trong khung hình.';
+      return const GuidanceSignal.bodyInFrame();
     }
     return null;
   }
@@ -263,8 +264,7 @@ class MountainClimber extends ExerciseBase {
       _doubleKneeRejects++;
       resultIssues.feedback['Result'] = 'Không tính rep';
       resultIssues.feedback['ROM'] = 'Luân phiên từng gối';
-      resultIssues.addInstruction(
-          'high_plank_base', 'ROM', 'Kéo từng gối một, không co cả hai gối');
+      // Legacy UI instruction copy: Kéo từng gối một, không co cả hai gối
       trunkMetric.reset();
       romMetric.reset();
       _leftCounter.reset();

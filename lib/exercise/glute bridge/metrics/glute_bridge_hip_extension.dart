@@ -17,10 +17,10 @@
                Negative = hip below line (sagging).
 
    Threshold Table — Vietnamese-adjusted:
-     Good         : 160–175°
-     Warning      : 150–160°  (affectsForm = false)
-     Error (low)  : < 150°    (affectsForm = true)
-     Error (hyper): deviation > 0.03 (affectsForm = true)
+     Good         : 152–175°
+     Warning      : 140–152°  (affectsForm = false)
+     Error (low)  : < 140°    (affectsForm = true)
+     Error (hyper): deviation > 0.045 (affectsForm = true)
 
    When to check:
      - Per-rep at TOP_HOLD (peak angle snapshot passed in checkRepCompletion).
@@ -33,14 +33,14 @@ import '../../../../utils/debouncer.dart';
 
 class HipExtensionConfig {
   // Shoulder-hip-knee angle thresholds (Vietnamese adjusted)
-  static const double GOOD_MIN_ANGLE = 148.0;
-  static const double WARNING_MIN_ANGLE = 138.0;
+  static const double GOOD_MIN_ANGLE = 152.0;
+  static const double WARNING_MIN_ANGLE = 140.0;
   // Below WARNING_MIN_ANGLE → affectsForm = true (error)
   // Between WARNING_MIN_ANGLE and GOOD_MIN_ANGLE → affectsForm = false (warning)
 
   // Normalized perpendicular deviation from the shoulder-knee line.
   // Positive = hip above the line = lumbar hyperextension risk.
-  static const double HYPEREXT_THRESHOLD = 0.05;
+  static const double HYPEREXT_THRESHOLD = 0.045;
 
   // Require this many consecutive frames before flagging live hyperextension.
   static const int HYPEREXT_DEBOUNCE_FRAMES = 6;
@@ -57,9 +57,8 @@ class HipExtensionMetric extends GluteBridgeMetricBase {
   final Debouncer _hyperextDebouncer =
       Debouncer(requiredFrames: HipExtensionConfig.HYPEREXT_DEBOUNCE_FRAMES);
 
-  // Prevent instruction and fault spam — one per rep.
+  // Prevent duplicate fault within one rep.
   bool _hyperextFaultAdded = false;
-  bool _hyperextInstructionSet = false;
 
   @override
   List<FaultRecord> get faults => _faults;
@@ -86,16 +85,6 @@ class HipExtensionMetric extends GluteBridgeMetricBase {
         ctx.normalizedHipDeviation > HipExtensionConfig.HYPEREXT_THRESHOLD;
 
     if (_hyperextDebouncer.update(isHyperextending)) {
-      // Live coaching instruction — shown once until rep resets.
-      if (!_hyperextInstructionSet) {
-        ctx.resultIssues.addInstruction(
-          'bottom',
-          'HipExt',
-          'Đừng ưỡn lưng! Siết cơ bụng và ép lưng vào sàn',
-        );
-        _hyperextInstructionSet = true;
-      }
-
       // Fault — recorded once per rep.
       if (!_hyperextFaultAdded) {
         _faults.add(FaultRecord(
@@ -148,7 +137,7 @@ class HipExtensionMetric extends GluteBridgeMetricBase {
             ? 'Nâng hông cao hơn — co mông tối đa'
             : 'Cố gắng nâng hông thêm một chút',
         voiceMessage: 'Nâng hông cao hơn',
-        affectsForm: isError, // error if < 150°, warning if 150–160°
+        affectsForm: isError, // error if < 140°, warning if 140–152°
       ));
     }
   }
@@ -161,7 +150,6 @@ class HipExtensionMetric extends GluteBridgeMetricBase {
       GluteBridgeState from, GluteBridgeState to, int timestampMs) {
     if (to == GluteBridgeState.ascending || to == GluteBridgeState.bottom) {
       _hyperextDebouncer.reset();
-      _hyperextInstructionSet = false;
       _hyperextFaultAdded = false;
     }
   }
@@ -170,7 +158,6 @@ class HipExtensionMetric extends GluteBridgeMetricBase {
   void reset() {
     _faults.clear();
     _hyperextDebouncer.reset();
-    _hyperextInstructionSet = false;
     _hyperextFaultAdded = false;
   }
 }

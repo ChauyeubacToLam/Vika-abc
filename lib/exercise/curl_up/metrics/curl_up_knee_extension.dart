@@ -145,8 +145,7 @@ class KneeExtensionMetric extends CurlUpMetricBase {
         voiceMessage: 'Giữ gối gập',
         priority: CurlUpFaultVoicePriority.kneeExtension,
       ));
-      ctx.resultIssues.addInstruction('resting', 'Knee',
-          'Rep tới giữ gối gập — chân thẳng đẩy lực vào lưng dưới.');
+      // Legacy UI instruction copy: Rep tới giữ gối gập — chân thẳng đẩy lực vào lưng dưới.
       _loggedLevel = _KneeFaultLevel.error;
       return;
     }
@@ -159,8 +158,7 @@ class KneeExtensionMetric extends CurlUpMetricBase {
         affectsForm: false,
         priority: CurlUpFaultVoicePriority.kneeExtension,
       ));
-      ctx.resultIssues.addInstruction('resting', 'Knee',
-          'Rep tới co gối thêm chút — đừng để chân duỗi ra.');
+      // Legacy UI instruction copy: Rep tới co gối thêm chút — đừng để chân duỗi ra.
       _loggedLevel = _KneeFaultLevel.warning;
     }
   }

@@ -65,11 +65,7 @@ class CobraPelvicMetric extends CobraMetricBase {
     if (_errorDebouncer.update(hipLiftNorm >= _errorMin)) {
       _isFaultingNow = true;
       ctx.resultIssues.feedback['Hips'] = '⚠️ Hông nâng quá cao!';
-      ctx.resultIssues.addInstruction(
-        'holding',
-        'hipLifted',
-        'Giữ hông sát sàn. Đừng nâng quá cao.',
-      );
+      // Legacy UI instruction copy: Giữ hông sát sàn. Đừng nâng quá cao.
       _logFault(phase, 'Hip significantly lifted', 'HipLift');
     }
     // Warning: moderate lift (>=0.12)

@@ -68,8 +68,7 @@ class BackKneeMetric extends WarriorOneMetricBase {
       ctx.resultIssues.feedback['back_knee'] =
           'Duỗi thẳng chân sau hơn nhé! Siết cơ đùi trước để giữ chân vững.';
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction('hold', 'back_knee',
-            'Duỗi thẳng chân sau hơn nhé! Siết cơ đùi trước để giữ chân vững.');
+        // Legacy UI instruction copy: Duỗi thẳng chân sau hơn nhé! Siết cơ đùi trước để giữ chân vững.
         _instructionSet = true;
       }
       _logFault(phase, 'Back knee bent / floppy',

@@ -57,7 +57,10 @@ PoseLandmark _landmark(
 
 // All landmarks at center; likelihood controls avg presence reported by gate.
 Map<PoseLandmarkType, PoseLandmark> _allLandmarks({double likelihood = 0.99}) {
-  return {for (final t in PoseLandmarkType.values) t: _landmark(t, likelihood: likelihood)};
+  return {
+    for (final t in PoseLandmarkType.values)
+      t: _landmark(t, likelihood: likelihood)
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -68,7 +71,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('seeking — confirm / un-confirm', () {
-    test('not confirmed before 900ms continuous presence', () {
+    test('not confirmed before 400ms continuous presence', () {
       final fake = _FakePresenceSource()..personDetected = true;
       final gate = PresenceGate(detector: fake);
       final landmarks = _allLandmarks();
@@ -81,7 +84,7 @@ void main() {
       expect(gate.personConfirmed, isFalse);
 
       final v = gate.onPose(
-        now: DateTime.fromMillisecondsSinceEpoch(899),
+        now: DateTime.fromMillisecondsSinceEpoch(399),
         phase: GatePhase.seeking,
         landmarks: landmarks,
       );
@@ -90,7 +93,7 @@ void main() {
       expect(v.block, GateBlock.searching);
     });
 
-    test('confirms at exactly 900ms continuous presence', () {
+    test('confirms at exactly 400ms continuous presence', () {
       final fake = _FakePresenceSource()..personDetected = true;
       final gate = PresenceGate(detector: fake);
       final landmarks = _allLandmarks();
@@ -101,7 +104,7 @@ void main() {
         landmarks: landmarks,
       );
       final v = gate.onPose(
-        now: DateTime.fromMillisecondsSinceEpoch(900),
+        now: DateTime.fromMillisecondsSinceEpoch(400),
         phase: GatePhase.seeking,
         landmarks: landmarks,
       );
@@ -130,7 +133,7 @@ void main() {
         landmarks: landmarks,
       );
 
-      // presence returns — needs full 900ms again from zero
+      // presence returns — needs full 400ms again from zero
       fake.personDetected = true;
       gate.onPose(
         now: DateTime.fromMillisecondsSinceEpoch(200),
@@ -138,7 +141,7 @@ void main() {
         landmarks: landmarks,
       );
       gate.onPose(
-        now: DateTime.fromMillisecondsSinceEpoch(899),
+        now: DateTime.fromMillisecondsSinceEpoch(599),
         phase: GatePhase.seeking,
         landmarks: landmarks,
       );
@@ -239,7 +242,8 @@ void main() {
       expect(gate.isPaused, isTrue);
     });
 
-    test('auto-resumes after 320ms continuous presence during active pause', () {
+    test('auto-resumes after 320ms continuous presence during active pause',
+        () {
       final fake = _FakePresenceSource()..personDetected = false;
       final gate = PresenceGate(detector: fake);
 
@@ -279,7 +283,8 @@ void main() {
       expect(gate.isPaused, isFalse); // 320ms — unpaused
     });
 
-    test('auto-pause switches detector to the paused cadence, not per-frame poke',
+    test(
+        'auto-pause switches detector to the paused cadence, not per-frame poke',
         () {
       final fake = _FakePresenceSource()..personDetected = false;
       final gate = PresenceGate(detector: fake);
@@ -293,7 +298,8 @@ void main() {
         phase: GatePhase.active,
       );
       expect(gate.isPaused, isTrue);
-      expect(fake.usePausedCadenceCalls, 1); // cadence dropped to 1s on the edge
+      expect(
+          fake.usePausedCadenceCalls, 1); // cadence dropped to 1s on the edge
 
       // Stay paused with pose present (person came back but not yet re-confirmed):
       // must NOT re-fire the old per-frame paused poke.
@@ -337,7 +343,8 @@ void main() {
       expect(fake.useActivatedCadenceCalls, 1); // restored on the resume edge
     });
 
-    test('manual pause drops to the activated baseline, never the paused cadence',
+    test(
+        'manual pause drops to the activated baseline, never the paused cadence',
         () {
       final fake = _FakePresenceSource()..personDetected = true;
       final gate = PresenceGate(detector: fake);
@@ -493,7 +500,8 @@ void main() {
       );
 
       // done phase: NOT in active → trigger must NOT fire even on transition
-      gate.onPose(now: t, phase: GatePhase.active, landmarks: safe); // clears flag
+      gate.onPose(
+          now: t, phase: GatePhase.active, landmarks: safe); // clears flag
       final countBefore =
           fake.triggerReasons.where((r) => r == 'pose_frame_edge').length;
       gate.onPose(
@@ -511,7 +519,8 @@ void main() {
     // drops by >0.15 for 3 consecutive frames (debouncer).
     // With baseline 0.9 and low 0.2: delta ≈ 0.3+ once short window fills.
     // Trigger confirmed at the 5th low frame (frames 63+64+65 satisfy debouncer).
-    test('pose_anomaly fires once per false→true, in any non-blocked phase', () {
+    test('pose_anomaly fires once per false→true, in any non-blocked phase',
+        () {
       final fake = _FakePresenceSource()..personDetected = true;
       final gate = PresenceGate(detector: fake);
       final t = DateTime.fromMillisecondsSinceEpoch(0);
@@ -594,8 +603,11 @@ void main() {
 
       // Trigger auto-pause: seed _personLostSince at t=0, check at t=900ms
       fake.personDetected = false;
-      gate.onNoPose(now: DateTime.fromMillisecondsSinceEpoch(0), phase: GatePhase.active);
-      gate.onNoPose(now: DateTime.fromMillisecondsSinceEpoch(900), phase: GatePhase.active);
+      gate.onNoPose(
+          now: DateTime.fromMillisecondsSinceEpoch(0), phase: GatePhase.active);
+      gate.onNoPose(
+          now: DateTime.fromMillisecondsSinceEpoch(900),
+          phase: GatePhase.active);
       expect(gate.isPaused, isTrue);
       fake.triggerReasons.removeWhere((r) => r == 'pose_anomaly');
 

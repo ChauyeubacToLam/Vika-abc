@@ -32,12 +32,20 @@ enum CueType {
   /// first-occurrence-deterministic.
   softFault,
 
+  /// Short feedforward line at the next rep-start edge after a live critical
+  /// fault was seen in the previous rep. Outcome-class; same fault key as the
+  /// correction path so it cannot double-speak inside that next rep.
+  reminder,
+
   /// Deterministic structure copy: setup intro, ready, rest, set-complete.
   /// Always eligible to speak; the adapter latches each moment so it fires
   /// exactly once (behaviour spec hard-rule #2).
   setup,
 
-  /// Sparse effort push, only on the final reps of a set, at most once.
+  /// Sparse effort push. Arms on a stretched inter-rep gap, fires only at
+  /// entry into the exercise's declared effort phase, and may pair with the
+  /// one-remaining count anchor when the target proves it. Never mid-gap, and
+  /// no per-set cap.
   hustle,
 
   /// Movement/phase cue (e.g. squat's "Xuống" / "Giữ" / "Đứng lên").
@@ -84,8 +92,8 @@ class CueContext {
   /// the policy never tracks this itself.
   final int faultPersistence;
 
-  /// The specific fault/metric id (for `criticalFault`/`softFault`/`setup`)
-  /// — this is the hunger key, so staying silent about one fault never
+  /// The specific fault/metric id (for `criticalFault`/`softFault`/`reminder`/
+  /// `setup`) — this is the hunger key, so staying silent about one fault never
   /// raises the odds for another.
   final String contentKey;
 
@@ -240,10 +248,14 @@ class VoiceScript {
     required this.slug,
     this.faultIds = const [],
     this.softCuePools = const {},
+    this.reminderPools = const {},
     required this.praisePool,
     required this.hustlePool,
+    this.hustleFinalPool = const [],
     required this.countPool,
     this.phaseCues = const {},
+    this.repStartPhaseKeys = const {},
+    this.effortPhaseKeys = const {},
   });
 
   factory VoiceScript.from(
@@ -251,38 +263,67 @@ class VoiceScript {
     required String slug,
     List<String> faultIds = const [],
     Map<String, List<String>> softCuePools = const {},
+    Map<String, List<String>> reminderPools = const {},
     List<String>? praisePool,
     List<String>? hustlePool,
+    List<String>? hustleFinalPool,
     List<String>? countPool,
     Map<String, String> phaseCues = const {},
+    Set<String> repStartPhaseKeys = const {},
+    Set<String> effortPhaseKeys = const {},
   }) {
     return VoiceScript(
       slug: slug,
       faultIds: faultIds,
       softCuePools: softCuePools,
+      reminderPools: reminderPools,
       praisePool: praisePool ?? bundle.praise,
       hustlePool: hustlePool ?? bundle.hustle,
+      hustleFinalPool: hustleFinalPool ?? const [],
       countPool: countPool ?? bundle.count,
       phaseCues: phaseCues,
+      repStartPhaseKeys: repStartPhaseKeys,
+      effortPhaseKeys: effortPhaseKeys,
     );
   }
 
   final String slug;
   final List<String> faultIds;
   final Map<String, List<String>> softCuePools;
+  final Map<String, List<String>> reminderPools;
   final List<String> praisePool;
   final List<String> hustlePool;
+  final List<String> hustleFinalPool;
   final List<String> countPool;
 
   bool get hasSoftCues => softCuePools.isNotEmpty;
 
   List<String> softPoolFor(String id) => softCuePools[id] ?? const [];
 
+  List<String> reminderPoolFor(String id) => reminderPools[id] ?? const [];
+
   /// phaseKey -> logical key. The squat/surya escape hatch for movement
   /// cues that aren't rep-outcome cues (e.g. "Xuống" / "Giữ" / "Đứng lên").
   final Map<String, String> phaseCues;
 
+  /// Phase keys where a new rep attempt commits. Empty means this script never
+  /// fires next-rep reminders.
+  final Set<String> repStartPhaseKeys;
+
+  /// Phase keys where the exercise's force phase is underway. Empty means
+  /// this script never arms hustle.
+  final Set<String> effortPhaseKeys;
+
   /// Unchanged from today's `GenericExerciseVoiceScript.faultKey` /
   /// `SquatVoiceCoach` fault-line convention: `<slug>.<faultId>`.
   String faultKey(String id) => '$slug.$id';
+
+  /// Reminder convention: `<slug>.<faultId>_reminder`.
+  String reminderKey(String id) => '$slug.${id}_reminder';
+
+  /// The per-set intro pair (setup instruction) — same `<slug>.<id>` keys the
+  /// legacy generic coach spoke, so they resolve to the already-recorded
+  /// `glute_bridge.setup_position` / `glute_bridge.active_intro` assets.
+  String get setupPositionKey => '$slug.setup_position';
+  String get activeIntroKey => '$slug.active_intro';
 }

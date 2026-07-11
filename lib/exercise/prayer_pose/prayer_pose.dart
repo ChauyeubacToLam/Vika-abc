@@ -190,20 +190,20 @@ class PrayerPose extends ExerciseBase {
   }
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.left &&
         cameraFacing != CameraFacing.right) {
-      return '⚠️ Xin hãy quay nghiêng để theo dõi tư thế Pranamasana';
+      return const GuidanceSignal.turnSide();
     }
 
     final body = _resolveSideLandmarks(landmarks);
     if (body == null) {
-      return '⚠️ Đảm bảo vai và hông trong khung hình';
+      return const GuidanceSignal.bodyInFrame();
     }
 
     final required = [body.shoulder, body.hip];
     if (!required.every(ExerciseBase.isLandmarkConfident)) {
-      return '⚠️ Hình ảnh không rõ. Điều chỉnh ánh sáng hoặc vị trí';
+      return const GuidanceSignal.lighting();
     }
 
     return null;
@@ -280,11 +280,7 @@ class PrayerPose extends ExerciseBase {
 
     if (shouldersHiked) {
       resultIssues.feedback['Shoulders'] = 'Thả lỏng vai xuống nhé';
-      resultIssues.addInstruction(
-        'holding',
-        'shoulderEase',
-        'Thả lỏng vai xuống, giữ cổ dài và ngực mềm.',
-      );
+      // Legacy UI instruction copy: Thả lỏng vai xuống, giữ cổ dài và ngực mềm.
     } else {
       resultIssues.feedback['Shoulders'] = 'Vai thả lỏng ✓';
     }
@@ -295,11 +291,8 @@ class PrayerPose extends ExerciseBase {
       final holdSecs = _currentHoldSeconds();
       final remaining = (PrayerPoseConfig.HOLD_DURATION - holdSecs)
           .clamp(0.0, PrayerPoseConfig.HOLD_DURATION);
-      resultIssues.addInstruction(
-        'holding',
-        'Status',
-        'Giữ! ${remaining.toStringAsFixed(1)}s',
-      );
+      resultIssues.setPhaseStatus(
+          'holding', 'Giữ! ${remaining.toStringAsFixed(1)}s');
       debugData['holdProgress'] =
           (holdSecs / PrayerPoseConfig.HOLD_DURATION).clamp(0.0, 1.0);
     }
@@ -308,13 +301,11 @@ class PrayerPose extends ExerciseBase {
       final elapsed = (frameTimestampMs - _exitStartMs!) / 1000.0;
       final remaining = (PrayerPoseConfig.EXIT_DURATION - elapsed)
           .clamp(0.0, PrayerPoseConfig.EXIT_DURATION);
-      resultIssues.addInstruction(
-        'exit',
-        'Status',
-        repCount >= maxRep
-            ? 'Hoàn tất'
-            : 'Thư giãn ${remaining.toStringAsFixed(1)}s',
-      );
+      resultIssues.setPhaseStatus(
+          'exit',
+          repCount >= maxRep
+              ? 'Hoàn tất'
+              : 'Thư giãn ${remaining.toStringAsFixed(1)}s');
     }
   }
 
@@ -376,7 +367,7 @@ class PrayerPose extends ExerciseBase {
         _exitStartMs = null;
         _exitShouldCount = false;
         _exitRejectReason = null;
-        resultIssues.instructions.clear();
+        resultIssues.phaseStatus.clear();
         break;
       case PrayerPoseState.exit:
         _exitStartMs = timestampMs;
@@ -496,11 +487,8 @@ class PrayerPose extends ExerciseBase {
       for (final metric in _metrics) {
         metric.reset();
       }
-      resultIssues.addInstruction(
-        'entry',
-        'Status',
-        'Mất mốc cơ thể, đứng lại tư thế Cầu nguyện trước khi giữ.',
-      );
+      resultIssues.setPhaseStatus(
+          'entry', 'Mất mốc cơ thể, đứng lại tư thế Cầu nguyện trước khi giữ.');
     }
     return super.processNoPoseFrame();
   }

@@ -178,12 +178,12 @@ void main() {
 
     expect(exercise.checkSafety(_butterflyPose()), isNull);
     expect(
-      exercise.checkSafety(_butterflyPose(includeLeftHeel: false)),
-      contains('khuất'),
+      exercise.checkSafety(_butterflyPose(includeLeftHeel: false))?.kind,
+      GuidanceClass.bodyInFrame,
     );
     expect(
-      exercise.checkSafety(_butterflyPose(leftHipLikelihood: 0.1)),
-      contains('khuất'),
+      exercise.checkSafety(_butterflyPose(leftHipLikelihood: 0.1))?.kind,
+      GuidanceClass.bodyInFrame,
     );
   });
 }

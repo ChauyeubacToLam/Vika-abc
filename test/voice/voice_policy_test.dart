@@ -66,9 +66,14 @@ class _GateableVoiceSink implements VoiceSink {
   }
 
   @override
-  Future<void> waitUntilIdle() {
+  Future<void> waitUntilIdle({
+    Duration timeout = const Duration(seconds: 4),
+  }) {
     return _idleCompleter?.future ?? Future<void>.value();
   }
+
+  @override
+  void clearPending() {}
 
   @override
   Future<void> stop() async {
@@ -83,12 +88,8 @@ class _GateableVoiceSink implements VoiceSink {
 
 Map<CueType, CueTuning> _gluteBridgePilotTuning() => {
       ...kDefaultTuning,
-      CueType.count: const CueTuning(
-        CueMode.always,
-        base: 0.50,
-        step: 0.10,
-        cap: 1.0,
-      ),
+      // count: no override — mirrors the real pilot map, which inherits the
+      // fleet default (base 1.0, every rep counted; registration ruling 07-11).
       CueType.praise: const CueTuning(
         CueMode.variableRatio,
         base: 0.50,
@@ -109,7 +110,20 @@ Map<CueType, CueTuning> _gluteBridgePilotTuning() => {
         step: 0.08,
         cap: 0.55,
       ),
-      CueType.hustle: const CueTuning(CueMode.perishable, base: 0.0, cap: 0.0),
+      CueType.reminder: const CueTuning(
+        CueMode.correction,
+        base: 0.30,
+        step: 0.15,
+        cap: 0.65,
+        firstOccurrenceCertain: true,
+      ),
+      CueType.hustle: const CueTuning(
+        CueMode.perishable,
+        base: 0.50,
+        step: 0.20,
+        cap: 0.90,
+        postFireIdlePenalty: 2,
+      ),
     };
 
 VoicePolicy _gluteBridgePilotPolicy({
@@ -486,8 +500,30 @@ void main() {
   });
 
   group('hustle', () {
-    test('only fires on final reps, and at most once per set', () {
-      final policy = VoicePolicy(random: _ScriptedRandom([0.0]));
+    Map<CueType, CueTuning> hustleTuning({
+      double base = 0.20,
+      double step = 0.30,
+      double cap = 0.80,
+      int postFireIdlePenalty = 0,
+    }) {
+      return {
+        ...kDefaultTuning,
+        CueType.hustle: CueTuning(
+          CueMode.perishable,
+          base: base,
+          step: step,
+          cap: cap,
+          postFireIdlePenalty: postFireIdlePenalty,
+        ),
+      };
+    }
+
+    test('quiet at hunger 0, then fires after armed silence raises hunger', () {
+      final policy = VoicePolicy(
+        random: _ScriptedRandom([0.25, 0.25]),
+        tuning: hustleTuning(),
+        outcomeCollisionGapMs: 0,
+      );
 
       expect(
         policy.decide(
@@ -495,32 +531,141 @@ void main() {
           const CueContext(repNumber: 1, isFinalReps: false),
         ),
         isFalse,
-        reason: 'not in the final stretch yet',
+        reason: '0.25 misses the 0.20 base chance at hunger 0',
       );
       expect(
         policy.decide(
           CueType.hustle,
-          const CueContext(repNumber: 9, isFinalReps: true),
+          const CueContext(repNumber: 2, isFinalReps: false),
         ),
         isTrue,
+        reason: 'the same roll hits after one armed-but-silent attempt',
       );
-      expect(
-        policy.decide(
-          CueType.hustle,
-          const CueContext(repNumber: 10, isFinalReps: true),
-        ),
-        isFalse,
-        reason: 'already used its one hustle for this set',
+    });
+
+    test('firing resets the hunger climb', () {
+      final policy = VoicePolicy(
+        random: _ScriptedRandom([0.25, 0.25, 0.25]),
+        tuning: hustleTuning(),
+        outcomeCollisionGapMs: 0,
       );
 
-      policy.beginSet();
+      expect(
+        policy.decide(CueType.hustle, const CueContext(repNumber: 1)),
+        isFalse,
+      );
+      expect(
+        policy.decide(CueType.hustle, const CueContext(repNumber: 2)),
+        isTrue,
+      );
+      policy.markOutcomeAudioEnded();
+      expect(
+        policy.decide(CueType.hustle, const CueContext(repNumber: 3)),
+        isFalse,
+        reason: 'after a fire, the 0.25 roll is back above the 0.20 base',
+      );
+    });
+
+    test('two fires in one set are allowed', () {
+      final policy = VoicePolicy(
+        random: _ScriptedRandom([0.0]),
+        tuning: hustleTuning(),
+        outcomeCollisionGapMs: 0,
+      );
+
+      expect(
+        policy.decide(CueType.hustle, const CueContext(repNumber: 1)),
+        isTrue,
+      );
+      policy.markOutcomeAudioEnded();
+      expect(
+        policy.decide(CueType.hustle, const CueContext(repNumber: 2)),
+        isTrue,
+        reason: 'the old once-per-set latch is gone',
+      );
+    });
+
+    test('post-fire backoff mutes the next eligible pushes without a hard gate',
+        () {
+      final policy = VoicePolicy(
+        random: _ScriptedRandom([0.0, 0.35, 0.35, 0.35]),
+        tuning: hustleTuning(
+          base: 0.50,
+          step: 0.20,
+          cap: 0.90,
+          postFireIdlePenalty: 2,
+        ),
+        outcomeCollisionGapMs: 0,
+      );
+
+      expect(policy.decide(CueType.hustle, const CueContext(repNumber: 1)),
+          isTrue);
+      policy.markOutcomeAudioEnded();
+      expect(
+        policy.decide(CueType.hustle, const CueContext(repNumber: 2)),
+        isFalse,
+        reason: 'after a fire, the next eligible roll starts at 0.10',
+      );
+      expect(
+        policy.decide(CueType.hustle, const CueContext(repNumber: 3)),
+        isFalse,
+        reason: 'the following eligible roll is still muted at 0.30',
+      );
+      expect(
+        policy.decide(CueType.hustle, const CueContext(repNumber: 4)),
+        isTrue,
+        reason: 'silent eligible attempts climb back to the normal 0.50 base',
+      );
+    });
+
+    test('still loses the second in-rep outcome slot', () {
+      final policy = VoicePolicy(
+        random: _ScriptedRandom([0.0]),
+        tuning: hustleTuning(base: 1.0, cap: 1.0),
+        outcomeCollisionGapMs: 0,
+      );
+
+      expect(
+        policy.decide(CueType.praise, const CueContext(repNumber: 1)),
+        isTrue,
+      );
+      policy.markOutcomeAudioEnded();
+      expect(
+        policy.decide(CueType.hustle, const CueContext(repNumber: 1)),
+        isFalse,
+        reason: 'hustle is not allowed to take the second in-rep slot',
+      );
+    });
+
+    test('fires even when isFinalReps is false', () {
+      final policy = VoicePolicy(
+        random: _ScriptedRandom([0.99]),
+        tuning: hustleTuning(base: 1.0, cap: 1.0),
+      );
+
       expect(
         policy.decide(
           CueType.hustle,
-          const CueContext(repNumber: 9, isFinalReps: true),
+          const CueContext(repNumber: 3, isFinalReps: false),
         ),
         isTrue,
-        reason: 'a new set resets the once-per-set cap',
+        reason: 'final-reps is no longer a policy gate',
+      );
+    });
+
+    test('drops when the sink is busy', () {
+      final policy = VoicePolicy(
+        random: _ScriptedRandom([0.0]),
+        tuning: hustleTuning(base: 1.0, cap: 1.0),
+      );
+
+      expect(
+        policy.decide(
+          CueType.hustle,
+          const CueContext(repNumber: 3, sinkBusy: true),
+        ),
+        isFalse,
+        reason: 'hustle is perishable at the fire moment',
       );
     });
   });
@@ -636,6 +781,237 @@ void main() {
         ),
         isFalse,
         reason: 'later reps go back to the configured escalation roll',
+      );
+    });
+  });
+
+  group('reminder', () {
+    Map<CueType, CueTuning> reminderTuning({
+      double base = 0.30,
+      double step = 0.15,
+      double cap = 0.65,
+      bool firstOccurrenceCertain = true,
+    }) {
+      return {
+        ...kDefaultTuning,
+        CueType.reminder: CueTuning(
+          CueMode.correction,
+          base: base,
+          step: step,
+          cap: cap,
+          firstOccurrenceCertain: firstOccurrenceCertain,
+        ),
+      };
+    }
+
+    test('streak 0 is deterministic when the pilot flag is enabled', () {
+      final policy = VoicePolicy(
+        random: _ScriptedRandom([0.99]),
+        tuning: reminderTuning(base: 0.0, step: 0.0, cap: 0.0),
+        outcomeCollisionGapMs: 0,
+      );
+
+      expect(
+        policy.decide(
+          CueType.reminder,
+          const CueContext(
+            repNumber: 2,
+            contentKey: 'hyperextension',
+            faultPersistence: 0,
+          ),
+        ),
+        isTrue,
+      );
+      policy.markOutcomeAudioEnded();
+      expect(
+        policy.decide(
+          CueType.reminder,
+          const CueContext(
+            repNumber: 3,
+            contentKey: 'hyperextension',
+            faultPersistence: 1,
+          ),
+        ),
+        isFalse,
+        reason: 'only the first reminder in the streak bypasses the roll',
+      );
+    });
+
+    test('streak n rolls from base plus step times reminder streak', () {
+      final hit = VoicePolicy(
+        random: _ScriptedRandom([0.44]),
+        tuning: reminderTuning(),
+      );
+      expect(
+        hit.decide(
+          CueType.reminder,
+          const CueContext(
+            repNumber: 3,
+            contentKey: 'hyperextension',
+            faultPersistence: 1,
+          ),
+        ),
+        isTrue,
+        reason: '0.30 + 0.15 * 1 = 0.45, so 0.44 hits',
+      );
+
+      final miss = VoicePolicy(
+        random: _ScriptedRandom([0.46]),
+        tuning: reminderTuning(),
+      );
+      expect(
+        miss.decide(
+          CueType.reminder,
+          const CueContext(
+            repNumber: 3,
+            contentKey: 'hyperextension',
+            faultPersistence: 1,
+          ),
+        ),
+        isFalse,
+        reason: 'the same streak misses just above the 0.45 tier',
+      );
+    });
+
+    test('probability respects the configured cap', () {
+      final cappedMiss = VoicePolicy(
+        random: _ScriptedRandom([0.66]),
+        tuning: reminderTuning(),
+      );
+      expect(
+        cappedMiss.decide(
+          CueType.reminder,
+          const CueContext(
+            repNumber: 6,
+            contentKey: 'hyperextension',
+            faultPersistence: 99,
+          ),
+        ),
+        isFalse,
+        reason: 'even huge streaks cap at 0.65',
+      );
+
+      final cappedHit = VoicePolicy(
+        random: _ScriptedRandom([0.64]),
+        tuning: reminderTuning(),
+      );
+      expect(
+        cappedHit.decide(
+          CueType.reminder,
+          const CueContext(
+            repNumber: 6,
+            contentKey: 'hyperextension',
+            faultPersistence: 99,
+          ),
+        ),
+        isTrue,
+      );
+    });
+
+    test('counts as an outcome and blocks same-fault correction in that rep',
+        () {
+      final policy = VoicePolicy(
+        random: _ScriptedRandom([0.0]),
+        tuning: reminderTuning(),
+        outcomeCollisionGapMs: 0,
+      );
+
+      expect(
+        policy.decide(
+          CueType.reminder,
+          const CueContext(
+            repNumber: 2,
+            contentKey: 'hyperextension',
+            faultPersistence: 0,
+          ),
+        ),
+        isTrue,
+      );
+      policy.markOutcomeAudioEnded();
+
+      expect(
+        policy.decide(
+          CueType.criticalFault,
+          const CueContext(
+            repNumber: 2,
+            contentKey: 'hyperextension',
+            faultPersistence: 0,
+          ),
+        ),
+        isFalse,
+        reason: 'same contentKey already spoke as the reminder',
+      );
+      expect(
+        policy.decide(
+          CueType.criticalFault,
+          const CueContext(
+            repNumber: 2,
+            contentKey: 'neck_head',
+            faultPersistence: 0,
+          ),
+        ),
+        isTrue,
+        reason: 'the second slot is still critical-only for a different fault',
+      );
+    });
+
+    test('gap blocks it and it never takes the second in-rep slot', () {
+      var now = 0;
+      final policy = VoicePolicy(
+        random: _ScriptedRandom([0.0]),
+        clockMs: () => now,
+        tuning: reminderTuning(),
+        outcomeCollisionGapMs: 500,
+      );
+
+      expect(
+        policy.decide(
+          CueType.criticalFault,
+          const CueContext(repNumber: 1, contentKey: 'neck_head'),
+        ),
+        isTrue,
+      );
+      policy.markOutcomeAudioEnded(1000);
+
+      now = 1499;
+      expect(
+        policy.decide(
+          CueType.reminder,
+          const CueContext(
+            repNumber: 2,
+            contentKey: 'hyperextension',
+            faultPersistence: 0,
+          ),
+        ),
+        isFalse,
+        reason: 'collision gap is measured from the previous outcome audio end',
+      );
+
+      now = 1500;
+      expect(
+        policy.decide(
+          CueType.reminder,
+          const CueContext(
+            repNumber: 2,
+            contentKey: 'hyperextension',
+            faultPersistence: 0,
+          ),
+        ),
+        isTrue,
+      );
+      policy.markOutcomeAudioEnded(1500);
+
+      expect(
+        policy.decide(
+          CueType.reminder,
+          const CueContext(
+            repNumber: 2,
+            contentKey: 'neck_head',
+            faultPersistence: 0,
+          ),
+        ),
+        isFalse,
+        reason: 'reminder is not allowed to take the second outcome slot',
       );
     });
   });
@@ -928,77 +1304,56 @@ void main() {
       );
     });
 
-    test('null target means no final-two anchor reaches the policy', () {
-      final policy = VoicePolicy(random: _ScriptedRandom([0.999]));
-
-      expect(
-        policy.decide(CueType.count, const CueContext(repNumber: 9)),
-        isFalse,
-      );
-    });
-
     test(
-        'roll saturates below certainty — a skip streak never forces '
-        'the next count by probability alone', () {
-      // 0.95 beats the 0.90 cap every time. Under the old cap of 1.0 the
-      // hunger step made the roll certain after 2 silent counts — a
-      // learnable "quiet twice → next always counts" rhythm. Below the
-      // relief point every middle rep must remain a real draw.
-      final policy = VoicePolicy(random: _ScriptedRandom([0.95]));
-      for (var rep = 2; rep <= 7; rep++) {
+        'REGISTRATION (07-11): every landed rep is counted under the fleet '
+        'default, regardless of an unfavourable roll', () {
+      // The count is trust feedback, not chatter — users don't watch the
+      // screen, so the spoken number is the only proof a rep registered.
+      final policy = VoicePolicy(random: _ScriptedRandom([0.999]));
+      for (var rep = 1; rep <= 12; rep++) {
         expect(
           policy.decide(CueType.count, CueContext(repNumber: rep)),
-          isFalse,
-          reason: 'rep $rep: p is capped at 0.90, so a 0.95 roll must lose',
+          isTrue,
+          reason: 'rep $rep must be counted — no thinning at base 1.0',
         );
       }
     });
 
-    test(
-        'relief valve: only 6 straight silent counts force one, '
-        'and speaking resets the streak', () {
-      final policy = VoicePolicy(random: _ScriptedRandom([0.999]));
-      for (var rep = 2; rep <= 7; rep++) {
-        expect(
-          policy.decide(CueType.count, CueContext(repNumber: rep)),
-          isFalse,
-        );
-      }
-      expect(
-        policy.decide(CueType.count, const CueContext(repNumber: 8)),
-        isTrue,
-        reason: 'idle streak reached reliefAfter (6) — the uncounted-set '
-            'guard, the only deterministic count after rep 1',
-      );
-      expect(
-        policy.decide(CueType.count, const CueContext(repNumber: 9)),
-        isFalse,
-        reason: 'the forced count reset the streak; the roll governs again',
-      );
-    });
-
-    test('glute bridge pilot count reaches certainty after five skips', () {
+    test('count is personality-immune — a quiet coach still counts every rep',
+        () {
       final policy = VoicePolicy(
+        personality: 0.1,
         random: _ScriptedRandom([0.999]),
-        tuning: _gluteBridgePilotTuning(),
-      );
-
-      expect(
-        policy.decide(CueType.count, const CueContext(repNumber: 1)),
-        isTrue,
-        reason: 'rep 1 remains the anchor',
       );
       for (var rep = 2; rep <= 6; rep++) {
         expect(
           policy.decide(CueType.count, CueContext(repNumber: rep)),
-          isFalse,
-          reason: 'rep $rep is still below 1.0 with a 0.999 roll',
+          isTrue,
+          reason: 'registration feedback must not be thinned by personality',
         );
       }
+    });
+
+    test(
+        'an explicit re-thinning config (base < 1.0) still rolls — the '
+        'mechanism survives the 07-11 default', () {
+      final policy = VoicePolicy(
+        random: _ScriptedRandom([0.95]),
+        tuning: {
+          ...kDefaultTuning,
+          CueType.count:
+              const CueTuning(CueMode.always, base: 0.5, step: 0.0, cap: 0.9),
+        },
+      );
       expect(
-        policy.decide(CueType.count, const CueContext(repNumber: 7)),
+        policy.decide(CueType.count, const CueContext(repNumber: 2)),
+        isFalse,
+        reason: 'a 0.95 roll loses against an explicit thinned base',
+      );
+      expect(
+        policy.decide(CueType.count, const CueContext(repNumber: 1)),
         isTrue,
-        reason: 'after five straight silent counts, 0.50 + 5*0.10 = 1.0',
+        reason: 'the rep-1 anchor holds even under a thinned config',
       );
     });
   });
@@ -1115,10 +1470,18 @@ void main() {
     test('same seed reproduces the transcript; a different seed differs', () {
       final run1 = runTranscript(1234);
       final run2 = runTranscript(1234);
-      final run3 = runTranscript(9999);
-
       expect(run1, equals(run2));
-      expect(run1, isNot(equals(run3)));
+
+      // Counts are deterministic since the 07-11 registration ruling, so far
+      // fewer draws remain in this transcript and any single alternate seed
+      // can coincide with the baseline. The stochastic-cadence property is
+      // "seeds CAN differ", so require at least one of several seeds to
+      // diverge instead of pinning one specific pair.
+      final anyDiffers = [9999, 5678, 424242, 31337]
+          .any((seed) => runTranscript(seed).toString() != run1.toString());
+      expect(anyDiffers, isTrue,
+          reason: 'different seeds must be able to produce a different '
+              'transcript — the stochastic layer is still live');
     });
   });
 }

@@ -99,16 +99,14 @@ class TrunkAlignmentMetric extends PlankMetricBase {
       if (isSagError) {
         ctx.resultIssues.feedback['Back'] = 'Lưng võng quá!';
         if (!_sagInstructionSet) {
-          ctx.resultIssues.addInstruction(
-              'resting', 'Back', 'Gồng cơ bụng nhiều hơn lần sau!');
+          // Legacy UI instruction copy: Gồng cơ bụng nhiều hơn lần sau!
           _sagInstructionSet = true;
         }
         _logFault('Hông chùng quá mức');
       } else {
         ctx.resultIssues.feedback['Back'] = 'Gồng cơ bụng!';
         if (!_sagInstructionSet) {
-          ctx.resultIssues.addInstruction(
-              'resting', 'Back', 'Hông hơi chùng — siết bụng lại!');
+          // Legacy UI instruction copy: Hông hơi chùng — siết bụng lại!
           _sagInstructionSet = true;
         }
         _logFault('Hông hơi chùng');
@@ -120,16 +118,14 @@ class TrunkAlignmentMetric extends PlankMetricBase {
       if (isPikeError) {
         ctx.resultIssues.feedback['Back'] = 'Hông quá cao!';
         if (!_pikeInstructionSet) {
-          ctx.resultIssues.addInstruction(
-              'resting', 'Back', 'Hạ hông xuống, giữ thân thẳng!');
+          // Legacy UI instruction copy: Hạ hông xuống, giữ thân thẳng!
           _pikeInstructionSet = true;
         }
         _logFault('Hông quá cao');
       } else {
         ctx.resultIssues.feedback['Back'] = 'Hơi cao hông';
         if (!_pikeInstructionSet) {
-          ctx.resultIssues.addInstruction(
-              'resting', 'Back', 'Hông hơi cao — hạ thấp một chút!');
+          // Legacy UI instruction copy: Hông hơi cao — hạ thấp một chút!
           _pikeInstructionSet = true;
         }
         _logFault('Hông hơi cao');

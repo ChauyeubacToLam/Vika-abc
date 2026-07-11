@@ -10,5 +10,6 @@ Routing + conventions: see CLAUDE.md § "Agent memory".
 - [Research runs use Sonnet](research-runs-use-sonnet.md) — web research = one capped background Sonnet agent, never the deep-research workflow / Fable fan-outs
 - [Humanlike cadence is stochastic](humanlike-cadence-is-stochastic.md) — no fixed-interval cooldowns for user-facing behavior; probability + hunger shaping, deterministic only for causality/structure/safety
 - [Model division of labor](delegate-coding-codex-tokens.md) — Fable thinks "what", Opus designs "how" in lavish, Codex implements; Opus never drafts code (tokens tight)
+- [Small fixes do yourself](small-fixes-do-yourself.md) — small/surgical code fixes (one-line bug, typo): edit directly + verify, don't route to Codex; the split is for non-trivial work
 - [Search reference docs first](search-reference-docs-first.md) — before Vika implementation work, search the relevant docs/reference topic folder, including paired md/html artifacts
 - [References are system knowledge, not specs](references-are-system-knowledge-not-specs.md) — docs/reference/ is durable topic knowledge for future models; transient Codex specs/prompts go inline or a scratch spot, never there

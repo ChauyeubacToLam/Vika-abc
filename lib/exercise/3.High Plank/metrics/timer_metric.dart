@@ -37,19 +37,8 @@ class TimerMetric extends HighPlankMetricBase {
     }
     _debugData['holdTime'] = (totalHoldingTimeMs / 1000.0).toStringAsFixed(1);
 
-    // Tính toán tiến độ % để gửi ra UI (0.0 đến 1.0)
-    double targetSeconds =
-        30.0; // Hoặc có thể gọi từ HighPlankConfig.TARGET_TIME_MS / 1000.0
     double currentSeconds = totalHoldingTimeMs / 1000.0;
-    double progress = (currentSeconds / targetSeconds).clamp(0.0, 1.0);
-
-    // Gửi instruction chứa text để UI hiển thị số giây
-    ctx.resultIssues.addInstruction(ctx.state.name, 'Clock',
-        '${currentSeconds.toStringAsFixed(1)}s / ${targetSeconds.toStringAsFixed(0)}s');
-
-    // Gửi instruction chứa progress để UI vẽ vòng tròn
-    ctx.resultIssues
-        .addInstruction(ctx.state.name, 'ClockProgress', progress.toString());
+    _debugData['holdClock'] = '${currentSeconds.toStringAsFixed(1)}s';
   }
 
   @override

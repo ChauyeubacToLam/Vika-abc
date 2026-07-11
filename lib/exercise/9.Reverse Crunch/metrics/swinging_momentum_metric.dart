@@ -50,11 +50,7 @@ class SwingingMomentumMetric extends ReverseCrunchMetricBase {
       priority: CrunchVoicePriority.momentum,
       voiceMessage: 'Co gối về ngực trước, rồi mới duỗi chân lên ở đỉnh.',
     ));
-    ctx.resultIssues.addInstruction(
-      'lying',
-      'KneeLock',
-      'Rep trước bạn duỗi chân hơi sớm. Hãy co gối về ngực trước rồi mới leg thrust.',
-    );
+    // Legacy UI instruction copy: Rep trước bạn duỗi chân hơi sớm. Hãy co gối về ngực trước rồi mới leg thrust.
   }
 
   @override

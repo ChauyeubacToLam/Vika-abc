@@ -41,11 +41,7 @@ class HipCollapseMetric extends AshtangaMetricBase {
 
     if (_errorDebouncer.update(ratio < _errorMax)) {
       ctx.resultIssues.feedback['Hips'] = '⚠️ Đẩy hông lên cao!';
-      ctx.resultIssues.addInstruction(
-        ctx.state.name,
-        'hipCollapse',
-        'Đây không phải chaturanga. Đẩy hông lên cao, hạ ngực xuống.',
-      );
+      // Legacy UI instruction copy: Đây không phải chaturanga. Đẩy hông lên cao, hạ ngực xuống.
     }
 
     if (_stickyErrorDebouncer.update(ratio < _errorMax)) {

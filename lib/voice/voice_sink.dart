@@ -34,7 +34,17 @@ abstract class VoiceSink {
   /// even for an unmapped key (see [VoiceSet]).
   Future<void> playKey(String logicalKey);
 
-  Future<void> waitUntilIdle();
+  /// Resolves once the sink drains. The [timeout] is plumbed through to the
+  /// underlying player so callers that must observe a genuine audio-end (the
+  /// setup-intro grace re-anchor) can pass a window generous enough that the
+  /// player's own default 4s cap can't fire mid-line and masquerade as idle.
+  Future<void> waitUntilIdle({Duration timeout = const Duration(seconds: 4)});
+
+  /// Drops queued lines but lets the currently-playing one finish — the
+  /// perishable-drop seam (e.g. stale activation counts after a broken hold).
+  /// A thin passthrough to the player's existing FIFO trim; the player stays
+  /// a dumb FIFO.
+  void clearPending();
 
   Future<void> stop();
 
@@ -116,6 +126,11 @@ class AssetVoiceSink implements VoiceSink {
     }
 
     _busy = true;
+    // The player does its own key -> filename resolution (assetMap /
+    // assetResolver) and its own safe no-op if the asset file itself is
+    // missing from the bundle — this call is intentionally on the
+    // original logical key, not a translated path.
+    await _player.speak(logicalKey);
     // QueuedAssetVoicePlayer doesn't expose a public isBusy/isPlaying
     // getter (only speak/waitUntilIdle/clearQueue/dispose — see
     // `queued_asset_voice_player.dart`), so `isBusy` is tracked here
@@ -123,20 +138,24 @@ class AssetVoiceSink implements VoiceSink {
     // flip back false once the player reports it's genuinely idle again
     // (queue empty and nothing playing). Multiple overlapping calls are
     // harmless — every waiter resolves together once the player goes idle.
+    // The waiter MUST register after speak() has enqueued the line: from an
+    // idle player waitUntilIdle returns an already-completed future, so a
+    // waiter registered pre-enqueue resolved instantly and left isBusy
+    // false for the whole first utterance (perishables didn't drop, the
+    // safety pump dispatched over playing audio).
     unawaited(
       _player.waitUntilIdle(timeout: const Duration(seconds: 30)).then((_) {
         _busy = false;
       }),
     );
-    // The player does its own key -> filename resolution (assetMap /
-    // assetResolver) and its own safe no-op if the asset file itself is
-    // missing from the bundle — this call is intentionally on the
-    // original logical key, not a translated path.
-    await _player.speak(logicalKey);
   }
 
   @override
-  Future<void> waitUntilIdle() => _player.waitUntilIdle();
+  Future<void> waitUntilIdle({Duration timeout = const Duration(seconds: 4)}) =>
+      _player.waitUntilIdle(timeout: timeout);
+
+  @override
+  void clearPending() => _player.clearPendingButKeepCurrent();
 
   @override
   Future<void> stop() async {

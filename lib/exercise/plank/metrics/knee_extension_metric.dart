@@ -81,16 +81,14 @@ class KneeExtensionMetric extends PlankMetricBase {
       if (isError) {
         ctx.resultIssues.feedback['Knees'] = 'Gối gập quá nhiều!';
         if (!_instructionSet) {
-          ctx.resultIssues.addInstruction(
-              'resting', 'Knees', 'Siết đùi, thẳng đầu gối ra!');
+          // Legacy UI instruction copy: Siết đùi, thẳng đầu gối ra!
           _instructionSet = true;
         }
         _logFault('Đầu gối gập quá nhiều');
       } else {
         ctx.resultIssues.feedback['Knees'] = 'Thẳng gối ra';
         if (!_instructionSet) {
-          ctx.resultIssues.addInstruction(
-              'resting', 'Knees', 'Gối hơi gập — siết đùi lại!');
+          // Legacy UI instruction copy: Gối hơi gập — siết đùi lại!
           _instructionSet = true;
         }
         _logFault('Đầu gối hơi gập');

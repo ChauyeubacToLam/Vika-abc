@@ -132,10 +132,10 @@ class DownwardDog extends ExerciseBase {
   bool requestStop() => repCount >= maxHolds;
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.left &&
         cameraFacing != CameraFacing.right) {
-      return 'Hãy quay nghiêng để theo dõi tư thế Chó cúi mặt.';
+      return const GuidanceSignal.turnSide();
     }
 
     final required = [
@@ -156,7 +156,7 @@ class DownwardDog extends ExerciseBase {
     for (final type in required) {
       final landmark = landmarks[type];
       if (landmark == null || !ExerciseBase.isLandmarkConfident(landmark)) {
-        return 'Giữ toàn thân trong khung hình, thấy rõ tay, vai, hông, gối và cổ chân.';
+        return const GuidanceSignal.bodyInFrame();
       }
     }
 
@@ -477,21 +477,13 @@ class DownwardDog extends ExerciseBase {
 
     // Post-hold hip-height instruction.
     if (ctx.apexAngle > DownwardDogConfig.APEX_TOO_LOW) {
-      ctx.resultIssues.addInstruction(
-        'exit',
-        'hip_height',
-        'Đẩy hông lên cao và ra sau hơn nhé!',
-      );
+      // Legacy UI instruction copy: Đẩy hông lên cao và ra sau hơn nhé!
     }
 
     // Arm-torso line post-hold coaching.
     if (ctx.spineAngle < DownwardDogConfig.ARM_TORSO_COACHING_ANGLE &&
         _spineMetric.status != MetricStatus.fault) {
-      ctx.resultIssues.addInstruction(
-        'exit',
-        'arm_torso',
-        'Vươn ngực về phía đùi, kéo dài tay.',
-      );
+      // Legacy UI instruction copy: Vươn ngực về phía đùi, kéo dài tay.
     }
 
     _transitionTo(DownwardDogState.exit, timestampMs);
@@ -539,8 +531,8 @@ class DownwardDog extends ExerciseBase {
     if (next == DownwardDogState.hold) {
       _holdSeconds.resetTick();
       _holdStartMs = timestampMs;
-      // Clear per-hold instructions when new hold begins.
-      resultIssues.instructions.clear();
+      // Clear per-hold phase status when new hold begins.
+      resultIssues.phaseStatus.clear();
     } else if (prev == DownwardDogState.hold) {
       _holdSeconds.resetTick();
     }
@@ -672,7 +664,7 @@ class DownwardDog extends ExerciseBase {
     for (final metric in _metrics) {
       metric.reset();
     }
-    resultIssues.addInstruction('entry', 'Status', message);
+    resultIssues.setPhaseStatus('entry', message);
     resultIssues.feedback['System'] = message;
   }
 

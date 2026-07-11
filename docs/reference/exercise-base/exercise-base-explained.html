@@ -539,41 +539,36 @@ mark.note-hl.flash{animation:noteflash 1.2s ease}
 
 <!-- ============ 4 RESULT ISSUES ============ -->
 <section id="result">
-  <p class="kicker"><span class="n">04</span> A mailbox <span class="range">· L57–72</span></p>
+  <p class="kicker"><span class="n">04</span> A mailbox <span class="range">· L75–86</span></p>
   <h2><code>ResultIssues</code> — the feedback mailbox</h2>
   <div class="code">
-    <div class="code-head"><span>class ResultIssues</span><b>L57–72</b></div>
+    <div class="code-head"><span>class ResultIssues</span><b>L75–86</b></div>
     <div class="code-body">
-<pre class="gut">57
-58
-59
-60
-61
-62
-63
-64
-65
-66
-67
-68
-69
-70
-71
-72</pre>
+<pre class="gut">75
+76
+77
+78
+79
+80
+81
+82
+83
+84
+85
+86</pre>
 <pre class="src"><span class="c">// --- Result Tracking ---</span>
 
 <span class="k">class</span> ResultIssues {
   Map&lt;String, String&gt; feedback = {};
-  Map&lt;String, Map&lt;String, String&gt;&gt; instructions = {};
+  Map&lt;String, String&gt; phaseStatus = {};
 
-  <span class="k">void</span> addInstruction(String phase, String type, String message) {
-    instructions.putIfAbsent(phase, () =&gt; {});
-    instructions[phase]![type] = message;
+  <span class="k">void</span> setPhaseStatus(String phase, String message) {
+    phaseStatus[phase] = message;
   }
 
   <span class="k">void</span> clear() {
     feedback.clear();
-    instructions.clear();
+    phaseStatus.clear();
   }
 }
 </pre>
@@ -581,10 +576,10 @@ mark.note-hl.flash{animation:noteflash 1.2s ease}
   </div>
   <div class="call eli">
     <p class="ct">🧒 Like you’re five</p>
-    <p>Two mailboxes for messages to show the user. <code>feedback</code> is the “right now, this frame”
+    <p>Two message surfaces for the exercise UI. <code>feedback</code> is the “right now, this frame”
     box — it gets <strong>emptied every frame</strong> (you’ll see <code>resultIssues.feedback.clear()</code>
-    at the start of the heartbeat). <code>instructions</code> is the “sticky” box, organized by phase
-    (“going down,” “hold”), that survives across frames until someone changes it.</p>
+    at the start of the heartbeat). <code>phaseStatus</code> is the live phase label keyed by phase,
+    used for hold/rest copy like “Nghỉ 4.2s” and release verbs like “Đứng lên”.</p>
   </div>
   <div class="call idea">
     <p class="ct">🧠 Reading the types</p>

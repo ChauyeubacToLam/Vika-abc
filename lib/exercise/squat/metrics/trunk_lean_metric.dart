@@ -90,8 +90,7 @@ class TrunkLeanMetric extends SquatMetricBase {
       _status = MetricStatus.fault;
       ctx.resultIssues.feedback['Back'] = 'Chest up!';
       if (!_instructionSet) {
-        ctx.resultIssues
-            .addInstruction('standing', 'Back', 'Keep chest up next time!');
+        // Legacy UI instruction copy: Keep chest up next time!
         _instructionSet = true;
       }
       _logFault(
@@ -107,8 +106,7 @@ class TrunkLeanMetric extends SquatMetricBase {
       _status = MetricStatus.fault;
       ctx.resultIssues.feedback['Back'] = "Don't lean back!";
       if (!_instructionSet) {
-        ctx.resultIssues
-            .addInstruction('standing', 'Back', "Don't lean back next time!");
+        // Legacy UI instruction copy: Don't lean back next time!
         _instructionSet = true;
       }
       _logFault(

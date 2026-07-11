@@ -108,11 +108,7 @@ class LegStraightnessMetric extends DownwardDogMetricBase {
     if (min < LegStraightnessConfig.STRAIGHT_THRESHOLD) {
       if (_spineLongDuringHold) {
         // Spine was great — gentle nudge toward straighter legs.
-        ctx.resultIssues.addInstruction(
-          'exit',
-          'leg_straight',
-          'Nếu gân kheo cho phép, duỗi chân thẳng hơn nhé. Còn không thì cứ gập gối.',
-        );
+        // Legacy UI instruction copy: Nếu gân kheo cho phép, duỗi chân thẳng hơn nhé. Còn không thì cứ gập gối.
         _logFault(
           'HOLD',
           'Legs bent — spine long (acceptable, coaching only)',

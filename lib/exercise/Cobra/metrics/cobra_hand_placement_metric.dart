@@ -53,11 +53,7 @@ class CobraHandPlacementMetric extends CobraMetricBase {
     if (_tooFarDebouncer.update(handOffset >= _errorTooFar)) {
       _isFaultingNow = true;
       ctx.resultIssues.feedback['Hands'] = '⚠️ Tay đặt quá xa!';
-      ctx.resultIssues.addInstruction(
-        'setup',
-        'handsTooForward',
-        'Đặt tay gần xương sườn hơn, ngay dưới vai.',
-      );
+      // Legacy UI instruction copy: Đặt tay gần xương sườn hơn, ngay dưới vai.
       _logFault(phase, 'Hands placed too far forward', 'HandsTooFar');
     }
     // Warning: too far

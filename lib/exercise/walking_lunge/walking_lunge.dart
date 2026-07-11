@@ -153,13 +153,13 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
   }
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.left &&
         cameraFacing != CameraFacing.right) {
-      return "⚠️ Bài tập này yêu cầu quay mặt ngang hông (Side Camera).";
+      return const GuidanceSignal.turnSide();
     }
     final req = getSideTrackedLandmarks(landmarks);
-    if (req == null) return "⚠️ Không thấy rõ cơ thể. Hãy điều chỉnh góc máy.";
+    if (req == null) return const GuidanceSignal.bodyInFrame();
     return null;
   }
 
@@ -387,24 +387,23 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
     }
 
     if (walkingState == WalkingState.stepping) {
-      resultIssues.addInstruction('stepping', 'Status', 'Bước tới!');
+      resultIssues.setPhaseStatus('stepping', 'Bước tới!');
     } else if (walkingState == WalkingState.descending) {
-      resultIssues.addInstruction('descending', 'Status', 'Hạ hông xuống...');
+      resultIssues.setPhaseStatus('descending', 'Hạ hông xuống...');
     } else if (walkingState == WalkingState.bottom) {
       if (_bottomStartTime != null) {
         int elapsed = now - _bottomStartTime!;
         int remaining = 2000 - elapsed;
         if (remaining > 0) {
-          int seconds = (remaining / 1000).ceil();
-          resultIssues.addInstruction('bottom', 'Timer', 'Giữ $seconds giây!');
+          // Legacy UI instruction copy: Giữ [seconds] giây!
         } else {
-          resultIssues.addInstruction('bottom', 'Timer', 'Tốt! Đứng lên!');
+          // Legacy UI instruction copy: Tốt! Đứng lên!
         }
       } else {
-        resultIssues.addInstruction('bottom', 'Status', 'Giữ 2 giây!');
+        resultIssues.setPhaseStatus('bottom', 'Giữ 2 giây!');
       }
     } else if (walkingState == WalkingState.pulling_through) {
-      resultIssues.addInstruction('pulling', 'Status', 'Rút chân sau lên!');
+      resultIssues.setPhaseStatus('pulling', 'Rút chân sau lên!');
     }
   }
 
@@ -436,11 +435,7 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
           if (ctx.frontKneeAngle > 140 && ctx.rearKneeAngle > 145) {
             _transitionState(WalkingState.stepping, now);
           } else {
-            ctx.resultIssues.addInstruction(
-              'descending',
-              'Depth',
-              'Hạ sâu hơn, đầu gối sau gần sàn rồi mới lên.',
-            );
+            // Legacy UI instruction copy: Hạ sâu hơn, đầu gối sau gần sàn rồi mới lên.
           }
         } else {
           _bottomDepthConfirmed = true;
@@ -597,7 +592,7 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
 
     if (newState == WalkingState.stepping &&
         previousWalkingState == WalkingState.standing) {
-      resultIssues.instructions.clear();
+      resultIssues.phaseStatus.clear();
       _lastBottomCleanRepSnapshot = null;
     }
 
@@ -619,7 +614,7 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
     if (calibratedCleanRep) {
       allFaults.clear();
       resultIssues.feedback.clear();
-      resultIssues.instructions.clear();
+      resultIssues.phaseStatus.clear();
     }
 
     correctForm = !allFaults.any((f) => f.affectsForm);

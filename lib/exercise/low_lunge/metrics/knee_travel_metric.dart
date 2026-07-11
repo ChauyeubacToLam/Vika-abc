@@ -50,11 +50,7 @@ class KneeTravelMetric extends LowLungeMetricBase {
 
     if (_errorDebouncer.update(offset > _errorMin)) {
       ctx.resultIssues.feedback['Knee'] = '⚠️ Cẩn thận đầu gối!';
-      ctx.resultIssues.addInstruction(
-        'holding',
-        'kneeTravel',
-        'Đẩy hông ra sau, giữ cẳng chân trước thẳng đứng.',
-      );
+      // Legacy UI instruction copy: Đẩy hông ra sau, giữ cẳng chân trước thẳng đứng.
     }
 
     if (_stickyErrorDebouncer.update(offset > _errorMin)) {

@@ -78,11 +78,7 @@ class CobraDescentMetric extends CobraMetricBase {
           _crashFrameCount++;
           if (_crashFrameCount >= _crashFramesRequired) {
             ctx.resultIssues.feedback['Descent'] = '⚠️ Hạ quá nhanh!';
-            ctx.resultIssues.addInstruction(
-              'descent',
-              'crashDescent',
-              'Hạ người xuống chậm hơn. Kiểm soát chuyển động bằng cơ lưng.',
-            );
+            // Legacy UI instruction copy: Hạ người xuống chậm hơn. Kiểm soát chuyển động bằng cơ lưng.
             _logFault('descent', 'Crash descent', 'CrashDescent');
           }
         } else {

@@ -85,16 +85,14 @@ class LegSpreadMetric extends JJMetricBase {
     if (_spreadDebouncer.update(narrowStance)) {
       ctx.resultIssues.feedback['Legs'] = 'Mở chân rộng hơn!';
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction(
-            'closed', 'Legs spread', 'Lần sau, bước rộng bằng vai hoặc hơn!');
+        // Legacy UI instruction copy: Lần sau, bước rộng bằng vai hoặc hơn!
         _instructionSet = true;
       }
       _logFault('OPEN', 'Chân chưa đủ rộng', voiceMessage: 'Mở chân rộng hơn');
     } else if (mediumStance) {
       ctx.resultIssues.feedback['Legs'] = 'Rộng hơn chút!';
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction(
-            'closed', 'Legs spread', 'Cố gắng mở rộng chân hơn lần sau!');
+        // Legacy UI instruction copy: Cố gắng mở rộng chân hơn lần sau!
         _instructionSet = true;
       }
     } else {

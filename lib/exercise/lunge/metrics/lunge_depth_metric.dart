@@ -85,13 +85,11 @@ class LungeDepthMetric extends LungeMetricBase {
     if (minKneeAngle! > LungeDepthConfig.GOOD_DEPTH_RANGE[1]) {
       // Never reached good depth
       _logFault(phase, 'Not deep enough', voiceMessage: 'Xuống thấp hơn');
-      ctx.resultIssues
-          .addInstruction('standing', 'Depth', 'Xuống sâu hơn lần sau!');
+      // Legacy UI instruction copy: Xuống sâu hơn lần sau!
     } else if (minKneeAngle! < LungeDepthConfig.TOO_DEEP_THRESHOLD) {
       // Went too deep
       _logFault(phase, 'Too deep! Come up a bit');
-      ctx.resultIssues.addInstruction(
-          'standing', 'Depth', 'Đừng xuống quá sâu, giữ gối ở 90°.');
+      // Legacy UI instruction copy: Đừng xuống quá sâu, giữ gối ở 90°.
     }
   }
 

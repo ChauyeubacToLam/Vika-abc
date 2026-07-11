@@ -30,7 +30,7 @@ class HeelRiseMetric extends SquatMetricBase {
 
   // 3 frames  ~0.1875s at 16fps — prevents false triggers from floor jitter
   final Debouncer _heelDebouncer = Debouncer(requiredFrames: 5);
-  
+
   /// Prevent instruction spam — only set coaching once per rep.
   bool _instructionSet = false;
   double? _normalizedHeelLift;
@@ -67,8 +67,7 @@ class HeelRiseMetric extends SquatMetricBase {
       _status = MetricStatus.fault;
       ctx.resultIssues.feedback['Heels'] = 'Heels lifting';
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction(
-            'standing', 'Heels', 'Heels lifting — try elevating heels');
+        // Legacy UI instruction copy: Heels lifting — try elevating heels
         _instructionSet = true;
       }
       _logFault(phase, 'Heels lifting');

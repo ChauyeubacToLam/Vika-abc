@@ -148,7 +148,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   Timer? _setCompleteTimer;
   DateTime? _lastPersonDetectionAt;
   bool _personDetectionInFlight = false;
-  bool _orientationPauseActive = false;
+  bool _orientationGateBlocked = false;
   bool _isLifecyclePaused = false;
   bool _resumeInitRequested = false;
   // Last pause state pushed to the native pose channel via
@@ -177,10 +177,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // Restrict allowed orientations to those the exercise supports. For
-    // landscape-only exercises this forces iOS to rotate the Flutter surface
-    // into landscape, so the orientation gate can detect that the user is in
-    // a supported orientation and the rest of the UI lays out correctly.
+    // Keep the OS portrait-locked. Landscape exercises rotate this page
+    // manually from the device sensor; unsupported orientations are guidance
+    // gates, not pause states.
     unawaited(
       OrientationLock.forSupported(widget.exercise.supportedOrientations),
     );
@@ -494,7 +493,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   ) async {
     if (_isDisposed) return;
 
-    final wasGated = _orientationPauseActive;
+    final wasGated = _orientationGateBlocked;
     final changed = newOrientation != _currentOrientation;
     if (changed) {
       _setCurrentOrientation(newOrientation);
@@ -504,7 +503,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     }
 
     final blocked = _syncOrientationGate();
-    final gateChanged = wasGated != _orientationPauseActive;
+    final gateChanged = wasGated != _orientationGateBlocked;
     if (!_isDisposed && mounted && (changed || blocked || gateChanged)) {
       setState(() {});
     }
@@ -529,17 +528,17 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   bool get _orientationGateActive =>
       ExerciseBase.kLandscapeRotationEnabled && !_isCurrentOrientationSupported;
 
-  String get _orientationFeedbackCode {
+  GuidanceSignal get _orientationGuidanceSignal {
     final wantsLandscape = !widget.exercise.supportedOrientations
         .contains(VikaImageOrientation.portrait);
     return wantsLandscape
-        ? 'wrong_orientation_landscape'
-        : 'wrong_orientation_portrait';
+        ? const GuidanceSignal.phoneLandscape()
+        : const GuidanceSignal.phonePortrait();
   }
 
-  bool _isOrientationFeedback(String? value) {
-    return value == 'wrong_orientation_landscape' ||
-        value == 'wrong_orientation_portrait';
+  bool _isOrientationGuidance(GuidanceSignal? signal) {
+    return signal?.kind == GuidanceClass.phoneLandscape ||
+        signal?.kind == GuidanceClass.phonePortrait;
   }
 
   bool _syncOrientationGate() {
@@ -548,37 +547,19 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     }
 
     if (!_isCurrentOrientationSupported) {
-      widget.exercise.resultIssues.feedback['System'] =
-          _orientationFeedbackCode;
+      widget.exercise.publishGuidanceSignal(_orientationGuidanceSignal);
       _feedback =
           Map<String, String>.from(widget.exercise.resultIssues.feedback);
-      if (!_orientationPauseActive) {
-        widget.exercise.manualPause();
-        _orientationPauseActive = true;
-        // Orientation-gate pause goes through the same manualPause() as the
-        // pause button — sync immediately, don't wait for _handleLandmarkEvent's
-        // per-frame check (which only runs once we get past this early return).
-        _syncPoseThrottle();
-      }
+      _orientationGateBlocked = true;
       return true;
     }
 
-    if (_isOrientationFeedback(
-        widget.exercise.resultIssues.feedback['System'])) {
-      widget.exercise.resultIssues.feedback.remove('System');
+    if (_isOrientationGuidance(widget.exercise.guidanceSignal)) {
+      widget.exercise.clearGuidanceSignal(clearFeedback: true);
     }
-    if (_isOrientationFeedback(_feedback['System'])) {
-      _feedback.remove('System');
-    }
+    _feedback = Map<String, String>.from(widget.exercise.resultIssues.feedback);
 
-    if (_orientationPauseActive) {
-      _orientationPauseActive = false;
-      if (!_isManualPause) {
-        widget.exercise.manualResume();
-        // Same immediacy reasoning as the pause branch above.
-        _syncPoseThrottle();
-      }
-    }
+    _orientationGateBlocked = false;
     unawaited(_sendOrientationToNative());
     return false;
   }
@@ -651,11 +632,10 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   /// Load-bearing: this is the ONLY place that reads widget.exercise.isPaused
   /// to drive the channel, but it is called from several sites for different
   /// reasons:
-  ///  - Right after every manualPause()/manualResume() call (button taps AND
-  ///    the orientation gate's own manualPause()/manualResume() in
-  ///    _syncOrientationGate — that gate also drives a "manual" pause from
-  ///    PresenceGate's point of view) — zero-latency response to a
-  ///    synchronous user/system action, no need to wait for the next frame.
+  ///  - Right after every manualPause()/manualResume() button tap —
+  ///    zero-latency response to a synchronous user action, no need to wait for
+  ///    the next frame. The orientation gate is deliberately not a pause; it
+  ///    blocks processing with setup guidance instead.
   ///  - Once per pose event, after processPose()/processNoPoseFrame(), to
   ///    catch the gate's OWN auto-pause/auto-resume edges — those flip
   ///    isPaused inside PresenceGate's internal confirm/grace/resume timers
@@ -674,11 +654,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   /// call is safe per the channel contract.
   void _syncPoseThrottle() {
     // _pipelineReady also requires the native session to actually be up
-    // (textureId set) — guards against premature calls from
-    // _syncOrientationGate(), which runs once before _initCamera() has
-    // called _poseChannel.initialize() (see there). That pre-init call is a
-    // no-op here; the forced resync after init succeeds (below) picks up
-    // whatever isPaused ended up being by then.
+    // (textureId set) — guards against premature calls before _initCamera() has
+    // called _poseChannel.initialize(). The forced resync after init succeeds
+    // picks up whatever isPaused ended up being by then.
     if (_runtime != _PoseRuntime.nativeMediaPipe || !_pipelineReady) return;
     final paused = widget.exercise.isPaused;
     if (paused == _lastPoseThrottlePaused) return;
@@ -1620,7 +1598,7 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     coach.processFrame(
       exercise: widget.exercise,
       repCount: widget.exercise.repCount,
-      hasPose: hasPose,
+      hasPose: hasPose && !_orientationGateActive,
       feedback: _feedback,
     );
   }
@@ -2043,15 +2021,18 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
           // ── Swipeable stage: camera view ↔ full-screen demo ──
           // The swipe changes what is DISPLAYED, never the session state —
           // detection, rep counting, timers and voice keep running on either
-          // page. Swiping is locked while paused or with the debug panel
-          // open so the drag never fights those surfaces' own gestures.
+          // page. Swiping is locked while paused, under guidance signage, or
+          // with the debug panel open so the drag never fights those surfaces'
+          // own gestures.
           PageView(
             controller: _pageController,
             // Keeps both pages alive so swiping back never rebuilds the
             // camera stage from scratch; the demo's video decoder is still
             // gated off by videoActive while the camera page is showing.
             allowImplicitScrolling: true,
-            physics: (widget.exercise.isPaused || showDebugPanel)
+            physics: (widget.exercise.isPaused ||
+                    guidanceCopy != null ||
+                    showDebugPanel)
                 ? const NeverScrollableScrollPhysics()
                 : null,
             onPageChanged: (index) {
@@ -2272,7 +2253,10 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
           // under the hold cue and signage, so the hero owns the right edge
           // instead. No fault marking — feedback during the set is additive
           // only; the form verdict is computed after the set, never during.
-          if (!widget.isTimeBased && activeState && !showDebugPanel)
+          if (!widget.isTimeBased &&
+              activeState &&
+              guidanceCopy == null &&
+              !showDebugPanel)
             if (isLandscape)
               Positioned(
                 right: 40,
@@ -2299,7 +2283,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
               ),
 
           // ── Page arrows — left/right center edges ──
-          if (!widget.exercise.isPaused && !showDebugPanel) ...[
+          if (!widget.exercise.isPaused &&
+              guidanceCopy == null &&
+              !showDebugPanel) ...[
             if (_demoPageIndex == 0)
               Positioned(
                 right: 12,
@@ -2382,13 +2368,9 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
               child: IvoryPauseOverlay(
                 isManualPause: _isManualPause,
                 onResume: () {
-                  if (_orientationGateActive) {
-                    _syncOrientationGate();
-                    setState(() {});
-                    return;
-                  }
                   _isManualPause = false;
                   widget.exercise.manualResume();
+                  _syncOrientationGate();
                   _syncPoseThrottle();
                   setState(() {});
                 },
@@ -2490,151 +2472,84 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
   }
 
   _GuidanceCopy? get _currentGuidanceCopy {
-    final raw = _feedback['System'];
-    if (raw == null || raw.trim().isEmpty) return null;
-    return _guidanceForSystemMessage(raw);
+    // Raw signal, never grace-gated: signage renders live from frame one
+    // (grace suppresses VOICE only — a user still setting up is standing and
+    // looking at the screen, so the table is useful immediately).
+    final signal = widget.exercise.guidanceSignal;
+    if (signal == null) return null;
+    return _guidanceForSignal(signal);
   }
 
-  _GuidanceCopy? _guidanceForSystemMessage(String rawMessage) {
-    final message = _translateSystemMessage(rawMessage);
-    final normalized = message.toLowerCase();
-    final rawNormalized = rawMessage.toLowerCase();
+  _GuidanceCopy? _guidanceForSignal(GuidanceSignal signal) {
+    final base = switch (signal.kind) {
+      GuidanceClass.phoneLandscape => const _GuidanceCopy(
+          icon: Icons.screen_rotation_alt_rounded,
+          kind: GuidanceGlyphKind.rotate,
+          title: 'Xoay ngang máy',
+          body: 'Bài này cần điện thoại nằm ngang để AI thấy rõ toàn thân bạn.',
+          mode: SystemBannerMode.warn,
+        ),
+      GuidanceClass.phonePortrait => const _GuidanceCopy(
+          icon: Icons.screen_rotation_alt_rounded,
+          kind: GuidanceGlyphKind.rotate,
+          title: 'Xoay dọc máy',
+          body: 'Bài này cần màn hình dọc để AI theo dõi ổn định hơn.',
+          mode: SystemBannerMode.warn,
+        ),
+      GuidanceClass.turnSide => const _GuidanceCopy(
+          icon: Icons.accessibility_new_rounded,
+          kind: GuidanceGlyphKind.turnSide,
+          title: 'Đứng nghiêng người',
+          body:
+              'Đứng nghiêng người với camera để AI thấy rõ vai, hông, gối và mắt cá.',
+          mode: SystemBannerMode.warn,
+        ),
+      GuidanceClass.faceCamera => const _GuidanceCopy(
+          icon: Icons.center_focus_strong_rounded,
+          kind: GuidanceGlyphKind.faceCamera,
+          title: 'Hướng về camera',
+          body: 'Đứng đối diện camera để AI thấy cả hai bên người rõ hơn.',
+          mode: SystemBannerMode.warn,
+        ),
+      GuidanceClass.lighting => const _GuidanceCopy(
+          icon: Icons.light_mode_rounded,
+          kind: GuidanceGlyphKind.light,
+          title: 'Thêm ánh sáng',
+          body:
+              'Đứng chỗ sáng hơn hoặc tránh ngược sáng để AI nhận diện ổn định hơn.',
+          mode: SystemBannerMode.warn,
+        ),
+      GuidanceClass.searching => const _GuidanceCopy(
+          icon: Icons.person_search_rounded,
+          kind: GuidanceGlyphKind.search,
+          title: 'Đang tìm người',
+          body: 'Đứng trong khung hình để bắt đầu.',
+          mode: SystemBannerMode.scan,
+        ),
+      GuidanceClass.bodyInFrame => const _GuidanceCopy(
+          icon: Icons.accessibility_new_rounded,
+          kind: GuidanceGlyphKind.stepBack,
+          title: 'Lùi lại',
+          body: 'Lùi lại hoặc hạ điện thoại để thấy từ vai đến bàn chân.',
+          mode: SystemBannerMode.warn,
+        ),
+      GuidanceClass.setupPosition => const _GuidanceCopy(
+          icon: Icons.accessibility_new_rounded,
+          kind: GuidanceGlyphKind.faceCamera,
+          title: 'Vào vị trí',
+          body: 'Vào tư thế và giữ yên để bắt đầu.',
+          mode: SystemBannerMode.info,
+        ),
+      GuidanceClass.holdStill => null,
+      GuidanceClass.paused => null,
+      GuidanceClass.resume => null,
+    };
 
-    if (normalized.contains('đứng yên')) {
-      return null;
-    }
-
-    if (rawNormalized.contains('wrong_orientation_landscape')) {
-      return const _GuidanceCopy(
-        icon: Icons.screen_rotation_alt_rounded,
-        kind: GuidanceGlyphKind.rotate,
-        title: 'Xoay ngang máy',
-        body: 'Bài này cần điẹn thoại nằm ngang để AI thấy rõ toàn thân bạn.',
-        mode: SystemBannerMode.warn,
-      );
-    }
-    if (rawNormalized.contains('wrong_orientation_portrait')) {
-      return const _GuidanceCopy(
-        icon: Icons.screen_rotation_alt_rounded,
-        kind: GuidanceGlyphKind.rotate,
-        title: 'Xoay dọc máy',
-        body: 'Bài này cần màn hình dọc.',
-        mode: SystemBannerMode.warn,
-      );
-    }
-    if (rawNormalized.contains('turn to the side') ||
-        normalized.contains('quay ngang') ||
-        normalized.contains('quay nghiêng') ||
-        normalized.contains('quay sang bên')) {
-      return const _GuidanceCopy(
-        icon: Icons.accessibility_new_rounded,
-        kind: GuidanceGlyphKind.turnSide,
-        title: 'Đứng nghiêng người',
-        body:
-            'Đứng nghiêng người với camera để AI thấy rõ vai, hông, gối và mắt cá.',
-        mode: SystemBannerMode.warn,
-      );
-    }
-    if (normalized.contains('quay mặt')) {
-      return const _GuidanceCopy(
-        icon: Icons.center_focus_strong_rounded,
-        kind: GuidanceGlyphKind.faceCamera,
-        title: 'Hướng về camera',
-        body: 'Đứng đối diện camera để AI thấy cả hai bên người rõ hơn.',
-        mode: SystemBannerMode.warn,
-      );
-    }
-    if (rawNormalized.contains('adjust lighting') ||
-        rawNormalized.contains('lighting') ||
-        normalized.contains('ánh sáng') ||
-        normalized.contains('hình ảnh không rõ')) {
-      return const _GuidanceCopy(
-        icon: Icons.light_mode_rounded,
-        kind: GuidanceGlyphKind.light,
-        title: 'Thêm ánh sáng',
-        body:
-            'Đứng chỗ sáng hơn hoặc tránh ngược sáng để AI nhận diện ổn định hơn.',
-        mode: SystemBannerMode.warn,
-      );
-    }
-    if (normalized.contains('đang tìm người')) {
-      return const _GuidanceCopy(
-        icon: Icons.person_search_rounded,
-        kind: GuidanceGlyphKind.search,
-        title: 'Đang tìm người',
-        body: 'Đứng trong khung hình để bắt đầu.',
-        mode: SystemBannerMode.scan,
-      );
-    }
-    if (normalized.contains('tạm dừng') ||
-        normalized.contains('quay lại khung hình')) {
-      // Pause has ONE surface: the full IvoryPauseOverlay card ("Bạn ở đâu
-      // rồi?"), shown when exercise.isPaused. During the person-lost grace
-      // window the base still emits a "⏸ Tạm dừng" system string, but we
-      // deliberately render no banner for it — returning null here means the
-      // screen stays quiet through the grace, then the card takes over on the
-      // pause commit. Prevents the old two-step "banner → card" hand-off.
-      return null;
-    }
-    if (normalized.contains('phần trên cơ thể')) {
-      return const _GuidanceCopy(
-        icon: Icons.accessibility_new_rounded,
-        kind: GuidanceGlyphKind.stepBack,
-        title: 'Lùi lại chút',
-        body: 'Lùi lại một chút để thấy rõ vai, khuỷu tay và hông.',
-        mode: SystemBannerMode.warn,
-      );
-    }
-    if (rawNormalized.contains('body not fully visible') ||
-        normalized.contains('toàn thân')) {
-      return const _GuidanceCopy(
-        icon: Icons.accessibility_new_rounded,
-        kind: GuidanceGlyphKind.stepBack,
-        title: 'Lùi lại',
-        body: 'Lùi lại hoặc hạ điện thoại để thấy từ vai đến bàn chân.',
-        mode: SystemBannerMode.warn,
-      );
-    }
-    if (normalized.contains('trong khung hình') ||
-        normalized.contains('vai, hông') ||
-        normalized.contains('vai, hông và gối')) {
-      return const _GuidanceCopy(
-        icon: Icons.fit_screen_rounded,
-        kind: GuidanceGlyphKind.stepBack,
-        title: 'Chỉnh khung hình',
-        body: 'Lùi lại hoặc chỉnh góc điện thoại để AI nhìn rõ hơn.',
-        mode: SystemBannerMode.warn,
-      );
-    }
-    if (normalized.contains('vào tư thế') ||
-        normalized.contains('đứng trong khung') ||
-        normalized.contains('bắt đầu')) {
-      return _GuidanceCopy(
-        icon: Icons.accessibility_new_rounded,
-        kind: GuidanceGlyphKind.faceCamera,
-        title: 'Vào vị trí',
-        body: message,
-        mode: SystemBannerMode.info,
-      );
-    }
-
-    return null;
-  }
-
-  String _translateSystemMessage(String raw) {
-    if (raw.contains('Please turn to the side')) {
-      return 'Quay ngang người với camera để AI theo dõi tốt hơn';
-    }
-    if (raw.contains('Body not fully visible')) {
-      return 'Lùi lại, giữ toàn thân vào khung';
-    }
-    if (raw.contains('Adjust lighting/position')) {
-      return 'Di chuyển ra chỗ sáng hơn để AI nhận diện tốt hơn';
-    }
-    if (raw.contains('⏸') || raw.contains('⚸')) {
-      return 'Tạm dừng. đứng trong  khung ảnh để tiếp tục';
-    }
-    return raw.replaceAll('⚠️ ', '').replaceAll('⏸ ', '').replaceAll('⚸ ', '');
+    if (base == null) return null;
+    return base.withOverrides(
+      title: signal.title,
+      body: signal.body,
+    );
   }
 
   /// Chevron flow for the ambient phase-direction stream — only the two
@@ -2697,12 +2612,8 @@ class _ActiveExercisePageState extends State<ActiveExercisePage>
     return (_holdPoolPeakSeconds / target).clamp(0.0, 1.0);
   }
 
-  Map<String, String>? get _currentPhaseInstructions {
-    return widget
-        .exercise.resultIssues.instructions[widget.exercise.currentPhaseKey];
-  }
-
-  String? get _currentPhaseStatus => _currentPhaseInstructions?['Status'];
+  String? get _currentPhaseStatus =>
+      widget.exercise.resultIssues.phaseStatus[widget.exercise.currentPhaseKey];
 
   _BottomHoldCue? get _bottomHoldCue {
     if (widget.exercise.exerciseState != ExerciseState.activated) {
@@ -2890,6 +2801,16 @@ class _GuidanceCopy {
   /// Near-view detail, rendered small under the title.
   final String body;
   final SystemBannerMode mode;
+
+  _GuidanceCopy withOverrides({String? title, String? body}) {
+    return _GuidanceCopy(
+      icon: icon,
+      kind: kind,
+      title: title ?? this.title,
+      body: body ?? this.body,
+      mode: mode,
+    );
+  }
 }
 
 class _BottomHoldCue {
@@ -3094,26 +3015,34 @@ class _CenterOverlay extends StatelessWidget {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            isReadyToStart ? 'Bắt đầu' : 'Giữ yên',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontFamily: VikaIvory.fontFamily,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              color: VikaIvory.invInk,
-                              letterSpacing: 1.0,
-                              shadows: [
-                                Shadow(
-                                  color:
-                                      VikaIvory.heroBg.withValues(alpha: 0.7),
-                                  blurRadius: 4,
-                                ),
-                              ],
+                          // Caption row only at ready ('Bắt đầu'). During the
+                          // hold the countdown numeral sits alone, centered by
+                          // the Column — no 'Giữ yên' caption (ruled: the
+                          // voiced một-hai-ba owns that state's messaging; the
+                          // on-screen number stays remaining-seconds, the
+                          // voice-up/screen-down mismatch is deliberate).
+                          if (isReadyToStart) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              'Bắt đầu',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontFamily: VikaIvory.fontFamily,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: VikaIvory.invInk,
+                                letterSpacing: 1.0,
+                                shadows: [
+                                  Shadow(
+                                    color:
+                                        VikaIvory.heroBg.withValues(alpha: 0.7),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),

@@ -45,10 +45,7 @@ class ConnectionMetric extends BowPoseMetricBase {
             voiceMessage: 'Nắm chắc cổ chân',
             affectsForm: true,
           ));
-          ctx.resultIssues.addInstruction(
-              ctx.bowPoseState.toString().split('.').last,
-              'Connection',
-              'Hãy giữ chặt cổ chân!');
+          // Legacy UI instruction copy: Hãy giữ chặt cổ chân!
           _instructionSet = true;
         }
       } else {

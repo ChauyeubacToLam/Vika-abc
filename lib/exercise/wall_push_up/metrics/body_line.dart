@@ -71,8 +71,7 @@ class BodyLineMetric extends WallPushUpMetricBase {
       ctx.resultIssues.feedback['Body'] =
           'Giữ hông thẳng, siết bụng, không gập mông hay võng lưng.';
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction('standing', 'Body',
-            'Giữ vai, hông và chân thẳng hàng; siết bụng, không gập mông hay võng lưng.');
+        // Legacy UI instruction copy: Giữ vai, hông và chân thẳng hàng; siết bụng, không gập mông hay võng lưng.
         _instructionSet = true;
       }
       _logFault(phase, 'Vai-hông-chân lệch khỏi đường thẳng',
@@ -80,8 +79,7 @@ class BodyLineMetric extends WallPushUpMetricBase {
     } else if (warningConfirmed) {
       ctx.resultIssues.feedback['Body'] = 'Hông hơi lệch, siết core thêm.';
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction('standing', 'Body',
-            'Vai, hông và chân hơi lệch — giữ người thành một đường thẳng.');
+        // Legacy UI instruction copy: Vai, hông và chân hơi lệch — giữ người thành một đường thẳng.
         _instructionSet = true;
       }
       _logFault(phase, 'Vai-hông-chân hơi lệch',

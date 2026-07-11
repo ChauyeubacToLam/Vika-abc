@@ -47,11 +47,7 @@ class CervicalSafetyMetric extends LowLungeMetricBase {
 
     if (_errorDebouncer.update(cervicalAngle < _errorMax)) {
       ctx.resultIssues.feedback['Neck'] = 'Nhìn về trước thôi nhé';
-      ctx.resultIssues.addInstruction(
-        'holding',
-        'cervicalDanger',
-        'Đừng ngửa đầu ra sau. Giữ cổ dài và thoải mái.',
-      );
+      // Legacy UI instruction copy: Đừng ngửa đầu ra sau. Giữ cổ dài và thoải mái.
       _logFault(ctx.state.name, 'Neck cranked back', 'CervicalDanger');
     } else if (cervicalAngle >= _goodMin) {
       ctx.resultIssues.feedback['Neck'] = 'Cổ thoải mái ✓';

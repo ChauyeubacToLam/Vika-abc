@@ -46,11 +46,7 @@ class ClearTapMetric extends PlankTapMetricBase {
         priority: PlankTapVoicePriority.clearTap,
         voiceMessage: 'Chạm tay dứt khoát lên vai.',
       ));
-      ctx.resultIssues.addInstruction(
-        'base',
-        'Tap',
-        'Nhịp trước chạm chưa tới vai.',
-      );
+      // Legacy UI instruction copy: Nhịp trước chạm chưa tới vai.
     }
   }
 

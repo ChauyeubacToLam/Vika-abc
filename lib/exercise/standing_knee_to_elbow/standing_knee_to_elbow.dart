@@ -106,9 +106,9 @@ class StandingKneeToElbow extends ExerciseBase {
   }
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.front) {
-      return "⚠️ Bài tập này yêu cầu góc máy chính diện (Front Camera).";
+      return const GuidanceSignal.faceCamera();
     }
     return null; // The strict safety gate for vestibular/knee issues should be done in UI, but this text is a fallback.
   }
@@ -344,11 +344,11 @@ class StandingKneeToElbow extends ExerciseBase {
     }
 
     if (kteState == KteState.approaching) {
-      resultIssues.addInstruction('approaching', 'Status', 'Kéo chéo!');
+      resultIssues.setPhaseStatus('approaching', 'Kéo chéo!');
     } else if (kteState == KteState.touch) {
-      resultIssues.addInstruction('touch', 'Status', 'Chạm!');
+      resultIssues.setPhaseStatus('touch', 'Chạm!');
     } else if (kteState == KteState.returning) {
-      resultIssues.addInstruction('returning', 'Status', 'Thu chân');
+      resultIssues.setPhaseStatus('returning', 'Thu chân');
     }
   }
 
@@ -464,7 +464,7 @@ class StandingKneeToElbow extends ExerciseBase {
 
     if (newState == KteState.approaching &&
         previousKteState == KteState.standing_base) {
-      resultIssues.instructions.clear();
+      resultIssues.phaseStatus.clear();
     }
 
     for (final metric in _metrics) {

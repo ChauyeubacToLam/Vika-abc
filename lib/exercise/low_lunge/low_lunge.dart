@@ -183,15 +183,15 @@ class LowLunge extends ExerciseBase {
   }
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.left &&
         cameraFacing != CameraFacing.right) {
-      return '⚠️ Xin hãy quay nghiêng để theo dõi tư thế Low Lunge';
+      return const GuidanceSignal.turnSide();
     }
 
     final lunge = _resolveLungeLandmarks(landmarks);
     if (lunge == null) {
-      return '⚠️ Đảm bảo toàn thân và hai chân trong khung hình';
+      return const GuidanceSignal.bodyInFrame();
     }
 
     final required = [
@@ -204,7 +204,7 @@ class LowLunge extends ExerciseBase {
     ];
 
     if (!required.every(ExerciseBase.isLandmarkConfident)) {
-      return '⚠️ Hình ảnh không rõ. Điều chỉnh ánh sáng hoặc vị trí';
+      return const GuidanceSignal.lighting();
     }
 
     return null;
@@ -301,20 +301,12 @@ class LowLunge extends ExerciseBase {
   }) {
     if (!backKneeGrounded) {
       resultIssues.feedback['Back knee'] = 'Hạ gối sau xuống sàn nhé';
-      resultIssues.addInstruction(
-        'holding',
-        'backKneeLifted',
-        'Hạ gối sau xuống sàn để vào Low Lunge.',
-      );
+      // Legacy UI instruction copy: Hạ gối sau xuống sàn để vào Low Lunge.
     }
 
     if (frontKneeAngle > LowLungeConfig.FRONT_KNEE_SHALLOW) {
       resultIssues.feedback['Depth'] = 'Hạ hông thấp hơn nếu thoải mái';
-      resultIssues.addInstruction(
-        'holding',
-        'frontKneeShallow',
-        'Gối trước gập sâu hơn một chút, giữ cảm giác dễ chịu.',
-      );
+      // Legacy UI instruction copy: Gối trước gập sâu hơn một chút, giữ cảm giác dễ chịu.
     } else if (frontKneeAngle >= LowLungeConfig.FRONT_KNEE_GOOD_MIN &&
         frontKneeAngle <= LowLungeConfig.FRONT_KNEE_GOOD_MAX) {
       resultIssues.feedback['Depth'] = 'Độ sâu tốt ✓';
@@ -324,11 +316,7 @@ class LowLunge extends ExerciseBase {
     debugData['chestLift'] = chestLift.toStringAsFixed(1);
     if (chestLift < LowLungeConfig.CHEST_LIFT_MIN) {
       resultIssues.feedback['Chest'] = 'Nâng nhẹ ngực lên';
-      resultIssues.addInstruction(
-        'holding',
-        'chestLift',
-        'Thả lỏng hông xuống, nâng nhẹ ngực bằng lưng giữa.',
-      );
+      // Legacy UI instruction copy: Thả lỏng hông xuống, nâng nhẹ ngực bằng lưng giữa.
     }
   }
 
@@ -337,11 +325,8 @@ class LowLunge extends ExerciseBase {
       final holdSecs = _currentHoldSeconds();
       final remaining = (LowLungeConfig.HOLD_DURATION - holdSecs)
           .clamp(0.0, LowLungeConfig.HOLD_DURATION);
-      resultIssues.addInstruction(
-        'holding',
-        'Status',
-        'Giữ! ${remaining.toStringAsFixed(1)}s',
-      );
+      resultIssues.setPhaseStatus(
+          'holding', 'Giữ! ${remaining.toStringAsFixed(1)}s');
       debugData['holdProgress'] =
           (holdSecs / LowLungeConfig.HOLD_DURATION).clamp(0.0, 1.0);
     }
@@ -350,13 +335,11 @@ class LowLunge extends ExerciseBase {
       final elapsed = (frameTimestampMs - _exitStartMs!) / 1000.0;
       final remaining = (LowLungeConfig.EXIT_DURATION - elapsed)
           .clamp(0.0, LowLungeConfig.EXIT_DURATION);
-      resultIssues.addInstruction(
-        'exit',
-        'Status',
-        repCount >= maxRep
-            ? 'Hoàn tất'
-            : 'Đổi bên ${remaining.toStringAsFixed(1)}s',
-      );
+      resultIssues.setPhaseStatus(
+          'exit',
+          repCount >= maxRep
+              ? 'Hoàn tất'
+              : 'Đổi bên ${remaining.toStringAsFixed(1)}s');
     }
   }
 
@@ -412,7 +395,7 @@ class LowLunge extends ExerciseBase {
         _exitStartMs = null;
         _exitShouldCount = false;
         _exitRejectReason = null;
-        resultIssues.instructions.clear();
+        resultIssues.phaseStatus.clear();
         break;
       case LowLungeState.exit:
         _exitStartMs = timestampMs;
@@ -525,11 +508,8 @@ class LowLunge extends ExerciseBase {
       for (final metric in _metrics) {
         metric.reset();
       }
-      resultIssues.addInstruction(
-        'entry',
-        'Status',
-        'Mất mốc cơ thể, vào lại Low Lunge trước khi giữ.',
-      );
+      resultIssues.setPhaseStatus(
+          'entry', 'Mất mốc cơ thể, vào lại Low Lunge trước khi giữ.');
     }
     return super.processNoPoseFrame();
   }

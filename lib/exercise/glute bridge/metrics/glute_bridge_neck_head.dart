@@ -31,14 +31,23 @@ import '../../../../utils/debouncer.dart';
 
 class NeckHeadConfig {
   /// Normalized threshold. (shoulderY − headY) / scaleFactor > this → fault.
-  /// 5 % of shoulder-to-hip distance — filters minor camera / landmark noise.
-  static const double HEAD_LIFT_THRESHOLD = 0.08;
+  /// Fraction of shoulder-to-hip distance the ear must clear ABOVE the
+  /// shoulder before it counts as a lifted head.
+  ///
+  /// FEEL-TUNE (loosened 0.08 → 0.14, Nam device call 07-11): at 0.08 this was
+  /// the ONLY glute metric firing — nearly every rep — because a small,
+  /// natural head shift during the bridge cleared 8 %. 0.14 requires the ear
+  /// clearly above the shoulder line (an obvious "watching the movement" lift)
+  /// before it coaches. Not canonical — tune on device against real footage.
+  static const double HEAD_LIFT_THRESHOLD = 0.14;
 
   /// Pixel fallback when scaleFactor is unavailable.
-  static const double HEAD_LIFT_PIXELS = 12.0;
+  static const double HEAD_LIFT_PIXELS = 20.0;
 
-  /// Consecutive frames of sustained lift before coaching fires.
-  static const int DEBOUNCE_FRAMES = 7;
+  /// Consecutive frames of sustained lift before coaching fires. Bumped 7 → 10
+  /// (07-11) so a brief glance up mid-rep no longer trips it — the lift must
+  /// persist to count.
+  static const int DEBOUNCE_FRAMES = 10;
 }
 
 class NeckHeadMetric extends GluteBridgeMetricBase {
@@ -51,8 +60,7 @@ class NeckHeadMetric extends GluteBridgeMetricBase {
   final Debouncer _liftDebouncer =
       Debouncer(requiredFrames: NeckHeadConfig.DEBOUNCE_FRAMES);
 
-  // Prevent duplicate instruction and fault within one rep.
-  bool _instructionShown = false;
+  // Prevent duplicate fault within one rep.
   bool _faultAdded = false;
 
   @override
@@ -92,25 +100,14 @@ class NeckHeadMetric extends GluteBridgeMetricBase {
     final bool isLifted = rawDiff > threshold;
 
     if (_liftDebouncer.update(isLifted)) {
-      // Live coaching instruction — shown once per rep (persists until next
-      // ascending phase clears resultIssues.instructions).
-      if (!_instructionShown) {
-        ctx.resultIssues.addInstruction(
-          'bottom',
-          'NeckHead',
-          'Đặt đầu xuống sàn — tránh căng cơ cổ',
-        );
-        _instructionShown = true;
-      }
-
-      // Fault — recorded once per rep (affectsForm = false: injury-risk
-      // cue, but does not invalidate the rep's form score).
+      // Fault — recorded once per rep. Head lift now affects form so it can
+      // use the real-time critical voice path and block clean-rep praise.
       if (!_faultAdded) {
         _faults.add(FaultRecord(
           phase: ctx.state.toString().split('.').last,
           type: 'neck_head',
           message: 'Giữ đầu và cổ trên sàn khi thực hiện bài tập',
-          affectsForm: false,
+          affectsForm: true,
         ));
         _faultAdded = true;
       }
@@ -121,7 +118,6 @@ class NeckHeadMetric extends GluteBridgeMetricBase {
   void reset() {
     _faults.clear();
     _liftDebouncer.reset();
-    _instructionShown = false;
     _faultAdded = false;
   }
 }

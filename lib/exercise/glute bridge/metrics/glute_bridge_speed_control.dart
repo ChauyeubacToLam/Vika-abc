@@ -17,7 +17,7 @@
                 Velocity is already smoothed by a 5-7 frame rolling window
                 in GluteBridge._computeHipVelocity().
      Secondary: Eccentric (topHold→bottom) vs concentric (bottom→topHold)
-                duration ratio. A controlled eccentric >= 1.5ˣ concentric.
+	                duration ratio. A controlled eccentric >= 1.3ˣ concentric.
 
    False positive risk — HIGH:
      Users doing intentional speed reps will trigger false alerts.
@@ -38,12 +38,12 @@ import '../../../../utils/debouncer.dart';
 
 class SpeedControlConfig {
   // Minimum acceptable eccentric-to-concentric duration ratio.
-  static const double MIN_ECCENTRIC_RATIO = 1.1;
+  static const double MIN_ECCENTRIC_RATIO = 1.3;
 
   // Velocity thresholds during descent (pixels/frame, positive = falling).
   // In screen coordinates hip FALLING → velocity POSITIVE.
-  static const double RAPID_VELOCITY_WARNING = 0.09; // affectsForm = false
-  static const double RAPID_VELOCITY_ERROR = 0.16; // affectsForm = true
+  static const double RAPID_VELOCITY_WARNING = 0.08; // affectsForm = false
+  static const double RAPID_VELOCITY_ERROR = 0.15; // affectsForm = true
 
   // Frames of sustained rapid velocity before triggering live coaching.
   static const int RAPID_DEBOUNCE_FRAMES = 5;
@@ -103,11 +103,7 @@ class SpeedControlMetric extends GluteBridgeMetricBase {
     if (_rapidDebouncer.update(isRapid)) {
       // Live coaching — once per descent.
       if (!_liveInstructionShown) {
-        ctx.resultIssues.addInstruction(
-          'bottom',
-          'SpeedControl',
-          'Kiểm soát hạ hông — không để rơi tự do',
-        );
+        // Legacy UI instruction copy: Kiểm soát hạ hông — không để rơi tự do
         _liveInstructionShown = true;
       }
     }

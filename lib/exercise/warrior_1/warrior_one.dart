@@ -231,10 +231,10 @@ class WarriorOne extends ExerciseBase {
   // --- Safety Checks (needs BOTH legs, like Lunge) ---
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.left &&
         cameraFacing != CameraFacing.right) {
-      return "Hãy quay sang bên để theo dõi Warrior I tốt hơn";
+      return const GuidanceSignal.turnSide();
     }
 
     final required = [
@@ -250,10 +250,10 @@ class WarriorOne extends ExerciseBase {
 
     final pts = required.map((t) => landmarks[t]).toList();
     if (pts.any((l) => l == null)) {
-      return "⚠️ Không thấy toàn bộ cơ thể.";
+      return const GuidanceSignal.bodyInFrame();
     }
     if (pts.any((l) => !ExerciseBase.isLandmarkConfident(l!))) {
-      return "⚠️ Điều chỉnh ánh sáng/vị trí.";
+      return const GuidanceSignal.lighting();
     }
     return null;
   }
@@ -472,8 +472,8 @@ class WarriorOne extends ExerciseBase {
         final remaining =
             (WarriorOneConfig.HOLD_DURATION - _currentHoldSeconds())
                 .clamp(0.0, WarriorOneConfig.HOLD_DURATION);
-        resultIssues.addInstruction(
-            'hold', 'Status', 'Giữ! ${remaining.toStringAsFixed(0)}s');
+        resultIssues.setPhaseStatus(
+            'hold', 'Giữ! ${remaining.toStringAsFixed(0)}s');
         debugData['holdProgress'] =
             (_currentHoldSeconds() / WarriorOneConfig.HOLD_DURATION)
                 .clamp(0.0, 1.0);
@@ -500,38 +500,31 @@ class WarriorOne extends ExerciseBase {
     required bool backLegReady,
     required bool armsReady,
   }) {
-    resultIssues.addInstruction(
-      'entry',
-      'Status',
-      _entryGuidance(
-        frontKneeReady: frontKneeReady,
-        backLegReady: backLegReady,
-        armsReady: armsReady,
-      ),
-    );
+    resultIssues.setPhaseStatus(
+        'entry',
+        _entryGuidance(
+          frontKneeReady: frontKneeReady,
+          backLegReady: backLegReady,
+          armsReady: armsReady,
+        ));
 
     if (!frontKneeReady) {
-      resultIssues.addInstruction(
-          'entry', 'Depth', 'Hạ gối chân trước xuống thêm một chút.');
+      // Legacy UI instruction copy: Hạ gối chân trước xuống thêm một chút.
     }
     if (!backLegReady) {
-      resultIssues.addInstruction(
-          'entry', 'Back leg', 'Duỗi thẳng chân sau trước khi giữ.');
+      // Legacy UI instruction copy: Duỗi thẳng chân sau trước khi giữ.
     }
     if (!armsReady) {
-      resultIssues.addInstruction(
-          'entry', 'Arms', 'Giơ hai tay lên cao rồi giữ yên.');
+      // Legacy UI instruction copy: Giơ hai tay lên cao rồi giữ yên.
     }
 
     if (_stanceChecked || scaleFactor <= 0) return;
     _stanceChecked = true;
 
     if (stance < WarriorOneConfig.STANCE_TOO_SHORT) {
-      resultIssues.addInstruction(
-          'entry', 'Stance', 'Bước dài hơn một chút để tăng hiệu quả nhé!');
+      // Legacy UI instruction copy: Bước dài hơn một chút để tăng hiệu quả nhé!
     } else if (stance > WarriorOneConfig.STANCE_TOO_LONG) {
-      resultIssues.addInstruction(
-          'entry', 'Stance', 'Bước ngắn lại một chút để giữ thăng bằng nhé!');
+      // Legacy UI instruction copy: Bước ngắn lại một chút để giữ thăng bằng nhé!
     }
   }
 
@@ -565,16 +558,14 @@ class WarriorOne extends ExerciseBase {
     // Check 3: front-knee depth post-hold coaching.
     if (_minFrontKnee != null &&
         _minFrontKnee! > WarriorOneConfig.DEPTH_SHALLOW) {
-      resultIssues.addInstruction('exit', 'Depth',
-          'Hạ thấp hơn một chút nếu bạn cảm thấy thoải mái nhé.');
+      // Legacy UI instruction copy: Hạ thấp hơn một chút nếu bạn cảm thấy thoải mái nhé.
     }
     if (_minFrontKnee != null &&
         _maxFrontKnee != null &&
         (_maxFrontKnee! - _minFrontKnee!) >
             WarriorOneConfig.DEPTH_DECAY_LIMIT) {
       // Knee crept up during the hold — fatigue / position decay.
-      resultIssues.addInstruction(
-          'exit', 'Depth', 'Cố giữ độ sâu đều trong suốt thời gian giữ nhé.');
+      // Legacy UI instruction copy: Cố giữ độ sâu đều trong suốt thời gian giữ nhé.
     }
 
     // Build phase→type→message map for the result screen (Lunge pattern).
@@ -622,9 +613,9 @@ class WarriorOne extends ExerciseBase {
         // Finalize once, then either prompt a side switch (back to ENTRY)
         // or stop (requestStop fires when repCount >= maxHolds).
         if (repCount < maxHolds) {
-          resultIssues.instructions.clear();
-          resultIssues.addInstruction(
-              'entry', 'Status', 'Đổi chân! Đưa chân kia ra trước.');
+          resultIssues.phaseStatus.clear();
+          resultIssues.setPhaseStatus(
+              'entry', 'Đổi chân! Đưa chân kia ra trước.');
           _resetForNextSide();
           _transition(WarriorOneState.entry, now);
         }
@@ -640,7 +631,7 @@ class WarriorOne extends ExerciseBase {
     if (newState == WarriorOneState.hold) {
       _holdSeconds.resetTick();
       _frontLegLocked = true;
-      resultIssues.instructions.clear();
+      resultIssues.phaseStatus.clear();
     } else if (newState == WarriorOneState.exit) {
       _holdSeconds.resetTick();
       _onHoldComplete();
@@ -678,8 +669,8 @@ class WarriorOne extends ExerciseBase {
       _resetForNextSide();
       previousHoldState = holdState;
       holdState = WarriorOneState.entry;
-      resultIssues.addInstruction(
-          'entry', 'Status', 'Mất mốc cơ thể, vào lại tư thế trước khi giữ.');
+      resultIssues.setPhaseStatus(
+          'entry', 'Mất mốc cơ thể, vào lại tư thế trước khi giữ.');
     }
     return super.processNoPoseFrame();
   }

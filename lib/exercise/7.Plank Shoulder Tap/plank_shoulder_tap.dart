@@ -45,11 +45,12 @@ class PlankShoulderTap extends ExerciseBase {
   }
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
+  GuidanceSignal? checkSafety(
+      Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
     final guidance = _cameraAngleGuidance();
     if (guidance != null) return guidance;
     if (_getLandmarks(smoothedLandmarks) == null) {
-      return 'Giữ vai, hông, cổ chân và cổ tay phía camera rõ trong khung hình.';
+      return const GuidanceSignal.bodyInFrame();
     }
     return null;
   }
@@ -79,7 +80,7 @@ class PlankShoulderTap extends ExerciseBase {
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     final angleGuidance = _cameraAngleGuidance();
     if (angleGuidance != null) {
-      resultIssues.feedback['System'] = angleGuidance;
+      publishGuidanceSignal(angleGuidance);
       return false;
     }
 
@@ -158,7 +159,7 @@ class PlankShoulderTap extends ExerciseBase {
     final now = frameTimestampMs;
     final angleGuidance = _cameraAngleGuidance();
     if (angleGuidance != null) {
-      resultIssues.feedback['System'] = angleGuidance;
+      publishGuidanceSignal(angleGuidance);
       return;
     }
 
@@ -372,18 +373,18 @@ class PlankShoulderTap extends ExerciseBase {
     return max(0.0, (_baselineWristY! - wristY) / scaleFactor);
   }
 
-  String? _cameraAngleGuidance() {
+  GuidanceSignal? _cameraAngleGuidance() {
     if (cameraFacing == CameraFacing.left ||
         cameraFacing == CameraFacing.right) {
       return null;
     }
     if (cameraFacing == CameraFacing.front) {
-      return 'Đặt camera ngang bên hông, không quay chính diện.';
+      return const GuidanceSignal.turnSide();
     }
     if (cameraFacing == CameraFacing.angled) {
-      return 'Xoay sang góc ngang bên hông rồi mới tập.';
+      return const GuidanceSignal.turnSide();
     }
-    return 'Cần đặt camera ngang bên hông để thấy thân người và tay chống sàn.';
+    return const GuidanceSignal.turnSide();
   }
 
   @override

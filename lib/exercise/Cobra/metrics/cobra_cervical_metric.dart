@@ -66,11 +66,7 @@ class CobraCervicalMetric extends CobraMetricBase {
     if (_hyperextensionDebouncer.update(cervicalAngle > _errorHyperextension)) {
       _isFaultingNow = true;
       ctx.resultIssues.feedback['Neck'] = '⚠️ Đầu ngửa quá nhiều!';
-      ctx.resultIssues.addInstruction(
-        'holding',
-        'neckHyperextension',
-        'Đừng ngửa đầu ra sau. Nhìn thẳng hoặc hơi nhìn xuống.',
-      );
+      // Legacy UI instruction copy: Đừng ngửa đầu ra sau. Nhìn thẳng hoặc hơi nhìn xuống.
       _logFault(phase, 'Neck hyperextension', 'NeckHyperextension');
     }
     // Warning: outside good range

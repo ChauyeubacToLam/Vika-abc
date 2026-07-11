@@ -84,13 +84,13 @@ class BearPlank extends ExerciseBase {
   double? get liveHoldTargetSeconds => maxSeconds.toDouble();
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.left &&
         cameraFacing != CameraFacing.right) {
-      return "Yêu cầu quay ngang để đo độ phẳng của lưng và độ cao đầu gối.";
+      return const GuidanceSignal.turnSide();
     }
     if (_getLandmarks(landmarks) == null) {
-      return 'Giữ vai, hông, gối, cổ tay và cổ chân rõ trong khung hình.';
+      return const GuidanceSignal.bodyInFrame();
     }
     return null;
   }

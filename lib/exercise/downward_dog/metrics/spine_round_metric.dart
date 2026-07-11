@@ -107,11 +107,7 @@ class SpineRoundMetric extends DownwardDogMetricBase {
       ctx.resultIssues.feedback['spine_round'] =
           'Cong gối nhiều hơn nhé! Giữ lưng dài, đừng gù lưng. Chân thẳng không quan trọng bằng lưng thẳng.';
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction(
-          'hold',
-          'spine_round',
-          'Cong gối nhiều hơn nhé! Giữ lưng dài, đừng gù lưng.',
-        );
+        // Legacy UI instruction copy: Cong gối nhiều hơn nhé! Giữ lưng dài, đừng gù lưng.
         _instructionSet = true;
       }
       _logFault('HOLD', 'Spine rounding — lumbar flexion detected');

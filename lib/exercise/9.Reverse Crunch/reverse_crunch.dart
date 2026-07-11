@@ -107,16 +107,16 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
   }
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.left &&
         cameraFacing != CameraFacing.right) {
-      return "Vui lòng đặt camera quay ngang để thấy rõ thân và chân.";
+      return const GuidanceSignal.turnSide();
     }
     if (getSideTrackedLandmarks(landmarks) == null) {
-      return "Không thấy đủ vai, hông, gối và cổ chân ở góc ngang.";
+      return const GuidanceSignal.bodyInFrame();
     }
     if (cameraFacing == CameraFacing.front) {
-      return "Vui lòng đặt camera quay ngang (Side View).";
+      return const GuidanceSignal.turnSide();
     }
     return null;
   }
@@ -386,7 +386,6 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
   void _rejectRepAttempt(RepContext ctx, String message) {
     _rejectedAttempts++;
     resultIssues.feedback['Result'] = 'Không tính rep';
-    resultIssues.addInstruction('lying', 'ReverseCrunch', message);
     _transitionState(ReverseCrunchState.lying, ctx.frameTimestamp);
     for (final metric in _metrics) metric.reset();
   }

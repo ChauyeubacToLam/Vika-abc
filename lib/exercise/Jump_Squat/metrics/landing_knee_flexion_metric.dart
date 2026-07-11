@@ -45,11 +45,9 @@ class LandingKneeFlexionMetric extends JumpSquatMetricBase {
       if (ctx.kneeAngle > LandingConfig.STIFF_LANDING_MIN) {
         const message = 'Tiếp đất quá cứng, trùng gối sâu hơn ngay.';
         ctx.resultIssues.feedback['landing_stiff'] = message;
-        ctx.resultIssues.addInstruction('landing', 'landing_stiff', message);
       } else if (ctx.kneeAngle > LandingConfig.SAFE_FLEXION_MAX) {
         const message = 'Tiếp đất chưa đủ sâu, trùng gối thêm để giảm lực.';
         ctx.resultIssues.feedback['landing_depth'] = message;
-        ctx.resultIssues.addInstruction('landing', 'landing_depth', message);
       }
     }
   }

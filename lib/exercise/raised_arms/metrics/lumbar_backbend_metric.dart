@@ -40,11 +40,7 @@ class LumbarBackbendMetric extends RaisedArmsMetricBase {
 
     if (_errorDebouncer.update(backLean > _errorMin)) {
       ctx.resultIssues.feedback['Backbend'] = '⚠️ Cẩn thận thắt lưng!';
-      ctx.resultIssues.addInstruction(
-        'holding',
-        'lumbarOverextend',
-        'Đứng thẳng lại, ưỡn ngực bằng lưng trên thôi.',
-      );
+      // Legacy UI instruction copy: Đứng thẳng lại, ưỡn ngực bằng lưng trên thôi.
     }
 
     if (_stickyErrorDebouncer.update(backLean > _errorMin)) {

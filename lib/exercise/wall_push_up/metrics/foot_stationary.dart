@@ -105,8 +105,7 @@ class FootStationaryMetric extends WallPushUpMetricBase {
     if (errorConfirmed) {
       ctx.resultIssues.feedback['Feet'] = 'Giữ chân cố định, đừng bước chân.';
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction(
-            'standing', 'Feet', 'Đặt chân cố định, không bước khi chống đẩy.');
+        // Legacy UI instruction copy: Đặt chân cố định, không bước khi chống đẩy.
         _instructionSet = true;
       }
       _logFault(phase, 'Chân di chuyển khi tập',
@@ -114,8 +113,7 @@ class FootStationaryMetric extends WallPushUpMetricBase {
     } else if (warningConfirmed) {
       ctx.resultIssues.feedback['Feet'] = 'Chân hơi di chuyển.';
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction(
-            'standing', 'Feet', 'Chân hơi lệch — giữ nguyên vị trí.');
+        // Legacy UI instruction copy: Chân hơi lệch — giữ nguyên vị trí.
         _instructionSet = true;
       }
       _logFault(phase, 'Chân hơi di chuyển',
@@ -132,11 +130,7 @@ class FootStationaryMetric extends WallPushUpMetricBase {
       ctx.resultIssues.feedback['Feet'] =
           'Kiễng gót chân lên, dồn lực vào mũi chân.';
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction(
-          'standing',
-          'Feet',
-          'Kiễng gót chân lên và giữ mũi chân cố định trên sàn.',
-        );
+        // Legacy UI instruction copy: Kiễng gót chân lên và giữ mũi chân cố định trên sàn.
         _instructionSet = true;
       }
       _logFault(

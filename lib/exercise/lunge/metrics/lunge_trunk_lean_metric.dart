@@ -81,11 +81,7 @@ class LungeTrunkLeanMetric extends LungeMetricBase {
       // ≥ 40° — Core collapse
       ctx.resultIssues.feedback['Back'] = 'Nâng ngực lên!';
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction(
-          'standing',
-          'Back',
-          'Giữ thân trên thẳng, siết cơ core khi bước lùi.',
-        );
+        // Legacy UI instruction copy: Giữ thân trên thẳng, siết cơ core khi bước lùi.
         _instructionSet = true;
       }
       _logFault(phase, 'Chest up! Core collapse');
@@ -93,11 +89,7 @@ class LungeTrunkLeanMetric extends LungeMetricBase {
       // < 0° — Leaning backward
       ctx.resultIssues.feedback['Back'] = 'Đừng ngả ra sau!';
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction(
-          'standing',
-          'Back',
-          'Đừng ngả ra sau! Giữ thân trên thẳng.',
-        );
+        // Legacy UI instruction copy: Đừng ngả ra sau! Giữ thân trên thẳng.
         _instructionSet = true;
       }
       _logFault(phase, "Don't lean back!");

@@ -77,6 +77,30 @@ here as "peer-reviewed source fetched by the agent", one notch below §4's confi
   bridge) "failure" is closer to form breakdown than bar-speed collapse. Calibrate against our own
   ExerciseLogger rep durations before encoding any threshold. Low.
 
+### Inter-rep pause as a grind signal (2026-07-09 follow-up run)
+
+Second capped Sonnet run (~7 searches / 6 fetches) checking whether the spontaneous pause BETWEEN
+reps is a documented proximity-to-failure signal, as a candidate primary trigger over rep-duration
+slowdown. Same verification caveat as §3's intro.
+
+- Direct evidence: none. No study measures whether spontaneous inter-rep pauses lengthen as a
+  self-paced set approaches failure. Unstudied, not refuted.
+- Mechanism is real at higher doses: imposed inter-rep rests of ~10s+ (cluster sets) demonstrably
+  reduce velocity loss / lactate / muscle damage (PCr resynthesis). High — PMC11667556, PMC6257924.
+  But imposed pauses of 0-5s showed NO effect on RIR-estimation validity (PubMed 38662926, Med) —
+  the casual between-rep pause range buys little physiological recovery.
+- Where the literature DOES localize near-failure slowdown, it's the concentric phase / sticking
+  region (rep duration), not pause growth. Med — PMC12521083 + squat kinematics studies. A
+  purpose-built wearable RIR-detection paper (arXiv 2512.11854) engineers time-in-rep features and
+  ignores inter-rep pause entirely (Low, absence-of-evidence).
+- Bodyweight/untrained pacing near failure: nothing found.
+
+Design reading (ours, provisional): gap-stretch is a BEHAVIORAL hesitation signal (deciding whether
+to attempt the next rep), not a physiological fatigue meter; rep-duration slowdown is the
+literature-backed physiological proxy. Neither has validated thresholds for pose-derived bodyweight
+data, so per-exercise weighting of the two signals must come from our own ExerciseLogger timestamp
+calibration, not citations.
+
 ### Phrasing + escalation near failure
 
 - Practitioner consensus (Starting Strength / NSCA coaching-education): grind-rep cues must be short,
@@ -102,6 +126,157 @@ guardrail; no evidence base exists to cite.
 - CANNOT honor: validated duration thresholds (all numbers are loaded-barbell LPT data); within-set
   placement evidence (doesn't exist); physiological corroboration of effort — any grind threshold is
   a proxy with unknown false-positive/negative rate.
+
+## 3b. Next-rep carryover deep-dive (2026-07-09 run)
+
+Targeted follow-up run for the parked post-rep/next-rep reminder design (state.md "instruction/structure
+cluster"). Single-pass capped Sonnet run, ~27 tool calls; claims carry the run's own confidence tags and
+were NOT independently re-verified — same trust level as §3. Overlapping ground (bandwidth, faded KR,
+silence-default, summary-KR) already lives in §1/§2 and is not repeated here.
+
+### Carryover / anticipatory cueing (the target behavior)
+
+- **No controlled study observes the exact behavior** (a cue on rep N explicitly referencing rep N+1).
+  Everything below is practitioner consensus + inference from cue-timing/brevity literature. Med at best.
+- Timing rule: a cue must arrive BEFORE the joint position it targets — "a cue for the knees at the
+  bottom of the squat must be given before the bar starts down." Cueing is reaction-triggering, not
+  analysis; late feedback is wasted. Med — Starting Strength / PTDC practitioner consensus.
+- Anticipatory pre-cues are phrased as forward instruction, not diagnosis: "this one, deeper" / "drive
+  the knees out this time", never a restatement of what went wrong. Low-Med — consistent across cue-brevity
+  sources, but the specific next-rep phrasing pattern itself is thinly evidenced.
+- One correction per rep, max — "two cues per rep is too much information; fix the second problem during
+  the next set" (Rippetoe lineage; independently echoed by Rearick "10 things → nothing"). Med-High.
+- Deliberate silence FIRST: "let the first rep(s) suck" — watch several reps, let the client self-organize,
+  then one specific note. Silence is a behavior, not a gap. Med — single strong source (Rearick), aligns
+  with self-controlled-feedback literature.
+
+### Decay: what happens when a cue doesn't work
+
+- **If the cue fails, change the cue — don't repeat it louder.** Switch image, switch internal↔external,
+  or simplify wording before concluding the client can't do it. Med-High — PTDC, Barbell Logic, Cressey
+  converge independently.
+- After cue-switching fails (~2 attempts), regress the exercise or table it for after the set — a third
+  identical real-time repetition reads as nagging in every source reviewed. No quantified attempt-count
+  threshold exists; "2" is the converging practitioner shape, not a measured number. Med.
+- If the client fixes it: go silent or downgrade to a generic acknowledgment — don't keep narrating a
+  solved problem (bandwidth logic: in-band = generic success signal only). Med-High.
+- Exception sanctioned by the literature: genuine safety faults (joint-risk positions) may be cued every
+  instance until fixed — the only case where repeat-every-rep is endorsed. Med.
+
+### End-of-set behavior
+
+- In the final 1–2 reps, verbal behavior shifts from technique correction to short encouragement
+  ("you've got it", "one more"); technique correction is largely abandoned past technical failure — the
+  set is stopped, not corrected. Med — converging industry sources, not framed as a speech study.
+
+### Phrasing
+
+- Positive/target framing over negation: "chest up" not "don't round your back" — negation doesn't
+  suppress the image of the wrong movement. Low-Med — practitioner blogs; the external-focus mechanism
+  underneath is high-confidence (Wulf).
+- **External focus × frequency interaction (new vs §2):** in Wulf's soccer throw-in study, 100% feedback
+  beat 33% under EXTERNAL-focus framing, but 33% beat 100% under INTERNAL-focus framing. An external-cue
+  voice coach can afford a higher cue rate than an internal-cue one. High — Frontiers 2010 / PMC3153799.
+- Praise > correction directionally always; named ratios (3:1–12:1) have no empirical convergence —
+  treat any specific ratio as folklore. Low for any number.
+
+### Closest analog to Vika
+
+- Kaushik & Simmons, robot exercise coach for older adults (arXiv:2601.08819): feedback cadence directly
+  shapes perceived helpfulness, and changing one modality's cadence changes perception of the other.
+  Only found study of an AUTOMATED real-time exercise voice coach; specifics beyond the abstract not
+  verified, population may not generalize. Med, directional only.
+
+### Gaps (searched, not found)
+
+- No observational study of PT speech across consecutive reps; no quantified regress-after-N-attempts
+  threshold; no praise-ratio consensus; nothing on Vietnamese/non-Western coaching norms (two targeted
+  searches in §3, again here) — stays a design judgment under the warm-encouraging guardrail.
+
+### Second same-day run (independent capped Sonnet run — deltas only)
+
+A second capped run (13 searches / 6 fetches; only 2 fetches succeeded, startingstrength.com 403'd
+twice) independently converged on the §3b core: cue lands before the phase it fixes, feedforward
+phrasing, one fault per cue, brevity, taper-don't-repeat. Convergence is snippet-level on both sides
+(mostly non-shared sources) — mild corroboration, not proof. New findings this run:
+
+- **Placement made concrete: start-of-rise of the NEXT rep.** A peak/end-measured fault fires its
+  reminder at the start-of-raise boundary of the following rep, not at rep-end of the flawed one
+  ("a hips-up cue must be given before the bottom is reached" — Rippetoe, snippet only). For
+  continuous-tempo exercises (glute bridge) same placement: no source names a mid-eccentric reminder
+  technique; start-of-raise is the evidence-consistent choice, not directly sourced. Med.
+- **Line cap ~5–7 words, one fault — directly read:** "if you can't yell it during a rep, it's too
+  long"; "one cue at a time, two max" (rypenfitness "The Art (and Science) of Cueing", the run's one
+  confirmed fetch besides PMC6698475). High for the craft rule.
+- **Reminder cadence once a fault is intermittent: ~1 per 3 reps, never every rep.** Rippetoe snippet
+  only. Med. (Safety faults exempt per §3b — repeat-every-instance is sanctioned there.)
+- **Confirm-after-fix: one short warm line when the reminded fault is fixed on the very next rep**
+  ("đó, đúng rồi" territory). General immediate-specific-praise literature; the exact rep-to-rep moment
+  is unobserved in any strength study. Med/Low. Reconciled with §3b's "go silent / downgrade to generic
+  acknowledgment once fixed": confirm ONCE on the first fixed rep, then silence owns it.
+- **Dependency risk of pre-rep reminders:** plausibly lower than concurrent feedback (guidance-
+  hypothesis dependency is driven by concurrent high-frequency KR) but not exempt — the taper still
+  applies. Reasoned synthesis, no direct study. Med.
+- Faded-KR anchor (PMC6698475) re-confirmed by direct fetch, same as §1/§2.
+
+## 3c. Breathing cues deep-dive (2026-07-11 run)
+
+Triggered by Nam's PT saying trainers cue breathing "most of the time". Single-pass capped Sonnet run
+(~15 tool calls); claims carry the run's own confidence tags and were NOT independently re-verified —
+same trust level as §3. Decision status: OPEN, awaiting Nam's call (see decisions.md once ruled).
+
+### Efficacy — exhale-on-exertion is real physiology, not just tradition
+
+- Bench-press within-subject study (n=12 trained males, PMC12801646): inhale-during-lift produced
+  lower set completion, less volume, highest RPE; breath-hold (Valsalva) lowered RPE but showed HRV
+  stress markers; authors call exhale-on-exertion the "safest strategy". Med — small n, heavy barbell,
+  not bodyweight core.
+- Most Vika-relevant finding: breath-holding during SIT-UPS raised mean BP +22.2±16.4 mmHg vs free
+  breathing (n=14 healthy adults, ScienceDirect S0003999303000492, snippet only). Establishes
+  breath-hold as a measurable physiological event even at bodyweight trunk-work intensity. Med.
+- The scary Valsalva numbers (300+/200+ mmHg) are all from near-maximal barbell lifting; applying
+  them to glute bridge/plank intensity is extrapolation, not measured risk. High that the extreme
+  literature doesn't transfer.
+
+### Observed PT behavior — the "most of the time" claim doesn't hold for S&C
+
+- The one controlled coach-observation study (PubMed 12173963, same source as §1) does not code
+  breathing as a behavior category at all — no empirical support for breathing cues being a large
+  chunk of real S&C coach speech. High for absence-of-category; full-text percentages unconfirmed
+  (abstract only this run).
+- Pilates/group-fitness pedagogy IS an every-rep breath metronome ("inhale to prepare, exhale on the
+  effort" — STOTT/Merrithew et al.), never faded. Med, practitioner consensus. The PT's claim reads
+  as Pilates/physio norm-bleed into a general-PT statement, not general strength practice.
+
+### Attentional cost — breathing is the canonical harmful internal cue
+
+- Wulf-lineage running-economy study: breath-focus condition had measurably worse economy (higher O2,
+  higher lactate) than external focus. Directly on point: making breath a salient real-time
+  attentional target degrades performance. High.
+
+### Timing/phrasing (practitioner consensus only)
+
+- Pilates convention: exhale completes at peak exertion, inhale on the return; short rhythmic
+  phrasing, cued every rep. Med. No source describes tapering breathing cues — the per-rep metronome
+  directly conflicts with our faded/bandwidth design rules (§1/§2).
+
+### Automated coaches
+
+- Virtual breathing-exercise coach ≈ human-equivalent for dedicated breathing exercises (Sci Reports
+  2026, Aston) — different product category, limited transfer. Med. No outcome data on breathing cues
+  inside any rep-counting fitness app. Gap.
+
+### Detection limits (pose-only, no breath sensing)
+
+- CAN honor: phase-timed open-loop INSTRUCTION ("thở ra khi nâng lên" fired at concentric start or in
+  setup) — an instruction, not a feedback claim, so it doesn't violate data honesty.
+- CANNOT honor: anything phrased as feedback ("you're holding your breath", "good breathing") —
+  unverifiable, violates the never-say-what-we-didn't-measure guardrail. Compliance is never known.
+
+### Gaps (searched, not found)
+
+- No trial on breathing-cue timing/taper in strength training; no frequency data for breathing cues
+  in general PT sessions; no Vietnam/SEA PT breathing-norm data (yoga marketing only, two searches).
 
 ## 4. Verification notes
 

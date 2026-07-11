@@ -165,8 +165,7 @@ class TrunkElevationMetric extends CurlUpMetricBase {
         voiceMessage: 'Chỉ nâng vai',
         priority: CurlUpFaultVoicePriority.trunkTooHigh,
       ));
-      ctx.resultIssues.addInstruction('resting', 'Range',
-          'Rep tới chỉ cần nâng vai khỏi sàn — giữ ROM ngắn để bảo vệ lưng.');
+      // Legacy UI instruction copy: Rep tới chỉ cần nâng vai khỏi sàn — giữ ROM ngắn để bảo vệ lưng.
       _loggedLevel = _HighFaultLevel.error;
       return;
     }
@@ -179,8 +178,7 @@ class TrunkElevationMetric extends CurlUpMetricBase {
         affectsForm: false,
         priority: CurlUpFaultVoicePriority.trunkTooHigh,
       ));
-      ctx.resultIssues.addInstruction(
-          'resting', 'Range', 'Rep tới hạ thấp một chút — giữ biên độ ngắn.');
+      // Legacy UI instruction copy: Rep tới hạ thấp một chút — giữ biên độ ngắn.
       _loggedLevel = _HighFaultLevel.warning;
     }
   }
@@ -209,11 +207,10 @@ class TrunkElevationMetric extends CurlUpMetricBase {
         voiceMessage: 'Cuộn cao hơn',
         priority: CurlUpFaultVoicePriority.trunkTooShallow,
       ));
-      ctx.resultIssues
-          .addInstruction('resting', 'Range', 'Rep tới cuộn cao hơn một chút.');
+      // Legacy UI instruction copy: Rep tới cuộn cao hơn một chút.
     } else {
       _status = MetricStatus.pass;
-      ctx.resultIssues.addInstruction('resting', 'Range', 'Biên độ rất chuẩn!');
+      // Legacy UI instruction copy: Biên độ rất chuẩn!
     }
   }
 

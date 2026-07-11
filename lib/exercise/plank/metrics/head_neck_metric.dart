@@ -111,16 +111,14 @@ class HeadNeckMetric extends PlankMetricBase {
       if (isDropError) {
         ctx.resultIssues.feedback['Neck'] = 'Đừng cúi đầu!';
         if (!_dropInstructionSet) {
-          ctx.resultIssues.addInstruction(
-              'resting', 'Neck', 'Đầu cúi quá — nhìn xuống sàn nhẹ thôi!');
+          // Legacy UI instruction copy: Đầu cúi quá — nhìn xuống sàn nhẹ thôi!
           _dropInstructionSet = true;
         }
         _logFault('Cúi đầu quá mức');
       } else {
         ctx.resultIssues.feedback['Neck'] = 'Đầu hơi cúi';
         if (!_dropInstructionSet) {
-          ctx.resultIssues.addInstruction(
-              'resting', 'Neck', 'Đầu hơi cúi — giữ thẳng hàng với lưng!');
+          // Legacy UI instruction copy: Đầu hơi cúi — giữ thẳng hàng với lưng!
           _dropInstructionSet = true;
         }
         _logFault('Đầu hơi cúi');
@@ -132,16 +130,14 @@ class HeadNeckMetric extends PlankMetricBase {
       if (isLiftError) {
         ctx.resultIssues.feedback['Neck'] = 'Đừng ngẩng đầu!';
         if (!_liftInstructionSet) {
-          ctx.resultIssues.addInstruction(
-              'resting', 'Neck', 'Ngẩng đầu quá — nhìn xuống sàn!');
+          // Legacy UI instruction copy: Ngẩng đầu quá — nhìn xuống sàn!
           _liftInstructionSet = true;
         }
         _logFault('Ngẩng đầu quá mức');
       } else {
         ctx.resultIssues.feedback['Neck'] = 'Đầu hơi ngẩng';
         if (!_liftInstructionSet) {
-          ctx.resultIssues.addInstruction(
-              'resting', 'Neck', 'Đầu hơi ngẩng — nhìn xuống sàn!');
+          // Legacy UI instruction copy: Đầu hơi ngẩng — nhìn xuống sàn!
           _liftInstructionSet = true;
         }
         _logFault('Đầu hơi ngẩng');

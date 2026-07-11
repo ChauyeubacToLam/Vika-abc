@@ -41,7 +41,6 @@ class TakeOffDepthMetric extends JumpSquatMetricBase {
           _minSquatAngle! > TakeOffConfig.SHALLOW_WARNING) {
         const message = 'Lấy đà nông quá, hạ hông sâu hơn rồi mới bật.';
         ctx.resultIssues.feedback['takeoff_depth'] = message;
-        ctx.resultIssues.addInstruction('squatting', 'takeoff_depth', message);
       }
     }
   }

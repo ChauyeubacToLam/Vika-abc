@@ -83,10 +83,10 @@ class PlankUpDown extends ExerciseBase {
   double? get liveHoldTargetSeconds => PlankConfig.HOLD_DURATION_SECONDS;
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.left &&
         cameraFacing != CameraFacing.right) {
-      return "⚠️ Vui lòng quay góc ngang (Side) để đo trục lưng.";
+      return const GuidanceSignal.turnSide();
     }
     return null;
   }
@@ -404,8 +404,8 @@ class PlankUpDown extends ExerciseBase {
 
     if (_isHoldState(plankState) && !_holdCompleteForState) {
       final remaining = _holdRemainingSeconds(now);
-      resultIssues.addInstruction(
-          plankState.name, 'Status', 'Hold! ${remaining.toStringAsFixed(1)}s');
+      resultIssues.setPhaseStatus(
+          plankState.name, 'Hold! ${remaining.toStringAsFixed(1)}s');
       debugData['holdProgress'] = _holdProgress(now);
       debugData['holdRemaining'] = remaining;
       debugData['Hold_Remaining'] = remaining.toStringAsFixed(1);
@@ -416,17 +416,16 @@ class PlankUpDown extends ExerciseBase {
 
     switch (plankState) {
       case PlankState.forearm_plank:
-        resultIssues.addInstruction(plankState.name, 'Status', 'Sẵn sàng đẩy');
+        resultIssues.setPhaseStatus(plankState.name, 'Sẵn sàng đẩy');
         break;
       case PlankState.pushing_up:
-        resultIssues.addInstruction(plankState.name, 'Status', 'Đang đẩy lên');
+        resultIssues.setPhaseStatus(plankState.name, 'Đang đẩy lên');
         break;
       case PlankState.high_plank:
-        resultIssues.addInstruction(
-            plankState.name, 'Status', 'Hạ xuống có kiểm soát');
+        resultIssues.setPhaseStatus(plankState.name, 'Hạ xuống có kiểm soát');
         break;
       case PlankState.lowering:
-        resultIssues.addInstruction(plankState.name, 'Status', 'Going Down...');
+        resultIssues.setPhaseStatus(plankState.name, 'Going Down...');
         break;
     }
   }

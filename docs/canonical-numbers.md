@@ -5,7 +5,7 @@ read here. Update this file first when any number changes. Business/pricing/surv
 `~/vika-ops/canonical-numbers-business.md`. On conflict, this file wins for technical values; flag and
 fix the other doc.
 
-Last reviewed: July 2, 2026.
+Last reviewed: July 11, 2026.
 
 ## Pose Detection Tech
 | Spec | Value |
@@ -92,6 +92,19 @@ with a pixel floor for close framings.
 | ACTIVE body-line / shoulder-wrist-X / shoulder-above-wrist / knee-clearance | 150 / 0.70 / 0.05 / 0.05 | Looser than setup so fatigue is coached not rejected. ACTIVE shoulder-wrist-X flagged for cut. |
 | MAX_REP | 15 | Per-set cap |
 
+## Glute Bridge Form Thresholds
+| Parameter | Value | Notes |
+|---|---|---|
+| Hip extension GOOD_MIN_ANGLE | 152 deg | Peak shoulder-hip-knee angle below this emits soft/non-critical `hip_extension`. Tightened 07-11 from 150 after device feel-test. |
+| Hip extension WARNING_MIN_ANGLE | 140 deg | Peak angle below this is the hard/form-affecting low-extension fault. Tightened 07-11 from 138. |
+| Hip extension HYPEREXT_THRESHOLD | 0.045 normalized deviation | Hip above shoulder-knee line beyond this emits critical `hyperextension`. Tightened 07-11 from 0.05. |
+| Neck/head HEAD_LIFT_THRESHOLD | 0.14 normalized (debounce 10 frames) | Ear above shoulder line beyond this (sustained) emits critical `neck_head`. LOOSENED 07-11 from 0.08 — was over-firing every rep; deliberately left sensitive-but-not-hair-trigger (Nam's hard fence: do not tighten this one further without device evidence). |
+| Knee angle good band | 85-135 deg | No `knee_angle` fault. Tightened 07-11 from 80-140. |
+| Knee angle acceptable upper band | 135-145 deg | No `knee_angle` fault; above 145 emits soft/non-critical feet-too-far cue. Tightened 07-11 from 150. |
+| Knee angle WARNING_MIN | 55 deg | Below this emits hard/form-affecting `knee_angle`; 55-85 emits soft/non-critical feet-too-close cue. Tightened 07-11 from 50. |
+| Speed control MIN_ECCENTRIC_RATIO | 1.3x | Eccentric/lowering duration below this emits soft/non-critical `speed_control`. Tightened 07-11 from 1.1x. |
+| Speed control rapid velocity | warning 0.08 / error 0.15 | Normalized descent velocity; warning is soft, error is hard/form-affecting. Tightened 07-11 from 0.09 / 0.16. |
+
 ## Coaching & Adaptation
 | Rule | Value |
 |---|---|
@@ -101,16 +114,16 @@ with a pixel floor for close framings.
 | Comparison ladder | 13 tiers, banner never empty |
 | Voice cue cadence / cooldowns / priority | Stochastic, no fixed values — see docs/reference/voice-coach/voice-behavior-spec.md (ADD 2026-07-07; supersedes the never-shipped "corrective 3 reps / positive 1 rep" + "5-layer queue") |
 
-Glute Bridge voice pilot tuning (07-08 device-test default; tune on device, shapes locked in
-docs/decisions.md). 07-09: cue types renamed (`criticalFault`/`softFault`/`setup`); numbers below unchanged.
+Glute Bridge voice pilot tuning (current 07-11 device-test values; tune on device, shapes locked in
+docs/decisions.md).
 
 | Cue | Value |
 |---|---|
-| Count | base 0.50, hunger +0.10, cap 1.0, rep 1 always, final 2 reps always, no relief valve |
+| Count | base 1.0, deterministic every landed rep (registration ruling), personality-immune |
 | Praise | base 0.50, hunger +0.10, cap 0.85, never twice in a row, no formScore probability multiplier |
 | Critical fault (`criticalFault`) | base 0.25, persistence +0.30, cap 0.85, first occurrence certain, no relief valve |
 | Soft fault (`softFault`) | base 0.20, hunger +0.08, cap 0.55, not first-occurrence deterministic |
-| Hustle | off |
+| Hustle | enabled; base 0.50, hunger +0.20, cap 0.90, post-fire idle penalty 2 (next eligible rolls start below baseline), hesitation-armed only |
 | Outcome collision guard | 2nd in-rep outcome cue: `criticalFault` only, different fault, ≥0.5s after previous outcome line's audio ENDS, max 2 voiced outcome cues/rep; the system's only time cooldown |
 
 Timing (07-09 — behavior, not numbers; see decisions.md + voice-coach/realtime-cue-design.html): `criticalFault`

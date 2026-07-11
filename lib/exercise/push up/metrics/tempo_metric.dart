@@ -8,7 +8,7 @@
    Architecture mirrors squat TempoMetric exactly:
    - onStateTransition() records timestamps + calculates durations
    - update() provides live feedback (null-gated)
-   - evaluateRep() logs faults + sets coaching instructions
+   - evaluateRep() logs faults + sets coaching references
    
    Vietnamese context:
    - Beginners with weak upper body naturally descend slowly → GOOD
@@ -101,7 +101,7 @@ class TempoMetric extends PushUpMetricBase {
   }
 
   /* -----------------------------------------------------------------------
-     REP COMPLETE — Log faults + set coaching instructions.
+     REP COMPLETE — Log faults + preserve coaching references.
      Called by PushUp after rep completes.
      ----------------------------------------------------------------------- */
   void evaluateRep(RepContext ctx) {
@@ -115,13 +115,11 @@ class TempoMetric extends PushUpMetricBase {
     if (_descentDuration! < TempoConfig.DESCENT_WARNING_MIN) {
       _logFault(phase,
           'Thả rơi quá nhanh (${_descentDuration!.toStringAsFixed(1)}s)');
-      ctx.resultIssues.addInstruction(
-          'plank', 'Tempo', 'Đừng thả rơi! Hạ người chậm 2-3 giây.');
+      // Legacy UI instruction copy: Đừng thả rơi! Hạ người chậm 2-3 giây.
     } else if (_descentDuration! < TempoConfig.DESCENT_GOOD_MIN) {
       _logFault(
           phase, 'Hạ hơi nhanh (${_descentDuration!.toStringAsFixed(1)}s)');
-      ctx.resultIssues
-          .addInstruction('plank', 'Tempo', 'Hạ người chậm hơn lần sau!');
+      // Legacy UI instruction copy: Hạ người chậm hơn lần sau!
     }
 
     _debugData['tempoResult'] = _faults.isEmpty ? 'good' : 'fault';

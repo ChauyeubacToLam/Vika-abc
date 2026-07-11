@@ -131,8 +131,7 @@ class WallContactMetric extends WallPushUpMetricBase {
       const message = 'Tay bị di chuyển — giữ tay cố định trên tường.';
       ctx.resultIssues.feedback['Wall'] = message;
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction('standing', 'Wall',
-            'Giữ tay cố định trên tường, không để tay đi theo người.');
+        // Legacy UI instruction copy: Giữ tay cố định trên tường, không để tay đi theo người.
         _instructionSet = true;
       }
       _logFault(phase, message,

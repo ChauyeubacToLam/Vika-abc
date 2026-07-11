@@ -66,8 +66,8 @@ class GuidanceSignage extends StatefulWidget {
   final String body;
   final SystemBannerMode mode;
 
-  /// Compact horizontal pill — used when the signage rides above another
-  /// full-screen surface (e.g. the orientation gate over the pause overlay).
+  /// Compact horizontal pill — reserved for cases where signage rides above
+  /// another full-screen surface.
   final bool compact;
 
   /// Landscape sizing: the same centered glyph-above-title layout, scaled

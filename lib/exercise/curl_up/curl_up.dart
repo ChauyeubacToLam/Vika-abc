@@ -315,17 +315,17 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
   // --- Safety Checks ---
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing == CameraFacing.front) {
-      return "⚠️ Hãy quay người sang ngang so với camera để theo dõi Curl-up";
+      return const GuidanceSignal.turnSide();
     }
 
     final required = getSideTrackedLandmarks(landmarks);
-    if (required == null) return "⚠️ Cơ thể chưa hiện đủ trong khung hình";
+    if (required == null) return const GuidanceSignal.bodyInFrame();
 
     final allConfident =
         required.values.every((lm) => ExerciseBase.isLandmarkConfident(lm));
-    if (!allConfident) return "⚠️ Điều chỉnh ánh sáng/vị trí";
+    if (!allConfident) return const GuidanceSignal.lighting();
 
     return null;
   }
@@ -462,7 +462,7 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
       }
     }
 
-    // 10. Phase-specific UI instructions
+    // 10. Phase-specific UI status
     _updatePhaseInstructions();
   }
 
@@ -560,13 +560,13 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
   void _updatePhaseInstructions() {
     switch (curlUpState) {
       case CurlUpState.resting:
-        resultIssues.addInstruction('resting', 'Status', restingStatus);
+        resultIssues.setPhaseStatus('resting', restingStatus);
         break;
       case CurlUpState.ascending:
-        resultIssues.addInstruction('ascending', 'Status', ascendingStatus);
+        resultIssues.setPhaseStatus('ascending', ascendingStatus);
         break;
       case CurlUpState.descending:
-        resultIssues.addInstruction('descending', 'Status', descendingStatus);
+        resultIssues.setPhaseStatus('descending', descendingStatus);
         break;
     }
   }
@@ -637,7 +637,7 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
 
     if (newState == CurlUpState.ascending &&
         previousCurlUpState == CurlUpState.resting) {
-      resultIssues.instructions.clear();
+      resultIssues.phaseStatus.clear();
       _resetRepPeaks();
     }
 

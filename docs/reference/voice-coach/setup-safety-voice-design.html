@@ -1,0 +1,1007 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Setup / tracking-safety voice · design for review · Vika</title>
+<style>
+:root{
+  --ink:#1F1812; --ink-soft:#4A4031; --muted:#8a7c63;
+  --page:#F1E9D9; --raised:#FBF7EE; --line:#E4DAC5; --line-soft:#EEE6D5;
+  --yellow:#FFB701;
+  --code-bg:#211A12; --code-fg:#EDE3CE; --code-dim:#9A8C71; --code-rule:#37291a;
+  --tip:#2E6E63; --tip-bg:#E9F1EE; --tip-line:#BFDBD3;
+  --warn:#A2472B; --warn-bg:#F7EAE2; --warn-line:#E7C6B6;
+  --idea:#8A6608; --idea-bg:#FBF0D6; --idea-line:#EBD69E;
+  --mono:"JetBrains Mono","SF Mono",Menlo,Consolas,monospace;
+  --sans:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font-family:var(--sans);line-height:1.62;font-size:16px;-webkit-font-smoothing:antialiased}
+code{font-family:var(--mono);overflow-wrap:anywhere;font-size:.92em}
+h1,h2,h3{line-height:1.18;font-weight:800;letter-spacing:-.01em}
+header.hero{padding:56px 28px 40px;background:radial-gradient(120% 140% at 12% 0%,#2b2117 0%,#1c150e 60%,#160f09 100%);color:#F3ECDD}
+.hero-in{max-width:900px;margin:0 auto}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:var(--yellow);margin:0 0 14px}
+header.hero h1{font-size:clamp(28px,5vw,44px);margin:0 0 14px;color:#FBF7EE}
+header.hero h1 .u{background:linear-gradient(transparent 68%,rgba(255,183,1,.42) 0);padding:0 2px}
+header.hero p.lede{font-size:17px;max-width:74ch;color:#D9CFBD;margin:0 0 26px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-family:var(--mono);font-size:12px;padding:6px 11px;border-radius:999px;border:1px solid rgba(255,255,255,.16);color:#E8DFCD;background:rgba(255,255,255,.04)}
+.chip b{color:var(--yellow);font-weight:600}
+main{max-width:900px;margin:0 auto;padding:8px 28px 120px}
+section{padding:30px 0;border-top:1px solid var(--line)}
+section:first-of-type{border-top:0}
+.kicker{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+h2{font-size:24px;margin:0 0 14px}
+h3{font-size:17px;margin:22px 0 8px}
+p{margin:10px 0;max-width:78ch}
+table{border-collapse:collapse;width:100%;margin:14px 0;font-size:14px;background:var(--raised)}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top;overflow-wrap:anywhere}
+th{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;background:var(--line-soft)}
+.code{margin:16px 0;border-radius:10px;overflow:hidden;border:1px solid var(--code-rule)}
+.code-head{font-family:var(--mono);font-size:12px;color:var(--code-dim);background:#191209;padding:8px 14px;border-bottom:1px solid var(--code-rule)}
+.code-body{background:var(--code-bg);color:var(--code-fg);padding:14px 16px;overflow-x:auto}
+.code-body pre{margin:0;font-family:var(--mono);font-size:13px;line-height:1.55}
+.call{border-radius:10px;padding:12px 16px;margin:16px 0;font-size:14.5px;border:1px solid}
+.call b.t{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px}
+.call.tip{background:var(--tip-bg);border-color:var(--tip-line)} .call.tip b.t{color:var(--tip)}
+.call.warn{background:var(--warn-bg);border-color:var(--warn-line)} .call.warn b.t{color:var(--warn)}
+.call.idea{background:var(--idea-bg);border-color:var(--idea-line)} .call.idea b.t{color:var(--idea)}
+.gl{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:20px 0}
+.gl>div{background:var(--raised);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:14px}
+.gl b{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px}
+.vn{font-style:italic}
+ul{max-width:78ch}
+li{margin:6px 0}
+/* ===== personal notes layer ===== */
+mark.note-hl{background:rgba(255,183,1,.20);border-bottom:2px solid rgba(255,183,1,.7);border-radius:2px;
+  cursor:pointer;color:inherit;padding:0 .5px;transition:background .12s ease}
+mark.note-hl.hot{background:rgba(255,183,1,.45)}
+mark.note-hl.flash{animation:noteflash 1.2s ease}
+@keyframes noteflash{0%,100%{background-color:rgba(255,183,1,.20)}30%{background-color:rgba(255,183,1,.62)}}
+.note-badge{display:inline-flex;align-items:center;justify-content:center;min-width:14px;height:14px;padding:0 3px;
+  margin:0 1px 0 2px;font-family:var(--sans);font-size:9px;font-weight:800;line-height:1;vertical-align:super;
+  background:var(--ink);color:#FBF7EE;border-radius:7px;cursor:pointer;user-select:none;transition:background .12s ease}
+.note-badge.hot{background:var(--yellow);color:var(--ink)}
+.note-card{transition:box-shadow .12s ease,border-color .12s ease}
+.note-card.linked{border-color:var(--yellow);box-shadow:0 0 0 2px rgba(255,183,1,.28)}
+.note-card.active{border-color:var(--yellow);box-shadow:0 0 0 3px rgba(255,183,1,.42)}
+.note-card .cnum{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;
+  background:var(--ink);color:#FBF7EE;border-radius:8px;font-size:10px;font-weight:800;margin-right:7px;vertical-align:middle}
+.note-fab{position:fixed;right:22px;bottom:22px;z-index:50;display:flex;align-items:center;gap:9px;
+  background:var(--ink);color:#FBF7EE;border:none;border-radius:999px;padding:12px 17px;cursor:pointer;
+  font-family:var(--sans);font-weight:600;font-size:14px;box-shadow:0 10px 26px -10px rgba(31,24,18,.55)}
+.note-fab:hover{background:#332619}
+.note-fab .cnt{font-family:var(--mono);font-size:12px;background:var(--yellow);color:var(--ink);
+  border-radius:999px;padding:1px 8px;min-width:20px;text-align:center}
+.note-pop{position:absolute;z-index:60;transform:translate(-50%,-100%);margin-top:-9px;display:none;
+  background:var(--ink);border-radius:9px;padding:5px;box-shadow:0 12px 30px -12px rgba(0,0,0,.5)}
+.note-pop button{background:var(--yellow);color:var(--ink);border:none;border-radius:6px;
+  padding:7px 12px;font-family:var(--sans);font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap}
+.note-pop:after{content:"";position:absolute;left:50%;top:100%;transform:translateX(-50%);
+  border:6px solid transparent;border-top-color:var(--ink)}
+.note-panel{position:fixed;top:0;right:0;height:100%;width:min(380px,92vw);z-index:70;background:var(--raised);
+  border-left:1px solid var(--line);box-shadow:-18px 0 40px -30px rgba(31,24,18,.5);display:flex;flex-direction:column;
+  opacity:0;visibility:hidden;transform:translateY(6px);transition:opacity .18s ease,transform .18s ease,visibility .18s}
+.note-panel.open{opacity:1;visibility:visible;transform:none}
+.note-panel .ph{padding:18px 18px 14px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.note-panel .ph h3{margin:0;font-size:17px;font-weight:800}
+.note-panel .ph .sub{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.03em}
+.note-panel .x{background:none;border:none;font-size:24px;line-height:1;cursor:pointer;color:var(--muted)}
+.newbtn{background:var(--ink);color:#FBF7EE;border:none;border-radius:8px;padding:7px 12px;font-family:var(--sans);font-weight:700;font-size:12.5px;cursor:pointer;white-space:nowrap}
+.composer{padding:12px 14px;border-bottom:1px solid var(--line);background:#fff}
+.composer .anchor{font-family:var(--mono);font-size:11px;color:var(--tip);background:var(--tip-bg);
+  border:1px solid var(--tip-line);border-radius:7px;padding:5px 8px;margin-bottom:8px;display:flex;gap:6px;align-items:center;overflow:hidden}
+.composer .anchor span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.composer .anchor .axn{margin-left:auto;cursor:pointer;font-weight:700;flex:none}
+.composer textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:9px;
+  font-family:var(--sans);font-size:15px;padding:10px;resize:vertical;min-height:82px;background:#fff;color:var(--ink)}
+.composer textarea:focus{outline:2px solid var(--yellow);outline-offset:0;border-color:transparent}
+.composer .crow{display:flex;flex-direction:column;align-items:stretch;gap:7px;margin-top:8px}
+.composer .chint{font-size:11.5px;color:var(--muted)}
+.composer .addbtn{display:block;width:100%;background:var(--ink);color:#FBF7EE;border:none;border-radius:9px;
+  padding:12px 16px;font-family:var(--sans);font-weight:700;font-size:15px;cursor:pointer}
+.composer .addbtn:hover{background:#332619}
+.storage-note{margin:0;padding:9px 14px;background:var(--warn-bg);border-bottom:1px solid var(--warn-line);
+  color:var(--warn);font-size:12px;line-height:1.5}
+.storage-note.ok{background:var(--tip-bg);border-bottom-color:var(--tip-line);color:var(--tip)}
+.note-list{flex:1;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:12px}
+.note-empty{color:var(--muted);font-size:14px;text-align:center;padding:40px 14px;line-height:1.7}
+.note-empty b{color:var(--ink)}
+.note-card{background:#fff;border:1px solid var(--line);border-radius:11px;padding:12px 13px}
+.note-card .loc{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--tip);font-weight:700;cursor:pointer;margin-bottom:6px;display:inline-block}
+.note-card .quote{font-size:12px;color:var(--ink-soft);border-left:3px solid var(--line);padding:2px 0 2px 9px;
+  margin:0 0 8px;font-family:var(--mono);white-space:pre-wrap;word-break:break-word;max-height:74px;overflow:auto}
+.note-card .body{font-size:14.5px;white-space:pre-wrap;word-break:break-word}
+.note-card .body.empty{color:var(--muted);font-style:italic}
+.note-card textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;font-family:var(--sans);
+  font-size:14.5px;padding:8px;resize:vertical;min-height:66px;background:#fff;color:var(--ink)}
+.note-card .row{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
+.note-card .row button{border:none;border-radius:7px;padding:6px 11px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:var(--sans)}
+.note-card .save{background:var(--ink);color:#FBF7EE}
+.note-card .edit{background:var(--line-soft);color:var(--ink-soft)}
+.note-card .del{background:var(--warn-bg);color:var(--warn)}
+.note-card .reply{background:var(--tip-bg);color:var(--tip)}
+.note-card .replies{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+.note-thread{border-left:3px solid var(--line);padding:5px 0 5px 10px}
+.note-thread .who{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:3px;font-weight:700}
+.note-thread .txt{font-size:13.5px;white-space:pre-wrap;word-break:break-word}
+.note-thread.agent{border-left-color:var(--yellow)}
+.note-thread.agent .who{color:var(--idea)}
+.reply-box{margin-top:9px}
+.reply-box textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;
+  font-family:var(--sans);font-size:14px;padding:8px;resize:vertical;min-height:52px;background:#fff;color:var(--ink)}
+.reply-box textarea:focus{outline:2px solid var(--yellow);outline-offset:0;border-color:transparent}
+.note-panel .pf{padding:11px 14px;border-top:1px solid var(--line);display:flex;gap:8px}
+.note-panel .pf button{flex:1;border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans);color:var(--ink-soft)}
+.note-panel .pf button:hover{background:var(--line-soft)}
+</style>
+</head>
+<body>
+<header class="hero"><div class="hero-in">
+  <p class="eyebrow">Voice coach · design for review · 2026-07-10 · rev 2 — Nam's 7 review notes resolved same day</p>
+  <h1>Setup / tracking-safety: <span class="u">the least optional cue in the app finally speaks</span></h1>
+  <p class="lede">When the person-gate blocks, <code>checkSafety</code> fails, or the skeleton vanishes,
+  the pipeline early-returns — no reps count — and the user is lying on the floor and cannot read the
+  screen. Today those states surface silent on-screen text. This design moves them to VOICE, backed by a
+  typed <code>GuidanceSignal</code>: one producer, two renderers (UI table + voice), a DETERMINISTIC
+  latch channel separate from the form-fault cues. Shape locked by Nam + Fable 07-10; Rev 3 folds Nam's
+  late-07-10 rulings (MIN_REFIRE + post-audio gap DELETED, grace per-class at the signal layer). <b>LANDED
+  IN CODE</b> (analyze clean, voice+exercise suites green; uncommitted, pending Nam's line review). This doc
+  now mirrors the running code. Drafted by Opus; Nam reviews every line.</p>
+  <div class="chips">
+    <span class="chip">backend <b>typed GuidanceSignal</b></span>
+    <span class="chip">renderers <b>UI table + voice</b></span>
+    <span class="chip">firing <b>deterministic latch</b></span>
+    <span class="chip">ping-pong guard <b>per-class re-fire ~10s (review)</b></span>
+    <span class="chip">content keys <b>4 + per-exercise orientation</b></span>
+    <span class="chip">check <b>stays granular</b></span>
+    <span class="chip">player <b>untouched</b></span>
+    <span class="chip">review <b>all 7 notes resolved 07-10</b></span>
+  </div>
+</div></header>
+<main>
+
+<section>
+  <p class="kicker">01 · Locked shape</p>
+  <h2>What is already decided (do not re-open)</h2>
+  <p>decisions.md 2026-07-10 "Setup/tracking-safety guidance moves to VOICE":</p>
+  <ul>
+    <li>The pipeline-BLOCKING states speak: person-gate blocks (searching/paused),
+      <code>checkSafety</code> (orientation, landmark-missing, lighting), the no-pose branch. Text-only was
+      a <b>silent dead system</b> for a floor-bound user.</li>
+    <li><b>One typed <code>GuidanceSignal</code>, two renderers.</b> Producers stop emitting free
+      <code>feedback['System']</code> strings. UI derives glyph+title+body from a table; voice derives a
+      content key. <code>checkSafety</code>'s return type changes <code>String?</code> → the typed signal
+      across ~20 subclasses (Nam approved the pipeline change).</li>
+    <li><b>The check stays granular; only the message generalizes.</b> Do NOT weaken the gate — the message
+      over-asks, the check under-asks, on purpose.</li>
+    <li><b>Content keys are coarse:</b> <code>orientation</code> (per-exercise), <code>body_in_frame</code>
+      (ALL landmark variants → one line, never name body parts), <code>paused</code>, <code>resume</code>,
+      <code>searching</code> = silent.</li>
+    <li><b>Firing is deterministic</b> (principle 3): latch per class, fire-once-on-entry, silent while held,
+      re-arm through an exit debounce, re-fire on genuine re-entry. NOT a probability draw.</li>
+    <li>All timings are <b>feel-tune</b>; nothing enters canonical-numbers.</li>
+    <li><b>Rev 2 — Nam's lavish review (07-10, 7 notes):</b> a per-class MINIMUM RE-FIRE INTERVAL (~10s)
+      <b>[SUPERSEDED by Rev 3 — deleted]</b>; implementation reuses the existing debouncer utilities;
+      <code>paused</code> confirmed timer-free; <code>resume</code> = producer-emitted (adapter-edge
+      rejected); UI copy defaults live in the UI table, signal carries only per-exercise overrides;
+      searching-silent + missing-asset-no-op confirmed as designed.</li>
+    <li><b>Rev 3 — Nam's late-07-10 rulings + LANDED IN CODE (analyze clean, voice+exercise suites green;
+      uncommitted, pending Nam review):</b> the per-class MIN_REFIRE interval is DELETED (re-firing is
+      governed only by continuous-presence latch semantics; a debounced exit + re-entry fires again; the
+      EXIT DEBOUNCE is the anti-ping-pong knob); the ~1s post-audio gap is DELETED (no time cooldowns
+      left — debounces + the single re-validated slot + sink serialization are the only limiters); the
+      grace is now PER-CLASS at the SIGNAL layer, shared by voice AND UI
+      (<code>ExerciseBase.kGuidanceSignalGraceClasses</code>, <code>guidanceSignalForPresentation</code>).
+      This doc now mirrors the landed code.</li>
+  </ul>
+</section>
+
+<section>
+  <p class="kicker">02 · Ground truth</p>
+  <h2>The code seam — read before trusting the design</h2>
+  <p>Three producers early-return the pipeline. Each is where a <code>GuidanceSignal</code> gets set today
+  as a <code>feedback['System']</code> string:</p>
+  <div class="code"><div class="code-head">lib/exercise/exercise_base.dart:307-320 — processPose gate block + checkSafety (verbatim)</div>
+  <div class="code-body"><pre>if (!verdict.proceed) {
+  resultIssues.feedback['System'] = _systemStringForBlock(verdict.block!);
+  return [repCount, resultIssues.feedback];          // ← BLOCKED: no reps count
+}
+cameraFacing = detectCameraFacing(smoothedLandmarks);
+final safetyError = checkSafety(smoothedLandmarks);  // ← String? today
+if (safetyError != null) {
+  resultIssues.feedback["System"] = safetyError;
+  return [repCount, resultIssues.feedback];          // ← BLOCKED: no reps count
+}</pre></div></div>
+  <div class="code"><div class="code-head">glute bridge checkSafety — granular, per-landmark; ONLY the return type/message changes (verbatim)</div>
+  <div class="code-body"><pre>if (cameraFacing != CameraFacing.left &amp;&amp; cameraFacing != CameraFacing.right) {
+  return "⚠️ Xin hãy quay nghiêng để theo dõi tư thế Glute Bridge";   // orientation
+}
+if (getSideTrackedLandmarks(landmarks) != null) return null;          // side view OK — far arm occluded, allowed
+final shoulder = ...; final hip = ...; final knee = ...;
+if (shoulder == null || hip == null || knee == null) {
+  return "⚠️ Đảm bảo vai, hông và gối trong khung hình";              // body_in_frame
+}
+if (!isLandmarkConfident(shoulder) || ...) {
+  return "⚠️ Hình ảnh không rõ. Điều chỉnh ánh sáng hoặc vị trí";      // body_in_frame (lighting)
+}</pre></div></div>
+  <p>Note the second line: side-view glute bridge <b>passes safety with the far arm invisible</b>. That is
+  the whole reason the gate must stay granular — a literal full-body requirement would block this exercise
+  forever, and a loosened one would score reps off landmarks it can't see (data honesty). The message says
+  "be fully in frame" (simple, always-safe); the check only demands shoulder/hip/knee. That asymmetry is
+  deliberate and must survive the refactor.</p>
+  <div class="call tip"><b class="t">The seam is already half-built</b>
+  <code>CueType.safety</code> exists (<code>voice_policy.dart</code>, <code>CueTuning(CueMode.always)</code>),
+  and <code>policy_voice_coach.dart:128-131</code> holds a standing <code>TODO(wiring)</code>: "ExerciseBase
+  exposes no structured safety-event signal (only the generic <code>resultIssues.feedback['System']</code>
+  string shared by searching/paused/instruction copy). Wire <code>CueType.safety</code> once a real
+  per-exercise hook exists." This design IS that hook. But <code>CueMode.always</code> returns
+  <code>true</code> every frame — the latch/debounce below is the NEW logic deciding WHEN to hand it a key.</div>
+  <p>And the UI already sniffs strings — including a machine token smuggled INTO the display copy, which is
+  the honest tell that the string channel is a de-facto enum with none of the type safety:</p>
+  <div class="code"><div class="code-head">lib/screens/exercise/active_exercise_page.dart:2484-2523 — the sniffers this design deletes (verbatim, trimmed)</div>
+  <div class="code-body"><pre>_GuidanceCopy? _guidanceForSystemMessage(String rawMessage) {
+  final message = _translateSystemMessage(rawMessage);
+  final normalized = message.toLowerCase();
+  final rawNormalized = rawMessage.toLowerCase();
+  ...
+  if (rawNormalized.contains('wrong_orientation_landscape')) { ... }   // ← machine token INSIDE the copy
+  if (rawNormalized.contains('turn to the side') ||
+      normalized.contains('quay nghiêng')) { ... }                     // ← classify by substring
+  ...
+}</pre></div></div>
+  <p><b>ELI5:</b> the app already knows exactly which of a handful of situations you're in (turn sideways,
+  step back, too dark, paused). But it only tells the pipeline by writing a Vietnamese sentence, then both
+  the screen AND (soon) the voice have to READ that sentence back and guess which situation it meant. This
+  design writes down the situation itself — a labelled tag — so the screen and the voice each just look up
+  what to do. Same idea as an airport: the sign and the announcement both come from one departure code, not
+  from someone re-reading the sign aloud.</p>
+</section>
+
+<section>
+  <p class="kicker">03 · The backend</p>
+  <h2>One producer, two renderers</h2>
+  <p>The producer emits a <b>fine-grained class</b> (so the UI keeps its rich glyph vocabulary), plus
+  optional per-exercise copy. Voice <b>collapses</b> that class to a coarse content key (the anti-spam
+  decision). The class vocabulary is the existing <code>GuidanceGlyphKind</code> (rotate / turnSide /
+  faceCamera / light / search / stepBack / still) plus <code>paused</code> and <code>resume</code> as
+  distinct members (transient, not steady-state glyphs).</p>
+  <div class="code"><div class="code-head">PROPOSED shape — not code yet; Codex reconciles the exact enum with GuidanceGlyphKind</div>
+  <div class="code-body"><pre>// producer: ExerciseBase.guidanceSignal  (nullable; null = pipeline proceeding)
+GuidanceSignal { GuidanceClass kind; String? title; String? body; }   // title/body = per-exercise UI override
+
+// renderer 1 (UI): kind -> glyph + default title/body, one exhaustive table
+// renderer 2 (voice): kind -> content key (COARSE), per below</pre></div></div>
+  <table>
+    <tr><th>producer class</th><th>fires from</th><th>UI glyph</th><th>voice content key</th></tr>
+    <tr><td><code>turnSide</code></td><td>checkSafety cameraFacing wrong (glute bridge)</td><td>turnSide</td><td><code>common.side_orientation</code> — SHARED side-view line</td></tr>
+    <tr><td><code>faceCamera</code></td><td>checkSafety front-view exercises</td><td>faceCamera</td><td style="color:var(--muted)">↳ same key</td></tr>
+    <tr><td><code>stepBack</code> / fit</td><td>checkSafety landmark missing</td><td>stepBack</td><td><code>common.body_in_frame</code> — ONE generic line for all</td></tr>
+    <tr><td><code>light</code></td><td>checkSafety low confidence / lighting</td><td>light</td><td style="color:var(--muted)">↳ same key</td></tr>
+    <tr><td>(tracking-loss)</td><td>no-pose branch while activated</td><td>fit</td><td style="color:var(--muted)">↳ same key</td></tr>
+    <tr><td><code>search</code></td><td>gate seeking / hold-to-start</td><td>search</td><td><b>— (silent)</b> intro covers it</td></tr>
+    <tr><td><code>paused</code></td><td>gate pause commit</td><td>pause overlay</td><td><code>common.paused</code></td></tr>
+    <tr><td><code>resume</code></td><td>gate resume edge</td><td>(existing)</td><td><code>common.resume</code></td></tr>
+  </table>
+  <div class="call idea"><b class="t">Orientation is COMMON per mode (07-10), body_in_frame is one generic line</b>
+  There are only ~3 orientation modes total (side / portrait / face-camera), so orientation lines are SHARED
+  <code>common.*</code> keys per mode — a few recordings beat one per exercise (07-10, supersedes the earlier
+  per-exercise <code>&lt;slug&gt;.orientation</code> plan). Only the SIDE mode has a key today
+  (<code>common.side_orientation</code>, "Bạn quay nghiêng người với màn hình nhé"); other modes onboard
+  their key when an exercise needs them. <b>body_in_frame</b>'s remedy is identical for every variant ("get
+  fully / clearly in frame"), AND the missing landmark cycles knee→hip→knee frame to frame as confidence
+  bounces — naming parts would machine-gun. One class, one latch, one line.</div>
+</section>
+
+<section>
+  <p class="kicker">04 · The firing policy</p>
+  <h2>The latch / debounce / slot state machine (read this hardest)</h2>
+  <p>This is the CORE. It is deterministic — no probability, no hunger — because setup/structure/safety is
+  reserved for causality (principle 3). The player (<code>QueuedAssetVoicePlayer</code>) stays a dumb FIFO;
+  ALL of this lives in a new adapter-owned controller, sibling to <code>VoicePolicy</code>.</p>
+  <h3>Per steady-state class (<code>orientation</code>, <code>body_in_frame</code>)</h3>
+  <div class="code"><div class="code-head">PSEUDOCODE — the per-class latch (feel-tune constants flagged; mirrors landed code)</div>
+  <div class="code-body"><pre>state per class C:  CLEAR | LATCHED | LATCHED_RECUED
+timers per class C: conditionTrueSince, conditionClearSince, latchedSince
+
+each frame, given C's condition = present/absent this frame:
+
+  CLEAR:
+    if present for &ge; ENTER_DEBOUNCE_MS (~1s continuous):   // flicker guard
+        request(C)              // enqueue into the single slot, latest-wins
+        state = LATCHED; latchedSince = now
+    // brief flicker to present-then-absent never crosses the debounce -> no fire
+    // NOTE: request() enqueues into the slot; the PUMP is the ONLY gate
+    // (sink-free + re-validation). No wall-clock re-fire block — a
+    // debounced exit + genuine re-entry fires again.
+
+  LATCHED:
+    if absent for &ge; EXIT_DEBOUNCE_MS (~1s continuous):
+        state = CLEAR           // re-armed; a genuine RE-ENTRY will fire again
+    else if still present for &ge; RE_CUE_MS (~10s since latchedSince):
+        request(C, recue=true)  // ONE re-cue, then quiet for real
+        state = LATCHED_RECUED  // (fuller/help register is the content INTENT;
+                                //  v1 audio replays the same file — missing-audio.md)
+
+  LATCHED_RECUED:
+    if absent for &ge; EXIT_DEBOUNCE_MS: state = CLEAR   // only exit is clearing
+    // never fires again while continuously latched</pre></div></div>
+  <div class="call tip"><b class="t">Review directive — reuse the house debouncers</b>
+  The enter/exit timers are NOT new timer code: implement them with the existing utilities in
+  <code>lib/utils/</code> (<code>StickyDebouncer</code> / <code>Debouncer</code> — the same hysteresis
+  machinery the orientation detector already trusts). One debouncer per class per edge, or one
+  <code>StickyDebouncer</code> where its two-sided shape fits. New timer logic is limited to
+  <code>latchedSince</code> bookkeeping (the RE_CUE_MS clock).</div>
+  <h3>The single pending slot (latest-wins, re-validated at speak time)</h3>
+  <p>Setup lines are <b>state descriptions, not events</b>. <code>request(C)</code> does NOT push straight
+  to the FIFO — it writes ONE slot (overwriting any waiting request; latest wins). A pump drains the slot
+  only when the sink is free — audio serialization is the ONLY drain gate (Rev 3: no time cooldowns).
+  At drain time it <b>re-validates</b>: is C's condition still true right now?</p>
+  <ul>
+    <li>Still true → speak (<code>orientation</code> → <code>common.side_orientation</code>,
+      <code>body_in_frame</code> → <code>common.body_in_frame</code>).</li>
+    <li>Cleared while waiting → <b>DROP silently</b>. The drop is correct: the user already complied. Never
+      FIFO-stack safety lines — a stale "turn sideways" after they already turned is worse than silence.</li>
+  </ul>
+  <div class="call warn"><b class="t">Rev 3 — no wall-clock re-fire block (the ~10s MIN_REFIRE was deleted)</b>
+  Rev 2 added a per-class ~10s minimum re-fire interval to kill cross-class ping-pong (phone-fiddling
+  alternating orientation ↔ body every ~2s). Nam re-ruled after seeing it run: re-firing is governed ONLY
+  by continuous-presence latch semantics — a debounced exit + genuine re-entry MUST fire again (fix
+  orientation, regress 5s later → the coach responds). The failure mode of the floor (coach deaf to a real
+  regression for up to 10s = feels dead) is worse than the noise it prevented, and fiddling is
+  self-limiting. <b>Anti-ping-pong is now the EXIT DEBOUNCE's job</b> — instant flapping can't clear it, and
+  its width is THE feel-tune knob if device tests show fiddle-spam (never a wall-clock block). Only one ~10s
+  knob remains: <code>RE_CUE_MS</code>, the single "did you hear me" escalation while a class is CONTINUOUSLY
+  latched — presence-based, dies on exit.</div>
+  <h3>Edge classes (<code>paused</code>, <code>resume</code>)</h3>
+  <ul>
+    <li><b><code>paused</code></b> fires once on the pause COMMIT edge — the gate's own person-lost grace IS
+      its entire timing (confirmed in review). No enter-debounce, no cooldown logic of any kind on this
+      class: the gate already decides when a pause is real, and stacking a second timer would double-delay
+      the line. The latch controller treats the commit edge as pre-debounced.</li>
+    <li><b><code>resume</code></b> — DECIDED in review: <b>producer-emitted</b> (a one-frame
+      <code>resume</code> signal from the gate's resume edge), for one-family consistency — every guidance
+      event flows through <code>GuidanceSignal</code>, so the UI and any future consumer see the same edge.
+      The alternative (adapter detects the paused→active transition it already tracks for hustle
+      gap-voiding) was REJECTED: it works, but splits guidance semantics across two layers. It is a
+      one-shot, not a state; it does not latch.</li>
+  </ul>
+  <h3>Per-class grace at the SIGNAL layer (shared by UI + voice) — Rev 3</h3>
+  <p>At exercise open the body/orientation conditions are trivially true (user isn't positioned yet), so a
+  settle window suppresses the classes that ARE fixable in-position. Rev 3 made this <b>per-class and moved
+  it to the signal layer</b> so BOTH renderers honour one clock — no renderer drift.
+  <b>Graced</b> (<code>ExerciseBase.kGuidanceSignalGraceClasses</code>): <code>bodyInFrame</code>,
+  <code>lighting</code>, <code>turnSide</code>, <code>faceCamera</code>. <b>Ungraced</b> (fire/show from
+  frame one, because the user must fix them BEFORE getting into position, or they're informational/edge):
+  <code>phoneLandscape</code>, <code>phonePortrait</code>, <code>searching</code>, <code>paused</code>,
+  <code>resume</code>. The voice controller reads <code>exercise.isGuidanceGraceActive(kind)</code>; the UI
+  reads <code>exercise.guidanceSignalForPresentation</code> (null while a graced class is in grace) — one
+  source of truth, so graced signage is suppressed on screen exactly when its voice is.</p>
+  <div class="call tip"><b class="t">Grace anchor — fixed window from activation/set-start (pilot)</b>
+  The current <code>PolicyVoiceCoach</code> does NOT emit the setup intro (setup-voice wiring is parked;
+  <code>createVoiceCoach()</code> returns <code>PolicyVoiceCoach</code>, and the legacy
+  <code>_speakSetup</code> path in <code>_GenericExerciseVoiceCoach</code> is not on it). So there is no
+  intro audio to anchor to; the pilot uses a fixed <code>kGuidanceSignalGraceMs</code> (3500ms, feel-tune)
+  from set-start/activation. A clearly-commented seam re-anchors the grace to intro-audio-end when the
+  parked setup cluster wires the intro (a Fable decision, next chat). No hard-coded intro-end dependency.</div>
+  <div class="call warn"><b class="t">The integration point that will bite: the adapter early-returns</b>
+  <code>policy_voice_coach.dart:133</code> — <code>processFrame</code> RETURNS early when
+  <code>state != activated || isPaused || !hasPose</code>. Every setup/tracking-safety state hits that
+  guard. The setup-safety controller MUST run BEFORE (or outside) that early-return — it is the one path
+  that fires precisely when the rep pipeline is dormant. The controller reads
+  <code>exercise.guidanceSignal</code> every frame regardless of exercise state. To be precise about scope
+  (review note 4): this risk is <b>voice-adapter-internal only</b>. The UI signage path never goes through
+  <code>PolicyVoiceCoach</code> and already renders guidance pre-activation; if the controller lands after
+  the guard, the UI keeps working while the voice is silently dead — which is exactly what makes the bug
+  easy to miss on device.</div>
+</section>
+
+<section>
+  <p class="kicker">05 · State split</p>
+  <h2>Who owns what</h2>
+  <div class="gl">
+    <div><b>Producer — ExerciseBase</b>New nullable <code>guidanceSignal</code>, set each frame in the same
+      spots that set <code>feedback['System']</code> today (gate block, checkSafety, no-pose branch); null
+      when the pipeline proceeds. <code>checkSafety</code> returns the typed signal instead of
+      <code>String?</code> across ~20 subclasses. Copy stays base-owned (the gate stays language-free).</div>
+    <div><b>Adapter — the new latch controller</b>Per-class state + debouncers, the single pending slot, the
+      pump + re-validation, the resume edge. Runs every frame BEFORE the rep-pipeline early return. Reads the
+      grace from the signal layer (<code>isGuidanceGraceActive</code>), does not own it. Hands a resolved key
+      to the voice channel only at drain time. Cleared on <code>beginSet</code>.</div>
+    <div><b>Voice channel / policy</b>Effectively unchanged: <code>CueType.safety</code> is already
+      <code>CueMode.always</code>. The controller is what gates it; once the controller says "speak this key
+      now", the channel just plays it. The FIFO player is untouched.</div>
+    <div><b>UI — active_exercise_page</b>Reads <code>exercise.guidanceSignalForPresentation</code> (the
+      grace-aware getter, not <code>feedback['System']</code>); one exhaustive
+      <code>kind → glyph/title/body</code> table replaces <code>_guidanceForSystemMessage</code> +
+      <code>_translateSystemMessage</code>. Pause still renders the
+      overlay, not a banner (the null-return special-case becomes the <code>paused</code> class UI branch).</div>
+  </div>
+</section>
+
+<section>
+  <p class="kicker">06 · Content</p>
+  <h2>The lines — candidates for Anh Doan</h2>
+  <p>Warm, encouraging, never drill-sergeant; short (~≤7 words). 3 shared recordings + one per-exercise
+  orientation line. <code>searching</code> has NO line by design. The exact key → asset-filename mapping
+  (Nam fetches/records these himself) lives in missing-audio.md — one fact, one place; the table below is
+  wording only.</p>
+  <table>
+    <tr><th>key</th><th>line (candidate)</th><th>note</th></tr>
+    <tr><td><code>common.body_in_frame</code></td><td class="vn">"Vika không thấy rõ bạn, bạn giữ toàn thân trong khung hình nhé!"</td><td>ONE line for every landmark / lighting / tracking-loss variant</td></tr>
+    <tr><td><code>common.paused</code></td><td class="vn">"Vika đã tạm dừng màn hình tập."</td><td>pause commit edge only</td></tr>
+    <tr><td><code>common.resume</code></td><td class="vn">"Oke, mình tiếp tục nhé!"</td><td>one-shot; reps count again</td></tr>
+    <tr><td><code>common.side_orientation</code></td><td class="vn">"Bạn quay nghiêng người với màn hình nhé."</td><td>shared SIDE-view line (COMMON, not per-exercise); glute needs a side view</td></tr>
+  </table>
+</section>
+
+<section>
+  <p class="kicker">07 · Risks</p>
+  <h2>Lines most likely wrong + what to stress-test</h2>
+  <ul>
+    <li><b>Flicker across class boundaries — the exit debounce is the guard (Rev 3).</b> The two-edge
+      debounce guards flicker WITHIN a class. Cross-class ping-pong (phone-fiddling alternating
+      orientation-wrong ↔ body-out-of-frame every ~2s) was Rev 2's reason for a ~10s MIN_REFIRE, but Nam
+      deleted that in Rev 3 (a wall-clock block also silenced genuine comply-then-regress). The guard is now
+      the EXIT DEBOUNCE: instant flapping never clears it, so it never re-arms; its width is the feel-tune
+      knob. Device watch item: if deliberate fiddling still produces annoying alternation, LENGTHEN the exit
+      debounce — do not reintroduce a wall-clock block.</li>
+    <li><b>Intro grace vs a fast setter.</b> A user who is already positioned when the set starts clears the
+      frame before <code>GRACE_MS</code> ends. If they then drift out-of-frame right after grace, the first
+      real block could feel late (it waits out the enter debounce on top). Tune <code>GRACE_MS</code>
+      against real setup speed; err short — a slightly-early first cue beats a silent block. (Anchor itself
+      is DECIDED: activation/set-start, §04.)</li>
+    <li><b>Pause-commit edge vs the enter debounce (double-debounce).</b> The gate already applies a
+      person-lost grace before it commits <code>paused</code>. If the latch ALSO runs its enter debounce on
+      the <code>paused</code> class, the line lands ~1s+grace late. <code>paused</code> is an EDGE class —
+      review-confirmed: NO extra timers of any kind on the pause path (no debounce, no cooldown). Verify one
+      debounce, not two.</li>
+    <li><b>Stale-drop race (condition re-enters while a line is pending).</b> Sequence: block fires →
+      request enqueued → sink busy → user complies (condition clears) → user regresses (condition true
+      again) BEFORE the pump drains. The slot still holds the original request; re-validation at drain sees
+      "true" and speaks — correct outcome, but confirm the re-entry didn't also start a SECOND latch cycle
+      that double-requests. The single-slot latest-wins collapses it to one; verify the latch state didn't
+      go CLEAR→LATCHED twice across the comply/regress blip (the exit debounce should have swallowed the
+      brief clear).</li>
+    <li><b>Adapter early-return (§04 warn).</b> If the controller is placed after the existing guard it
+      NEVER runs during the exact states it exists for. This is the most likely "it does nothing" bug.
+      Stress-test: block the pipeline (turn the phone the wrong way) and confirm a line within ~1-2s.</li>
+    <li><b>Grace anchor drift (§04 tip).</b> The anchor is DECIDED (activation/set-start), but the failure
+      mode survives as an implementation risk: if Codex anchors to an intro-audio-end signal that doesn't
+      exist yet, the grace never releases and the channel is silent forever. Test that a wrong-orientation
+      open speaks after grace, not never.</li>
+    <li><b>The ~20-subclass <code>checkSafety</code> return-type change.</b> Mechanical but wide; every
+      subclass and its tests touch. <code>flutter analyze</code> + full test run gate it. The per-exercise
+      granular logic must keep its exact semantics — only the return value changes shape.</li>
+  </ul>
+  <p><b>Device stress-tests:</b> (1) open wrong-oriented → line after grace, once, not machine-gunned;
+  (2) comply → silence; regress (any time, even within a few s) → line again on debounced re-entry (Rev 3:
+  no wall-clock block); (3) hold the block 15s → exactly one fuller re-cue at ~10s, then silence;
+  (4) borderline confidence pose + deliberate phone-fiddling that alternates classes → the exit debounce
+  should keep it from machine-gunning; if not, lengthen the exit debounce (NOT a wall-clock block); (5) walk out mid-set →
+  <code>paused</code> on commit (not on first lost frame) → walk back → <code>resume</code> once → next rep
+  counts; (6) pool-empty / key-missing → safe no-op, zero crashes (VoiceSink already no-ops unmapped keys);
+  (7) glute side view with far arm invisible → still passes safety (the granular gate survived the
+  refactor).</p>
+</section>
+
+<section>
+  <p class="kicker">08 · Open questions</p>
+  <h2>All RESOLVED in Nam's lavish review (07-10, 7 notes)</h2>
+  <ul>
+    <li><b>Latch timers:</b> the enter/exit debounces reuse <code>StickyDebouncer</code>/<code>Debouncer</code>
+      from <code>lib/utils/</code>. Rev 3: NO wall-clock re-fire block — the exit debounce is the anti-ping-pong
+      guard; re-firing is presence-based. The only ~10s clock left is <code>RE_CUE_MS</code> (one escalation
+      while continuously latched).</li>
+    <li><b><code>paused</code>:</b> confirmed timer-free beyond the gate's own person-lost grace — no
+      enter-debounce, no cooldown. The gate IS its timing.</li>
+    <li><b>Grace: per-class at the SIGNAL layer</b> — <s>shared by UI + voice</s> <b>SUPERSEDED latest
+      07-10</b> (decisions.md "Setup-voice follow-ups"): grace is now VOICE-ONLY and spans exactly the
+      intro voice's playback; the UI renders signage live and ungated
+      (<code>guidanceSignalForPresentation</code> removed). Details §09. Audio: the glute-bridge
+      set is RECORDED and resolves (missing-audio.md).</li>
+    <li><b>Adapter early-return:</b> clarified (note 4) — the risk is voice-adapter-internal; the UI signage
+      path never goes through <code>PolicyVoiceCoach</code> and already works pre-activation. The danger is
+      the UI masking a silently-dead voice channel.</li>
+    <li><b><code>resume</code>: producer-emitted, LOCKED.</b> One-family consistency; the adapter-edge
+      alternative rejected (splits guidance semantics across layers).</li>
+    <li><b>UI copy source of truth: LOCKED</b> — defaults live in the UI table (glyph layer); the signal
+      carries only optional per-exercise overrides; the producer stays copy-free and voice never reads
+      title/body. Nam delegated with "do what makes the system cleanest"; this is it — VN copy in exactly
+      one table.</li>
+    <li><b><code>searching</code>-silent + missing assets:</b> confirmed as designed — logical keys resolve;
+      a missing asset is a safe, logged no-op.</li>
+  </ul>
+  <p><b>Landed, not open.</b> The channel + all three Rev-3 rulings are in the working tree (uncommitted,
+  pending Nam's line review); audio is recorded and resolves. Next: Nam reviews + commits, then runs the
+  §07 device stress-tests. The setup-INSTRUCTION cluster was ruled + landed the same day — §09 below.</p>
+</section>
+
+<section>
+  <p class="kicker">09 · Setup-instruction cluster</p>
+  <h2>Intro / countdown / ready / set-complete + the stuck-user re-tell (ruled + landed late 07-10)</h2>
+  <p>Ruling: decisions.md "Setup-instruction voice"; behavior spec § "Setup / structure". Implemented by an
+  Opus subagent (Nam's explicit call), Fable-reviewed, on top of this doc's channel. Uncommitted, same
+  review pass as the rest. Voice suite 86/86, exercise suite 135/135, analyze clean.</p>
+  <ul>
+    <li><b>Intro = one-shot broadcast, NOT a latch.</b> <code>&lt;slug&gt;.setup_position</code> +
+      <code>&lt;slug&gt;.active_intro</code> fire back-to-back once at set start, unconditional — no
+      pose/in-frame gating; the intro is what tells the user to get in frame. Latched per set
+      (<code>_introFired</code>); a <code>completed/activated → notActivated</code> transition re-arms all
+      per-set one-shots (inert for the single-set pilot, pre-wires multi-set).</li>
+    <li><b>Grace = VOICE-ONLY, spans exactly the intro playback (re-ruled latest 07-10).</b> The window is
+      re-pinned to <i>now</i> every frame while intro audio plays and CLOSES at intro-audio-end — no 3.5s
+      settle tail (the ~1s enter debounce is the only residual delay). The UI is NOT gated: the guidance
+      table renders the current signal live from frame one (a user still setting up is standing and
+      reading the screen; it's the VOICE over the intro that was the double-speak).
+      <code>guidanceSignalForPresentation</code> is removed. Intro-end detection waits on sink-idle with a
+      generous 30s ceiling (the player's silent 4s default would fake "idle" mid-intro); if the intro
+      produces no audio, voice grace falls back to the fixed ~3.5s set-start window. The 3.5s
+      activation-edge re-anchor is retained (pre-dates these rulings).</li>
+    <li><b>The countdown TERMINATES a still-playing intro (ruled latest 07-10).</b> A user already holding
+      the start position has no use for setup instructions: the first count to fire while intro audio
+      plays stops the sink (current + queued dropped), speaks immediately, and marks intro-audio-end at
+      that moment — voice grace closes with it. The intro never resumes; it was consumed. The activation
+      ring shows the remaining-seconds number CENTERED — the 'Giữ yên' caption is removed (Nam: it said
+      nothing); the on-screen number stays count-down while the voice counts up, kept deliberately
+      (mid-hold the user can't see the screen).</li>
+    <li><b>Voiced countdown "một / hai / ba"</b> synced to the 3s hold at 800/1600/2400ms elapsed
+      (feel-tune; 2400 &lt; 3000 on purpose so "ba" fires before activation nulls the hold clock). Reuses
+      the rep-count keys <code>'1'/'2'/'3'</code> → <code>common/count_1..3.mp3</code>, routed
+      deterministically (never rep-count thinning). A broken hold drops pending counts
+      (<code>clearPending()</code>, the currently-playing line finishes) and a re-hold restarts from "một";
+      activation keeps the queue so a mid-play "ba" survives as the go cue. <code>holdStill</code> itself
+      stays lineless — the countdown owns that state's audio.</li>
+    <li><b>Stuck-user re-tell:</b> <code>setupPosition</code> joins the latch controller with
+      <code>fireOnEntry: false</code> — entry fire suppressed (the intro was the first telling); the ONE
+      fire is a re-tell of <code>setup_position</code> when the class has been continuously latched and
+      <code>now − max(latch-start, intro-audio-end) ≥ ~10s</code> (own constant, separate knob from
+      RE_CUE_MS). Null intro-end blocks it outright — it can never speak over the intro. Debounced exit +
+      re-entry re-arms exactly one more.</li>
+    <li><b><code>common.ready</code></b> once on the activation edge; <b><code>common.set_complete</code></b>
+      once on completion — <i>differs from legacy</i>, which spoke <code>exercise_complete</code>. Needs
+      Nam's listen-check (§ stress-test list).</li>
+  </ul>
+  <p><b>What to stress-test on device (adds to §07):</b> (1) LISTEN: does <code>set_complete.mp3</code> read
+  right as the pilot's <i>total</i> finish, or does it imply a next set (then swap to
+  <code>exercise_complete</code>)? (2) <s>UI countdown direction</s> RULED: caption removed, number stays
+  count-down — verify the centered number looks right. (3) <s>fast-user count lag</s> RULED: the countdown
+  now terminates the intro — verify the mid-sentence cut sounds acceptable (not glitchy) on device. (4) The
+  re-tell delay (~10s past intro-end) vs real floor-settling time — slow-but-normal settlers must not get
+  re-told. (5) A voiced safety line queued during the intro delays intro-end detection (whole-sink idle, no
+  per-line signal) — rare at set start, watch for it. (6) NEW: with the UI ungated, confirm the signage
+  doesn't visually fight the intro moment (screen shows "get in frame" while the voice is still explaining
+  the exercise — expected and ruled, but check the feel).</p>
+</section>
+
+</main>
+<!-- ===== personal notes layer (private, saved to .lavish via the notes server) ===== -->
+<button class="note-fab" id="noteFab" aria-label="Open your notes">🖊 Notes <span class="cnt" id="noteCount">0</span></button>
+<div class="note-pop" id="notePop"><button id="notePopBtn" type="button">🖊 Note this</button></div>
+<aside class="note-panel" id="notePanel" aria-label="Your private notes">
+  <div class="ph">
+    <div><h3>Your notes</h3><div class="sub">private · saved to .lavish/lavish-notes.json</div></div>
+    <button class="x" id="notePanelClose" type="button" aria-label="Close">&times;</button>
+  </div>
+  <div class="composer">
+    <div class="anchor" id="noteAnchor" hidden></div>
+    <textarea id="noteInput" placeholder="Type your note, then click outside the box (or press ⌘/Ctrl+Enter) to save…"></textarea>
+    <div class="crow">
+      <span class="chint" id="noteHint">Will attach to the section you're viewing</span>
+      <button class="addbtn" id="noteAdd" type="button">Add note</button>
+    </div>
+  </div>
+  <div class="storage-note" id="storageNote" hidden></div>
+  <div class="note-list" id="noteList"></div>
+  <div class="pf">
+    <button id="noteCopy" type="button">Copy all</button>
+    <button id="noteDownload" type="button">Download .md</button>
+    <button id="noteClear" type="button">Clear all</button>
+  </div>
+</aside>
+
+<script>
+// ===== personal notes layer: anchored, local + disk-backed, never auto-sent to the agent =====
+(function () {
+  var KEY = 'vika-ssvd-notes-v1';
+  var NAMEKEY = 'VIKA_SSVD_NOTES::';
+  var DOC = encodeURIComponent(document.title);
+  var REMOTE = 'http://127.0.0.1:4599/notes?doc=' + DOC;
+  var localOk = true, remoteOk = false;
+  try { localStorage.setItem('vika-gbvc-t', '1'); localStorage.removeItem('vika-gbvc-t'); } catch (e) { localOk = false; }
+  function loadLocal() {
+    if (localOk) { try { var v = localStorage.getItem(KEY); if (v) return JSON.parse(v); } catch (e) {} }
+    try { if (window.name && window.name.indexOf(NAMEKEY) === 0) return JSON.parse(window.name.slice(NAMEKEY.length)); } catch (e) {}
+    return [];
+  }
+  var notes = loadLocal();
+
+  var fab = document.getElementById('noteFab');
+  var cnt = document.getElementById('noteCount');
+  var panel = document.getElementById('notePanel');
+  var list = document.getElementById('noteList');
+  var pop = document.getElementById('notePop');
+  var popBtn = document.getElementById('notePopBtn');
+  var input = document.getElementById('noteInput');
+  var anchorEl = document.getElementById('noteAnchor');
+  var hintEl = document.getElementById('noteHint');
+  var lastSel = null;
+  var pendingAnchor = null;
+
+  function mirrorLocal() {
+    var s = JSON.stringify(notes);
+    if (localOk) { try { localStorage.setItem(KEY, s); } catch (e) { localOk = false; } }
+    try { window.name = NAMEKEY + s; } catch (e) {}
+  }
+  function save() {
+    cnt.textContent = notes.length;
+    mirrorLocal();
+    if (remoteOk) {
+      try {
+        fetch(REMOTE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(notes) })
+          .catch(function () { remoteOk = false; updateStatus(); });
+      } catch (e) { remoteOk = false; }
+    }
+    updateStatus();
+  }
+  function updateStatus() {
+    var el = document.getElementById('storageNote'); if (!el) return;
+    if (remoteOk) {
+      el.hidden = false; el.className = 'storage-note ok';
+      el.textContent = '✓ Saved to disk — .lavish/lavish-notes.json (survives reloads & restarts while the notes server runs).';
+    } else if (localOk) {
+      el.hidden = true;
+    } else {
+      el.hidden = false; el.className = 'storage-note';
+      el.textContent = '⚠ The viewer blocks browser storage, so notes only survive reloads this session. Run the notes server or use “Download .md”.';
+    }
+  }
+  function uid() { return 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function sectionOf(node) {
+    var el = node && node.nodeType === 3 ? node.parentElement : node;
+    while (el && !(el.tagName === 'SECTION' && el.id)) el = el.parentElement;
+    return el;
+  }
+  function titleOf(sec) {
+    if (!sec) return 'Document';
+    var h = sec.querySelector('h2');
+    return h ? h.textContent.trim() : sec.id;
+  }
+  function currentSection() {
+    var secs = document.querySelectorAll('main section[id]');
+    var mid = window.scrollY + window.innerHeight / 2, best = null;
+    secs.forEach(function (s) { if (mid >= s.offsetTop && mid < s.offsetTop + s.offsetHeight) best = s; });
+    return best || secs[0] || null;
+  }
+  function setAnchor(a) {
+    pendingAnchor = a;
+    if (a && a.quote) {
+      anchorEl.hidden = false; anchorEl.innerHTML = '';
+      var t = document.createElement('span');
+      t.textContent = '“' + a.quote.slice(0, 90) + (a.quote.length > 90 ? '…' : '') + '”';
+      var x = document.createElement('span'); x.className = 'axn'; x.textContent = '✕'; x.title = 'Remove anchor';
+      x.onclick = function () { setAnchor(null); };
+      anchorEl.appendChild(t); anchorEl.appendChild(x);
+      hintEl.textContent = 'Attaching to this selection';
+    } else {
+      anchorEl.hidden = true; anchorEl.innerHTML = '';
+      hintEl.textContent = "Will attach to the section you're viewing";
+    }
+  }
+  function addFromComposer() {
+    var body = input.value.trim();
+    if (!body) { input.focus(); return; }
+    var a = pendingAnchor, sec = a ? document.getElementById(a.sectionId) : currentSection();
+    var n = {
+      id: uid(),
+      sectionId: a ? a.sectionId : (sec ? sec.id : ''),
+      sectionTitle: a ? a.sectionTitle : (sec ? titleOf(sec) : 'Document'),
+      quote: a ? a.quote : '',
+      start: a && a.start != null ? a.start : null,
+      end: a && a.end != null ? a.end : null,
+      body: body, createdAt: Date.now()
+    };
+    notes.push(n); render(); try { applyAll(); } catch (e) {} save();
+    input.value = ''; setAnchor(null);
+  }
+
+  // ---- anchored highlighting (spans across tokens, numbered) ----
+  function offsetOf(section, node, nodeOffset) {
+    var r = document.createRange();
+    r.selectNodeContents(section);
+    try { r.setEnd(node, nodeOffset); } catch (e) { return 0; }
+    return r.toString().length;
+  }
+  function appendBadge(mark, num, id) {
+    var b = document.createElement('sup');
+    b.className = 'note-badge'; b.dataset.nid = id; b.textContent = num;
+    b.title = 'Note ' + num + ' — click to open';
+    if (mark.parentNode) mark.parentNode.insertBefore(b, mark.nextSibling);
+  }
+  function clearHighlights() {
+    document.querySelectorAll('.note-badge').forEach(function (b) { b.remove(); });
+    document.querySelectorAll('mark.note-hl').forEach(function (m) {
+      var p = m.parentNode; while (m.firstChild) p.insertBefore(m.firstChild, m); p.removeChild(m); p.normalize();
+    });
+  }
+  function highlightRange(section, start, end, id, num) {
+    if (!section || start == null || end == null || end <= start) return false;
+    var w = document.createTreeWalker(section, NodeFilter.SHOW_TEXT, null), n, pos = 0, segs = [];
+    while ((n = w.nextNode())) {
+      var len = n.nodeValue.length, nodeStart = pos; pos += len;
+      if (pos <= start) continue;
+      if (nodeStart >= end) break;
+      if (n.parentElement && n.parentElement.closest('mark.note-hl')) continue;
+      var s = Math.max(0, start - nodeStart), e = Math.min(len, end - nodeStart);
+      if (e > s) segs.push({ node: n, s: s, e: e });
+    }
+    var made = 0, last = null;
+    segs.forEach(function (seg) {
+      var r = document.createRange(); r.setStart(seg.node, seg.s); r.setEnd(seg.node, seg.e);
+      var m = document.createElement('mark'); m.className = 'note-hl'; m.dataset.nid = id;
+      try { r.surroundContents(m); made++; last = m; } catch (e2) {}
+    });
+    if (made && last) appendBadge(last, num, id);
+    return made > 0;
+  }
+  function highlightFirst(section, quote, id, num) {
+    if (!section || !quote) return false;
+    var w = document.createTreeWalker(section, NodeFilter.SHOW_TEXT, null), tn;
+    while ((tn = w.nextNode())) {
+      if (tn.parentElement && tn.parentElement.closest('mark.note-hl')) continue;
+      var i = tn.nodeValue.indexOf(quote);
+      if (i >= 0) {
+        var r = document.createRange(); r.setStart(tn, i); r.setEnd(tn, i + quote.length);
+        var m = document.createElement('mark'); m.className = 'note-hl'; m.dataset.nid = id;
+        try { r.surroundContents(m); appendBadge(m, num, id); return true; } catch (e) { return false; }
+      }
+    }
+    return false;
+  }
+  function applyAll() {
+    clearHighlights();
+    notes.forEach(function (n, i) {
+      var sec = document.getElementById(n.sectionId); if (!sec) return;
+      var ok = false;
+      if (n.start != null && n.end != null) ok = highlightRange(sec, n.start, n.end, n.id, i + 1);
+      if (!ok && n.quote) highlightFirst(sec, n.quote, n.id, i + 1);
+    });
+  }
+  function setLinked(id, on) {
+    document.querySelectorAll('mark.note-hl[data-nid="' + id + '"], .note-badge[data-nid="' + id + '"]')
+      .forEach(function (el) { el.classList.toggle('hot', on); });
+    var card = list.querySelector('.note-card[data-nid="' + id + '"]');
+    if (card) card.classList.toggle('linked', on);
+  }
+
+  // ---- panel ----
+  function render() {
+    list.innerHTML = '';
+    if (!notes.length) {
+      var e = document.createElement('div'); e.className = 'note-empty';
+      e.innerHTML = 'No notes yet.<br>Type in the box above and hit <b>Add note</b>,<br>or select text/code and hit <b>🖊 Note this</b>.';
+      list.appendChild(e); return;
+    }
+    notes.slice().reverse().forEach(function (n) {
+      var num = notes.indexOf(n) + 1;
+      var card = document.createElement('div'); card.className = 'note-card'; card.dataset.nid = n.id;
+      card.onmouseenter = function () { setLinked(n.id, true); };
+      card.onmouseleave = function () { setLinked(n.id, false); };
+      var loc = document.createElement('span'); loc.className = 'loc'; loc.title = 'Jump to this spot';
+      var cn = document.createElement('span'); cn.className = 'cnum'; cn.textContent = num; loc.appendChild(cn);
+      loc.appendChild(document.createTextNode(' § ' + n.sectionTitle));
+      loc.onclick = function () { jump(n.id); }; card.appendChild(loc);
+      if (n.quote) { var q = document.createElement('div'); q.className = 'quote'; q.textContent = n.quote; card.appendChild(q); }
+      var body = document.createElement('div'); body.className = 'body' + (n.body ? '' : ' empty');
+      body.textContent = n.body || 'Empty — click Edit to write.'; card.appendChild(body);
+      if (n.replies && n.replies.length) {
+        var thread = document.createElement('div'); thread.className = 'replies';
+        n.replies.forEach(function (rp) {
+          var t = document.createElement('div');
+          t.className = 'note-thread' + (rp.author === 'agent' ? ' agent' : '');
+          var who = document.createElement('div'); who.className = 'who';
+          who.textContent = rp.author === 'agent' ? '↳ Claude' : '↳ You';
+          var tx = document.createElement('div'); tx.className = 'txt'; tx.textContent = rp.body;
+          t.appendChild(who); t.appendChild(tx); thread.appendChild(t);
+        });
+        card.appendChild(thread);
+      }
+      var row = document.createElement('div'); row.className = 'row';
+      var rb = document.createElement('button'); rb.className = 'reply'; rb.textContent = 'Reply'; rb.onclick = function () { replyCard(card, n); };
+      var ed = document.createElement('button'); ed.className = 'edit'; ed.textContent = 'Edit'; ed.onclick = function () { editCard(card, n); };
+      var dl = document.createElement('button'); dl.className = 'del'; dl.textContent = 'Delete';
+      dl.onclick = function () { notes = notes.filter(function (x) { return x.id !== n.id; }); render(); try { applyAll(); } catch (e) {} save(); };
+      row.appendChild(rb); row.appendChild(ed); row.appendChild(dl); card.appendChild(row);
+      list.appendChild(card);
+    });
+  }
+  function editCard(card, n) {
+    card.innerHTML = '';
+    var loc = document.createElement('span'); loc.className = 'loc'; loc.textContent = '§ ' + n.sectionTitle; card.appendChild(loc);
+    if (n.quote) { var q = document.createElement('div'); q.className = 'quote'; q.textContent = n.quote; card.appendChild(q); }
+    var ta = document.createElement('textarea'); ta.value = n.body || ''; ta.placeholder = 'Type your note…'; card.appendChild(ta);
+    var row = document.createElement('div'); row.className = 'row';
+    var sv = document.createElement('button'); sv.className = 'save'; sv.textContent = 'Save';
+    sv.onclick = function () { n.body = ta.value.trim(); save(); render(); };
+    row.appendChild(sv); card.appendChild(row);
+    ta.focus();
+    ta.addEventListener('keydown', function (e) { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') sv.click(); });
+  }
+  // Reply to a note: threads under it (author 'nam'); the agent writes replies with
+  // author 'agent' straight to the notes-server, and live-sync below surfaces them.
+  function replyCard(card, n) {
+    if (card.querySelector('.reply-box')) { card.querySelector('.reply-box textarea').focus(); return; }
+    var box = document.createElement('div'); box.className = 'reply-box';
+    var ta = document.createElement('textarea'); ta.placeholder = 'Reply to this note…'; box.appendChild(ta);
+    var row = document.createElement('div'); row.className = 'row';
+    var sv = document.createElement('button'); sv.className = 'save'; sv.textContent = 'Send reply';
+    var cx = document.createElement('button'); cx.className = 'edit'; cx.textContent = 'Cancel';
+    sv.onclick = function () {
+      var t = ta.value.trim(); if (!t) { ta.focus(); return; }
+      n.replies = n.replies || []; n.replies.push({ author: 'nam', body: t, createdAt: Date.now() });
+      save(); render(); try { applyAll(); } catch (e) {}
+    };
+    cx.onclick = function () { box.remove(); };
+    row.appendChild(sv); row.appendChild(cx); box.appendChild(row);
+    card.appendChild(box); ta.focus();
+    ta.addEventListener('keydown', function (e) { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') sv.click(); });
+  }
+  function openPanel() { panel.classList.add('open'); setTimeout(function () { if (input) input.focus(); }, 40); }
+  fab.onclick = function () {
+    panel.classList.toggle('open');
+    if (panel.classList.contains('open')) setTimeout(function () { if (input) input.focus(); }, 40);
+  };
+  document.getElementById('notePanelClose').onclick = function () { panel.classList.remove('open'); };
+  document.getElementById('noteAdd').onclick = addFromComposer;
+  input.addEventListener('keydown', function (e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); addFromComposer(); }
+  });
+  input.addEventListener('blur', function () { if (input.value.trim()) addFromComposer(); });
+
+  function jump(id) {
+    var marks = document.querySelectorAll('mark.note-hl[data-nid="' + id + '"]');
+    var n = notes.find(function (x) { return x.id === id; });
+    var target = marks[0] || (n && document.getElementById(n.sectionId));
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    marks.forEach(function (m) { m.classList.remove('flash'); void m.offsetWidth; m.classList.add('flash'); });
+  }
+
+  // ---- selection popover ----
+  function hidePop() { pop.style.display = 'none'; }
+  document.addEventListener('mouseup', function () {
+    setTimeout(function () {
+      var s = document.getSelection();
+      if (!s || s.isCollapsed) { hidePop(); return; }
+      var txt = s.toString();
+      if (!txt.trim()) { hidePop(); return; }
+      var host = s.anchorNode && (s.anchorNode.nodeType === 3 ? s.anchorNode.parentElement : s.anchorNode);
+      if (!host || !host.closest('main')) { hidePop(); return; }
+      var range = s.getRangeAt(0);
+      var section = sectionOf(range.startContainer);
+      var start = 0, end = 0;
+      if (section) {
+        start = offsetOf(section, range.startContainer, range.startOffset);
+        end = offsetOf(section, range.endContainer, range.endOffset);
+        if (end < start) { var tmp = start; start = end; end = tmp; }
+      }
+      lastSel = { quote: txt.trim().slice(0, 2000), section: section, start: start, end: end };
+      var rect = range.getBoundingClientRect();
+      var cw = document.documentElement.clientWidth;
+      var x = Math.min(Math.max(64, rect.left + rect.width / 2), cw - 64);
+      pop.style.left = (window.scrollX + x) + 'px';
+      pop.style.top = (window.scrollY + Math.max(rect.top, 8)) + 'px';
+      pop.style.display = 'block';
+    }, 10);
+  });
+  document.addEventListener('scroll', hidePop, { passive: true });
+  popBtn.addEventListener('mousedown', function (e) {
+    e.preventDefault();
+    if (!lastSel) return;
+    var sec = lastSel.section;
+    setAnchor({ sectionId: sec ? sec.id : '', sectionTitle: titleOf(sec), quote: lastSel.quote, start: lastSel.start, end: lastSel.end });
+    openPanel(); hidePop();
+    var sel = window.getSelection(); if (sel) sel.removeAllRanges();
+  });
+
+  document.addEventListener('click', function (e) {
+    var m = e.target.closest && e.target.closest('mark.note-hl, .note-badge');
+    if (!m || !m.dataset.nid) return;
+    var id = m.dataset.nid;
+    openPanel(); render();
+    var card = list.querySelector('.note-card[data-nid="' + id + '"]');
+    if (card) {
+      card.scrollIntoView({ block: 'center' });
+      card.classList.add('active');
+      setTimeout(function () { card.classList.remove('active'); }, 1600);
+    }
+  });
+  document.addEventListener('mouseover', function (e) {
+    var m = e.target.closest && e.target.closest('mark.note-hl, .note-badge');
+    if (m && m.dataset.nid) setLinked(m.dataset.nid, true);
+  });
+  document.addEventListener('mouseout', function (e) {
+    var m = e.target.closest && e.target.closest('mark.note-hl, .note-badge');
+    if (m && m.dataset.nid) setLinked(m.dataset.nid, false);
+  });
+
+  // ---- export ----
+  function toMd() {
+    return '# Glute Bridge × Voice Coach — my notes\n\n' + notes.map(function (n) {
+      var s = '## § ' + n.sectionTitle + '\n' + (n.quote ? '> ' + n.quote.replace(/\n/g, '\n> ') + '\n\n' : '') + (n.body || '') + '\n';
+      if (n.replies && n.replies.length) {
+        s += n.replies.map(function (rp) { return '\n**' + (rp.author === 'agent' ? 'Claude' : 'You') + ':** ' + rp.body; }).join('\n') + '\n';
+      }
+      return s;
+    }).join('\n');
+  }
+  document.getElementById('noteCopy').onclick = function () { if (navigator.clipboard) navigator.clipboard.writeText(toMd()); };
+  document.getElementById('noteDownload').onclick = function () {
+    var b = new Blob([toMd()], { type: 'text/markdown' }), u = URL.createObjectURL(b);
+    var a = document.createElement('a'); a.href = u; a.download = 'glute-bridge-voice-review-notes.md'; a.click(); URL.revokeObjectURL(u);
+  };
+  document.getElementById('noteClear').onclick = function () {
+    if (confirm('Delete ALL your notes? This cannot be undone.')) { notes = []; save(); applyAll(); render(); }
+  };
+
+  render(); try { applyAll(); } catch (e) {} mirrorLocal(); cnt.textContent = notes.length; updateStatus();
+  try {
+    fetch(REMOTE).then(function (r) { return r.ok ? r.json() : null; }).then(function (server) {
+      if (!Array.isArray(server)) return;
+      remoteOk = true;
+      if (server.length >= notes.length) {
+        notes = server; render(); try { applyAll(); } catch (e) {} cnt.textContent = notes.length;
+      } else {
+        save();
+      }
+      updateStatus();
+    }).catch(function () { remoteOk = false; updateStatus(); });
+  } catch (e) { updateStatus(); }
+
+  // Live sync: pull agent replies / new notes from the disk server without a reload,
+  // so a "↳ Claude" reply appears within a few seconds. Skips while an edit or reply
+  // box is open so it never clobbers something you're mid-typing.
+  var lastServerJson = JSON.stringify(notes);
+  setInterval(function () {
+    if (!remoteOk) return;
+    if (panel.querySelector('.note-card textarea') || panel.querySelector('.reply-box')) return;
+    fetch(REMOTE).then(function (r) { return r.ok ? r.json() : null; }).then(function (server) {
+      if (!Array.isArray(server)) return;
+      var sj = JSON.stringify(server);
+      if (sj === lastServerJson) return;
+      lastServerJson = sj;
+      notes = server; render(); try { applyAll(); } catch (e) {} cnt.textContent = notes.length;
+    }).catch(function () {});
+  }, 4000);
+})();
+</script>
+
+<script>
+// Scrollspy: highlight the current section in the TOC.
+(function () {
+  var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+  var map = {};
+  links.forEach(function (a) {
+    var id = a.getAttribute('href').slice(1);
+    var el = document.getElementById(id);
+    if (el) map[id] = a;
+  });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); });
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) {
+        links.forEach(function (l) { l.classList.remove('on'); });
+        var a = map[e.target.id];
+        if (a) a.classList.add('on');
+      }
+    });
+  }, { rootMargin: '0px 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { io.observe(s); });
+})();
+</script>
+</body>
+</html>

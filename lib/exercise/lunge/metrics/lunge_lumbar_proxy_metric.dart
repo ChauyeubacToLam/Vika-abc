@@ -78,11 +78,7 @@ class LungeLumbarProxyMetric extends LungeMetricBase {
       // < 140° with upright torso — lower back arching
       ctx.resultIssues.feedback['Core'] = 'Lưng đang võng! Gồng cơ bụng!';
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction(
-          'standing',
-          'Core',
-          'Giữ ngực, hông và đầu gối sau thẳng hàng như một đường thẳng.',
-        );
+        // Legacy UI instruction copy: Giữ ngực, hông và đầu gối sau thẳng hàng như một đường thẳng.
         _instructionSet = true;
       }
       _logFault(phase, 'Lower back arching! Brace core!');

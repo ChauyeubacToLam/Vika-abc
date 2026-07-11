@@ -110,13 +110,13 @@ class SitUp extends ExerciseBase with SideTrackedExerciseMixin {
   }
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.left &&
         cameraFacing != CameraFacing.right) {
-      return 'Hãy đặt camera ngang bên hông để theo dõi Sit-Up.';
+      return const GuidanceSignal.turnSide();
     }
     if (getSideTrackedLandmarks(landmarks) == null) {
-      return 'Giữ vai, hông, gối và cổ chân rõ trong khung hình.';
+      return const GuidanceSignal.bodyInFrame();
     }
     // Pain screening gate (thoát vị / đau thắt lưng) được xử lý ở UI layer
     // trước khi exercise này được khởi tạo. Xem: SitUpSafetyGateScreen.
@@ -243,7 +243,7 @@ class SitUp extends ExerciseBase with SideTrackedExerciseMixin {
       for (final metric in _metrics) metric.update(ctx);
     }
 
-    resultIssues.addInstruction(state.name, 'Status', currentPhaseLabel);
+    resultIssues.setPhaseStatus(state.name, currentPhaseLabel);
   }
 
   void _updateStateMachine(double trunkHoriz, double khsAngle, int now) {

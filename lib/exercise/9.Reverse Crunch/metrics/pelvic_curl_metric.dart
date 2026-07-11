@@ -64,11 +64,7 @@ class PelvicCurlMetric extends ReverseCrunchMetricBase {
         priority: CrunchVoicePriority.pelvicCurl,
         voiceMessage: 'Co gối về ngực và cuộn hông nhấc lên khỏi thảm.',
       ));
-      ctx.resultIssues.addInstruction(
-        'lying',
-        'Curl',
-        'Co gối về ngực trước, rồi cuộn xương chậu lên khỏi thảm.',
-      );
+      // Legacy UI instruction copy: Co gối về ngực trước, rồi cuộn xương chậu lên khỏi thảm.
     }
   }
 

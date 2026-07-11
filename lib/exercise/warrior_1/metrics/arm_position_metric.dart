@@ -80,8 +80,7 @@ class ArmPositionMetric extends WarriorOneMetricBase {
       _isFaultingNow = true;
       ctx.resultIssues.feedback['arms'] = 'Vươn tay cao hơn nhé!';
       if (!_lowInstructionSet) {
-        ctx.resultIssues.addInstruction(
-            'hold', 'arms', 'Vươn tay cao hơn nếu vai cho phép nhé!');
+        // Legacy UI instruction copy: Vươn tay cao hơn nếu vai cho phép nhé!
         _lowInstructionSet = true;
       }
       _logFault(phase, 'Arms', 'Arms hanging forward — reach overhead',
@@ -102,8 +101,7 @@ class ArmPositionMetric extends WarriorOneMetricBase {
       _isFaultingNow = true;
       ctx.resultIssues.feedback['arms'] = 'Duỗi thẳng khuỷu tay nhé!';
       if (!_elbowInstructionSet) {
-        ctx.resultIssues
-            .addInstruction('hold', 'arms', 'Duỗi thẳng khuỷu tay nhé!');
+        // Legacy UI instruction copy: Duỗi thẳng khuỷu tay nhé!
         _elbowInstructionSet = true;
       }
       _logFault(phase, 'Arms', 'Elbows bent — straighten the arms',

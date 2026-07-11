@@ -75,8 +75,7 @@ class KneeDriveRomMetric extends ClimberMetricBase {
       ));
       ctx.resultIssues.feedback['ROM'] =
           'Co gối ${side == KneeSide.left ? "trái" : "phải"} sâu hơn!';
-      ctx.resultIssues.addInstruction(
-          'high_plank_base', 'ROM', 'Co gối sâu hơn ở nhịp sau');
+      // Legacy UI instruction copy: Co gối sâu hơn ở nhịp sau
     } else {
       _goodRomCount++;
       ctx.resultIssues.feedback['ROM'] = 'Biên độ tốt';

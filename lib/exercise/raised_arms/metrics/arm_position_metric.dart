@@ -51,11 +51,7 @@ class ArmPositionMetric extends RaisedArmsMetricBase {
     if (tooLow) {
       ctx.resultIssues.feedback['Arms'] = 'Vươn tay cao hơn nhé';
       if (!_lowInstructionSet) {
-        ctx.resultIssues.addInstruction(
-          'holding',
-          'armsLow',
-          'Vươn tay cao hơn nếu vai cho phép nhé.',
-        );
+        // Legacy UI instruction copy: Vươn tay cao hơn nếu vai cho phép nhé.
         _lowInstructionSet = true;
       }
       _logFault(phase, 'Arms hanging forward', 'ArmsLow');
@@ -71,11 +67,7 @@ class ArmPositionMetric extends RaisedArmsMetricBase {
     if (elbowBent) {
       ctx.resultIssues.feedback['Arms'] = 'Duỗi thẳng khuỷu tay nhé';
       if (!_elbowInstructionSet) {
-        ctx.resultIssues.addInstruction(
-          'holding',
-          'elbowBent',
-          'Duỗi thẳng khuỷu tay, vươn dài lên nhé.',
-        );
+        // Legacy UI instruction copy: Duỗi thẳng khuỷu tay, vươn dài lên nhé.
         _elbowInstructionSet = true;
       }
       _logFault(phase, 'Elbows bent', 'ElbowBent');

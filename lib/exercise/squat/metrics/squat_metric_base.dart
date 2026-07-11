@@ -3,7 +3,7 @@
    
    Each metric is a self-contained unit that:
    - Receives frame data via update()
-   - Writes feedback + instructions to ctx.resultIssues
+   - Writes feedback to ctx.resultIssues
    - Logs faults into its own fault list
    - Resets cleanly between reps
    
@@ -16,10 +16,8 @@
    Data flow:
    - feedback{}  → cleared every frame in processPose()
                   → metrics write live cards here (Depth, Back, Feet, etc.)
-   - instructions{phase → {type → message}}
                   → coaching from evaluateRep() or per-frame faults
                   → cleared when new rep begins (standing → descending)
-                  → UI reads instructions[currentPhase] for coaching chips
    ========================================================================= */
 
 import '../squat.dart';
@@ -46,7 +44,7 @@ class RepContext {
   final double hipY;
   final double shoulderY;
 
-  /// Shared result container — metrics write feedback + instructions here.
+  /// Shared result container — metrics write feedback here.
   final ResultIssues resultIssues;
 
   RepContext({
@@ -84,7 +82,7 @@ abstract class SquatMetricBase {
   int faultsCount = 0;
 
   /// Called every frame during an active rep (squatState != standing).
-  /// Writes feedback + instructions directly to ctx.resultIssues.
+  /// Writes feedback directly to ctx.resultIssues.
   void update(RepContext ctx);
 
   /// Faults accumulated this rep. Squat reads these when rep completes.

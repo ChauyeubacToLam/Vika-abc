@@ -100,10 +100,11 @@ class DeadBug extends ExerciseBase {
           : null;
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
+  GuidanceSignal? checkSafety(
+      Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
     if (cameraFacing != CameraFacing.left &&
         cameraFacing != CameraFacing.right) {
-      return 'Vui lòng quay ngang người 100% với camera!';
+      return const GuidanceSignal.turnSide();
     }
     return null;
   }
@@ -398,7 +399,7 @@ class DeadBug extends ExerciseBase {
       debugData.addAll(metric.debugData);
     }
 
-    resultIssues.addInstruction(state.name, 'Status', currentPhaseLabel);
+    resultIssues.setPhaseStatus(state.name, currentPhaseLabel);
   }
 
   void _updateStateMachine(double maxAngle, int now) {
@@ -491,11 +492,6 @@ class DeadBug extends ExerciseBase {
   void _publishBlockingFault(FaultRecord fault) {
     resultIssues.feedback['Result'] = 'Fix Form';
     resultIssues.feedback['Error'] = fault.message;
-    resultIssues.addInstruction(
-      currentPhaseKey,
-      'Error',
-      fault.voiceMessage ?? fault.message,
-    );
   }
 
   void _resetRepState() {

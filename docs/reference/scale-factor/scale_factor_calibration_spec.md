@@ -123,5 +123,5 @@ than a private `_distance`; verify its signature before wiring.
 ## Open items
 - `SCALE_EMA_ALPHA = 0.1` is a starting guess; the curl_up device pass finalizes it.
 - Verify `calculateDistance` in `pose_math_helpers.dart` before using it in `_rawScale`.
-- Resume-rehold feature is NOT built here. When it lands, it must route state back to `notActivated`
-  (which it does anyway to re-run the hold); re-seeding then happens for free. No work needed now.
+- Resume re-hold landed 2026-07-10: active-set resume routes state back to `notActivated`, so scale
+  hard-tracks again during the hold and re-seeds the activated EMA for free. Device smoke still pending.

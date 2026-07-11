@@ -88,8 +88,7 @@ class TrunkLeanMetric extends WarriorOneMetricBase {
       ctx.resultIssues.feedback['trunk_lean'] =
           'Cẩn thận lưng! Đứng thẳng hơn, đừng gập quá nhiều.';
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction('hold', 'trunk_lean',
-            'Cẩn thận lưng! Đứng thẳng hơn, đừng gập quá nhiều.');
+        // Legacy UI instruction copy: Cẩn thận lưng! Đứng thẳng hơn, đừng gập quá nhiều.
         _instructionSet = true;
       }
       _logFault(phase, 'Trunk collapsing forward (>30°)',

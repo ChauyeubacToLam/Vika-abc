@@ -24,7 +24,6 @@ class CossackHeelLiftMetric extends CossackMetricBase {
     if (ctx.workingHeelDistance > HEEL_LIFT_THRESHOLD) {
       const message = 'Hạ gót chân xuống, giữ bàn chân trụ chạm sàn.';
       ctx.resultIssues.feedback['heel'] = message;
-      ctx.resultIssues.addInstruction(ctx.state.name, 'heel', message);
       addFault(
         FaultRecord(
           type: 'heel_lift',

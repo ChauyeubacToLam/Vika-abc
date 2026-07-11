@@ -2,7 +2,6 @@
 
 import 'dart:async';
 import 'dart:io';
-import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:camera/camera.dart';
@@ -1793,11 +1792,9 @@ class _ExerciseScreenState extends State<ExerciseScreen>
               Positioned(bottom: 12, right: 12, child: _buildRepCountOverlay()),
               if (_repLogs.isNotEmpty)
                 Positioned(bottom: 12, left: 12, child: _buildRepDots()),
-              _buildCoachingOverlay(),
             ],
           ),
         ),
-        _buildInstructionsBar(),
         _buildFeedbackCards(),
         _buildBottomBar(),
         if (_showDebug) _buildDebugPanel(),
@@ -2287,155 +2284,6 @@ class _ExerciseScreenState extends State<ExerciseScreen>
         ),
       ),
     );
-  }
-
-  /* ── INSTRUCTIONS BAR ── */
-  Widget _buildInstructionsBar() {
-    final phaseKey = _exercise.currentPhaseKey;
-    final phaseInstr = _exercise.resultIssues.instructions[phaseKey];
-    if (phaseInstr == null || phaseInstr.isEmpty)
-      return const SizedBox.shrink();
-
-    final statusText = phaseInstr['Status'];
-    if (statusText == null) return const SizedBox.shrink();
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      color: const Color(0xFF0D1228),
-      child: _buildStatusBadge(statusText),
-    );
-  }
-
-  Widget _buildStatusBadge(String statusText) {
-    final isHold = statusText.startsWith('Hold') ||
-        statusText.startsWith('Giữ') ||
-        statusText.contains('!');
-
-    final holdProgress = isHold
-        ? (_exercise.debugData['bottomHoldProgress'] as double? ??
-            _exercise.debugData['holdProgress'] as double? ??
-            0.0)
-        : null;
-
-    final phaseKey = _exercise.currentPhaseKey;
-    final color = _definition.phaseColors[phaseKey] ?? _definition.primaryColor;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.35), width: 1),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (holdProgress != null && holdProgress > 0) ...[
-            SizedBox(
-              width: 20,
-              height: 20,
-              child: CustomPaint(
-                painter: _ArcCountdownPainter(
-                  progress: holdProgress,
-                  color: color,
-                ),
-              ),
-            ),
-            const SizedBox(width: 7),
-          ] else ...[
-            Icon(_statusIcon(statusText), color: color, size: 14),
-            const SizedBox(width: 6),
-          ],
-          Text(
-            statusText,
-            style: TextStyle(
-              color: color,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.2,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /* ── COACHING OVERLAY ── */
-  Widget _buildCoachingOverlay() {
-    final phaseKey = _exercise.currentPhaseKey;
-    final phaseInstr = _exercise.resultIssues.instructions[phaseKey];
-
-    if (phaseInstr == null || phaseInstr.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    final coachingEntries =
-        phaseInstr.entries.where((e) => e.key != 'Status').toList();
-    if (coachingEntries.isEmpty) return const SizedBox.shrink();
-
-    return Positioned(
-      top: 60,
-      right: 8,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: coachingEntries.map((entry) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.65),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: const Color(0xFFFF9800).withValues(alpha: 0.35),
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.tips_and_updates_outlined,
-                    color: Color(0xFFFFB74D),
-                    size: 13,
-                  ),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      entry.value,
-                      style: const TextStyle(
-                        color: Color(0xFFFFB74D),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        height: 1.3,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  IconData _statusIcon(String status) {
-    if (status.contains('Xuống') || status.contains('Down'))
-      return Icons.arrow_downward_rounded;
-    if (status.contains('Giữ') ||
-        status.contains('Hold') ||
-        status.contains('Bottom')) return Icons.pause_circle_outline;
-    if (status.contains('Đứng lên') ||
-        status.contains('Push') ||
-        status.contains('Up')) return Icons.arrow_upward_rounded;
-    if (status.contains('Nghỉ') || status.contains('Rest'))
-      return Icons.bedtime_outlined;
-    if (status.contains('Chuẩn bị') || status.contains('Setup'))
-      return Icons.accessibility_new;
-    return Icons.info_outline;
   }
 
   /* ── FEEDBACK CARDS ── */
@@ -2954,53 +2802,6 @@ class _ExerciseScreenState extends State<ExerciseScreen>
       ),
     );
   }
-}
-
-/* =========================================================================
-   ARC COUNTDOWN PAINTER
-   ========================================================================= */
-
-class _ArcCountdownPainter extends CustomPainter {
-  final double progress;
-  final Color color;
-
-  const _ArcCountdownPainter({required this.progress, required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2 - 1.5;
-
-    canvas.drawCircle(
-      center,
-      radius,
-      Paint()
-        ..color = color.withValues(alpha: 0.2)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.5,
-    );
-
-    final sweepAngle = 2 * math.pi * progress;
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      -math.pi / 2,
-      sweepAngle,
-      false,
-      Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.5
-        ..strokeCap = StrokeCap.round,
-    );
-
-    if (progress >= 1.0) {
-      canvas.drawCircle(center, 2.5, Paint()..color = color);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_ArcCountdownPainter old) =>
-      old.progress != progress || old.color != color;
 }
 
 /* =========================================================================

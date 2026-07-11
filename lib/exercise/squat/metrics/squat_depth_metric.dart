@@ -101,8 +101,7 @@ class DepthMetric extends SquatMetricBase {
         voiceMessage: 'Xuống thấp hơn',
         priority: SquatFaultVoicePriority.depth,
       );
-      ctx.resultIssues
-          .addInstruction('standing', 'Depth', 'Go deeper next time!');
+      // Legacy UI instruction copy: Go deeper next time!
     }
   }
 

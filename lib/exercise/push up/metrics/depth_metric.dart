@@ -100,8 +100,7 @@ class DepthMetric extends PushUpMetricBase {
         affectsForm: true,
       ));
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction(
-            'plank', 'Depth', 'Chưa đủ sâu! Hạ ngực thấp hơn lần sau.');
+        // Legacy UI instruction copy: Chưa đủ sâu! Hạ ngực thấp hơn lần sau.
         _instructionSet = true;
       }
     } else if (min > DepthConfig.goodDepthMax) {
@@ -113,8 +112,7 @@ class DepthMetric extends PushUpMetricBase {
         affectsForm: false, // warning only, don't kill the rep
       ));
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction(
-            'plank', 'Depth', 'Thử xuống sâu hơn một chút lần sau!');
+        // Legacy UI instruction copy: Thử xuống sâu hơn một chút lần sau!
         _instructionSet = true;
       }
     }

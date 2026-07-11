@@ -53,11 +53,7 @@ class ArmPositionMetric extends LegRaiseMetricBase {
               : 'Tay rời xa hông';
       ctx.resultIssues.feedback['Arms'] = 'Duỗi thẳng hai tay, khép sát hông.';
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction(
-          'lying',
-          'Arms',
-          'Duỗi thẳng hai tay và khép sát bên hông trong suốt rep.',
-        );
+        // Legacy UI instruction copy: Duỗi thẳng hai tay và khép sát bên hông trong suốt rep.
         _instructionSet = true;
       }
       _logFault(ctx.state.name, message);

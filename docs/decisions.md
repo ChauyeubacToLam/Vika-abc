@@ -14,6 +14,515 @@ Alternatives considered: <what we rejected and why>
 
 ---
 
+## 2026-07-11 · Praise relief valve DROPPED (never built, hunger saturates first)
+Status: active — Nam 2026-07-11.
+Decision: The praise "5+ clean unpraised → next ≥90%" relief valve is dropped from the spec, not to be
+built. It never existed in any code path (no `reliefAfter` on praise tuning; `_praise` has no relief
+branch).
+Why: Hunger already does the valve's job. At base 0.50 + 0.10/rep the praise probability hits its 0.85
+cap by ~rep 4-5 of an unpraised clean streak, so the valve would only nudge 0.85 → ≥0.90 —
+near-invisible on a real set. Consistent with the 07-08 "lean into praise / fewer hard rules"
+direction. Surfaced during the 07-11 full-code-review lavish walkthrough.
+Alternatives considered: build the ≥0.90 floor for spec completeness — rejected; buys almost nothing
+at base 0.50 and adds a hard rule for no felt gain.
+
+## 2026-07-11 · Glute bridge feel-tune: hustle backoff + non-neck metric tightening
+Status: active — Nam's 2026-07-11 device feel call. Refines the 07-09 hustle decision and the 07-11
+glute bridge threshold tune. Neck/head metric thresholds stay untouched because Nam flagged that metric
+as sensitive after the prior loosening.
+Decision: Keep hustle hesitation-armed and stochastic, but add a post-fire negative-hunger backoff of 2
+instead of a fixed rep cooldown. Tighten only non-neck glute metrics: hip extension 152/140 with
+hyperextension deviation 0.045, knee angle good 85-135 with upper acceptable to 145 and hard lower 55,
+and speed-control ratio/velocity to 1.3x plus 0.08/0.15.
+Why: device feel said hustle could talk on repeated hesitations, but a deterministic "cool down for 2-3
+reps" violates the anti-metronome rule that makes Vika sound less robotic. Negative hunger makes the
+next eligible pushes unlikely and lets silence recover the chance naturally. The form metrics were
+under-calling easy reps, so the threshold move should create more honest soft coaching without touching
+the known-sensitive neck/head detector or changing the rep state machine.
+Alternatives considered: fixed rep cooldown after hustle — rejected as learnable cadence; retuning
+neck/head too — rejected per Nam's hard fence; rep-count/state-machine tightening — rejected because the
+complaint named metrics, and changing count registration would be the wrong trust surface.
+
+---
+
+## 2026-07-11 · Count = REGISTRATION: every landed rep is counted (supersedes count-thinning)
+Status: active — Nam's ruling 2026-07-11 after device runs. SUPERSEDES the stochastic count-thinning
+design (07-07) and the 07-08 pilot retune (base 0.50/+0.10/cap 1.0), and RETIRES hard rule 4's
+non-verbal tick (decided-never-built; no skipped counts exist to tick for).
+Decision: `CueType.count` speaks on EVERY landed rep, deterministically and personality-immune
+(fleet default base 1.0 short-circuits the roll; the roll machinery survives only for an explicit
+re-thinned config). Rep-1/final-2 anchors and the relief valve remain in code as guards if anyone
+re-thins.
+Why: on device the count turned out to be REGISTRATION feedback, not pacing chatter — users don't
+watch the screen (new tech, lying down), so the spoken number is their only proof a rep landed; a
+silent rep is ambiguous between "counted but coach chose silence" and "didn't register", which is a
+trust leak in exactly the population Vika targets. This re-classifies the count under principle 3
+(deterministic is reserved for causality/structure — a rep landing IS the causal event) rather than
+principle 2 (no metronomes — which governs OPTIONAL cues; the 07-08 metronome complaint was about the
+relief valve's learnable alternating rhythm, not counting itself; a PT counting every rep is just a
+rep counter). The coach's non-robotic personality lives in the stochastic outcome layer on top
+(praise/faults/hustle), which is unchanged.
+Alternatives considered: guarantee-one-cue coalescing (count only when no outcome cue fired that rep)
+— rejected: an outcome line doesn't carry the NUMBER, so the user still loses their place, and it
+buys marginal quiet for real ordering complexity; the non-verbal tick — rejected/retired: a tick
+must be learned, a number is self-evident, and the asset was never built.
+
+---
+
+## 2026-07-11 · Phone-orientation guidance gets VOICE (device-driven)
+Status: active — Nam's ruling 2026-07-11 after the first full-setup device run (he hit silent rotate
+signage mid-setup). Supersedes the voiceless default for `phoneLandscape`/`phonePortrait` in the
+setup-safety class map (they were UI-only; the 07-10 grace entries treated phone setup as pre-position
+signage). `searching` and `holdStill` KEEP their explicit silent rulings (intro covers get-in-frame;
+the countdown owns the hold) — Nam's "everything the setup UI shows" read as the rotate gap he hit,
+not a blanket reversal.
+Decision: `phoneLandscape`/`phonePortrait` join the deterministic latch channel as standard
+entry-fire classes (~1s debounce, 10s re-cue, re-fire on re-entry, ungraced) speaking new COMMON keys
+`common.rotate_landscape` / `common.rotate_portrait`. MP3 files are present in tree 07-11 (listen-check
+if needed); the legacy ngang/thẳng intro files were rejected as the source (old voice, intro-length
+content).
+Known feel-check: wrong orientation at set start queues the rotate line right behind the intro (FIFO)
+rather than cutting it — flagged for device, not gated.
+Why: the orientation gate blocks the whole pipeline and the user may already be propped-and-stepped-
+back; a silent block is the dead-system failure this channel exists to kill.
+Alternatives considered: reusing `common/ngang_intro.mp3` (rejected — legacy voice + intro-register
+content); speaking the rotate line INSTEAD of the intro at set start (rejected — the intro is an
+unconditional one-shot by ruling; revisit only if device feel demands it).
+
+---
+
+## 2026-07-10 · Resume requires the start-position hold again
+Status: active — landed in tree, not device-smoked.
+Decision: Any active-set resume, manual or auto, routes the exercise back through `ExerciseState.
+notActivated` while preserving completed reps, logger data, and set progress. The user must regain the
+exercise's normal start position and hold through the same voiced "một, hai, ba" countdown before reps
+count again. This is a resume re-hold, not a new set: the per-set setup intro does NOT replay, but the
+countdown and `common.ready` re-arm. The generic `common.resume` edge is effectively reserved for
+non-reactivation resume edges; active-set resume uses the start-position flow. The glute-bridge pilot
+resets only transient in-progress rep phase/fault state on this edge, so an interrupted half-rep is
+dropped without clearing completed reps.
+Why: after a pause/walkout, counting immediately can accept a bad return frame or resume from a stale
+mid-rep state. Reusing `notActivated` is the smallest honest path because it already owns the start-pose
+check, setup signage, scale-factor hard-write, activation countdown, and ready edge. Calling the normal
+`onExerciseActivated()` path would wipe many exercises' counters/loggers, so resume has its own
+reactivation hook.
+Alternatives considered: (a) speak `common.resume` and continue immediately — rejected, too easy to
+count from a bad/stale posture; (b) add a second resume-countdown state — rejected, duplicates the
+activation gate and risks drift; (c) treat resume as a full new set — rejected, replays the intro and
+can clear progress.
+
+---
+
+## 2026-07-10 · Setup-voice follow-ups: grace goes VOICE-ONLY and = intro duration; countdown terminates the intro; ring caption removed
+Status: active — Nam's rulings latest 2026-07-10 (chat, reviewing the landed setup-instruction cluster).
+SUPERSEDES two same-day rulings in part: (a) the "Setup-safety firing simplified" entry's point 3
+UI-PARITY requirement — grace no longer gates the UI at all; (b) the settle-window tail — grace ends at
+intro-audio-end, not intro-end + 3.5s.
+Decision:
+1. **Grace suppresses VOICE only. The UI always shows safety signage, live.** During the intro (and any
+   grace) the guidance table renders whatever the current signal is; only the voice stays quiet. Why: a
+   user still SETTING UP is standing and looking at the screen — signage is useful from frame one; it was
+   the VOICE firing over the intro that was the double-speak problem. The UI is a live table (re-derived
+   every frame, never queued); the single-slot/FIFO semantics are voice-channel-only.
+   `guidanceSignalForPresentation` (landed hours earlier, now dead) is REMOVED, not flagged — it never
+   shipped in a commit.
+2. **Voice grace window = the intro voice's actual duration.** The pinning implementation stays (window
+   pinned to now each frame while intro audio plays) but the tail goes: at intro-audio-end the window
+   CLOSES (no +3.5s settle; the ~1s enter debounce is the only residual delay before a persisting
+   graced-class condition speaks). Fallback when the intro produces no audio: the old fixed 3500ms from
+   set start stays (no spoken first-telling happened, so the settle window still earns its keep). The
+   activation-edge re-anchor (3.5s voice-quiet for graced classes right after activation) is RETAINED —
+   pre-dates today's rulings, not re-opened.
+3. **The activation countdown TERMINATES a still-playing intro.** A user already holding the start
+   position has no use for setup instructions; when the first count fires while intro audio is still
+   playing, the sink is stopped (current + queued lines dropped), the count speaks immediately, and
+   intro-audio-end is marked at that moment (so the voice grace closes with it). "Let people get the
+   voice that makes sense" (Nam). The intro never resumes — it is one-shot and was consumed.
+4. **holdStill ring caption 'Giữ yên' is REMOVED from the UI** — the countdown number sits centered in
+   the activation ring ('Bắt đầu' at ready keeps its slot). The number stays remaining-seconds while the
+   voice counts up; Nam saw the mismatch and kept it (mid-hold the user can't see the screen anyway).
+Alternatives considered: keeping UI parity with voice grace (rejected — the parity cure was worse than
+the renderer-drift disease once the intro voice landed; the drift concern was about COPY sources, which
+stays one table); letting queued counts play after the intro instead of terminating (rejected — stale
+counts lag the hold and read broken); gating the countdown on intro completion (rejected — the countdown
+must stay deterministic, causality beats politeness here).
+
+---
+
+## 2026-07-10 · Setup-instruction voice: per-set one-shot intro, stuck-user re-tell, holdStill voiceless
+Status: active — ruled with Nam late 2026-07-10 (chat). Completes the instruction-cluster design the 07-09
+defer pointed at (missing-audio.md "wiring deferred to a next-thread pass"). Wiring is a Codex follow-up
+spec (docs/scratch/setup-intro-voice-impl-spec.md), sequenced AFTER the 3-delta setup-safety spec lands.
+Decision:
+1. **Setup intro = one-shot BROADCAST, not a monitored latch.** `<slug>.setup_position` +
+   `<slug>.active_intro` (the legacy pair) fire back-to-back exactly once at set start, unconditional —
+   the intro does not wait for the user to be in frame; it IS the thing that tells them to get in frame
+   (same logic that ruled `searching` voiceless). Never latches, re-fires, or re-cues.
+2. **Fires EVERY set.** Per-session dedupe on set 2+ (intro once per exercise, ready per set) is a noted
+   future refinement for the multi-set flow, explicitly NOT designed now (Nam: good idea, that kind of
+   thing will be different later — don't perfect it yet).
+3. **The anti-chatter is the grace re-anchor going live:** wiring the intro re-anchors the shared
+   per-class grace window from set start to INTRO-AUDIO-END (the commented seam). Sequence the user
+   hears: intro → silence while complying → safety line only if still broken past the settle window →
+   countdown → set. The intro counts as the first telling; the first latch fire is the escalation.
+4. **Stuck-user backstop:** `GuidanceClass.setupPosition` maps to voice (was null). Entry-fire
+   SUPPRESSED; ONE delayed re-tell of `<slug>.setup_position` iff the class stays continuously latched
+   ~10s past intro-audio-end (feel-tune), then quiet for real; debounced exit re-arms as usual. Shape
+   borrowed from no-count and the safety re-cue: tell → one help → silence.
+5. **`holdStill` stays LINELESS — and the activation countdown IS VOICED (follow-up ruling, same chat):**
+   "một, hai, ba" synced to the 3s activation hold, REUSING the existing `common/count_1..3.mp3` rep-count
+   assets (no new recording; listen-check that the rep-count intonation reads as a countdown). Counts
+   align so "ba" lands at/near the activation moment (exact offsets feel-tune). A hold break stops the
+   count and DROPS any pending count lines (perishable); a re-hold restarts from "một" — causal feedback,
+   not a nag. Deterministic (structure), never routed through rep-count thinning. No "giữ yên"
+   instruction line ever (`common/hold_still.mp3` exists on disk, stays unwired by design): the countdown
+   occupies that state's audio.
+6. `common.ready` (activation edge) and the set-complete line stay hard-rule-2 deterministic, once per
+   their moment, per set.
+Execution note: Nam explicitly ordered direct implementation by an Opus subagent (07-10, overriding the
+default Codex lane for this change), stacking onto the uncommitted setup-safety diff — his call, one
+review pass covers both.
+Why: the setup instruction narrates STRUCTURE (like countdown and finish line); it does not react to
+state the way the safety latch channel does. Running it through the latch machinery would stack lines
+during setup and drown everything — Nam's exact worry ("it's gonna be a lot and they won't ever hear
+anything"). The stuck-user case is the one hole a pure one-shot leaves: in frame + right orientation +
+not in pose means the safety channel has nothing to say → permanently-silent dead system, the failure
+this whole channel exists to kill. One deterministic delayed re-tell fills it at minimal chatter cost.
+Alternatives considered: routing setup through the safety latch (rejected: chatter + double-speak with
+the intro); fully silent on the stuck user (rejected — though weaker than the usual can't-read-the-screen
+argument, since a user not yet lying down CAN read the setup card; dead-system failure mode still wins);
+step-by-step detected sub-instructions (rejected: no sub-step detection exists, would machine-gun);
+once-per-exercise-session intro (deferred, revisit with the multi-set flow).
+
+---
+
+## 2026-07-10 · Setup-safety firing simplified: re-fire interval + post-audio gap DELETED; grace goes per-class at the signal layer (UI parity)
+Status: active EXCEPT point 3's UI-parity + settle-tail portions — superseded same day by "Setup-voice
+follow-ups" above (grace is now VOICE-ONLY and = intro duration; the UI renders signage ungated). Nam's
+rulings late 2026-07-10 (chat, after reviewing the implemented behavior). Partially
+supersedes the same-day lavish-review addendum below: its per-class MIN RE-FIRE point ONLY — the addendum's
+grace anchor, producer-emitted resume, UI copy table, and searching-silent all stand.
+Decision:
+1. The per-class ~10s minimum re-fire interval is REMOVED. Re-firing is governed only by
+   continuous-presence latch semantics: fire on debounced entry; silent while held; ONE re-cue iff the SAME
+   flag stays continuously latched ~10s (clock dies on exit); debounced exit + re-entry = fresh fire, never
+   blocked by wall-clock time since the last utterance. Anti-ping-pong (instant back-and-forth flicker) is
+   the EXIT DEBOUNCE's job (~1s; THE designated feel-tune knob if device tests show fiddle-spam) — never a
+   wall-clock block.
+2. The ~1s post-audio safety gap is DELETED outright. (An interim "make it per-content-key" proposal from
+   the same conversation is superseded by full deletion, same day.) Once per-content it could never bind:
+   same-key refire is already floored by exit+enter debounce (~2s > 1s) and the re-cue fires at ~10s;
+   different keys must stay responsive (Nam). Chaining is structurally impossible anyway: single latest-wins
+   pending slot (max two back-to-back lines, each re-validated true at speak time) + sink serialization.
+   The setup-safety channel now has NO time cooldowns at all — debounces, the continuous-presence re-cue,
+   and sink serialization only; the outcome channel's collision gap is again the system's ONLY time cooldown.
+3. The activation grace (~3.5s, feel-tune) becomes PER-CLASS and moves to the SIGNAL layer, shared by BOTH
+   renderers. Graced (fixable in-position, trivially true while settling): body_in_frame (incl. the
+   lighting fold), turnSide, faceCamera. UNgraced (must be known BEFORE getting into position, else the
+   user has to get back up — or informational/edge): phoneLandscape, phonePortrait, searching, paused,
+   resume. One clock + one graced-class set at the signal layer, consulted by both renderers; during grace
+   the UI suppresses graced-class signage too (today it shows from frame one while voice waits — renderer
+   drift, the disease the typed backend exists to kill). searching/get-ready states still render, so the
+   screen never looks dead. The intro-audio-end re-anchor seam is unchanged.
+Why: (1) a genuine switch-away-and-come-back — fix orientation, regress 5s later — MUST fire again; every
+line in a slow alternation is true and actionable when spoken; the floor's failure mode (coach deaf to a
+real regression for up to 10s = feels dead) is worse than the noise it prevents, and the noise is
+self-limiting (nobody fiddles with a phone for a minute straight). (2) Fewer moving parts to review; limits
+must be saturation guards that never bind, and this one could never bind. (3) The settle window is right
+only where settling IS the fix; blocking "rotate your phone" for 3.5s makes the user get back up.
+Alternatives considered: keep the 10s floor (rejected: deaf-to-regression); shrink it to ~3-4s (rejected
+for v1: the exit debounce already covers it; revisit only on device evidence); per-content-key gap
+(superseded same day by full deletion — scoped correctly, it protected nothing). Fallback if the two-line
+butt-joint feels rushed on device: a small breath at the pump, feel-tune — never a cooldown map.
+
+---
+
+## 2026-07-10 · Voice copy conventions: persona (Vika/bạn), soft + reminder patterns, orientation→common, metric audio per-exercise
+Status: active — finalized with Nam 2026-07-10 (chat), after the setup-safety entries below. Wordings
+live in docs/reference/voice-coach/missing-audio.md (one-fact-one-place); behavior in voice-behavior-spec.md.
+Decision:
+- PERSONA DEFAULT for ALL voice lines: the coach self-refers as **Vika** and addresses the user as **bạn**
+  (softer tone). Two fixed copy patterns: soft fault `Tốt, bạn [action] chút nữa là đẹp.`; reminder
+  `Lần này bạn nhớ [action] nhé.` Nam's verbatim string wins over the mechanical pattern where he wrote one
+  (e.g. hip_extension_soft "Tốt đấy, nâng hông cao hơn chút nữa là đẹp." drops the pattern's "bạn").
+- ORIENTATION becomes a COMMON key: `common.side_orientation` (assets/audio/common/side_orientation.mp3),
+  SUPERSEDING the per-exercise `<slug>.orientation` plan in the "moves to VOICE" entry below. Rationale:
+  only ~3 orientation modes exist total, so a few shared recordings beat one-per-exercise (N files). Only
+  the SIDE mode gets a key now ("Bạn quay nghiêng người với màn hình nhé."); other modes onboard their keys
+  with the first exercise that needs them. CONSEQUENCE: as a `common.*` key it must be hand-registered in
+  `GenericExerciseVoiceAssets.commonFiles` (resolveAsset returns null for unregistered `common.*`); the code
+  currently resolves orientation via `script.faultKey('orientation')` (per-exercise, policy_voice_coach.dart)
+  and must repoint to `common.side_orientation` — a pending code delta.
+- AUDIO ROUTING RULE (the principle behind the above): COMMON (`common.*`) = structural/channel lines
+  (counts, praise, setup, setup/tracking-safety, orientation — about the camera/session, identical
+  everywhere); PER-EXERCISE (`<slug>.<id>`) = movement lines (faults, softs, reminders — about this
+  exercise's mechanics). Metric/fault audio STAYS per-exercise even where a metric is reused across
+  exercises: a shared fault pool is a file-management dependency graph waiting to cause weird issues;
+  per-exercise keeps lines specific (data honesty) and the onboarding workflow simple (onboard exercise →
+  record its metric set).
+- REMINDER length constraint relaxed: the reminder slot is the system's tightest window (~1–1.5s at the
+  rep-start commit edge). The persona pattern runs longer than the old ≤7-word cap (hyperextension_reminder
+  is now 10 words — the longest line in the tightest slot), so the constraint relaxes from a word count to
+  "keep ~1.5s spoken, record brisk."
+- VARIANT POOLS deferred (phase-2-style, NOT scheduled): multiple recordings per content key so
+  deterministic-channel repeats (reminders, safety, soft) aren't verbatim; praise already rotates. Noted,
+  not on any checklist.
+Why: warmer VN tone (Vika/bạn softens correction); one shared orientation recording per mode instead of N
+near-identical files; per-exercise fault audio avoids a cross-exercise file dependency graph and keeps data
+honesty. Wordings finalized: missing-audio.md carries the final vs pattern-derived table.
+Alternatives considered: per-exercise orientation (rejected — N near-identical recordings for ~3 modes); a
+shared cross-exercise metric-fault pool (rejected — file-management dependency graph, dilutes line
+specificity); enforcing ≤7 words on reminders (rejected — the persona pattern needs the room; brisk
+recording covers the timing).
+
+---
+
+## 2026-07-10 · Setup-safety voice lavish review: per-class re-fire interval added; grace/resume/UI-copy locked
+Status: partially superseded — the per-class MINIMUM RE-FIRE point below was removed later the same day
+(see "Setup-safety firing simplified" above); every other resolution stands. Nam's lavish review of
+setup-safety-voice-design.html (7 notes), resolved same day.
+Addendum to the base entry below; the design HTML is rev 2 with resolutions folded in place.
+Decision:
+- NEW mechanism: a per-class MINIMUM RE-FIRE INTERVAL (~10s, feel-tune) joins the latch machine. Why the
+  two-edge debounce alone is not enough: it stops flicker WITHIN a class but not cross-class ping-pong — a
+  user fiddling with the phone can alternate orientation-wrong ↔ body-out-of-frame every ~2s, each pass
+  clearing its ~1s debounce and re-arming while the other class is latched, producing alternating
+  instructions every ~3s forever. The re-fire window floors the gap between any two fires of one class,
+  across clear/re-entry cycles. Sized as a saturation guard, not a scheduler (principle 2's corollary): a
+  genuine comply-then-regress cycle takes >10s, so it never binds in normal use; pathological fiddling
+  degrades to ~one line per ~10s. Distinct knob from the ~10s mid-set re-cue (which fires while
+  CONTINUOUSLY latched). Enforced at the pump/drain gate so the latest-wins slot + re-validation still
+  guarantee a late line only speaks if the condition still holds.
+- Implementation reuses the house debouncer utilities (StickyDebouncer/Debouncer, lib/utils/) for the
+  enter/exit edges — no new timer code.
+- `paused` confirmed timer-free: the gate's person-lost grace is its ENTIRE timing (no enter-debounce, no
+  re-fire window, no cooldown).
+- Grace anchor DECIDED: fixed window from activation/set-start for the pilot (the policy coach doesn't
+  emit the setup intro yet); commented re-anchor seam to intro-audio-end for when setup voice wires.
+- `resume` LOCKED producer-emitted (one-frame GuidanceSignal from the gate's resume edge) — one-family
+  consistency; the adapter-edge alternative rejected (splits guidance semantics across layers).
+- UI copy source of truth LOCKED: default VN title/body per class lives in the ONE UI table; the signal
+  carries only optional per-exercise overrides; producer stays copy-free; voice never reads title/body.
+- searching-silent + missing-asset-safe-no-op confirmed as designed. Nam downloads the 4 audio files
+  himself pre-device-test; missing-audio.md carries the exact key → filename table (the three `common.*`
+  keys additionally need `commonFiles` map entries — resolveAsset returns null for unregistered common
+  keys).
+Why: review notes in the lavish session 07-10. All timings remain feel-tune, none canonical. Spec final:
+docs/scratch/setup-safety-voice-codex-spec.md. Next: Codex implements; Nam fetches audio + runs the
+design's §07 device stress-tests.
+
+---
+
+## 2026-07-10 · Setup/tracking-safety guidance moves to VOICE, on a typed GuidanceSignal backend (one producer → two renderers)
+Status: active — decided with Nam + Fable 2026-07-10. Review addendum: see the lavish-review entry above
+(same day) — re-fire interval added, grace/resume/UI-copy locked.
+Supersedes (in part): the "Safety — reframed 2026-07-09" section of
+docs/reference/voice-coach/voice-behavior-spec.md, on the ONE point that landmark/tracking safety
+"surfaces on-screen text, not voice." That point is reversed here. The rest of the 07-09 reframe stands
+(critical FORM faults firing real-time ARE the injury cue; there is still no separate injury voice line).
+Decision:
+- Setup / tracking-safety guidance GETS VOICE. The producers are the person-gate blocks
+  (searching/paused), `checkSafety` (orientation + landmark/lighting), and the no-pose branch. Every one
+  of these EARLY-RETURNS the pipeline — `ExerciseBase.processPose` returns on a gate block and on
+  `checkSafety != null`; `processNoPoseFrame` on a missing skeleton — so NO reps count while they hold,
+  and a mid-exercise user physically cannot read the screen (glute bridge = lying on the floor). Without
+  voice the system goes silently dead. This is the least optional cue in the app.
+- ONE typed signal, TWO renderers. Producers stop emitting free Vietnamese `feedback['System']` strings
+  and emit a typed `GuidanceSignal` (a condition class + optional per-exercise copy). Both surfaces derive
+  from it. UI = one table (glyph + title + body), replacing the substring sniffers
+  `_guidanceForSystemMessage` + `_translateSystemMessage` in active_exercise_page.dart (~2478-2624), which
+  today classify by `contains('quay nghiêng')` / `contains('wrong_orientation_landscape')`. Voice = class →
+  content key through the deterministic firing policy below. `checkSafety`'s return type changes
+  `String?` → the typed signal across all ~20 exercise subclasses (mechanical but wide; Nam approved this
+  pipeline-architecture change explicitly).
+- The check STAYS granular; only the MESSAGE generalizes. `checkSafety` keeps its per-exercise,
+  per-landmark logic (glute-bridge side view permanently occludes the far arm — a literal full-body gate
+  would block forever; a loosened gate would score reps off unseen landmarks and break data honesty). The
+  asymmetry is deliberate: the message over-asks ("be fully in frame" = a simple, always-safe compliance
+  action), the check under-asks (only the landmarks this exercise measures). Do not weaken the gate.
+- Voice content keys are COARSE (the anti-spam decision): `orientation` (per-exercise line — SUPERSEDED
+  07-10: now the COMMON key `common.side_orientation`, see the "Voice copy conventions" entry above),
+  `body_in_frame` (ALL landmark-missing variants collapse to ONE generic line — NEVER name body parts;
+  per-landmark latching would machine-gun as confidence cycles knee→hip→knee), `paused` (pause-commit),
+  `resume` (one-shot on gate resume), `searching` = NO voice (the setup intro already says get in frame).
+- Firing policy is DETERMINISTIC (principle 3 — deterministic is reserved for causality and structure),
+  not a probability draw: latch per content-class (coarse on purpose); fire once on entry; silent while the
+  condition persists; re-arm only after the exit debounce clears; re-fire on genuine re-entry (user
+  complied then regressed). Two-edge ~1s debounce each way (frame-flicker guard, house precedent
+  StickyDebouncer 5-frame / gate 650ms). Single pending slot, latest-wins, re-validated at speak time —
+  drop silently if the condition cleared while audio was busy (the drop is correct; the user complied).
+  ~1s post-audio saturation gap (SUPERSEDED 07-10 — DELETED, see the "Setup-safety firing simplified"
+  entry above; the sink already serializes, so no time cooldown is needed). Arm-after-intro grace during
+  setup (the intro is the first telling; the first latch fire is the escalation). ONE fuller re-cue if still latched after ~10s, then real silence
+  (borrowed from the no-count "cue → one help → quiet" shape; the failure it prevents is a user who never
+  heard it → permanently silent dead system). `paused` fires on the pause COMMIT edge, not the first lost
+  frame (mirrors the UI, which renders no banner during the person-lost grace). ALL timings are FEEL-TUNE,
+  none enters canonical-numbers.
+Why: these states block the pipeline and the screen is unreadable mid-rep, so a text-only cue is a silent
+death. The honest backend is a typed signal — the string channel is already a de-facto enum with none of
+the safety (active_exercise_page matches the machine token `wrong_orientation_landscape` INSIDE the display
+copy), and two independent substring sniffers is exactly the fragility a typed source removes.
+Alternatives considered: keep landmark/tracking safety on-screen only (rejected — silent dead system for a
+floor-bound user); genericize the gate to match the generic message (rejected — breaks data honesty, blocks
+occluded-limb exercises); probabilistic firing (rejected — safety/structure is deterministic, principle 3);
+per-landmark voice lines (rejected — machine-guns as landmark confidence cycles; latch on the class instead).
+Seam already stubbed: `CueType.safety` exists (`CueMode.always`) and policy_voice_coach.dart:128-131 carries
+a `TODO(wiring)` waiting for exactly this typed hook. Design:
+docs/reference/voice-coach/setup-safety-voice-design.html. Codex spec:
+docs/scratch/setup-safety-voice-codex-spec.md. Implementation PENDING (spec ready, no code yet).
+
+---
+
+## 2026-07-09 · Next-rep instruction lavish review: UI instruction layer deleted (voice-only), neck_head flipped critical, Q2-Q4 locked
+Status: active — Nam's lavish review of next-rep-instruction-design.html (rev 2 folds resolutions in
+place). Resolves every open item of the base "Next-rep instruction layer" entry (moved to sit below
+this one) except the neck_head reminder wording.
+Decision:
+- The on-screen instruction layer DIES: delete `ExerciseBase.instructions` + `addInstruction()` +
+  all metric call sites (~13 files across six exercises) + the UI consumer(s). Rationale (Nam): a
+  user mid-exercise cannot look at the screen, so on-screen instructions are worthless where they
+  matter; the instruction concept lives ONLY in the voice coach — the next-rep reminder layer IS
+  the replacement. The broader "delayed UI display" idea is a separate later task. Metrics' VN
+  instruction strings are preserved as comments (voice-wording references) before deletion.
+- `neck_head` flips to `affectsForm: true` (critical). Accepted consequences: fires real-time as a
+  deterministic-first criticalFault (existing 4.4s neck_head.mp3 — long, consider re-record);
+  head-lifted reps no longer count clean (praise gating + form score shift); `neck_head_soft`
+  recording ON HOLD (soft path unreachable). Pilot reminder faults: 2.
+- Q2 streak-first reminder deterministic (100%): YES. Q3 cue-type name `CueType.reminder`: YES.
+  Q4 hyperextension line: "Lần này siết bụng, lưng sát sàn nhé" (option A).
+- neck_head reminder wording PROPOSED ("Lần này giữ đầu trên sàn nhé"), pending Nam — blocks only
+  the recording, not implementation (stage A ships with empty pools).
+Why: review notes in the lavish session 07-09; design doc §02/§07 carry the evidence and the flip's
+consequences. Codex spec (docs/scratch/next-rep-instruction-codex-spec.md) APPROVED FOR
+IMPLEMENTATION same day — coordinate the shared commit edge with hustle stage A.
+Addendum (same day, chat): SEQUENCING — the UI removal runs FIRST as its own Codex task
+(docs/scratch/ui-instructions-removal-codex-spec.md), before the reminder wiring (task 2). Discovery
+(Nam asked for a real audit, not his guess): the instructions map is dual-purpose — metric-fault
+"remember next time" texts (invisible in v9, nothing reads them → delete) vs the 'Status' phase
+channel (LIVE hold/rest UI protocol: rest-ring 'Nghỉ X s' parse, hold/release cue verbs → migrate to
+a dedicated phase-status surface, then the map dies). `resultIssues.feedback` untouched: 'System' is
+the safety UI channel, and non-System metric entries feed the legacy fleet voice coach
+(_GenericExerciseVoiceCoach) — invisible in v9 UI but load-bearing for fleet voice. Legacy main.dart
+instruction reads sit in the orphaned exercise screen ('/exercise' routes to
+ExerciseExperienceScreen) — its reads go with the map; full orphan cleanup stays phase-2.
+neck_head reminder wording APPROVED ("Lần này giữ đầu trên sàn nhé") — both reminder lines recordable.
+
+---
+
+## 2026-07-09 · Next-rep instruction layer: scope = real-time-cued critical faults; peak faults excluded
+Status: active — all Open items resolved by the lavish-review entry above; kept for the scope +
+firing-moment rationale. The "mirroring the UI addInstruction pattern" framing below is superseded in
+part: the UI layer is now deleted, voice-only (entry above). (Entry moved here from the file bottom
+07-09 — this ledger appends at top.)
+Decision: The parked post-rep/next-rep reminder becomes a voice "instruction" layer mirroring the UI
+`addInstruction` pattern (ExerciseBase.instructions, phase-keyed): a CONTINUOUS critical fault that was
+cued real-time during rep N earns a short feedforward reminder around the start of rep N+1 ("lần này
+hạ sâu hơn chút nhé"). Peak-measured faults (glute: hip_extension, knee_angle, speed_control) are
+EXCLUDED: their rep-end firing is already framed as next-rep guidance — it IS the instruction; a second
+line would duplicate. (Supersedes the spec's earlier sentence routing peak faults INTO the parked
+post-rep-instructions feature; they stay at rep-end.) Confirm-after-fix praise ("Đó, đúng rồi!" when a
+reminded fault comes back clean) DEFERRED — research-backed but not worth complicating the praise
+system now; when it lands, prefer a praise-pool variant selection (resolver picks the confirm register
+when the prior rep carried a reminder) over any new cue type.
+Why: mimics the observed PT chain — correct mid-rep, remind at the next attempt, then watch. Research:
+voice-research-rules.md §3b (two independent capped runs converging on cue-before-the-phase-it-fixes +
+feedforward phrasing + brevity). Anti-duplication keeps one measured fault = one instruction surface.
+Decided same day (Nam): firing moment = the rep-start COMMIT EDGE — the state-machine transition out
+of rest into the rep's first movement phase, per exercise (glute: bottom→ascending + the
+descending→ascending fast-path; a squat would be standing→descending). On glute this coincides with
+hustle's fire moment (effort-phase entry = the raise, per the 07-09 hustle lavish-review entry);
+when both arm at one moment, the reminder outranks hustle. Exercises whose effort phase is not the
+first movement (squat: effort = ascent, rep-start = descent) separate the two moments — the reminder
+stays on rep-start. Why: rep-end already hosts count + outcome and the fast-path makes rep-end and
+rep-start coincide on continuous tempo — the commit edge is the empty slot and lands the cue
+adjacent to the action (cue-before-the-phase-it-fixes, research §3b). Design: model rep-start and
+effort-phase entry as two declared moments that share plumbing where they coincide.
+Open (all RESOLVED 07-09 by the lavish-review entry above): cadence numbers; cue-type name; line pool
+recordings.
+
+---
+
+## 2026-07-09 · Hustle lavish-review refinements: effort-phase firing, void-on-absence, final-rep paired push
+Status: active — Nam's lavish review of hustle-design.html, resolved with Fable 07-09. Refines the
+"hesitation-armed, commit-fired" entry below (fire-moment clause + two additions); everything else
+there stands.
+Decision:
+- Fire moment generalizes: the armed cue fires at entry into the exercise's DECLARED EFFORT PHASE
+  (`VoiceScript.effortPhaseKeys`, renamed from the draft's `risePhaseKeys`) — the first one after the
+  armed gap — not literally "rep start". Glute bridge: the raise (behavior identical to the draft).
+  Squat when it migrates: the ascent — a squat rep STARTS with the descent, but the push belongs on
+  the force moment (Nam; matches the cue-just-before-effort coaching craft). Review Q4 decided with
+  it: the declaration lives on VoiceScript (zero ExerciseBase surface, squat's neutralization stays a
+  default no-op, phaseCues is precedent for phase semantics in the content layer).
+- Void-on-absence: presence-loss or pause during an inter-rep gap VOIDS that gap — it cannot arm
+  hustle and is excluded from the baseline median. We cannot distinguish an urgent out-of-frame
+  errand from a walk-away rest, and both invalidate the "hesitating in position" read; voiding is
+  wrong in neither case. Extends the draft's pause guard.
+- Final-rep paired push (second hustle flavor; resolves review Q1): when the count anchor fires with
+  exactly one rep remaining (rep N-1 lands), the push MAY pair in the same breath ("Chín — cố lên!" /
+  "Một cái nữa thôi!" — truthful, target-proven). STOCHASTIC quiet-side roll, rotating final pool,
+  never deterministic — a guaranteed finish line every set is the 07-08 metronome again. A fired
+  pairing consumes the push for that transition (no second fire at the final rep's effort-phase entry).
+- Review Q2: inflated-baseline failure mode accepted for v1 + instrumented (Stage-B data decides a
+  clamp). Review Q3: strict perishability — an armed push drops if the sink is busy at the fire moment.
+Why: the draft's "rep start" was a glute-bridge coincidence (its rep starts with its effort phase);
+Nam caught that the push should track force, not rep topology. The paired final push restores the
+finish-energy feel Nam wants without re-opening the rejected 07-08 shape: it rides an anchor count
+that fires anyway, is last-rep-only content, stays a roll, and the mid-set hesitation mechanism
+exists independently.
+Next: Opus folds these into hustle-design.html + docs/scratch/hustle-codex-spec.md; then Codex
+implements stage A (wired OFF + gap debug-logging).
+
+---
+
+## 2026-07-09 · Voice coach: hustle = hesitation-armed, commit-fired (replaces the final-rep push)
+Status: active — decided with Nam 07-09 (chat); fire-moment clause refined + two rules added by the
+07-09 lavish-review entry above. ENABLED in the glute pilot 07-11 (was "OFF until calibration"): Nam
+called it on after Stage-B device data (armed on real 6s+ gaps vs a ~4s baseline). Tuning base 0.50/
+step 0.20/cap 0.90, pools common.push + common.one_more_rep (MP3 files present in tree 07-11;
+listen-check if needed);
+fast-path baseline pollution fixed (sub-kMinArmGapMs gaps excluded — the ~0ms descending→ascending
+gaps the device log exposed). Placeholder arming numbers (kStretchRatio 1.5, kMinArmGapMs 800) held,
+device-tunable. Details: voice-behavior-spec.md § Hustle. Supersedes the 07-08 candidate mechanism
+(grind = rep duration >> set average) and the 07-07 "hustle ≤1/set" hard cap.
+Decision: hustle fires on effort decisions, not rep positions:
+- ARM on hesitation: the inter-rep gap stretching past this set's own baseline (median of the set's
+  first 2-3 gaps) arms hustle. Nothing is ever spoken mid-gap.
+- FIRE on commit: the armed cue rolls at the instant the next rep starts (rest -> raise transition),
+  so the push lands on the effort the user just chose. If the next rep never starts, hustle never
+  fires — structurally impossible to hustle someone who already finished or quit.
+- Probability: persistence-shaped, no hard per-set cap. First hesitation of a set = low odds;
+  accumulating hesitations climb (same shape as criticalFault persistence); firing resets. A genuinely
+  grinding finish can earn 2+ pushes. Base starts quiet-side; personality scalar applies as usual.
+- Rep-duration slowdown is NOT a trigger for bodyweight (weight 0 in the glute pilot); shelved as a
+  loaded-movement corroborator for when squat migrates.
+- Line honesty: "Một cái nữa thôi!" only when targetReps proves it's the final rep; otherwise generic
+  "Cố lên!". Slot rules unchanged (lowest outcome priority, never the second in-rep slot).
+- Numbers (gap-stretch threshold, base, persistence step) are deliberately NOT set here: calibrate
+  from real ExerciseLogger rep timestamps before enabling; no canonical-numbers row until calibrated.
+  Pilot: glute bridge (the gap signal needs no load, so the original pilot stands).
+Why: research (voice-research-rules.md §3): encouragement's effect is in-the-moment and dies the
+instant the voice stops — per-rep beats once-per-set, so the rejected finish-line one-shot was also
+the least effective placement. Bodyweight reality (Nam): without load there is little mid-rep grind;
+the struggle is the "do I go again" decision, visible as the stretched gap. Literature: spontaneous
+inter-rep pause is unstudied (not refuted); the documented near-failure slowdown is concentric/
+barbell-only — so the gap is read as a BEHAVIORAL hesitation signal, not a fatigue meter, and our own
+logged timestamps are the calibration authority. Firing on commit instead of mid-gap (Nam's call)
+avoids surveillance/nagging framing (VN face-saving: don't call out the slack, join the effort) and
+structurally kills the worst false positive (encouraging someone who already ended the set). Known
+cost, accepted: a user who hesitates and never starts another rep gets no push — we lose the coach's
+"talk them into one more" moment in exchange for never nagging.
+Alternatives considered: (a) any final-reps-window softening — rejected, still a rep-counter robot and
+fires on easy sets (07-08 rationale); (b) rep-duration grind trigger — barbell-derived, unvalidated
+for bodyweight; (c) mid-gap firing — nagging framing + needs a fragile "grinding vs done" ceiling
+threshold; (d) hard 1/set cap — contradicts the in-the-moment evidence; the post-fire persistence
+reset already spaces fires.
+Next: Opus lavish design + Codex spec; zero/migrate squat's stale live hustle gate (generic 0.50
+tuning + wired targetReps, inconsistent with the 07-08 lock) in the same change; hustle audio still
+unrecorded (missing-audio.md).
+
+---
+
 ## 2026-07-09 · Voice coach: outcome exclusivity is per-MOMENT, not per-rep (critical second slot + collision gap)
 Status: active — decided with Nam 07-09 (chat), implemented for the glute pilot. Refines the 07-08
 glute-bridge lock's "max one outcome cue per rep" clause (spec hard rule 7 / principle 4).
@@ -127,7 +636,10 @@ now stale on the constructor + core-state fields and its gutter line numbers bel
 ---
 
 ## 2026-07-08 · Voice coach: glute-bridge-first behavior lock (soft cue, deterministic first fault, count/praise retune)
-Status: active (locked with Nam 07-08 via the lavish review docs/reference/voice-coach/glute-bridge-voice-review.html; refines the 07-07 entry's ship-day defaults). Implementation: Codex, glute-bridge scope only.
+Status: active EXCEPT the count clause — superseded 07-11 by "Count = registration" (every landed rep
+is counted deterministically; the 0.50/+0.10 thinning is retired). Locked with Nam 07-08 via the
+lavish review docs/reference/voice-coach/glute-bridge-voice-review.html; refines the 07-07 entry's
+ship-day defaults. Implementation: Codex, glute-bridge scope only.
 Decision: Wire glute bridge end-to-end as the first on-device voice test, and lock the behavior below (glute-bridge scope only; other exercises untouched until device-confirmed).
 - Rep classifier (adapter, from existing RepLog data — NO new fields): `!correctForm` (a critical / affectsForm fault) -> correction; `correctForm && fault_types` non-empty (only non-critical faults) -> NEW soft cue; `correctForm && fault_types` empty (truly clean) -> praise. Count fires independently.
 - NEW cue type `soft` (minor / non-critical): a warm nudge ("Tốt, chỉ cần nâng hông cao hơn chút") — not urgent, gentler cadence (lower base, NOT first-time-deterministic), own audio. Exists so we never say "good" on a rep with a measured minor fault (data honesty) yet never scold for a non-critical one. Praise is thereby gated on TRULY clean (correctForm && no faults at all).
@@ -256,9 +768,9 @@ slowly-drifting calibration signal:
   `return 1.0` fallback is deleted; glute_bridge's `> 0` guards become dead-but-harmless (the
   seed-before-activation invariant replaces them). NOTE: posture_stack's `< 1.0` check reads
   prayer_pose's LOCAL scale, a different source — out of scope, untouched.
-- Resume-rehold (planned) re-seeds for free: it routes state back to notActivated, so the hard-track
-  resumes during the re-hold and re-freezes into EMA on re-activation. No reset helper needed — it
-  falls out of the notActivated guard.
+- Resume re-hold is now landed (2026-07-10 entry above) and re-seeds for free: it routes state back to
+  notActivated, so the hard-track resumes during the re-hold and re-freezes into EMA on re-activation.
+  No reset helper needed — it falls out of the notActivated guard.
 - Anatomical basis stays shoulder→hip. Not switching to femur (hip→knee, rigid under flexion)
   because every PT-calibrated ratio threshold is denominated in torso-lengths; changing basis =
   recalibrating all form-checked exercises. Door stays open per-exercise later.

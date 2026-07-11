@@ -59,11 +59,7 @@ class CervicalSafetyMetric extends RaisedArmsMetricBase {
       ctx.resultIssues.feedback['Neck'] =
           'Nhìn lên nhẹ thôi, đừng ngửa cổ ra sau';
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction(
-          'holding',
-          'cervicalDanger',
-          'Giữ cổ dài, nhìn lên nhẹ hoặc nhìn thẳng về trước.',
-        );
+        // Legacy UI instruction copy: Giữ cổ dài, nhìn lên nhẹ hoặc nhìn thẳng về trước.
         _instructionSet = true;
       }
       _logFault(ctx.state.name, 'Neck cranked back', 'CervicalDanger');

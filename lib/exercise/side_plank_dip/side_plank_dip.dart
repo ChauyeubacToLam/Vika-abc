@@ -78,15 +78,15 @@ class SidePlankDip extends ExerciseBase {
   }
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.left &&
         cameraFacing != CameraFacing.right) {
-      return 'Quay ngang người với camera để đo plank nghiêng chính xác.';
+      return const GuidanceSignal.turnSide();
     }
 
     final body = _trackedBody(landmarks);
     if (body == null) {
-      return 'Giữ vai, khuỷu tay, hông và cổ chân rõ trong khung hình.';
+      return const GuidanceSignal.bodyInFrame();
     }
     return null;
   }
@@ -154,13 +154,11 @@ class SidePlankDip extends ExerciseBase {
       },
     );
 
-    resultIssues.addInstruction(
-      'basePlank',
-      'Status',
-      formClean
-          ? 'Giữ nguyên tư thế.'
-          : 'Chỉnh lại tư thế để tiếp tục tính giờ.',
-    );
+    resultIssues.setPhaseStatus(
+        'basePlank',
+        formClean
+            ? 'Giữ nguyên tư thế.'
+            : 'Chỉnh lại tư thế để tiếp tục tính giờ.');
 
     debugData['sidePlankBodyAngle'] = geometry.bodyAngle;
     debugData['sidePlankShoulderOffset'] = geometry.shoulderOffsetRatio;

@@ -98,9 +98,9 @@ class CossackSquat extends ExerciseBase {
   }
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.front) {
-      return "⚠️ Bài tập này yêu cầu quay mặt chính diện (Front Camera).";
+      return const GuidanceSignal.faceCamera();
     }
 
     final requiredTypes = [
@@ -119,7 +119,7 @@ class CossackSquat extends ExerciseBase {
     for (var type in requiredTypes) {
       final lm = landmarks[type];
       if (lm == null || !ExerciseBase.isLandmarkConfident(lm)) {
-        return "⚠️ Không thấy rõ toàn bộ cơ thể. Hãy điều chỉnh góc máy.";
+        return const GuidanceSignal.bodyInFrame();
       }
     }
     return null;
@@ -336,11 +336,11 @@ class CossackSquat extends ExerciseBase {
 
     // UI Instructions
     if (cossackState == CossackState.descending) {
-      resultIssues.addInstruction('descending', 'Status', 'Đang xuống...');
+      resultIssues.setPhaseStatus('descending', 'Đang xuống...');
     } else if (cossackState == CossackState.bottom) {
-      resultIssues.addInstruction('bottom', 'Status', 'Đứng lên!');
+      resultIssues.setPhaseStatus('bottom', 'Đứng lên!');
     } else if (cossackState == CossackState.ascending) {
-      resultIssues.addInstruction('ascending', 'Status', 'Đẩy hông về giữa!');
+      resultIssues.setPhaseStatus('ascending', 'Đẩy hông về giữa!');
     }
   }
 
@@ -382,7 +382,7 @@ class CossackSquat extends ExerciseBase {
     if (newState == CossackState.descending &&
         previousCossackState == CossackState.standing) {
       _reachedBottomThisRep = false;
-      resultIssues.instructions.clear();
+      resultIssues.phaseStatus.clear();
     } else if (newState == CossackState.bottom) {
       _reachedBottomThisRep = true;
     } else if (newState == CossackState.standing) {
@@ -442,10 +442,7 @@ class CossackSquat extends ExerciseBase {
     for (final fault in sorted) {
       final key = _feedbackKeyForFault(fault);
       final message = fault.voiceMessage ?? fault.message;
-      final phase =
-          fault.phase == 'REP_COMPLETE' ? currentPhaseKey : fault.phase;
       resultIssues.feedback[key] = message;
-      resultIssues.addInstruction(phase, key, fault.message);
     }
   }
 

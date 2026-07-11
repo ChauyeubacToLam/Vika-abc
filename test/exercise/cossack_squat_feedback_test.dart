@@ -39,7 +39,7 @@ void main() {
     metric.update(_ctx(workingHeelDistance: 0.12, issues: issues));
 
     expect(issues.feedback, contains('heel'));
-    expect(issues.instructions['bottom'], contains('heel'));
+    expect(metric.faults.single.type, 'heel_lift');
   });
 
   test('knee valgus metric publishes live feedback', () {
@@ -55,7 +55,7 @@ void main() {
     );
 
     expect(issues.feedback, contains('knee_valgus'));
-    expect(issues.instructions['bottom'], contains('knee_valgus'));
+    expect(metric.faults.single.type, 'knee_valgus');
   });
 
   test('straight leg metric publishes live feedback', () {
@@ -65,6 +65,6 @@ void main() {
     metric.update(_ctx(straightKneeAngle: 130, issues: issues));
 
     expect(issues.feedback, contains('straight_leg'));
-    expect(issues.instructions['bottom'], contains('straight_leg'));
+    expect(metric.faults.single.type, 'bent_straight_leg');
   });
 }

@@ -218,10 +218,10 @@ class Cobra extends ExerciseBase {
   }
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.left &&
         cameraFacing != CameraFacing.right) {
-      return "⚠️ Xin hãy quay nghiêng để theo dõi tư thế Cobra";
+      return const GuidanceSignal.turnSide();
     }
 
     PoseLandmark? shoulder = getSideLandmark(
@@ -234,12 +234,12 @@ class Cobra extends ExerciseBase {
         leftType: PoseLandmarkType.leftHip);
 
     if (shoulder == null || hip == null) {
-      return "⚠️ Đảm bảo phần trên cơ thể trong khung hình";
+      return const GuidanceSignal.bodyInFrame();
     }
 
     if (!ExerciseBase.isLandmarkConfident(shoulder) ||
         !ExerciseBase.isLandmarkConfident(hip)) {
-      return "⚠️ Hình ảnh không rõ. Điều chỉnh ánh sáng hoặc vị trí";
+      return const GuidanceSignal.lighting();
     }
 
     return null;
@@ -381,8 +381,8 @@ class Cobra extends ExerciseBase {
       final restRemaining = (CobraConfig.REST_DURATION - restElapsed)
           .clamp(0.0, CobraConfig.REST_DURATION);
 
-      resultIssues.addInstruction(
-          'resting', 'Status', 'Nghỉ ${restRemaining.toStringAsFixed(1)}s');
+      resultIssues.setPhaseStatus(
+          'resting', 'Nghỉ ${restRemaining.toStringAsFixed(1)}s');
       debugData['restRemaining'] = restRemaining.toStringAsFixed(1);
     }
 
@@ -390,8 +390,8 @@ class Cobra extends ExerciseBase {
       final holdSecs = _currentHoldSeconds();
       final remaining = (CobraConfig.HOLD_DURATION - holdSecs)
           .clamp(0.0, CobraConfig.HOLD_DURATION);
-      resultIssues.addInstruction(
-          'holding', 'Status', 'Giữ! ${remaining.toStringAsFixed(1)}s');
+      resultIssues.setPhaseStatus(
+          'holding', 'Giữ! ${remaining.toStringAsFixed(1)}s');
       debugData['holdProgress'] =
           (holdSecs / CobraConfig.HOLD_DURATION).clamp(0.0, 1.0);
     }
@@ -455,7 +455,7 @@ class Cobra extends ExerciseBase {
         _holdSeconds.resetTick();
         _holdStartMs = timestampMs;
         _restStartMs = null;
-        resultIssues.instructions.clear();
+        resultIssues.phaseStatus.clear();
         break;
 
       case CobraState.resting:

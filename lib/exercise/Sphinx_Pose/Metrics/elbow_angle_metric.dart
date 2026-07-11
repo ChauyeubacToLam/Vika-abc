@@ -45,8 +45,7 @@ class ElbowAngleMetric extends SphinxMetricBase {
       _isFaultingNow = true;
       ctx.resultIssues.feedback['Arm'] = 'Gập khuỷu tay lại!';
       if (!_instructionSet) {
-        ctx.resultIssues.addInstruction('isometricHold', 'Arm',
-            'Đang bị sai thành Rắn hổ mang. Hạ cẳng tay chạm sàn.');
+        // Legacy UI instruction copy: Đang bị sai thành Rắn hổ mang. Hạ cẳng tay chạm sàn.
         _instructionSet = true;
       }
       _logFault(ctx.state.name, 'Lỗi đẩy thẳng tay', 'Gập cùi chỏ lại');

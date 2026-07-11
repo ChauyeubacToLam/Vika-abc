@@ -109,10 +109,10 @@ class BirdDog extends ExerciseBase {
   double? get liveHoldTargetSeconds => BirdDogConfig.HOLD_TARGET_SECONDS;
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.left &&
         cameraFacing != CameraFacing.right) {
-      return 'Vui lòng quay ngang người 100% với camera!';
+      return const GuidanceSignal.turnSide();
     }
     return null;
   }
@@ -193,7 +193,7 @@ class BirdDog extends ExerciseBase {
       if (!_timeoutReached) {
         _timeoutReached = true;
         resultIssues.feedback['Result'] = 'Hết thời gian!';
-        resultIssues.addInstruction('TIMEOUT', 'Status', 'Đang lưu kết quả...');
+        resultIssues.setPhaseStatus('TIMEOUT', 'Đang lưu kết quả...');
       }
       return;
     }
@@ -393,10 +393,9 @@ class BirdDog extends ExerciseBase {
       resultIssues.feedback['progress'] = progress.toStringAsFixed(2);
 
       if (progress < 1.0) {
-        resultIssues.addInstruction(
-            'HOLD', 'Timer', 'Giữ: ${elapsed.toStringAsFixed(1)}s');
+        // Legacy UI instruction copy: Giữ: ${elapsed.toStringAsFixed(1)}s
       } else {
-        resultIssues.addInstruction('HOLD', 'Timer', 'Tốt! Hạ chân xuống');
+        // Legacy UI instruction copy: Tốt! Hạ chân xuống
       }
     } else {
       resultIssues.feedback['progress'] = '0.0';
@@ -596,11 +595,6 @@ class BirdDog extends ExerciseBase {
   void _publishBlockingFault(FaultRecord fault) {
     resultIssues.feedback['Result'] = 'Không tính rep';
     resultIssues.feedback['Error'] = fault.message;
-    resultIssues.addInstruction(
-      currentPhaseKey,
-      'Error',
-      fault.voiceMessage ?? fault.message,
-    );
   }
 
   void _resetRepState({bool countFaults = true}) {

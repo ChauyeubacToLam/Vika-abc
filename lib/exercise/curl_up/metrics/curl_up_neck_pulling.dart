@@ -176,8 +176,7 @@ class NeckPullingMetric extends CurlUpMetricBase {
         voiceMessage: 'Không kéo cổ',
         priority: CurlUpFaultVoicePriority.neckPulling,
       ));
-      ctx.resultIssues.addInstruction('resting', 'Neck',
-          'Rep tới giữ cằm trung tính — đừng dùng tay kéo đầu lên.');
+      // Legacy UI instruction copy: Rep tới giữ cằm trung tính — đừng dùng tay kéo đầu lên.
       _loggedLevel = _NeckFaultLevel.error;
       return;
     }
@@ -191,8 +190,7 @@ class NeckPullingMetric extends CurlUpMetricBase {
         priority: CurlUpFaultVoicePriority.neckPulling,
         // No voiceMessage — yellow-band warnings stay quiet to avoid TTS spam.
       ));
-      ctx.resultIssues.addInstruction(
-          'resting', 'Neck', 'Rep tới giữ cổ thẳng tự nhiên — đừng gập cằm.');
+      // Legacy UI instruction copy: Rep tới giữ cổ thẳng tự nhiên — đừng gập cằm.
       _loggedLevel = _NeckFaultLevel.warning;
     }
   }

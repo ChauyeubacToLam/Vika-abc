@@ -10,6 +10,8 @@ library;
 import 'dart:async';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart' show debugPrint;
+
 import 'voice_content.dart';
 import 'voice_policy.dart';
 import 'voice_sink.dart';
@@ -46,19 +48,30 @@ class VoiceCoach {
   /// accepted and dispatched, so adapters can mark "spoken" state without
   /// spending blocked attempts.
   bool say(CueType type, VoiceContent content, CueContext ctx) {
-    if (content.keys.isEmpty) return false;
-    if (!_policy.decide(type, ctx)) return false;
+    if (content.keys.isEmpty) return false; // never requestable — no log spam
+    final tag =
+        '${type.name}${ctx.contentKey.isEmpty ? '' : '(${ctx.contentKey})'} '
+        'rep=${ctx.repNumber}';
+    if (!_policy.decide(type, ctx)) {
+      debugPrint('[Voice] $tag SKIP — ${_policy.lastReason}');
+      return false;
+    }
     final key = _resolveKey(type, content, ctx);
     if (key == null) {
+      debugPrint('[Voice] $tag RESOLVE-FAILED (${content.keys.first})');
       if (_isOutcomeCue(type)) {
         _policy.markOutcomeAudioEnded();
       }
       return false;
     }
+    debugPrint('[Voice] $tag SPEAK $key — ${_policy.lastReason}');
     unawaited(_sink.playKey(key));
     if (_isOutcomeCue(type)) {
+      // Generous timeout: the sink's default 4s resolves silently on timeout,
+      // which stamped "audio ended" mid-line for lines >4s (hyperextension is
+      // 4.8s) and let the collision gap expire before the audio finished.
       unawaited(
-        _sink.waitUntilIdle().then((_) {
+        _sink.waitUntilIdle(timeout: const Duration(seconds: 30)).then((_) {
           _policy.markOutcomeAudioEnded();
         }),
       );
@@ -66,7 +79,17 @@ class VoiceCoach {
     return true;
   }
 
-  Future<void> waitUntilIdle() => _sink.waitUntilIdle();
+  Future<void> waitUntilIdle({Duration timeout = const Duration(seconds: 4)}) =>
+      _sink.waitUntilIdle(timeout: timeout);
+
+  /// Drops queued lines, keeping the one currently playing. Used by the
+  /// adapter to make stale activation counts perishable on a broken hold.
+  void clearPending() => _sink.clearPending();
+
+  /// Stops the sink outright — the current line is cut AND queued lines are
+  /// dropped. Used by the adapter when the activation countdown terminates a
+  /// still-playing setup intro (the intro is one-shot; it never resumes).
+  void stop() => unawaited(_sink.stop());
 
   void dispose() => _sink.dispose();
 
@@ -78,6 +101,7 @@ class VoiceCoach {
     return type == CueType.praise ||
         type == CueType.criticalFault ||
         type == CueType.softFault ||
+        type == CueType.reminder ||
         type == CueType.hustle;
   }
 

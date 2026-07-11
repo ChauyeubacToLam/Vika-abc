@@ -1,0 +1,1241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hustle — hesitation-armed, commit-fired · design for review · Vika</title>
+<style>
+:root{
+  --ink:#1F1812; --ink-soft:#4A4031; --muted:#8a7c63;
+  --page:#F1E9D9; --raised:#FBF7EE; --line:#E4DAC5; --line-soft:#EEE6D5;
+  --yellow:#FFB701;
+  --code-bg:#211A12; --code-fg:#EDE3CE; --code-dim:#9A8C71; --code-ln:#6B5D45; --code-rule:#37291a;
+  --tip:#2E6E63; --tip-bg:#E9F1EE; --tip-line:#BFDBD3;
+  --warn:#A2472B; --warn-bg:#F7EAE2; --warn-line:#E7C6B6;
+  --idea:#8A6608; --idea-bg:#FBF0D6; --idea-line:#EBD69E;
+  --mono:"JetBrains Mono","SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;overflow-x:clip;background:var(--page);color:var(--ink);font-family:var(--sans);line-height:1.62;
+  -webkit-font-smoothing:antialiased;font-size:16px}
+a{color:inherit}
+h1,h2,h3{line-height:1.18;text-wrap:balance;font-weight:800;letter-spacing:-.01em}
+code{font-family:var(--mono);overflow-wrap:anywhere}
+.gl{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:20px 0}
+.gl>div{min-width:0;background:var(--raised);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:14px}
+.gl b{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px;color:var(--ink)}
+.wrap{max-width:1160px;margin:0 auto;display:grid;grid-template-columns:238px minmax(0,1fr);
+  gap:48px;padding:0 28px 120px}
+header.hero{padding:56px 28px 40px;
+  background:radial-gradient(120% 140% at 12% 0%,#2b2117 0%,#1c150e 60%,#160f09 100%);
+  color:#F3ECDD;position:relative;overflow:hidden}
+header.hero::after{content:"";position:absolute;inset:0;opacity:.05;pointer-events:none;
+  background-image:repeating-linear-gradient(0deg,#fff 0 1px,transparent 1px 3px)}
+.hero-in{max-width:1104px;margin:0 auto;position:relative}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.24em;text-transform:uppercase;
+  color:var(--yellow);margin:0 0 14px}
+header.hero h1{font-size:clamp(30px,5vw,48px);margin:0 0 14px;color:#FBF7EE}
+header.hero h1 .u{background:linear-gradient(transparent 68%,rgba(255,183,1,.42) 0);padding:0 2px}
+header.hero p.lede{font-size:18px;max-width:74ch;color:#D9CFBD;margin:0 0 26px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-family:var(--mono);font-size:12px;padding:6px 11px;border-radius:999px;
+  border:1px solid rgba(255,255,255,.16);color:#E8DFCD;background:rgba(255,255,255,.04)}
+.chip b{color:var(--yellow);font-weight:600}
+nav.toc{position:sticky;top:0;align-self:start;max-height:100vh;overflow:auto;padding:34px 0;font-size:13.5px}
+nav.toc .lbl{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--muted);margin:0 0 12px}
+nav.toc ol{list-style:none;margin:0;padding:0;counter-reset:toc}
+nav.toc li{counter-increment:toc;margin:1px 0}
+nav.toc a{display:flex;gap:9px;text-decoration:none;color:var(--ink-soft);padding:5px 10px;
+  border-radius:7px;border-left:2px solid transparent}
+nav.toc a:before{content:counter(toc,decimal-leading-zero);font-family:var(--mono);font-size:11px;
+  color:var(--muted);padding-top:2px}
+nav.toc a:hover{background:var(--line-soft)}
+nav.toc a.on{background:var(--line-soft);border-left-color:var(--yellow);color:var(--ink)}
+main{min-width:0;padding-top:20px}
+section{scroll-margin-top:20px;padding:30px 0;border-top:1px solid var(--line)}
+section:first-of-type{border-top:0}
+.kicker{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--yellow);font-weight:600;margin:0 0 6px;display:flex;align-items:center;gap:10px}
+.kicker .n{color:var(--muted)}
+h2{font-size:clamp(22px,3.2vw,30px);margin:0 0 8px}
+h3{font-size:18px;margin:28px 0 6px;font-weight:700}
+h3 .tag{font-family:var(--mono);font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;
+  vertical-align:middle;margin-left:8px;letter-spacing:.04em}
+.tag.crit{background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-line)}
+.tag.high{background:var(--idea-bg);color:var(--idea);border:1px solid var(--idea-line)}
+.tag.med{background:var(--tip-bg);color:var(--tip);border:1px solid var(--tip-line)}
+p{margin:12px 0;max-width:76ch}
+.lead{font-size:17px;color:var(--ink-soft)}
+strong{font-weight:700}
+em.term{font-style:normal;font-weight:700;color:var(--ink);
+  background:linear-gradient(transparent 70%,rgba(255,183,1,.34) 0);padding:0 1px}
+ul,ol.steps{max-width:76ch;padding-left:20px}
+li{margin:5px 0}
+.code{border-radius:12px;overflow:hidden;background:var(--code-bg);margin:18px 0;
+  box-shadow:0 1px 0 rgba(0,0,0,.04),0 14px 30px -22px rgba(31,24,18,.5)}
+.code-head{font-family:var(--mono);font-size:11.5px;color:var(--code-dim);padding:9px 14px;
+  border-bottom:1px solid var(--code-rule);letter-spacing:.03em;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.code-head span{min-width:0;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+.code-head b{color:var(--yellow);font-weight:600;flex:none}
+.code-body{overflow-x:auto}
+.src{padding:14px 20px 16px;color:var(--code-fg);white-space:pre;margin:0;min-width:max-content;
+  font-family:var(--mono);font-size:12.5px;line-height:1.72}
+.src .c{color:var(--code-dim);font-style:italic}
+.src .k{color:#E7A93A}
+.src .s{color:#9FBE7E}
+.src .bad{background:rgba(162,71,43,.36);border-radius:3px;padding:0 2px}
+.src .good{background:rgba(46,110,99,.32);border-radius:3px;padding:0 2px}
+.call{border-radius:11px;padding:15px 17px 15px 16px;margin:16px 0;border:1px solid;border-left-width:4px;font-size:15px}
+.call p{margin:7px 0;max-width:none}
+.call .ct{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+  font-weight:700;display:flex;align-items:center;gap:8px;margin:0 0 4px}
+.call.eli{background:var(--raised);border-color:var(--line);border-left-color:var(--yellow)}
+.call.eli .ct{color:var(--idea)}
+.call.tip{background:var(--tip-bg);border-color:var(--tip-line);border-left-color:var(--tip)}
+.call.tip .ct{color:var(--tip)}
+.call.warn{background:var(--warn-bg);border-color:var(--warn-line);border-left-color:var(--warn)}
+.call.warn .ct{color:var(--warn)}
+.call.idea{background:var(--idea-bg);border-color:var(--idea-line);border-left-color:var(--idea)}
+.call.idea .ct{color:var(--idea)}
+.call code{font-size:13px;background:rgba(0,0,0,.06);padding:1px 5px;border-radius:5px}
+.chain{margin:22px 0;border:1px solid var(--line);border-radius:14px;background:var(--raised);overflow:hidden;counter-reset:ch}
+.chain .row{display:grid;grid-template-columns:54px 1fr;border-top:1px solid var(--line-soft)}
+.chain .row:first-child{border-top:0}
+.chain .row .num{counter-increment:ch;font-family:var(--mono);font-size:12px;color:var(--muted);
+  display:flex;align-items:flex-start;justify-content:center;padding:14px 0;background:#fff;border-right:1px solid var(--line-soft)}
+.chain .row .num:before{content:counter(ch,decimal-leading-zero)}
+.chain .row .body{padding:12px 16px}
+.chain .row .body b{font-family:var(--mono);font-size:13px}
+.chain .row .body .d{font-size:14px;color:var(--ink-soft);margin-top:2px}
+.tbl{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:18px 0}
+.recap{width:100%;border-collapse:collapse;font-size:14.5px;background:var(--raised);
+  border:1px solid var(--line);border-radius:12px;overflow:hidden;table-layout:fixed;min-width:640px}
+.recap th,.recap td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line-soft);
+  vertical-align:top;word-break:break-word;overflow-wrap:anywhere}
+.recap th{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:#fff}
+.recap tr:last-child td{border-bottom:0}
+.recap td code,.recap th code{font-size:12.5px;background:var(--line-soft);padding:1px 5px;border-radius:5px;
+  white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+.recap .y{color:var(--tip);font-weight:700}.recap .n{color:var(--warn);font-weight:700}
+.q{background:var(--raised);border:1px solid var(--line);border-left:4px solid var(--yellow);
+  border-radius:11px;padding:16px 18px;margin:16px 0}
+.q .qn{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--idea);font-weight:700;margin:0 0 4px}
+.q h3{margin:2px 0 8px;text-wrap:wrap;overflow-wrap:break-word;padding-right:3px}
+.opt{display:grid;grid-template-columns:auto 1fr;gap:8px 12px;margin:10px 0 0;font-size:14.5px}
+.opt .k{font-family:var(--mono);font-weight:700;color:var(--ink);background:var(--line-soft);border-radius:6px;padding:1px 8px;height:fit-content}
+.rec{color:var(--tip);font-weight:700}
+.foot{grid-column:1/-1;margin-top:40px;padding-top:22px;border-top:1px solid var(--line);
+  color:var(--muted);font-size:13.5px;font-family:var(--mono)}
+@media(max-width:900px){
+  .wrap{grid-template-columns:1fr;gap:0;padding:0 18px 80px}
+  nav.toc{position:static;max-height:none;padding:22px 0;border-bottom:1px solid var(--line);margin-bottom:8px}
+  nav.toc ol{columns:2;gap:8px}
+  header.hero{padding:44px 18px 32px}
+}
+/* ===== personal notes layer ===== */
+mark.note-hl{background:rgba(255,183,1,.20);border-bottom:2px solid rgba(255,183,1,.7);border-radius:2px;
+  cursor:pointer;color:inherit;padding:0 .5px;transition:background .12s ease}
+mark.note-hl.hot{background:rgba(255,183,1,.45)}
+mark.note-hl.flash{animation:noteflash 1.2s ease}
+@keyframes noteflash{0%,100%{background-color:rgba(255,183,1,.20)}30%{background-color:rgba(255,183,1,.62)}}
+.note-badge{display:inline-flex;align-items:center;justify-content:center;min-width:14px;height:14px;padding:0 3px;
+  margin:0 1px 0 2px;font-family:var(--sans);font-size:9px;font-weight:800;line-height:1;vertical-align:super;
+  background:var(--ink);color:#FBF7EE;border-radius:7px;cursor:pointer;user-select:none;transition:background .12s ease}
+.note-badge.hot{background:var(--yellow);color:var(--ink)}
+.note-card{transition:box-shadow .12s ease,border-color .12s ease}
+.note-card.linked{border-color:var(--yellow);box-shadow:0 0 0 2px rgba(255,183,1,.28)}
+.note-card.active{border-color:var(--yellow);box-shadow:0 0 0 3px rgba(255,183,1,.42)}
+.note-card .cnum{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;
+  background:var(--ink);color:#FBF7EE;border-radius:8px;font-size:10px;font-weight:800;margin-right:7px;vertical-align:middle}
+.note-fab{position:fixed;right:22px;bottom:22px;z-index:50;display:flex;align-items:center;gap:9px;
+  background:var(--ink);color:#FBF7EE;border:none;border-radius:999px;padding:12px 17px;cursor:pointer;
+  font-family:var(--sans);font-weight:600;font-size:14px;box-shadow:0 10px 26px -10px rgba(31,24,18,.55)}
+.note-fab:hover{background:#332619}
+.note-fab .cnt{font-family:var(--mono);font-size:12px;background:var(--yellow);color:var(--ink);
+  border-radius:999px;padding:1px 8px;min-width:20px;text-align:center}
+.note-pop{position:absolute;z-index:60;transform:translate(-50%,-100%);margin-top:-9px;display:none;
+  background:var(--ink);border-radius:9px;padding:5px;box-shadow:0 12px 30px -12px rgba(0,0,0,.5)}
+.note-pop button{background:var(--yellow);color:var(--ink);border:none;border-radius:6px;
+  padding:7px 12px;font-family:var(--sans);font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap}
+.note-pop:after{content:"";position:absolute;left:50%;top:100%;transform:translateX(-50%);
+  border:6px solid transparent;border-top-color:var(--ink)}
+.note-panel{position:fixed;top:0;right:0;height:100%;width:min(380px,92vw);z-index:70;background:var(--raised);
+  border-left:1px solid var(--line);box-shadow:-18px 0 40px -30px rgba(31,24,18,.5);display:flex;flex-direction:column;
+  opacity:0;visibility:hidden;transform:translateY(6px);transition:opacity .18s ease,transform .18s ease,visibility .18s}
+.note-panel.open{opacity:1;visibility:visible;transform:none}
+.note-panel .ph{padding:18px 18px 14px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.note-panel .ph h3{margin:0;font-size:17px;font-weight:800}
+.note-panel .ph .sub{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.03em}
+.note-panel .x{background:none;border:none;font-size:24px;line-height:1;cursor:pointer;color:var(--muted)}
+.newbtn{background:var(--ink);color:#FBF7EE;border:none;border-radius:8px;padding:7px 12px;font-family:var(--sans);font-weight:700;font-size:12.5px;cursor:pointer;white-space:nowrap}
+.composer{padding:12px 14px;border-bottom:1px solid var(--line);background:#fff}
+.composer .anchor{font-family:var(--mono);font-size:11px;color:var(--tip);background:var(--tip-bg);
+  border:1px solid var(--tip-line);border-radius:7px;padding:5px 8px;margin-bottom:8px;display:flex;gap:6px;align-items:center;overflow:hidden}
+.composer .anchor span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.composer .anchor .axn{margin-left:auto;cursor:pointer;font-weight:700;flex:none}
+.composer textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:9px;
+  font-family:var(--sans);font-size:15px;padding:10px;resize:vertical;min-height:82px;background:#fff;color:var(--ink)}
+.composer textarea:focus{outline:2px solid var(--yellow);outline-offset:0;border-color:transparent}
+.composer .crow{display:flex;flex-direction:column;align-items:stretch;gap:7px;margin-top:8px}
+.composer .chint{font-size:11.5px;color:var(--muted)}
+.composer .addbtn{display:block;width:100%;background:var(--ink);color:#FBF7EE;border:none;border-radius:9px;
+  padding:12px 16px;font-family:var(--sans);font-weight:700;font-size:15px;cursor:pointer}
+.composer .addbtn:hover{background:#332619}
+.storage-note{margin:0;padding:9px 14px;background:var(--warn-bg);border-bottom:1px solid var(--warn-line);
+  color:var(--warn);font-size:12px;line-height:1.5}
+.storage-note.ok{background:var(--tip-bg);border-bottom-color:var(--tip-line);color:var(--tip)}
+.note-list{flex:1;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:12px}
+.note-empty{color:var(--muted);font-size:14px;text-align:center;padding:40px 14px;line-height:1.7}
+.note-empty b{color:var(--ink)}
+.note-card{background:#fff;border:1px solid var(--line);border-radius:11px;padding:12px 13px}
+.note-card .loc{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--tip);font-weight:700;cursor:pointer;margin-bottom:6px;display:inline-block}
+.note-card .quote{font-size:12px;color:var(--ink-soft);border-left:3px solid var(--line);padding:2px 0 2px 9px;
+  margin:0 0 8px;font-family:var(--mono);white-space:pre-wrap;word-break:break-word;max-height:74px;overflow:auto}
+.note-card .body{font-size:14.5px;white-space:pre-wrap;word-break:break-word}
+.note-card .body.empty{color:var(--muted);font-style:italic}
+.note-card textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;font-family:var(--sans);
+  font-size:14.5px;padding:8px;resize:vertical;min-height:66px;background:#fff;color:var(--ink)}
+.note-card .row{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
+.note-card .row button{border:none;border-radius:7px;padding:6px 11px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:var(--sans)}
+.note-card .save{background:var(--ink);color:#FBF7EE}
+.note-card .edit{background:var(--line-soft);color:var(--ink-soft)}
+.note-card .del{background:var(--warn-bg);color:var(--warn)}
+.note-card .reply{background:var(--tip-bg);color:var(--tip)}
+.note-card .replies{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+.note-thread{border-left:3px solid var(--line);padding:5px 0 5px 10px}
+.note-thread .who{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:3px;font-weight:700}
+.note-thread .txt{font-size:13.5px;white-space:pre-wrap;word-break:break-word}
+.note-thread.agent{border-left-color:var(--yellow)}
+.note-thread.agent .who{color:var(--idea)}
+.reply-box{margin-top:9px}
+.reply-box textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;
+  font-family:var(--sans);font-size:14px;padding:8px;resize:vertical;min-height:52px;background:#fff;color:var(--ink)}
+.reply-box textarea:focus{outline:2px solid var(--yellow);outline-offset:0;border-color:transparent}
+.note-panel .pf{padding:11px 14px;border-top:1px solid var(--line);display:flex;gap:8px}
+.note-panel .pf button{flex:1;border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans);color:var(--ink-soft)}
+.note-panel .pf button:hover{background:var(--line-soft)}
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-in">
+    <p class="eyebrow">Technical design · voice-coach · hustle · glute-bridge pilot · 2026-07-09 · rev 2 — review resolutions folded</p>
+    <h1>Hustle: <span class="u">hesitation-armed</span>, commit-fired</h1>
+    <p class="lede">The behavior is locked (decisions.md, 07-09): hustle arms when the inter-rep gap
+      stretches past this set's own rhythm, and fires only at entry into the exercise's declared
+      <em>effort phase</em>. Rev 2 folds in Nam's lavish-review resolutions (decisions.md, "Hustle
+      lavish-review refinements"): effort-phase firing, void-on-absence, the count-paired final push.
+      This is the <em>how</em> — what we can actually observe, where the gap math lives, and what still
+      has to be calibrated from real timestamps before a single line plays.</p>
+    <div class="chips">
+      <span class="chip">scope <b>glute bridge pilot</b></span>
+      <span class="chip">arm <b>stretched inter-rep gap</b></span>
+      <span class="chip">fire <b>at effort-phase entry</b></span>
+      <span class="chip">finish <b>count-paired roll</b></span>
+      <span class="chip">void <b>pause/absence gaps</b></span>
+      <span class="chip">cap <b>none (persistence resets)</b></span>
+      <span class="chip">ships <b>OFF until calibrated</b></span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+<nav class="toc">
+  <p class="lbl">Design</p>
+  <ol>
+    <li><a href="#goal">Goal &amp; what's locked</a></li>
+    <li><a href="#today">The rejected mechanism, in code</a></li>
+    <li><a href="#observe">Can we even see the commit?</a></li>
+    <li><a href="#gap">The gap &amp; the baseline</a></li>
+    <li><a href="#mechanism">Arm in the adapter, fire in the policy</a></li>
+    <li><a href="#calibration">Calibration: the three numbers</a></li>
+    <li><a href="#blast">Blast radius &amp; tests</a></li>
+    <li><a href="#questions">Your call — all resolved</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<!-- 1 -->
+<section id="goal">
+  <p class="kicker"><span class="n">01</span> The ask</p>
+  <h2>Goal &amp; what's already locked</h2>
+  <p class="lead">Rebuild hustle as an <em>effort</em> cue, not a rep-counter cue. It <em>arms</em> when the
+    user hesitates between reps (the inter-rep gap stretches past this set's own baseline) and <em>fires</em>
+    only at the first entry into the exercise's declared <em>effort phase</em> after that gap — the force
+    moment the user just committed to (glute bridge: the raise). Speaking never happens mid-gap, and
+    structurally never after a set ends. This is the 07-09 decision plus its lavish-review refinements
+    (decisions.md, both 07-09 hustle entries); do not re-litigate them. This doc designs their
+    implementation.</p>
+  <div class="gl">
+    <div><b>Locked · arm</b>The inter-rep gap stretching past the set's baseline (median of the first 2–3
+      gaps) arms hustle. It is a <em>behavioral</em> "do I go again" signal, not a fatigue meter. Never spoken
+      mid-gap.</div>
+    <div><b>Locked · fire</b>The armed cue rolls at entry into the exercise's declared <em>effort phase</em>
+      (<code>VoiceScript.effortPhaseKeys</code>) — the push tracks force, not rep topology (review
+      generalization). Glute bridge: the raise, which is also its first movement phase — a topology
+      coincidence. Squat, when it migrates: the ascent, not the descent-start. No next rep → no fire.</div>
+    <div><b>Locked · void-on-absence</b>Presence-loss or pause during an inter-rep gap VOIDS it: cannot arm
+      hustle, excluded from the baseline median (review rule). An out-of-frame errand and a walk-away rest
+      are indistinguishable — both kill the "hesitating in position" read.</div>
+    <div><b>Locked · paired finish</b>Second flavor (review Q1): when the count anchor fires with exactly ONE
+      rep remaining (rep N−1 lands), the push MAY pair in the same breath ("Chín — cố lên!" / "Một cái nữa
+      thôi!"). Stochastic quiet-side roll, rotating final pool, NEVER deterministic. A fired pairing consumes
+      the push for that transition.</div>
+    <div><b>Locked · probability</b>Persistence-shaped, <em>no per-set cap</em>. First hesitation = low odds;
+      stacking hesitations climb; firing resets. A grinding finish can earn 2+ pushes. Base quiet-side,
+      personality scalar applies.</div>
+    <div><b>Locked · honesty</b>"Một cái nữa thôi!" only when <code>targetReps</code> proves the final rep;
+      otherwise "Cố lên!". Rep-duration slowdown is <em>not</em> a trigger (bodyweight).</div>
+    <div><b>Locked · slot</b>Lowest outcome priority, never the second in-rep slot (per-moment exclusivity,
+      collision gap). Strict perishability (review Q3): an armed push drops if the sink is busy at the fire
+      moment. The next-rep reminder outranks hustle where they share the commit edge (§05).</div>
+    <div><b>Locked · ships OFF</b>Numbers stay symbolic. Nothing plays until the gap thresholds are calibrated
+      from real <code>ExerciseLogger</code> timestamps and the audio is recorded. Pilot: glute bridge.</div>
+  </div>
+  <p>The design problem is not "what should hustle do" — that's settled. It's three things the decision left
+    to the build: <strong>(1)</strong> can we observe the effort-phase entry and the gap at the adapter seam
+    at all; <strong>(2)</strong> which layer owns the gap math versus the probability; <strong>(3)</strong>
+    how we get from "no timestamps in any log today" to three calibrated numbers.</p>
+</section>
+
+<!-- 2 -->
+<section id="today">
+  <p class="kicker"><span class="n">02</span> Current state</p>
+  <h2>The rejected mechanism is still wired — here it is</h2>
+  <p>Today's <code>_hustle()</code> is the design we're replacing: a once-per-set latch, a final-reps-window
+    gate, and a flat coin-flip. Every one of the three highlighted lines is the rejected behavior.</p>
+  <div class="code">
+    <div class="code-head"><span>lib/voice/voice_policy.dart — _hustle() (current, REJECTED)</span><b>3 gates to remove</b></div>
+    <div class="code-body"><pre class="src"><span class="k">bool</span> _hustle(CueContext ctx) {
+  <span class="bad"><span class="k">if</span> (_hustledThisSet) <span class="k">return</span> <span class="k">false</span>;</span>          <span class="c">// once-per-set cap — DROP (no cap now)</span>
+  <span class="k">if</span> (!_canStartOutcome(CueType.hustle, ctx)) {   <span class="c">// KEEP: slot / collision gap</span>
+    <span class="k">return</span> <span class="k">false</span>;
+  }
+  <span class="bad"><span class="k">if</span> (!ctx.isFinalReps) <span class="k">return</span> <span class="k">false</span>;</span>            <span class="c">// final-reps window — DROP (arming replaces it)</span>
+  <span class="k">final</span> t = tuning[CueType.hustle]!;
+  <span class="k">return</span> _rng.nextDouble() &lt; <span class="bad">_p(t, <span class="s">0</span>)</span>;          <span class="c">// flat roll at idle 0 — REPLACE with hunger</span>
+}</pre></div>
+  </div>
+  <p>The adapter fires it at the wrong moment too — batched at rep-<em>completion</em>, inside
+    <code>_handleRepLanded</code>, gated on the same rejected 2-rep window:</p>
+  <div class="code">
+    <div class="code-head"><span>lib/voice/policy_voice_coach.dart — _handleRepLanded (current, REJECTED placement)</span><b>delete this block</b></div>
+    <div class="code-body"><pre class="src"><span class="bad"><span class="k">if</span> (isFinalReps) {
+  _coach.say(
+    CueType.hustle,
+    VoiceContent.pool(script.hustlePool),
+    baseCtx,                          <span class="c">// repNumber = the rep that just LANDED</span>
+  );
+}</pre></div>
+  </div>
+  <div class="call warn"><p class="ct">⚠ two inconsistent "off" states in the tree right now</p>
+    <p><b>Glute bridge</b> is off the honest way — <code>hustlePool: const []</code> plus
+      <code>CueTuning(base: 0.0, cap: 0.0)</code>. <b>Squat</b> is <em>not</em>: its factory
+      (<code>squat.dart</code> ~214) never overrides the hustle pool, so it inherits
+      <code>VoiceDefaults.repBased.hustle</code> = <code>['common.one_more_rep','common.push']</code>, and
+      it never overrides the hustle tuning, so it inherits <code>kDefaultTuning</code>'s live
+      <code>base: 0.50, cap: 0.50</code>. That is the "stale LIVE hustle gate" — squat currently rolls a
+      50% final-rep push every set, contradicting the 07-08 OFF lock. This change must neutralize it
+      (empty its pool) <em>without</em> migrating squat to the new arming behavior.</p></div>
+</section>
+
+<!-- 3 -->
+<section id="observe">
+  <p class="kicker"><span class="n">03</span> The observability question</p>
+  <h2>Can the adapter even see the effort-phase entry and the gap?</h2>
+  <p>The whole design hinges on this. If the effort-phase entry and the inter-rep gap are not cleanly
+    observable at the adapter seam, everything else is moot. Three findings, all verified against the code.</p>
+
+  <h3>Finding A — the effort-phase entry is already observable, no new base surface</h3>
+  <p>The adapter reads <code>exercise.currentPhaseKey</code> every activated frame today (it's how phase cues
+    work). For glute bridge that key is the state-machine name: <code>bottom</code> → <code>ascending</code> →
+    <code>topHold</code> → <code>descending</code>. The fire moment (review generalization: entry into the
+    exercise's declared <em>effort phase</em> — the force moment, not "rep start") is exactly
+    <code>currentPhaseKey</code> entering the <em>ascending</em> phase. On glute bridge the effort phase IS
+    the rep's first movement phase, so this edge is also the rep-start commit edge — a topology coincidence,
+    not the definition. (Squat, when it migrates: rep starts with the descent, but the push belongs on the
+    ascent.)</p>
+  <div class="code">
+    <div class="code-head"><span>lib/voice/policy_voice_coach.dart — _maybeSpeakPhaseCue (proof the phase key is in hand)</span><b>already read every frame</b></div>
+    <div class="code-body"><pre class="src"><span class="k">final</span> cueKey = script.phaseCues[<span class="good">exercise.currentPhaseKey</span>];  <span class="c">// opaque string, adapter already has it</span></pre></div>
+  </div>
+  <p>So the adapter can detect the effort-phase entry with <em>zero</em> new <code>ExerciseBase</code> surface
+    — it just needs to know <em>which</em> opaque key means "the force phase is now underway." That identity is
+    exercise-specific (glute's effort phase is <code>ascending</code>; squat's would be its ascent), so it
+    belongs in the <em>content layer</em> next to <code>phaseCues</code>, not baked into the agnostic adapter:
+    a <code>Set&lt;String&gt; effortPhaseKeys</code> on <code>VoiceScript</code>, which the glute factory sets
+    to <code>{'ascending'}</code> and nobody else sets. Empty = this exercise never arms hustle (the switch).</p>
+  <div class="call tip"><p class="ct">✔ why VoiceScript, not a new ExerciseBase getter — RESOLVED (review Q4)</p>
+    <p>Nam decided Q4 with the generalization: the declaration lives on <code>VoiceScript</code>. The 07-09
+      real-time-cue design already paid for one additive base getter (<code>liveFaults</code>); this needs
+      zero more — the phase key is already surfaced, <code>phaseCues</code> is precedent for phase semantics
+      in the content layer, and squat's non-migration stays a default no-op: squat simply doesn't set
+      <code>effortPhaseKeys</code>, so the arming code never runs for it.</p></div>
+
+  <h3>Finding B — the gap must be timed on the pose clock, and it is available</h3>
+  <p>The inter-rep gap is a property of the <em>movement</em> timeline, not the audio timeline. The exercise
+    already stamps every frame with a pose clock the adapter can read:</p>
+  <div class="code">
+    <div class="code-head"><span>lib/exercise/exercise_base.dart — the frame clock (public, already there)</span><b>gap timing source</b></div>
+    <div class="code-body"><pre class="src"><span class="k">int</span> <span class="k">get</span> frameTimestampMs =&gt; frameTimestamp.millisecondsSinceEpoch;  <span class="c">// same clock the state machine times reps on</span></pre></div>
+  </div>
+  <p>Timing the gap on <code>exercise.frameTimestampMs</code> (rather than the policy's wall clock, which the
+    <em>collision</em> gap uses) keeps the measured gap identical to the gap the exercise itself experienced —
+    robust to pipeline lag / dropped frames, because both use the same per-frame stamp. Two clocks, each for
+    the right physical quantity: pose clock for the inter-rep gap, audio/wall clock for the collision gap.</p>
+
+  <h3>Finding C <span class="tag crit">blocker for calibration</span> — no log holds a timestamp today</h3>
+  <p>This is the finding that shapes the rollout. <code>RepLog</code> carries <code>repNumber</code>,
+    <code>correctForm</code>, and a free-form <code>data</code> map — <em>no timestamp</em>.
+    <code>ExerciseLogger</code> stores none either. Glute bridge's <code>_onRepCompleted</code> receives
+    <code>timestampMs</code> and uses it for speed control, but never logs it.</p>
+  <div class="code">
+    <div class="code-head"><span>lib/utils/exercise_logger.dart — RepLog (no time field anywhere)</span><b>calibration gap</b></div>
+    <div class="code-body"><pre class="src"><span class="k">class</span> RepLog {
+  <span class="k">final</span> <span class="k">bool</span> correctForm;
+  <span class="k">final</span> <span class="k">int</span> repNumber;
+  <span class="k">final</span> Map&lt;String, dynamic&gt; data;   <span class="c">// peak angles, fault ids — but NO rep-land / rep-start time</span>
+}</pre></div>
+  </div>
+  <div class="call idea"><p class="ct">💡 consequence: gaps cannot be recovered from existing sessions</p>
+    <p>The three hustle numbers are supposed to come from real logged rep timestamps — but no logged session,
+      past or present, contains one. So calibration <em>requires</em> a capture step before it can start. The
+      cheapest one that touches nothing risky: have the adapter <code>debugPrint</code> every gap it computes
+      (it computes them anyway). Nam runs a handful of real glute-bridge sets on a debug build and reads the
+      gap distributions off the console. No schema change, no pipeline change. Detail in §06.</p></div>
+</section>
+
+<!-- 4 -->
+<section id="gap">
+  <p class="kicker"><span class="n">04</span> The measurement</p>
+  <h2>The gap, the baseline, void-on-absence, and the one failure mode</h2>
+  <p>Define the gap from the two observable events. Rep N "lands" when <code>repCount</code> increments (glute
+    counts at <code>descending → bottom</code>). Rep N+1 "starts" when the phase enters the effort key (on
+    glute, the effort phase is the rep's first phase, so effort entry = rep start). The gap that precedes
+    rep N+1 is the rest between them:</p>
+  <div class="code">
+    <div class="code-head"><span>the definition (design, not final code)</span><b>one pose-clock subtraction</b></div>
+    <div class="code-body"><pre class="src"><span class="c">// gap(N+1) = time the user spent deciding to go again</span>
+gap(N+1) = frameTimestampMs<span class="k">@</span>effortEntry(N+1)  −  frameTimestampMs<span class="k">@</span>repLanded(N)</pre></div>
+  </div>
+  <div class="chain">
+    <div class="row"><div class="num"></div><div class="body"><b>repCount++ → record land time</b><div class="d">On the landing frame, stamp <code>_lastRepLandedAtMs = frameTimestampMs</code> and set <code>_awaitingRepStart = true</code>. State is now <code>bottom</code> (resting).</div></div></div>
+    <div class="row"><div class="num"></div><div class="body"><b>bottom … bottom (resting)</b><div class="d">Frames tick by; nothing fires. This is the hesitation — silent by construction. A paused or person-lost frame here VOIDS the gap (below).</div></div></div>
+    <div class="row"><div class="num"></div><div class="body"><b>enter effort phase → the commit</b><div class="d">When <code>currentPhaseKey</code> enters an effort key AND <code>_awaitingRepStart</code>: compute <code>gap = frameTimestampMs − _lastRepLandedAtMs</code>, clear the flag, then decide.</div></div></div>
+  </div>
+  <div class="call idea"><p class="ct">💡 generalization note — where the collapse stops holding (squat, later)</p>
+    <p>On glute the gap ends at the same edge the push fires on. On an exercise whose effort phase is
+      <em>not</em> its first phase (squat: rep starts descending, force is the ascent) the two moments
+      separate: the gap must end at the rep-start commit edge (or it would absorb the descent), while the
+      fire moves to the effort entry — an <code>armed</code> flag carried from one edge to the other. That
+      split is <strong>deferred until squat migrates</strong>; v1 implements only the collapsed glute form.
+      Named here so the migration doesn't silently measure squat gaps through the descent.</p></div>
+
+  <h3>Void-on-absence — a gap touched by pause or presence-loss is dead <span class="tag med">review rule</span></h3>
+  <p>Presence-loss or pause during an inter-rep gap VOIDS that gap: it can never arm hustle, and it is
+    excluded from the baseline median. An out-of-frame errand and a walk-away rest are indistinguishable, and
+    both kill the "hesitating in position" read — voiding is wrong in neither case. Mechanically the void is
+    one nulled stamp, hooked into the adapter's existing early-return
+    (<code>state != activated || exercise.isPaused || !hasPose</code>):</p>
+  <div class="chain">
+    <div class="row"><div class="num"></div><div class="body"><b>what clears</b><div class="d"><code>_lastRepLandedAtMs = null</code> on every paused / no-pose / not-activated frame (plus a one-shot debug log of the void, for Stage-B visibility). <code>_awaitingRepStart</code> stays latched — it is about the phase edge, not the gap.</div></div></div>
+    <div class="row"><div class="num"></div><div class="body"><b>what the baseline sees</b><div class="d">Nothing. The voided gap is never computed, so it never reaches <code>_recordGapAndLog</code> — the baseline window simply waits for the next <em>valid</em> gap (it closes on the first <code>kBaselineGapCount</code> valid gaps, however long that takes).</div></div></div>
+    <div class="row"><div class="num"></div><div class="body"><b>what resumes fresh</b><div class="d">The first effort entry after the void clears the <code>_awaitingRepStart</code> latch, finds <code>landed == null</code>, and no-ops — no arm, no log. The next rep LAND re-stamps <code>_lastRepLandedAtMs</code>, and gap measurement resumes clean from there.</div></div></div>
+  </div>
+  <p>Nulling on <em>every</em> blocked frame (not just gap-phase ones) is deliberate: a mid-rep pause is
+    harmless to null because the next land re-stamps anyway, and it saves the adapter from having to know
+    whether the exercise was mid-rep or mid-gap when the world went away.</p>
+  <p><strong>Baseline.</strong> Collect the first <code>kBaselineGapCount</code> gaps of the set (placeholder
+    <code>2</code>, TUNE 2–3) and take their median. Only gaps <em>after</em> the baseline window is closed are
+    arm-eligible — during the window we're still learning the user's rest rhythm. With count 2, the earliest
+    fire is the start of rep 4 (gaps before reps 2 and 3 build the baseline; the gap before rep 4 is the first
+    that can arm). That satisfies the "nothing arms before ~rep 3" cold start automatically.</p>
+  <p><strong>Arm condition.</strong> A post-baseline gap arms iff <code>gap &gt; baseline × kStretchRatio</code>
+    <em>and</em> <code>gap &gt; kMinArmGapMs</code>. The ratio makes it scale-free (a fast rester and a slow
+    rester each get judged against their own rhythm); the absolute floor stops a tiny baseline (e.g. 200 ms)
+    from turning an ordinary 400 ms pause into a "2× stretch."</p>
+  <div class="call warn"><p class="ct">⚠ numbers most likely wrong — the inflated-baseline failure mode</p>
+    <p>Named in the spec's own risk list: <em>a hard set whose EARLY gaps are already long inflates the
+      baseline, so hustle never arms on the grind it exists for.</em> A user who is already struggling from
+      rep 2 sets a high baseline, and their rep-9 grind looks "normal" against it. Two honest options:</p>
+    <p><b>(a) Accept for v1</b> — simplest, and the decision explicitly allows "mitigate or explicitly
+      accept." We lose hustle on the already-hard set; we never false-fire. <b>(b) Clamp the baseline</b> to a
+      plausible-rest ceiling (median, then <code>min(median, kBaselineCeilingMs)</code>) so early grinding
+      can't run the baseline away. The ceiling is itself an uncalibrated number.
+      <b>My call:</b> ship (a), but instrument for (b) — the calibration run (§06) logs raw baselines and
+      per-rep gaps, so we'll <em>see</em> whether early-gap inflation is real for glute bridge before adding a
+      knob we might not need.</p></div>
+  <div class="call idea"><p class="ct">💡 "arm" and "fire" collapse to one instant on glute — by topology</p>
+    <p>You cannot know a gap stretched until it <em>ends</em> — and on glute it ends exactly at the effort
+      entry. So there is no mid-gap timer to get wrong: the adapter learns the gap length and decides in the
+      same frame, at the raise. Arm-on-hesitation, fire-on-commit is one evaluation, not two, <em>in the
+      pilot</em> (the generalization note above covers when that stops holding). A hesitation that never
+      resolves into a rep is never evaluated, so it can't climb the persistence counter for nothing — which is
+      the correct reading of "stacking <em>hesitations</em>," since a hesitation only counts if the user then
+      chose to go again.</p></div>
+</section>
+
+<!-- 5 -->
+<section id="mechanism">
+  <p class="kicker"><span class="n">05</span> The seam</p>
+  <h2>Arm in the adapter, fire in the policy — reusing hunger</h2>
+  <p>The split follows the existing division of labor exactly. The <strong>adapter</strong> owns everything
+    exercise-semantic (what a rep-start is, what the gap is, whether it stretched, which line honesty
+    demands). The <strong>policy</strong> owns the probability — and the persistence climb is
+    <em>already built</em>: it's the per-type hunger counter, which climbs on every eligible-but-silent
+    <code>decide()</code> and resets to zero in <code>_onSpoke</code>. That is precisely "stacking hesitations
+    climb the odds; firing resets them."</p>
+
+  <div class="tbl"><table class="recap">
+    <colgroup><col style="width:30%"><col style="width:38%"><col style="width:32%"></colgroup>
+    <tr><th>Concern</th><th>Lives in</th><th>Why there</th></tr>
+    <tr><td>effort-entry detection, gap, baseline, "stretched?", void</td><td class="y">adapter (<code>PolicyVoiceCoach</code>)</td><td>needs <code>currentPhaseKey</code> + <code>frameTimestampMs</code> + per-exercise effort key — all exercise-semantic</td></tr>
+    <tr><td>line honesty (final vs generic) + the paired finish + its consume flag</td><td class="y">adapter</td><td><code>targetReps</code> already lives here; picks the pool and the moment before calling <code>say</code></td></tr>
+    <tr><td>fire probability + persistence climb + reset</td><td class="y">policy (<code>_hustle</code> + hunger)</td><td>reuses <code>_p()</code> and the <code>_idle['hustle']</code> counter → personality + determinism for free</td></tr>
+    <tr><td>slot / collision gap / perishability</td><td class="y">policy (<code>_canStartOutcome</code>)</td><td>hustle is an outcome cue; this is unchanged shared machinery</td></tr>
+  </table></div>
+
+  <h3>Adapter: one shared "rep attempt started" boundary — reminder first, hustle second</h3>
+  <p>On glute bridge the effort entry IS the rep-start commit edge, and a parallel 07-09 decision put the
+    <em>next-rep instruction</em> (reminder) on that same edge — with explicit precedence:
+    <strong>the reminder outranks hustle where they share the edge</strong> (voice-behavior-spec.md, "next-rep
+    instruction"). So the adapter computes the boundary ONCE and feeds both consumers in rank order. This
+    design does <em>not</em> build the reminder layer (someone else's surface) — it builds the boundary as a
+    single named seam, evaluates hustle there, and leaves an explicit, ordered hook point above it. Where an
+    exercise's effort phase is not its first phase (squat, later), the edges separate and the two cues stop
+    competing.</p>
+  <p>Arming reduces to "should we even ask the policy at this boundary." If the gap didn't stretch, the
+    adapter doesn't call <code>say(hustle)</code> at all, so the hunger counter isn't touched (neither
+    climbed nor reset) — a normal rep between two hesitations correctly leaves the climb intact.</p>
+  <div class="code">
+    <div class="code-head"><span>lib/voice/policy_voice_coach.dart — the shared boundary + arming step (design sketch)</span><b>runs every activated frame</b></div>
+    <div class="code-body"><pre class="src"><span class="c">// called after the rep-land / drain logic, every activated frame</span>
+<span class="k">void</span> _onRepAttemptBoundary(ExerciseBase exercise) {
+  <span class="k">final</span> effort = script.effortPhaseKeys;
+  <span class="k">if</span> (effort.isEmpty) <span class="k">return</span>;                     <span class="c">// exercise opted out (squat, everything non-glute)</span>
+  <span class="k">final</span> phase = exercise.currentPhaseKey;
+  <span class="k">final</span> enteredEffort = !effort.contains(_lastPhaseKey) &amp;&amp; effort.contains(phase);
+  _lastPhaseKey = phase;
+  <span class="k">if</span> (!enteredEffort || !_awaitingRepStart) <span class="k">return</span>; <span class="c">// only the first effort entry after a landed rep</span>
+  _awaitingRepStart = <span class="k">false</span>;
+  <span class="c">// >>> THE shared "rep attempt started" boundary (glute: raise entry = commit edge).</span>
+  <span class="c">// TODO(wiring): the next-rep reminder evaluates FIRST here and OUTRANKS hustle</span>
+  <span class="c">// (spec, Nam 07-09). When that layer lands, hustle below runs only if the</span>
+  <span class="c">// reminder did not claim this moment. Do not reorder.</span>
+
+  <span class="k">final</span> landed = _lastRepLandedAtMs;
+  <span class="k">if</span> (landed == <span class="k">null</span>) <span class="k">return</span>;                    <span class="c">// rep 1 — and void-on-absence gaps (§04)</span>
+  <span class="k">final</span> gap = exercise.frameTimestampMs - landed;
+  _recordGapAndLog(gap);                          <span class="c">// calibration capture (§06) — runs even while OFF</span>
+
+  <span class="k">final</span> base = _baselineGapMs;                     <span class="c">// null until the baseline window closes (valid gaps only)</span>
+  <span class="k">if</span> (base == <span class="k">null</span>) <span class="k">return</span>;                      <span class="c">// cold start: nothing arms before ~rep 3</span>
+  <span class="k">final</span> armed = gap &gt; base * kStretchRatio &amp;&amp; gap &gt; kMinArmGapMs;
+  <span class="k">if</span> (!armed) <span class="k">return</span>;
+
+  <span class="k">final</span> startedRep = _lastRepCount + <span class="s">1</span>;            <span class="c">// the rep being committed to</span>
+  <span class="k">final</span> isFinalRep = targetReps != <span class="k">null</span> &amp;&amp; startedRep == targetReps;
+  <span class="good"><span class="k">if</span> (isFinalRep &amp;&amp; _finalPushConsumed) <span class="k">return</span>;</span>  <span class="c">// paired push already took this transition (below)</span>
+  <span class="k">final</span> pool = isFinalRep &amp;&amp; script.hustleFinalPool.isNotEmpty
+      ? script.hustleFinalPool          <span class="c">// "Một cái nữa thôi!" — only when the counter PROVES it</span>
+      : script.hustlePool;              <span class="c">// "Cố lên!" — generic push</span>
+  _coach.say(CueType.hustle, VoiceContent.pool(pool),
+      CueContext(repNumber: startedRep, sinkBusy: _coach.isBusy));
+}</pre></div>
+  </div>
+
+  <h3>The paired finish: a roll that rides the N−1 count anchor, then consumes <span class="tag med">review Q1</span></h3>
+  <p>Second flavor, resolving review Q1: when rep N−1 lands (exactly one rep remaining) the count anchor
+    fires deterministically (hard rule 3) — and the push MAY pair in the same breath ("Chín — cố lên!" /
+    "Một cái nữa thôi!", target-proven, rotating <code>hustleFinalPool</code> — this is where that pool earns
+    its keep, so it needs ≥2 recorded lines at Stage C for the no-immediate-repeat rotation to bite).
+    <strong>Stochastic quiet-side roll, never deterministic</strong> — a guaranteed finish line every set is
+    the rejected 07-08 metronome; Nam accepted that condition. It lives in <code>_handleRepLanded</code>,
+    <em>after</em> the count and the fault/praise branches (hustle is the lowest-priority outcome, so it must
+    roll last and lose the moment to any of them via <code>_canStartOutcome</code>):</p>
+  <div class="code">
+    <div class="code-head"><span>lib/voice/policy_voice_coach.dart — _handleRepLanded, appended after the outcome branches (design sketch)</span><b>the pairing + the consume</b></div>
+    <div class="code-body"><pre class="src"><span class="c">// countSpoke = the captured return of the count say() above — "same breath" means</span>
+<span class="c">// riding an anchor that actually voiced (defensive: final-2 anchors always do).</span>
+<span class="k">final</span> oneRemaining = targetReps != <span class="k">null</span> &amp;&amp; repCount == targetReps - <span class="s">1</span>;
+<span class="k">if</span> (oneRemaining &amp;&amp; countSpoke &amp;&amp; script.hustleFinalPool.isNotEmpty) {
+  <span class="k">final</span> spoke = _coach.say(
+    CueType.hustle,
+    VoiceContent.pool(script.hustleFinalPool),   <span class="c">// rotating: "cố lên" / "một cái nữa thôi"</span>
+    baseCtx.copyWith(sinkBusy: _coach.isBusy),
+  );
+  <span class="good"><span class="k">if</span> (spoke) _finalPushConsumed = <span class="k">true</span>;</span>       <span class="c">// a FIRED pairing consumes the final transition —</span>
+}                                              <span class="c">// no second fire at the final rep's effort entry</span></pre></div>
+  </div>
+  <p><strong>The consume mechanism, explicitly.</strong> <code>_finalPushConsumed</code> is a single adapter
+    bool, set only when the paired <code>say</code> returns true (a fired pairing — a rolled-and-lost or
+    slot-blocked pairing does NOT consume; the final effort entry can then still fire if its gap arms).
+    It is read exactly once, at the effort entry whose <code>startedRep == targetReps</code>, where it
+    suppresses the <code>say</code> — the gap is still measured and logged for calibration, only the voice is
+    consumed. It never needs clearing mid-set (it can only matter on the final transition, which is followed
+    by set-end); the begin-set wipe resets it with the rest of the per-set state.</p>
+  <p>Interplay worth naming: the paired roll goes through the same <code>decide(CueType.hustle, …)</code> as
+    the mid-set flavor, so it shares the hunger counter — a set full of armed-but-silent hesitations makes
+    the finish pairing likelier, and a fired pairing resets the climb. That coupling is deliberate (one
+    probability machinery, one determinism story, and a grinding set earning a likelier finish push is the
+    right feel) but it is a coupling — flagged in the review list below.</p>
+
+  <h3>Policy: hunger replaces the coin-flip</h3>
+  <p><code>_hustledThisSet</code> and the <code>isFinalReps</code> gate are deleted. What remains is the slot
+    check plus a hunger-scaled roll — identical in shape to every other stochastic cue:</p>
+  <div class="code">
+    <div class="code-head"><span>lib/voice/voice_policy.dart — _hustle() (design target)</span><b>persistence via existing hunger</b></div>
+    <div class="code-body"><pre class="src"><span class="k">bool</span> _hustle(CueContext ctx) {
+  <span class="k">if</span> (!_canStartOutcome(CueType.hustle, ctx)) <span class="k">return</span> <span class="k">false</span>;  <span class="c">// lowest priority, never the 2nd in-rep slot</span>
+  <span class="good"><span class="k">if</span> (ctx.sinkBusy) <span class="k">return</span> <span class="k">false</span>;</span>                        <span class="c">// perishable: drop at the commit, never queue late</span>
+  <span class="k">final</span> t = tuning[CueType.hustle]!;
+  <span class="k">final</span> idle = _idle[_key(CueType.hustle, ctx)] ?? <span class="s">0</span>;    <span class="c">// climbs per armed-but-silent commit; _onSpoke resets it</span>
+  <span class="k">return</span> _rng.nextDouble() &lt; _p(t, idle);              <span class="c">// _p applies base + step·idle, then personality, then cap</span>
+}</pre></div>
+  </div>
+  <div class="call idea"><p class="ct">💡 the whole mechanism in one breath</p>
+    <p>"When the user rests longer than their own rhythm and then goes again, ask the coach if it should push
+      as the force phase begins; the more times that has happened this set without a push, the likelier yes;
+      a push resets the meter; there's no cap, so a real grind can earn two. At the second-to-last count, the
+      coach may also pair a finish push in the same breath — a roll, never a ritual — and if it does, it
+      won't double-dip at the last raise. If the moment's audio slot is busy, the push is dropped, not saved
+      — a late 'one more!' is worse than none. And if the camera lost you or you paused mid-rest, that rest
+      tells us nothing, so it's thrown away."</p></div>
+  <div class="call warn"><p class="ct">⚠ the seams I'd get wrong first — review these hardest</p>
+    <p><b>1 · Perishable via <code>sinkBusy</code> — RESOLVED strict (review Q3).</b> An explicit
+      <code>ctx.sinkBusy</code> drop (like <code>phase</code>), adapter passes <code>_coach.isBusy</code>,
+      applied to BOTH flavors. Rationale: the collision gap only blocks <em>outcome</em> audio; a short count
+      anchor still playing at the fire moment isn't an outcome, so without the <code>sinkBusy</code> check
+      the push would <em>queue behind it</em> and land a beat late — re-introducing the very "narrating the
+      slack" feel we're avoiding. Nam confirmed strict-drop over queue-slightly-late. One consequence to
+      watch: the paired flavor fires immediately after its own count anchor, so on a slow device the count's
+      audio may still be draining at the paired roll — if Stage-B testing shows the pairing starving, the
+      "same breath" may need to ride the count's queue rather than the busy check. Flagged, not built.</p>
+    <p><b>2 · Void-on-absence supersedes the plain pause guard (review rule 5).</b> Pause OR presence-loss
+      during a gap voids it — not just "don't arm" but "don't let it into the baseline" (§04). The false-arm
+      risk (wall-derived <code>frameTimestampMs</code> keeps advancing across a pause → huge resumed gap) and
+      the baseline-poisoning risk (a 30 s walk-away entering the median) die together. The nulled-stamp
+      mechanism and the resume path are specified in §04.</p>
+    <p><b>3 · Aborted rise (twitch-up, drop back).</b> Glute's state machine can go
+      <code>ascending → bottom</code> (abort, no rep). That's an effort entry with no landed rep after it.
+      The <code>_awaitingRepStart</code> latch handles it: it's cleared on the first effort entry after a
+      land, so a re-rise doesn't re-fire. A twitch only ever fires if the gap before it was already stretched
+      — rare, and accepted for v1. Worth a targeted test.</p>
+    <p><b>4 · The two flavors share one hunger counter.</b> The paired roll and the mid-set roll both go
+      through <code>decide(CueType.hustle, …)</code>, so hesitation climb inflates the finish-pairing odds
+      and either fire resets both. Deliberate (one machinery, right feel) — but if Nam ever wants the finish
+      pairing's odds independent of the set's hesitation history, it needs its own flat roll, which is a
+      policy change, not an adapter tweak. Also note the edge: at <code>targetReps == 2</code> the pairing is
+      eligible at rep 1's land, before any baseline exists — legal per the rule (it's structural, not
+      gap-conditioned), quiet-side roll anyway.</p></div>
+</section>
+
+<!-- 6 -->
+<section id="calibration">
+  <p class="kicker"><span class="n">06</span> From symbols to numbers</p>
+  <h2>Calibration plan &amp; the staged rollout</h2>
+  <p>Per the decision, nothing enters <code>canonical-numbers.md</code> and no line plays until the numbers
+    come from real timestamps. Because Finding C means no existing log has one, calibration is itself a small
+    build step, sequenced so hustle stays provably OFF throughout.</p>
+  <div class="chain">
+    <div class="row"><div class="num"></div><div class="body"><b>Stage A — wire it OFF, log the gaps</b>
+      <div class="d">Codex builds the full arming + firing mechanism (both flavors, void, consume), but glute
+      ships <code>hustlePool: []</code> / <code>hustleFinalPool: []</code> and tuning
+      <code>base 0.0 / cap 0.0</code>. <code>say</code> no-ops on the empty pools, so <em>nothing can play</em>.
+      The gap/baseline computation and its <code>debugPrint</code> run regardless — including a log line per
+      VOIDED gap, so Stage B can see how often pause/absence eats a rest. Deliverable: the mechanism exists,
+      all tests green, zero audio.</div></div></div>
+    <div class="row"><div class="num"></div><div class="body"><b>Stage B — Nam runs real sets, reads distributions</b>
+      <div class="d">On a debug build, do ~10–20 real glute-bridge sets (mix easy and grind-to-near-failure).
+      Grep the console for the gap lines. Out of that: the actual rest-gap distribution, whether early-gap
+      inflation is real (does the baseline sit above the grind gaps?), and sane values for
+      <code>kStretchRatio</code>, <code>base</code>, <code>step</code>, and the baseline gap count.</div></div></div>
+    <div class="row"><div class="num"></div><div class="body"><b>Stage C — set numbers, record audio, flip ON</b>
+      <div class="d">Enter the calibrated <code>base</code> / <code>step</code> / <code>cap</code> and the gap
+      thresholds; record the audio — the generic pool ("Cố lên!" + variants) AND ≥2 final-pool lines
+      ("Một cái nữa thôi!", "Cố lên!"…), because the paired finish rotates <code>hustleFinalPool</code> and
+      rotation needs at least two members to bite; populate the pools. Add the canonical-numbers row. This is
+      a small follow-up diff, not part of the build under review.</div></div></div>
+  </div>
+  <div class="tbl"><table class="recap">
+    <colgroup><col style="width:26%"><col style="width:20%"><col style="width:54%"></colgroup>
+    <tr><th>Symbol</th><th>Placeholder</th><th>What the calibration run decides</th></tr>
+    <tr><td><code>kBaselineGapCount</code></td><td><code>2</code></td><td>2 vs 3 — enough to be stable without pushing the cold start past rep 4–5</td></tr>
+    <tr><td><code>kStretchRatio</code></td><td><code>1.5</code> <span class="tag med">TUNE</span></td><td>how much longer than baseline counts as hesitation; the core false-positive/negative knob</td></tr>
+    <tr><td><code>kMinArmGapMs</code></td><td><code>800</code> <span class="tag med">TUNE</span></td><td>absolute floor so a tiny baseline can't make an ordinary pause "stretch"</td></tr>
+    <tr><td><code>hustle.base</code></td><td><code>0.15</code> <span class="tag med">TUNE</span></td><td>quiet-side odds on the first hesitation of a set</td></tr>
+    <tr><td><code>hustle.step</code></td><td><code>0.20</code> <span class="tag med">TUNE</span></td><td>the persistence climb per stacked-and-silent hesitation</td></tr>
+    <tr><td><code>hustle.cap</code></td><td><code>0.85</code> <span class="tag med">TUNE</span></td><td>a grind approaches but never guarantees a push</td></tr>
+    <tr><td>OFF lever (v1)</td><td><code>base 0 / cap 0</code> + empty pools</td><td>the two independent guarantees that Stage A/B make no sound</td></tr>
+  </table></div>
+  <div class="call tip"><p class="ct">✔ every placeholder is marked TUNE-ON-CALIBRATION</p>
+    <p>Reviewers should read the placeholders as shape, never as values. They exist so the mechanism compiles
+      and unit-tests; they are wrong on purpose until Stage B. A richer capture (writing the gap into
+      <code>RepLog.data</code> so it persists to Supabase) is a nice upgrade but not required — the
+      <code>debugPrint</code> path needs no schema change and no pipeline touch, so it's the v1 capture.</p></div>
+</section>
+
+<!-- 7 -->
+<section id="blast">
+  <p class="kicker"><span class="n">07</span> Scope</p>
+  <h2>What Codex touches — and what flips in the tests</h2>
+  <div class="tbl"><table class="recap">
+    <colgroup><col style="width:34%"><col style="width:66%"></colgroup>
+    <tr><th>File</th><th>Change</th></tr>
+    <tr><td><code>voice_content.dart</code></td><td>+ <code>Set&lt;String&gt; effortPhaseKeys</code> and <code>List&lt;String&gt; hustleFinalPool</code> on <code>VoiceScript</code> (both default empty), threaded through <code>VoiceScript.from</code>. Update the stale <code>CueType.hustle</code> enum doc.</td></tr>
+    <tr><td><code>voice_policy.dart</code></td><td>rewrite <code>_hustle()</code> (drop <code>_hustledThisSet</code> + <code>isFinalReps</code>, add <code>sinkBusy</code> + hunger); delete the <code>_hustledThisSet</code> field + its <code>beginSet</code>/<code>_onSpoke</code> lines; fix the stale <code>kDefaultTuning</code> hustle comment.</td></tr>
+    <tr><td><code>policy_voice_coach.dart</code></td><td>the real work: the shared rep-attempt boundary + arming step (gap, baseline, arm, content select, consume check) with the ordered reminder hook comment; the paired-finish roll + <code>_finalPushConsumed</code> in <code>_handleRepLanded</code> (after the outcome branches, conditioned on the count anchor having spoken); rep-land time stamping; <code>_lastPhaseKey</code> / <code>_awaitingRepStart</code> state; void-on-absence in the early-return; calibration log (gaps + voids); delete the old <code>_handleRepLanded</code> hustle block.</td></tr>
+    <tr><td><code>glute bridge/glute_bridge.dart</code></td><td>set <code>effortPhaseKeys: {'ascending'}</code>; keep pools empty + hustle tuning <code>base 0/cap 0</code> (OFF). The empty pools + the arming wiring is what §06 Stage A ships.</td></tr>
+    <tr><td><code>squat/squat.dart</code></td><td>neutralize: override <code>hustlePool: const []</code> (clears the stale live pool). Do <em>not</em> set <code>effortPhaseKeys</code> → squat never arms. Optional belt: hustle tuning base 0.</td></tr>
+    <tr><td><code>test/voice/*</code></td><td>rewrite the <code>hustle</code> group; extend the fake exercise to drive phase + <code>frameTimestamp</code>; new adapter arming + pairing + void tests. See below.</td></tr>
+  </table></div>
+  <h3>Which assertions flip</h3>
+  <ul>
+    <li><strong>Rewrite</strong> <code>voice_policy_test.dart</code> group <code>'hustle'</code> (~488–525). It
+      pins the rejected mechanism (<code>!isFinalReps → false</code>, once-per-set, <code>beginSet</code>
+      resets the cap). New pins: base is quiet at hunger 0; hunger climbs the odds per armed-silent call;
+      firing resets the climb; <em>two fires in one set are allowed</em> (no cap); hustle still loses the
+      second in-rep slot; hustle fires with <code>isFinalReps:false</code> (the gate is gone).</li>
+    <li><strong>Stays green, review the comment</strong> — the <code>reproducibility</code> test (~1087). It
+      only asserts same-seed==same-transcript and different-seed differs; the new <code>_hustle</code> is still
+      pure given seed, so it holds. The internal draw sequence changes (harmless). Optionally add an assertion
+      that a genuine 2nd hustle can occur, to pin "no cap" at the transcript level.</li>
+    <li><strong>Stays green</strong> — <code>policy_voice_coach_wiring_test.dart</code> "glute bridge … keeps
+      hustle off" (~44). v1 keeps <code>hustlePool</code> empty, so <code>isEmpty</code> and
+      <code>targetReps == 3</code> still hold; this remains the pin for the OFF state.</li>
+    <li><strong>New</strong> — adapter-level: an armed commit (stretched gap after baseline) calls
+      <code>say(hustle)</code> at the effort entry; a normal gap does not; the final rep's effort entry
+      selects <code>hustleFinalPool</code>; squat (no <code>effortPhaseKeys</code>) never arms.</li>
+    <li><strong>New — paired finish + consume:</strong> at rep N−1's land the paired roll happens (after the
+      outcome branches, riding a spoken count anchor); a FIRED pairing sets the consume flag and the final
+      effort entry stays silent even with an armed gap (gap still logged); a rolled-and-lost or slot-blocked
+      pairing does NOT consume, and the final effort entry can still fire; the pairing is never deterministic
+      (a losing scripted roll produces silence).</li>
+    <li><strong>New — void-on-absence:</strong> a paused or no-pose frame during a gap nulls the pending land
+      stamp — the next effort entry neither arms nor feeds the baseline; the baseline window closes only on
+      valid gaps (a void mid-window stretches the window, never poisons the median); the next rep land
+      resumes measurement fresh.</li>
+  </ul>
+  <div class="call tip"><p class="ct">✔ untouched</p>
+    <p>No other cue type's behavior or tuning. No audio assets. No <code>ExerciseBase</code> surface change
+      (the effort-phase identity rides on <code>VoiceScript</code>, and the clock/phase key already exist). No
+      pose/frame pipeline change. No metric edits. Squat is neutralized, not migrated. The next-rep reminder
+      layer is NOT built here — only its ordered hook point at the shared boundary (it outranks hustle
+      there), for whoever owns that surface.</p></div>
+</section>
+
+<!-- 8 -->
+<section id="questions">
+  <p class="kicker"><span class="n">08</span> Your call — RESOLVED 07-09</p>
+  <h2>Open questions — all resolved in Nam's lavish review (07-09)</h2>
+  <p>All four were ruled on with Fable 07-09 (decisions.md, "Hustle lavish-review refinements";
+    voice-behavior-spec.md hustle section + hard rule 8 carry the canonical wording). The cards stay as the
+    reasoning trail — each carries its resolution.</p>
+
+  <div class="q">
+    <p class="qn">Q1 · the "Chín — cố lên!" pairing changes shape — <span class="rec">RESOLVED: second flavor added</span></p>
+    <h3>Commit-firing means the count and the push no longer land together</h3>
+    <p>In the old post-rep model, count + hustle fired at the same instant ("Chín — cố lên!"). In the
+      commit-fired model, the count for rep 9 fires when rep 9 lands <em>at the bottom</em>, and the push
+      fires when rep 10 <em>starts at the raise</em> — on either side of the hesitation. So they're sequential
+      now: "Chín… <em>[rest]</em>… Một cái nữa thôi!". The co-occurrence <em>machinery</em> is preserved
+      (count is not an outcome cue, so it never blocks or is blocked by hustle) — but in glute's timing they
+      simply happen at different moments.</p>
+    <div class="opt">
+      <span class="k">A</span><span>Sequential is correct and better — it mirrors a real coach: count the rep, watch the hesitation, then push into the commit. (My read.)</span>
+      <span class="k">B</span><span>You actually want them simultaneous — then hustle would need a different moment, which reopens the commit-fired decision. Flag it.</span>
+    </div>
+    <div class="call tip"><p class="ct">✔ Nam's ruling — neither A nor B: both, as two flavors</p>
+      <p>The hesitation-armed effort-entry push stays exactly as designed (sequential). AND a second flavor
+        restores the same-breath finish energy without reopening the commit-fired decision: when the count
+        anchor fires with exactly ONE rep remaining, the push MAY pair in the same breath — a stochastic
+        quiet-side roll on the rotating <code>hustleFinalPool</code>, NEVER deterministic (a guaranteed
+        finish line every set is the rejected 07-08 metronome; Nam accepted that condition). A fired pairing
+        consumes the push for that transition — no second fire at the final rep's effort entry. Mechanism:
+        §05 "The paired finish."</p></div>
+  </div>
+
+  <div class="q">
+    <p class="qn">Q2 · the inflated-baseline failure mode — <span class="rec">RESOLVED: option A</span></p>
+    <h3>Accept it for v1, or clamp the baseline now?</h3>
+    <p>A set that's hard from the first rep inflates its own baseline, so the grind never reads as stretched
+      and hustle stays silent on exactly the set it's for (§04).</p>
+    <div class="opt">
+      <span class="k">A</span><span><span class="rec">Accept for v1</span>, instrument, revisit with Stage-B data — we never false-fire, and the calibration run will show whether it's real before we add a knob. <b>← Nam's ruling.</b></span>
+      <span class="k">B</span><span>Clamp the baseline to a ceiling now — costs one more uncalibrated number up front.</span>
+    </div>
+  </div>
+
+  <div class="q">
+    <p class="qn">Q3 · perishability strictness — <span class="rec">RESOLVED: option A, strict drop</span></p>
+    <h3>Drop the push if any audio is mid-word at the commit, or only if an outcome line is?</h3>
+    <p>Strict (my design): add <code>ctx.sinkBusy</code> so a push is dropped even behind a short count anchor
+      — never late. Loose: rely only on the outcome collision gap, letting a push queue briefly behind a
+      non-outcome line.</p>
+    <div class="opt">
+      <span class="k">A</span><span><span class="rec">Strict drop</span> — a late "one more!" is worse than none; the armed gap is long so this rarely binds anyway. <b>← Nam's ruling: an armed push drops if the sink is busy at the fire moment.</b></span>
+      <span class="k">B</span><span>Loose — let it queue behind a count so a valid push isn't lost to a coincident number.</span>
+    </div>
+  </div>
+
+  <div class="q">
+    <p class="qn">Q4 · phase identity on VoiceScript — <span class="rec">RESOLVED: yes, renamed effortPhaseKeys</span></p>
+    <h3>Is the phase-identity declaration on <code>VoiceScript</code> the right home?</h3>
+    <p>It keeps <code>ExerciseBase</code> untouched and makes squat's non-migration a no-op, but it does put a
+      sliver of movement semantics into the content layer next to <code>phaseCues</code>. The alternative is
+      a new <code>ExerciseBase</code> getter (e.g. <code>bool get repInProgress</code>). My read:
+      <code>VoiceScript</code> is cheaper and already holds per-exercise phase config.</p>
+    <div class="call tip"><p class="ct">✔ Nam's ruling — VoiceScript, plus a generalization the draft missed</p>
+      <p>Home confirmed: <code>VoiceScript</code> (zero <code>ExerciseBase</code> surface, squat neutralization
+        stays a default no-op, <code>phaseCues</code> precedent). And the semantics generalize: the fire
+        moment is entry into the exercise's declared <em>EFFORT PHASE</em>, not "rep start" — the draft's
+        "rise = rep start" was a glute-bridge topology coincidence. Renamed
+        <code>risePhaseKeys → effortPhaseKeys</code> everywhere. Glute bridge: the raise (identical behavior
+        to the draft). Squat when it migrates: the ascent, NOT the descent-start — the push tracks force, not
+        rep topology. Where effort phase ≠ first phase, hustle's edge separates from the next-rep reminder's
+        commit edge and the two stop competing (§05).</p></div>
+  </div>
+</section>
+
+<div class="foot">
+  Hustle — hesitation-armed, commit-fired · technical design · glute-bridge pilot · 2026-07-09 · rev 2
+  (lavish-review resolutions folded: effort-phase firing, void-on-absence, paired finish, Q1–Q4) ·
+  reviewed against lib/voice/*, lib/exercise/glute bridge/*, lib/exercise/squat/*, exercise_base.dart,
+  exercise_logger.dart, test/voice/* · pairs with decisions.md 07-09 (both hustle entries) +
+  voice-behavior-spec.md hustle section &amp; hard rule 8 + the next-rep instruction section (precedence).
+</div>
+
+</main>
+</div>
+<!-- ===== personal notes layer (private, saved to .lavish via the notes server) ===== -->
+<button class="note-fab" id="noteFab" aria-label="Open your notes">🖊 Notes <span class="cnt" id="noteCount">0</span></button>
+<div class="note-pop" id="notePop"><button id="notePopBtn" type="button">🖊 Note this</button></div>
+<aside class="note-panel" id="notePanel" aria-label="Your private notes">
+  <div class="ph">
+    <div><h3>Your notes</h3><div class="sub">private · saved to .lavish/lavish-notes.json</div></div>
+    <button class="x" id="notePanelClose" type="button" aria-label="Close">&times;</button>
+  </div>
+  <div class="composer">
+    <div class="anchor" id="noteAnchor" hidden></div>
+    <textarea id="noteInput" placeholder="Type your note, then click outside the box (or press ⌘/Ctrl+Enter) to save…"></textarea>
+    <div class="crow">
+      <span class="chint" id="noteHint">Will attach to the section you're viewing</span>
+      <button class="addbtn" id="noteAdd" type="button">Add note</button>
+    </div>
+  </div>
+  <div class="storage-note" id="storageNote" hidden></div>
+  <div class="note-list" id="noteList"></div>
+  <div class="pf">
+    <button id="noteCopy" type="button">Copy all</button>
+    <button id="noteDownload" type="button">Download .md</button>
+    <button id="noteClear" type="button">Clear all</button>
+  </div>
+</aside>
+
+<script>
+// ===== personal notes layer: anchored, local + disk-backed, never auto-sent to the agent =====
+(function () {
+  var KEY = 'vika-hustle-notes-v1';
+  var NAMEKEY = 'VIKA_HUSTLE_NOTES::';
+  var DOC = encodeURIComponent(document.title);
+  var REMOTE = 'http://127.0.0.1:4599/notes?doc=' + DOC;
+  var localOk = true, remoteOk = false;
+  try { localStorage.setItem('vika-hustle-t', '1'); localStorage.removeItem('vika-hustle-t'); } catch (e) { localOk = false; }
+  function loadLocal() {
+    if (localOk) { try { var v = localStorage.getItem(KEY); if (v) return JSON.parse(v); } catch (e) {} }
+    try { if (window.name && window.name.indexOf(NAMEKEY) === 0) return JSON.parse(window.name.slice(NAMEKEY.length)); } catch (e) {}
+    return [];
+  }
+  var notes = loadLocal();
+
+  var fab = document.getElementById('noteFab');
+  var cnt = document.getElementById('noteCount');
+  var panel = document.getElementById('notePanel');
+  var list = document.getElementById('noteList');
+  var pop = document.getElementById('notePop');
+  var popBtn = document.getElementById('notePopBtn');
+  var input = document.getElementById('noteInput');
+  var anchorEl = document.getElementById('noteAnchor');
+  var hintEl = document.getElementById('noteHint');
+  var lastSel = null;
+  var pendingAnchor = null;
+
+  function mirrorLocal() {
+    var s = JSON.stringify(notes);
+    if (localOk) { try { localStorage.setItem(KEY, s); } catch (e) { localOk = false; } }
+    try { window.name = NAMEKEY + s; } catch (e) {}
+  }
+  function save() {
+    cnt.textContent = notes.length;
+    mirrorLocal();
+    if (remoteOk) {
+      try {
+        fetch(REMOTE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(notes) })
+          .catch(function () { remoteOk = false; updateStatus(); });
+      } catch (e) { remoteOk = false; }
+    }
+    updateStatus();
+  }
+  function updateStatus() {
+    var el = document.getElementById('storageNote'); if (!el) return;
+    if (remoteOk) {
+      el.hidden = false; el.className = 'storage-note ok';
+      el.textContent = '✓ Saved to disk — .lavish/lavish-notes.json (survives reloads & restarts while the notes server runs).';
+    } else if (localOk) {
+      el.hidden = true;
+    } else {
+      el.hidden = false; el.className = 'storage-note';
+      el.textContent = '⚠ The viewer blocks browser storage, so notes only survive reloads this session. Run the notes server or use “Download .md”.';
+    }
+  }
+  function uid() { return 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function sectionOf(node) {
+    var el = node && node.nodeType === 3 ? node.parentElement : node;
+    while (el && !(el.tagName === 'SECTION' && el.id)) el = el.parentElement;
+    return el;
+  }
+  function titleOf(sec) {
+    if (!sec) return 'Document';
+    var h = sec.querySelector('h2');
+    return h ? h.textContent.trim() : sec.id;
+  }
+  function currentSection() {
+    var secs = document.querySelectorAll('main section[id]');
+    var mid = window.scrollY + window.innerHeight / 2, best = null;
+    secs.forEach(function (s) { if (mid >= s.offsetTop && mid < s.offsetTop + s.offsetHeight) best = s; });
+    return best || secs[0] || null;
+  }
+  function setAnchor(a) {
+    pendingAnchor = a;
+    if (a && a.quote) {
+      anchorEl.hidden = false; anchorEl.innerHTML = '';
+      var t = document.createElement('span');
+      t.textContent = '“' + a.quote.slice(0, 90) + (a.quote.length > 90 ? '…' : '') + '”';
+      var x = document.createElement('span'); x.className = 'axn'; x.textContent = '✕'; x.title = 'Remove anchor';
+      x.onclick = function () { setAnchor(null); };
+      anchorEl.appendChild(t); anchorEl.appendChild(x);
+      hintEl.textContent = 'Attaching to this selection';
+    } else {
+      anchorEl.hidden = true; anchorEl.innerHTML = '';
+      hintEl.textContent = "Will attach to the section you're viewing";
+    }
+  }
+  function addFromComposer() {
+    var body = input.value.trim();
+    if (!body) { input.focus(); return; }
+    var a = pendingAnchor, sec = a ? document.getElementById(a.sectionId) : currentSection();
+    var n = {
+      id: uid(),
+      sectionId: a ? a.sectionId : (sec ? sec.id : ''),
+      sectionTitle: a ? a.sectionTitle : (sec ? titleOf(sec) : 'Document'),
+      quote: a ? a.quote : '',
+      start: a && a.start != null ? a.start : null,
+      end: a && a.end != null ? a.end : null,
+      body: body, createdAt: Date.now()
+    };
+    notes.push(n); render(); try { applyAll(); } catch (e) {} save();
+    input.value = ''; setAnchor(null);
+  }
+
+  // ---- anchored highlighting (spans across tokens, numbered) ----
+  function offsetOf(section, node, nodeOffset) {
+    var r = document.createRange();
+    r.selectNodeContents(section);
+    try { r.setEnd(node, nodeOffset); } catch (e) { return 0; }
+    return r.toString().length;
+  }
+  function appendBadge(mark, num, id) {
+    var b = document.createElement('sup');
+    b.className = 'note-badge'; b.dataset.nid = id; b.textContent = num;
+    b.title = 'Note ' + num + ' — click to open';
+    if (mark.parentNode) mark.parentNode.insertBefore(b, mark.nextSibling);
+  }
+  function clearHighlights() {
+    document.querySelectorAll('.note-badge').forEach(function (b) { b.remove(); });
+    document.querySelectorAll('mark.note-hl').forEach(function (m) {
+      var p = m.parentNode; while (m.firstChild) p.insertBefore(m.firstChild, m); p.removeChild(m); p.normalize();
+    });
+  }
+  function highlightRange(section, start, end, id, num) {
+    if (!section || start == null || end == null || end <= start) return false;
+    var w = document.createTreeWalker(section, NodeFilter.SHOW_TEXT, null), n, pos = 0, segs = [];
+    while ((n = w.nextNode())) {
+      var len = n.nodeValue.length, nodeStart = pos; pos += len;
+      if (pos <= start) continue;
+      if (nodeStart >= end) break;
+      if (n.parentElement && n.parentElement.closest('mark.note-hl')) continue;
+      var s = Math.max(0, start - nodeStart), e = Math.min(len, end - nodeStart);
+      if (e > s) segs.push({ node: n, s: s, e: e });
+    }
+    var made = 0, last = null;
+    segs.forEach(function (seg) {
+      var r = document.createRange(); r.setStart(seg.node, seg.s); r.setEnd(seg.node, seg.e);
+      var m = document.createElement('mark'); m.className = 'note-hl'; m.dataset.nid = id;
+      try { r.surroundContents(m); made++; last = m; } catch (e2) {}
+    });
+    if (made && last) appendBadge(last, num, id);
+    return made > 0;
+  }
+  function highlightFirst(section, quote, id, num) {
+    if (!section || !quote) return false;
+    var w = document.createTreeWalker(section, NodeFilter.SHOW_TEXT, null), tn;
+    while ((tn = w.nextNode())) {
+      if (tn.parentElement && tn.parentElement.closest('mark.note-hl')) continue;
+      var i = tn.nodeValue.indexOf(quote);
+      if (i >= 0) {
+        var r = document.createRange(); r.setStart(tn, i); r.setEnd(tn, i + quote.length);
+        var m = document.createElement('mark'); m.className = 'note-hl'; m.dataset.nid = id;
+        try { r.surroundContents(m); appendBadge(m, num, id); return true; } catch (e) { return false; }
+      }
+    }
+    return false;
+  }
+  function applyAll() {
+    clearHighlights();
+    notes.forEach(function (n, i) {
+      var sec = document.getElementById(n.sectionId); if (!sec) return;
+      var ok = false;
+      if (n.start != null && n.end != null) ok = highlightRange(sec, n.start, n.end, n.id, i + 1);
+      if (!ok && n.quote) highlightFirst(sec, n.quote, n.id, i + 1);
+    });
+  }
+  function setLinked(id, on) {
+    document.querySelectorAll('mark.note-hl[data-nid="' + id + '"], .note-badge[data-nid="' + id + '"]')
+      .forEach(function (el) { el.classList.toggle('hot', on); });
+    var card = list.querySelector('.note-card[data-nid="' + id + '"]');
+    if (card) card.classList.toggle('linked', on);
+  }
+
+  // ---- panel ----
+  function render() {
+    list.innerHTML = '';
+    if (!notes.length) {
+      var e = document.createElement('div'); e.className = 'note-empty';
+      e.innerHTML = 'No notes yet.<br>Type in the box above and hit <b>Add note</b>,<br>or select text/code and hit <b>🖊 Note this</b>.';
+      list.appendChild(e); return;
+    }
+    notes.slice().reverse().forEach(function (n) {
+      var num = notes.indexOf(n) + 1;
+      var card = document.createElement('div'); card.className = 'note-card'; card.dataset.nid = n.id;
+      card.onmouseenter = function () { setLinked(n.id, true); };
+      card.onmouseleave = function () { setLinked(n.id, false); };
+      var loc = document.createElement('span'); loc.className = 'loc'; loc.title = 'Jump to this spot';
+      var cn = document.createElement('span'); cn.className = 'cnum'; cn.textContent = num; loc.appendChild(cn);
+      loc.appendChild(document.createTextNode(' § ' + n.sectionTitle));
+      loc.onclick = function () { jump(n.id); }; card.appendChild(loc);
+      if (n.quote) { var q = document.createElement('div'); q.className = 'quote'; q.textContent = n.quote; card.appendChild(q); }
+      var body = document.createElement('div'); body.className = 'body' + (n.body ? '' : ' empty');
+      body.textContent = n.body || 'Empty — click Edit to write.'; card.appendChild(body);
+      if (n.replies && n.replies.length) {
+        var thread = document.createElement('div'); thread.className = 'replies';
+        n.replies.forEach(function (rp) {
+          var t = document.createElement('div');
+          t.className = 'note-thread' + (rp.author === 'agent' ? ' agent' : '');
+          var who = document.createElement('div'); who.className = 'who';
+          who.textContent = rp.author === 'agent' ? '↳ Claude' : '↳ You';
+          var tx = document.createElement('div'); tx.className = 'txt'; tx.textContent = rp.body;
+          t.appendChild(who); t.appendChild(tx); thread.appendChild(t);
+        });
+        card.appendChild(thread);
+      }
+      var row = document.createElement('div'); row.className = 'row';
+      var rb = document.createElement('button'); rb.className = 'reply'; rb.textContent = 'Reply'; rb.onclick = function () { replyCard(card, n); };
+      var ed = document.createElement('button'); ed.className = 'edit'; ed.textContent = 'Edit'; ed.onclick = function () { editCard(card, n); };
+      var dl = document.createElement('button'); dl.className = 'del'; dl.textContent = 'Delete';
+      dl.onclick = function () { notes = notes.filter(function (x) { return x.id !== n.id; }); render(); try { applyAll(); } catch (e) {} save(); };
+      row.appendChild(rb); row.appendChild(ed); row.appendChild(dl); card.appendChild(row);
+      list.appendChild(card);
+    });
+  }
+  function editCard(card, n) {
+    card.innerHTML = '';
+    var loc = document.createElement('span'); loc.className = 'loc'; loc.textContent = '§ ' + n.sectionTitle; card.appendChild(loc);
+    if (n.quote) { var q = document.createElement('div'); q.className = 'quote'; q.textContent = n.quote; card.appendChild(q); }
+    var ta = document.createElement('textarea'); ta.value = n.body || ''; ta.placeholder = 'Type your note…'; card.appendChild(ta);
+    var row = document.createElement('div'); row.className = 'row';
+    var sv = document.createElement('button'); sv.className = 'save'; sv.textContent = 'Save';
+    sv.onclick = function () { n.body = ta.value.trim(); save(); render(); };
+    row.appendChild(sv); card.appendChild(row);
+    ta.focus();
+    ta.addEventListener('keydown', function (e) { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') sv.click(); });
+  }
+  // Reply to a note: threads under it (author 'nam'); the agent writes replies with
+  // author 'agent' straight to the notes-server, and live-sync below surfaces them.
+  function replyCard(card, n) {
+    if (card.querySelector('.reply-box')) { card.querySelector('.reply-box textarea').focus(); return; }
+    var box = document.createElement('div'); box.className = 'reply-box';
+    var ta = document.createElement('textarea'); ta.placeholder = 'Reply to this note…'; box.appendChild(ta);
+    var row = document.createElement('div'); row.className = 'row';
+    var sv = document.createElement('button'); sv.className = 'save'; sv.textContent = 'Send reply';
+    var cx = document.createElement('button'); cx.className = 'edit'; cx.textContent = 'Cancel';
+    sv.onclick = function () {
+      var t = ta.value.trim(); if (!t) { ta.focus(); return; }
+      n.replies = n.replies || []; n.replies.push({ author: 'nam', body: t, createdAt: Date.now() });
+      save(); render(); try { applyAll(); } catch (e) {}
+    };
+    cx.onclick = function () { box.remove(); };
+    row.appendChild(sv); row.appendChild(cx); box.appendChild(row);
+    card.appendChild(box); ta.focus();
+    ta.addEventListener('keydown', function (e) { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') sv.click(); });
+  }
+  function openPanel() { panel.classList.add('open'); setTimeout(function () { if (input) input.focus(); }, 40); }
+  fab.onclick = function () {
+    panel.classList.toggle('open');
+    if (panel.classList.contains('open')) setTimeout(function () { if (input) input.focus(); }, 40);
+  };
+  document.getElementById('notePanelClose').onclick = function () { panel.classList.remove('open'); };
+  document.getElementById('noteAdd').onclick = addFromComposer;
+  input.addEventListener('keydown', function (e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); addFromComposer(); }
+  });
+  input.addEventListener('blur', function () { if (input.value.trim()) addFromComposer(); });
+
+  function jump(id) {
+    var marks = document.querySelectorAll('mark.note-hl[data-nid="' + id + '"]');
+    var n = notes.find(function (x) { return x.id === id; });
+    var target = marks[0] || (n && document.getElementById(n.sectionId));
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    marks.forEach(function (m) { m.classList.remove('flash'); void m.offsetWidth; m.classList.add('flash'); });
+  }
+
+  // ---- selection popover ----
+  function hidePop() { pop.style.display = 'none'; }
+  document.addEventListener('mouseup', function () {
+    setTimeout(function () {
+      var s = document.getSelection();
+      if (!s || s.isCollapsed) { hidePop(); return; }
+      var txt = s.toString();
+      if (!txt.trim()) { hidePop(); return; }
+      var host = s.anchorNode && (s.anchorNode.nodeType === 3 ? s.anchorNode.parentElement : s.anchorNode);
+      if (!host || !host.closest('main')) { hidePop(); return; }
+      var range = s.getRangeAt(0);
+      var section = sectionOf(range.startContainer);
+      var start = 0, end = 0;
+      if (section) {
+        start = offsetOf(section, range.startContainer, range.startOffset);
+        end = offsetOf(section, range.endContainer, range.endOffset);
+        if (end < start) { var tmp = start; start = end; end = tmp; }
+      }
+      lastSel = { quote: txt.trim().slice(0, 2000), section: section, start: start, end: end };
+      var rect = range.getBoundingClientRect();
+      var cw = document.documentElement.clientWidth;
+      var x = Math.min(Math.max(64, rect.left + rect.width / 2), cw - 64);
+      pop.style.left = (window.scrollX + x) + 'px';
+      pop.style.top = (window.scrollY + Math.max(rect.top, 8)) + 'px';
+      pop.style.display = 'block';
+    }, 10);
+  });
+  document.addEventListener('scroll', hidePop, { passive: true });
+  popBtn.addEventListener('mousedown', function (e) {
+    e.preventDefault();
+    if (!lastSel) return;
+    var sec = lastSel.section;
+    setAnchor({ sectionId: sec ? sec.id : '', sectionTitle: titleOf(sec), quote: lastSel.quote, start: lastSel.start, end: lastSel.end });
+    openPanel(); hidePop();
+    var sel = window.getSelection(); if (sel) sel.removeAllRanges();
+  });
+
+  document.addEventListener('click', function (e) {
+    var m = e.target.closest && e.target.closest('mark.note-hl, .note-badge');
+    if (!m || !m.dataset.nid) return;
+    var id = m.dataset.nid;
+    openPanel(); render();
+    var card = list.querySelector('.note-card[data-nid="' + id + '"]');
+    if (card) {
+      card.scrollIntoView({ block: 'center' });
+      card.classList.add('active');
+      setTimeout(function () { card.classList.remove('active'); }, 1600);
+    }
+  });
+  document.addEventListener('mouseover', function (e) {
+    var m = e.target.closest && e.target.closest('mark.note-hl, .note-badge');
+    if (m && m.dataset.nid) setLinked(m.dataset.nid, true);
+  });
+  document.addEventListener('mouseout', function (e) {
+    var m = e.target.closest && e.target.closest('mark.note-hl, .note-badge');
+    if (m && m.dataset.nid) setLinked(m.dataset.nid, false);
+  });
+
+  // ---- export ----
+  function toMd() {
+    return '# Hustle (hesitation-armed) × Voice Coach — my notes\n\n' + notes.map(function (n) {
+      var s = '## § ' + n.sectionTitle + '\n' + (n.quote ? '> ' + n.quote.replace(/\n/g, '\n> ') + '\n\n' : '') + (n.body || '') + '\n';
+      if (n.replies && n.replies.length) {
+        s += n.replies.map(function (rp) { return '\n**' + (rp.author === 'agent' ? 'Claude' : 'You') + ':** ' + rp.body; }).join('\n') + '\n';
+      }
+      return s;
+    }).join('\n');
+  }
+  document.getElementById('noteCopy').onclick = function () { if (navigator.clipboard) navigator.clipboard.writeText(toMd()); };
+  document.getElementById('noteDownload').onclick = function () {
+    var b = new Blob([toMd()], { type: 'text/markdown' }), u = URL.createObjectURL(b);
+    var a = document.createElement('a'); a.href = u; a.download = 'hustle-design-notes.md'; a.click(); URL.revokeObjectURL(u);
+  };
+  document.getElementById('noteClear').onclick = function () {
+    if (confirm('Delete ALL your notes? This cannot be undone.')) { notes = []; save(); applyAll(); render(); }
+  };
+
+  render(); try { applyAll(); } catch (e) {} mirrorLocal(); cnt.textContent = notes.length; updateStatus();
+  try {
+    fetch(REMOTE).then(function (r) { return r.ok ? r.json() : null; }).then(function (server) {
+      if (!Array.isArray(server)) return;
+      remoteOk = true;
+      if (server.length >= notes.length) {
+        notes = server; render(); try { applyAll(); } catch (e) {} cnt.textContent = notes.length;
+      } else {
+        save();
+      }
+      updateStatus();
+    }).catch(function () { remoteOk = false; updateStatus(); });
+  } catch (e) { updateStatus(); }
+
+  // Live sync: pull agent replies / new notes from the disk server without a reload,
+  // so a "↳ Claude" reply appears within a few seconds. Skips while an edit or reply
+  // box is open so it never clobbers something you're mid-typing.
+  var lastServerJson = JSON.stringify(notes);
+  setInterval(function () {
+    if (!remoteOk) return;
+    if (panel.querySelector('.note-card textarea') || panel.querySelector('.reply-box')) return;
+    fetch(REMOTE).then(function (r) { return r.ok ? r.json() : null; }).then(function (server) {
+      if (!Array.isArray(server)) return;
+      var sj = JSON.stringify(server);
+      if (sj === lastServerJson) return;
+      lastServerJson = sj;
+      notes = server; render(); try { applyAll(); } catch (e) {} cnt.textContent = notes.length;
+    }).catch(function () {});
+  }, 4000);
+})();
+</script>
+
+<script>
+// Scrollspy: highlight the current section in the TOC.
+(function () {
+  var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+  var map = {};
+  links.forEach(function (a) {
+    var id = a.getAttribute('href').slice(1);
+    var el = document.getElementById(id);
+    if (el) map[id] = a;
+  });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); });
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) {
+        links.forEach(function (l) { l.classList.remove('on'); });
+        var a = map[e.target.id];
+        if (a) a.classList.add('on');
+      }
+    });
+  }, { rootMargin: '0px 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { io.observe(s); });
+})();
+</script>
+</body>
+</html>

@@ -13,7 +13,7 @@
    APPROACH:
    - onStateTransition() records timestamps + calculates durations.
    - update() checks durations per-frame (null-gated) for live feedback.
-   - evaluateRep() logs faults + sets coaching instructions for next rep.
+   - evaluateRep() logs faults + sets coaching references for next rep.
    
    LIVE FEEDBACK (in update, fires as soon as data exists):
      Bottom phase    → descent speed check (descentDuration available)
@@ -170,7 +170,7 @@ class TempoMetric extends SquatMetricBase {
   }
 
   /* -----------------------------------------------------------------------
-     REP COMPLETE — Log faults + set coaching instructions for next rep.
+     REP COMPLETE — Log faults + preserve coaching references for next rep.
      Called by Squat after final state transition to standing.
      ----------------------------------------------------------------------- */
   void evaluateRep(RepContext ctx) {
@@ -191,8 +191,7 @@ class TempoMetric extends SquatMetricBase {
         voiceMessage: 'Chậm lại',
         priority: SquatFaultVoicePriority.tempo,
       );
-      ctx.resultIssues.addInstruction(
-          'standing', 'Tempo descent', 'Dropped too fast last rep, go slower');
+      // Legacy UI instruction copy: Dropped too fast last rep, go slower
     } else if (_descentDuration! < TempoConfig.DESCENT_MIN_GOOD) {
       _status = MetricStatus.near;
       _logFault(
@@ -201,8 +200,7 @@ class TempoMetric extends SquatMetricBase {
         voiceMessage: 'Chậm lại',
         priority: SquatFaultVoicePriority.tempo,
       );
-      ctx.resultIssues.addInstruction('standing', 'Tempo descent',
-          'A bit fast last rep, try 2-3 seconds down');
+      // Legacy UI instruction copy: A bit fast last rep, try 2-3 seconds down
     }
 
     // --- 2. Bottom hold (bounce detection) ---
@@ -215,8 +213,7 @@ class TempoMetric extends SquatMetricBase {
         voiceMessage: 'Chậm lại',
         priority: SquatFaultVoicePriority.tempo,
       );
-      ctx.resultIssues.addInstruction('standing', 'Tempo bottom hold',
-          'Not holding at bottom, pause this time!');
+      // Legacy UI instruction copy: Not holding at bottom, pause this time!
     }
 
     // --- 3. Descent:Ascent ratio (eccentric control) ---
@@ -229,12 +226,10 @@ class TempoMetric extends SquatMetricBase {
           voiceMessage: 'Chậm lại',
           priority: SquatFaultVoicePriority.tempo,
         );
-        ctx.resultIssues.addInstruction(
-            'standing', 'Tempo eccentric', 'Control the way down this time');
+        // Legacy UI instruction copy: Control the way down this time
       } else if (_descentAscentRatio! >
           TempoConfig.RATIO_GOOD + TempoConfig.RATIO_WARNING) {
-        ctx.resultIssues.addInstruction(
-            'standing', 'Tempo eccentric', 'Drive up with more control');
+        // Legacy UI instruction copy: Drive up with more control
       }
     }
 
@@ -243,8 +238,7 @@ class TempoMetric extends SquatMetricBase {
         _ascentDuration != null &&
         _ascentDuration! >
             _descentDuration! * TempoConfig.ASCENT_STRUGGLE_MULTIPLIER) {
-      ctx.resultIssues.addInstruction(
-          'standing', 'Tempo ascent', 'Drive up with more power!');
+      // Legacy UI instruction copy: Drive up with more power!
     }
 
     _debugData['tempoResult'] = _faults.isEmpty ? 'good' : 'fault';

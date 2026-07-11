@@ -100,12 +100,9 @@ class GluteBridge extends ExerciseBase with SideTrackedExerciseMixin {
 
   static final Map<CueType, CueTuning> _voiceTuning = {
     ...kDefaultTuning,
-    CueType.count: CueTuning(
-      CueMode.always,
-      base: 0.50,
-      step: 0.10,
-      cap: 1.0,
-    ),
+    // count: no override — inherits the fleet default (base 1.0, every landed
+    // rep counted; registration ruling 07-11). The 07-08 pilot thinning
+    // (0.50/+0.10) is superseded.
     CueType.praise: CueTuning(
       CueMode.variableRatio,
       base: 0.50,
@@ -126,7 +123,28 @@ class GluteBridge extends ExerciseBase with SideTrackedExerciseMixin {
       step: 0.08,
       cap: 0.55,
     ),
-    CueType.hustle: CueTuning(CueMode.perishable, base: 0.0, cap: 0.0),
+    CueType.reminder: CueTuning(
+      CueMode.correction,
+      base: 0.30,
+      step: 0.15,
+      cap: 0.65,
+      firstOccurrenceCertain: true,
+    ),
+    // Hustle ENABLED 07-11 (Nam's call; Stage B arming data on device looked
+    // sane — armed on real 6s+ gaps vs a ~4s baseline). Quiet-side +
+    // persistence-shaped with a stochastic backoff after a spoken push: a lone
+    // hesitation is a coin flip, stacked silent hesitations climb, and a fired
+    // hustle drops the next eligible roll below baseline (not a fixed cooldown).
+    // It only ever ROLLS when the gap-stretch arming already fired, so the base
+    // isn't "every rep" — it's "when the user visibly paused." All feel-tune,
+    // not canonical.
+    CueType.hustle: CueTuning(
+      CueMode.perishable,
+      base: 0.50,
+      step: 0.20,
+      cap: 0.90,
+      postFireIdlePenalty: 2,
+    ),
   };
 
   GluteBridgeState gluteState = GluteBridgeState.bottom;
@@ -207,6 +225,21 @@ class GluteBridge extends ExerciseBase with SideTrackedExerciseMixin {
   List<FaultRecord> get liveFaults =>
       [for (final metric in _metrics) ...metric.faults];
 
+  @override
+  void onPauseReactivationStarted() {
+    _transitionState(GluteBridgeState.bottom, frameTimestampMs);
+    correctForm = true;
+    _hipYHistory.clear();
+    _peakHipY = null;
+    _peakShoulderHipKneeAngle = null;
+    _peakNormalizedDeviation = null;
+    _peakKneeAngle = null;
+    resultIssues.phaseStatus.clear();
+    for (final metric in _metrics) {
+      metric.reset();
+    }
+  }
+
   /* -----------------------------------------------------------------------
      UI BRIDGE
      ----------------------------------------------------------------------- */
@@ -220,9 +253,25 @@ class GluteBridge extends ExerciseBase with SideTrackedExerciseMixin {
       slug: 'glute_bridge',
       faultIds: _voiceFaultIds,
       softCuePools: _softCuePools,
-      // Hustle is intentionally off for the first device pass; the useful
-      // future version should be grind-triggered, not final-rep-positioned.
-      hustlePool: const [],
+      // Enabled 07-11: the two FINAL reminder recordings landed 07-10; the
+      // pools were only empty while the audio didn't exist. Continuous
+      // criticals only (peak faults are excluded by design — their rep-end
+      // line IS the instruction).
+      reminderPools: const {
+        'neck_head': ['glute_bridge.neck_head_reminder'],
+        'hyperextension': ['glute_bridge.hyperextension_reminder'],
+      },
+      // Hustle ENABLED 07-11. Generic push for a mid-set hesitation ("Cố lên
+      // nào!"); the final-rep pool is line-honest — "Một cái nữa thôi!" only
+      // fires when targetReps proves it's the last rep (paired with the count
+      // anchor at target-1, or at the final effort-phase entry). COMMON keys
+      // (encouragement is about the session, not the movement). Recordings
+      // pending (missing-audio.md) — a missing file is a safe logged no-op, so
+      // the arming/cadence is validatable on device before the audio lands.
+      hustlePool: const ['common.push'],
+      hustleFinalPool: const ['common.one_more_rep'],
+      repStartPhaseKeys: const {'ascending'},
+      effortPhaseKeys: const {'ascending'},
     );
     return PolicyVoiceCoach(
       script: script,
@@ -344,12 +393,12 @@ class GluteBridge extends ExerciseBase with SideTrackedExerciseMixin {
      SAFETY CHECKS
      ----------------------------------------------------------------------- */
   @override
-  String? checkSafety(
+  GuidanceSignal? checkSafety(
     Map<PoseLandmarkType, PoseLandmark> landmarks,
   ) {
     if (cameraFacing != CameraFacing.left &&
         cameraFacing != CameraFacing.right) {
-      return "⚠️ Xin hãy quay nghiêng để theo dõi tư thế Glute Bridge";
+      return const GuidanceSignal.turnSide();
     }
 
     if (getSideTrackedLandmarks(landmarks) != null) {
@@ -370,13 +419,13 @@ class GluteBridge extends ExerciseBase with SideTrackedExerciseMixin {
         leftType: PoseLandmarkType.leftKnee);
 
     if (shoulder == null || hip == null || knee == null) {
-      return "⚠️ Đảm bảo vai, hông và gối trong khung hình";
+      return const GuidanceSignal.bodyInFrame();
     }
 
     if (!ExerciseBase.isLandmarkConfident(shoulder) ||
         !ExerciseBase.isLandmarkConfident(hip) ||
         !ExerciseBase.isLandmarkConfident(knee)) {
-      return "⚠️ Hình ảnh không rõ. Điều chỉnh ánh sáng hoặc vị trí";
+      return const GuidanceSignal.lighting();
     }
 
     return null;
@@ -513,13 +562,13 @@ class GluteBridge extends ExerciseBase with SideTrackedExerciseMixin {
     // ---------- 7. Status Coaching ----------
 
     if (gluteState == GluteBridgeState.bottom) {
-      resultIssues.addInstruction('bottom', 'Status', 'Nâng hông lên!');
+      resultIssues.setPhaseStatus('bottom', 'Nâng hông lên!');
     } else if (gluteState == GluteBridgeState.ascending) {
-      resultIssues.addInstruction('ascending', 'Status', 'Đang nâng...');
+      resultIssues.setPhaseStatus('ascending', 'Đang nâng...');
     } else if (gluteState == GluteBridgeState.topHold) {
-      resultIssues.addInstruction('topHold', 'Status', 'Giữ vững!');
+      resultIssues.setPhaseStatus('topHold', 'Giữ vững!');
     } else if (gluteState == GluteBridgeState.descending) {
-      resultIssues.addInstruction('descending', 'Status', 'Hạ từ từ...');
+      resultIssues.setPhaseStatus('descending', 'Hạ từ từ...');
     }
   }
 
@@ -756,9 +805,9 @@ class GluteBridge extends ExerciseBase with SideTrackedExerciseMixin {
     gluteState = newState;
     _topHoldStartMs = newState == GluteBridgeState.topHold ? timestampMs : null;
 
-    // Clear coaching instructions at the start of a new rep.
+    // Clear phase status at the start of a new rep.
     if (newState == GluteBridgeState.ascending) {
-      resultIssues.instructions.clear();
+      resultIssues.phaseStatus.clear();
     }
 
     // Reset all debouncers to ensure a clean slate for the new state.

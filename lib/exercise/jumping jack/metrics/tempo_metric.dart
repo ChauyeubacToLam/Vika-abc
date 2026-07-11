@@ -142,15 +142,13 @@ class TempoMetric extends JJMetricBase {
           'Quá nhanh (${_currentRepDuration!.toStringAsFixed(1)}s)');
       ctx.resultIssues.feedback['Tempo'] = 'Chậm lại, giữ form!';
       if (!_tempoInstructionSet) {
-        ctx.resultIssues.addInstruction(
-            'closed', 'Tempo speed', 'Chậm lại, giữ form chuẩn!');
+        // Legacy UI instruction copy: Chậm lại, giữ form chuẩn!
         _tempoInstructionSet = true;
       }
     } else if (_currentRepDuration! > TempoConfig.REP_MAX_ERROR) {
       ctx.resultIssues.feedback['Tempo'] = 'Nhanh hơn một chút!';
       if (!_tempoInstructionSet) {
-        ctx.resultIssues.addInstruction(
-            'closed', 'Tempo speed', 'Cố gắng nhanh hơn lần sau!');
+        // Legacy UI instruction copy: Cố gắng nhanh hơn lần sau!
         _tempoInstructionSet = true;
       }
     } else if (_currentRepDuration! > TempoConfig.REP_MAX_GOOD) {
@@ -170,8 +168,7 @@ class TempoMetric extends JJMetricBase {
 
       if (stdev > TempoConfig.RHYTHM_BAD_STDEV) {
         if (!_rhythmInstructionSet) {
-          ctx.resultIssues
-              .addInstruction('closed', 'Tempo rhythm', 'Giữ nhịp đều hơn!');
+          // Legacy UI instruction copy: Giữ nhịp đều hơn!
           _rhythmInstructionSet = true;
         }
       }
@@ -192,8 +189,7 @@ class TempoMetric extends JJMetricBase {
       _debugData['fatigueSlowdown'] = '${(slowdown * 100).toStringAsFixed(0)}%';
 
       if (slowdown > TempoConfig.FATIGUE_THRESHOLD && !_fatigueInstructionSet) {
-        ctx.resultIssues.addInstruction(
-            'closed', 'Tempo fatigue', 'Bạn đang mệt — giữ nhịp hoặc nghỉ!');
+        // Legacy UI instruction copy: Bạn đang mệt — giữ nhịp hoặc nghỉ!
         _fatigueInstructionSet = true;
       }
     }

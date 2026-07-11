@@ -51,11 +51,7 @@ class CobraElbowMetric extends CobraMetricBase {
     if (_lockoutDebouncer.update(angle >= _errorMin)) {
       _isFaultingNow = true;
       ctx.resultIssues.feedback['Elbow'] = '⚠️ Khuỷu tay duỗi quá thẳng!';
-      ctx.resultIssues.addInstruction(
-        'holding',
-        'elbowLockout',
-        'Giữ khuỷu tay hơi cong. Đừng duỗi thẳng hoàn toàn.',
-      );
+      // Legacy UI instruction copy: Giữ khuỷu tay hơi cong. Đừng duỗi thẳng hoàn toàn.
       _logFault(phase, 'Elbow locked out', 'ElbowLockout');
     }
     // Warning: approaching lockout (140-160°)

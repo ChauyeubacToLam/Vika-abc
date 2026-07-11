@@ -55,8 +55,7 @@ class RussianTwistConfig {
 /// toward the camera's blind side, stalling the rep counter.
 class RussianTwist extends ExerciseBase {
   @override
-  Set<VikaImageOrientation> get supportedOrientations =>
-      <VikaImageOrientation>{
+  Set<VikaImageOrientation> get supportedOrientations => <VikaImageOrientation>{
         VikaImageOrientation.landscapeLeft,
         VikaImageOrientation.landscapeRight,
         VikaImageOrientation.portrait,
@@ -130,21 +129,21 @@ class RussianTwist extends ExerciseBase {
   // -- Safety: require a front view --
 
   @override
-  String? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.front) {
       if (cameraFacing == CameraFacing.left ||
           cameraFacing == CameraFacing.right) {
-        return 'Đặt camera chính diện trước mặt, không quay nghiêng hông.';
+        return const GuidanceSignal.faceCamera();
       }
       if (cameraFacing == CameraFacing.angled) {
-        return 'Xoay camera về chính diện trước mặt rồi mới tập.';
+        return const GuidanceSignal.faceCamera();
       }
-      return 'Đặt camera chính diện trước mặt để AI thấy rõ hai vai và hai tay.';
+      return const GuidanceSignal.faceCamera();
     }
 
     final bundle = _collectFrontLandmarks(landmarks);
     if (bundle == null) {
-      return 'Không nhìn thấy đủ các điểm khớp vai, hông, gối và cổ tay.';
+      return const GuidanceSignal.bodyInFrame();
     }
     return null;
   }
@@ -175,8 +174,7 @@ class RussianTwist extends ExerciseBase {
     }
 
     final wristPoint = _leadingWrist(landmarks, bundle);
-    final wristOffset =
-        (wristPoint.x - bundle.midShoulderX) / shoulderWidth;
+    final wristOffset = (wristPoint.x - bundle.midShoulderX) / shoulderWidth;
     if (wristOffset.abs() > RussianTwistConfig.TWIST_START_DELTA) {
       resultIssues.feedback['System'] =
           'Đưa hai tay về giữa ngực trước khi bắt đầu.';
@@ -197,7 +195,7 @@ class RussianTwist extends ExerciseBase {
   void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
     final safety = checkSafety(smoothedLandmarks);
     if (safety != null) {
-      resultIssues.feedback['System'] = safety;
+      publishGuidanceSignal(safety);
       return;
     }
 
@@ -209,8 +207,7 @@ class RussianTwist extends ExerciseBase {
     scaleFactor = shoulderWidth;
 
     final wristPoint = _leadingWrist(smoothedLandmarks, bundle);
-    final wristOffset =
-        (wristPoint.x - bundle.midShoulderX) / shoulderWidth;
+    final wristOffset = (wristPoint.x - bundle.midShoulderX) / shoulderWidth;
     final shoulderRotationOffset =
         (bundle.midShoulderX - bundle.midHipX) / shoulderWidth;
     final trunkAngle = _trunkHorizontalAngle(bundle);
@@ -276,11 +273,11 @@ class RussianTwist extends ExerciseBase {
     }
 
     if (russianState == RussianTwistState.center_setup) {
-      resultIssues.addInstruction('center', 'Status', 'Sẵn sàng vặn');
+      resultIssues.setPhaseStatus('center', 'Sẵn sàng vặn');
     } else if (russianState == RussianTwistState.twisting) {
-      resultIssues.addInstruction('twisting', 'Status', 'Vặn người!');
+      resultIssues.setPhaseStatus('twisting', 'Vặn người!');
     } else if (russianState == RussianTwistState.returning) {
-      resultIssues.addInstruction('returning', 'Status', 'Quay về giữa');
+      resultIssues.setPhaseStatus('returning', 'Quay về giữa');
     }
   }
 
@@ -314,8 +311,7 @@ class RussianTwist extends ExerciseBase {
         _transitionState(RussianTwistState.returning, now);
       }
     } else if (russianState == RussianTwistState.returning) {
-      final nearCenter =
-          delta.abs() <= RussianTwistConfig.CENTER_TOLERANCE;
+      final nearCenter = delta.abs() <= RussianTwistConfig.CENTER_TOLERANCE;
       if (nearCenter) {
         _transitionState(RussianTwistState.center_setup, now);
         _completeHalfRep();
@@ -342,7 +338,7 @@ class RussianTwist extends ExerciseBase {
 
     if (newState == RussianTwistState.twisting &&
         previousRussianState == RussianTwistState.center_setup) {
-      resultIssues.instructions.clear();
+      resultIssues.phaseStatus.clear();
     }
 
     for (final metric in _metrics) {
@@ -481,8 +477,7 @@ class RussianTwist extends ExerciseBase {
     // near 0° (shoulders directly above hips); a fully laid-back torso reads
     // near 90°. We reuse the same MIN/MAX trunk-angle config semantics, so
     // measure from vertical here.
-    final fromVertical =
-        math.atan2(dx, dy) * (180.0 / math.pi);
+    final fromVertical = math.atan2(dx, dy) * (180.0 / math.pi);
     return fromVertical;
   }
 

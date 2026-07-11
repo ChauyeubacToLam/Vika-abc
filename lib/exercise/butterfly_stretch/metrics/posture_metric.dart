@@ -51,10 +51,7 @@ class PostureMetric extends ButterflyMetricBase {
           'Giữ lưng thẳng, không gập người xuống!';
 
       if (!_collapseInstructionSet) {
-        ctx.resultIssues.addInstruction(
-            ctx.currentState.toString().split('.').last,
-            'Posture',
-            'Giữ ngực mở và lưng thẳng, đừng gập rạp người xuống khi ép gối.');
+        // Legacy UI instruction copy: Giữ ngực mở và lưng thẳng, đừng gập rạp người xuống khi ép gối.
         _collapseInstructionSet = true;
       }
       _logFault(phase, 'PostureCollapse', 'Gập người/gù lưng khi giữ tư thế');
@@ -63,10 +60,7 @@ class PostureMetric extends ButterflyMetricBase {
       ctx.resultIssues.feedback['Posture'] = 'Lệch vai!';
 
       if (!_tiltInstructionSet) {
-        ctx.resultIssues.addInstruction(
-            ctx.currentState.toString().split('.').last,
-            'Posture',
-            'Ngồi thẳng lưng, giữ hai vai ngang nhau!');
+        // Legacy UI instruction copy: Ngồi thẳng lưng, giữ hai vai ngang nhau!
         _tiltInstructionSet = true;
       }
       _logFault(phase, 'Posture', 'Nghiêng/Lệch vai');
