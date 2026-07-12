@@ -14,6 +14,24 @@ Alternatives considered: <what we rejected and why>
 
 ---
 
+## 2026-07-12 · Voice tuning: ONE default, no per-exercise overrides
+Status: active — Nam 2026-07-12.
+Decision: All cue tuning lives in the single `kDefaultTuning` map (lib/voice/voice_policy.dart). No
+exercise passes a `tuning:` override. The glute pilot's device-calibrated values ARE the default now;
+glute's `_voiceTuning` and squat's hustle-neutralizing override are deleted (both used `VoicePolicy()`).
+Two things this promoted to fleet-wide: `criticalFault` gains firstOccurrenceCertain and drops the
+(now-redundant) relief valve; `reminder` becomes 0.30/+0.15/0.65 + firstOccurrenceCertain (was a weak
+0.20 default that barely fired on device — 07-12 report). And it FIXED A LATENT BUG: `softFault` was
+missing from the default entirely, so every fleet soft nudge Tier 2 wired was a silent no-op
+('soft-no-tuning-configured') — adding it makes them speak.
+Why: the whole point of the policy design is a single calibrated PT tuned once, retuned only via the
+personality scalar — per-exercise maps defeat that and drift. Hustle stays off fleet-wide not via
+zero-tuning but via absent effortPhaseKeys (the real gate). Glute behaviour is unchanged (default now
+equals its old override). Test mechanisms that left the default (relief valve, D8 formScore scaling,
+roll-based escalation) now construct explicit tunings in voice_policy_test.dart.
+Alternatives considered: keep glute's override as "the pilot's own numbers" — rejected; they were always
+meant to be the fleet default, and the split hid the missing-softFault bug.
+
 ## 2026-07-11 · Squat stops narrating movement phases (no phaseCues)
 Status: active — Nam 2026-07-11 (device catch).
 Decision: Squat's `phaseCues` ({descending→"Xuống", bottom→"Giữ", ascending→"Đứng lên"}) is

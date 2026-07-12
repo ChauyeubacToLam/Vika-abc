@@ -170,8 +170,20 @@ void main() {
 
     test('D8: a higher formScore raises the praise chance', () {
       // base 0.35 * (0.6 + 0.4*formScore): formScore 0 -> 0.21, formScore
-      // 1 -> 0.35. A roll of 0.30 sits between the two.
-      final lowQuality = VoicePolicy(random: _ScriptedRandom([0.30]));
+      // 1 -> 0.35. A roll of 0.30 sits between the two. D8 formScore scaling
+      // left the calibrated default (07-12, scalePraiseByFormScore now false),
+      // so test the mechanism via an explicit tuning that enables it.
+      final d8Tuning = {
+        ...kDefaultTuning,
+        CueType.praise: const CueTuning(
+          CueMode.variableRatio,
+          base: 0.35,
+          step: 0.10,
+          cap: 0.85,
+        ),
+      };
+      final lowQuality =
+          VoicePolicy(random: _ScriptedRandom([0.30]), tuning: d8Tuning);
       expect(
         lowQuality.decide(
           CueType.praise,
@@ -180,7 +192,8 @@ void main() {
         isFalse,
       );
 
-      final highQuality = VoicePolicy(random: _ScriptedRandom([0.30]));
+      final highQuality =
+          VoicePolicy(random: _ScriptedRandom([0.30]), tuning: d8Tuning);
       expect(
         highQuality.decide(
           CueType.praise,
@@ -673,8 +686,20 @@ void main() {
   group('correction', () {
     test('probability rises with faultPersistence', () {
       // 25% -> 55% -> 85% by persistence (0, 1, 2). A fixed 0.30 roll
-      // misses the first tier and hits the rest.
-      final policy = VoicePolicy(random: _ScriptedRandom([0.30]));
+      // misses the first tier and hits the rest. The calibrated default now
+      // has firstOccurrenceCertain (persistence 0 = certain), so isolate the
+      // roll-based escalation with an explicit no-first-certain tuning.
+      final rollingCritical = {
+        ...kDefaultTuning,
+        CueType.criticalFault: const CueTuning(
+          CueMode.correction,
+          base: 0.25,
+          step: 0.30,
+          cap: 0.85,
+        ),
+      };
+      final policy =
+          VoicePolicy(random: _ScriptedRandom([0.30]), tuning: rollingCritical);
       expect(
         policy.decide(
           CueType.criticalFault,
@@ -687,7 +712,8 @@ void main() {
         isFalse,
       );
 
-      final policy2 = VoicePolicy(random: _ScriptedRandom([0.30]));
+      final policy2 =
+          VoicePolicy(random: _ScriptedRandom([0.30]), tuning: rollingCritical);
       expect(
         policy2.decide(
           CueType.criticalFault,
@@ -703,8 +729,21 @@ void main() {
 
     test('relief valve fires near-certainly past reliefAfter', () {
       // 0.99 would miss every escalation tier (cap 0.85) but the relief
-      // valve bypasses the roll entirely once persistence >= reliefAfter.
-      final policy = VoicePolicy(random: _ScriptedRandom([0.99]));
+      // valve bypasses the roll entirely once persistence >= reliefAfter. The
+      // calibrated default dropped the relief valve (redundant with
+      // firstOccurrenceCertain), so test the mechanism via an explicit tuning.
+      final reliefCritical = {
+        ...kDefaultTuning,
+        CueType.criticalFault: const CueTuning(
+          CueMode.correction,
+          base: 0.25,
+          step: 0.30,
+          cap: 0.85,
+          reliefAfter: 4,
+        ),
+      };
+      final policy =
+          VoicePolicy(random: _ScriptedRandom([0.99]), tuning: reliefCritical);
       expect(
         policy.decide(
           CueType.criticalFault,
@@ -1137,9 +1176,21 @@ void main() {
 
         // Hammer fault A with several silent (missed) calls on one policy
         // instance, then ask about fault B with a roll that hits the base
-        // (25%) tier.
+        // (25%) tier. No-first-certain tuning so fault A actually MISSES its
+        // rolls (the calibrated default would fire A's first occurrence and
+        // trip outcome-pending) — this test is about hunger independence.
+        final rollingCritical = {
+          ...kDefaultTuning,
+          CueType.criticalFault: const CueTuning(
+            CueMode.correction,
+            base: 0.25,
+            step: 0.30,
+            cap: 0.85,
+          ),
+        };
         final hammered = VoicePolicy(
           random: _ScriptedRandom([0.90, 0.90, 0.90, 0.20]),
+          tuning: rollingCritical,
         );
         hammered.decide(
           CueType.criticalFault,
@@ -1169,7 +1220,10 @@ void main() {
 
         // A fresh policy asked about fault B with the same final roll and
         // no fault-A history at all.
-        final fresh = VoicePolicy(random: _ScriptedRandom([0.20]));
+        final fresh = VoicePolicy(
+          random: _ScriptedRandom([0.20]),
+          tuning: rollingCritical,
+        );
         final freshResult = fresh.decide(CueType.criticalFault, ctxB);
 
         expect(hammeredResult, isTrue); // 0.20 hits the 25% base tier.
@@ -1257,10 +1311,21 @@ void main() {
         isFalse,
       );
 
-      // A very quiet coach still fires the relief valve near-certainly.
+      // A very quiet coach still fires the relief valve near-certainly. The
+      // relief valve left the calibrated default (07-12); test it explicitly.
       final quietCorrect = VoicePolicy(
         personality: 0.1,
         random: _ScriptedRandom([0.99]),
+        tuning: {
+          ...kDefaultTuning,
+          CueType.criticalFault: const CueTuning(
+            CueMode.correction,
+            base: 0.25,
+            step: 0.30,
+            cap: 0.85,
+            reliefAfter: 4,
+          ),
+        },
       );
       expect(
         quietCorrect.decide(

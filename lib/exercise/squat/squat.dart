@@ -239,16 +239,12 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
       script: script,
       coach: VoiceCoach(
         sink: AssetVoiceSink(),
-        policy: VoicePolicy(
-          tuning: {
-            ...kDefaultTuning,
-            CueType.hustle:
-                const CueTuning(CueMode.perishable, base: 0.0, cap: 0.0),
-          },
-        ),
+        // No tuning override — the single kDefaultTuning is the whole point.
+        // Hustle stays off via the absent effortPhaseKeys + empty hustlePool,
+        // not a per-exercise zero-tuning map.
+        policy: VoicePolicy(),
       ),
-      // Final-rep awareness stays for count anchors. Hustle remains neutralized
-      // by the empty pool, zero tuning, and absent effortPhaseKeys.
+      // Final-rep awareness stays for count anchors.
       targetReps: targetReps,
     );
   }

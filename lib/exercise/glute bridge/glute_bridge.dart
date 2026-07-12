@@ -98,55 +98,6 @@ class GluteBridge extends ExerciseBase with SideTrackedExerciseMixin {
     'neck_head': ['glute_bridge.neck_head_soft'],
   };
 
-  static final Map<CueType, CueTuning> _voiceTuning = {
-    ...kDefaultTuning,
-    // count: no override — inherits the fleet default (base 1.0, every landed
-    // rep counted; registration ruling 07-11). The 07-08 pilot thinning
-    // (0.50/+0.10) is superseded.
-    CueType.praise: CueTuning(
-      CueMode.variableRatio,
-      base: 0.50,
-      step: 0.10,
-      cap: 0.85,
-      scalePraiseByFormScore: false,
-    ),
-    CueType.criticalFault: CueTuning(
-      CueMode.correction,
-      base: 0.25,
-      step: 0.30,
-      cap: 0.85,
-      firstOccurrenceCertain: true,
-    ),
-    CueType.softFault: CueTuning(
-      CueMode.variableRatio,
-      base: 0.20,
-      step: 0.08,
-      cap: 0.55,
-    ),
-    CueType.reminder: CueTuning(
-      CueMode.correction,
-      base: 0.30,
-      step: 0.15,
-      cap: 0.65,
-      firstOccurrenceCertain: true,
-    ),
-    // Hustle ENABLED 07-11 (Nam's call; Stage B arming data on device looked
-    // sane — armed on real 6s+ gaps vs a ~4s baseline). Quiet-side +
-    // persistence-shaped with a stochastic backoff after a spoken push: a lone
-    // hesitation is a coin flip, stacked silent hesitations climb, and a fired
-    // hustle drops the next eligible roll below baseline (not a fixed cooldown).
-    // It only ever ROLLS when the gap-stretch arming already fired, so the base
-    // isn't "every rep" — it's "when the user visibly paused." All feel-tune,
-    // not canonical.
-    CueType.hustle: CueTuning(
-      CueMode.perishable,
-      base: 0.50,
-      step: 0.20,
-      cap: 0.90,
-      postFireIdlePenalty: 2,
-    ),
-  };
-
   GluteBridgeState gluteState = GluteBridgeState.bottom;
   GluteBridgeState previousGluteState = GluteBridgeState.bottom;
 
@@ -283,7 +234,10 @@ class GluteBridge extends ExerciseBase with SideTrackedExerciseMixin {
         sink: AssetVoiceSink(),
         // Collision gap + outcome cap are policy-level (one place to tune,
         // inherited by every exercise) — not passed per-exercise (Nam 07-09).
-        policy: VoicePolicy(tuning: _voiceTuning),
+        // No tuning override — the single kDefaultTuning IS these values now
+        // (Nam 07-12: one calibrated default, one file). Glute was the pilot
+        // they were tuned on; they're the fleet default.
+        policy: VoicePolicy(),
       ),
     );
   }

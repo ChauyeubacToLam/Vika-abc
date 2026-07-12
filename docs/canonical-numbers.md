@@ -114,8 +114,9 @@ with a pixel floor for close framings.
 | Comparison ladder | 13 tiers, banner never empty |
 | Voice cue cadence / cooldowns / priority | Stochastic, no fixed values — see docs/reference/voice-coach/voice-behavior-spec.md (ADD 2026-07-07; supersedes the never-shipped "corrective 3 reps / positive 1 rep" + "5-layer queue") |
 
-Glute Bridge voice pilot tuning (current 07-11 device-test values; tune on device, shapes locked in
-docs/decisions.md).
+Fleet voice tuning — the ONE default (`kDefaultTuning` in lib/voice/voice_policy.dart; Nam 07-12: one
+calibrated default, one file, no per-exercise overrides). Device-tuned on the glute pilot, now inherited
+fleet-wide; chattiness retunes only via the personality scalar. Tune on device, shapes locked in decisions.md.
 
 | Cue | Value |
 |---|---|
@@ -123,7 +124,8 @@ docs/decisions.md).
 | Praise | base 0.50, hunger +0.10, cap 0.85, never twice in a row, no formScore probability multiplier |
 | Critical fault (`criticalFault`) | base 0.25, persistence +0.30, cap 0.85, first occurrence certain, no relief valve |
 | Soft fault (`softFault`) | base 0.20, hunger +0.08, cap 0.55, not first-occurrence deterministic |
-| Hustle | enabled; base 0.50, hunger +0.20, cap 0.90, post-fire idle penalty 2 (next eligible rolls start below baseline), hesitation-armed only |
+| Reminder (`reminder`) | base 0.30, hunger +0.15, cap 0.65, first occurrence certain (fires at rep-start commit edge) |
+| Hustle | base 0.50, hunger +0.20, cap 0.90, post-fire idle penalty 2, hesitation-armed only; fires ONLY where an exercise declares effortPhaseKeys — glute-only today (fleet stays off until Tier 3) |
 | Outcome collision guard | 2nd in-rep outcome cue: `criticalFault` only, different fault, ≥0.5s after previous outcome line's audio ENDS, max 2 voiced outcome cues/rep; the system's only time cooldown |
 
 Timing (07-09 — behavior, not numbers; see decisions.md + voice-coach/realtime-cue-design.html): `criticalFault`

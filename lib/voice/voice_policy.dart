@@ -126,21 +126,57 @@ const Map<CueType, CueTuning> kDefaultTuning = {
   // cap-0.90/relief-6 and the 07-08 pilot 0.50/+0.10). base 1.0 short-circuits
   // the roll in _count; re-thinning an exercise means an explicit base < 1.0.
   CueType.count: CueTuning(CueMode.always, base: 1.0),
-  CueType.praise:
-      CueTuning(CueMode.variableRatio, base: 0.35, step: 0.10, cap: 0.85),
+  // ONE calibrated default, no per-exercise overrides (Nam 2026-07-12: the
+  // whole point of the policy is a single tuning in a single file). These are
+  // the values the glute pilot was device-tuned to; promoting them here makes
+  // every exercise inherit the calibrated PT. Chattiness is retuned ONLY via
+  // the personality scalar, never a per-exercise map.
+  CueType.praise: CueTuning(
+    CueMode.variableRatio,
+    base: 0.50,
+    step: 0.10,
+    cap: 0.85,
+    scalePraiseByFormScore: false, // D8 formScore multiplier dropped (07-08)
+  ),
+  // First occurrence of a fault is CERTAIN, then persistence escalates
+  // 0.25→0.55→0.85. No relief valve — redundant once first=100%
+  // (voice-behavior-spec § criticalFault).
   CueType.criticalFault: CueTuning(
     CueMode.correction,
     base: 0.25,
     step: 0.30,
     cap: 0.85,
-    reliefAfter: 4,
+    firstOccurrenceCertain: true,
   ),
-  CueType.reminder:
-      CueTuning(CueMode.correction, base: 0.20, step: 0.10, cap: 0.50),
+  // Non-critical nudge: hunger + base, never first-occurrence-deterministic.
+  // Was MISSING from the default entirely, so every fleet soft nudge was a
+  // silent no-op ('soft-no-tuning-configured') until this landed (07-12).
+  CueType.softFault: CueTuning(
+    CueMode.variableRatio,
+    base: 0.20,
+    step: 0.08,
+    cap: 0.55,
+  ),
+  // Streak-first deterministic (firstOccurrenceCertain), then 0.30/+0.15/cap
+  // 0.65 — the LOCKED reminder design (voice-behavior-spec § reminder). The old
+  // default (0.20/0.10/0.50, no first-certain) never matched it, so fleet
+  // reminders barely fired on device (07-12).
+  CueType.reminder: CueTuning(
+    CueMode.correction,
+    base: 0.30,
+    step: 0.15,
+    cap: 0.65,
+    firstOccurrenceCertain: true,
+  ),
+  // Persistence-shaped with a stochastic post-fire backoff. Only ever ROLLS
+  // after the adapter's gap-stretch arming fires AND the exercise declares
+  // effortPhaseKeys — so a fleet exercise without effort keys never hustles
+  // regardless of this tuning (hustle is glute-only until Tier 3).
   CueType.hustle: CueTuning(
     CueMode.perishable,
     base: 0.50,
-    cap: 0.50,
+    step: 0.20,
+    cap: 0.90,
     postFireIdlePenalty: 2,
   ),
   CueType.phase: CueTuning(CueMode.perishable, base: 0.45, cap: 1.0),
