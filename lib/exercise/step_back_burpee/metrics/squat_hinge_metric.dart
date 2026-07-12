@@ -55,7 +55,7 @@ class SquatHingeMetric extends StepBackBurpeeMetricBase {
         if (_minKneeAngleDuringSquat! > SquatHingeConfig.STIFF_LEG_DANGER) {
           _faults.add(FaultRecord(
             phase: 'REP_COMPLETE',
-            type: 'Spine',
+            type: 'squat_hinge',
             message:
                 'Lỗi nguy hiểm: Cúi gập lưng với chân thẳng. Hãy trùng gối!',
             affectsForm: true,
@@ -64,7 +64,7 @@ class SquatHingeMetric extends StepBackBurpeeMetricBase {
             SquatHingeConfig.SAFE_KNEE_FLEXION) {
           _faults.add(FaultRecord(
             phase: 'REP_COMPLETE',
-            type: 'Spine',
+            type: 'squat_depth',
             message: 'Hạ hông và gập gối sâu hơn nữa khi chạm đất.',
             affectsForm: false,
           ));

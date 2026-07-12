@@ -45,7 +45,7 @@ class AlternatingLeadArmMetric extends PlankMetricBase {
     if (lastLeadArm != null && currentLeadArm == lastLeadArm) {
       _faults.add(FaultRecord(
         phase: 'pushing_up',
-        type: 'LeadArmSymmetry',
+        type: 'alternating',
         message: 'Không đổi tay dẫn khi đẩy lên',
         affectsForm: false,
         voiceMessage: 'Bạn nên đổi tay dẫn đẩy lên để cân bằng lực cơ.',

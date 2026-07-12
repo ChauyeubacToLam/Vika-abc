@@ -23,7 +23,7 @@ class CossackTorsoVerticalityMetric extends CossackMetricBase {
       ctx.resultIssues.feedback['torso'] = message;
       addFault(
         FaultRecord(
-          type: 'torso_lean',
+          type: 'torso',
           message:
               'Tránh rạp ngực hoàn toàn xuống đất. Cố gắng giữ lưng thẳng hơn.',
           affectsForm: false, // Don't fail the rep, but warn

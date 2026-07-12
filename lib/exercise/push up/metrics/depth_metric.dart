@@ -95,7 +95,7 @@ class DepthMetric extends PushUpMetricBase {
       // Error: way too shallow
       _faults.add(FaultRecord(
         phase: 'REP_COMPLETE',
-        type: 'Depth',
+        type: 'depth',
         message: 'Quá nông (${min.toStringAsFixed(0)}°)',
         affectsForm: true,
       ));
@@ -107,7 +107,7 @@ class DepthMetric extends PushUpMetricBase {
       // Warning: almost deep enough
       _faults.add(FaultRecord(
         phase: 'REP_COMPLETE',
-        type: 'Depth',
+        type: 'depth',
         message: 'Hơi nông (${min.toStringAsFixed(0)}°)',
         affectsForm: false, // warning only, don't kill the rep
       ));

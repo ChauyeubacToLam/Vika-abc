@@ -54,7 +54,7 @@ class TakeOffDepthMetric extends JumpSquatMetricBase {
           _minSquatAngle! > TakeOffConfig.SHALLOW_WARNING) {
         _faults.add(FaultRecord(
           phase: 'REP_COMPLETE',
-          type: 'Power',
+          type: 'takeoff_depth',
           message:
               'Lấy đà quá nông (${_minSquatAngle!.toStringAsFixed(0)}°). Hạ hông sâu hơn!',
           voiceMessage: 'Hạ hông sâu hơn rồi mới bật nhảy',

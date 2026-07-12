@@ -12,8 +12,21 @@ import 'metrics/v_shape_rom_metric.dart';
 import 'metrics/jerking_metric.dart';
 import 'metrics/knee_extension_metric.dart';
 import 'metrics/tempo_metric.dart';
+import '../../voice/policy_voice_coach.dart';
+import '../../voice/voice_coach.dart';
+import '../../voice/voice_content.dart';
+import '../../voice/voice_policy.dart';
+import '../../voice/voice_sink.dart';
 
 class VUp extends ExerciseBase with SideTrackedExerciseMixin {
+  static const List<String> _voiceFaultIds = [
+    'sync',
+    'tempo',
+    'jerking',
+    'rom',
+    'knee',
+  ];
+
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
       const <VikaImageOrientation>{
@@ -91,10 +104,30 @@ class VUp extends ExerciseBase with SideTrackedExerciseMixin {
   final Debouncer _abortDebouncer = Debouncer(requiredFrames: 2);
   final Debouncer _lyingDebouncer = Debouncer(requiredFrames: 2);
 
-  VUp({required this.maxRep});
+  VUp({required this.maxRep}) : super(targetReps: maxRep);
 
   @override
   String get exerciseName => 'V-Up';
+
+  @override
+  List<FaultRecord> get liveFaults =>
+      [for (final metric in _metrics) ...metric.faults];
+
+  @override
+  ExerciseVoiceCoach createVoiceCoach() {
+    return PolicyVoiceCoach(
+      script: VoiceScript.from(
+        VoiceDefaults.repBased,
+        slug: 'v_up',
+        faultIds: _voiceFaultIds,
+      ),
+      targetReps: targetReps,
+      coach: VoiceCoach(
+        sink: AssetVoiceSink(),
+        policy: VoicePolicy(),
+      ),
+    );
+  }
 
   @override
   String get currentPhaseKey => state.name;
@@ -439,7 +472,7 @@ class VUp extends ExerciseBase with SideTrackedExerciseMixin {
     final allFaults = <FaultRecord>[];
     for (final metric in _metrics) allFaults.addAll(metric.faults);
 
-    final hasDisqualifyingFault = allFaults.any((f) => f.type == 'BentKnee');
+    final hasDisqualifyingFault = allFaults.any((f) => f.type == 'knee');
 
     correctForm = !allFaults.any((f) => f.affectsForm);
 
@@ -451,6 +484,17 @@ class VUp extends ExerciseBase with SideTrackedExerciseMixin {
       if (!correctForm) resultIssues.feedback['Result'] = 'Fix Form';
     }
 
+    final faultAffectsForm = <String, bool>{};
+    final faultPriorities = <String, int>{};
+    for (final fault in allFaults) {
+      faultAffectsForm[fault.type] =
+          (faultAffectsForm[fault.type] ?? false) || fault.affectsForm;
+      final previousPriority = faultPriorities[fault.type];
+      if (previousPriority == null || fault.priority < previousPriority) {
+        faultPriorities[fault.type] = fault.priority;
+      }
+    }
+
     logger
         .addRepLog(RepLog(correctForm: correctForm, repNumber: repCount, data: {
       "min_v_angle": romMetric.minVAngle ?? 180.0,
@@ -458,7 +502,9 @@ class VUp extends ExerciseBase with SideTrackedExerciseMixin {
       "max_ankle_lift": _maxAnkleLiftThisRep,
       "min_wrist_ankle_dist": _minWristAnkleDistThisRep ?? 999.0,
       "lowering_time": tempoMetric.loweringDuration ?? 0.0,
-      "fault_types": allFaults.map((e) => e.type).toSet().toList()
+      "fault_types": allFaults.map((e) => e.type).toSet().toList(),
+      "fault_affects_form": faultAffectsForm,
+      "fault_priorities": faultPriorities,
     }));
 
     correctForm = true;

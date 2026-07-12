@@ -1,7 +1,9 @@
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:vika/debug/debug_types.dart';
 import 'package:vika/exercise/exercise_base.dart';
+import 'package:vika/exercise/fault_record.dart';
 import '../ashtanga_namaskara.dart';
+export 'package:vika/exercise/fault_record.dart';
 
 class AshtangaContext {
   final AshtangaState state;
@@ -45,20 +47,6 @@ class AshtangaContext {
     this.ankle,
     this.ear,
     this.cervicalBaseline,
-  });
-}
-
-class FaultRecord {
-  final String phase;
-  final String type;
-  final String message;
-  final bool affectsForm;
-
-  FaultRecord({
-    required this.phase,
-    required this.type,
-    required this.message,
-    required this.affectsForm,
   });
 }
 

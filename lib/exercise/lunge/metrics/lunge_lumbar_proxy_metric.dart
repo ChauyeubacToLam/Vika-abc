@@ -93,10 +93,10 @@ class LungeLumbarProxyMetric extends LungeMetricBase {
   }
 
   void _logFault(String phase, String message) {
-    if (!_faults.any((f) => f.phase == phase && f.type == 'Core')) {
+    if (!_faults.any((f) => f.phase == phase && f.type == 'lumbar')) {
       _faults.add(FaultRecord(
         phase: phase,
-        type: 'Core',
+        type: 'lumbar',
         message: message,
         affectsForm: true,
       ));

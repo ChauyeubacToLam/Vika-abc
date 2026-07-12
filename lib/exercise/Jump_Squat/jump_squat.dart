@@ -12,6 +12,11 @@ import 'metrics/jump_squat_metric_base.dart';
 import 'metrics/landing_knee_flexion_metric.dart';
 import 'metrics/take_off_depth_metric.dart';
 import 'metrics/landing_trunk_alignment_metric.dart';
+import '../../voice/policy_voice_coach.dart';
+import '../../voice/voice_coach.dart';
+import '../../voice/voice_content.dart';
+import '../../voice/voice_policy.dart';
+import '../../voice/voice_sink.dart';
 
 // --- Config ---
 class JumpSquatConfig {
@@ -30,6 +35,13 @@ class JumpSquatConfig {
 
 // --- Jump Squat ---
 class JumpSquat extends ExerciseBase {
+  static const List<String> _voiceFaultIds = [
+    'landing_stiff',
+    'landing_depth',
+    'trunk',
+    'takeoff_depth',
+  ];
+
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
       const <VikaImageOrientation>{
@@ -37,7 +49,7 @@ class JumpSquat extends ExerciseBase {
       };
 
   final int maxRep;
-  JumpSquat({required this.maxRep});
+  JumpSquat({required this.maxRep}) : super(targetReps: maxRep);
 
   JumpSquatState jumpSquatState = JumpSquatState.standing;
   JumpSquatState previousJumpSquatState = JumpSquatState.standing;
@@ -69,6 +81,26 @@ class JumpSquat extends ExerciseBase {
 
   @override
   String get exerciseName => 'Jump Squat';
+
+  @override
+  List<FaultRecord> get liveFaults =>
+      [for (final metric in _metrics) ...metric.faults];
+
+  @override
+  ExerciseVoiceCoach createVoiceCoach() {
+    return PolicyVoiceCoach(
+      script: VoiceScript.from(
+        VoiceDefaults.repBased,
+        slug: 'jump_squat',
+        faultIds: _voiceFaultIds,
+      ),
+      targetReps: targetReps,
+      coach: VoiceCoach(
+        sink: AssetVoiceSink(),
+        policy: VoicePolicy(),
+      ),
+    );
+  }
 
   @override
   String get currentPhaseKey => jumpSquatState.toString().split('.').last;
@@ -269,11 +301,23 @@ class JumpSquat extends ExerciseBase {
 
       if (!isAntiCheatReject) {
         repCount += 1;
+        final faultAffectsForm = <String, bool>{};
+        final faultPriorities = <String, int>{};
+        for (final fault in allFaults) {
+          faultAffectsForm[fault.type] =
+              (faultAffectsForm[fault.type] ?? false) || fault.affectsForm;
+          final previousPriority = faultPriorities[fault.type];
+          if (previousPriority == null || fault.priority < previousPriority) {
+            faultPriorities[fault.type] = fault.priority;
+          }
+        }
         logger.addRepLog(RepLog(
           correctForm: correctForm,
           repNumber: repCount,
           data: {
             'fault_types': allFaults.map((e) => e.type).toSet().toList(),
+            'fault_affects_form': faultAffectsForm,
+            'fault_priorities': faultPriorities,
           },
         ));
 
@@ -432,12 +476,14 @@ class JumpSquat extends ExerciseBase {
 
   String _feedbackKeyForFault(FaultRecord fault) {
     switch (fault.type) {
-      case 'Power':
+      case 'takeoff_depth':
         return 'takeoff_depth';
-      case 'Back':
+      case 'trunk':
         return 'trunk';
-      case 'Knee':
-        return fault.affectsForm ? 'landing_stiff' : 'landing_depth';
+      case 'landing_stiff':
+        return 'landing_stiff';
+      case 'landing_depth':
+        return 'landing_depth';
       default:
         return fault.type;
     }

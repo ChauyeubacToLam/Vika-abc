@@ -32,7 +32,7 @@ class RomMetric extends SitUpMetricBase {
         minKneeHipShoulder! > minCountableKneeHipShoulder) {
       _faults.add(FaultRecord(
         phase: 'REP_COMPLETE',
-        type: 'ROM',
+        type: 'rom',
         message:
             'Chưa lên cao nhất: ${minKneeHipShoulder!.toStringAsFixed(1)} độ',
         voiceMessage: 'Cố gắng cuộn người cao hơn nữa',

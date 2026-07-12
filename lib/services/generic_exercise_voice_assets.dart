@@ -37,12 +37,6 @@ class GenericExerciseVoiceAssets {
     // tree 07-11; Nam can still listen-check wording/intonation.
     'common.push': 'common/push.mp3',
     'common.one_more_rep': 'common/one_more_rep.mp3',
-    // Squat's PolicyVoiceCoach phase cues are phrase keys, not '<slug>.<id>'.
-    // Keep them in the shared map so the new sink can play the already-shipped
-    // squat WAVs without keeping the legacy SquatVoiceCoach player wrapper.
-    'Xuống': 'squat/xuong.wav',
-    'Giữ': 'squat/giu.wav',
-    'Đứng lên': 'squat/dung_len.wav',
     '1': 'common/count_1.mp3',
     '2': 'common/count_2.mp3',
     '3': 'common/count_3.mp3',

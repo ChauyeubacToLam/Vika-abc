@@ -92,7 +92,7 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
   double? _repTrunkLeanAtBottom;
   double? _repMaxHeelDistance;
 
-  Squat({this.maxRep = SquatConfig.MAX_REP});
+  Squat({this.maxRep = SquatConfig.MAX_REP}) : super(targetReps: maxRep);
 
   static String bottomHoldStatus(double remainingSeconds) =>
       'Hold! ${remainingSeconds.toStringAsFixed(1)}s';
@@ -204,6 +204,10 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
   @override
   String get exerciseName => 'Squat';
 
+  @override
+  List<FaultRecord> get liveFaults =>
+      [for (final metric in _metrics) ...metric.faults];
+
   /// Squat pilot for the shared voice policy.
   ///
   /// The old [SquatVoiceCoach] did three jobs at once: phase cues,
@@ -222,14 +226,10 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
       slug: legacy.slug,
       faultIds: legacy.faultIds,
       hustlePool: const [],
-      // PolicyVoiceCoach reads exercise.currentPhaseKey each frame. For squat
-      // that key is the SquatState enum name, so this map translates movement
-      // state into the logical audio key the sink should play.
-      phaseCues: const {
-        'descending': 'Xuống',
-        'bottom': 'Giữ',
-        'ascending': 'Đứng lên',
-      },
+      // No phaseCues: the new coach does NOT narrate the movement ("Xuống" /
+      // "Giữ" / "Đứng lên") — that was the legacy behaviour. Silence is the
+      // default; squat speaks only counts, praise, faults, and setup, like the
+      // rest of the fleet (Nam, 2026-07-11).
     );
     return PolicyVoiceCoach(
       script: script,
@@ -245,7 +245,7 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
       ),
       // Final-rep awareness stays for count anchors. Hustle remains neutralized
       // by the empty pool, zero tuning, and absent effortPhaseKeys.
-      targetReps: maxRep,
+      targetReps: targetReps,
     );
   }
 
@@ -526,6 +526,17 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
         }
       }
 
+      final faultAffectsForm = <String, bool>{};
+      final faultPriorities = <String, int>{};
+      for (final fault in allFaults) {
+        faultAffectsForm[fault.type] =
+            (faultAffectsForm[fault.type] ?? false) || fault.affectsForm;
+        final previousPriority = faultPriorities[fault.type];
+        if (previousPriority == null || fault.priority < previousPriority) {
+          faultPriorities[fault.type] = fault.priority;
+        }
+      }
+
       // Log per-rep data
       logger.addRepLog(
           RepLog(correctForm: correctForm, repNumber: repCount, data: {
@@ -535,6 +546,8 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
         "ascending_time": tempoMetric.ascentDuration ?? 0.0,
         "descending_time": tempoMetric.descentDuration ?? 0.0,
         "fault_types": allFaults.map((f) => f.type).toSet().toList(),
+        "fault_affects_form": faultAffectsForm,
+        "fault_priorities": faultPriorities,
       }));
       for (final metric in _metrics) {
         if (calibratedCleanRep) {

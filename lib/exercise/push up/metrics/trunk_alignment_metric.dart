@@ -145,7 +145,7 @@ class TrunkAlignmentMetric extends PushUpMetricBase {
     if (!_faults.any((f) => f.phase == phase && f.message == message)) {
       _faults.add(FaultRecord(
         phase: phase,
-        type: 'Back',
+        type: 'sag',
         message: message,
         voiceMessage: voiceMessage,
         affectsForm: true,

@@ -63,10 +63,10 @@ class ArmPositionMetric extends LegRaiseMetricBase {
   }
 
   void _logFault(String phase, String message) {
-    if (_faults.any((f) => f.type == 'ArmPosition')) return;
+    if (_faults.any((f) => f.type == 'arms')) return;
     _faults.add(FaultRecord(
       phase: phase,
-      type: 'ArmPosition',
+      type: 'arms',
       message: message,
       voiceMessage: 'Duỗi thẳng tay và khép sát hông',
       affectsForm: true,

@@ -14,6 +14,121 @@ Alternatives considered: <what we rejected and why>
 
 ---
 
+## 2026-07-11 · Squat stops narrating movement phases (no phaseCues)
+Status: active — Nam 2026-07-11 (device catch).
+Decision: Squat's `phaseCues` ({descending→"Xuống", bottom→"Giữ", ascending→"Đứng lên"}) is
+removed. Squat now behaves like the fleet: silence is the default, it speaks only counts, praise,
+faults, and setup — no per-phase movement narration. The dead `'Xuống'/'Giữ'/'Đứng lên'` →
+`squat/*.wav` entries in `commonFiles` are removed and the 3 wavs archived.
+Why: Tier-1 migration retained squat's legacy phase narration; on device it read as the old coach
+talking through every rep ("going down / going up"). Movement narration contradicts principle 1
+(silence is default) and no other exercise does it. `phaseCues` stays in `VoiceScript` as unused
+infrastructure (only Surya, voice-null, ever referenced it) — do NOT re-add it to squat.
+Alternatives considered: keep phase cues as a squat-only nicety — rejected; it's the exact legacy
+behaviour the redesign removed everywhere else.
+
+## 2026-07-11 · Hold-based voice behavior LOCKED (glute pilot's time-based counterpart)
+Status: active — Nam's rulings via the hold-design lavish review + same-day chat. Design doc:
+docs/reference/voice-coach/hold-exercise-voice-design.html (v2 DECIDED); impl spec for Codex:
+docs/scratch/hold-voice-impl-spec.md; behavior: voice-behavior-spec.md § Hold-based exercises.
+Decision, the shape (High Plank = pilot):
+- **Clock is pose-validity gated, NOT form-gated.** Two rings: outer = anti-cheat/"still in the
+  pose" gates time accrual; inner = form-quality metrics coach real-time while the clock RUNS.
+  Only cheating stops earning. Per-metric fault-seconds accounting stays (summary honesty).
+  REVERSES the shipped High Plank perfect-timer semantics (timer paused on any form drop).
+- **Voice milestones, relative rule any duration:** halfway + "còn 10 giây", deterministic,
+  earned-time crossings. NO spoken per-second countdown — a coach says "10 seconds left", never
+  "10, 9, 8". Voice speaks REMAINING; the UI ring stays as-is (coach = person, screen = tool).
+- **Final countdown is NON-VERBAL:** 3 identical beeps on the last 3 earned seconds + a distinct
+  end tone (the universal timer beep grammar — zero teaching needed). No continuous tick in v1
+  (research: anxiety cost + clashes with voice). Spoken-numeral swap stays a one-line change.
+- **Milestone outcome slot SWITCHES praise/hustle by measured state:** clean since last milestone
+  → praise roll; struggling/final stretch → hustle roll; neither wins → time line alone. Never
+  praise two consecutive milestones. Hustle's second flavor: final-third pose-break arms, re-hold
+  commit fires (quiet-side roll).
+- **criticalFault/softFault real-time during the hold, rep-fleet rules unchanged**; persistence +
+  same-fault-once bookkeeping unit = the hold EPISODE, not the (nonexistent) rep.
+- **90s TIMEOUT DELETED.** Walk-away = presence gate; stuck = setup_position re-tell; give-up =
+  quit. No third ending, no "hết giờ" line.
+- **Sets normalized fleet-wide (hybrid):** a set = one continuous hold to target duration, sets ×
+  duration prescribed like sets × reps, High Plank joins the existing multi-set flow. Hold
+  exercises never display "reps" (the repCount-carries-seconds leak gets cleaned in migration).
+Why: users come to be coached on faults — freezing the clock on every fault is a referee, not a
+coach (Nam); milestones are a hold's only structural moments, so outcome cues anchor there; the
+beep grammar is already trained into every phone user; timeout was an arbitrary third ending.
+Alternatives rejected: form-gated earned time (v1 proposal — punitive), spoken "năm-bốn-ba-hai-một"
+final countdown (robot-counts), praise-only milestone pairing (praises bad holds), keeping timeout
+at 15-20min (dead mechanism once the clock runs through faults).
+Out of scope, deferred: yoga/stretch register (VoiceScript config: reduced milestones, no hustle);
+audio wordings (structure ships first, missing keys are safe no-ops — Nam records later).
+
+## 2026-07-11 · Voice-copy skill: external-target cue style with no-assumption fence; bạn confirmed; praise stays generic
+Status: active — Nam picked the options after the 07-11 wording research run (voice-research-rules.md §3d).
+Decision: All new voice lines are written per the `voice-copy` skill (.agents/skills/voice-copy/SKILL.md).
+Four calls locked there:
+1. **Cue style = external target (verb + direction + concrete target), with a NO-ASSUMPTION FENCE:**
+   only universally-present targets (sàn, trần nhà, màn hình/điện thoại, own-body geometry). Wall, chair,
+   mirror, furniture forbidden — even as metaphor ("như ngồi ghế" out). Anatomical cue is the sanctioned
+   fallback when no safe target exists; never force a weird image.
+2. **`bạn` stays** despite the research flag that it can read as youth/ad register vs age-matched anh/chị
+   (§3d pronoun flag). Why: pre-recorded audio would ~double per line, runtime doesn't reliably know
+   age/gender, and `bạn` fits the training-partner register the hustle research favors. Revisit only on a
+   move to dynamic TTS.
+3. **Praise stays generic** (common rotating pool). Specific process-praise is better per the research but
+   a shared recording can't name specifics; post-set (interpreter) carries all measured specificity.
+   **DEFERRED, first noted here: per-metric specific praise files** (phase-2-style, alongside the existing
+   variant-pools deferral, NOT scheduled).
+4. **Mandatory grounding before writing metric strings:** read the exercise class + the metric file first
+   (what it measures, what clears it), then write — a line naming an unmeasured action is a data-honesty
+   violation (Nam's explicit note).
+Why: fleet is scaling past hand-written strings; a skill makes any model write them correctly. External
+focus is the strongest replicated finding in cueing science; the fence keeps it from producing nonsense
+audio in unknown rooms (Nam's flag — user's room contents are unknowable).
+Alternatives considered: analogy/image style (rejected as default — highest assumption risk); anh/chị
+address (rejected for v1 — fleet size + unknown demographics); per-exercise specific praise now (rejected
+— recording cost, post-set already carries specifics); template-free formula-only copywriting (rejected —
+deterministic channels keep locked 07-10 templates).
+Consequence: pending un-recorded lines in missing-audio.md should be checked against the formula before
+recording (cheap now, nothing recorded for those yet); Nam confirms wordings at recording time as before.
+
+## 2026-07-11 · Fleet soft/critical severity kept as-coded; ONE flip (walking_lunge torso → critical)
+Status: active — Nam delegated "change only what's super off" on the Tier-1 fleet decision table.
+Decision: The per-fault `affectsForm` values across the 24-exercise rep fleet stand as coded, with one
+correction: `walking_lunge` `torso` flips soft→critical (torso_verticality_metric.dart). Its soft line
+is NOT recorded; the existing critical `walking_lunge/torso.mp3` covers it. Soft-cue wordings for the
+fleet live in missing-audio.md ("Fleet Tier-1 SOFT cues"), pattern-derived, Nam confirms at recording.
+Why: trunk-lean is critical in every sibling (squat/lunge/jump squat/bird dog/mountain climber/
+plank-family), and the walking-lunge detector only fires past MAX_FORWARD_LEAN — the error band — so
+soft was miscoded, not a calibration choice. Side-effect (accepted): the fault now fails the rep in
+scoring/logs, matching stationary Lunge. Left as-coded despite variance, both directions defensible:
+rom criticality (critical on sit-up/mountain-climber/leg-raises, soft on v-up) and tempo criticality
+(exercise-dependent — fast eccentric on spinal flexion is a real risk, jumping-jack pace is style).
+Alternatives considered: flipping cossack_squat `torso` too — rejected, deep lateral squat geometry
+legitimately needs forward lean, soft is a calibration choice there, not an error.
+
+## 2026-07-11 · Rep voice fleet Tier 1 uses one policy adapter and the existing fault contract
+Status: active — implementation landed in the working tree; Nam review pending.
+Decision: Put all 24 in-scope rep exercises on an explicit rep-based `PolicyVoiceCoach` bundle with
+`targetReps`, normalized snake_case fault ids, and the three-field RepLog contract
+(`fault_types`, `fault_affects_form`, `fault_priorities`). Expose current metric faults through
+`liveFaults` for 23 exercises. Tricep Dip deliberately omits `liveFaults`: its four metric objects are
+declared but never updated, collected, or reset by the exercise, so surfacing them would pretend that
+detection exists when it does not. Retire the superseded Bird Dog, Jumping Jack, Wall Push Up, Leg
+Raise, and Squat voice stacks after verifying that production has no remaining call sites. Tier 1 does
+not add soft pools, reminders, hustle phase keys, per-exercise tuning, or new audio.
+Why: the fleet already had the shared policy path, but PascalCase detector types did not match the
+legacy snake_case script ids, so the adapter filtered fault voice out. Three rep exercises also exposed
+a hold target and therefore inherited the wrong time-based voice bundle. Normalizing at the fault
+source makes one id describe detection, RepLog data, reporting, and the existing asset convention;
+explicit rep bundles remove the accidental hold/rep ambiguity. Preserving each `affectsForm` value
+keeps Tier 1 data-honest and leaves critical/soft product calls for the fleet decision table.
+Alternatives considered: aliasing every mismatch only at RepLog write time — rejected because UI,
+reports, and voice would keep different identities; changing the shared voice engine — rejected because
+the engine contract already works; wiring Tricep Dip's dormant metrics — deferred because that is a
+detection/pipeline change, outside a voice rollout; inventing mappings for Bird Dog `MissingBody`/
+`Plank` or Russian Twist `arm_swinging` — rejected because no matching legacy meaning or recording was
+verified.
+
 ## 2026-07-11 · Praise relief valve DROPPED (never built, hunger saturates first)
 Status: active — Nam 2026-07-11.
 Decision: The praise "5+ clean unpraised → next ≥90%" relief valve is dropped from the spec, not to be

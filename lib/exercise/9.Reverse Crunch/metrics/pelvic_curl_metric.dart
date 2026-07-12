@@ -58,7 +58,7 @@ class PelvicCurlMetric extends ReverseCrunchMetricBase {
         _maxHipLift < ReverseCrunchConfig.HIP_LIFT_MIN_NORMALIZED) {
       _faults.add(FaultRecord(
         phase: 'TOP',
-        type: 'NoPelvicTilt',
+        type: 'curl',
         message: 'Hông chưa nhấc khỏi sàn',
         affectsForm: true,
         priority: CrunchVoicePriority.pelvicCurl,

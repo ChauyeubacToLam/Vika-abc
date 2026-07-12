@@ -11,6 +11,11 @@ import 'metrics/rom_metric.dart';
 import 'metrics/jerking_metric.dart';
 import 'metrics/stability_metric.dart';
 import 'metrics/tempo_metric.dart';
+import '../../voice/policy_voice_coach.dart';
+import '../../voice/voice_coach.dart';
+import '../../voice/voice_content.dart';
+import '../../voice/voice_policy.dart';
+import '../../voice/voice_sink.dart';
 
 class SitUpConfig {
   static const int TIMEOUT_MS = 90000; // 90s
@@ -32,6 +37,12 @@ class SitUpConfig {
 }
 
 class SitUp extends ExerciseBase with SideTrackedExerciseMixin {
+  static const List<String> _voiceFaultIds = [
+    'jerking',
+    'rom',
+    'stability',
+  ];
+
   final int maxRep;
   SitUpState state = SitUpState.lying;
   SitUpState previousState = SitUpState.lying;
@@ -60,7 +71,27 @@ class SitUp extends ExerciseBase with SideTrackedExerciseMixin {
   final Debouncer _loweringDebouncer = Debouncer(requiredFrames: 2);
   final Debouncer _lyingDebouncer = Debouncer(requiredFrames: 2);
 
-  SitUp({required this.maxRep});
+  SitUp({required this.maxRep}) : super(targetReps: maxRep);
+
+  @override
+  List<FaultRecord> get liveFaults =>
+      [for (final metric in _metrics) ...metric.faults];
+
+  @override
+  ExerciseVoiceCoach createVoiceCoach() {
+    return PolicyVoiceCoach(
+      script: VoiceScript.from(
+        VoiceDefaults.repBased,
+        slug: 'sit_up',
+        faultIds: _voiceFaultIds,
+      ),
+      targetReps: targetReps,
+      coach: VoiceCoach(
+        sink: AssetVoiceSink(),
+        policy: VoicePolicy(),
+      ),
+    );
+  }
 
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
@@ -301,11 +332,24 @@ class SitUp extends ExerciseBase with SideTrackedExerciseMixin {
       resultIssues.feedback['Result'] = 'Fix Form';
     }
 
+    final faultAffectsForm = <String, bool>{};
+    final faultPriorities = <String, int>{};
+    for (final fault in allFaults) {
+      faultAffectsForm[fault.type] =
+          (faultAffectsForm[fault.type] ?? false) || fault.affectsForm;
+      final previousPriority = faultPriorities[fault.type];
+      if (previousPriority == null || fault.priority < previousPriority) {
+        faultPriorities[fault.type] = fault.priority;
+      }
+    }
+
     logger
         .addRepLog(RepLog(correctForm: correctForm, repNumber: repCount, data: {
       "min_khs_angle": romMetric.minKneeHipShoulder ?? 180.0,
       "lowering_time": tempoMetric.loweringDuration ?? 0.0,
-      "fault_types": allFaults.map((e) => e.type).toSet().toList()
+      "fault_types": allFaults.map((e) => e.type).toSet().toList(),
+      "fault_affects_form": faultAffectsForm,
+      "fault_priorities": faultPriorities,
     }));
 
     correctForm = true;

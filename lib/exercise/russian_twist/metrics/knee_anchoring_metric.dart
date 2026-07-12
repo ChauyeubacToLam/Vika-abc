@@ -27,16 +27,15 @@ class KneeAnchoringMetric extends RussianMetricBase {
     final driftX = ctx.midKneeX - _setupKneeX!;
     final driftY = ctx.midKneeY - _setupKneeY!;
     final drift = math.sqrt(driftX * driftX + driftY * driftY);
-    final driftRatio = ctx.shoulderWidth > 1e-6
-        ? drift / ctx.shoulderWidth
-        : 0.0;
+    final driftRatio =
+        ctx.shoulderWidth > 1e-6 ? drift / ctx.shoulderWidth : 0.0;
 
     debugData['kneeDriftRatio'] = driftRatio.toStringAsFixed(2);
 
     if (driftRatio > KNEE_WOBBLE_RATIO_LIMIT) {
       addFault(
         FaultRecord(
-          type: 'knee_wobble',
+          type: 'knee',
           message: 'Giữ đầu gối ổn định, đừng dùng chân lấy đà.',
           affectsForm: true,
           phase: ctx.state.name,

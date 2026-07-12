@@ -43,10 +43,10 @@ class AlignmentMetric extends BirdDogMetricBase {
     if (ctx.state != BirdDogState.hold_extended) return;
 
     if (armBad || legBad) {
-      if (!_faults.any((f) => f.type == 'Alignment_Limb')) {
+      if (!_faults.any((f) => f.type == 'alignment')) {
         _faults.add(FaultRecord(
           phase: ctx.state.name,
-          type: 'Alignment_Limb',
+          type: 'alignment',
           message: 'Tay/Chân duỗi chưa thẳng với mặt đất',
           voiceMessage: 'Vươn dài tay và chân.',
           affectsForm: true,
@@ -62,10 +62,10 @@ class AlignmentMetric extends BirdDogMetricBase {
       _debugData['headDrop'] = headDrop;
       if (headDrop > 0.15) {
         _status = MetricStatus.fault;
-        if (!_faults.any((f) => f.type == 'Alignment_Head')) {
+        if (!_faults.any((f) => f.type == 'head')) {
           _faults.add(FaultRecord(
             phase: ctx.state.name,
-            type: 'Alignment_Head',
+            type: 'head',
             message: 'Đầu cúi quá thấp',
             voiceMessage: 'Nâng đầu nhẹ, mắt nhìn xuống thảm.',
             affectsForm: true,

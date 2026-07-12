@@ -49,10 +49,10 @@ class StableLimbsMetric extends DeadBugMetricBase {
 
       if (_faultDebouncer.update(
           lArmUnstable || rArmUnstable || lHipUnstable || rHipUnstable)) {
-        if (!_faults.any((f) => f.type == 'StableLimbs')) {
+        if (!_faults.any((f) => f.type == 'stable_limbs')) {
           _faults.add(FaultRecord(
             phase: ctx.state.name,
-            type: 'StableLimbs',
+            type: 'stable_limbs',
             message: 'Chi trụ bị kéo xê dịch',
             voiceMessage: 'Giữ cố định tay và chân còn lại vuông góc nhé!',
             affectsForm: true,

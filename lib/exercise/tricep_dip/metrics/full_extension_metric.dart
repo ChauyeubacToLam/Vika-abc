@@ -35,7 +35,7 @@ class FullExtensionMetric extends TricepMetricBase {
       // transitioning from ascending directly to descending means they missed full extension.
       addFault(
         FaultRecord(
-          type: 'no_full_extension',
+          type: 'extension',
           message:
               'Chưa duỗi thẳng tay hoàn toàn! Hãy đẩy thẳng tay lên để siết cơ.',
           affectsForm: false, // Medium

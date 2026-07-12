@@ -21,7 +21,7 @@ class SpinalFlexionMetric extends RussianMetricBase {
         RussianTwistConfig.MAX_TRUNK_HORIZONTAL_ANGLE) {
       addFault(
         FaultRecord(
-          type: 'upright_torso',
+          type: 'too_upright',
           message:
               'Không tính: hãy ngả lưng ra sau để siết bụng, không ngồi thẳng 90 độ.',
           affectsForm: true,
@@ -34,7 +34,7 @@ class SpinalFlexionMetric extends RussianMetricBase {
         RussianTwistConfig.MIN_TRUNK_HORIZONTAL_ANGLE) {
       addFault(
         FaultRecord(
-          type: 'collapsed_torso',
+          type: 'too_low',
           message:
               'Không tính: nâng thân lên một chút, đừng nằm quá thấp khi vặn.',
           affectsForm: true,

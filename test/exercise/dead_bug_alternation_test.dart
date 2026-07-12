@@ -246,7 +246,7 @@ void main() {
     expect(exercise.logger.repLogs.last.correctForm, isFalse);
     expect(
       exercise.logger.repLogs.last.data['fault_types'],
-      contains('NotAlternating'),
+      contains('alternate'),
     );
   });
 
@@ -272,7 +272,7 @@ void main() {
     expect(exercise.logger.repLogs.single.correctForm, isFalse);
     expect(
       exercise.logger.repLogs.single.data['fault_types'],
-      contains('FloorContact'),
+      contains('floor_contact'),
     );
   });
 }

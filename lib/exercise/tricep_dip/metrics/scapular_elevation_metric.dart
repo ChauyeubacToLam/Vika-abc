@@ -35,7 +35,7 @@ class ScapularElevationMetric extends TricepMetricBase {
     if (ratio < SHRUG_THRESHOLD_RATIO) {
       addFault(
         FaultRecord(
-          type: 'shrugging',
+          type: 'shrug',
           message: 'Ưỡn ngực, hạ vai xuống, cách xa mang tai!',
           affectsForm: false, // Don't fail rep, but warn
           phase: ctx.state.name,

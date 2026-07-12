@@ -149,7 +149,7 @@ class WallContactMetric extends WallPushUpMetricBase {
     if (!_faults.any((f) => f.phase == phase && f.message == message)) {
       _faults.add(FaultRecord(
         phase: phase,
-        type: 'Wall',
+        type: 'hand',
         message: message,
         voiceMessage: voiceMessage,
         affectsForm: affectsForm,

@@ -68,7 +68,7 @@ class PlankFormMetric extends StepBackBurpeeMetricBase {
       if (_minBodyAngle != null && _minBodyAngle! < PlankConfig.SAG_DANGER) {
         _faults.add(FaultRecord(
           phase: 'REP_COMPLETE',
-          type: 'Spine',
+          type: 'plank_sag',
           message: 'Lưng bị gập quá mức khi nằm!',
           affectsForm: true,
         ));
@@ -79,7 +79,7 @@ class PlankFormMetric extends StepBackBurpeeMetricBase {
           _maxHipAngle! < PlankConfig.SHORT_STEP_WARNING) {
         _faults.add(FaultRecord(
           phase: 'REP_COMPLETE',
-          type: 'Amplitude',
+          type: 'plank_extension',
           message: 'Chân chưa duỗi thẳng hết cỡ khi nằm xuống.',
           affectsForm: false,
         ));

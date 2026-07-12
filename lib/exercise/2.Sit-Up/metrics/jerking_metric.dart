@@ -47,10 +47,10 @@ class JerkingMetric extends SitUpMetricBase {
           _maxVelocity = velocity;
         }
 
-        if (velocity > 2.0 && !_faults.any((f) => f.type == 'Jerking')) {
+        if (velocity > 2.0 && !_faults.any((f) => f.type == 'jerking')) {
           _faults.add(FaultRecord(
             phase: ctx.state.name,
-            type: 'Jerking',
+            type: 'jerking',
             message: 'Dùng lực giật/quăng người',
             voiceMessage: 'Lên từ từ, đừng giật thân người!',
             affectsForm: true,

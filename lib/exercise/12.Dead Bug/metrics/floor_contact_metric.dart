@@ -42,10 +42,10 @@ class FloorContactMetric extends DeadBugMetricBase {
         // Legacy UI instruction copy: Hạ tay/chân gần sàn nhưng giữ lơ lửng, không chạm sàn.
         _instructionSet = true;
       }
-      if (!_faults.any((f) => f.type == 'FloorContact')) {
+      if (!_faults.any((f) => f.type == 'floor_contact')) {
         _faults.add(FaultRecord(
           phase: ctx.state.name,
-          type: 'FloorContact',
+          type: 'floor_contact',
           message: 'Tay hoặc chân chạm sàn',
           voiceMessage: 'Giữ tay và chân lơ lửng, đừng chạm sàn',
           affectsForm: true,

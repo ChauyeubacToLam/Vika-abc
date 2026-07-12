@@ -12,8 +12,21 @@ import 'metrics/rom_metric.dart';
 import 'metrics/knee_straightness_metric.dart';
 import 'metrics/tempo_metric.dart';
 import 'metrics/arm_position_metric.dart';
+import '../../voice/policy_voice_coach.dart';
+import '../../voice/voice_coach.dart';
+import '../../voice/voice_content.dart';
+import '../../voice/voice_policy.dart';
+import '../../voice/voice_sink.dart';
 
 class LegRaise extends ExerciseBase {
+  static const List<String> _voiceFaultIds = [
+    'pelvic',
+    'rom',
+    'knee',
+    'tempo',
+    'arms',
+  ];
+
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
       const <VikaImageOrientation>{
@@ -54,10 +67,30 @@ class LegRaise extends ExerciseBase {
   final Debouncer _loweringDebouncer = Debouncer(requiredFrames: 2);
   final Debouncer _lyingDebouncer = Debouncer(requiredFrames: 2);
 
-  LegRaise({required this.maxRep});
+  LegRaise({required this.maxRep}) : super(targetReps: maxRep);
 
   @override
   String get exerciseName => 'Leg Raises';
+
+  @override
+  List<FaultRecord> get liveFaults =>
+      [for (final metric in _metrics) ...metric.faults];
+
+  @override
+  ExerciseVoiceCoach createVoiceCoach() {
+    return PolicyVoiceCoach(
+      script: VoiceScript.from(
+        VoiceDefaults.repBased,
+        slug: 'leg_raises',
+        faultIds: _voiceFaultIds,
+      ),
+      targetReps: targetReps,
+      coach: VoiceCoach(
+        sink: AssetVoiceSink(),
+        policy: VoicePolicy(),
+      ),
+    );
+  }
 
   @override
   String get currentPhaseKey => state.toString().split('.').last;
@@ -496,7 +529,7 @@ class LegRaise extends ExerciseBase {
     if (!correctForm) resultIssues.feedback['Result'] = 'Fix Form';
 
     bool hasBlockingFormFault =
-        allFaults.any((f) => f.type == 'BentKnee' || f.type == 'ArmPosition');
+        allFaults.any((f) => f.type == 'knee' || f.type == 'arms');
     if (!hasBlockingFormFault) {
       repCount++;
       setFeedback.add({correctForm: faultMap});
@@ -507,11 +540,23 @@ class LegRaise extends ExerciseBase {
     }
 
     if (!hasBlockingFormFault) {
+      final faultAffectsForm = <String, bool>{};
+      final faultPriorities = <String, int>{};
+      for (final fault in allFaults) {
+        faultAffectsForm[fault.type] =
+            (faultAffectsForm[fault.type] ?? false) || fault.affectsForm;
+        final previousPriority = faultPriorities[fault.type];
+        if (previousPriority == null || fault.priority < previousPriority) {
+          faultPriorities[fault.type] = fault.priority;
+        }
+      }
       logger.addRepLog(
           RepLog(correctForm: correctForm, repNumber: repCount, data: {
         "min_hip_flexion": romMetric.minHipFlexion ?? 180.0,
         "lowering_time": tempoMetric.loweringDuration ?? 0.0,
-        "fault_types": allFaults.map((e) => e.type).toSet().toList()
+        "fault_types": allFaults.map((e) => e.type).toSet().toList(),
+        "fault_affects_form": faultAffectsForm,
+        "fault_priorities": faultPriorities,
       }));
     }
 

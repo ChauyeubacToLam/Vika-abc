@@ -39,7 +39,7 @@ class RearKneeDepthMetric extends WalkingMetricBase {
       if (normalizedDist > DEPTH_TOLERANCE) {
         addFault(
           FaultRecord(
-            type: 'shallow_lunge',
+            type: 'rear_depth',
             message: 'Đầu gối sau chưa đủ sâu! Hạ sát mặt đất hơn.',
             affectsForm: false, // Don't fail the rep, just warn
             phase: ctx.state.name,

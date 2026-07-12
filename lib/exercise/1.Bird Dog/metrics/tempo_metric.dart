@@ -56,7 +56,7 @@ class TempoMetric extends BirdDogMetricBase {
         holdDuration! < BirdDogTiming.holdTargetSeconds) {
       _faults.add(FaultRecord(
         phase: 'REP_COMPLETE',
-        type: 'Tempo',
+        type: 'hold',
         message:
             'Giữ chưa đủ ${BirdDogTiming.holdTargetShortLabel} (${holdDuration!.toStringAsFixed(1)}s)',
         voiceMessage:

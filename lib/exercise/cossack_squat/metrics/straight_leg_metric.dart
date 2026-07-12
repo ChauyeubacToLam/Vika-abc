@@ -26,7 +26,7 @@ class CossackStraightLegMetric extends CossackMetricBase {
       ctx.resultIssues.feedback['straight_leg'] = message;
       addFault(
         FaultRecord(
-          type: 'bent_straight_leg',
+          type: 'straight_leg',
           message:
               'Bạn đang thu hẹp tư thế, mất tác dụng kéo giãn cơ khép. Hãy giữ thẳng chân còn lại.',
           affectsForm: true,

@@ -88,10 +88,10 @@ class LungeHeelLiftMetric extends LungeMetricBase {
 
   void _logFault(String phase, String message, {String? voiceMessage}) {
     // Only log one fault per phase to avoid spam
-    if (!_faults.any((f) => f.phase == phase && f.type == 'Feet')) {
+    if (!_faults.any((f) => f.phase == phase && f.type == 'heel')) {
       _faults.add(FaultRecord(
         phase: phase,
-        type: 'Feet',
+        type: 'heel',
         message: message,
         voiceMessage: voiceMessage,
         priority: 0,

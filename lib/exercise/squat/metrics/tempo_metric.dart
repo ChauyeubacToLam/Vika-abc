@@ -253,7 +253,7 @@ class TempoMetric extends SquatMetricBase {
     if (!_faults.any((f) => f.phase == phase && f.message == message)) {
       _faults.add(FaultRecord(
         phase: phase,
-        type: 'Tempo',
+        type: 'tempo',
         message: message,
         affectsForm: true,
         voiceMessage: voiceMessage,

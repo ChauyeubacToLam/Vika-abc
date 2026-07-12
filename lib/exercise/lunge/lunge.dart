@@ -10,6 +10,11 @@ import 'metrics/lunge_trunk_lean_metric.dart';
 import 'metrics/lunge_heel_lift_metric.dart';
 import 'metrics/lunge_lumbar_proxy_metric.dart';
 import '../../utils/debouncer.dart';
+import '../../voice/policy_voice_coach.dart';
+import '../../voice/voice_coach.dart';
+import '../../voice/voice_content.dart';
+import '../../voice/voice_policy.dart';
+import '../../voice/voice_sink.dart';
 
 // --- Config ---
 
@@ -42,6 +47,13 @@ enum LungeState { standing, descending, bottom, ascending }
 // --- Lunge ---
 
 class Lunge extends ExerciseBase {
+  static const List<String> _voiceFaultIds = [
+    'depth',
+    'trunk',
+    'lumbar',
+    'heel',
+  ];
+
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
       const <VikaImageOrientation>{
@@ -50,7 +62,7 @@ class Lunge extends ExerciseBase {
 
   final int maxRep;
 
-  Lunge({this.maxRep = LungeConfig.MAX_REP});
+  Lunge({this.maxRep = LungeConfig.MAX_REP}) : super(targetReps: maxRep);
 
   LungeState lungeState = LungeState.standing;
   LungeState previousLungeState = LungeState.standing;
@@ -137,6 +149,26 @@ class Lunge extends ExerciseBase {
 
   @override
   String get exerciseName => 'Lunge';
+
+  @override
+  List<FaultRecord> get liveFaults =>
+      [for (final metric in _metrics) ...metric.faults];
+
+  @override
+  ExerciseVoiceCoach createVoiceCoach() {
+    return PolicyVoiceCoach(
+      script: VoiceScript.from(
+        VoiceDefaults.repBased,
+        slug: 'lunge',
+        faultIds: _voiceFaultIds,
+      ),
+      targetReps: targetReps,
+      coach: VoiceCoach(
+        sink: AssetVoiceSink(),
+        policy: VoicePolicy(),
+      ),
+    );
+  }
 
   @override
   String get currentPhaseKey => lungeState.toString().split('.').last;
@@ -413,6 +445,17 @@ class Lunge extends ExerciseBase {
       }
       setFeedback.add({correctForm: faultMap});
 
+      final faultAffectsForm = <String, bool>{};
+      final faultPriorities = <String, int>{};
+      for (final fault in allFaults) {
+        faultAffectsForm[fault.type] =
+            (faultAffectsForm[fault.type] ?? false) || fault.affectsForm;
+        final previousPriority = faultPriorities[fault.type];
+        if (previousPriority == null || fault.priority < previousPriority) {
+          faultPriorities[fault.type] = fault.priority;
+        }
+      }
+
       if (debugEnabled) {
         for (final metric in _metrics) {
           debugData.addAll(metric.debugData);
@@ -426,6 +469,8 @@ class Lunge extends ExerciseBase {
           "min_lead_knee_angle": depthMetric.minKneeAngle ?? leadKneeAngle,
           "max_trunk_lean": trunkLeanMetric.maxTrunkLean ?? trunkLean,
           "fault_types": allFaults.map((f) => f.type).toSet().toList(),
+          "fault_affects_form": faultAffectsForm,
+          "fault_priorities": faultPriorities,
         },
       ));
 

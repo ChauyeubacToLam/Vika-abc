@@ -34,10 +34,10 @@ class KneeStraightnessMetric extends LegRaiseMetricBase {
 
     if (_faultDebouncer.update(
         ctx.kneeStraightnessAngle < LegRaiseConfig.START_KNEE_STRAIGHT_MIN)) {
-      if (!_faults.any((f) => f.type == 'BentKnee')) {
+      if (!_faults.any((f) => f.type == 'knee')) {
         _faults.add(FaultRecord(
           phase: ctx.state.name,
-          type: 'BentKnee',
+          type: 'knee',
           message: 'Gập gối làm giảm áp lực cơ bụng',
           voiceMessage: 'Cố gắng duỗi thẳng gối ra nhé',
           affectsForm: true,

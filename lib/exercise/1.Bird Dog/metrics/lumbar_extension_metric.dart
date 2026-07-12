@@ -50,10 +50,10 @@ class LumbarExtensionMetric extends BirdDogMetricBase {
 
     if (_faultDebouncer.update(isHyperextending)) {
       ctx.resultIssues.feedback['Spine'] = 'Lưng bị võng!';
-      if (!_faults.any((f) => f.type == 'Lumbar')) {
+      if (!_faults.any((f) => f.type == 'lumbar')) {
         _faults.add(FaultRecord(
           phase: ctx.state.name,
-          type: 'Lumbar',
+          type: 'lumbar',
           message: 'Đưa chân quá cao gây võng lưng',
           voiceMessage: 'Hạ chân xuống ngang thân.',
           affectsForm: true,

@@ -47,10 +47,10 @@ class PelvicStabilityMetric extends LegRaiseMetricBase {
 
       // Nếu hông bị giật lên > 5% chiều dài thân (khoảng 2-3cm là rất nghiêm trọng ở khung chậu)
       if (_faultDebouncer.update(normalizedShift > 0.05)) {
-        if (!_faults.any((f) => f.type == 'PelvicInstability')) {
+        if (!_faults.any((f) => f.type == 'pelvic')) {
           _faults.add(FaultRecord(
             phase: ctx.state.name,
-            type: 'PelvicInstability',
+            type: 'pelvic',
             message: 'Khung chậu bất ổn / Võng lưng',
             voiceMessage:
                 'Võng lưng! Đừng hạ chân quá sâu nếu bạn không giữ được lưng sát sàn!',

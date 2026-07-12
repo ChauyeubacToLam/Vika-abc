@@ -1,12 +1,14 @@
 // ignore_for_file: non_constant_identifier_names, curly_braces_in_flow_control_structures
 import 'package:vika/utils/debouncer.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
-import '../../services/bird_dog_voice_assets.dart';
-import '../../services/generic_exercise_voice_assets.dart';
-import '../../services/queued_asset_voice_player.dart';
 import '../../utils/pose_math_helpers.dart';
 import '../../utils/exercise_logger.dart';
 import '../exercise_base.dart';
+import '../../voice/policy_voice_coach.dart';
+import '../../voice/voice_coach.dart';
+import '../../voice/voice_content.dart';
+import '../../voice/voice_policy.dart';
+import '../../voice/voice_sink.dart';
 import 'metrics/bird_dog_metric_base.dart';
 import 'metrics/lumbar_extension_metric.dart';
 import 'metrics/alignment_metric.dart';
@@ -31,6 +33,16 @@ class BirdDogConfig {
 }
 
 class BirdDog extends ExerciseBase {
+  static const List<String> _voiceFaultIds = [
+    'opposite_side',
+    'alternate',
+    'alignment',
+    'head',
+    'lumbar',
+    'hold',
+    'trunk',
+  ];
+
   final int maxRep;
   BirdDogState state = BirdDogState.neutral;
   BirdDogState previousState = BirdDogState.neutral;
@@ -67,7 +79,7 @@ class BirdDog extends ExerciseBase {
   bool? _lastPeakLeftLeg;
   bool? _lastPeakLeftArm;
 
-  BirdDog({required this.maxRep});
+  BirdDog({required this.maxRep}) : super(targetReps: maxRep);
 
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
@@ -80,7 +92,24 @@ class BirdDog extends ExerciseBase {
   String get exerciseName => 'Bird Dog';
 
   @override
-  ExerciseVoiceCoach? createVoiceCoach() => BirdDogVoiceCoach();
+  List<FaultRecord> get liveFaults =>
+      [for (final metric in _metrics) ...metric.faults];
+
+  @override
+  ExerciseVoiceCoach createVoiceCoach() {
+    return PolicyVoiceCoach(
+      script: VoiceScript.from(
+        VoiceDefaults.repBased,
+        slug: 'bird_dog',
+        faultIds: _voiceFaultIds,
+      ),
+      targetReps: targetReps,
+      coach: VoiceCoach(
+        sink: AssetVoiceSink(),
+        policy: VoicePolicy(),
+      ),
+    );
+  }
 
   @override
   String get currentPhaseKey => state.toString().split('.').last;
@@ -467,7 +496,7 @@ class BirdDog extends ExerciseBase {
     tempoMetric.evaluateRep(ctx);
     FaultRecord? tempoFault;
     for (final fault in tempoMetric.faults) {
-      if (fault.type == 'Tempo') {
+      if (fault.type == 'hold') {
         tempoFault = fault;
         break;
       }
@@ -496,10 +525,23 @@ class BirdDog extends ExerciseBase {
     lastRepWasClean = correctForm;
     if (!correctForm) resultIssues.feedback['Result'] = 'Sai Form';
 
+    final faultAffectsForm = <String, bool>{};
+    final faultPriorities = <String, int>{};
+    for (final fault in allFaults) {
+      faultAffectsForm[fault.type] =
+          (faultAffectsForm[fault.type] ?? false) || fault.affectsForm;
+      final previousPriority = faultPriorities[fault.type];
+      if (previousPriority == null || fault.priority < previousPriority) {
+        faultPriorities[fault.type] = fault.priority;
+      }
+    }
+
     logger
         .addRepLog(RepLog(correctForm: correctForm, repNumber: repCount, data: {
       "hold_time": tempoMetric.holdDuration ?? 0,
-      "fault_types": allFaults.map((e) => e.type).toSet().toList()
+      "fault_types": allFaults.map((e) => e.type).toSet().toList(),
+      "fault_affects_form": faultAffectsForm,
+      "fault_priorities": faultPriorities,
     }));
 
     _resetRepState();
@@ -533,7 +575,7 @@ class BirdDog extends ExerciseBase {
   FaultRecord _shortHoldFault(double holdSeconds) {
     return FaultRecord(
       phase: state.name,
-      type: 'Tempo',
+      type: 'hold',
       message:
           'Giữ chưa đủ ${BirdDogTiming.holdTargetShortLabel} (${holdSeconds.toStringAsFixed(1)}s)',
       voiceMessage:
@@ -564,7 +606,7 @@ class BirdDog extends ExerciseBase {
     if (ctx.isSameSide) {
       return FaultRecord(
         phase: ctx.state.name,
-        type: 'SameSide',
+        type: 'opposite_side',
         message: 'Không cùng tay cùng chân',
         voiceMessage: 'Giơ tay và chân đối diện.',
         affectsForm: true,
@@ -581,7 +623,7 @@ class BirdDog extends ExerciseBase {
     if (repeatedLeg || repeatedArm) {
       return FaultRecord(
         phase: ctx.state.name,
-        type: 'NotAlternating',
+        type: 'alternate',
         message: 'Chưa luân phiên tay và chân',
         voiceMessage: 'Đổi sang bên còn lại.',
         affectsForm: true,
@@ -609,320 +651,5 @@ class BirdDog extends ExerciseBase {
     // Xóa snapshot để chu trình sau nhận diện lại từ đầu
     _peakLeftLeg = null;
     _peakLeftArm = null;
-  }
-}
-
-abstract class BirdDogVoicePlayer {
-  Future<void> speak(String text);
-  Future<void> waitUntilIdle({Duration timeout = const Duration(seconds: 4)}) {
-    return Future<void>.value();
-  }
-
-  void clearQueue();
-  void clearPendingButKeepCurrent();
-  void dispose() {}
-}
-
-class _BirdDogAssetVoicePlayer implements BirdDogVoicePlayer {
-  _BirdDogAssetVoicePlayer({QueuedAssetVoicePlayer? player})
-      : _player = player ??
-            QueuedAssetVoicePlayer(
-              assetMap: {
-                ...GenericExerciseVoiceAssets.commonFiles,
-                ...BirdDogVoiceAssets.files,
-              },
-              assetSourcePrefix: BirdDogVoiceAssets.assetSourcePrefix,
-              assetBundlePrefix: BirdDogVoiceAssets.assetBundlePrefix,
-              assetResolver: GenericExerciseVoiceAssets.resolveAsset,
-              logTag: 'BirdDogVoice',
-            );
-
-  final QueuedAssetVoicePlayer _player;
-
-  @override
-  Future<void> speak(String text) => _player.speak(text);
-
-  @override
-  Future<void> waitUntilIdle({
-    Duration timeout = const Duration(seconds: 4),
-  }) =>
-      _player.waitUntilIdle(timeout: timeout);
-
-  @override
-  void clearQueue() => _player.clearQueue();
-
-  @override
-  void clearPendingButKeepCurrent() => _player.clearPendingButKeepCurrent();
-
-  @override
-  void dispose() => _player.dispose();
-}
-
-class BirdDogVoiceCoach implements ExerciseVoiceCoach {
-  BirdDogVoiceCoach({BirdDogVoicePlayer? voicePlayer})
-      : _voicePlayer = voicePlayer ?? _BirdDogAssetVoicePlayer();
-
-  // ignore: unused_field
-  static const String _setupIntro =
-      'Đặt điện thoại hơi chéo để thấy toàn thân trên thảm.';
-  static const String _setupPosition =
-      'Chống hai tay và hai gối. Tay dưới vai, gối dưới hông, lưng phẳng.';
-  static const String _activeIntro =
-      'Giơ tay và chân đối diện. Vươn dài. Giữ 2 giây rồi đổi bên.';
-  static const String _setNextSetup =
-      'Hiệp này chống lại bốn điểm. Lưng phẳng, tay dưới vai.';
-  static const String _noCount = 'Lần này chưa tính.';
-  static const String _ready = 'Sẵn sàng.';
-  static const String _complete = 'Hoàn thành bài tập.';
-  static const String _goodClean = 'common.correct';
-
-  static const String _faultOppositeSide = 'Giơ tay và chân đối diện.';
-  static const String _faultAlternate = 'Đổi sang bên còn lại.';
-  static const String _faultAlignment = 'Vươn dài tay và chân.';
-  static const String _faultHead = 'Nâng đầu nhẹ, mắt nhìn xuống thảm.';
-  static const String _faultLumbar = 'Hạ chân xuống ngang thân.';
-  static const String _faultHold = 'Giữ 2 giây ở điểm cao nhất.';
-  static const String _faultTrunk = 'Siết bụng, giữ hông cân bằng.';
-
-  static final Map<String, int> _previousSetFaultCounts = {};
-
-  final BirdDogVoicePlayer _voicePlayer;
-  final Map<String, int> _setFaultCounts = {};
-
-  int _lastRepCount = 0;
-  int _lastInvalidAttemptCount = 0;
-  bool _didSpeakSetupIntro = false;
-  bool _didSpeakReady = false;
-  bool _didSpeakPreviousSetAdvice = false;
-  bool _didSpeakSetComplete = false;
-
-  @override
-  void processFrame({
-    required ExerciseBase exercise,
-    required int repCount,
-    required bool hasPose,
-    required Map<String, String> feedback,
-  }) {
-    if (exercise is! BirdDog) return;
-
-    final repIncreased = repCount > _lastRepCount;
-    final invalidAttemptIncreased =
-        exercise.invalidAttemptCount > _lastInvalidAttemptCount;
-
-    if (exercise.exerciseState == ExerciseState.completed) {
-      if (!_didSpeakSetComplete) {
-        _voicePlayer.clearPendingButKeepCurrent();
-        if (repIncreased) {
-          _speakRepOutcome(exercise, repCount);
-        } else if (invalidAttemptIncreased) {
-          _speakInvalidAttemptOutcome(exercise);
-        }
-      }
-      _handleSetComplete();
-      _lastRepCount = repCount;
-      _lastInvalidAttemptCount = exercise.invalidAttemptCount;
-      return;
-    }
-
-    if (exercise.exerciseState == ExerciseState.notActivated) {
-      _handleSetup(exercise);
-      _lastRepCount = repCount;
-      _lastInvalidAttemptCount = exercise.invalidAttemptCount;
-      return;
-    }
-
-    if (exercise.exerciseState != ExerciseState.activated ||
-        exercise.isPaused ||
-        !hasPose) {
-      _lastRepCount = repCount;
-      _lastInvalidAttemptCount = exercise.invalidAttemptCount;
-      return;
-    }
-
-    if (!_didSpeakReady) {
-      _voicePlayer.speak(_ready);
-      _didSpeakReady = true;
-    }
-
-    _speakPreviousSetAdviceIfNeeded();
-
-    if (repIncreased) {
-      _handleRepComplete(exercise, repCount);
-      _lastRepCount = repCount;
-      _lastInvalidAttemptCount = exercise.invalidAttemptCount;
-      return;
-    }
-
-    if (invalidAttemptIncreased) {
-      _handleInvalidAttempt(exercise);
-      _lastRepCount = repCount;
-      _lastInvalidAttemptCount = exercise.invalidAttemptCount;
-      return;
-    }
-
-    _lastRepCount = repCount;
-    _lastInvalidAttemptCount = exercise.invalidAttemptCount;
-  }
-
-  void _handleSetup(BirdDog exercise) {
-    if (!_didSpeakSetupIntro) {
-      _voicePlayer.speak(exercise.setupOrientationIntroVoiceKey);
-      _voicePlayer.speak(_setupPosition);
-      _voicePlayer.speak(_activeIntro);
-      _speakPreviousSetAdviceIfNeeded();
-      _didSpeakSetupIntro = true;
-    }
-  }
-
-  void _handleRepComplete(BirdDog exercise, int repCount) {
-    _voicePlayer.clearPendingButKeepCurrent();
-    _speakRepOutcome(exercise, repCount);
-  }
-
-  void _speakRepOutcome(BirdDog exercise, int repCount) {
-    _voicePlayer.speak('$repCount');
-
-    if (exercise.lastRepWasClean) {
-      _voicePlayer.speak(_goodClean);
-      return;
-    }
-
-    for (final rawMessage in exercise.lastRepFaultVoiceMessages.take(2)) {
-      final voice = _immediateVoiceForRaw(rawMessage);
-      final faultId = _faultIdForVoice(voice);
-      if (voice == null || faultId == null) continue;
-      _setFaultCounts[faultId] = (_setFaultCounts[faultId] ?? 0) + 1;
-    }
-
-    final topAdvice = _immediateVoiceForRaw(exercise.lastRepTopVoiceMessage);
-    if (topAdvice != null) {
-      _voicePlayer.speak(topAdvice);
-    } else {
-      _voicePlayer.speak('common.fix_pose');
-    }
-  }
-
-  void _handleInvalidAttempt(BirdDog exercise) {
-    _voicePlayer.clearPendingButKeepCurrent();
-    _speakInvalidAttemptOutcome(exercise);
-  }
-
-  void _speakInvalidAttemptOutcome(BirdDog exercise) {
-    _voicePlayer.speak(_noCount);
-
-    final topAdvice = _immediateVoiceForRaw(exercise.lastRepTopVoiceMessage);
-    if (topAdvice != null) {
-      final faultId = _faultIdForVoice(topAdvice);
-      if (faultId != null) {
-        _setFaultCounts[faultId] = (_setFaultCounts[faultId] ?? 0) + 1;
-      }
-      _voicePlayer.speak(topAdvice);
-    } else {
-      _voicePlayer.speak('common.fix_pose');
-    }
-  }
-
-  void _handleSetComplete() {
-    if (_didSpeakSetComplete) return;
-
-    _voicePlayer.speak(_complete);
-
-    _previousSetFaultCounts
-      ..clear()
-      ..addAll(_setFaultCounts);
-
-    _didSpeakSetComplete = true;
-  }
-
-  String? _topPreviousSetAdvice() {
-    if (_previousSetFaultCounts.isEmpty) return null;
-    final sorted = _previousSetFaultCounts.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-    return _setNextVoiceForId(sorted.first.key);
-  }
-
-  void _speakPreviousSetAdviceIfNeeded() {
-    if (_didSpeakPreviousSetAdvice || _previousSetFaultCounts.isEmpty) return;
-
-    final advice = _topPreviousSetAdvice();
-    _voicePlayer.speak(_setNextSetup);
-    if (advice != null) {
-      _voicePlayer.speak(advice);
-    }
-    _didSpeakPreviousSetAdvice = true;
-  }
-
-  String? _immediateVoiceForRaw(String? raw) {
-    final value = raw?.trim();
-    if (value == null || value.isEmpty) return null;
-    if (BirdDogVoiceAssets.files.containsKey(value)) return value;
-
-    if (value.contains('đối diện') ||
-        value.contains('cùng tay') ||
-        value.contains('cùng chân')) {
-      return _faultOppositeSide;
-    }
-    if (value.contains('còn lại') || value.contains('luân phiên')) {
-      return _faultAlternate;
-    }
-    if (value.contains('Vươn dài') || value.contains('duỗi')) {
-      return _faultAlignment;
-    }
-    if (value.contains('Nâng đầu') || value.contains('cúi đầu')) {
-      return _faultHead;
-    }
-    if (value.contains('Hạ chân') ||
-        value.contains('Hạ thấp chân') ||
-        value.contains('võng')) {
-      return _faultLumbar;
-    }
-    if (value.contains('2 giây') ||
-        value.contains('2s') ||
-        value.contains('5 giây') ||
-        value.contains('5s')) {
-      return _faultHold;
-    }
-    if (value.contains('bụng') || value.contains('hông')) {
-      return _faultTrunk;
-    }
-    return null;
-  }
-
-  String? _faultIdForVoice(String? voice) {
-    if (voice == _faultOppositeSide) return 'opposite_side';
-    if (voice == _faultAlternate) return 'alternate';
-    if (voice == _faultAlignment) return 'alignment';
-    if (voice == _faultHead) return 'head';
-    if (voice == _faultLumbar) return 'lumbar';
-    if (voice == _faultHold) return 'hold';
-    if (voice == _faultTrunk) return 'trunk';
-    return null;
-  }
-
-  String? _setNextVoiceForId(String faultId) {
-    return switch (faultId) {
-      'opposite_side' => 'Hiệp này đừng giơ cùng bên.',
-      'alternate' => 'Hiệp này đổi bên sau mỗi lần.',
-      'alignment' => 'Hiệp này giữ tay chân thẳng hơn.',
-      'head' => 'Hiệp này đừng cúi đầu quá thấp.',
-      'lumbar' => 'Hiệp này đừng đá chân quá cao.',
-      'hold' => 'Hiệp này giữ đủ lâu rồi mới hạ.',
-      'trunk' => 'Hiệp này đừng để hông lệch.',
-      _ => null,
-    };
-  }
-
-  @override
-  Future<void> waitUntilIdle({
-    Duration timeout = const Duration(seconds: 4),
-  }) {
-    return _voicePlayer.waitUntilIdle(timeout: timeout);
-  }
-
-  @override
-  void dispose() {
-    _voicePlayer.clearQueue();
-    _voicePlayer.dispose();
-    _setFaultCounts.clear();
   }
 }

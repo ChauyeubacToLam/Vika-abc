@@ -42,10 +42,10 @@ class AntiExtensionMetric extends DeadBugMetricBase {
 
         // Nhấc quá 5% chiều dài lưng
         if (_faultDebouncer.update(hipLift > 0.05)) {
-          if (!_faults.any((f) => f.type == 'AntiExtension')) {
+          if (!_faults.any((f) => f.type == 'anti_extension')) {
             _faults.add(FaultRecord(
               phase: ctx.state.name,
-              type: 'AntiExtension',
+              type: 'anti_extension',
               message: 'Lưng bị cong khỏi mặt sàn',
               voiceMessage:
                   'Lưng bị cong! Hãy gồng bụng ép chặt thắt lưng xuống sàn!',

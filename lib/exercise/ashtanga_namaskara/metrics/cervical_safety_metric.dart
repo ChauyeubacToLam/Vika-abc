@@ -57,7 +57,7 @@ class CervicalSafetyMetric extends AshtangaMetricBase {
         // Legacy UI instruction copy: Đặt cằm xuống nhẹ, giữ cổ thoải mái.
         _instructionSet = true;
       }
-      _logFault(ctx.state.name, 'Neck cranked upward', 'CervicalDanger');
+      _logFault(ctx.state.name, 'Neck cranked upward', 'neck');
     } else if (angle >= _goodMin) {
       ctx.resultIssues.feedback['Neck'] = 'Cổ thoải mái ✓';
     }

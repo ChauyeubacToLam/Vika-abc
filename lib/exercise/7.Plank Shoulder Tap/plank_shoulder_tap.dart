@@ -9,11 +9,23 @@ import 'metrics/hip_rotation_metric.dart';
 import 'metrics/trunk_alignment_metric.dart';
 import 'metrics/clear_tap_metric.dart';
 import 'metrics/tap_tempo_metric.dart';
+import '../../voice/policy_voice_coach.dart';
+import '../../voice/voice_coach.dart';
+import '../../voice/voice_content.dart';
+import '../../voice/voice_policy.dart';
+import '../../voice/voice_sink.dart';
 
 enum TappingSide { none, leftHandToRight, rightHandToLeft }
 
 class PlankShoulderTap extends ExerciseBase {
-  PlankShoulderTap({required this.maxRep});
+  static const List<String> _voiceFaultIds = [
+    'hip_rotation',
+    'tap',
+    'tempo',
+    'trunk',
+  ];
+
+  PlankShoulderTap({required this.maxRep}) : super(targetReps: maxRep);
 
   final int maxRep;
 
@@ -26,6 +38,26 @@ class PlankShoulderTap extends ExerciseBase {
 
   @override
   String get exerciseName => 'Plank Shoulder Tap';
+
+  @override
+  List<FaultRecord> get liveFaults =>
+      [for (final metric in _metrics) ...metric.faults];
+
+  @override
+  ExerciseVoiceCoach createVoiceCoach() {
+    return PolicyVoiceCoach(
+      script: VoiceScript.from(
+        VoiceDefaults.repBased,
+        slug: 'plank_shoulder_tap',
+        faultIds: _voiceFaultIds,
+      ),
+      targetReps: targetReps,
+      coach: VoiceCoach(
+        sink: AssetVoiceSink(),
+        policy: VoicePolicy(),
+      ),
+    );
+  }
 
   @override
   String get currentPhaseKey => tapState.toString().split('.').last;
@@ -287,11 +319,23 @@ class PlankShoulderTap extends ExerciseBase {
       correctForm = !allFaults.any((f) => f.affectsForm);
       lastTappedSide = currentTappingSide;
       setFeedback.add({correctForm: faultMap});
+      final faultAffectsForm = <String, bool>{};
+      final faultPriorities = <String, int>{};
+      for (final fault in allFaults) {
+        faultAffectsForm[fault.type] =
+            (faultAffectsForm[fault.type] ?? false) || fault.affectsForm;
+        final previousPriority = faultPriorities[fault.type];
+        if (previousPriority == null || fault.priority < previousPriority) {
+          faultPriorities[fault.type] = fault.priority;
+        }
+      }
       logger.addRepLog(RepLog(
         correctForm: correctForm,
         repNumber: repCount,
         data: {
           "fault_types": allFaults.map((f) => f.type).toSet().toList(),
+          "fault_affects_form": faultAffectsForm,
+          "fault_priorities": faultPriorities,
         },
       ));
     } else {

@@ -22,10 +22,10 @@ class TrunkAlignmentMetric extends PlankTapMetricBase {
 
     if (_sagDebouncer.update(isSagging)) {
       ctx.resultIssues.feedback['Spine'] = 'Võng lưng/Chổng mông!';
-      if (!_faults.any((f) => f.type == 'TrunkSag')) {
+      if (!_faults.any((f) => f.type == 'trunk')) {
         _faults.add(FaultRecord(
             phase: ctx.state.name.toUpperCase(),
-            type: 'TrunkSag',
+            type: 'trunk',
             message: 'Mất trục lưng thẳng',
             affectsForm: true,
             priority: PlankTapVoicePriority.trunkAlignment,

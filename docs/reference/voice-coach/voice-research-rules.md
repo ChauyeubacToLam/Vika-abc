@@ -278,6 +278,88 @@ same trust level as §3. Decision status: OPEN, awaiting Nam's call (see decisio
 - No trial on breathing-cue timing/taper in strength training; no frequency data for breathing cues
   in general PT sessions; no Vietnam/SEA PT breathing-norm data (yoga marketing only, two searches).
 
+## 3d. Cue wording / copywriting deep-dive (2026-07-11 run)
+
+Triggered by the fleet-scaling need for a string-writing skill (so any model can write correct
+coaching lines for new exercises). Single-pass capped Sonnet run (~15 searches / ~10 fetches);
+claims carry the run's own confidence tags and were NOT independently re-verified — same trust
+level as §3. Scope: HOW to word lines (§1–§3b cover WHEN to speak; not repeated here).
+
+### Cue construction (the [action] slot)
+
+- **External focus phrasing**: direct attention to the movement's effect on the environment, not
+  body mechanics ("push the floor away" > "extend your knees"). The load-bearing, heavily
+  replicated finding. High — Wulf 2013 review (snippet only, primary PDF not fetched).
+- **Winkelman 3D cue anatomy** (The Language of Coaching): verb (push/drive/press) + directional
+  preposition (up/away/toward) + concrete target (the floor, the ceiling). High — scienceforsport.com
+  fetched, corroborated by a second practitioner source (snippet).
+- Distance nuance: novices respond better to NEAR external targets, skilled movers to FAR ones.
+  Med — less replicated sub-finding.
+- **Brevity**: no empirical word count exists (sources contradict: "1-2 words" vs "3+"). The rule
+  is "one verb + one target, as short as possible while specific", not a numeric cap. High for the
+  principle, Low for any specific number.
+- Verb-first imperative structure: practitioner consensus, never RCT-tested. Med.
+- **Analogy/imagery cues** (Masters implicit-learning lineage): a single concrete image compresses
+  a movement rule and resists breakdown under fatigue/pressure; effectively a one-image external
+  cue. High for mechanism, Med for magnitude vs plain external cues.
+- **Positive/target framing over negation**: "đừng/không [X]" still primes the wrong image and
+  names no replacement; always state the target behavior. Med-High for the practice; Low for
+  rigorous causal evidence on the "don't" wording itself. (Reinforces §3b's framing rule.)
+
+### Motivational language (SDT / praise)
+
+- Mageau & Vallerand 2003 autonomy-supportive coach model: choice within limits, brief rationale
+  for tasks, acknowledge perspective, NON-CONTROLLING competence feedback, no guilt/conditional
+  regard. Canonical citation but primary PDF unparseable — snippet-verified only. Med.
+- **Process praise > person praise** (Dweck lineage): praise the specific action/effort ("hông lên
+  đủ cao"), never a trait ("bạn giỏi quá"). High in the child-development literature, Low for the
+  adult-fitness transfer — reasonable analogical extension, not a validated finding.
+- Praise specificity: generic "great job" alone is explicitly insufficient; name the measured
+  thing done well. Med. (Aligns with the data-honesty guardrail.)
+
+### Commercial voice-coach copy (weakest area)
+
+- No published style guide, line taxonomy, or UX-writing teardown exists for Peloton / Apple
+  Fitness+ / NTC / Freeletics copy (15 searches). What exists is production-process description:
+  Peloton pre-cues upcoming effort during rest, repeats key vocabulary, scripts with producers
+  (Med, blog sources); Apple runs an "audio-alone followability" pass (Med). Nothing line-level.
+
+### Vietnamese register
+
+- **Particles**: `nhé`/`nha` (N/S variants) soften a command into a warm suggestion; bare `đi`/`nào`
+  read as blunt commands — wrong register for corrections. `ạ` = deference, stackable. Med-High,
+  one source fetched. Fully consistent with the existing "…nhé." templates — no contradiction.
+- **Pronoun FLAG (design tension, unresolved)**: three independent (non-academic, expat-facing)
+  sources converge that `bạn` is a peer/youth/advertising register that can read "customer-service
+  bot" to older adults; the natural VN service/coach register is age-matched `anh`/`chị`/`em`
+  (erring older as flattery); VN TTS vendors build anh/chị/em selection for this reason. Med.
+  Countervailing: Vika can't always know age/gender, and anh/chị variants would multiply the
+  recorded-audio fleet per line. Treat `bạn` as a considered simplification, not the linguistically
+  warmest default — a conscious call for Nam, not a silent convention.
+- Vietnamese PT phrasing conventions: NOTHING found, searched in Vietnamese directly ("huấn luyện
+  viên cá nhân cách nói động viên…") — confirmed absence, only generic what-is-a-PT pages.
+- VN correction-softening beyond particles: no dedicated source; particle mechanism applied by
+  inference.
+
+### Line-type taxonomy (coaching science)
+
+- CBAS (Smith, Smoll & Hunt 1977): 12 categories, reactive (reinforcement, mistake-contingent
+  encouragement, mistake-contingent technical instruction, punishment, ignoring…) vs spontaneous
+  (general technical instruction, general encouragement, organization). High reinforcement +
+  mistake-contingent-encouragement frequency correlates with enjoyment and lower dropout — pair
+  corrections with encouragement. Med — category names corroborated, primary PDFs unfetchable.
+- CAIS (Cushion 2012): 23 behaviors; instruction / feedback / questioning are structurally
+  distinct. Med, snippet only.
+- Net 4-bucket shape for a copy rulebook: (1) technical instruction, (2) corrective feedback,
+  (3) reinforcement/encouragement, (4) organization. Maps onto Vika's existing cue types.
+
+### Gaps (searched, not found)
+
+- No empirical cue word-count; no commercial copy style guides; no VN PT phrasing sources (in
+  Vietnamese or English); no VN correction-softening study; Wulf + Mageau & Vallerand + CBAS
+  primary sources all unfetchable (snippet/secondary-verified only); Ntoumanis controlling-language
+  sources 403'd (search-synthesis only, one layer more removed).
+
 ## 4. Verification notes
 
 - Claim 1 (silent monitoring 21.99%, most frequent behavior) — **confirmed**, exact figure matches source (PubMed 12173963).

@@ -33,7 +33,7 @@ class StepLengthMetric extends WalkingMetricBase {
     if (diff > TOLERANCE) {
       addFault(
         FaultRecord(
-          type: 'inconsistent_step',
+          type: 'step_length',
           message:
               'Sải bước không đều! Hãy cố gắng duy trì độ dài bước chân ổn định.',
           affectsForm: false,

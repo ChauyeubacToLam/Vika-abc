@@ -12,10 +12,10 @@ class LimbElevationMetric extends SupermanMetricBase {
     if (ctx.currentState != SupermanState.hold) return;
 
     if (ctx.armElevation < SupermanConfig.LIFT_THRESHOLD) {
-      if (!faults.any((f) => f.type == 'ArmTooLow')) {
+      if (!faults.any((f) => f.type == 'elevation_arm')) {
         addFault(FaultRecord(
           phase: ctx.currentState.name,
-          type: 'ArmTooLow',
+          type: 'elevation_arm',
           message: 'Nâng tay cao hơn!',
           voiceMessage: 'Nâng tay lên cao hơn',
           affectsForm: true,
@@ -25,10 +25,10 @@ class LimbElevationMetric extends SupermanMetricBase {
       }
     }
     if (ctx.legElevation < SupermanConfig.LIFT_THRESHOLD) {
-      if (!faults.any((f) => f.type == 'LegTooLow')) {
+      if (!faults.any((f) => f.type == 'elevation_leg')) {
         addFault(FaultRecord(
           phase: ctx.currentState.name,
-          type: 'LegTooLow',
+          type: 'elevation_leg',
           message: 'Nâng chân cao hơn!',
           voiceMessage: 'Nâng chân lên cao hơn',
           affectsForm: true,

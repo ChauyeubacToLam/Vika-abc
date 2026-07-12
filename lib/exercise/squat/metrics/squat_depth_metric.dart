@@ -111,10 +111,10 @@ class DepthMetric extends SquatMetricBase {
     String? voiceMessage,
     required int priority,
   }) {
-    if (!_faults.any((f) => f.phase == phase && f.type == 'Depth')) {
+    if (!_faults.any((f) => f.phase == phase && f.type == 'depth')) {
       _faults.add(FaultRecord(
         phase: phase,
-        type: 'Depth',
+        type: 'depth',
         message: message,
         affectsForm: true,
         voiceMessage: voiceMessage,

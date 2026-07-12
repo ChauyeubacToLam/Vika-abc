@@ -6,6 +6,12 @@ Design / how-it-works -> the owning reference doc. If this file only grows, it's
 
 ## Now
 
+**Voice copy-writing skill — WRITTEN (07-11), Nam text-review pending, UNCOMMITTED.**
+`.agents/skills/voice-copy/SKILL.md`: grounding steps, cue formula (external target + no-assumption
+fence), per-slot templates, register, data honesty. Calls locked in decisions.md 07-11 "Voice-copy
+skill"; research basis voice-research-rules.md §3d. Follow-up (non-blocking): check pending
+un-recorded missing-audio.md lines against the formula before recording.
+
 **Voice coach — glute-bridge pilot: COMPLETE (07-11), device-approved, UNCOMMITTED.**
 Nam device-tested the full glute bridge 07-11: "good enough, call it done." All behavior landed and
 green (analyze clean; voice + exercise suites ~241 green). The "why" for every call lives in
@@ -24,13 +30,46 @@ Device-log observability across all cues (`[Voice]` / `[VoiceGuard]` / `[VoiceSe
   "done."
 - **OPEN (non-blocking):** (a) hustle uses a stochastic post-fire backoff (`postFireIdlePenalty: 2`),
   NOT a hard rep cooldown — Codex's deliberate anti-metronome call, ~10% back-to-back vs 0%; Nam to
-  confirm or override (decisions.md 07-11 "hustle backoff + metric tightening"). (b) praise relief valve
-  — spec'd, never built; Nam to drop-from-spec or build. (c) watch the tightened non-neck metrics for
-  over-firing on the next device run before tightening further.
-- **PARKED (post-pilot):** fleet rollout (~35 exercises); delete the 2 remaining rejected
-  `kDefaultTuning` rows (criticalFault relief-4, praise 0.35 + D8 — count row already fixed); no-count
-  cue type + behavior; per-rep speak-only-top-fault; multi-set intro dedupe (intro once per exercise).
+  confirm or override (decisions.md 07-11 "hustle backoff + metric tightening"). (b) watch the
+  tightened non-neck metrics for over-firing on the next device run before tightening further.
+  (Praise relief valve RESOLVED 07-11: dropped from spec, never to be built — decisions.md.)
+- **PARKED (post-pilot):** delete the 2 remaining rejected `kDefaultTuning` rows (criticalFault
+  relief-4, praise 0.35 + D8 — count row already fixed); no-count cue type + behavior; per-rep
+  speak-only-top-fault; multi-set intro dedupe (intro once per exercise).
+
+**Voice fleet rollout — Tier 1 IMPLEMENTED (07-11), review pending, UNCOMMITTED.** All 24 in-scope
+rep exercises now select the rep-based policy bundle explicitly, inherit `targetReps`, write the
+three-key RepLog fault contract, and use normalized snake_case detector ids. Current faults are exposed
+for 23/24; Tricep Dip is the deliberate exception because its metric objects are never driven by the
+exercise, so Tier 1 provides setup/count/praise there without claiming fault detection. This fixes the
+Superman / Plank Up-Down / Walking Lunge time-based-bundle bug and the fleet-wide type/id filter bug.
+The obsolete bespoke exercise coaches and their isolated tests are removed after zero-call-site checks.
+No shared voice-engine code, detector thresholds, `affectsForm` values, hold exercises, Surya, Glute
+Bridge, or audio assets changed. Decision surface + code contradictions:
+`docs/reference/voice-coach/voice-fleet-tier1-review.html`; asset gaps:
+`docs/reference/voice-coach/missing-audio.md`. Scoped exercise/voice tests: 248 green; analyze clean.
+Full suite: 434 passed / 6 failed, all six the documented pre-existing 12px workout-summary overflow
+cluster; no fleet test failed.
+Tier 2 (soft pools, reminders, hustle keys) waits on Nam's table rulings. Tier-3 design calls remain
+parked: Jump Squat 3-phase effort, Burpee phase semantics, Russian Twist two-half reps, Mountain
+Climber per-side types.
 - **Device residual** (from the 07-10 UI-instruction removal): plank rest-ring/hold-cue visuals → next device smoke.
+
+**Hold-based voice — behavior DECIDED (07-11), implementation NOT started.** Nam ruled via the
+hold-design lavish review + chat; full record: decisions.md 07-11 "Hold-based voice behavior LOCKED",
+behavior spec § Hold-based exercises, design doc hold-exercise-voice-design.html (v2). Shape:
+pose-gated clock (only cheating stops earning — reverses High Plank's perfect-timer), voice milestones
+(halfway + "còn 10 giây", speaks remaining, UI ring untouched), final-3 earcon beeps + end tone (no
+spoken countdown, no tick v1), milestone praise/hustle switch, real-time faults with hold-EPISODE
+bookkeeping, 90s timeout deleted, sets hybrid (High Plank joins the multi-set flow). High Plank pilot.
+- **NEXT:** Codex implements from docs/scratch/hold-voice-impl-spec.md (authoring in flight 07-11);
+  audio wordings parked until structure lands (master record list in missing-audio.md; new lines follow
+  the voice-copy skill).
+- **NEXT (data, Nam runs):** hold catalog rows are still single-set (base_sets=1 everywhere; plank/
+  cobra/warrior_one mis-encode hold count in base_reps). Normalization SQL drafted →
+  docs/scratch/hold-catalog-hybrid-fix.sql (provisional set counts, preserves volume intent; stretch
+  poses untouched pending PT). Must apply BEFORE the hold pilot's device test or High Plank launches
+  1×20s. Code path already consumes sets×seconds correctly — data-only fix.
 
 **PresenceGate extraction (2026-07-05): SHIPPED, device smoke pending.** `lib/exercise/presence_gate.dart`
 extracted from `ExerciseBase` (~200 lines lighter), `PosePresenceSource` on `PersonDetector`, analyze

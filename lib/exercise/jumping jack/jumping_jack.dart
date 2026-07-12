@@ -7,7 +7,11 @@ import 'package:vika/utils/debouncer.dart';
 import '../../utils/pose_math_helpers.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/exercise_logger.dart';
-import '../../services/jumping_jack_voice_coach.dart';
+import '../../voice/policy_voice_coach.dart';
+import '../../voice/voice_coach.dart';
+import '../../voice/voice_content.dart';
+import '../../voice/voice_policy.dart';
+import '../../voice/voice_sink.dart';
 
 import '../exercise_base.dart';
 import 'metrics/jumping_jack_metric_base.dart';
@@ -30,6 +34,12 @@ enum JJState { closed, open }
 // --- Jumping Jack (front-view exercise) ---
 
 class JumpingJack extends ExerciseBase {
+  static const List<String> _voiceFaultIds = [
+    'arms',
+    'legs',
+    'tempo_fast',
+  ];
+
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
       const <VikaImageOrientation>{
@@ -38,7 +48,7 @@ class JumpingJack extends ExerciseBase {
 
   final int maxRep;
 
-  JumpingJack({required this.maxRep});
+  JumpingJack({required this.maxRep}) : super(targetReps: maxRep);
 
   JJState jjState = JJState.closed;
   JJState previousJJState = JJState.closed;
@@ -67,7 +77,24 @@ class JumpingJack extends ExerciseBase {
   String get exerciseName => 'Nhảy Dạng';
 
   @override
-  ExerciseVoiceCoach? createVoiceCoach() => JumpingJackVoiceCoach();
+  List<FaultRecord> get liveFaults =>
+      [for (final metric in _metrics) ...metric.faults];
+
+  @override
+  ExerciseVoiceCoach createVoiceCoach() {
+    return PolicyVoiceCoach(
+      script: VoiceScript.from(
+        VoiceDefaults.repBased,
+        slug: 'jumping_jack',
+        faultIds: _voiceFaultIds,
+      ),
+      targetReps: targetReps,
+      coach: VoiceCoach(
+        sink: AssetVoiceSink(),
+        policy: VoicePolicy(),
+      ),
+    );
+  }
 
   @override
   String get currentPhaseKey => jjState.toString().split('.').last;
@@ -333,12 +360,25 @@ class JumpingJack extends ExerciseBase {
             '${tempoMetric.lastRepDuration!.toStringAsFixed(1)}s';
       }
 
+      final faultAffectsForm = <String, bool>{};
+      final faultPriorities = <String, int>{};
+      for (final fault in allFaults) {
+        faultAffectsForm[fault.type] =
+            (faultAffectsForm[fault.type] ?? false) || fault.affectsForm;
+        final previousPriority = faultPriorities[fault.type];
+        if (previousPriority == null || fault.priority < previousPriority) {
+          faultPriorities[fault.type] = fault.priority;
+        }
+      }
+
       logger.addRepLog(RepLog(
         correctForm: correctForm,
         repNumber: repCount,
         data: {
           "rep_duration": tempoMetric.lastRepDuration ?? 0.0,
           "fault_types": allFaults.map((f) => f.type).toSet().toList(),
+          "fault_affects_form": faultAffectsForm,
+          "fault_priorities": faultPriorities,
         },
       ));
 
@@ -396,16 +436,16 @@ class JumpingJack extends ExerciseBase {
   }
 
   String? _topVoiceMessage(List<FaultRecord> faults) {
-    if (faults.any((fault) => fault.type == 'Arms')) {
+    if (faults.any((fault) => fault.type == 'arms')) {
       return 'Vươn tay cao hơn';
     }
-    if (faults.any((fault) => fault.type == 'Legs')) {
+    if (faults.any((fault) => fault.type == 'legs')) {
       return 'Mở chân rộng hơn';
     }
 
     String? tempoFault;
     for (final fault in faults) {
-      if (fault.type == 'Tempo') {
+      if (fault.type == 'tempo_fast') {
         tempoFault = fault.message;
         break;
       }

@@ -147,28 +147,28 @@ void main() {
     final faults = <FaultRecord>[
       FaultRecord(
         phase: 'BOTTOM',
-        type: 'Depth',
+        type: 'depth',
         message: 'Too shallow',
         voiceMessage: 'Xuống thấp hơn',
         priority: SquatFaultVoicePriority.depth,
       ),
       FaultRecord(
         phase: 'BOTTOM',
-        type: 'Feet',
+        type: 'heel',
         message: 'Heels lifting',
         voiceMessage: 'Giữ gót chân',
         priority: SquatFaultVoicePriority.heelRise,
       ),
       FaultRecord(
         phase: 'ASCENDING',
-        type: 'Back',
+        type: 'trunk',
         message: 'Leaned too forward',
         voiceMessage: null,
         priority: SquatFaultVoicePriority.trunkLean,
       ),
       FaultRecord(
         phase: 'ASCENDING',
-        type: 'Tempo',
+        type: 'tempo',
         message: 'Dropped too fast',
         voiceMessage: 'Chậm lại',
         priority: SquatFaultVoicePriority.tempo,

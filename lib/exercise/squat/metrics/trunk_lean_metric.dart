@@ -128,10 +128,10 @@ class TrunkLeanMetric extends SquatMetricBase {
     String? voiceMessage, {
     required int priority,
   }) {
-    if (!_faults.any((f) => f.phase == phase && f.type == 'Back')) {
+    if (!_faults.any((f) => f.phase == phase && f.type == 'trunk')) {
       _faults.add(FaultRecord(
         phase: phase,
-        type: 'Back',
+        type: 'trunk',
         message: message,
         voiceMessage: voiceMessage,
         affectsForm: true,

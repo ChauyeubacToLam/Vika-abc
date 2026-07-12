@@ -49,7 +49,7 @@ class SyncElevationMetric extends VUpMetricBase {
       if (shoulderLead || ankleLead) {
         _faults.add(FaultRecord(
           phase: ctx.state.name,
-          type: 'AsyncElevation',
+          type: 'sync',
           message: 'Mất đồng bộ thân trên và chi dưới',
           voiceMessage: 'Hãy nâng cả tay và chân CÙNG LÚC để bảo vệ lưng!',
           affectsForm: false,

@@ -27,10 +27,10 @@ class HipRotationMetric extends PlankMetricBase {
 
     if (variance > PlankConfig.HIP_Y_ROTATION_TOLERANCE) {
       ctx.resultIssues.feedback['Rotation'] = 'Lắc hông quá nhiều';
-      if (!_faults.any((f) => f.type == 'Rotation')) {
+      if (!_faults.any((f) => f.type == 'hip_rotation')) {
         _faults.add(FaultRecord(
           phase: ctx.currentState.name,
-          type: 'Rotation',
+          type: 'hip_rotation',
           message: 'Hông mất ổn định khi đổi tay',
           affectsForm: true,
           voiceMessage: 'Giữ hông cố định, không lắc lư khi đẩy người!',

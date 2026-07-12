@@ -40,7 +40,7 @@ class ClearTapMetric extends PlankTapMetricBase {
     if (!_reachedTapThisRep) {
       _faults.add(FaultRecord(
         phase: 'LIFTING',
-        type: 'MissedTap',
+        type: 'tap',
         message: 'Không chạm tới vai',
         affectsForm: true,
         priority: PlankTapVoicePriority.clearTap,

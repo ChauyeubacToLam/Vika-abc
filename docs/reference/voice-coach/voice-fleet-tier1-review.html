@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voice Fleet Tier 1 Review — Vika</title>
+<style>
+:root{--ink:#1F1812;--ink-soft:#4A4031;--muted:#81735d;--page:#F1E9D9;--raised:#FBF7EE;--line:#E4DAC5;--line-soft:#EEE6D5;--yellow:#FFB701;--tip:#2E6E63;--tip-bg:#E9F1EE;--tip-line:#BFDBD3;--warn:#A2472B;--warn-bg:#F7EAE2;--warn-line:#E7C6B6;--sans:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"SFMono-Regular",Consolas,monospace}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--page);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}header{background:radial-gradient(110% 180% at 10% 0,#302419 0,#1F1812 62%,#150f0a 100%);color:#FBF7EE;padding:54px 24px 46px}.hero{max-width:1220px;margin:auto}.eyebrow{margin:0 0 13px;color:var(--yellow);font:700 12px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase}h1{margin:0;font-size:clamp(34px,6vw,64px);line-height:1.03;letter-spacing:-.04em;max-width:880px}header .lede{max-width:780px;color:#d9cfbd;font-size:18px;margin:18px 0 24px}.chips{display:flex;flex-wrap:wrap;gap:8px}.chip{border:1px solid #ffffff28;border-radius:999px;padding:7px 11px;font:12px var(--mono);color:#e9dfce}.chip b{color:var(--yellow)}main{max-width:1220px;margin:auto;padding:34px 24px 100px}section{padding:30px 0;border-top:1px solid var(--line)}section:first-child{border-top:0}.kicker{font:700 11px var(--mono);letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin:0 0 7px}h2{margin:0 0 10px;font-size:clamp(24px,4vw,36px);line-height:1.15;letter-spacing:-.025em}h3{margin:0 0 7px;font-size:17px}.lead{font-size:17px;color:var(--ink-soft);max-width:800px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:13px;margin-top:20px}.card{background:var(--raised);border:1px solid var(--line);border-radius:13px;padding:17px}.card.warn{border-top:4px solid var(--warn)}.card.tip{border-top:4px solid var(--tip)}.card.idea{border-top:4px solid var(--yellow)}.card p{margin:5px 0;color:var(--ink-soft);font-size:14px}.card code,.fault{font-family:var(--mono);font-size:12px}.exercise-list{columns:2;column-gap:34px;margin:18px 0 0;padding:0;list-style:none}.exercise-list li{break-inside:avoid;padding:8px 0;border-bottom:1px solid var(--line-soft);font-size:14px}.exercise-list b{display:inline-block;min-width:165px}.filters{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--page) 94%,transparent);backdrop-filter:blur(12px);display:flex;flex-wrap:wrap;gap:9px;padding:12px 0}.filters input,.filters select{border:1px solid var(--line);background:var(--raised);color:var(--ink);border-radius:9px;padding:10px 12px;font:14px var(--sans)}.filters input{flex:1;min-width:220px}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:13px;background:var(--raised);max-height:75vh}.decision{border-collapse:separate;border-spacing:0;min-width:1900px;width:100%;font-size:12.5px}.decision th,.decision td{text-align:left;vertical-align:top;padding:10px 11px;border-bottom:1px solid var(--line-soft);max-width:260px}.decision thead th{position:sticky;top:0;background:#fffaf1;z-index:3;font:700 10.5px var(--mono);letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}.decision .exercise{position:sticky;left:0;z-index:2;background:var(--raised);min-width:145px}.decision thead th:first-child{left:0;z-index:4}.decision .ditto{color:var(--muted);font-family:var(--mono)}.decision tr.critical td:nth-child(3){color:var(--warn);font-weight:700}.decision tr.soft td:nth-child(3){color:var(--tip);font-weight:700}.decision tr.conditional td:nth-child(3){color:#8A6608;font-weight:700}.decision tr.missing td:nth-child(6){background:var(--warn-bg)}.decision tr:hover td,.decision tr:hover th{background:#fff}.decision tr[hidden]{display:none}.meta{font:12px var(--mono);color:var(--muted);margin:8px 0}.callout{border-left:4px solid var(--yellow);background:var(--raised);border-radius:0 11px 11px 0;padding:14px 17px;margin:16px 0;max-width:900px}.callout.warn{border-color:var(--warn);background:var(--warn-bg)}code{background:var(--line-soft);padding:1px 5px;border-radius:4px}.orphans{display:grid;grid-template-columns:repeat(2,1fr);gap:8px 24px;margin-top:18px}.orphans div{border-bottom:1px solid var(--line);padding:7px 0;font-size:14px}.orphans b{display:inline-block;min-width:170px}footer{border-top:1px solid var(--line);padding-top:20px;color:var(--muted);font:12px var(--mono)}@media(max-width:800px){.grid{grid-template-columns:1fr}.exercise-list{columns:1}.orphans{grid-template-columns:1fr}main{padding-inline:16px}header{padding-inline:16px}.filters{position:static}}
+</style>
+</head>
+<body>
+<header><div class="hero"><p class="eyebrow">Code-synced decision surface · 2026-07-11</p><h1>Rep voice fleet<br>Tier 1 review</h1><p class="lede">What actually landed across 24 exercises, where the code contradicted the sweep, and every critical/soft/audio/reminder call Nam needs for Tier 2.</p><div class="chips"><span class="chip"><b>24</b> exercises</span><span class="chip"><b>108</b> fault rows</span><span class="chip"><b>23/24</b> live-fault surfaces</span><span class="chip"><b>0</b> engine or audio edits</span></div></div></header>
+<main>
+<section id="outcome"><p class="kicker">01 · Outcome</p><h2>One adapter contract across the rep fleet</h2><p class="lead">Every in-scope exercise now chooses the rep bundle explicitly, supplies its target, logs normalized fault identity + severity + priority, and keeps the existing setup/count/praise/safety path. Tier 1 deliberately does not decide new soft pools, reminders, hustle, tuning or recordings.</p><div class="grid"><article class="card tip"><h3>Fixed</h3><p>PascalCase detector types were filtered by snake_case scripts. Three rep exercises also inherited hold-time content because they expose a UI hold target.</p></article><article class="card idea"><h3>Preserved</h3><p>All detector thresholds, debounce logic, <code>affectsForm</code> values, phases, rep state machines and the shared <code>lib/voice/*</code> engine.</p></article><article class="card warn"><h3>Review debt</h3><p>Tricep Dip declares dormant metrics; Bird Dog clears rejected-attempt faults; Squat and Ashtanga lack resolving fault recordings.</p></article></div></section>
+<section id="contradictions"><p class="kicker">02 · Code over spec</p><h2>Seven calls where the sweep was not the whole story</h2>
+<div class="callout warn"><b>Tricep Dip:</b> the four metrics exist but the exercise never updates, transitions, collects or resets them. Tier 1 wires structural voice only and skips <code>liveFaults</code>. Fixing detection would cross the pipeline fence.</div>
+<div class="grid"><article class="card"><h3>Bird Dog</h3><p><code>MissingBody</code>/<code>Plank</code> have no verified legacy id. <code>opposite_side</code>, <code>alternate</code> and <code>hold</code> occur on rejected attempts and are cleared before the adapter sees them.</p></article><article class="card"><h3>Russian Twist</h3><p><code>arm_swinging</code> does not honestly map to <code>spine</code> or <code>thoracic</code>. Shallow half-twists do not produce a full-rep log.</p></article><article class="card"><h3>Assets</h3><p>Squat's old named WAVs are not resolver-compatible. Ashtanga has no <code>hip.mp3</code>/<code>neck.mp3</code>. Missing files remain safe no-ops.</p></article><article class="card"><h3>Squat comment drift</h3><p>The heel metric header says informational, but the executable FaultRecord says <code>affectsForm: true</code>. The table follows code and flags the conflict.</p></article><article class="card"><h3>Meaningful splits</h3><p>Jump landing and Burpee phase collisions got distinct ids. Wall feet split into <code>foot</code> movement vs <code>heel</code> position.</p></article><article class="card"><h3>Kept oddities</h3><p>Curl-up's non-enum <code>APEX</code> phase and Dead Bug's duplicate coordination logic remain. Both were fenced from behavior changes.</p></article></div></section>
+<section id="exercise-notes"><p class="kicker">03 · Per exercise</p><h2>What changed, one line each</h2><ul class="exercise-list">
+<li><b>Squat</b> normalized five ids, added live/log/target contract, retained phase cues + hustle neutralization; fault audio missing.</li>
+<li><b>Push Up</b> mapped Back→sag and made conditional depth severity visible to the adapter.</li>
+<li><b>Wall Push Up</b> retired bespoke coach; split foot movement/heel position and mapped contact→hand.</li>
+<li><b>Lunge</b> normalized four live ids; one depth id still represents both detector directions.</li>
+<li><b>Walking Lunge</b> explicit rep bundle fixes hold-content leak; normalized hold/rear-depth/torso/step.</li>
+<li><b>Cossack Squat</b> normalized six ids; retained deep-soft vs shallow-critical split.</li>
+<li><b>Jump Squat</b> split landing stiffness/depth collision and synced report-builder ids.</li>
+<li><b>Standing Knee-to-Elbow</b> already snake_case; added full adapter/log/target wiring.</li>
+<li><b>Tricep Dip</b> structural voice only; skipped live faults because detector metrics are dormant.</li>
+<li><b>Step-Back Burpee</b> split two old Spine meanings into squat/plank ids; synced report builder.</li>
+<li><b>McGill Curl-up</b> ids already valid; kept non-enum APEX phase; resolver alias finds existing folder.</li>
+<li><b>Sit-Up</b> normalized jerking/rom/stability; tempo remains data-only.</li>
+<li><b>V-Up</b> normalized five ids and preserved mixed critical/soft coding.</li>
+<li><b>Dead Bug</b> normalized both duplicate coordination implementations; did not deduplicate behavior.</li>
+<li><b>Bird Dog</b> retired inline coach; mapped seven honest ids and left two guards unmapped.</li>
+<li><b>Superman</b> explicit rep bundle fixes hold-content leak; normalized five ids.</li>
+<li><b>Mountain Climber</b> collapsed left/right short-ROM to one recording key; kept trunk meanings split.</li>
+<li><b>Reverse Crunch</b> normalized curl/tempo/momentum/arms and retired dead legacy stack.</li>
+<li><b>Plank Shoulder Tap</b> normalized four ids across live trunk/hip and rep-end tap/tempo.</li>
+<li><b>Leg Raises</b> normalized five ids and retired never-instantiated bespoke voice stack.</li>
+<li><b>Russian Twist</b> wired four honest ids; left arm_swinging unmapped and two-half rep logic untouched.</li>
+<li><b>Jumping Jack</b> retired bespoke coach; only implemented tempo direction maps to tempo_fast.</li>
+<li><b>Ashtanga Namaskara</b> moved metrics to shared FaultRecord data shape; normalized hip/neck; both recordings missing.</li>
+<li><b>Plank Up-Down</b> explicit rep bundle fixes hold-content leak; normalized four ids.</li>
+</ul></section>
+<section id="table"><p class="kicker">04 · Decision table</p><h2>What can speak now, and what Tier 2 should decide</h2><p class="lead">“Silent alone” is current behavior, not a recommendation: Tier 1 has no soft pools. If a soft fault shares a rep with a critical fault, the legacy two-way rep classifier can still enqueue it as part of that critical rep.</p>
+<div class="filters"><input id="search" type="search" placeholder="Filter exercise, fault, flag…"><select id="kind"><option value="">All rows</option><option value="critical">Critical</option><option value="soft">Soft</option><option value="conditional">Conditional</option><option value="missing">Missing MP3</option><option value="silent">Silent after Tier 1</option></select></div><p class="meta"><span id="visible">108</span> / 108 rows visible</p>
+<div class="table-wrap"><table class="decision"><thead><tr><th>exercise</th><th>fault id (final)</th><th>affectsForm as-coded</th><th>firing</th><th>existing mp3?</th><th>speaks after Tier 1?</th><th>suggested soft line (VN)</th><th>reminder candidate?</th><th>flags</th></tr></thead><tbody><tr class="critical missing silent" data-exercise="squat" data-kind="critical missing silent"><th scope="rowgroup" class="exercise">Squat</th><td class="fault">heel</td><td>true</td><td>live-continuous</td><td>n</td><td>n: missing asset</td><td>—</td><td>y: live critical</td><td>Code says true; file header says informational</td></tr>
+<tr class="critical missing silent" data-exercise="squat" data-kind="critical missing silent"><th class="exercise ditto" aria-label="Squat">↳</th><td class="fault">depth</td><td>true</td><td>live-continuous</td><td>n</td><td>n: missing asset</td><td>—</td><td>y: live critical</td><td></td></tr>
+<tr class="critical missing silent" data-exercise="squat" data-kind="critical missing silent"><th class="exercise ditto" aria-label="Squat">↳</th><td class="fault">trunk</td><td>true</td><td>live-continuous</td><td>n</td><td>n: missing asset</td><td>—</td><td>y: live critical</td><td>Back→trunk</td></tr>
+<tr class="critical missing silent" data-exercise="squat" data-kind="critical missing silent"><th class="exercise ditto" aria-label="Squat">↳</th><td class="fault">tempo</td><td>true</td><td>rep-end-peak</td><td>n</td><td>n: missing asset</td><td>—</td><td>n: peak-only</td><td></td></tr>
+<tr class="critical missing silent" data-exercise="squat" data-kind="critical missing silent"><th class="exercise ditto" aria-label="Squat">↳</th><td class="fault">sync</td><td>true</td><td>live-continuous</td><td>n</td><td>n: missing asset</td><td>—</td><td>y: live critical</td><td>HipShoulderSync→sync</td></tr>
+<tr class="conditional  " data-exercise="push up" data-kind="conditional  "><th scope="rowgroup" class="exercise">Push Up</th><td class="fault">depth</td><td>conditional: severe=true; warning=false</td><td>rep-end-peak</td><td>y</td><td>y on critical branch; warning silent alone</td><td>Tốt, bạn hạ ngực thấp hơn chút nữa là đẹp.</td><td>n: peak-only</td><td>One id carries two severities</td></tr>
+<tr class="critical  " data-exercise="push up" data-kind="critical  "><th class="exercise ditto" aria-label="Push Up">↳</th><td class="fault">tempo</td><td>true</td><td>rep-end-peak</td><td>y</td><td>y</td><td>—</td><td>n: peak-only</td><td></td></tr>
+<tr class="critical  " data-exercise="push up" data-kind="critical  "><th class="exercise ditto" aria-label="Push Up">↳</th><td class="fault">sag</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>Back→sag</td></tr>
+<tr class="conditional  " data-exercise="wall push up" data-kind="conditional  "><th scope="rowgroup" class="exercise">Wall Push Up</th><td class="fault">body_line</td><td>conditional: error=true; warning=false</td><td>live-continuous</td><td>y</td><td>y on error; warning silent alone</td><td>Tốt, bạn siết bụng giữ thân thẳng hơn chút nữa là đẹp.</td><td>y: error branch is live critical</td><td>Body→body_line; signed sag/pike ambiguity pre-existing</td></tr>
+<tr class="conditional  " data-exercise="wall push up" data-kind="conditional  "><th class="exercise ditto" aria-label="Wall Push Up">↳</th><td class="fault">foot</td><td>conditional: error=true; warning=false</td><td>live-continuous</td><td>y</td><td>y on error; warning silent alone</td><td>Tốt, bạn giữ chân cố định hơn chút nữa là đẹp.</td><td>y: error branch is live critical</td><td>Feet split by detected meaning</td></tr>
+<tr class="critical  " data-exercise="wall push up" data-kind="critical  "><th class="exercise ditto" aria-label="Wall Push Up">↳</th><td class="fault">heel</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>Feet split by detected meaning</td></tr>
+<tr class="conditional  " data-exercise="wall push up" data-kind="conditional  "><th class="exercise ditto" aria-label="Wall Push Up">↳</th><td class="fault">shoulder</td><td>conditional: error=true; warning=false</td><td>live-continuous</td><td>y</td><td>y on error; warning silent alone</td><td>Tốt, bạn hạ vai xa tai hơn chút nữa là đẹp.</td><td>y: error branch is live critical</td><td>Shoulders→shoulder</td></tr>
+<tr class="conditional  " data-exercise="wall push up" data-kind="conditional  "><th class="exercise ditto" aria-label="Wall Push Up">↳</th><td class="fault">elbow</td><td>conditional: error=true; warning=false</td><td>live-continuous</td><td>y</td><td>y on error; warning silent alone</td><td>Tốt, bạn khép khuỷu tay hơn chút nữa là đẹp.</td><td>y: error branch is live critical</td><td>Arms→elbow</td></tr>
+<tr class="soft  " data-exercise="wall push up" data-kind="soft  "><th class="exercise ditto" aria-label="Wall Push Up">↳</th><td class="fault">head</td><td>false</td><td>live-continuous</td><td>y</td><td>n alone; only with critical co-fault</td><td>Tốt, bạn giữ đầu thẳng hơn chút nữa là đẹp.</td><td>n: non-critical</td><td></td></tr>
+<tr class="soft  " data-exercise="wall push up" data-kind="soft  "><th class="exercise ditto" aria-label="Wall Push Up">↳</th><td class="fault">cervical</td><td>false</td><td>live-continuous</td><td>y</td><td>n alone; only with critical co-fault</td><td>Tốt, bạn thu cằm nhẹ hơn chút nữa là đẹp.</td><td>n: non-critical</td><td>Neck→cervical</td></tr>
+<tr class="critical  " data-exercise="wall push up" data-kind="critical  "><th class="exercise ditto" aria-label="Wall Push Up">↳</th><td class="fault">hand</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>Wall→hand by contact message</td></tr>
+<tr class="soft  " data-exercise="wall push up" data-kind="soft  "><th class="exercise ditto" aria-label="Wall Push Up">↳</th><td class="fault">tempo</td><td>false</td><td>rep-end-peak</td><td>y</td><td>n alone; only with critical co-fault</td><td>Tốt, bạn hạ người chậm hơn chút nữa là đẹp.</td><td>n: peak-only + non-critical</td><td></td></tr>
+<tr class="critical  " data-exercise="lunge" data-kind="critical  "><th scope="rowgroup" class="exercise">Lunge</th><td class="fault">depth</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>Both shallow/too-deep detector messages share depth</td></tr>
+<tr class="critical  " data-exercise="lunge" data-kind="critical  "><th class="exercise ditto" aria-label="Lunge">↳</th><td class="fault">trunk</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>Back→trunk</td></tr>
+<tr class="critical  " data-exercise="lunge" data-kind="critical  "><th class="exercise ditto" aria-label="Lunge">↳</th><td class="fault">lumbar</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>Core→lumbar</td></tr>
+<tr class="critical  " data-exercise="lunge" data-kind="critical  "><th class="exercise ditto" aria-label="Lunge">↳</th><td class="fault">heel</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>Feet→heel</td></tr>
+<tr class="critical  " data-exercise="walking lunge" data-kind="critical  "><th scope="rowgroup" class="exercise">Walking Lunge</th><td class="fault">hold</td><td>true</td><td>rep-end-peak</td><td>y</td><td>y</td><td>—</td><td>n: transition/peak</td><td>Local transition fault</td></tr>
+<tr class="soft  " data-exercise="walking lunge" data-kind="soft  "><th class="exercise ditto" aria-label="Walking Lunge">↳</th><td class="fault">rear_depth</td><td>false</td><td>live-continuous</td><td>y</td><td>n alone; only with critical co-fault</td><td>Tốt, bạn hạ gối sau thấp hơn chút nữa là đẹp.</td><td>n: non-critical</td><td>shallow_lunge→rear_depth</td></tr>
+<tr class="soft  " data-exercise="walking lunge" data-kind="soft  "><th class="exercise ditto" aria-label="Walking Lunge">↳</th><td class="fault">torso</td><td>false</td><td>live-continuous</td><td>y</td><td>n alone; only with critical co-fault</td><td>Tốt, bạn giữ thân thẳng hơn chút nữa là đẹp.</td><td>n: non-critical</td><td></td></tr>
+<tr class="soft  " data-exercise="walking lunge" data-kind="soft  "><th class="exercise ditto" aria-label="Walking Lunge">↳</th><td class="fault">step_length</td><td>false</td><td>live-continuous</td><td>y</td><td>n alone; only with critical co-fault</td><td>Tốt, bạn giữ sải bước đều hơn chút nữa là đẹp.</td><td>n: non-critical</td><td></td></tr>
+<tr class="critical  " data-exercise="cossack squat" data-kind="critical  "><th scope="rowgroup" class="exercise">Cossack Squat</th><td class="fault">knee_valgus</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td></td></tr>
+<tr class="critical  " data-exercise="cossack squat" data-kind="critical  "><th class="exercise ditto" aria-label="Cossack Squat">↳</th><td class="fault">heel</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>heel_lift→heel</td></tr>
+<tr class="soft  " data-exercise="cossack squat" data-kind="soft  "><th class="exercise ditto" aria-label="Cossack Squat">↳</th><td class="fault">depth_deep</td><td>false</td><td>live-continuous</td><td>y</td><td>n alone; only with critical co-fault</td><td>Tốt, bạn kiểm soát độ sâu vừa hơn chút nữa là đẹp.</td><td>n: non-critical</td><td>too_deep→depth_deep</td></tr>
+<tr class="critical  " data-exercise="cossack squat" data-kind="critical  "><th class="exercise ditto" aria-label="Cossack Squat">↳</th><td class="fault">depth_shallow</td><td>true</td><td>rep-end-peak</td><td>y</td><td>y</td><td>—</td><td>n: peak-only</td><td></td></tr>
+<tr class="critical  " data-exercise="cossack squat" data-kind="critical  "><th class="exercise ditto" aria-label="Cossack Squat">↳</th><td class="fault">straight_leg</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>bent_straight_leg→straight_leg</td></tr>
+<tr class="soft  " data-exercise="cossack squat" data-kind="soft  "><th class="exercise ditto" aria-label="Cossack Squat">↳</th><td class="fault">torso</td><td>false</td><td>live-continuous</td><td>y</td><td>n alone; only with critical co-fault</td><td>Tốt, bạn nâng ngực thẳng hơn chút nữa là đẹp.</td><td>n: non-critical</td><td>torso_lean→torso</td></tr>
+<tr class="critical  " data-exercise="jump squat" data-kind="critical  "><th scope="rowgroup" class="exercise">Jump Squat</th><td class="fault">landing_stiff</td><td>true</td><td>rep-end-peak</td><td>y</td><td>y</td><td>—</td><td>n: peak-only</td><td>Split former Knee collision</td></tr>
+<tr class="soft  " data-exercise="jump squat" data-kind="soft  "><th class="exercise ditto" aria-label="Jump Squat">↳</th><td class="fault">landing_depth</td><td>false</td><td>rep-end-peak</td><td>y</td><td>n alone; only with critical co-fault</td><td>Tốt, bạn trùng gối sâu hơn lúc tiếp đất chút nữa là đẹp.</td><td>n: peak-only + non-critical</td><td>Split former Knee collision</td></tr>
+<tr class="critical  " data-exercise="jump squat" data-kind="critical  "><th class="exercise ditto" aria-label="Jump Squat">↳</th><td class="fault">trunk</td><td>true</td><td>rep-end-peak</td><td>y</td><td>y</td><td>—</td><td>n: peak-only</td><td>Back→trunk</td></tr>
+<tr class="critical  " data-exercise="jump squat" data-kind="critical  "><th class="exercise ditto" aria-label="Jump Squat">↳</th><td class="fault">takeoff_depth</td><td>true</td><td>rep-end-peak</td><td>y</td><td>y</td><td>—</td><td>n: peak-only</td><td>Power→takeoff_depth</td></tr>
+<tr class="critical  " data-exercise="standing knee-to-elbow" data-kind="critical  "><th scope="rowgroup" class="exercise">Standing Knee-to-Elbow</th><td class="fault">core_drive</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>Already normalized</td></tr>
+<tr class="critical  " data-exercise="standing knee-to-elbow" data-kind="critical  "><th class="exercise ditto" aria-label="Standing Knee-to-Elbow">↳</th><td class="fault">knee_valgus</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>Already normalized</td></tr>
+<tr class="critical  " data-exercise="standing knee-to-elbow" data-kind="critical  "><th class="exercise ditto" aria-label="Standing Knee-to-Elbow">↳</th><td class="fault">pelvic_drop</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>Already normalized</td></tr>
+<tr class="critical  silent" data-exercise="tricep dip" data-kind="critical  silent"><th scope="rowgroup" class="exercise">Tricep Dip</th><td class="fault">hip_thrust</td><td>true</td><td>live-continuous</td><td>y</td><td>n: detector metric never updated</td><td>—</td><td>n: unreachable</td><td>Skipped liveFaults; detector wiring is dead</td></tr>
+<tr class="soft  silent" data-exercise="tricep dip" data-kind="soft  silent"><th class="exercise ditto" aria-label="Tricep Dip">↳</th><td class="fault">shrug</td><td>false</td><td>live-continuous</td><td>y</td><td>n: detector metric never updated</td><td>Tốt, bạn hạ vai xa tai hơn chút nữa là đẹp.</td><td>n: unreachable</td><td>Skipped liveFaults; detector wiring is dead</td></tr>
+<tr class="soft  silent" data-exercise="tricep dip" data-kind="soft  silent"><th class="exercise ditto" aria-label="Tricep Dip">↳</th><td class="fault">rom</td><td>false</td><td>rep-end-peak</td><td>y</td><td>n: detector metric never transitioned</td><td>Tốt, bạn gập tay sâu hơn chút nữa là đẹp.</td><td>n: unreachable</td><td>Skipped liveFaults; detector wiring is dead</td></tr>
+<tr class="soft  silent" data-exercise="tricep dip" data-kind="soft  silent"><th class="exercise ditto" aria-label="Tricep Dip">↳</th><td class="fault">extension</td><td>false</td><td>rep-end-peak</td><td>y</td><td>n: detector metric never transitioned</td><td>Tốt, bạn duỗi tay thẳng hơn chút nữa là đẹp.</td><td>n: unreachable</td><td>Skipped liveFaults; detector wiring is dead</td></tr>
+<tr class="critical  " data-exercise="step-back burpee" data-kind="critical  "><th scope="rowgroup" class="exercise">Step-Back Burpee</th><td class="fault">squat_hinge</td><td>true</td><td>rep-end-peak</td><td>y</td><td>y</td><td>—</td><td>n: peak-only</td><td>Split former Spine collision</td></tr>
+<tr class="soft  " data-exercise="step-back burpee" data-kind="soft  "><th class="exercise ditto" aria-label="Step-Back Burpee">↳</th><td class="fault">squat_depth</td><td>false</td><td>rep-end-peak</td><td>y</td><td>n alone; only with critical co-fault</td><td>Tốt, bạn hạ hông sâu hơn chút nữa là đẹp.</td><td>n: peak-only + non-critical</td><td>Split former Spine collision</td></tr>
+<tr class="critical  " data-exercise="step-back burpee" data-kind="critical  "><th class="exercise ditto" aria-label="Step-Back Burpee">↳</th><td class="fault">plank_sag</td><td>true</td><td>rep-end-peak</td><td>y</td><td>y</td><td>—</td><td>n: peak-only</td><td>Split former Spine collision</td></tr>
+<tr class="soft  " data-exercise="step-back burpee" data-kind="soft  "><th class="exercise ditto" aria-label="Step-Back Burpee">↳</th><td class="fault">plank_extension</td><td>false</td><td>rep-end-peak</td><td>y</td><td>n alone; only with critical co-fault</td><td>Tốt, bạn duỗi chân thẳng hơn chút nữa là đẹp.</td><td>n: peak-only + non-critical</td><td>Amplitude→plank_extension</td></tr>
+<tr class="conditional  " data-exercise="mcgill curl-up" data-kind="conditional  "><th scope="rowgroup" class="exercise">McGill Curl-up</th><td class="fault">knee_extension</td><td>conditional: error=true; warning=false</td><td>live-continuous</td><td>y</td><td>y on error; warning silent alone</td><td>Tốt, bạn co gối thêm chút nữa là đẹp.</td><td>y: error branch is live critical</td><td></td></tr>
+<tr class="conditional  " data-exercise="mcgill curl-up" data-kind="conditional  "><th class="exercise ditto" aria-label="McGill Curl-up">↳</th><td class="fault">neck_pull</td><td>conditional: error=true; warning=false</td><td>live-continuous</td><td>y</td><td>y on error; warning silent alone</td><td>Tốt, bạn thả lỏng cổ hơn chút nữa là đẹp.</td><td>y: error branch is live critical</td><td></td></tr>
+<tr class="conditional  " data-exercise="mcgill curl-up" data-kind="conditional  "><th class="exercise ditto" aria-label="McGill Curl-up">↳</th><td class="fault">trunk_high</td><td>conditional: error=true; warning=false</td><td>live-continuous</td><td>y</td><td>y on error; warning silent alone</td><td>Tốt, bạn nâng vai vừa hơn chút nữa là đẹp.</td><td>y: error branch is live critical</td><td>Phase APEX is not a CurlUpState; retained</td></tr>
+<tr class="soft  " data-exercise="mcgill curl-up" data-kind="soft  "><th class="exercise ditto" aria-label="McGill Curl-up">↳</th><td class="fault">trunk_low</td><td>false</td><td>rep-end-peak</td><td>y</td><td>n alone; only with critical co-fault</td><td>Tốt, bạn nâng vai cao hơn chút nữa là đẹp.</td><td>n: peak-only + non-critical</td><td>Resolver aliases curl_up→mc_gill_curl_up</td></tr>
+<tr class="critical  " data-exercise="sit-up" data-kind="critical  "><th scope="rowgroup" class="exercise">Sit-Up</th><td class="fault">jerking</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>Jerking→jerking</td></tr>
+<tr class="critical  " data-exercise="sit-up" data-kind="critical  "><th class="exercise ditto" aria-label="Sit-Up">↳</th><td class="fault">rom</td><td>true</td><td>rep-end-peak</td><td>y</td><td>y</td><td>—</td><td>n: peak-only</td><td>ROM→rom</td></tr>
+<tr class="critical  " data-exercise="sit-up" data-kind="critical  "><th class="exercise ditto" aria-label="Sit-Up">↳</th><td class="fault">stability</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>Stability→stability</td></tr>
+<tr class="soft  " data-exercise="v-up" data-kind="soft  "><th scope="rowgroup" class="exercise">V-Up</th><td class="fault">sync</td><td>false</td><td>live-continuous</td><td>y</td><td>n alone; only with critical co-fault</td><td>Tốt, bạn nâng tay và chân đồng thời hơn chút nữa là đẹp.</td><td>n: non-critical</td><td>AsyncElevation→sync</td></tr>
+<tr class="critical  " data-exercise="v-up" data-kind="critical  "><th class="exercise ditto" aria-label="V-Up">↳</th><td class="fault">tempo</td><td>true</td><td>rep-end-peak</td><td>y</td><td>y</td><td>—</td><td>n: peak-only</td><td></td></tr>
+<tr class="critical  " data-exercise="v-up" data-kind="critical  "><th class="exercise ditto" aria-label="V-Up">↳</th><td class="fault">jerking</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td></td></tr>
+<tr class="soft  " data-exercise="v-up" data-kind="soft  "><th class="exercise ditto" aria-label="V-Up">↳</th><td class="fault">rom</td><td>false</td><td>rep-end-peak</td><td>y</td><td>n alone; only with critical co-fault</td><td>Tốt, bạn nâng người cao hơn chút nữa là đẹp.</td><td>n: peak-only + non-critical</td><td>ROM→rom</td></tr>
+<tr class="critical  " data-exercise="v-up" data-kind="critical  "><th class="exercise ditto" aria-label="V-Up">↳</th><td class="fault">knee</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>BentKnee→knee</td></tr>
+<tr class="critical  " data-exercise="dead bug" data-kind="critical  "><th scope="rowgroup" class="exercise">Dead Bug</th><td class="fault">opposite_side</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>Duplicated inline + coordination metric</td></tr>
+<tr class="critical  " data-exercise="dead bug" data-kind="critical  "><th class="exercise ditto" aria-label="Dead Bug">↳</th><td class="fault">alternate</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>Duplicated inline + coordination metric</td></tr>
+<tr class="critical  " data-exercise="dead bug" data-kind="critical  "><th class="exercise ditto" aria-label="Dead Bug">↳</th><td class="fault">anti_extension</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td></td></tr>
+<tr class="critical  " data-exercise="dead bug" data-kind="critical  "><th class="exercise ditto" aria-label="Dead Bug">↳</th><td class="fault">floor_contact</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td></td></tr>
+<tr class="critical  " data-exercise="dead bug" data-kind="critical  "><th class="exercise ditto" aria-label="Dead Bug">↳</th><td class="fault">stable_limbs</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td></td></tr>
+<tr class="critical  " data-exercise="dead bug" data-kind="critical  "><th class="exercise ditto" aria-label="Dead Bug">↳</th><td class="fault">tempo</td><td>true</td><td>rep-end-peak</td><td>y</td><td>y</td><td>—</td><td>n: peak-only</td><td></td></tr>
+<tr class="critical  " data-exercise="bird dog" data-kind="critical  "><th scope="rowgroup" class="exercise">Bird Dog</th><td class="fault">alignment</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>Alignment_Limb→alignment</td></tr>
+<tr class="critical  " data-exercise="bird dog" data-kind="critical  "><th class="exercise ditto" aria-label="Bird Dog">↳</th><td class="fault">head</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>Alignment_Head→head</td></tr>
+<tr class="critical  " data-exercise="bird dog" data-kind="critical  "><th class="exercise ditto" aria-label="Bird Dog">↳</th><td class="fault">lumbar</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td></td></tr>
+<tr class="critical  " data-exercise="bird dog" data-kind="critical  "><th class="exercise ditto" aria-label="Bird Dog">↳</th><td class="fault">trunk</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td></td></tr>
+<tr class="critical  silent" data-exercise="bird dog" data-kind="critical  silent"><th class="exercise ditto" aria-label="Bird Dog">↳</th><td class="fault">opposite_side</td><td>true</td><td>live-continuous</td><td>y</td><td>n: rejected attempt cleared before adapter</td><td>—</td><td>n: unreachable</td><td>SameSide→opposite_side</td></tr>
+<tr class="critical  silent" data-exercise="bird dog" data-kind="critical  silent"><th class="exercise ditto" aria-label="Bird Dog">↳</th><td class="fault">alternate</td><td>true</td><td>live-continuous</td><td>y</td><td>n: rejected attempt cleared before adapter</td><td>—</td><td>n: unreachable</td><td>NotAlternating→alternate</td></tr>
+<tr class="critical  silent" data-exercise="bird dog" data-kind="critical  silent"><th class="exercise ditto" aria-label="Bird Dog">↳</th><td class="fault">hold</td><td>true</td><td>rep-end-peak</td><td>y</td><td>n: rejected attempt cleared before adapter</td><td>—</td><td>n: unreachable</td><td>Tempo→hold</td></tr>
+<tr class="critical missing silent" data-exercise="bird dog" data-kind="critical missing silent"><th class="exercise ditto" aria-label="Bird Dog">↳</th><td class="fault">MissingBody (unmapped)</td><td>true</td><td>live-continuous</td><td>n</td><td>n: not in script</td><td>—</td><td>n: unmapped</td><td>Guard record; no verified legacy id</td></tr>
+<tr class="critical missing silent" data-exercise="bird dog" data-kind="critical missing silent"><th class="exercise ditto" aria-label="Bird Dog">↳</th><td class="fault">Plank (unmapped)</td><td>true</td><td>live-continuous</td><td>n</td><td>n: not in script</td><td>—</td><td>n: unmapped</td><td>Guard record; no verified legacy id</td></tr>
+<tr class="critical  " data-exercise="superman" data-kind="critical  "><th scope="rowgroup" class="exercise">Superman</th><td class="fault">hip</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>HipNotGrounded→hip</td></tr>
+<tr class="critical  " data-exercise="superman" data-kind="critical  "><th class="exercise ditto" aria-label="Superman">↳</th><td class="fault">elevation_arm</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>ArmTooLow→elevation_arm</td></tr>
+<tr class="critical  " data-exercise="superman" data-kind="critical  "><th class="exercise ditto" aria-label="Superman">↳</th><td class="fault">elevation_leg</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>LegTooLow→elevation_leg</td></tr>
+<tr class="critical  " data-exercise="superman" data-kind="critical  "><th class="exercise ditto" aria-label="Superman">↳</th><td class="fault">lumbar</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td></td></tr>
+<tr class="critical  " data-exercise="superman" data-kind="critical  "><th class="exercise ditto" aria-label="Superman">↳</th><td class="fault">hold</td><td>true</td><td>rep-end-peak</td><td>y</td><td>y</td><td>—</td><td>n: peak-only</td><td>Explicit rep bundle fixes old time-based selection</td></tr>
+<tr class="critical  " data-exercise="mountain climber" data-kind="critical  "><th scope="rowgroup" class="exercise">Mountain Climber</th><td class="fault">rom</td><td>true</td><td>rep-end-peak</td><td>y</td><td>y</td><td>—</td><td>n: peak-only</td><td>Left/right faults collapse to one audio id</td></tr>
+<tr class="critical  " data-exercise="mountain climber" data-kind="critical  "><th class="exercise ditto" aria-label="Mountain Climber">↳</th><td class="fault">trunk_sag</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>HipDrop→trunk_sag</td></tr>
+<tr class="critical  " data-exercise="mountain climber" data-kind="critical  "><th class="exercise ditto" aria-label="Mountain Climber">↳</th><td class="fault">trunk_bounce</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>HipBounce→trunk_bounce</td></tr>
+<tr class="critical  " data-exercise="reverse crunch" data-kind="critical  "><th scope="rowgroup" class="exercise">Reverse Crunch</th><td class="fault">curl</td><td>true</td><td>rep-end-peak</td><td>y</td><td>y</td><td>—</td><td>n: peak-only</td><td>NoPelvicTilt→curl</td></tr>
+<tr class="soft  " data-exercise="reverse crunch" data-kind="soft  "><th class="exercise ditto" aria-label="Reverse Crunch">↳</th><td class="fault">tempo</td><td>false</td><td>rep-end-peak</td><td>y</td><td>n alone; only with critical co-fault</td><td>Tốt, bạn hạ hông chậm hơn chút nữa là đẹp.</td><td>n: peak-only + non-critical</td><td>FastEccentric→tempo</td></tr>
+<tr class="soft  " data-exercise="reverse crunch" data-kind="soft  "><th class="exercise ditto" aria-label="Reverse Crunch">↳</th><td class="fault">momentum</td><td>false</td><td>rep-end-peak</td><td>y</td><td>n alone; only with critical co-fault</td><td>Tốt, bạn cuộn hông chủ động hơn chút nữa là đẹp.</td><td>n: peak-only + non-critical</td><td>Swinging→momentum</td></tr>
+<tr class="critical  " data-exercise="reverse crunch" data-kind="critical  "><th class="exercise ditto" aria-label="Reverse Crunch">↳</th><td class="fault">arms</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>ArmPosition→arms</td></tr>
+<tr class="critical  " data-exercise="plank shoulder tap" data-kind="critical  "><th scope="rowgroup" class="exercise">Plank Shoulder Tap</th><td class="fault">hip_rotation</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td></td></tr>
+<tr class="critical  " data-exercise="plank shoulder tap" data-kind="critical  "><th class="exercise ditto" aria-label="Plank Shoulder Tap">↳</th><td class="fault">tap</td><td>true</td><td>rep-end-peak</td><td>y</td><td>y</td><td>—</td><td>n: peak-only</td><td>MissedTap→tap</td></tr>
+<tr class="soft  " data-exercise="plank shoulder tap" data-kind="soft  "><th class="exercise ditto" aria-label="Plank Shoulder Tap">↳</th><td class="fault">tempo</td><td>false</td><td>rep-end-peak</td><td>y</td><td>n alone; only with critical co-fault</td><td>Tốt, bạn chạm vai chậm hơn chút nữa là đẹp.</td><td>n: peak-only + non-critical</td><td>TooFast→tempo</td></tr>
+<tr class="critical  " data-exercise="plank shoulder tap" data-kind="critical  "><th class="exercise ditto" aria-label="Plank Shoulder Tap">↳</th><td class="fault">trunk</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>TrunkSag→trunk</td></tr>
+<tr class="critical  " data-exercise="leg raises" data-kind="critical  "><th scope="rowgroup" class="exercise">Leg Raises</th><td class="fault">pelvic</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>PelvicInstability→pelvic</td></tr>
+<tr class="critical  " data-exercise="leg raises" data-kind="critical  "><th class="exercise ditto" aria-label="Leg Raises">↳</th><td class="fault">rom</td><td>true</td><td>rep-end-peak</td><td>y</td><td>y</td><td>—</td><td>n: peak-only</td><td>ROM→rom</td></tr>
+<tr class="critical  " data-exercise="leg raises" data-kind="critical  "><th class="exercise ditto" aria-label="Leg Raises">↳</th><td class="fault">knee</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>BentKnee→knee</td></tr>
+<tr class="critical  " data-exercise="leg raises" data-kind="critical  "><th class="exercise ditto" aria-label="Leg Raises">↳</th><td class="fault">tempo</td><td>true</td><td>rep-end-peak</td><td>y</td><td>y</td><td>—</td><td>n: peak-only</td><td></td></tr>
+<tr class="critical  " data-exercise="leg raises" data-kind="critical  "><th class="exercise ditto" aria-label="Leg Raises">↳</th><td class="fault">arms</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>ArmPosition→arms</td></tr>
+<tr class="critical  " data-exercise="russian twist" data-kind="critical  "><th scope="rowgroup" class="exercise">Russian Twist</th><td class="fault">knee</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>knee_wobble→knee</td></tr>
+<tr class="critical  " data-exercise="russian twist" data-kind="critical  "><th class="exercise ditto" aria-label="Russian Twist">↳</th><td class="fault">too_upright</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td></td></tr>
+<tr class="critical  " data-exercise="russian twist" data-kind="critical  "><th class="exercise ditto" aria-label="Russian Twist">↳</th><td class="fault">too_low</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td></td></tr>
+<tr class="critical  silent" data-exercise="russian twist" data-kind="critical  silent"><th class="exercise ditto" aria-label="Russian Twist">↳</th><td class="fault">rom</td><td>true</td><td>rep-end-peak</td><td>y</td><td>n: rejected half-twist produces no RepLog</td><td>—</td><td>n: rejected/peak</td><td>Full rep remains two accepted half-twists</td></tr>
+<tr class="soft missing silent" data-exercise="russian twist" data-kind="soft missing silent"><th class="exercise ditto" aria-label="Russian Twist">↳</th><td class="fault">arm_swinging (unmapped)</td><td>false</td><td>live-continuous</td><td>n</td><td>n: no verified legacy id</td><td>Tốt, bạn xoay cả vai và ngực thêm chút nữa là đẹp.</td><td>n: unmapped</td><td>spine/thoracic audio meaning not proven</td></tr>
+<tr class="critical  " data-exercise="jumping jack" data-kind="critical  "><th scope="rowgroup" class="exercise">Jumping Jack</th><td class="fault">arms</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>Arms→arms</td></tr>
+<tr class="critical  " data-exercise="jumping jack" data-kind="critical  "><th class="exercise ditto" aria-label="Jumping Jack">↳</th><td class="fault">legs</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>Legs→legs</td></tr>
+<tr class="soft  " data-exercise="jumping jack" data-kind="soft  "><th class="exercise ditto" aria-label="Jumping Jack">↳</th><td class="fault">tempo_fast</td><td>false</td><td>rep-end-peak</td><td>y</td><td>n alone; only with critical co-fault</td><td>Tốt, bạn giữ nhịp chậm hơn chút nữa là đẹp.</td><td>n: peak-only + non-critical</td><td>Only implemented direction is too fast</td></tr>
+<tr class="critical missing silent" data-exercise="ashtanga namaskara" data-kind="critical missing silent"><th scope="rowgroup" class="exercise">Ashtanga Namaskara</th><td class="fault">hip</td><td>true</td><td>live-continuous</td><td>n</td><td>n: missing asset</td><td>—</td><td>y: live critical after recording</td><td>hip_collapse→hip</td></tr>
+<tr class="soft missing silent" data-exercise="ashtanga namaskara" data-kind="soft missing silent"><th class="exercise ditto" aria-label="Ashtanga Namaskara">↳</th><td class="fault">neck</td><td>false</td><td>live-continuous</td><td>n</td><td>n: missing asset</td><td>Tốt, bạn giữ cổ trung lập hơn chút nữa là đẹp.</td><td>n: non-critical</td><td>Private FaultRecord replaced by shared data type</td></tr>
+<tr class="critical  " data-exercise="plank up-down" data-kind="critical  "><th scope="rowgroup" class="exercise">Plank Up-Down</th><td class="fault">hip_rotation</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>Rotation→hip_rotation</td></tr>
+<tr class="critical  " data-exercise="plank up-down" data-kind="critical  "><th class="exercise ditto" aria-label="Plank Up-Down">↳</th><td class="fault">trunk</td><td>true</td><td>live-continuous</td><td>y</td><td>y</td><td>—</td><td>y: live critical</td><td>Sagging→trunk</td></tr>
+<tr class="soft  " data-exercise="plank up-down" data-kind="soft  "><th class="exercise ditto" aria-label="Plank Up-Down">↳</th><td class="fault">alternating</td><td>false</td><td>rep-end-peak</td><td>y</td><td>n alone; only with critical co-fault</td><td>Tốt, bạn đổi tay dẫn đều hơn chút nữa là đẹp.</td><td>n: peak-only + non-critical</td><td>LeadArmSymmetry→alternating</td></tr>
+<tr class="critical  " data-exercise="plank up-down" data-kind="critical  "><th class="exercise ditto" aria-label="Plank Up-Down">↳</th><td class="fault">arm_extension</td><td>true</td><td>rep-end-peak</td><td>y</td><td>y</td><td>—</td><td>n: peak-only</td><td>Explicit rep bundle fixes old time-based selection</td></tr></tbody></table></div></section>
+<section id="orphans"><p class="kicker">05 · Orphan inventory</p><h2>Existing legacy ids with no implemented/reachable fault</h2><div class="orphans">
+<div><b>Push Up</b><code>pike</code>, <code>setup_guard</code></div><div><b>Wall Push Up</b><code>setup</code></div><div><b>Lunge</b><code>too_deep</code></div><div><b>Walking Lunge</b><code>front_knee</code>, <code>framing</code></div><div><b>Jump Squat</b><code>too_fast</code></div><div><b>Standing KTE</b><code>cross_rom</code>, <code>setup</code></div><div><b>Tricep Dip</b><code>setup</code>; four fault recordings detector-unreachable</div><div><b>Sit-Up</b><code>tempo</code> data only</div><div><b>Mountain Climber</b><code>double_knee</code></div><div><b>Russian Twist</b><code>spine</code>, <code>thoracic</code></div><div><b>Jumping Jack</b><code>tempo_slow</code></div><div><b>Ashtanga</b><code>knees</code>, <code>chest</code>, <code>count_guard</code></div><div><b>Plank Up-Down</b><code>knee</code></div><div><b>All others</b>no known orphaned fault id</div></div></section>
+<section id="verification"><p class="kicker">06 · Verification</p><h2>Evidence, not green-by-assertion</h2><div class="grid"><article class="card tip"><h3>Analyzer</h3><p><code>flutter analyze</code>: clean, no issues.</p></article><article class="card tip"><h3>Scoped behavior</h3><p>Exercise + voice + Squat post-rep suites: 248 passed.</p></article><article class="card idea"><h3>Full suite</h3><p><code>flutter test</code>: 434 passed, 6 failed. All six are the documented pre-existing 12px <code>workout_summary_screen_test.dart</code> overflow cluster; no fleet test failed.</p></article></div></section>
+<footer>Generated from the 2026-07-11 working tree. Review notes stay local to this artifact.</footer>
+</main>
+<script>
+const rowsEls=[...document.querySelectorAll("tbody tr")], search=document.getElementById("search"), kind=document.getElementById("kind"), visible=document.getElementById("visible");
+function filter(){const q=search.value.trim().toLowerCase(),k=kind.value;let n=0;rowsEls.forEach(r=>{const ok=(!q||r.textContent.toLowerCase().includes(q))&&(!k||r.dataset.kind.includes(k));r.hidden=!ok;if(ok)n++});visible.textContent=n}
+search.addEventListener("input",filter);kind.addEventListener("change",filter);
+</script>
+<!-- ============================================================================
+     LAVISH REVIEWER NOTEPAD — reusable, self-contained component
+     ----------------------------------------------------------------------------
+     A private, Google-Docs-style margin-note layer for any lavish artifact.
+     The user selects text/code and jots a note anchored to it; notes are NEVER
+     sent to the agent. Splice the THREE blocks below into the artifact:
+
+       1. <!--NP:STYLE-->   paste inside the artifact's <style> (or as its own)
+       2. <!--NP:MARKUP-->  paste just before </body>
+       3. <!--NP:SCRIPT-->  paste just before </body>, AFTER the markup
+
+     Design: colors are `var(--host, fallback)` so it inherits the artifact's
+     design tokens when present, else uses tasteful defaults.
+
+     Persistence (tries in order, degrades gracefully — no setup required):
+       - disk server (optional, cross-session) .......... notes-server.js on :4599
+       - window.name .... survives lavish's live-reloads in the sandboxed iframe
+       - localStorage ... works when the artifact is opened standalone
+     Notes are namespaced per document via <title>, so artifacts don't collide.
+
+     WHY the sandbox matters: lavish serves artifacts in
+     <iframe sandbox="allow-scripts allow-forms allow-popups allow-downloads">
+     (no allow-same-origin), so localStorage THROWS. The window.name fallback and
+     the render-before-save ordering below are what make it work anyway.
+     ============================================================================ -->
+
+<!--NP:STYLE-->
+<style>
+:root{
+  --np-ink:var(--ink,#1f1812); --np-ink-soft:var(--ink-soft,#4a4031); --np-muted:var(--muted,#8a7c63);
+  --np-raised:var(--raised,#fbf7ee); --np-line:var(--line,#e4dac5); --np-line-soft:var(--line-soft,#eee6d5);
+  --np-yellow:var(--yellow,#ffb701);
+  --np-tip:var(--tip,#2e6e63); --np-tip-bg:var(--tip-bg,#e9f1ee); --np-tip-line:var(--tip-line,#bfdbd3);
+  --np-warn:var(--warn,#a2472b); --np-warn-bg:var(--warn-bg,#f7eae2); --np-warn-line:var(--warn-line,#e7c6b6);
+  --np-sans:var(--sans,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif);
+  --np-mono:var(--mono,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace);
+}
+mark.note-hl{background:rgba(255,183,1,.20);border-bottom:2px solid rgba(255,183,1,.7);border-radius:2px;
+  cursor:pointer;color:inherit;padding:0 .5px;transition:background .12s ease}
+mark.note-hl.hot{background:rgba(255,183,1,.45)}
+mark.note-hl.flash{animation:npflash 1.2s ease}
+@keyframes npflash{0%,100%{background-color:rgba(255,183,1,.20)}30%{background-color:rgba(255,183,1,.62)}}
+.note-badge{display:inline-flex;align-items:center;justify-content:center;min-width:14px;height:14px;padding:0 3px;
+  margin:0 1px 0 2px;font-family:var(--np-sans);font-size:9px;font-weight:800;line-height:1;vertical-align:super;
+  background:var(--np-ink);color:#fbf7ee;border-radius:7px;cursor:pointer;user-select:none;transition:background .12s ease}
+.note-badge.hot{background:var(--np-yellow);color:var(--np-ink)}
+.note-fab{position:fixed;right:22px;bottom:22px;z-index:2147483000;display:flex;align-items:center;gap:9px;
+  background:var(--np-ink);color:#fbf7ee;border:none;border-radius:999px;padding:12px 17px;cursor:pointer;
+  font-family:var(--np-sans);font-weight:600;font-size:14px;box-shadow:0 10px 26px -10px rgba(31,24,18,.55)}
+.note-fab:hover{background:#332619}
+.note-fab .cnt{font-family:var(--np-mono);font-size:12px;background:var(--np-yellow);color:var(--np-ink);
+  border-radius:999px;padding:1px 8px;min-width:20px;text-align:center}
+.note-pop{position:absolute;z-index:2147483001;transform:translate(-50%,-100%);margin-top:-9px;display:none;
+  background:var(--np-ink);border-radius:9px;padding:5px;box-shadow:0 12px 30px -12px rgba(0,0,0,.5)}
+.note-pop button{background:var(--np-yellow);color:var(--np-ink);border:none;border-radius:6px;
+  padding:7px 12px;font-family:var(--np-sans);font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap}
+.note-pop:after{content:"";position:absolute;left:50%;top:100%;transform:translateX(-50%);
+  border:6px solid transparent;border-top-color:var(--np-ink)}
+.note-panel{position:fixed;top:0;right:0;height:100%;width:min(380px,92vw);z-index:2147483002;background:var(--np-raised);
+  border-left:1px solid var(--np-line);box-shadow:-18px 0 40px -30px rgba(31,24,18,.5);display:flex;flex-direction:column;
+  opacity:0;visibility:hidden;transform:translateY(6px);transition:opacity .18s ease,transform .18s ease,visibility .18s}
+.note-panel.open{opacity:1;visibility:visible;transform:none}
+.note-panel .ph{padding:18px 18px 14px;border-bottom:1px solid var(--np-line);display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.note-panel .ph h3{margin:0;font-size:17px;font-weight:800;font-family:var(--np-sans);color:var(--np-ink)}
+.note-panel .ph .sub{font-family:var(--np-mono);font-size:11px;color:var(--np-muted);letter-spacing:.03em}
+.note-panel .x{background:none;border:none;font-size:24px;line-height:1;cursor:pointer;color:var(--np-muted)}
+.composer{padding:12px 14px;border-bottom:1px solid var(--np-line);background:#fff}
+.composer .anchor{font-family:var(--np-mono);font-size:11px;color:var(--np-tip);background:var(--np-tip-bg);
+  border:1px solid var(--np-tip-line);border-radius:7px;padding:5px 8px;margin-bottom:8px;display:flex;gap:6px;align-items:center;overflow:hidden}
+.composer .anchor span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.composer .anchor .axn{margin-left:auto;cursor:pointer;font-weight:700;flex:none}
+.composer textarea{width:100%;box-sizing:border-box;border:1px solid var(--np-line);border-radius:9px;
+  font-family:var(--np-sans);font-size:15px;padding:10px;resize:vertical;min-height:82px;background:#fff;color:var(--np-ink)}
+.composer textarea:focus{outline:2px solid var(--np-yellow);outline-offset:0;border-color:transparent}
+.composer .crow{display:flex;flex-direction:column;align-items:stretch;gap:7px;margin-top:8px}
+.composer .chint{font-size:11.5px;color:var(--np-muted)}
+.composer .addbtn{display:block;width:100%;background:var(--np-ink);color:#fbf7ee;border:none;border-radius:9px;
+  padding:12px 16px;font-family:var(--np-sans);font-weight:700;font-size:15px;cursor:pointer}
+.composer .addbtn:hover{background:#332619}
+.composer .addbtn:active{background:#0f0b07}
+.storage-note{margin:0;padding:9px 14px;background:var(--np-warn-bg);border-bottom:1px solid var(--np-warn-line);
+  color:var(--np-warn);font-size:12px;line-height:1.5;font-family:var(--np-sans)}
+.storage-note.ok{background:var(--np-tip-bg);border-bottom-color:var(--np-tip-line);color:var(--np-tip)}
+.note-list{flex:1;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:12px}
+.note-empty{color:var(--np-muted);font-size:14px;text-align:center;padding:40px 14px;line-height:1.7;font-family:var(--np-sans)}
+.note-empty b{color:var(--np-ink)}
+.note-card{background:#fff;border:1px solid var(--np-line);border-radius:11px;padding:12px 13px;font-family:var(--np-sans);
+  transition:box-shadow .12s ease,border-color .12s ease}
+.note-card.linked{border-color:var(--np-yellow);box-shadow:0 0 0 2px rgba(255,183,1,.28)}
+.note-card.active{border-color:var(--np-yellow);box-shadow:0 0 0 3px rgba(255,183,1,.42)}
+.note-card .loc{font-family:var(--np-mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--np-tip);font-weight:700;cursor:pointer;margin-bottom:6px;display:inline-block}
+.note-card .cnum{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;
+  background:var(--np-ink);color:#fbf7ee;border-radius:8px;font-size:10px;font-weight:800;margin-right:7px;vertical-align:middle}
+.note-card .quote{font-size:12px;color:var(--np-ink-soft);border-left:3px solid var(--np-line);padding:2px 0 2px 9px;
+  margin:0 0 8px;font-family:var(--np-mono);white-space:pre-wrap;word-break:break-word;max-height:74px;overflow:auto}
+.note-card .body{font-size:14.5px;white-space:pre-wrap;word-break:break-word;color:var(--np-ink)}
+.note-card .body.empty{color:var(--np-muted);font-style:italic}
+.note-card textarea{width:100%;box-sizing:border-box;border:1px solid var(--np-line);border-radius:8px;font-family:var(--np-sans);
+  font-size:14.5px;padding:8px;resize:vertical;min-height:66px;background:#fff;color:var(--np-ink)}
+.note-card .row{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
+.note-card .row button{border:none;border-radius:7px;padding:6px 11px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:var(--np-sans)}
+.note-card .save{background:var(--np-ink);color:#fbf7ee}
+.note-card .edit{background:var(--np-line-soft);color:var(--np-ink-soft)}
+.note-card .del{background:var(--np-warn-bg);color:var(--np-warn)}
+.note-panel .pf{padding:11px 14px;border-top:1px solid var(--np-line);display:flex;gap:8px}
+.note-panel .pf button{flex:1;border:1px solid var(--np-line);background:#fff;border-radius:8px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--np-sans);color:var(--np-ink-soft)}
+.note-panel .pf button:hover{background:var(--np-line-soft)}
+@media(max-width:900px){.note-fab{right:14px;bottom:14px}}
+</style>
+
+<!--NP:MARKUP-->
+<button class="note-fab" id="noteFab" aria-label="Open your notes">🖊 Notes <span class="cnt" id="noteCount">0</span></button>
+<div class="note-pop" id="notePop"><button id="notePopBtn" type="button">🖊 Note this</button></div>
+<aside class="note-panel" id="notePanel" aria-label="Your private notes">
+  <div class="ph">
+    <div><h3>Your notes</h3><div class="sub">private · not sent to the agent</div></div>
+    <button class="x" id="notePanelClose" type="button" aria-label="Close">&times;</button>
+  </div>
+  <div class="composer">
+    <div class="anchor" id="noteAnchor" hidden></div>
+    <textarea id="noteInput" placeholder="Type your note, then click outside the box (or ⌘/Ctrl+Enter) to save…"></textarea>
+    <div class="crow">
+      <span class="chint" id="noteHint">Will attach to the section you're viewing</span>
+      <button class="addbtn" id="noteAdd" type="button">Add note</button>
+    </div>
+  </div>
+  <div class="storage-note" id="storageNote" hidden></div>
+  <div class="note-list" id="noteList"></div>
+  <div class="pf">
+    <button id="noteCopy" type="button">Copy all</button>
+    <button id="noteDownload" type="button">Download .md</button>
+    <button id="noteClear" type="button">Clear all</button>
+  </div>
+</aside>
+
+<!--NP:SCRIPT-->
+<script>
+// ===== lavish reviewer notepad: anchored, local-only, never sent to the agent =====
+(function () {
+  // Per-document namespace so different artifacts never share notes.
+  var DOC = (document.title || location.pathname || 'doc').trim();
+  var KEY = 'lavish-notes::' + DOC;
+  var NP_TAG = 'LAVISH_NOTES::';
+  var REMOTE = 'http://127.0.0.1:4599/notes?doc=' + encodeURIComponent(DOC);
+  var localOk = true, remoteOk = false;
+  try { localStorage.setItem('np-t', '1'); localStorage.removeItem('np-t'); } catch (e) { localOk = false; }
+
+  function loadName() {
+    try {
+      if (window.name && window.name.indexOf(NP_TAG) === 0) {
+        var rest = window.name.slice(NP_TAG.length), nl = rest.indexOf('\n');
+        if (nl > -1 && rest.slice(0, nl) === KEY) return JSON.parse(rest.slice(nl + 1));
+      }
+    } catch (e) {}
+    return null;
+  }
+  function loadLocal() {
+    if (localOk) { try { var v = localStorage.getItem(KEY); if (v) return JSON.parse(v); } catch (e) {} }
+    var n = loadName(); if (n) return n;
+    return [];
+  }
+  var notes = loadLocal();
+
+  var fab = document.getElementById('noteFab'), cnt = document.getElementById('noteCount');
+  var panel = document.getElementById('notePanel'), list = document.getElementById('noteList');
+  var pop = document.getElementById('notePop'), popBtn = document.getElementById('notePopBtn');
+  var input = document.getElementById('noteInput'), anchorEl = document.getElementById('noteAnchor');
+  var hintEl = document.getElementById('noteHint');
+  var lastSel = null, pendingAnchor = null;
+
+  function mirrorLocal() {
+    var s = JSON.stringify(notes);
+    if (localOk) { try { localStorage.setItem(KEY, s); } catch (e) { localOk = false; } }
+    try { window.name = NP_TAG + KEY + '\n' + s; } catch (e) {}
+  }
+  function save() {
+    cnt.textContent = notes.length;
+    mirrorLocal();
+    if (remoteOk) {
+      try {
+        fetch(REMOTE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(notes) })
+          .catch(function () { remoteOk = false; updateStatus(); });
+      } catch (e) { remoteOk = false; }
+    }
+    updateStatus();
+  }
+  function updateStatus() {
+    var el = document.getElementById('storageNote'); if (!el) return;
+    if (remoteOk) { el.hidden = false; el.className = 'storage-note ok';
+      el.textContent = '✓ Saved to disk (survives reloads & restarts while the notes server runs).'; }
+    else if (localOk) { el.hidden = true; }
+    else { el.hidden = false; el.className = 'storage-note';
+      el.textContent = '⚠ The viewer blocks browser storage, so notes only survive reloads this session. To keep them for good, run the notes server or use “Download .md”.'; }
+  }
+  function uid() { return 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function sectionOf(node) {
+    var el = node && node.nodeType === 3 ? node.parentElement : node;
+    while (el && !(el.tagName === 'SECTION' && el.id)) el = el.parentElement;
+    return el;
+  }
+  function titleOf(sec) { if (!sec) return 'Document'; var h = sec.querySelector('h1,h2,h3'); return h ? h.textContent.trim() : sec.id; }
+  function currentSection() {
+    var secs = document.querySelectorAll('main section[id], section[id]');
+    var mid = window.scrollY + window.innerHeight / 2, best = null;
+    secs.forEach(function (s) { if (mid >= s.offsetTop && mid < s.offsetTop + s.offsetHeight) best = s; });
+    return best || secs[0] || null;
+  }
+  function setAnchor(a) {
+    pendingAnchor = a;
+    if (a && a.quote) {
+      anchorEl.hidden = false; anchorEl.innerHTML = '';
+      var t = document.createElement('span');
+      t.textContent = '“' + a.quote.slice(0, 90) + (a.quote.length > 90 ? '…' : '') + '”';
+      var x = document.createElement('span'); x.className = 'axn'; x.textContent = '✕'; x.title = 'Remove anchor';
+      x.onclick = function () { setAnchor(null); };
+      anchorEl.appendChild(t); anchorEl.appendChild(x);
+      hintEl.textContent = 'Attaching to this selection';
+    } else { anchorEl.hidden = true; anchorEl.innerHTML = ''; hintEl.textContent = "Will attach to the section you're viewing"; }
+  }
+  function addFromComposer() {
+    var body = input.value.trim();
+    if (!body) { input.focus(); return; }
+    var a = pendingAnchor, sec = a ? document.getElementById(a.sectionId) : currentSection();
+    var n = { id: uid(), sectionId: a ? a.sectionId : (sec ? sec.id : ''),
+      sectionTitle: a ? a.sectionTitle : (sec ? titleOf(sec) : 'Document'),
+      quote: a ? a.quote : '', start: a && a.start != null ? a.start : null, end: a && a.end != null ? a.end : null,
+      body: body, createdAt: Date.now() };
+    notes.push(n); render(); try { applyAll(); } catch (e) {} save();
+    input.value = ''; setAnchor(null);
+  }
+
+  // ---- anchored highlighting (spans across tokens, numbered markers) ----
+  function offsetOf(section, node, nodeOffset) {
+    var r = document.createRange(); r.selectNodeContents(section);
+    try { r.setEnd(node, nodeOffset); } catch (e) { return 0; } return r.toString().length;
+  }
+  function appendBadge(mark, num, id) {
+    var b = document.createElement('sup'); b.className = 'note-badge'; b.dataset.nid = id; b.textContent = num;
+    b.title = 'Note ' + num + ' — click to open';
+    if (mark.parentNode) mark.parentNode.insertBefore(b, mark.nextSibling);
+  }
+  function clearHighlights() {
+    document.querySelectorAll('.note-badge').forEach(function (b) { b.remove(); });
+    document.querySelectorAll('mark.note-hl').forEach(function (m) {
+      var p = m.parentNode; while (m.firstChild) p.insertBefore(m.firstChild, m); p.removeChild(m); p.normalize();
+    });
+  }
+  function highlightRange(section, start, end, id, num) {
+    if (!section || start == null || end == null || end <= start) return false;
+    var w = document.createTreeWalker(section, NodeFilter.SHOW_TEXT, null), n, pos = 0, segs = [];
+    while ((n = w.nextNode())) {
+      var len = n.nodeValue.length, nodeStart = pos; pos += len;
+      if (pos <= start) continue;
+      if (nodeStart >= end) break;
+      if (n.parentElement && n.parentElement.closest('mark.note-hl')) continue;
+      var s = Math.max(0, start - nodeStart), e = Math.min(len, end - nodeStart);
+      if (e > s) segs.push({ node: n, s: s, e: e });
+    }
+    var made = 0, last = null;
+    segs.forEach(function (seg) {
+      var r = document.createRange(); r.setStart(seg.node, seg.s); r.setEnd(seg.node, seg.e);
+      var m = document.createElement('mark'); m.className = 'note-hl'; m.dataset.nid = id;
+      try { r.surroundContents(m); made++; last = m; } catch (e2) {}
+    });
+    if (made && last) appendBadge(last, num, id);
+    return made > 0;
+  }
+  function highlightFirst(section, quote, id, num) {
+    if (!section || !quote) return false;
+    var w = document.createTreeWalker(section, NodeFilter.SHOW_TEXT, null), tn;
+    while ((tn = w.nextNode())) {
+      if (tn.parentElement && tn.parentElement.closest('mark.note-hl')) continue;
+      var i = tn.nodeValue.indexOf(quote);
+      if (i >= 0) {
+        var r = document.createRange(); r.setStart(tn, i); r.setEnd(tn, i + quote.length);
+        var m = document.createElement('mark'); m.className = 'note-hl'; m.dataset.nid = id;
+        try { r.surroundContents(m); appendBadge(m, num, id); return true; } catch (e) { return false; }
+      }
+    }
+    return false;
+  }
+  function applyAll() {
+    clearHighlights();
+    notes.forEach(function (n, i) {
+      var sec = document.getElementById(n.sectionId); if (!sec) return;
+      var ok = false;
+      if (n.start != null && n.end != null) ok = highlightRange(sec, n.start, n.end, n.id, i + 1);
+      if (!ok && n.quote) highlightFirst(sec, n.quote, n.id, i + 1);
+    });
+  }
+  function setLinked(id, on) {
+    document.querySelectorAll('mark.note-hl[data-nid="' + id + '"], .note-badge[data-nid="' + id + '"]')
+      .forEach(function (el) { el.classList.toggle('hot', on); });
+    var card = list.querySelector('.note-card[data-nid="' + id + '"]');
+    if (card) card.classList.toggle('linked', on);
+  }
+
+  // ---- panel ----
+  function render() {
+    list.innerHTML = '';
+    if (!notes.length) {
+      var e = document.createElement('div'); e.className = 'note-empty';
+      e.innerHTML = 'No notes yet.<br>Type in the box above and hit <b>Add note</b>,<br>or select text/code and hit <b>🖊 Note this</b>.';
+      list.appendChild(e); return;
+    }
+    notes.slice().reverse().forEach(function (n) {
+      var num = notes.indexOf(n) + 1;
+      var card = document.createElement('div'); card.className = 'note-card'; card.dataset.nid = n.id;
+      card.onmouseenter = function () { setLinked(n.id, true); };
+      card.onmouseleave = function () { setLinked(n.id, false); };
+      var loc = document.createElement('span'); loc.className = 'loc'; loc.title = 'Jump to this spot';
+      var cn = document.createElement('span'); cn.className = 'cnum'; cn.textContent = num; loc.appendChild(cn);
+      loc.appendChild(document.createTextNode(' § ' + n.sectionTitle));
+      loc.onclick = function () { jump(n.id); }; card.appendChild(loc);
+      if (n.quote) { var q = document.createElement('div'); q.className = 'quote'; q.textContent = n.quote; card.appendChild(q); }
+      var body = document.createElement('div'); body.className = 'body' + (n.body ? '' : ' empty');
+      body.textContent = n.body || 'Empty — click Edit to write.'; card.appendChild(body);
+      var row = document.createElement('div'); row.className = 'row';
+      var ed = document.createElement('button'); ed.className = 'edit'; ed.textContent = 'Edit'; ed.onclick = function () { editCard(card, n); };
+      var dl = document.createElement('button'); dl.className = 'del'; dl.textContent = 'Delete';
+      dl.onclick = function () { notes = notes.filter(function (x) { return x.id !== n.id; }); render(); try { applyAll(); } catch (e) {} save(); };
+      row.appendChild(ed); row.appendChild(dl); card.appendChild(row);
+      list.appendChild(card);
+    });
+  }
+  function editCard(card, n) {
+    card.innerHTML = '';
+    var loc = document.createElement('span'); loc.className = 'loc'; loc.textContent = '§ ' + n.sectionTitle; card.appendChild(loc);
+    if (n.quote) { var q = document.createElement('div'); q.className = 'quote'; q.textContent = n.quote; card.appendChild(q); }
+    var ta = document.createElement('textarea'); ta.value = n.body || ''; ta.placeholder = 'Type your note…'; card.appendChild(ta);
+    var row = document.createElement('div'); row.className = 'row';
+    var sv = document.createElement('button'); sv.className = 'save'; sv.textContent = 'Save';
+    sv.onclick = function () { n.body = ta.value.trim(); save(); render(); try { applyAll(); } catch (e) {} };
+    row.appendChild(sv); card.appendChild(row);
+    ta.focus();
+    ta.addEventListener('keydown', function (e) { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') sv.click(); });
+  }
+  function openPanel() { panel.classList.add('open'); setTimeout(function () { if (input) input.focus(); }, 40); }
+  fab.onclick = function () { panel.classList.toggle('open'); if (panel.classList.contains('open')) setTimeout(function () { if (input) input.focus(); }, 40); };
+  document.getElementById('notePanelClose').onclick = function () { panel.classList.remove('open'); };
+  document.getElementById('noteAdd').onclick = addFromComposer;
+  input.addEventListener('keydown', function (e) { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); addFromComposer(); } });
+  // lavish's annotate overlay can eat button clicks in the iframe; typing/blur are never intercepted.
+  input.addEventListener('blur', function () { if (input.value.trim()) addFromComposer(); });
+
+  function jump(id) {
+    var marks = document.querySelectorAll('mark.note-hl[data-nid="' + id + '"]');
+    var n = notes.find(function (x) { return x.id === id; });
+    var target = marks[0] || (n && document.getElementById(n.sectionId));
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    marks.forEach(function (m) { m.classList.remove('flash'); void m.offsetWidth; m.classList.add('flash'); });
+  }
+
+  // ---- selection popover ----
+  function hidePop() { pop.style.display = 'none'; }
+  document.addEventListener('mouseup', function () {
+    setTimeout(function () {
+      var s = document.getSelection();
+      if (!s || s.isCollapsed) { hidePop(); return; }
+      var txt = s.toString();
+      if (!txt.trim()) { hidePop(); return; }
+      var host = s.anchorNode && (s.anchorNode.nodeType === 3 ? s.anchorNode.parentElement : s.anchorNode);
+      if (!host || host.closest('.note-panel') || host.closest('.note-pop')) { hidePop(); return; }
+      var range = s.getRangeAt(0), section = sectionOf(range.startContainer);
+      var start = 0, end = 0;
+      if (section) {
+        start = offsetOf(section, range.startContainer, range.startOffset);
+        end = offsetOf(section, range.endContainer, range.endOffset);
+        if (end < start) { var tmp = start; start = end; end = tmp; }
+      }
+      lastSel = { quote: txt.trim().slice(0, 2000), section: section, start: start, end: end };
+      var rect = range.getBoundingClientRect(), cw = document.documentElement.clientWidth;
+      var x = Math.min(Math.max(64, rect.left + rect.width / 2), cw - 64);
+      pop.style.left = (window.scrollX + x) + 'px';
+      pop.style.top = (window.scrollY + Math.max(rect.top, 8)) + 'px';
+      pop.style.display = 'block';
+    }, 10);
+  });
+  document.addEventListener('scroll', hidePop, { passive: true });
+  popBtn.addEventListener('mousedown', function (e) {
+    e.preventDefault();
+    if (!lastSel) return;
+    var sec = lastSel.section;
+    setAnchor({ sectionId: sec ? sec.id : '', sectionTitle: titleOf(sec), quote: lastSel.quote, start: lastSel.start, end: lastSel.end });
+    openPanel(); hidePop();
+    var sel = window.getSelection(); if (sel) sel.removeAllRanges();
+  });
+
+  // click a highlight or its badge -> open + focus its card
+  document.addEventListener('click', function (e) {
+    var m = e.target.closest && e.target.closest('mark.note-hl, .note-badge');
+    if (!m || !m.dataset.nid) return;
+    openPanel(); render();
+    var card = list.querySelector('.note-card[data-nid="' + m.dataset.nid + '"]');
+    if (card) { card.scrollIntoView({ block: 'center' }); card.classList.add('active'); setTimeout(function () { card.classList.remove('active'); }, 1600); }
+  });
+  // two-way hover linking (delegated so it survives re-highlighting)
+  document.addEventListener('mouseover', function (e) { var m = e.target.closest && e.target.closest('mark.note-hl, .note-badge'); if (m && m.dataset.nid) setLinked(m.dataset.nid, true); });
+  document.addEventListener('mouseout', function (e) { var m = e.target.closest && e.target.closest('mark.note-hl, .note-badge'); if (m && m.dataset.nid) setLinked(m.dataset.nid, false); });
+
+  // ---- export ----
+  function toMd() {
+    return '# Notes — ' + DOC + '\n\n' + notes.map(function (n, i) {
+      return '## ' + (i + 1) + '. § ' + n.sectionTitle + '\n' + (n.quote ? '> ' + n.quote.replace(/\n/g, '\n> ') + '\n\n' : '') + (n.body || '') + '\n';
+    }).join('\n');
+  }
+  document.getElementById('noteCopy').onclick = function () { if (navigator.clipboard) navigator.clipboard.writeText(toMd()); };
+  document.getElementById('noteDownload').onclick = function () {
+    var b = new Blob([toMd()], { type: 'text/markdown' }), u = URL.createObjectURL(b);
+    var a = document.createElement('a'); a.href = u; a.download = 'notes.md'; a.click(); URL.revokeObjectURL(u);
+  };
+  document.getElementById('noteClear').onclick = function () { if (confirm('Delete ALL your notes? This cannot be undone.')) { notes = []; save(); applyAll(); render(); } };
+
+  render(); try { applyAll(); } catch (e) {} mirrorLocal(); cnt.textContent = notes.length; updateStatus();
+  // Reconcile with the optional disk server if it's running.
+  try {
+    fetch(REMOTE).then(function (r) { return r.ok ? r.json() : null; }).then(function (server) {
+      if (!Array.isArray(server)) return;
+      remoteOk = true;
+      if (server.length >= notes.length) { notes = server; render(); try { applyAll(); } catch (e) {} cnt.textContent = notes.length; }
+      else { save(); }
+      updateStatus();
+    }).catch(function () { remoteOk = false; updateStatus(); });
+  } catch (e) { updateStatus(); }
+})();
+</script>
+
+</body>
+</html>

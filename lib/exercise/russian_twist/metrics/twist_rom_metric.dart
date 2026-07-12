@@ -34,13 +34,13 @@ class TwistRomMetric extends RussianMetricBase {
     }
 
     if (ctx.state == RussianTwistState.returning && !_evaluatedThisHalf) {
-      final sufficientRom = (_bestAbsOffset ?? delta.abs()) >=
-          RussianTwistConfig.GOOD_ROM_DELTA;
+      final sufficientRom =
+          (_bestAbsOffset ?? delta.abs()) >= RussianTwistConfig.GOOD_ROM_DELTA;
 
       if (!sufficientRom) {
         addFault(
           FaultRecord(
-            type: 'shallow_twist',
+            type: 'rom',
             message: 'Vặn chưa đủ sâu, tay cần đi dứt khoát qua hai hướng.',
             affectsForm: true,
             phase: ctx.direction.name,

@@ -36,7 +36,7 @@ class CossackWorkingDepthMetric extends CossackMetricBase {
         ctx.resultIssues.feedback['depth_deep'] = message;
         addFault(
           FaultRecord(
-            type: 'too_deep',
+            type: 'depth_deep',
             message: 'Xuống quá sâu, có thể gây áp lực lên khớp gối.',
             affectsForm:
                 false, // Don't fail the rep for going too deep, just a warning
@@ -56,7 +56,7 @@ class CossackWorkingDepthMetric extends CossackMetricBase {
       if (!_reachedDepth) {
         addFault(
           FaultRecord(
-            type: 'shallow_depth',
+            type: 'depth_shallow',
             message: 'Squat chưa đủ sâu! Cố gắng hạ hông thấp hơn.',
             affectsForm: true,
             phase: 'ascending',

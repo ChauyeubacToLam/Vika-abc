@@ -27,7 +27,7 @@ class LumbarExtensionMetric extends SupermanMetricBase {
       ctx.resultIssues.feedback['Spine'] = 'Uốn lưng quá gắt! Hạ thấp tay chân';
       _logFault(
           ctx.state.name.toUpperCase(),
-          'Uốn lưng quá mức',
+          'lumbar',
           'Hạ thấp tay chân xuống, không uốn cong lưng quá gắt!',
           SupermanVoicePriority.lumbarExtension);
     } else {

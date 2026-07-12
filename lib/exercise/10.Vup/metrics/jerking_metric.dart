@@ -40,10 +40,10 @@ class JerkingMetric extends VUpMetricBase {
 
         final isSustainedJerk =
             _faultDebouncer.update(vel > VUpConfig.JERKING_VELOCITY_THRESHOLD);
-        if (isSustainedJerk && !_faults.any((f) => f.type == 'Jerking')) {
+        if (isSustainedJerk && !_faults.any((f) => f.type == 'jerking')) {
           _faults.add(FaultRecord(
             phase: ctx.state.name,
-            type: 'Jerking',
+            type: 'jerking',
             message: 'Dùng lực quán tính để giật lên',
             voiceMessage: 'Dùng cơ bụng để cuộn lên, không giật lấy đà!',
             affectsForm: true,

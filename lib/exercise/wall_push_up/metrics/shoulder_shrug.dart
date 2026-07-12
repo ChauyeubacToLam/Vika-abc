@@ -98,7 +98,7 @@ class ShoulderShrugMetric extends WallPushUpMetricBase {
     if (!_faults.any((f) => f.phase == phase && f.message == message)) {
       _faults.add(FaultRecord(
         phase: phase,
-        type: 'Shoulders',
+        type: 'shoulder',
         message: message,
         voiceMessage: voiceMessage,
         affectsForm: affectsForm,

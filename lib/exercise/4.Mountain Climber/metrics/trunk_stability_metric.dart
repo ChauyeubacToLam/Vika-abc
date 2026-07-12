@@ -65,7 +65,7 @@ class TrunkStabilityMetric extends ClimberMetricBase {
       ctx.resultIssues.feedback['Core'] = 'Võng lưng! Siết bụng lại';
       _logFault(
         phase,
-        'HipDrop',
+        'trunk_sag',
         'Giữ thẳng lưng, siết chặt cơ bụng',
         ClimberVoicePriority.trunkStability,
       );
@@ -73,7 +73,7 @@ class TrunkStabilityMetric extends ClimberMetricBase {
       ctx.resultIssues.feedback['Core'] = 'Hông nhấp nhô!';
       _logFault(
         phase,
-        'HipBounce',
+        'trunk_bounce',
         'Giữ hông cố định, không nảy mông',
         ClimberVoicePriority.trunkStability,
       );

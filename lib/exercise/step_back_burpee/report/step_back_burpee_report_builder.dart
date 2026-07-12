@@ -47,8 +47,10 @@ class StepBackBurpeeReportBuilder {
     int shortStepFaultReps = 0;
 
     for (var faults in _repHistory) {
-      bool hasSpineFault = faults.any((f) => f.type == 'Spine');
-      bool hasAmplitudeFault = faults.any((f) => f.type == 'Amplitude');
+      bool hasSpineFault = faults.any(
+        (f) => f.type == 'squat_hinge' || f.type == 'plank_sag',
+      );
+      bool hasAmplitudeFault = faults.any((f) => f.type == 'plank_extension');
 
       if (hasSpineFault) spineFaultReps++;
       if (hasAmplitudeFault) shortStepFaultReps++;

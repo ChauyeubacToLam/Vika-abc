@@ -47,7 +47,7 @@ class TempoMetric extends DeadBugMetricBase {
     if (extendingDuration != null && extendingDuration! < 0.8) {
       _faults.add(FaultRecord(
         phase: 'REP_COMPLETE',
-        type: 'Tempo',
+        type: 'tempo',
         message:
             'Thả rơi tay/chân nhanh (${extendingDuration!.toStringAsFixed(1)}s)',
         voiceMessage:

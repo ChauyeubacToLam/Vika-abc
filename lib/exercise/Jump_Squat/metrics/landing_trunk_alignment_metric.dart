@@ -52,7 +52,7 @@ class LandingTrunkAlignmentMetric extends JumpSquatMetricBase {
           _maxLeanAngle! > TrunkLandingConfig.MAX_LEAN_ANGLE) {
         _faults.add(FaultRecord(
           phase: 'REP_COMPLETE',
-          type: 'Back',
+          type: 'trunk',
           message:
               'Lưng rạp úp quá mức khi tiếp đất (${_maxLeanAngle!.toStringAsFixed(0)}°)! Giữ ngực cao.',
           voiceMessage: 'Nâng ngực lên khi tiếp đất',

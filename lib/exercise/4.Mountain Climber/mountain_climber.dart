@@ -7,9 +7,20 @@ import '../exercise_base.dart';
 import 'metrics/mountain_climber_metric_base.dart';
 import 'metrics/trunk_stability_metric.dart';
 import 'metrics/knee_drive_rom_metric.dart';
+import '../../voice/policy_voice_coach.dart';
+import '../../voice/voice_coach.dart';
+import '../../voice/voice_content.dart';
+import '../../voice/voice_policy.dart';
+import '../../voice/voice_sink.dart';
 
 class MountainClimber extends ExerciseBase {
-  MountainClimber({required this.maxRep});
+  static const List<String> _voiceFaultIds = [
+    'rom',
+    'trunk_sag',
+    'trunk_bounce',
+  ];
+
+  MountainClimber({required this.maxRep}) : super(targetReps: maxRep);
 
   static const double _movingLegPresenceMin = 0.25;
   static const double _movingLegVisibilityMin = 0.05;
@@ -28,6 +39,28 @@ class MountainClimber extends ExerciseBase {
 
   @override
   String get exerciseName => 'Mountain Climber';
+
+  @override
+  List<FaultRecord> get liveFaults => [
+        ...trunkMetric.faults,
+        ...romMetric.faults,
+      ];
+
+  @override
+  ExerciseVoiceCoach createVoiceCoach() {
+    return PolicyVoiceCoach(
+      script: VoiceScript.from(
+        VoiceDefaults.repBased,
+        slug: 'mountain_climber',
+        faultIds: _voiceFaultIds,
+      ),
+      targetReps: targetReps,
+      coach: VoiceCoach(
+        sink: AssetVoiceSink(),
+        policy: VoicePolicy(),
+      ),
+    );
+  }
 
   // ---------------------------------------------------------------------------
   // State — chỉ dùng để hiển thị UI label, KHÔNG dùng để đếm rep
@@ -358,6 +391,17 @@ class MountainClimber extends ExerciseBase {
     repCount++;
     if (!correctForm) resultIssues.feedback['Result'] = 'Chỉnh form';
 
+    final faultAffectsForm = <String, bool>{};
+    final faultPriorities = <String, int>{};
+    for (final fault in allFaults) {
+      faultAffectsForm[fault.type] =
+          (faultAffectsForm[fault.type] ?? false) || fault.affectsForm;
+      final previousPriority = faultPriorities[fault.type];
+      if (previousPriority == null || fault.priority < previousPriority) {
+        faultPriorities[fault.type] = fault.priority;
+      }
+    }
+
     logger.addRepLog(RepLog(
       correctForm: correctForm,
       repNumber: repCount,
@@ -367,6 +411,8 @@ class MountainClimber extends ExerciseBase {
         'peak_knee_angle': peakAngle,
         'zone_threshold': threshold,
         'fault_types': allFaults.map((f) => f.type).toSet().toList(),
+        'fault_affects_form': faultAffectsForm,
+        'fault_priorities': faultPriorities,
       },
     ));
 

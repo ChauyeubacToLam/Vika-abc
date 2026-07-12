@@ -40,7 +40,7 @@ class EccentricTempoMetric extends ReverseCrunchMetricBase {
       if (loweringDuration! < ReverseCrunchConfig.ECCENTRIC_MIN_TIME) {
         _faults.add(FaultRecord(
             phase: 'LOWERING',
-            type: 'FastEccentric',
+            type: 'tempo',
             message: 'Hạ hông quá nhanh',
             affectsForm: false, // Lỗi nhịp độ, không đánh hỏng form cứng
             priority: CrunchVoicePriority.tempo,

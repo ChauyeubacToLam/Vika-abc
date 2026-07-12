@@ -38,7 +38,7 @@ class RomMetric extends LegRaiseMetricBase {
     if (minHipFlexion == null || minHipFlexion! > 100.0) {
       _faults.add(FaultRecord(
         phase: 'REP_COMPLETE',
-        type: 'ROM',
+        type: 'rom',
         message: minHipFlexion == null
             ? 'Lên chưa đủ cao (Không nhận diện được pha nâng chân)'
             : 'Lên chưa đủ cao (Góc đỉnh: ${minHipFlexion!.toStringAsFixed(1)}°)',

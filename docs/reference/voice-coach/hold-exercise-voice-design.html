@@ -1,0 +1,1593 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hold-Exercise Voice Design — Proposal v1</title>
+<style>
+:root{
+  --ink:#1F1812; --ink-soft:#4A4031; --muted:#8a7c63;
+  --page:#F1E9D9; --raised:#FBF7EE; --line:#E4DAC5; --line-soft:#EEE6D5;
+  --yellow:#FFB701;
+  --code-bg:#211A12; --code-fg:#EDE3CE; --code-dim:#9A8C71; --code-ln:#6B5D45; --code-rule:#37291a;
+  --tip:#2E6E63; --tip-bg:#E9F1EE; --tip-line:#BFDBD3;
+  --warn:#A2472B; --warn-bg:#F7EAE2; --warn-line:#E7C6B6;
+  --idea:#8A6608; --idea-bg:#FBF0D6; --idea-line:#EBD69E;
+  --mono:"JetBrains Mono","SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--page);color:var(--ink);font-family:var(--sans);line-height:1.62;
+  -webkit-font-smoothing:antialiased;font-size:16px}
+a{color:inherit}
+h1,h2,h3{line-height:1.18;text-wrap:balance;font-weight:800;letter-spacing:-.01em}
+code{font-family:var(--mono)}
+.wrap{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:256px minmax(0,1fr);
+  gap:52px;padding:0 28px 120px}
+/* ---- Top hero ---- */
+header.hero{padding:56px 28px 40px;
+  background:radial-gradient(120% 140% at 12% 0%,#2b2117 0%,#1c150e 60%,#160f09 100%);
+  color:#F3ECDD;position:relative;overflow:hidden}
+header.hero::after{content:"";position:absolute;inset:0;opacity:.05;pointer-events:none;
+  background-image:repeating-linear-gradient(0deg,#fff 0 1px,transparent 1px 3px)}
+.hero-in{max-width:1144px;margin:0 auto;position:relative}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.24em;text-transform:uppercase;
+  color:var(--yellow);margin:0 0 14px}
+header.hero h1{font-size:clamp(30px,5vw,50px);margin:0 0 14px;color:#FBF7EE}
+header.hero h1 .u{background:linear-gradient(transparent 68%,rgba(255,183,1,.42) 0);padding:0 2px}
+header.hero p.lede{font-size:18px;max-width:74ch;color:#D9CFBD;margin:0 0 26px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-family:var(--mono);font-size:12px;padding:6px 11px;border-radius:999px;
+  border:1px solid rgba(255,255,255,.16);color:#E8DFCD;background:rgba(255,255,255,.04)}
+.chip b{color:var(--yellow);font-weight:600}
+/* ---- proposal ribbon ---- */
+.prop-ribbon{background:repeating-linear-gradient(45deg,#2b2117 0 14px,#332619 14px 28px);
+  color:#FBF7EE;font-family:var(--mono);font-size:12.5px;letter-spacing:.05em;text-align:center;
+  padding:9px 16px;border-bottom:2px solid var(--yellow)}
+.prop-ribbon b{color:var(--yellow)}
+/* ---- TOC ---- */
+nav.toc{position:sticky;top:0;align-self:start;max-height:100vh;overflow:auto;
+  padding:34px 0;font-size:13.5px}
+nav.toc .lbl{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--muted);margin:0 0 12px}
+nav.toc ol{list-style:none;margin:0;padding:0;counter-reset:toc}
+nav.toc li{counter-increment:toc;margin:1px 0}
+nav.toc a{display:flex;gap:9px;text-decoration:none;color:var(--ink-soft);padding:5px 10px;
+  border-radius:7px;border-left:2px solid transparent}
+nav.toc a:before{content:counter(toc,decimal-leading-zero);font-family:var(--mono);font-size:11px;
+  color:var(--muted);padding-top:2px}
+nav.toc a:hover{background:var(--line-soft)}
+nav.toc a.on{background:#fff;border-left-color:var(--yellow);color:var(--ink);font-weight:600}
+/* ---- Main ---- */
+main{min-width:0;padding-top:20px}
+section{scroll-margin-top:20px;padding:30px 0;border-top:1px solid var(--line)}
+section:first-of-type{border-top:0}
+.kicker{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--yellow);font-weight:600;margin:0 0 6px;display:flex;align-items:center;gap:10px}
+.kicker .n{color:var(--muted)}
+h2{font-size:clamp(22px,3.2vw,30px);margin:0 0 8px}
+h3{font-size:18px;margin:28px 0 6px;font-weight:700;line-height:1.35;text-wrap:wrap}
+h3 .tag{font-family:var(--mono);font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;
+  vertical-align:middle;margin-left:8px;letter-spacing:.04em}
+.tag.crit{background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-line)}
+.tag.high{background:var(--idea-bg);color:var(--idea);border:1px solid var(--idea-line)}
+.tag.med{background:var(--tip-bg);color:var(--tip);border:1px solid var(--tip-line)}
+.tag.ok{background:var(--tip-bg);color:var(--tip);border:1px solid var(--tip-line)}
+.tag.prop{background:#2b2117;color:var(--yellow);border:1px solid var(--idea-line)}
+p{margin:12px 0;max-width:74ch}
+.lead{font-size:17px;color:var(--ink-soft)}
+strong{font-weight:700}
+em.term{font-style:normal;font-weight:700;color:var(--ink);
+  background:linear-gradient(transparent 70%,rgba(255,183,1,.34) 0);padding:0 1px}
+ul,ol.steps{max-width:74ch;padding-left:20px}
+li{margin:5px 0}
+kbd{font-family:var(--mono);font-size:12px;background:var(--line-soft);border:1px solid var(--line);
+  border-radius:5px;padding:1px 6px;color:var(--ink-soft)}
+/* ---- vietnamese voice line ---- */
+.vn{font-family:var(--sans);font-style:italic;font-weight:600;color:#7a4d00;
+  background:linear-gradient(transparent 66%,rgba(255,183,1,.24) 0);padding:0 3px;border-radius:2px;
+  white-space:nowrap}
+.vn:before{content:"\201C"} .vn:after{content:"\201D"}
+/* ---- code ---- */
+.code{border-radius:12px;overflow:hidden;background:var(--code-bg);margin:18px 0;
+  box-shadow:0 1px 0 rgba(0,0,0,.04),0 14px 30px -22px rgba(31,24,18,.5)}
+.code-head{font-family:var(--mono);font-size:11.5px;color:var(--code-dim);padding:9px 14px;
+  border-bottom:1px solid var(--code-rule);letter-spacing:.03em;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.code-head span{min-width:0;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+.code-head b{color:var(--yellow);font-weight:600;flex:none}
+.code-body{overflow-x:auto}
+.src{padding:14px 20px 16px;color:var(--code-fg);white-space:pre;margin:0;min-width:max-content;
+  font-family:var(--mono);font-size:12.5px;line-height:1.72}
+.src .c{color:var(--code-dim);font-style:italic}
+.src .k{color:#E7A93A}
+.src .s{color:#9FBE7E}
+.src .bad{background:rgba(162,71,43,.36);border-radius:3px;padding:0 2px}
+.src .good{background:rgba(46,110,99,.32);border-radius:3px;padding:0 2px}
+/* ---- callouts ---- */
+.call{border-radius:11px;padding:15px 17px 15px 16px;margin:16px 0;border:1px solid;
+  border-left-width:4px;font-size:15px}
+.call p{margin:7px 0;max-width:none}
+.call .ct{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+  font-weight:700;display:flex;align-items:center;gap:8px;margin:0 0 4px}
+.call.eli{background:var(--raised);border-color:var(--line);border-left-color:var(--yellow)}
+.call.eli .ct{color:var(--idea)}
+.call.tip{background:var(--tip-bg);border-color:var(--tip-line);border-left-color:var(--tip)}
+.call.tip .ct{color:var(--tip)}
+.call.warn{background:var(--warn-bg);border-color:var(--warn-line);border-left-color:var(--warn)}
+.call.warn .ct{color:var(--warn)}
+.call.idea{background:var(--idea-bg);border-color:var(--idea-line);border-left-color:var(--idea)}
+.call.idea .ct{color:var(--idea)}
+.call.prop{background:#faf3e3;border-color:var(--idea-line);border-left-color:var(--yellow)}
+.call.prop .ct{color:var(--idea)}
+.call code{font-size:13px;background:rgba(0,0,0,.06);padding:1px 5px;border-radius:5px}
+/* ---- legend / chain ---- */
+.legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin:22px 0}
+.legend div{background:var(--raised);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:14px}
+.legend b{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px;color:var(--ink)}
+/* recap table */
+.tbl{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:18px 0}
+.recap{width:100%;border-collapse:collapse;margin:18px 0;font-size:14.5px;background:var(--raised);
+  border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.tbl .recap{margin:0;min-width:640px}
+.recap th,.recap td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line-soft);
+  vertical-align:top;word-break:break-word;overflow-wrap:anywhere}
+.recap th{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:#fff}
+.recap tr:last-child td{border-bottom:0}
+.recap .sev{font-family:var(--mono);font-size:11px;font-weight:700;white-space:nowrap}
+.recap .sev.hi{color:var(--warn)} .recap .sev.med{color:var(--idea)} .recap .sev.lo{color:var(--tip)}
+.recap td code,.recap th code{font-size:12.5px;background:var(--line-soft);padding:1px 5px;border-radius:5px;
+  white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+.recap td .vn{white-space:normal}
+/* ---- visual timeline ---- */
+.tl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:24px 0 10px;padding:6px 0 2px}
+.tl-axis{position:relative;min-width:840px;height:92px;margin:0 14px}
+.tl-axis .bar{position:absolute;left:0;right:0;top:44px;height:12px;border-radius:7px;
+  background:linear-gradient(90deg,#E4DAC5 0%,#E6C864 55%,#FFB701 100%)}
+.tl-axis .paused{position:absolute;top:41px;height:18px;border-radius:3px;
+  background:repeating-linear-gradient(45deg,#e2b39f 0 6px,#F7EAE2 6px 12px);
+  border:1px solid var(--warn-line)}
+.tl-axis .cd{position:absolute;top:38px;height:24px;border-radius:5px;border:1px dashed var(--idea-line);
+  background:rgba(255,183,1,.10)}
+.tl-axis .tk{position:absolute;top:62px;transform:translateX(-50%);font-family:var(--mono);font-size:11px;color:var(--muted)}
+.tl-axis .tk:before{content:"";position:absolute;left:50%;top:-16px;width:1px;height:11px;background:var(--line)}
+.tl-axis .dot{position:absolute;top:44px;width:14px;height:14px;border-radius:50%;
+  transform:translate(-50%,-1px);border:3px solid var(--page);box-shadow:0 0 0 1px var(--line);z-index:2}
+.tl-axis .dot.mile{background:var(--yellow)}
+.tl-axis .dot.brk{background:var(--warn)}
+.tl-axis .dot.push{background:var(--tip)}
+.tl-axis .dot.done{background:var(--ink)}
+.tl-axis .lab{position:absolute;top:4px;transform:translateX(-50%);font-family:var(--mono);
+  font-size:10.5px;color:var(--ink-soft);white-space:nowrap;background:var(--raised);
+  border:1px solid var(--line);border-radius:6px;padding:2px 6px}
+.tl-axis .lab.dn{top:auto;bottom:2px;color:var(--warn);border-color:var(--warn-line);background:var(--warn-bg)}
+.tl-cards{display:flex;flex-wrap:wrap;gap:10px;margin:0 14px}
+.tl-cards .c code{overflow-wrap:anywhere}
+.tl-cards .c{flex:1 1 140px;min-width:0;background:var(--raised);border:1px solid var(--line);border-radius:10px;
+  padding:10px 11px;font-size:13px;min-width:0}
+.tl-cards .c .t{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ink);margin-bottom:5px}
+.tl-cards .c.brk{border-left:3px solid var(--warn)}
+.tl-cards .c.mile{border-left:3px solid var(--yellow)}
+.tl-cards .c.push{border-left:3px solid var(--tip)}
+.tl-cards .c .vn{white-space:normal;font-size:12.5px}
+.tl-cards .c .w{color:var(--muted);font-size:12px;margin-top:5px}
+/* ---- fork ---- */
+.fork{border:1px solid var(--line);border-radius:14px;background:var(--raised);margin:22px 0;overflow:hidden}
+.fork>.fh{display:flex;align-items:center;gap:12px;padding:14px 18px;background:#fff;border-bottom:1px solid var(--line)}
+.fork>.fh .fn{font-family:var(--mono);font-size:13px;font-weight:800;color:#fff;background:var(--ink);
+  border-radius:8px;min-width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.fork>.fh h3{margin:0;font-size:17px}
+.fork .fb{padding:6px 18px 18px}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}
+.opts .o{border:1px solid var(--line);border-radius:10px;padding:11px 13px;font-size:14px;background:#fff}
+.opts .o .oh{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;margin-bottom:5px}
+.opts .o.rec{border-color:var(--idea-line);background:var(--idea-bg)}
+.opts .o.rec .oh{color:var(--idea)}
+.opts .o.alt .oh{color:var(--muted)}
+.yourcall{display:inline-flex;align-items:center;gap:9px;margin:8px 0 2px;font-family:var(--mono);
+  font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink);
+  background:var(--yellow);border-radius:999px;padding:7px 15px}
+.rectag{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--idea);
+  background:var(--idea-bg);border:1px solid var(--idea-line);border-radius:6px;padding:2px 8px;margin-left:6px}
+.foot{grid-column:1/-1;margin-top:40px;padding-top:22px;border-top:1px solid var(--line);
+  color:var(--muted);font-size:13.5px;font-family:var(--mono)}
+@media(max-width:900px){
+  .wrap{grid-template-columns:1fr;gap:0;padding:0 18px 80px}
+  nav.toc{position:static;max-height:none;height:auto;padding:22px 0;border-bottom:1px solid var(--line);margin-bottom:8px}
+  nav.toc ol{columns:2;gap:8px}
+  header.hero{padding:44px 18px 32px}
+  .opts{grid-template-columns:1fr}
+  .note-fab{right:14px;bottom:14px}
+}
+/* ===== personal notes layer ===== */
+mark.note-hl{background:rgba(255,183,1,.20);border-bottom:2px solid rgba(255,183,1,.7);border-radius:2px;
+  cursor:pointer;color:inherit;padding:0 .5px;transition:background .12s ease}
+mark.note-hl.hot{background:rgba(255,183,1,.45)}
+mark.note-hl.flash{animation:noteflash 1.2s ease}
+@keyframes noteflash{0%,100%{background-color:rgba(255,183,1,.20)}30%{background-color:rgba(255,183,1,.62)}}
+.note-badge{display:inline-flex;align-items:center;justify-content:center;min-width:14px;height:14px;padding:0 3px;
+  margin:0 1px 0 2px;font-family:var(--sans);font-size:9px;font-weight:800;line-height:1;vertical-align:super;
+  background:var(--ink);color:#FBF7EE;border-radius:7px;cursor:pointer;user-select:none;transition:background .12s ease}
+.note-badge.hot{background:var(--yellow);color:var(--ink)}
+.note-card{transition:box-shadow .12s ease,border-color .12s ease}
+.note-card.linked{border-color:var(--yellow);box-shadow:0 0 0 2px rgba(255,183,1,.28)}
+.note-card.active{border-color:var(--yellow);box-shadow:0 0 0 3px rgba(255,183,1,.42)}
+.note-card .cnum{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;
+  background:var(--ink);color:#FBF7EE;border-radius:8px;font-size:10px;font-weight:800;margin-right:7px;vertical-align:middle}
+.note-fab{position:fixed;right:22px;bottom:22px;z-index:50;display:flex;align-items:center;gap:9px;
+  background:var(--ink);color:#FBF7EE;border:none;border-radius:999px;padding:12px 17px;cursor:pointer;
+  font-family:var(--sans);font-weight:600;font-size:14px;box-shadow:0 10px 26px -10px rgba(31,24,18,.55)}
+.note-fab:hover{background:#332619}
+.note-fab .cnt{font-family:var(--mono);font-size:12px;background:var(--yellow);color:var(--ink);
+  border-radius:999px;padding:1px 8px;min-width:20px;text-align:center}
+.note-pop{position:absolute;z-index:60;transform:translate(-50%,-100%);margin-top:-9px;display:none;
+  background:var(--ink);border-radius:9px;padding:5px;box-shadow:0 12px 30px -12px rgba(0,0,0,.5)}
+.note-pop button{background:var(--yellow);color:var(--ink);border:none;border-radius:6px;
+  padding:7px 12px;font-family:var(--sans);font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap}
+.note-pop:after{content:"";position:absolute;left:50%;top:100%;transform:translateX(-50%);
+  border:6px solid transparent;border-top-color:var(--ink)}
+.note-panel{position:fixed;top:0;right:0;height:100%;width:min(380px,92vw);z-index:70;background:var(--raised);
+  border-left:1px solid var(--line);box-shadow:-18px 0 40px -30px rgba(31,24,18,.5);display:flex;flex-direction:column;
+  opacity:0;visibility:hidden;transform:translateY(6px);transition:opacity .18s ease,transform .18s ease,visibility .18s}
+.note-panel.open{opacity:1;visibility:visible;transform:none}
+.note-panel .ph{padding:18px 18px 14px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.note-panel .ph h3{margin:0;font-size:17px;font-weight:800}
+.note-panel .ph .sub{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.03em}
+.note-panel .x{background:none;border:none;font-size:24px;line-height:1;cursor:pointer;color:var(--muted)}
+.newbtn{background:var(--ink);color:#FBF7EE;border:none;border-radius:8px;padding:7px 12px;font-family:var(--sans);font-weight:700;font-size:12.5px;cursor:pointer;white-space:nowrap}
+.composer{padding:12px 14px;border-bottom:1px solid var(--line);background:#fff}
+.composer .anchor{font-family:var(--mono);font-size:11px;color:var(--tip);background:var(--tip-bg);
+  border:1px solid var(--tip-line);border-radius:7px;padding:5px 8px;margin-bottom:8px;display:flex;gap:6px;align-items:center;overflow:hidden}
+.composer .anchor span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.composer .anchor .axn{margin-left:auto;cursor:pointer;font-weight:700;flex:none}
+.composer textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:9px;
+  font-family:var(--sans);font-size:15px;padding:10px;resize:vertical;min-height:82px;background:#fff;color:var(--ink)}
+.composer textarea:focus{outline:2px solid var(--yellow);outline-offset:0;border-color:transparent}
+.composer .crow{display:flex;flex-direction:column;align-items:stretch;gap:7px;margin-top:8px}
+.composer .chint{font-size:11.5px;color:var(--muted)}
+.composer .addbtn{display:block;width:100%;background:var(--ink);color:#FBF7EE;border:none;border-radius:9px;
+  padding:12px 16px;font-family:var(--sans);font-weight:700;font-size:15px;cursor:pointer}
+.composer .addbtn:hover{background:#332619}
+.storage-note{margin:0;padding:9px 14px;background:var(--warn-bg);border-bottom:1px solid var(--warn-line);
+  color:var(--warn);font-size:12px;line-height:1.5}
+.storage-note.ok{background:var(--tip-bg);border-bottom-color:var(--tip-line);color:var(--tip)}
+.note-list{flex:1;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:12px}
+.note-empty{color:var(--muted);font-size:14px;text-align:center;padding:40px 14px;line-height:1.7}
+.note-empty b{color:var(--ink)}
+.note-card{background:#fff;border:1px solid var(--line);border-radius:11px;padding:12px 13px}
+.note-card .loc{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--tip);font-weight:700;cursor:pointer;margin-bottom:6px;display:inline-block}
+.note-card .quote{font-size:12px;color:var(--ink-soft);border-left:3px solid var(--line);padding:2px 0 2px 9px;
+  margin:0 0 8px;font-family:var(--mono);white-space:pre-wrap;word-break:break-word;max-height:74px;overflow:auto}
+.note-card .body{font-size:14.5px;white-space:pre-wrap;word-break:break-word}
+.note-card .body.empty{color:var(--muted);font-style:italic}
+.note-card textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;font-family:var(--sans);
+  font-size:14.5px;padding:8px;resize:vertical;min-height:66px;background:#fff;color:var(--ink)}
+.note-card .row{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
+.note-card .row button{border:none;border-radius:7px;padding:6px 11px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:var(--sans)}
+.note-card .save{background:var(--ink);color:#FBF7EE}
+.note-card .edit{background:var(--line-soft);color:var(--ink-soft)}
+.note-card .del{background:var(--warn-bg);color:var(--warn)}
+.note-card .reply{background:var(--tip-bg);color:var(--tip)}
+.note-card .replies{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+.note-thread{border-left:3px solid var(--line);padding:5px 0 5px 10px}
+.note-thread .who{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:3px;font-weight:700}
+.note-thread .txt{font-size:13.5px;white-space:pre-wrap;word-break:break-word}
+.note-thread.agent{border-left-color:var(--yellow)}
+.note-thread.agent .who{color:var(--idea)}
+.reply-box{margin-top:9px}
+.reply-box textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;
+  font-family:var(--sans);font-size:14px;padding:8px;resize:vertical;min-height:52px;background:#fff;color:var(--ink)}
+.reply-box textarea:focus{outline:2px solid var(--yellow);outline-offset:0;border-color:transparent}
+.note-panel .pf{padding:11px 14px;border-top:1px solid var(--line);display:flex;gap:8px}
+.note-panel .pf button{flex:1;border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans);color:var(--ink-soft)}
+.note-panel .pf button:hover{background:var(--line-soft)}
+</style>
+</head>
+<body>
+<div class="prop-ribbon"><b>DECIDED v2</b> · 2026-07-11 · ruled by Nam (lavish review) · <span style="color:#D9CFBD">was Proposal v1 — every fork below is now closed; the fork framing is kept as history</span></div>
+<header class="hero">
+  <div class="hero-in">
+    <p class="eyebrow">Voice coach · hold-based exercises · DECIDED design</p>
+    <h1>How the coach talks during a <span class="u">hold</span></h1>
+    <p class="lede">Rep-based voice behaviour is locked and piloted on glute bridge. This is its
+      counterpart for <strong>timed / isometric holds</strong> — plank and friends — where there are no reps,
+      just a clock. The big ruling (2026-07-11): the clock is <strong>pose-validity gated, not
+      form-gated</strong> — two rings, only cheating stops the time. Pilot: <strong>High Plank</strong>.
+      Implementation is specced in <code>docs/scratch/hold-voice-impl-spec.md</code>.</p>
+    <div class="chips">
+      <span class="chip"><b>status</b> decided, spec live</span>
+      <span class="chip"><b>pilot</b> High Plank (sets × duration)</span>
+      <span class="chip"><b>4</b> forks ruled</span>
+      <span class="chip"><b>3</b> risks resolved by architecture</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc" aria-label="Contents">
+  <p class="lbl">On this page</p>
+  <ol>
+    <li><a href="#ctx">What this doc is</a></li>
+    <li><a href="#eli5">ELI5 — the two rings</a></li>
+    <li><a href="#research">Research digest</a></li>
+    <li><a href="#earcons">Earcon channel</a></li>
+    <li><a href="#behavior">Decided behaviour</a></li>
+    <li><a href="#risks">Wiring risks → resolved</a></li>
+    <li><a href="#timeline">Visual timeline</a></li>
+    <li><a href="#worked">Worked example transcript</a></li>
+    <li><a href="#forks">Forks — how they were ruled</a></li>
+    <li><a href="#audio">Audio inventory</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<!-- ============================================================= -->
+<section id="ctx">
+  <p class="kicker"><span class="n">01</span> Context</p>
+  <h2>What this is, and where it sits</h2>
+  <p class="lead">One sentence: this proposes how the <em class="term">policy voice coach</em> — the same
+    brain that already runs the glute-bridge pilot — should behave when the exercise is a <strong>hold</strong>
+    instead of a set of reps.</p>
+
+  <div class="call prop">
+    <p class="ct">▲ Decided — this is the walkthrough of what's being built</p>
+    <p>The rep-based spec (<code>voice-behavior-spec.md</code>) is <strong>locked</strong> and the glute
+      pilot is <strong>live on device</strong>. Holds were the gap. Nam ruled every fork in a lavish review
+      on 2026-07-11; this doc is now a <strong>DECIDED walkthrough</strong>, and the migration is specced for
+      Codex in <code>docs/scratch/hold-voice-impl-spec.md</code>. High Plank still runs a <strong>legacy
+      bespoke coach</strong> today (free-text TTS, a fixed 2.5s cooldown, none of the policy machinery) — the
+      plan is to <strong>retire that and put holds on the policy coach</strong>, reusing every locked
+      rep-based principle. Sections that were forks now read <span class="rectag">RULED</span> with the
+      one-line why; the fork framing is kept below as history.</p>
+  </div>
+
+  <div class="legend">
+    <div><b>Locked (don't re-litigate)</b>Cue types, the hunger/base/cap probability model, silence-is-default,
+      no-metronomes, deterministic-for-causality, the collision gap, data honesty, and the 07-11
+      "count = registration" trust ruling. This doc <em>reuses</em> them verbatim.</div>
+    <div><b>The big ruling</b>The clock is <strong>pose-validity gated, not form-gated</strong> — an OUTER
+      anti-cheat ring gates time, an INNER form ring is coached while the clock keeps running (§02). Only
+      cheating stops earning. This reversed the original proposal.</div>
+    <div><b>Ruled forks (§09)</b>Milestone praise/hustle switch; NO spoken countdown (earcons instead);
+      timeout deleted; sets normalised fleet-wide. The four §09 forks are all closed.</div>
+    <div><b>Pilot scope</b>High Plank only. ~20 exercises expose <code>liveHoldSeconds</code>, but they split
+      into effortful isometrics and calm yoga/stretch poses (see §05) — the register split is deferred.</div>
+  </div>
+
+  <div class="call idea">
+    <p class="ct">💡 How to read this doc</p>
+    <p>Code blocks are verbatim from the repo (file + line range in the dark header); the
+      <span style="background:rgba(162,71,43,.30);padding:0 3px;border-radius:3px">red</span> /
+      <span style="background:rgba(46,110,99,.28);padding:0 3px;border-radius:3px">green</span> highlights
+      mark the load-bearing line. Under the two-ring ruling the red "form-gated clock" lines are exactly
+      what <strong>changes</strong> — the snippets now show what the migration replaces. <strong>ELI5</strong>
+      = plain English. Vietnamese product copy shows as <span class="vn">Được một nửa rồi</span>. Select any
+      text and hit <kbd>🖊 Note this</kbd> to pin a reaction — it saves to disk and I read it back.</p>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<section id="eli5">
+  <p class="kicker"><span class="n">02</span> The core idea</p>
+  <h2>ELI5 — why a hold is a different animal from reps</h2>
+
+  <p class="lead">Reps and holds look similar on screen but are opposite shapes to a voice coach. Get this
+    one idea and the rest of the doc is obvious.</p>
+
+  <div class="legend">
+    <div><b>Reps = a string of events</b>Each rep is a discrete thing with a start and an end. The coach has
+      natural moments to speak: "a rep just landed" → count it; "that rep was clean/bad" → praise/correct.
+      Events everywhere.</div>
+    <div><b>Hold = one long event</b>A 30s plank is a <em>single</em> continuous thing. There are no rep
+      boundaries to hang cues on. The only real "events" are <strong>state changes</strong>: you got into
+      position, you broke form, you fixed it, you finished.</div>
+  </div>
+
+  <h3>The clock is "earned time" — but earned means <em>in-pose</em>, not <em>flawless</em> <span class="tag ok">RULED 07-11</span></h3>
+  <p>This is the fact everything hinges on, and it's where Nam reversed the original proposal. The hold clock
+    advances while you are <strong>recognisably in the pose</strong> — it stops only when you leave it. It does
+    <strong>not</strong> freeze on a form fault. The shipped code today does the opposite (it freezes on any
+    sag), and that's exactly the line the migration changes:</p>
+
+  <div class="legend">
+    <div><b>OUTER ring — anti-cheat (gates the clock)</b>"Are you still doing a plank at all?" On the floor,
+      not stood up, not collapsed flat, in frame, not planking on a wall. Lose the outer ring → the clock
+      stops earning. This is the only thing that pauses time.</div>
+    <div><b>INNER ring — form quality (clock keeps running)</b>Sagging / piked / elbow <em>within</em> a still-
+      recognisable plank. Coached in real time on the fault channel — but the seconds keep banking. The
+      per-metric fault-<em>seconds</em> still accrue, so the post-set summary stays honest.</div>
+  </div>
+
+  <div class="call idea">
+    <p class="ct">💡 Why the reversal — coach, not referee</p>
+    <p>Users come to Vika to be <em>coached</em> on their faults. Freezing the clock the instant a beginner's
+      hips sag punishes the exact thing they showed up to fix — it reads as a referee blowing a whistle, not a
+      coach. So a fault gets a <strong>real-time correction</strong> while the clock keeps ticking; only
+      <strong>cheating</strong> (leaving the pose) stops earning time. The quality honesty lives in the post-set
+      summary (fault-seconds), the clock lives in the time. Two separate jobs.</p>
+  </div>
+
+  <p>Mechanically the clock is still "earned time" that only accrues in the <code>holding</code> state — that
+    part is unchanged:</p>
+
+  <div class="code">
+    <div class="code-head"><span>lib/exercise/3.High Plank/metrics/timer_metric.dart — the clock only ticks while holding (UNCHANGED)</span><b>L17–42</b></div>
+    <div class="code-body"><pre class="src"><span class="k">@override</span>
+<span class="k">void</span> onStateTransition(
+    HighPlankState from, HighPlankState to, <span class="k">int</span> timestampMs) {
+  <span class="k">if</span> (to == HighPlankState.holding) {
+    _lastTickMs = timestampMs;
+  } <span class="k">else</span> {
+    _lastTickMs = <span class="k">null</span>;                 <span class="c">// &lt;- leaving 'holding' STOPS the clock</span>
+  }
+}
+
+<span class="k">@override</span>
+<span class="k">void</span> update(HighPlankRepContext ctx) {
+  <span class="k">if</span> (ctx.state == HighPlankState.holding) {   <span class="c">// &lt;- ONLY accrues while holding</span>
+    <span class="k">if</span> (_lastTickMs == <span class="k">null</span>) {
+      _lastTickMs = ctx.frameTimestampMs;
+    } <span class="k">else</span> {
+      <span class="k">int</span> delta = ctx.frameTimestampMs - _lastTickMs!;
+      <span class="good">totalHoldingTimeMs += delta;</span>            <span class="c">// earned time only</span>
+      _lastTickMs = ctx.frameTimestampMs;
+    }
+  }
+  ...
+}</pre></div>
+  </div>
+
+  <p>The earned seconds ride the rep counter — a plank's "rep count" is just how many banked seconds you have,
+    and the adapter reads it to detect milestone crossings. What the ruling changes is <em>when a second is
+    earned</em>: the per-metric fault-<em>seconds</em> (<code>faultingByKey</code> below) now accrue
+    <strong>while the clock keeps running through a sag</strong>, instead of the clock freezing:</p>
+
+  <div class="code">
+    <div class="code-head"><span>lib/exercise/3.High Plank/high_plank.dart — earned seconds feed repCount; fault-seconds accrue through the hold</span><b>L400–413</b></div>
+    <div class="code-body"><pre class="src"><span class="k">if</span> (state == HighPlankState.holding) {
+  _holdSeconds.accumulate(
+    elapsedMs: elapsedMs,
+    faultingByKey: {                              <span class="c">// per-metric fault-SECONDS accrue here</span>
+      <span class="s">'sagging_seconds'</span>: saggingMetric.isFaultingNow,
+      <span class="s">'piked_seconds'</span>: pikedHipMetric.isFaultingNow,
+      <span class="s">'elbow_seconds'</span>: elbowMetric.isFaultingNow,
+    },
+  );
+} <span class="k">else if</span> (wasHolding) {
+  _holdSeconds.resetTick();
+}
+
+<span class="good">repCount = timerMetric.totalHoldingTimeMs ~/ 1000;</span>   <span class="c">// &lt;- earned SECONDS = the "rep count"</span></pre></div>
+  </div>
+
+  <div class="call eli">
+    <p class="ct">🧒 ELI5 — the one consequence</p>
+    <p>You <strong>cannot</strong> schedule <span class="vn">còn 15 giây</span> on a wall clock, because
+      leaving the pose stalls earned time. So every time announcement is a <em>crossing of earned in-pose
+      time</em> — "you have now banked 15 seconds." That's a feature, not a workaround: each milestone is a
+      genuine <strong>causal event</strong> ("you earned this"), which is what the locked
+      <em>deterministic-for-causality</em> principle wants, and it sidesteps <em>no-metronomes</em> — nothing
+      fires on a fixed beat. Under the two-ring ruling the clock almost never stalls mid-hold (only real
+      cheating does it), so those crossings track the real seconds closely.</p>
+  </div>
+
+  <h3>The trust rule flips upside-down</h3>
+  <p>For reps, the 07-11 ruling was: <strong>every landed rep must speak its number</strong>, because a
+    silent rep is ambiguous ("did it count?"). Silence there is a trust leak. For a hold, silence means the
+    opposite:</p>
+
+  <table class="recap">
+    <tr><th>&nbsp;</th><th>Rep-based (locked)</th><th>Hold-based (decided)</th></tr>
+    <tr><td class="sev">What silence means</td>
+      <td>Ambiguous — did the rep register? So every rep speaks (count = registration).</td>
+      <td><strong>Reassuring</strong> — silence = the clock is running. No news is good news.</td></tr>
+    <tr><td class="sev">What voice marks</td>
+      <td>Each discrete event (the landed rep) + outcome.</td>
+      <td>A few sparse <strong>milestones</strong> (halfway, final stretch) + <strong>real-time fault
+        corrections</strong>. The continuous clean part is deliberately quiet; the end-of-set countdown is
+        non-verbal <strong>earcons</strong>, not spoken numbers (§04).</td></tr>
+  </table>
+
+  <div class="call idea">
+    <p class="ct">💡 So the whole hold philosophy in one line</p>
+    <p><strong>Front-load the setup, then stay quiet; coach faults in real time while the clock keeps running,
+      and speak at the meaningful marks (halfway, the final stretch).</strong> Leaving the pose is the only
+      thing that stalls the clock. The research below says every discipline that coaches holds converges on
+      the front-load-then-quiet shape.</p>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<section id="research">
+  <p class="kicker"><span class="n">03</span> Evidence</p>
+  <h2>Research digest — how the world coaches a hold</h2>
+  <p class="lead">A prior web-research pass (Sonnet) surveyed yoga teaching, PT/personal-training practice,
+    plank-timer apps, and sport-science literature. Reproduced faithfully with confidence labels. This is
+    the source of truth for the claims — not re-run here.</p>
+
+  <table class="recap">
+    <tr><th>Finding</th><th>What it says</th><th>Confidence</th></tr>
+    <tr><td><b>Front-load, then go quiet</b></td>
+      <td>Every teaching tradition front-loads 2–3 form cues at the start, then falls deliberately silent
+        (yoga's "3-cue rule", Sage Rountree; NASM / PTDC "pause after cueing"). <strong>Silence is an
+        intentional feature</strong>, not an absence of coaching.</td>
+      <td><span class="tag high">high</span></td></tr>
+    <tr><td><b>Halfway is sacred</b></td>
+      <td>The <em>one</em> milestone every source family flags: yoga's <span class="vn">last breath, halfway there</span>,
+        PT fatigue-onset psychology, plank apps' spoken halfway call-out. Treat as <strong>mandatory</strong>.</td>
+      <td><span class="tag high">high</span></td></tr>
+    <tr><td><b>Density rises in the last ~10s</b></td>
+      <td>A countdown over the final 5–10s is near-universal in apps (Freeletics ships a <em>mute</em> toggle —
+        i.e. on by default). Encouragement concentrates here, matching fatigue onset. <strong>Vika realises
+        this as non-verbal earcons, not spoken numbers</strong> (§04) — a coach says "10 seconds left", not
+        "10, 9, 8".</td>
+      <td><span class="tag med">medium-high</span></td></tr>
+    <tr><td><b>Long holds get check-ins, not narration</b></td>
+      <td>Holds &gt;60s get a sparse check-in roughly every 30s — a touch-point, not continuous talk.</td>
+      <td><span class="tag med">medium</span></td></tr>
+    <tr><td><b>External-focus cues win</b></td>
+      <td>Sport science: <em>external</em>-focus corrections (<span class="vn">đẩy sàn ra xa</span> — push the
+        floor away) measurably beat internal/anatomical ones (<span class="vn">siết cơ bụng</span> — squeeze
+        your abs) for isometric output (2026 isometric-trunk study; ScienceForSport). Concrete measured
+        feedback beats generic hype (2024 bench-press study). <em>Ideal encouragement frequency is an
+        acknowledged research gap</em> — practitioner consensus is the best evidence we have.</td>
+      <td><span class="tag high">high (for the focus effect)</span></td></tr>
+  </table>
+
+  <h3>Register: yoga vs PT — Vika sits between</h3>
+  <table class="recap">
+    <tr><th>&nbsp;</th><th>Yoga register</th><th>PT / HIIT register</th><th>Vika (decided)</th></tr>
+    <tr><td class="sev">Density</td><td>Sparse</td><td>Denser</td><td>Yoga-sparse baseline</td></tr>
+    <tr><td class="sev">Milestones</td><td>Felt, not numeric (<span class="vn">last breath</span>)</td>
+      <td>Numeric countdowns</td><td>Halfway (spoken) + non-verbal earcon countdown</td></tr>
+    <tr><td class="sev">Energy</td><td>Calm</td><td>Energetic</td><td>Encouraging, never drill-sergeant</td></tr>
+  </table>
+  <p>Down Dog exposes cue density as a user dial — evidence the "right" density is personal, which is why
+    the register split (§05) is real but deferred. Vika's default: <strong>yoga sparsity + HIIT's
+    evidence-backed halfway marker, with the final countdown moved to earcons</strong> (§04).</p>
+</section>
+
+<!-- ============================================================= -->
+<section id="earcons">
+  <p class="kicker"><span class="n">04</span> Evidence · sound</p>
+  <h2>The earcon channel — voice carries meaning, sounds carry state</h2>
+  <p class="lead">The end-of-set countdown is <strong>non-verbal earcons</strong>, not a spoken
+    <span class="vn">năm, bốn, ba…</span>. This was Nam's ruling and it is research-backed: every interval
+    timer, boxing-gym clock, and plank app converges on a beep grammar that needs <strong>zero teaching</strong>.</p>
+
+  <div class="call idea">
+    <p class="ct">💡 The channel-separation principle</p>
+    <p><strong>Voice carries meaning; sounds carry state.</strong> A spoken line is for something that needs
+      words — a correction, a milestone, encouragement. The passage of the final seconds is pure <em>state</em>,
+      and a coach never robot-counts it ("a coach says <span class="vn">còn 10 giây</span>, not
+      <span class="vn">10, 9, 8</span>"). Encoding the last-3-seconds as identical beeps keeps the two channels
+      from clashing: the voice can still be finishing a <span class="vn">cố lên</span> while the beeps tick
+      underneath, because they occupy different perceptual lanes.</p>
+  </div>
+
+  <h3>The beep grammar (research-verified, needs no teaching)</h3>
+  <div class="tbl">
+  <table class="recap">
+    <tr><th>Signal</th><th>When</th><th>Sound</th><th>Why it reads instantly</th></tr>
+    <tr><td><b>Final-3 pips</b></td><td>Earned seconds <code>target−3</code>, <code>−2</code>, <code>−1</code></td>
+      <td>3 identical short beeps</td>
+      <td>The universal "get ready, almost there" of every interval timer — three even ticks = "three left".</td></tr>
+    <tr><td><b>End tone</b></td><td>Earned time hits <code>target</code></td>
+      <td>One distinct, higher/longer tone</td>
+      <td>The "time!" bell — a different sound from the pips, so "done" is unmistakably not "another second".</td></tr>
+    <tr><td><b>Continuous tick</b></td><td>—</td><td><span class="sev">none in v1</span></td>
+      <td>Research flags an anxiety cost and it clashes with voice. Possible later as an opt-in; not v1.</td></tr>
+  </table>
+  </div>
+
+  <div class="call tip">
+    <p class="ct">✔ Why earcons over spoken numerals — and the honest stall</p>
+    <p>Because the beeps ride <strong>earned-second</strong> crossings, they stall honestly if the user leaves
+      the pose mid-countdown — which, under the two-ring ruling (§02), almost never happens mid-hold. No spoken
+      countdown means no half-spoken <span class="vn">ba…</span> freezing awkwardly. <strong>Escape hatch:</strong>
+      if the beeps feel worse than numbers on device, swapping to the already-recorded
+      <code>count_1..3</code> is a <em>one-line content change</em> — flagged in the impl spec, not built.</p>
+  </div>
+
+  <div class="call warn">
+    <p class="ct">🔴 Implementation note — earcons must not queue behind voice</p>
+    <p>The voice sink (<code>voice_sink.dart</code>) is a single FIFO; a beep pushed through it would wait
+      behind a playing 3s milestone line and miss its second. The spec recommends a <strong>second, lightweight
+      player</strong> running in parallel (channel separation in code, too), fire-and-forget, no hunger/no
+      collision-gap — earcons are deterministic state pips, not outcome cues. See
+      <code>docs/scratch/hold-voice-impl-spec.md</code> §4.</p>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<section id="behavior">
+  <p class="kicker"><span class="n">05</span> The design</p>
+  <h2>Decided behaviour — each rep cue type, mapped to a hold</h2>
+  <p class="lead">The move is <strong>reuse, don't reinvent</strong>: take every locked rep-based cue type
+    and give it a hold analog. Most of the machinery is identical; the count and the clock-gating change
+    shape hard. All rows below are <strong>ruled</strong>.</p>
+
+  <div class="tbl">
+  <table class="recap">
+    <tr><th>Rep-based rule (locked)</th><th>Hold-based analog (decided)</th><th>What actually changes</th></tr>
+    <tr><td><b>count</b> — every landed rep speaks its number, deterministic, personality-immune</td>
+      <td><b>time milestones</b> — halfway + <span class="vn">còn 10 giây</span> (relative, any duration),
+        fired on earned-time crossings. NO spoken countdown; the final 3s + end are non-verbal earcons (§04)</td>
+      <td>Biggest change. A continuous clock has no discrete reps, so "count every rep" becomes "announce two
+        earned-time marks + earcons." Still deterministic + personality-immune.</td></tr>
+    <tr><td><b>criticalFault / softFault</b> — real-time, first-occurrence 100%, persistence-escalated</td>
+      <td><b>inner-ring form faults</b> (sag / pike / elbow) fire real-time while the clock KEEPS running —
+        <strong>identical rules to the rep fleet</strong>; the bookkeeping unit is the hold episode</td>
+      <td>Machinery identical. The persistence unit becomes the continuous in-pose run, not the rep
+        (resolves old R1). The outer-ring break is a rare separate "clock stopped" signal.</td></tr>
+    <tr><td><b>praise</b> — clean reps only, variable-ratio, never twice in a row</td>
+      <td><b>milestone praise/hustle SWITCH</b> — at each milestone the single outcome slot is praise (clean)
+        OR hustle (struggling / final stretch) OR the time line alone</td>
+      <td>Praise can't fire mid-silence; a hold's only structural moments are its milestones. Never praise two
+        consecutive milestones.</td></tr>
+    <tr><td><b>hustle</b> — armed on hesitation, fired on the effort-phase commit</td>
+      <td>PRIMARY: milestone-paired (the switch above). SECONDARY: armed by a <b>break in the final third</b>,
+        fired on the <b>re-hold commit</b></td>
+      <td>Same locked shape (arm-on-behavior / fire-on-commit); the trigger and commit edge are re-cast for a
+        continuous hold.</td></tr>
+    <tr><td><b>setup / activation countdown / set-complete</b></td>
+      <td>identical</td><td>Modality-independent. No change.</td></tr>
+    <tr><td><b>reminder</b> (next-rep feedforward) / <b>timeout</b> ending</td>
+      <td><b>both dropped</b></td><td>No "next rep" in a continuous hold (reminder gone). No give-up timeout
+        (deleted — §05g).</td></tr>
+  </table>
+  </div>
+
+  <h3>a. Count → time milestones + earcons <span class="tag ok">RULED</span></h3>
+  <p>Deterministic, personality-immune, fired on earned-time crossings — and <strong>relative to the target
+    at any duration</strong>, not hardcoded to 30s. For a target <code>T</code>:</p>
+  <ul>
+    <li><strong>Halfway (<code>T/2</code> earned s):</strong> <span class="vn">Được một nửa rồi</span> — the
+      mandatory milestone every source flags.</li>
+    <li><strong>Final-10 (<code>T−10</code> earned s):</strong> <span class="vn">còn 10 giây</span> — density
+      starts to rise.</li>
+    <li><strong>Final-3 + end = NON-VERBAL earcons:</strong> 3 identical short beeps on the last 3 earned
+      seconds, then a distinct end tone at <code>T</code>. The coach never robot-counts (§04). No spoken
+      <span class="vn">năm, bốn, ba…</span> in v1.</li>
+    <li><strong>Silent before halfway.</strong> The setup intro + <span class="vn">Sẵn sàng</span> already
+      confirmed the start; nothing to say until the first mark.</li>
+  </ul>
+  <div class="call idea">
+    <p class="ct">💡 The milestone outcome switch (praise / hustle)</p>
+    <p>Each milestone fires the time line, and its single <strong>outcome slot</strong> is decided by measured
+      state since the previous milestone: <strong>clean</strong> → praise roll (hunger model), may pair
+      (<span class="vn">Được một nửa rồi — form đẹp lắm!</span>); <strong>struggling</strong> (a pose-break or a
+      persistent fault since the last milestone, or the final stretch) → hustle roll
+      (<span class="vn">Được một nửa rồi, cố lên!</span>); <strong>neither wins its roll</strong> → the time
+      line speaks alone. One outcome per moment; never praise two consecutive milestones. This is the hold
+      analog of the rep spec's per-moment exclusivity — the milestone <em>is</em> the moment.</p>
+  </div>
+
+  <h3>b. The two rings in the state machine <span class="tag ok">RULED — the big change</span></h3>
+  <p>Today a single <code>isFormBadToDrop</code> condition trips <code>holding → dropping</code> on <em>any</em>
+    fault — sag, pike, bent elbow — and freezes the clock. That is the form-gating the ruling reverses. The
+    migration <strong>splits this into two rings</strong>:</p>
+  <ul>
+    <li><strong>OUTER ring (gates the clock):</strong> only a real anti-cheat exit — off the floor / stood up /
+      collapsed flat / out of frame / the wall-plank guard — trips <code>dropping</code>. Thresholds
+      <strong>loosened</strong> from today's tight values (feel-tune). This break is rare, and its line doubles
+      as the <strong>"clock stopped" trust signal</strong>.</li>
+    <li><strong>INNER ring (clock keeps running):</strong> sag / pike / elbow within a still-recognisable plank
+      no longer touch the state machine. They fire on the criticalFault/softFault channel in real time —
+      <strong>identical rules to the rep fleet</strong> — while the seconds keep banking.</li>
+  </ul>
+  <p>Here is the single condition being split — the <span class="bad">red</span> line currently conflates both
+    rings:</p>
+
+  <div class="code">
+    <div class="code-head"><span>lib/exercise/3.High Plank/high_plank.dart — the drop condition being split (form-gated TODAY, outer-ring-only AFTER)</span><b>L451–471</b></div>
+    <div class="code-body"><pre class="src"><span class="c">// TODAY: one condition, mixing anti-cheat AND form quality —</span>
+bool isFormBadToDrop = <span class="bad">bodyAngle &lt; DROPPING_PIKE_ANGLE</span> ||     <span class="c">// pike = FORM (inner)</span>
+    <span class="bad">armAngle &lt; DROPPING_ARM_ANGLE</span> ||                    <span class="c">// bent elbow = FORM (inner)</span>
+    <span class="bad">kneeAngle &lt; DROPPING_KNEE_ANGLE</span> ||                  <span class="c">// bent knee = FORM (inner)</span>
+    <span class="bad">hipDev &gt;= DROPPING_SAG_DEVIATION</span>;                    <span class="c">// sag = FORM (inner) &lt;- freezes clock today</span>
+
+<span class="k">if</span> (state == HighPlankState.holding) {
+  <span class="k">if</span> (_droppingDebouncer.update(isFormBadToDrop)) {           <span class="c">// AFTER: only OUTER-ring loss reaches here</span>
+    _transitionState(HighPlankState.dropping, now);          <span class="c">// clock stops ONLY on a real anti-cheat exit</span>
+  }
+}
+<span class="c">// AFTER: sag/pike/elbow move OUT of this condition into liveFaults (inner ring, clock runs).</span></pre></div>
+  </div>
+  <p>So the migration removes the inner-ring terms (sag/pike/elbow) from the drop condition and replaces them
+    with a <strong>loosened outer-ring test</strong> (recognisable-plank-or-not). Those inner faults instead
+    surface through <code>liveFaults</code> to the criticalFault channel (see §06 R2, §10 audio).</p>
+
+  <h3>c. Inner-ring faults are coached while the clock runs <span class="tag ok">RULED</span></h3>
+  <p>A sag / pike / bent elbow within a still-recognisable plank now fires the criticalFault (or softFault)
+    real-time channel <em>with the clock still banking seconds</em> — identical rules to the rep fleet (first
+    occurrence 100% deterministic, collision gap, persistence escalation), with the <strong>hold episode</strong>
+    as the persistence unit. Fault-<em>seconds</em> keep accruing per metric (<code>sagging_seconds</code> /
+    <code>piked_seconds</code> / <code>elbow_seconds</code>, §02 code) — even better than before, because the
+    clock now runs <em>through</em> the fault, so the honest fault-second count is captured. Post-set summary
+    stays data-honest with no new plumbing.</p>
+
+  <h3>d. Praise is the clean side of the milestone switch <span class="tag ok">RULED</span></h3>
+  <p>Praise is one arm of the outcome switch (§05a): eligibility = <strong>clean since the previous
+    milestone</strong>, a hunger-shaped roll that <em>pairs</em> with the time line when it wins
+    (<span class="vn">Được một nửa rồi — form đẹp lắm!</span>). Praise <strong>never fires mid-silence</strong> —
+    a random compliment 12s into quiet focus startles; milestones are a hold's only structural moments, so
+    that's the only place praise can land. Hard rule 6 becomes <strong>"never praise two consecutive
+    milestones."</strong></p>
+
+  <h3>e. Hustle — milestone-paired (primary) + the re-hold push (secondary) <span class="tag ok">RULED</span></h3>
+  <p>Two flavours, both quiet-side probability, never deterministic (a guaranteed finish line every set is the
+    rejected metronome):</p>
+  <ul>
+    <li><strong>PRIMARY — milestone-paired:</strong> the hustle arm of the outcome switch (§05a). When the
+      user is struggling or in the final stretch at a milestone, the slot rolls hustle instead of praise.</li>
+    <li><strong>SECONDARY — the re-hold push (the one causal mid-hold moment):</strong> a pose-break in the
+      <strong>final third</strong> arms hustle; the <strong>re-hold commit</strong> (<code>dropping →
+      holding</code>) fires it — the user just re-committed under fatigue: <span class="vn">Cố lên, sắp xong
+      rồi!</span> This keeps hustle's locked arm-on-behaviour / fire-on-commit shape, re-cast for a
+      continuous hold.</li>
+  </ul>
+
+  <h3>f. Setup / activation countdown / set-complete <span class="tag ok">unchanged</span></h3>
+  <p>Modality-independent, lifted straight from the rep spec: the per-set intro one-shot, the voiced
+    <span class="vn">một, hai, ba</span> activation countdown (3s hold), <span class="vn">Sẵn sàng</span>,
+    and <code>common.set_complete</code>. A hold's start position <em>is</em> the plank position, so the
+    3-second activation hold works exactly as it does for a rep exercise.</p>
+
+  <h3>g. Completion, and the timeout is DELETED <span class="tag ok">RULED</span></h3>
+  <p>The original proposal flagged a 90s "give-up" timeout as a data-honesty gap needing its own line. Nam
+    ruled it out entirely: <strong>the timeout is deleted as designed behaviour</strong> — no 90s give-up
+    ending, no <span class="vn">hết giờ</span> line. The migration removes the <code>TIMEOUT_MS</code> path:</p>
+  <div class="code">
+    <div class="code-head"><span>lib/exercise/3.High Plank/high_plank.dart — the timeout term being removed</span><b>L14–16, L252–254</b></div>
+    <div class="code-body"><pre class="src">static const <span class="k">int</span> TARGET_TIME_MS = 30000; <span class="c">// 30s form chuẩn (the win) — KEEP</span>
+<span class="bad">static const int TIMEOUT_MS = 90000;</span>          <span class="c">// &lt;- DELETE (no give-up ending)</span>
+...
+<span class="k">bool</span> requestStop() =&gt;
+    <span class="good">timerMetric.totalHoldingTimeMs &gt;= _targetTimeMs;</span>  <span class="c">// target-only; _timeoutReached removed</span></pre></div>
+  </div>
+  <p>The only ending is <strong>target reached</strong> → the existing completion flow +
+    <code>common.set_complete</code> + post-set summary. The failure modes the timeout used to catch are handled
+    by other channels: walk-away = the presence gate / pause; stuck-in-setup = the <code>setup_position</code>
+    re-tell; give-up = the user quits. Nothing to congratulate falsely, so no honest-timeout line is needed.</p>
+
+  <h3>g2. Sets normalised fleet-wide: a set = one hold to a duration <span class="tag ok">RULED</span></h3>
+  <p>A "set" is now <strong>one continuous hold to a target duration</strong>, exactly parallel to sets × reps —
+    the plan prescribes <em>sets × duration</em>. High Plank migrates out of its one-long-hold-per-exercise
+    shape into the <strong>existing multi-set flow</strong>
+    (<code>exercise_experience_screen.dart</code> drives <code>_spec.sets</code>, per-set loggers, rest between
+    sets), which already supports time-based holds. Hold exercises never display "reps"; the
+    <code>repCount = totalHoldingTimeMs ~/ 1000</code> line stays only as the earned-second feed the adapter
+    reads for milestone/earcon crossings — it is never surfaced to the user as a rep count (hold seconds show
+    through <code>liveHoldSeconds</code>). Details in the impl spec §5.</p>
+
+  <h3>h. Out of scope for v1 <span class="tag med">deferred</span></h3>
+  <ul>
+    <li><strong>Yoga / stretch register:</strong> same policy, different <code>VoiceScript</code> config —
+      an empty hustle pool + a reduced milestone set. The mechanism already exists; only the behaviour
+      design is deferred.</li>
+    <li><strong>Breathing cues:</strong> breathing is <em>not measured</em>, so data honesty forbids a live
+      <span class="vn">thở đều</span> cue. If it belongs anywhere, it's baked into the setup-intro recording,
+      not spoken live.</li>
+  </ul>
+
+  <div class="call idea">
+    <p class="ct">💡 Why the pilot is High Plank only</p>
+    <p>~20 exercises implement <code>liveHoldSeconds</code>, and they split into two families:
+      <strong>effortful isometrics</strong> (High / Bear Plank, Superman) — grind, fatigue, needs the
+      halfway push + end earcons — and <strong>yoga / stretch poses</strong> (Cobra, Butterfly, Warrior 1…)
+      — calm, felt, reduced milestones + empty hustle pool. That's the register split that makes §05h real. We pilot the
+      <em>effortful</em> shape on High Plank first, prove it, then design the calm register as a config
+      variant.</p>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<section id="risks">
+  <p class="kicker"><span class="n">06</span> Reality check</p>
+  <h2>Wiring risks — resolved by the architecture decisions</h2>
+  <p class="lead">The three risks the proposal flagged are all <strong>resolved by the rulings</strong>, and the
+    fix for each is now an ordered step in <code>docs/scratch/hold-voice-impl-spec.md</code>. The code
+    snippets below stay as the evidence for <em>why</em> each step exists. None was ever a blocker — all three
+    were "the channel is right, the wiring isn't built yet."</p>
+
+  <div class="call tip">
+    <p class="ct">✔ R1 — RESOLVED: hold-episode bookkeeping, not per-second (spec §3)</p>
+    <p>The generic adapter drives everything off a rising rep count. For a hold, <code>repCount</code> is
+      earned seconds (§02), so this <code>repIncreased</code> branch runs <strong>every clean second</strong>:</p>
+    <div class="code">
+      <div class="code-head"><span>lib/voice/policy_voice_coach.dart — the per-frame diff loop</span><b>L282–292</b></div>
+      <div class="code-body"><pre class="src"><span class="k">final</span> repIncreased = repCount &gt; _lastRepCount;
+<span class="k">if</span> (repIncreased) {
+  _drainLiveFaults(exercise: exercise, repNumber: _trackedRepNumber);
+  <span class="bad">_handleRepLanded(exercise: exercise, repCount: repCount);</span>   <span class="c">// &lt;- would fire ~1×/second on a plank</span>
+  _startTrackingRep(repCount + 1);                             <span class="c">// &lt;- clears per-rep fault memory every second</span>
+}</pre></div>
+    </div>
+    <p><strong>Resolution (spec §3):</strong> the adapter gets a hold path (taken when
+      <code>countsByRepNumber == false</code>) that computes milestone crossings from
+      <code>repCount</code> (earned seconds) vs <code>liveHoldTargetSeconds</code> and suppresses every other
+      second — no "count every tick." And per ruling 6 the persistence / same-fault bookkeeping unit becomes the
+      <strong>hold episode</strong> (a continuous in-pose run), so the adapter no longer calls
+      <code>_startTrackingRep</code> every second and <code>faultPersistence</code> stays meaningful across the
+      hold. This is the central migration task, and it is fully specced.</p>
+  </div>
+
+  <div class="call tip">
+    <p class="ct">✔ R2 — RESOLVED: High Plank overrides <code>liveFaults</code> (spec §2)</p>
+    <p>The policy coach voices real-time faults by draining <code>exercise.liveFaults</code>:</p>
+    <div class="code">
+      <div class="code-head"><span>lib/voice/policy_voice_coach.dart — _drainLiveFaults reads liveFaults</span><b>L550–555</b></div>
+      <div class="code-body"><pre class="src"><span class="k">void</span> _drainLiveFaults({required ExerciseBase exercise, required <span class="k">int</span> repNumber}) {
+  <span class="bad">final faults = _sortedFaults(exercise.liveFaults);</span>
+  <span class="k">if</span> (faults.isEmpty) <span class="k">return</span>;
+  ...</pre></div>
+    </div>
+    <p>But High Plank inherits the base default and never overrides it:</p>
+    <div class="code">
+      <div class="code-head"><span>lib/exercise/exercise_base.dart — the default High Plank keeps</span><b>L922–926</b></div>
+      <div class="code-body"><pre class="src"><span class="c">/// Faults known so far in the rep-in-progress, exposed the instant a</span>
+<span class="c">/// metric detects them. Exercises that do not opt in keep the post-rep path.</span>
+<span class="bad">List&lt;FaultRecord&gt; get liveFaults =&gt; const [];</span>   <span class="c">// &lt;- High Plank does NOT override this</span></pre></div>
+    </div>
+    <p>Today High Plank surfaces faults through a <em>bespoke</em> path — metric <code>isFaultingNow</code>
+      flags + the free-text <code>lastHoldFaultVoiceMessage</code> — which the generic adapter never reads.
+      <strong>Resolution (spec §2):</strong> High Plank overrides <code>liveFaults</code> to emit the inner-ring
+      metric faults (sag / pike / elbow) while holding, and the outer-ring break while dropping, as
+      <code>FaultRecord</code>s with proper <code>affectsForm</code> + priority + <strong>snake_case
+      <code>type</code> matching the script's faultIds</strong> (<code>sagging</code> / <code>piked</code> /
+      <code>elbow</code> / <code>wall_guard</code>) — NOT the metrics' PascalCase types. The fault mp3s already
+      exist on disk, so this is a re-key, not a re-record.</p>
+  </div>
+
+  <div class="call tip">
+    <p class="ct">✔ R3 — RESOLVED: rework the <code>timeBased</code> bundle + delete the legacy coach (spec §6)</p>
+    <p>There's an already-sketched-but-unwired time bundle. It does <strong>not</strong> match this proposal
+      and would need reworking:</p>
+    <div class="code">
+      <div class="code-head"><span>lib/voice/voice_content.dart — the sketched (unwired) time-hold bundle</span><b>L205–241</b></div>
+      <div class="code-body"><pre class="src">static const List&lt;String&gt; countTime = [
+  <span class="bad">'common.time.30s'</span>,   <span class="c">// absolute-time scheme — NOT the proposed halfway/final-10/countdown</span>
+  <span class="bad">'common.time.15s'</span>,
+  <span class="bad">'common.time.5s'</span>,
+];
+
+static const List&lt;String&gt; hustleHold = [
+  <span class="bad">'common.hold_15s'</span>,   <span class="c">// generic — not the proposed "Cố lên, sắp xong rồi!"</span>
+  <span class="bad">'common.keep_going'</span>,
+];
+...
+static const ScriptBundle timeBased = ScriptBundle(
+  count: VoiceLib.countTime,
+  hustle: VoiceLib.hustleHold,
+  praise: VoiceLib.praise,      <span class="c">// praise pool is fine, reused as-is</span>
+);</pre></div>
+    </div>
+    <p>The <code>countTime</code> pool is a flat "announce absolute seconds" idea; the design wants
+      <em>halfway + final-10 (relative) + non-verbal earcons</em>. The bundle is reworked to those keys
+      (spec §6/§7). And the generic factory already routes holds to this bundle — so deleting High Plank's
+      <code>createVoiceCoach()</code> override is step one, after which it inherits this:</p>
+    <div class="code">
+      <div class="code-head"><span>lib/exercise/exercise_base.dart — createVoiceCoach picks the bundle by hold-ness</span><b>L630–641</b></div>
+      <div class="code-body"><pre class="src"><span class="k">final</span> bundle = liveHoldTargetSeconds != <span class="k">null</span>
+    ? <span class="good">VoiceDefaults.timeBased</span>          <span class="c">// High Plank lands here (target = 30s)</span>
+    : VoiceDefaults.repBased;
+...
+<span class="good">countsByRepNumber: liveHoldTargetSeconds == <span class="k">null</span>,</span>   <span class="c">// FALSE for a hold</span></pre></div>
+    </div>
+    <p><strong>Resolution:</strong> rework the bundle contents to the milestone/earcon keys, add the adapter's
+      hold path (R1), and delete the legacy <code>createVoiceCoach()</code> override +
+      <code>high_plank_voice_coach.dart</code> so High Plank inherits this factory. Verified: the only call
+      sites of the legacy coach are the override and its two tests — all specced for removal (spec §6).</p>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<section id="timeline">
+  <p class="kicker"><span class="n">07</span> The picture</p>
+  <h2>A 30-second High Plank, on the earned-time axis</h2>
+  <p class="lead">The whole design in one image. The axis is <strong>earned in-pose seconds</strong> (not wall
+    time). Yellow dots = deterministic milestones; a red dot = a fault the coach corrects <em>while the clock
+    keeps running</em>; the striped block = the ONE outer-ring break where the clock stalls; teal = the hustle
+    push; the dashed box = the end earcons (beeps + tone), no spoken numbers.</p>
+
+  <div class="tl-wrap">
+    <div class="tl-axis">
+      <div class="bar"></div>
+      <!-- outer-ring break ~24s (final third): the ONLY clock stall -->
+      <div class="paused" style="left:78.5%;width:3%"></div>
+      <!-- end earcons bracket 27-30 -->
+      <div class="cd" style="left:90%;width:10%"></div>
+
+      <!-- ticks -->
+      <div class="tk" style="left:0%">0s</div>
+      <div class="tk" style="left:16.7%">5</div>
+      <div class="tk" style="left:33.3%">10</div>
+      <div class="tk" style="left:50%">15</div>
+      <div class="tk" style="left:66.7%">20</div>
+      <div class="tk" style="left:83.3%">25</div>
+      <div class="tk" style="left:100%">30s</div>
+
+      <!-- event dots + labels -->
+      <div class="dot done" style="left:0%"></div>
+      <div class="lab" style="left:0%">start · Sẵn sàng</div>
+
+      <div class="dot brk" style="left:26.7%"></div>
+      <div class="lab dn" style="left:26.7%">sag (8s) — clock KEEPS running</div>
+
+      <div class="dot mile" style="left:50%"></div>
+      <div class="lab" style="left:50%">HALFWAY · cố lên! (struggled)</div>
+
+      <div class="dot mile" style="left:66.7%"></div>
+      <div class="lab" style="left:66.7%">còn 10 giây · form đẹp</div>
+
+      <div class="dot brk" style="left:80%"></div>
+      <div class="lab dn" style="left:80%">out of pose (~24s) — clock stalls</div>
+
+      <div class="dot push" style="left:82%"></div>
+      <div class="lab" style="left:84%">re-hold → Cố lên!</div>
+
+      <div class="dot done" style="left:100%"></div>
+      <div class="lab" style="left:95%">30s · 🔔 end tone</div>
+    </div>
+  </div>
+
+  <div class="tl-cards">
+    <div class="c"><div class="t">0 → 8s</div>Clock runs. Quiet.
+      <div class="w">Silence is default. Intro + <span class="vn">Sẵn sàng</span> already fired.</div></div>
+    <div class="c brk"><div class="t">~8s · SAG (inner ring)</div>Hips sag but still a recognisable plank.
+      <span class="vn">Siết chặt bụng, nâng hông lên</span> — <b>clock keeps running</b>.
+      <div class="w">criticalFault, first occurrence → deterministic. NOT a clock stop. sagging_seconds accrues.</div></div>
+    <div class="c mile"><div class="t">15s · HALFWAY</div><span class="vn">Được một nửa rồi, cố lên!</span>
+      <div class="w">Milestone (det) + hustle (rolled — struggled since start, so the switch picks hustle).</div></div>
+    <div class="c mile"><div class="t">20s</div><span class="vn">Còn 10 giây — form đẹp!</span>
+      <div class="w">Milestone (det) + praise (rolled — clean since halfway, so the switch picks praise).</div></div>
+    <div class="c push"><div class="t">~24s · OUTER BREAK → PUSH</div>Knees drop = out of pose. Clock <b>stalls</b>;
+      break line; re-hold → <span class="vn">Cố lên, sắp xong rồi!</span>
+      <div class="w">Outer-ring exit (the only clock stall). Arms hustle; re-hold commit fires it (rolled).</div></div>
+    <div class="c"><div class="t">27 → 30s</div>🔔 3 beeps + end tone
+      <div class="w">Non-verbal earcons on the final 3 earned seconds + tone at target. No spoken numbers.</div></div>
+    <div class="c mile"><div class="t">30s · DONE</div><span class="vn">Hoàn thành! Tốt lắm!</span> + summary
+      <div class="w"><code>set_complete</code> (det) + post-set summary (richest feedback).</div></div>
+  </div>
+  <p style="color:var(--muted);font-size:13px">Note: the axis is earned time. The one striped block is the
+    <em>outer-ring</em> stall (out of pose) — wall time passes while earned time holds still. The 8s sag has no
+    block: under the two-ring ruling a form fault is coached <em>through</em>, the clock never pauses for it.</p>
+</section>
+
+<!-- ============================================================= -->
+<section id="worked">
+  <p class="kicker"><span class="n">08</span> Concrete</p>
+  <h2>Worked example — 30s hold: a sag at ~8s (coached through), out of pose at ~24s</h2>
+  <p class="lead">Same shape as the rep spec's worked example, so it reads familiar. Every row shows what the
+    coach says and <em>why</em> — including the silences, because silence is a design decision here, not an
+    absence of one. "det" = deterministic (causal), "rolled" = a probability draw. Note the clock runs
+    through the sag; only the out-of-pose event stalls it.</p>
+
+  <div class="tbl">
+  <table class="recap">
+    <tr><th>Earned clock</th><th>State</th><th>Coach says</th><th>Why (rule fired)</th></tr>
+    <tr><td class="sev">0.0s</td><td>activated → holding</td><td><span class="vn">Sẵn sàng</span></td>
+      <td>setup channel — <b>det</b> (intro already fired before this)</td></tr>
+    <tr><td class="sev">0 → 8s</td><td>holding, clock running</td><td><em>— 8s of quiet —</em></td>
+      <td><b>silence-is-default</b>: clock running, nothing to say</td></tr>
+    <tr><td class="sev">~8s</td><td>holding (INNER-ring sag; <b>clock keeps running</b>)</td>
+      <td><span class="vn">Siết chặt bụng, nâng hông lên</span></td>
+      <td>criticalFault, <b>first occurrence → det 100%</b>. Clock does NOT stop; sagging_seconds accrues</td></tr>
+    <tr><td class="sev">8 → 12s</td><td>holding (sag self-corrects)</td><td><em>— quiet —</em></td>
+      <td>one cue then watch (not naggy); clock never paused</td></tr>
+    <tr><td class="sev">15s</td><td>holding, earned crosses 15</td>
+      <td><span class="vn">Được một nửa rồi, cố lên!</span></td>
+      <td>milestone (<b>det</b>) + <b>hustle</b> (<b>rolled</b>) — the switch: struggled (a fault) since start</td></tr>
+    <tr><td class="sev">15 → 20s</td><td>holding, clean</td><td><em>— quiet —</em></td><td>silence-is-default</td></tr>
+    <tr><td class="sev">20s</td><td>earned crosses 20</td><td><span class="vn">Còn 10 giây — form đẹp!</span></td>
+      <td>milestone (<b>det</b>) + <b>praise</b> (<b>rolled</b>) — the switch: clean since halfway</td></tr>
+    <tr><td class="sev">~24s</td><td>holding → <b>dropping</b> — OUTER-ring exit (knees drop; final third)</td>
+      <td><span class="vn">Siết chặt bụng, nâng hông lên</span></td>
+      <td>the ONE clock stall. criticalFault (episode persistence). Also <b>arms hustle</b> (final-third break)</td></tr>
+    <tr><td class="sev">~24s</td><td>dropping → holding (re-hold commit)</td>
+      <td><span class="vn">Cố lên, sắp xong rồi!</span></td>
+      <td>hustle — armed by the final-third break, fires on the re-hold commit (<b>rolled</b>, quiet-side)</td></tr>
+    <tr><td class="sev">24 → 27s</td><td>holding</td><td><em>— quiet —</em></td><td>silence-is-default</td></tr>
+    <tr><td class="sev">27, 28, 29s</td><td>earned crosses target−3…−1</td>
+      <td>🔔 🔔 🔔 <em>(3 identical beeps)</em></td>
+      <td>non-verbal earcons — <b>det</b>, one per earned second (§04). No spoken numbers</td></tr>
+    <tr><td class="sev">30s</td><td>earned hits target → completed</td>
+      <td>🔔 <em>end tone</em> + <span class="vn">Hoàn thành! Tốt lắm!</span> + summary</td>
+      <td>end earcon + <code>set_complete</code> (<b>det</b>) + post-set summary (dominant fault: sagging)</td></tr>
+  </table>
+  </div>
+  <p>Run the same physical set again and the rolled rows (praise pairing at 15s, hustle at 22s) come out
+    differently — the deterministic rows (milestones, breaks, countdown, completion) never do. Same
+    guarantee as the rep spec: structure is reliable, cadence is alive.</p>
+</section>
+
+<!-- ============================================================= -->
+<section id="forks">
+  <p class="kicker"><span class="n">09</span> Decisions</p>
+  <h2>Forks — how they were ruled</h2>
+  <p class="lead">Four choices Nam ruled on in the 2026-07-11 review. The fork framing is kept as history; each
+    now carries its <span class="rectag">RULED</span> verdict. The options that were weighed stay below for the
+    record, but the decision is closed.</p>
+
+  <!-- Fork 1 -->
+  <div class="fork">
+    <div class="fh"><span class="fn">1</span><h3>The final-countdown stall</h3></div>
+    <div class="fb">
+      <p><strong>The situation:</strong> the countdown runs on <em>earned</em> seconds. So if the user breaks
+        form mid-countdown (say at <span class="vn">ba</span>), the clock pauses and the countdown
+        <em>stalls</em> there until they fix it — it can't keep ticking to <span class="vn">một</span> on a
+        wall clock, because they haven't earned those seconds.</p>
+      <div class="opts">
+        <div class="o rec"><div class="oh">Recommend — honest stall</div>Let it stall. Resume from the
+          actual earned second when the hold re-commits. The stall <em>is</em> the feedback — same logic as
+          the activation countdown restarting on a broken hold. Keeps the strongest finish-line pull the
+          research found.</div>
+        <div class="o alt"><div class="oh">Alternative — no per-second countdown</div>Drop the per-second
+          countdown; announce only <span class="vn">còn 5 giây</span> once. Simpler, no stall to reason
+          about — but loses the near-universal numeric countdown that apps ship on-by-default.</div>
+      </div>
+      <div class="call tip"><p class="ct">✔ RULED — neither: no spoken countdown at all</p>
+        <p>Nam ruled OUT a spoken per-second countdown entirely. The end-of-set countdown is <strong>non-verbal
+        earcons</strong> (§04) — 3 beeps + an end tone — which ride earned seconds, so they stall honestly with
+        no half-spoken <span class="vn">ba…</span> freezing mid-word. The stall problem dissolves, and under the
+        two-ring ruling the clock barely stalls mid-hold anyway. A one-line swap to spoken
+        <code>count_1..3</code> stays available if device feel disagrees.</p></div>
+    </div>
+  </div>
+
+  <!-- Fork 2 -->
+  <div class="fork">
+    <div class="fh"><span class="fn">2</span><h3>Count direction — voice says "remaining", UI ring counts up</h3></div>
+    <div class="fb">
+      <p><strong>The situation:</strong> the voice speaks <em>remaining</em> time (<span class="vn">còn 10
+        giây</span>), but the on-screen ring shows earned seconds counting <em>up</em>
+        (<code>repCount = earned seconds</code>). Those two directions disagree.</p>
+      <p><strong>Precedent:</strong> this exact mismatch already exists and you kept it — the activation ring
+        shows remaining-seconds counting down while the voice counts <span class="vn">một, hai, ba</span> up.
+        Your rationale: mid-hold, the user physically can't see the screen, so the voice wins and the ring is
+        secondary.</p>
+      <div class="opts">
+        <div class="o rec"><div class="oh">Recommend — voice says remaining</div>Keep the voice on
+          "remaining" (matches the finish-line mental model + the countdown), leave the UI ring counting up
+          as-is. Consistent with the activation-ring precedent you already ruled on.</div>
+        <div class="o alt"><div class="oh">Alternative — align them</div>Make one follow the other. Removes
+          the mismatch, but forces a change to a UI you already deliberately left alone.</div>
+      </div>
+      <div class="call tip"><p class="ct">✔ RULED — voice says remaining; UI ring stays exactly as-is</p>
+        <p>Kept the mismatch on purpose: the coach speaks REMAINING (finish-line mental model), the screen
+        counts however it counts today. Coach = person, screen = tool; mid-hold the user can't see the screen,
+        so the voice wins. No UI change in scope (impl fence: UI ring untouched).</p></div>
+    </div>
+  </div>
+
+  <!-- Fork 3 -->
+  <div class="fork">
+    <div class="fh"><span class="fn">3</span><h3>Resume-confirm after a fixed break</h3></div>
+    <div class="fb">
+      <p><strong>The situation:</strong> after a break is fixed (<code>dropping → holding</code>), should the
+        coach speak a "clock restarted" confirm — something like <span class="vn">Oke, đếm tiếp</span>?</p>
+      <div class="opts">
+        <div class="o rec"><div class="oh">Recommend — NO confirm</div>Stay silent on re-hold. Hustle may
+          fire there anyway (final third), and the next milestone confirms progress soon enough. A
+          deterministic confirm on <em>every</em> re-hold gets naggy on a wobbly holder who breaks and fixes
+          repeatedly.</div>
+        <div class="o alt"><div class="oh">Counter-argument — the one trust leak</div>This is the single spot
+          where trust could leak: after a fix, the user can't tell the clock actually restarted (they can't
+          see the ring). A short confirm would close that gap. The cost is nagginess on a shaky hold.</div>
+      </div>
+      <div class="call tip"><p class="ct">✔ RULED — NO confirm</p>
+        <p>Stay silent on re-hold. Under the two-ring ruling a re-hold is now rare (only after a real
+        out-of-pose break, not a form fault), so the nagginess worry mostly evaporates; the next milestone and
+        any hustle push confirm progress soon enough. No deterministic "đếm tiếp" line.</p></div>
+    </div>
+  </div>
+
+  <!-- Fork 4 -->
+  <div class="fork">
+    <div class="fh"><span class="fn">4</span><h3>Milestone set for longer targets (60–90s)</h3></div>
+    <div class="fb">
+      <p><strong>The situation:</strong> the research says holds &gt;60s want a check-in roughly every 30s.
+        Do we add that cadence for longer targets, or keep one relative rule at every length?</p>
+      <div class="opts">
+        <div class="o rec"><div class="oh">Recommend — one relative rule</div>Halfway + final-10 +
+          final-5-countdown, computed relative to the target at <em>any</em> length. No new recordings per
+          duration; the same milestones just land at different absolute times.</div>
+        <div class="o alt"><div class="oh">Alternative — add ~30s check-ins</div>For 60–90s holds, insert the
+          research's periodic check-in. More faithful to the long-hold evidence, but needs new "keep going"
+          recordings and re-introduces a near-periodic cue on long holds (mild metronome risk).</div>
+      </div>
+      <div class="call tip"><p class="ct">✔ RULED — one relative rule at any duration</p>
+        <p>Halfway + <span class="vn">còn 10 giây</span> (at <code>T−10</code>) + end earcons, computed relative
+        to the target at any length. Zero new audio per duration, no per-duration config, dodges the metronome
+        risk. The ~30s long-hold check-in stays an easy additive follow-up if device feel wants it later; v1
+        doesn't need it and High Plank never triggers it.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<section id="audio">
+  <p class="kicker"><span class="n">10</span> Recording list</p>
+  <h2>Audio inventory — reused vs new</h2>
+  <p class="lead">What already exists on disk and can be reused, vs what needs recording. Final Vietnamese
+    wordings are <strong>to-be-confirmed at recording time</strong> (the <code>missing-audio.md</code>
+    convention) — the lines below are examples, not locked copy.</p>
+
+  <table class="recap">
+    <tr><th>Line / role</th><th>Status</th><th>Key / note</th></tr>
+    <tr><td>Praise pools</td><td class="sev lo">REUSE</td>
+      <td><code>common.good_*</code> / <code>common.great_*</code> — the clean side of the milestone switch</td></tr>
+    <tr><td>Ready</td><td class="sev lo">REUSE</td><td><code>common.ready</code> — <span class="vn">Sẵn sàng</span></td></tr>
+    <tr><td>Set complete</td><td class="sev lo">REUSE</td>
+      <td><code>common.set_complete</code> (listen-check pending per rep spec)</td></tr>
+    <tr><td>Activation countdown / earcon fallback</td><td class="sev lo">REUSE</td>
+      <td><code>count_1..3</code> — unchanged for activation; also the one-line swap target if earcons feel worse</td></tr>
+    <tr><td>High-plank fault lines (inner + outer)</td><td class="sev lo">RE-KEY (files exist)</td>
+      <td><code>high_plank.sagging</code> / <code>.piked</code> / <code>.elbow</code> / <code>.wall_guard</code>
+        — snake_case ids matching the script's faultIds. The mp3s already exist on disk; re-key from the legacy
+        free-text map, no re-record.</td></tr>
+    <tr><td>Halfway milestone</td><td class="sev hi">NEW</td>
+      <td><code>common.time.halfway</code> — e.g. <span class="vn">Được một nửa rồi</span> (wording TBD)</td></tr>
+    <tr><td>Final-10 milestone (relative)</td><td class="sev hi">NEW</td>
+      <td><code>common.time.10s_left</code> — e.g. <span class="vn">còn 10 giây</span> (wording TBD)</td></tr>
+    <tr><td>Final-3 beep (earcon)</td><td class="sev hi">NEW</td>
+      <td><code>common.time.beep</code> — non-verbal, one short beep per final earned second</td></tr>
+    <tr><td>End tone (earcon)</td><td class="sev hi">NEW</td>
+      <td><code>common.time.end_tone</code> — non-verbal, distinct tone at target</td></tr>
+    <tr><td>Hold hustle pool</td><td class="sev hi">NEW</td>
+      <td>e.g. <code>common.hold_push</code> (+ target-proven variant) — <span class="vn">Cố lên, sắp xong rồi!</span>
+        (naming OPEN, wording TBD; replaces the stale <code>hustleHold</code> sketch)</td></tr>
+    <tr><td><s>Final countdown 5→1</s> / <s>timeout line</s></td><td class="sev lo">DROPPED</td>
+      <td>No spoken countdown (earcons instead); no timeout (deleted). Neither is to be recorded.</td></tr>
+  </table>
+
+  <div class="call prop">
+    <p class="ct">▲ Decided — implementation is specced</p>
+    <p>Every fork above is ruled and the wiring risks are resolved. The migration steps live in
+      <code>docs/scratch/hold-voice-impl-spec.md</code> (Codex implements). Wordings and the earcon/hustle
+      files are PARKED — Nam records/downloads later; a missing key is already a safe no-op. Downstream doc
+      propagation (<code>decisions.md</code>, <code>voice-behavior-spec.md</code> hold subsection,
+      <code>canonical-numbers.md</code> if any number lands) follows this doc, not
+      <code>missing-audio.md</code>.</p>
+  </div>
+</section>
+
+<div class="foot">
+  Hold-Exercise Voice Design · DECIDED v2 (was Proposal v1) · 2026-07-11 · ruled by Nam · pilot: High Plank ·
+  impl spec: docs/scratch/hold-voice-impl-spec.md · counterpart to voice-behavior-spec.md (rep-based, locked)
+</div>
+
+</main>
+</div>
+
+<!-- ===== personal notes layer (private, saved to .lavish via the notes server) ===== -->
+<button class="note-fab" id="noteFab" aria-label="Open your notes">🖊 Notes <span class="cnt" id="noteCount">0</span></button>
+<div class="note-pop" id="notePop"><button id="notePopBtn" type="button">🖊 Note this</button></div>
+<aside class="note-panel" id="notePanel" aria-label="Your private notes">
+  <div class="ph">
+    <div><h3>Your notes</h3><div class="sub">private · saved to .lavish/lavish-notes.json</div></div>
+    <button class="x" id="notePanelClose" type="button" aria-label="Close">&times;</button>
+  </div>
+  <div class="composer">
+    <div class="anchor" id="noteAnchor" hidden></div>
+    <textarea id="noteInput" placeholder="Type your note, then click outside the box (or press ⌘/Ctrl+Enter) to save…"></textarea>
+    <div class="crow">
+      <span class="chint" id="noteHint">Will attach to the section you're viewing</span>
+      <button class="addbtn" id="noteAdd" type="button">Add note</button>
+    </div>
+  </div>
+  <div class="storage-note" id="storageNote" hidden></div>
+  <div class="note-list" id="noteList"></div>
+  <div class="pf">
+    <button id="noteCopy" type="button">Copy all</button>
+    <button id="noteDownload" type="button">Download .md</button>
+    <button id="noteClear" type="button">Clear all</button>
+  </div>
+</aside>
+
+<script>
+// ===== personal notes layer: anchored, local + disk-backed, never auto-sent to the agent =====
+(function () {
+  var KEY = 'vika-hvd-notes-v1';
+  var NAMEKEY = 'VIKA_HVD_NOTES::';
+  var DOC = encodeURIComponent(document.title);
+  var REMOTE = 'http://127.0.0.1:4599/notes?doc=' + DOC;
+  var localOk = true, remoteOk = false;
+  try { localStorage.setItem('vika-hvd-t', '1'); localStorage.removeItem('vika-hvd-t'); } catch (e) { localOk = false; }
+  function loadLocal() {
+    if (localOk) { try { var v = localStorage.getItem(KEY); if (v) return JSON.parse(v); } catch (e) {} }
+    try { if (window.name && window.name.indexOf(NAMEKEY) === 0) return JSON.parse(window.name.slice(NAMEKEY.length)); } catch (e) {}
+    return [];
+  }
+  var notes = loadLocal();
+
+  var fab = document.getElementById('noteFab');
+  var cnt = document.getElementById('noteCount');
+  var panel = document.getElementById('notePanel');
+  var list = document.getElementById('noteList');
+  var pop = document.getElementById('notePop');
+  var popBtn = document.getElementById('notePopBtn');
+  var input = document.getElementById('noteInput');
+  var anchorEl = document.getElementById('noteAnchor');
+  var hintEl = document.getElementById('noteHint');
+  var lastSel = null;
+  var pendingAnchor = null;
+
+  function mirrorLocal() {
+    var s = JSON.stringify(notes);
+    if (localOk) { try { localStorage.setItem(KEY, s); } catch (e) { localOk = false; } }
+    try { window.name = NAMEKEY + s; } catch (e) {}
+  }
+  function save() {
+    cnt.textContent = notes.length;
+    mirrorLocal();
+    if (remoteOk) {
+      try {
+        fetch(REMOTE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(notes) })
+          .catch(function () { remoteOk = false; updateStatus(); });
+      } catch (e) { remoteOk = false; }
+    }
+    updateStatus();
+  }
+  function updateStatus() {
+    var el = document.getElementById('storageNote'); if (!el) return;
+    if (remoteOk) {
+      el.hidden = false; el.className = 'storage-note ok';
+      el.textContent = '✓ Saved to disk — .lavish/lavish-notes.json (survives reloads & restarts while the notes server runs).';
+    } else if (localOk) {
+      el.hidden = true;
+    } else {
+      el.hidden = false; el.className = 'storage-note';
+      el.textContent = '⚠ The viewer blocks browser storage, so notes only survive reloads this session. Run the notes server or use “Download .md”.';
+    }
+  }
+  function uid() { return 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function sectionOf(node) {
+    var el = node && node.nodeType === 3 ? node.parentElement : node;
+    while (el && !(el.tagName === 'SECTION' && el.id)) el = el.parentElement;
+    return el;
+  }
+  function titleOf(sec) {
+    if (!sec) return 'Document';
+    var h = sec.querySelector('h2');
+    return h ? h.textContent.trim() : sec.id;
+  }
+  function currentSection() {
+    var secs = document.querySelectorAll('main section[id]');
+    var mid = window.scrollY + window.innerHeight / 2, best = null;
+    secs.forEach(function (s) { if (mid >= s.offsetTop && mid < s.offsetTop + s.offsetHeight) best = s; });
+    return best || secs[0] || null;
+  }
+  function setAnchor(a) {
+    pendingAnchor = a;
+    if (a && a.quote) {
+      anchorEl.hidden = false; anchorEl.innerHTML = '';
+      var t = document.createElement('span');
+      t.textContent = '“' + a.quote.slice(0, 90) + (a.quote.length > 90 ? '…' : '') + '”';
+      var x = document.createElement('span'); x.className = 'axn'; x.textContent = '✕'; x.title = 'Remove anchor';
+      x.onclick = function () { setAnchor(null); };
+      anchorEl.appendChild(t); anchorEl.appendChild(x);
+      hintEl.textContent = 'Attaching to this selection';
+    } else {
+      anchorEl.hidden = true; anchorEl.innerHTML = '';
+      hintEl.textContent = "Will attach to the section you're viewing";
+    }
+  }
+  function addFromComposer() {
+    var body = input.value.trim();
+    if (!body) { input.focus(); return; }
+    var a = pendingAnchor, sec = a ? document.getElementById(a.sectionId) : currentSection();
+    var n = {
+      id: uid(),
+      sectionId: a ? a.sectionId : (sec ? sec.id : ''),
+      sectionTitle: a ? a.sectionTitle : (sec ? titleOf(sec) : 'Document'),
+      quote: a ? a.quote : '',
+      start: a && a.start != null ? a.start : null,
+      end: a && a.end != null ? a.end : null,
+      body: body, createdAt: Date.now()
+    };
+    notes.push(n); render(); try { applyAll(); } catch (e) {} save();
+    input.value = ''; setAnchor(null);
+  }
+
+  // ---- anchored highlighting (spans across tokens, numbered) ----
+  function offsetOf(section, node, nodeOffset) {
+    var r = document.createRange();
+    r.selectNodeContents(section);
+    try { r.setEnd(node, nodeOffset); } catch (e) { return 0; }
+    return r.toString().length;
+  }
+  function appendBadge(mark, num, id) {
+    var b = document.createElement('sup');
+    b.className = 'note-badge'; b.dataset.nid = id; b.textContent = num;
+    b.title = 'Note ' + num + ' — click to open';
+    if (mark.parentNode) mark.parentNode.insertBefore(b, mark.nextSibling);
+  }
+  function clearHighlights() {
+    document.querySelectorAll('.note-badge').forEach(function (b) { b.remove(); });
+    document.querySelectorAll('mark.note-hl').forEach(function (m) {
+      var p = m.parentNode; while (m.firstChild) p.insertBefore(m.firstChild, m); p.removeChild(m); p.normalize();
+    });
+  }
+  function highlightRange(section, start, end, id, num) {
+    if (!section || start == null || end == null || end <= start) return false;
+    var w = document.createTreeWalker(section, NodeFilter.SHOW_TEXT, null), n, pos = 0, segs = [];
+    while ((n = w.nextNode())) {
+      var len = n.nodeValue.length, nodeStart = pos; pos += len;
+      if (pos <= start) continue;
+      if (nodeStart >= end) break;
+      if (n.parentElement && n.parentElement.closest('mark.note-hl')) continue;
+      var s = Math.max(0, start - nodeStart), e = Math.min(len, end - nodeStart);
+      if (e > s) segs.push({ node: n, s: s, e: e });
+    }
+    var made = 0, last = null;
+    segs.forEach(function (seg) {
+      var r = document.createRange(); r.setStart(seg.node, seg.s); r.setEnd(seg.node, seg.e);
+      var m = document.createElement('mark'); m.className = 'note-hl'; m.dataset.nid = id;
+      try { r.surroundContents(m); made++; last = m; } catch (e2) {}
+    });
+    if (made && last) appendBadge(last, num, id);
+    return made > 0;
+  }
+  function highlightFirst(section, quote, id, num) {
+    if (!section || !quote) return false;
+    var w = document.createTreeWalker(section, NodeFilter.SHOW_TEXT, null), tn;
+    while ((tn = w.nextNode())) {
+      if (tn.parentElement && tn.parentElement.closest('mark.note-hl')) continue;
+      var i = tn.nodeValue.indexOf(quote);
+      if (i >= 0) {
+        var r = document.createRange(); r.setStart(tn, i); r.setEnd(tn, i + quote.length);
+        var m = document.createElement('mark'); m.className = 'note-hl'; m.dataset.nid = id;
+        try { r.surroundContents(m); appendBadge(m, num, id); return true; } catch (e) { return false; }
+      }
+    }
+    return false;
+  }
+  function applyAll() {
+    clearHighlights();
+    notes.forEach(function (n, i) {
+      var sec = document.getElementById(n.sectionId); if (!sec) return;
+      var ok = false;
+      if (n.start != null && n.end != null) ok = highlightRange(sec, n.start, n.end, n.id, i + 1);
+      if (!ok && n.quote) highlightFirst(sec, n.quote, n.id, i + 1);
+    });
+  }
+  function setLinked(id, on) {
+    document.querySelectorAll('mark.note-hl[data-nid="' + id + '"], .note-badge[data-nid="' + id + '"]')
+      .forEach(function (el) { el.classList.toggle('hot', on); });
+    var card = list.querySelector('.note-card[data-nid="' + id + '"]');
+    if (card) card.classList.toggle('linked', on);
+  }
+
+  // ---- panel ----
+  function render() {
+    list.innerHTML = '';
+    if (!notes.length) {
+      var e = document.createElement('div'); e.className = 'note-empty';
+      e.innerHTML = 'No notes yet.<br>Type in the box above and hit <b>Add note</b>,<br>or select text/code and hit <b>🖊 Note this</b>.';
+      list.appendChild(e); return;
+    }
+    notes.slice().reverse().forEach(function (n) {
+      var num = notes.indexOf(n) + 1;
+      var card = document.createElement('div'); card.className = 'note-card'; card.dataset.nid = n.id;
+      card.onmouseenter = function () { setLinked(n.id, true); };
+      card.onmouseleave = function () { setLinked(n.id, false); };
+      var loc = document.createElement('span'); loc.className = 'loc'; loc.title = 'Jump to this spot';
+      var cn = document.createElement('span'); cn.className = 'cnum'; cn.textContent = num; loc.appendChild(cn);
+      loc.appendChild(document.createTextNode(' § ' + n.sectionTitle));
+      loc.onclick = function () { jump(n.id); }; card.appendChild(loc);
+      if (n.quote) { var q = document.createElement('div'); q.className = 'quote'; q.textContent = n.quote; card.appendChild(q); }
+      var body = document.createElement('div'); body.className = 'body' + (n.body ? '' : ' empty');
+      body.textContent = n.body || 'Empty — click Edit to write.'; card.appendChild(body);
+      if (n.replies && n.replies.length) {
+        var thread = document.createElement('div'); thread.className = 'replies';
+        n.replies.forEach(function (rp) {
+          var t = document.createElement('div');
+          t.className = 'note-thread' + (rp.author === 'agent' ? ' agent' : '');
+          var who = document.createElement('div'); who.className = 'who';
+          who.textContent = rp.author === 'agent' ? '↳ Claude' : '↳ You';
+          var tx = document.createElement('div'); tx.className = 'txt'; tx.textContent = rp.body;
+          t.appendChild(who); t.appendChild(tx); thread.appendChild(t);
+        });
+        card.appendChild(thread);
+      }
+      var row = document.createElement('div'); row.className = 'row';
+      var rb = document.createElement('button'); rb.className = 'reply'; rb.textContent = 'Reply'; rb.onclick = function () { replyCard(card, n); };
+      var ed = document.createElement('button'); ed.className = 'edit'; ed.textContent = 'Edit'; ed.onclick = function () { editCard(card, n); };
+      var dl = document.createElement('button'); dl.className = 'del'; dl.textContent = 'Delete';
+      dl.onclick = function () { notes = notes.filter(function (x) { return x.id !== n.id; }); render(); try { applyAll(); } catch (e) {} save(); };
+      row.appendChild(rb); row.appendChild(ed); row.appendChild(dl); card.appendChild(row);
+      list.appendChild(card);
+    });
+  }
+  function editCard(card, n) {
+    card.innerHTML = '';
+    var loc = document.createElement('span'); loc.className = 'loc'; loc.textContent = '§ ' + n.sectionTitle; card.appendChild(loc);
+    if (n.quote) { var q = document.createElement('div'); q.className = 'quote'; q.textContent = n.quote; card.appendChild(q); }
+    var ta = document.createElement('textarea'); ta.value = n.body || ''; ta.placeholder = 'Type your note…'; card.appendChild(ta);
+    var row = document.createElement('div'); row.className = 'row';
+    var sv = document.createElement('button'); sv.className = 'save'; sv.textContent = 'Save';
+    sv.onclick = function () { n.body = ta.value.trim(); save(); render(); };
+    row.appendChild(sv); card.appendChild(row);
+    ta.focus();
+    ta.addEventListener('keydown', function (e) { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') sv.click(); });
+  }
+  // Reply to a note: threads under it (author 'nam'); the agent writes replies with
+  // author 'agent' straight to the notes-server, and live-sync below surfaces them.
+  function replyCard(card, n) {
+    if (card.querySelector('.reply-box')) { card.querySelector('.reply-box textarea').focus(); return; }
+    var box = document.createElement('div'); box.className = 'reply-box';
+    var ta = document.createElement('textarea'); ta.placeholder = 'Reply to this note…'; box.appendChild(ta);
+    var row = document.createElement('div'); row.className = 'row';
+    var sv = document.createElement('button'); sv.className = 'save'; sv.textContent = 'Send reply';
+    var cx = document.createElement('button'); cx.className = 'edit'; cx.textContent = 'Cancel';
+    sv.onclick = function () {
+      var t = ta.value.trim(); if (!t) { ta.focus(); return; }
+      n.replies = n.replies || []; n.replies.push({ author: 'nam', body: t, createdAt: Date.now() });
+      save(); render(); try { applyAll(); } catch (e) {}
+    };
+    cx.onclick = function () { box.remove(); };
+    row.appendChild(sv); row.appendChild(cx); box.appendChild(row);
+    card.appendChild(box); ta.focus();
+    ta.addEventListener('keydown', function (e) { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') sv.click(); });
+  }
+  function openPanel() { panel.classList.add('open'); setTimeout(function () { if (input) input.focus(); }, 40); }
+  fab.onclick = function () {
+    panel.classList.toggle('open');
+    if (panel.classList.contains('open')) setTimeout(function () { if (input) input.focus(); }, 40);
+  };
+  document.getElementById('notePanelClose').onclick = function () { panel.classList.remove('open'); };
+  document.getElementById('noteAdd').onclick = addFromComposer;
+  input.addEventListener('keydown', function (e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); addFromComposer(); }
+  });
+  input.addEventListener('blur', function () { if (input.value.trim()) addFromComposer(); });
+
+  function jump(id) {
+    var marks = document.querySelectorAll('mark.note-hl[data-nid="' + id + '"]');
+    var n = notes.find(function (x) { return x.id === id; });
+    var target = marks[0] || (n && document.getElementById(n.sectionId));
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    marks.forEach(function (m) { m.classList.remove('flash'); void m.offsetWidth; m.classList.add('flash'); });
+  }
+
+  // ---- selection popover ----
+  function hidePop() { pop.style.display = 'none'; }
+  document.addEventListener('mouseup', function () {
+    setTimeout(function () {
+      var s = document.getSelection();
+      if (!s || s.isCollapsed) { hidePop(); return; }
+      var txt = s.toString();
+      if (!txt.trim()) { hidePop(); return; }
+      var host = s.anchorNode && (s.anchorNode.nodeType === 3 ? s.anchorNode.parentElement : s.anchorNode);
+      if (!host || !host.closest('main')) { hidePop(); return; }
+      var range = s.getRangeAt(0);
+      var section = sectionOf(range.startContainer);
+      var start = 0, end = 0;
+      if (section) {
+        start = offsetOf(section, range.startContainer, range.startOffset);
+        end = offsetOf(section, range.endContainer, range.endOffset);
+        if (end < start) { var tmp = start; start = end; end = tmp; }
+      }
+      lastSel = { quote: txt.trim().slice(0, 2000), section: section, start: start, end: end };
+      var rect = range.getBoundingClientRect();
+      var cw = document.documentElement.clientWidth;
+      var x = Math.min(Math.max(64, rect.left + rect.width / 2), cw - 64);
+      pop.style.left = (window.scrollX + x) + 'px';
+      pop.style.top = (window.scrollY + Math.max(rect.top, 8)) + 'px';
+      pop.style.display = 'block';
+    }, 10);
+  });
+  document.addEventListener('scroll', hidePop, { passive: true });
+  popBtn.addEventListener('mousedown', function (e) {
+    e.preventDefault();
+    if (!lastSel) return;
+    var sec = lastSel.section;
+    setAnchor({ sectionId: sec ? sec.id : '', sectionTitle: titleOf(sec), quote: lastSel.quote, start: lastSel.start, end: lastSel.end });
+    openPanel(); hidePop();
+    var sel = window.getSelection(); if (sel) sel.removeAllRanges();
+  });
+
+  document.addEventListener('click', function (e) {
+    var m = e.target.closest && e.target.closest('mark.note-hl, .note-badge');
+    if (!m || !m.dataset.nid) return;
+    var id = m.dataset.nid;
+    openPanel(); render();
+    var card = list.querySelector('.note-card[data-nid="' + id + '"]');
+    if (card) {
+      card.scrollIntoView({ block: 'center' });
+      card.classList.add('active');
+      setTimeout(function () { card.classList.remove('active'); }, 1600);
+    }
+  });
+  document.addEventListener('mouseover', function (e) {
+    var m = e.target.closest && e.target.closest('mark.note-hl, .note-badge');
+    if (m && m.dataset.nid) setLinked(m.dataset.nid, true);
+  });
+  document.addEventListener('mouseout', function (e) {
+    var m = e.target.closest && e.target.closest('mark.note-hl, .note-badge');
+    if (m && m.dataset.nid) setLinked(m.dataset.nid, false);
+  });
+
+  // ---- export ----
+  function toMd() {
+    return '# Hold-Exercise Voice Design — my notes\n\n' + notes.map(function (n) {
+      var s = '## § ' + n.sectionTitle + '\n' + (n.quote ? '> ' + n.quote.replace(/\n/g, '\n> ') + '\n\n' : '') + (n.body || '') + '\n';
+      if (n.replies && n.replies.length) {
+        s += n.replies.map(function (rp) { return '\n**' + (rp.author === 'agent' ? 'Claude' : 'You') + ':** ' + rp.body; }).join('\n') + '\n';
+      }
+      return s;
+    }).join('\n');
+  }
+  document.getElementById('noteCopy').onclick = function () { if (navigator.clipboard) navigator.clipboard.writeText(toMd()); };
+  document.getElementById('noteDownload').onclick = function () {
+    var b = new Blob([toMd()], { type: 'text/markdown' }), u = URL.createObjectURL(b);
+    var a = document.createElement('a'); a.href = u; a.download = 'hold-exercise-voice-design-notes.md'; a.click(); URL.revokeObjectURL(u);
+  };
+  document.getElementById('noteClear').onclick = function () {
+    if (confirm('Delete ALL your notes? This cannot be undone.')) { notes = []; save(); applyAll(); render(); }
+  };
+
+  render(); try { applyAll(); } catch (e) {} mirrorLocal(); cnt.textContent = notes.length; updateStatus();
+  try {
+    fetch(REMOTE).then(function (r) { return r.ok ? r.json() : null; }).then(function (server) {
+      if (!Array.isArray(server)) return;
+      remoteOk = true;
+      if (server.length >= notes.length) {
+        notes = server; render(); try { applyAll(); } catch (e) {} cnt.textContent = notes.length;
+      } else {
+        save();
+      }
+      updateStatus();
+    }).catch(function () { remoteOk = false; updateStatus(); });
+  } catch (e) { updateStatus(); }
+
+  // Live sync: pull agent replies / new notes from the disk server without a reload,
+  // so a "↳ Claude" reply appears within a few seconds. Skips while an edit or reply
+  // box is open so it never clobbers something you're mid-typing.
+  var lastServerJson = JSON.stringify(notes);
+  setInterval(function () {
+    if (!remoteOk) return;
+    if (panel.querySelector('.note-card textarea') || panel.querySelector('.reply-box')) return;
+    fetch(REMOTE).then(function (r) { return r.ok ? r.json() : null; }).then(function (server) {
+      if (!Array.isArray(server)) return;
+      var sj = JSON.stringify(server);
+      if (sj === lastServerJson) return;
+      lastServerJson = sj;
+      notes = server; render(); try { applyAll(); } catch (e) {} cnt.textContent = notes.length;
+    }).catch(function () {});
+  }, 4000);
+})();
+</script>
+
+<script>
+// Scrollspy: highlight the current section in the TOC.
+(function () {
+  var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+  var map = {};
+  links.forEach(function (a) {
+    var id = a.getAttribute('href').slice(1);
+    var el = document.getElementById(id);
+    if (el) map[id] = a;
+  });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); });
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) {
+        links.forEach(function (l) { l.classList.remove('on'); });
+        var a = map[e.target.id];
+        if (a) a.classList.add('on');
+      }
+    });
+  }, { rootMargin: '0px 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { io.observe(s); });
+})();
+</script>
+</body>
+</html>

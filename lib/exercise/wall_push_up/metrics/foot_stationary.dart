@@ -109,7 +109,7 @@ class FootStationaryMetric extends WallPushUpMetricBase {
         _instructionSet = true;
       }
       _logFault(phase, 'Chân di chuyển khi tập',
-          voiceMessage: 'Giữ chân cố định', affectsForm: true);
+          type: 'foot', voiceMessage: 'Giữ chân cố định', affectsForm: true);
     } else if (warningConfirmed) {
       ctx.resultIssues.feedback['Feet'] = 'Chân hơi di chuyển.';
       if (!_instructionSet) {
@@ -117,7 +117,7 @@ class FootStationaryMetric extends WallPushUpMetricBase {
         _instructionSet = true;
       }
       _logFault(phase, 'Chân hơi di chuyển',
-          voiceMessage: 'Giữ chân cố định', affectsForm: false);
+          type: 'foot', voiceMessage: 'Giữ chân cố định', affectsForm: false);
     } else {
       ctx.resultIssues.feedback['Feet'] = 'Chân giữ cố định tốt!';
     }
@@ -136,6 +136,7 @@ class FootStationaryMetric extends WallPushUpMetricBase {
       _logFault(
         phase,
         'Gót chân chưa kiễng',
+        type: 'heel',
         voiceMessage: 'Kiễng gót chân lên',
         affectsForm: true,
       );
@@ -146,11 +147,11 @@ class FootStationaryMetric extends WallPushUpMetricBase {
   }
 
   void _logFault(String phase, String message,
-      {String? voiceMessage, required bool affectsForm}) {
+      {required String type, String? voiceMessage, required bool affectsForm}) {
     if (!_faults.any((f) => f.phase == phase && f.message == message)) {
       _faults.add(FaultRecord(
         phase: phase,
-        type: 'Feet',
+        type: type,
         message: message,
         voiceMessage: voiceMessage,
         affectsForm: affectsForm,

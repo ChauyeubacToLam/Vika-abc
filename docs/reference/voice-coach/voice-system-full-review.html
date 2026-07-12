@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Voice System — Full Code Review (Glute Bridge pilot) — Vika</title>
+<title>Voice System — Full Code Review (rep fleet Tier 1) — Vika</title>
 <style>
 :root{
   --ink:#1F1812; --ink-soft:#4A4031; --muted:#8a7c63;
@@ -137,17 +137,19 @@ main code{overflow-wrap:anywhere;background:var(--line-soft);padding:1px 5px;bor
 </style>
 <header class="hero">
   <div class="hero-in">
-    <p class="eyebrow">Full code review · voice system + glute-bridge pilot · 2026-07-11</p>
+    <p class="eyebrow">Full code review · shared voice system + rep fleet Tier 1 · 2026-07-11</p>
     <h1>The <span class="u">Voice System</span>, line by line</h1>
     <p class="lede">Every file the coach touches, in the order data flows through it — from the camera frame
       that drives it, through the stochastic brain that decides <em>whether</em> to speak, down to the MP3
       that plays. Verbatim code with real line numbers, an ELI5 for each piece, and flagged review targets.
-      Glute Bridge is the live pilot, so its faults, tuning and wiring are shown end-to-end.</p>
+      Glute Bridge remains the full behavior pilot; all 24 other rep exercises now use its Tier-1 adapter
+      contract for counts, praise, critical faults, setup, countdown, ready, complete and safety.</p>
     <div class="chips">
       <span class="chip"><b>13 sections</b> · whole pipeline</span>
       <span class="chip"><b>10 core files</b> + glute metrics</span>
+      <span class="chip"><b>24 rep exercises</b> on Tier 1</span>
       <span class="chip"><b>1 call site</b> per frame</span>
-      <span class="chip"><b>status</b> pilot live · uncommitted</span>
+      <span class="chip"><b>status</b> fleet implemented · review pending</span>
     </div>
   </div>
 </header>
@@ -307,8 +309,12 @@ main code{overflow-wrap:anywhere;background:var(--line-soft);padding:1px 5px;bor
       that memory, the pipeline stays dumb and every other exercise keeps working untouched.</p>
   </div>
 
-  <p>Glute Bridge is the only exercise that returns this new adapter today. Every other exercise still
-    returns its legacy hand-written coach, so nothing else changed behaviour:</p>
+  <p>Glute Bridge is still the full-superset pilot: it owns soft pools, reminders, hustle phase keys and
+    local tuning. The 24 Tier-1 rep exercises now return the same policy adapter with the smaller default
+    contract: explicit rep bundle, target, normalized fault ids and three-field RepLog metadata. Hold
+    exercises retain their existing paths. Tricep Dip gets structural voice but no live fault surface
+    because its declared metrics are not driven by its exercise loop; pretending otherwise would violate
+    data honesty. The per-exercise decision surface is in <code>voice-fleet-tier1-review.html</code>.</p>
 
   <div class="code"><div class="code-head"><span>lib/exercise/glute bridge/glute_bridge.dart</span><b>GluteBridge.createVoiceCoach() — the wiring</b></div><div class="code-body"><div class="gut">249
 250

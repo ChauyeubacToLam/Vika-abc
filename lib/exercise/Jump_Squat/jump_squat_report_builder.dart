@@ -66,10 +66,11 @@ class JumpSquatReportBuilder {
 
     // QUAN SÁT & ĐO LƯỜNG: Quét lịch sử toàn bộ Set tập
     for (var faults in _repHistory) {
-      bool hasLandingFault = faults.any((f) =>
-          f.type == 'Knee' && f.affectsForm == true); // Tiếp đất chân cứng
-      bool hasTakeOffFault = faults.any((f) => f.type == 'Power'); // Lấy đà cạn
-      bool hasTorsoFault = faults.any((f) => f.type == 'Back'); // Úp lưng
+      bool hasLandingFault =
+          faults.any((f) => f.type == 'landing_stiff'); // Tiếp đất chân cứng
+      bool hasTakeOffFault =
+          faults.any((f) => f.type == 'takeoff_depth'); // Lấy đà cạn
+      bool hasTorsoFault = faults.any((f) => f.type == 'trunk'); // Úp lưng
 
       if (hasLandingFault) stiffLandingFaults++;
       if (hasTakeOffFault) shallowTakeOffFaults++;

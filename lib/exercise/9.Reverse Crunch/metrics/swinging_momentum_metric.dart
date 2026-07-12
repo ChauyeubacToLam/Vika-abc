@@ -44,7 +44,7 @@ class SwingingMomentumMetric extends ReverseCrunchMetricBase {
 
     _faults.add(FaultRecord(
       phase: 'CURLING',
-      type: 'Swinging',
+      type: 'momentum',
       message: 'Duỗi chân quá sớm để lấy đà',
       affectsForm: false,
       priority: CrunchVoicePriority.momentum,

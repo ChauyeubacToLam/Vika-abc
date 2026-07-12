@@ -99,7 +99,7 @@ class ElbowFlareMetric extends WallPushUpMetricBase {
     if (!_faults.any((f) => f.phase == phase && f.message == message)) {
       _faults.add(FaultRecord(
         phase: phase,
-        type: 'Arms',
+        type: 'elbow',
         message: message,
         voiceMessage: voiceMessage,
         affectsForm: affectsForm,

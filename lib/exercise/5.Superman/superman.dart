@@ -9,9 +9,22 @@ import 'metrics/limb_elevation_metric.dart';
 import 'metrics/hip_grounding_metric.dart';
 import 'metrics/hold_time_metric.dart';
 import 'metrics/lumbar_extension_metric.dart';
+import '../../voice/policy_voice_coach.dart';
+import '../../voice/voice_coach.dart';
+import '../../voice/voice_content.dart';
+import '../../voice/voice_policy.dart';
+import '../../voice/voice_sink.dart';
 
 class Superman extends ExerciseBase {
-  Superman({required this.maxRep});
+  static const List<String> _voiceFaultIds = [
+    'hip',
+    'elevation_arm',
+    'elevation_leg',
+    'lumbar',
+    'hold',
+  ];
+
+  Superman({required this.maxRep}) : super(targetReps: maxRep);
 
   final int maxRep;
 
@@ -24,6 +37,26 @@ class Superman extends ExerciseBase {
 
   @override
   String get exerciseName => 'Superman';
+
+  @override
+  List<FaultRecord> get liveFaults =>
+      [for (final metric in _metrics) ...metric.faults];
+
+  @override
+  ExerciseVoiceCoach createVoiceCoach() {
+    return PolicyVoiceCoach(
+      script: VoiceScript.from(
+        VoiceDefaults.repBased,
+        slug: 'superman',
+        faultIds: _voiceFaultIds,
+      ),
+      targetReps: targetReps,
+      coach: VoiceCoach(
+        sink: AssetVoiceSink(),
+        policy: VoicePolicy(),
+      ),
+    );
+  }
 
   SupermanState superState = SupermanState.setup;
   SupermanState previousState = SupermanState.setup;
@@ -373,12 +406,25 @@ class Superman extends ExerciseBase {
     repCount++;
     if (!correctForm) resultIssues.feedback['Result'] = 'Fix Form';
 
+    final faultAffectsForm = <String, bool>{};
+    final faultPriorities = <String, int>{};
+    for (final fault in faults) {
+      faultAffectsForm[fault.type] =
+          (faultAffectsForm[fault.type] ?? false) || fault.affectsForm;
+      final previousPriority = faultPriorities[fault.type];
+      if (previousPriority == null || fault.priority < previousPriority) {
+        faultPriorities[fault.type] = fault.priority;
+      }
+    }
+
     logger.addRepLog(RepLog(
       correctForm: correctForm,
       repNumber: repCount,
       data: {
         'hold_time': holdMetric.lastHoldDurationMs / 1000.0,
         'fault_types': faults.map((e) => e.type).toSet().toList(),
+        'fault_affects_form': faultAffectsForm,
+        'fault_priorities': faultPriorities,
       },
     ));
 

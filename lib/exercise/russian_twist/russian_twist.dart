@@ -13,6 +13,11 @@ import 'metrics/russian_metric_base.dart';
 import 'metrics/spinal_flexion_metric.dart';
 import 'metrics/thoracic_rotation_metric.dart';
 import 'metrics/twist_rom_metric.dart';
+import '../../voice/policy_voice_coach.dart';
+import '../../voice/voice_coach.dart';
+import '../../voice/voice_content.dart';
+import '../../voice/voice_policy.dart';
+import '../../voice/voice_sink.dart';
 
 enum RussianTwistState { center_setup, twisting, max_point, returning }
 
@@ -54,6 +59,13 @@ class RussianTwistConfig {
 /// implementation whose tracked shoulder was fully occluded when twisting
 /// toward the camera's blind side, stalling the rep counter.
 class RussianTwist extends ExerciseBase {
+  static const List<String> _voiceFaultIds = [
+    'knee',
+    'too_upright',
+    'too_low',
+    'rom',
+  ];
+
   @override
   Set<VikaImageOrientation> get supportedOrientations => <VikaImageOrientation>{
         VikaImageOrientation.landscapeLeft,
@@ -62,7 +74,8 @@ class RussianTwist extends ExerciseBase {
       };
 
   final int maxRep;
-  RussianTwist({this.maxRep = RussianTwistConfig.MAX_REP});
+  RussianTwist({this.maxRep = RussianTwistConfig.MAX_REP})
+      : super(targetReps: maxRep);
 
   RussianTwistState russianState = RussianTwistState.center_setup;
   RussianTwistState previousRussianState = RussianTwistState.center_setup;
@@ -75,10 +88,10 @@ class RussianTwist extends ExerciseBase {
   final List<FaultRecord> _pendingFullRepFaults = [];
 
   static const Set<String> _blockingFaultTypes = {
-    'shallow_twist',
-    'knee_wobble',
-    'upright_torso',
-    'collapsed_torso',
+    'rom',
+    'knee',
+    'too_upright',
+    'too_low',
   };
 
   final ThoracicRotationMetric thoracicMetric = ThoracicRotationMetric();
@@ -95,6 +108,26 @@ class RussianTwist extends ExerciseBase {
 
   @override
   String get exerciseName => 'Russian Twist';
+
+  @override
+  List<FaultRecord> get liveFaults =>
+      [for (final metric in _metrics) ...metric.faults];
+
+  @override
+  ExerciseVoiceCoach createVoiceCoach() {
+    return PolicyVoiceCoach(
+      script: VoiceScript.from(
+        VoiceDefaults.repBased,
+        slug: 'russian_twist',
+        faultIds: _voiceFaultIds,
+      ),
+      targetReps: targetReps,
+      coach: VoiceCoach(
+        sink: AssetVoiceSink(),
+        policy: VoicePolicy(),
+      ),
+    );
+  }
 
   @override
   String get currentPhaseKey => russianState.toString().split('.').last;
@@ -389,12 +422,24 @@ class RussianTwist extends ExerciseBase {
           }
 
           setFeedback.add({correctForm: faultMap});
+          final faultAffectsForm = <String, bool>{};
+          final faultPriorities = <String, int>{};
+          for (final fault in _pendingFullRepFaults) {
+            faultAffectsForm[fault.type] =
+                (faultAffectsForm[fault.type] ?? false) || fault.affectsForm;
+            final previousPriority = faultPriorities[fault.type];
+            if (previousPriority == null || fault.priority < previousPriority) {
+              faultPriorities[fault.type] = fault.priority;
+            }
+          }
           logger.addRepLog(RepLog(
             correctForm: correctForm,
             repNumber: repCount,
             data: {
               'fault_types':
                   _pendingFullRepFaults.map((f) => f.type).toSet().toList(),
+              'fault_affects_form': faultAffectsForm,
+              'fault_priorities': faultPriorities,
               'half_rep_count': _halfRepCount,
             },
           ));

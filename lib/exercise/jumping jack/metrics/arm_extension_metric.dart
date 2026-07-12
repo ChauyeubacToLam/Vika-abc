@@ -166,10 +166,10 @@ class ArmExtensionMetric extends JJMetricBase {
   }
 
   void _logFault(String phase, String message) {
-    if (!_faults.any((f) => f.phase == phase && f.type == 'Arms')) {
+    if (!_faults.any((f) => f.phase == phase && f.type == 'arms')) {
       _faults.add(FaultRecord(
         phase: phase,
-        type: 'Arms',
+        type: 'arms',
         message: message,
         affectsForm: true,
       ));

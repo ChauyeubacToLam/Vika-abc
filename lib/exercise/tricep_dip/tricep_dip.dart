@@ -9,6 +9,11 @@ import 'metrics/hip_thrust_metric.dart';
 import 'metrics/tricep_rom_metric.dart';
 import 'metrics/full_extension_metric.dart';
 import 'metrics/scapular_elevation_metric.dart';
+import '../../voice/policy_voice_coach.dart';
+import '../../voice/voice_coach.dart';
+import '../../voice/voice_content.dart';
+import '../../voice/voice_policy.dart';
+import '../../voice/voice_sink.dart';
 
 enum TricepDipState { setup_top, descending, bottom, ascending }
 
@@ -24,6 +29,13 @@ class TricepDipConfig {
 }
 
 class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
+  static const List<String> _voiceFaultIds = [
+    'extension',
+    'hip_thrust',
+    'shrug',
+    'rom',
+  ];
+
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
       const <VikaImageOrientation>{
@@ -32,7 +44,7 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
       };
 
   final int maxRep;
-  TricepDip({required this.maxRep});
+  TricepDip({required this.maxRep}) : super(targetReps: maxRep);
 
   TricepDipState tricepState = TricepDipState.setup_top;
   TricepDipState previousTricepState = TricepDipState.setup_top;
@@ -85,6 +97,22 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
 
   @override
   String get exerciseName => 'Tricep Dip (Floor)';
+
+  @override
+  ExerciseVoiceCoach createVoiceCoach() {
+    return PolicyVoiceCoach(
+      script: VoiceScript.from(
+        VoiceDefaults.repBased,
+        slug: 'tricep_dip',
+        faultIds: _voiceFaultIds,
+      ),
+      targetReps: targetReps,
+      coach: VoiceCoach(
+        sink: AssetVoiceSink(),
+        policy: VoicePolicy(),
+      ),
+    );
+  }
 
   @override
   String get currentPhaseKey => tricepState.toString().split('.').last;
@@ -273,9 +301,22 @@ class TricepDip extends ExerciseBase with SideTrackedExerciseMixin {
 
     setFeedback.add({correctForm: faultMap});
 
+    final faultAffectsForm = <String, bool>{};
+    final faultPriorities = <String, int>{};
+    for (final fault in allFaults) {
+      faultAffectsForm[fault.type] =
+          (faultAffectsForm[fault.type] ?? false) || fault.affectsForm;
+      final previousPriority = faultPriorities[fault.type];
+      if (previousPriority == null || fault.priority < previousPriority) {
+        faultPriorities[fault.type] = fault.priority;
+      }
+    }
+
     logger
         .addRepLog(RepLog(correctForm: correctForm, repNumber: repCount, data: {
       "fault_types": allFaults.map((f) => f.type).toSet().toList(),
+      "fault_affects_form": faultAffectsForm,
+      "fault_priorities": faultPriorities,
     }));
 
     correctForm = true;

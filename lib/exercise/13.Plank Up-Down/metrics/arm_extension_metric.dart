@@ -29,7 +29,7 @@ class ArmExtensionMetric extends PlankMetricBase {
       if (!_reachedFullExtension) {
         _faults.add(FaultRecord(
           phase: 'high_plank',
-          type: 'ArmExtension',
+          type: 'arm_extension',
           message: 'Chưa duỗi thẳng tay ở High Plank',
           affectsForm: true,
           voiceMessage: 'Đẩy thẳng tay lên!',

@@ -191,7 +191,7 @@ class HipShoulderSyncMetric extends SquatMetricBase {
     final phase = ctx.squatState.toString().split('.').last.toUpperCase();
     _faults.add(FaultRecord(
       phase: phase,
-      type: 'HipShoulderSync',
+      type: 'sync',
       message: message,
       affectsForm: true,
       voiceMessage: null,

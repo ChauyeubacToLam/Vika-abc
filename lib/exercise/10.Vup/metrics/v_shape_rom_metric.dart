@@ -38,7 +38,7 @@ class VShapeRomMetric extends VUpMetricBase {
         !reachedHandsToFeet) {
       _faults.add(FaultRecord(
         phase: 'REP_COMPLETE',
-        type: 'ROM',
+        type: 'rom',
         message:
             'Chưa gập đủ sâu (Góc nhỏ nhất: ${minVAngle!.toStringAsFixed(1)}°)',
         voiceMessage: 'Cố gắng rướn tay chạm vào mũi chân nhé',

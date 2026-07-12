@@ -45,8 +45,7 @@ class HipCollapseMetric extends AshtangaMetricBase {
     }
 
     if (_stickyErrorDebouncer.update(ratio < _errorMax)) {
-      _logFault(
-          ctx.state.name, 'Hips collapsed toward shoulders', 'HipCollapse');
+      _logFault(ctx.state.name, 'Hips collapsed toward shoulders', 'hip');
       return;
     }
 

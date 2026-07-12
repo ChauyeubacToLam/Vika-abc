@@ -97,7 +97,7 @@ class BodyLineMetric extends WallPushUpMetricBase {
     if (!_faults.any((f) => f.phase == phase && f.message == message)) {
       _faults.add(FaultRecord(
         phase: phase,
-        type: 'Body',
+        type: 'body_line',
         message: message,
         voiceMessage: voiceMessage,
         affectsForm: affectsForm,

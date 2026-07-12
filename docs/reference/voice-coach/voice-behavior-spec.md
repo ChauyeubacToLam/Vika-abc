@@ -23,6 +23,8 @@ landed): grace goes VOICE-ONLY and = intro duration (UI signage ungated,
 Late 07-10 follow-up landed: active-set resume (manual or auto) now routes through the normal
 start-position hold again. It does not replay the per-set setup intro, but it re-arms the voiced
 "một, hai, ba" countdown and `common.ready`; completed reps/logs stay intact.
+07-11 late: HOLD-BASED family behavior decided (§ Hold-based exercises below) — pose-gated clock,
+voice milestones + final earcons, milestone praise/hustle switch; High Plank pilot, unimplemented.
 Design + state machine: [setup-safety-voice-design.html](setup-safety-voice-design.html) (same folder).
 Research backing: [voice-research-rules.md](voice-research-rules.md) (same folder).
 Decision record: docs/decisions.md — 2026-07-07, 07-08, and 07-09 voice-coach entries.
@@ -459,6 +461,35 @@ Multiple recordings per content key so repeats don't sound verbatim. Matters mos
 channels — reminders, setup/tracking-safety, soft — where a verbatim repeat is where the robot shows
 (probabilistic cues hide their repetition behind varying gaps; praise already rotates a pool). A
 nice-to-have noted for the future, on no current checklist. (Nam, 2026-07-10.)
+
+## Hold-based exercises (time-based family) — DECIDED 2026-07-11, unimplemented
+Nam's rulings via the hold-design lavish review + same-day chat; full design in
+[hold-exercise-voice-design.html](hold-exercise-voice-design.html) (v2), impl spec
+docs/scratch/hold-voice-impl-spec.md (Codex), decision record decisions.md 07-11 "Hold-based voice
+behavior LOCKED". High Plank = pilot. Everything above stays rep-fleet; the hold mappings:
+
+- **Clock: pose-validity gated, not form-gated.** Outer ring (anti-cheat / "still in the pose")
+  gates time accrual; inner ring (form metrics) coaches real-time while the clock RUNS. Only
+  cheating stops earning. Fault-seconds accounting keeps the summary honest. Reverses the shipped
+  High Plank perfect-timer.
+- **Count → voice milestones** (deterministic, personality-immune, earned-time crossings, relative
+  rule at any duration): halfway + "còn 10 giây". Voice speaks REMAINING; UI ring unchanged. NO
+  spoken per-second countdown.
+- **Final countdown = earcons, not voice:** 3 identical beeps on the last 3 earned seconds + a
+  distinct end tone. No continuous tick in v1. Earcons are a separate lightweight channel — never
+  queued behind voice lines (sounds carry state, voice carries meaning).
+- **Milestone outcome slot switches praise/hustle by measured state:** clean since last milestone
+  → praise roll; struggling or final stretch → hustle roll; neither wins → time line alone. Never
+  praise two consecutive milestones (hard rule 6's hold form).
+- **criticalFault/softFault: identical real-time rules**; persistence + same-fault-once bookkeeping
+  unit = the hold EPISODE, not the rep.
+- **Hustle flavors:** milestone-paired (primary) + final-third pose-break arms / re-hold commit
+  fires (secondary, quiet-side).
+- **No timeout ending.** Walk-away = presence gate; stuck = setup_position re-tell; give-up = quit.
+- **Sets: hybrid fleet-wide** — a set = one continuous hold to target duration in the existing
+  multi-set flow; hold exercises never display "reps".
+- Setup intro / activation countdown / set-complete / GuidanceSignal safety: modality-independent,
+  unchanged. Yoga/stretch register deferred (VoiceScript config: reduced milestones, empty hustle).
 
 ## Post-set — deterministic, and the richest moment
 Set-complete line always; then the summary carries the dense feedback: single dominant fault to

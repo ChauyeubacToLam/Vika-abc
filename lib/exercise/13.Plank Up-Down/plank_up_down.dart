@@ -10,8 +10,20 @@ import 'metrics/trunk_alignment_metric.dart';
 import 'metrics/hip_rotation_metric.dart';
 import 'metrics/arm_extension_metric.dart';
 import 'metrics/alternating_lead_arm_metric.dart';
+import '../../voice/policy_voice_coach.dart';
+import '../../voice/voice_coach.dart';
+import '../../voice/voice_content.dart';
+import '../../voice/voice_policy.dart';
+import '../../voice/voice_sink.dart';
 
 class PlankUpDown extends ExerciseBase {
+  static const List<String> _voiceFaultIds = [
+    'hip_rotation',
+    'trunk',
+    'alternating',
+    'arm_extension',
+  ];
+
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
       const <VikaImageOrientation>{
@@ -50,10 +62,30 @@ class PlankUpDown extends ExerciseBase {
   final Debouncer _loweringDebouncer = Debouncer(requiredFrames: 2);
   final Debouncer _forearmDebouncer = Debouncer(requiredFrames: 2);
 
-  PlankUpDown({required this.maxRep});
+  PlankUpDown({required this.maxRep}) : super(targetReps: maxRep);
 
   @override
   String get exerciseName => 'Plank Up-Down';
+
+  @override
+  List<FaultRecord> get liveFaults =>
+      [for (final metric in _metrics) ...metric.faults];
+
+  @override
+  ExerciseVoiceCoach createVoiceCoach() {
+    return PolicyVoiceCoach(
+      script: VoiceScript.from(
+        VoiceDefaults.repBased,
+        slug: 'plank_up_down',
+        faultIds: _voiceFaultIds,
+      ),
+      targetReps: targetReps,
+      coach: VoiceCoach(
+        sink: AssetVoiceSink(),
+        policy: VoicePolicy(),
+      ),
+    );
+  }
 
   @override
   String get currentPhaseKey => plankState.name;
@@ -469,12 +501,24 @@ class PlankUpDown extends ExerciseBase {
     correctForm = isRepGood;
 
     if (countRep) {
+      final faultAffectsForm = <String, bool>{};
+      final faultPriorities = <String, int>{};
+      for (final fault in allFaults) {
+        faultAffectsForm[fault.type] =
+            (faultAffectsForm[fault.type] ?? false) || fault.affectsForm;
+        final previousPriority = faultPriorities[fault.type];
+        if (previousPriority == null || fault.priority < previousPriority) {
+          faultPriorities[fault.type] = fault.priority;
+        }
+      }
       logger.addRepLog(RepLog(
         correctForm: correctForm,
         repNumber: repCount,
         data: {
           "lead_arm": leadArmMetric.currentLeadArm ?? 'None',
           "fault_types": allFaults.map((e) => e.type).toSet().toList(),
+          "fault_affects_form": faultAffectsForm,
+          "fault_priorities": faultPriorities,
         },
       ));
 

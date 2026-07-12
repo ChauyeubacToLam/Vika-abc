@@ -20,10 +20,10 @@ class KneeExtensionMetric extends VUpMetricBase {
 
     if (_faultDebouncer
         .update(ctx.hipKneeAnkleAngle < VUpConfig.ACTIVE_KNEE_MIN)) {
-      if (!_faults.any((f) => f.type == 'BentKnee')) {
+      if (!_faults.any((f) => f.type == 'knee')) {
         _faults.add(FaultRecord(
           phase: ctx.state.name,
-          type: 'BentKnee',
+          type: 'knee',
           message: 'Gập gối làm mất lực đòn bẩy',
           voiceMessage: 'Nhớ giữ thẳng gối trong suốt quá trình gập nhé',
           affectsForm: true,

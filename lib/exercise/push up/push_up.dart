@@ -17,6 +17,11 @@ import 'metrics/push_up_metric_base.dart';
 import 'metrics/trunk_alignment_metric.dart';
 import 'metrics/depth_metric.dart';
 import 'metrics/tempo_metric.dart';
+import '../../voice/policy_voice_coach.dart';
+import '../../voice/voice_coach.dart';
+import '../../voice/voice_content.dart';
+import '../../voice/voice_policy.dart';
+import '../../voice/voice_sink.dart';
 
 // --- Config ---
 
@@ -62,8 +67,14 @@ enum PushUpState { plank, descending, bottom, ascending }
 // --- Push Up ---
 
 class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
+  static const List<String> _voiceFaultIds = [
+    'depth',
+    'tempo',
+    'sag',
+  ];
+
   final int maxRep;
-  PushUp({required this.maxRep});
+  PushUp({required this.maxRep}) : super(targetReps: maxRep);
 
   PushUpState pushUpState = PushUpState.plank;
   PushUpState previousPushUpState = PushUpState.plank;
@@ -172,6 +183,26 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
 
   @override
   String get exerciseName => 'Push Up';
+
+  @override
+  List<FaultRecord> get liveFaults =>
+      [for (final metric in _metrics) ...metric.faults];
+
+  @override
+  ExerciseVoiceCoach createVoiceCoach() {
+    return PolicyVoiceCoach(
+      script: VoiceScript.from(
+        VoiceDefaults.repBased,
+        slug: 'push_up',
+        faultIds: _voiceFaultIds,
+      ),
+      targetReps: targetReps,
+      coach: VoiceCoach(
+        sink: AssetVoiceSink(),
+        policy: VoicePolicy(),
+      ),
+    );
+  }
 
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
@@ -413,6 +444,17 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
     final topElbow = _topElbowAngle;
     final elbowRom = (topElbow - minElbow).clamp(0.0, 180.0).toDouble();
 
+    final faultAffectsForm = <String, bool>{};
+    final faultPriorities = <String, int>{};
+    for (final fault in allFaults) {
+      faultAffectsForm[fault.type] =
+          (faultAffectsForm[fault.type] ?? false) || fault.affectsForm;
+      final previousPriority = faultPriorities[fault.type];
+      if (previousPriority == null || fault.priority < previousPriority) {
+        faultPriorities[fault.type] = fault.priority;
+      }
+    }
+
     logger.addRepLog(RepLog(
       correctForm: correctForm,
       repNumber: repCount,
@@ -428,6 +470,8 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
         "ascending_time": tempoMetric.ascentDuration ?? 0.0,
         "descending_time": tempoMetric.descentDuration ?? 0.0,
         "fault_types": allFaults.map((f) => f.type).toSet().toList(),
+        "fault_affects_form": faultAffectsForm,
+        "fault_priorities": faultPriorities,
       },
     ));
 

@@ -8,8 +8,11 @@ import 'package:vika/exercise/Cobra/cobra.dart';
 import 'package:vika/exercise/exercise_base.dart';
 import 'package:vika/exercise/fault_record.dart';
 import 'package:vika/exercise/glute bridge/glute_bridge.dart';
+import 'package:vika/exercise/5.Superman/superman.dart';
+import 'package:vika/exercise/13.Plank Up-Down/plank_up_down.dart';
 import 'package:vika/exercise/lunge/lunge.dart';
 import 'package:vika/exercise/squat/squat.dart';
+import 'package:vika/exercise/walking_lunge/walking_lunge.dart';
 import 'package:vika/services/generic_exercise_voice_assets.dart';
 import 'package:vika/utils/exercise_logger.dart';
 import 'package:vika/voice/voice_coach.dart';
@@ -31,16 +34,38 @@ void main() {
   test('generic rep exercises use the policy coach with rep defaults', () {
     final exercise = Lunge();
     final coach = exercise.createVoiceCoach();
-    addTearDown(() => coach?.dispose());
+    addTearDown(coach.dispose);
 
     expect(coach, isA<PolicyVoiceCoach>());
 
-    final policyCoach = coach! as PolicyVoiceCoach;
+    final policyCoach = coach as PolicyVoiceCoach;
     expect(policyCoach.script.slug, 'lunge');
     expect(policyCoach.script.countPool, VoiceDefaults.repBased.count);
     expect(policyCoach.script.hasSoftCues, isFalse);
     expect(policyCoach.countsByRepNumber, isTrue);
     expect(policyCoach.script.faultKey('depth'), 'lunge.depth');
+  });
+
+  test('mixed rep-hold exercises explicitly keep rep voice defaults', () {
+    final exercises = <ExerciseBase>[
+      Superman(maxRep: 8),
+      PlankUpDown(maxRep: 8),
+      WalkingLunge(maxRep: 8),
+    ];
+    final coaches = exercises
+        .map((exercise) => exercise.createVoiceCoach() as PolicyVoiceCoach)
+        .toList();
+    addTearDown(() {
+      for (final coach in coaches) {
+        coach.dispose();
+      }
+    });
+
+    for (final coach in coaches) {
+      expect(coach.script.countPool, VoiceDefaults.repBased.count);
+      expect(coach.countsByRepNumber, isTrue);
+      expect(coach.targetReps, 8);
+    }
   });
 
   test('glute bridge uses its pilot script with hustle + reminders enabled',

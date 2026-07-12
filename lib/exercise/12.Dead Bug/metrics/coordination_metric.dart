@@ -32,7 +32,7 @@ class CoordinationMetric extends DeadBugMetricBase {
       if (sameSide) {
         _faults.add(FaultRecord(
           phase: ctx.state.name,
-          type: 'Coordination',
+          type: 'opposite_side',
           message: 'Chuyển động cùng bên',
           voiceMessage: 'Sai nhịp! Hãy hạ tay và chân ĐỐI DIỆN nhau.',
           affectsForm: true,
@@ -45,7 +45,7 @@ class CoordinationMetric extends DeadBugMetricBase {
         if (_lastWasLeftArm != null && _lastWasLeftArm == currentIsLeftArm) {
           _faults.add(FaultRecord(
             phase: ctx.state.name,
-            type: 'NotAlternating',
+            type: 'alternate',
             message: 'Không luân phiên đổi bên',
             voiceMessage: 'Nhớ đổi bên sau mỗi lần nhé',
             affectsForm: true,

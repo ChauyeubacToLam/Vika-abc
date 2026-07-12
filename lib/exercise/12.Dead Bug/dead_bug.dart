@@ -11,6 +11,11 @@ import 'metrics/coordination_metric.dart';
 import 'metrics/stable_limbs_metric.dart';
 import 'metrics/tempo_metric.dart';
 import 'metrics/floor_contact_metric.dart';
+import '../../voice/policy_voice_coach.dart';
+import '../../voice/voice_coach.dart';
+import '../../voice/voice_content.dart';
+import '../../voice/voice_policy.dart';
+import '../../voice/voice_sink.dart';
 
 class DeadBugConfig {
   static const int TIMEOUT_MS = 90000; // 90s timeout
@@ -27,6 +32,15 @@ class DeadBugConfig {
 }
 
 class DeadBug extends ExerciseBase {
+  static const List<String> _voiceFaultIds = [
+    'opposite_side',
+    'alternate',
+    'anti_extension',
+    'floor_contact',
+    'stable_limbs',
+    'tempo',
+  ];
+
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
       const <VikaImageOrientation>{
@@ -71,10 +85,30 @@ class DeadBug extends ExerciseBase {
   bool? _lastPhysicalLeftArm;
   bool? _lastPhysicalLeftLeg;
 
-  DeadBug({required this.maxRep});
+  DeadBug({required this.maxRep}) : super(targetReps: maxRep);
 
   @override
   String get exerciseName => 'Dead Bug';
+
+  @override
+  List<FaultRecord> get liveFaults =>
+      [for (final metric in _metrics) ...metric.faults];
+
+  @override
+  ExerciseVoiceCoach createVoiceCoach() {
+    return PolicyVoiceCoach(
+      script: VoiceScript.from(
+        VoiceDefaults.repBased,
+        slug: 'dead_bug',
+        faultIds: _voiceFaultIds,
+      ),
+      targetReps: targetReps,
+      coach: VoiceCoach(
+        sink: AssetVoiceSink(),
+        policy: VoicePolicy(),
+      ),
+    );
+  }
 
   @override
   String get currentPhaseKey => state.toString().split('.').last;
@@ -448,10 +482,23 @@ class DeadBug extends ExerciseBase {
 
     if (!correctForm) resultIssues.feedback['Result'] = 'Fix Form';
 
+    final faultAffectsForm = <String, bool>{};
+    final faultPriorities = <String, int>{};
+    for (final fault in allFaults) {
+      faultAffectsForm[fault.type] =
+          (faultAffectsForm[fault.type] ?? false) || fault.affectsForm;
+      final previousPriority = faultPriorities[fault.type];
+      if (previousPriority == null || fault.priority < previousPriority) {
+        faultPriorities[fault.type] = fault.priority;
+      }
+    }
+
     logger
         .addRepLog(RepLog(correctForm: correctForm, repNumber: repCount, data: {
       "extending_time": tempoMetric.extendingDuration ?? 0.0,
-      "fault_types": allFaults.map((e) => e.type).toSet().toList()
+      "fault_types": allFaults.map((e) => e.type).toSet().toList(),
+      "fault_affects_form": faultAffectsForm,
+      "fault_priorities": faultPriorities,
     }));
 
     _lastPhysicalLeftArm = ctx.physicalLeftArmExtending;
@@ -463,7 +510,7 @@ class DeadBug extends ExerciseBase {
     if (ctx.physicalLeftArmExtending == ctx.physicalLeftLegExtending) {
       return FaultRecord(
         phase: ctx.state.name,
-        type: 'SameSide',
+        type: 'opposite_side',
         message: 'Không duỗi cùng tay cùng chân',
         voiceMessage: 'Duỗi tay và chân đối diện',
         affectsForm: true,
@@ -478,7 +525,7 @@ class DeadBug extends ExerciseBase {
             _lastPhysicalLeftLeg == ctx.physicalLeftLegExtending)) {
       return FaultRecord(
         phase: ctx.state.name,
-        type: 'NotAlternating',
+        type: 'alternate',
         message: 'Chưa luân phiên bên',
         voiceMessage: 'Đổi sang tay và chân còn lại',
         affectsForm: true,

@@ -15,6 +15,11 @@ import 'metrics/curl_up_metric_base.dart';
 import 'metrics/curl_up_trunk_elevation.dart';
 import 'metrics/curl_up_neck_pulling.dart';
 import 'metrics/curl_up_knee_extension.dart';
+import '../../voice/policy_voice_coach.dart';
+import '../../voice/voice_coach.dart';
+import '../../voice/voice_content.dart';
+import '../../voice/voice_policy.dart';
+import '../../voice/voice_sink.dart';
 
 // =========================================================================
 // CURL-UP STATE MACHINE OVERVIEW
@@ -73,6 +78,13 @@ class CurlUpConfig {
 enum CurlUpState { resting, ascending, descending }
 
 class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
+  static const List<String> _voiceFaultIds = [
+    'knee_extension',
+    'neck_pull',
+    'trunk_high',
+    'trunk_low',
+  ];
+
   static const String restingStatus = 'Cuộn lên';
   static const String ascendingStatus = 'Lên...';
   static const String descendingStatus = 'Hạ từ từ';
@@ -113,7 +125,27 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
   double? _repMinEarShoulderHipAngle;
   double? _repMaxHipKneeAnkleAngle;
 
-  CurlUp({required this.maxRep});
+  CurlUp({required this.maxRep}) : super(targetReps: maxRep);
+
+  @override
+  List<FaultRecord> get liveFaults =>
+      [for (final metric in _metrics) ...metric.faults];
+
+  @override
+  ExerciseVoiceCoach createVoiceCoach() {
+    return PolicyVoiceCoach(
+      script: VoiceScript.from(
+        VoiceDefaults.repBased,
+        slug: 'curl_up',
+        faultIds: _voiceFaultIds,
+      ),
+      targetReps: targetReps,
+      coach: VoiceCoach(
+        sink: AssetVoiceSink(),
+        policy: VoicePolicy(),
+      ),
+    );
+  }
 
   // ── Voice-coach helpers (parity with Squat) ──
 
@@ -513,6 +545,17 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
         ? (baseESH - _repMinEarShoulderHipAngle!).clamp(0.0, 90.0)
         : 0.0;
 
+    final faultAffectsForm = <String, bool>{};
+    final faultPriorities = <String, int>{};
+    for (final fault in allFaults) {
+      faultAffectsForm[fault.type] =
+          (faultAffectsForm[fault.type] ?? false) || fault.affectsForm;
+      final previousPriority = faultPriorities[fault.type];
+      if (previousPriority == null || fault.priority < previousPriority) {
+        faultPriorities[fault.type] = fault.priority;
+      }
+    }
+
     logger.addRepLog(RepLog(
       correctForm: correctForm,
       repNumber: repCount,
@@ -521,6 +564,8 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
         "peak_neck_deviation": peakNeckDev,
         "max_knee_angle": _repMaxHipKneeAnkleAngle ?? 0.0,
         "fault_types": allFaults.map((f) => f.type).toSet().toList(),
+        "fault_affects_form": faultAffectsForm,
+        "fault_priorities": faultPriorities,
       },
     ));
 

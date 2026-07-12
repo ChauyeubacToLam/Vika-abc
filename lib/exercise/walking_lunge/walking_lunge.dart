@@ -11,6 +11,11 @@ import 'metrics/front_knee_control_metric.dart';
 import 'metrics/rear_knee_depth_metric.dart';
 import 'metrics/torso_verticality_metric.dart';
 import 'dart:ui' show Size;
+import '../../voice/policy_voice_coach.dart';
+import '../../voice/voice_coach.dart';
+import '../../voice/voice_content.dart';
+import '../../voice/voice_policy.dart';
+import '../../voice/voice_sink.dart';
 
 enum WalkingState { standing, stepping, descending, bottom, pulling_through }
 
@@ -47,6 +52,13 @@ class _WalkingCleanRepSnapshot {
 }
 
 class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
+  static const List<String> _voiceFaultIds = [
+    'hold',
+    'rear_depth',
+    'torso',
+    'step_length',
+  ];
+
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
       const <VikaImageOrientation>{
@@ -54,7 +66,8 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
       };
 
   final int maxRep;
-  WalkingLunge({this.maxRep = WalkingLungeConfig.MAX_REP});
+  WalkingLunge({this.maxRep = WalkingLungeConfig.MAX_REP})
+      : super(targetReps: maxRep);
 
   WalkingState walkingState = WalkingState.standing;
   WalkingState previousWalkingState = WalkingState.standing;
@@ -108,6 +121,28 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
 
   @override
   String get exerciseName => 'Walking Lunge';
+
+  @override
+  List<FaultRecord> get liveFaults => [
+        ..._localFaults,
+        for (final metric in _metrics) ...metric.faults,
+      ];
+
+  @override
+  ExerciseVoiceCoach createVoiceCoach() {
+    return PolicyVoiceCoach(
+      script: VoiceScript.from(
+        VoiceDefaults.repBased,
+        slug: 'walking_lunge',
+        faultIds: _voiceFaultIds,
+      ),
+      targetReps: targetReps,
+      coach: VoiceCoach(
+        sink: AssetVoiceSink(),
+        policy: VoicePolicy(),
+      ),
+    );
+  }
 
   @override
   String get currentPhaseKey => walkingState.toString().split('.').last;
@@ -565,9 +600,9 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
       if (_bottomStartTime != null) {
         int elapsed = timestampMs - _bottomStartTime!;
         if (elapsed < 2000) {
-          if (!_localFaults.any((f) => f.type == 'not_enough_hold')) {
+          if (!_localFaults.any((f) => f.type == 'hold')) {
             _localFaults.add(FaultRecord(
-              type: 'not_enough_hold',
+              type: 'hold',
               message: 'Chưa giữ đủ 2 giây!',
               affectsForm: true,
               phase: 'bottom',
@@ -643,9 +678,22 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
 
     setFeedback.add({correctForm: faultMap});
 
+    final faultAffectsForm = <String, bool>{};
+    final faultPriorities = <String, int>{};
+    for (final fault in allFaults) {
+      faultAffectsForm[fault.type] =
+          (faultAffectsForm[fault.type] ?? false) || fault.affectsForm;
+      final previousPriority = faultPriorities[fault.type];
+      if (previousPriority == null || fault.priority < previousPriority) {
+        faultPriorities[fault.type] = fault.priority;
+      }
+    }
+
     logger
         .addRepLog(RepLog(correctForm: correctForm, repNumber: repCount, data: {
       "fault_types": allFaults.map((f) => f.type).toSet().toList(),
+      "fault_affects_form": faultAffectsForm,
+      "fault_priorities": faultPriorities,
     }));
 
     correctForm = true;

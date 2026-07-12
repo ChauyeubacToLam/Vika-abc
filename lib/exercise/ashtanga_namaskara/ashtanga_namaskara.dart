@@ -9,6 +9,11 @@ import 'package:vika/utils/exercise_logger.dart';
 import 'metrics/ashtanga_metric_base.dart';
 import 'metrics/hip_collapse_metric.dart';
 import 'metrics/cervical_safety_metric.dart';
+import '../../voice/policy_voice_coach.dart';
+import '../../voice/voice_coach.dart';
+import '../../voice/voice_content.dart';
+import '../../voice/voice_policy.dart';
+import '../../voice/voice_sink.dart';
 
 enum AshtangaMode { transient, microHold }
 
@@ -30,13 +35,18 @@ class AshtangaConfig {
 }
 
 class AshtangaNamaskara extends ExerciseBase {
+  static const List<String> _voiceFaultIds = [
+    'hip',
+    'neck',
+  ];
+
   final int maxRep;
   final AshtangaMode mode;
 
   AshtangaNamaskara({
     required this.maxRep,
     this.mode = AshtangaMode.transient,
-  });
+  }) : super(targetReps: maxRep);
 
   AshtangaState ashtangaState = AshtangaState.entry;
   AshtangaState previousAshtangaState = AshtangaState.entry;
@@ -69,6 +79,26 @@ class AshtangaNamaskara extends ExerciseBase {
 
   @override
   String get exerciseName => 'Ashtanga Namaskara';
+
+  @override
+  List<FaultRecord> get liveFaults =>
+      [for (final metric in _metrics) ...metric.faults];
+
+  @override
+  ExerciseVoiceCoach createVoiceCoach() {
+    return PolicyVoiceCoach(
+      script: VoiceScript.from(
+        VoiceDefaults.repBased,
+        slug: 'ashtanga_namaskara',
+        faultIds: _voiceFaultIds,
+      ),
+      targetReps: targetReps,
+      coach: VoiceCoach(
+        sink: AssetVoiceSink(),
+        policy: VoicePolicy(),
+      ),
+    );
+  }
 
   @override
   String get currentPhaseKey => ashtangaState.toString().split('.').last;
@@ -433,6 +463,17 @@ class AshtangaNamaskara extends ExerciseBase {
     final faultMap = _faultMapFrom(allFaults);
     setFeedback.add({correctForm: faultMap});
 
+    final faultAffectsForm = <String, bool>{};
+    final faultPriorities = <String, int>{};
+    for (final fault in allFaults) {
+      faultAffectsForm[fault.type] =
+          (faultAffectsForm[fault.type] ?? false) || fault.affectsForm;
+      final previousPriority = faultPriorities[fault.type];
+      if (previousPriority == null || fault.priority < previousPriority) {
+        faultPriorities[fault.type] = fault.priority;
+      }
+    }
+
     logger.addRepLog(
       RepLog(
         correctForm: correctForm,
@@ -443,6 +484,8 @@ class AshtangaNamaskara extends ExerciseBase {
               : AshtangaConfig.RECOGNITION_WINDOW_MS / 1000.0,
           'mode': mode.name,
           'fault_types': allFaults.map((f) => f.type).toSet().toList(),
+          'fault_affects_form': faultAffectsForm,
+          'fault_priorities': faultPriorities,
         },
       ),
     );

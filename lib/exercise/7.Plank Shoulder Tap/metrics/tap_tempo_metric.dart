@@ -37,7 +37,7 @@ class TapTempoMetric extends PlankTapMetricBase {
       if (totalLiftTime < PlankTapConfig.MIN_TAP_TIME) {
         _faults.add(FaultRecord(
             phase: 'RETURNING',
-            type: 'TooFast',
+            type: 'tempo',
             message: 'Tập giật cục, quá nhanh',
             affectsForm: false,
             priority: PlankTapVoicePriority.tempo,

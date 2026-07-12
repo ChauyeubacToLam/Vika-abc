@@ -52,7 +52,7 @@ class TempoMetric extends LegRaiseMetricBase {
         loweringDuration! < LegRaiseConfig.TEMPO_FAULT_THRESHOLD) {
       _faults.add(FaultRecord(
         phase: 'REP_COMPLETE',
-        type: 'Tempo',
+        type: 'tempo',
         message:
             'Thả rơi chân quá nhanh (${loweringDuration!.toStringAsFixed(1)}s)',
         voiceMessage:

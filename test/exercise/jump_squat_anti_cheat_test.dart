@@ -187,7 +187,7 @@ void main() {
     expect(exercise.logger.repLogs.single.correctForm, isFalse);
     expect(
       exercise.logger.repLogs.single.data['fault_types'],
-      contains('Power'),
+      contains('takeoff_depth'),
     );
     expect(exercise.resultIssues.feedback, contains('takeoff_depth'));
 

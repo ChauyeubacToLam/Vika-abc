@@ -88,7 +88,7 @@ class ForwardHeadMetric extends WallPushUpMetricBase {
     if (!_faults.any((f) => f.phase == phase && f.message == message)) {
       _faults.add(FaultRecord(
         phase: phase,
-        type: 'Head',
+        type: 'head',
         message: message,
         voiceMessage: voiceMessage,
         affectsForm: false, // coaching only

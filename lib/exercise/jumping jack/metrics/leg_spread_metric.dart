@@ -114,10 +114,10 @@ class LegSpreadMetric extends JJMetricBase {
   }
 
   void _logFault(String phase, String message, {String? voiceMessage}) {
-    if (!_faults.any((f) => f.phase == phase && f.type == 'Legs')) {
+    if (!_faults.any((f) => f.phase == phase && f.type == 'legs')) {
       _faults.add(FaultRecord(
         phase: phase,
-        type: 'Legs',
+        type: 'legs',
         message: message,
         voiceMessage: voiceMessage,
         affectsForm: true,

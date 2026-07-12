@@ -11,6 +11,11 @@ import 'metrics/knee_valgus_metric.dart';
 import 'metrics/core_drive_metric.dart';
 import 'metrics/cross_rom_metric.dart';
 import 'metrics/pelvic_drop_metric.dart';
+import '../../voice/policy_voice_coach.dart';
+import '../../voice/voice_coach.dart';
+import '../../voice/voice_content.dart';
+import '../../voice/voice_policy.dart';
+import '../../voice/voice_sink.dart';
 
 enum KteState { standing_base, approaching, touch, returning }
 
@@ -28,6 +33,12 @@ class StandingKneeToElbowConfig {
 }
 
 class StandingKneeToElbow extends ExerciseBase {
+  static const List<String> _voiceFaultIds = [
+    'core_drive',
+    'knee_valgus',
+    'pelvic_drop',
+  ];
+
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
       const <VikaImageOrientation>{
@@ -35,7 +46,8 @@ class StandingKneeToElbow extends ExerciseBase {
       };
 
   final int maxRep;
-  StandingKneeToElbow({this.maxRep = StandingKneeToElbowConfig.MAX_REP});
+  StandingKneeToElbow({this.maxRep = StandingKneeToElbowConfig.MAX_REP})
+      : super(targetReps: maxRep);
 
   KteState kteState = KteState.standing_base;
   KteState previousKteState = KteState.standing_base;
@@ -74,6 +86,26 @@ class StandingKneeToElbow extends ExerciseBase {
 
   @override
   String get exerciseName => 'Standing Knee-to-Elbow';
+
+  @override
+  List<FaultRecord> get liveFaults =>
+      [for (final metric in _metrics) ...metric.faults];
+
+  @override
+  ExerciseVoiceCoach createVoiceCoach() {
+    return PolicyVoiceCoach(
+      script: VoiceScript.from(
+        VoiceDefaults.repBased,
+        slug: 'standing_kte',
+        faultIds: _voiceFaultIds,
+      ),
+      targetReps: targetReps,
+      coach: VoiceCoach(
+        sink: AssetVoiceSink(),
+        policy: VoicePolicy(),
+      ),
+    );
+  }
 
   @override
   String get currentPhaseKey => kteState.toString().split('.').last;
@@ -491,9 +523,22 @@ class StandingKneeToElbow extends ExerciseBase {
 
     setFeedback.add({correctForm: faultMap});
 
+    final faultAffectsForm = <String, bool>{};
+    final faultPriorities = <String, int>{};
+    for (final fault in allFaults) {
+      faultAffectsForm[fault.type] =
+          (faultAffectsForm[fault.type] ?? false) || fault.affectsForm;
+      final previousPriority = faultPriorities[fault.type];
+      if (previousPriority == null || fault.priority < previousPriority) {
+        faultPriorities[fault.type] = fault.priority;
+      }
+    }
+
     logger
         .addRepLog(RepLog(correctForm: correctForm, repNumber: repCount, data: {
       "fault_types": allFaults.map((f) => f.type).toSet().toList(),
+      "fault_affects_form": faultAffectsForm,
+      "fault_priorities": faultPriorities,
     }));
 
     correctForm = true;

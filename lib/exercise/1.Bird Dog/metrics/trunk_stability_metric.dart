@@ -53,10 +53,10 @@ class TrunkStabilityMetric extends BirdDogMetricBase {
       if (ctx.state != BirdDogState.hold_extended) return;
 
       if (deviation > 0.15) {
-        if (!_faults.any((f) => f.type == 'Trunk')) {
+        if (!_faults.any((f) => f.type == 'trunk')) {
           _faults.add(FaultRecord(
             phase: ctx.state.name,
-            type: 'Trunk',
+            type: 'trunk',
             message: 'Hông bị lệch/sụt',
             voiceMessage: 'Siết bụng, giữ hông cân bằng.',
             affectsForm: true,

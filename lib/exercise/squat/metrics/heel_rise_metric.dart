@@ -78,10 +78,10 @@ class HeelRiseMetric extends SquatMetricBase {
   }
 
   void _logFault(String phase, String message) {
-    if (!_faults.any((f) => f.phase == phase && f.type == 'Heel')) {
+    if (!_faults.any((f) => f.phase == phase && f.type == 'heel')) {
       _faults.add(FaultRecord(
         phase: phase,
-        type: 'Heel',
+        type: 'heel',
         message: message,
         voiceMessage: _postRepVoiceCue,
         affectsForm: true,

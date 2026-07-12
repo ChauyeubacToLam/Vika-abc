@@ -203,10 +203,10 @@ class TempoMetric extends JJMetricBase {
   }
 
   void _logFault(String phase, String message) {
-    if (!_faults.any((f) => f.phase == phase && f.type == 'Tempo')) {
+    if (!_faults.any((f) => f.phase == phase && f.type == 'tempo_fast')) {
       _faults.add(FaultRecord(
         phase: phase,
-        type: 'Tempo',
+        type: 'tempo_fast',
         message: message,
         affectsForm: false, // Tempo is informational for JJ
       ));

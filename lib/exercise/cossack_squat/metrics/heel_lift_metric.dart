@@ -26,7 +26,7 @@ class CossackHeelLiftMetric extends CossackMetricBase {
       ctx.resultIssues.feedback['heel'] = message;
       addFault(
         FaultRecord(
-          type: 'heel_lift',
+          type: 'heel',
           message:
               'Gót chân trụ phải chạm sàn. Nếu không làm được, hãy squat nông lại!',
           affectsForm: true,

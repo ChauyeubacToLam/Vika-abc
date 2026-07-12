@@ -41,7 +41,7 @@ class TricepRomMetric extends TricepMetricBase {
       if (!_reachedDepth) {
         addFault(
           FaultRecord(
-            type: 'shallow_dip',
+            type: 'rom',
             message: 'Gập tay sâu hơn cho đến khi mông gần chạm sàn.',
             affectsForm:
                 false, // Medium priority, doesn't necessarily fail the rep if they are weak

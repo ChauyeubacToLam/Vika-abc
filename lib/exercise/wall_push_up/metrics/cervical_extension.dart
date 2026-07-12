@@ -97,7 +97,7 @@ class CervicalExtensionMetric extends WallPushUpMetricBase {
     if (!_faults.any((f) => f.phase == phase && f.message == message)) {
       _faults.add(FaultRecord(
         phase: phase,
-        type: 'Neck',
+        type: 'cervical',
         message: message,
         voiceMessage: voiceMessage,
         affectsForm: false, // coaching only

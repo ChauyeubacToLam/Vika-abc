@@ -10,6 +10,11 @@ import 'metrics/heel_lift_metric.dart';
 import 'metrics/working_depth_metric.dart';
 import 'metrics/straight_leg_metric.dart';
 import 'metrics/torso_verticality_metric.dart';
+import '../../voice/policy_voice_coach.dart';
+import '../../voice/voice_coach.dart';
+import '../../voice/voice_content.dart';
+import '../../voice/voice_policy.dart';
+import '../../voice/voice_sink.dart';
 
 enum CossackState { standing, descending, bottom, ascending }
 
@@ -31,6 +36,15 @@ class CossackConfig {
 }
 
 class CossackSquat extends ExerciseBase {
+  static const List<String> _voiceFaultIds = [
+    'heel',
+    'knee_valgus',
+    'straight_leg',
+    'torso',
+    'depth_deep',
+    'depth_shallow',
+  ];
+
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
       const <VikaImageOrientation>{
@@ -38,7 +52,7 @@ class CossackSquat extends ExerciseBase {
       };
 
   final int maxRep;
-  CossackSquat({required this.maxRep});
+  CossackSquat({required this.maxRep}) : super(targetReps: maxRep);
 
   CossackState cossackState = CossackState.standing;
   CossackState previousCossackState = CossackState.standing;
@@ -65,6 +79,26 @@ class CossackSquat extends ExerciseBase {
 
   @override
   String get exerciseName => 'Cossack Squat';
+
+  @override
+  List<FaultRecord> get liveFaults =>
+      [for (final metric in _metrics) ...metric.faults];
+
+  @override
+  ExerciseVoiceCoach createVoiceCoach() {
+    return PolicyVoiceCoach(
+      script: VoiceScript.from(
+        VoiceDefaults.repBased,
+        slug: 'cossack_squat',
+        faultIds: _voiceFaultIds,
+      ),
+      targetReps: targetReps,
+      coach: VoiceCoach(
+        sink: AssetVoiceSink(),
+        policy: VoicePolicy(),
+      ),
+    );
+  }
 
   @override
   String get currentPhaseKey => cossackState.toString().split('.').last;
@@ -424,9 +458,22 @@ class CossackSquat extends ExerciseBase {
 
     setFeedback.add({correctForm: faultMap});
 
+    final faultAffectsForm = <String, bool>{};
+    final faultPriorities = <String, int>{};
+    for (final fault in allFaults) {
+      faultAffectsForm[fault.type] =
+          (faultAffectsForm[fault.type] ?? false) || fault.affectsForm;
+      final previousPriority = faultPriorities[fault.type];
+      if (previousPriority == null || fault.priority < previousPriority) {
+        faultPriorities[fault.type] = fault.priority;
+      }
+    }
+
     logger
         .addRepLog(RepLog(correctForm: correctForm, repNumber: repCount, data: {
       "fault_types": allFaults.map((f) => f.type).toSet().toList(),
+      "fault_affects_form": faultAffectsForm,
+      "fault_priorities": faultPriorities,
     }));
 
     correctForm = true;
@@ -448,17 +495,17 @@ class CossackSquat extends ExerciseBase {
 
   String _feedbackKeyForFault(FaultRecord fault) {
     switch (fault.type) {
-      case 'heel_lift':
+      case 'heel':
         return 'heel';
       case 'knee_valgus':
         return 'knee_valgus';
-      case 'bent_straight_leg':
+      case 'straight_leg':
         return 'straight_leg';
-      case 'torso_lean':
+      case 'torso':
         return 'torso';
-      case 'too_deep':
+      case 'depth_deep':
         return 'depth_deep';
-      case 'shallow_depth':
+      case 'depth_shallow':
         return 'depth_shallow';
       default:
         return fault.type;

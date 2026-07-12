@@ -11,9 +11,21 @@ import 'metrics/eccentric_tempo_metric.dart';
 import 'metrics/arm_position_metric.dart';
 import '../../utils/exercise_logger.dart';
 import '../../utils/debouncer.dart';
+import '../../voice/policy_voice_coach.dart';
+import '../../voice/voice_coach.dart';
+import '../../voice/voice_content.dart';
+import '../../voice/voice_policy.dart';
+import '../../voice/voice_sink.dart';
 
 class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
-  ReverseCrunch({required this.maxRep});
+  static const List<String> _voiceFaultIds = [
+    'curl',
+    'tempo',
+    'momentum',
+    'arms',
+  ];
+
+  ReverseCrunch({required this.maxRep}) : super(targetReps: maxRep);
 
   final int maxRep;
 
@@ -46,6 +58,26 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
 
   @override
   String get exerciseName => 'Reverse Crunch';
+
+  @override
+  List<FaultRecord> get liveFaults =>
+      [for (final metric in _metrics) ...metric.faults];
+
+  @override
+  ExerciseVoiceCoach createVoiceCoach() {
+    return PolicyVoiceCoach(
+      script: VoiceScript.from(
+        VoiceDefaults.repBased,
+        slug: 'reverse_crunch',
+        faultIds: _voiceFaultIds,
+      ),
+      targetReps: targetReps,
+      coach: VoiceCoach(
+        sink: AssetVoiceSink(),
+        policy: VoicePolicy(),
+      ),
+    );
+  }
 
   ReverseCrunchState crunchState = ReverseCrunchState.lying;
   ReverseCrunchState previousState = ReverseCrunchState.lying;
@@ -420,10 +452,24 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
 
     repCount++;
     if (!correctForm) resultIssues.feedback['Result'] = 'Fix Form';
+    final faultAffectsForm = <String, bool>{};
+    final faultPriorities = <String, int>{};
+    for (final fault in allFaults) {
+      faultAffectsForm[fault.type] =
+          (faultAffectsForm[fault.type] ?? false) || fault.affectsForm;
+      final previousPriority = faultPriorities[fault.type];
+      if (previousPriority == null || fault.priority < previousPriority) {
+        faultPriorities[fault.type] = fault.priority;
+      }
+    }
     logger.addRepLog(RepLog(
       correctForm: correctForm,
       repNumber: repCount,
-      data: {"fault_types": allFaults.map((e) => e.type).toSet().toList()},
+      data: {
+        "fault_types": allFaults.map((e) => e.type).toSet().toList(),
+        "fault_affects_form": faultAffectsForm,
+        "fault_priorities": faultPriorities,
+      },
     ));
 
     _transitionState(ReverseCrunchState.lying, ctx.frameTimestamp);

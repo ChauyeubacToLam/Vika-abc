@@ -31,7 +31,7 @@ class TempoMetric extends VUpMetricBase {
     if (loweringDuration != null && loweringDuration! < 1.0) {
       _faults.add(FaultRecord(
         phase: 'REP_COMPLETE',
-        type: 'Tempo',
+        type: 'tempo',
         message:
             'Thả rơi tự do ở pha hạ (${loweringDuration!.toStringAsFixed(1)}s)',
         voiceMessage:

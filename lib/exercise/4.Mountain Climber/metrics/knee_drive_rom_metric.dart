@@ -67,7 +67,7 @@ class KneeDriveRomMetric extends ClimberMetricBase {
       _shortRomCount++;
       _faults.add(FaultRecord(
         phase: 'MAX_FLEXION',
-        type: 'ShortROM_${side.name}',
+        type: 'rom',
         message: 'Co gối ${side == KneeSide.left ? "trái" : "phải"} quá ngắn',
         affectsForm: true,
         priority: ClimberVoicePriority.kneeRom,

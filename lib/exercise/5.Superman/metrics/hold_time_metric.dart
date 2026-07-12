@@ -35,7 +35,7 @@ class HoldTimeMetric extends SupermanMetricBase {
     if (lastHoldDurationMs < SupermanConfig.HOLD_MIN_MS) {
       addFault(FaultRecord(
         phase: 'REP_COMPLETE',
-        type: 'HoldTooShort',
+        type: 'hold',
         message: 'Giữ tư thế lâu hơn!',
         voiceMessage: 'Giữ lại 2 giây ở điểm cao nhất, không giật cục',
         affectsForm: true,

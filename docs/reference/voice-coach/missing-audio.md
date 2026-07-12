@@ -14,6 +14,260 @@ reminders, safety, praise. Two fixed copy patterns follow from it:
 Status tags below: **FINAL** = Nam's verbatim wording; **pattern-derived** = mechanically filled from
 an existing action phrase, Nam confirms the exact string at recording time.
 
+Writing NEW lines (or reviewing pending ones): follow `.agents/skills/voice-copy/SKILL.md` —
+cue formula (external target + no-assumption fence), grounding steps, per-slot templates
+(decisions.md 07-11 "Voice-copy skill"). Pending un-recorded lines below predate the formula;
+check them against it before recording.
+
+## Rep fleet Tier 1 gaps (07-11 code sync)
+
+Tier 1 reuses the resolver convention `assets/audio/<slug>/<fault_id>.mp3`; it did not add or rename
+audio. Two implemented detector groups currently resolve to safe no-ops:
+
+| Exercise | Implemented fault ids with no resolving MP3 | Why |
+|---|---|---|
+| Squat | `heel`, `depth`, `trunk`, `tempo`, `sync` | The old Squat stack used differently named WAV files. The generic resolver has no aliases for those fault keys. |
+| Ashtanga Namaskara | `hip`, `neck` | `assets/audio/ashtanga_namaskara/` contains no matching recordings. |
+
+One implemented Russian Twist detector, `arm_swinging`, remains intentionally outside the script: no
+legacy id or audio meaning matches it closely enough. Bird Dog's `MissingBody` / `Plank` guard records
+also remain unmapped; its rejected `opposite_side`, `alternate`, and `hold` attempts are cleared before
+the policy adapter can speak them. Tricep Dip has recordings for its declared faults, but its metric
+objects are not driven by the exercise, so those recordings are unreachable until detector wiring is
+designed separately.
+
+Existing recordings with no implemented/reachable fault are orphaned for now:
+
+| Exercise | Orphaned legacy ids |
+|---|---|
+| Push Up | `pike`, `setup_guard` |
+| Wall Push Up | `setup` |
+| Lunge | `too_deep` |
+| Walking Lunge | `front_knee`, `framing` |
+| Jump Squat | `too_fast` |
+| Standing Knee-to-Elbow | `cross_rom`, `setup` |
+| Tricep Dip | `setup`; all four fault recordings are detector-unreachable |
+| Sit-Up | `tempo` (data only; no FaultRecord) |
+| Mountain Climber | `double_knee` |
+| Russian Twist | `spine`, `thoracic` |
+| Jumping Jack | `tempo_slow` |
+| Ashtanga Namaskara | `knees`, `chest`, `count_guard` |
+| Plank Up-Down | `knee` |
+
+Exercises not listed have no known orphaned fault id in their current script. The full per-fault
+decision surface lives in `voice-fleet-tier1-review.html`.
+
+## MASTER RECORD LIST (07-11) — every file to create, one flat table
+
+Everything the fleet needs, in one place: legacy re-records (old files predate the persona
+convention), the new soft lines, and the optional reminders. Supersedes the two earlier
+checklists ("Missing CRITICAL lines" + "Fleet Tier-1 SOFT cues"), whose wordings are folded in.
+Glute Bridge and all `common.*` files are DONE to convention — not listed.
+
+Lines POLISHED 07-11 to the §3d copywriting craft (voice-research-rules.md): external-focus
+phrasing where it fits (verb + direction + concrete target — "đạp sàn" over "duỗi gối"), one
+verb + one target, positive/target framing (never "đừng"), `nhé` softening. Still DRAFTS — your
+recording is canonical. Pronoun stays `bạn` per the persona convention; §3d flags `bạn` may read
+"customer-service bot" to older users (age-matched anh/chị/em is the natural PT register) — an
+open call for you, deliberately not changed here.
+
+How to use:
+- Drop each file at EXACTLY the path shown (paths are what the resolver loads today; note the
+  odd legacy names called out inline). Replacing an existing file at the same path is the upgrade.
+- A missing file is a safe logged no-op — partial batches are fine, record in any order.
+- Status: **re-record** = legacy file exists, content/tone predates the persona rules · **NEW** =
+  no file exists · **soft** = new `_soft` nudge line · **reminder (opt.)** = next-rep reminder,
+  record only the ones you want coached (empty = silent; glute precedent is 1-2 per exercise).
+- Patterns: critical `Bạn [action] nhé.` · soft `Tốt, bạn [action] chút nữa là đẹp.` · reminder
+  `Lần này bạn nhớ [action] nhé.`
+
+| # | File (assets/audio/…) | Draft line | Status |
+|---|---|---|---|
+| 1 | squat/squat.setup_position.mp3 | Bạn đứng hai chân rộng bằng vai, quay nghiêng với màn hình nhé. | NEW |
+| 2 | squat/squat.active_intro.mp3 | Ngồi xuống chậm rồi đứng thẳng lên, đều nhịp nhé. | NEW |
+| 3 | squat/heel.mp3 | Bạn đạp gót chân xuống sàn nhé. | NEW (legacy WAV nho_giu_got_chan — listen; rename if it fits) |
+| 4 | squat/depth.mp3 | Bạn ngồi xuống thấp hơn nhé. | NEW (legacy nho_xuong_thap_hon) |
+| 5 | squat/trunk.mp3 | Bạn hướng ngực lên, giữ lưng thẳng nhé. | NEW (legacy uon_nguc_len) |
+| 6 | squat/tempo.mp3 | Bạn hạ người xuống thật chậm nhé. | NEW (legacy nho_cham_lai) |
+| 7 | squat/sync.mp3 | Bạn đẩy hông và ngực lên cùng lúc nhé. | NEW |
+| 8 | squat/heel_reminder.mp3 | Lần này bạn nhớ đạp gót xuống sàn nhé. | reminder (opt.) |
+| 9 | squat/depth_reminder.mp3 | Lần này bạn nhớ ngồi xuống thấp hơn nhé. | reminder (opt.) |
+| 10 | push_up/push_up.setup_position.mp3 | Bạn vào tư thế hít đất, hai tay rộng bằng vai nhé. | re-record |
+| 11 | push_up/push_up.active_intro.mp3 | Hạ ngực xuống sàn rồi đẩy người lên nhé. | re-record |
+| 12 | push_up/depth.mp3 | Bạn hạ ngực gần sàn hơn nhé. | re-record |
+| 13 | push_up/tempo.mp3 | Bạn hạ người xuống thật chậm nhé. | re-record |
+| 14 | push_up/sag.mp3 | Bạn siết bụng, giữ người thành một đường thẳng nhé. | re-record |
+| 15 | push_up/depth_soft.mp3 | Tốt, bạn hạ ngực gần sàn hơn chút nữa là đẹp. | soft |
+| 16 | push_up/sag_reminder.mp3 | Lần này bạn nhớ siết bụng, giữ người thẳng nhé. | reminder (opt.) |
+| 17 | wall_push_up/wall_push_up.setup_position.mp3 | Bạn đứng cách tường một sải tay, hai tay chống lên tường nhé. | re-record |
+| 18 | wall_push_up/wall_push_up.active_intro.mp3 | Đưa ngực về phía tường rồi đẩy người ra nhé. | re-record |
+| 19 | wall_push_up/body_line.mp3 | Bạn siết bụng, giữ người thành một đường thẳng nhé. | re-record |
+| 20 | wall_push_up/foot.mp3 | Bạn giữ chân đứng yên một chỗ nhé. | re-record |
+| 21 | wall_push_up/heel.mp3 | Bạn giữ gót chân chạm sàn nhé. | re-record |
+| 22 | wall_push_up/shoulder.mp3 | Bạn thả lỏng vai xuống nhé. | re-record |
+| 23 | wall_push_up/elbow.mp3 | Bạn khép khuỷu tay vào gần người nhé. | re-record |
+| 24 | wall_push_up/hand.mp3 | Bạn chống tay chắc lên tường nhé. | re-record |
+| 25 | wall_push_up/body_line_soft.mp3 | Tốt, bạn siết bụng giữ người thẳng hơn chút nữa là đẹp. | soft |
+| 26 | wall_push_up/foot_soft.mp3 | Tốt, bạn giữ chân đứng yên là đẹp. | soft |
+| 27 | wall_push_up/shoulder_soft.mp3 | Tốt, bạn thả vai xuống chút nữa là đẹp. | soft |
+| 28 | wall_push_up/elbow_soft.mp3 | Tốt, bạn khép khuỷu tay vào chút nữa là đẹp. | soft |
+| 29 | wall_push_up/head_soft.mp3 | Tốt, bạn giữ đầu thẳng hơn chút nữa là đẹp. | soft |
+| 30 | wall_push_up/cervical_soft.mp3 | Tốt, bạn thu cằm lại chút nữa là đẹp. | soft |
+| 31 | wall_push_up/tempo_soft.mp3 | Tốt, bạn hạ người chậm hơn chút nữa là đẹp. | soft |
+| 32 | wall_push_up/body_line_reminder.mp3 | Lần này bạn nhớ giữ người thẳng nhé. | reminder (opt.) |
+| 33 | lunge/lunge.setup_position.mp3 | Bạn đứng thẳng, một chân bước dài lên trước nhé. | re-record |
+| 34 | lunge/lunge.active_intro.mp3 | Hạ gối sau xuống gần sàn rồi đứng lên nhé. | re-record |
+| 35 | lunge/depth.mp3 | Bạn hạ gối sau xuống gần sàn hơn nhé. | re-record |
+| 36 | lunge/trunk.mp3 | Bạn hướng ngực lên, giữ lưng thẳng nhé. | re-record |
+| 37 | lunge/lumbar.mp3 | Bạn siết bụng lại nhé. | re-record |
+| 38 | lunge/heel.mp3 | Bạn đạp gót chân trước xuống sàn nhé. | re-record |
+| 39 | lunge/depth_reminder.mp3 | Lần này bạn nhớ hạ gối sâu hơn nhé. | reminder (opt.) |
+| 40 | walking_lunge/setup_position.mp3 | Bạn đứng thẳng, chuẩn bị bước dài về trước nhé. | re-record |
+| 41 | walking_lunge/active_intro.mp3 | Bước tới, hạ gối sau xuống, giữ một nhịp rồi bước tiếp nhé. | re-record |
+| 42 | walking_lunge/hold.mp3 | Bạn giữ ở dưới thêm một nhịp nhé. | re-record |
+| 43 | walking_lunge/torso.mp3 | Bạn giữ thân trên thẳng nhé. | re-record (critical since 07-11 flip) |
+| 44 | walking_lunge/rear_depth_soft.mp3 | Tốt, bạn hạ gối sau gần sàn hơn chút nữa là đẹp. | soft |
+| 45 | walking_lunge/step_length_soft.mp3 | Tốt, bạn giữ sải bước đều hơn chút nữa là đẹp. | soft |
+| 46 | walking_lunge/torso_reminder.mp3 | Lần này bạn nhớ giữ thân thẳng nhé. | reminder (opt.) |
+| 47 | cossack_squat/setup_position.mp3 | Bạn đứng hai chân rộng hơn vai nhé. | re-record |
+| 48 | cossack_squat/active_intro.mp3 | Ngồi xuống một bên, chân kia duỗi thẳng, rồi đổi bên nhé. | re-record |
+| 49 | cossack_squat/knee_valgus.mp3 | Bạn hướng đầu gối theo mũi chân nhé. | re-record |
+| 50 | cossack_squat/heel.mp3 | Bạn đạp gót chân xuống sàn nhé. | re-record |
+| 51 | cossack_squat/depth_shallow.mp3 | Bạn ngồi xuống thấp hơn nhé. | re-record |
+| 52 | cossack_squat/straight_leg.mp3 | Bạn duỗi thẳng chân bên kia nhé. | re-record |
+| 53 | cossack_squat/depth_deep_soft.mp3 | Tốt, bạn ngồi vừa tầm thôi là đẹp. | soft |
+| 54 | cossack_squat/torso_soft.mp3 | Tốt, bạn hướng ngực lên chút nữa là đẹp. | soft |
+| 55 | cossack_squat/knee_valgus_reminder.mp3 | Lần này bạn nhớ hướng gối theo mũi chân nhé. | reminder (opt.) |
+| 56 | jump_squat/set_up position.mp3 | Bạn đứng hai chân rộng bằng vai nhé. | re-record (KEEP this exact odd filename — resolver special-case) |
+| 57 | jump_squat/active_intro.mp3 | Ngồi xuống rồi bật lên, tiếp đất thật nhẹ nhé. | re-record |
+| 58 | jump_squat/landing_stiff.mp3 | Bạn tiếp đất nhẹ, trùng gối để giảm sốc nhé. | re-record |
+| 59 | jump_squat/trunk.mp3 | Bạn giữ lưng thẳng nhé. | re-record |
+| 60 | jump_squat/takeoff_depth.mp3 | Bạn ngồi xuống thấp hơn trước khi bật nhé. | re-record |
+| 61 | jump_squat/landing_depth_soft.mp3 | Tốt, lúc tiếp đất bạn trùng gối thêm chút nữa là đẹp. | soft |
+| 62 | standing_kte/setup_position.mp3 | Bạn đứng thẳng, hai tay đưa lên cao nhé. | re-record |
+| 63 | standing_kte/active_intro.mp3 | Kéo gối lên chạm khuỷu tay đối diện nhé. | re-record |
+| 64 | standing_kte/core_drive.mp3 | Bạn siết bụng kéo gối lên cao nhé. | re-record |
+| 65 | standing_kte/knee_valgus.mp3 | Bạn hướng đầu gối theo mũi chân nhé. | re-record |
+| 66 | standing_kte/pelvic_drop.mp3 | Bạn giữ hông ngang bằng nhé. | re-record |
+| 67 | tricep_dip/setup_position.mp3 | Bạn ngồi trên sàn, hai tay chống phía sau nhé. | re-record (intros only — fault detectors not wired) |
+| 68 | tricep_dip/active_intro.mp3 | Hạ người xuống rồi đẩy thẳng tay lên nhé. | re-record |
+| 69 | step_back_burpee/setup_position.mp3 | Bạn đứng thẳng, chuẩn bị nhé. | re-record |
+| 70 | step_back_burpee/active_intro.mp3 | Chống tay, bước chân ra sau thành plank, rồi thu về đứng lên nhé. | re-record |
+| 71 | step_back_burpee/squat_hinge.mp3 | Bạn ngồi xổm xuống, giữ lưng thẳng nhé. | re-record |
+| 72 | step_back_burpee/plank_sag.mp3 | Bạn siết bụng, giữ người thẳng khi plank nhé. | re-record |
+| 73 | step_back_burpee/squat_depth_soft.mp3 | Tốt, bạn hạ hông thấp hơn chút nữa là đẹp. | soft |
+| 74 | step_back_burpee/plank_extension_soft.mp3 | Tốt, bạn duỗi chân thẳng hơn chút nữa là đẹp. | soft |
+| 75 | mc_gill_curl_up/curl_up.setup_position.mp3 | Bạn nằm ngửa, một chân co một chân duỗi, tay đặt dưới lưng nhé. | re-record |
+| 76 | mc_gill_curl_up/curl_up.active_intro.mp3 | Nâng nhẹ đầu và vai lên, giữ một nhịp rồi hạ xuống nhé. | re-record |
+| 77 | mc_gill_curl_up/knee_extension.mp3 | Bạn giữ gối co đúng tư thế nhé. | re-record |
+| 78 | mc_gill_curl_up/neck_pull.mp3 | Bạn thả lỏng cổ nhé. | re-record |
+| 79 | mc_gill_curl_up/trunk_high.mp3 | Bạn nâng đầu và vai lên nhẹ thôi nhé. | re-record |
+| 80 | mc_gill_curl_up/knee_extension_soft.mp3 | Tốt, bạn giữ gối co thêm chút nữa là đẹp. | soft |
+| 81 | mc_gill_curl_up/neck_pull_soft.mp3 | Tốt, bạn thả lỏng cổ chút nữa là đẹp. | soft |
+| 82 | mc_gill_curl_up/trunk_high_soft.mp3 | Tốt, bạn nâng vai nhẹ thôi là đẹp. | soft |
+| 83 | mc_gill_curl_up/trunk_low_soft.mp3 | Tốt, bạn nâng vai lên cao hơn chút nữa là đẹp. | soft |
+| 84 | sit_up/sit_up.setup_position.mp3 | Bạn nằm ngửa, co gối, tay đặt sau đầu nhé. | re-record |
+| 85 | sit_up/sit_up.active_intro.mp3 | Ngồi dậy bằng cơ bụng rồi hạ xuống chậm nhé. | re-record |
+| 86 | sit_up/jerking.mp3 | Bạn ngồi dậy đều bằng cơ bụng nhé. | re-record |
+| 87 | sit_up/rom.mp3 | Bạn ngồi dậy cao hơn nhé. | re-record |
+| 88 | sit_up/stability.mp3 | Bạn lên xuống đều, giữ người ổn định nhé. | re-record |
+| 89 | sit_up/jerking_reminder.mp3 | Lần này bạn nhớ lên đều bằng cơ bụng nhé. | reminder (opt.) |
+| 90 | v_up/v_up.setup_position.mp3 | Bạn nằm ngửa, tay duỗi qua đầu nhé. | re-record |
+| 91 | v_up/v_up.active_intro.mp3 | Nâng tay và chân lên chạm nhau thành chữ V rồi hạ xuống nhé. | re-record |
+| 92 | v_up/tempo.mp3 | Bạn nâng và hạ người thật chậm nhé. | re-record |
+| 93 | v_up/jerking.mp3 | Bạn nâng người đều bằng cơ bụng nhé. | re-record |
+| 94 | v_up/knee.mp3 | Bạn giữ chân thẳng gối nhé. | re-record |
+| 95 | v_up/sync_soft.mp3 | Tốt, bạn nâng tay và chân cùng lúc là đẹp. | soft |
+| 96 | v_up/rom_soft.mp3 | Tốt, bạn nâng người cao hơn chút nữa là đẹp. | soft |
+| 97 | dead_bug/dead_bug.setup_position.mp3 | Bạn nằm ngửa, tay hướng lên trần, gối co vuông góc nhé. | re-record |
+| 98 | dead_bug/dead_bug.active_intro.mp3 | Duỗi tay và chân đối diện ra chậm rồi thu về nhé. | re-record |
+| 99 | dead_bug/opposite_side.mp3 | Bạn duỗi tay và chân đối diện nhau nhé. | re-record |
+| 100 | dead_bug/alternate.mp3 | Bạn đổi bên luân phiên nhé. | re-record |
+| 101 | dead_bug/anti_extension.mp3 | Bạn ép lưng dưới sát sàn nhé. | re-record |
+| 102 | dead_bug/floor_contact.mp3 | Bạn giữ tay và chân trên không nhé. | re-record |
+| 103 | dead_bug/stable_limbs.mp3 | Bạn giữ tay chân bên kia cố định nhé. | re-record |
+| 104 | dead_bug/tempo.mp3 | Bạn duỗi ra thật chậm nhé. | re-record |
+| 105 | dead_bug/anti_extension_reminder.mp3 | Lần này bạn nhớ ép lưng sát sàn nhé. | reminder (opt.) |
+| 106 | bird_dog/bird_dog.setup_position.mp3 | Bạn quỳ chống tay, tay dưới vai, gối dưới hông nhé. | re-record |
+| 107 | bird_dog/bird_dog.active_intro.mp3 | Duỗi tay và chân đối diện ra, giữ một nhịp rồi thu về nhé. | re-record |
+| 108 | bird_dog/alignment.mp3 | Bạn duỗi tay chân thẳng hàng với lưng nhé. | re-record |
+| 109 | bird_dog/head.mp3 | Bạn giữ đầu thẳng, mắt nhìn xuống sàn nhé. | re-record |
+| 110 | bird_dog/lumbar.mp3 | Bạn siết bụng, giữ lưng cố định nhé. | re-record |
+| 111 | bird_dog/trunk.mp3 | Bạn giữ hông ngang bằng, thân vững nhé. | re-record |
+| 112 | bird_dog/lumbar_reminder.mp3 | Lần này bạn nhớ siết bụng, giữ lưng yên nhé. | reminder (opt.) |
+| 113 | superman/superman.setup_position.mp3 | Bạn nằm sấp, tay duỗi về phía trước nhé. | re-record |
+| 114 | superman/superman.active_intro.mp3 | Nâng tay và chân lên, giữ một nhịp rồi hạ xuống nhé. | re-record |
+| 115 | superman/hip.mp3 | Bạn giữ hông chạm sàn nhé. | re-record |
+| 116 | superman/elevation_arm.mp3 | Bạn vươn tay lên cao hơn nhé. | re-record |
+| 117 | superman/elevation_leg.mp3 | Bạn nâng chân lên cao hơn nhé. | re-record |
+| 118 | superman/lumbar.mp3 | Bạn nâng người lên vừa phải thôi nhé. | re-record |
+| 119 | superman/hold.mp3 | Bạn giữ tư thế thêm một nhịp nhé. | re-record |
+| 120 | mountain_climber/mountain_climber.setup_position.mp3 | Bạn vào tư thế plank cao, tay thẳng nhé. | re-record |
+| 121 | mountain_climber/mountain_climber.active_intro.mp3 | Kéo từng gối lên gần ngực, đổi chân thật nhanh nhé. | re-record |
+| 122 | mountain_climber/rom.mp3 | Bạn kéo gối lên gần ngực hơn nhé. | re-record |
+| 123 | mountain_climber/trunk_sag.mp3 | Bạn siết bụng, giữ hông ngang bằng nhé. | re-record |
+| 124 | mountain_climber/trunk_bounce.mp3 | Bạn giữ hông ổn định nhé. | re-record |
+| 125 | mountain_climber/trunk_sag_reminder.mp3 | Lần này bạn nhớ giữ hông ngang bằng nhé. | reminder (opt.) |
+| 126 | reverse_crunch/reverse_crunch.setup_position.mp3 | Bạn nằm ngửa, co gối, tay xuôi theo người nhé. | re-record |
+| 127 | reverse_crunch/reverse_crunch.active_intro.mp3 | Cuộn hông lên khỏi sàn rồi hạ xuống chậm nhé. | re-record |
+| 128 | reverse_crunch/curl.mp3 | Bạn cuộn hông lên khỏi sàn nhé. | re-record |
+| 129 | reverse_crunch/arms.mp3 | Bạn giữ tay xuôi trên sàn nhé. | re-record |
+| 130 | reverse_crunch/tempo_soft.mp3 | Tốt, bạn hạ hông xuống chậm hơn chút nữa là đẹp. | soft |
+| 131 | reverse_crunch/momentum_soft.mp3 | Tốt, bạn cuộn hông chủ động hơn chút nữa là đẹp. | soft |
+| 132 | plank_shoulder_tap/plank_shoulder_tap.setup_position.mp3 | Bạn vào tư thế plank cao nhé. | re-record |
+| 133 | plank_shoulder_tap/plank_shoulder_tap.active_intro.mp3 | Lần lượt chạm tay lên vai đối diện, giữ hông vững nhé. | re-record |
+| 134 | plank_shoulder_tap/hip_rotation.mp3 | Bạn giữ hông ngang bằng nhé. | re-record |
+| 135 | plank_shoulder_tap/tap.mp3 | Bạn chạm tay lên vai đối diện nhé. | re-record |
+| 136 | plank_shoulder_tap/trunk.mp3 | Bạn siết bụng, giữ người thẳng nhé. | re-record |
+| 137 | plank_shoulder_tap/tempo_soft.mp3 | Tốt, bạn chạm vai chậm hơn chút nữa là đẹp. | soft |
+| 138 | plank_shoulder_tap/hip_rotation_reminder.mp3 | Lần này bạn nhớ giữ hông ngang bằng nhé. | reminder (opt.) |
+| 139 | leg_raises/leg_raises.setup_position.mp3 | Bạn nằm ngửa, chân duỗi thẳng, tay xuôi theo người nhé. | re-record |
+| 140 | leg_raises/leg_raises.active_intro.mp3 | Nâng hai chân lên cao rồi hạ xuống thật chậm nhé. | re-record |
+| 141 | leg_raises/pelvic.mp3 | Bạn ép lưng dưới sát sàn nhé. | re-record |
+| 142 | leg_raises/rom.mp3 | Bạn nâng chân lên cao hơn nhé. | re-record |
+| 143 | leg_raises/knee.mp3 | Bạn giữ chân thẳng gối nhé. | re-record |
+| 144 | leg_raises/tempo.mp3 | Bạn hạ chân xuống thật chậm nhé. | re-record |
+| 145 | leg_raises/arms.mp3 | Bạn giữ tay xuôi trên sàn nhé. | re-record |
+| 146 | leg_raises/pelvic_reminder.mp3 | Lần này bạn nhớ ép lưng sát sàn nhé. | reminder (opt.) |
+| 147 | russian_twist/setup_position.mp3 | Bạn ngồi, co gối, ngả người ra sau một chút nhé. | re-record |
+| 148 | russian_twist/active_intro.mp3 | Xoay người sang hai bên luân phiên nhé. | re-record |
+| 149 | russian_twist/knee.mp3 | Bạn giữ gối ổn định nhé. | re-record |
+| 150 | russian_twist/too_upright.mp3 | Bạn ngả người ra sau thêm chút nhé. | re-record |
+| 151 | russian_twist/too_low.mp3 | Bạn nâng người lên cao hơn chút nhé. | re-record |
+| 152 | jumping_jack/jumping_jack.setup_position.mp3 | Bạn đứng thẳng, tay xuôi theo người nhé. | re-record |
+| 153 | jumping_jack/jumping_jack.active_intro.mp3 | Bật dạng chân, vung tay lên cao, rồi thu về nhé. | re-record |
+| 154 | jumping_jack/arms.mp3 | Bạn vung tay lên cao qua đầu nhé. | re-record |
+| 155 | jumping_jack/legs.mp3 | Bạn bật dạng chân rộng hơn nhé. | re-record |
+| 156 | jumping_jack/tempo_fast_soft.mp3 | Tốt, bạn giữ nhịp chậm hơn chút nữa là đẹp. | soft |
+| 157 | ashtanga_namaskara/ashtanga_namaskara.setup_position.mp3 | Bạn quỳ xuống, chuẩn bị hạ ngực và cằm nhé. | NEW |
+| 158 | ashtanga_namaskara/ashtanga_namaskara.active_intro.mp3 | Hạ gối, ngực và cằm chạm sàn, giữ hông cao nhé. | NEW |
+| 159 | ashtanga_namaskara/hip.mp3 | Bạn giữ hông cao lên nhé. | NEW |
+| 160 | ashtanga_namaskara/neck_soft.mp3 | Tốt, bạn giữ cổ thẳng tự nhiên là đẹp. | soft |
+| 161 | plank_up_down/plank_up_down.setup_position.mp3 | Bạn vào tư thế plank thấp trên cẳng tay nhé. | re-record |
+| 162 | plank_up_down/plank_up_down.active_intro.mp3 | Lần lượt chống tay lên plank cao rồi hạ về cẳng tay nhé. | re-record |
+| 163 | plank_up_down/hip_rotation.mp3 | Bạn giữ hông ngang bằng nhé. | re-record |
+| 164 | plank_up_down/trunk.mp3 | Bạn siết bụng, giữ người thẳng nhé. | re-record |
+| 165 | plank_up_down/arm_extension.mp3 | Bạn chống thẳng tay khi lên nhé. | re-record |
+| 166 | plank_up_down/trunk_reminder.mp3 | Lần này bạn nhớ giữ người thẳng nhé. | reminder (opt.) |
+
+### DO NOT record (unreachable / unmapped — waste of a take)
+
+- Tricep Dip fault lines + softs (`hip_thrust`, `shrug`, `rom`, `extension`) — detectors never
+  driven; Tier-3 wiring first. Intros (rows 67-68) still needed.
+- Bird Dog `opposite_side` / `alternate` / `hold` — cleared on rejected attempts before the
+  adapter can speak them; `MissingBody` / `Plank` — unmapped guard records.
+- Russian Twist `arm_swinging` (unmapped) and `rom` (rejected half-twist writes no RepLog).
+
+### Legacy files you can IGNORE (not spoken by the new system)
+
+The critical `<id>.mp3` of always-soft faults never plays — their only voice surface is the
+`_soft` file above: wall_push_up head/cervical/tempo · jump_squat landing_depth · curl_up
+trunk_low · v_up sync/rom · reverse_crunch tempo/momentum · plank_shoulder_tap tempo ·
+jumping_jack tempo_fast · plank_up_down alternating · step_back_burpee squat_depth/
+plank_extension · cossack_squat depth_deep/torso · walking_lunge rear_depth/step_length.
+Also ignorable: all legacy `good_clean` / `hold_good` / `set_next_*` / `setup_intro` files
+(praise is the common pool now; set_next/setup_intro belong to the retired legacy coaches).
+
 ## V2 RE-RECORD LIST — ✅ COMPLETE (Nam recorded all groups 07-11; files on disk)
 
 Every glute-pilot audio key now resolves to a recorded file (verified on disk 07-11 — timestamps

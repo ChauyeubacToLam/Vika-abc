@@ -94,10 +94,10 @@ class LungeDepthMetric extends LungeMetricBase {
   }
 
   void _logFault(String phase, String message, {String? voiceMessage}) {
-    if (!_faults.any((f) => f.phase == phase && f.type == 'Depth')) {
+    if (!_faults.any((f) => f.phase == phase && f.type == 'depth')) {
       _faults.add(FaultRecord(
         phase: phase,
-        type: 'Depth',
+        type: 'depth',
         message: message,
         voiceMessage: voiceMessage,
         affectsForm: true,

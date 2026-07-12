@@ -57,10 +57,10 @@ class HipRotationMetric extends PlankTapMetricBase {
 
     if (_rotationDebouncer.update(isRotating)) {
       ctx.resultIssues.feedback['Anti-Rotation'] = 'Lắc hông! Siết bụng lại';
-      if (!_faults.any((f) => f.type == 'HipRotation')) {
+      if (!_faults.any((f) => f.type == 'hip_rotation')) {
         _faults.add(FaultRecord(
           phase: ctx.state.name.toUpperCase(),
-          type: 'HipRotation',
+          type: 'hip_rotation',
           message: 'Hông bị vặn xoắn hoặc rớt xuống',
           affectsForm: true,
           priority: PlankTapVoicePriority.hipRotation,

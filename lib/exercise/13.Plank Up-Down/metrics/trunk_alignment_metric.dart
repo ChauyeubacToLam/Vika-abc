@@ -20,10 +20,10 @@ class TrunkAlignmentMetric extends PlankMetricBase {
 
     if (_sagDebouncer.update(isSagging)) {
       ctx.resultIssues.feedback['Trunk'] = 'Sụt hông! Gồng chặt cơ bụng';
-      if (!_faults.any((f) => f.type == 'Sagging')) {
+      if (!_faults.any((f) => f.type == 'trunk')) {
         _faults.add(FaultRecord(
           phase: ctx.currentState.name,
-          type: 'Sagging',
+          type: 'trunk',
           message: 'Sụt hông, mất liên kết Core',
           affectsForm: true,
           voiceMessage: 'Sụt hông! Gồng chặt cơ bụng, đừng để lưng bị võng!',

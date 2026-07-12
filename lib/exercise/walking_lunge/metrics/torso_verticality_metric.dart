@@ -21,9 +21,11 @@ class TorsoVerticalityMetric extends WalkingMetricBase {
     if (ctx.torsoAngle > MAX_FORWARD_LEAN) {
       addFault(
         FaultRecord(
-          type: 'torso_lean',
+          type: 'torso',
           message: 'Lưng bị gập quá nhiều. Hãy giữ thân thẳng đứng.',
-          affectsForm: false,
+          // Trunk-lean is critical fleet-wide (squat/lunge/jump squat/…); this only
+          // fires past MAX_FORWARD_LEAN, i.e. the error band, so soft was miscoded.
+          affectsForm: true,
           phase: ctx.state.name,
           priority: WalkingFaultPriority.torsoLean,
           voiceMessage: 'Giữ lưng thẳng lên!',

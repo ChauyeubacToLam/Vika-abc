@@ -74,7 +74,7 @@ class LandingKneeFlexionMetric extends JumpSquatMetricBase {
     if (angle > LandingConfig.STIFF_LANDING_MIN) {
       _faults.add(FaultRecord(
         phase: phase,
-        type: 'Knee',
+        type: 'landing_stiff',
         message:
             'Tiếp đất chân quá thẳng (${angle.toStringAsFixed(0)}°)! Nguy hiểm khớp gối.',
         affectsForm: true, // Hủy rep, tính là form hỏng nặng
@@ -84,7 +84,7 @@ class LandingKneeFlexionMetric extends JumpSquatMetricBase {
     } else if (angle > LandingConfig.SAFE_FLEXION_MAX) {
       _faults.add(FaultRecord(
         phase: phase,
-        type: 'Knee',
+        type: 'landing_depth',
         message:
             'Tiếp đất chưa đủ sâu (${angle.toStringAsFixed(0)}°). Hãy trùng gối thêm!',
         affectsForm: false, // Cảnh báo

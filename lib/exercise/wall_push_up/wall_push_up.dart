@@ -28,9 +28,13 @@ import 'package:vika/utils/debouncer.dart';
 import 'package:vika/utils/exercise_logger.dart';
 
 import '../../utils/pose_math_helpers.dart';
-import '../../services/wall_push_up_voice_coach.dart';
 import '../exercise_base.dart';
 import '../fault_record.dart';
+import '../../voice/policy_voice_coach.dart';
+import '../../voice/voice_coach.dart';
+import '../../voice/voice_content.dart';
+import '../../voice/voice_policy.dart';
+import '../../voice/voice_sink.dart';
 export '../fault_record.dart';
 
 import 'metrics/body_line.dart';
@@ -285,7 +289,7 @@ class TempoMetric extends WallPushUpMetricBase {
     if (_descentDuration! < TempoConfig.DESCENT_FAST_ERROR) {
       _faults.add(FaultRecord(
         phase: 'REP_COMPLETE',
-        type: 'Tempo',
+        type: 'tempo',
         message: 'Hạ quá nhanh (${_descentDuration!.toStringAsFixed(1)}s)',
         affectsForm: false, // safe at wall push-up load, just less effective
         voiceMessage: 'Chậm lại',
@@ -309,8 +313,20 @@ class TempoMetric extends WallPushUpMetricBase {
 // --- Wall Push Up ---
 
 class WallPushUp extends ExerciseBase {
+  static const List<String> _voiceFaultIds = [
+    'body_line',
+    'foot',
+    'heel',
+    'shoulder',
+    'elbow',
+    'head',
+    'cervical',
+    'hand',
+    'tempo',
+  ];
+
   final int maxRep;
-  WallPushUp({required this.maxRep});
+  WallPushUp({required this.maxRep}) : super(targetReps: maxRep);
 
   WallPushUpState wallPushUpState = WallPushUpState.standing;
   WallPushUpState previousWallPushUpState = WallPushUpState.standing;
@@ -410,7 +426,24 @@ class WallPushUp extends ExerciseBase {
   String get exerciseName => 'Wall Push Up';
 
   @override
-  ExerciseVoiceCoach? createVoiceCoach() => WallPushUpVoiceCoach();
+  List<FaultRecord> get liveFaults =>
+      [for (final metric in _metrics) ...metric.faults];
+
+  @override
+  ExerciseVoiceCoach createVoiceCoach() {
+    return PolicyVoiceCoach(
+      script: VoiceScript.from(
+        VoiceDefaults.repBased,
+        slug: 'wall_push_up',
+        faultIds: _voiceFaultIds,
+      ),
+      targetReps: targetReps,
+      coach: VoiceCoach(
+        sink: AssetVoiceSink(),
+        policy: VoicePolicy(),
+      ),
+    );
+  }
 
   @override
   String get currentPhaseKey => wallPushUpState.toString().split('.').last;
@@ -853,6 +886,17 @@ class WallPushUp extends ExerciseBase {
       }
       setFeedback.add({correctForm: faultMap});
 
+      final faultAffectsForm = <String, bool>{};
+      final faultPriorities = <String, int>{};
+      for (final fault in allFaults) {
+        faultAffectsForm[fault.type] =
+            (faultAffectsForm[fault.type] ?? false) || fault.affectsForm;
+        final previousPriority = faultPriorities[fault.type];
+        if (previousPriority == null || fault.priority < previousPriority) {
+          faultPriorities[fault.type] = fault.priority;
+        }
+      }
+
       logger.addRepLog(
         RepLog(
           correctForm: correctForm,
@@ -863,6 +907,8 @@ class WallPushUp extends ExerciseBase {
             'descent_duration': tempoMetric.descentDuration,
             'ascent_duration': tempoMetric.ascentDuration,
             'fault_types': allFaults.map((f) => f.type).toSet().toList(),
+            'fault_affects_form': faultAffectsForm,
+            'fault_priorities': faultPriorities,
           },
         ),
       );
