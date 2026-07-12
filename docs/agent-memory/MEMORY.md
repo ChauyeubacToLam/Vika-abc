@@ -13,3 +13,4 @@ Routing + conventions: see CLAUDE.md § "Agent memory".
 - [Small fixes do yourself](small-fixes-do-yourself.md) — small/surgical code fixes (one-line bug, typo): edit directly + verify, don't route to Codex; the split is for non-trivial work
 - [Search reference docs first](search-reference-docs-first.md) — before Vika implementation work, search the relevant docs/reference topic folder, including paired md/html artifacts
 - [References are system knowledge, not specs](references-are-system-knowledge-not-specs.md) — docs/reference/ is durable topic knowledge for future models; transient Codex specs/prompts go inline or a scratch spot, never there
+- [Voice audio TTS tool](voice-audio-tts-tool.md) — any agent generates/downloads coaching audio via tools/voice_tts/generate.py (vclip Chi Mai, key auto-loads from .env)

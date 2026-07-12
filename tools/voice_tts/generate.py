@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
 """Generate Vika voice audio via vclip TTS (Chi Mai) → the fleet mp3 spec.
 
+FOR AN AGENT (zero setup — the key auto-loads from the gitignored .env):
+    # generate one or more new lines, each written to assets/audio/<relpath>:
+    python3 tools/voice_tts/generate.py --go \\
+        --line 'squat/heel.mp3=Bạn đạp gót chân xuống sàn nhé.'
+    # or (re-)generate everything listed in missing-audio.md's master table:
+    python3 tools/voice_tts/generate.py --go            # add --only <slug> to scope
+    # drop --go for a dry run (prints what it WOULD do, calls nothing).
+Existing files are skipped unless --force. See `--help`.
+
 The single tool for downloading / (re-)recording coaching lines. It speaks
 each line through vclip's async JSON-RPC API, converts the returned WAV to the
 fleet's mp3 spec (64 kbps / 24 kHz / mono, matching every existing recording),
@@ -47,6 +56,26 @@ import urllib.error
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 MD = os.path.join(REPO, "docs/reference/voice-coach/missing-audio.md")
 AUDIO = os.path.join(REPO, "assets/audio")
+
+
+def _load_dotenv():
+    """Populate os.environ from the repo-root .env (gitignored) so callers —
+    including other agents — need zero setup. A real environment variable
+    always wins; .env only fills what's unset. Silent if .env is absent."""
+    path = os.path.join(REPO, ".env")
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+    except FileNotFoundError:
+        pass
+
+
+_load_dotenv()
 
 API_URL = "https://api-tts.vclip.io/json-rpc"
 VOICE_ID = os.environ.get("VCLIP_VOICE_ID", "cLZiqtzLcKYqwYrWJemAJH")  # Chi Mai
@@ -146,7 +175,8 @@ def main():
             rows = [r for r in rows if r[0].startswith(args.only + "/")]
 
     if args.go and not KEY:
-        sys.exit("set VCLIP_KEY env var first:  export VCLIP_KEY='sk_live_...'")
+        sys.exit("No VCLIP_KEY. Add it to the repo-root .env (VCLIP_KEY=sk_live_...) "
+                 "or export it. It auto-loads from .env — normally zero setup.")
 
     print(f"{len(rows)} line(s). mode={'SYNTH' if args.go else 'DRY-RUN'} "
           f"force={args.force} voice={VOICE_ID}\n")

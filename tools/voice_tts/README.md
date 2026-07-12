@@ -7,15 +7,16 @@ file at its exact `assets/audio/<path>`.
 
 Replaces the dead `tools/download_tts.dart` (Viettel, service removed).
 
-## Setup (once)
+## Setup
 
-```bash
-brew install ffmpeg          # or your platform's ffmpeg
-export VCLIP_KEY='sk_live_...'   # your vclip API key — NEVER commit it
-```
+Nothing, normally. The API key auto-loads from the repo-root **`.env`**
+(`VCLIP_KEY=...`, gitignored so it never leaves the machine) — an agent can
+call the tool with zero setup. Only `ffmpeg` must be on PATH
+(`brew install ffmpeg`).
 
-The Chi Mai voice id is the default. Override per run with `VCLIP_VOICE_ID=...`
-(or `VCLIP_SPEED=1.1`).
+To point at a fresh key / different voice, edit `.env` (`VCLIP_KEY`,
+`VCLIP_VOICE_ID`) or export the same vars — a real env var wins over `.env`.
+The Chi Mai voice id is the default.
 
 ## The two ways to use it
 
