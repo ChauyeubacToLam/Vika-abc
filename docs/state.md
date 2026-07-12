@@ -14,14 +14,14 @@ un-recorded missing-audio.md lines against the formula before recording.
 
 **Voice coach — glute-bridge pilot: COMPLETE (07-11), device-approved, UNCOMMITTED.**
 Nam device-tested the full glute bridge 07-11: "good enough, call it done." All behavior landed and
-green (analyze clean; voice + exercise suites ~241 green). The "why" for every call lives in
+green (analyze clean; voice + exercise suites 247 green as of 07-12). The "why" for every call lives in
 decisions.md (07-07 → 07-11 voice entries); behavior in voice-behavior-spec.md; numbers in
 canonical-numbers.md § Glute Bridge; audio all recorded + resolving (missing-audio.md — no gap).
 Scope shipped this pilot: 3-way classifier + real-time critical/soft + per-MOMENT exclusivity;
 next-rep reminder (neck_head + hyperextension, wins the commit-edge slot over the re-correction);
 count = REGISTRATION (every landed rep, deterministic, personality-immune); setup/tracking-safety
 VOICE channel (typed `GuidanceSignal`, one producer / two renderers) incl. phone-orientation rotate
-prompts; setup-instruction cluster (per-set intro, voiced một-hai-ba activation countdown, ready,
+prompts; setup-instruction cluster (per-set intro, voiced ba-hai-một activation countdown, ready,
 set-complete, stuck-user re-tell, holdStill lineless); hustle (hesitation-armed, stochastic post-fire
 backoff); resume re-hold; non-neck glute metric tightening (neck_head left sensitive per Nam's fence).
 Device-log observability across all cues (`[Voice]` / `[VoiceGuard]` / `[VoiceSetup]` / `[VoiceCount]`).
@@ -56,36 +56,47 @@ Also 07-11: all 166 fleet lines + 9 Tier-2 reminders GENERATED via vclip (Chi Ma
 dead Viettel audio archived off-tree to gitignored `archive_voice/` (for Drive backup). Loose orphan
 `16-30.mp3` count fallbacks KEPT (still wired, but old-voice — regen in Chi Mai if a plan uses >15 reps).
 
-**Voice fleet Tier 2 — IMPLEMENTED, UNCOMMITTED (07-11).** All 24 rep exercises verified; 27 reachable
-soft ids now have `softCuePools`, and 20 selected continuous-critical faults have `reminderPools` +
-verified `repStartPhaseKeys`. No soft id was dropped and no reminder pick was rep-end-only. Walking
-Lunge was the one spec correction: its next rep can enter through `stepping` or directly through
-`descending`, so both keys are wired. Hustle remains OFF fleet-wide (`effortPhaseKeys` empty); engine,
-Glute Bridge, holds, Surya, thresholds, `affectsForm`, audio and pubspec untouched. Code-synced matrix:
-`docs/reference/voice-coach/voice-fleet-tier1-review.html` § Tier 2. Exercise + voice suites: 242 green;
-analyze clean. The 9 reminder mp3s and wiring are still uncommitted and belong in the same Tier-2 commit.
-Watch item (device): lunge `trunk` (and squat `sync`) fire every rep like glute's neck_head did —
-honest if form's off, naggy if the metric's oversensitive; a metric-threshold tune, not a voice bug.
-Tier-3 parked: hustle fleet-wide; Jump Squat 3-phase effort, Burpee phase semantics, Russian Twist
-two-half reps, Mountain Climber per-side types; Tricep Dip dead detectors; Bird Dog rejected-attempt
-fault clearing; the dead ViettelTtsService class + its import in exercise_base.dart + constants token.
+**Voice fleet Tiers 2 + 3 — IMPLEMENTED, UNCOMMITTED (07-12).** All 24 rep exercises verified; 27
+reachable soft ids have `softCuePools`, 20 selected continuous-critical faults have `reminderPools` +
+verified `repStartPhaseKeys`, and every script now has a verified effort phase plus the strict hustle
+pair (`common.push` mid-set, `common.one_more_rep` target-proven final). No soft id was dropped and no
+reminder pick was rep-end-only. Tier-2 correction: Walking Lunge can enter through `stepping` or
+directly through `descending`, so both rep-start keys are wired. Tier-3 correction: default/transient
+Ashtanga enters `recognized`, not the draft's `holding`; the script selects by mode. Hustle's register
+is encouragement-when-hesitating, not "push harder," so controlled/stability moves stay enabled.
+Engine, arming constants, tuning, Glute Bridge, holds, Surya, thresholds, `affectsForm`, audio and
+pubspec untouched. Code-synced matrix: `docs/reference/voice-coach/voice-fleet-tier1-review.html`.
+Verification 07-12: analyze clean; exercise suite 148 green; voice suite 100 green. The 9 reminder
+mp3s and Tier-2/3 wiring are still uncommitted and belong in the same fleet commit.
+- **DEFERRED (Tier-3 Note 1):** Mountain Climber, Jumping Jack, Jump Squat, Step-Back Burpee, Russian
+  Twist, and Ashtanga Namaskara need a dedicated fast/quirky policy variant. It must thin count cadence
+  and cue density across count/critical/soft/hustle and model their non-standard rep boundaries; all
+  six run the standard policy for now and carry `TODO(voice)` at `createVoiceCoach`.
+- **Watch (device):** lunge `trunk` (and squat `sync`) fire every rep like glute's neck_head did —
+  honest if form's off, naggy if the metric's oversensitive; a metric-threshold tune, not a voice bug.
+- **Parked cleanup:** Tricep Dip dead detectors; Bird Dog rejected-attempt fault clearing; the dead
+  ViettelTtsService class + its import in exercise_base.dart + constants token.
 - **Device residual** (from the 07-10 UI-instruction removal): plank rest-ring/hold-cue visuals → next device smoke.
 
-**Hold-based voice — behavior DECIDED (07-11), implementation NOT started.** Nam ruled via the
-hold-design lavish review + chat; full record: decisions.md 07-11 "Hold-based voice behavior LOCKED",
-behavior spec § Hold-based exercises, design doc hold-exercise-voice-design.html (v2). Shape:
-pose-gated clock (only cheating stops earning — reverses High Plank's perfect-timer), voice milestones
-(halfway + "còn 10 giây", speaks remaining, UI ring untouched), final-3 earcon beeps + end tone (no
-spoken countdown, no tick v1), milestone praise/hustle switch, real-time faults with hold-EPISODE
-bookkeeping, 90s timeout deleted, sets hybrid (High Plank joins the multi-set flow). High Plank pilot.
-- **NEXT:** Codex implements from docs/scratch/hold-voice-impl-spec.md (authoring in flight 07-11);
-  audio wordings parked until structure lands (master record list in missing-audio.md; new lines follow
-  the voice-copy skill).
-- **NEXT (data, Nam runs):** hold catalog rows are still single-set (base_sets=1 everywhere; plank/
-  cobra/warrior_one mis-encode hold count in base_reps). Normalization SQL drafted →
-  docs/scratch/hold-catalog-hybrid-fix.sql (provisional set counts, preserves volume intent; stretch
-  poses untouched pending PT). Must apply BEFORE the hold pilot's device test or High Plank launches
-  1×20s. Code path already consumes sets×seconds correctly — data-only fix.
+**Hold-based voice — behavior DECIDED (07-11, plank-model re-ruling 07-12), implementation NOT
+started.** Full record: decisions.md 07-11 "Hold-based voice behavior LOCKED" + 07-12 "Holds count
+holds as REPS"; behavior spec § Hold-based exercises; design doc hold-exercise-voice-design.html
+(v2, plank-model patch in flight). Shape: a set = N holds counted as REPS (plank.dart is the
+reference; High Plank migrates to maxHolds × holdSeconds, each completed hold speaks its number),
+pose-gated clock (only cheating stops earning), per-hold voice milestones (halfway + "còn 10 giây",
+speaks remaining, UI ring untouched), final-3 earcon beeps + end tone per hold (no spoken countdown,
+no tick v1), milestone praise/hustle switch, real-time faults (hold = the rep, fleet bookkeeping maps
+directly), 90s timeout deleted. High Plank pilot.
+- **NEXT:** Codex implements from docs/scratch/hold-voice-impl-spec.md (plank-model revision in
+  flight 07-12); audio wordings parked until structure lands (master record list in missing-audio.md;
+  new lines follow the voice-copy skill). Open in spec: how a plank-model catalog row carries both
+  hold count and per-hold seconds (_resolveVolume infers hold-ness from base_seconds != null);
+  firstOccurrenceCertain-as-factory-default awaiting Nam sign-off.
+- **URGENT (data, Nam runs):** the v1 catalog SQL (applied 07-12) BROKE plank/cobra/warrior_one
+  launches — it nulled base_reps, but their classes consume a hold count as reps (_withReps asserts
+  reps != null). Corrective v2 restores them → docs/scratch/hold-catalog-hybrid-fix.sql. high_plank/
+  bear_plank stay seconds-shaped (3 × one-hold interim) until the code migration lands, then flip
+  plank-shaped (flip SQL drafted in the same file, commented out).
 
 **PresenceGate extraction (2026-07-05): SHIPPED, device smoke pending.** `lib/exercise/presence_gate.dart`
 extracted from `ExerciseBase` (~200 lines lighter), `PosePresenceSource` on `PersonDetector`, analyze

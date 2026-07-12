@@ -14,6 +14,50 @@ Alternatives considered: <what we rejected and why>
 
 ---
 
+## 2026-07-12 · Hustle is fleet-wide hesitation encouragement, not intensity pressure
+Status: active — Tier 3 wired across every rep exercise 07-12; the six fast/quirky exercises retain
+the standard policy temporarily and carry explicit follow-up TODOs.
+Decision: Every rep exercise declares an effort phase and uses `common.push` for a generic
+hesitation push plus `common.one_more_rep` only for a target-proven final rep. Hustle means warm
+encouragement when the user's inter-rep gap stretches and they choose to continue, never "push
+harder." That register makes it valid for controlled and stability work as well as grinds. The
+default Ashtanga path is a verified correction to the Tier-3 draft: transient mode enters
+`recognized`, not `holding`; its script selects `recognized` for transient mode and `holding` for
+micro-hold mode.
+Why: the shared gap-stretch arming already self-gates fast movement and only fires after a user
+commits to another effort. Excluding controlled exercises would confuse encouragement with intensity
+and leave tired users in those movements without the same support. Vietnamese-market register stays
+warm and face-saving: `common.push` is "Cố lên nào!", not an aggressive command.
+Deferred: Mountain Climber, Jumping Jack, Jump Squat, Step-Back Burpee, Russian Twist, and Ashtanga
+Namaskara need a fast/quirky policy variant that thins count and all cue density and models their
+non-standard rep boundaries. Tier 3 does not solve that policy design.
+Alternatives considered: leave controlled/stability exercises off (rejected — encouragement does not
+contradict control); use the default mixed hustle bundle (rejected — it can say "one more rep"
+mid-set); skip the six quirky exercises (rejected — fast gaps self-gate today and the debt is now
+explicit).
+
+## 2026-07-12 · Device re-rulings: reminder consecutive-content ban + activation countdown counts DOWN
+Status: active — decided by Nam from device experience 07-12; implemented and covered in the shared
+policy-coach suite the same day (hard rule 12, § reminder, § setup countdown).
+Decision:
+1. **Reminder same-content consecutive-rep ban (hard rule 12).** A reminder for fault X on rep N is
+   never followed by a reminder for the same X on rep N+1; a DIFFERENT fault's reminder on rep N+1 is
+   explicitly fine. Implemented in the ADAPTER's candidate pick (skip the banned id, priority falls
+   through to the next eligible fault or silence), not the shared policy — the policy only sees one
+   candidate, so a policy-side rule could only silence, never fall through. Ban expires after one
+   reminder-free rep; resets per set.
+2. **Activation countdown flips to "ba, hai, một"** (was "một, hai, ba" — supersedes the direction
+   detail of 07-10 "Setup-instruction voice" point 5; everything else there stands). Same offsets,
+   same common count files in reverse order, perishability/intro-termination semantics unchanged; the
+   existing ready line still follows activation ("ba-hai-một, ready"). Side effect: the 07-10
+   voice-up/ring-down UI mismatch (Nam had kept it) dissolves — both count down now.
+Why: (1) same-fault reminders on back-to-back reps read as nagging — the PT pattern is remind, watch,
+switch focus; different-fault back-to-back is real coaching. (2) counting UP to activation reads as
+rep counting, not a countdown; 3-2-1-go is the universal pre-start convention.
+Alternatives considered: policy-level hard rule for the ban (rejected — can't fall through to a
+different fault); cross-set ban carryover (rejected — a new set is a fresh coaching context);
+re-recording dedicated countdown audio (unnecessary — count files reuse in reverse).
+
 ## 2026-07-12 · Voice tuning: ONE default, no per-exercise overrides
 Status: active — Nam 2026-07-12.
 Decision: All cue tuning lives in the single `kDefaultTuning` map (lib/voice/voice_policy.dart). No
@@ -25,10 +69,11 @@ Two things this promoted to fleet-wide: `criticalFault` gains firstOccurrenceCer
 missing from the default entirely, so every fleet soft nudge Tier 2 wired was a silent no-op
 ('soft-no-tuning-configured') — adding it makes them speak.
 Why: the whole point of the policy design is a single calibrated PT tuned once, retuned only via the
-personality scalar — per-exercise maps defeat that and drift. Hustle stays off fleet-wide not via
-zero-tuning but via absent effortPhaseKeys (the real gate). Glute behaviour is unchanged (default now
-equals its old override). Test mechanisms that left the default (relief valve, D8 formScore scaling,
-roll-based escalation) now construct explicit tunings in voice_policy_test.dart.
+personality scalar — per-exercise maps defeat that and drift. At this decision point hustle stayed
+off fleet-wide via absent effortPhaseKeys (the real gate); fleet enablement is superseded by the
+07-12 Tier-3 decision above. Glute behaviour is unchanged (default now equals its old override). Test
+mechanisms that left the default (relief valve, D8 formScore scaling, roll-based escalation) now
+construct explicit tunings in voice_policy_test.dart.
 Alternatives considered: keep glute's override as "the pilot's own numbers" — rejected; they were always
 meant to be the fleet default, and the split hid the missing-softFault bug.
 
@@ -45,8 +90,32 @@ infrastructure (only Surya, voice-null, ever referenced it) — do NOT re-add it
 Alternatives considered: keep phase cues as a squat-only nicety — rejected; it's the exact legacy
 behaviour the redesign removed everywhere else.
 
+## 2026-07-12 · Holds count holds as REPS (plank model) — supersedes "a set = one continuous hold"
+Status: active — Nam's ruling, 07-12 chat ("rep count needs to act exactly like plank"). Refines
+the 07-11 hold entry below: its sets-normalization bullet is SUPERSEDED, everything else stands.
+Decision: Isometric holds adopt Forearm Plank's existing model — a SET contains N holds counted as
+REPS (each completed hold → repCount+1 + a per-hold RepLog; brief in-exercise breather between
+holds, plank.dart REST_DURATION-style), per-hold duration from the catalog, formal multi-set flow
+on top. High Plank migrates `HighPlank(maxSeconds)` → maxHolds × holdSeconds; each completed hold
+speaks its NUMBER via the rep fleet's count-registration rule (deterministic "Một!"); milestones +
+final-3 beeps live INSIDE each hold, relative to per-hold seconds; hold-episode fault bookkeeping
+now coincides with the rep; the reminder commit edge = the next hold's re-entry into holding.
+Why: Plank/Cobra/Warrior already work this way (Plank(maxRep), Cobra(maxRep), WarriorOne(maxHolds))
+— High Plank was the odd one out, and "one long hold" loses the rest-and-go-again structure real
+plank programming uses. Counting each hold as a rep reuses the entire rep voice machinery (count
+registration, RepLogs, reminder edges) instead of inventing hold-only variants.
+Data corollary: the v1 catalog SQL (applied 07-12) wrongly nulled base_reps on plank/cobra/
+warrior_one — misread their hold count as a mis-encoding — which flips them into _resolveVolume's
+hold path and hits the _withReps reps!=null assert at launch. Corrective v2 in
+docs/scratch/hold-catalog-hybrid-fix.sql restores them; high_plank/bear_plank stay seconds-shaped
+until the code migration lands, then flip plank-shaped. OPEN (impl spec): how a plank-model row
+carries BOTH hold count and per-hold seconds without flipping _resolveVolume's
+seconds-means-hold modality inference.
+
 ## 2026-07-11 · Hold-based voice behavior LOCKED (glute pilot's time-based counterpart)
-Status: active — Nam's rulings via the hold-design lavish review + same-day chat. Design doc:
+Status: active, ONE bullet superseded — "sets normalized (a set = one continuous hold)" is replaced
+by the 07-12 plank-model entry above; all other rulings stand. Nam's rulings via the
+hold-design lavish review + same-day chat. Design doc:
 docs/reference/voice-coach/hold-exercise-voice-design.html (v2 DECIDED); impl spec for Codex:
 docs/scratch/hold-voice-impl-spec.md; behavior: voice-behavior-spec.md § Hold-based exercises.
 Decision, the shape (High Plank = pilot):
@@ -68,9 +137,10 @@ Decision, the shape (High Plank = pilot):
   same-fault-once bookkeeping unit = the hold EPISODE, not the (nonexistent) rep.
 - **90s TIMEOUT DELETED.** Walk-away = presence gate; stuck = setup_position re-tell; give-up =
   quit. No third ending, no "hết giờ" line.
-- **Sets normalized fleet-wide (hybrid):** a set = one continuous hold to target duration, sets ×
-  duration prescribed like sets × reps, High Plank joins the existing multi-set flow. Hold
-  exercises never display "reps" (the repCount-carries-seconds leak gets cleaned in migration).
+- ~~**Sets normalized fleet-wide (hybrid):** a set = one continuous hold to target duration~~
+  SUPERSEDED 07-12 (plank-model entry above): a set = N holds counted as reps, plank.dart style.
+  Still true from this bullet: the repCount-carries-SECONDS leak gets cleaned in migration —
+  repCount now carries completed HOLDS, a real count.
 Why: users come to be coached on faults — freezing the clock on every fault is a referee, not a
 coach (Nam); milestones are a hold's only structural moments, so outcome cues anchor there; the
 beep grammar is already trained into every phone user; timeout was an arbitrary third ending.
@@ -303,6 +373,7 @@ Decision:
    ~10s past intro-audio-end (feel-tune), then quiet for real; debounced exit re-arms as usual. Shape
    borrowed from no-count and the safety re-cue: tell → one help → silence.
 5. **`holdStill` stays LINELESS — and the activation countdown IS VOICED (follow-up ruling, same chat):**
+   [direction SUPERSEDED 07-12 by "Device re-rulings": counts DOWN "ba, hai, một"; rest of this point stands]
    "một, hai, ba" synced to the 3s activation hold, REUSING the existing `common/count_1..3.mp3` rep-count
    assets (no new recording; listen-check that the rep-count intonation reads as a countdown). Counts
    align so "ba" lands at/near the activation moment (exact offsets feel-tune). A hold break stops the

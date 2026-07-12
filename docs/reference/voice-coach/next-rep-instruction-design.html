@@ -92,6 +92,12 @@ li{margin:6px 0}
       <code>contentKey</code>. <b>Reminder outranks hustle</b> when both arm at one moment.</li>
     <li>Rep-start and hustle's effort-phase entry are <b>two declared moments</b> that coincide on glute
       and share plumbing there; squat would separate them.</li>
+    <li><b>Same-content consecutive-rep ban (Nam device ruling 07-12, hard rule 12; landed same day):</b>
+      a reminder for fault X spoken into rep N is never followed by the same X into rep N+1 — the adapter
+      skips the banned id in the priority pick (<code>_highestPriorityReminderFaultId</code>), so selection
+      falls through to the next eligible fault, or silence if none. A DIFFERENT fault back-to-back is fine.
+      Ban expires after one reminder-free rep (rep-number arithmetic, only reminders that actually SPOKE
+      count) and resets per set.</li>
     <li>Confirm-after-fix: deferred. Numbers: open, feel-tune. Research: voice-research-rules.md §3b.</li>
   </ul>
 </section>
@@ -203,7 +209,7 @@ final Set&lt;String&gt; repStartPhaseKeys;   // glute_bridge: {'ascending'}
   <div class="code"><div class="code-head">proposed tuning (glute pilot) — ALL numbers feel-tune, flagged for Nam</div>
   <div class="code-body"><pre>CueType.reminder: CueTuning(
   CueMode.correction,
-  base: 0.30,   // second consecutive reminder for a persisting fault: quiet-ish
+  base: 0.30,   // later reminder in a persisting fault streak: quiet-ish
   step: 0.15,   // climbs while the fault keeps recurring un-reminded
   cap:  0.65,   // BELOW criticalFault's 0.85 — the mid-rep re-correction still exists;
                 // the reminder is the follow-through, not the main channel

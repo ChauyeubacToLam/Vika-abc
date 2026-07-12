@@ -399,12 +399,12 @@ The setup-layer cues are recorded and now WIRED (uncommitted; behavior: decision
 "Setup-instruction voice"; voice-behavior-spec.md § Setup / structure; executed work order:
 docs/scratch/setup-intro-voice-impl-spec.md): `glute_bridge.setup_position` +
 `glute_bridge.active_intro` (per-set intro), `common.ready` (activation edge), `common.set_complete`
-(completion), and `common/count_1..3.mp3` reused as the voiced "một/hai/ba" activation countdown.
+(completion), and `common/count_3/2/1.mp3` reused as the voiced "ba/hai/một" activation countdown.
 Listen-checks for Nam (content calls, not asset gaps):
 1. `set_complete.mp3` — the landed completion choice differs from legacy (`exercise_complete`); if the
    recording implies a NEXT set, the single-set pilot should speak `common.exercise_complete` instead
    (both are registered; one-line swap).
-2. count_1..3 — confirm the rep-count intonation reads as a countdown in context; re-record only if it
+2. count_3/2/1 — confirm the rep-count intonation reads as a countdown in context; re-record only if it
    sounds off.
 Note: `common/hold_still.mp3` is recorded but stays UNWIRED by design (holdStill has no instruction
 line — the countdown owns that state's audio); don't treat it as a gap.

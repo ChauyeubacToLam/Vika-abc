@@ -41,12 +41,12 @@ class PolicyVoiceCoach implements ExerciseVoiceCoach {
   static const int kMinArmGapMs = 800;
 
   /// Feel-tune (NOT canonical): elapsed-hold offsets, in ms, at which the
-  /// voiced activation countdown fires "một / hai / ba". Each is a threshold
+  /// voiced activation countdown fires "ba / hai / một". Each is a threshold
   /// into the 3s hold; the last is deliberately < HOLD_STILL_REQUIRED_DURATION
-  /// (3000ms) so "ba" fires on a frame BEFORE the state machine flips to
+  /// (3000ms) so "một" fires on a frame BEFORE the state machine flips to
   /// activated — the moment activation lands, `holdStillElapsedMs` returns null
-  /// — letting the spoken "ba" land at/near activation. ~0.8s spacing reads as
-  /// a "một-hai-ba-go" cadence over the hold.
+  /// — letting the spoken "một" land at/near activation. ~0.8s spacing reads as
+  /// a "ba-hai-một-go" cadence over the hold.
   static const List<int> kActivationCountOffsetsMs = <int>[800, 1600, 2400];
 
   /// Generous ceiling on the wait for intro audio to finish before the grace
@@ -99,6 +99,11 @@ class PolicyVoiceCoach implements ExerciseVoiceCoach {
   final Set<String> _reminderEligibleFaultTypes = <String>{};
   final Map<String, int> _reminderPriorityByFault = {};
   final Map<String, int> _reminderStreakByFault = {};
+
+  // Track only a reminder that actually spoke. Rep-number arithmetic makes
+  // one silent rep expire the ban without another state transition.
+  String? _lastReminderFaultId;
+  int? _lastReminderRep;
 
   String? _lastPhaseKey;
   bool _awaitingRepStart = false;
@@ -169,6 +174,8 @@ class PolicyVoiceCoach implements ExerciseVoiceCoach {
       _reminderEligibleFaultTypes.clear();
       _reminderPriorityByFault.clear();
       _reminderStreakByFault.clear();
+      _lastReminderFaultId = null;
+      _lastReminderRep = null;
       _startTrackingRep(repCount + 1);
       _lastPhaseCue = null;
       _lastPhaseKey = null;
@@ -363,10 +370,10 @@ class PolicyVoiceCoach implements ExerciseVoiceCoach {
     );
   }
 
-  /// Voiced "một / hai / ba" synced to the 3s activation hold (item 4).
+  /// Voiced "ba / hai / một" synced to the 3s activation hold (item 4).
   /// Deterministic (CueType.setup), never routed through rep-count thinning.
   /// Counts are perishable: a broken hold drops any pending count line and
-  /// re-arms from "một"; activation keeps the queue so "ba" finishes as the
+  /// re-arms from "ba"; activation keeps the queue so "một" finishes as the
   /// "go" cue.
   void _handleActivationCountdown(ExerciseBase exercise) {
     final holdMs = exercise.holdStillElapsedMs;
@@ -396,10 +403,11 @@ class PolicyVoiceCoach implements ExerciseVoiceCoach {
             );
           }
           _countdownSpoken.add(i);
+          final spokenNumber = kActivationCountOffsetsMs.length - i;
           _coach.say(
             CueType.setup,
-            VoiceContent.key('${i + 1}'),
-            CueContext(repNumber: 0, contentKey: 'count_${i + 1}'),
+            VoiceContent.key('$spokenNumber'),
+            CueContext(repNumber: 0, contentKey: 'count_$spokenNumber'),
           );
         }
       }
@@ -409,12 +417,12 @@ class PolicyVoiceCoach implements ExerciseVoiceCoach {
     if (!_holdCountingActive) return;
     // The hold ended. A break (still notActivated) drops the perishable pending
     // counts so no stale count plays; activation (now activated) keeps the
-    // queue so a mid-play "ba" survives. Either way the tracker re-arms.
+    // queue so a mid-play "một" survives. Either way the tracker re-arms.
     if (exercise.exerciseState == ExerciseState.notActivated) {
       _coach.clearPending();
       debugPrint(
         '[VoiceSetup] hold BROKE — pending counts dropped, countdown '
-        're-armed from một',
+        're-armed from ba',
       );
     }
     _holdCountingActive = false;
@@ -821,7 +829,7 @@ class PolicyVoiceCoach implements ExerciseVoiceCoach {
   }
 
   bool _maybeSpeakReminder({required int startedRep}) {
-    final id = _highestPriorityReminderFaultId();
+    final id = _highestPriorityReminderFaultId(startedRep: startedRep);
     if (id == null) return false;
     final pool = script.reminderPoolFor(id);
     if (pool.isEmpty) return false;
@@ -841,13 +849,21 @@ class PolicyVoiceCoach implements ExerciseVoiceCoach {
     );
     if (spoke) {
       _reminderStreakByFault[id] = streak + 1;
+      _lastReminderFaultId = id;
+      _lastReminderRep = startedRep;
     }
     return spoke;
   }
 
-  String? _highestPriorityReminderFaultId() {
+  String? _highestPriorityReminderFaultId({required int startedRep}) {
+    final lastReminderRep = _lastReminderRep;
     final eligible = _reminderEligibleFaultTypes
         .where((id) => script.reminderPoolFor(id).isNotEmpty)
+        .where(
+          (id) => !(id == _lastReminderFaultId &&
+              lastReminderRep != null &&
+              startedRep == lastReminderRep + 1),
+        )
         .toList();
     if (eligible.isEmpty) return null;
     eligible.sort((a, b) {
@@ -1170,10 +1186,7 @@ class _SetupSafetyVoiceController {
       // that state's audio — a "giữ yên" line would talk over its own count.
       // searching stays silent by ruling: the setup intro covers "get in
       // frame", and searching is reassurance, not a correction.
-      GuidanceClass.searching ||
-      GuidanceClass.holdStill ||
-      null =>
-        null,
+      GuidanceClass.searching || GuidanceClass.holdStill || null => null,
     };
   }
 

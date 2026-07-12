@@ -87,12 +87,13 @@ void main() {
     }
   });
 
-  test('rep exercise fleet exposes the Tier 2 soft and reminder wiring', () {
+  test('rep exercise fleet exposes the Tier 2 and Tier 3 wiring', () {
     final cases = <({
       ExerciseBase exercise,
       Map<String, List<String>> softPools,
       Map<String, List<String>> reminderPools,
       Set<String> repStartPhaseKeys,
+      Set<String> effortPhaseKeys,
     })>[
       (
         exercise: Squat(maxRep: 2),
@@ -101,6 +102,7 @@ void main() {
           'trunk': ['squat.trunk_reminder'],
         },
         repStartPhaseKeys: const {'descending'},
+        effortPhaseKeys: const {'ascending'},
       ),
       (
         exercise: PushUp(maxRep: 2),
@@ -111,6 +113,7 @@ void main() {
           'sag': ['push_up.sag_reminder'],
         },
         repStartPhaseKeys: const {'descending'},
+        effortPhaseKeys: const {'ascending'},
       ),
       (
         exercise: WallPushUp(maxRep: 2),
@@ -127,6 +130,7 @@ void main() {
           'body_line': ['wall_push_up.body_line_reminder'],
         },
         repStartPhaseKeys: const {'descending'},
+        effortPhaseKeys: const {'ascending'},
       ),
       (
         exercise: Lunge(maxRep: 2),
@@ -135,6 +139,7 @@ void main() {
           'trunk': ['lunge.trunk_reminder'],
         },
         repStartPhaseKeys: const {'descending'},
+        effortPhaseKeys: const {'ascending'},
       ),
       (
         exercise: WalkingLunge(maxRep: 2),
@@ -146,6 +151,7 @@ void main() {
           'torso': ['walking_lunge.torso_reminder'],
         },
         repStartPhaseKeys: const {'stepping', 'descending'},
+        effortPhaseKeys: const {'pulling_through'},
       ),
       (
         exercise: CossackSquat(maxRep: 2),
@@ -157,6 +163,7 @@ void main() {
           'knee_valgus': ['cossack_squat.knee_valgus_reminder'],
         },
         repStartPhaseKeys: const {'descending'},
+        effortPhaseKeys: const {'ascending'},
       ),
       (
         exercise: StandingKneeToElbow(maxRep: 2),
@@ -165,12 +172,14 @@ void main() {
           'core_drive': ['standing_kte.core_drive_reminder'],
         },
         repStartPhaseKeys: const {'approaching'},
+        effortPhaseKeys: const {'approaching'},
       ),
       (
         exercise: TricepDip(maxRep: 2),
         softPools: const {},
         reminderPools: const {},
         repStartPhaseKeys: const {},
+        effortPhaseKeys: const {'ascending'},
       ),
       (
         exercise: JumpSquat(maxRep: 2),
@@ -179,6 +188,7 @@ void main() {
         },
         reminderPools: const {},
         repStartPhaseKeys: const {},
+        effortPhaseKeys: const {'launching'},
       ),
       (
         exercise: StepBackBurpee(maxRep: 2),
@@ -188,6 +198,7 @@ void main() {
         },
         reminderPools: const {},
         repStartPhaseKeys: const {},
+        effortPhaseKeys: const {'standingUp'},
       ),
       (
         exercise: CurlUp(maxRep: 2),
@@ -201,6 +212,7 @@ void main() {
           'neck_pull': ['curl_up.neck_pull_reminder'],
         },
         repStartPhaseKeys: const {'ascending'},
+        effortPhaseKeys: const {'ascending'},
       ),
       (
         exercise: SitUp(maxRep: 2),
@@ -209,6 +221,7 @@ void main() {
           'jerking': ['sit_up.jerking_reminder'],
         },
         repStartPhaseKeys: const {'rising'},
+        effortPhaseKeys: const {'rising'},
       ),
       (
         exercise: VUp(maxRep: 2),
@@ -220,6 +233,7 @@ void main() {
           'knee': ['v_up.knee_reminder'],
         },
         repStartPhaseKeys: const {'rising'},
+        effortPhaseKeys: const {'rising'},
       ),
       (
         exercise: DeadBug(maxRep: 2),
@@ -228,6 +242,7 @@ void main() {
           'anti_extension': ['dead_bug.anti_extension_reminder'],
         },
         repStartPhaseKeys: const {'extending'},
+        effortPhaseKeys: const {'extending'},
       ),
       (
         exercise: BirdDog(maxRep: 2),
@@ -236,6 +251,7 @@ void main() {
           'lumbar': ['bird_dog.lumbar_reminder'],
         },
         repStartPhaseKeys: const {'extending'},
+        effortPhaseKeys: const {'hold_extended'},
       ),
       (
         exercise: Superman(maxRep: 2),
@@ -244,6 +260,7 @@ void main() {
           'lumbar': ['superman.lumbar_reminder'],
         },
         repStartPhaseKeys: const {'lifting'},
+        effortPhaseKeys: const {'lifting'},
       ),
       (
         exercise: MountainClimber(maxRep: 2),
@@ -252,6 +269,7 @@ void main() {
           'trunk_sag': ['mountain_climber.trunk_sag_reminder'],
         },
         repStartPhaseKeys: const {'knee_driving_in'},
+        effortPhaseKeys: const {'knee_driving_in'},
       ),
       (
         exercise: ReverseCrunch(maxRep: 2),
@@ -263,6 +281,7 @@ void main() {
           'arms': ['reverse_crunch.arms_reminder'],
         },
         repStartPhaseKeys: const {'curling'},
+        effortPhaseKeys: const {'curling'},
       ),
       (
         exercise: PlankShoulderTap(maxRep: 2),
@@ -275,6 +294,7 @@ void main() {
           ],
         },
         repStartPhaseKeys: const {'lifting'},
+        effortPhaseKeys: const {'lifting'},
       ),
       (
         exercise: LegRaise(maxRep: 2),
@@ -283,6 +303,7 @@ void main() {
           'pelvic': ['leg_raises.pelvic_reminder'],
         },
         repStartPhaseKeys: const {'raising'},
+        effortPhaseKeys: const {'raising'},
       ),
       (
         exercise: RussianTwist(maxRep: 2),
@@ -291,6 +312,7 @@ void main() {
           'knee': ['russian_twist.knee_reminder'],
         },
         repStartPhaseKeys: const {'twisting'},
+        effortPhaseKeys: const {'twisting'},
       ),
       (
         exercise: JumpingJack(maxRep: 2),
@@ -299,6 +321,7 @@ void main() {
         },
         reminderPools: const {},
         repStartPhaseKeys: const {},
+        effortPhaseKeys: const {'open'},
       ),
       (
         exercise: AshtangaNamaskara(maxRep: 2),
@@ -309,6 +332,7 @@ void main() {
           'hip': ['ashtanga_namaskara.hip_reminder'],
         },
         repStartPhaseKeys: const {'recognized'},
+        effortPhaseKeys: const {'recognized'},
       ),
       (
         exercise: PlankUpDown(maxRep: 2),
@@ -319,6 +343,7 @@ void main() {
           'trunk': ['plank_up_down.trunk_reminder'],
         },
         repStartPhaseKeys: const {'pushing_up'},
+        effortPhaseKeys: const {'pushing_up'},
       ),
     ];
 
@@ -345,10 +370,29 @@ void main() {
       );
       expect(
         policyCoach.script.effortPhaseKeys,
-        isEmpty,
-        reason: '${policyCoach.script.slug} hustle must stay off',
+        tier2Case.effortPhaseKeys,
+        reason: '${policyCoach.script.slug} effort phases',
+      );
+      expect(policyCoach.script.hustlePool, const ['common.push']);
+      expect(
+        policyCoach.script.hustleFinalPool,
+        const ['common.one_more_rep'],
       );
     }
+  });
+
+  test('ashtanga selects the effort phase for its active mode', () {
+    final transientCoach = AshtangaNamaskara(maxRep: 2).createVoiceCoach()
+        as PolicyVoiceCoach;
+    final microHoldCoach = AshtangaNamaskara(
+      maxRep: 2,
+      mode: AshtangaMode.microHold,
+    ).createVoiceCoach() as PolicyVoiceCoach;
+    addTearDown(transientCoach.dispose);
+    addTearDown(microHoldCoach.dispose);
+
+    expect(transientCoach.script.effortPhaseKeys, const {'recognized'});
+    expect(microHoldCoach.script.effortPhaseKeys, const {'holding'});
   });
 
   test('glute bridge uses its pilot script with hustle + reminders enabled',
@@ -390,8 +434,7 @@ void main() {
     expect(policyCoach.script.reminderPoolFor('hip_extension'), isEmpty);
     expect(policyCoach.script.repStartPhaseKeys, const {'ascending'});
     expect(policyCoach.script.effortPhaseKeys, const {'ascending'});
-    // Glute bridge forwards maxRep -> targetReps (so final-rep awareness works);
-    // hustle stays off via the empty hustlePool + zero tuning, not a null target.
+    // Glute bridge forwards maxRep -> targetReps (so final-rep awareness works).
     expect(policyCoach.targetReps, 3);
   });
 
@@ -427,8 +470,12 @@ void main() {
       const ['squat.trunk_reminder'],
     );
     expect(policyCoach.script.repStartPhaseKeys, const {'descending'});
-    expect(policyCoach.script.hustlePool, isEmpty);
-    expect(policyCoach.script.effortPhaseKeys, isEmpty);
+    expect(policyCoach.script.hustlePool, const ['common.push']);
+    expect(
+      policyCoach.script.hustleFinalPool,
+      const ['common.one_more_rep'],
+    );
+    expect(policyCoach.script.effortPhaseKeys, const {'ascending'});
     expect(policyCoach.script.faultKey('depth'), 'squat.depth');
     expect(policyCoach.targetReps, 15);
   });
@@ -890,6 +937,179 @@ void main() {
     expect(
       sink.keys.where((key) => key.endsWith('_reminder')),
       const ['glute_bridge.neck_head_reminder'],
+    );
+  });
+
+  test('reminder suppresses the same fault on consecutive reps', () async {
+    final sink = _RecordingVoiceSink();
+    final exercise = _VoiceTestExercise(targetReps: 4)
+      ..exerciseState = ExerciseState.activated;
+    final coach = _reminderCoach(
+      sink: sink,
+      targetReps: 4,
+      policy: _reminderAdapterPolicy(),
+    );
+    addTearDown(coach.dispose);
+
+    _driveFrame(coach, exercise, repCount: 0, phase: 'bottom', ms: 0);
+    _observeReminderFaults(
+      coach,
+      exercise,
+      repCount: 0,
+      ms: 500,
+      faults: [_reminderFault('hyperextension')],
+    );
+    _landRepAndStartNext(coach, exercise, repNumber: 1, ms: 1000);
+    await Future<void>.delayed(Duration.zero);
+
+    _observeReminderFaults(
+      coach,
+      exercise,
+      repCount: 1,
+      ms: 2000,
+      faults: [_reminderFault('hyperextension')],
+    );
+    _landRepAndStartNext(coach, exercise, repNumber: 2, ms: 2500);
+
+    expect(
+      sink.keys.where((key) => key == 'glute_bridge.hyperextension_reminder'),
+      hasLength(1),
+    );
+  });
+
+  test('reminder allows a different fault on consecutive reps', () async {
+    final sink = _RecordingVoiceSink();
+    final exercise = _VoiceTestExercise(targetReps: 4)
+      ..exerciseState = ExerciseState.activated;
+    final coach = _reminderCoach(
+      sink: sink,
+      targetReps: 4,
+      policy: _reminderAdapterPolicy(),
+    );
+    addTearDown(coach.dispose);
+
+    _driveFrame(coach, exercise, repCount: 0, phase: 'bottom', ms: 0);
+    _observeReminderFaults(
+      coach,
+      exercise,
+      repCount: 0,
+      ms: 500,
+      faults: [_reminderFault('hyperextension', priority: 1)],
+    );
+    _landRepAndStartNext(coach, exercise, repNumber: 1, ms: 1000);
+    await Future<void>.delayed(Duration.zero);
+
+    _observeReminderFaults(
+      coach,
+      exercise,
+      repCount: 1,
+      ms: 2000,
+      faults: [
+        _reminderFault('hyperextension', priority: 1),
+        _reminderFault('neck_head', priority: 2),
+      ],
+    );
+    _landRepAndStartNext(coach, exercise, repNumber: 2, ms: 2500);
+
+    expect(
+      sink.keys.where((key) => key.endsWith('_reminder')),
+      const [
+        'glute_bridge.hyperextension_reminder',
+        'glute_bridge.neck_head_reminder',
+      ],
+      reason: 'the banned higher-priority fault falls through to the next id',
+    );
+  });
+
+  test('reminder same-fault ban expires after one silent rep', () async {
+    final sink = _RecordingVoiceSink();
+    final exercise = _VoiceTestExercise(targetReps: 5)
+      ..exerciseState = ExerciseState.activated;
+    final coach = _reminderCoach(
+      sink: sink,
+      targetReps: 5,
+      policy: _reminderAdapterPolicy(),
+    );
+    addTearDown(coach.dispose);
+
+    _driveFrame(coach, exercise, repCount: 0, phase: 'bottom', ms: 0);
+    _observeReminderFaults(
+      coach,
+      exercise,
+      repCount: 0,
+      ms: 500,
+      faults: [_reminderFault('hyperextension')],
+    );
+    _landRepAndStartNext(coach, exercise, repNumber: 1, ms: 1000);
+    await Future<void>.delayed(Duration.zero);
+
+    _observeReminderFaults(
+      coach,
+      exercise,
+      repCount: 1,
+      ms: 2000,
+      faults: [_reminderFault('hyperextension')],
+    );
+    _landRepAndStartNext(coach, exercise, repNumber: 2, ms: 2500);
+
+    _observeReminderFaults(
+      coach,
+      exercise,
+      repCount: 2,
+      ms: 3500,
+      faults: [_reminderFault('hyperextension')],
+    );
+    _landRepAndStartNext(coach, exercise, repNumber: 3, ms: 4000);
+
+    expect(
+      sink.keys.where((key) => key == 'glute_bridge.hyperextension_reminder'),
+      hasLength(2),
+      reason: 'rep 3 is silent, so the same reminder may return on rep 4',
+    );
+  });
+
+  test('reminder consecutive-content ban resets across sets', () async {
+    final sink = _RecordingVoiceSink();
+    final exercise = _VoiceTestExercise(targetReps: 4)
+      ..exerciseState = ExerciseState.activated;
+    final coach = _reminderCoach(
+      sink: sink,
+      targetReps: 4,
+      policy: _reminderAdapterPolicy(),
+    );
+    addTearDown(coach.dispose);
+
+    _driveFrame(coach, exercise, repCount: 0, phase: 'bottom', ms: 0);
+    _observeReminderFaults(
+      coach,
+      exercise,
+      repCount: 0,
+      ms: 500,
+      faults: [_reminderFault('hyperextension')],
+    );
+    _landRepAndStartNext(coach, exercise, repNumber: 1, ms: 1000);
+    await Future<void>.delayed(Duration.zero);
+
+    exercise.exerciseState = ExerciseState.completed;
+    _driveFrame(coach, exercise, repCount: 1, phase: 'bottom', ms: 2000);
+    exercise.exerciseState = ExerciseState.notActivated;
+    _driveFrame(coach, exercise, repCount: 1, phase: 'bottom', ms: 2100);
+    exercise.exerciseState = ExerciseState.activated;
+    _driveFrame(coach, exercise, repCount: 1, phase: 'bottom', ms: 2200);
+
+    _observeReminderFaults(
+      coach,
+      exercise,
+      repCount: 1,
+      ms: 2500,
+      faults: [_reminderFault('hyperextension')],
+    );
+    _landRepAndStartNext(coach, exercise, repNumber: 2, ms: 3000);
+
+    expect(
+      sink.keys.where((key) => key == 'glute_bridge.hyperextension_reminder'),
+      hasLength(2),
+      reason: 'the prior set spoke on rep 2, but must not ban set 2 rep 3',
     );
   });
 
@@ -2053,7 +2273,7 @@ void main() {
     expect(sink.keys, isNot(contains('common.hold_still')));
   });
 
-  test('activation countdown counts up in order and ba lands before ready', () {
+  test('activation countdown speaks 3 2 1 before ready', () {
     final sink = _RecordingVoiceSink();
     final exercise = _VoiceTestExercise(targetReps: 3)
       ..exerciseState = ExerciseState.notActivated;
@@ -2062,7 +2282,7 @@ void main() {
 
     _driveSetupFrame(coach, exercise, ms: 0, hasPose: false);
 
-    // Hold progresses through the 3s window: một @≥800, hai @≥1600, ba @≥2400.
+    // Hold progresses through the 3s window: ba @≥800, hai @≥1600, một @≥2400.
     exercise.holdElapsedOverride = 500;
     _driveSetupFrame(coach, exercise, ms: 600);
     exercise.holdElapsedOverride = 900;
@@ -2072,7 +2292,7 @@ void main() {
     exercise.holdElapsedOverride = 2500;
     _driveSetupFrame(coach, exercise, ms: 2600);
 
-    // Activation: the hold clock nulls, state flips; "ba" already fired.
+    // Activation: the hold clock nulls, state flips; "một" already fired.
     exercise
       ..holdElapsedOverride = null
       ..exerciseState = ExerciseState.activated;
@@ -2080,16 +2300,15 @@ void main() {
 
     final counts =
         sink.keys.where((k) => RegExp(r'^\d+$').hasMatch(k)).toList();
-    expect(counts, const ['1', '2', '3']);
+    expect(counts, const ['3', '2', '1']);
     expect(
-      sink.keys.indexOf('3') < sink.keys.indexOf('common.ready'),
+      sink.keys.indexOf('1') < sink.keys.indexOf('common.ready'),
       isTrue,
-      reason: 'ba is queued before the ready cue',
+      reason: 'một is queued before the ready cue',
     );
   });
 
-  test('a broken hold drops pending counts and a re-hold restarts from một',
-      () {
+  test('a broken hold drops pending counts and a re-hold restarts from 3', () {
     final sink = _RecordingVoiceSink();
     final exercise = _VoiceTestExercise(targetReps: 3)
       ..exerciseState = ExerciseState.notActivated;
@@ -2104,7 +2323,7 @@ void main() {
     _driveSetupFrame(coach, exercise, ms: 1800);
     expect(
       sink.keys.where((k) => RegExp(r'^\d+$').hasMatch(k)).toList(),
-      const ['1', '2'],
+      const ['3', '2'],
     );
 
     // Hold breaks (still notActivated, clock gone): drop pending counts.
@@ -2113,13 +2332,43 @@ void main() {
     expect(sink.clearPendingCalls, 1,
         reason: 'a broken hold drops the perishable pending count line');
 
-    // Re-hold restarts from "một" — no stale hai/ba replays.
+    // Re-hold restarts from "ba" — no stale hai/một replays.
     exercise.holdElapsedOverride = 900;
     _driveSetupFrame(coach, exercise, ms: 2500);
     expect(
       sink.keys.where((k) => RegExp(r'^\d+$').hasMatch(k)).toList(),
-      const ['1', '2', '1'],
+      const ['3', '2', '3'],
     );
+  });
+
+  test('activation while 1 is playing keeps the countdown queue', () {
+    final sink = _BusyRecordingVoiceSink();
+    final exercise = _VoiceTestExercise(targetReps: 3)
+      ..exerciseState = ExerciseState.notActivated;
+    final coach = _setupCoach(sink: sink, targetReps: 3);
+    addTearDown(coach.dispose);
+
+    _driveSetupFrame(coach, exercise, ms: 0, hasPose: false);
+    exercise.holdElapsedOverride = 2500;
+    _driveSetupFrame(coach, exercise, ms: 2600);
+
+    expect(
+      sink.keys.where((k) => RegExp(r'^\d+$').hasMatch(k)).toList(),
+      const ['3', '2', '1'],
+    );
+    expect(sink.isBusy, isTrue, reason: 'the final count is still playing');
+
+    exercise
+      ..holdElapsedOverride = null
+      ..exerciseState = ExerciseState.activated;
+    _driveSetupFrame(coach, exercise, ms: 3000);
+
+    expect(
+      sink.clearPendingCalls,
+      0,
+      reason: 'activation keeps the in-flight 1 as the go cue',
+    );
+    expect(sink.keys.last, 'common.ready');
   });
 
   test('manual resume re-enters start gate without clearing set progress', () {
@@ -2176,7 +2425,7 @@ void main() {
     );
     expect(
       sink.keys.where((k) => RegExp(r'^\d+$').hasMatch(k)).toList(),
-      const ['1', '2', '3'],
+      const ['3', '2', '1'],
     );
     expect(sink.keys.where((k) => k == 'common.ready'), hasLength(2));
   });
@@ -2204,7 +2453,7 @@ void main() {
     _driveSetupFrame(coach, exercise, ms: 1000);
 
     expect(sink.stopCalls, 1, reason: 'the still-playing intro was stopped');
-    expect(sink.keys.last, '1',
+    expect(sink.keys.last, '3',
         reason: 'the count speaks immediately, not stalled behind the intro');
     expect(
       exercise.isGuidanceGraceActive(GuidanceClass.bodyInFrame),
@@ -2701,6 +2950,63 @@ void _driveFrame(
     repCount: repCount,
     hasPose: hasPose,
     feedback: const {},
+  );
+}
+
+FaultRecord _reminderFault(String type, {int priority = 1}) {
+  return FaultRecord(
+    phase: 'topHold',
+    type: type,
+    message: type,
+    affectsForm: true,
+    priority: priority,
+  );
+}
+
+void _observeReminderFaults(
+  PolicyVoiceCoach coach,
+  _VoiceTestExercise exercise, {
+  required int repCount,
+  required int ms,
+  required List<FaultRecord> faults,
+}) {
+  exercise.live = faults;
+  _driveFrame(
+    coach,
+    exercise,
+    repCount: repCount,
+    phase: 'topHold',
+    ms: ms,
+  );
+  exercise.live = const [];
+}
+
+void _landRepAndStartNext(
+  PolicyVoiceCoach coach,
+  _VoiceTestExercise exercise, {
+  required int repNumber,
+  required int ms,
+}) {
+  exercise.logger.addRepLog(
+    RepLog(
+      repNumber: repNumber,
+      correctForm: false,
+      data: const {'fault_types': []},
+    ),
+  );
+  _driveFrame(
+    coach,
+    exercise,
+    repCount: repNumber,
+    phase: 'bottom',
+    ms: ms,
+  );
+  _driveFrame(
+    coach,
+    exercise,
+    repCount: repNumber,
+    phase: 'ascending',
+    ms: ms + 500,
   );
 }
 

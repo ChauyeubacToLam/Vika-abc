@@ -547,14 +547,13 @@ each frame, given C's condition = present/absent this frame:
       plays stops the sink (current + queued dropped), speaks immediately, and marks intro-audio-end at
       that moment — voice grace closes with it. The intro never resumes; it was consumed. The activation
       ring shows the remaining-seconds number CENTERED — the 'Giữ yên' caption is removed (Nam: it said
-      nothing); the on-screen number stays count-down while the voice counts up, kept deliberately
-      (mid-hold the user can't see the screen).</li>
-    <li><b>Voiced countdown "một / hai / ba"</b> synced to the 3s hold at 800/1600/2400ms elapsed
-      (feel-tune; 2400 &lt; 3000 on purpose so "ba" fires before activation nulls the hold clock). Reuses
-      the rep-count keys <code>'1'/'2'/'3'</code> → <code>common/count_1..3.mp3</code>, routed
+      nothing). The 07-12 direction fix makes both screen and voice count down.</li>
+    <li><b>Voiced countdown "ba / hai / một"</b> synced to the 3s hold at 800/1600/2400ms elapsed
+      (feel-tune; 2400 &lt; 3000 on purpose so "một" fires before activation nulls the hold clock). Reuses
+      the rep-count keys <code>'3'/'2'/'1'</code> → <code>common/count_3/2/1.mp3</code>, routed
       deterministically (never rep-count thinning). A broken hold drops pending counts
-      (<code>clearPending()</code>, the currently-playing line finishes) and a re-hold restarts from "một";
-      activation keeps the queue so a mid-play "ba" survives as the go cue. <code>holdStill</code> itself
+      (<code>clearPending()</code>, the currently-playing line finishes) and a re-hold restarts from "ba";
+      activation keeps the queue so a mid-play "một" survives as the go cue. <code>holdStill</code> itself
       stays lineless — the countdown owns that state's audio.</li>
     <li><b>Stuck-user re-tell:</b> <code>setupPosition</code> joins the latch controller with
       <code>fireOnEntry: false</code> — entry fire suppressed (the intro was the first telling); the ONE

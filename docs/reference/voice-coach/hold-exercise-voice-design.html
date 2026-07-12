@@ -286,7 +286,7 @@ mark.note-hl.flash{animation:noteflash 1.2s ease}
 </style>
 </head>
 <body>
-<div class="prop-ribbon"><b>DECIDED v2</b> · 2026-07-11 · ruled by Nam (lavish review) · <span style="color:#D9CFBD">was Proposal v1 — every fork below is now closed; the fork framing is kept as history</span></div>
+<div class="prop-ribbon"><b>DECIDED v2</b> · 2026-07-11 · ruled by Nam (lavish review) · <span style="color:#D9CFBD">was Proposal v1 — every fork below is now closed; the fork framing is kept as history</span> · <b>07-12</b> ruling 8 revised: holds adopt the plank <b>reps-of-holds</b> model (§05g2)</div>
 <header class="hero">
   <div class="hero-in">
     <p class="eyebrow">Voice coach · hold-based exercises · DECIDED design</p>
@@ -298,7 +298,7 @@ mark.note-hl.flash{animation:noteflash 1.2s ease}
       Implementation is specced in <code>docs/scratch/hold-voice-impl-spec.md</code>.</p>
     <div class="chips">
       <span class="chip"><b>status</b> decided, spec live</span>
-      <span class="chip"><b>pilot</b> High Plank (sets × duration)</span>
+      <span class="chip"><b>pilot</b> High Plank (holds × seconds, plank model)</span>
       <span class="chip"><b>4</b> forks ruled</span>
       <span class="chip"><b>3</b> risks resolved by architecture</span>
     </div>
@@ -353,7 +353,8 @@ mark.note-hl.flash{animation:noteflash 1.2s ease}
       anti-cheat ring gates time, an INNER form ring is coached while the clock keeps running (§02). Only
       cheating stops earning. This reversed the original proposal.</div>
     <div><b>Ruled forks (§09)</b>Milestone praise/hustle switch; NO spoken countdown (earcons instead);
-      timeout deleted; sets normalised fleet-wide. The four §09 forks are all closed.</div>
+      timeout deleted; hold structure = the plank <strong>reps-of-holds</strong> model (07-12 revision of the
+      sets ruling, §05g2). The four §09 forks are all closed.</div>
     <div><b>Pilot scope</b>High Plank only. ~20 exercises expose <code>liveHoldSeconds</code>, but they split
       into effortful isometrics and calm yoga/stretch poses (see §05) — the register split is deferred.</div>
   </div>
@@ -441,13 +442,15 @@ mark.note-hl.flash{animation:noteflash 1.2s ease}
 }</pre></div>
   </div>
 
-  <p>The earned seconds ride the rep counter — a plank's "rep count" is just how many banked seconds you have,
-    and the adapter reads it to detect milestone crossings. What the ruling changes is <em>when a second is
-    earned</em>: the per-metric fault-<em>seconds</em> (<code>faultingByKey</code> below) now accrue
-    <strong>while the clock keeps running through a sag</strong>, instead of the clock freezing:</p>
+  <p>Two things change in this code under the rulings. The fault-<em>seconds</em>
+    (<code>faultingByKey</code>) now accrue <strong>while the clock keeps running through a sag</strong>,
+    instead of the clock freezing (07-11). And the <span class="bad" style="padding:0 3px;border-radius:3px">red</span>
+    line — earned seconds masquerading as a rep count — is <strong>deleted</strong> by the 07-12 reps-of-holds
+    ruling: <code>repCount</code> becomes a genuine counter of <em>completed holds</em> (plank model, §05g2),
+    and within-hold seconds surface only through <code>liveHoldSeconds</code>:</p>
 
   <div class="code">
-    <div class="code-head"><span>lib/exercise/3.High Plank/high_plank.dart — earned seconds feed repCount; fault-seconds accrue through the hold</span><b>L400–413</b></div>
+    <div class="code-head"><span>lib/exercise/3.High Plank/high_plank.dart — fault-seconds accrue through the hold; the seconds-as-repCount leak is deleted (07-12)</span><b>L400–413</b></div>
     <div class="code-body"><pre class="src"><span class="k">if</span> (state == HighPlankState.holding) {
   _holdSeconds.accumulate(
     elapsedMs: elapsedMs,
@@ -461,7 +464,7 @@ mark.note-hl.flash{animation:noteflash 1.2s ease}
   _holdSeconds.resetTick();
 }
 
-<span class="good">repCount = timerMetric.totalHoldingTimeMs ~/ 1000;</span>   <span class="c">// &lt;- earned SECONDS = the "rep count"</span></pre></div>
+<span class="bad">repCount = timerMetric.totalHoldingTimeMs ~/ 1000;</span>   <span class="c">// &lt;- DELETED 07-12: repCount becomes completed HOLDS</span></pre></div>
   </div>
 
   <div class="call eli">
@@ -475,21 +478,25 @@ mark.note-hl.flash{animation:noteflash 1.2s ease}
       cheating does it), so those crossings track the real seconds closely.</p>
   </div>
 
-  <h3>The trust rule flips upside-down</h3>
-  <p>For reps, the 07-11 ruling was: <strong>every landed rep must speak its number</strong>, because a
-    silent rep is ambiguous ("did it count?"). Silence there is a trust leak. For a hold, silence means the
-    opposite:</p>
+  <h3>The trust rule — half of it comes back <span class="tag ok">REFINED 07-12</span></h3>
+  <p>For reps, the 07-11 ruling was: <strong>every landed rep must speak its number</strong> (count =
+    registration; a silent rep is ambiguous). Under the 07-12 reps-of-holds model a hold IS a rep — a set is
+    N holds, and <strong>each completed hold speaks its number</strong> (<span class="vn">Một!</span>,
+    <span class="vn">Hai!</span>…), deterministic and personality-immune, exactly the rep fleet's count
+    registration. That numeral replaces any hold-specific per-hold completion cue. <em>Inside</em> each hold,
+    the original hold logic still applies:</p>
 
   <table class="recap">
-    <tr><th>&nbsp;</th><th>Rep-based (locked)</th><th>Hold-based (decided)</th></tr>
+    <tr><th>&nbsp;</th><th>Between holds (= the rep layer)</th><th>Inside a hold (decided)</th></tr>
     <tr><td class="sev">What silence means</td>
-      <td>Ambiguous — did the rep register? So every rep speaks (count = registration).</td>
+      <td>Ambiguous — did the hold register? So every completed hold speaks its number
+        (count = registration, verbatim from the rep spec).</td>
       <td><strong>Reassuring</strong> — silence = the clock is running. No news is good news.</td></tr>
     <tr><td class="sev">What voice marks</td>
-      <td>Each discrete event (the landed rep) + outcome.</td>
-      <td>A few sparse <strong>milestones</strong> (halfway, final stretch) + <strong>real-time fault
-        corrections</strong>. The continuous clean part is deliberately quiet; the end-of-set countdown is
-        non-verbal <strong>earcons</strong>, not spoken numbers (§04).</td></tr>
+      <td>The completed hold (its number) + the hold's outcome, off its per-hold RepLog.</td>
+      <td>A few sparse <strong>milestones</strong> (halfway, final stretch — relative to per-hold seconds) +
+        <strong>real-time fault corrections</strong>. The continuous clean part is deliberately quiet; the
+        end-of-hold countdown is non-verbal <strong>earcons</strong>, not spoken numbers (§04).</td></tr>
   </table>
 
   <div class="call idea">
@@ -555,7 +562,7 @@ mark.note-hl.flash{animation:noteflash 1.2s ease}
 <section id="earcons">
   <p class="kicker"><span class="n">04</span> Evidence · sound</p>
   <h2>The earcon channel — voice carries meaning, sounds carry state</h2>
-  <p class="lead">The end-of-set countdown is <strong>non-verbal earcons</strong>, not a spoken
+  <p class="lead">The end-of-hold countdown is <strong>non-verbal earcons</strong>, not a spoken
     <span class="vn">năm, bốn, ba…</span>. This was Nam's ruling and it is research-backed: every interval
     timer, boxing-gym clock, and plank app converges on a beep grammar that needs <strong>zero teaching</strong>.</p>
 
@@ -573,10 +580,12 @@ mark.note-hl.flash{animation:noteflash 1.2s ease}
   <div class="tbl">
   <table class="recap">
     <tr><th>Signal</th><th>When</th><th>Sound</th><th>Why it reads instantly</th></tr>
-    <tr><td><b>Final-3 pips</b></td><td>Earned seconds <code>target−3</code>, <code>−2</code>, <code>−1</code></td>
+    <tr><td><b>Final-3 pips</b></td><td>In-hold earned seconds <code>T−3</code>, <code>−2</code>, <code>−1</code>
+      (T = the per-hold target, 07-12)</td>
       <td>3 identical short beeps</td>
       <td>The universal "get ready, almost there" of every interval timer — three even ticks = "three left".</td></tr>
-    <tr><td><b>End tone</b></td><td>Earned time hits <code>target</code></td>
+    <tr><td><b>End tone</b></td><td>In-hold earned time hits <code>T</code> — fires once per hold, right as the
+      hold's count numeral lands</td>
       <td>One distinct, higher/longer tone</td>
       <td>The "time!" bell — a different sound from the pips, so "done" is unmistakably not "another second".</td></tr>
     <tr><td><b>Continuous tick</b></td><td>—</td><td><span class="sev">none in v1</span></td>
@@ -615,15 +624,18 @@ mark.note-hl.flash{animation:noteflash 1.2s ease}
   <table class="recap">
     <tr><th>Rep-based rule (locked)</th><th>Hold-based analog (decided)</th><th>What actually changes</th></tr>
     <tr><td><b>count</b> — every landed rep speaks its number, deterministic, personality-immune</td>
-      <td><b>time milestones</b> — halfway + <span class="vn">còn 10 giây</span> (relative, any duration),
-        fired on earned-time crossings. NO spoken countdown; the final 3s + end are non-verbal earcons (§04)</td>
-      <td>Biggest change. A continuous clock has no discrete reps, so "count every rep" becomes "announce two
-        earned-time marks + earcons." Still deterministic + personality-immune.</td></tr>
+      <td><b>applies VERBATIM (07-12)</b> — each completed hold is a landed rep and speaks its number
+        (<span class="vn">Một!</span>). PLUS, inside each hold: <b>time milestones</b> — halfway +
+        <span class="vn">còn 10 giây</span> (relative to per-hold seconds, when the hold is long enough) and
+        non-verbal earcons for the final 3s + end (§04). No spoken countdown</td>
+      <td>Under the reps-of-holds model the count is the rep fleet's registration, unchanged. The new part is
+        only the within-hold time layer. All deterministic + personality-immune.</td></tr>
     <tr><td><b>criticalFault / softFault</b> — real-time, first-occurrence 100%, persistence-escalated</td>
       <td><b>inner-ring form faults</b> (sag / pike / elbow) fire real-time while the clock KEEPS running —
-        <strong>identical rules to the rep fleet</strong>; the bookkeeping unit is the hold episode</td>
-      <td>Machinery identical. The persistence unit becomes the continuous in-pose run, not the rep
-        (resolves old R1). The outer-ring break is a rare separate "clock stopped" signal.</td></tr>
+        <strong>identical rules to the rep fleet</strong>; the bookkeeping unit is the hold, which IS the rep</td>
+      <td>Machinery identical — and after 07-12 nearly literal: a hold is a rep, so same-fault-once and
+        persistence-across-holds ride the existing rep-scoped state (resolves old R1). The outer-ring break
+        stays a rare separate "clock stopped" signal.</td></tr>
     <tr><td><b>praise</b> — clean reps only, variable-ratio, never twice in a row</td>
       <td><b>milestone praise/hustle SWITCH</b> — at each milestone the single outcome slot is praise (clean)
         OR hustle (struggling / final stretch) OR the time line alone</td>
@@ -637,21 +649,28 @@ mark.note-hl.flash{animation:noteflash 1.2s ease}
     <tr><td><b>setup / activation countdown / set-complete</b></td>
       <td>identical</td><td>Modality-independent. No change.</td></tr>
     <tr><td><b>reminder</b> (next-rep feedforward) / <b>timeout</b> ending</td>
-      <td><b>both dropped</b></td><td>No "next rep" in a continuous hold (reminder gone). No give-up timeout
-        (deleted — §05g).</td></tr>
+      <td><b>reminder returns (07-12)</b>: the next hold's re-entry into <code>holding</code> is the commit
+        edge — a critical in hold N earns <span class="vn">Lần này bạn nhớ…</span> at hold N+1's start.
+        <b>Timeout stays dropped</b></td>
+      <td>The v2 continuous-hold design had no "next rep"; reps-of-holds restores one per hold boundary, so
+        the rep fleet's reminder shape maps directly. No give-up timeout (deleted — §05g).</td></tr>
   </table>
   </div>
 
-  <h3>a. Count → time milestones + earcons <span class="tag ok">RULED</span></h3>
-  <p>Deterministic, personality-immune, fired on earned-time crossings — and <strong>relative to the target
-    at any duration</strong>, not hardcoded to 30s. For a target <code>T</code>:</p>
+  <h3>a. Count = the hold's number; time milestones + earcons live inside each hold <span class="tag ok">RULED · refined 07-12</span></h3>
+  <p><strong>The count (07-12):</strong> each completed hold lands as a rep and speaks its number —
+    <span class="vn">Một!</span>, <span class="vn">Hai!</span>… — the rep fleet's count-registration rule
+    verbatim (deterministic, personality-immune; reuses <code>count_1..N</code>). Inside each hold, the time
+    layer is deterministic, fired on in-hold earned-time crossings, <strong>relative to the per-hold target
+    at any duration</strong>. For a per-hold target <code>T</code>:</p>
   <ul>
-    <li><strong>Halfway (<code>T/2</code> earned s):</strong> <span class="vn">Được một nửa rồi</span> — the
+    <li><strong>Halfway (<code>T/2</code> in-hold s):</strong> <span class="vn">Được một nửa rồi</span> — the
       mandatory milestone every source flags.</li>
-    <li><strong>Final-10 (<code>T−10</code> earned s):</strong> <span class="vn">còn 10 giây</span> — density
-      starts to rise.</li>
-    <li><strong>Final-3 + end = NON-VERBAL earcons:</strong> 3 identical short beeps on the last 3 earned
-      seconds, then a distinct end tone at <code>T</code>. The coach never robot-counts (§04). No spoken
+    <li><strong>Final-10 (<code>T−10</code> in-hold s):</strong> <span class="vn">còn 10 giây</span> — only
+      when the hold is long enough for it to be distinct from halfway (a short hold keeps halfway only).</li>
+    <li><strong>Final-3 + end = NON-VERBAL earcons:</strong> 3 identical short beeps on the hold's last 3
+      earned seconds, then a distinct end tone at <code>T</code> — landing together with the hold's count
+      numeral on separate channels. The coach never robot-counts (§04). No spoken
       <span class="vn">năm, bốn, ba…</span> in v1.</li>
     <li><strong>Silent before halfway.</strong> The setup intro + <span class="vn">Sẵn sàng</span> already
       confirmed the start; nothing to say until the first mark.</li>
@@ -734,7 +753,7 @@ bool isFormBadToDrop = <span class="bad">bodyAngle &lt; DROPPING_PIKE_ANGLE</spa
 
   <h3>f. Setup / activation countdown / set-complete <span class="tag ok">unchanged</span></h3>
   <p>Modality-independent, lifted straight from the rep spec: the per-set intro one-shot, the voiced
-    <span class="vn">một, hai, ba</span> activation countdown (3s hold), <span class="vn">Sẵn sàng</span>,
+    <span class="vn">ba, hai, một</span> activation countdown (3s hold), <span class="vn">Sẵn sàng</span>,
     and <code>common.set_complete</code>. A hold's start position <em>is</em> the plank position, so the
     3-second activation hold works exactly as it does for a rep exercise.</p>
 
@@ -755,15 +774,32 @@ bool isFormBadToDrop = <span class="bad">bodyAngle &lt; DROPPING_PIKE_ANGLE</spa
     by other channels: walk-away = the presence gate / pause; stuck-in-setup = the <code>setup_position</code>
     re-tell; give-up = the user quits. Nothing to congratulate falsely, so no honest-timeout line is needed.</p>
 
-  <h3>g2. Sets normalised fleet-wide: a set = one hold to a duration <span class="tag ok">RULED</span></h3>
-  <p>A "set" is now <strong>one continuous hold to a target duration</strong>, exactly parallel to sets × reps —
-    the plan prescribes <em>sets × duration</em>. High Plank migrates out of its one-long-hold-per-exercise
-    shape into the <strong>existing multi-set flow</strong>
-    (<code>exercise_experience_screen.dart</code> drives <code>_spec.sets</code>, per-set loggers, rest between
-    sets), which already supports time-based holds. Hold exercises never display "reps"; the
-    <code>repCount = totalHoldingTimeMs ~/ 1000</code> line stays only as the earned-second feed the adapter
-    reads for milestone/earcon crossings — it is never surfaced to the user as a rep count (hold seconds show
-    through <code>liveHoldSeconds</code>). Details in the impl spec §5.</p>
+  <h3>g2. Hold structure: the PLANK model — reps-of-holds <span class="tag ok">RE-RULED 07-12</span></h3>
+  <p><strong>Supersedes the 07-11 "a set = one continuous hold" ruling.</strong> Holds adopt the shape
+    Forearm Plank (<code>lib/exercise/plank/plank.dart</code>) already implements: a <strong>set contains N
+    HOLDS counted as REPS</strong>. Each hold runs a fixed per-hold duration, then a brief internal
+    <code>resting</code> breather (~5s — inside the exercise, NOT the formal rest screen), then the next hold;
+    completing a hold increments <code>repCount</code> and logs a real per-hold <code>RepLog</code>. High
+    Plank migrates to <code>HighPlank(maxHolds, holdSeconds)</code> — hold count from the catalog
+    <code>base_reps</code>, per-hold seconds from <code>base_seconds</code>, no hard-coded per-hold constants
+    (aligning plank's own hard-coded 15s to the catalog is a noted follow-up, out of pilot scope).</p>
+  <ul>
+    <li><strong>Why this simplifies the voice design:</strong> a hold IS a rep, so count registration, the
+      per-hold outcome, same-fault-once, persistence across holds, and the next-hold reminder all ride the
+      rep fleet's existing machinery — far more directly than the v2 continuous-hold design assumed.</li>
+    <li><strong>The formal multi-set flow sits above this:</strong> <code>base_sets</code> sets with the rest
+      screen, each containing the holds. High Plank's catalog row stays interim <em>3 sets × one 30s hold</em>
+      until the code migration lands, then flips to plank-shaped <em>1 set × 3 holds × 30s</em> (flip SQL
+      drafted in <code>docs/scratch/hold-catalog-hybrid-fix.sql</code>, Nam applies it).</li>
+    <li><strong>repCount leak fixed by the model:</strong> <code>repCount = totalHoldingTimeMs ~/ 1000</code>
+      is deleted; <code>repCount</code> counts completed holds, within-hold seconds surface only through
+      <code>liveHoldSeconds</code>. UI ring untouched (ruling 9).</li>
+    <li><strong>Verified in plank.dart:</strong> the internal hold→rest→hold cycle never leaves the base
+      <code>activated</code> state — re-entering a hold is a debounced pose re-check, NOT a re-run of
+      <code>isInStartPosition</code> — so the setup/activation channel (intro, "một, hai, ba",
+      <span class="vn">Sẵn sàng</span>) fires once per set, not per hold (ruling 12 intact).</li>
+  </ul>
+  <p>Details + the open catalog-modality question in the impl spec §5.</p>
 
   <h3>h. Out of scope for v1 <span class="tag med">deferred</span></h3>
   <ul>
@@ -808,13 +844,13 @@ bool isFormBadToDrop = <span class="bad">bodyAngle &lt; DROPPING_PIKE_ANGLE</spa
   _startTrackingRep(repCount + 1);                             <span class="c">// &lt;- clears per-rep fault memory every second</span>
 }</pre></div>
     </div>
-    <p><strong>Resolution (spec §3):</strong> the adapter gets a hold path (taken when
-      <code>countsByRepNumber == false</code>) that computes milestone crossings from
-      <code>repCount</code> (earned seconds) vs <code>liveHoldTargetSeconds</code> and suppresses every other
-      second — no "count every tick." And per ruling 6 the persistence / same-fault bookkeeping unit becomes the
-      <strong>hold episode</strong> (a continuous in-pose run), so the adapter no longer calls
-      <code>_startTrackingRep</code> every second and <code>faultPersistence</code> stays meaningful across the
-      hold. This is the central migration task, and it is fully specced.</p>
+    <p><strong>Resolution (spec §3, simplified further by the 07-12 plank model):</strong> under
+      reps-of-holds, <code>repCount</code> increments once per <em>completed hold</em>, not per earned second —
+      so this branch fires exactly at hold completions and the metronome risk dissolves at the source. The
+      rep path becomes the spine (count registration + per-hold outcome off a real RepLog); the adapter's new
+      work shrinks to a within-hold layer (milestones from <code>liveHoldSeconds</code> vs the per-hold
+      target, the milestone switch, earcons, the re-hold push). The fault bookkeeping unit is the hold, which
+      IS the rep — <code>_startTrackingRep</code> scopes correctly with no per-second wipe. Fully specced.</p>
   </div>
 
   <div class="call tip">
@@ -889,11 +925,13 @@ static const ScriptBundle timeBased = ScriptBundle(
 <!-- ============================================================= -->
 <section id="timeline">
   <p class="kicker"><span class="n">07</span> The picture</p>
-  <h2>A 30-second High Plank, on the earned-time axis</h2>
-  <p class="lead">The whole design in one image. The axis is <strong>earned in-pose seconds</strong> (not wall
-    time). Yellow dots = deterministic milestones; a red dot = a fault the coach corrects <em>while the clock
-    keeps running</em>; the striped block = the ONE outer-ring break where the clock stalls; teal = the hustle
-    push; the dashed box = the end earcons (beeps + tone), no spoken numbers.</p>
+  <h2>Hold 1 of a 3 × 30s set, on the in-hold earned-time axis <span class="tag ok" style="vertical-align:middle">plank model 07-12</span></h2>
+  <p class="lead">One hold of the set in one image (a set = 3 such holds with a ~5s internal breather between
+    them — the plank model, §05g2). The axis is <strong>in-hold earned seconds</strong> (not wall time).
+    Yellow dots = deterministic milestones; a red dot = a fault the coach corrects <em>while the clock keeps
+    running</em>; the striped block = the ONE outer-ring break where the clock stalls; teal = the hustle push;
+    the dashed box = the end earcons (beeps + tone) — capped by the hold's <strong>count numeral</strong>
+    (<span class="vn">Một!</span>), the rep fleet's registration rule.</p>
 
   <div class="tl-wrap">
     <div class="tl-axis">
@@ -932,7 +970,7 @@ static const ScriptBundle timeBased = ScriptBundle(
       <div class="lab" style="left:84%">re-hold → Cố lên!</div>
 
       <div class="dot done" style="left:100%"></div>
-      <div class="lab" style="left:95%">30s · 🔔 end tone</div>
+      <div class="lab" style="left:95%">30s · 🔔 + Một!</div>
     </div>
   </div>
 
@@ -950,29 +988,36 @@ static const ScriptBundle timeBased = ScriptBundle(
       break line; re-hold → <span class="vn">Cố lên, sắp xong rồi!</span>
       <div class="w">Outer-ring exit (the only clock stall). Arms hustle; re-hold commit fires it (rolled).</div></div>
     <div class="c"><div class="t">27 → 30s</div>🔔 3 beeps + end tone
-      <div class="w">Non-verbal earcons on the final 3 earned seconds + tone at target. No spoken numbers.</div></div>
-    <div class="c mile"><div class="t">30s · DONE</div><span class="vn">Hoàn thành! Tốt lắm!</span> + summary
-      <div class="w"><code>set_complete</code> (det) + post-set summary (richest feedback).</div></div>
+      <div class="w">Non-verbal earcons on the hold's final 3 earned seconds + tone at target. No spoken numbers.</div></div>
+    <div class="c mile"><div class="t">30s · HOLD 1 DONE</div><span class="vn">Một!</span> — the hold's count
+      <div class="w">Completed hold = landed rep → count registration (det). Clean hold may add its praise roll.</div></div>
+    <div class="c"><div class="t">→ ~5s breather → holds 2, 3</div>Internal <code>resting</code>, then the same
+      shape again; <span class="vn">Hai!</span> … <span class="vn">Ba!</span>
+      <div class="w">Reminder edge: a fault seen in hold 1 earns <span class="vn">Lần này bạn nhớ…</span> at
+        hold 2's re-entry. After hold 3: <code>set_complete</code> + post-set summary.</div></div>
   </div>
-  <p style="color:var(--muted);font-size:13px">Note: the axis is earned time. The one striped block is the
-    <em>outer-ring</em> stall (out of pose) — wall time passes while earned time holds still. The 8s sag has no
-    block: under the two-ring ruling a form fault is coached <em>through</em>, the clock never pauses for it.</p>
+  <p style="color:var(--muted);font-size:13px">Note: the axis is in-hold earned time. The one striped block is
+    the <em>outer-ring</em> stall (out of pose) — wall time passes while earned time holds still. The 8s sag has
+    no block: under the two-ring ruling a form fault is coached <em>through</em>, the clock never pauses for it.
+    The internal breather between holds is NOT the formal rest screen — that sits at the set boundary.</p>
 </section>
 
 <!-- ============================================================= -->
 <section id="worked">
   <p class="kicker"><span class="n">08</span> Concrete</p>
-  <h2>Worked example — 30s hold: a sag at ~8s (coached through), out of pose at ~24s</h2>
+  <h2>Worked example — a 3 × 30s set (plank model): hold 1 in detail, then the set</h2>
   <p class="lead">Same shape as the rep spec's worked example, so it reads familiar. Every row shows what the
     coach says and <em>why</em> — including the silences, because silence is a design decision here, not an
-    absence of one. "det" = deterministic (causal), "rolled" = a probability draw. Note the clock runs
-    through the sag; only the out-of-pose event stalls it.</p>
+    absence of one. "det" = deterministic (causal), "rolled" = a probability draw. Hold 1 has a sag at ~8s
+    (coached through — the clock runs) and an out-of-pose break at ~24s (the one stall); each completed hold
+    lands as a rep and speaks its number.</p>
 
   <div class="tbl">
   <table class="recap">
-    <tr><th>Earned clock</th><th>State</th><th>Coach says</th><th>Why (rule fired)</th></tr>
+    <tr><th>In-hold clock</th><th>State</th><th>Coach says</th><th>Why (rule fired)</th></tr>
+    <tr><td class="sev" colspan="4" style="background:#fff"><b>HOLD 1 of 3</b> — the detailed one</td></tr>
     <tr><td class="sev">0.0s</td><td>activated → holding</td><td><span class="vn">Sẵn sàng</span></td>
-      <td>setup channel — <b>det</b> (intro already fired before this)</td></tr>
+      <td>setup channel — <b>det</b>, once per SET (intro already fired; never re-fires per hold)</td></tr>
     <tr><td class="sev">0 → 8s</td><td>holding, clock running</td><td><em>— 8s of quiet —</em></td>
       <td><b>silence-is-default</b>: clock running, nothing to say</td></tr>
     <tr><td class="sev">~8s</td><td>holding (INNER-ring sag; <b>clock keeps running</b>)</td>
@@ -980,30 +1025,42 @@ static const ScriptBundle timeBased = ScriptBundle(
       <td>criticalFault, <b>first occurrence → det 100%</b>. Clock does NOT stop; sagging_seconds accrues</td></tr>
     <tr><td class="sev">8 → 12s</td><td>holding (sag self-corrects)</td><td><em>— quiet —</em></td>
       <td>one cue then watch (not naggy); clock never paused</td></tr>
-    <tr><td class="sev">15s</td><td>holding, earned crosses 15</td>
+    <tr><td class="sev">15s</td><td>holding, in-hold crosses 15</td>
       <td><span class="vn">Được một nửa rồi, cố lên!</span></td>
-      <td>milestone (<b>det</b>) + <b>hustle</b> (<b>rolled</b>) — the switch: struggled (a fault) since start</td></tr>
-    <tr><td class="sev">15 → 20s</td><td>holding, clean</td><td><em>— quiet —</em></td><td>silence-is-default</td></tr>
-    <tr><td class="sev">20s</td><td>earned crosses 20</td><td><span class="vn">Còn 10 giây — form đẹp!</span></td>
+      <td>milestone (<b>det</b>) + <b>hustle</b> (<b>rolled</b>) — the switch: struggled (a fault) since hold start</td></tr>
+    <tr><td class="sev">20s</td><td>in-hold crosses 20</td><td><span class="vn">Còn 10 giây — form đẹp!</span></td>
       <td>milestone (<b>det</b>) + <b>praise</b> (<b>rolled</b>) — the switch: clean since halfway</td></tr>
-    <tr><td class="sev">~24s</td><td>holding → <b>dropping</b> — OUTER-ring exit (knees drop; final third)</td>
+    <tr><td class="sev">~24s</td><td>holding → interrupted — OUTER-ring exit (knees drop; final third)</td>
       <td><span class="vn">Siết chặt bụng, nâng hông lên</span></td>
-      <td>the ONE clock stall. criticalFault (episode persistence). Also <b>arms hustle</b> (final-third break)</td></tr>
-    <tr><td class="sev">~24s</td><td>dropping → holding (re-hold commit)</td>
+      <td>the ONE clock stall. criticalFault (persistence within the hold). Also <b>arms hustle</b></td></tr>
+    <tr><td class="sev">~24s</td><td>re-entry into holding (re-hold commit)</td>
       <td><span class="vn">Cố lên, sắp xong rồi!</span></td>
       <td>hustle — armed by the final-third break, fires on the re-hold commit (<b>rolled</b>, quiet-side)</td></tr>
-    <tr><td class="sev">24 → 27s</td><td>holding</td><td><em>— quiet —</em></td><td>silence-is-default</td></tr>
-    <tr><td class="sev">27, 28, 29s</td><td>earned crosses target−3…−1</td>
+    <tr><td class="sev">27, 28, 29s</td><td>in-hold crosses T−3…T−1</td>
       <td>🔔 🔔 🔔 <em>(3 identical beeps)</em></td>
       <td>non-verbal earcons — <b>det</b>, one per earned second (§04). No spoken numbers</td></tr>
-    <tr><td class="sev">30s</td><td>earned hits target → completed</td>
-      <td>🔔 <em>end tone</em> + <span class="vn">Hoàn thành! Tốt lắm!</span> + summary</td>
-      <td>end earcon + <code>set_complete</code> (<b>det</b>) + post-set summary (dominant fault: sagging)</td></tr>
+    <tr><td class="sev">30s</td><td>hold 1 complete → resting (repCount = 1)</td>
+      <td>🔔 <em>end tone</em> + <span class="vn">Một!</span></td>
+      <td>end earcon + <b>count registration</b> (<b>det</b>, 07-12): a completed hold is a landed rep and
+        speaks its number — this IS the per-hold completion cue</td></tr>
+    <tr><td class="sev" colspan="4" style="background:#fff"><b>HOLDS 2–3</b> — same shape, compressed</td></tr>
+    <tr><td class="sev">~5s breather</td><td>resting → holding (debounced pose re-check)</td>
+      <td><span class="vn">Lần này bạn nhớ siết bụng nhé</span></td>
+      <td><b>reminder</b> at the next hold's re-entry into holding (<b>rolled</b>) — the sag was live-cued in
+        hold 1, so hold 2's commit edge earns the feedforward; same-fault-once then mutes a re-correction</td></tr>
+    <tr><td class="sev">hold 2</td><td>clean 30s</td><td>milestones … 🔔🔔🔔 🔔 <span class="vn">Hai!</span></td>
+      <td>same within-hold layer; count registration at completion; clean hold may add its praise roll</td></tr>
+    <tr><td class="sev">hold 3</td><td>clean 30s</td><td>milestones … 🔔🔔🔔 🔔 <span class="vn">Ba!</span></td>
+      <td>final hold — the count anchor; a target-proven final push may pair (<b>rolled</b>, never guaranteed)</td></tr>
+    <tr><td class="sev">set done</td><td>repCount = 3 = maxHolds → completed</td>
+      <td><span class="vn">Hoàn thành! Tốt lắm!</span> + summary</td>
+      <td><code>set_complete</code> (<b>det</b>) + post-set summary (dominant fault: sagging)</td></tr>
   </table>
   </div>
-  <p>Run the same physical set again and the rolled rows (praise pairing at 15s, hustle at 22s) come out
-    differently — the deterministic rows (milestones, breaks, countdown, completion) never do. Same
-    guarantee as the rep spec: structure is reliable, cadence is alive.</p>
+  <p>Run the same physical set again and the rolled rows (the milestone switch outcomes, the re-hold push,
+    the hold-2 reminder) come out differently — the deterministic rows (milestones, the hold counts
+    <span class="vn">Một! Hai! Ba!</span>, beeps, completion) never do. Same guarantee as the rep spec:
+    structure is reliable, cadence is alive.</p>
 </section>
 
 <!-- ============================================================= -->
@@ -1032,7 +1089,7 @@ static const ScriptBundle timeBased = ScriptBundle(
           about — but loses the near-universal numeric countdown that apps ship on-by-default.</div>
       </div>
       <div class="call tip"><p class="ct">✔ RULED — neither: no spoken countdown at all</p>
-        <p>Nam ruled OUT a spoken per-second countdown entirely. The end-of-set countdown is <strong>non-verbal
+        <p>Nam ruled OUT a spoken per-second countdown entirely. The end-of-hold countdown is <strong>non-verbal
         earcons</strong> (§04) — 3 beeps + an end tone — which ride earned seconds, so they stall honestly with
         no half-spoken <span class="vn">ba…</span> freezing mid-word. The stall problem dissolves, and under the
         two-ring ruling the clock barely stalls mid-hold anyway. A one-line swap to spoken
@@ -1101,11 +1158,14 @@ static const ScriptBundle timeBased = ScriptBundle(
           research's periodic check-in. More faithful to the long-hold evidence, but needs new "keep going"
           recordings and re-introduces a near-periodic cue on long holds (mild metronome risk).</div>
       </div>
-      <div class="call tip"><p class="ct">✔ RULED — one relative rule at any duration</p>
+      <div class="call tip"><p class="ct">✔ RULED — one relative rule at any duration · refined 07-12</p>
         <p>Halfway + <span class="vn">còn 10 giây</span> (at <code>T−10</code>) + end earcons, computed relative
         to the target at any length. Zero new audio per duration, no per-duration config, dodges the metronome
-        risk. The ~30s long-hold check-in stays an easy additive follow-up if device feel wants it later; v1
-        doesn't need it and High Plank never triggers it.</p></div>
+        risk. <strong>07-12 refinement (plank model):</strong> <code>T</code> is the <em>per-hold</em> duration,
+        and the milestones live inside each hold — halfway always; <span class="vn">còn 10 giây</span> only when
+        the hold is long enough for it to be distinct (a 15s hold keeps halfway only); final-3 beeps always.
+        Long "holds" now arrive as more/longer holds per set rather than one long hold, which also defuses the
+        60–90s check-in question for the pilot.</p></div>
     </div>
   </div>
 </section>
@@ -1125,20 +1185,25 @@ static const ScriptBundle timeBased = ScriptBundle(
     <tr><td>Ready</td><td class="sev lo">REUSE</td><td><code>common.ready</code> — <span class="vn">Sẵn sàng</span></td></tr>
     <tr><td>Set complete</td><td class="sev lo">REUSE</td>
       <td><code>common.set_complete</code> (listen-check pending per rep spec)</td></tr>
+    <tr><td>Hold count numerals (07-12)</td><td class="sev lo">REUSE</td>
+      <td><code>count_1..N</code> — the completed-hold count (<span class="vn">Một!</span> per hold), rep-fleet
+        registration verbatim; replaces any per-hold completion cue</td></tr>
     <tr><td>Activation countdown / earcon fallback</td><td class="sev lo">REUSE</td>
       <td><code>count_1..3</code> — unchanged for activation; also the one-line swap target if earcons feel worse</td></tr>
     <tr><td>High-plank fault lines (inner + outer)</td><td class="sev lo">RE-KEY (files exist)</td>
       <td><code>high_plank.sagging</code> / <code>.piked</code> / <code>.elbow</code> / <code>.wall_guard</code>
         — snake_case ids matching the script's faultIds. The mp3s already exist on disk; re-key from the legacy
         free-text map, no re-record.</td></tr>
-    <tr><td>Halfway milestone</td><td class="sev hi">NEW</td>
-      <td><code>common.time.halfway</code> — e.g. <span class="vn">Được một nửa rồi</span> (wording TBD)</td></tr>
-    <tr><td>Final-10 milestone (relative)</td><td class="sev hi">NEW</td>
-      <td><code>common.time.10s_left</code> — e.g. <span class="vn">còn 10 giây</span> (wording TBD)</td></tr>
+    <tr><td>Halfway milestone (within-hold)</td><td class="sev hi">NEW</td>
+      <td><code>common.time.halfway</code> — e.g. <span class="vn">Được một nửa rồi</span> (wording TBD);
+        relative to per-hold seconds</td></tr>
+    <tr><td>Final-10 milestone (within-hold, relative)</td><td class="sev hi">NEW</td>
+      <td><code>common.time.10s_left</code> — e.g. <span class="vn">còn 10 giây</span> (wording TBD); only
+        when the hold is long enough for it to be distinct from halfway</td></tr>
     <tr><td>Final-3 beep (earcon)</td><td class="sev hi">NEW</td>
-      <td><code>common.time.beep</code> — non-verbal, one short beep per final earned second</td></tr>
+      <td><code>common.time.beep</code> — non-verbal, one short beep per final in-hold earned second, per hold</td></tr>
     <tr><td>End tone (earcon)</td><td class="sev hi">NEW</td>
-      <td><code>common.time.end_tone</code> — non-verbal, distinct tone at target</td></tr>
+      <td><code>common.time.end_tone</code> — non-verbal, distinct tone as each hold reaches its target</td></tr>
     <tr><td>Hold hustle pool</td><td class="sev hi">NEW</td>
       <td>e.g. <code>common.hold_push</code> (+ target-proven variant) — <span class="vn">Cố lên, sắp xong rồi!</span>
         (naming OPEN, wording TBD; replaces the stale <code>hustleHold</code> sketch)</td></tr>
@@ -1158,7 +1223,8 @@ static const ScriptBundle timeBased = ScriptBundle(
 </section>
 
 <div class="foot">
-  Hold-Exercise Voice Design · DECIDED v2 (was Proposal v1) · 2026-07-11 · ruled by Nam · pilot: High Plank ·
+  Hold-Exercise Voice Design · DECIDED v2 (was Proposal v1) · 2026-07-11, ruling 8 revised 07-12 (plank
+  reps-of-holds) · ruled by Nam · pilot: High Plank ·
   impl spec: docs/scratch/hold-voice-impl-spec.md · counterpart to voice-behavior-spec.md (rep-based, locked)
 </div>
 

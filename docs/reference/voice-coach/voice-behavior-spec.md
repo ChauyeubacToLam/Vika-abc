@@ -2,9 +2,9 @@
 
 Status: v1.5 — reviewed by Nam 2026-07-07 (personality scalar), refined 2026-07-08 (glute-bridge
 behavior lock), 2026-07-09 (cue-type rename + real-time critical/soft + per-moment outcome
-exclusivity + hustle re-decided: hesitation-armed / commit-fired, not yet wired). Numbers stay open
-for feel-tuning; shapes locked. Glute bridge is the in-code pilot; real-time firing and the collision
-gap are implemented for the glute pilot.
+exclusivity + hustle re-decided: hesitation-armed / commit-fired), and fleet-wired through Tier 3 on
+2026-07-12. Numbers stay open for feel-tuning; shapes locked. Glute bridge remains the device pilot;
+the shared rep fleet now carries the same policy wiring.
 07-09 folded in: cue types renamed `criticalFault`/`softFault`/`setup`; NEW `softFault` (non-critical)
 bucket; count finalized to cap-1.0 / no-discrete-relief-valve; `criticalFault` + `softFault` fire
 REAL-TIME (the instant a fault is known), not post-rep; outcome exclusivity relaxed to per-MOMENT
@@ -22,9 +22,15 @@ landed): grace goes VOICE-ONLY and = intro duration (UI signage ungated,
 'Giữ yên' caption is removed.
 Late 07-10 follow-up landed: active-set resume (manual or auto) now routes through the normal
 start-position hold again. It does not replay the per-set setup intro, but it re-arms the voiced
-"một, hai, ba" countdown and `common.ready`; completed reps/logs stay intact.
+"ba, hai, một" countdown and `common.ready`; completed reps/logs stay intact.
+07-12: two device re-rulings LANDED: countdown direction flips to "ba, hai, một" (was "một, hai,
+ba"); reminder gains a consecutive-rep same-content ban (hard rule 12).
+07-12 Tier 3: hustle enabled on all 24 rep exercises with verified effort-phase keys and the strict
+generic/final pools; six fast/quirky exercises retain the standard policy with explicit follow-up TODOs.
 07-11 late: HOLD-BASED family behavior decided (§ Hold-based exercises below) — pose-gated clock,
 voice milestones + final earcons, milestone praise/hustle switch; High Plank pilot, unimplemented.
+07-12: holds re-ruled to the PLANK MODEL — a set = N holds counted as reps, each completed hold
+speaks its number (registration); supersedes "a set = one continuous hold" (§ Hold-based).
 Design + state machine: [setup-safety-voice-design.html](setup-safety-voice-design.html) (same folder).
 Research backing: [voice-research-rules.md](voice-research-rules.md) (same folder).
 Decision record: docs/decisions.md — 2026-07-07, 07-08, and 07-09 voice-coach entries.
@@ -232,23 +238,25 @@ rule 2). Wiring: docs/scratch/setup-intro-voice-impl-spec.md, after the 3-delta 
 - **Stuck-user backstop rides the safety channel**, not intro repetition: `setupPosition` class, one
   delayed re-tell of `<slug>.setup_position` iff still not activated ~10s past intro-audio-end, then
   quiet for real (details in the § setup/tracking-safety key list).
-- **Activation countdown is VOICED (ruled late 07-10): "một, hai, ba"** synced to the 3s hold, reusing
-  `common/count_1..3.mp3` (no new recording; listen-check the intonation). Landed offsets: 800/1600/
-  2400ms elapsed (feel-tune; 2400 < 3000 on purpose so "ba" fires before activation nulls the hold
-  clock — it lands at/near the activation moment). Hold break drops pending count lines
-  (`clearPending`, current line finishes) and re-hold restarts from "một"; activation keeps the queue
-  so a mid-play "ba" survives as the go cue. Deterministic — never routed through rep-count thinning.
+- **Activation countdown is VOICED (ruled late 07-10), direction RE-RULED 07-12: "ba, hai, một"**
+  (counts DOWN — the up-count read as rep counting, not a countdown; Nam device call) synced to the
+  3s hold, reusing `common/count_1..3.mp3` in reverse order (no new recording). Landed offsets:
+  800/1600/2400ms elapsed (feel-tune; 2400 < 3000 on purpose so the last count fires before
+  activation nulls the hold clock — it lands at/near the activation moment). Hold break drops
+  pending count lines (`clearPending`, current line finishes) and re-hold restarts from "ba";
+  activation keeps the queue so a mid-play "một" survives as the go cue. Deterministic — never
+  routed through rep-count thinning. Landed 07-12 in `PolicyVoiceCoach`.
   **The countdown TERMINATES a still-playing intro (latest 07-10):** a user already holding the start
   position has no use for setup instructions — the first count to fire while intro audio is playing
   stops the sink (current + queued lines dropped), speaks immediately, and marks intro-audio-end at
   that moment (voice grace closes with it). The intro never resumes; it was consumed.
   **UI note (latest 07-10):** the activation ring shows the remaining-seconds number CENTERED, no
-  'Giữ yên' caption (removed — it said nothing the ring didn't); the number stays remaining-seconds
-  (down) while the voice counts up — Nam kept the mismatch, mid-hold the user can't see the screen.
+  'Giữ yên' caption (removed — it said nothing the ring didn't). The 07-10 voice-up/ring-down
+  direction mismatch dissolves with the 07-12 re-ruling — both count down now.
 - **Resume re-hold uses the same activation countdown, not the intro.** After an active-set pause or
   auto-pause, resume drops back to `notActivated` and requires the exercise's normal start position +
   hold. This preserves completed reps/logs and does NOT replay `<slug>.setup_position` +
-  `<slug>.active_intro` (not a new set), but it re-arms the "một, hai, ba" countdown and `common.ready`.
+  `<slug>.active_intro` (not a new set), but it re-arms the "ba, hai, một" countdown and `common.ready`.
   In-progress rep state is allowed to reset locally so a half-rep before pause is not counted after return.
 - **`holdStill` = NO instruction line.** The countdown above is that state's audio; a "giữ yên" line
   would talk over its own countdown. A broken hold restarting the count is the causal feedback.
@@ -362,6 +370,12 @@ prefer a praise-pool variant over a new cue type).
 - **Reminder outranks hustle at the commit edge (Nam 07-09).** Outcome-class: cap counts, collision
   gap, blocked ≠ spent all apply; it carries the fault's contentKey, so the same-fault-once-per-rep
   rule already blocks reminder + re-correction double-speak within rep N+1.
+- **Same-content consecutive-rep ban (Nam device ruling 07-12, hard rule 12):** a reminder for fault
+  X on rep N is NEVER followed by a reminder for the same X on rep N+1. A DIFFERENT fault on rep N+1
+  is explicitly fine (shoulder this rep, legs the next — good coaching); the adapter skips the banned
+  candidate in the priority pick so selection falls through to the next eligible fault, or to silence
+  if none. Ban expires after one rep (X, quiet, X again is legal) and resets per set. Landed 07-12
+  in the adapter candidate selection; the shared policy is unchanged.
 - **Reminder must claim the slot BEFORE the in-progress live-fault drain (ordering fix 07-11).** The
   adapter now evaluates the rep-start reminder at the commit edge before draining that rep's live
   criticals, so the feedforward reminder wins the outcome slot and then same-fault-already-voiced
@@ -382,9 +396,11 @@ prefer a praise-pool variant over a new cue type).
   shared `PolicyVoiceCoach` edge before hustle/phase cues, empty glute pools for silent Stage A, and
   `neck_head` now `affectsForm: true`.
 
-### Hustle / effort push — DECIDED 07-09, ENABLED 07-11 (hesitation-armed, commit-fired)
-- **Status:** behavior decided 07-09 (decisions.md); **ENABLED in the glute pilot 07-11** (Nam's call
-  after Stage-B device data looked sane — armed on real 6s+ gaps vs a ~4s baseline). Tuning
+### Hustle / effort push — DECIDED 07-09, FLEET-ENABLED 07-12 (hesitation-armed, commit-fired)
+- **Status:** behavior decided 07-09 (decisions.md); enabled in the glute pilot 07-11 after Stage-B
+  device data looked sane, then enabled across all 24 rep exercises in Tier 3 on 07-12. Hustle is
+  encouragement when a user hesitates and recommits, not pressure to move harder, so controlled and
+  stability exercises use it too. Tuning
   base 0.50 / step 0.20 / cap 0.90 (quiet-side, persistence-shaped: lone hesitation ~coin flip,
   stacked hesitations climb), with a post-fire negative-hunger backoff of 2 so the next eligible pushes
   are muted without a fixed rep cooldown. Pools `common.push` (generic) + `common.one_more_rep`
@@ -462,32 +478,39 @@ channels — reminders, setup/tracking-safety, soft — where a verbatim repeat 
 (probabilistic cues hide their repetition behind varying gaps; praise already rotates a pool). A
 nice-to-have noted for the future, on no current checklist. (Nam, 2026-07-10.)
 
-## Hold-based exercises (time-based family) — DECIDED 2026-07-11, unimplemented
-Nam's rulings via the hold-design lavish review + same-day chat; full design in
-[hold-exercise-voice-design.html](hold-exercise-voice-design.html) (v2), impl spec
-docs/scratch/hold-voice-impl-spec.md (Codex), decision record decisions.md 07-11 "Hold-based voice
-behavior LOCKED". High Plank = pilot. Everything above stays rep-fleet; the hold mappings:
+## Hold-based exercises (time-based family) — DECIDED 2026-07-11, re-ruled 07-12, unimplemented
+Nam's rulings via the hold-design lavish review + chat (07-11), plank-model re-ruling 07-12; full
+design in [hold-exercise-voice-design.html](hold-exercise-voice-design.html) (v2), impl spec
+docs/scratch/hold-voice-impl-spec.md (Codex), decision records decisions.md 07-11 "Hold-based voice
+behavior LOCKED" + 07-12 "Holds count holds as REPS". High Plank = pilot. The hold mappings:
 
+- **A set = N HOLDS counted as REPS (plank model, 07-12; supersedes "one continuous hold").**
+  Forearm Plank is the reference implementation (`Plank(maxRep)`: each completed hold →
+  repCount+1 + a per-hold RepLog, brief in-exercise breather between holds). High Plank migrates
+  to maxHolds × holdSeconds (per-hold seconds catalog-driven). **Each completed hold speaks its
+  number — rep count = registration (hard rule 3) applies verbatim.** The formal multi-set flow
+  sits above, unchanged.
 - **Clock: pose-validity gated, not form-gated.** Outer ring (anti-cheat / "still in the pose")
   gates time accrual; inner ring (form metrics) coaches real-time while the clock RUNS. Only
   cheating stops earning. Fault-seconds accounting keeps the summary honest. Reverses the shipped
   High Plank perfect-timer.
-- **Count → voice milestones** (deterministic, personality-immune, earned-time crossings, relative
-  rule at any duration): halfway + "còn 10 giây". Voice speaks REMAINING; UI ring unchanged. NO
+- **Within each hold: voice milestones** (deterministic, personality-immune, earned-time
+  crossings, relative to PER-HOLD seconds): halfway + "còn 10 giây" (the latter only when the
+  hold is long enough for it to be distinct). Voice speaks REMAINING; UI ring unchanged. NO
   spoken per-second countdown.
-- **Final countdown = earcons, not voice:** 3 identical beeps on the last 3 earned seconds + a
-  distinct end tone. No continuous tick in v1. Earcons are a separate lightweight channel — never
-  queued behind voice lines (sounds carry state, voice carries meaning).
+- **Hold-end = earcons, not voice:** 3 identical beeps on the last 3 earned seconds + a distinct
+  end tone at hold completion (the count line then registers the landed hold). No continuous tick
+  in v1. Earcons are a separate lightweight channel — never queued behind voice lines (sounds
+  carry state, voice carries meaning).
 - **Milestone outcome slot switches praise/hustle by measured state:** clean since last milestone
   → praise roll; struggling or final stretch → hustle roll; neither wins → time line alone. Never
   praise two consecutive milestones (hard rule 6's hold form).
 - **criticalFault/softFault: identical real-time rules**; persistence + same-fault-once bookkeeping
-  unit = the hold EPISODE, not the rep.
+  unit = the hold, which under the plank model IS the rep — the rep-fleet machinery (same-fault-
+  once, cross-rep persistence, reminder at the next hold's re-entry into holding) maps directly.
 - **Hustle flavors:** milestone-paired (primary) + final-third pose-break arms / re-hold commit
   fires (secondary, quiet-side).
 - **No timeout ending.** Walk-away = presence gate; stuck = setup_position re-tell; give-up = quit.
-- **Sets: hybrid fleet-wide** — a set = one continuous hold to target duration in the existing
-  multi-set flow; hold exercises never display "reps".
 - Setup intro / activation countdown / set-complete / GuidanceSignal safety: modality-independent,
   unchanged. Yoga/stretch register deferred (VoiceScript config: reduced milestones, empty hustle).
 
@@ -501,7 +524,7 @@ this is already the interpreter's job, unchanged.)
 | # | Rule |
 |---|---|
 | 1 | No separate FORM-fault safety cue — a `criticalFault` firing real-time IS the injury reaction. (Setup/tracking-safety is a SEPARATE deterministic channel, rule 11.) |
-| 2 | Setup intro / ready / set-complete exactly once PER SET, always (`setup`); the intro is an unconditional one-shot broadcast at set start, never latched or re-fired; activation countdown "một, hai, ba" voiced deterministically synced to the hold (break → drop pending + restart from một; first count fired while the intro still plays TERMINATES the intro); `holdStill` has no instruction line — the countdown is that state's audio (stuck-user re-tell → rule 11) |
+| 2 | Setup intro / ready / set-complete exactly once PER SET, always (`setup`); the intro is an unconditional one-shot broadcast at set start, never latched or re-fired; activation countdown "ba, hai, một" (counts DOWN, re-ruled 07-12) voiced deterministically synced to the hold (break → drop pending + restart from ba; first count fired while the intro still plays TERMINATES the intro); `holdStill` has no instruction line — the countdown is that state's audio (stuck-user re-tell → rule 11) |
 | 3 | EVERY landed rep is counted, deterministically and personality-immune (registration ruling 07-11; supersedes anchors+thinning — anchors/relief stay only as guards for an explicit re-thinned config) |
 | 4 | ~~Skipped counts still get a non-verbal tick~~ RETIRED 07-11 — no skipped counts exist under rule 3 |
 | 5 | First occurrence of a fault in a set is cued deterministically (100%); a fire blocked by the collision gap/cap keeps the credit — next occurrence is still deterministic |
@@ -511,6 +534,7 @@ this is already the interpreter's job, unchanged.)
 | 9 | After 2 consecutive no-counts, switch to help, don't repeat the failure line (parked) |
 | 10 | Every cue is backed by a measurement from this set |
 | 11 | Setup/tracking-safety (07-10) is VOICE via a typed `GuidanceSignal`, deterministic: latch per content-class (`orientation` / `body_in_frame` / `paused` / `resume` / `rotate_landscape` / `rotate_portrait` (07-11), plus `setup_position` as a stuck-user re-tell: entry-fire suppressed, ONE fire iff continuously latched ~10s past intro-audio-end, then quiet; `searching` + `holdStill` = silent), fire once on debounced entry, silent while held, re-arm past the ~1s exit debounce, re-fire on genuine re-entry — NO wall-clock re-fire block and NO post-audio cooldown (re-ruled late 07-10; debounces + the single re-validated latest-wins slot + sink serialization are the only limiters); ONE fuller re-cue after ~10s continuously latched then silent; per-class grace is VOICE-ONLY and spans exactly the intro voice's playback (closes at intro-audio-end, no settle tail; ~3.5s set-start fallback when no intro audio; graced: body_in_frame/turnSide/faceCamera; ungraced: phone orientation, searching, paused, resume) — the UI renders signage live and ungated; `paused` fires on the pause commit edge with NO extra timers; active-set resume re-enters the start-position hold and re-arms countdown + ready instead of speaking `common.resume`. All timings feel-tune, none canonical. |
+| 12 | A reminder never repeats the same fault content on two consecutive reps (07-12) — a different fault's reminder on the next rep is allowed; if the banned fault is the only candidate, the rep gets no reminder; the ban expires after one reminder-free rep and resets per set |
 
 ## Worked example — 10-rep squat set, faults on reps 4–5 (heels), grind on rep 9
 (Illustrates the stochastic cadence principle. Predates the 07-09 refinements — it still shows the old

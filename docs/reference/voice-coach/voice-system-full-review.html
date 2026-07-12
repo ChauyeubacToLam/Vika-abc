@@ -137,7 +137,7 @@ main code{overflow-wrap:anywhere;background:var(--line-soft);padding:1px 5px;bor
 </style>
 <header class="hero">
   <div class="hero-in">
-    <p class="eyebrow">Full code review · shared voice system + rep fleet Tier 1 · 2026-07-11</p>
+    <p class="eyebrow">Full code review · shared voice system + rep fleet Tier 1 · code-synced 2026-07-12</p>
     <h1>The <span class="u">Voice System</span>, line by line</h1>
     <p class="lede">Every file the coach touches, in the order data flows through it — from the camera frame
       that drives it, through the stochastic brain that decides <em>whether</em> to speak, down to the MP3
@@ -733,7 +733,7 @@ main code{overflow-wrap:anywhere;background:var(--line-soft);padding:1px 5px;bor
 
   <p>Two subtleties for the review. (1) <code>countReps</code> reuses the already-recorded numeral assets
     <code>'1'..'12'</code> rather than inventing a <code>common.count.N</code> namespace — the same numeral
-    keys the activation countdown reuses for "một/hai/ba." (2) <code>variations</code> lets a single logical
+    keys the activation countdown reuses in "ba/hai/một" order. (2) <code>variations</code> lets a single logical
     key like <code>common.good</code> expand to a pool; the façade (§05) never sends <code>common.good</code>
     to the sink directly.</p>
 
@@ -2032,7 +2032,7 @@ main code{overflow-wrap:anywhere;background:var(--line-soft);padding:1px 5px;bor
   <p>Everything the glute pilot speaks that isn't a movement fault is here: <code>ready</code>,
     <code>set_complete</code>, <code>side_orientation</code>, <code>body_in_frame</code>, <code>paused</code>,
     <code>resume</code>, the two rotate prompts, the great_/good_ praise pools, <code>push</code> /
-    <code>one_more_rep</code>, and the numeral counts (which double as the "một/hai/ba" countdown).</p>
+    <code>one_more_rep</code>, and the numeral counts (which double as the "ba/hai/một" countdown).</p>
 
   <div class="code"><div class="code-head"><span>lib/services/generic_exercise_voice_assets.dart</span><b>resolveAsset — common-first, then the slug/id convention</b></div><div class="code-body"><div class="gut">349
 350
@@ -2230,12 +2230,12 @@ main code{overflow-wrap:anywhere;background:var(--line-soft);padding:1px 5px;bor
   static const int kMinArmGapMs = 800;
 
   /// Feel-tune (NOT canonical): elapsed-hold offsets, in ms, at which the
-  /// voiced activation countdown fires &quot;một / hai / ba&quot;. Each is a threshold
+  /// voiced activation countdown fires &quot;ba / hai / một&quot;. Each is a threshold
   /// into the 3s hold; the last is deliberately &lt; HOLD_STILL_REQUIRED_DURATION
-  /// (3000ms) so &quot;ba&quot; fires on a frame BEFORE the state machine flips to
+  /// (3000ms) so &quot;một&quot; fires on a frame BEFORE the state machine flips to
   /// activated — the moment activation lands, `holdStillElapsedMs` returns null
-  /// — letting the spoken &quot;ba&quot; land at/near activation. ~0.8s spacing reads as
-  /// a &quot;một-hai-ba-go&quot; cadence over the hold.
+  /// — letting the spoken &quot;một&quot; land at/near activation. ~0.8s spacing reads as
+  /// a &quot;ba-hai-một-go&quot; cadence over the hold.
   static const List&lt;int&gt; kActivationCountOffsetsMs = &lt;int&gt;[800, 1600, 2400];
 
   /// Generous ceiling on the wait for intro audio to finish before the grace
@@ -2288,6 +2288,11 @@ main code{overflow-wrap:anywhere;background:var(--line-soft);padding:1px 5px;bor
   final Set&lt;String&gt; _reminderEligibleFaultTypes = &lt;String&gt;{};
   final Map&lt;String, int&gt; _reminderPriorityByFault = {};
   final Map&lt;String, int&gt; _reminderStreakByFault = {};
+
+  // Track only a reminder that actually spoke. Rep-number arithmetic makes
+  // one silent rep expire the ban without another state transition.
+  String? _lastReminderFaultId;
+  int? _lastReminderRep;
 
   String? _lastPhaseKey;
   bool _awaitingRepStart = false;
@@ -2437,6 +2442,8 @@ main code{overflow-wrap:anywhere;background:var(--line-soft);padding:1px 5px;bor
       _reminderEligibleFaultTypes.clear();
       _reminderPriorityByFault.clear();
       _reminderStreakByFault.clear();
+      _lastReminderFaultId = null;
+      _lastReminderRep = null;
       _startTrackingRep(repCount + 1);
       _lastPhaseCue = null;
       _lastPhaseKey = null;
@@ -2640,7 +2647,7 @@ main code{overflow-wrap:anywhere;background:var(--line-soft);padding:1px 5px;bor
   </div>
 
   <h3>The voiced activation countdown</h3>
-  <div class="code"><div class="code-head"><span>lib/voice/policy_voice_coach.dart</span><b>_handleActivationCountdown — một/hai/ba synced to the 3s hold</b></div><div class="code-body"><div class="gut">371
+  <div class="code"><div class="code-head"><span>lib/voice/policy_voice_coach.dart</span><b>_handleActivationCountdown — ba/hai/một synced to the 3s hold</b></div><div class="code-body"><div class="gut">371
 372
 373
 374
@@ -2719,10 +2726,11 @@ main code{overflow-wrap:anywhere;background:var(--line-soft);padding:1px 5px;bor
             );
           }
           _countdownSpoken.add(i);
+          final spokenNumber = kActivationCountOffsetsMs.length - i;
           _coach.say(
             CueType.setup,
-            VoiceContent.key(&#x27;${i + 1}&#x27;),
-            CueContext(repNumber: 0, contentKey: &#x27;count_${i + 1}&#x27;),
+            VoiceContent.key(&#x27;$spokenNumber&#x27;),
+            CueContext(repNumber: 0, contentKey: &#x27;count_$spokenNumber&#x27;),
           );
         }
       }
@@ -2732,22 +2740,22 @@ main code{overflow-wrap:anywhere;background:var(--line-soft);padding:1px 5px;bor
     if (!_holdCountingActive) return;
     // The hold ended. A break (still notActivated) drops the perishable pending
     // counts so no stale count plays; activation (now activated) keeps the
-    // queue so a mid-play &quot;ba&quot; survives. Either way the tracker re-arms.
+    // queue so a mid-play &quot;một&quot; survives. Either way the tracker re-arms.
     if (exercise.exerciseState == ExerciseState.notActivated) {
       _coach.clearPending();
       debugPrint(
         &#x27;[VoiceSetup] hold BROKE — pending counts dropped, countdown &#x27;
-        &#x27;re-armed from một&#x27;,
+        &#x27;re-armed from ba&#x27;,
       );
     }
     _holdCountingActive = false;
     _countdownSpoken.clear();
   }</pre></div></div>
 
-  <p>Offsets are 800/1600/2400ms into the hold (§ constants). 2400 &lt; 3000 on purpose so "ba" fires on a
+  <p>Offsets are 800/1600/2400ms into the hold (§ constants). 2400 &lt; 3000 on purpose so "một" fires on a
     frame <em>before</em> activation nulls the hold clock, landing at/near the go moment. A broken hold drops
-    pending counts (<code>clearPending</code>) and re-arms from "một"; activation keeps the queue so a
-    mid-play "ba" survives as the go cue. And the first count that fires while the intro is still playing
+    pending counts (<code>clearPending</code>) and re-arms from "ba"; activation keeps the queue so a
+    mid-play "một" survives as the go cue. And the first count that fires while the intro is still playing
     <em>terminates</em> the intro (lines 388-397) — a user already holding position has no use for setup
     instructions.</p>
 
@@ -3287,7 +3295,9 @@ main code{overflow-wrap:anywhere;background:var(--line-soft);padding:1px 5px;bor
   <p>Both fire on phase-key edges the script declares. The reminder fires when entering a
     <code>repStartPhaseKeys</code> phase (glute: <code>ascending</code>); hustle arms on a stretched inter-rep
     gap and fires on entering an <code>effortPhaseKeys</code> phase (glute: also <code>ascending</code> — so on
-    this exercise they share one edge, and the reminder wins it).</p>
+    this exercise they share one edge, and the reminder wins it). The 07-12 hard rule excludes the last
+    spoken reminder fault on the immediately following rep before priority sorting, so a different eligible
+    fault can fall through or the edge stays silent.</p>
   <div class="code"><div class="code-head"><span>lib/voice/policy_voice_coach.dart</span><b>_onRepAttemptBoundary — reminder, then gap-baseline + hustle arming</b></div><div class="code-body"><div class="gut">731
 732
 733
@@ -3517,7 +3527,7 @@ main code{overflow-wrap:anywhere;background:var(--line-soft);padding:1px 5px;bor
 858
 859
 860</div><pre class="src">  bool _maybeSpeakReminder({required int startedRep}) {
-    final id = _highestPriorityReminderFaultId();
+    final id = _highestPriorityReminderFaultId(startedRep: startedRep);
     if (id == null) return false;
     final pool = script.reminderPoolFor(id);
     if (pool.isEmpty) return false;
@@ -3537,13 +3547,21 @@ main code{overflow-wrap:anywhere;background:var(--line-soft);padding:1px 5px;bor
     );
     if (spoke) {
       _reminderStreakByFault[id] = streak + 1;
+      _lastReminderFaultId = id;
+      _lastReminderRep = startedRep;
     }
     return spoke;
   }
 
-  String? _highestPriorityReminderFaultId() {
+  String? _highestPriorityReminderFaultId({required int startedRep}) {
+    final lastReminderRep = _lastReminderRep;
     final eligible = _reminderEligibleFaultTypes
         .where((id) =&gt; script.reminderPoolFor(id).isNotEmpty)
+        .where(
+          (id) =&gt; !(id == _lastReminderFaultId &amp;&amp;
+              lastReminderRep != null &amp;&amp;
+              startedRep == lastReminderRep + 1),
+        )
         .toList();
     if (eligible.isEmpty) return null;
     eligible.sort((a, b) {
@@ -3554,6 +3572,13 @@ main code{overflow-wrap:anywhere;background:var(--line-soft);padding:1px 5px;bor
     });
     return eligible.first;
   }</pre></div></div>
+  <div class="call eli">
+    <p class="ct">ELI5 — ban content, not the whole reminder slot</p>
+    <p>If fault X was reminded on rep N, only X is removed from rep N+1's candidate list. The normal
+      priority sort still chooses fault Y if Y is eligible. Tracking updates only after audio actually
+      speaks, expires through rep-number arithmetic after one rep, and is wiped with the rest of the
+      per-set reminder state.</p>
+  </div>
   <div class="code"><div class="code-head"><span>lib/voice/policy_voice_coach.dart</span><b>_maybePairFinalPush — the count-anchor-paired final push</b></div><div class="code-body"><div class="gut">522
 523
 524
@@ -5527,7 +5552,7 @@ class NeckHeadMetric extends GluteBridgeMetricBase {
       <td class="sev lo">— (count only)</td></tr>
     <tr><td>Set start (for contrast)</td>
       <td>intro (<code>setup_position</code> + <code>active_intro</code>) → grace pinned → user holds → 800/1600/2400ms counts → activation → <code>ready</code>.</td>
-      <td class="sev med">"một… hai… ba" → "Sẵn sàng"</td></tr>
+      <td class="sev med">"ba… hai… một" → "Sẵn sàng"</td></tr>
   </table>
   </div>
 
@@ -5535,9 +5560,8 @@ class NeckHeadMetric extends GluteBridgeMetricBase {
     <p class="ct">ELI5 — the punchline</p>
     <p>On a rep with a known ongoing fault, the coach <em>reminds</em> at the start ("this time, keep your head
       straight"), then stays quiet about it for the rest of the rep instead of nagging, and still counts the
-      rep so you know it landed. Run the same set again and the reminder's exact wording, and whether praise or
-      hustle appears on other reps, will differ — because everything except the count and the reminder-vs-drain
-      ordering is a dice roll.</p>
+      rep so you know it landed. If the same fault remains eligible on the next rep, its reminder is banned
+      for that one edge; a different eligible fault may speak instead. Praise and hustle remain stochastic.</p>
   </div>
 </section>
 
@@ -5560,6 +5584,8 @@ class NeckHeadMetric extends GluteBridgeMetricBase {
       <td>Pure feel. The cap should essentially never bind on a real set; if it does, the gap is too small. Verify the 30s audio-end timeout (§05) actually holds for the 4.8s hyperextension line so the gap measures from true end.</td></tr>
     <tr><td class="sev med">verify</td><td>reminder-before-drain ordering</td>
       <td>The 07-11 fix. Listen that the reminder is now audible on device (Nam previously heard it as "extremely rare"), and that it correctly suppresses the same-rep re-correction.</td></tr>
+    <tr><td class="sev med">verify</td><td>reminder consecutive-content ban</td>
+      <td>The 07-12 fix. Same fault on adjacent reps must be silent on the second edge; a different eligible fault must still fall through and speak.</td></tr>
     <tr><td class="sev med">decide</td><td>praise base 0.50 + the unimplemented relief valve</td>
       <td>0.50 sits at the chatty edge of the literature's 30–50% band. The "5+ clean unpraised → ≥90%" valve exists in no code path — open Nam call: drop from spec or build it.</td></tr>
     <tr><td class="sev lo">tidy</td><td>two unreachable soft keys in <code>_softCuePools</code></td>

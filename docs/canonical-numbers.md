@@ -5,7 +5,7 @@ read here. Update this file first when any number changes. Business/pricing/surv
 `~/vika-ops/canonical-numbers-business.md`. On conflict, this file wins for technical values; flag and
 fix the other doc.
 
-Last reviewed: July 11, 2026.
+Last reviewed: July 12, 2026.
 
 ## Pose Detection Tech
 | Spec | Value |
@@ -125,7 +125,7 @@ fleet-wide; chattiness retunes only via the personality scalar. Tune on device, 
 | Critical fault (`criticalFault`) | base 0.25, persistence +0.30, cap 0.85, first occurrence certain, no relief valve |
 | Soft fault (`softFault`) | base 0.20, hunger +0.08, cap 0.55, not first-occurrence deterministic |
 | Reminder (`reminder`) | base 0.30, hunger +0.15, cap 0.65, first occurrence certain (fires at rep-start commit edge) |
-| Hustle | base 0.50, hunger +0.20, cap 0.90, post-fire idle penalty 2, hesitation-armed only; fires ONLY where an exercise declares effortPhaseKeys — glute-only today (fleet stays off until Tier 3) |
+| Hustle | base 0.50, hunger +0.20, cap 0.90, post-fire idle penalty 2, hesitation-armed only; all 24 rep exercises declare verified effortPhaseKeys as of Tier 3 (07-12), plus the glute pilot |
 | Outcome collision guard | 2nd in-rep outcome cue: `criticalFault` only, different fault, ≥0.5s after previous outcome line's audio ENDS, max 2 voiced outcome cues/rep; the system's only time cooldown |
 
 Timing (07-09 — behavior, not numbers; see decisions.md + voice-coach/realtime-cue-design.html): `criticalFault`
