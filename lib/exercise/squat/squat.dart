@@ -228,8 +228,11 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
       reminderPools: const {
         'trunk': ['squat.trunk_reminder'],
       },
-      hustlePool: const [],
       repStartPhaseKeys: const {'descending'},
+      // Hesitation encouragement, not "push harder"; valid for controlled work too.
+      effortPhaseKeys: const {'ascending'},
+      hustlePool: const ['common.push'],
+      hustleFinalPool: const ['common.one_more_rep'],
       // No phaseCues: the new coach does NOT narrate the movement ("Xuống" /
       // "Giữ" / "Đứng lên") — that was the legacy behaviour. Silence is the
       // default; squat speaks only counts, praise, faults, and setup, like the
@@ -240,8 +243,6 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
       coach: VoiceCoach(
         sink: AssetVoiceSink(),
         // No tuning override — the single kDefaultTuning is the whole point.
-        // Hustle stays off via the absent effortPhaseKeys + empty hustlePool,
-        // not a per-exercise zero-tuning map.
         policy: VoicePolicy(),
       ),
       // Final-rep awareness stays for count anchors.

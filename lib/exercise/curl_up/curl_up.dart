@@ -148,6 +148,10 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
           'neck_pull': ['curl_up.neck_pull_reminder'],
         },
         repStartPhaseKeys: const {'ascending'},
+        // Hesitation encouragement, not "push harder"; valid for controlled work too.
+        effortPhaseKeys: const {'ascending'},
+        hustlePool: const ['common.push'],
+        hustleFinalPool: const ['common.one_more_rep'],
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

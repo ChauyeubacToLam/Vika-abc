@@ -143,6 +143,10 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
           'torso': ['walking_lunge.torso_reminder'],
         },
         repStartPhaseKeys: const {'stepping', 'descending'},
+        // Hesitation encouragement, not "push harder"; valid for controlled work too.
+        effortPhaseKeys: const {'pulling_through'},
+        hustlePool: const ['common.push'],
+        hustleFinalPool: const ['common.one_more_rep'],
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

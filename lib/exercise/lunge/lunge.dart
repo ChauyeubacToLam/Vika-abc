@@ -165,6 +165,10 @@ class Lunge extends ExerciseBase {
           'trunk': ['lunge.trunk_reminder'],
         },
         repStartPhaseKeys: const {'descending'},
+        // Hesitation encouragement, not "push harder"; valid for controlled work too.
+        effortPhaseKeys: const {'ascending'},
+        hustlePool: const ['common.push'],
+        hustleFinalPool: const ['common.one_more_rep'],
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

@@ -102,6 +102,10 @@ class StandingKneeToElbow extends ExerciseBase {
           'core_drive': ['standing_kte.core_drive_reminder'],
         },
         repStartPhaseKeys: const {'approaching'},
+        // Hesitation encouragement, not "push harder"; valid for controlled work too.
+        effortPhaseKeys: const {'approaching'},
+        hustlePool: const ['common.push'],
+        hustleFinalPool: const ['common.one_more_rep'],
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

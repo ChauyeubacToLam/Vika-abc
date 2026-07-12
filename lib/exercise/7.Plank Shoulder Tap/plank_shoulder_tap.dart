@@ -57,6 +57,10 @@ class PlankShoulderTap extends ExerciseBase {
           'hip_rotation': ['plank_shoulder_tap.hip_rotation_reminder'],
         },
         repStartPhaseKeys: const {'lifting'},
+        // Hesitation encouragement, not "push harder"; valid for controlled work too.
+        effortPhaseKeys: const {'lifting'},
+        hustlePool: const ['common.push'],
+        hustleFinalPool: const ['common.one_more_rep'],
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

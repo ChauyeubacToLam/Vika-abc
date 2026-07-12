@@ -128,6 +128,10 @@ class VUp extends ExerciseBase with SideTrackedExerciseMixin {
           'knee': ['v_up.knee_reminder'],
         },
         repStartPhaseKeys: const {'rising'},
+        // Hesitation encouragement, not "push harder"; valid for controlled work too.
+        effortPhaseKeys: const {'rising'},
+        hustlePool: const ['common.push'],
+        hustleFinalPool: const ['common.one_more_rep'],
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

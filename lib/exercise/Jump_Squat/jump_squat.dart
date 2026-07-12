@@ -88,6 +88,7 @@ class JumpSquat extends ExerciseBase {
 
   @override
   ExerciseVoiceCoach createVoiceCoach() {
+    // TODO(voice): fast-movement policy variant — see tier3 note 1
     return PolicyVoiceCoach(
       script: VoiceScript.from(
         VoiceDefaults.repBased,
@@ -96,6 +97,10 @@ class JumpSquat extends ExerciseBase {
         softCuePools: const {
           'landing_depth': ['jump_squat.landing_depth_soft'],
         },
+        // Hesitation encouragement, not "push harder"; valid for controlled work too.
+        effortPhaseKeys: const {'launching'},
+        hustlePool: const ['common.push'],
+        hustleFinalPool: const ['common.one_more_rep'],
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

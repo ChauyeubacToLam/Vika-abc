@@ -87,6 +87,10 @@ class LegRaise extends ExerciseBase {
           'pelvic': ['leg_raises.pelvic_reminder'],
         },
         repStartPhaseKeys: const {'raising'},
+        // Hesitation encouragement, not "push harder"; valid for controlled work too.
+        effortPhaseKeys: const {'raising'},
+        hustlePool: const ['common.push'],
+        hustleFinalPool: const ['common.one_more_rep'],
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

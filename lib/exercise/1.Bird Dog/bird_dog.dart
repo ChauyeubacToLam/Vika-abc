@@ -106,6 +106,10 @@ class BirdDog extends ExerciseBase {
           'lumbar': ['bird_dog.lumbar_reminder'],
         },
         repStartPhaseKeys: const {'extending'},
+        // Hesitation encouragement, not "push harder"; valid for controlled work too.
+        effortPhaseKeys: const {'hold_extended'},
+        hustlePool: const ['common.push'],
+        hustleFinalPool: const ['common.one_more_rep'],
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

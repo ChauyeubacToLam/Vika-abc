@@ -82,6 +82,7 @@ class JumpingJack extends ExerciseBase {
 
   @override
   ExerciseVoiceCoach createVoiceCoach() {
+    // TODO(voice): fast-movement policy variant — see tier3 note 1
     return PolicyVoiceCoach(
       script: VoiceScript.from(
         VoiceDefaults.repBased,
@@ -90,6 +91,10 @@ class JumpingJack extends ExerciseBase {
         softCuePools: const {
           'tempo_fast': ['jumping_jack.tempo_fast_soft'],
         },
+        // Hesitation encouragement, not "push harder"; valid for controlled work too.
+        effortPhaseKeys: const {'open'},
+        hustlePool: const ['common.push'],
+        hustleFinalPool: const ['common.one_more_rep'],
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

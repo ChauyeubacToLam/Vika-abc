@@ -105,6 +105,10 @@ class DeadBug extends ExerciseBase {
           'anti_extension': ['dead_bug.anti_extension_reminder'],
         },
         repStartPhaseKeys: const {'extending'},
+        // Hesitation encouragement, not "push harder"; valid for controlled work too.
+        effortPhaseKeys: const {'extending'},
+        hustlePool: const ['common.push'],
+        hustleFinalPool: const ['common.one_more_rep'],
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

@@ -78,6 +78,10 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
           'arms': ['reverse_crunch.arms_reminder'],
         },
         repStartPhaseKeys: const {'curling'},
+        // Hesitation encouragement, not "push harder"; valid for controlled work too.
+        effortPhaseKeys: const {'curling'},
+        hustlePool: const ['common.push'],
+        hustleFinalPool: const ['common.one_more_rep'],
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

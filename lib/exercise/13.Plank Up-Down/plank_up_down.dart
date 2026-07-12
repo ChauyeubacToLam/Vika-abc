@@ -85,6 +85,10 @@ class PlankUpDown extends ExerciseBase {
           'trunk': ['plank_up_down.trunk_reminder'],
         },
         repStartPhaseKeys: const {'pushing_up'},
+        // Hesitation encouragement, not "push harder"; valid for controlled work too.
+        effortPhaseKeys: const {'pushing_up'},
+        hustlePool: const ['common.push'],
+        hustleFinalPool: const ['common.one_more_rep'],
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

@@ -449,6 +449,10 @@ class WallPushUp extends ExerciseBase {
           'body_line': ['wall_push_up.body_line_reminder'],
         },
         repStartPhaseKeys: const {'descending'},
+        // Hesitation encouragement, not "push harder"; valid for controlled work too.
+        effortPhaseKeys: const {'ascending'},
+        hustlePool: const ['common.push'],
+        hustleFinalPool: const ['common.one_more_rep'],
       ),
       targetReps: targetReps,
       coach: VoiceCoach(
