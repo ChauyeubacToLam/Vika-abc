@@ -83,6 +83,10 @@ class LegRaise extends ExerciseBase {
         VoiceDefaults.repBased,
         slug: 'leg_raises',
         faultIds: _voiceFaultIds,
+        reminderPools: const {
+          'pelvic': ['leg_raises.pelvic_reminder'],
+        },
+        repStartPhaseKeys: const {'raising'},
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

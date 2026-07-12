@@ -91,6 +91,13 @@ class AshtangaNamaskara extends ExerciseBase {
         VoiceDefaults.repBased,
         slug: 'ashtanga_namaskara',
         faultIds: _voiceFaultIds,
+        softCuePools: const {
+          'neck': ['ashtanga_namaskara.neck_soft'],
+        },
+        reminderPools: const {
+          'hip': ['ashtanga_namaskara.hip_reminder'],
+        },
+        repStartPhaseKeys: const {'recognized'},
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

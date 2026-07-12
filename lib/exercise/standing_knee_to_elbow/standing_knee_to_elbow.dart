@@ -98,6 +98,10 @@ class StandingKneeToElbow extends ExerciseBase {
         VoiceDefaults.repBased,
         slug: 'standing_kte',
         faultIds: _voiceFaultIds,
+        reminderPools: const {
+          'core_drive': ['standing_kte.core_drive_reminder'],
+        },
+        repStartPhaseKeys: const {'approaching'},
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

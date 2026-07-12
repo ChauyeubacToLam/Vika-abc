@@ -195,6 +195,13 @@ class PushUp extends ExerciseBase with SideTrackedExerciseMixin {
         VoiceDefaults.repBased,
         slug: 'push_up',
         faultIds: _voiceFaultIds,
+        softCuePools: const {
+          'depth': ['push_up.depth_soft'],
+        },
+        reminderPools: const {
+          'sag': ['push_up.sag_reminder'],
+        },
+        repStartPhaseKeys: const {'descending'},
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

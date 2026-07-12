@@ -91,6 +91,14 @@ class CossackSquat extends ExerciseBase {
         VoiceDefaults.repBased,
         slug: 'cossack_squat',
         faultIds: _voiceFaultIds,
+        softCuePools: const {
+          'depth_deep': ['cossack_squat.depth_deep_soft'],
+          'torso': ['cossack_squat.torso_soft'],
+        },
+        reminderPools: const {
+          'knee_valgus': ['cossack_squat.knee_valgus_reminder'],
+        },
+        repStartPhaseKeys: const {'descending'},
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

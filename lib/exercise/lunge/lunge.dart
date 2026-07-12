@@ -161,6 +161,10 @@ class Lunge extends ExerciseBase {
         VoiceDefaults.repBased,
         slug: 'lunge',
         faultIds: _voiceFaultIds,
+        reminderPools: const {
+          'trunk': ['lunge.trunk_reminder'],
+        },
+        repStartPhaseKeys: const {'descending'},
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

@@ -84,6 +84,10 @@ class SitUp extends ExerciseBase with SideTrackedExerciseMixin {
         VoiceDefaults.repBased,
         slug: 'sit_up',
         faultIds: _voiceFaultIds,
+        reminderPools: const {
+          'jerking': ['sit_up.jerking_reminder'],
+        },
+        repStartPhaseKeys: const {'rising'},
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

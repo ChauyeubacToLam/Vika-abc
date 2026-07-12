@@ -50,6 +50,13 @@ class PlankShoulderTap extends ExerciseBase {
         VoiceDefaults.repBased,
         slug: 'plank_shoulder_tap',
         faultIds: _voiceFaultIds,
+        softCuePools: const {
+          'tempo': ['plank_shoulder_tap.tempo_soft'],
+        },
+        reminderPools: const {
+          'hip_rotation': ['plank_shoulder_tap.hip_rotation_reminder'],
+        },
+        repStartPhaseKeys: const {'lifting'},
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

@@ -138,6 +138,16 @@ class CurlUp extends ExerciseBase with SideTrackedExerciseMixin {
         VoiceDefaults.repBased,
         slug: 'curl_up',
         faultIds: _voiceFaultIds,
+        softCuePools: const {
+          'knee_extension': ['curl_up.knee_extension_soft'],
+          'neck_pull': ['curl_up.neck_pull_soft'],
+          'trunk_high': ['curl_up.trunk_high_soft'],
+          'trunk_low': ['curl_up.trunk_low_soft'],
+        },
+        reminderPools: const {
+          'neck_pull': ['curl_up.neck_pull_reminder'],
+        },
+        repStartPhaseKeys: const {'ascending'},
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

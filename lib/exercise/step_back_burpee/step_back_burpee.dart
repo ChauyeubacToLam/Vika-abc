@@ -70,6 +70,10 @@ class StepBackBurpee extends ExerciseBase {
         VoiceDefaults.repBased,
         slug: 'step_back_burpee',
         faultIds: _voiceFaultIds,
+        softCuePools: const {
+          'squat_depth': ['step_back_burpee.squat_depth_soft'],
+          'plank_extension': ['step_back_burpee.plank_extension_soft'],
+        },
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

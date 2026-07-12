@@ -78,6 +78,13 @@ class PlankUpDown extends ExerciseBase {
         VoiceDefaults.repBased,
         slug: 'plank_up_down',
         faultIds: _voiceFaultIds,
+        softCuePools: const {
+          'alternating': ['plank_up_down.alternating_soft'],
+        },
+        reminderPools: const {
+          'trunk': ['plank_up_down.trunk_reminder'],
+        },
+        repStartPhaseKeys: const {'pushing_up'},
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

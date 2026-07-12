@@ -225,7 +225,11 @@ class Squat extends ExerciseBase with SideTrackedExerciseMixin {
       VoiceDefaults.repBased,
       slug: legacy.slug,
       faultIds: legacy.faultIds,
+      reminderPools: const {
+        'trunk': ['squat.trunk_reminder'],
+      },
       hustlePool: const [],
+      repStartPhaseKeys: const {'descending'},
       // No phaseCues: the new coach does NOT narrate the movement ("Xuống" /
       // "Giữ" / "Đứng lên") — that was the legacy behaviour. Silence is the
       // default; squat speaks only counts, praise, faults, and setup, like the

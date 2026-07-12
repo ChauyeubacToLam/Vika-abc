@@ -135,6 +135,14 @@ class WalkingLunge extends ExerciseBase with SideTrackedExerciseMixin {
         VoiceDefaults.repBased,
         slug: 'walking_lunge',
         faultIds: _voiceFaultIds,
+        softCuePools: const {
+          'rear_depth': ['walking_lunge.rear_depth_soft'],
+          'step_length': ['walking_lunge.step_length_soft'],
+        },
+        reminderPools: const {
+          'torso': ['walking_lunge.torso_reminder'],
+        },
+        repStartPhaseKeys: const {'stepping', 'descending'},
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

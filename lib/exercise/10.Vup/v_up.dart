@@ -120,6 +120,14 @@ class VUp extends ExerciseBase with SideTrackedExerciseMixin {
         VoiceDefaults.repBased,
         slug: 'v_up',
         faultIds: _voiceFaultIds,
+        softCuePools: const {
+          'sync': ['v_up.sync_soft'],
+          'rom': ['v_up.rom_soft'],
+        },
+        reminderPools: const {
+          'knee': ['v_up.knee_reminder'],
+        },
+        repStartPhaseKeys: const {'rising'},
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

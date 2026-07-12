@@ -53,6 +53,10 @@ class MountainClimber extends ExerciseBase {
         VoiceDefaults.repBased,
         slug: 'mountain_climber',
         faultIds: _voiceFaultIds,
+        reminderPools: const {
+          'trunk_sag': ['mountain_climber.trunk_sag_reminder'],
+        },
+        repStartPhaseKeys: const {'knee_driving_in'},
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

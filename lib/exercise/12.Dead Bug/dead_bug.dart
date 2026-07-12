@@ -101,6 +101,10 @@ class DeadBug extends ExerciseBase {
         VoiceDefaults.repBased,
         slug: 'dead_bug',
         faultIds: _voiceFaultIds,
+        reminderPools: const {
+          'anti_extension': ['dead_bug.anti_extension_reminder'],
+        },
+        repStartPhaseKeys: const {'extending'},
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

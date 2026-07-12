@@ -120,6 +120,10 @@ class RussianTwist extends ExerciseBase {
         VoiceDefaults.repBased,
         slug: 'russian_twist',
         faultIds: _voiceFaultIds,
+        reminderPools: const {
+          'knee': ['russian_twist.knee_reminder'],
+        },
+        repStartPhaseKeys: const {'twisting'},
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

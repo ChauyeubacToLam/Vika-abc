@@ -87,6 +87,9 @@ class JumpingJack extends ExerciseBase {
         VoiceDefaults.repBased,
         slug: 'jumping_jack',
         faultIds: _voiceFaultIds,
+        softCuePools: const {
+          'tempo_fast': ['jumping_jack.tempo_fast_soft'],
+        },
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

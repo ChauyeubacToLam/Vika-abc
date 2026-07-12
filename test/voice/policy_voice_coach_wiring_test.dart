@@ -4,15 +4,34 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:vika/exercise/1.Bird Dog/bird_dog.dart';
+import 'package:vika/exercise/10.Vup/v_up.dart';
+import 'package:vika/exercise/12.Dead Bug/dead_bug.dart';
+import 'package:vika/exercise/13.Plank Up-Down/plank_up_down.dart';
+import 'package:vika/exercise/2.Sit-Up/sit_up.dart';
+import 'package:vika/exercise/4.Mountain Climber/mountain_climber.dart';
+import 'package:vika/exercise/5.Superman/superman.dart';
+import 'package:vika/exercise/7.Plank Shoulder Tap/plank_shoulder_tap.dart';
+import 'package:vika/exercise/8.Leg Raises (Supine)/leg_raise.dart';
+import 'package:vika/exercise/9.Reverse Crunch/reverse_crunch.dart';
 import 'package:vika/exercise/Cobra/cobra.dart';
+import 'package:vika/exercise/Jump_Squat/jump_squat.dart';
+import 'package:vika/exercise/ashtanga_namaskara/ashtanga_namaskara.dart';
+import 'package:vika/exercise/cossack_squat/cossack_squat.dart';
+import 'package:vika/exercise/curl_up/curl_up.dart';
 import 'package:vika/exercise/exercise_base.dart';
 import 'package:vika/exercise/fault_record.dart';
 import 'package:vika/exercise/glute bridge/glute_bridge.dart';
-import 'package:vika/exercise/5.Superman/superman.dart';
-import 'package:vika/exercise/13.Plank Up-Down/plank_up_down.dart';
+import 'package:vika/exercise/jumping jack/jumping_jack.dart';
 import 'package:vika/exercise/lunge/lunge.dart';
+import 'package:vika/exercise/push up/push_up.dart';
+import 'package:vika/exercise/russian_twist/russian_twist.dart';
 import 'package:vika/exercise/squat/squat.dart';
+import 'package:vika/exercise/standing_knee_to_elbow/standing_knee_to_elbow.dart';
+import 'package:vika/exercise/step_back_burpee/step_back_burpee.dart';
+import 'package:vika/exercise/tricep_dip/tricep_dip.dart';
 import 'package:vika/exercise/walking_lunge/walking_lunge.dart';
+import 'package:vika/exercise/wall_push_up/wall_push_up.dart' hide FaultRecord;
 import 'package:vika/services/generic_exercise_voice_assets.dart';
 import 'package:vika/utils/exercise_logger.dart';
 import 'package:vika/voice/voice_coach.dart';
@@ -65,6 +84,270 @@ void main() {
       expect(coach.script.countPool, VoiceDefaults.repBased.count);
       expect(coach.countsByRepNumber, isTrue);
       expect(coach.targetReps, 8);
+    }
+  });
+
+  test('rep exercise fleet exposes the Tier 2 soft and reminder wiring', () {
+    final cases = <({
+      ExerciseBase exercise,
+      Map<String, List<String>> softPools,
+      Map<String, List<String>> reminderPools,
+      Set<String> repStartPhaseKeys,
+    })>[
+      (
+        exercise: Squat(maxRep: 2),
+        softPools: const {},
+        reminderPools: const {
+          'trunk': ['squat.trunk_reminder'],
+        },
+        repStartPhaseKeys: const {'descending'},
+      ),
+      (
+        exercise: PushUp(maxRep: 2),
+        softPools: const {
+          'depth': ['push_up.depth_soft'],
+        },
+        reminderPools: const {
+          'sag': ['push_up.sag_reminder'],
+        },
+        repStartPhaseKeys: const {'descending'},
+      ),
+      (
+        exercise: WallPushUp(maxRep: 2),
+        softPools: const {
+          'body_line': ['wall_push_up.body_line_soft'],
+          'foot': ['wall_push_up.foot_soft'],
+          'shoulder': ['wall_push_up.shoulder_soft'],
+          'elbow': ['wall_push_up.elbow_soft'],
+          'head': ['wall_push_up.head_soft'],
+          'cervical': ['wall_push_up.cervical_soft'],
+          'tempo': ['wall_push_up.tempo_soft'],
+        },
+        reminderPools: const {
+          'body_line': ['wall_push_up.body_line_reminder'],
+        },
+        repStartPhaseKeys: const {'descending'},
+      ),
+      (
+        exercise: Lunge(maxRep: 2),
+        softPools: const {},
+        reminderPools: const {
+          'trunk': ['lunge.trunk_reminder'],
+        },
+        repStartPhaseKeys: const {'descending'},
+      ),
+      (
+        exercise: WalkingLunge(maxRep: 2),
+        softPools: const {
+          'rear_depth': ['walking_lunge.rear_depth_soft'],
+          'step_length': ['walking_lunge.step_length_soft'],
+        },
+        reminderPools: const {
+          'torso': ['walking_lunge.torso_reminder'],
+        },
+        repStartPhaseKeys: const {'stepping', 'descending'},
+      ),
+      (
+        exercise: CossackSquat(maxRep: 2),
+        softPools: const {
+          'depth_deep': ['cossack_squat.depth_deep_soft'],
+          'torso': ['cossack_squat.torso_soft'],
+        },
+        reminderPools: const {
+          'knee_valgus': ['cossack_squat.knee_valgus_reminder'],
+        },
+        repStartPhaseKeys: const {'descending'},
+      ),
+      (
+        exercise: StandingKneeToElbow(maxRep: 2),
+        softPools: const {},
+        reminderPools: const {
+          'core_drive': ['standing_kte.core_drive_reminder'],
+        },
+        repStartPhaseKeys: const {'approaching'},
+      ),
+      (
+        exercise: TricepDip(maxRep: 2),
+        softPools: const {},
+        reminderPools: const {},
+        repStartPhaseKeys: const {},
+      ),
+      (
+        exercise: JumpSquat(maxRep: 2),
+        softPools: const {
+          'landing_depth': ['jump_squat.landing_depth_soft'],
+        },
+        reminderPools: const {},
+        repStartPhaseKeys: const {},
+      ),
+      (
+        exercise: StepBackBurpee(maxRep: 2),
+        softPools: const {
+          'squat_depth': ['step_back_burpee.squat_depth_soft'],
+          'plank_extension': ['step_back_burpee.plank_extension_soft'],
+        },
+        reminderPools: const {},
+        repStartPhaseKeys: const {},
+      ),
+      (
+        exercise: CurlUp(maxRep: 2),
+        softPools: const {
+          'knee_extension': ['curl_up.knee_extension_soft'],
+          'neck_pull': ['curl_up.neck_pull_soft'],
+          'trunk_high': ['curl_up.trunk_high_soft'],
+          'trunk_low': ['curl_up.trunk_low_soft'],
+        },
+        reminderPools: const {
+          'neck_pull': ['curl_up.neck_pull_reminder'],
+        },
+        repStartPhaseKeys: const {'ascending'},
+      ),
+      (
+        exercise: SitUp(maxRep: 2),
+        softPools: const {},
+        reminderPools: const {
+          'jerking': ['sit_up.jerking_reminder'],
+        },
+        repStartPhaseKeys: const {'rising'},
+      ),
+      (
+        exercise: VUp(maxRep: 2),
+        softPools: const {
+          'sync': ['v_up.sync_soft'],
+          'rom': ['v_up.rom_soft'],
+        },
+        reminderPools: const {
+          'knee': ['v_up.knee_reminder'],
+        },
+        repStartPhaseKeys: const {'rising'},
+      ),
+      (
+        exercise: DeadBug(maxRep: 2),
+        softPools: const {},
+        reminderPools: const {
+          'anti_extension': ['dead_bug.anti_extension_reminder'],
+        },
+        repStartPhaseKeys: const {'extending'},
+      ),
+      (
+        exercise: BirdDog(maxRep: 2),
+        softPools: const {},
+        reminderPools: const {
+          'lumbar': ['bird_dog.lumbar_reminder'],
+        },
+        repStartPhaseKeys: const {'extending'},
+      ),
+      (
+        exercise: Superman(maxRep: 2),
+        softPools: const {},
+        reminderPools: const {
+          'lumbar': ['superman.lumbar_reminder'],
+        },
+        repStartPhaseKeys: const {'lifting'},
+      ),
+      (
+        exercise: MountainClimber(maxRep: 2),
+        softPools: const {},
+        reminderPools: const {
+          'trunk_sag': ['mountain_climber.trunk_sag_reminder'],
+        },
+        repStartPhaseKeys: const {'knee_driving_in'},
+      ),
+      (
+        exercise: ReverseCrunch(maxRep: 2),
+        softPools: const {
+          'tempo': ['reverse_crunch.tempo_soft'],
+          'momentum': ['reverse_crunch.momentum_soft'],
+        },
+        reminderPools: const {
+          'arms': ['reverse_crunch.arms_reminder'],
+        },
+        repStartPhaseKeys: const {'curling'},
+      ),
+      (
+        exercise: PlankShoulderTap(maxRep: 2),
+        softPools: const {
+          'tempo': ['plank_shoulder_tap.tempo_soft'],
+        },
+        reminderPools: const {
+          'hip_rotation': [
+            'plank_shoulder_tap.hip_rotation_reminder',
+          ],
+        },
+        repStartPhaseKeys: const {'lifting'},
+      ),
+      (
+        exercise: LegRaise(maxRep: 2),
+        softPools: const {},
+        reminderPools: const {
+          'pelvic': ['leg_raises.pelvic_reminder'],
+        },
+        repStartPhaseKeys: const {'raising'},
+      ),
+      (
+        exercise: RussianTwist(maxRep: 2),
+        softPools: const {},
+        reminderPools: const {
+          'knee': ['russian_twist.knee_reminder'],
+        },
+        repStartPhaseKeys: const {'twisting'},
+      ),
+      (
+        exercise: JumpingJack(maxRep: 2),
+        softPools: const {
+          'tempo_fast': ['jumping_jack.tempo_fast_soft'],
+        },
+        reminderPools: const {},
+        repStartPhaseKeys: const {},
+      ),
+      (
+        exercise: AshtangaNamaskara(maxRep: 2),
+        softPools: const {
+          'neck': ['ashtanga_namaskara.neck_soft'],
+        },
+        reminderPools: const {
+          'hip': ['ashtanga_namaskara.hip_reminder'],
+        },
+        repStartPhaseKeys: const {'recognized'},
+      ),
+      (
+        exercise: PlankUpDown(maxRep: 2),
+        softPools: const {
+          'alternating': ['plank_up_down.alternating_soft'],
+        },
+        reminderPools: const {
+          'trunk': ['plank_up_down.trunk_reminder'],
+        },
+        repStartPhaseKeys: const {'pushing_up'},
+      ),
+    ];
+
+    for (final tier2Case in cases) {
+      final coach = tier2Case.exercise.createVoiceCoach();
+      expect(coach, isA<PolicyVoiceCoach>());
+      final policyCoach = coach! as PolicyVoiceCoach;
+      addTearDown(policyCoach.dispose);
+
+      expect(
+        policyCoach.script.softCuePools,
+        tier2Case.softPools,
+        reason: '${policyCoach.script.slug} soft pools',
+      );
+      expect(
+        policyCoach.script.reminderPools,
+        tier2Case.reminderPools,
+        reason: '${policyCoach.script.slug} reminder pools',
+      );
+      expect(
+        policyCoach.script.repStartPhaseKeys,
+        tier2Case.repStartPhaseKeys,
+        reason: '${policyCoach.script.slug} rep-start phases',
+      );
+      expect(
+        policyCoach.script.effortPhaseKeys,
+        isEmpty,
+        reason: '${policyCoach.script.slug} hustle must stay off',
+      );
     }
   });
 
@@ -128,9 +411,7 @@ void main() {
     expect(policyCoach.script.faultKey('elbow'), 'cobra.elbow');
   });
 
-  // Squat is the stage-3 pilot: it adds phase cues and targetReps on top of the
-  // generic policy wiring, while still reusing legacy fault ids.
-  test('squat uses the policy coach with phase cues and rep target', () {
+  test('squat uses fleet-standard silence with reminders and rep target', () {
     final exercise = Squat(maxRep: 15);
     final coach = exercise.createVoiceCoach();
     addTearDown(() => coach?.dispose());
@@ -140,24 +421,16 @@ void main() {
     final policyCoach = coach! as PolicyVoiceCoach;
     expect(policyCoach.script.slug, 'squat');
     expect(policyCoach.script.countPool, VoiceDefaults.repBased.count);
-    expect(policyCoach.script.phaseCues['descending'], 'Xuống');
-    expect(policyCoach.script.phaseCues['bottom'], 'Giữ');
-    expect(policyCoach.script.phaseCues['ascending'], 'Đứng lên');
+    expect(policyCoach.script.phaseCues, isEmpty);
+    expect(
+      policyCoach.script.reminderPoolFor('trunk'),
+      const ['squat.trunk_reminder'],
+    );
+    expect(policyCoach.script.repStartPhaseKeys, const {'descending'});
     expect(policyCoach.script.hustlePool, isEmpty);
     expect(policyCoach.script.effortPhaseKeys, isEmpty);
     expect(policyCoach.script.faultKey('depth'), 'squat.depth');
     expect(policyCoach.targetReps, 15);
-  });
-
-  // The pilot is useful on device only if phase cues make sound. These keys are
-  // phrase keys, so they must resolve through the shared asset map.
-  test('squat phase cues resolve to shipped assets', () {
-    expect(GenericExerciseVoiceAssets.resolveAsset('Xuống'), 'squat/xuong.wav');
-    expect(GenericExerciseVoiceAssets.resolveAsset('Giữ'), 'squat/giu.wav');
-    expect(
-      GenericExerciseVoiceAssets.resolveAsset('Đứng lên'),
-      'squat/dung_len.wav',
-    );
   });
 
   test('rep counts speak the landed rep number, regardless of random seed', () {

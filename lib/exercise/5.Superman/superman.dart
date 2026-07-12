@@ -49,6 +49,10 @@ class Superman extends ExerciseBase {
         VoiceDefaults.repBased,
         slug: 'superman',
         faultIds: _voiceFaultIds,
+        reminderPools: const {
+          'lumbar': ['superman.lumbar_reminder'],
+        },
+        repStartPhaseKeys: const {'lifting'},
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

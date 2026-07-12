@@ -102,6 +102,10 @@ class BirdDog extends ExerciseBase {
         VoiceDefaults.repBased,
         slug: 'bird_dog',
         faultIds: _voiceFaultIds,
+        reminderPools: const {
+          'lumbar': ['bird_dog.lumbar_reminder'],
+        },
+        repStartPhaseKeys: const {'extending'},
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

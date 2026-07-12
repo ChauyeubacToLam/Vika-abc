@@ -93,6 +93,9 @@ class JumpSquat extends ExerciseBase {
         VoiceDefaults.repBased,
         slug: 'jump_squat',
         faultIds: _voiceFaultIds,
+        softCuePools: const {
+          'landing_depth': ['jump_squat.landing_depth_soft'],
+        },
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

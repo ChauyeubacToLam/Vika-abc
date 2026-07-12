@@ -70,6 +70,14 @@ class ReverseCrunch extends ExerciseBase with SideTrackedExerciseMixin {
         VoiceDefaults.repBased,
         slug: 'reverse_crunch',
         faultIds: _voiceFaultIds,
+        softCuePools: const {
+          'tempo': ['reverse_crunch.tempo_soft'],
+          'momentum': ['reverse_crunch.momentum_soft'],
+        },
+        reminderPools: const {
+          'arms': ['reverse_crunch.arms_reminder'],
+        },
+        repStartPhaseKeys: const {'curling'},
       ),
       targetReps: targetReps,
       coach: VoiceCoach(

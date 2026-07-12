@@ -37,7 +37,7 @@ Device-log observability across all cues (`[Voice]` / `[VoiceGuard]` / `[VoiceSe
   relief-4, praise 0.35 + D8 — count row already fixed); no-count cue type + behavior; per-rep
   speak-only-top-fault; multi-set intro dedupe (intro once per exercise).
 
-**Voice fleet rollout — Tier 1 IMPLEMENTED (07-11), review pending, UNCOMMITTED.** All 24 in-scope
+**Voice fleet rollout — Tier 1 COMMITTED (07-11, c9ed034), device-checked on squat+lunge.** All 24 in-scope
 rep exercises now select the rep-based policy bundle explicitly, inherit `targetReps`, write the
 three-key RepLog fault contract, and use normalized snake_case detector ids. Current faults are exposed
 for 23/24; Tricep Dip is the deliberate exception because its metric objects are never driven by the
@@ -50,9 +50,25 @@ Bridge, or audio assets changed. Decision surface + code contradictions:
 `docs/reference/voice-coach/missing-audio.md`. Scoped exercise/voice tests: 248 green; analyze clean.
 Full suite: 434 passed / 6 failed, all six the documented pre-existing 12px workout-summary overflow
 cluster; no fleet test failed.
-Tier 2 (soft pools, reminders, hustle keys) waits on Nam's table rulings. Tier-3 design calls remain
-parked: Jump Squat 3-phase effort, Burpee phase semantics, Russian Twist two-half reps, Mountain
-Climber per-side types.
+Device catch 07-11 (fixed in c9ed034): squat still narrated movement phases ("Xuống/Giữ/Đứng lên")
+via a retained `phaseCues` — removed (decisions.md "Squat stops narrating"); squat now fleet-standard.
+Also 07-11: all 166 fleet lines + 9 Tier-2 reminders GENERATED via vclip (Chi Mai, 64k/24kHz), legacy +
+dead Viettel audio archived off-tree to gitignored `archive_voice/` (for Drive backup). Loose orphan
+`16-30.mp3` count fallbacks KEPT (still wired, but old-voice — regen in Chi Mai if a plan uses >15 reps).
+
+**Voice fleet Tier 2 — IMPLEMENTED, UNCOMMITTED (07-11).** All 24 rep exercises verified; 27 reachable
+soft ids now have `softCuePools`, and 20 selected continuous-critical faults have `reminderPools` +
+verified `repStartPhaseKeys`. No soft id was dropped and no reminder pick was rep-end-only. Walking
+Lunge was the one spec correction: its next rep can enter through `stepping` or directly through
+`descending`, so both keys are wired. Hustle remains OFF fleet-wide (`effortPhaseKeys` empty); engine,
+Glute Bridge, holds, Surya, thresholds, `affectsForm`, audio and pubspec untouched. Code-synced matrix:
+`docs/reference/voice-coach/voice-fleet-tier1-review.html` § Tier 2. Exercise + voice suites: 242 green;
+analyze clean. The 9 reminder mp3s and wiring are still uncommitted and belong in the same Tier-2 commit.
+Watch item (device): lunge `trunk` (and squat `sync`) fire every rep like glute's neck_head did —
+honest if form's off, naggy if the metric's oversensitive; a metric-threshold tune, not a voice bug.
+Tier-3 parked: hustle fleet-wide; Jump Squat 3-phase effort, Burpee phase semantics, Russian Twist
+two-half reps, Mountain Climber per-side types; Tricep Dip dead detectors; Bird Dog rejected-attempt
+fault clearing; the dead ViettelTtsService class + its import in exercise_base.dart + constants token.
 - **Device residual** (from the 07-10 UI-instruction removal): plank rest-ring/hold-cue visuals → next device smoke.
 
 **Hold-based voice — behavior DECIDED (07-11), implementation NOT started.** Nam ruled via the

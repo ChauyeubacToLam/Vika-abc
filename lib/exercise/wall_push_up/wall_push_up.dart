@@ -436,6 +436,19 @@ class WallPushUp extends ExerciseBase {
         VoiceDefaults.repBased,
         slug: 'wall_push_up',
         faultIds: _voiceFaultIds,
+        softCuePools: const {
+          'body_line': ['wall_push_up.body_line_soft'],
+          'foot': ['wall_push_up.foot_soft'],
+          'shoulder': ['wall_push_up.shoulder_soft'],
+          'elbow': ['wall_push_up.elbow_soft'],
+          'head': ['wall_push_up.head_soft'],
+          'cervical': ['wall_push_up.cervical_soft'],
+          'tempo': ['wall_push_up.tempo_soft'],
+        },
+        reminderPools: const {
+          'body_line': ['wall_push_up.body_line_reminder'],
+        },
+        repStartPhaseKeys: const {'descending'},
       ),
       targetReps: targetReps,
       coach: VoiceCoach(
