@@ -1,21 +1,19 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:vika/exercise/butterfly_stretch/butterfly_stretch.dart';
-import 'package:vika/exercise/butterfly_stretch/metrics/butterfly_metric_base.dart';
 import 'package:vika/exercise/exercise_base.dart';
 
 PoseLandmark _landmark(
   PoseLandmarkType type,
   double x,
   double y, {
-  double z = 0,
   double likelihood = 0.99,
 }) {
   return PoseLandmark(
     type: type,
     x: x,
     y: y,
-    z: z,
+    z: 0,
     likelihood: likelihood,
   );
 }
@@ -23,6 +21,7 @@ PoseLandmark _landmark(
 Map<PoseLandmarkType, PoseLandmark> _butterflyPose({
   bool feetFarFromHips = false,
   bool collapsedTorso = false,
+  double? rightShoulderY,
   double leftHipLikelihood = 0.99,
   bool includeLeftHeel = true,
 }) {
@@ -33,8 +32,11 @@ Map<PoseLandmarkType, PoseLandmark> _butterflyPose({
   final pose = <PoseLandmarkType, PoseLandmark>{
     PoseLandmarkType.leftShoulder:
         _landmark(PoseLandmarkType.leftShoulder, 150, shoulderY),
-    PoseLandmarkType.rightShoulder:
-        _landmark(PoseLandmarkType.rightShoulder, 250, shoulderY),
+    PoseLandmarkType.rightShoulder: _landmark(
+      PoseLandmarkType.rightShoulder,
+      250,
+      rightShoulderY ?? shoulderY,
+    ),
     PoseLandmarkType.leftHip: _landmark(
       PoseLandmarkType.leftHip,
       160,
@@ -55,96 +57,111 @@ Map<PoseLandmarkType, PoseLandmark> _butterflyPose({
     pose[PoseLandmarkType.leftHeel] =
         _landmark(PoseLandmarkType.leftHeel, 195, heelY);
   }
-
   return pose;
 }
 
-int _pumpFrames(
+void _pump(
   ButterflyStretch exercise,
-  Map<PoseLandmarkType, PoseLandmark> pose, {
-  required int startMs,
-  required int count,
-  int stepMs = 1000,
-}) {
-  var timestamp = startMs;
-  for (var i = 0; i < count; i++) {
-    exercise.frameTimestamp = DateTime.fromMillisecondsSinceEpoch(timestamp);
-    exercise.checkingPose(pose);
-    timestamp += stepMs;
-  }
-  return timestamp;
+  Map<PoseLandmarkType, PoseLandmark> pose,
+  int timestampMs,
+) {
+  exercise.frameTimestamp = DateTime.fromMillisecondsSinceEpoch(timestampMs);
+  exercise.checkingPose(pose);
 }
 
-ButterflyStretch _activeButterfly() {
-  return ButterflyStretch(maxSeconds: 30)
+ButterflyStretch _activeButterfly({int holdSeconds = 1}) {
+  final exercise = ButterflyStretch(maxHolds: 1, holdSeconds: holdSeconds)
     ..cameraFacing = CameraFacing.front
-    ..stretchState = ButterflyState.isometric_hold;
+    ..exerciseState = ExerciseState.activated;
+  exercise.onExerciseActivated();
+  return exercise;
 }
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('good hold accumulates valid time and completes cleanly', () {
+  test('full hold logs one rep and preserves every report-builder key', () {
     final exercise = _activeButterfly();
     final pose = _butterflyPose();
 
-    _pumpFrames(exercise, pose, startMs: 0, count: 32);
+    var timestampMs = 0;
+    while (exercise.repCount == 0 && timestampMs < 4000) {
+      _pump(exercise, pose, timestampMs);
+      timestampMs += 100;
+    }
 
-    expect(exercise.repCount, greaterThanOrEqualTo(30));
+    expect(exercise.phase, HoldPhase.resting);
+    expect(exercise.repCount, 1);
     expect(exercise.requestStop(), isTrue);
+    expect(exercise.logger.repLogs, hasLength(1));
+    expect(exercise.logger.repLogs.single.data['hold_time'], 1.0);
 
     exercise.onSetComplete();
-
-    expect(exercise.correctForm, isTrue);
-    expect(exercise.logger.repLogs.single.correctForm, isTrue);
-    expect(exercise.logger.setLogs['foot_placement_seconds'], 0.0);
+    final setLogs = exercise.logger.setLogs;
+    expect(setLogs['max_rep'], 1);
+    expect(setLogs['total_seconds'], 1.0);
+    expect(setLogs['good_seconds'], isA<num>());
+    expect(setLogs['total_hold_time'], 1.0);
+    expect(setLogs['max_knee_separation'], greaterThan(0));
+    expect(setLogs['knee_seconds'], isA<num>());
+    expect(setLogs['posture_seconds'], isA<num>());
+    expect(setLogs['foot_placement_seconds'], isA<num>());
+    expect(setLogs['good_rep_count'], 1);
   });
 
-  test('feet too far from hips freeze hold progress and fail form', () {
-    final exercise = _activeButterfly();
-    final goodPose = _butterflyPose();
-    final farFeetPose = _butterflyPose(feetFarFromHips: true);
+  test('foot metric emits snake_case live fault without freezing hold time',
+      () {
+    final exercise = _activeButterfly(holdSeconds: 2);
+    final clean = _butterflyPose();
+    final farFeet = _butterflyPose(feetFarFromHips: true);
 
-    final nextMs = _pumpFrames(exercise, goodPose, startMs: 0, count: 4);
-    final holdSecondsBeforeFault = exercise.repCount;
-    _pumpFrames(exercise, farFeetPose, startMs: nextMs, count: 10);
+    var timestampMs = 0;
+    while (exercise.phase != HoldPhase.holding && timestampMs < 3000) {
+      _pump(exercise, clean, timestampMs);
+      timestampMs += 100;
+    }
+    final beforeFault = exercise.timerMetric.totalHoldingTimeMs;
+    for (var i = 0; i < 6; i += 1) {
+      _pump(exercise, farFeet, timestampMs);
+      timestampMs += 100;
+    }
 
-    expect(exercise.repCount, holdSecondsBeforeFault);
-    expect(exercise.requestStop(), isFalse);
+    expect(exercise.phase, HoldPhase.holding);
+    expect(exercise.timerMetric.totalHoldingTimeMs, greaterThan(beforeFault));
+    expect(exercise.liveFaults.map((fault) => fault.type), contains('foot'));
 
-    exercise.onSetComplete();
-
-    expect(exercise.correctForm, isFalse);
-    expect(exercise.logger.setLogs['foot_placement_seconds'], 0.0);
+    while (exercise.repCount == 0 && timestampMs < 6000) {
+      _pump(exercise, clean, timestampMs);
+      timestampMs += 100;
+    }
     expect(
       exercise.logger.repLogs.single.data['fault_types'],
-      contains('FootPlacement'),
+      contains('foot'),
     );
   });
 
-  test('collapsed torso freezes hold progress and fails form', () {
-    final exercise = _activeButterfly();
-    final goodPose = _butterflyPose();
-    final collapsedPose = _butterflyPose(collapsedTorso: true);
+  test('measured shoulder tilt routes shoulder audio identity', () {
+    final exercise = _activeButterfly(holdSeconds: 2);
+    final clean = _butterflyPose();
+    final tiltedShoulders = _butterflyPose(rightShoulderY: 150);
 
-    final nextMs = _pumpFrames(exercise, goodPose, startMs: 0, count: 4);
-    final holdSecondsBeforeFault = exercise.repCount;
-    _pumpFrames(exercise, collapsedPose, startMs: nextMs, count: 10);
+    var timestampMs = 0;
+    while (exercise.phase != HoldPhase.holding && timestampMs < 3000) {
+      _pump(exercise, clean, timestampMs);
+      timestampMs += 100;
+    }
+    for (var i = 0; i < 7; i += 1) {
+      _pump(exercise, tiltedShoulders, timestampMs);
+      timestampMs += 100;
+    }
 
-    expect(exercise.repCount, holdSecondsBeforeFault);
-
-    exercise.onSetComplete();
-
-    expect(exercise.correctForm, isFalse);
-    expect(exercise.logger.setLogs['posture_seconds'], 0.0);
-    expect(
-      exercise.logger.repLogs.single.data['fault_types'],
-      contains('PostureCollapse'),
-    );
+    final liveTypes = exercise.liveFaults.map((fault) => fault.type).toSet();
+    expect(liveTypes, contains('shoulder'));
+    expect(liveTypes, isNot(contains('posture')));
   });
 
   test('start position rejects far feet and collapsed posture', () {
-    final exercise = ButterflyStretch(maxSeconds: 30)
+    final exercise = ButterflyStretch(maxHolds: 1, holdSeconds: 30)
       ..cameraFacing = CameraFacing.front;
 
     expect(exercise.isInStartPosition(_butterflyPose()), isTrue);
@@ -158,8 +175,8 @@ void main() {
     );
   });
 
-  test('supports both upright and landscape phone orientations', () {
-    final exercise = ButterflyStretch(maxSeconds: 30);
+  test('supports upright and landscape phone orientations', () {
+    final exercise = ButterflyStretch(maxHolds: 1, holdSeconds: 30);
 
     expect(
       exercise.supportedOrientations,
@@ -173,7 +190,7 @@ void main() {
   });
 
   test('safety rejects missing or low-confidence hip and heel landmarks', () {
-    final exercise = ButterflyStretch(maxSeconds: 30)
+    final exercise = ButterflyStretch(maxHolds: 1, holdSeconds: 30)
       ..cameraFacing = CameraFacing.front;
 
     expect(exercise.checkSafety(_butterflyPose()), isNull);

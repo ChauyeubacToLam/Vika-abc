@@ -47,6 +47,18 @@ Additions:
 - `end_retest`: forced post-deload retest metadata.
 - `session_type`: currently `workout`, reserved for future expansion.
 
+### Volume Modality (P1, 2026-07-12)
+
+The catalog now has two legal shapes:
+
+- Rep-based: `base_reps` is set and `base_seconds` is null.
+- Hybrid hold: both are set. Reps is the structural hold count; seconds is the per-hold duration.
+
+`base_seconds != null` is the hold discriminator. Hybrid prescriptions carry both fields, but only
+seconds progress through tier start, cap interpolation, deload, carry-over, and variant unlock.
+Hold count passes through unchanged. During the SQL rollout, a legacy seconds row with null reps is
+tolerated as one hold and logged; rows with both fields null still fail loudly.
+
 ### Template Registry
 
 Added the 8 launch templates in `templates.dart`:
@@ -88,6 +100,9 @@ Deload:
 Carry-over reads the most recent non-deload session per exercise and applies it as a floor:
 
 - Reps/seconds: `max(planned, lastActual)`, capped at the user tier cap.
+- Hybrids apply that floor only to seconds and preserve the catalog hold count.
+- Recent `exercise_sessions.set_data` outranks `user_exercise_capacity` when both exist because the
+  current capacity schema caches reps but not seconds; capacity remains the older-session fallback.
 - Rest: can drop to the last applied rest only if the session was not hard.
 - Hard sessions keep planned rest.
 - Deload sessions never carry forward.
@@ -158,6 +173,7 @@ All tables follow own-row SELECT/INSERT/UPDATE RLS. No DELETE policies were adde
 ## Edge Cases Handled
 
 - Existing legacy plan JSON still deserializes.
+- Hybrid rows with both reps and seconds generate without a modality error.
 - Empty slot muscle match relaxes to body-region match, then minimum safety fallback.
 - Pain contraindications are never relaxed.
 - Deload sessions do not update carry-over.
@@ -205,7 +221,8 @@ I do not think tier-only is enough. The unlock condition is strict but reachable
 ## Things Not Done
 
 - Full 60-second retest camera flow: current exercise definitions are 5-rep assessments.
-- Hold-duration execution: the engine can prescribe seconds, but the existing exercise flow is rep-target oriented.
+- P1 data rollout: Nam still needs to apply the approved `base_reps = 1` SQL for the four legacy
+  seconds rows, then run the catalog generator and commit the regenerated JSON.
 - Remote migration execution: SQL is added locally but not applied to Supabase from this workspace.
 - ML/autoregulation use of weekly check-ins: v4.4 logs only, per brief.
 - Server-side plan generation: the app currently inserts its own `recommendations_log` row under own-row RLS. This unblocks end-to-end testing now; a server function would be cleaner for production control.
@@ -220,6 +237,12 @@ Added targeted tests:
   - carry-over floor capped at tier cap
   - hard carry-over does not reduce rest
   - variant unlock qualification
+  - hybrid seconds progression, deload, carry-over, hold-count passthrough, null-reps tolerance,
+    malformed-row failure, and seconds-cap variant unlock
+
+- `test/services/hybrid_volume_labels_test.dart`
+  - count-aware hybrid labels on catalog and workout surfaces
+  - direct catalog launch retains both hybrid targets
 
 - `test/services/recommendation/recommendation_engine_test.dart`
   - full 7-week plan generation
@@ -229,14 +252,14 @@ Added targeted tests:
 
 Verification:
 
-- `dart analyze lib/services/recommendation test/services/recommendation` passes.
-- `dart analyze lib/main.dart lib/screens/exercise/exercise_experience_screen.dart lib/screens/exercise/rest_screen.dart lib/screens/exercise/exercise_launch_args.dart lib/services/session_persistence.dart` passes.
-- `flutter test test/services/recommendation` passes.
+- `flutter analyze`: clean.
+- Focused recommendation/catalog/launch suite: 44 passed.
+- Full `flutter test`: 467 passed / 6 failed. All six failures are the pre-existing 12px
+  `workout_summary_screen_test.dart` RenderFlex overflow cluster.
 
 Known unrelated verification blockers:
 
-- Full `flutter analyze` fails on pre-existing unused `_reasoning` in `lib/screens/onboarding/v5/screens/s05_fork.dart`.
-- Full `flutter test` fails on existing widget/pose/audio plugin test setup issues unrelated to this change.
+- The six `workout_summary_screen_test.dart` overflow failures remain unrelated to P1.
 
 ## Open Questions
 

@@ -1194,9 +1194,8 @@ class _ExerciseExperienceSpec {
           createExercise: (repsPerSet) => BirdDog(maxRep: repsPerSet),
         );
       default:
-        // isHold comes from the DEFINITION's declared target type, not from
-        // catalog seconds. Rep-type and hold-type both feed the single
-        // resolved `target` into createExercise — never a null target.
+        // Holds receive their seconds target plus the catalog's structural
+        // hold count when present. Rep exercises receive only the rep target.
         return _generic(
           definition: definition,
           sets: sets,
@@ -1206,7 +1205,7 @@ class _ExerciseExperienceSpec {
           secondsPerUnit: isHold ? 1 : 4,
           timeBased: isHold,
           createExercise: (targetPerSet) => definition.createExercise(
-            reps: isHold ? null : targetPerSet,
+            reps: isHold ? volume.reps : targetPerSet,
             seconds: isHold ? targetPerSet : null,
           ),
         );

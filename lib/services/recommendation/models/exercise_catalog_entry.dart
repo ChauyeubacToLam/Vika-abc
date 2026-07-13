@@ -106,11 +106,11 @@ class ExerciseCatalogEntry {
   final String? videoUrl;
 
   // ── Default volume (overridden per-week by ProgressionRules) ──
-  /// Default rep count for rep-based exercises. Null for hold-based.
+  /// Unit count per set. For a hybrid hold, this is the number of holds.
+  /// Required by the catalog contract; null is tolerated only during rollout.
   final int? baseReps;
 
-  /// Default hold duration in seconds for hold-based / yoga.
-  /// Null for rep-based.
+  /// Per-hold duration. Present for hybrid holds, null for rep-based rows.
   final int? baseSeconds;
 
   /// Tier-specific rep ceilings. Null = no cap.

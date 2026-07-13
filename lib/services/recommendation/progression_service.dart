@@ -64,20 +64,24 @@ class RecommendationProgressionService {
           .order('completed_at', ascending: false)
           .limit(limit);
 
-      final byExercise = <String, CarryOverPerformance>{...fromCapacity};
+      final fromSessions = <String, CarryOverPerformance>{};
       for (final raw in rows as List) {
         final row = raw as Map<String, dynamic>;
         final exerciseId = row['exercise_id'] as String?;
-        if (exerciseId == null || byExercise.containsKey(exerciseId)) {
+        if (exerciseId == null || fromSessions.containsKey(exerciseId)) {
           continue;
         }
 
         final carryOver = parseCarryOverFromSessionRow(row);
         if (carryOver == null || carryOver.isDeloadSource) continue;
-        byExercise[exerciseId] = carryOver;
+        fromSessions[exerciseId] = carryOver;
       }
 
-      return byExercise;
+      // Session payloads carry both reps and seconds; the capacity cache only
+      // has last_final_reps today. Prefer the richer session source so hybrid
+      // seconds reach applyCarryOverFloor, while retaining capacity as fallback
+      // for exercises outside the recent-session query window.
+      return {...fromCapacity, ...fromSessions};
     } catch (e) {
       debugPrint('[RecommendationProgression] carry-over fetch failed: $e');
       return const {};
@@ -311,7 +315,7 @@ bool sessionQualifiesForVariantUnlock({
     return reps >= tierRepCap(exercise: exercise, tier: userTier);
   }
 
-  if (exercise.isHoldBased) {
+  if (exercise.isHybridHold) {
     final seconds = carryOver.seconds;
     if (seconds == null) return false;
     return seconds >= tierSecondCap(exercise: exercise, tier: userTier);

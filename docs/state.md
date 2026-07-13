@@ -6,19 +6,102 @@ Design / how-it-works -> the owning reference doc. If this file only grows, it's
 
 ## Now
 
-**Hold scale-up — DESIGNED (07-12), ADR provisional, Nam review pending.** Nam's framing 07-12:
+**Hold scale-up — P1 + P2 + P3 IMPLEMENTED, UNCOMMITTED (07-13); P1 data applied.** Nam's framing 07-12:
 (1) extract the rep-counted-hold state machine out of High Plank (bear plank = real second
 consumer), (2) collapse catalog to TWO modalities — rep-based + hybrid (reps always set; seconds
 present = hold; former seconds-only rows get reps=1; reps==1 hides the rep UI). ADR: decisions.md
 07-12 "two-modality catalog" (3 OPEN forks inside: label copy, rep-based /1 rows, bear-plank clock
 leniency). Specs drafted, phased P1→P4: `docs/scratch/hold-hybrid-modality-codex-spec.md` (P1
-engine+data unbreak, incl. the SQL Nam runs — fixes the prescribeVolume blocker below) and
+engine+data unbreak, incl. the SQL Nam runs — implementation status below) and
 `hold-engine-extraction-codex-spec.md` (P2 extraction behavior-preserving, P3 bear plank + voice
 pools + generic hybrid launch flag; P4 count==1 UI is spec'd only as scope). Lavish SKIPPED per
 Nam 07-12; design annotations live inside the specs.
-- **P1 APPROVED 07-12, cleared for Codex.** ADR decisions 1+2 active. NEXT: Codex implements P1 →
-  Nam runs the base_reps=1 SQL → regen JSON. This unblocks the prescribeVolume blocker below.
-- P2/P3/P4 still design-only; fork (c) gates P3, forks (a)/(b) + decision 3 gate P4.
+- **P1 code LANDED 07-12.** Hybrid prescriptions now carry structural hold count + progressed
+  seconds, use hold rest, floor/cap carry-over and unlock variants on seconds, and retain both
+  targets through direct workout launch. Recent session payloads now outrank the reps-only capacity
+  cache so persisted hybrid seconds actually reach carry-over. Catalog/workout labels are
+  seconds-first and show count only above 1; this copy remains PROVISIONAL under fork (a). The
+  generator now requires reps and permits optional seconds. Null-reps seconds rows temporarily
+  default to one hold with a debug log.
+  Verification at code landing, before the later prod JSON resync: analyze clean; focused
+  recommendation/catalog/launch suite 44 green; full suite 467 green / the same 6 pre-existing
+  12px workout_summary overflows. Generator guard stays inline (no test-only extraction); the
+  generator was not run in this environment.
+- **Data flip APPLIED 07-12 (Nam ran it).** butterfly / seated_forward_fold / sphinx are now
+  clean `1 × 30s` hybrids (base_reps=1, base_seconds=30, sets=1, caps 45/60/90) in prod. Only 3
+  rows, not 4 — side_plank_dip was rep-shaped in prod, handled separately (below).
+- **side_plank_dip fix APPLIED 07-12 (Nam ran it).** Was stale rep-shaping (10 reps/3 sets); its
+  code+definition are a static hold ("3 lần giữ × 15 giây", `_withSeconds` factory) so the row was
+  broken to launch. Now base_reps=1, base_seconds=15, base_sets=3 (single-hold code can't do 3
+  holds/set before P3, so holds were placed in external sets), rep caps nulled, second caps 20/30/45.
+  P3 preserved that actual catalog shape: 3 external sets × 1 hold, rather than silently turning it
+  into 3 holds per set. All 4 hold rows are clean hybrids in prod.
+- **JSON RESYNCED to prod 07-12.** `assets/data/exercise_catalog.json` regenerated (12 field
+  changes, clean diff). The generator tool FFI-crashes in this env, so it was patched from prod via
+  Supabase MCP instead (see agent-memory `catalog-regen-tool-crashes`). Beyond the hold flips, the
+  resync surfaced 4 `isFormChecked` divergences the hand-edited JSON was masking: butterfly,
+  reverse_crunch, russian_twist, standing_knee_to_elbow now false (matching prod). Those 3 rep
+  exercises being NOT form-checked in prod looks suspect (all are form-detectable) — flag for Nam:
+  is prod right, or is prod itself stale there?
+- **P2 code LANDED 07-12.** `RepCountedHoldExercise` now owns the typed five-phase reps-of-holds
+  machine, timer/fault-second accumulation, pause/rest/re-arm lifecycle, and per-hold logging.
+  High Plank was the reference subclass and keeps geometry, form metrics, live faults,
+  set-summary keys, and diagnostics. Frame protocol is fixed as `samplePose` pre-transition → state machine →
+  `updateFormMetrics` post-transition. `HoldPhase` lives in `lib/exercise/hold/`; voice keys derive
+  from the enum.
+  Verification (Codex + Claude-reverified against code 07-12): analyze clean; frame ordering,
+  dt-gate, drop-resume-no-reset, pause-discards-partial all faithful to the original; fences clean.
+  267 exercise+voice tests green with ZERO assertion edits. Codex synced the current-code lavish
+  `hold-pilot-code-review.html`.
+- **P1 catalog_source_test FIXED by Claude 07-12** (Codex's flagged 7th failure). The "static holds"
+  assertion encoded the dead pre-hybrid contract (all 3 rows baseReps null / same shape). Rewritten
+  per-row for the resynced JSON: side_plank_dip 3×1×15, seated_forward_fold + sphinx 1×1×30, all
+  reps=1 hybrids, count-hidden labels. Only the 6 pre-existing `workout_summary` overflows remain.
+- **Fork (c) RESOLVED 07-12 (Nam):** universal hold invariant — bad form earns a cue + keeps the
+  clock running; only anti-cheat collapse (via the loose outer ring) stops it. Applies to ALL holds;
+  bear plank being form-gated today is the bug to fix. decisions.md ADR fork (c) + 07-11 two-ring.
+- **P3 code LANDED 07-13: VOICE scaled to all 5 remaining holds.** bear_plank / butterfly /
+  seated_forward_fold / sphinx / side_plank_dip now subclass `RepCountedHoldExercise`, emit the
+  declared snake_case voice fault ids, and preserve their existing report-builder keys. Existing CV
+  checks were reused without threshold tuning or anti-cheat rings. Bear keeps its 3-frame hover entry
+  and 5-frame not-hover exit; Butterfly keeps 10-frame stability entry and 5-frame release; Seated,
+  Sphinx, and Side keep their immediate 1-frame exits. The engine timer is authoritative; Seated
+  deliberately still omits `max_rep` / `good_rep_count`. Generic hybrid launch now forwards both
+  `reps` and `seconds`; Side stays the real catalog shape 3 external sets × 1 hold × 15s, not 3 holds
+  inside each set. All 21 declared base fault recordings already exist. All 21 optional `_reminder`
+  variants are missing; only Bear's five are reachable with today's multi-hold catalog target. Seated
+  `ankle` / `tempo` are non-form records, so their base MP3s do not speak through the critical channel;
+  making them audible needs explicit soft-pool wiring plus `ankle_soft.mp3` / `tempo_soft.mp3` after a
+  copy ruling. Data-honesty review also found stale moving hip-dip copy in Side's `active_intro` and
+  `amplitude`; both resolver keys are safe-no-oped pending same-key static-hold re-records. Bear's
+  `setup_position` needs a same-key rewrite because it is incomplete when replayed alone between
+  holds. Fault-id reachability and exact TTS work live in `missing-audio.md`.
+  Verification 07-13: `flutter analyze` clean; migration-focused suite 87 green; full suite 472 green /
+  the same 6 pre-existing 12px `workout_summary` overflows. High Plank, the shared hold engine,
+  catalog, and recommendation code were hash-checked unchanged from the start of P3.
+- **Hold audio CORRECTED 07-13 (Claude): migrated holds need ZERO new per-exercise clips.** Three
+  per-exercise cue fields are VESTIGIAL — declared on every GenericExerciseVoiceScript but never
+  consumed by createVoiceCoach (exercise_base.dart:646-670): `setup_intro` (→ shared
+  common.ngang/thang_intro), `set_next_setup` (no requester; re-arm plays `<slug>.setup_position`),
+  `hold_good`/cleanCueId (not passed to bundle; clean-hold praise uses shared VoiceLib.praise pool).
+  Any `<slug>.setup_intro/set_next_setup/hold_good.mp3` on disk (incl. High Plank's) is an ORPHAN —
+  I generated 6 such clips before catching this; ALL 6 deleted (2 set_next_setup + 4 hold_good).
+  Holds run fully on shared common audio + existing per-exercise setup_position/active_intro + the
+  21 existing fault lines. RULED 07-13 (Nam): generic shared praise pool now; per-exercise hold
+  praise (wire `cleanCueId` + re-record 4 lines) is a parked later enhancement — wordings saved in
+  missing-audio.md note.
+- **Bear reminders GENERATED 07-13 (Claude, TTS) — 5 clips (missing-audio.md rows 179-183):**
+  knee_hover/hip_high/back_sag/back_arch/weight `_reminder`, grounded per metric, resolve plain at
+  `bear_plank/<id>_reminder.mp3`. Bear is the ONLY hold that reaches reminders (3 internal holds →
+  fault carries to next hold start). The other 4 holds are 1-hold/external-set so their reminders
+  can't fire — deliberately not recorded. Hold HUSTLE verified working: repCountedHold bundle →
+  common.hold_push (mid) + common.hold_push_final (final), both mp3s exist + reached. No hold audio
+  outstanding.
+- **NEXT:** Nam line-reviews Codex's P3 migration + the P1/P2 stack + device-tests, then commits.
+  Migration verified by Claude: 87-test migration suite green, snake-case liveFaults + report-key
+  preservation covered, analyze clean. Remaining hold-audio gaps (deferred): per-fault `_reminder`
+  variants (fleet-wide; High Plank lacks them); Side's suppressed `active_intro`/`amplitude`; Seated
+  `ankle`/`tempo` softs. Forks (a)/(b) + decision 3 gate P4; anti-cheat + mechanics tuning separate.
 
 **Voice copy-writing skill — WRITTEN (07-11), Nam text-review pending, UNCOMMITTED.**
 `.agents/skills/voice-copy/SKILL.md`: grounding steps, cue formula (external target + no-assumption
@@ -94,8 +177,9 @@ HYBRID time-rings + rep-hero UI. The device-tune follow-up has also landed:
   - **Device catch 07-12 (Nam) + FIXED (Claude):** the re-arm countdown ring wasn't showing, and
     Opus's Fix-3 design had routed the count through the LEGACY `_CenterOverlay` set-start gauge —
     Nam overrode: the re-arm 3-2-1 must render in the NEW `RestCountdownRing` (hold-pilot design).
-    Fixes: (1) high_plank.dart `_publishReArmGuidance` — once posed, clear guidance (lineless) so
-    no banner suppresses the ring; not-posed keeps the reused setup banner. (2)
+    Fixes: (1) `_publishReArmGuidance` — now engine-owned as `publishReArmGuidance` — clears
+    guidance once posed (lineless) so no banner suppresses the ring; not-posed keeps the reused
+    setup banner. (2)
     active_exercise_page.dart — `_CenterOverlay` hidden during re-arm; `RestCountdownRing` now
     renders the 3-2-1 fed by the re-arm hold-still countdown (remaining = 3s×(1−activationProgress),
     total 3s), so the count reads in the amber ring like the rest ring. Test assertion updated
@@ -106,11 +190,11 @@ HYBRID time-rings + rep-hero UI. The device-tune follow-up has also landed:
   use one shared constant set with release-log/debug-assert validation; empty praise/hustle pools get
   the same hold-only fail-loud guard. Measured hold time replaces the target constant in each RepLog;
   no-pose interrupts now use the refreshed timestamp. The dead generic coach/helper block and
-  unreachable re-arm `centerLabel` call are deleted. Shared hold-engine extraction remains deferred
-  to the bear-plank design pass with a real second consumer.
-- Verification: `flutter analyze` clean; voice fleet + High Plank suite 119 passed. Full suite
-  458 passed / 6 failed — the 6 are ONLY the pre-existing 12px `workout_summary` overflow cluster
-  (unrelated). The stale `catalog_source_test` "hold entry carries seconds, not reps" was fixed
+  unreachable re-arm `centerLabel` call are deleted. The P2 shared hold engine is now extracted and,
+  after P3, has six consumers including the untouched High Plank reference.
+- Verification before P2: `flutter analyze` clean; voice fleet + High Plank suite 119 passed. Full
+  suite 458 passed / 6 failed — the 6 were the pre-existing 12px `workout_summary` overflow cluster.
+  The stale `catalog_source_test` "hold entry carries seconds, not reps" was fixed
   by Claude 07-12 (renamed → "hybrid hold entry carries per-hold seconds AND a hold-count reps",
   now asserts high_plank baseReps=3 + baseSeconds=20 — matches the hybrid catalog flip; the test
   encoded the dead pre-hybrid contract).
@@ -118,8 +202,7 @@ HYBRID time-rings + rep-hero UI. The device-tune follow-up has also landed:
   `docs/reference/voice-coach/hold-pilot-code-review.html`, then device-retests the two outcome pairs,
   standing/walking/kneeling/deep-sag/pike/side-lying tilt readings, clean/stuck/already-posed re-arm,
   multiple holds, and 3s/10s/30s leave-frame/pause cases. Tone loudness and iOS/Android earcon overlap
-  remain device checks. Hybrid pre-exercise target copy stays deferred. The four yoga-pose fault-id /
-  `liveFaults` wiring mismatch remains a separate queued follow-up.
+  remain device checks. Hybrid pre-exercise target copy stays deferred.
 
 **PresenceGate extraction (2026-07-05): SHIPPED, device smoke pending.** `lib/exercise/presence_gate.dart`
 extracted from `ExerciseBase` (~200 lines lighter), `PosePresenceSource` on `PersonDetector`, analyze
@@ -158,16 +241,6 @@ Progress Experience + Exercise Experience reference docs. Pending: device verify
    Ranked insights renders guided-empty until per-exercise builders land.
 
 ## Active blockers
-- **Hybrid catalog shape THROWS in the recommendation engine (07-12, prod-severity — DESIGN
-  LANDED, fix unimplemented).** high_plank + bear_plank carry BOTH base_reps AND base_seconds;
-  `prescribeVolume` (progression_rules.dart:56-63) hard-throws on both-fields rows at plan
-  generation (recommendation_engine.dart:112). Picker check DONE 07-12: both rows ARE
-  pool-eligible (selection never checks modality), so the crash is reachable in prod. Also
-  confirmed: `tool/generate_exercise_catalog.dart:69` still enforces exactly-one-of and would
-  exit(1) today (bundled JSON was hand-edited), and hybrid rows can never pass variant unlock
-  (progression_service.dart:308-318). The design answer (progress SECONDS, hold count is a
-  structural constant) is the 07-12 two-modality ADR; implementation = P1 spec
-  `docs/scratch/hold-hybrid-modality-codex-spec.md`. Blocked on Nam's ADR review, then Codex.
 - **No physical-Android full-session test yet** = the Android validation gate. Build + video + Firebase
   distribution work, but nobody has run a full session (camera + pose + rep-count + set-complete + mid-set
   back-guard) on a real ARM Android phone; emulator can't. Play Store also pending: switch

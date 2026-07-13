@@ -484,22 +484,32 @@ channels — reminders, setup/tracking-safety, soft — where a verbatim repeat 
 (probabilistic cues hide their repetition behind varying gaps; praise already rotates a pool). A
 nice-to-have noted for the future, on no current checklist. (Nam, 2026-07-10.)
 
-## Hold-based exercises (time-based family) — DECIDED 2026-07-11, re-ruled 07-12, High Plank pilot implemented
+## Hold-based exercises (time-based family) — DECIDED 2026-07-11, re-ruled 07-12, six-exercise fleet implemented 07-13
 Nam's rulings via the hold-design lavish review + chat (07-11), plank-model re-ruling 07-12; full
 design in [hold-exercise-voice-design.html](hold-exercise-voice-design.html) (v2), impl spec
 docs/scratch/hold-voice-impl-spec.md (Codex), decision records decisions.md 07-11 "Hold-based voice
-behavior LOCKED" + 07-12 "Holds count holds as REPS". High Plank = pilot. The hold mappings:
+behavior LOCKED" + 07-12 "Holds count holds as REPS". High Plank is the reference; Bear Plank,
+Butterfly, Seated Forward Fold, Sphinx, and Side Plank joined the same engine in P3. The hold mappings:
 
 - **A set = N HOLDS counted as REPS (plank model, 07-12; supersedes "one continuous hold").**
   Forearm Plank is the reference implementation (`Plank(maxRep)`: each completed hold →
-  repCount+1 + a per-hold RepLog, brief in-exercise breather between holds). High Plank migrates
-  to maxHolds × holdSeconds (per-hold seconds catalog-driven). **Each completed hold speaks its
-  number — rep count = registration (hard rule 3) applies verbatim.** The formal multi-set flow
-  sits above, unchanged.
-- **Clock: pose-validity gated, not form-gated.** Outer ring (anti-cheat / "still in the pose")
-  gates time accrual; inner ring (form metrics) coaches real-time while the clock RUNS. Only
-  cheating stops earning. Fault-seconds accounting keeps the summary honest. Reverses the shipped
-  High Plank perfect-timer.
+  repCount+1 + a per-hold RepLog, brief in-exercise breather between holds). The six engine consumers
+  use maxHolds × holdSeconds (per-hold seconds catalog-driven). **Each completed hold speaks its
+  number — rep count = registration (hard rule 3) applies verbatim.** The formal multi-set flow sits
+  above, unchanged. Side Plank currently stays 3 external sets × 1 hold × 15s; P3 did not reinterpret
+  that catalog row as 3 internal holds per set.
+- **Clock target: pose-validity gated, not form-gated.** Outer ring (anti-cheat / "still in the pose")
+  gates time accrual; inner ring (form metrics) coaches real-time while the clock RUNS. High Plank has
+  the dedicated two-ring implementation. P3 deliberately reused the other five exercises' existing
+  gates with no anti-cheat ring or threshold tuning: Bear exits its knee-hover gate, Side exits its
+  strict `formClean` gate, and Butterfly / Seated / Sphinx keep their existing motion or pose exits.
+  Those adapters are interim mechanics, not proof that the universal outer-ring target is fully
+  realized. Fault-seconds accounting remains the summary surface.
+- **P3 audio honesty exceptions (07-13):** Side Plank's legacy moving hip-dip `active_intro` and
+  `amplitude` files are resolver-suppressed until same-key static-hold recordings replace them.
+  Seated `ankle` / `tempo` are non-form faults and stay silent until explicit soft pools + `_soft`
+  assets exist. Bear's between-hold re-arm replays only `setup_position`; that same key needs
+  standalone copy that includes entering the hover. Exact gaps: `missing-audio.md`.
 - **Pause/re-hold discards the current partial hold; in-exercise drop/re-entry does not.** A base
   pause means the user stopped the attempt and must earn a fresh hold from zero after the normal
   start-position re-hold. Completed hold reps/logs survive. A brief outer-ring break inside the
@@ -535,11 +545,10 @@ behavior LOCKED" + 07-12 "Holds count holds as REPS". High Plank = pilot. The ho
   gap, and second-outcome suppression so a second milestone in the same hold cannot land silent.
   Rep-path praise/hustle odds and guards are unchanged. A rep-counted-hold script must provide both
   pools; empty praise/hustle pools log once in release and assert in debug instead of failing silent.
-- **Temporary phase-key contract (pre-scale guard):** until the shared hold engine owns a typed
-  phase, rep-counted holds must report `setup`, `holding`, `dropping`, `resting`, or `reArming`.
-  Shared constants replace scattered literals, and the adapter checks every hold phase: an unknown
-  key logs once in release and asserts in debug. This is deliberately not the deferred engine/enum
-  extraction.
+- **Typed phase-key contract (P2, 07-12):** the shared hold engine owns `HoldPhase` with `setup`,
+  `holding`, `dropping`, `resting`, and `reArming`. `currentPhaseKey` and the compatibility voice
+  keys derive from `phase.name`; the adapter still checks every live key, logging once in release
+  and asserting in debug if an unsupported producer bypasses the typed engine.
 - **criticalFault/softFault: identical real-time rules**; persistence + same-fault-once bookkeeping
   unit = the hold, which under the plank model IS the rep — the rep-fleet machinery (same-fault-
   once, cross-rep persistence, reminder at the next hold's re-entry into holding) maps directly.

@@ -19,6 +19,48 @@ cue formula (external target + no-assumption fence), grounding steps, per-slot t
 (decisions.md 07-11 "Voice-copy skill"). Pending un-recorded lines below predate the formula;
 check them against it before recording.
 
+## Rep-counted hold scale gaps (07-13 code sync)
+
+The five migrated hold scripts declare 21 base correction fault ids. Every corresponding
+`<slug>/<faultId>.mp3` exists on disk, so **no critical/base resolver path needs a TTS pass**. File
+presence does not mean every id can speak through the current policy; the exceptions are below.
+
+Detector reconcile: Butterfly's existing posture metric already distinguishes shoulder tilt from
+torso collapse; P3 preserves those branches as `shoulder` and `posture`. Sphinx's existing arm metric
+already has separate straight-arm, forearm, and upper-arm checks; P3 preserves those identities as
+`straight_arm`, `forearm`, and `upper_arm` without changing their thresholds or debounce. All five
+paths have matching base audio. `sphinx/hip.mp3` remains orphaned: `hip` is neither declared nor
+emitted, and the report honestly keeps `hip_seconds=0`.
+
+Seated `ankle` and `tempo` are emitted as `affectsForm:false`. Policy correctly routes non-form faults
+only through `softCuePools`, and the generic hold script has no soft pools. Their existing
+`ankle.mp3` / `tempo.mp3` critical recordings therefore do not speak. Making them audible requires a
+separate copy + wiring decision and two missing soft assets: `seated_forward_fold/ankle_soft.mp3` and
+`seated_forward_fold/tempo_soft.mp3`. No wording is drafted here.
+
+Two Side Plank files exist but contain legacy moving hip-dip instructions that contradict the current
+static hold. P3 safe-no-ops `side_plank_dip/active_intro.mp3` and
+`side_plank_dip/amplitude.mp3` in the resolver. Re-record both at the same paths for the static hold,
+then remove the suppression. The old text is retained and marked stale in
+`voice_docs/all_exercise_voice_scripts.md`; no replacement wording is drafted here.
+
+Bear's `bear_plank/setup_position.mp3` is accurate for set start, where `active_intro` follows it, but
+incomplete for the engine's between-hold re-arm, which replays only `setup_position`: it gets the user
+onto hands and knees without asking them to lift the knees. Re-record that same key with a line that
+also works standalone after rest; wording needs the voice-copy pass first.
+
+The generated hold script exposes an optional next-hold reminder path for every declared id. None of
+these 21 files exists yet; runtime eligibility is narrower, as the table notes. No wording is drafted
+here; run the voice-copy grounding pass before TTS.
+
+| Exercise slug | Missing `_reminder.mp3` fault ids | Reachable today |
+|---|---|---|
+| `bear_plank` | `knee_hover`, `hip_high`, `back_sag`, `back_arch`, `weight` | Yes, between its 3 holds |
+| `butterfly_stretch` | `foot`, `knee`, `posture`, `shoulder` | No, current target is 1 hold |
+| `seated_forward_fold` | `ankle`, `knee`, `spine`, `tempo` | `knee` / `spine`: no, current target is 1 hold. `ankle` / `tempo`: non-form and reminder-ineligible under current policy |
+| `sphinx` | `straight_arm`, `forearm`, `upper_arm`, `shrug`, `neck` | No, current target is 1 hold |
+| `side_plank_dip` | `shoulder`, `rotation`, `amplitude` | No, current catalog target is 1 hold per external set |
+
 ## Rep fleet Tier 1 gaps (07-11 code sync) — ✅ RESOLVED 07-12
 
 Tier 1 reuses the resolver convention `assets/audio/<slug>/<fault_id>.mp3`; it did not add or rename
@@ -266,6 +308,36 @@ How to use:
 | 176 | prayer_pose/prayer_pose.active_intro.mp3 | Đứng yên, giữ lưng và đầu thẳng nhé. | ✅ TTS 07-12 |
 | 177 | raised_arms/raised_arms.setup_position.mp3 | Bạn đứng thẳng, vươn hai tay lên cao qua đầu nhé. | ✅ TTS 07-12 |
 | 178 | raised_arms/raised_arms.active_intro.mp3 | Vươn tay lên cao, hướng ngực lên trần và giữ tư thế nhé. | ✅ TTS 07-12 |
+| 179 | bear_plank/knee_hover_reminder.mp3 | Lần này bạn nhớ nhấc nhẹ hai gối khỏi sàn nhé. | ✅ TTS 07-13 |
+| 180 | bear_plank/hip_high_reminder.mp3 | Lần này bạn nhớ hạ hông cho thân thẳng nhé. | ✅ TTS 07-13 |
+| 181 | bear_plank/back_sag_reminder.mp3 | Lần này bạn nhớ siết bụng giữ lưng thẳng nhé. | ✅ TTS 07-13 |
+| 182 | bear_plank/back_arch_reminder.mp3 | Lần này bạn nhớ hạ lưng về đường thẳng nhé. | ✅ TTS 07-13 |
+| 183 | bear_plank/weight_reminder.mp3 | Lần này bạn nhớ dồn vai thẳng trên cổ tay nhé. | ✅ TTS 07-13 |
+
+Bear reminders (rows 179-183, 07-13): the ONLY reachable hold reminders — Bear has 3 internal holds so
+a fault carries into the next hold start (`repStartPhaseKeys{'holding'}`). The other 4 holds are 1-hold
+(butterfly/seated/sphinx) or external-set (side_plank), so their `_reminder` variants can never fire and
+were deliberately NOT recorded (would be orphans). Paths resolve plain (`bear_plank/<id>_reminder.mp3`).
+
+Hold-fleet channel-line note (07-13, RESOLVED): the migrated holds need ZERO new per-exercise channel
+audio. Clean-hold praise uses the shared `VoiceLib.praise` pool (`common.good_*`) — RULED 07-13 (Nam):
+generic praise now, per-exercise hold praise is a later enhancement. Three per-exercise cue fields are
+VESTIGIAL — declared on every `GenericExerciseVoiceScript` but never consumed by `createVoiceCoach`
+(exercise_base.dart:646-670):
+- `setup_intro` → `setupIntroCueId` resolves to shared `common.ngang_intro`/`common.thang_intro`
+  (already recorded); no per-slug setup_intro is ever requested.
+- `set_next_setup` → NO requester anywhere (grep-verified); the inter-hold re-arm plays
+  `<slug>.setup_position` via `GuidanceSignal.setupPosition`, not set_next_setup.
+- `hold_good` (`cleanCueId`) → NOT passed into the voice bundle; clean-hold praise uses the shared
+  pool. So `<slug>.hold_good` never plays.
+Any `<slug>.setup_intro`/`set_next_setup`/`hold_good.mp3` on disk (incl. High Plank's) is an ORPHAN.
+6 such clips were TTS-generated 07-13, found unwired, and DELETED same day (2 set_next_setup + 4
+hold_good). `active_intro`/`setup_position` for all 5 holds already existed;
+`side_plank_dip.active_intro` is suppressed by design. LATER (parked): to enable per-exercise hold
+praise, wire `cleanCueId` into `VoiceScript.from` and re-record the 4 hold_good lines (wordings were:
+bear "Tốt lắm, bạn giữ vững nhé!", butterfly "Đẹp lắm, bạn thả lỏng giữ nguyên nhé!", seated "Tốt lắm,
+bạn hít thở đều giữ nguyên nhé!", sphinx "Đẹp lắm, bạn giữ ngực mở nhé!"). Per-fault `_reminder`
+variants remain the only reachable open hold-audio gap (deferred; High Plank lacks them too).
 
 ### DO NOT record (unreachable / unmapped — waste of a take)
 

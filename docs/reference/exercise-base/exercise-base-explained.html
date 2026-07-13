@@ -2456,8 +2456,9 @@ return PolicyVoiceCoach(
     <p class="ct">🧒 Like you’re five</p>
     <p>The base no longer owns a second talking brain. It looks up the exercise’s audio footprint, chooses one
     of three shared scripts (rep, timer, or rep-counted hold), and hands everything to
-    <code>PolicyVoiceCoach</code>. High Plank’s temporary hold phase keys share constants with the producer and
-    consumer, so a rename fails loud instead of silently losing voice.</p>
+    <code>PolicyVoiceCoach</code>. Rep-counted holds now report the shared engine’s typed
+    <code>HoldPhase.name</code>; the compatibility voice keys derive from that enum, and the consumer still
+    fails loud if a non-engine producer reports an unsupported phase.</p>
   </div>
 
   <div class="call idea">

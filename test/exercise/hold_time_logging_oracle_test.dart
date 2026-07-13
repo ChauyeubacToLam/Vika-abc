@@ -195,8 +195,8 @@ void main() {
       expect(exercise.logger.setLogs['piked_seconds'], isA<num>());
     });
 
-    test('Bear Plank good_seconds already uses fully clean hover frames', () {
-      final exercise = BearPlank(maxSeconds: 10)
+    test('Bear Plank inner back/weight faults keep the hold clock running', () {
+      final exercise = BearPlank(maxHolds: 1, holdSeconds: 10)
         ..cameraFacing = CameraFacing.right;
       final clean = _bearPlankPose();
       final backFault = _bearPlankPose(shoulderY: 225);
@@ -205,21 +205,21 @@ void main() {
       expect(exercise.isInStartPosition(clean), isTrue);
       _activate(exercise);
 
-      // Three clean frames enter hovering at 2000ms. From 2000->7000ms, only
-      // the 3000, 5000, and 7000ms intervals are fully clean.
+      // Three clean frames enter holding at 500ms. Back/weight are now inner
+      // coached faults, so every valid 250ms interval still earns hold time.
       _pump(exercise, clean, 0);
-      _pump(exercise, clean, 1000);
-      _pump(exercise, clean, 2000);
-      _pump(exercise, clean, 3000);
-      _pump(exercise, backFault, 4000);
-      _pump(exercise, clean, 5000);
-      _pump(exercise, weightFault, 6000);
-      _pump(exercise, clean, 7000);
+      _pump(exercise, clean, 250);
+      _pump(exercise, clean, 500);
+      _pump(exercise, clean, 750);
+      _pump(exercise, backFault, 1000);
+      _pump(exercise, clean, 1250);
+      _pump(exercise, weightFault, 1500);
+      _pump(exercise, clean, 1750);
 
       exercise.onSetComplete();
 
       expect(exercise.logger.setLogs['total_seconds'], 10.0);
-      expect(exercise.logger.setLogs['total_hover_time_ms'], 3000);
+      expect(exercise.logger.setLogs['total_hover_time_ms'], 1250);
       expect(exercise.logger.setLogs['good_seconds'], 0.0);
       expect(exercise.logger.setLogs['knee_seconds'], isA<num>());
       expect(
@@ -234,7 +234,7 @@ void main() {
 
     test('Seated Forward Fold good_seconds excludes active form-fault frames',
         () {
-      final exercise = SeatedForwardFold(maxSeconds: 10, maxHolds: 10)
+      final exercise = SeatedForwardFold(maxHolds: 10, holdSeconds: 10)
         ..cameraFacing = CameraFacing.right;
       final start = _seatedForwardPose(
         shoulderX: 200,
@@ -280,7 +280,7 @@ void main() {
       _pump(exercise, cleanHold, 5000);
       _pump(exercise, cleanHold, 5100);
 
-      expect(exercise.liveHoldSeconds, closeTo(3.9, 0.001));
+      expect(exercise.liveHoldSeconds, closeTo(2.6, 0.001));
 
       exercise.onSetComplete();
 

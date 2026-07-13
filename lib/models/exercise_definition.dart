@@ -56,6 +56,9 @@ ExerciseBase _withReps(
   return createWithTarget(reps ?? 1);
 }
 
+// Retained for older definitions that may move back to explicit second
+// factories; the rep-counted hold fleet now consumes both dimensions directly.
+// ignore: unused_element
 ExerciseBase _withSeconds(
   int? seconds,
   ExerciseBase Function(int seconds) createWithTarget,
@@ -256,11 +259,17 @@ final seatedForwardFoldAssessmentDefinition = ExerciseDefinition(
   safetyWarning:
       'Gập từ từ theo hơi thở, đừng giật mạnh. Dừng nếu căng đau ở lưng dưới.',
   videoAsset: 'assets/video/seated_forward_fold.mp4',
-  createExercise: ({int? reps, int? seconds}) =>
-      SeatedForwardFold(maxSeconds: seconds ?? 30, maxHolds: 1),
+  createExercise: ({int? reps, int? seconds}) => SeatedForwardFold(
+    maxHolds: reps ?? 1,
+    holdSeconds: seconds ?? 30,
+  ),
   targetType: ExerciseTargetType.seconds,
   phaseColors: {
-    'default': const Color(0xFF00E676),
+    'setup': const Color(0xFFFF6D00),
+    'holding': const Color(0xFF00E676),
+    'dropping': const Color(0xFF00B0FF),
+    'resting': const Color(0xFFFFD600),
+    'reArming': const Color(0xFFFFD600),
   },
 );
 final List<ExerciseDefinition> exerciseDefinitions = [
@@ -633,13 +642,17 @@ final List<ExerciseDefinition> exerciseDefinitions = [
     safetyWarning:
         'Dồn lực đều lên bàn tay, giữ cổ tay thẳng. Dừng lại nếu cổ tay đau.',
     videoAsset: 'assets/video/bear_plank.mp4',
-    createExercise: ({int? reps, int? seconds}) =>
-        _withSeconds(seconds, (target) => BearPlank(maxSeconds: target)),
+    createExercise: ({int? reps, int? seconds}) => BearPlank(
+      maxHolds: reps ?? 1,
+      holdSeconds: seconds ?? 15,
+    ),
     targetType: ExerciseTargetType.seconds,
     phaseColors: {
       'setup': const Color(0xFFFF6D00),
-      'hovering': const Color(0xFF00E676),
-      'fatiguing': const Color(0xFF00B0FF),
+      'holding': const Color(0xFF00E676),
+      'dropping': const Color(0xFF00B0FF),
+      'resting': const Color(0xFFFFD600),
+      'reArming': const Color(0xFFFFD600),
     },
   ),
   ExerciseDefinition(
@@ -909,11 +922,17 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ lưng thẳng, thả lỏng để hai gối rơi đều xuống sàn.',
     ],
     safetyWarning: 'Đừng dùng tay ép gối xuống. Để gối tự rơi theo nhịp thở.',
-    createExercise: ({int? reps, int? seconds}) =>
-        _withSeconds(seconds, (target) => ButterflyStretch(maxSeconds: target)),
+    createExercise: ({int? reps, int? seconds}) => ButterflyStretch(
+      maxHolds: reps ?? 1,
+      holdSeconds: seconds ?? 30,
+    ),
     targetType: ExerciseTargetType.seconds,
     phaseColors: {
-      'default': const Color(0xFF00E676),
+      'setup': const Color(0xFFFF6D00),
+      'holding': const Color(0xFF00E676),
+      'dropping': const Color(0xFF00B0FF),
+      'resting': const Color(0xFFFFD600),
+      'reArming': const Color(0xFFFFD600),
     },
   ),
   ExerciseDefinition(
@@ -1040,11 +1059,17 @@ final List<ExerciseDefinition> exerciseDefinitions = [
     safetyWarning:
         'Gập từ từ theo hơi thở, đừng giật mạnh. Dừng nếu căng đau ở lưng dưới.',
     videoAsset: 'assets/video/seated_forward_fold.mp4',
-    createExercise: ({int? reps, int? seconds}) => _withSeconds(seconds,
-        (target) => SeatedForwardFold(maxSeconds: target, maxHolds: 1)),
+    createExercise: ({int? reps, int? seconds}) => SeatedForwardFold(
+      maxHolds: reps ?? 1,
+      holdSeconds: seconds ?? 30,
+    ),
     targetType: ExerciseTargetType.seconds,
     phaseColors: {
-      'default': const Color(0xFF00E676),
+      'setup': const Color(0xFFFF6D00),
+      'holding': const Color(0xFF00E676),
+      'dropping': const Color(0xFF00B0FF),
+      'resting': const Color(0xFFFFD600),
+      'reArming': const Color(0xFFFFD600),
     },
   ),
   ExerciseDefinition(
@@ -1067,11 +1092,17 @@ final List<ExerciseDefinition> exerciseDefinitions = [
       'Giữ nguyên tư thế; đồng hồ dừng khi thân người mất thẳng hàng.'
     ],
     videoAsset: 'assets/video/side_plank.mp4',
-    createExercise: ({int? reps, int? seconds}) =>
-        _withSeconds(seconds, (target) => SidePlankDip(maxSeconds: target)),
+    createExercise: ({int? reps, int? seconds}) => SidePlankDip(
+      maxHolds: reps ?? 1,
+      holdSeconds: seconds ?? 15,
+    ),
     targetType: ExerciseTargetType.seconds,
     phaseColors: {
-      'default': const Color(0xFF00E676),
+      'setup': const Color(0xFFFF6D00),
+      'holding': const Color(0xFF00E676),
+      'dropping': const Color(0xFF00B0FF),
+      'resting': const Color(0xFFFFD600),
+      'reArming': const Color(0xFFFFD600),
     },
   ),
   ExerciseDefinition(
@@ -1096,11 +1127,17 @@ final List<ExerciseDefinition> exerciseDefinitions = [
     safetyWarning:
         'Giữ cẳng tay đỡ lực — đừng duỗi thẳng tay thành Cobra. Dừng nếu đau lưng dưới.',
     videoAsset: 'assets/video/sphinx_pose.mp4',
-    createExercise: ({int? reps, int? seconds}) =>
-        _withSeconds(seconds, (target) => SphinxStretch(maxSeconds: target)),
+    createExercise: ({int? reps, int? seconds}) => SphinxStretch(
+      maxHolds: reps ?? 1,
+      holdSeconds: seconds ?? 30,
+    ),
     targetType: ExerciseTargetType.seconds,
     phaseColors: {
-      'default': const Color(0xFF00E676),
+      'setup': const Color(0xFFFF6D00),
+      'holding': const Color(0xFF00E676),
+      'dropping': const Color(0xFF00B0FF),
+      'resting': const Color(0xFFFFD600),
+      'reArming': const Color(0xFFFFD600),
     },
   ),
   ExerciseDefinition(

@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
+
 import 'models/exercise_catalog_entry.dart';
 import 'models/plan.dart';
 import 'models/template.dart';
@@ -53,12 +55,17 @@ VolumePrescription prescribeVolume({
     );
   }
 
-  final isRep = exercise.isRepBased;
-  final isHold = exercise.isHoldBased;
-  if (!isRep && !isHold) {
+  final isRepBased = exercise.isRepBased;
+  final isHybridHold = exercise.isHybridHold;
+  if (!isRepBased && !isHybridHold) {
     throw StateError(
-      'Exercise ${exercise.id} must have exactly one of baseReps or '
-      'baseSeconds set.',
+      'Exercise ${exercise.id} must have baseReps or baseSeconds set.',
+    );
+  }
+  if (isHybridHold && exercise.baseReps == null) {
+    debugPrint(
+      '[ProgressionRules] hybrid exercise ${exercise.id} is missing baseReps; '
+      'defaulting hold count to 1 until the catalog migration lands.',
     );
   }
 
@@ -68,10 +75,11 @@ VolumePrescription prescribeVolume({
     isDeloadWeek: isDeloadWeek,
   );
 
-  final plannedRest =
-      isHold ? template.defaultRestSecondsHold : template.defaultRestSecondsRep;
+  final plannedRest = isHybridHold
+      ? template.defaultRestSecondsHold
+      : template.defaultRestSecondsRep;
 
-  final base = isRep
+  final plannedReps = isRepBased
       ? _plannedRepTarget(
           exercise: exercise,
           userTier: userTier,
@@ -79,8 +87,8 @@ VolumePrescription prescribeVolume({
           progressionWeeks: progressionWeeks,
           isDeloadWeek: isDeloadWeek,
         )
-      : null;
-  final baseSeconds = isHold
+      : exercise.baseReps ?? 1;
+  final plannedSeconds = isHybridHold
       ? _plannedSecondTarget(
           exercise: exercise,
           userTier: userTier,
@@ -92,8 +100,8 @@ VolumePrescription prescribeVolume({
 
   final prescription = VolumePrescription(
     sets: sets,
-    reps: base,
-    seconds: baseSeconds,
+    reps: plannedReps,
+    seconds: plannedSeconds,
     restSeconds: plannedRest,
     isDeloadWeek: isDeloadWeek,
   );
@@ -118,13 +126,13 @@ VolumePrescription applyCarryOverFloor({
 }) {
   if (planned.isDeloadWeek || carryOver.isDeloadSource) return planned;
 
-  final cap = exercise.isRepBased
+  final isRepBased = exercise.isRepBased;
+  final cap = isRepBased
       ? tierRepCap(exercise: exercise, tier: userTier)
       : tierSecondCap(exercise: exercise, tier: userTier);
 
-  final carriedTarget =
-      exercise.isRepBased ? carryOver.reps : carryOver.seconds;
-  final plannedTarget = planned.reps ?? planned.seconds;
+  final carriedTarget = isRepBased ? carryOver.reps : carryOver.seconds;
+  final plannedTarget = isRepBased ? planned.reps : planned.seconds;
   final shouldCarryTarget = carriedTarget != null &&
       plannedTarget != null &&
       carriedTarget > plannedTarget;
@@ -143,8 +151,8 @@ VolumePrescription applyCarryOverFloor({
 
   return VolumePrescription(
     sets: planned.sets,
-    reps: exercise.isRepBased ? nextTarget : null,
-    seconds: exercise.isHoldBased ? nextTarget : null,
+    reps: isRepBased ? nextTarget : planned.reps,
+    seconds: exercise.isHybridHold ? nextTarget : null,
     restSeconds: nextRest,
     isDeloadWeek: planned.isDeloadWeek,
   );
@@ -346,5 +354,5 @@ int _startingSecondTarget(ExerciseCatalogEntry exercise, int userTier) {
 
 extension ExerciseCatalogVolumeX on ExerciseCatalogEntry {
   bool get isRepBased => baseReps != null && baseSeconds == null;
-  bool get isHoldBased => baseSeconds != null && baseReps == null;
+  bool get isHybridHold => baseSeconds != null;
 }

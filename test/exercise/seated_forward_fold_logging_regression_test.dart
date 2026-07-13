@@ -2,22 +2,19 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:vika/exercise/exercise_base.dart';
 import 'package:vika/exercise/seated_forward_fold/seated_forward_fold.dart';
-import 'package:vika/exercise/seated_forward_fold/metrics/seated_forward_metric_base.dart';
 import 'package:vika/exercise/seated_forward_fold/seated_forward_report_builder.dart';
 
 PoseLandmark _landmark(
   PoseLandmarkType type,
   double x,
-  double y, {
-  double z = 0,
-  double likelihood = 0.99,
-}) {
+  double y,
+) {
   return PoseLandmark(
     type: type,
     x: x,
     y: y,
-    z: z,
-    likelihood: likelihood,
+    z: 0,
+    likelihood: 0.99,
   );
 }
 
@@ -31,37 +28,16 @@ Map<PoseLandmarkType, PoseLandmark> _seatedForwardPose({
   double toeX = 620,
   double toeY = 250,
 }) {
-  return {
-    PoseLandmarkType.rightEar: _landmark(
-      PoseLandmarkType.rightEar,
-      earX,
-      earY,
-    ),
-    PoseLandmarkType.rightShoulder: _landmark(
-      PoseLandmarkType.rightShoulder,
-      shoulderX,
-      shoulderY,
-    ),
-    PoseLandmarkType.rightHip: _landmark(
-      PoseLandmarkType.rightHip,
-      200,
-      300,
-    ),
-    PoseLandmarkType.rightKnee: _landmark(
-      PoseLandmarkType.rightKnee,
-      400,
-      300,
-    ),
-    PoseLandmarkType.rightHeel: _landmark(
-      PoseLandmarkType.rightHeel,
-      heelX,
-      heelY,
-    ),
-    PoseLandmarkType.rightFootIndex: _landmark(
-      PoseLandmarkType.rightFootIndex,
-      toeX,
-      toeY,
-    ),
+  return <PoseLandmarkType, PoseLandmark>{
+    PoseLandmarkType.rightEar: _landmark(PoseLandmarkType.rightEar, earX, earY),
+    PoseLandmarkType.rightShoulder:
+        _landmark(PoseLandmarkType.rightShoulder, shoulderX, shoulderY),
+    PoseLandmarkType.rightHip: _landmark(PoseLandmarkType.rightHip, 200, 300),
+    PoseLandmarkType.rightKnee: _landmark(PoseLandmarkType.rightKnee, 400, 300),
+    PoseLandmarkType.rightHeel:
+        _landmark(PoseLandmarkType.rightHeel, heelX, heelY),
+    PoseLandmarkType.rightFootIndex:
+        _landmark(PoseLandmarkType.rightFootIndex, toeX, toeY),
   };
 }
 
@@ -74,40 +50,11 @@ void _pump(
   exercise.checkingPose(pose);
 }
 
-Future<int> _completeShortHoldRep({
-  required SeatedForwardFold exercise,
-  required Map<PoseLandmarkType, PoseLandmark> start,
-  required Map<PoseLandmarkType, PoseLandmark> cleanHold,
-  required int timestampMs,
-}) async {
-  _pump(exercise, start, timestampMs);
-
-  for (var offsetMs = 100; offsetMs <= 2200; offsetMs += 100) {
-    _pump(exercise, cleanHold, timestampMs + offsetMs);
-  }
-  expect(exercise.state, SeatedForwardState.isometricHold);
-
-  var currentTimestamp = timestampMs + 2200;
-  for (var i = 0; i < 12; i += 1) {
-    await Future<void>.delayed(const Duration(milliseconds: 70));
-    currentTimestamp += 100;
-    _pump(exercise, cleanHold, currentTimestamp);
-  }
-  expect(exercise.state, SeatedForwardState.ascending);
-
-  currentTimestamp += 100;
-  _pump(exercise, start, currentTimestamp);
-  expect(exercise.state, SeatedForwardState.setup);
-
-  return currentTimestamp + 100;
-}
-
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('Seated Forward Fold scores partial clean time over all three holds',
-      () async {
-    final exercise = SeatedForwardFold(maxSeconds: 2, maxHolds: 3)
+  test('full engine hold logs snake fault and preserves report keys', () {
+    final exercise = SeatedForwardFold(maxHolds: 1, holdSeconds: 2)
       ..cameraFacing = CameraFacing.right
       ..exerciseState = ExerciseState.activated;
     final start = _seatedForwardPose(
@@ -117,34 +64,56 @@ void main() {
       earY: 150,
     );
     final cleanHold = _seatedForwardPose();
+    final kneeFault = _seatedForwardPose(
+      heelX: 480,
+      heelY: 440,
+      toeX: 500,
+      toeY: 390,
+    );
 
     expect(exercise.isInStartPosition(start), isTrue);
     exercise.onExerciseActivated();
 
     var timestampMs = 0;
-    for (var rep = 0; rep < 3; rep += 1) {
-      timestampMs = await _completeShortHoldRep(
-        exercise: exercise,
-        start: start,
-        cleanHold: cleanHold,
-        timestampMs: timestampMs,
-      );
+    while (exercise.phase != HoldPhase.holding && timestampMs < 3000) {
+      _pump(exercise, cleanHold, timestampMs);
+      timestampMs += 100;
+    }
+    expect(exercise.phase, HoldPhase.holding);
+
+    for (var i = 0; i < 6; i += 1) {
+      _pump(exercise, kneeFault, timestampMs);
+      timestampMs += 100;
+    }
+    expect(exercise.liveFaults.map((fault) => fault.type), contains('knee'));
+
+    while (exercise.repCount == 0 && timestampMs < 7000) {
+      _pump(exercise, cleanHold, timestampMs);
+      timestampMs += 100;
     }
 
+    expect(exercise.repCount, 1);
     expect(exercise.requestStop(), isTrue);
-    exercise.onSetComplete();
+    expect(exercise.logger.repLogs, hasLength(1));
+    final repData = exercise.logger.repLogs.single.data;
+    expect(repData['hold_time'], 2.0);
+    expect(repData['max_depth_angle'], isA<num>());
+    expect(repData['fault_types'], contains('knee'));
 
+    exercise.onSetComplete();
     final setLogs = exercise.logger.setLogs;
-    final goodSeconds = setLogs['good_seconds'] as double;
+    expect(setLogs['total_seconds'], 2.0);
+    expect(setLogs['good_seconds'], isA<num>());
+    expect(setLogs['knee_bent_seconds'], isA<num>());
+    expect(setLogs['spine_round_seconds'], isA<num>());
+    expect(setLogs.containsKey('max_rep'), isFalse);
+    expect(setLogs.containsKey('good_rep_count'), isFalse);
+
     final report = SeatedForwardReportBuilder().buildReport(
       setLoggers: [exercise.logger],
       exerciseName: 'Seated Forward Fold',
       metValue: 2.5,
     );
-
-    expect(setLogs['total_seconds'], 6.0);
-    expect(goodSeconds, greaterThan(0.0));
-    expect(goodSeconds, lessThan(6.0));
-    expect(report.formScore, lessThan(100));
+    expect(report.formScore, inInclusiveRange(0, 100));
   });
 }

@@ -349,6 +349,10 @@ class GenericExerciseVoiceAssets {
   static String? resolveAsset(String key) {
     final value = key.trim();
     if (value.isEmpty) return null;
+    // The landed files still coach the removed hip-dip movement. Safe-no-op
+    // these two static-hold contradictions until they are re-recorded at the
+    // same logical paths, then remove this suppression.
+    if (_suppressedLegacyKeys.contains(value)) return null;
     // Some logical keys are exact shared/phrase keys. Check them before the
     // '<slug>.<id>' resolver below, otherwise squat phase cues would no-op.
     final commonFile = commonFiles[value];
@@ -379,6 +383,11 @@ class GenericExerciseVoiceAssets {
     if (id.startsWith('set_next_')) return '$dir/$id.mp3';
     return '$dir/$id.mp3';
   }
+
+  static const Set<String> _suppressedLegacyKeys = <String>{
+    'side_plank_dip.active_intro',
+    'side_plank_dip.amplitude',
+  };
 
   static String _assetDirectoryForSlug(String slug) {
     if (slug == 'curl_up') return 'mc_gill_curl_up';

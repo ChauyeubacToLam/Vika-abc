@@ -15,6 +15,7 @@ import 'package:vika/exercise/warrior_1/warrior_one.dart';
 import 'package:vika/exercise/seated_forward_fold/seated_forward_fold.dart';
 import 'package:vika/exercise/side_plank_dip/side_plank_dip.dart';
 import 'package:vika/exercise/Sphinx_Pose/sphinx_stretch.dart';
+import 'package:vika/exercise/butterfly_stretch/butterfly_stretch.dart';
 import 'package:vika/models/exercise_definition.dart';
 import 'package:vika/models/exercise_lookup.dart';
 import 'package:vika/screens/exercise/exercise_experience_screen.dart';
@@ -118,12 +119,16 @@ void main() {
     expect((spec.exercise as MountainClimber).maxRep, 18);
   });
 
-  test('catalog base seconds make bear plank a time hold', () {
+  test('catalog hybrid targets both reach Bear Plank', () {
     final definition = lookupExerciseDefinition('bear__plank')!;
 
     final spec = debugBuildExerciseExperienceSpec(
       definition,
-      catalogInfo: catalogInfo(id: 'bear__plank', baseSeconds: 24),
+      catalogInfo: catalogInfo(
+        id: 'bear__plank',
+        baseReps: 3,
+        baseSeconds: 24,
+      ),
     );
 
     expect(spec.targetPerSet, 24);
@@ -131,22 +136,35 @@ void main() {
     expect(spec.secondsPerUnit, 1);
     expect(spec.timeBased, isTrue);
     expect(spec.exercise, isA<BearPlank>());
-    expect((spec.exercise as BearPlank).maxSeconds, 24);
+    expect((spec.exercise as BearPlank).maxHolds, 3);
+    expect((spec.exercise as BearPlank).holdSeconds, 24);
   });
 
-  test('static stretch definitions launch and display as seconds', () {
-    final cases = <({String id, int Function(Object) targetOf})>[
+  test('migrated one-hold definitions preserve count and seconds', () {
+    final cases = <({
+      String id,
+      int Function(Object) countOf,
+      int Function(Object) secondsOf,
+    })>[
+      (
+        id: 'butterfly__stretch',
+        countOf: (exercise) => (exercise as ButterflyStretch).maxHolds,
+        secondsOf: (exercise) => (exercise as ButterflyStretch).holdSeconds,
+      ),
       (
         id: 'seated__forward__fold',
-        targetOf: (exercise) => (exercise as SeatedForwardFold).maxSeconds,
+        countOf: (exercise) => (exercise as SeatedForwardFold).maxHolds,
+        secondsOf: (exercise) => (exercise as SeatedForwardFold).holdSeconds,
       ),
       (
         id: 'side__plank_with__hip__dip',
-        targetOf: (exercise) => (exercise as SidePlankDip).maxSeconds,
+        countOf: (exercise) => (exercise as SidePlankDip).maxHolds,
+        secondsOf: (exercise) => (exercise as SidePlankDip).holdSeconds,
       ),
       (
         id: 'sphinx_',
-        targetOf: (exercise) => (exercise as SphinxStretch).maxSeconds,
+        countOf: (exercise) => (exercise as SphinxStretch).maxHolds,
+        secondsOf: (exercise) => (exercise as SphinxStretch).holdSeconds,
       ),
     ];
 
@@ -154,13 +172,18 @@ void main() {
       final definition = lookupExerciseDefinition(entry.id)!;
       final spec = debugBuildExerciseExperienceSpec(
         definition,
-        catalogInfo: catalogInfo(id: entry.id, baseSeconds: 15),
+        catalogInfo: catalogInfo(
+          id: entry.id,
+          baseReps: 1,
+          baseSeconds: 15,
+        ),
       );
 
       expect(spec.targetPerSet, 15, reason: entry.id);
       expect(spec.targetLabel, 'GIÂY/HIỆP', reason: entry.id);
       expect(spec.timeBased, isTrue, reason: entry.id);
-      expect(entry.targetOf(spec.exercise), 15, reason: entry.id);
+      expect(entry.countOf(spec.exercise), 1, reason: entry.id);
+      expect(entry.secondsOf(spec.exercise), 15, reason: entry.id);
     }
   });
 

@@ -1,21 +1,37 @@
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+
 import '../../utils/pose_math_helpers.dart';
-import '../../utils/exercise_logger.dart';
 import '../exercise_base.dart';
-import 'metrics/seated_forward_metric_base.dart';
-import 'metrics/knee_extension_metric.dart';
-import 'metrics/spinal_alignment_metric.dart';
-import 'metrics/hold_tempo_metric.dart';
+import '../hold/rep_counted_hold_exercise.dart';
 import 'metrics/ankle_dorsiflexion_metric.dart';
+import 'metrics/hold_tempo_metric.dart';
+import 'metrics/knee_extension_metric.dart';
+import 'metrics/seated_forward_metric_base.dart';
+import 'metrics/spinal_alignment_metric.dart';
 
-class SeatedForwardFold extends ExerciseBase {
+class _SeatedForwardPoseFrame {
+  const _SeatedForwardPoseFrame({
+    required this.kneeAngle,
+    required this.hipAngle,
+    required this.hipVelocity,
+    required this.spineAngle,
+    required this.ankleAngle,
+  });
+
+  final double kneeAngle;
+  final double hipAngle;
+  final double hipVelocity;
+  final double spineAngle;
+  final double ankleAngle;
+}
+
+class SeatedForwardFold extends RepCountedHoldExercise {
   SeatedForwardFold({
-    required this.maxSeconds,
-    this.maxHolds = SeatedForwardConfig.At_Num_Holds,
-  }) : tempoMetric = HoldTempoMetric(minHoldSeconds: maxSeconds);
+    required super.maxHolds,
+    required super.holdSeconds,
+  }) : tempoMetric = HoldTempoMetric(minHoldSeconds: holdSeconds);
 
-  final int maxSeconds;
-  final int maxHolds;
+  int get maxSeconds => holdSeconds;
 
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
@@ -24,30 +40,23 @@ class SeatedForwardFold extends ExerciseBase {
         VikaImageOrientation.landscapeRight,
       };
 
-  SeatedForwardState state = SeatedForwardState.setup;
-  SeatedForwardState prevState = SeatedForwardState.setup;
   bool isLeftTracked = true;
 
   double _minHipAngleThisRep = 999.0;
   double _lastMaxDepth = 0.0;
-  double? _userMaxRom;
   double? _setupHipAngle;
-
   double _lastHipAngle = -1.0;
   int _lastTimestampMs = -1;
   double _currentVelocity = 0.0;
   int? _stableStartTimeMs;
-  final HoldSecondsAccumulator _holdSeconds = HoldSecondsAccumulator(const [
-    'knee_bent_seconds',
-    'spine_round_seconds',
-  ]);
+  _SeatedForwardPoseFrame? _sampledFrame;
 
   final KneeExtensionMetric kneeMetric = KneeExtensionMetric();
   final SpinalAlignmentMetric spineMetric = SpinalAlignmentMetric();
   final HoldTempoMetric tempoMetric;
   final AnkleDorsiflexionMetric ankleMetric = AnkleDorsiflexionMetric();
 
-  late final List<SeatedForwardMetricBase> _metrics = [
+  late final List<SeatedForwardMetricBase> _metrics = <SeatedForwardMetricBase>[
     kneeMetric,
     spineMetric,
     tempoMetric,
@@ -58,23 +67,61 @@ class SeatedForwardFold extends ExerciseBase {
   String get exerciseName => 'Seated Forward Fold';
 
   @override
-  bool requestStop() => repCount >= maxHolds;
+  int get holdingDebounceFrames => 1;
 
   @override
-  void onExerciseActivated() {
-    super.onExerciseActivated();
-    _holdSeconds.reset();
+  int get droppingDebounceFrames => 1;
+
+  @override
+  String get currentPhaseLabel {
+    switch (phase) {
+      case HoldPhase.setup:
+        return 'Chuẩn bị';
+      case HoldPhase.holding:
+        return 'Giữ tư thế gập';
+      case HoldPhase.dropping:
+        return 'Nhả cơ';
+      case HoldPhase.resting:
+        return 'Nghỉ';
+      case HoldPhase.reArming:
+        return 'Vào tư thế';
+    }
+  }
+
+  @override
+  List<FaultRecord> get liveFaults {
+    final faults = <String, FaultRecord>{};
+    if (phase == HoldPhase.holding) {
+      if (kneeMetric.isFaultingNow) {
+        _addMappedFaults(faults, kneeMetric.faults);
+      }
+      if (spineMetric.isFaultingNow) {
+        _addMappedFaults(faults, spineMetric.faults);
+      }
+      if (ankleMetric.isFaultingNow) {
+        _addMappedFaults(faults, ankleMetric.faults);
+      }
+    } else if (phase == HoldPhase.dropping) {
+      _addMappedFaults(
+        faults,
+        tempoMetric.faults.where((fault) => fault.type == 'TempoShort'),
+      );
+    }
+    return faults.values.toList(growable: false);
   }
 
   @override
   GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (!_updateTrackedSide()) {
+      interruptReArm();
       return const GuidanceSignal.turnSide();
     }
 
     for (final type in _requiredLandmarks) {
       final landmark = landmarks[type];
       if (landmark == null || !ExerciseBase.isLandmarkConfident(landmark)) {
+        interruptActiveHold(interruptedHoldFaultId);
+        interruptReArm();
         return const GuidanceSignal.bodyInFrame();
       }
     }
@@ -85,72 +132,95 @@ class SeatedForwardFold extends ExerciseBase {
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (!_updateTrackedSide()) return false;
     final body = _body(landmarks);
-    if (body == null) return false;
+    if (body == null || !body.all.every(ExerciseBase.isLandmarkConfident)) {
+      return false;
+    }
 
-    final ah = calculateAngleNormalized(
+    final hipAngle = calculateAngleNormalized(
       firstPoint: body.shoulder,
       midPoint: body.hip,
       lastPoint: body.knee,
     );
-    final ak = calculateAngleNormalized(
+    final kneeAngle = calculateAngleNormalized(
       firstPoint: body.hip,
       midPoint: body.knee,
       lastPoint: body.heel,
     );
 
-    debugData['SeatedForwardSetup'] = {
+    debugData['SeatedForwardSetup'] = <String, String>{
       'cameraFacing': cameraFacing.name,
       'trackedSide': isLeftTracked ? 'left' : 'right',
-      'hipAngle': ah.toStringAsFixed(1),
-      'kneeAngle': ak.toStringAsFixed(1),
+      'hipAngle': hipAngle.toStringAsFixed(1),
+      'kneeAngle': kneeAngle.toStringAsFixed(1),
     };
 
-    final isValid = ak >= SeatedForwardConfig.Ak_Start_Knee_Angle &&
-        ah >= SeatedForwardConfig.Ah_Start_Hip_Angle[0] &&
-        ah <= SeatedForwardConfig.Ah_Start_Hip_Angle[1];
-    if (isValid) {
-      _setupHipAngle = ah;
-    }
+    final isValid = kneeAngle >= SeatedForwardConfig.Ak_Start_Knee_Angle &&
+        hipAngle >= SeatedForwardConfig.Ah_Start_Hip_Angle[0] &&
+        hipAngle <= SeatedForwardConfig.Ah_Start_Hip_Angle[1];
+    if (isValid) _setupHipAngle = hipAngle;
     return isValid;
   }
 
   @override
-  void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
-    if (!_updateTrackedSide()) {
-      _holdSeconds.resetTick();
-      return;
-    }
-    final body = _body(smoothedLandmarks);
-    if (body == null) {
-      _holdSeconds.resetTick();
-      return;
+  Set<String> get faultSecondsKeys => const <String>{
+        'knee_bent_seconds',
+        'spine_round_seconds',
+      };
+
+  @override
+  HoldPoseSample? samplePose(
+    Map<PoseLandmarkType, PoseLandmark> landmarks,
+  ) {
+    if (!_updateTrackedSide()) return null;
+    final body = _body(landmarks);
+    if (body == null || !body.all.every(ExerciseBase.isLandmarkConfident)) {
+      return null;
     }
 
-    final ah = calculateAngleNormalized(
+    final hipAngle = calculateAngleNormalized(
       firstPoint: body.shoulder,
       midPoint: body.hip,
       lastPoint: body.knee,
     );
     if (_lastHipAngle >= 0 && _lastTimestampMs > 0) {
-      final dt = (frameTimestampMs - _lastTimestampMs) / 1000.0;
-      if (dt > 0) _currentVelocity = (ah - _lastHipAngle) / dt;
+      final deltaSeconds = (frameTimestampMs - _lastTimestampMs) / 1000.0;
+      if (deltaSeconds > 0) {
+        _currentVelocity = (hipAngle - _lastHipAngle) / deltaSeconds;
+      }
+    } else {
+      _currentVelocity = 0.0;
     }
-    _lastHipAngle = ah;
+    _lastHipAngle = hipAngle;
     _lastTimestampMs = frameTimestampMs;
 
-    final scale = calculateDistance(body.shoulder, body.hip);
-    if (scale <= 1e-6) {
-      _holdSeconds.resetTick();
-      return;
+    scaleFactor = calculateDistance(body.shoulder, body.hip);
+    if (!scaleFactor.isFinite || scaleFactor <= 1e-6) return null;
+
+    if (hipAngle < _minHipAngleThisRep) {
+      _minHipAngleThisRep = hipAngle;
     }
 
-    final ctx = SeatedForwardContext(
+    final atDepth = hipAngle < _targetDepth();
+    final stable =
+        _currentVelocity.abs() < SeatedForwardConfig.Av_Stable_Velocity;
+    if (atDepth && stable) {
+      _stableStartTimeMs ??= frameTimestampMs;
+    } else {
+      _stableStartTimeMs = null;
+    }
+    final stableAtDepth = _stableStartTimeMs != null &&
+        frameTimestampMs - _stableStartTimeMs! >= 1000;
+    final releasedEarly = _minHipAngleThisRep < 999.0 &&
+        hipAngle >
+            _minHipAngleThisRep + SeatedForwardConfig.Ascending_Threshold;
+
+    _sampledFrame = _SeatedForwardPoseFrame(
       kneeAngle: calculateAngleNormalized(
         firstPoint: body.hip,
         midPoint: body.knee,
         lastPoint: body.heel,
       ),
-      hipAngle: ah,
+      hipAngle: hipAngle,
       hipVelocity: _currentVelocity,
       spineAngle: calculateAngleNormalized(
         firstPoint: body.ear,
@@ -162,120 +232,127 @@ class SeatedForwardFold extends ExerciseBase {
         midPoint: body.heel,
         lastPoint: body.toe,
       ),
-      scaleFactor: scale,
-      state: state,
+    );
+
+    return HoldPoseSample(
+      insideOuterEntry: stableAtDepth,
+      outsideOuterExit: releasedEarly,
+    );
+  }
+
+  @override
+  Map<String, bool> updateFormMetrics() {
+    final sample = _sampledFrame!;
+    final context = SeatedForwardContext(
+      kneeAngle: sample.kneeAngle,
+      hipAngle: sample.hipAngle,
+      hipVelocity: sample.hipVelocity,
+      spineAngle: sample.spineAngle,
+      ankleAngle: sample.ankleAngle,
+      scaleFactor: scaleFactor,
+      state: _legacyStateFor(phase),
       frameTimestampMs: frameTimestampMs,
       resultIssues: resultIssues,
     );
 
-    _updateStateBuffer(ctx);
+    if (phase == HoldPhase.holding || phase == HoldPhase.dropping) {
+      for (final metric in _metrics) {
+        metric.update(context);
+        debugData.addAll(metric.debugData);
+      }
+    }
 
-    debugData['SeatedForwardDebug'] = {
-      'state': state.name,
+    debugData['SeatedForwardDebug'] = <String, dynamic>{
+      'state': phase.name,
       'trackedSide': isLeftTracked ? 'left' : 'right',
-      'hipAngle': ctx.hipAngle.toStringAsFixed(1),
-      'hipVelocity': ctx.hipVelocity.toStringAsFixed(1),
+      'hipAngle': sample.hipAngle.toStringAsFixed(1),
+      'hipVelocity': sample.hipVelocity.toStringAsFixed(1),
       'targetDepth': _targetDepth().toStringAsFixed(1),
       'liveHold': liveHoldSeconds?.toStringAsFixed(1),
       'repCount': repCount,
     };
 
-    if (state != SeatedForwardState.setup) {
-      for (final m in _metrics) {
-        m.update(ctx);
-        debugData.addAll(m.debugData);
-      }
-    }
+    return <String, bool>{
+      'knee_bent_seconds': kneeMetric.isFaultingNow,
+      'spine_round_seconds': spineMetric.isFaultingNow,
+    };
+  }
 
-    if (state == SeatedForwardState.isometricHold) {
-      _holdSeconds.accumulate(
-        elapsedMs: elapsedMs,
-        faultingByKey: {
-          'knee_bent_seconds': kneeMetric.isFaultingNow,
-          'spine_round_seconds': spineMetric.isFaultingNow,
-        },
-      );
-    } else {
-      _holdSeconds.resetTick();
+  @override
+  Map<String, FaultRecord> snapshotHoldFaults() {
+    final faults = <String, FaultRecord>{};
+    for (final metric in _metrics) {
+      _addMappedFaults(faults, metric.faults);
+    }
+    return faults;
+  }
+
+  @override
+  void resetFormMetrics({required bool countFaults}) {
+    for (final metric in _metrics) {
+      if (countFaults) {
+        metric.resetAndCountFault();
+      } else {
+        metric.reset();
+      }
     }
   }
 
-  void _updateStateBuffer(SeatedForwardContext ctx) {
-    var newState = state;
-    var completedHoldTarget = false;
-
-    switch (state) {
-      case SeatedForwardState.setup:
-        final setupAngle = _setupHipAngle ?? 90.0;
-        final movedFromStart = ctx.hipAngle <
-            setupAngle - SeatedForwardConfig.Ah_Min_Fold_From_Setup;
-        if (movedFromStart &&
-            (ctx.hipVelocity < -6.0 ||
-                ctx.hipAngle <
-                    setupAngle -
-                        SeatedForwardConfig.Ah_Min_Fold_From_Setup -
-                        2.0)) {
-          newState = SeatedForwardState.descending;
-        }
-        break;
-
-      case SeatedForwardState.descending:
-        if (ctx.hipAngle < _minHipAngleThisRep) {
-          _minHipAngleThisRep = ctx.hipAngle;
-        }
-
-        final targetDepth = _targetDepth();
-        if (ctx.hipAngle < targetDepth &&
-            ctx.hipVelocity.abs() < SeatedForwardConfig.Av_Stable_Velocity) {
-          _stableStartTimeMs ??= ctx.frameTimestampMs;
-          if (ctx.frameTimestampMs - _stableStartTimeMs! >= 1000) {
-            newState = SeatedForwardState.isometricHold;
-            _stableStartTimeMs = null;
-          }
-        } else {
-          _stableStartTimeMs = null;
-        }
-        break;
-
-      case SeatedForwardState.isometricHold:
-        if (ctx.hipAngle < _minHipAngleThisRep) {
-          _minHipAngleThisRep = ctx.hipAngle;
-        }
-        if (tempoMetric.getLiveHoldTime(ctx.frameTimestampMs) >= maxSeconds) {
-          newState = SeatedForwardState.ascending;
-          completedHoldTarget = true;
-        } else if (ctx.hipAngle >
-            _minHipAngleThisRep + SeatedForwardConfig.Ascending_Threshold) {
-          newState = SeatedForwardState.ascending;
-        }
-        break;
-
-      case SeatedForwardState.ascending:
-        if (ctx.hipAngle > SeatedForwardConfig.Ah_Start_Hip_Angle[0] - 10) {
-          newState = SeatedForwardState.setup;
-        }
-        break;
+  @override
+  void onHoldPhaseChanged(
+    HoldPhase previous,
+    HoldPhase next,
+    int nowMs,
+  ) {
+    final oldState = _legacyStateFor(previous);
+    final newState = _legacyStateFor(next);
+    for (final metric in _metrics) {
+      metric.onStateTransition(oldState, newState, nowMs);
     }
 
-    if (newState != state) {
-      final oldState = state;
-      for (final m in _metrics) {
-        m.onStateTransition(oldState, newState, ctx.frameTimestampMs);
-      }
-      prevState = oldState;
-      state = newState;
-
-      if (oldState == SeatedForwardState.isometricHold &&
-          newState == SeatedForwardState.ascending &&
-          completedHoldTarget) {
-        _completeRep(ctx);
-      }
-
-      if (state == SeatedForwardState.setup &&
-          prevState == SeatedForwardState.ascending) {
-        _resetAttempt();
-      }
+    if (previous == HoldPhase.holding && next == HoldPhase.resting) {
+      _lastMaxDepth = _minHipAngleThisRep;
     }
+    if (next == HoldPhase.dropping) {
+      _stableStartTimeMs = null;
+    } else if (next == HoldPhase.setup || next == HoldPhase.reArming) {
+      _resetAttemptGeometry();
+    }
+  }
+
+  @override
+  Map<String, dynamic> holdRepLogExtras() => <String, dynamic>{
+        'max_depth_angle': _lastMaxDepth,
+      };
+
+  @override
+  void onHoldSetReset() {
+    _sampledFrame = null;
+    _lastMaxDepth = 0.0;
+    _resetAttemptGeometry();
+  }
+
+  @override
+  void onSetComplete() {
+    final targetSeconds = (maxHolds * holdSeconds).toDouble();
+    logger.pushKey('total_seconds', targetSeconds);
+    logger.pushKey('good_seconds', clampedGoodHoldSeconds(targetSeconds));
+    logger.pushKey(
+      'knee_bent_seconds',
+      faultHoldSecondsFor('knee_bent_seconds'),
+    );
+    logger.pushKey(
+      'spine_round_seconds',
+      faultHoldSecondsFor('spine_round_seconds'),
+    );
+  }
+
+  void _resetAttemptGeometry() {
+    _minHipAngleThisRep = 999.0;
+    _lastHipAngle = -1.0;
+    _lastTimestampMs = -1;
+    _currentVelocity = 0.0;
+    _stableStartTimeMs = null;
   }
 
   double _targetDepth() {
@@ -286,86 +363,45 @@ class SeatedForwardFold extends ExerciseBase {
         : SeatedForwardConfig.Ah_Hold_Safety_Floor;
   }
 
-  void _resetAttempt() {
-    _minHipAngleThisRep = 999.0;
-    _stableStartTimeMs = null;
-    for (final m in _metrics) {
-      m.reset();
+  SeatedForwardState _legacyStateFor(HoldPhase holdPhase) {
+    switch (holdPhase) {
+      case HoldPhase.holding:
+        return SeatedForwardState.isometricHold;
+      case HoldPhase.dropping:
+        return SeatedForwardState.ascending;
+      case HoldPhase.setup:
+      case HoldPhase.resting:
+      case HoldPhase.reArming:
+        return SeatedForwardState.setup;
     }
   }
 
-  void _completeRep(SeatedForwardContext ctx) {
-    repCount += 1;
-    _lastMaxDepth = _minHipAngleThisRep;
-    if (_userMaxRom == null || _lastMaxDepth < _userMaxRom!) {
-      _userMaxRom = _lastMaxDepth;
-    }
-
-    final allFaults = <FaultRecord>[
-      ...kneeMetric.faults,
-      ...spineMetric.faults,
-      ...tempoMetric.faults,
-      ...ankleMetric.faults,
-    ];
-
-    correctForm = !allFaults.any((f) =>
-        f.priority == SeatedForwardFaultVoicePriority.kneeBent ||
-        f.priority == SeatedForwardFaultVoicePriority.spineRound);
-
-    logger.addRepLog(RepLog(
-      repNumber: repCount,
-      correctForm: correctForm,
-      data: {
-        'max_depth_angle': _lastMaxDepth,
-        'hold_time': tempoMetric.activeHoldSeconds,
-        'fault_types': allFaults.map((f) => f.type).toSet().toList(),
-      },
-    ));
-
-    _minHipAngleThisRep = 999.0;
-    _stableStartTimeMs = null;
-    for (final m in _metrics) {
-      m.resetAndCountFault();
+  void _addMappedFaults(
+    Map<String, FaultRecord> target,
+    Iterable<FaultRecord> source,
+  ) {
+    for (final fault in source) {
+      final mapped = _mapFaultRecord(fault);
+      target[mapped.type] = mapped;
     }
   }
 
-  @override
-  String get currentPhaseKey => state.name;
-
-  @override
-  String get currentPhaseLabel {
-    switch (state) {
-      case SeatedForwardState.setup:
-        return 'Chuẩn bị';
-      case SeatedForwardState.descending:
-        return 'Gập người';
-      case SeatedForwardState.isometricHold:
-        return 'Giữ tĩnh';
-      case SeatedForwardState.ascending:
-        return 'Nhả cơ';
-    }
-  }
-
-  @override
-  double? get liveHoldSeconds => state == SeatedForwardState.isometricHold
-      ? tempoMetric.getLiveHoldTime(frameTimestampMs)
-      : null;
-
-  @override
-  double? get liveHoldTargetSeconds => maxSeconds.toDouble();
-
-  @override
-  void onSetComplete() {
-    final targetSeconds = (maxHolds * maxSeconds).toDouble();
-    logger.pushKey('total_seconds', targetSeconds);
-    logger.pushKey(
-      'good_seconds',
-      _holdSeconds.goodSeconds.clamp(0.0, targetSeconds),
+  FaultRecord _mapFaultRecord(FaultRecord fault) {
+    final type = switch (fault.type) {
+      'KneeBent' => 'knee',
+      'SpineRound' => 'spine',
+      'AnklePlantar' => 'ankle',
+      'TempoShort' => 'tempo',
+      _ => fault.type,
+    };
+    return FaultRecord(
+      phase: phase.name,
+      type: type,
+      message: fault.message,
+      affectsForm: fault.affectsForm,
+      voiceMessage: fault.voiceMessage,
+      priority: fault.priority,
     );
-    logger.pushKey(
-        'knee_bent_seconds', _holdSeconds.faultSecondsFor('knee_bent_seconds'));
-    logger.pushKey('spine_round_seconds',
-        _holdSeconds.faultSecondsFor('spine_round_seconds'));
   }
 
   bool _updateTrackedSide() {
@@ -380,7 +416,7 @@ class SeatedForwardFold extends ExerciseBase {
     return false;
   }
 
-  List<PoseLandmarkType> get _requiredLandmarks => [
+  List<PoseLandmarkType> get _requiredLandmarks => <PoseLandmarkType>[
         isLeftTracked ? PoseLandmarkType.leftEar : PoseLandmarkType.rightEar,
         isLeftTracked
             ? PoseLandmarkType.leftShoulder
@@ -394,7 +430,8 @@ class SeatedForwardFold extends ExerciseBase {
       ];
 
   _SeatedForwardLandmarks? _body(
-      Map<PoseLandmarkType, PoseLandmark> landmarks) {
+    Map<PoseLandmarkType, PoseLandmark> landmarks,
+  ) {
     final ear = landmarks[
         isLeftTracked ? PoseLandmarkType.leftEar : PoseLandmarkType.rightEar];
     final shoulder = landmarks[isLeftTracked
@@ -430,13 +467,6 @@ class SeatedForwardFold extends ExerciseBase {
 }
 
 class _SeatedForwardLandmarks {
-  final PoseLandmark ear;
-  final PoseLandmark shoulder;
-  final PoseLandmark hip;
-  final PoseLandmark knee;
-  final PoseLandmark heel;
-  final PoseLandmark toe;
-
   const _SeatedForwardLandmarks({
     required this.ear,
     required this.shoulder,
@@ -445,4 +475,20 @@ class _SeatedForwardLandmarks {
     required this.heel,
     required this.toe,
   });
+
+  final PoseLandmark ear;
+  final PoseLandmark shoulder;
+  final PoseLandmark hip;
+  final PoseLandmark knee;
+  final PoseLandmark heel;
+  final PoseLandmark toe;
+
+  List<PoseLandmark> get all => <PoseLandmark>[
+        ear,
+        shoulder,
+        hip,
+        knee,
+        heel,
+        toe,
+      ];
 }

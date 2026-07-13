@@ -14,11 +14,78 @@ Alternatives considered: <what we rejected and why>
 
 ---
 
+## 2026-07-13 · Hold P3 fault identity and audio-honesty reconcile
+Status: active, implemented with the five-exercise hold-voice migration.
+Decision: preserve each existing measured CV branch as a distinct hold fault without changing its
+threshold: Butterfly routes `PostureCollapse` to `posture` and shoulder tilt to `shoulder`; Sphinx
+routes the existing straight-arm, forearm, and upper-arm elbow checks to `straight_arm`, `forearm`,
+and `upper_arm`. Suppress Side Plank's existing `active_intro` and `amplitude` assets until those
+same keys are regenerated for a static hold, because their current copy instructs a moving hip dip.
+Leave Seated Forward Fold's non-form `ankle` and `tempo` faults silent until dedicated soft-cue pools
+and assets are approved; do not force them through critical form coaching. Bear Plank keeps the
+catalog's three internal holds, while Side Plank keeps the catalog's actual three external sets × one
+internal hold, not three internal holds per set. Bear's short `setup_position` asset remains usable at
+set start but needs a same-key rewrite before re-arm can use it honestly without stranding the user on
+hands and knees.
+Why: every spoken fault must name something the running CV actually measured, and silence is safer
+than giving the wrong movement instruction. Keeping the catalog volume shape avoids turning Side
+Plank's prescribed three holds into nine. The reconcile preserves the P3 fence: voice/engine wiring
+around existing checks, with no threshold tuning, anti-cheat design, engine change, or catalog change.
+Alternatives considered: collapse Butterfly and Sphinx branches onto broader fault IDs (rejected,
+loses measured identity); play Side Plank's old moving-dip audio (rejected, contradicts the static
+hold); route Seated ankle/tempo through critical form audio (rejected, wrong cue policy); hard-code
+three Side Plank holds inside each set from the scratch-spec shorthand (rejected, conflicts with the
+actual catalog prescription).
+
+## 2026-07-12 · Scale hold VOICE to all hold exercises (P3 redefined), mechanics deferred
+Status: active — Nam's call 07-12 under publish pressure.
+Decision: migrate ALL 5 hold-based exercises (bear_plank, butterfly, seated_forward_fold, sphinx,
+side_plank_dip; high_plank already done) onto the `RepCountedHoldExercise` engine so their VOICE
+works, reusing each exercise's EXISTING CV checks as-is. Do NOT build anti-cheat outer rings, do NOT
+tune thresholds or metrics, do NOT perfect the CV — Nam finalizes exercise "magics" (anti-cheat,
+calibration) in a separate later pass and will device-test then. Scope now = voice + audio + the
+engine wiring around the existing checks. Each exercise's existing hold-entry condition maps to the
+engine's `insideOuterEntry`, its break/exit condition to `outsideOuterExit`, its form metrics to the
+inner coached layer — untouched.
+Why: publishing needs the hold fleet speaking now; the engine (P2) is the built vehicle and a
+uniform fill-in-the-blanks per exercise is the fastest correct path. Reusing existing CV honors
+"don't fix the exercise"; the engine drives phases/timing/voice around it. One holds pattern, not a
+second voice-adapter path that drifts.
+Consequence accepted: exercises with movement-phase nuance (butterfly stretching-vs-hold; sphinx/
+seated reps-of-holds tempo metric) flatten to setup→hold→(rest)→done. Fine because the mechanics
+pass reworks them anyway. Fork (c)'s anti-cheat realization is therefore DEFERRED — the universal
+"form coaches, cheat stops clock" rule stands as the target, but the outer-ring implementation is
+Nam's mechanics pass, not this voice pass. Interim clock gates on each exercise's existing check.
+Alternatives considered: bespoke voice adapter per exercise keeping its state machine (rejected —
+fiddlier per exercise, partial/inconsistent voice, second holds pattern = drift); do bear plank only
+then the rest later (rejected — publish needs the whole hold fleet).
+Spec: docs/scratch/hold-voice-scale-codex-spec.md (batch, per-exercise mapping table).
+
+## 2026-07-12 · P2 rep-counted-hold engine extraction
+Status: active engine decision; the one-subclass/P3-gated status was superseded by "Scale hold
+VOICE to all hold exercises (P3 redefined)" above, and P3 landed 2026-07-13.
+Decision: `RepCountedHoldExercise` is a base class in `lib/exercise/hold/`. It owns the
+setup/holding/dropping/resting/reArming machine, timer and fault-second accumulation, pause/rest/
+re-arm lifecycle, and per-hold RepLog core. Exercise geometry and form metrics stay in the subclass
+through the two-call frame contract: `samplePose` before transitions, then `updateFormMetrics` after
+transitions. `HoldPhase` lives beside the engine in `hold/hold_phase.dart`; voice validation keys are
+derived from `HoldPhase.name` instead of duplicating phase spellings in `exercise_base.dart`.
+Why: the state machine now has one owner without pulling hold-only types into the universal exercise
+base. The two-call protocol preserves the load-bearing current-frame ordering: geometry decides the
+transition, then every metric sees the resulting phase. A base class also prevents each future hold
+exercise from re-wiring pause, rest, re-arm, logging, and debounce behavior independently.
+Alternatives considered: mixin (rejected — invites consumer-by-consumer lifecycle wiring drift);
+put `HoldPhase` in `exercise_base.dart` (rejected — universal base should not own one modality's
+state type); combine geometry and metrics in one callback (rejected — changes completion/drop frame
+semantics); migrate Bear Plank in the same pass (rejected — P3 changes clock behavior and remains
+approval-gated).
+
 ## 2026-07-12 · ADR: two-modality catalog (rep-based + hybrid hold) + hybrid progression
 Status: active — Nam approved P1 (07-12): decisions 1 (two modalities) + 2 (seconds-axis hybrid
-progression) are committed and cleared for Codex. Decision 3 (count==1 UI) rides with P4; forks
-(a) label copy, (b) rep-based /1 rows, (c) bear-plank clock leniency remain OPEN and gate P3/P4,
-not P1. Resolves the OPEN impl item in "Holds count holds as REPS" (how a plank-model row carries
+progression) are committed. P1 code is implemented pending Nam line review; the prod data flip was
+applied and the bundled JSON was resynced. Decision 3 (count==1 UI) rides with P4. Fork (c)
+RESOLVED 07-12 (see the OPEN forks note below). Forks (a) label copy, (b) rep-based /1 rows remain
+OPEN and gate P4, not P1. Resolves the OPEN impl item in "Holds count holds as REPS" (how a plank-model row carries
 both hold count and per-hold seconds) and the prod-severity `prescribeVolume` blocker in state.md.
 Problem: the catalog has three shapes — reps-only, seconds-only, and (since the plank-model flip)
 both-fields on high_plank/bear_plank. Every consumer enforces exactly-one-of
@@ -51,9 +118,16 @@ OPEN forks (Nam):
 (a) Hybrid volume label copy (e.g. "3 hiệp × 3 lần × 20 giây") — spec proposes, Nam owns copy.
 (b) Rep-based rows with reps=1 (downward_dog, prayer_pose, raised_arms) show a "/1" rep hero
     today; left unchanged this pass (hiding it would leave them no progress surface).
-(c) Bear plank's clock flips form-gated → pose-validity-gated two-ring when it adopts the shared
-    engine. That follows the locked hold design but is MORE LENIENT than its current scoring
-    (back/weight faults become coached, not clock-stopping) — PT sanity-check wanted.
+(c) RESOLVED 07-12 (Nam): NOT a per-exercise fork — it is the UNIVERSAL hold invariant, already
+    decided at High Plank and binding on every hold. Bad FORM never stops the clock; it earns a
+    coaching cue while time keeps accruing. Only ANTI-CHEAT stops the clock — gross positional
+    collapse (e.g. lying flat on the floor), caught by the loose OUTER ring. Inner form metrics
+    (sag, pike, back, weight) coach only. Bear plank being form-gated today is the inconsistency to
+    fix, not a calibration to preserve; data honesty holds because fault seconds are still measured
+    and scored, just not double-punished by a frozen clock. This rule applies to ALL future holds —
+    each one must define an outer anti-cheat ring (what = collapse) distinct from its inner form
+    metrics. See the 07-11 "two rings" hold decision; this makes it explicitly universal. No PT
+    sign-off needed; the only per-exercise work left is choosing each hold's collapse thresholds.
 Sequencing: P1 engine+data unbreak (progression rules hybrid path, variant unlock, generator
 guard, SQL base_reps=1 ×4, regen JSON) → P2 hold-engine extraction from High Plank
 (behavior-preserving) → P3 bear plank onto the engine + its voice pools (second consumer proves
@@ -72,9 +146,9 @@ Decision:
 - `TimerMetric` and `HoldSecondsAccumulator` share the same valid inter-frame delta range. Gaps
   outside that range are dropped, so a pause, camera interruption, or janky frame cannot be credited
   as held time by one clock while the other rejects it.
-- Until the deferred shared hold engine owns a typed phase model, rep-counted holds use one named
-  string contract (`setup`, `holding`, `dropping`, `resting`, `reArming`). The voice adapter checks
-  every reported phase and fails loud: one release log plus a debug assertion for an unknown key.
+- SUPERSEDED by "P2 rep-counted-hold engine extraction" above: the shared engine now owns typed
+  `HoldPhase`; the voice adapter still validates the derived `phase.name` key and fails loud on an
+  unknown key.
 - Rep-counted-hold milestone praise and hustle pools are required configuration. Empty pools get the
   same release-log/debug-assert treatment; no fallback line is invented. Rep exercises never enter
   either hold-only guard.

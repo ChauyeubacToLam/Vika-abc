@@ -1,12 +1,13 @@
 import '../../exercise_base.dart';
 import '../../fault_record.dart';
+import '../../hold/timer_metric.dart';
 import '../../../debug/debug_types.dart';
 export '../../../debug/debug_types.dart';
 export '../../fault_record.dart';
 
-enum HighPlankState { setup, holding, dropping, resting, reArming }
+typedef HighPlankState = HoldPhase;
 
-class HighPlankRepContext {
+class HighPlankRepContext implements HoldTimerFrame {
   final double shoulderHipAnkleAngle; // Đo thẳng người
   final double shoulderElbowWristAngle; // Đo tay duỗi
 
@@ -15,6 +16,7 @@ class HighPlankRepContext {
   final double? scaleFactor; // Khoảng cách Shoulder-Hip để chuẩn hóa
 
   final HighPlankState state;
+  @override
   final int frameTimestampMs;
   final ResultIssues resultIssues;
 
@@ -27,6 +29,9 @@ class HighPlankRepContext {
     required this.frameTimestampMs,
     required this.resultIssues,
   });
+
+  @override
+  HoldPhase get holdPhase => state;
 }
 
 class HighPlankFaultPriority {

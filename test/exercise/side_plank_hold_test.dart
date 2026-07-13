@@ -16,7 +16,7 @@ PoseLandmark _landmark(PoseLandmarkType type, double x, double y) {
 Map<PoseLandmarkType, PoseLandmark> _sidePlankPose({
   double hipY = 300,
 }) {
-  return {
+  return <PoseLandmarkType, PoseLandmark>{
     PoseLandmarkType.leftShoulder:
         _landmark(PoseLandmarkType.leftShoulder, 200, 300),
     PoseLandmarkType.rightShoulder:
@@ -42,47 +42,71 @@ void _pump(
   exercise.checkingPose(pose);
 }
 
+SidePlankDip _activeSidePlank({int holdSeconds = 1}) {
+  final exercise = SidePlankDip(maxHolds: 1, holdSeconds: holdSeconds)
+    ..cameraFacing = CameraFacing.left
+    ..exerciseState = ExerciseState.activated;
+  final pose = _sidePlankPose();
+  expect(exercise.isInStartPosition(pose), isTrue);
+  exercise.onExerciseActivated();
+  return exercise;
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('uses a hold timer and completes one static hold', () {
-    final exercise = SidePlankDip(maxSeconds: 2)
-      ..cameraFacing = CameraFacing.left
-      ..exerciseState = ExerciseState.activated;
+  test('full static hold logs one engine rep', () {
+    final exercise = _activeSidePlank();
     final pose = _sidePlankPose();
 
-    expect(exercise.isInStartPosition(pose), isTrue);
-    exercise.onExerciseActivated();
-    for (var timestamp = 0; timestamp <= 2000; timestamp += 250) {
-      _pump(exercise, pose, timestamp);
+    var timestampMs = 0;
+    while (exercise.repCount == 0 && timestampMs < 4000) {
+      _pump(exercise, pose, timestampMs);
+      timestampMs += 250;
     }
 
-    expect(exercise.liveHoldSeconds, 2.0);
-    expect(exercise.requestStop(), isTrue);
-    expect(exercise.repCount, 0);
-
-    exercise.onSetComplete();
+    expect(exercise.phase, HoldPhase.resting);
     expect(exercise.repCount, 1);
-    expect(exercise.logger.repLogs.single.data['hold_time'], 2.0);
+    expect(exercise.requestStop(), isTrue);
+    expect(exercise.logger.repLogs.single.data['hold_time'], 1.0);
   });
 
-  test('does not advance the timer while the hip drops', () {
-    final exercise = SidePlankDip(maxSeconds: 2)
-      ..cameraFacing = CameraFacing.left
-      ..exerciseState = ExerciseState.activated;
+  test('strict reused gate emits amplitude and preserves report keys', () {
+    final exercise = _activeSidePlank();
     final good = _sidePlankPose();
     final dropped = _sidePlankPose(hipY: 410);
 
-    expect(exercise.isInStartPosition(good), isTrue);
-    exercise.onExerciseActivated();
     _pump(exercise, good, 0);
     _pump(exercise, good, 250);
-    final beforeDrop = exercise.liveHoldSeconds;
     _pump(exercise, dropped, 500);
-    _pump(exercise, dropped, 750);
 
-    expect(exercise.liveHoldSeconds, beforeDrop);
-    expect(exercise.repCount, 0);
-    expect(exercise.resultIssues.feedback['Amplitude'], isNotNull);
+    expect(exercise.phase, HoldPhase.dropping);
+    expect(
+      exercise.liveFaults.map((fault) => fault.type),
+      contains('amplitude'),
+    );
+
+    var timestampMs = 750;
+    while (exercise.repCount == 0 && timestampMs < 5000) {
+      _pump(exercise, good, timestampMs);
+      timestampMs += 250;
+    }
+
+    final repData = exercise.logger.repLogs.single.data;
+    expect(repData['hold_time'], 1.0);
+    expect(repData['fault_types'], contains('amplitude'));
+
+    exercise.onSetComplete();
+    final setLogs = exercise.logger.setLogs;
+    expect(setLogs['shoulder_align_fails_count'], 0);
+    expect(setLogs['rotation_fails_count'], 0);
+    expect(setLogs['dip_depth_fails_count'], 1);
+    expect(setLogs['total_seconds'], 1.0);
+    expect(setLogs['good_seconds'], isA<num>());
+    expect(setLogs['shoulder_seconds'], isA<num>());
+    expect(setLogs['rotation_seconds'], isA<num>());
+    expect(setLogs['body_line_seconds'], isA<num>());
+    expect(setLogs['max_rep'], 1);
+    expect(setLogs['good_rep_count'], 0);
   });
 }

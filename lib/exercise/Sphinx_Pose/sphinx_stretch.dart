@@ -1,36 +1,55 @@
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
-import '../../utils/pose_math_helpers.dart';
-import '../../utils/exercise_logger.dart';
-import '../exercise_base.dart';
-import 'Metrics/sphinx_metric_base.dart';
-import 'Metrics/hold_tempo_metric.dart';
-import 'Metrics/elbow_angle_metric.dart';
-import 'Metrics/neck_shoulder_metric.dart';
 
-class SphinxStretch extends ExerciseBase {
-  SphinxStretch({
-    required this.maxSeconds,
+import '../../utils/pose_math_helpers.dart';
+import '../exercise_base.dart';
+import '../hold/rep_counted_hold_exercise.dart';
+import 'Metrics/elbow_angle_metric.dart';
+import 'Metrics/hold_tempo_metric.dart';
+import 'Metrics/neck_shoulder_metric.dart';
+import 'Metrics/sphinx_metric_base.dart';
+
+class _SphinxPoseFrame {
+  const _SphinxPoseFrame({
+    required this.bodyAngle,
+    required this.elbowAngle,
+    required this.spineAngle,
+    required this.forearmAngle,
+    required this.upperArmAngle,
+    required this.neckAngle,
+    required this.hipY,
+    required this.ankleY,
+    required this.earShoulderDistance,
   });
 
-  final int maxSeconds;
+  final double bodyAngle;
+  final double elbowAngle;
+  final double spineAngle;
+  final double forearmAngle;
+  final double upperArmAngle;
+  final double neckAngle;
+  final double hipY;
+  final double ankleY;
+  final double earShoulderDistance;
+}
 
-  SphinxState state = SphinxState.proneSetup;
-  SphinxState prevState = SphinxState.proneSetup;
+class SphinxStretch extends RepCountedHoldExercise {
+  SphinxStretch({
+    required super.maxHolds,
+    required super.holdSeconds,
+  });
+
+  int get maxSeconds => holdSeconds;
+
   bool isLeftTracked = true;
-
-  // Cache thông số rep cuối
+  _SphinxPoseFrame? _sampledFrame;
   double _lastHoldTime = 0.0;
   double _lastStabilityScore = 0.0;
-  final HoldSecondsAccumulator _holdSeconds = HoldSecondsAccumulator(const [
-    'straight_arm_seconds',
-    'shrug_neck_seconds',
-  ]);
 
   final HoldTempoMetric tempoMetric = HoldTempoMetric();
   final ElbowAngleMetric elbowMetric = ElbowAngleMetric();
   final NeckShoulderMetric neckMetric = NeckShoulderMetric();
 
-  late final List<SphinxMetricBase> _metrics = [
+  late final List<SphinxMetricBase> _metrics = <SphinxMetricBase>[
     tempoMetric,
     elbowMetric,
     neckMetric,
@@ -47,50 +66,65 @@ class SphinxStretch extends ExerciseBase {
   String get exerciseName => 'Sphinx Pose';
 
   @override
-  bool requestStop() => repCount >= SphinxConfig.Af_Max_Reps;
+  int get holdingDebounceFrames => 1;
 
   @override
-  void onExerciseActivated() {
-    super.onExerciseActivated();
-    _holdSeconds.reset();
+  int get droppingDebounceFrames => 1;
+
+  @override
+  String get currentPhaseLabel {
+    switch (phase) {
+      case HoldPhase.setup:
+        return 'Nằm chuẩn bị';
+      case HoldPhase.holding:
+        return 'Giữ tư thế nhân sư';
+      case HoldPhase.dropping:
+        return 'Thoát thế';
+      case HoldPhase.resting:
+        return 'Nghỉ';
+      case HoldPhase.reArming:
+        return 'Vào tư thế';
+    }
   }
 
   @override
-  double? get liveHoldSeconds => state == SphinxState.isometricHold
-      ? tempoMetric.getLiveHoldTime(frameTimestampMs)
-      : null;
+  List<FaultRecord> get liveFaults {
+    if (phase != HoldPhase.holding) return const <FaultRecord>[];
 
-  @override
-  double? get liveHoldTargetSeconds => maxSeconds.toDouble();
+    final faults = <String, FaultRecord>{};
+    final currentArmFault = elbowMetric.currentFault;
+    if (elbowMetric.isFaultingNow && currentArmFault != null) {
+      final mapped = _mapFaultRecord(currentArmFault);
+      faults[mapped.type] = mapped;
+    }
+    if (neckMetric.isShrugFaultingNow) {
+      final source = _faultOfType(neckMetric.faults, 'NeckShrug');
+      if (source != null) {
+        final mapped = _mapFaultRecord(source);
+        faults[mapped.type] = mapped;
+      }
+    }
+    if (neckMetric.isHyperFaultingNow) {
+      final source = _faultOfType(neckMetric.faults, 'NeckHyper');
+      if (source != null) {
+        final mapped = _mapFaultRecord(source);
+        faults[mapped.type] = mapped;
+      }
+    }
+    return faults.values.toList(growable: false);
+  }
 
   @override
   GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.left &&
         cameraFacing != CameraFacing.right) {
+      interruptReArm();
       return const GuidanceSignal.turnSide();
     }
-
     if (!_selectTrackedSide(landmarks)) {
+      interruptActiveHold(interruptedHoldFaultId);
+      interruptReArm();
       return const GuidanceSignal.bodyInFrame();
-    }
-
-    final req = isLeftTracked
-        ? [
-            PoseLandmarkType.leftShoulder,
-            PoseLandmarkType.leftHip,
-            PoseLandmarkType.leftAnkle,
-          ]
-        : [
-            PoseLandmarkType.rightShoulder,
-            PoseLandmarkType.rightHip,
-            PoseLandmarkType.rightAnkle,
-          ];
-
-    for (final type in req) {
-      if (landmarks[type] == null ||
-          !ExerciseBase.isLandmarkConfident(landmarks[type]!)) {
-        return const GuidanceSignal.bodyInFrame();
-      }
     }
     return null;
   }
@@ -99,41 +133,61 @@ class SphinxStretch extends ExerciseBase {
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (!_selectTrackedSide(landmarks)) return false;
 
-    final shoulder = isLeftTracked
-        ? landmarks[PoseLandmarkType.leftShoulder]
-        : landmarks[PoseLandmarkType.rightShoulder];
-    final hip = isLeftTracked
-        ? landmarks[PoseLandmarkType.leftHip]
-        : landmarks[PoseLandmarkType.rightHip];
-    final ankle = isLeftTracked
-        ? landmarks[PoseLandmarkType.leftAnkle]
-        : landmarks[PoseLandmarkType.rightAnkle];
-    final elbow = isLeftTracked
-        ? landmarks[PoseLandmarkType.leftElbow]
-        : landmarks[PoseLandmarkType.rightElbow];
-    final wrist = isLeftTracked
-        ? landmarks[PoseLandmarkType.leftWrist]
-        : landmarks[PoseLandmarkType.rightWrist];
-    final knee = isLeftTracked
-        ? landmarks[PoseLandmarkType.leftKnee]
-        : landmarks[PoseLandmarkType.rightKnee];
-
+    final shoulder = _point(
+      landmarks,
+      PoseLandmarkType.leftShoulder,
+      PoseLandmarkType.rightShoulder,
+    );
+    final hip = _point(
+      landmarks,
+      PoseLandmarkType.leftHip,
+      PoseLandmarkType.rightHip,
+    );
+    final ankle = _point(
+      landmarks,
+      PoseLandmarkType.leftAnkle,
+      PoseLandmarkType.rightAnkle,
+    );
     if (shoulder == null || hip == null || ankle == null) return false;
 
     final bodyAngle = calculateAngleNormalized(
-        firstPoint: shoulder, midPoint: hip, lastPoint: ankle);
+      firstPoint: shoulder,
+      midPoint: hip,
+      lastPoint: ankle,
+    );
     if (bodyAngle >= SphinxConfig.Aa_Start_Body_Angle) return true;
 
+    final elbow = _point(
+      landmarks,
+      PoseLandmarkType.leftElbow,
+      PoseLandmarkType.rightElbow,
+    );
+    final wrist = _point(
+      landmarks,
+      PoseLandmarkType.leftWrist,
+      PoseLandmarkType.rightWrist,
+    );
+    final knee = _point(
+      landmarks,
+      PoseLandmarkType.leftKnee,
+      PoseLandmarkType.rightKnee,
+    );
     if (elbow == null || wrist == null || knee == null) return false;
-    if (![elbow, wrist, knee].every(ExerciseBase.isLandmarkConfident)) {
+    if (!<PoseLandmark>[elbow, wrist, knee]
+        .every(ExerciseBase.isLandmarkConfident)) {
       return false;
     }
 
     final elbowAngle = calculateAngleNormalized(
-        firstPoint: shoulder, midPoint: elbow, lastPoint: wrist);
+      firstPoint: shoulder,
+      midPoint: elbow,
+      lastPoint: wrist,
+    );
     final spineAngle = calculateAngleNormalized(
-        firstPoint: shoulder, midPoint: hip, lastPoint: knee);
-
+      firstPoint: shoulder,
+      midPoint: hip,
+      lastPoint: knee,
+    );
     return elbowAngle >= SphinxConfig.Ab_Elbow_Hold_Angle[0] &&
         elbowAngle <= SphinxConfig.Al_Exit_Elbow_Angle &&
         spineAngle >= SphinxConfig.Ac_Spine_Ext_Angle[0] &&
@@ -141,34 +195,52 @@ class SphinxStretch extends ExerciseBase {
   }
 
   @override
-  void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
-    if (!_selectTrackedSide(smoothedLandmarks)) {
-      _holdSeconds.resetTick();
-      return;
-    }
+  Set<String> get faultSecondsKeys => const <String>{
+        'straight_arm_seconds',
+        'shrug_neck_seconds',
+      };
 
-    final shoulder = isLeftTracked
-        ? smoothedLandmarks[PoseLandmarkType.leftShoulder]
-        : smoothedLandmarks[PoseLandmarkType.rightShoulder];
-    final hip = isLeftTracked
-        ? smoothedLandmarks[PoseLandmarkType.leftHip]
-        : smoothedLandmarks[PoseLandmarkType.rightHip];
-    final ankle = isLeftTracked
-        ? smoothedLandmarks[PoseLandmarkType.leftAnkle]
-        : smoothedLandmarks[PoseLandmarkType.rightAnkle];
-    final elbow = isLeftTracked
-        ? smoothedLandmarks[PoseLandmarkType.leftElbow]
-        : smoothedLandmarks[PoseLandmarkType.rightElbow];
-    final wrist = isLeftTracked
-        ? smoothedLandmarks[PoseLandmarkType.leftWrist]
-        : smoothedLandmarks[PoseLandmarkType.rightWrist];
-    final knee = isLeftTracked
-        ? smoothedLandmarks[PoseLandmarkType.leftKnee]
-        : smoothedLandmarks[PoseLandmarkType.rightKnee];
-    final ear = isLeftTracked
-        ? smoothedLandmarks[PoseLandmarkType.leftEar]
-        : smoothedLandmarks[PoseLandmarkType.rightEar];
+  @override
+  HoldPoseSample? samplePose(
+    Map<PoseLandmarkType, PoseLandmark> landmarks,
+  ) {
+    if (!_selectTrackedSide(landmarks)) return null;
 
+    final shoulder = _point(
+      landmarks,
+      PoseLandmarkType.leftShoulder,
+      PoseLandmarkType.rightShoulder,
+    );
+    final hip = _point(
+      landmarks,
+      PoseLandmarkType.leftHip,
+      PoseLandmarkType.rightHip,
+    );
+    final ankle = _point(
+      landmarks,
+      PoseLandmarkType.leftAnkle,
+      PoseLandmarkType.rightAnkle,
+    );
+    final elbow = _point(
+      landmarks,
+      PoseLandmarkType.leftElbow,
+      PoseLandmarkType.rightElbow,
+    );
+    final wrist = _point(
+      landmarks,
+      PoseLandmarkType.leftWrist,
+      PoseLandmarkType.rightWrist,
+    );
+    final knee = _point(
+      landmarks,
+      PoseLandmarkType.leftKnee,
+      PoseLandmarkType.rightKnee,
+    );
+    final ear = _point(
+      landmarks,
+      PoseLandmarkType.leftEar,
+      PoseLandmarkType.rightEar,
+    );
     if (shoulder == null ||
         hip == null ||
         ankle == null ||
@@ -176,160 +248,199 @@ class SphinxStretch extends ExerciseBase {
         wrist == null ||
         knee == null ||
         ear == null) {
-      _holdSeconds.resetTick();
-      return;
+      return null;
     }
 
-    final scaleFactor = calculateDistance(shoulder, hip);
+    scaleFactor = calculateDistance(shoulder, hip);
+    if (!scaleFactor.isFinite || scaleFactor <= 1e-6) return null;
 
-    final ctx = SphinxContext(
+    final elbowAngle = calculateAngleNormalized(
+      firstPoint: shoulder,
+      midPoint: elbow,
+      lastPoint: wrist,
+    );
+    final spineAngle = calculateAngleNormalized(
+      firstPoint: shoulder,
+      midPoint: hip,
+      lastPoint: knee,
+    );
+
+    _sampledFrame = _SphinxPoseFrame(
       bodyAngle: calculateAngleNormalized(
-          firstPoint: shoulder, midPoint: hip, lastPoint: ankle),
-      elbowAngle: calculateAngleNormalized(
-          firstPoint: shoulder, midPoint: elbow, lastPoint: wrist),
-      spineAngle: calculateAngleNormalized(
-          firstPoint: shoulder, midPoint: hip, lastPoint: knee),
+        firstPoint: shoulder,
+        midPoint: hip,
+        lastPoint: ankle,
+      ),
+      elbowAngle: elbowAngle,
+      spineAngle: spineAngle,
       forearmAngle:
           calculateAbsoluteHorizontalAngle(point1: elbow, point2: wrist),
       upperArmAngle:
           calculateAbsoluteHorizontalAngle(point1: shoulder, point2: elbow),
       neckAngle: calculateAngleNormalized(
-          firstPoint: ear, midPoint: shoulder, lastPoint: hip),
+        firstPoint: ear,
+        midPoint: shoulder,
+        lastPoint: hip,
+      ),
       hipY: hip.y,
       ankleY: ankle.y,
-      earShoulderDist: calculateDistance(ear, shoulder),
+      earShoulderDistance: calculateDistance(ear, shoulder),
+    );
+
+    return HoldPoseSample(
+      insideOuterEntry: elbowAngle >= SphinxConfig.Ab_Elbow_Hold_Angle[0] &&
+          elbowAngle <= SphinxConfig.Ab_Elbow_Hold_Angle[1] &&
+          spineAngle >= SphinxConfig.Ac_Spine_Ext_Angle[0] &&
+          spineAngle <= SphinxConfig.Ac_Spine_Ext_Angle[1],
+      outsideOuterExit: elbowAngle > SphinxConfig.Al_Exit_Elbow_Angle ||
+          spineAngle > SphinxConfig.Am_Exit_Spine_Angle,
+    );
+  }
+
+  @override
+  Map<String, bool> updateFormMetrics() {
+    final sample = _sampledFrame!;
+    final context = SphinxContext(
+      bodyAngle: sample.bodyAngle,
+      elbowAngle: sample.elbowAngle,
+      spineAngle: sample.spineAngle,
+      forearmAngle: sample.forearmAngle,
+      upperArmAngle: sample.upperArmAngle,
+      neckAngle: sample.neckAngle,
+      hipY: sample.hipY,
+      ankleY: sample.ankleY,
+      earShoulderDist: sample.earShoulderDistance,
       scaleFactor: scaleFactor,
-      state: state,
+      state: _legacyStateFor(phase),
       frameTimestampMs: frameTimestampMs,
       resultIssues: resultIssues,
     );
 
-    _updateStateBuffer(ctx);
-
-    if (state != SphinxState.proneSetup) {
-      for (final m in _metrics) {
-        m.update(ctx);
-        debugData.addAll(m.debugData);
+    if (phase == HoldPhase.holding || phase == HoldPhase.dropping) {
+      for (final metric in _metrics) {
+        metric.update(context);
+        debugData.addAll(metric.debugData);
       }
     }
 
-    if (state == SphinxState.isometricHold) {
-      _holdSeconds.accumulate(
-        elapsedMs: elapsedMs,
-        faultingByKey: {
-          'straight_arm_seconds': elbowMetric.isFaultingNow,
-          'shrug_neck_seconds': neckMetric.isFaultingNow,
-        },
-      );
-    } else {
-      _holdSeconds.resetTick();
-    }
+    return <String, bool>{
+      'straight_arm_seconds': elbowMetric.isFaultingNow,
+      'shrug_neck_seconds': neckMetric.isFaultingNow,
+    };
   }
 
-  void _updateStateBuffer(SphinxContext ctx) {
-    SphinxState newState = state;
-
-    switch (state) {
-      case SphinxState.proneSetup:
-        if (ctx.elbowAngle < SphinxConfig.Al_Exit_Elbow_Angle &&
-            ctx.spineAngle < SphinxConfig.Ac_Spine_Ext_Angle[1] + 10) {
-          newState = SphinxState.ascending;
-        }
-        break;
-
-      case SphinxState.ascending:
-        if (ctx.elbowAngle >= SphinxConfig.Ab_Elbow_Hold_Angle[0] &&
-            ctx.elbowAngle <= SphinxConfig.Ab_Elbow_Hold_Angle[1] &&
-            ctx.spineAngle >= SphinxConfig.Ac_Spine_Ext_Angle[0] &&
-            ctx.spineAngle <= SphinxConfig.Ac_Spine_Ext_Angle[1]) {
-          newState = SphinxState.isometricHold;
-        }
-        break;
-
-      case SphinxState.isometricHold:
-        if (ctx.elbowAngle > SphinxConfig.Al_Exit_Elbow_Angle ||
-            ctx.spineAngle > SphinxConfig.Am_Exit_Spine_Angle) {
-          newState = SphinxState.descending;
-        }
-        break;
-
-      case SphinxState.descending:
-        newState = SphinxState.proneSetup;
-        break;
+  @override
+  Map<String, FaultRecord> snapshotHoldFaults() {
+    final faults = <String, FaultRecord>{};
+    for (final fault in elbowMetric.faults) {
+      final mapped = _mapFaultRecord(fault);
+      faults[mapped.type] = mapped;
     }
-
-    // Logic xử lý chuyển trạng thái cũ
-    if (newState != state) {
-      final oldState = state;
-      for (final m in _metrics) {
-        m.onStateTransition(state, newState, ctx.frameTimestampMs);
-      }
-      prevState = state;
-      state = newState;
-
-      if (oldState == SphinxState.ascending &&
-          newState == SphinxState.isometricHold) {
-        _holdSeconds.resetTick();
-        elbowMetric.reset();
-        neckMetric.reset();
-      } else if (oldState == SphinxState.isometricHold) {
-        _holdSeconds.resetTick();
-      }
+    for (final fault in neckMetric.faults) {
+      final mapped = _mapFaultRecord(fault);
+      faults[mapped.type] = mapped;
     }
+    return faults;
+  }
 
-    // --- LOGIC MỚI: ĐẾM REP THEO GIÂY TRONG LÚC HOLD ---
-    if (state == SphinxState.isometricHold) {
-      // Lấy thời gian hold thực tế đang diễn ra
-      double liveHold = tempoMetric.getLiveHoldTime(ctx.frameTimestampMs);
-
-      // Bài giữ: đủ thời gian thì hoàn thành, lỗi form được ghi vào báo cáo.
-      if (liveHold >= maxSeconds) {
-        // Chốt 1 rep ngay lập tức
-        _completeRep(ctx);
-
-        // Ép State Machine về trạng thái Nằm chuẩn bị (Prone Setup)
-        prevState = SphinxState.descending;
-        state = SphinxState.proneSetup;
-
-        // Báo cho các metrics dọn dẹp state
-        for (final m in _metrics) {
-          m.onStateTransition(SphinxState.isometricHold, SphinxState.proneSetup,
-              ctx.frameTimestampMs);
-        }
-        _holdSeconds.resetTick();
+  @override
+  void resetFormMetrics({required bool countFaults}) {
+    for (final metric in _metrics) {
+      if (countFaults) {
+        metric.resetAndCountFault();
+      } else {
+        metric.reset();
       }
     }
   }
 
-  void _completeRep(SphinxContext ctx) {
-    repCount += 1;
-    tempoMetric.flushCurrentSegment(ctx.frameTimestampMs);
+  @override
+  void onHoldPhaseChanged(
+    HoldPhase previous,
+    HoldPhase next,
+    int nowMs,
+  ) {
+    final oldState = _legacyStateFor(previous);
+    final newState = _legacyStateFor(next);
+    for (final metric in _metrics) {
+      metric.onStateTransition(oldState, newState, nowMs);
+    }
+  }
 
-    final allFaults = <FaultRecord>[
-      ...elbowMetric.faults,
-      ...neckMetric.faults,
-      ...tempoMetric.faults,
-    ];
-
-    correctForm = !allFaults.any((f) => f.affectsForm);
-
-    _lastHoldTime = tempoMetric.activeHoldSeconds;
+  @override
+  Map<String, dynamic> holdRepLogExtras() {
+    _lastHoldTime = timerMetric.totalHoldingTimeMs / 1000.0;
     _lastStabilityScore = tempoMetric.stabilityScore;
+    return <String, dynamic>{
+      'active_hold_time': _lastHoldTime,
+      'stability_score': _lastStabilityScore,
+    };
+  }
 
-    logger.addRepLog(RepLog(
-      repNumber: repCount,
-      correctForm: correctForm,
-      data: {
-        "active_hold_time": _lastHoldTime,
-        "stability_score": _lastStabilityScore,
-        "fault_types": allFaults.map((f) => f.type).toSet().toList(),
-      },
-    ));
+  @override
+  void onHoldSetReset() {
+    _sampledFrame = null;
+    _lastHoldTime = 0.0;
+    _lastStabilityScore = 0.0;
+  }
 
-    for (final m in _metrics) {
-      m.resetAndCountFault();
+  @override
+  void onSetComplete() {
+    final targetSeconds = (maxHolds * holdSeconds).toDouble();
+    logger.pushKey('active_hold_time', _lastHoldTime);
+    logger.pushKey('stability_score', _lastStabilityScore);
+    logger.pushKey('total_seconds', targetSeconds);
+    logger.pushKey('good_seconds', clampedGoodHoldSeconds(targetSeconds));
+    logger.pushKey('hip_seconds', 0.0);
+    logger.pushKey(
+      'straight_arm_seconds',
+      faultHoldSecondsFor('straight_arm_seconds'),
+    );
+    logger.pushKey(
+      'shrug_neck_seconds',
+      faultHoldSecondsFor('shrug_neck_seconds'),
+    );
+    logger.pushKey('max_rep', maxHolds);
+    logger.pushGoodRepCount();
+  }
+
+  SphinxState _legacyStateFor(HoldPhase holdPhase) {
+    switch (holdPhase) {
+      case HoldPhase.holding:
+        return SphinxState.isometricHold;
+      case HoldPhase.dropping:
+        return SphinxState.descending;
+      case HoldPhase.setup:
+      case HoldPhase.resting:
+      case HoldPhase.reArming:
+        return SphinxState.proneSetup;
     }
-    _holdSeconds.resetTick();
+  }
+
+  FaultRecord _mapFaultRecord(FaultRecord fault) {
+    final type = switch (fault.type) {
+      'StraightArm' => 'straight_arm',
+      'Forearm' => 'forearm',
+      'UpperArm' => 'upper_arm',
+      'NeckShrug' => 'shrug',
+      'NeckHyper' => 'neck',
+      _ => fault.type,
+    };
+    return FaultRecord(
+      phase: phase.name,
+      type: type,
+      message: fault.message,
+      affectsForm: fault.affectsForm,
+      voiceMessage: fault.voiceMessage,
+      priority: fault.priority,
+    );
+  }
+
+  FaultRecord? _faultOfType(Iterable<FaultRecord> faults, String type) {
+    for (final fault in faults) {
+      if (fault.type == type) return fault;
+    }
+    return null;
   }
 
   bool _selectTrackedSide(Map<PoseLandmarkType, PoseLandmark> landmarks) {
@@ -361,48 +472,18 @@ class SphinxStretch extends ExerciseBase {
     final hip = landmarks[hipType];
     final ankle = landmarks[ankleType];
     if (shoulder == null || hip == null || ankle == null) return null;
-    if (![shoulder, hip, ankle].every(ExerciseBase.isLandmarkConfident)) {
+    if (!<PoseLandmark>[shoulder, hip, ankle]
+        .every(ExerciseBase.isLandmarkConfident)) {
       return null;
     }
     return shoulder.likelihood + hip.likelihood + ankle.likelihood;
   }
 
-  @override
-  String get currentPhaseKey => state.name;
-
-  @override
-  String get currentPhaseLabel {
-    switch (state) {
-      case SphinxState.proneSetup:
-        return 'Nằm chuẩn bị';
-      case SphinxState.ascending:
-        return 'Nâng người';
-      case SphinxState.isometricHold:
-        return 'Giữ tĩnh';
-      case SphinxState.descending:
-        return 'Thoát thế';
-    }
-  }
-
-  @override
-  void onSetComplete() {
-    if (state == SphinxState.isometricHold) {
-      tempoMetric.flushCurrentSegment(frameTimestampMs);
-    }
-    logger.pushKey("active_hold_time", _lastHoldTime);
-    logger.pushKey("stability_score", _lastStabilityScore);
-    logger.pushKey("total_seconds", maxSeconds.toDouble());
-    logger.pushKey(
-        "good_seconds", _holdSeconds.goodSeconds.clamp(0.0, maxSeconds));
-    // Hip pressure cannot be inferred reliably from 2D pose landmarks. Keep
-    // the historical report key at zero instead of coaching the user to press
-    // harder into the floor.
-    logger.pushKey("hip_seconds", 0.0);
-    logger.pushKey("straight_arm_seconds",
-        _holdSeconds.faultSecondsFor('straight_arm_seconds'));
-    logger.pushKey("shrug_neck_seconds",
-        _holdSeconds.faultSecondsFor('shrug_neck_seconds'));
-    logger.pushKey("max_rep", SphinxConfig.Af_Max_Reps);
-    logger.pushGoodRepCount();
+  PoseLandmark? _point(
+    Map<PoseLandmarkType, PoseLandmark> landmarks,
+    PoseLandmarkType left,
+    PoseLandmarkType right,
+  ) {
+    return landmarks[isLeftTracked ? left : right];
   }
 }

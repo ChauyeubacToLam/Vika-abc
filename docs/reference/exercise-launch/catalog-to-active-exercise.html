@@ -591,8 +591,8 @@ Future&lt;<span class="k">void</span>&gt; main() <span class="k">async</span> {
   </div>
 
   <h3>2d · What a catalog entry carries</h3>
-  <p>The info object the catalog hands out — note <code>volumeLabel</code>, the “3 x 8 rep” string the cards
-  and the intro both render, so they never disagree:</p>
+  <p>The info object the catalog hands out — note <code>volumeLabel</code>, the “3 x 8 rep” or
+  hybrid “3 x 2 x 30 giây” string the cards and the intro both render, so they never disagree:</p>
   <div class="code">
     <div class="code-head"><span>class ExerciseLaunchCatalogInfo — recommendation_service.dart</span><b>L433–471</b></div>
     <div class="code-body">
@@ -616,7 +616,14 @@ Future&lt;<span class="k">void</span>&gt; main() <span class="k">async</span> {
 468
 469
 470
-471</pre>
+471
+472
+473
+474
+475
+476
+477
+478</pre>
 <pre class="src"><span class="k">class</span> ExerciseLaunchCatalogInfo {
   <span class="c">// const constructor: id, isFormChecked, names, classKey, base{Reps,Seconds,Sets}</span>
   <span class="k">final</span> String id;
@@ -628,12 +635,19 @@ Future&lt;<span class="k">void</span>&gt; main() <span class="k">async</span> {
   <span class="k">final int</span>? baseSeconds;
   <span class="k">final int</span>? baseSets;
 
-  <span class="c">/// Compact volume label for list/summary surfaces, e.g. "3 x 8 rep" or
-  /// "1 x 30 giây" — matches [workoutVolumeLabel]'s "sets x target" wording so
-  /// cards and the exercise intro never disagree. Returns '' if malformed.</span>
+  <span class="c">/// Compact volume label for list/summary surfaces, e.g. "3 x 8 rep",
+  /// "1 x 30 giây", or "3 x 2 x 30 giây" for repeated holds. Matches
+  /// [workoutVolumeLabel]'s wording so cards and the exercise intro never
+  /// disagree. Returns '' if the entry is malformed (neither target set).</span>
   String <span class="k">get</span> volumeLabel {
     <span class="k">final</span> sets = baseSets ?? 1;
-    <span class="k">if</span> (baseSeconds != <span class="k">null</span>) <span class="k">return</span> <span class="s">'$sets x $baseSeconds giây'</span>;
+    <span class="k">if</span> (baseSeconds != <span class="k">null</span>) {
+      <span class="k">final</span> holdCount = baseReps;
+      <span class="k">if</span> (holdCount != <span class="k">null</span> &amp;&amp; holdCount &gt; 1) {
+        <span class="k">return</span> <span class="s">'$sets x $holdCount x $baseSeconds giây'</span>;
+      }
+      <span class="k">return</span> <span class="s">'$sets x $baseSeconds giây'</span>;
+    }
     <span class="k">if</span> (baseReps != <span class="k">null</span>) <span class="k">return</span> <span class="s">'$sets x $baseReps rep'</span>;
     <span class="k">return</span> <span class="s">''</span>;
   }

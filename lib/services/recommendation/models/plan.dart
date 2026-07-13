@@ -10,9 +10,9 @@
 // Templates can override numPhases/weeksPerPhase/includeDeloadAtEnd
 // for variants (e.g., custom plans).
 //
-// VolumePrescription is single-target (reps OR seconds), NOT a range.
-// User-facing presentation is a single number. Internal autoregulation
-// (via the per-set difficulty system) handles fluctuation.
+// VolumePrescription carries reps for rep exercises and both a structural hold
+// count + seconds-per-hold for hybrids. Neither target is a range. Internal
+// autoregulation (via the per-set difficulty system) handles fluctuation.
 
 /// Plan scope constants. Used in plan_structure JSONB and on Plan model.
 const String kPlanScopePhase1Only = 'phase_1_only';
@@ -336,9 +336,9 @@ class SlotAssignment {
 
 /// Volume prescription for a single (slot, week) cell.
 ///
-/// Exactly one of `reps` / `seconds` is populated, depending on the
-/// exercise type (rep-based vs. hold-based / yoga). `sets` and
-/// `restSeconds` always present.
+/// `reps` is populated for every valid catalog-backed prescription. Hybrid
+/// holds also populate `seconds`; rep-based exercises leave it null. `sets`
+/// and `restSeconds` are always present.
 ///
 /// v4.3: NO range. Single integer target. Internal autoregulation via
 /// the per-set difficulty system handles within-session adaptation.
@@ -358,10 +358,10 @@ class VolumePrescription {
   final int sets;
   final int restSeconds;
 
-  /// Populated for rep-based exercises. Null for yoga/holds.
+  /// Rep count, or the structural number of holds for a hybrid.
   final int? reps;
 
-  /// Populated for hold-based / yoga. Null for rep-based.
+  /// Per-hold duration for hybrids. Null for rep-based exercises.
   final int? seconds;
 
   /// True if this prescription is part of a deload week.

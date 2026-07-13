@@ -14,7 +14,6 @@ import 'package:vika/exercise/9.Reverse Crunch/metrics/reverse_crunch_metric_bas
 import 'package:vika/exercise/9.Reverse Crunch/reverse_crunch.dart';
 import 'package:vika/exercise/Jump_Squat/jump_squat.dart';
 import 'package:vika/exercise/Sphinx_Pose/sphinx_stretch.dart';
-import 'package:vika/exercise/Sphinx_Pose/Metrics/sphinx_metric_base.dart';
 import 'package:vika/exercise/bow_pose/bow_pose.dart';
 import 'package:vika/exercise/glute bridge/glute_bridge.dart';
 import 'package:vika/exercise/jumping jack/jumping_jack.dart';
@@ -100,10 +99,11 @@ void main() {
         ReverseCrunchConfig.MAX_REP,
       );
 
-      final sphinx = SphinxStretch(maxSeconds: 3)..onSetComplete();
+      final sphinx = SphinxStretch(maxHolds: 1, holdSeconds: 3)
+        ..onSetComplete();
       expect(sphinx.repCount, 0);
       expect(sphinx.logger.setLogs.containsKey('target_rep'), isFalse);
-      expect(sphinx.logger.setLogs['max_rep'], SphinxConfig.Af_Max_Reps);
+      expect(sphinx.logger.setLogs['max_rep'], 1);
     });
 
     test('hold exercises publish fault seconds without duplicate count keys',
@@ -119,7 +119,7 @@ void main() {
       expect(highPlank.logger.setLogs['elbow_seconds'], 0.0);
       expect(highPlank.logger.repLogs, isEmpty);
 
-      final bearPlank = BearPlank(maxSeconds: 30);
+      final bearPlank = BearPlank(maxHolds: 1, holdSeconds: 30);
       bearPlank.onSetComplete();
       bearPlank.onSetComplete();
 
@@ -130,7 +130,7 @@ void main() {
       expect(bearPlank.logger.setLogs['knee_seconds'], 0.0);
       expect(bearPlank.logger.setLogs['back_seconds'], 0.0);
       expect(bearPlank.logger.setLogs['weight_seconds'], 0.0);
-      expect(bearPlank.logger.repLogs, hasLength(1));
+      expect(bearPlank.logger.repLogs, isEmpty);
     });
   });
 }

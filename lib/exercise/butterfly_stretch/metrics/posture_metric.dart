@@ -19,11 +19,13 @@ class PostureMetric extends ButterflyMetricBase {
   bool _tiltInstructionSet = false;
   bool _collapseInstructionSet = false;
   bool _isFaultingNow = false;
+  String? _currentFaultType;
 
   @override
   List<FaultRecord> get faults => _faults;
   @override
   bool get isFaultingNow => _isFaultingNow;
+  String? get currentFaultType => _currentFaultType;
 
   @override
   Map<String, dynamic> get debugData => _debugData;
@@ -31,6 +33,7 @@ class PostureMetric extends ButterflyMetricBase {
   @override
   void update(StretchContext ctx) {
     _isFaultingNow = false;
+    _currentFaultType = null;
     // Chuẩn hóa độ nghiêng vai
     double normalizedTilt = ctx.shoulderTilt /
         (ctx.shoulderToHipRatio == 0 ? 1 : ctx.shoulderToHipRatio);
@@ -47,6 +50,7 @@ class PostureMetric extends ButterflyMetricBase {
 
     if (isCollapsed) {
       _isFaultingNow = true;
+      _currentFaultType = 'PostureCollapse';
       ctx.resultIssues.feedback['Posture'] =
           'Giữ lưng thẳng, không gập người xuống!';
 
@@ -57,6 +61,7 @@ class PostureMetric extends ButterflyMetricBase {
       _logFault(phase, 'PostureCollapse', 'Gập người/gù lưng khi giữ tư thế');
     } else if (isTilted) {
       _isFaultingNow = true;
+      _currentFaultType = 'Posture';
       ctx.resultIssues.feedback['Posture'] = 'Lệch vai!';
 
       if (!_tiltInstructionSet) {
@@ -89,5 +94,6 @@ class PostureMetric extends ButterflyMetricBase {
     _tiltInstructionSet = false;
     _collapseInstructionSet = false;
     _isFaultingNow = false;
+    _currentFaultType = null;
   }
 }

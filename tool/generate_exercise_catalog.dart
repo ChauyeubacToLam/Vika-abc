@@ -8,8 +8,9 @@
 // `.env`. Each catalog row is resolved to an ExerciseDefinition using the SAME
 // order as WorkoutLaunchService._lookupLaunchDefinition (id → class_key →
 // english_name). The tool FAILS LOUDLY (non-zero exit) if any row does not
-// resolve to a definition, or violates the exactly-one-of-reps/seconds or
-// sets >= 1 invariants — never silently drops a row.
+// resolve to a definition, omits required reps, or violates the sets >= 1
+// invariant — never silently drops a row. Seconds are optional and mark a
+// hybrid hold when present.
 
 import 'dart:convert';
 import 'dart:io';
@@ -66,8 +67,8 @@ Future<void> main() async {
       unresolved.add(id);
       continue;
     }
-    if ((reps == null) == (seconds == null)) {
-      stderr.writeln('Row "$id": exactly one of base_reps/base_seconds required.');
+    if (reps == null) {
+      stderr.writeln('Row "$id": base_reps is required.');
       exit(1);
     }
     if (sets < 1) {

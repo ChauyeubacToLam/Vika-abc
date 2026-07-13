@@ -46,20 +46,31 @@ void main() {
 
   test('hybrid hold entry carries per-hold seconds AND a hold-count reps', () {
     // Plank-model (07-12): high_plank is hybrid — base_reps is the HOLD COUNT
-    // (3 holds), base_seconds the per-hold duration (20s). volumeLabel still
-    // prefers seconds. Mirrors the prod catalog flip + the bundled JSON.
+    // (3 holds), base_seconds the per-hold duration (20s). The label keeps the
+    // count because it is above one. Mirrors prod + the bundled JSON.
     final highPlank = source.lookup('high__plank')!; // by definition id
     expect(highPlank.baseSeconds, 20);
     expect(highPlank.baseReps, 3);
-    expect(highPlank.volumeLabel, '1 x 20 giây');
+    expect(highPlank.volumeLabel, '1 x 3 x 20 giây');
   });
 
-  test('updated static holds use three sets of fifteen seconds', () {
-    for (final id in ['side_plank_dip', 'seated_forward_fold', 'sphinx']) {
+  test('former static holds are now 1-hold hybrids (reps=1 + seconds)', () {
+    // Two-modality flip (ADR 07-12): every hold row carries base_reps. These
+    // three were seconds-only; they became single-hold hybrids (reps=1). Shape
+    // differs per row now — verified against prod + the resynced JSON 07-12.
+    // reps==1 keeps the label at "sets x seconds giây" (count hidden above 1).
+    final sidePlank = source.lookup('side_plank_dip')!;
+    expect(sidePlank.baseSets, 3);
+    expect(sidePlank.baseReps, 1);
+    expect(sidePlank.baseSeconds, 15);
+    expect(sidePlank.volumeLabel, '3 x 15 giây');
+
+    for (final id in ['seated_forward_fold', 'sphinx']) {
       final exercise = source.lookup(id)!;
-      expect(exercise.baseSets, 3, reason: id);
-      expect(exercise.baseSeconds, 15, reason: id);
-      expect(exercise.baseReps, isNull, reason: id);
+      expect(exercise.baseSets, 1, reason: id);
+      expect(exercise.baseReps, 1, reason: id);
+      expect(exercise.baseSeconds, 30, reason: id);
+      expect(exercise.volumeLabel, '1 x 30 giây', reason: id);
     }
   });
 

@@ -8,6 +8,7 @@ import 'package:vika/exercise/1.Bird Dog/bird_dog.dart';
 import 'package:vika/exercise/10.Vup/v_up.dart';
 import 'package:vika/exercise/12.Dead Bug/dead_bug.dart';
 import 'package:vika/exercise/13.Plank Up-Down/plank_up_down.dart';
+import 'package:vika/exercise/14.Bear Plank/bear_plank.dart';
 import 'package:vika/exercise/2.Sit-Up/sit_up.dart';
 import 'package:vika/exercise/3.High Plank/high_plank.dart';
 import 'package:vika/exercise/4.Mountain Climber/mountain_climber.dart';
@@ -17,7 +18,9 @@ import 'package:vika/exercise/8.Leg Raises (Supine)/leg_raise.dart';
 import 'package:vika/exercise/9.Reverse Crunch/reverse_crunch.dart';
 import 'package:vika/exercise/Cobra/cobra.dart';
 import 'package:vika/exercise/Jump_Squat/jump_squat.dart';
+import 'package:vika/exercise/Sphinx_Pose/sphinx_stretch.dart';
 import 'package:vika/exercise/ashtanga_namaskara/ashtanga_namaskara.dart';
+import 'package:vika/exercise/butterfly_stretch/butterfly_stretch.dart';
 import 'package:vika/exercise/cossack_squat/cossack_squat.dart';
 import 'package:vika/exercise/curl_up/curl_up.dart';
 import 'package:vika/exercise/exercise_base.dart';
@@ -27,6 +30,8 @@ import 'package:vika/exercise/jumping jack/jumping_jack.dart';
 import 'package:vika/exercise/lunge/lunge.dart';
 import 'package:vika/exercise/push up/push_up.dart';
 import 'package:vika/exercise/russian_twist/russian_twist.dart';
+import 'package:vika/exercise/seated_forward_fold/seated_forward_fold.dart';
+import 'package:vika/exercise/side_plank_dip/side_plank_dip.dart';
 import 'package:vika/exercise/squat/squat.dart';
 import 'package:vika/exercise/standing_knee_to_elbow/standing_knee_to_elbow.dart';
 import 'package:vika/exercise/step_back_burpee/step_back_burpee.dart';
@@ -474,6 +479,99 @@ void main() {
     expect(
       kDefaultTuning[CueType.criticalFault]!.firstOccurrenceCertain,
       isTrue,
+    );
+  });
+
+  test('migrated hold fleet routes rep-counted voice metadata', () {
+    final cases = <({
+      ExerciseBase exercise,
+      String slug,
+      int target,
+      List<String> faultIds,
+    })>[
+      (
+        exercise: BearPlank(maxHolds: 3, holdSeconds: 15),
+        slug: 'bear_plank',
+        target: 3,
+        faultIds: const <String>[
+          'knee_hover',
+          'hip_high',
+          'back_sag',
+          'back_arch',
+          'weight',
+        ],
+      ),
+      (
+        exercise: ButterflyStretch(maxHolds: 1, holdSeconds: 30),
+        slug: 'butterfly_stretch',
+        target: 1,
+        faultIds: const <String>['foot', 'knee', 'posture', 'shoulder'],
+      ),
+      (
+        exercise: SeatedForwardFold(maxHolds: 1, holdSeconds: 30),
+        slug: 'seated_forward_fold',
+        target: 1,
+        faultIds: const <String>['ankle', 'knee', 'spine', 'tempo'],
+      ),
+      (
+        exercise: SidePlankDip(maxHolds: 1, holdSeconds: 15),
+        slug: 'side_plank_dip',
+        target: 1,
+        faultIds: const <String>['shoulder', 'rotation', 'amplitude'],
+      ),
+      (
+        exercise: SphinxStretch(maxHolds: 1, holdSeconds: 30),
+        slug: 'sphinx',
+        target: 1,
+        faultIds: const <String>[
+          'straight_arm',
+          'forearm',
+          'upper_arm',
+          'shrug',
+          'neck',
+        ],
+      ),
+    ];
+
+    final coaches = cases
+        .map((entry) => entry.exercise.createVoiceCoach()! as PolicyVoiceCoach)
+        .toList(growable: false);
+    addTearDown(() {
+      for (final coach in coaches) {
+        coach.dispose();
+      }
+    });
+
+    for (var index = 0; index < cases.length; index += 1) {
+      final entry = cases[index];
+      final coach = coaches[index];
+      expect(coach.script.slug, entry.slug);
+      expect(coach.script.faultIds, entry.faultIds);
+      expect(coach.script.countPool, VoiceDefaults.repCountedHold.count);
+      expect(coach.countsByRepNumber, isTrue);
+      expect(coach.targetReps, entry.target);
+      expect(coach.script.repStartPhaseKeys, const <String>{'holding'});
+    }
+  });
+
+  test('static Side Plank suppresses contradictory hip-dip recordings', () {
+    expect(
+      GenericExerciseVoiceAssets.resolveAsset(
+        'side_plank_dip.active_intro',
+      ),
+      isNull,
+    );
+    expect(
+      GenericExerciseVoiceAssets.resolveAsset('side_plank_dip.amplitude'),
+      isNull,
+    );
+    expect(
+      GenericExerciseVoiceAssets.resolveAsset('side_plank_dip.shoulder'),
+      'side_plank_dip/shoulder.mp3',
+    );
+    expect(
+      GenericExerciseVoiceAssets.resolveAsset('side_plank_dip.rotation'),
+      'side_plank_dip/rotation.mp3',
     );
   });
 

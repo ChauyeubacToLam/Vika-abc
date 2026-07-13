@@ -1,10 +1,11 @@
 import 'dart:math' as math;
 
-import 'package:vika/utils/debouncer.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+
 import '../../utils/frame_snapshot.dart';
-import '../../utils/exercise_logger.dart';
 import '../exercise_base.dart';
+import '../fault_record.dart' as hold_fault;
+import '../hold/rep_counted_hold_exercise.dart';
 import 'metrics/butterfly_metric_base.dart';
 import 'metrics/foot_placement_metric.dart';
 import 'metrics/knee_separation_metric.dart';
@@ -20,12 +21,39 @@ class ButterflyConfig {
   static const int MAX_BUFFER_FRAMES = 45;
 }
 
-class ButterflyStretch extends ExerciseBase {
-  ButterflyStretch({
-    required this.maxSeconds,
+class _ButterflyPoseFrame {
+  const _ButterflyPoseFrame({
+    required this.kneeSeparation,
+    required this.leftKneeY,
+    required this.rightKneeY,
+    required this.ankleSeparation,
+    required this.shoulderToHipRatio,
+    required this.shoulderTilt,
+    required this.ankleSeparationNorm,
+    required this.footToHipDistanceNorm,
+    required this.torsoVerticalNorm,
+    required this.yChangeNorm,
   });
 
-  final int maxSeconds;
+  final double kneeSeparation;
+  final double leftKneeY;
+  final double rightKneeY;
+  final double ankleSeparation;
+  final double shoulderToHipRatio;
+  final double shoulderTilt;
+  final double ankleSeparationNorm;
+  final double footToHipDistanceNorm;
+  final double torsoVerticalNorm;
+  final double yChangeNorm;
+}
+
+class ButterflyStretch extends RepCountedHoldExercise {
+  ButterflyStretch({
+    required super.maxHolds,
+    required super.holdSeconds,
+  });
+
+  int get maxSeconds => holdSeconds;
 
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
@@ -35,29 +63,18 @@ class ButterflyStretch extends ExerciseBase {
         VikaImageOrientation.landscapeRight,
       };
 
-  ButterflyState stretchState = ButterflyState.setup;
-  ButterflyState previousState = ButterflyState.setup;
-
-  int? _lastFrameTimeMs;
-  int _validHoldTimeMs = 0;
-  final HoldSecondsAccumulator _holdSeconds = HoldSecondsAccumulator(const [
-    'knee_seconds',
-    'posture_seconds',
-    'foot_placement_seconds',
-  ]);
+  _ButterflyPoseFrame? _sampledFrame;
+  double _maxKneeSeparation = 0.0;
 
   final KneeSeparationMetric kneeMetric = KneeSeparationMetric();
   final PostureMetric postureMetric = PostureMetric();
   final FootPlacementMetric footPlacementMetric = FootPlacementMetric();
 
-  late final List<ButterflyMetricBase> _metrics = [
+  late final List<ButterflyMetricBase> _metrics = <ButterflyMetricBase>[
     kneeMetric,
     postureMetric,
     footPlacementMetric,
   ];
-
-  final Debouncer _holdDebouncer = Debouncer(requiredFrames: 10);
-  final Debouncer _releaseDebouncer = Debouncer(requiredFrames: 5);
 
   @override
   String get exerciseName => 'Butterfly Stretch';
@@ -66,355 +83,344 @@ class ButterflyStretch extends ExerciseBase {
   String get setupOrientationIntroVoiceKey => 'common.thang_intro';
 
   @override
-  String get currentPhaseKey => stretchState.toString().split('.').last;
+  int get holdingDebounceFrames => 10;
+
+  @override
+  int get droppingDebounceFrames => 5;
 
   @override
   String get currentPhaseLabel {
-    switch (stretchState) {
-      case ButterflyState.setup:
+    switch (phase) {
+      case HoldPhase.setup:
         return 'Chuẩn bị';
-      case ButterflyState.stretching:
-        return 'Đang ép';
-      case ButterflyState.isometric_hold:
-        return 'Giữ nguyên!';
-      case ButterflyState.release:
+      case HoldPhase.holding:
+        return 'Giữ tư thế bướm';
+      case HoldPhase.dropping:
         return 'Thả lỏng';
+      case HoldPhase.resting:
+        return 'Nghỉ';
+      case HoldPhase.reArming:
+        return 'Vào tư thế';
     }
   }
 
   @override
-  double? get liveHoldSeconds =>
-      stretchState == ButterflyState.isometric_hold ||
-              stretchState == ButterflyState.release
-          ? _elapsedSeconds
-          : null;
-
-  @override
-  double? get liveHoldTargetSeconds => maxSeconds.toDouble();
+  List<hold_fault.FaultRecord> get liveFaults {
+    if (phase != HoldPhase.holding) {
+      return const <hold_fault.FaultRecord>[];
+    }
+    final faults = <String, hold_fault.FaultRecord>{};
+    if (kneeMetric.isFaultingNow) {
+      _addMappedFaults(faults, kneeMetric.faults);
+    }
+    if (postureMetric.isFaultingNow) {
+      final currentPostureFault = _faultOfType(
+        postureMetric.faults,
+        postureMetric.currentFaultType,
+      );
+      if (currentPostureFault != null) {
+        _addMappedFaults(faults, <FaultRecord>[currentPostureFault]);
+      }
+    }
+    if (footPlacementMetric.isFaultingNow) {
+      _addMappedFaults(faults, footPlacementMetric.faults);
+    }
+    return faults.values.toList(growable: false);
+  }
 
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.front) return false;
 
-    final lKnee = landmarks[PoseLandmarkType.leftKnee];
-    final rKnee = landmarks[PoseLandmarkType.rightKnee];
-    final lAnkle = landmarks[PoseLandmarkType.leftAnkle];
-    final rAnkle = landmarks[PoseLandmarkType.rightAnkle];
-    final lShoulder = landmarks[PoseLandmarkType.leftShoulder];
-    final rShoulder = landmarks[PoseLandmarkType.rightShoulder];
-    final lHip = landmarks[PoseLandmarkType.leftHip];
-    final rHip = landmarks[PoseLandmarkType.rightHip];
-    final lHeel = landmarks[PoseLandmarkType.leftHeel];
-    final rHeel = landmarks[PoseLandmarkType.rightHeel];
+    final points = _landmarks(landmarks);
+    if (points == null) return false;
 
-    if (lKnee == null ||
-        rKnee == null ||
-        lAnkle == null ||
-        rAnkle == null ||
-        lShoulder == null ||
-        rShoulder == null ||
-        lHip == null ||
-        rHip == null ||
-        lHeel == null ||
-        rHeel == null) {
-      return false;
-    }
-    if (![
-      lKnee,
-      rKnee,
-      lAnkle,
-      rAnkle,
-      lShoulder,
-      rShoulder,
-      lHip,
-      rHip,
-      lHeel,
-      rHeel,
-    ].every(ExerciseBase.isLandmarkConfident)) {
-      return false;
-    }
+    final shoulderDistance =
+        (points.leftShoulder.x - points.rightShoulder.x).abs();
+    if (shoulderDistance < 10) return false;
 
-    double shoulderDist = (lShoulder.x - rShoulder.x).abs();
-    if (shoulderDist < 10) return false;
+    final ankleDistance = (points.leftAnkle.x - points.rightAnkle.x).abs();
+    if ((ankleDistance / shoulderDistance) > 0.6) return false;
 
-    double ankleDist = (lAnkle.x - rAnkle.x).abs();
-    if ((ankleDist / shoulderDist) > 0.6) return false;
+    final kneeDistance = (points.leftKnee.x - points.rightKnee.x).abs();
+    if (kneeDistance < shoulderDistance * 0.8) return false;
 
-    double kneeDist = (lKnee.x - rKnee.x).abs();
-    if (kneeDist < shoulderDist * 0.8) return false;
-
-    final avgShoulderY = (lShoulder.y + rShoulder.y) / 2;
-    final avgHipY = (lHip.y + rHip.y) / 2;
-    final torsoHeight = (avgShoulderY - avgHipY).abs();
+    final averageShoulderY =
+        (points.leftShoulder.y + points.rightShoulder.y) / 2;
+    final averageHipY = (points.leftHip.y + points.rightHip.y) / 2;
+    final torsoHeight = (averageShoulderY - averageHipY).abs();
+    final normalizer = _bodyNormalizer(torsoHeight, shoulderDistance);
     final footToHipDistanceNorm = _pointDistance(
-          (lHip.x + rHip.x) / 2,
-          avgHipY,
-          (lHeel.x + rHeel.x) / 2,
-          (lHeel.y + rHeel.y) / 2,
+          (points.leftHip.x + points.rightHip.x) / 2,
+          averageHipY,
+          (points.leftHeel.x + points.rightHeel.x) / 2,
+          (points.leftHeel.y + points.rightHeel.y) / 2,
         ) /
-        _bodyNormalizer(torsoHeight, shoulderDist);
-    final torsoVerticalNorm =
-        torsoHeight / (shoulderDist == 0 ? 1 : shoulderDist);
+        normalizer;
+    final torsoVerticalNorm = torsoHeight / shoulderDistance;
 
-    if (footToHipDistanceNorm >
-        FootPlacementConfig.MAX_FOOT_TO_HIP_DISTANCE_NORM) {
-      return false;
-    }
-    if (torsoVerticalNorm < PostureConfig.COLLAPSE_THRESHOLD) return false;
-
-    return true;
-  }
-
-  double get _elapsedSeconds {
-    return _validHoldTimeMs / 1000.0;
-  }
-
-  @override
-  bool requestStop() => _elapsedSeconds >= maxSeconds;
-
-  @override
-  void onExerciseActivated() {
-    super.onExerciseActivated();
-    _holdSeconds.reset();
-    _lastFrameTimeMs = null;
-    _validHoldTimeMs = 0;
-  }
-
-  @override
-  void onSetComplete() {
-    final allFaults = [
-      ...kneeMetric.faults,
-      ...postureMetric.faults,
-      ...footPlacementMetric.faults,
-    ];
-    final holdCorrect = _validHoldTimeMs >= maxSeconds * 1000 &&
-        !allFaults.any((f) => f.affectsForm);
-
-    logger.pushKey("max_rep", 1);
-    logger.pushKey("total_seconds", maxSeconds.toDouble());
-    logger.pushKey(
-        "good_seconds", _holdSeconds.goodSeconds.clamp(0.0, maxSeconds));
-    logger.pushKey("total_hold_time", _elapsedSeconds);
-    logger.pushKey("max_knee_separation", kneeMetric.maxSeparation);
-    logger.pushKey(
-        "knee_seconds", _holdSeconds.faultSecondsFor('knee_seconds'));
-    logger.pushKey(
-        "posture_seconds", _holdSeconds.faultSecondsFor('posture_seconds'));
-    logger.pushKey("foot_placement_seconds",
-        _holdSeconds.faultSecondsFor('foot_placement_seconds'));
-    logger.addRepLog(RepLog(
-      correctForm: holdCorrect,
-      repNumber: 1,
-      data: {
-        "hold_time": _elapsedSeconds,
-        "fault_types": allFaults.map((f) => f.type).toSet().toList(),
-      },
-    ));
-    correctForm = holdCorrect;
-    logger.pushGoodRepCount();
+    return footToHipDistanceNorm <=
+            FootPlacementConfig.MAX_FOOT_TO_HIP_DISTANCE_NORM &&
+        torsoVerticalNorm >= PostureConfig.COLLAPSE_THRESHOLD;
   }
 
   @override
   GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.front) {
-      return _safetyError(const GuidanceSignal.faceCamera());
+      interruptReArm();
+      return const GuidanceSignal.faceCamera();
     }
-    final requiredLandmarks = [
-      PoseLandmarkType.leftKnee,
-      PoseLandmarkType.rightKnee,
-      PoseLandmarkType.leftAnkle,
-      PoseLandmarkType.rightAnkle,
-      PoseLandmarkType.leftShoulder,
-      PoseLandmarkType.rightShoulder,
-      PoseLandmarkType.leftHip,
-      PoseLandmarkType.rightHip,
-      PoseLandmarkType.leftHeel,
-      PoseLandmarkType.rightHeel,
-    ];
-    for (final type in requiredLandmarks) {
-      final landmark = landmarks[type];
-      if (landmark == null || !ExerciseBase.isLandmarkConfident(landmark)) {
-        return _safetyError(const GuidanceSignal.bodyInFrame());
-      }
+    if (_landmarks(landmarks) == null) {
+      interruptActiveHold(interruptedHoldFaultId);
+      interruptReArm();
+      return const GuidanceSignal.bodyInFrame();
     }
     return null;
   }
 
   @override
-  void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
-    final now = frameTimestampMs;
-    final dt = _lastFrameTimeMs == null ? 0 : now - _lastFrameTimeMs!;
-    _lastFrameTimeMs = now;
+  Set<String> get faultSecondsKeys => const <String>{
+        'knee_seconds',
+        'posture_seconds',
+        'foot_placement_seconds',
+      };
 
-    final lKnee = smoothedLandmarks[PoseLandmarkType.leftKnee];
-    final rKnee = smoothedLandmarks[PoseLandmarkType.rightKnee];
-    final lAnkle = smoothedLandmarks[PoseLandmarkType.leftAnkle];
-    final rAnkle = smoothedLandmarks[PoseLandmarkType.rightAnkle];
-    final lShoulder = smoothedLandmarks[PoseLandmarkType.leftShoulder];
-    final rShoulder = smoothedLandmarks[PoseLandmarkType.rightShoulder];
-    final lHip = smoothedLandmarks[PoseLandmarkType.leftHip];
-    final rHip = smoothedLandmarks[PoseLandmarkType.rightHip];
-    final lHeel = smoothedLandmarks[PoseLandmarkType.leftHeel];
-    final rHeel = smoothedLandmarks[PoseLandmarkType.rightHeel];
+  @override
+  HoldPoseSample? samplePose(
+    Map<PoseLandmarkType, PoseLandmark> landmarks,
+  ) {
+    final points = _landmarks(landmarks);
+    if (points == null) return null;
 
-    if (lKnee == null ||
-        rKnee == null ||
-        lAnkle == null ||
-        rAnkle == null ||
-        lShoulder == null ||
-        rShoulder == null ||
-        lHip == null ||
-        rHip == null ||
-        lHeel == null ||
-        rHeel == null) {
-      _holdSeconds.resetTick();
-      return;
-    }
-    if (![
-      lKnee,
-      rKnee,
-      lAnkle,
-      rAnkle,
-      lShoulder,
-      rShoulder,
-      lHip,
-      rHip,
-      lHeel,
-      rHeel,
-    ].every(ExerciseBase.isLandmarkConfident)) {
-      _holdSeconds.resetTick();
-      return;
-    }
+    final kneeSeparation = (points.leftKnee.x - points.rightKnee.x).abs();
+    final ankleSeparation = (points.leftAnkle.x - points.rightAnkle.x).abs();
+    final averageKneeY = (points.leftKnee.y + points.rightKnee.y) / 2;
+    final averageShoulderY =
+        (points.leftShoulder.y + points.rightShoulder.y) / 2;
+    final averageHipY = (points.leftHip.y + points.rightHip.y) / 2;
+    final torsoHeight = (averageShoulderY - averageHipY).abs();
+    final shoulderWidth =
+        (points.leftShoulder.x - points.rightShoulder.x).abs();
+    final safeShoulderWidth = shoulderWidth == 0 ? 1.0 : shoulderWidth;
+    final normalizer = _bodyNormalizer(torsoHeight, shoulderWidth);
+    scaleFactor = normalizer;
 
-    double kneeSep = (lKnee.x - rKnee.x).abs();
-    double ankleSep = (lAnkle.x - rAnkle.x).abs();
-    double avgKneeY = (lKnee.y + rKnee.y) / 2;
-    double avgShoulderY = (lShoulder.y + rShoulder.y) / 2;
-    double avgHipY = (lHip.y + rHip.y) / 2;
-    double torsoHeight = (avgShoulderY - avgHipY).abs();
-    final shoulderWidth = (lShoulder.x - rShoulder.x).abs();
-    final kneeSeparationNorm =
-        kneeSep / (shoulderWidth == 0 ? 1 : shoulderWidth);
-    final ankleSeparationNorm =
-        ankleSep / (shoulderWidth == 0 ? 1 : shoulderWidth);
+    final kneeSeparationNorm = kneeSeparation / safeShoulderWidth;
+    final ankleSeparationNorm = ankleSeparation / safeShoulderWidth;
     final footToHipDistanceNorm = _pointDistance(
-          (lHip.x + rHip.x) / 2,
-          avgHipY,
-          (lHeel.x + rHeel.x) / 2,
-          (lHeel.y + rHeel.y) / 2,
+          (points.leftHip.x + points.rightHip.x) / 2,
+          averageHipY,
+          (points.leftHeel.x + points.rightHeel.x) / 2,
+          (points.leftHeel.y + points.rightHeel.y) / 2,
         ) /
-        _bodyNormalizer(torsoHeight, shoulderWidth);
-    final torsoVerticalNorm =
-        torsoHeight / (shoulderWidth == 0 ? 1 : shoulderWidth);
-
-    // ButterflyStretch là nguồn sự thật cho hold time.
-    // Dùng thời gian trôi qua liên tục từ lúc bắt đầu
-    final ctx = StretchContext(
-      kneeSeparation: kneeSep,
-      leftKneeY: lKnee.y,
-      rightKneeY: rKnee.y,
-      ankleSeparation: ankleSep,
-      shoulderToHipRatio: torsoHeight,
-      shoulderTilt: (lShoulder.y - rShoulder.y).abs(),
-      ankleSeparationNorm: ankleSeparationNorm,
-      footToHipDistanceNorm: footToHipDistanceNorm,
-      torsoVerticalNorm: torsoVerticalNorm,
-      currentState: stretchState,
-      frameTimestamp: now,
-      resultIssues: resultIssues,
-      currentHoldSeconds: _elapsedSeconds, // <-- truyền vào ctx
-    );
+        normalizer;
+    final torsoVerticalNorm = torsoHeight / safeShoulderWidth;
 
     frameBuffer.addFrame(FrameSnapshot(
-        log: {"avgKneeY": avgKneeY, "kneeSep": kneeSep}, timeStamp: now));
+      log: <String, double>{
+        'avgKneeY': averageKneeY,
+        'kneeSep': kneeSeparation,
+      },
+      timeStamp: frameTimestampMs,
+    ));
     if (frameBuffer.frameBuffer.length > ButterflyConfig.MAX_BUFFER_FRAMES) {
       frameBuffer.frameBuffer.removeAt(0);
     }
-    _updateStateBuffer(avgKneeY, kneeSep, torsoHeight, kneeSeparationNorm, now);
 
-    if (stretchState != ButterflyState.setup) {
-      for (final metric in _metrics) {
-        metric.update(ctx);
-        debugData.addAll(metric.debugData);
-      }
-    }
-
-    if (stretchState == ButterflyState.isometric_hold) {
-      _holdSeconds.accumulate(
-        elapsedMs: elapsedMs,
-        faultingByKey: {
-          'knee_seconds': kneeMetric.isFaultingNow,
-          'posture_seconds': postureMetric.isFaultingNow,
-          'foot_placement_seconds': footPlacementMetric.isFaultingNow,
-        },
-      );
-    } else {
-      _holdSeconds.resetTick();
-    }
-
-    final normalizedKneeDiff =
-        (lKnee.y - rKnee.y).abs() / (torsoHeight == 0 ? 1 : torsoHeight);
-    final normalizedShoulderTilt = (lShoulder.y - rShoulder.y).abs() /
-        (torsoHeight == 0 ? 1 : torsoHeight);
-    final formClean =
-        normalizedKneeDiff <= KneeSeparationConfig.ASYMMETRY_THRESHOLD &&
-            normalizedShoulderTilt <= PostureConfig.TILT_THRESHOLD &&
-            torsoVerticalNorm >= PostureConfig.COLLAPSE_THRESHOLD &&
-            ankleSeparationNorm <= ButterflyConfig.MAX_ANKLE_SEPARATION_NORM &&
-            kneeSeparationNorm >= ButterflyConfig.MIN_KNEE_SEPARATION_NORM &&
-            footToHipDistanceNorm <=
-                FootPlacementConfig.MAX_FOOT_TO_HIP_DISTANCE_NORM;
-    if (stretchState == ButterflyState.isometric_hold && formClean) {
-      _validHoldTimeMs += dt;
-    }
-
-    repCount =
-        _elapsedSeconds.toInt(); // Cập nhật repCount để UI quay vòng liên tục
-
-    _updateHoldDisplay(now);
-    _updatePhaseInstructions();
-  }
-
-  void _updateStateBuffer(double avgKneeY, double kneeSep, double torsoHeight,
-      double kneeSeparationNorm, int timestampMs) {
-    double yChange = 0.0;
+    var yChange = 0.0;
     final buffer = frameBuffer.frameBuffer;
     if (buffer.length >= 2) {
-      int lookback = buffer.length > 10 ? 10 : buffer.length - 1;
-      double currentY = buffer.last.log["avgKneeY"] ?? 0.0;
-      double pastY =
-          buffer[buffer.length - 1 - lookback].log["avgKneeY"] ?? 0.0;
+      final lookback = buffer.length > 10 ? 10 : buffer.length - 1;
+      final currentY = buffer.last.log['avgKneeY'] ?? 0.0;
+      final pastY = buffer[buffer.length - 1 - lookback].log['avgKneeY'] ?? 0.0;
       yChange = currentY - pastY;
     }
     final yChangeNorm = yChange / (torsoHeight == 0 ? 1 : torsoHeight);
 
-    if (stretchState == ButterflyState.setup &&
-        (yChangeNorm > ButterflyConfig.STRETCH_THRESHOLD ||
-            (kneeSeparationNorm >= ButterflyConfig.MIN_KNEE_SEPARATION_NORM &&
-                _holdDebouncer.update(yChangeNorm.abs() <
-                    ButterflyConfig.HOLD_STABILITY_THRESHOLD)))) {
-      _transitionState(ButterflyState.stretching, timestampMs);
-    } else if ((stretchState == ButterflyState.stretching ||
-            stretchState == ButterflyState.release) &&
-        _holdDebouncer.update(
-            yChangeNorm.abs() < ButterflyConfig.HOLD_STABILITY_THRESHOLD)) {
-      _transitionState(ButterflyState.isometric_hold, timestampMs);
-    } else if (stretchState == ButterflyState.isometric_hold &&
-        _releaseDebouncer
-            .update(yChangeNorm < ButterflyConfig.RELEASE_THRESHOLD)) {
-      _transitionState(ButterflyState.release, timestampMs);
+    _sampledFrame = _ButterflyPoseFrame(
+      kneeSeparation: kneeSeparation,
+      leftKneeY: points.leftKnee.y,
+      rightKneeY: points.rightKnee.y,
+      ankleSeparation: ankleSeparation,
+      shoulderToHipRatio: torsoHeight,
+      shoulderTilt: (points.leftShoulder.y - points.rightShoulder.y).abs(),
+      ankleSeparationNorm: ankleSeparationNorm,
+      footToHipDistanceNorm: footToHipDistanceNorm,
+      torsoVerticalNorm: torsoVerticalNorm,
+      yChangeNorm: yChangeNorm,
+    );
+
+    debugData['kneeSeparationNorm'] = kneeSeparationNorm;
+    return HoldPoseSample(
+      insideOuterEntry:
+          yChangeNorm.abs() < ButterflyConfig.HOLD_STABILITY_THRESHOLD,
+      outsideOuterExit: yChangeNorm < ButterflyConfig.RELEASE_THRESHOLD,
+    );
+  }
+
+  @override
+  Map<String, bool> updateFormMetrics() {
+    final sample = _sampledFrame!;
+    final context = StretchContext(
+      kneeSeparation: sample.kneeSeparation,
+      leftKneeY: sample.leftKneeY,
+      rightKneeY: sample.rightKneeY,
+      ankleSeparation: sample.ankleSeparation,
+      shoulderToHipRatio: sample.shoulderToHipRatio,
+      shoulderTilt: sample.shoulderTilt,
+      ankleSeparationNorm: sample.ankleSeparationNorm,
+      footToHipDistanceNorm: sample.footToHipDistanceNorm,
+      torsoVerticalNorm: sample.torsoVerticalNorm,
+      currentState: _legacyStateFor(phase),
+      frameTimestamp: frameTimestampMs,
+      resultIssues: resultIssues,
+      currentHoldSeconds: timerMetric.totalHoldingTimeMs / 1000.0,
+    );
+
+    if (phase == HoldPhase.holding || phase == HoldPhase.dropping) {
+      for (final metric in _metrics) {
+        metric.update(context);
+        debugData.addAll(metric.debugData);
+      }
+      if (kneeMetric.maxSeparation > _maxKneeSeparation) {
+        _maxKneeSeparation = kneeMetric.maxSeparation;
+      }
+    }
+
+    resultIssues.feedback['Thời gian'] =
+        '${(timerMetric.totalHoldingTimeMs / 1000).toStringAsFixed(1)}s / ${holdSeconds}s';
+    debugData['total_hold'] =
+        (timerMetric.totalHoldingTimeMs / 1000).toStringAsFixed(1);
+
+    return <String, bool>{
+      'knee_seconds': kneeMetric.isFaultingNow,
+      'posture_seconds': postureMetric.isFaultingNow,
+      'foot_placement_seconds': footPlacementMetric.isFaultingNow,
+    };
+  }
+
+  @override
+  Map<String, hold_fault.FaultRecord> snapshotHoldFaults() {
+    final faults = <String, hold_fault.FaultRecord>{};
+    _addMappedFaults(faults, kneeMetric.faults);
+    _addMappedFaults(faults, postureMetric.faults);
+    _addMappedFaults(faults, footPlacementMetric.faults);
+    return faults;
+  }
+
+  @override
+  void resetFormMetrics({required bool countFaults}) {
+    for (final metric in _metrics) {
+      if (countFaults) {
+        metric.resetAndCountFault();
+      } else {
+        metric.reset();
+      }
     }
   }
 
-  void _transitionState(ButterflyState newState, int timestampMs) {
-    if (newState == stretchState) return;
-
-    previousState = stretchState;
-    stretchState = newState;
-
+  @override
+  void onHoldPhaseChanged(
+    HoldPhase previous,
+    HoldPhase next,
+    int nowMs,
+  ) {
+    final oldState = _legacyStateFor(previous);
+    final newState = _legacyStateFor(next);
     for (final metric in _metrics) {
-      metric.onStateTransition(previousState, newState, timestampMs);
+      metric.onStateTransition(oldState, newState, nowMs);
     }
+  }
+
+  @override
+  void onHoldSetReset() {
+    _sampledFrame = null;
+    _maxKneeSeparation = 0.0;
+    frameBuffer.clear();
+  }
+
+  @override
+  void onSetComplete() {
+    final targetSeconds = (maxHolds * holdSeconds).toDouble();
+    logger.pushKey('max_rep', maxHolds);
+    logger.pushKey('total_seconds', targetSeconds);
+    logger.pushKey('good_seconds', clampedGoodHoldSeconds(targetSeconds));
+    logger.pushKey('total_hold_time', completedHoldingTimeMs / 1000.0);
+    logger.pushKey('max_knee_separation', _maxKneeSeparation);
+    logger.pushKey('knee_seconds', faultHoldSecondsFor('knee_seconds'));
+    logger.pushKey('posture_seconds', faultHoldSecondsFor('posture_seconds'));
+    logger.pushKey(
+      'foot_placement_seconds',
+      faultHoldSecondsFor('foot_placement_seconds'),
+    );
+    logger.pushGoodRepCount();
+  }
+
+  ButterflyState _legacyStateFor(HoldPhase holdPhase) {
+    switch (holdPhase) {
+      case HoldPhase.holding:
+        return ButterflyState.isometric_hold;
+      case HoldPhase.dropping:
+        return ButterflyState.release;
+      case HoldPhase.setup:
+      case HoldPhase.resting:
+      case HoldPhase.reArming:
+        return ButterflyState.setup;
+    }
+  }
+
+  void _addMappedFaults(
+    Map<String, hold_fault.FaultRecord> target,
+    Iterable<FaultRecord> source,
+  ) {
+    for (final fault in source) {
+      final mapped = _mapFaultRecord(fault);
+      target[mapped.type] = mapped;
+    }
+  }
+
+  hold_fault.FaultRecord _mapFaultRecord(FaultRecord fault) {
+    final type = switch (fault.type) {
+      'Knee' => 'knee',
+      'PostureCollapse' => 'posture',
+      'Posture' => 'shoulder',
+      'FootPlacement' => 'foot',
+      _ => fault.type,
+    };
+    final priority = switch (type) {
+      'knee' => 0,
+      'posture' => 1,
+      'foot' => 2,
+      _ => 99,
+    };
+    return hold_fault.FaultRecord(
+      phase: phase.name,
+      type: type,
+      message: fault.message,
+      affectsForm: fault.affectsForm,
+      priority: priority,
+    );
+  }
+
+  FaultRecord? _faultOfType(
+    Iterable<FaultRecord> faults,
+    String? type,
+  ) {
+    if (type == null) return null;
+    for (final fault in faults) {
+      if (fault.type == type) return fault;
+    }
+    return null;
+  }
+
+  _ButterflyLandmarks? _landmarks(
+    Map<PoseLandmarkType, PoseLandmark> landmarks,
+  ) {
+    final points = _ButterflyLandmarks.maybeFrom(landmarks);
+    if (points == null || !points.all.every(ExerciseBase.isLandmarkConfident)) {
+      return null;
+    }
+    return points;
   }
 
   double _bodyNormalizer(double torsoHeight, double shoulderWidth) {
@@ -428,35 +434,82 @@ class ButterflyStretch extends ExerciseBase {
     final dy = ay - by;
     return math.sqrt(dx * dx + dy * dy);
   }
+}
 
-  GuidanceSignal _safetyError(GuidanceSignal signal) {
-    _lastFrameTimeMs = frameTimestampMs;
-    _holdSeconds.resetTick();
-    return signal;
-  }
+class _ButterflyLandmarks {
+  const _ButterflyLandmarks({
+    required this.leftKnee,
+    required this.rightKnee,
+    required this.leftAnkle,
+    required this.rightAnkle,
+    required this.leftShoulder,
+    required this.rightShoulder,
+    required this.leftHip,
+    required this.rightHip,
+    required this.leftHeel,
+    required this.rightHeel,
+  });
 
-  /// Duy nhất nơi ghi feedback['Thời gian'] — không còn HoldDurationMetric ghi đè.
-  void _updateHoldDisplay(int now) {
-    final displayed = _elapsedSeconds;
-    resultIssues.feedback['Thời gian'] =
-        '${displayed.toStringAsFixed(1)}s / ${maxSeconds}s';
-    debugData['total_hold'] = displayed.toStringAsFixed(1);
-  }
-
-  void _updatePhaseInstructions() {
-    switch (stretchState) {
-      case ButterflyState.setup:
-        // Legacy UI instruction copy: Chụm hai lòng bàn chân
-        break;
-      case ButterflyState.stretching:
-        // Legacy UI instruction copy: Ép gối xuống từ từ
-        break;
-      case ButterflyState.isometric_hold:
-        // Legacy UI instruction copy: Giữ nguyên ở đây!
-        break;
-      case ButterflyState.release:
-        // Legacy UI instruction copy: Thả lỏng
-        break;
+  static _ButterflyLandmarks? maybeFrom(
+    Map<PoseLandmarkType, PoseLandmark> landmarks,
+  ) {
+    final leftKnee = landmarks[PoseLandmarkType.leftKnee];
+    final rightKnee = landmarks[PoseLandmarkType.rightKnee];
+    final leftAnkle = landmarks[PoseLandmarkType.leftAnkle];
+    final rightAnkle = landmarks[PoseLandmarkType.rightAnkle];
+    final leftShoulder = landmarks[PoseLandmarkType.leftShoulder];
+    final rightShoulder = landmarks[PoseLandmarkType.rightShoulder];
+    final leftHip = landmarks[PoseLandmarkType.leftHip];
+    final rightHip = landmarks[PoseLandmarkType.rightHip];
+    final leftHeel = landmarks[PoseLandmarkType.leftHeel];
+    final rightHeel = landmarks[PoseLandmarkType.rightHeel];
+    if (leftKnee == null ||
+        rightKnee == null ||
+        leftAnkle == null ||
+        rightAnkle == null ||
+        leftShoulder == null ||
+        rightShoulder == null ||
+        leftHip == null ||
+        rightHip == null ||
+        leftHeel == null ||
+        rightHeel == null) {
+      return null;
     }
+    return _ButterflyLandmarks(
+      leftKnee: leftKnee,
+      rightKnee: rightKnee,
+      leftAnkle: leftAnkle,
+      rightAnkle: rightAnkle,
+      leftShoulder: leftShoulder,
+      rightShoulder: rightShoulder,
+      leftHip: leftHip,
+      rightHip: rightHip,
+      leftHeel: leftHeel,
+      rightHeel: rightHeel,
+    );
   }
+
+  final PoseLandmark leftKnee;
+  final PoseLandmark rightKnee;
+  final PoseLandmark leftAnkle;
+  final PoseLandmark rightAnkle;
+  final PoseLandmark leftShoulder;
+  final PoseLandmark rightShoulder;
+  final PoseLandmark leftHip;
+  final PoseLandmark rightHip;
+  final PoseLandmark leftHeel;
+  final PoseLandmark rightHeel;
+
+  List<PoseLandmark> get all => <PoseLandmark>[
+        leftKnee,
+        rightKnee,
+        leftAnkle,
+        rightAnkle,
+        leftShoulder,
+        rightShoulder,
+        leftHip,
+        rightHip,
+        leftHeel,
+        rightHeel,
+      ];
 }

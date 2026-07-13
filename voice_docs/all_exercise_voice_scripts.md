@@ -286,6 +286,11 @@ Nguyên tắc viết câu:
 
 ## Bear Plank - Chống bốn điểm nhấc gối
 
+**CODE SYNC 07-13:** `setup_position` remains active, but the between-hold re-arm replays it without
+`active_intro`. Its current wording stops at hands-and-knees, while the entry gate needs hovering
+knees. Re-record the same `setup_position` key with standalone re-arm-safe copy after Nam's text pass.
+The table below preserves the current recording transcript; it is not replacement copy.
+
 | Mã file | Câu nói |
 |---|---|
 | bear_plank.setup_intro | Đặt điện thoại hơi chéo trước mặt để thấy vai, tay, hông, gối và bàn chân. |
@@ -551,6 +556,11 @@ Nguyên tắc viết câu:
 | tempo | Giữ lâu hơn một chút. | Hiệp này giữ đủ thời gian kéo giãn. |
 
 ## Side Plank with Hip Dip - Nghiêng người hạ hông
+
+**STALE COPY, SUPPRESSED 07-13:** the exercise is now a static Side Plank hold. The existing
+`active_intro` and `amplitude` recordings still instruct a moving hip dip, directly contradicting the
+static `formClean` gate. The resolver safe-no-ops both keys until approved static-hold recordings
+replace them at the same paths. The table below preserves the current recording transcripts only.
 
 | Mã file | Câu nói |
 |---|---|

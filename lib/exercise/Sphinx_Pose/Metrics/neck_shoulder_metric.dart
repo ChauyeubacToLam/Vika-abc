@@ -22,6 +22,9 @@ class NeckShoulderMetric extends SphinxMetricBase {
   bool _isHyper = false;
   bool _isShrug = false;
 
+  bool get isHyperFaultingNow => _isHyper;
+  bool get isShrugFaultingNow => _isShrug;
+
   @override
   List<FaultRecord> get faults => _faults;
   @override

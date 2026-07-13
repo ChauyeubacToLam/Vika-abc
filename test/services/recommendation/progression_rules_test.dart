@@ -33,6 +33,36 @@ ExerciseCatalogEntry _repExercise({
   );
 }
 
+ExerciseCatalogEntry _holdExercise({
+  String id = 'high_plank',
+  int? baseReps = 3,
+  int? baseSeconds = 20,
+  int beginnerCap = 30,
+  String? progressionTo,
+}) {
+  return ExerciseCatalogEntry(
+    id: id,
+    vietnameseName: 'Plank cao',
+    englishName: 'High Plank',
+    fork: 'both',
+    bodyRegions: const ['core'],
+    muscleGroups: const ['core'],
+    difficultyTier: 1,
+    goalFit: const {'health': 1},
+    painSafe: const [],
+    painContraindicated: const [],
+    isFormChecked: true,
+    isCorrective: false,
+    correctiveFor: const [],
+    baseReps: baseReps,
+    baseSeconds: baseSeconds,
+    maxSecondsBeginner: beginnerCap,
+    maxSecondsIntermediate: 40,
+    maxSecondsAdvanced: 50,
+    progressionTo: progressionTo,
+  );
+}
+
 Template _template({
   int numPhases = 2,
   int weeksPerPhase = 3,
@@ -181,6 +211,100 @@ void main() {
     expect(planned.restSeconds, 45);
   });
 
+  test('hybrid progresses seconds while hold count passes through', () {
+    final exercise = _holdExercise();
+    final template = _template();
+
+    final weekOne = prescribeVolume(
+      exercise: exercise,
+      userTier: 1,
+      absoluteWeek: 1,
+      template: template,
+    );
+    final peak = prescribeVolume(
+      exercise: exercise,
+      userTier: 1,
+      absoluteWeek: template.progressionWeeks,
+      template: template,
+    );
+    final deload = prescribeVolume(
+      exercise: exercise,
+      userTier: 1,
+      absoluteWeek: template.totalWeeks,
+      template: template,
+    );
+
+    expect((weekOne.reps, weekOne.seconds), (3, 20));
+    expect((peak.reps, peak.seconds), (3, 30));
+    expect((deload.reps, deload.seconds), (3, 22));
+    expect(weekOne.restSeconds, template.defaultRestSecondsHold);
+    expect(peak.restSeconds, template.defaultRestSecondsHold);
+    expect(deload.restSeconds, template.defaultRestSecondsHold);
+  });
+
+  test('hybrid hold count does not receive a fitness-tier bump', () {
+    final exercise = _holdExercise();
+    final template = _template();
+
+    final prescriptions = [
+      for (var tier = 1; tier <= 3; tier++)
+        prescribeVolume(
+          exercise: exercise,
+          userTier: tier,
+          absoluteWeek: 1,
+          template: template,
+        ),
+    ];
+
+    expect(prescriptions.map((volume) => volume.reps), everyElement(3));
+    expect(
+      prescriptions.map((volume) => volume.seconds),
+      orderedEquals([20, 25, 30]),
+    );
+  });
+
+  test('hybrid carry-over floors seconds and preserves hold count', () {
+    final planned = prescribeVolume(
+      exercise: _holdExercise(),
+      userTier: 1,
+      absoluteWeek: 1,
+      template: _template(),
+      carryOver: const CarryOverPerformance(
+        reps: 99,
+        seconds: 28,
+        appliedRestSeconds: 20,
+      ),
+    );
+
+    expect(planned.reps, 3);
+    expect(planned.seconds, 28);
+    expect(planned.restSeconds, 20);
+  });
+
+  test('legacy seconds row defaults to one hold during data rollout', () {
+    final planned = prescribeVolume(
+      exercise: _holdExercise(id: 'sphinx', baseReps: null),
+      userTier: 1,
+      absoluteWeek: 1,
+      template: _template(),
+    );
+
+    expect(planned.reps, 1);
+    expect(planned.seconds, 20);
+  });
+
+  test('exercise with neither reps nor seconds still throws', () {
+    expect(
+      () => prescribeVolume(
+        exercise: _holdExercise(baseReps: null, baseSeconds: null),
+        userTier: 1,
+        absoluteWeek: 1,
+        template: _template(),
+      ),
+      throwsStateError,
+    );
+  });
+
   test('hard carry-over does not reduce planned rest', () {
     final exercise = _repExercise(beginnerCap: 10);
     final template = _template();
@@ -223,5 +347,29 @@ void main() {
 
     expect(qualifies, isTrue);
     expect(hardSession, isFalse);
+  });
+
+  test('hybrid variant unlock uses the seconds cap', () {
+    final exercise = _holdExercise(progressionTo: 'harder_plank');
+
+    final qualifies = sessionQualifiesForVariantUnlock(
+      exercise: exercise,
+      userTier: 1,
+      difficultyRatings: const ['easy', 'easy'],
+      setData: const [
+        {'actual_reps': 3, 'actual_seconds': 30},
+      ],
+    );
+    final belowSecondsCap = sessionQualifiesForVariantUnlock(
+      exercise: exercise,
+      userTier: 1,
+      difficultyRatings: const ['easy', 'easy'],
+      setData: const [
+        {'actual_reps': 99, 'actual_seconds': 29},
+      ],
+    );
+
+    expect(qualifies, isTrue);
+    expect(belowSecondsCap, isFalse);
   });
 }

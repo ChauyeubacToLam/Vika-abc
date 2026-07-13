@@ -103,7 +103,7 @@ mark.note-hl.flash{animation:npflash 1.2s ease}
 <header><div class="hero">
 <p class="eyebrow">Current-code report · 2026-07-12</p>
 <h1>High Plank pre-scale fixes are landed.</h1>
-<p>The false-perfect pause bug is closed, hidden hold wiring now fails loud, and the confirmed dead paths are gone. The shared hold engine is still deliberately deferred until bear plank becomes the real second consumer.</p>
+<p>The false-perfect pause bug is closed, hidden hold wiring fails loud, and the confirmed dead paths are gone. At this pre-scale review snapshot, P2 had extracted the shared hold engine with High Plank as its only consumer. P3 landed 07-13: Bear Plank plus Butterfly, Seated Forward Fold, Sphinx, and Side Plank now use that unchanged engine.</p>
 </div></header>
 <main>
 <section id="verdict">
@@ -130,7 +130,7 @@ mark.note-hl.flash{animation:npflash 1.2s ease}
 <tr><td>Milestone pools</td><td>Rep-counted holds require non-empty praise and hustle pools. Missing pools log once in release and assert in debug. No generic fallback hides a broken voice footprint; rep paths never enter the guard.</td><td class="path">policy_voice_coach.dart · empty-pool test</td><td class="done">Done</td></tr>
 <tr><td>Data honesty</td><td>Each completed RepLog writes measured, clamped hold time instead of copying the target constant. No-pose transitions now use the timestamp refreshed by the base call.</td><td class="path">high_plank.dart</td><td class="done">Done</td></tr>
 <tr><td>Dead code</td><td>The unreachable re-arm <code>centerLabel</code> call and the obsolete generic exercise voice coach/helper were deleted. The separate parked Viettel service field remains untouched.</td><td class="path">active_exercise_page.dart · exercise_base.dart</td><td class="done">Done</td></tr>
-<tr><td>Shared hold engine</td><td>The High Plank state machine is still exercise-owned. Do the extraction with bear plank so geometry stays exercise-specific while pause/rest/re-arm mechanics gain a real second consumer.</td><td class="path">Deferred architecture pass; no change in this fixes-only work order</td><td class="deferred">Deferred</td></tr>
+<tr><td>Shared hold engine</td><td>P2 moved the generic state machine into <code>RepCountedHoldExercise</code>; High Plank now supplies geometry and form hooks only. Bear Plank is still gated and was not migrated.</td><td class="path">lib/exercise/hold/rep_counted_hold_exercise.dart</td><td class="done">Done</td></tr>
 </tbody>
 </table>
 </section>

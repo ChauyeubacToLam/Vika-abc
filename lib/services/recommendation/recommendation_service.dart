@@ -459,13 +459,19 @@ class ExerciseLaunchCatalogInfo {
     }
   }
 
-  /// Compact volume label for list/summary surfaces, e.g. "3 x 8 rep" or
-  /// "1 x 30 giây" — matches [workoutVolumeLabel]'s "sets x target" wording so
-  /// cards and the exercise intro never disagree. Returns '' if the entry is
-  /// malformed (neither reps nor seconds).
+  /// Compact volume label for list/summary surfaces, e.g. "3 x 8 rep",
+  /// "1 x 30 giây", or "3 x 2 x 30 giây" for repeated holds. Matches
+  /// [workoutVolumeLabel]'s wording so cards and the exercise intro never
+  /// disagree. Returns '' if the entry is malformed (neither target set).
   String get volumeLabel {
     final sets = baseSets ?? 1;
-    if (baseSeconds != null) return '$sets x $baseSeconds giây';
+    if (baseSeconds != null) {
+      final holdCount = baseReps;
+      if (holdCount != null && holdCount > 1) {
+        return '$sets x $holdCount x $baseSeconds giây';
+      }
+      return '$sets x $baseSeconds giây';
+    }
     if (baseReps != null) return '$sets x $baseReps rep';
     return '';
   }

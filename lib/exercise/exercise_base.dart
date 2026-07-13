@@ -26,6 +26,8 @@ import '../voice/voice_content.dart';
 import '../voice/voice_sink.dart';
 import 'dart:math' as math;
 import 'fault_record.dart';
+export 'hold/hold_phase.dart';
+import 'hold/hold_phase.dart';
 import 'presence_gate.dart';
 import 'dart:async';
 import 'dart:ui' show Size;
@@ -51,22 +53,6 @@ const double SCALE_EMA_ALPHA = 0.1;
 enum ExerciseState { notActivated, activated, completed }
 
 enum CameraFacing { front, left, right, angled, undefined }
-
-// Rep-counted holds currently bridge exercise-owned enums to the shared voice
-// adapter through String phase keys. Keep the temporary naming contract in one
-// place until the hold engine owns a typed phase model.
-const String REP_COUNTED_HOLD_PHASE_SETUP = 'setup';
-const String REP_COUNTED_HOLD_PHASE_HOLDING = 'holding';
-const String REP_COUNTED_HOLD_PHASE_DROPPING = 'dropping';
-const String REP_COUNTED_HOLD_PHASE_RESTING = 'resting';
-const String REP_COUNTED_HOLD_PHASE_RE_ARMING = 'reArming';
-const Set<String> REP_COUNTED_HOLD_PHASE_KEYS = <String>{
-  REP_COUNTED_HOLD_PHASE_SETUP,
-  REP_COUNTED_HOLD_PHASE_HOLDING,
-  REP_COUNTED_HOLD_PHASE_DROPPING,
-  REP_COUNTED_HOLD_PHASE_RESTING,
-  REP_COUNTED_HOLD_PHASE_RE_ARMING,
-};
 
 enum GuidanceClass {
   phoneLandscape,
@@ -672,7 +658,7 @@ abstract class ExerciseBase {
           ? VoiceLib.hustleRepCountedHoldFinal
           : const <String>[],
       repStartPhaseKeys: isRepCountedHold
-          ? const <String>{REP_COUNTED_HOLD_PHASE_HOLDING}
+          ? <String>{REP_COUNTED_HOLD_PHASE_HOLDING}
           : const <String>{},
     );
     return PolicyVoiceCoach(

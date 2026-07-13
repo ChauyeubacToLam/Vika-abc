@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Hold Pilot Code Review — Vika</title>
+<title>Hold Pilot + P2 Engine Code Review — Vika</title>
 <style>
 :root{--ink:#1F1812;--ink-soft:#4A4031;--muted:#81735d;--page:#F1E9D9;--raised:#FBF7EE;--line:#E4DAC5;--line-soft:#EEE6D5;--yellow:#FFB701;--tip:#2E6E63;--tip-bg:#E9F1EE;--tip-line:#BFDBD3;--warn:#A2472B;--warn-bg:#F7EAE2;--warn-line:#E7C6B6;--sans:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"SFMono-Regular",Consolas,monospace}
 *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--page);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
@@ -48,23 +48,25 @@ footer{border-top:1px solid var(--line);padding-top:20px;margin-top:20px;color:v
 </head>
 <body>
 <header><div class="hero">
-<p class="eyebrow">Review companion · uncommitted working tree · 2026-07-12</p>
-<h1>High Plank hold-pilot<br>code review</h1>
-<p class="lede">A reading map for the pending diff — the structural hold migration, inter-hold re-arm/hybrid pass, device tune, and pre-scale safety pass. High Plank is now reps-of-holds with a two-ring clock, parallel earcons, a spoken final countdown, a per-hold re-activation ritual, deterministic milestone outcomes, a torso-horizontal outer gate, and explicit pause/timer/voice contracts. Grouped by subsystem in the order to read them, with the verbatim hunks that matter, an ELI5 per mechanism, and the lines to review hardest. Nothing here is committed.</p>
-<div class="chips"><span class="chip"><b>4</b> stacked runs</span><span class="chip"><b>1</b> new file (earcon_player)</span><span class="chip"><b>dead</b> generic coach removed</span><span class="chip"><b>119</b> focused tests green</span><span class="chip"><b>2</b> interruption semantics</span><span class="chip"><b>0</b> pipeline-arch edits</span></div>
+<p class="eyebrow">Review companion · uncommitted working tree · 2026-07-13</p>
+<h1>High Plank hold-pilot<br>+ shared hold engine</h1>
+<p class="lede">Current-code overlay through the P3 hold-voice migration, followed by the original High Plank behavior review as an explicitly archived baseline. The generic reps-of-holds machine lives in <code>lib/exercise/hold/rep_counted_hold_exercise.dart</code>; all six subclasses keep their own geometry, form metrics, live faults, set-summary keys, and diagnostics. Nothing here is committed.</p>
+<div class="chips"><span class="chip"><b>6</b> stacked runs</span><span class="chip"><b>1</b> engine base</span><span class="chip"><b>6</b> subclasses</span><span class="chip"><b>87</b> P3 focused tests green</span><span class="chip"><b>472</b> full-suite tests green</span><span class="chip"><b>0</b> P3 fence edits</span></div>
 </div></header>
 <main>
 
 <section id="how">
 <p class="kicker">00 · How to use this</p>
 <h2>What the diff does, and where to look</h2>
-<p class="lead">Four runs landed on top of each other in one working tree. <b>Run 1 (structural):</b> High Plank goes from a single form-gated hold-timer to <code>maxHolds × holdSeconds</code> reps-of-holds; the clock splits into an outer anti-cheat ring (gates time) and an inner form ring (coaches, never stops the clock); the spoken "năm…một" countdown and a new <code>EarconPlayer</code> end tone replace the spoken set-complete fleet-wide; the legacy bespoke coach is deleted. <b>Run 2 (re-arm + hybrid):</b> adds <code>holding → resting → reArming → holding</code>, a rest-end tone, typed rest getters, and the hybrid rings-plus-rep-hero UI. <b>Run 3 (device tune):</b> forces one praise/hustle after every milestone, adds shoulder→hip torso tilt to the outer ring, advances rest without a pose, and republishes set-start setup/hold signals during re-arm. <b>Run 4 (pre-scale safety):</b> discards a partial hold across the base pause ritual, gates timer deltas, validates the temporary hold phase/pool contract, logs measured clamped hold time, and removes dead generic voice/UI paths.</p>
+<p class="lead">Runs 1–4 built and hardened the High Plank pilot. <b>Run 5 (P2 extraction)</b> moved the generic machine, timer, rest/re-arm clocks, pause semantics, fault-second accumulator, and per-hold RepLog core into <code>RepCountedHoldExercise</code>. <b>Run 6 (P3 scale)</b> migrated Bear Plank, Butterfly, Seated Forward Fold, Sphinx, and Side Plank onto that unchanged engine while preserving each exercise's existing CV checks and reporting contract.</p>
+<article class="card warn"><h3>Two-layer artifact</h3><p><b>Section 01 is current source ownership through P3.</b> Sections 02–10 preserve the pre-extraction High Plank pilot review so the behavior rationale stays readable; their High-Plank-local paths and verbatim snippets are historical baseline evidence, not current ownership. Review the live P3 diff in Source Control.</p></article>
 <div class="grid">
 <article class="card idea"><h3>Read core first</h3><p>The state machine (§03) and the voice adapter (§04) carry the algorithmic risk. The earcon/sink/factory/UI sections are glue — skim for pattern-match, not correctness.</p></article>
 <article class="card tip"><h3>Truth anchors</h3><p>Specs: <code>hold-voice-impl-spec.md</code> + <code>hold-rest-spec-addendum.md</code>. Rulings: <code>decisions.md</code> (07-11 hold entry + five 07-12 entries). Behavior: <code>voice-behavior-spec.md § Hold-based</code>.</p></article>
 <article class="card warn"><h3>Three deviations</h3><p>Codex diverged from the design in three sanctioned-but-unblessed spots (§02). Each is spec-said / code-does / verdict-question. These are your first stop.</p></article>
 </div>
 <div class="toc">
+<a href="#p2"><b>01</b><span>P2 current ownership + two-call protocol</span></a>
 <a href="#deviations"><b>02</b><span>Implementation choices + device ruling</span></a>
 <a href="#statemachine"><b>03</b><span>State machine — high_plank.dart</span></a>
 <a href="#adapter"><b>04</b><span>Voice adapter — policy_voice_coach.dart</span></a>
@@ -74,6 +76,23 @@ footer{border-top:1px solid var(--line);padding-top:20px;margin-top:20px;color:v
 <a href="#eyes"><b>08</b><span>Second-pair-of-eyes findings</span></a>
 <a href="#tests"><b>09</b><span>Tests — what they prove</span></a>
 <a href="#fences"><b>10</b><span>Fence check + known-unrelated</span></a>
+</div>
+</section>
+
+<section id="p2">
+<p class="kicker">01 · P2 + P3 current code</p>
+<h2>One machine, six exercise-specific adapters</h2>
+<p class="lead"><code>RepCountedHoldExercise</code> owns phase transitions and lifecycle. <code>HighPlank</code> remains the reference; Bear Plank, Butterfly, Seated Forward Fold, Sphinx, and Side Plank now implement the same exercise-specific sensing and reporting seam. The engine’s <code>checkingPose</code> is load-bearing and stayed untouched in P3.</p>
+<div class="grid two">
+<article class="card tip"><h3>Engine owns</h3><p><code>HoldPhase</code>, debounce gates, <code>TimerMetric</code>, rest/re-arm clocks, no-pose rest advancement, pause-discard-current semantics, hold-second accumulation, rep completion, measured <code>hold_time</code>, and live hold/rest getters.</p></article>
+<article class="card idea"><h3>Each hold subclass owns</h3><p>Landmark selection, its existing entry/exit geometry, form metric updates, fault snapshots/priorities, Vietnamese phase labels, snake-case live faults, set-summary keys, and diagnostics.</p></article>
+</div>
+<div class="eli5"><b>Frame protocol:</b> <code>samplePose(landmarks)</code> → engine transition → re-arm guidance → <code>updateFormMetrics()</code> → timer tick → fault-second accumulation → phase status. The split is deliberate: every metric sees the post-transition phase of the current frame.</div>
+<div class="grid">
+<article class="card"><h3>Typed phase location</h3><p><code>lib/exercise/hold/hold_phase.dart</code>. <code>currentPhaseKey</code> is <code>phase.name</code>; voice compatibility keys and the validation set derive from the enum.</p></article>
+<article class="card"><h3>Ordering stress</h3><p>Completion frame cannot leak a delta into the next hold; dropping→holding resumes the same timer; no-pose during resting advances the wall clock into re-arm.</p></article>
+<article class="card"><h3>Verification</h3><p>Analyze clean. P3 migration-focused suite: 87/87. Full suite: 472 green / 6 failed, all the known 12px <code>workout_summary</code> overflow cluster. High Plank, shared engine, catalog, and recommendation files match their pre-P3 hashes.</p></article>
+<article class="card warn"><h3>P3 voice honesty fences</h3><p>Butterfly shoulder tilt and all three Sphinx arm checks keep distinct measured fault ids. Side Plank's stale moving hip-dip <code>active_intro</code> and <code>amplitude</code> assets are resolver-suppressed pending same-key static-hold recordings. Seated ankle/tempo stay silent until soft pools exist.</p></article>
 </div>
 </section>
 
@@ -110,7 +129,7 @@ footer{border-top:1px solid var(--line);padding-top:20px;margin-top:20px;color:v
 <section id="statemachine">
 <p class="kicker">03 · Core — read hardest</p>
 <h2>State machine — <code>lib/exercise/3.High&nbsp;Plank/high_plank.dart</code></h2>
-<p class="lead">The load-bearing file: +354/−? lines. Five sub-mechanisms below, in dependency order. This is where the two-ring partition, the break semantics, and the re-arm gate live — the things most likely to be subtly wrong.</p>
+<p class="lead"><b>Archived pre-P2 ownership map.</b> The behavior below remains current, but the generic machine now lives in <code>lib/exercise/hold/rep_counted_hold_exercise.dart</code>; High Plank supplies the geometry and form hooks described in §01.</p>
 
 <h3>3.1 &nbsp;Reps-of-holds structure + the enum</h3>
 <p>The constructor drops <code>maxSeconds</code> for <code>maxHolds × holdSeconds</code> and forwards both to the base's <code>targetReps</code>/<code>targetSeconds</code>. The state enum gains <code>resting</code> and <code>reArming</code>.</p>
@@ -299,7 +318,7 @@ footer{border-top:1px solid var(--line);padding-top:20px;margin-top:20px;color:v
 <div class="eli5"><b>ELI5:</b> The same "ba, hai, một" countdown that plays at set start now also plays at each hold's re-arm — because the countdown follows <code>holdStillElapsedMs</code>, and High Plank overrides that getter to return the re-arm clock while <code>reArming</code> (§03/§07). "Re-arm, don't copy": one clock-follower, lit up in two contexts. The <code>notActivated</code> guard added to the intro-termination line is deviation ②.</div>
 
 <h3>4.5 &nbsp;Temporary hold contract fails loud</h3>
-<p>The shared base now owns the five canonical phase-key constants used by the High Plank producer, factory config, and voice consumer. The rep-counted-hold adapter validates every live phase against that set and validates once that its praise and hustle pools are both non-empty. Debug builds assert immediately; release builds emit one <code>[VoiceGuard]</code> diagnostic per issue and do not invent fallback coaching. This is intentionally temporary until a typed shared hold engine replaces the string seam.</p>
+<p>P2 now owns the five canonical phases as <code>HoldPhase</code> in the shared hold engine. <code>currentPhaseKey</code> and the compatibility voice keys derive from <code>phase.name</code>. The rep-counted-hold adapter still validates every live key and validates once that its praise and hustle pools are both non-empty. Debug builds assert immediately; release builds emit one <code>[VoiceGuard]</code> diagnostic per issue and do not invent fallback coaching.</p>
 </section>
 
 <section id="earcon">
@@ -418,7 +437,7 @@ footer{border-top:1px solid var(--line);padding-top:20px;margin-top:20px;color:v
 <article class="card warn"><h3>Cross-hold praise alternation becomes hustle</h3><p><code>_lastHoldMilestoneWasPraise</code> still does not reset on a new hold. A praise on hold N's last milestone makes hold N+1's first clean milestone choose forced hustle. It never creates silence now; verify that cross-hold alternation feels right.</p></article>
 <article class="card warn"><h3>Sag can 2.5× the old drop threshold</h3><p><code>OUTER_EXIT_SAG_MAX = 0.45</code> vs old <code>DROPPING_SAG_DEVIATION = 0.18</code>. A user can now sag well past the old "you dropped" line and still earn time. Correct per the two-ring intent, but it's the exact number to feel-tune first — a genuinely collapsed plank must still trip the outer ring.</p></article>
 <article class="card tip"><h3><code>hold_time</code> has one measured source</h3><p>Every completed-hold RepLog records the timer's measured accrued time, clamped to the target, and the completed-time accumulator consumes the same value. Wobble pauses still extend wall-clock duration but cannot inflate earned time.</p></article>
-<article class="card tip"><h3>Pre-scale seams are guarded, not abstracted</h3><p>The phase-string seam and voice pool footprint now fail loud; timer gaps use the shared 10–250ms inclusive gate; the dead generic coach/helper block and unreachable UI call are gone. Shared hold-engine extraction remains deferred until bear plank becomes the real second consumer.</p></article>
+<article class="card tip"><h3>The pre-scale seams carried P3</h3><p>The phase-string seam and voice pool footprint fail loud; timer gaps use the shared 10–250ms inclusive gate; the dead generic coach/helper block and unreachable UI call are gone. The unchanged engine now serves six consumers through exercise-owned pose and metric adapters.</p></article>
 <article class="card tip"><h3>Docs edited that the spec fenced Codex off</h3><p><code>missing-audio.md</code> and <code>voice-behavior-spec.md</code> are in the diff, though both specs told Codex not to touch them. The edits are doc-propagation (loop-closing per CLAUDE.md), not code — they read as Opus/Nam sync, and the code respects the fences. Review them as docs; confirm the propagation is what you intended.</p></article>
 <article class="card tip"><h3>Trailing <code>correctForm = true</code></h3><p><code>_onHoldComplete</code> sets <code>correctForm</code> from the hold's faults, writes the RepLog, then resets it to <code>true</code>. The RepLog captured the real verdict, so this is hygiene — just confirm nothing samples the live <code>correctForm</code> flag in the same frame after the reset.</p></article>
 </div>
@@ -447,7 +466,7 @@ footer{border-top:1px solid var(--line);padding-top:20px;margin-top:20px;color:v
 <tr><td><code>policy_voice_coach_wiring_test</code> (new asserts)</td><td>Factory routes High Plank to <code>repCountedHold</code> bundle, <code>countsByRepNumber:true</code>, <code>targetReps:3</code>, <code>repStartPhaseKeys:{holding}</code>, empty <code>effortPhaseKeys</code>; set-complete uses tone + final <code>exercise_complete</code>, no <code>common.set_complete</code> key, one <code>endTone</code> call.</td></tr>
 </tbody>
 </table>
-<p style="margin-top:14px">Verification after the pre-scale safety patch: <code>flutter analyze</code> clean; 119 focused voice/High Plank tests pass. Full suite: 458 passed / 6 failed, all six the known unrelated <code>workout_summary</code> 12px overflow cluster. The stale catalog-source assertion was fixed to match the hybrid row. <b>Not proven by tests:</b> real-body tilt separation, earcon/voice overlap, and device timing under long absence/pause.</p>
+<p style="margin-top:14px">Verification after P3: <code>flutter analyze</code> clean; 87 migration-focused exercise, launch, and voice tests pass. Full suite: 472 passed / 6 failed, all the known unrelated <code>workout_summary</code> 12px overflow cluster. <b>Not proven by tests:</b> real-body CV behavior, earcon/voice overlap, and device timing under long absence/pause.</p>
 </section>
 
 <section id="fences">
@@ -457,12 +476,12 @@ footer{border-top:1px solid var(--line);padding-top:20px;margin-top:20px;color:v
 <article class="card tip"><h3>Code-side fences held</h3><p><code>plank.dart</code>, <code>plank_voice_coach.dart</code> (read-only reference) and <code>hold-catalog-hybrid-fix.sql</code> (Nam owns) are <b>not in the diff</b>. No audio files added by code — the two <code>.mp3</code>s are Nam-picked assets. No pipeline-architecture edits.</p></article>
 <article class="card tip"><h3>Legacy cleanup complete</h3><p><code>high_plank_voice_coach.dart</code> + <code>high_plank_voice_assets.dart</code> deleted; the High Plank override/dead helpers, unused generic coach/player block, and unreachable re-arm label call are removed. The live generic factory and policy coach route High Plank.</p></article>
 <article class="card warn"><h3>Doc edits crossed the Codex fence</h3><p><code>missing-audio.md</code>, <code>voice-behavior-spec.md</code> edited despite the spec's "do not touch" — but as doc-propagation, not code (see §08). Verify authorship/intent; the code is clean.</p></article>
-<article class="card"><h3>Known-unrelated</h3><p>Full suite has 6 pre-existing failures, all <code>workout_summary</code> 12px overflows. No High Plank, voice, catalog, or analyzer failure remains.</p></article>
+<article class="card"><h3>Known-unrelated</h3><p>Full suite has the 6 pre-existing <code>workout_summary</code> overflows plus one current dirty-P1 catalog/test mismatch. No High Plank, hold voice, or analyzer failure remains.</p></article>
 </div>
 </section>
 
 <footer>
-Review companion for the uncommitted 07-12 High Plank hold-pilot diff · anchors are approximate (post-diff line numbers, orientation only) · verify every claim against the working tree · code untouched by this doc.
+Review companion for the uncommitted 07-12 High Plank hold-pilot + P2 extraction · §01 mirrors current ownership; §02–10 preserve the pre-P2 behavior-review baseline · verify source against the working tree.
 </footer>
 </main>
 <!-- ============================================================================

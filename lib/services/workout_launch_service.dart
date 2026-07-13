@@ -260,17 +260,18 @@ class WorkoutLaunchService {
     ExerciseLaunchCatalogInfo? catalogInfo,
   ) {
     if (catalogInfo == null) return null;
+    if (catalogInfo.baseSeconds != null) {
+      return VolumePrescription(
+        sets: 1,
+        reps: catalogInfo.baseReps,
+        seconds: catalogInfo.baseSeconds,
+        restSeconds: 60,
+      );
+    }
     if (catalogInfo.baseReps != null) {
       return VolumePrescription(
         sets: 1,
         reps: catalogInfo.baseReps,
-        restSeconds: 60,
-      );
-    }
-    if (catalogInfo.baseSeconds != null) {
-      return VolumePrescription(
-        sets: 1,
-        seconds: catalogInfo.baseSeconds,
         restSeconds: 60,
       );
     }
@@ -279,10 +280,12 @@ class WorkoutLaunchService {
 }
 
 String workoutVolumeLabel(VolumePrescription volume) {
-  final target = volume.reps != null
-      ? '${volume.reps} rep'
-      : volume.seconds != null
-          ? '${volume.seconds} giây'
+  final target = volume.seconds != null
+      ? volume.reps != null && volume.reps! > 1
+          ? '${volume.reps} x ${volume.seconds} giây'
+          : '${volume.seconds} giây'
+      : volume.reps != null
+          ? '${volume.reps} rep'
           : '';
   if (target.isEmpty) return '${volume.sets} hiệp';
   return '${volume.sets} x $target';

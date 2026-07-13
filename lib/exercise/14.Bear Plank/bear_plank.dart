@@ -1,21 +1,38 @@
 // ignore_for_file: curly_braces_in_flow_control_structures
 
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+
 import '../../utils/pose_math_helpers.dart';
-import '../../utils/exercise_logger.dart';
-import '../../utils/debouncer.dart';
 import '../exercise_base.dart';
+import '../hold/rep_counted_hold_exercise.dart';
 import 'metrics/bear_plank_metric_base.dart';
-import 'metrics/knee_hover_metric.dart';
 import 'metrics/flat_back_metric.dart';
+import 'metrics/knee_hover_metric.dart';
 import 'metrics/weight_distribution_metric.dart';
 
-class BearPlank extends ExerciseBase {
-  BearPlank({
-    required this.maxSeconds,
+class _BearPoseFrame {
+  const _BearPoseFrame({
+    required this.kneeHeightOffset,
+    required this.kneeAngle,
+    required this.backYOffset,
+    required this.shoulderWristXOffset,
+    required this.isHoveringForm,
   });
 
-  final int maxSeconds;
+  final double kneeHeightOffset;
+  final double kneeAngle;
+  final double backYOffset;
+  final double shoulderWristXOffset;
+  final bool isHoveringForm;
+}
+
+class BearPlank extends RepCountedHoldExercise {
+  BearPlank({
+    required super.maxHolds,
+    required super.holdSeconds,
+  });
+
+  int get maxSeconds => holdSeconds;
 
   @override
   Set<VikaImageOrientation> get supportedOrientations =>
@@ -24,153 +41,159 @@ class BearPlank extends ExerciseBase {
         VikaImageOrientation.landscapeRight,
       };
 
-  BearState bearState = BearState.setup;
-  BearState previousBearState = BearState.setup;
-
   int? _exerciseStartTimeMs;
-  int _totalHoverTimeMs = 0; // Tổng thời gian giữ form chuẩn
-  int? _lastFrameTimeMs;
-  bool _isTimeout = false;
-  bool _setCompletionLogged = false;
+  _BearPoseFrame? _sampledFrame;
 
-  final HoldSecondsAccumulator _holdSeconds = HoldSecondsAccumulator(const [
-    'knee_seconds',
-    'back_seconds',
-    'weight_seconds',
-  ]);
+  final List<Map<String, dynamic>> _telemetryLog = <Map<String, dynamic>>[];
 
-  // Telemetry Log
-  final List<Map<String, dynamic>> _telemetryLog = [];
-
-  // Metrics
   final KneeHoverMetric kneeMetric = KneeHoverMetric();
   final FlatBackMetric backMetric = FlatBackMetric();
   final WeightDistributionMetric weightMetric = WeightDistributionMetric();
-  late final List<BearMetricBase> _metrics = [
+
+  late final List<BearMetricBase> _metrics = <BearMetricBase>[
     kneeMetric,
     backMetric,
-    weightMetric
+    weightMetric,
   ];
-
-  // Debouncers
-  final Debouncer _hoverDebouncer = Debouncer(requiredFrames: 3);
-  final Debouncer _fatigueDebouncer = Debouncer(requiredFrames: 5);
 
   @override
   String get exerciseName => 'Bear Plank';
 
   @override
-  String get currentPhaseKey => bearState.name;
+  int get holdingDebounceFrames => 3;
+
+  @override
+  int get droppingDebounceFrames => 5;
 
   @override
   String get currentPhaseLabel {
-    switch (bearState) {
-      case BearState.setup:
-        return 'Setup (Vào vị trí)';
-      case BearState.hovering:
-        return 'Giữ tĩnh (Hold!)';
-      case BearState.fatiguing:
-        return 'Mất form/Hạ gối';
+    switch (phase) {
+      case HoldPhase.setup:
+        return 'Vào vị trí plank gấu';
+      case HoldPhase.holding:
+        return 'Giữ plank gấu';
+      case HoldPhase.dropping:
+        return 'Vào lại tư thế';
+      case HoldPhase.resting:
+        return 'Nghỉ';
+      case HoldPhase.reArming:
+        return 'Vào tư thế';
     }
   }
 
   @override
-  double? get liveHoldSeconds =>
-      bearState == BearState.hovering || bearState == BearState.fatiguing
-          ? _totalHoverTimeMs / 1000.0
-          : null;
+  List<FaultRecord> get liveFaults {
+    final sample = _sampledFrame;
+    if (sample == null) return const <FaultRecord>[];
+    if (phase != HoldPhase.holding && phase != HoldPhase.dropping) {
+      return const <FaultRecord>[];
+    }
 
-  @override
-  double? get liveHoldTargetSeconds => maxSeconds.toDouble();
+    final faults = <FaultRecord>[];
+    final kneeFaultType = sample.kneeHeightOffset < BearConfig.KNEE_HOVER_MIN
+        ? 'KneeTouchingFloor'
+        : sample.kneeHeightOffset > BearConfig.KNEE_HOVER_MAX
+            ? 'ButtTooHigh'
+            : null;
+    final kneeFault = _faultOfType(kneeMetric.faults, kneeFaultType);
+    if (kneeFault != null) faults.add(_mapFaultRecord(kneeFault));
+
+    if (phase == HoldPhase.holding && backMetric.isFaultingNow) {
+      final backFaultType = sample.backYOffset > BearConfig.BACK_SAG_THRESHOLD
+          ? 'BackSagging'
+          : sample.backYOffset < -BearConfig.BACK_ARCH_THRESHOLD
+              ? 'BackArching'
+              : null;
+      final backFault = _faultOfType(backMetric.faults, backFaultType);
+      if (backFault != null) faults.add(_mapFaultRecord(backFault));
+    }
+    if (phase == HoldPhase.holding && weightMetric.isFaultingNow) {
+      final weightFault = _faultOfType(weightMetric.faults, 'WeightForward');
+      if (weightFault != null) faults.add(_mapFaultRecord(weightFault));
+    }
+    return faults;
+  }
 
   @override
   GuidanceSignal? checkSafety(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     if (cameraFacing != CameraFacing.left &&
         cameraFacing != CameraFacing.right) {
+      interruptReArm();
       return const GuidanceSignal.turnSide();
     }
     if (_getLandmarks(landmarks) == null) {
+      interruptActiveHold(interruptedHoldFaultId);
+      interruptReArm();
       return const GuidanceSignal.bodyInFrame();
     }
     return null;
   }
 
-  // Điều kiện Setup chuẩn: Tay thẳng, đùi vuông góc, gối chạm hoặc sát đất
   @override
   bool isInStartPosition(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     final lm = _getLandmarks(landmarks);
     if (lm == null) return false;
 
     final kneeAngle = calculateAngleNormalized(
-        firstPoint: lm['hip']!, midPoint: lm['knee']!, lastPoint: lm['ankle']!);
-    // Đầu gối vuông góc 60-120 độ. Nếu lưng thẳng nữa thì mới cho bắt đầu.
+      firstPoint: lm['hip']!,
+      midPoint: lm['knee']!,
+      lastPoint: lm['ankle']!,
+    );
     return kneeAngle >= BearConfig.KNEE_ANGLE_SETUP_MIN &&
         kneeAngle <= BearConfig.KNEE_ANGLE_SETUP_MAX;
   }
 
   @override
-  void checkingPose(Map<PoseLandmarkType, PoseLandmark> smoothedLandmarks) {
+  Set<String> get faultSecondsKeys => const <String>{
+        'knee_seconds',
+        'back_seconds',
+        'weight_seconds',
+      };
+
+  @override
+  HoldPoseSample? samplePose(
+    Map<PoseLandmarkType, PoseLandmark> landmarks,
+  ) {
     final now = frameTimestampMs;
     _exerciseStartTimeMs ??= now;
-    final int dt = _lastFrameTimeMs != null ? (now - _lastFrameTimeMs!) : 0;
-    _lastFrameTimeMs = now;
 
-    if (now - _exerciseStartTimeMs! > BearConfig.MAX_SESSION_MS ||
-        _totalHoverTimeMs >= _targetHoverMs) {
-      _isTimeout = (now - _exerciseStartTimeMs! > BearConfig.MAX_SESSION_MS);
-      return;
-    }
-
-    final lm = _getLandmarks(smoothedLandmarks);
-    if (lm == null) {
-      _lastFrameTimeMs = null;
-      _holdSeconds.resetTick();
-      return;
-    }
+    final lm = _getLandmarks(landmarks);
+    if (lm == null) return null;
 
     final shoulder = lm['shoulder']!;
     final hip = lm['hip']!;
     final knee = lm['knee']!;
+    final ankle = lm['ankle']!;
     final wrist = lm['wrist']!;
 
-    final ankle = lm['ankle']!;
-
     scaleFactor = calculateDistance(shoulder, hip);
-    if (!scaleFactor.isFinite || scaleFactor <= 1e-6) {
-      _lastFrameTimeMs = null;
-      _holdSeconds.resetTick();
-      return;
-    }
+    if (!scaleFactor.isFinite || scaleFactor <= 1e-6) return null;
 
-    // Tính toán hình học
-    // Sàn là đường thẳng nối cổ tay (wrist) và cổ chân (ankle)
     double floorY;
     if ((ankle.x - wrist.x).abs() > 0.001) {
-      double t = (knee.x - wrist.x) / (ankle.x - wrist.x);
+      final t = (knee.x - wrist.x) / (ankle.x - wrist.x);
       floorY = wrist.y + t * (ankle.y - wrist.y);
     } else {
       floorY = wrist.y > ankle.y ? wrist.y : ankle.y;
     }
 
-    final kneeHeightOffset = floorY - knee.y; // Dương khi gối nhấc lên khỏi sàn
+    final kneeHeightOffset = (floorY - knee.y) / scaleFactor;
     final kneeAngle = calculateAngleNormalized(
-        firstPoint: hip, midPoint: knee, lastPoint: ankle);
-
-    // Signed: dương = shoulder thấp hơn hip (Y hướng xuống) → võng lưng
+      firstPoint: hip,
+      midPoint: knee,
+      lastPoint: ankle,
+    );
     final backYOffset = (shoulder.y - hip.y) / scaleFactor;
-
-    // Abs distance: vai chúi trước cổ tay
     final shoulderWristXOffset = (shoulder.x - wrist.x).abs() / scaleFactor;
-
-    // Chuẩn hóa knee height
-    final normKneeHeight = kneeHeightOffset / scaleFactor;
+    final isHoveringForm = kneeHeightOffset > BearConfig.KNEE_HOVER_MIN &&
+        kneeHeightOffset <= BearConfig.KNEE_HOVER_MAX &&
+        kneeAngle < BearConfig.KNEE_ANGLE_BUTT_UP;
 
     if (isDebugModeActive) {
-      // GHI LOG TELEMETRY
-      _telemetryLog.add({
+      _telemetryLog.add(<String, dynamic>{
         'timestamp': now,
-        'state': bearState.name,
-        'normKneeHeight': double.parse(normKneeHeight.toStringAsFixed(3)),
+        'state': phase.name,
+        'normKneeHeight': double.parse(kneeHeightOffset.toStringAsFixed(3)),
         'kneeAngle': double.parse(kneeAngle.toStringAsFixed(1)),
         'backYOffset': double.parse(backYOffset.toStringAsFixed(3)),
         'shoulderWristXOffset':
@@ -178,184 +201,165 @@ class BearPlank extends ExerciseBase {
       });
     }
 
-    final ctx = BearRepContext(
-      kneeHeightOffset: normKneeHeight,
+    _sampledFrame = _BearPoseFrame(
+      kneeHeightOffset: kneeHeightOffset,
       kneeAngle: kneeAngle,
       backYOffset: backYOffset,
       shoulderWristXOffset: shoulderWristXOffset,
+      isHoveringForm: isHoveringForm,
+    );
+
+    return HoldPoseSample(
+      insideOuterEntry: isHoveringForm,
+      outsideOuterExit: !isHoveringForm,
+    );
+  }
+
+  @override
+  Map<String, bool> updateFormMetrics() {
+    final sample = _sampledFrame!;
+    final context = BearRepContext(
+      kneeHeightOffset: sample.kneeHeightOffset,
+      kneeAngle: sample.kneeAngle,
+      backYOffset: sample.backYOffset,
+      shoulderWristXOffset: sample.shoulderWristXOffset,
       scaleFactor: scaleFactor,
-      currentState: bearState,
-      frameTimestampMs: now,
+      currentState: _legacyStateFor(phase),
+      frameTimestampMs: frameTimestampMs,
       resultIssues: resultIssues,
     );
 
-    // Cập nhật State Machine
-    _updateStateMachine(ctx, now, dt);
-
-    repCount = _totalHoverTimeMs ~/ 1000;
-
-    // Cập nhật Metrics (chỉ khi đang hovering)
-    for (var metric in _metrics) {
-      metric.update(ctx);
+    for (final metric in _metrics) {
+      metric.update(context);
       debugData.addAll(metric.debugData);
     }
 
-    if (bearState == BearState.hovering) {
-      _holdSeconds.accumulate(
-        elapsedMs: elapsedMs,
-        faultingByKey: {
-          'knee_seconds': kneeMetric.isFaultingNow,
-          'back_seconds': backMetric.isFaultingNow,
-          'weight_seconds': weightMetric.isFaultingNow,
-        },
-      );
-    } else {
-      _holdSeconds.resetTick();
-    }
-
-    // UI Data
-    debugData['State'] = bearState.name;
+    debugData['State'] = phase.name;
     debugData['Hover_Time'] =
-        '${(_totalHoverTimeMs / 1000).toStringAsFixed(1)}s / ${maxSeconds}s';
+        '${(timerMetric.totalHoldingTimeMs / 1000).toStringAsFixed(1)}s / ${holdSeconds}s';
+
+    return <String, bool>{
+      'knee_seconds': kneeMetric.isFaultingNow,
+      'back_seconds': backMetric.isFaultingNow,
+      'weight_seconds': weightMetric.isFaultingNow,
+    };
   }
 
-  void _updateStateMachine(BearRepContext ctx, int now, int dt) {
-    bool isHoveringForm = ctx.kneeHeightOffset > BearConfig.KNEE_HOVER_MIN &&
-        ctx.kneeHeightOffset <= BearConfig.KNEE_HOVER_MAX &&
-        ctx.kneeAngle < BearConfig.KNEE_ANGLE_BUTT_UP;
-
-    final hasCleanBack = ctx.backYOffset <= BearConfig.BACK_SAG_THRESHOLD &&
-        ctx.backYOffset >= -BearConfig.BACK_ARCH_THRESHOLD;
-    final hasCleanWeight =
-        ctx.shoulderWristXOffset <= BearConfig.WEIGHT_SHIFT_THRESHOLD;
-    final isFullyCleanHold = isHoveringForm && hasCleanBack && hasCleanWeight;
-    bool isFatiguedForm = !isFullyCleanHold;
-
-    switch (bearState) {
-      case BearState.setup:
-        if (_hoverDebouncer.update(isHoveringForm)) {
-          _transitionState(BearState.hovering, now);
-        }
-        break;
-      case BearState.hovering:
-        // Chỉ cộng thời gian khi form thực sự chuẩn (chưa bị fatigue)
-        if (isFullyCleanHold) {
-          _totalHoverTimeMs += dt;
-        }
-
-        if (_fatigueDebouncer.update(isFatiguedForm)) {
-          // Reset metrics khi kết thúc hold cycle
-          for (var metric in _metrics) {
-            metric.resetAndCountFault();
-          }
-          _transitionState(BearState.fatiguing, now);
-        }
-        break;
-      case BearState.fatiguing:
-        if (_hoverDebouncer.update(isHoveringForm)) {
-          _transitionState(BearState.hovering, now);
-        }
-        break;
+  @override
+  Map<String, FaultRecord> snapshotHoldFaults() {
+    final faults = <String, FaultRecord>{};
+    for (final metric in _metrics) {
+      for (final fault in metric.faults) {
+        final mapped = _mapFaultRecord(fault);
+        faults[mapped.type] = mapped;
+      }
     }
+    return faults;
   }
 
-  void _transitionState(BearState newState, int now) {
-    previousBearState = bearState;
-    bearState = newState;
-    _hoverDebouncer.reset();
-    _fatigueDebouncer.reset();
-    for (var metric in _metrics) {
-      metric.onStateTransition(previousBearState, newState, now);
+  @override
+  void resetFormMetrics({required bool countFaults}) {
+    for (final metric in _metrics) {
+      if (countFaults) {
+        metric.resetAndCountFault();
+      } else {
+        metric.reset();
+      }
     }
   }
 
   @override
-  bool requestStop() => _totalHoverTimeMs >= _targetHoverMs || _isTimeout;
-
-  @override
-  Map<String, String> processNoPoseFrame() {
-    _lastFrameTimeMs = null;
-    _holdSeconds.resetTick();
-    return super.processNoPoseFrame();
+  void onHoldPhaseChanged(
+    HoldPhase previous,
+    HoldPhase next,
+    int nowMs,
+  ) {
+    final oldState = _legacyStateFor(previous);
+    final newState = _legacyStateFor(next);
+    for (final metric in _metrics) {
+      metric.onStateTransition(oldState, newState, nowMs);
+    }
   }
 
   @override
-  void onExerciseActivated() {
-    super.onExerciseActivated();
-    _resetSetState();
+  Map<String, dynamic> holdRepLogExtras() => <String, dynamic>{
+        'perfect_hold_time': timerMetric.totalHoldingTimeMs / 1000.0,
+      };
+
+  @override
+  void onHoldSetReset() {
+    _exerciseStartTimeMs = null;
+    _sampledFrame = null;
+    _telemetryLog.clear();
   }
 
   @override
   void onSetComplete() {
-    final allFaults = <FaultRecord>[
-      ...kneeMetric.faults,
-      ...backMetric.faults,
-      ...weightMetric.faults,
-    ];
-    final holdCorrect = _totalHoverTimeMs >= _targetHoverMs &&
-        !allFaults.any((f) => f.affectsForm);
-
-    // Đẩy dữ liệu tổng kết
-    final targetSeconds = maxSeconds.toDouble();
-    final goodSeconds = _holdSeconds.goodSeconds.clamp(0.0, targetSeconds);
-    // Target denominator for scoring, not elapsed hold time.
-    logger.pushKey("total_seconds", targetSeconds);
-    logger.pushKey("good_seconds", goodSeconds);
-    logger.pushKey("max_rep", 1);
-    logger.pushKey("total_hover_time_ms", _totalHoverTimeMs);
-    logger.pushKey("timeout_triggered", _isTimeout);
+    final targetSeconds = (maxHolds * holdSeconds).toDouble();
+    logger.pushKey('total_seconds', targetSeconds);
+    logger.pushKey('good_seconds', clampedGoodHoldSeconds(targetSeconds));
+    logger.pushKey('max_rep', maxHolds);
     logger.pushKey(
-        "knee_seconds", _holdSeconds.faultSecondsFor('knee_seconds'));
-    logger.pushKey(
-        "back_seconds", _holdSeconds.faultSecondsFor('back_seconds'));
-    logger.pushKey(
-        "weight_seconds", _holdSeconds.faultSecondsFor('weight_seconds'));
+      'total_hover_time_ms',
+      completedHoldingTimeMs + currentPartialHoldingTimeMs,
+    );
+    logger.pushKey('timeout_triggered', false);
+    logger.pushKey('knee_seconds', faultHoldSecondsFor('knee_seconds'));
+    logger.pushKey('back_seconds', faultHoldSecondsFor('back_seconds'));
+    logger.pushKey('weight_seconds', faultHoldSecondsFor('weight_seconds'));
 
     if (isDebugModeActive) {
-      logger.pushKey("telemetry_data", _telemetryLog); // Chìa khóa debug
+      logger.pushKey('telemetry_data', _telemetryLog);
     }
-
-    // Set kết quả (Form tốt nếu giữ trên 80% thời gian mục tiêu)
-    if (!_setCompletionLogged) {
-      logger.addRepLog(RepLog(
-        correctForm: holdCorrect,
-        repNumber: 1,
-        data: {
-          "perfect_hold_time": _totalHoverTimeMs / 1000.0,
-          "fault_types": allFaults.map((f) => f.type).toSet().toList(),
-        },
-      ));
-      _setCompletionLogged = true;
-    }
-
-    correctForm = holdCorrect;
     logger.pushGoodRepCount();
   }
 
-  int get _targetHoverMs => maxSeconds * 1000;
-
-  void _resetSetState() {
-    bearState = BearState.setup;
-    previousBearState = BearState.setup;
-    _exerciseStartTimeMs = null;
-    _totalHoverTimeMs = 0;
-    _lastFrameTimeMs = null;
-    _isTimeout = false;
-    _setCompletionLogged = false;
-    _holdSeconds.reset();
-    _telemetryLog.clear();
-    repCount = 0;
-    correctForm = true;
-    logger.clear();
-    _hoverDebouncer.reset();
-    _fatigueDebouncer.reset();
-    for (final metric in _metrics) {
-      metric.reset();
+  BearState _legacyStateFor(HoldPhase holdPhase) {
+    switch (holdPhase) {
+      case HoldPhase.holding:
+        return BearState.hovering;
+      case HoldPhase.dropping:
+        return BearState.fatiguing;
+      case HoldPhase.setup:
+      case HoldPhase.resting:
+      case HoldPhase.reArming:
+        return BearState.setup;
     }
   }
 
+  FaultRecord _mapFaultRecord(FaultRecord fault) {
+    final type = switch (fault.type) {
+      'KneeTouchingFloor' => 'knee_hover',
+      'ButtTooHigh' => 'hip_high',
+      'BackSagging' => 'back_sag',
+      'BackArching' => 'back_arch',
+      'WeightForward' => 'weight',
+      _ => fault.type,
+    };
+    return FaultRecord(
+      phase: phase.name,
+      type: type,
+      message: fault.message,
+      affectsForm: fault.affectsForm,
+      voiceMessage: fault.voiceMessage,
+      priority: fault.priority,
+    );
+  }
+
+  FaultRecord? _faultOfType(
+    Iterable<FaultRecord> faults,
+    String? type,
+  ) {
+    if (type == null) return null;
+    for (final fault in faults) {
+      if (fault.type == type) return fault;
+    }
+    return null;
+  }
+
   Map<String, PoseLandmark>? _getLandmarks(
-      Map<PoseLandmarkType, PoseLandmark> landmarks) {
+    Map<PoseLandmarkType, PoseLandmark> landmarks,
+  ) {
     final lShoulder = landmarks[PoseLandmarkType.leftShoulder];
     final lHip = landmarks[PoseLandmarkType.leftHip];
     final lKnee = landmarks[PoseLandmarkType.leftKnee];
@@ -368,21 +372,20 @@ class BearPlank extends ExerciseBase {
     final rAnkle = landmarks[PoseLandmarkType.rightAnkle];
     final rWrist = landmarks[PoseLandmarkType.rightWrist];
 
-    // Chọn bên có likelihood hông cao hơn, fallback nếu 1 bên null
     if (lShoulder != null &&
         lHip != null &&
         lKnee != null &&
         lAnkle != null &&
         lWrist != null &&
-        [lShoulder, lHip, lKnee, lAnkle, lWrist]
+        <PoseLandmark>[lShoulder, lHip, lKnee, lAnkle, lWrist]
             .every(ExerciseBase.isLandmarkConfident)) {
       if (rHip == null || lHip.likelihood >= rHip.likelihood) {
-        return {
+        return <String, PoseLandmark>{
           'shoulder': lShoulder,
           'hip': lHip,
           'knee': lKnee,
           'ankle': lAnkle,
-          'wrist': lWrist
+          'wrist': lWrist,
         };
       }
     }
@@ -391,30 +394,29 @@ class BearPlank extends ExerciseBase {
         rKnee != null &&
         rAnkle != null &&
         rWrist != null &&
-        [rShoulder, rHip, rKnee, rAnkle, rWrist]
+        <PoseLandmark>[rShoulder, rHip, rKnee, rAnkle, rWrist]
             .every(ExerciseBase.isLandmarkConfident)) {
-      return {
+      return <String, PoseLandmark>{
         'shoulder': rShoulder,
         'hip': rHip,
         'knee': rKnee,
         'ankle': rAnkle,
-        'wrist': rWrist
+        'wrist': rWrist,
       };
     }
-    // Fallback to left if right failed but left was available
     if (lShoulder != null &&
         lHip != null &&
         lKnee != null &&
         lAnkle != null &&
         lWrist != null &&
-        [lShoulder, lHip, lKnee, lAnkle, lWrist]
+        <PoseLandmark>[lShoulder, lHip, lKnee, lAnkle, lWrist]
             .every(ExerciseBase.isLandmarkConfident)) {
-      return {
+      return <String, PoseLandmark>{
         'shoulder': lShoulder,
         'hip': lHip,
         'knee': lKnee,
         'ankle': lAnkle,
-        'wrist': lWrist
+        'wrist': lWrist,
       };
     }
     return null;
